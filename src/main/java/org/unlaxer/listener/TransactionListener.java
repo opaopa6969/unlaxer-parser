@@ -1,6 +1,7 @@
 package org.unlaxer.listener;
 
 import java.util.Arrays;
+import java.util.List;
 
 import org.unlaxer.Token;
 import org.unlaxer.TokenList;
@@ -13,8 +14,16 @@ public interface TransactionListener extends BreakPointHolder{
 	public void setLevel(OutputLevel level);
 	public void onOpen(ParseContext parseContext);
 	public void onBegin(ParseContext parseContext , Parser parser);
-	public void onCommit(ParseContext parseContext , Parser parser , TokenList committedTokens);
-	public void onRollback(ParseContext parseContext , Parser parser, TokenList rollbackedTokens);
+	public default void onCommit(ParseContext parseContext , Parser parser , TokenList committedTokens){
+		onCommit(parseContext, parser, (List<Token>) committedTokens);
+	}
+	public default void onRollback(ParseContext parseContext , Parser parser, TokenList rollbackedTokens){
+		onRollback(parseContext, parser, (List<Token>) rollbackedTokens);
+	}
+	@Deprecated
+	public default void onCommit(ParseContext parseContext , Parser parser , List<Token> committedTokens){}
+	@Deprecated
+	public default void onRollback(ParseContext parseContext , Parser parser, List<Token> rollbackedTokens){}
 	public void onClose(ParseContext parseContext);
 	
 	public default void onCommit(ParseContext parseContext , Parser parser , Token committedToken){
