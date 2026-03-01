@@ -2340,6 +2340,29 @@ if (result.isSucceeded()) {
 // Output: Error at position 2: Expected digit after '+' operator
 ```
 
+### Expected-Hint Mode (Choice Fallback)
+
+Use `ErrorMessageParser.expected(...)` when you want a `Choice` fallback that fails but injects a focused expected hint for diagnostics.
+
+```java
+Parser parser = new Chain(
+    Parser.get(DigitParser.class),
+    Parser.get(PlusParser.class),
+    new Choice(
+        Parser.get(DigitParser.class),
+        ErrorMessageParser.expected("expected: digit after '+'")
+    )
+);
+
+ParseContext context = new ParseContext(
+    StringSource.createRootSource("1+")
+);
+Parsed result = parser.parse(context);
+
+// Parse fails, diagnostics can read the custom expected hint.
+ParseFailureDiagnostics diagnostics = context.getParseFailureDiagnostics();
+```
+
 ### Use Case 1: Syntax Error Recovery
 
 Continue parsing after errors to find multiple issues:

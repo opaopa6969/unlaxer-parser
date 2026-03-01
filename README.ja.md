@@ -2340,6 +2340,29 @@ if (result.isSucceeded()) {
 // Output: Error at position 2: Expected digit after '+' operator
 ```
 
+### Expected-Hint モード（Choice フォールバック）
+
+`Choice` のフォールバックとして「失敗させつつ、診断向けの期待ヒントだけを注入したい」場合は `ErrorMessageParser.expected(...)` を使います。
+
+```java
+Parser parser = new Chain(
+    Parser.get(DigitParser.class),
+    Parser.get(PlusParser.class),
+    new Choice(
+        Parser.get(DigitParser.class),
+        ErrorMessageParser.expected("expected: digit after '+'")
+    )
+);
+
+ParseContext context = new ParseContext(
+    StringSource.createRootSource("1+")
+);
+Parsed result = parser.parse(context);
+
+// Parse は失敗し、diagnostics から custom expected hint を参照できる。
+ParseFailureDiagnostics diagnostics = context.getParseFailureDiagnostics();
+```
+
 ### Use Case 1: 構文エラー回復
 
 エラー後も継続して複数問題を検出します:

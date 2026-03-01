@@ -14,6 +14,7 @@ unlaxerパーサーコンビネータライブラリの内部構造を、TinyCal
 8. [完全トレース: var x set 10; sin(x) + sqrt(3.14)](08-trace-complex.md)
 9. [Lazyパーサーと再帰文法](09-lazy-and-recursion.md)
 10. [デバッグ・リスナーシステム](10-debug-system.md)
+11. [2.4.0互換レイヤーと診断拡張](11-compat-and-diagnostics.md)
 
 ## ソースコード
 
