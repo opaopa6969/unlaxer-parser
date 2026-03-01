@@ -20,11 +20,24 @@ public class Not extends ConstructedSingleChildParser {
 
 	@Override
 	public Parsed parse(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
-		
+
 		parseContext.startParse(this, parseContext, tokenKind, invertMatch);
-		Parsed parsed = getChild().parse(parseContext,tokenKind , invertMatch).negate();
-		parseContext.endParse(this , parsed, parseContext, tokenKind, invertMatch);
-		return parsed;
+
+		parseContext.begin(this);
+
+		Parsed parsed = getChild().parse(parseContext, TokenKind.matchOnly, invertMatch);
+
+		if (parsed.isSucceeded()) {
+			// child succeeded → Not fails; rollback any state changes
+			parseContext.rollback(this);
+			parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);
+			return Parsed.FAILED;
+		}
+
+		// child failed → Not succeeds; commit (no tokens consumed)
+		Parsed committed = new Parsed(parseContext.commit(this, TokenKind.matchOnly));
+		parseContext.endParse(this, committed, parseContext, tokenKind, invertMatch);
+		return committed;
 	}
 
 }
