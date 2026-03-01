@@ -28,6 +28,7 @@ import org.eclipse.lsp4j.SemanticTokensLegend;
 import org.eclipse.lsp4j.SemanticTokensParams;
 import org.eclipse.lsp4j.SemanticTokensWithRegistrationOptions;
 import org.eclipse.lsp4j.ServerCapabilities;
+import org.eclipse.lsp4j.SetTraceParams;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.eclipse.lsp4j.TextDocumentSyncKind;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
@@ -99,6 +100,10 @@ public class CalculatorLanguageServer implements LanguageServer, LanguageClientA
         return textDocumentService;
     }
 
+    @Override
+    public void setTrace(SetTraceParams params) {
+       // VS Code sends this notification; ignore it.
+    }
     @Override
     public WorkspaceService getWorkspaceService() {
         return new CalculatorWorkspaceService();
