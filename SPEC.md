@@ -1,5 +1,13 @@
 # UBNF Spec Notes (Working Draft)
 
+> **Note**: この文書の内容は `specs/` ディレクトリに移動・拡充されました。
+> - アノテーション仕様 → [specs/annotations.md](specs/annotations.md)
+> - CLI 仕様 → [specs/cli.md](specs/cli.md)
+> - バリデーション仕様 → [specs/validation.md](specs/validation.md)
+> - その他の仕様 → [specs/overview.md](specs/overview.md)
+>
+> この文書は参照用として残されていますが、規範的な仕様は `specs/` を参照してください。
+
 This document defines behavior that users should be able to rely on when writing grammars for `unlaxer-dsl`.
 
 ## Scope
