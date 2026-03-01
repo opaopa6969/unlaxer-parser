@@ -2,6 +2,7 @@ package org.unlaxer;
 
 import java.io.Serializable;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,10 @@ public class Token implements Serializable{
 					token->TokenPrinter.get(token,0,OutputLevel.detail,false));
 	
 	public final Source source;
+	@Deprecated
+	public final Optional<String> tokenString;
+	@Deprecated
+	public final Range tokenRange;
 	public Parser parser;
 	
 	public Optional<Token> parent;
@@ -54,6 +59,21 @@ public class Token implements Serializable{
 		this(tokenKind , token , parser , new TokenList());
 	}
 	
+	@Deprecated
+	public Token(TokenKind tokenKind , List<? extends Token> tokens , Parser parser) {
+		this(tokenKind, TokenList.of(new ArrayList<>(tokens)), parser);
+	}
+	
+	@Deprecated
+	public Token(TokenKind tokenKind , List<? extends Token> tokens , Parser parser , int position) {
+		this(tokenKind, TokenList.of(new ArrayList<>(tokens)), parser);
+	}
+	
+	@Deprecated
+	public Token(TokenKind tokenKind , Source token, Parser parser , int position) {
+		this(tokenKind, token, parser);
+	}
+	
 	public Token(TokenKind tokenKind , TokenList tokens , Parser parser) {
 		this(tokenKind , 
 			tokens.toSource(SourceKind.subSource),
@@ -70,6 +90,8 @@ public class Token implements Serializable{
 		super();
 		this.tokenKind = tokenKind;
 		this.source = token;
+		this.tokenString = token == null ? Optional.empty() : token.nonEmptyString();
+		this.tokenRange = token == null ? Range.invalidRange() : token.cursorRange().toRange();
 		this.parser = parser;
 		this.originalChildren = children;
 		parent= Optional.empty();
@@ -119,6 +141,25 @@ public class Token implements Serializable{
 	
 	public Source getSource() {
 		return source;
+	}
+	
+	@Deprecated
+	public Optional<String> getToken() {
+		return tokenString;
+	}
+	
+	@Deprecated
+	public Range getTokenRange() {
+		return tokenRange;
+	}
+	
+	@Deprecated
+	public RangedString getRangedString() {
+		if (source == null) {
+			return new RangedString(0, "");
+		}
+		int start = source.cursorRange().startIndexInclusive.position().value();
+		return new RangedString(start, source.sourceAsString());
 	}
 	
 	public Parser getParser(){
@@ -254,6 +295,11 @@ public class Token implements Serializable{
 		Token newToken = new Token(tokenKind , newChildrens , parser)
 				.setParent(parent);
 		return newToken;
+	}
+	
+	@Deprecated
+	public Token newCreatesOf(List<? extends Token> newChildrens) {
+		return newCreatesOf(TokenList.of(new ArrayList<>(newChildrens)));
 	}
 	
 	public Token newCreatesOf(Token... newChildrens) {

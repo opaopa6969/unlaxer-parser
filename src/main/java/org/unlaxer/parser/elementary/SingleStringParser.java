@@ -1,5 +1,7 @@
 package org.unlaxer.parser.elementary;
 
+import java.util.Optional;
+
 import org.unlaxer.CodePointIndex;
 import org.unlaxer.CodePointLength;
 import org.unlaxer.Name;
@@ -35,5 +37,28 @@ public abstract class SingleStringParser extends AbstractTokenParser implements 
 	}
 
 	public abstract boolean isMatch(String target);
+
+	@Override
+	public Optional<String> expectedDisplayText() {
+		return detectSingleCharacter().map(this::quote);
+	}
+
+	Optional<String> detectSingleCharacter() {
+		String matched = null;
+		for (int codePoint = 32; codePoint <= 126; codePoint++) {
+			String candidate = Character.toString((char) codePoint);
+			if (isMatch(candidate)) {
+				if (matched != null) {
+					return Optional.empty();
+				}
+				matched = candidate;
+			}
+		}
+		return Optional.ofNullable(matched);
+	}
+
+	String quote(String token) {
+		return "'".concat(token).concat("'");
+	}
 	
 }

@@ -1,5 +1,7 @@
 package org.unlaxer;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.Predicate;
 
@@ -61,6 +63,11 @@ public class TypedToken<P extends Parser> extends Token{
 
 	public TypedToken<P> newCreatesOfTyped(TokenList newChildrens) {
 		return super.newCreatesOf(newChildrens).typed(parser);
+	}
+	
+	@Deprecated
+	public TypedToken<P> newCreatesOfTyped(List<? extends Token> newChildrens) {
+		return super.newCreatesOf(TokenList.of(new ArrayList<>(newChildrens))).typed(parser);
 	}
 
 	public TypedToken<P> newCreatesOfTyped(Token... newChildrens) {

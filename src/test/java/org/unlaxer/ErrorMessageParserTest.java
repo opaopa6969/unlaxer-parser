@@ -7,6 +7,7 @@ import java.util.List;
 
 import org.junit.Test;
 import org.unlaxer.listener.OutputLevel;
+import org.unlaxer.context.ParseFailureDiagnostics;
 import org.unlaxer.parser.ErrorMessageParser;
 import org.unlaxer.parser.ascii.PlusParser;
 import org.unlaxer.parser.combinator.Chain;
@@ -63,5 +64,29 @@ public class ErrorMessageParserTest extends ParserTestBase{
 		System.out.println(JSON.encode(errorMessages));
 
 
+	}
+
+	@Test
+	public void expectedHintModeReportsCustomHintOnFailure() {
+
+		String customHint = "expected: digit after '+'";
+		Chain parser = new Chain(
+			new DigitParser(),
+			new PlusParser(),
+			new Choice(
+				new DigitParser(),
+				ErrorMessageParser.expected(customHint)
+			)
+		);
+
+		TestResult result = testUnMatch(parser, "1+");
+		assertTrue(result.parsed.isFailed());
+
+		ParseFailureDiagnostics diagnostics = result.parseContext.getParseFailureDiagnostics();
+		boolean hasCustomHint = diagnostics.getExpectedHintCandidates().stream()
+			.map(ParseFailureDiagnostics.ExpectedHintCandidate::getDisplayHint)
+			.anyMatch(customHint::equals);
+
+		assertTrue(hasCustomHint);
 	}
 }

@@ -26,6 +26,15 @@ public class StringSource implements Source {
   private final CursorRange cursorRange;
   
   
+  /**
+   * Backward-compatibility constructor for legacy callers.
+   * Equivalent to {@link #createRootSource(String)}.
+   */
+  @Deprecated
+  public StringSource(String source) {
+    this(source, SourceKind.root, null, new CodePointOffset(0));
+  }
+  
   public static StringSource create(String source , SourceKind sourceKind) {
     if(sourceKind == SourceKind.subSource) {
       throw new IllegalArgumentException();

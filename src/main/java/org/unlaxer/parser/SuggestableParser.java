@@ -14,7 +14,7 @@ import org.unlaxer.TransactionElement;
 import org.unlaxer.context.ParseContext;
 import org.unlaxer.parser.elementary.AbstractTokenParser;
 
-public abstract class SuggestableParser extends AbstractTokenParser {
+public abstract class SuggestableParser extends AbstractTokenParser implements TerminalSymbol {
 	
 	private static final long serialVersionUID = -7966896868712698646L;
 	
@@ -83,10 +83,30 @@ public abstract class SuggestableParser extends AbstractTokenParser {
 	}
 	
 	public abstract String getSuggestString(String matchedString);
-	
+
+	@Override
+	public Optional<String> expectedDisplayText() {
+		if(targetStrings.isEmpty()){
+			return Optional.empty();
+		}
+		return Optional.of(quote(targetStrings.get(0).toString()));
+	}
+
+	@Override
+	public List<String> expectedDisplayTexts() {
+		return targetStrings.stream()
+		    .map(Source::toString)
+		    .map(this::quote)
+		    .collect(Collectors.toList());
+	}
+
 	boolean equals(String targetString , String baseString){
 		return ignoreCase ? 
 				targetString.equalsIgnoreCase(baseString):
 				targetString.equals(baseString);
+	}
+
+	String quote(String token){
+		return "'".concat(token).concat("'");
 	}
 }

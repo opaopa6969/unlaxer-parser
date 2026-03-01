@@ -1,5 +1,6 @@
 package org.unlaxer.parser.elementary;
 
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
@@ -134,6 +135,17 @@ public class WordParser extends AbstractTokenParser implements TerminalSymbol{
 	public String toString() {
 		return "wordParser("+word+")";
 	}; 
+	
+  @Override
+  public Optional<String> expectedDisplayText() {
+    return Optional.of("'" + escape(word.sourceAsString()) + "'");
+  }
+
+  private String escape(String value) {
+    return value
+        .replace("\\", "\\\\")
+        .replace("'", "\\'");
+  }
 	
 	
 }
