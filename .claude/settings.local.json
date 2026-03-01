@@ -3,7 +3,12 @@
     "allow": [
       "Bash(mvn test:*)",
       "Bash(mvn -Dtest=CalculatorLspTest test -Dgpg.skip=true)",
-      "Bash(mvn test-compile:*)"
+      "Bash(mvn test-compile:*)",
+      "Bash(mvn -f:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git config:*)",
+      "Bash(git push)"
     ]
   }
 }

@@ -5,7 +5,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.unlaxer</groupId>
 	<artifactId>unlaxer-common</artifactId>
-	<version>2.2.0</version>
+	<version>2.5.0</version>
 	<name>unlaxer-common</name>
 	<packaging>jar</packaging>
 	<url>https://bitbucket.org/opaopa6969/unlaxer/src/master/</url>
