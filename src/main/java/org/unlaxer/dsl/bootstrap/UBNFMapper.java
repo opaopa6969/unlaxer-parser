@@ -162,12 +162,23 @@ public class UBNFMapper {
     static TokenDecl toTokenDecl(Token token) {
         List<Token> identifiers = findDescendants(token, UBNFParsers.IdentifierParser.class);
         String name = identifiers.size() > 0 ? identifiers.get(0).source.toString().trim() : "";
-        // parserClass は TokenDecl の末尾要素で、trailing SPACE がコメントを消費することがある。
-        // IdentifierParser が一致する文字は [A-Za-z_][A-Za-z0-9_]* のみなので
-        // 最初の空白文字以降を除去して純粋なクラス名だけを取り出す。
-        String parserClass = identifiers.size() > 1
-            ? firstWord(identifiers.get(1).source.toString())
-            : "";
+
+        // QualifiedClassNameParser ノードからドット区切りクラス名を再構築する。
+        // IDENTIFIER { '.' IDENTIFIER } の各 Identifier を "." で結合する。
+        List<Token> qualifiedTokens = findDescendants(token, UBNFParsers.QualifiedClassNameParser.class);
+        String parserClass;
+        if (!qualifiedTokens.isEmpty()) {
+            List<Token> segments = findDescendants(qualifiedTokens.get(0), UBNFParsers.IdentifierParser.class);
+            parserClass = segments.stream()
+                .map(t -> t.source.toString().trim())
+                .filter(s -> !s.isEmpty())
+                .collect(java.util.stream.Collectors.joining("."));
+        } else {
+            // フォールバック: 旧形式（単純 IDENTIFIER）
+            parserClass = identifiers.size() > 1
+                ? firstWord(identifiers.get(1).source.toString())
+                : "";
+        }
         return new TokenDecl(name, parserClass);
     }
 

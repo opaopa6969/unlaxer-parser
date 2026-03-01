@@ -338,7 +338,7 @@ public class UBNFParsers {
 
     /**
      * TokenDecl: 'token' IDENTIFIER '=' CLASS_NAME
-     * CLASS_NAME は IDENTIFIER と同じ構文（先頭大文字は意味的制約のみ）
+     * CLASS_NAME は IDENTIFIER { '.' IDENTIFIER } (完全修飾名も可)
      */
     public static class TokenDeclParser extends UBNFLazyChain {
         private static final long serialVersionUID = 1L;
@@ -349,7 +349,36 @@ public class UBNFParsers {
                 new WordParser("token"),
                 Parser.get(IdentifierParser.class),
                 Parser.get(EqualParser.class),
-                Parser.get(IdentifierParser.class)
+                Parser.get(QualifiedClassNameParser.class)
+            );
+        }
+    }
+
+    /**
+     * QualifiedClassNameParser: IDENTIFIER { '.' IDENTIFIER }
+     * 完全修飾Javaクラス名（例: org.unlaxer.parser.clang.IdentifierParser）を
+     * ドット区切りで解析する。
+     */
+    public static class QualifiedClassNameParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                Parser.get(IdentifierParser.class),
+                new ZeroOrMore(
+                    new UBNFLazyChain() {
+                        private static final long serialVersionUID = 1L;
+
+                        @Override
+                        public Parsers getLazyParsers() {
+                            return new Parsers(
+                                Parser.get(PointParser.class),
+                                Parser.get(IdentifierParser.class)
+                            );
+                        }
+                    }
+                )
             );
         }
     }
