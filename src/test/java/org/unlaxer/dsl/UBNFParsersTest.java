@@ -340,6 +340,124 @@ public class UBNFParsersTest {
         assertTrue("'x'+ should parse successfully", parsed.isSucceeded());
     }
 
+    // =========================================================================
+    // ERROR element
+    // =========================================================================
+
+    @Test
+    public void testErrorElement() {
+        String input = "grammar G {\n"
+            + "  @whitespace: javaStyle\n"
+            + "  token ID = IdentifierParser\n"
+            + "  @root\n"
+            + "  Rule ::= ID | ERROR('expected identifier') ;\n"
+            + "}";
+        Parsed parsed = parse(UBNFParsers.getRootParser(), input);
+        assertTrue("ERROR('msg') should parse successfully", parsed.isSucceeded());
+    }
+
+    // =========================================================================
+    // Token keywords: ANY, EOF, EMPTY, CHAR_RANGE, CI
+    // =========================================================================
+
+    @Test
+    public void testTokenDecl_any() {
+        Parsed parsed = parse(Parser.get(UBNFParsers.TokenDeclParser.class),
+            "token ANY_CHAR = ANY");
+        assertTrue(parsed.isSucceeded());
+    }
+
+    @Test
+    public void testTokenDecl_eof() {
+        Parsed parsed = parse(Parser.get(UBNFParsers.TokenDeclParser.class),
+            "token FILE_END = EOF");
+        assertTrue(parsed.isSucceeded());
+    }
+
+    @Test
+    public void testTokenDecl_empty() {
+        Parsed parsed = parse(Parser.get(UBNFParsers.TokenDeclParser.class),
+            "token EMPTY_MATCH = EMPTY");
+        assertTrue(parsed.isSucceeded());
+    }
+
+    @Test
+    public void testTokenDecl_charRange() {
+        Parsed parsed = parse(Parser.get(UBNFParsers.TokenDeclParser.class),
+            "token LOWER = CHAR_RANGE('a','z')");
+        assertTrue(parsed.isSucceeded());
+    }
+
+    @Test
+    public void testTokenDecl_caseInsensitive() {
+        Parsed parsed = parse(Parser.get(UBNFParsers.TokenDeclParser.class),
+            "token KW_IF = CI('if')");
+        assertTrue(parsed.isSucceeded());
+    }
+
+    // =========================================================================
+    // @doc annotation
+    // =========================================================================
+
+    @Test
+    public void testAnnotation_doc() {
+        Parsed parsed = parse(Parser.get(UBNFParsers.AnnotationParser.class),
+            "@doc('this rule parses an expression')");
+        assertTrue(parsed.isSucceeded());
+    }
+
+    // =========================================================================
+    // Bounded quantifiers: {n}  {n,m}  {n,}
+    // =========================================================================
+
+    @Test
+    public void testAnnotatedElement_exactQuantifier() {
+        String input = "grammar G {\n"
+            + "  @whitespace: javaStyle\n"
+            + "  token ID = IdentifierParser\n"
+            + "  @root\n"
+            + "  Rule ::= ID{3} ;\n"
+            + "}";
+        Parsed parsed = parse(UBNFParsers.getRootParser(), input);
+        assertTrue("ID{3} should parse successfully", parsed.isSucceeded());
+    }
+
+    @Test
+    public void testAnnotatedElement_rangeQuantifier() {
+        String input = "grammar G {\n"
+            + "  @whitespace: javaStyle\n"
+            + "  token ID = IdentifierParser\n"
+            + "  @root\n"
+            + "  Rule ::= ID{1,3} ;\n"
+            + "}";
+        Parsed parsed = parse(UBNFParsers.getRootParser(), input);
+        assertTrue("ID{1,3} should parse successfully", parsed.isSucceeded());
+    }
+
+    @Test
+    public void testAnnotatedElement_openEndedQuantifier() {
+        String input = "grammar G {\n"
+            + "  @whitespace: javaStyle\n"
+            + "  token ID = IdentifierParser\n"
+            + "  @root\n"
+            + "  Rule ::= ID{2,} ;\n"
+            + "}";
+        Parsed parsed = parse(UBNFParsers.getRootParser(), input);
+        assertTrue("ID{2,} should parse successfully", parsed.isSucceeded());
+    }
+
+    @Test
+    public void testAnnotatedElement_asteriskQuantifier() {
+        String input = "grammar G {\n"
+            + "  @whitespace: javaStyle\n"
+            + "  token ID = IdentifierParser\n"
+            + "  @root\n"
+            + "  Rule ::= ID* ;\n"
+            + "}";
+        Parsed parsed = parse(UBNFParsers.getRootParser(), input);
+        assertTrue("ID* should parse successfully", parsed.isSucceeded());
+    }
+
     @Test
     public void testAnnotatedElement_plusWithCapture() {
         String input = "grammar G {\n"

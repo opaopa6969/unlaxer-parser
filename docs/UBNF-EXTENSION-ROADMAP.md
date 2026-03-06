@@ -1,7 +1,7 @@
 # UBNF 拡張ロードマップ
 
 > ステータス: draft
-> 最終更新: 2026-03-07
+> 最終更新: 2026-03-07 (T1-4, T2-1〜T2-3, T3-1, T3-2, T4-1〜T4-6 完了)
 > 関連: [specs/ubnf-syntax.md](../specs/ubnf-syntax.md) · [specs/open-questions.md](../specs/open-questions.md)
 
 ## 概要
@@ -16,16 +16,18 @@ UBNF の表現力を段階的に ANTLR/EBNF 水準に引き上げるためのロ
 ```
 ✅ grammar 宣言
 ✅ token 宣言（ParserClass 形式）
-✅ token 宣言（UNTIL 形式）  ← v0.2 で実装済み
+✅ token 宣言（UNTIL 形式）
+✅ token 宣言（NEGATION 形式）
+✅ token 宣言（LOOKAHEAD 形式）
+✅ token 宣言（NEGATIVE_LOOKAHEAD 形式）
 ✅ rule 宣言
 ✅ シーケンス（暗黙的）
 ✅ 選択肢 (|)
 ✅ グループ (...)
-✅ 0回以上 {...}
-✅ 1回以上 element+  ← v0.2 で実装済み
-✅ 0または1回 element?  ← v0.2 で実装済み
-✅ オプション [...]
-✅ リテラル '...'
+✅ 0回以上 {...} / element*
+✅ 1回以上 element+
+✅ 0または1回 element? / [...]
+✅ リテラル '...'（エスケープ \n \t \r \\ \' 対応）
 ✅ キャプチャ @name
 ✅ アノテーション @root, @mapping, @whitespace など
 ✅ コメント (//)
@@ -92,9 +94,9 @@ rule maybeSign ::= sign? ;
 
 ---
 
-### T1-4: エスケープシーケンス完全化
+### T1-4: エスケープシーケンス完全化 ✅ 実装済み
 
-**ステータス**: 部分実装（`\\` のみ動作未確認）
+**ステータス**: 実装済み
 **優先度**: High — リテラル内で `\n` `\t` `\'` が使えない
 
 **設計案**:
@@ -116,9 +118,9 @@ token SINGLE_Q = '\''
 
 ## Tier 2 — 強く推奨（次々リリース）
 
-### T2-1: `NEGATION` キーワード
+### T2-1: `NEGATION` キーワード ✅ 実装済み
 
-**ステータス**: 未実装
+**ステータス**: 実装済み
 **優先度**: Medium
 
 **設計案**:
@@ -140,9 +142,9 @@ token NOT_WHITESPACE = NEGATION(' \t\n\r')
 
 ---
 
-### T2-2: `LOOKAHEAD` キーワード
+### T2-2: `LOOKAHEAD` キーワード ✅ 実装済み
 
-**ステータス**: 未実装
+**ステータス**: 実装済み
 **優先度**: Medium-Low
 
 **設計案**:
@@ -160,9 +162,9 @@ token FOLLOWED_BY_COLON = LOOKAHEAD(':')
 
 ---
 
-### T2-3: `NEGATIVE_LOOKAHEAD` キーワード
+### T2-3: `NEGATIVE_LOOKAHEAD` キーワード ✅ 実装済み
 
-**ステータス**: 未実装
+**ステータス**: 実装済み
 **優先度**: Medium-Low
 
 **設計案**:
@@ -187,19 +189,22 @@ rule words ::= word{1,3} ;   // 1〜3回
 rule hex   ::= HEX{2}    ;   // ちょうど2回
 ```
 
-### T3-2: `*` postfix（{...} の別記法）
+### T3-2: `*` postfix（{...} の別記法）✅ 実装済み
+
+**ステータス**: 実装済み
 
 ```ubnf
 rule items ::= item* ;   // 既存の { item } と同義
 ```
 
-### T3-3: セマンティック述語
+### T3-3: セマンティック述語（保留）
 
 ```ubnf
 rule id ::= letter (letter | digit)* ?{ !isReservedWord($$) } ;
 ```
 
 **実装難度**: Very High（ランタイム Java コード埋め込み）
+**方針**: 要望があるまで保留
 
 ---
 
@@ -208,15 +213,24 @@ rule id ::= letter (letter | digit)* ?{ !isReservedWord($$) } ;
 | ID     | 機能                     | 優先度 | 工数 | ステータス  |
 |--------|--------------------------|--------|------|-------------|
 | T1-1   | `UNTIL` キーワード        | ✅     | —    | **完了**    |
-| T1-2   | `+` 演算子               | High   | M    | 未実装      |
-| T1-3   | `?` 演算子               | High   | S    | 未実装      |
-| T1-4   | エスケープシーケンス      | High   | S    | 部分実装    |
-| T2-1   | `NEGATION` キーワード     | Medium | M    | 未実装      |
-| T2-2   | `LOOKAHEAD` キーワード    | Med-Lo | S    | 未実装      |
-| T2-3   | `NEGATIVE_LOOKAHEAD`      | Med-Lo | M    | 未実装      |
-| T3-1   | `{n,m}` 定量化            | Low    | L    | 未実装      |
-| T3-2   | `*` postfix               | Low    | S    | 未実装      |
-| T3-3   | セマンティック述語        | Low    | XL   | 未実装      |
+| T1-2   | `+` 演算子               | ✅     | —    | **完了**    |
+| T1-3   | `?` 演算子               | ✅     | —    | **完了**    |
+| T1-4   | エスケープシーケンス      | ✅     | —    | **完了**    |
+| T2-1   | `NEGATION` キーワード     | ✅     | —    | **完了**    |
+| T2-2   | `LOOKAHEAD` キーワード    | ✅     | —    | **完了**    |
+| T2-3   | `NEGATIVE_LOOKAHEAD`      | ✅     | —    | **完了**    |
+| T3-1   | `{n,m}` 定量化            | ✅     | —    | **完了**    |
+| T3-2   | `*` postfix               | ✅     | —    | **完了**    |
+| T3-3   | セマンティック述語        | Low    | XL   | **保留**    |
+| T4-1   | `CHAR_RANGE('a','z')`     | ✅     | —    | **完了**    |
+| T4-2   | `ANY`                     | ✅     | —    | **完了**    |
+| T4-3   | `REGEX('pattern')`        | Low    | L    | 未実装      |
+| T4-4   | `CI('keyword')`           | ✅     | —    | **完了**    |
+| T4-5   | セパレータ糖衣 `%`         | Low    | M    | 未実装      |
+| T4-6   | `EOF` / `EMPTY`           | ✅     | —    | **完了**    |
+| T4-7   | `ERROR('msg')`            | ✅     | —    | **完了**    |
+| T4-8   | `@doc('text')`            | ✅     | —    | **完了**    |
+| T4-9   | `@skip`                   | Low    | M    | 未実装      |
 
 工数目安: S=数時間 / M=1-2日 / L=数日 / XL=1週間以上
 

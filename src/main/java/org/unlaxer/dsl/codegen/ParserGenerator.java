@@ -9,11 +9,14 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.InterleaveAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.LeftAssocAnnotation;
+import org.unlaxer.dsl.bootstrap.UBNFAST.BoundedRepeatElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.ErrorElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OneOrMoreElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OptionalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.PrecedenceAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RepeatElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RightAssocAnnotation;
+import org.unlaxer.dsl.bootstrap.UBNFAST.DocAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RootAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RuleBody;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RuleDecl;
@@ -56,6 +59,11 @@ public class ParserGenerator implements CodeGenerator {
         final Map<String, String> tokenNegationMap;     // token name -> excluded chars (Negation tokens only)
         final Map<String, String> tokenLookaheadMap;    // token name -> pattern (Lookahead tokens only)
         final Map<String, String> tokenNegLookaheadMap; // token name -> pattern (NegativeLookahead tokens only)
+        final Set<String> tokenAnySet;                  // token names backed by ANY
+        final Set<String> tokenEofSet;                  // token names backed by EOF
+        final Set<String> tokenEmptySet;                // token names backed by EMPTY
+        final Map<String, int[]> tokenCharRangeMap;     // token name -> [min char, max char]
+        final Map<String, String> tokenCIMap;           // token name -> word (CaseInsensitive)
         final Set<String> ruleNames;
         final Map<String, List<String>> helpers = new LinkedHashMap<>(); // rule -> helper codes
         final Map<String, Boolean> useDelimitedChainByRule = new LinkedHashMap<>();
@@ -72,13 +80,23 @@ public class ParserGenerator implements CodeGenerator {
             this.tokenNegationMap = new LinkedHashMap<>();
             this.tokenLookaheadMap = new LinkedHashMap<>();
             this.tokenNegLookaheadMap = new LinkedHashMap<>();
+            this.tokenAnySet = new LinkedHashSet<>();
+            this.tokenEofSet = new LinkedHashSet<>();
+            this.tokenEmptySet = new LinkedHashSet<>();
+            this.tokenCharRangeMap = new LinkedHashMap<>();
+            this.tokenCIMap = new LinkedHashMap<>();
             for (TokenDecl token : grammar.tokens()) {
                 switch (token) {
-                    case TokenDecl.Simple s           -> tokenParserMap.put(s.name(), s.parserClass());
-                    case TokenDecl.Until u            -> tokenUntilMap.put(u.name(), u.terminator());
-                    case TokenDecl.Negation n         -> tokenNegationMap.put(n.name(), n.excludedChars());
-                    case TokenDecl.Lookahead la       -> tokenLookaheadMap.put(la.name(), la.pattern());
+                    case TokenDecl.Simple s              -> tokenParserMap.put(s.name(), s.parserClass());
+                    case TokenDecl.Until u               -> tokenUntilMap.put(u.name(), u.terminator());
+                    case TokenDecl.Negation n            -> tokenNegationMap.put(n.name(), n.excludedChars());
+                    case TokenDecl.Lookahead la          -> tokenLookaheadMap.put(la.name(), la.pattern());
                     case TokenDecl.NegativeLookahead nla -> tokenNegLookaheadMap.put(nla.name(), nla.pattern());
+                    case TokenDecl.Any a                 -> tokenAnySet.add(a.name());
+                    case TokenDecl.Eof e                 -> tokenEofSet.add(e.name());
+                    case TokenDecl.Empty em              -> tokenEmptySet.add(em.name());
+                    case TokenDecl.CharRange cr          -> tokenCharRangeMap.put(cr.name(), new int[]{cr.min(), cr.max()});
+                    case TokenDecl.CaseInsensitive ci    -> tokenCIMap.put(ci.name(), ci.word());
                 }
             }
             this.ruleNames = grammar.rules().stream()
@@ -171,8 +189,9 @@ public class ParserGenerator implements CodeGenerator {
             sb.append(generateDelimitedChainClass(ctx));
         }
 
-        // NEGATION トークン用の生成 SingleCharacterParser 内部クラス
+        // NEGATION / CHAR_RANGE トークン用の生成 SingleCharacterParser 内部クラス
         sb.append(generateNegationClasses(ctx));
+        sb.append(generateCharRangeClasses(ctx));
 
         // Phase 2: 各ルールのヘルパー + ルールクラスを出力
         for (RuleDecl rule : grammar.rules()) {
@@ -475,6 +494,19 @@ public class ParserGenerator implements CodeGenerator {
                     ctx.addHelper(ruleName, helperCode);
                 }
             }
+            case BoundedRepeatElement bounded -> {
+                if (!isSingleRuleRef(bounded.body())) {
+                    int n = ctx.nextRepeat(ruleName);
+                    String helperName = ruleName + "Bounded" + n + "Parser";
+                    int[] before = ctx.snapshotCounters(ruleName);
+                    collectHelpersInBody(ctx, ruleName, bounded.body());
+                    int[] after = ctx.snapshotCounters(ruleName);
+                    ctx.restoreCounters(ruleName, before);
+                    String helperCode = generateHelperCode(ctx, ruleName, helperName, bounded.body());
+                    ctx.restoreCounters(ruleName, after);
+                    ctx.addHelper(ruleName, helperCode);
+                }
+            }
             case GroupElement g -> {
                 int n = ctx.nextGroup(ruleName);
                 String helperName = ruleName + "Group" + n + "Parser";
@@ -486,7 +518,7 @@ public class ParserGenerator implements CodeGenerator {
                 ctx.restoreCounters(ruleName, after);
                 ctx.addHelper(ruleName, helperCode);
             }
-            default -> {} // TerminalElement, RuleRefElement
+            default -> {} // TerminalElement, RuleRefElement, ErrorElement
         }
     }
 
@@ -534,6 +566,15 @@ public class ParserGenerator implements CodeGenerator {
 
         StringBuilder sb = new StringBuilder();
         String indent = "    ";
+
+        // @doc annotation → Javadoc comment
+        rule.annotations().stream()
+            .filter(a -> a instanceof DocAnnotation)
+            .map(a -> ((DocAnnotation) a).text())
+            .findFirst()
+            .ifPresent(docText -> {
+                sb.append(indent).append("/** ").append(docText).append(" */\n");
+            });
 
         sb.append(indent).append("public static class ").append(className);
         if (isChoice) {
@@ -724,11 +765,36 @@ public class ParserGenerator implements CodeGenerator {
                 }
             }
 
+            case BoundedRepeatElement bounded -> {
+                String minStr = String.valueOf(bounded.min());
+                String maxStr = bounded.max() == BoundedRepeatElement.UNBOUNDED
+                    ? "Integer.MAX_VALUE"
+                    : String.valueOf(bounded.max());
+                if (isSingleRuleRef(bounded.body())) {
+                    AtomicElement single = getSingleAtomicElementFrom(bounded.body());
+                    if (single instanceof RuleRefElement ref && isInlineToken(ctx, ref.name())) {
+                        // inline tokens don't have a .class reference — wrap in helper
+                        int n = ctx.nextRepeat(ruleName);
+                        String helperName = ruleName + "Bounded" + n + "Parser";
+                        yield "new Repeat(" + helperName + ".class, " + minStr + ", " + maxStr + ")";
+                    }
+                    String parserClass = getSingleRuleRefClass(ctx, bounded.body());
+                    yield "new Repeat(" + parserClass + ", " + minStr + ", " + maxStr + ")";
+                } else {
+                    int n = ctx.nextRepeat(ruleName);
+                    String helperName = ruleName + "Bounded" + n + "Parser";
+                    yield "new Repeat(" + helperName + ".class, " + minStr + ", " + maxStr + ")";
+                }
+            }
+
             case GroupElement g -> {
                 int n = ctx.nextGroup(ruleName);
                 String helperName = ruleName + "Group" + n + "Parser";
                 yield "Parser.get(" + helperName + ".class)";
             }
+
+            case ErrorElement err ->
+                "org.unlaxer.parser.ErrorMessageParser.expected(\"" + escapeString(err.message()) + "\")";
         };
     }
 
@@ -781,9 +847,12 @@ public class ParserGenerator implements CodeGenerator {
      * Until トークンには使用しないこと（resolveParserExpression を使う）。
      */
     private String resolveParserClass(GenContext ctx, String name) {
-        // Negation tokens → generated inner class name
+        // Negation / CharRange tokens → generated inner class name
         if (ctx.tokenNegationMap.containsKey(name)) {
             return toNegationParserName(name) + ".class";
+        }
+        if (ctx.tokenCharRangeMap.containsKey(name)) {
+            return toCharRangeParserName(name) + ".class";
         }
         String tokenClass = ctx.tokenParserMap.get(name);
         if (tokenClass != null) {
@@ -813,14 +882,74 @@ public class ParserGenerator implements CodeGenerator {
         if (nlaPattern != null) {
             return "new Not(new WordParser(\"" + escapeString(nlaPattern) + "\"))";
         }
+        if (ctx.tokenAnySet.contains(name)) {
+            return "new org.unlaxer.parser.elementary.WildCardCharacterParser()";
+        }
+        if (ctx.tokenEofSet.contains(name)) {
+            return "new org.unlaxer.parser.elementary.EndOfSourceParser()";
+        }
+        if (ctx.tokenEmptySet.contains(name)) {
+            return "new org.unlaxer.parser.elementary.EmptyParser()";
+        }
+        String ciWord = ctx.tokenCIMap.get(name);
+        if (ciWord != null) {
+            return "new org.unlaxer.parser.elementary.IgnoreCaseWordParser(\""
+                + escapeString(ciWord) + "\")";
+        }
         return "Parser.get(" + resolveParserClass(ctx, name) + ")";
     }
 
-    /** 指定名がインライン生成式トークン（Until/Lookahead/NegativeLookahead）かどうか */
+    /** 指定名がインライン生成式トークン（クラス参照を持たない）かどうか */
     private boolean isInlineToken(GenContext ctx, String name) {
         return ctx.tokenUntilMap.containsKey(name)
             || ctx.tokenLookaheadMap.containsKey(name)
-            || ctx.tokenNegLookaheadMap.containsKey(name);
+            || ctx.tokenNegLookaheadMap.containsKey(name)
+            || ctx.tokenAnySet.contains(name)
+            || ctx.tokenEofSet.contains(name)
+            || ctx.tokenEmptySet.contains(name)
+            || ctx.tokenCIMap.containsKey(name);
+    }
+
+    /**
+     * CHAR_RANGE トークン用の SingleCharacterParser 内部クラス群を生成する。
+     * 例: token LOWER = CHAR_RANGE('a','z')
+     *   → public static class LowerParser extends SingleCharacterParser { ... }
+     */
+    private String generateCharRangeClasses(GenContext ctx) {
+        if (ctx.tokenCharRangeMap.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<String, int[]> e : ctx.tokenCharRangeMap.entrySet()) {
+            String tokenName = e.getKey();
+            char min = (char) e.getValue()[0];
+            char max = (char) e.getValue()[1];
+            String className = toNegationParserName(tokenName); // same camelCase logic
+            sb.append("    // --- CHAR_RANGE parser for token ").append(tokenName).append(" ---\n");
+            sb.append("    public static class ").append(className)
+              .append(" extends org.unlaxer.parser.elementary.SingleCharacterParser {\n");
+            sb.append("        private static final long serialVersionUID = 1L;\n");
+            sb.append("        @Override\n");
+            sb.append("        public boolean isMatch(char target) {\n");
+            sb.append("            return target >= '").append(escapeChar(min))
+              .append("' && target <= '").append(escapeChar(max)).append("';\n");
+            sb.append("        }\n");
+            sb.append("    }\n\n");
+        }
+        return sb.toString();
+    }
+
+    private String escapeChar(char c) {
+        return switch (c) {
+            case '\'' -> "\\'";
+            case '\\' -> "\\\\";
+            case '\n' -> "\\n";
+            case '\t' -> "\\t";
+            case '\r' -> "\\r";
+            default   -> String.valueOf(c);
+        };
+    }
+
+    private String toCharRangeParserName(String tokenName) {
+        return toNegationParserName(tokenName); // same camelCase: LOWER → LowerParser
     }
 
     /**

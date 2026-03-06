@@ -18,6 +18,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.AtomicElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ChoiceBody;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.BoundedRepeatElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OneOrMoreElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OptionalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RepeatElement;
@@ -272,6 +273,8 @@ public class RailroadMain {
             collectReferences(repElem.body(), refs);
         } else if (elem instanceof OneOrMoreElement oneElem) {
             collectReferences(oneElem.body(), refs);
+        } else if (elem instanceof BoundedRepeatElement boundedElem) {
+            collectReferences(boundedElem.body(), refs);
         } else if (elem instanceof GroupElement grpElem) {
             collectReferences(grpElem.body(), refs);
         }

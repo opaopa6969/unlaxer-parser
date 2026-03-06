@@ -130,8 +130,17 @@ public class UBNFParsers {
         }
     }
 
+    public static class AsteriskParser extends SingleCharacterParser {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public boolean isMatch(char target) {
+            return '*' == target;
+        }
+    }
+
     /**
-     * PostfixQuantifier: '+' | '?'
+     * PostfixQuantifier: '+' | '?' | '*'
      * Appears optionally after an AtomicElement in AnnotatedElement.
      */
     public static class PostfixQuantifierParser extends LazyChoice {
@@ -141,7 +150,8 @@ public class UBNFParsers {
         public Parsers getLazyParsers() {
             return new Parsers(
                 Parser.get(PlusParser.class),
-                Parser.get(QuestionMarkParser.class)
+                Parser.get(QuestionMarkParser.class),
+                Parser.get(AsteriskParser.class)
             );
         }
 
@@ -157,6 +167,44 @@ public class UBNFParsers {
         @Override
         public boolean isMatch(char target) {
             return Character.isDigit(target);
+        }
+    }
+
+    /**
+     * BoundedQuantifier: '{' digits [',' digits?] '}'
+     * Matches:  {2}   {1,3}   {2,}
+     * Note: no whitespace is allowed inside {}.
+     */
+    public static class BoundedQuantifierParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                Parser.get(LeftBraceParser.class),
+                new OneOrMore(DigitParser.class),   // min digits
+                new org.unlaxer.parser.combinator.Optional(
+                    new LazyChain() {
+                        private static final long serialVersionUID = 1L;
+
+                        @Override
+                        public Parsers getLazyParsers() {
+                            return new Parsers(
+                                Parser.get(CommaParser.class),
+                                new org.unlaxer.parser.combinator.Optional(
+                                    new OneOrMore(DigitParser.class) // max digits (absent = unbounded)
+                                )
+                            );
+                        }
+                    }
+                ),
+                Parser.get(RightBraceParser.class)
+            );
+        }
+
+        @Override
+        public Optional<RecursiveMode> getNotAstNodeSpecifier() {
+            return Optional.empty();
         }
     }
 
@@ -447,9 +495,79 @@ public class UBNFParsers {
         }
     }
 
+    /** ANY — matches any single character (no arguments) */
+    public static class AnyKeywordParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(new WordParser("ANY"));
+        }
+    }
+
+    /** EOF — matches end of input (no arguments) */
+    public static class EofKeywordParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(new WordParser("EOF"));
+        }
+    }
+
+    /** EMPTY — always matches without consuming input (no arguments) */
+    public static class EmptyKeywordParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(new WordParser("EMPTY"));
+        }
+    }
+
+    /**
+     * CharRangeExpressionParser: CHAR_RANGE '(' STRING_LITERAL ',' STRING_LITERAL ')'
+     * 例: CHAR_RANGE('a','z')
+     */
+    public static class CharRangeExpressionParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                new WordParser("CHAR_RANGE"),
+                Parser.get(LeftParenthesisParser.class),
+                Parser.get(SingleQuotedParser.class),
+                Parser.get(CommaParser.class),
+                Parser.get(SingleQuotedParser.class),
+                Parser.get(RightParenthesisParser.class)
+            );
+        }
+    }
+
+    /**
+     * CIExpressionParser: CI '(' STRING_LITERAL ')'
+     * 例: CI('if') — case-insensitive keyword match
+     */
+    public static class CIExpressionParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                new WordParser("CI"),
+                Parser.get(LeftParenthesisParser.class),
+                Parser.get(SingleQuotedParser.class),
+                Parser.get(RightParenthesisParser.class)
+            );
+        }
+    }
+
     /**
      * TokenValueParser: UntilExpressionParser | NegationExpressionParser
      *                 | LookaheadExpressionParser | NegativeLookaheadExpressionParser
+     *                 | CharRangeExpressionParser | CIExpressionParser
+     *                 | AnyKeywordParser | EofKeywordParser | EmptyKeywordParser
      *                 | QualifiedClassNameParser
      */
     public static class TokenValueParser extends LazyChoice {
@@ -462,6 +580,11 @@ public class UBNFParsers {
                 Parser.get(NegationExpressionParser.class),
                 Parser.get(LookaheadExpressionParser.class),
                 Parser.get(NegativeLookaheadExpressionParser.class),
+                Parser.get(CharRangeExpressionParser.class),
+                Parser.get(CIExpressionParser.class),
+                Parser.get(AnyKeywordParser.class),
+                Parser.get(EofKeywordParser.class),
+                Parser.get(EmptyKeywordParser.class),
                 Parser.get(QualifiedClassNameParser.class)
             );
         }
@@ -754,6 +877,23 @@ public class UBNFParsers {
     }
 
     /**
+     * DocAnnotation: '@doc' '(' STRING_LITERAL ')'
+     */
+    public static class DocAnnotationParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                new WordParser("@doc"),
+                Parser.get(LeftParenthesisParser.class),
+                Parser.get(SingleQuotedParser.class),
+                Parser.get(RightParenthesisParser.class)
+            );
+        }
+    }
+
+    /**
      * SimpleAnnotation: '@' IDENTIFIER
      * （上記の特殊アノテーションにマッチしない場合のフォールバック）
      */
@@ -790,6 +930,7 @@ public class UBNFParsers {
                 Parser.get(LeftAssocAnnotationParser.class),
                 Parser.get(RightAssocAnnotationParser.class),
                 Parser.get(PrecedenceAnnotationParser.class),
+                Parser.get(DocAnnotationParser.class),
                 Parser.get(SimpleAnnotationParser.class)
             );
         }
@@ -884,8 +1025,26 @@ public class UBNFParsers {
     }
 
     /**
+     * ErrorElement: ERROR '(' STRING_LITERAL ')'
+     * Always-fail hint element; generates ErrorMessageParser.expected("message").
+     */
+    public static class ErrorElementParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                new WordParser("ERROR"),
+                Parser.get(LeftParenthesisParser.class),
+                Parser.get(SingleQuotedParser.class),
+                Parser.get(RightParenthesisParser.class)
+            );
+        }
+    }
+
+    /**
      * AtomicElement: GroupElement | OptionalElement | RepeatElement
-     *              | TerminalElement | TypeofElement | RuleRefElement
+     *              | ErrorElement | TerminalElement | RuleRefElement
      */
     public static class AtomicElementParser extends LazyChoice {
         private static final long serialVersionUID = 1L;
@@ -896,6 +1055,7 @@ public class UBNFParsers {
                 Parser.get(GroupElementParser.class),
                 Parser.get(OptionalElementParser.class),
                 Parser.get(RepeatElementParser.class),
+                Parser.get(ErrorElementParser.class),
                 Parser.get(TerminalElementParser.class),
                 Parser.get(RuleRefElementParser.class)
             );
@@ -908,8 +1068,9 @@ public class UBNFParsers {
     }
 
     /**
-     * AnnotatedElement: ['@typeof' '(' IDENTIFIER ')'] AtomicElement [PostfixQuantifier] ['@' IDENTIFIER]
-     * PostfixQuantifier: '+' | '?'
+     * AnnotatedElement: ['@typeof' '(' IDENTIFIER ')'] AtomicElement [PostfixQuantifier | BoundedQuantifier] ['@' IDENTIFIER]
+     * PostfixQuantifier: '+' | '?' | '*'
+     * BoundedQuantifier: '{' n [',' m?] '}'
      */
     public static class AnnotatedElementParser extends UBNFLazyChain {
         private static final long serialVersionUID = 1L;
@@ -922,7 +1083,7 @@ public class UBNFParsers {
                 ),
                 Parser.get(AtomicElementParser.class),
                 new org.unlaxer.parser.combinator.Optional(
-                    Parser.get(PostfixQuantifierParser.class)
+                    new Choice(PostfixQuantifierParser.class, BoundedQuantifierParser.class)
                 ),
                 new org.unlaxer.parser.combinator.Optional(
                     new UBNFLazyChain() {

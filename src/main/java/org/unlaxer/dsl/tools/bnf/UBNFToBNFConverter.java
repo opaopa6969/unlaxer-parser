@@ -13,6 +13,8 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GlobalSetting;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.KeyValuePair;
+import org.unlaxer.dsl.bootstrap.UBNFAST.BoundedRepeatElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.ErrorElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OneOrMoreElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OptionalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RepeatElement;
@@ -141,11 +143,16 @@ public final class UBNFToBNFConverter {
     ) {
         String name = token.name();
         String tokenValue = switch (token) {
-            case UBNFAST.TokenDecl.Simple s           -> s.parserClass();
-            case UBNFAST.TokenDecl.Until u            -> "UNTIL('" + u.terminator() + "')";
-            case UBNFAST.TokenDecl.Negation n         -> "NEGATION('" + n.excludedChars() + "')";
-            case UBNFAST.TokenDecl.Lookahead la       -> "LOOKAHEAD('" + la.pattern() + "')";
+            case UBNFAST.TokenDecl.Simple s              -> s.parserClass();
+            case UBNFAST.TokenDecl.Until u               -> "UNTIL('" + u.terminator() + "')";
+            case UBNFAST.TokenDecl.Negation n            -> "NEGATION('" + n.excludedChars() + "')";
+            case UBNFAST.TokenDecl.Lookahead la          -> "LOOKAHEAD('" + la.pattern() + "')";
             case UBNFAST.TokenDecl.NegativeLookahead nla -> "NEGATIVE_LOOKAHEAD('" + nla.pattern() + "')";
+            case UBNFAST.TokenDecl.Any a                 -> "ANY";
+            case UBNFAST.TokenDecl.Eof e                 -> "EOF";
+            case UBNFAST.TokenDecl.Empty em              -> "EMPTY";
+            case UBNFAST.TokenDecl.CharRange cr          -> "CHAR_RANGE('" + cr.min() + "','" + cr.max() + "')";
+            case UBNFAST.TokenDecl.CaseInsensitive ci    -> "CI('" + ci.word() + "')";
         };
 
         builder.append("(* token: ");
@@ -236,6 +243,10 @@ public final class UBNFToBNFConverter {
             builder.append("@precedence(level=");
             builder.append(precedenceAnnotation.level());
             builder.append(")");
+        } else if (annotation instanceof UBNFAST.DocAnnotation docAnnotation) {
+            builder.append("@doc('");
+            builder.append(docAnnotation.text().replace("'", "\\'"));
+            builder.append("')");
         } else if (annotation instanceof UBNFAST.SimpleAnnotation simpleAnnotation) {
             builder.append("@");
             builder.append(simpleAnnotation.name());
@@ -324,12 +335,27 @@ public final class UBNFToBNFConverter {
         } else if (element instanceof OneOrMoreElement oneOrMoreElement) {
             convertRuleBody(oneOrMoreElement.body(), builder, context);
             builder.append("+");
+        } else if (element instanceof BoundedRepeatElement boundedRepeatElement) {
+            convertRuleBody(boundedRepeatElement.body(), builder, context);
+            builder.append("{");
+            builder.append(boundedRepeatElement.min());
+            if (boundedRepeatElement.max() != boundedRepeatElement.min()) {
+                builder.append(",");
+                if (boundedRepeatElement.max() != BoundedRepeatElement.UNBOUNDED) {
+                    builder.append(boundedRepeatElement.max());
+                }
+            }
+            builder.append("}");
         } else if (element instanceof TerminalElement terminalElement) {
             builder.append("\"");
             builder.append(terminalElement.value());
             builder.append("\"");
         } else if (element instanceof RuleRefElement ruleRefElement) {
             builder.append(ruleRefElement.name());
+        } else if (element instanceof ErrorElement errorElement) {
+            builder.append("ERROR('");
+            builder.append(errorElement.message().replace("'", "\\'"));
+            builder.append("')");
         }
     }
 

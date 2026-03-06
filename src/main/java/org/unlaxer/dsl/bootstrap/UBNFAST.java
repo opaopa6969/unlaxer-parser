@@ -73,7 +73,9 @@ public sealed interface UBNFAST permits
      */
     sealed interface TokenDecl extends UBNFAST
         permits TokenDecl.Simple, TokenDecl.Until,
-                TokenDecl.Negation, TokenDecl.Lookahead, TokenDecl.NegativeLookahead {
+                TokenDecl.Negation, TokenDecl.Lookahead, TokenDecl.NegativeLookahead,
+                TokenDecl.Any, TokenDecl.Eof, TokenDecl.Empty,
+                TokenDecl.CharRange, TokenDecl.CaseInsensitive {
         String name();
 
         /**
@@ -96,6 +98,21 @@ public sealed interface UBNFAST permits
 
         /** token NAME = NEGATIVE_LOOKAHEAD('pattern') — asserts pattern absent, consumes no input */
         record NegativeLookahead(String name, String pattern) implements TokenDecl {}
+
+        /** token NAME = ANY — matches any single character */
+        record Any(String name) implements TokenDecl {}
+
+        /** token NAME = EOF — matches end of input */
+        record Eof(String name) implements TokenDecl {}
+
+        /** token NAME = EMPTY — matches empty string (always succeeds without consuming) */
+        record Empty(String name) implements TokenDecl {}
+
+        /** token NAME = CHAR_RANGE('a','z') — matches a single char in [min,max] range */
+        record CharRange(String name, char min, char max) implements TokenDecl {}
+
+        /** token NAME = CI('keyword') — case-insensitive literal match */
+        record CaseInsensitive(String name, String word) implements TokenDecl {}
     }
 
     // =========================================================================
@@ -125,6 +142,7 @@ public sealed interface UBNFAST permits
         UBNFAST.LeftAssocAnnotation,
         UBNFAST.RightAssocAnnotation,
         UBNFAST.PrecedenceAnnotation,
+        UBNFAST.DocAnnotation,
         UBNFAST.SimpleAnnotation {}
 
     /** @root */
@@ -156,6 +174,9 @@ public sealed interface UBNFAST permits
 
     /** @precedence(level=10) */
     record PrecedenceAnnotation(int level) implements Annotation {}
+
+    /** @doc("description text") — documentation comment, emitted as Java comment */
+    record DocAnnotation(String text) implements Annotation {}
 
     /** @name（上記以外の任意アノテーション） */
     record SimpleAnnotation(String name) implements Annotation {}
@@ -197,8 +218,10 @@ public sealed interface UBNFAST permits
         UBNFAST.OptionalElement,
         UBNFAST.RepeatElement,
         UBNFAST.OneOrMoreElement,
+        UBNFAST.BoundedRepeatElement,
         UBNFAST.TerminalElement,
-        UBNFAST.RuleRefElement {}
+        UBNFAST.RuleRefElement,
+        UBNFAST.ErrorElement {}
 
     /** ( RuleBody ) */
     record GroupElement(RuleBody body) implements AtomicElement {}
@@ -212,11 +235,26 @@ public sealed interface UBNFAST permits
     /** element+ — one or more occurrences */
     record OneOrMoreElement(RuleBody body) implements AtomicElement {}
 
+    /**
+     * element{n} / element{n,m} / element{n,} — bounded repetition.
+     * max == Integer.MAX_VALUE means unbounded (i.e. {n,}).
+     */
+    record BoundedRepeatElement(RuleBody body, int min, int max) implements AtomicElement {
+        /** Sentinel value used to represent an open upper bound ({n,}). */
+        public static final int UNBOUNDED = Integer.MAX_VALUE;
+    }
+
     /** 'literal' */
     record TerminalElement(String value) implements AtomicElement {}
 
     /** RuleRef（非終端記号参照） */
     record RuleRefElement(String name) implements AtomicElement {}
+
+    /**
+     * ERROR("message") — 常に失敗するエラーヒント要素。
+     * 診断情報として message が表示される。ErrorMessageParser.expected() に対応。
+     */
+    record ErrorElement(String message) implements AtomicElement {}
 
     /**
      * @typeof(captureName) — AnnotatedElement のプレフィックス制約。

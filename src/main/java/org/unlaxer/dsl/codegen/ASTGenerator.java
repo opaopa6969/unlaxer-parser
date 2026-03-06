@@ -6,6 +6,8 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.ChoiceBody;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation;
+import org.unlaxer.dsl.bootstrap.UBNFAST.BoundedRepeatElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.ErrorElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OneOrMoreElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OptionalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RepeatElement;
@@ -141,11 +143,16 @@ public class ASTGenerator implements CodeGenerator {
                 String inner = inferTypeFromBody(grammar, one.body());
                 yield "List<" + inner + ">";
             }
+            case BoundedRepeatElement bounded -> {
+                String inner = inferTypeFromBody(grammar, bounded.body());
+                yield "List<" + inner + ">";
+            }
             case OptionalElement opt -> {
                 String inner = inferTypeFromBody(grammar, opt.body());
                 yield "Optional<" + inner + ">";
             }
             case GroupElement g -> "Object";
+            case ErrorElement e -> "Object";
         };
     }
 

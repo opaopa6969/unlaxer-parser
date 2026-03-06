@@ -7,6 +7,8 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.AnnotatedElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AtomicElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ChoiceBody;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.BoundedRepeatElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.ErrorElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OneOrMoreElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OptionalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RepeatElement;
@@ -106,9 +108,16 @@ public class UBNFToRailroad {
             RailroadDiagram inner = convertRuleBody(oneOrMoreElement.body(), grammarName);
             return new RailroadDiagram.Repeat(nextId(oneOrMoreElement), inner);
         }
+        if (atomicElement instanceof BoundedRepeatElement boundedRepeatElement) {
+            RailroadDiagram inner = convertRuleBody(boundedRepeatElement.body(), grammarName);
+            return new RailroadDiagram.Repeat(nextId(boundedRepeatElement), inner);
+        }
         if (atomicElement instanceof GroupElement groupElement) {
             RailroadDiagram inner = convertRuleBody(groupElement.body(), grammarName);
             return new RailroadDiagram.Group(nextId(groupElement), inner);
+        }
+        if (atomicElement instanceof ErrorElement errorElement) {
+            return new RailroadDiagram.Terminal(nextId(errorElement), "ERROR('" + errorElement.message() + "')");
         }
         return new RailroadDiagram.Terminal(nextId(atomicElement), "?");
     }

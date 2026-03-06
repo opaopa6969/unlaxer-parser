@@ -7,6 +7,8 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.LeftAssocAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation;
+import org.unlaxer.dsl.bootstrap.UBNFAST.BoundedRepeatElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.ErrorElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OneOrMoreElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OptionalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RepeatElement;
@@ -1039,11 +1041,16 @@ public class MapperGenerator implements CodeGenerator {
                 String inner = inferTypeFromBody(grammar, oneOrMoreElement.body());
                 yield "List<" + inner + ">";
             }
+            case BoundedRepeatElement boundedRepeatElement -> {
+                String inner = inferTypeFromBody(grammar, boundedRepeatElement.body());
+                yield "List<" + inner + ">";
+            }
             case OptionalElement optionalElement -> {
                 String inner = inferTypeFromBody(grammar, optionalElement.body());
                 yield "Optional<" + inner + ">";
             }
             case GroupElement ignored -> "Object";
+            case ErrorElement ignored -> "Object";
         };
     }
 

@@ -739,6 +739,85 @@ public class ParserGeneratorTest {
     }
 
     // =========================================================================
+    // Bounded quantifiers: {n}  {n,m}  {n,}
+    // =========================================================================
+
+    private static final String EXACT_GRAMMAR =
+        "grammar Exact {\n" +
+        "  @package: org.example.exact\n" +
+        "  @whitespace: javaStyle\n" +
+        "  token ID = IdentifierParser\n" +
+        "  @root\n" +
+        "  Exact ::= ID{3} ;\n" +
+        "}";
+
+    private static final String RANGE_GRAMMAR =
+        "grammar Range {\n" +
+        "  @package: org.example.range\n" +
+        "  @whitespace: javaStyle\n" +
+        "  token ID = IdentifierParser\n" +
+        "  @root\n" +
+        "  Range ::= ID{1,5} ;\n" +
+        "}";
+
+    private static final String OPEN_ENDED_GRAMMAR =
+        "grammar Open {\n" +
+        "  @package: org.example.open\n" +
+        "  @whitespace: javaStyle\n" +
+        "  token ID = IdentifierParser\n" +
+        "  @root\n" +
+        "  Open ::= ID{2,} ;\n" +
+        "}";
+
+    @Test
+    public void testExactQuantifierGeneratesRepeat() {
+        String source = generate(EXACT_GRAMMAR);
+        assertTrue("ID{3} should generate new Repeat(", source.contains("new Repeat("));
+        assertTrue("ID{3} should use min=3", source.contains(", 3, 3)"));
+    }
+
+    @Test
+    public void testRangeQuantifierGeneratesRepeat() {
+        String source = generate(RANGE_GRAMMAR);
+        assertTrue("ID{1,5} should generate new Repeat(", source.contains("new Repeat("));
+        assertTrue("ID{1,5} should use min=1 max=5", source.contains(", 1, 5)"));
+    }
+
+    @Test
+    public void testOpenEndedQuantifierGeneratesRepeatWithMaxValue() {
+        String source = generate(OPEN_ENDED_GRAMMAR);
+        assertTrue("ID{2,} should generate new Repeat(", source.contains("new Repeat("));
+        assertTrue("ID{2,} should use Integer.MAX_VALUE", source.contains("Integer.MAX_VALUE"));
+    }
+
+    // =========================================================================
+    // Postfix quantifier: *
+    // =========================================================================
+
+    private static final String ASTERISK_GRAMMAR =
+        "grammar Repeat {\n" +
+        "  @package: org.example.repeat\n" +
+        "  @whitespace: javaStyle\n" +
+        "  token ID = IdentifierParser\n" +
+        "  @root\n" +
+        "  Repeat ::= ID* ;\n" +
+        "}";
+
+    @Test
+    public void testAsteriskGeneratesZeroOrMore() {
+        String source = generate(ASTERISK_GRAMMAR);
+        assertTrue("ID* should generate new ZeroOrMore(",
+            source.contains("new ZeroOrMore("));
+    }
+
+    @Test
+    public void testAsteriskDoesNotGenerateOneOrMore() {
+        String source = generate(ASTERISK_GRAMMAR);
+        assertFalse("ID* must not generate OneOrMore",
+            source.contains("OneOrMore"));
+    }
+
+    // =========================================================================
     // ヘルパーメソッド
     // =========================================================================
 

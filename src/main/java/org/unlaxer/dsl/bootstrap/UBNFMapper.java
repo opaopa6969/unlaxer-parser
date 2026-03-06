@@ -21,8 +21,11 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.InterleaveAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.KeyValuePair;
 import org.unlaxer.dsl.bootstrap.UBNFAST.LeftAssocAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation;
+import org.unlaxer.dsl.bootstrap.UBNFAST.BoundedRepeatElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.ErrorElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OneOrMoreElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OptionalElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.DocAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.PrecedenceAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RepeatElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RightAssocAnnotation;
@@ -193,6 +196,35 @@ public class UBNFMapper {
             return new TokenDecl.NegativeLookahead(name, pattern);
         }
 
+        // CHAR_RANGE('a','z') 形式のチェック
+        List<Token> charRangeTokens = findDescendants(token, UBNFParsers.CharRangeExpressionParser.class);
+        if (!charRangeTokens.isEmpty()) {
+            List<Token> quoted = findDescendants(
+                charRangeTokens.get(0),
+                org.unlaxer.parser.elementary.SingleQuotedParser.class
+            );
+            char min = quoted.size() > 0 ? stripQuotes(quoted.get(0).source.toString().trim()).charAt(0) : 0;
+            char max = quoted.size() > 1 ? stripQuotes(quoted.get(1).source.toString().trim()).charAt(0) : min;
+            return new TokenDecl.CharRange(name, min, max);
+        }
+
+        // CI('word') 形式のチェック
+        List<Token> ciTokens = findDescendants(token, UBNFParsers.CIExpressionParser.class);
+        if (!ciTokens.isEmpty()) {
+            String word = extractQuotedValue(ciTokens.get(0));
+            return new TokenDecl.CaseInsensitive(name, word);
+        }
+
+        // ANY / EOF / EMPTY (parameterless) のチェック
+        List<Token> anyTokens = findDescendants(token, UBNFParsers.AnyKeywordParser.class);
+        if (!anyTokens.isEmpty()) return new TokenDecl.Any(name);
+
+        List<Token> eofTokens = findDescendants(token, UBNFParsers.EofKeywordParser.class);
+        if (!eofTokens.isEmpty()) return new TokenDecl.Eof(name);
+
+        List<Token> emptyTokens = findDescendants(token, UBNFParsers.EmptyKeywordParser.class);
+        if (!emptyTokens.isEmpty()) return new TokenDecl.Empty(name);
+
         // QualifiedClassNameParser ノードからドット区切りクラス名を再構築する。
         // IDENTIFIER { '.' IDENTIFIER } の各 Identifier を "." で結合する。
         List<Token> qualifiedTokens = findDescendants(token, UBNFParsers.QualifiedClassNameParser.class);
@@ -270,6 +302,8 @@ public class UBNFMapper {
                 result.add(new RightAssocAnnotation());
             } else if (child.parser.getClass() == UBNFParsers.PrecedenceAnnotationParser.class) {
                 result.add(toPrecedenceAnnotation(child));
+            } else if (child.parser.getClass() == UBNFParsers.DocAnnotationParser.class) {
+                result.add(toDocAnnotation(child));
             } else if (child.parser.getClass() == UBNFParsers.SimpleAnnotationParser.class) {
                 result.add(toSimpleAnnotation(child));
             } else {
@@ -325,6 +359,13 @@ public class UBNFMapper {
         List<Token> identifiers = findDescendants(token, UBNFParsers.IdentifierParser.class);
         String name = identifiers.isEmpty() ? "" : identifiers.get(0).source.toString().trim();
         return new SimpleAnnotation(name);
+    }
+
+    static DocAnnotation toDocAnnotation(Token token) {
+        List<Token> quoted = findDescendants(
+            token, org.unlaxer.parser.elementary.SingleQuotedParser.class);
+        String text = quoted.isEmpty() ? "" : stripQuotes(quoted.get(0).source.toString().trim());
+        return new DocAnnotation(text);
     }
 
     static PrecedenceAnnotation toPrecedenceAnnotation(Token token) {
@@ -442,15 +483,21 @@ public class UBNFMapper {
     static AnnotatedElement toAnnotatedElement(Token token) {
         AtomicElement baseElement = toAtomicElement(token);
 
-        // Postfix quantifier: '+' → OneOrMoreElement, '?' → OptionalElement
+        // Postfix quantifier: '+' → OneOrMoreElement, '?' → OptionalElement, '*' → RepeatElement
         List<Token> postfixTokens = findDescendants(token, UBNFParsers.PostfixQuantifierParser.class);
+        // Bounded quantifier: {n} / {n,m} / {n,} → BoundedRepeatElement
+        List<Token> boundedTokens = findDescendants(token, UBNFParsers.BoundedQuantifierParser.class);
         AtomicElement element;
         if (!postfixTokens.isEmpty()) {
             String postfix = postfixTokens.get(0).source.toString().trim();
             RuleBody wrappedBody = wrapElementInSequenceBody(baseElement);
             element = "+".equals(postfix)
                 ? new OneOrMoreElement(wrappedBody)
-                : new OptionalElement(wrappedBody);
+                : "*".equals(postfix)
+                    ? new RepeatElement(wrappedBody)
+                    : new OptionalElement(wrappedBody);
+        } else if (!boundedTokens.isEmpty()) {
+            element = parseBoundedRepeat(boundedTokens.get(0), baseElement);
         } else {
             element = baseElement;
         }
@@ -468,6 +515,32 @@ public class UBNFMapper {
     private static RuleBody wrapElementInSequenceBody(AtomicElement element) {
         AnnotatedElement ae = new AnnotatedElement(element, Optional.empty(), Optional.empty());
         return new SequenceBody(List.of(ae));
+    }
+
+    /**
+     * Parses a BoundedQuantifierParser token and wraps baseElement in a BoundedRepeatElement.
+     * Handles: {n}  {n,m}  {n,}
+     */
+    private static BoundedRepeatElement parseBoundedRepeat(Token boundedToken, AtomicElement baseElement) {
+        // Collect all DigitParser groups in the bounded token.
+        // BoundedQuantifierParser structure: '{' OneOrMore(Digit) [CommaParser [OneOrMore(Digit)?]] '}'
+        // We extract the digit runs as strings by scanning children.
+        String raw = boundedToken.source.sourceAsString().trim(); // e.g. "{2}" or "{1,3}" or "{2,}"
+        // Strip braces
+        String inner = raw.substring(1, raw.length() - 1).trim(); // "2" or "1,3" or "2,"
+        int commaIdx = inner.indexOf(',');
+        int min, max;
+        if (commaIdx < 0) {
+            // {n}
+            min = Integer.parseInt(inner.trim());
+            max = min;
+        } else {
+            min = Integer.parseInt(inner.substring(0, commaIdx).trim());
+            String maxStr = inner.substring(commaIdx + 1).trim();
+            max = maxStr.isEmpty() ? BoundedRepeatElement.UNBOUNDED : Integer.parseInt(maxStr);
+        }
+        RuleBody wrappedBody = wrapElementInSequenceBody(baseElement);
+        return new BoundedRepeatElement(wrappedBody, min, max);
     }
 
     static Optional<String> findCaptureNameInAnnotatedElement(Token token) {
@@ -525,6 +598,18 @@ public class UBNFMapper {
             List<Token> bodyTokens = findDescendants(repTokens.get(0), UBNFParsers.ChoiceBodyParser.class);
             RuleBody body = bodyTokens.isEmpty() ? new SequenceBody(List.of()) : toChoiceBody(bodyTokens.get(0));
             return new RepeatElement(body);
+        }
+        // ErrorElement
+        List<Token> errorTokens = findDescendants(token, UBNFParsers.ErrorElementParser.class);
+        if (false == errorTokens.isEmpty()) {
+            List<Token> quotedTokens = findDescendants(
+                errorTokens.get(0),
+                org.unlaxer.parser.elementary.SingleQuotedParser.class
+            );
+            String message = quotedTokens.isEmpty()
+                ? ""
+                : stripQuotes(quotedTokens.get(0).source.toString().trim());
+            return new ErrorElement(message);
         }
         // TerminalElement
         List<Token> termTokens = findDescendants(token, UBNFParsers.TerminalElementParser.class);
