@@ -97,6 +97,20 @@ public class UBNFParsersTest {
         assertTrue(parsed.isSucceeded());
     }
 
+    @Test
+    public void testTokenDecl_until_simple() {
+        Parsed parsed = parse(Parser.get(UBNFParsers.TokenDeclParser.class),
+            "token CODE_BODY = UNTIL('```')");
+        assertTrue(parsed.isSucceeded());
+    }
+
+    @Test
+    public void testTokenDecl_until_fqn_class() {
+        Parsed parsed = parse(Parser.get(UBNFParsers.TokenDeclParser.class),
+            "token CODE_BODY = org.example.SomeParser");
+        assertTrue(parsed.isSucceeded());
+    }
+
     // =========================================================================
     // Annotation
     // =========================================================================

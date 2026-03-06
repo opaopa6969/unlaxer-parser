@@ -546,6 +546,41 @@ public class ParserGeneratorTest {
     }
 
     // =========================================================================
+    // UNTIL トークン
+    // =========================================================================
+
+    private static final String UNTIL_GRAMMAR =
+        "grammar CodeBlock {\n" +
+        "  @package: org.example.codeblock\n" +
+        "  @whitespace: javaStyle\n" +
+        "  token CODE_BODY = UNTIL('```')\n" +
+        "  @root\n" +
+        "  CodeBlock ::= CODE_BODY ;\n" +
+        "}";
+
+    @Test
+    public void testUntilTokenGeneratesWildCardStringTerninatorParser() {
+        String source = generate(UNTIL_GRAMMAR);
+        assertTrue("UNTIL token should generate WildCardStringTerninatorParser",
+            source.contains("WildCardStringTerninatorParser"));
+    }
+
+    @Test
+    public void testUntilTokenIncludesTerminatorString() {
+        String source = generate(UNTIL_GRAMMAR);
+        assertTrue("UNTIL token should embed the terminator string",
+            source.contains("WildCardStringTerninatorParser(\"```\")"));
+    }
+
+    @Test
+    public void testUntilTokenDoesNotGenerateParserGet() {
+        String source = generate(UNTIL_GRAMMAR);
+        // CODE_BODY should not produce Parser.get(CODE_BODYParser.class)
+        assertFalse("UNTIL token must not produce Parser.get(CODE_BODYParser.class)",
+            source.contains("CODE_BODYParser.class"));
+    }
+
+    // =========================================================================
     // ヘルパーメソッド
     // =========================================================================
 

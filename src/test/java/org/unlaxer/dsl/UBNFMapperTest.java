@@ -2,6 +2,7 @@ package org.unlaxer.dsl;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.util.List;
@@ -72,6 +73,23 @@ public class UBNFMapperTest {
         assertEquals("NUMBER", tokens.get(0).name());
         assertEquals("NumberParser", tokens.get(0).parserClass());
         assertEquals("ID", tokens.get(1).name());
+    }
+
+    @Test
+    public void testGrammarDecl_tokenDecl_until() {
+        UBNFFile file = UBNFMapper.parse(
+            "grammar G {\n"
+            + "  token CODE_BODY = UNTIL('```')\n"
+            + "  Rule ::= CODE_BODY ;\n"
+            + "}");
+        GrammarDecl grammar = file.grammars().get(0);
+        List<TokenDecl> tokens = grammar.tokens();
+        assertEquals(1, tokens.size());
+        TokenDecl token = tokens.get(0);
+        assertEquals("CODE_BODY", token.name());
+        assertNull(token.parserClass()); // Until tokens return null for parserClass()
+        assertTrue(token instanceof TokenDecl.Until);
+        assertEquals("```", ((TokenDecl.Until) token).terminator());
     }
 
     // =========================================================================

@@ -20,7 +20,8 @@ public sealed interface UBNFAST permits
     UBNFAST.Annotation,
     UBNFAST.RuleBody,
     UBNFAST.AnnotatedElement,
-    UBNFAST.AtomicElement {
+    UBNFAST.AtomicElement,
+    UBNFAST.TypeofElement {
 
     // =========================================================================
     // ファイルレベル
@@ -68,9 +69,23 @@ public sealed interface UBNFAST permits
     // =========================================================================
 
     /**
-     * TokenDecl: token NAME = ParserClass
+     * TokenDecl: token NAME = ( ParserClass | UNTIL(terminator) )
      */
-    record TokenDecl(String name, String parserClass) implements UBNFAST {}
+    sealed interface TokenDecl extends UBNFAST permits TokenDecl.Simple, TokenDecl.Until {
+        String name();
+
+        /**
+         * Returns the parser class name, or null for UNTIL tokens.
+         * Use instanceof pattern matching for type-safe dispatch.
+         */
+        default String parserClass() { return null; }
+
+        /** token NAME = ClassName */
+        record Simple(String name, String parserClass) implements TokenDecl {}
+
+        /** token NAME = UNTIL('terminator') */
+        record Until(String name, String terminator) implements TokenDecl {}
+    }
 
     // =========================================================================
     // ルール宣言
@@ -158,11 +173,12 @@ public sealed interface UBNFAST permits
     // =========================================================================
 
     /**
-     * AnnotatedElement: AtomicElement [@captureName]
+     * AnnotatedElement: [@typeof(name)] AtomicElement [@captureName]
      */
     record AnnotatedElement(
         AtomicElement element,
-        Optional<String> captureName
+        Optional<String> captureName,
+        Optional<TypeofElement> typeofConstraint
     ) implements UBNFAST {}
 
     sealed interface AtomicElement extends UBNFAST permits
@@ -186,4 +202,11 @@ public sealed interface UBNFAST permits
 
     /** RuleRef（非終端記号参照） */
     record RuleRefElement(String name) implements AtomicElement {}
+
+    /**
+     * @typeof(captureName) — AnnotatedElement のプレフィックス制約。
+     * captureName で指定したキャプチャと同じ Choice alternative を持つことを制約する。
+     * マッパーの fromToken() 内でランタイム型チェックコードを生成する。
+     */
+    record TypeofElement(String captureName) implements UBNFAST {}
 }

@@ -337,7 +337,46 @@ public class UBNFParsers {
     // =========================================================================
 
     /**
-     * TokenDecl: 'token' IDENTIFIER '=' CLASS_NAME
+     * UntilExpressionParser: UNTIL '(' STRING_LITERAL ')'
+     * 例: UNTIL('```') — シングルクォートで囲んだ終端文字列を指定する。
+     */
+    public static class UntilExpressionParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                new WordParser("UNTIL"),
+                Parser.get(LeftParenthesisParser.class),
+                Parser.get(SingleQuotedParser.class),
+                Parser.get(RightParenthesisParser.class)
+            );
+        }
+    }
+
+    /**
+     * TokenValueParser: UntilExpressionParser | QualifiedClassNameParser
+     * UNTIL を先に試してからクラス名にフォールバックする。
+     */
+    public static class TokenValueParser extends LazyChoice {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                Parser.get(UntilExpressionParser.class),
+                Parser.get(QualifiedClassNameParser.class)
+            );
+        }
+
+        @Override
+        public Optional<RecursiveMode> getNotAstNodeSpecifier() {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * TokenDecl: 'token' IDENTIFIER '=' ( CLASS_NAME | UNTIL('terminator') )
      * CLASS_NAME は IDENTIFIER { '.' IDENTIFIER } (完全修飾名も可)
      */
     public static class TokenDeclParser extends UBNFLazyChain {
@@ -349,7 +388,7 @@ public class UBNFParsers {
                 new WordParser("token"),
                 Parser.get(IdentifierParser.class),
                 Parser.get(EqualParser.class),
-                Parser.get(QualifiedClassNameParser.class)
+                Parser.get(TokenValueParser.class)
             );
         }
     }
@@ -600,6 +639,24 @@ public class UBNFParsers {
     }
 
     /**
+     * TypeofElement: '@typeof' '(' IDENTIFIER ')'
+     * 要素レベルアノテーション: captureName と同じ型を持つことを制約する。
+     */
+    public static class TypeofElementParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                new WordParser("@typeof"),
+                Parser.get(LeftParenthesisParser.class),
+                Parser.get(IdentifierParser.class),
+                Parser.get(RightParenthesisParser.class)
+            );
+        }
+    }
+
+    /**
      * SimpleAnnotation: '@' IDENTIFIER
      * （上記の特殊アノテーションにマッチしない場合のフォールバック）
      */
@@ -731,7 +788,7 @@ public class UBNFParsers {
 
     /**
      * AtomicElement: GroupElement | OptionalElement | RepeatElement
-     *              | TerminalElement | RuleRefElement
+     *              | TerminalElement | TypeofElement | RuleRefElement
      */
     public static class AtomicElementParser extends LazyChoice {
         private static final long serialVersionUID = 1L;
@@ -754,7 +811,7 @@ public class UBNFParsers {
     }
 
     /**
-     * AnnotatedElement: AtomicElement ['@' IDENTIFIER]
+     * AnnotatedElement: ['@typeof' '(' IDENTIFIER ')'] AtomicElement ['@' IDENTIFIER]
      */
     public static class AnnotatedElementParser extends UBNFLazyChain {
         private static final long serialVersionUID = 1L;
@@ -762,6 +819,9 @@ public class UBNFParsers {
         @Override
         public Parsers getLazyParsers() {
             return new Parsers(
+                new org.unlaxer.parser.combinator.Optional(
+                    Parser.get(TypeofElementParser.class)
+                ),
                 Parser.get(AtomicElementParser.class),
                 new org.unlaxer.parser.combinator.Optional(
                     new UBNFLazyChain() {

@@ -37,6 +37,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.SimpleAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.StringSettingValue;
 import org.unlaxer.dsl.bootstrap.UBNFAST.TerminalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.TokenDecl;
+import org.unlaxer.dsl.bootstrap.UBNFAST.TypeofElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.UBNFFile;
 import org.unlaxer.dsl.bootstrap.UBNFAST.WhitespaceAnnotation;
 import org.unlaxer.parser.Parser;
@@ -163,6 +164,17 @@ public class UBNFMapper {
         List<Token> identifiers = findDescendants(token, UBNFParsers.IdentifierParser.class);
         String name = identifiers.size() > 0 ? identifiers.get(0).source.toString().trim() : "";
 
+        // UNTIL('terminator') 形式のチェック
+        List<Token> untilTokens = findDescendants(token, UBNFParsers.UntilExpressionParser.class);
+        if (!untilTokens.isEmpty()) {
+            List<Token> quotedTokens = findDescendants(
+                untilTokens.get(0), org.unlaxer.parser.elementary.SingleQuotedParser.class);
+            String terminator = quotedTokens.isEmpty()
+                ? ""
+                : stripQuotes(quotedTokens.get(0).source.toString().trim());
+            return new TokenDecl.Until(name, terminator);
+        }
+
         // QualifiedClassNameParser ノードからドット区切りクラス名を再構築する。
         // IDENTIFIER { '.' IDENTIFIER } の各 Identifier を "." で結合する。
         List<Token> qualifiedTokens = findDescendants(token, UBNFParsers.QualifiedClassNameParser.class);
@@ -170,7 +182,7 @@ public class UBNFMapper {
         if (!qualifiedTokens.isEmpty()) {
             List<Token> segments = findDescendants(qualifiedTokens.get(0), UBNFParsers.IdentifierParser.class);
             parserClass = segments.stream()
-                .map(t -> t.source.toString().trim())
+                .map(t -> firstWord(t.source.toString()))
                 .filter(s -> !s.isEmpty())
                 .collect(java.util.stream.Collectors.joining("."));
         } else {
@@ -179,7 +191,7 @@ public class UBNFMapper {
                 ? firstWord(identifiers.get(1).source.toString())
                 : "";
         }
-        return new TokenDecl(name, parserClass);
+        return new TokenDecl.Simple(name, parserClass);
     }
 
     /** 文字列から先頭の空白を除き、最初の空白文字より前の部分だけを返す。 */
@@ -322,7 +334,91 @@ public class UBNFMapper {
         List<AnnotatedElement> elements = elementTokens.stream()
             .map(UBNFMapper::toAnnotatedElement)
             .toList();
+        // Fix the "typeof" capture name issue:
+        // If we have an element with captureName="typeof" followed by a GroupElement,
+        // this was incorrectly parsed. We need to reconstruct it as a @typeof constraint
+        // on the following element.
+        elements = fixTypeofCaptureName(elements);
         return new SequenceBody(elements);
+    }
+
+    /**
+     * Fix the "typeof" capture name issue that occurs when @typeof(...) is parsed as:
+     * - Element 1: something with captureName="typeof"
+     * - Element 2: GroupElement(containing the identifier)
+     * - Element 3: the actual element with @capture
+     *
+     * We reconstruct this as:
+     * - Element: @typeof(identifier) element @capture
+     */
+    static List<AnnotatedElement> fixTypeofCaptureName(List<AnnotatedElement> elements) {
+        List<AnnotatedElement> result = new ArrayList<>();
+        int i = 0;
+        while (i < elements.size()) {
+            AnnotatedElement current = elements.get(i);
+            // Check if current has captureName="typeof" and is followed by GroupElement and RuleRefElement
+            if (i + 2 < elements.size() &&
+                current.captureName().isPresent() &&
+                "typeof".equals(current.captureName().get()) &&
+                elements.get(i + 1).element() instanceof GroupElement group &&
+                elements.get(i + 2).element() instanceof RuleRefElement ref &&
+                elements.get(i + 2).captureName().isPresent()) {
+
+                // Extract the identifier from the GroupElement (should be in the body)
+                // The groupElement contains the identifier in parentheses
+                String identifier = extractIdentifierFromGroup(group);
+
+                // Remove the "typeof" capture name from current element
+                AnnotatedElement fixedCurrent = new AnnotatedElement(
+                    current.element(),
+                    Optional.empty(),  // Remove the "typeof" capture name
+                    current.typeofConstraint()
+                );
+                result.add(fixedCurrent);
+
+                // Create a new element with @typeof constraint on the RuleRefElement
+                AnnotatedElement nextElement = elements.get(i + 2);
+                AnnotatedElement fixedNext = new AnnotatedElement(
+                    nextElement.element(),
+                    nextElement.captureName(),
+                    Optional.of(new TypeofElement(identifier))  // Add the @typeof constraint
+                );
+                result.add(fixedNext);
+
+                // Skip the GroupElement since we've incorporated it
+                i += 3;
+            } else {
+                result.add(current);
+                i++;
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Extract the identifier from a GroupElement body.
+     * The GroupElement contains something like (identifier) which parses to a GroupElement with a body.
+     */
+    static String extractIdentifierFromGroup(GroupElement group) {
+        // The group.body() contains a RuleBody with the identifier
+        // We need to extract the first identifier from it
+        RuleBody body = group.body();
+        if (body instanceof SequenceBody seq) {
+            for (AnnotatedElement ae : seq.elements()) {
+                if (ae.element() instanceof RuleRefElement ref) {
+                    return ref.name();
+                }
+            }
+        } else if (body instanceof ChoiceBody choice) {
+            for (SequenceBody seq : choice.alternatives()) {
+                for (AnnotatedElement ae : seq.elements()) {
+                    if (ae.element() instanceof RuleRefElement ref) {
+                        return ref.name();
+                    }
+                }
+            }
+        }
+        return "";
     }
 
     static AnnotatedElement toAnnotatedElement(Token token) {
@@ -332,7 +428,10 @@ public class UBNFMapper {
         // AtSignParser の直後の IdentifierParser を探す
         Optional<String> captureName = findCaptureNameInAnnotatedElement(token);
 
-        return new AnnotatedElement(element, captureName);
+        // @typeof 制約: AnnotatedElementParser のプレフィックス TypeofElementParser を探す
+        Optional<TypeofElement> typeofConstraint = findTypeofConstraintInAnnotatedElement(token);
+
+        return new AnnotatedElement(element, captureName, typeofConstraint);
     }
 
     static Optional<String> findCaptureNameInAnnotatedElement(Token token) {
@@ -357,6 +456,16 @@ public class UBNFMapper {
             }
         }
         return Optional.empty();
+    }
+
+    static Optional<TypeofElement> findTypeofConstraintInAnnotatedElement(Token token) {
+        // AnnotatedElementParser のプレフィックス Optional 内の TypeofElementParser を探す
+        List<Token> typeofTokens = findDescendants(token, UBNFParsers.TypeofElementParser.class);
+        if (typeofTokens.isEmpty()) return Optional.empty();
+        Token typeofToken = typeofTokens.get(0);
+        List<Token> identifiers = findDescendants(typeofToken, UBNFParsers.IdentifierParser.class);
+        String refCapture = identifiers.isEmpty() ? "" : identifiers.get(0).source.toString().trim();
+        return Optional.of(new TypeofElement(refCapture));
     }
 
     static AtomicElement toAtomicElement(Token token) {

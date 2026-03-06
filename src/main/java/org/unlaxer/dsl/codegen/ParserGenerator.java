@@ -50,7 +50,8 @@ public class ParserGenerator implements CodeGenerator {
     private static class GenContext {
         final GrammarDecl grammar;
         final String grammarName;
-        final Map<String, String> tokenParserMap;  // token name -> parser class name
+        final Map<String, String> tokenParserMap;  // token name -> parser class name (Simple tokens only)
+        final Map<String, String> tokenUntilMap;   // token name -> terminator string (Until tokens only)
         final Set<String> ruleNames;
         final Map<String, List<String>> helpers = new LinkedHashMap<>(); // rule -> helper codes
         final Map<String, Boolean> useDelimitedChainByRule = new LinkedHashMap<>();
@@ -63,8 +64,12 @@ public class ParserGenerator implements CodeGenerator {
             this.grammar = grammar;
             this.grammarName = grammar.name();
             this.tokenParserMap = new LinkedHashMap<>();
+            this.tokenUntilMap = new LinkedHashMap<>();
             for (TokenDecl token : grammar.tokens()) {
-                tokenParserMap.put(token.name(), token.parserClass());
+                switch (token) {
+                    case TokenDecl.Simple s -> tokenParserMap.put(s.name(), s.parserClass());
+                    case TokenDecl.Until u -> tokenUntilMap.put(u.name(), u.terminator());
+                }
             }
             this.ruleNames = grammar.rules().stream()
                 .map(RuleDecl::name)
@@ -194,7 +199,8 @@ public class ParserGenerator implements CodeGenerator {
         };
         List<String> imports = new ArrayList<>();
         for (TokenDecl token : grammar.tokens()) {
-            String parserClass = token.parserClass();
+            if (!(token instanceof TokenDecl.Simple s)) continue; // UNTIL tokens have no class to import
+            String parserClass = s.parserClass();
             if (alreadyImported.contains(parserClass) || parserClass.contains(".")) {
                 continue;
             }
@@ -611,10 +617,14 @@ public class ParserGenerator implements CodeGenerator {
         return switch (element) {
             case TerminalElement t -> "new WordParser(\"" + escapeString(t.value()) + "\")";
 
-            case RuleRefElement r -> "Parser.get(" + resolveParserClass(ctx, r.name()) + ")";
+            case RuleRefElement r -> resolveParserExpression(ctx, r.name());
 
             case RepeatElement rep -> {
                 if (isSingleRuleRef(rep.body())) {
+                    AtomicElement single = getSingleAtomicElementFrom(rep.body());
+                    if (single instanceof RuleRefElement ref && isUntilToken(ctx, ref.name())) {
+                        yield "new ZeroOrMore(" + resolveParserExpression(ctx, ref.name()) + ")";
+                    }
                     String parserClass = getSingleRuleRefClass(ctx, rep.body());
                     yield "new ZeroOrMore(" + parserClass + ")";
                 } else {
@@ -628,6 +638,9 @@ public class ParserGenerator implements CodeGenerator {
                 if (isSingleAtomicElement(opt.body())) {
                     AtomicElement inner = getSingleAtomicElementFrom(opt.body());
                     if (inner instanceof RuleRefElement ref) {
+                        if (isUntilToken(ctx, ref.name())) {
+                            yield "new Optional(" + resolveParserExpression(ctx, ref.name()) + ")";
+                        }
                         yield "new Optional(" + resolveParserClass(ctx, ref.name()) + ")";
                     } else if (inner instanceof TerminalElement t) {
                         yield "new Optional(new WordParser(\"" + escapeString(t.value()) + "\"))";
@@ -695,8 +708,9 @@ public class ParserGenerator implements CodeGenerator {
 
     /**
      * ルール参照名をパーサークラス参照文字列に変換する。
-     * - トークン宣言に存在する → token.parserClass() + ".class"
+     * - Simple トークン宣言に存在する → token.parserClass() + ".class"
      * - それ以外 → {Name}Parser.class
+     * Until トークンには使用しないこと（resolveParserExpression を使う）。
      */
     private String resolveParserClass(GenContext ctx, String name) {
         String tokenClass = ctx.tokenParserMap.get(name);
@@ -704,6 +718,25 @@ public class ParserGenerator implements CodeGenerator {
             return tokenClass + ".class";
         }
         return name + "Parser.class";
+    }
+
+    /**
+     * ルール参照名をパーサー生成式（完全な Java 式）に変換する。
+     * - Simple トークン / ルール → Parser.get(X.class)
+     * - Until トークン → new WildCardStringTerninatorParser("terminator")
+     */
+    private String resolveParserExpression(GenContext ctx, String name) {
+        String terminator = ctx.tokenUntilMap.get(name);
+        if (terminator != null) {
+            return "new org.unlaxer.parser.elementary.WildCardStringTerninatorParser(\""
+                + escapeString(terminator) + "\")";
+        }
+        return "Parser.get(" + resolveParserClass(ctx, name) + ")";
+    }
+
+    /** 指定名が Until トークンかどうか */
+    private boolean isUntilToken(GenContext ctx, String name) {
+        return ctx.tokenUntilMap.containsKey(name);
     }
 
     private RightAssocShape getRightAssocShape(RuleDecl rule) {
@@ -1096,20 +1129,21 @@ public class ParserGenerator implements CodeGenerator {
                 .append("        java.util.Map<String, ?> modeByRule,\n")
                 .append("        java.util.List<Object> nodes\n")
                 .append("    ) {\n")
-                .append("        if (nodes == null) {\n")
-                .append("            return java.util.List.of();\n")
-                .append("        }\n")
-                .append("        return java.util.List.copyOf(nodes);\n")
+                .append("        return org.unlaxer.dsl.ir.ParserIrScopeEvents.emitSyntheticEnterLeaveEventsForRulesAnyMode(\n")
+                .append("            grammarName,\n")
+                .append("            modeByRule,\n")
+                .append("            nodes\n")
+                .append("        );\n")
                 .append("    }\n\n");
 
             sb.append("    private static java.util.List<Object> emitSyntheticScopeEventsForScopeIdsAnyMode(\n")
                 .append("        java.util.Map<String, String> modeByScopeId,\n")
                 .append("        java.util.List<Object> nodes\n")
                 .append("    ) {\n")
-                .append("        if (nodes == null) {\n")
-                .append("            return java.util.List.of();\n")
-                .append("        }\n")
-                .append("        return java.util.List.copyOf(nodes);\n")
+                .append("        return org.unlaxer.dsl.ir.ParserIrScopeEvents.emitSyntheticEnterLeaveEventsForScopeIdsAnyMode(\n")
+                .append("            modeByScopeId,\n")
+                .append("            nodes\n")
+                .append("        );\n")
                 .append("    }\n\n");
 
             sb.append("    public static boolean hasScopeTree(String ruleName) {\n")
