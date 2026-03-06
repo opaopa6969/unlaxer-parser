@@ -557,16 +557,48 @@ public class UBNFMapper {
     }
 
     /**
-     * シングルクォートを除いた文字列値を返す。
-     * 例: "'hello'" → "hello"
+     * シングルクォートを除き、UBNF エスケープシーケンスを処理した文字列値を返す。
+     * 例: "'hello\\nworld'" → "hello\nworld"（実際の改行文字）
+     * サポートするエスケープ: \n \t \r \\ \'
      */
     static String stripQuotes(String quoted) {
+        String inner;
         if (quoted.length() >= 2
             && '\'' == quoted.charAt(0)
             && '\'' == quoted.charAt(quoted.length() - 1)) {
-            return quoted.substring(1, quoted.length() - 1);
+            inner = quoted.substring(1, quoted.length() - 1);
+        } else {
+            inner = quoted;
         }
-        return quoted;
+        return processEscapes(inner);
+    }
+
+    /**
+     * UBNF リテラル内のエスケープシーケンスを実際の文字に変換する。
+     * \n → 改行、\t → タブ、\r → CR、\\ → バックスラッシュ、\' → シングルクォート
+     */
+    public static String processEscapes(String s) {
+        if (!s.contains("\\")) {
+            return s; // fast path: エスケープなし
+        }
+        StringBuilder sb = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '\\' && i + 1 < s.length()) {
+                char next = s.charAt(i + 1);
+                switch (next) {
+                    case 'n'  -> { sb.append('\n'); i++; }
+                    case 't'  -> { sb.append('\t'); i++; }
+                    case 'r'  -> { sb.append('\r'); i++; }
+                    case '\\' -> { sb.append('\\'); i++; }
+                    case '\'' -> { sb.append('\''); i++; }
+                    default   -> sb.append(c);
+                }
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
     }
 
     private static boolean isAtomicElementParser(Class<?> clazz) {

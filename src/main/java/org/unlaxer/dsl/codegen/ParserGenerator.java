@@ -1261,7 +1261,11 @@ public class ParserGenerator implements CodeGenerator {
 
     /** 文字列内の特殊文字をエスケープする */
     private String escapeString(String s) {
-        return s.replace("\\", "\\\\").replace("\"", "\\\"");
+        return s.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\t", "\\t")
+                .replace("\r", "\\r");
     }
 
     /** @package 設定からパッケージ名を取得する */

@@ -581,6 +581,40 @@ public class ParserGeneratorTest {
     }
 
     // =========================================================================
+    // エスケープシーケンス
+    // =========================================================================
+
+    private static final String ESCAPE_GRAMMAR =
+        "grammar Esc {\n" +
+        "  @package: org.example.esc\n" +
+        "  @whitespace: javaStyle\n" +
+        "  token ID = IdentifierParser\n" +
+        "  @root\n" +
+        "  Esc ::= '\\n' | '\\t' | '\\\\' | ID ;\n" +
+        "}";
+
+    @Test
+    public void testEscape_newlineGeneratesJavaEscape() {
+        String source = generate(ESCAPE_GRAMMAR);
+        assertTrue("\\n literal should generate Java \\\\n escape",
+            source.contains("WordParser(\"\\n\")"));
+    }
+
+    @Test
+    public void testEscape_tabGeneratesJavaEscape() {
+        String source = generate(ESCAPE_GRAMMAR);
+        assertTrue("\\t literal should generate Java \\\\t escape",
+            source.contains("WordParser(\"\\t\")"));
+    }
+
+    @Test
+    public void testEscape_backslashGeneratesJavaEscape() {
+        String source = generate(ESCAPE_GRAMMAR);
+        assertTrue("\\\\ literal should generate Java \\\\\\\\ escape",
+            source.contains("WordParser(\"\\\\\\\\\")") || source.contains("WordParser(\"\\\\\")"));
+    }
+
+    // =========================================================================
     // Postfix quantifiers: + and ?
     // =========================================================================
 

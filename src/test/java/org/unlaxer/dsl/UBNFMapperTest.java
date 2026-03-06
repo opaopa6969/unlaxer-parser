@@ -317,6 +317,44 @@ public class UBNFMapperTest {
     // Postfix quantifier AST: + and ?
     // =========================================================================
 
+    // =========================================================================
+    // エスケープシーケンス
+    // =========================================================================
+
+    @Test
+    public void testProcessEscapes_newline() {
+        assertEquals("\n", UBNFMapper.processEscapes("\\n"));
+    }
+
+    @Test
+    public void testProcessEscapes_tab() {
+        assertEquals("\t", UBNFMapper.processEscapes("\\t"));
+    }
+
+    @Test
+    public void testProcessEscapes_backslash() {
+        assertEquals("\\", UBNFMapper.processEscapes("\\\\"));
+    }
+
+    @Test
+    public void testProcessEscapes_singleQuote() {
+        assertEquals("'", UBNFMapper.processEscapes("\\'"));
+    }
+
+    @Test
+    public void testProcessEscapes_noEscape_fastPath() {
+        assertEquals("hello", UBNFMapper.processEscapes("hello"));
+    }
+
+    @Test
+    public void testProcessEscapes_mixed() {
+        assertEquals("a\tb\nc", UBNFMapper.processEscapes("a\\tb\\nc"));
+    }
+
+    // =========================================================================
+    // Postfix quantifier AST: + and ?
+    // =========================================================================
+
     @Test
     public void testPostfixPlus_producesOneOrMoreElement() {
         String input = "grammar G {\n"
