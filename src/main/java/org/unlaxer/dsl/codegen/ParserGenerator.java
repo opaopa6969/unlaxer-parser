@@ -51,8 +51,11 @@ public class ParserGenerator implements CodeGenerator {
     private static class GenContext {
         final GrammarDecl grammar;
         final String grammarName;
-        final Map<String, String> tokenParserMap;  // token name -> parser class name (Simple tokens only)
-        final Map<String, String> tokenUntilMap;   // token name -> terminator string (Until tokens only)
+        final Map<String, String> tokenParserMap;       // token name -> parser class name (Simple tokens only)
+        final Map<String, String> tokenUntilMap;        // token name -> terminator string (Until tokens only)
+        final Map<String, String> tokenNegationMap;     // token name -> excluded chars (Negation tokens only)
+        final Map<String, String> tokenLookaheadMap;    // token name -> pattern (Lookahead tokens only)
+        final Map<String, String> tokenNegLookaheadMap; // token name -> pattern (NegativeLookahead tokens only)
         final Set<String> ruleNames;
         final Map<String, List<String>> helpers = new LinkedHashMap<>(); // rule -> helper codes
         final Map<String, Boolean> useDelimitedChainByRule = new LinkedHashMap<>();
@@ -66,10 +69,16 @@ public class ParserGenerator implements CodeGenerator {
             this.grammarName = grammar.name();
             this.tokenParserMap = new LinkedHashMap<>();
             this.tokenUntilMap = new LinkedHashMap<>();
+            this.tokenNegationMap = new LinkedHashMap<>();
+            this.tokenLookaheadMap = new LinkedHashMap<>();
+            this.tokenNegLookaheadMap = new LinkedHashMap<>();
             for (TokenDecl token : grammar.tokens()) {
                 switch (token) {
-                    case TokenDecl.Simple s -> tokenParserMap.put(s.name(), s.parserClass());
-                    case TokenDecl.Until u -> tokenUntilMap.put(u.name(), u.terminator());
+                    case TokenDecl.Simple s           -> tokenParserMap.put(s.name(), s.parserClass());
+                    case TokenDecl.Until u            -> tokenUntilMap.put(u.name(), u.terminator());
+                    case TokenDecl.Negation n         -> tokenNegationMap.put(n.name(), n.excludedChars());
+                    case TokenDecl.Lookahead la       -> tokenLookaheadMap.put(la.name(), la.pattern());
+                    case TokenDecl.NegativeLookahead nla -> tokenNegLookaheadMap.put(nla.name(), nla.pattern());
                 }
             }
             this.ruleNames = grammar.rules().stream()
@@ -161,6 +170,9 @@ public class ParserGenerator implements CodeGenerator {
             sb.append(generateDelimitorClass(ctx));
             sb.append(generateDelimitedChainClass(ctx));
         }
+
+        // NEGATION トークン用の生成 SingleCharacterParser 内部クラス
+        sb.append(generateNegationClasses(ctx));
 
         // Phase 2: 各ルールのヘルパー + ルールクラスを出力
         for (RuleDecl rule : grammar.rules()) {
@@ -373,6 +385,33 @@ public class ParserGenerator implements CodeGenerator {
     // =========================================================================
     // ヘルパー収集
     // =========================================================================
+
+    /**
+     * NEGATION トークンごとに SingleCharacterParser 内部クラスを生成する。
+     * 例: token NOT_QUOTE = NEGATION('"')
+     *   → public static class NotQuoteParser extends SingleCharacterParser { ... }
+     */
+    private String generateNegationClasses(GenContext ctx) {
+        if (ctx.tokenNegationMap.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<String, String> e : ctx.tokenNegationMap.entrySet()) {
+            String tokenName = e.getKey();
+            String excluded = e.getValue();
+            String className = toNegationParserName(tokenName);
+            sb.append("    // --- NEGATION parser for token ").append(tokenName).append(" ---\n");
+            sb.append("    public static class ").append(className)
+              .append(" extends org.unlaxer.parser.elementary.SingleCharacterParser {\n");
+            sb.append("        private static final long serialVersionUID = 1L;\n");
+            sb.append("        private static final String EXCLUDED = \"")
+              .append(escapeString(excluded)).append("\";\n");
+            sb.append("        @Override\n");
+            sb.append("        public boolean isMatch(char target) {\n");
+            sb.append("            return EXCLUDED.indexOf(target) < 0;\n");
+            sb.append("        }\n");
+            sb.append("    }\n\n");
+        }
+        return sb.toString();
+    }
 
     private void collectHelpers(GenContext ctx, RuleDecl rule) {
         collectHelpersInBody(ctx, rule.name(), rule.body());
@@ -636,7 +675,7 @@ public class ParserGenerator implements CodeGenerator {
             case RepeatElement rep -> {
                 if (isSingleRuleRef(rep.body())) {
                     AtomicElement single = getSingleAtomicElementFrom(rep.body());
-                    if (single instanceof RuleRefElement ref && isUntilToken(ctx, ref.name())) {
+                    if (single instanceof RuleRefElement ref && isInlineToken(ctx, ref.name())) {
                         yield "new ZeroOrMore(" + resolveParserExpression(ctx, ref.name()) + ")";
                     }
                     String parserClass = getSingleRuleRefClass(ctx, rep.body());
@@ -652,7 +691,7 @@ public class ParserGenerator implements CodeGenerator {
                 if (isSingleAtomicElement(opt.body())) {
                     AtomicElement inner = getSingleAtomicElementFrom(opt.body());
                     if (inner instanceof RuleRefElement ref) {
-                        if (isUntilToken(ctx, ref.name())) {
+                        if (isInlineToken(ctx, ref.name())) {
                             yield "new Optional(" + resolveParserExpression(ctx, ref.name()) + ")";
                         }
                         yield "new Optional(" + resolveParserClass(ctx, ref.name()) + ")";
@@ -673,7 +712,7 @@ public class ParserGenerator implements CodeGenerator {
             case OneOrMoreElement one -> {
                 if (isSingleRuleRef(one.body())) {
                     AtomicElement single = getSingleAtomicElementFrom(one.body());
-                    if (single instanceof RuleRefElement ref && isUntilToken(ctx, ref.name())) {
+                    if (single instanceof RuleRefElement ref && isInlineToken(ctx, ref.name())) {
                         yield "new OneOrMore(" + resolveParserExpression(ctx, ref.name()) + ")";
                     }
                     String parserClass = getSingleRuleRefClass(ctx, one.body());
@@ -742,6 +781,10 @@ public class ParserGenerator implements CodeGenerator {
      * Until トークンには使用しないこと（resolveParserExpression を使う）。
      */
     private String resolveParserClass(GenContext ctx, String name) {
+        // Negation tokens → generated inner class name
+        if (ctx.tokenNegationMap.containsKey(name)) {
+            return toNegationParserName(name) + ".class";
+        }
         String tokenClass = ctx.tokenParserMap.get(name);
         if (tokenClass != null) {
             return tokenClass + ".class";
@@ -751,8 +794,10 @@ public class ParserGenerator implements CodeGenerator {
 
     /**
      * ルール参照名をパーサー生成式（完全な Java 式）に変換する。
-     * - Simple トークン / ルール → Parser.get(X.class)
-     * - Until トークン → new WildCardStringTerninatorParser("terminator")
+     * - Simple / Negation / ルール → Parser.get(X.class)
+     * - Until → new WildCardStringTerninatorParser("terminator")
+     * - Lookahead → new MatchOnly(new WordParser("pattern"))
+     * - NegativeLookahead → new Not(new WordParser("pattern"))
      */
     private String resolveParserExpression(GenContext ctx, String name) {
         String terminator = ctx.tokenUntilMap.get(name);
@@ -760,12 +805,43 @@ public class ParserGenerator implements CodeGenerator {
             return "new org.unlaxer.parser.elementary.WildCardStringTerninatorParser(\""
                 + escapeString(terminator) + "\")";
         }
+        String laPattern = ctx.tokenLookaheadMap.get(name);
+        if (laPattern != null) {
+            return "new MatchOnly(new WordParser(\"" + escapeString(laPattern) + "\"))";
+        }
+        String nlaPattern = ctx.tokenNegLookaheadMap.get(name);
+        if (nlaPattern != null) {
+            return "new Not(new WordParser(\"" + escapeString(nlaPattern) + "\"))";
+        }
         return "Parser.get(" + resolveParserClass(ctx, name) + ")";
     }
 
-    /** 指定名が Until トークンかどうか */
-    private boolean isUntilToken(GenContext ctx, String name) {
-        return ctx.tokenUntilMap.containsKey(name);
+    /** 指定名がインライン生成式トークン（Until/Lookahead/NegativeLookahead）かどうか */
+    private boolean isInlineToken(GenContext ctx, String name) {
+        return ctx.tokenUntilMap.containsKey(name)
+            || ctx.tokenLookaheadMap.containsKey(name)
+            || ctx.tokenNegLookaheadMap.containsKey(name);
+    }
+
+    /**
+     * NEGATION トークン名を生成クラス名に変換する。
+     * 例: NOT_QUOTE → NotQuoteParser
+     */
+    private String toNegationParserName(String tokenName) {
+        StringBuilder sb = new StringBuilder();
+        boolean capitalizeNext = true;
+        for (char c : tokenName.toCharArray()) {
+            if (c == '_') {
+                capitalizeNext = true;
+            } else if (capitalizeNext) {
+                sb.append(Character.toUpperCase(c));
+                capitalizeNext = false;
+            } else {
+                sb.append(Character.toLowerCase(c));
+            }
+        }
+        sb.append("Parser");
+        return sb.toString();
     }
 
     private RightAssocShape getRightAssocShape(RuleDecl rule) {

@@ -261,6 +261,46 @@ public class UBNFParsersTest {
     }
 
     // =========================================================================
+    // T2-1: NEGATION  /  T2-2: LOOKAHEAD  /  T2-3: NEGATIVE_LOOKAHEAD
+    // =========================================================================
+
+    @Test
+    public void testTokenDecl_negation() {
+        String input = "grammar G {\n"
+            + "  @whitespace: javaStyle\n"
+            + "  token NOT_QUOTE = NEGATION('\"')\n"
+            + "  @root\n"
+            + "  Rule ::= NOT_QUOTE ;\n"
+            + "}";
+        Parsed parsed = parse(UBNFParsers.getRootParser(), input);
+        assertTrue("NEGATION token should parse successfully", parsed.isSucceeded());
+    }
+
+    @Test
+    public void testTokenDecl_lookahead() {
+        String input = "grammar G {\n"
+            + "  @whitespace: javaStyle\n"
+            + "  token COLON_AHEAD = LOOKAHEAD(':')\n"
+            + "  @root\n"
+            + "  Rule ::= COLON_AHEAD ;\n"
+            + "}";
+        Parsed parsed = parse(UBNFParsers.getRootParser(), input);
+        assertTrue("LOOKAHEAD token should parse successfully", parsed.isSucceeded());
+    }
+
+    @Test
+    public void testTokenDecl_negativeLookahead() {
+        String input = "grammar G {\n"
+            + "  @whitespace: javaStyle\n"
+            + "  token NOT_SLASH = NEGATIVE_LOOKAHEAD('//')\n"
+            + "  @root\n"
+            + "  Rule ::= NOT_SLASH ;\n"
+            + "}";
+        Parsed parsed = parse(UBNFParsers.getRootParser(), input);
+        assertTrue("NEGATIVE_LOOKAHEAD token should parse successfully", parsed.isSucceeded());
+    }
+
+    // =========================================================================
     // Postfix quantifiers: + and ?
     // =========================================================================
 

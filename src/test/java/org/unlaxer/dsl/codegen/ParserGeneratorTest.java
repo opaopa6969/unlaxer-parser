@@ -581,6 +581,72 @@ public class ParserGeneratorTest {
     }
 
     // =========================================================================
+    // T2-1: NEGATION  /  T2-2: LOOKAHEAD  /  T2-3: NEGATIVE_LOOKAHEAD
+    // =========================================================================
+
+    private static final String NEGATION_GRAMMAR =
+        "grammar Neg {\n" +
+        "  @package: org.example.neg\n" +
+        "  @whitespace: javaStyle\n" +
+        "  token NOT_QUOTE = NEGATION('\"')\n" +
+        "  @root\n" +
+        "  Neg ::= NOT_QUOTE ;\n" +
+        "}";
+
+    private static final String LOOKAHEAD_GRAMMAR =
+        "grammar La {\n" +
+        "  @package: org.example.la\n" +
+        "  @whitespace: javaStyle\n" +
+        "  token COLON_AHEAD = LOOKAHEAD(':')\n" +
+        "  @root\n" +
+        "  La ::= COLON_AHEAD ;\n" +
+        "}";
+
+    private static final String NEGATIVE_LOOKAHEAD_GRAMMAR =
+        "grammar Nla {\n" +
+        "  @package: org.example.nla\n" +
+        "  @whitespace: javaStyle\n" +
+        "  token NOT_SLASH = NEGATIVE_LOOKAHEAD('//')\n" +
+        "  @root\n" +
+        "  Nla ::= NOT_SLASH ;\n" +
+        "}";
+
+    @Test
+    public void testNegationGeneratesSingleCharacterParserSubclass() {
+        String source = generate(NEGATION_GRAMMAR);
+        assertTrue("NEGATION should generate SingleCharacterParser subclass",
+            source.contains("extends org.unlaxer.parser.elementary.SingleCharacterParser"));
+    }
+
+    @Test
+    public void testNegationGeneratesExcludedField() {
+        String source = generate(NEGATION_GRAMMAR);
+        assertTrue("NEGATION should embed excluded chars",
+            source.contains("EXCLUDED.indexOf(target) < 0"));
+    }
+
+    @Test
+    public void testNegationParserNameIsCamelCase() {
+        String source = generate(NEGATION_GRAMMAR);
+        assertTrue("NEGATION parser class should be NotQuoteParser",
+            source.contains("class NotQuoteParser"));
+    }
+
+    @Test
+    public void testLookaheadGeneratesMatchOnly() {
+        String source = generate(LOOKAHEAD_GRAMMAR);
+        assertTrue("LOOKAHEAD should generate MatchOnly",
+            source.contains("new MatchOnly(new WordParser(\":\"))"));
+    }
+
+    @Test
+    public void testNegativeLookaheadGeneratesNot() {
+        String source = generate(NEGATIVE_LOOKAHEAD_GRAMMAR);
+        assertTrue("NEGATIVE_LOOKAHEAD should generate Not",
+            source.contains("new Not(new WordParser(\"//\"))"));
+    }
+
+    // =========================================================================
     // エスケープシーケンス
     // =========================================================================
 

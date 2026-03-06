@@ -394,8 +394,63 @@ public class UBNFParsers {
     }
 
     /**
-     * TokenValueParser: UntilExpressionParser | QualifiedClassNameParser
-     * UNTIL を先に試してからクラス名にフォールバックする。
+     * NegationExpressionParser: NEGATION '(' STRING_LITERAL ')'
+     * 例: NEGATION('"') — 指定文字集合に含まれない単一文字にマッチ。
+     */
+    public static class NegationExpressionParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                new WordParser("NEGATION"),
+                Parser.get(LeftParenthesisParser.class),
+                Parser.get(SingleQuotedParser.class),
+                Parser.get(RightParenthesisParser.class)
+            );
+        }
+    }
+
+    /**
+     * LookaheadExpressionParser: LOOKAHEAD '(' STRING_LITERAL ')'
+     * 例: LOOKAHEAD(':') — 現在位置に指定パターンがあることを確認するが消費しない。
+     */
+    public static class LookaheadExpressionParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                new WordParser("LOOKAHEAD"),
+                Parser.get(LeftParenthesisParser.class),
+                Parser.get(SingleQuotedParser.class),
+                Parser.get(RightParenthesisParser.class)
+            );
+        }
+    }
+
+    /**
+     * NegativeLookaheadExpressionParser: NEGATIVE_LOOKAHEAD '(' STRING_LITERAL ')'
+     * 例: NEGATIVE_LOOKAHEAD('//') — 現在位置に指定パターンが無いことを確認する（消費しない）。
+     */
+    public static class NegativeLookaheadExpressionParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                new WordParser("NEGATIVE_LOOKAHEAD"),
+                Parser.get(LeftParenthesisParser.class),
+                Parser.get(SingleQuotedParser.class),
+                Parser.get(RightParenthesisParser.class)
+            );
+        }
+    }
+
+    /**
+     * TokenValueParser: UntilExpressionParser | NegationExpressionParser
+     *                 | LookaheadExpressionParser | NegativeLookaheadExpressionParser
+     *                 | QualifiedClassNameParser
      */
     public static class TokenValueParser extends LazyChoice {
         private static final long serialVersionUID = 1L;
@@ -404,6 +459,9 @@ public class UBNFParsers {
         public Parsers getLazyParsers() {
             return new Parsers(
                 Parser.get(UntilExpressionParser.class),
+                Parser.get(NegationExpressionParser.class),
+                Parser.get(LookaheadExpressionParser.class),
+                Parser.get(NegativeLookaheadExpressionParser.class),
                 Parser.get(QualifiedClassNameParser.class)
             );
         }

@@ -168,12 +168,29 @@ public class UBNFMapper {
         // UNTIL('terminator') 形式のチェック
         List<Token> untilTokens = findDescendants(token, UBNFParsers.UntilExpressionParser.class);
         if (!untilTokens.isEmpty()) {
-            List<Token> quotedTokens = findDescendants(
-                untilTokens.get(0), org.unlaxer.parser.elementary.SingleQuotedParser.class);
-            String terminator = quotedTokens.isEmpty()
-                ? ""
-                : stripQuotes(quotedTokens.get(0).source.toString().trim());
+            String terminator = extractQuotedValue(untilTokens.get(0));
             return new TokenDecl.Until(name, terminator);
+        }
+
+        // NEGATION('chars') 形式のチェック
+        List<Token> negTokens = findDescendants(token, UBNFParsers.NegationExpressionParser.class);
+        if (!negTokens.isEmpty()) {
+            String excludedChars = extractQuotedValue(negTokens.get(0));
+            return new TokenDecl.Negation(name, excludedChars);
+        }
+
+        // LOOKAHEAD('pattern') 形式のチェック
+        List<Token> laTokens = findDescendants(token, UBNFParsers.LookaheadExpressionParser.class);
+        if (!laTokens.isEmpty()) {
+            String pattern = extractQuotedValue(laTokens.get(0));
+            return new TokenDecl.Lookahead(name, pattern);
+        }
+
+        // NEGATIVE_LOOKAHEAD('pattern') 形式のチェック
+        List<Token> nlaTokens = findDescendants(token, UBNFParsers.NegativeLookaheadExpressionParser.class);
+        if (!nlaTokens.isEmpty()) {
+            String pattern = extractQuotedValue(nlaTokens.get(0));
+            return new TokenDecl.NegativeLookahead(name, pattern);
         }
 
         // QualifiedClassNameParser ノードからドット区切りクラス名を再構築する。
@@ -554,6 +571,17 @@ public class UBNFMapper {
             }
         }
         return results;
+    }
+
+    /**
+     * トークン内の最初の SingleQuotedParser 子孫からクォートを除去して値を返す。
+     */
+    private static String extractQuotedValue(Token token) {
+        List<Token> quotedTokens = findDescendants(
+            token, org.unlaxer.parser.elementary.SingleQuotedParser.class);
+        return quotedTokens.isEmpty()
+            ? ""
+            : stripQuotes(quotedTokens.get(0).source.toString().trim());
     }
 
     /**

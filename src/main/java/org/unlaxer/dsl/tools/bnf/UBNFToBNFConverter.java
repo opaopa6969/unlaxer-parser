@@ -141,8 +141,11 @@ public final class UBNFToBNFConverter {
     ) {
         String name = token.name();
         String tokenValue = switch (token) {
-            case UBNFAST.TokenDecl.Simple s -> s.parserClass();
-            case UBNFAST.TokenDecl.Until u -> "UNTIL('" + u.terminator() + "')";
+            case UBNFAST.TokenDecl.Simple s           -> s.parserClass();
+            case UBNFAST.TokenDecl.Until u            -> "UNTIL('" + u.terminator() + "')";
+            case UBNFAST.TokenDecl.Negation n         -> "NEGATION('" + n.excludedChars() + "')";
+            case UBNFAST.TokenDecl.Lookahead la       -> "LOOKAHEAD('" + la.pattern() + "')";
+            case UBNFAST.TokenDecl.NegativeLookahead nla -> "NEGATIVE_LOOKAHEAD('" + nla.pattern() + "')";
         };
 
         builder.append("(* token: ");

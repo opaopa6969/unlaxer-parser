@@ -71,11 +71,13 @@ public sealed interface UBNFAST permits
     /**
      * TokenDecl: token NAME = ( ParserClass | UNTIL(terminator) )
      */
-    sealed interface TokenDecl extends UBNFAST permits TokenDecl.Simple, TokenDecl.Until {
+    sealed interface TokenDecl extends UBNFAST
+        permits TokenDecl.Simple, TokenDecl.Until,
+                TokenDecl.Negation, TokenDecl.Lookahead, TokenDecl.NegativeLookahead {
         String name();
 
         /**
-         * Returns the parser class name, or null for UNTIL tokens.
+         * Returns the parser class name, or null for non-Simple tokens.
          * Use instanceof pattern matching for type-safe dispatch.
          */
         default String parserClass() { return null; }
@@ -83,8 +85,17 @@ public sealed interface UBNFAST permits
         /** token NAME = ClassName */
         record Simple(String name, String parserClass) implements TokenDecl {}
 
-        /** token NAME = UNTIL('terminator') */
+        /** token NAME = UNTIL('terminator') — matches until terminator string */
         record Until(String name, String terminator) implements TokenDecl {}
+
+        /** token NAME = NEGATION('chars') — matches single char NOT in excludedChars */
+        record Negation(String name, String excludedChars) implements TokenDecl {}
+
+        /** token NAME = LOOKAHEAD('pattern') — asserts pattern present, consumes no input */
+        record Lookahead(String name, String pattern) implements TokenDecl {}
+
+        /** token NAME = NEGATIVE_LOOKAHEAD('pattern') — asserts pattern absent, consumes no input */
+        record NegativeLookahead(String name, String pattern) implements TokenDecl {}
     }
 
     // =========================================================================
