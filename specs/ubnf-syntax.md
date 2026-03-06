@@ -17,6 +17,7 @@
 - [annotations.md](annotations.md) — アノテーション仕様
 - [token-resolution.md](token-resolution.md) — トークン解決仕様
 - [grammar/ubnf.ubnf](../grammar/ubnf.ubnf) — セルフホスティング文法定義
+- [docs/UBNF-EXTENSION-ROADMAP.md](../docs/UBNF-EXTENSION-ROADMAP.md) — 拡張ロードマップ（UNTIL, NEGATION, +, ? など）
 
 ## 用語定義
 
