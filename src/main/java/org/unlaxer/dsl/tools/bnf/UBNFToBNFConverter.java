@@ -13,6 +13,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GlobalSetting;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.KeyValuePair;
+import org.unlaxer.dsl.bootstrap.UBNFAST.OneOrMoreElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OptionalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RepeatElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RuleBody;
@@ -317,6 +318,9 @@ public final class UBNFToBNFConverter {
             builder.append("{ ");
             convertRuleBody(repeatElement.body(), builder, context);
             builder.append(" }");
+        } else if (element instanceof OneOrMoreElement oneOrMoreElement) {
+            convertRuleBody(oneOrMoreElement.body(), builder, context);
+            builder.append("+");
         } else if (element instanceof TerminalElement terminalElement) {
             builder.append("\"");
             builder.append(terminalElement.value());

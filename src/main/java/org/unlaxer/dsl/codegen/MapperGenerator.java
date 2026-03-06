@@ -7,6 +7,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.LeftAssocAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation;
+import org.unlaxer.dsl.bootstrap.UBNFAST.OneOrMoreElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OptionalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RepeatElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RightAssocAnnotation;
@@ -18,6 +19,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.SequenceBody;
 import org.unlaxer.dsl.bootstrap.UBNFAST.StringSettingValue;
 import org.unlaxer.dsl.bootstrap.UBNFAST.TerminalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.TokenDecl;
+import org.unlaxer.dsl.bootstrap.UBNFAST.TypeofElement;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -276,20 +278,24 @@ public class MapperGenerator implements CodeGenerator {
                     }
                     sb.append("        }\n");
                     sb.append("        ").append(leftType).append(" left = ").append(leftMapper).append(";\n");
-                    sb.append("        List<").append(opType).append("> op = new ArrayList<>();\n");
-                    sb.append("        List<").append(rightType).append("> right = new ArrayList<>();\n");
+                    sb.append("        List<").append(opType).append("> ops = new ArrayList<>();\n");
+                    sb.append("        List<").append(rightType).append("> rights = new ArrayList<>();\n");
                     sb.append("        for (Token repeatToken : findDescendants(working, ").append(repeatParserClass).append(")) {\n");
                     sb.append("            Token opToken = findFirstDescendant(repeatToken, ").append(opParserClass).append(");\n");
                     sb.append("            String opValue = firstTokenText(opToken == null ? repeatToken : opToken);\n");
                     sb.append("            if (opValue != null && !opValue.isEmpty()) {\n");
-                    sb.append("                op.add(stripQuotes(opValue));\n");
+                    sb.append("                ops.add(stripQuotes(opValue));\n");
                     sb.append("            }\n");
                     sb.append("            Token rightToken = findFirstDescendant(repeatToken, ").append(rightParserClass).append(");\n");
                     sb.append("            if (rightToken != null) {\n");
-                    sb.append("                right.add(").append(rightMapper).append(");\n");
+                    sb.append("                rights.add(").append(rightMapper).append(");\n");
                     sb.append("            }\n");
                     sb.append("        }\n");
-                    sb.append("        return registerNodeSourceSpan(new ").append(astClass).append(".").append(className).append("(left, op, right), working);\n");
+                    if (rightAssoc) {
+                        sb.append("        return registerNodeSourceSpan(foldRightAssoc").append(className).append("(left, ops, rights), working);\n");
+                    } else {
+                        sb.append("        return registerNodeSourceSpan(new ").append(astClass).append(".").append(className).append("(left, ops, rights), working);\n");
+                    }
                 } else {
                     sb.append("        throw new IllegalArgumentException(\"Unsupported assoc mapping shape for rule: ")
                       .append(rule.name()).append("\");\n");
@@ -297,6 +303,8 @@ public class MapperGenerator implements CodeGenerator {
             } else {
                 String ruleParserClass = parsersClass + "." + rule.name() + "Parser.class";
                 Map<String, Integer> scalarCaptureIndexByParserClass = new LinkedHashMap<>();
+                // Collect @typeof constraints: ownCaptureName -> referencedCaptureName
+                Map<String, String> typeofConstraints = collectTypeofConstraints(rule.body());
                 for (String param : mapping.paramNames()) {
                     String type = inferType(grammar, rule, param);
                     List<AtomicElement> capturedElements = findCapturedElements(rule.body(), param);
@@ -407,6 +415,21 @@ public class MapperGenerator implements CodeGenerator {
                         sb.append("        }\n");
                     }
                 }
+                // Emit @typeof runtime assertions
+                for (Map.Entry<String, String> constraint : typeofConstraints.entrySet()) {
+                    String ownCapture = constraint.getKey();
+                    String refCapture = constraint.getValue();
+                    sb.append("        if (").append(refCapture).append(" != null && ")
+                        .append(ownCapture).append(" != null && !")
+                        .append(refCapture).append(".getClass().equals(")
+                        .append(ownCapture).append(".getClass())) {\n");
+                    sb.append("            throw new IllegalArgumentException(\"@typeof constraint violated: ")
+                        .append(ownCapture).append(" must be same type as ")
+                        .append(refCapture).append(", expected \" + ")
+                        .append(refCapture).append(".getClass().getSimpleName() + \" but got \" + ")
+                        .append(ownCapture).append(".getClass().getSimpleName());\n");
+                    sb.append("        }\n");
+                }
                 sb.append("        ").append(astClass).append(".").append(className).append(" mapped = new ")
                     .append(astClass).append(".").append(className).append("(\n");
                 for (int i = 0; i < mapping.paramNames().size(); i++) {
@@ -420,6 +443,52 @@ public class MapperGenerator implements CodeGenerator {
             }
 
             sb.append("    }\n\n");
+        }
+
+        // Generate fold helper methods for right-associative rules
+        sb.append("    // =========================================================================\n");
+        sb.append("    // Fold Helpers (Right-Associative)\n");
+        sb.append("    // =========================================================================\n\n");
+
+        for (Map.Entry<String, RuleDecl> entry : mappingRules.entrySet()) {
+            String className = entry.getKey();
+            RuleDecl rule = entry.getValue();
+            MappingAnnotation mapping = getMappingAnnotation(rule).orElseThrow();
+            boolean rightAssoc = isRightAssocRule(rule, mapping);
+
+            if (rightAssoc) {
+                Optional<AssocShape> assocShapeOpt = findAssocShape(rule, "left", "op", "right");
+                if (assocShapeOpt.isPresent()) {
+                    String leftType = inferType(grammar, rule, "left");
+                    String opType = unwrapListType(inferType(grammar, rule, "op")).orElse("String");
+                    String rightType = unwrapListType(inferType(grammar, rule, "right")).orElse("Object");
+
+                    sb.append("    static ").append(astClass).append(".").append(className)
+                      .append(" foldRightAssoc").append(className).append("(\n");
+                    sb.append("            ").append(leftType).append(" left,\n");
+                    sb.append("            java.util.List<").append(opType).append("> ops,\n");
+                    sb.append("            java.util.List<").append(rightType).append("> rights) {\n");
+                    sb.append("        if (ops.isEmpty() || rights.isEmpty()) {\n");
+                    sb.append("            return new ").append(astClass).append(".").append(className)
+                      .append("(left, ops, rights);\n");
+                    sb.append("        }\n");
+                    sb.append("        // Right-associative fold: a op b op c => a op (b op c)\n");
+                    sb.append("        ").append(rightType).append(" right = rights.get(rights.size() - 1);\n");
+                    sb.append("        ").append(opType).append(" op = ops.get(ops.size() - 1);\n");
+                    sb.append("        java.util.List<").append(opType).append("> restOps = new java.util.ArrayList<>(ops);\n");
+                    sb.append("        java.util.List<").append(rightType).append("> restRights = new java.util.ArrayList<>(rights);\n");
+                    sb.append("        restOps.remove(restOps.size() - 1);\n");
+                    sb.append("        restRights.remove(restRights.size() - 1);\n");
+                    sb.append("        if (restRights.size() > 0) {\n");
+                    sb.append("            right = foldRightAssoc").append(className).append("(right, restOps, restRights);\n");
+                    sb.append("        }\n");
+                    sb.append("        java.util.List<").append(opType).append("> singleOp = java.util.List.of(op);\n");
+                    sb.append("        java.util.List<").append(rightType).append("> singleRight = java.util.List.of(right);\n");
+                    sb.append("        return new ").append(astClass).append(".").append(className)
+                      .append("(left, singleOp, singleRight);\n");
+                    sb.append("    }\n\n");
+                }
+            }
         }
 
         sb.append("    // =========================================================================\n");
@@ -966,12 +1035,56 @@ public class MapperGenerator implements CodeGenerator {
                 String inner = inferTypeFromBody(grammar, repeatElement.body());
                 yield "List<" + inner + ">";
             }
+            case OneOrMoreElement oneOrMoreElement -> {
+                String inner = inferTypeFromBody(grammar, oneOrMoreElement.body());
+                yield "List<" + inner + ">";
+            }
             case OptionalElement optionalElement -> {
                 String inner = inferTypeFromBody(grammar, optionalElement.body());
                 yield "Optional<" + inner + ">";
             }
             case GroupElement ignored -> "Object";
         };
+    }
+
+    /** TypeofElement を参照するキャプチャ名から実際の AtomicElement に解決する */
+    private AtomicElement resolveTypeofElement(TypeofElement typeofElement, RuleDecl rule) {
+        return findCapturedElement(rule.body(), typeofElement.captureName())
+            .orElse(new RuleRefElement("?"));
+    }
+
+    /** ルール本体から @typeof(x) @param の関係を収集する: paramName -> referencedCaptureName */
+    private Map<String, String> collectTypeofConstraints(RuleBody body) {
+        Map<String, String> result = new LinkedHashMap<>();
+        collectTypeofConstraintsFromBody(body, result);
+        return result;
+    }
+
+    private void collectTypeofConstraintsFromBody(RuleBody body, Map<String, String> result) {
+        switch (body) {
+            case ChoiceBody choiceBody -> {
+                for (SequenceBody seq : choiceBody.alternatives()) {
+                    collectTypeofConstraintsFromSequence(seq, result);
+                }
+            }
+            case SequenceBody seq -> collectTypeofConstraintsFromSequence(seq, result);
+        }
+    }
+
+    private void collectTypeofConstraintsFromSequence(SequenceBody seq, Map<String, String> result) {
+        for (AnnotatedElement ae : seq.elements()) {
+            if (ae.typeofConstraint().isPresent() && ae.captureName().isPresent()) {
+                TypeofElement te = ae.typeofConstraint().get();
+                result.put(ae.captureName().get(), te.captureName());
+            } else {
+                switch (ae.element()) {
+                    case GroupElement g -> collectTypeofConstraintsFromBody(g.body(), result);
+                    case OptionalElement o -> collectTypeofConstraintsFromBody(o.body(), result);
+                    case RepeatElement r -> collectTypeofConstraintsFromBody(r.body(), result);
+                    default -> {}
+                }
+            }
+        }
     }
 
     private String inferTypeFromBody(GrammarDecl grammar, RuleBody body) {

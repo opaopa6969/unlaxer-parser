@@ -19,7 +19,11 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.InterleaveAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.LeftAssocAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.PrecedenceAnnotation;
+import org.unlaxer.dsl.bootstrap.UBNFAST.OneOrMoreElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.OptionalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RepeatElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.RuleRefElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.SequenceBody;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RightAssocAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RootAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RuleDecl;
@@ -307,5 +311,59 @@ public class UBNFMapperTest {
         assertEquals("Factor", factorRule.name());
         ChoiceBody factorBody = (ChoiceBody) factorRule.body();
         assertEquals(3, factorBody.alternatives().size());
+    }
+
+    // =========================================================================
+    // Postfix quantifier AST: + and ?
+    // =========================================================================
+
+    @Test
+    public void testPostfixPlus_producesOneOrMoreElement() {
+        String input = "grammar G {\n"
+            + "  @whitespace: javaStyle\n"
+            + "  token ID = IdentifierParser\n"
+            + "  @root\n"
+            + "  Rule ::= ID+ ;\n"
+            + "}";
+        GrammarDecl grammar = UBNFMapper.parse(input).grammars().get(0);
+        RuleDecl rule = grammar.rules().get(0);
+        ChoiceBody choice = (ChoiceBody) rule.body();
+        SequenceBody seq = choice.alternatives().get(0);
+        AtomicElement element = seq.elements().get(0).element();
+        assertTrue("ID+ should produce OneOrMoreElement", element instanceof OneOrMoreElement);
+    }
+
+    @Test
+    public void testPostfixPlus_innerIsRuleRef() {
+        String input = "grammar G {\n"
+            + "  @whitespace: javaStyle\n"
+            + "  token ID = IdentifierParser\n"
+            + "  @root\n"
+            + "  Rule ::= ID+ ;\n"
+            + "}";
+        GrammarDecl grammar = UBNFMapper.parse(input).grammars().get(0);
+        RuleDecl rule = grammar.rules().get(0);
+        ChoiceBody choice = (ChoiceBody) rule.body();
+        SequenceBody seq = choice.alternatives().get(0);
+        OneOrMoreElement one = (OneOrMoreElement) seq.elements().get(0).element();
+        SequenceBody inner = (SequenceBody) one.body();
+        assertTrue("inner element should be RuleRefElement",
+            inner.elements().get(0).element() instanceof RuleRefElement);
+    }
+
+    @Test
+    public void testPostfixQuestion_producesOptionalElement() {
+        String input = "grammar G {\n"
+            + "  @whitespace: javaStyle\n"
+            + "  token ID = IdentifierParser\n"
+            + "  @root\n"
+            + "  Rule ::= ID? ;\n"
+            + "}";
+        GrammarDecl grammar = UBNFMapper.parse(input).grammars().get(0);
+        RuleDecl rule = grammar.rules().get(0);
+        ChoiceBody choice = (ChoiceBody) rule.body();
+        SequenceBody seq = choice.alternatives().get(0);
+        AtomicElement element = seq.elements().get(0).element();
+        assertTrue("ID? should produce OptionalElement", element instanceof OptionalElement);
     }
 }

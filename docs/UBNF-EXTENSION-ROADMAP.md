@@ -1,7 +1,7 @@
 # UBNF 拡張ロードマップ
 
 > ステータス: draft
-> 最終更新: 2026-03-06
+> 最終更新: 2026-03-07
 > 関連: [specs/ubnf-syntax.md](../specs/ubnf-syntax.md) · [specs/open-questions.md](../specs/open-questions.md)
 
 ## 概要
@@ -16,12 +16,14 @@ UBNF の表現力を段階的に ANTLR/EBNF 水準に引き上げるためのロ
 ```
 ✅ grammar 宣言
 ✅ token 宣言（ParserClass 形式）
-✅ token 宣言（UNTIL 形式）  ← v0.1 で実装済み
+✅ token 宣言（UNTIL 形式）  ← v0.2 で実装済み
 ✅ rule 宣言
 ✅ シーケンス（暗黙的）
 ✅ 選択肢 (|)
 ✅ グループ (...)
 ✅ 0回以上 {...}
+✅ 1回以上 element+  ← v0.2 で実装済み
+✅ 0または1回 element?  ← v0.2 で実装済み
 ✅ オプション [...]
 ✅ リテラル '...'
 ✅ キャプチャ @name
@@ -49,49 +51,44 @@ token CODE_BODY = UNTIL('```')
 
 ---
 
-### T1-2: `+` 演算子（1回以上）
+### T1-2: `+` 演算子（1回以上）✅ 実装済み
 
-**ステータス**: 未実装
+**ステータス**: `unlaxer-dsl` v0.2.0 にて実装済み
 **優先度**: High — EBNF との表記互換性
 
-**設計案**:
-
 ```ubnf
-// 現状（迂回策）
+// 現状の等価表記
 rule digits ::= digit { digit } ;
 
-// 提案（+ 演算子）
+// 新しい postfix 構文
 rule digits ::= digit+ ;
 rule words  ::= word+ ;
 ```
 
-**実装方針**:
-- `UBNFParsers`: `AnnotatedElementParser` の後に `+` / `?` / `*` を postfix として認識
-- `UBNFAST`: `AtomicElement` を拡張するか、`AnnotatedElement` に量化フィールドを追加
-- `ParserGenerator`: `OneOrMore(...)` を生成
-
-**影響範囲**: パーサー・AST・マッパー・コード生成器・スナップショット
-**推定工数**: M（中）
+**実装内容**:
+- `UBNFAST.OneOrMoreElement(RuleBody body)` を `AtomicElement` sealed hierarchy に追加
+- `UBNFParsers.PlusParser`, `PostfixQuantifierParser` を追加
+- `AnnotatedElementParser` に `Optional(PostfixQuantifierParser)` を追加
+- `UBNFMapper.toAnnotatedElement` で `+` を検出し `OneOrMoreElement` でラップ
+- `ParserGenerator` が `new OneOrMore(XxxParser.class)` を生成
+- `ASTGenerator`, `MapperGenerator`, `RailroadMain`, `UBNFToRailroad`, `UBNFToBNFConverter` も対応
 
 ---
 
-### T1-3: `?` 演算子（0または1回）
+### T1-3: `?` 演算子（0または1回）✅ 実装済み
 
-**ステータス**: 未実装
+**ステータス**: `unlaxer-dsl` v0.2.0 にて実装済み（T1-2 と同一 PR）
 **優先度**: High — EBNF との表記互換性
 
-**設計案**:
-
 ```ubnf
-// 現状（迂回策）
+// 現状の等価表記
 rule maybeSign ::= [ sign ] ;
 
-// 提案
+// 新しい postfix 構文
 rule maybeSign ::= sign? ;
-rule optInit   ::= [ '=' expr ]? ;  // グループに ? をつける
 ```
 
-**実装方針**: T1-2 と同時に実装（同一の postfix 機構）
+**実装内容**: T1-2 と同一の postfix 機構。`?` は `UBNFMapper` で既存の `OptionalElement` にラップ。
 
 ---
 

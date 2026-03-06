@@ -21,6 +21,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.InterleaveAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.KeyValuePair;
 import org.unlaxer.dsl.bootstrap.UBNFAST.LeftAssocAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation;
+import org.unlaxer.dsl.bootstrap.UBNFAST.OneOrMoreElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OptionalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.PrecedenceAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RepeatElement;
@@ -422,7 +423,20 @@ public class UBNFMapper {
     }
 
     static AnnotatedElement toAnnotatedElement(Token token) {
-        AtomicElement element = toAtomicElement(token);
+        AtomicElement baseElement = toAtomicElement(token);
+
+        // Postfix quantifier: '+' → OneOrMoreElement, '?' → OptionalElement
+        List<Token> postfixTokens = findDescendants(token, UBNFParsers.PostfixQuantifierParser.class);
+        AtomicElement element;
+        if (!postfixTokens.isEmpty()) {
+            String postfix = postfixTokens.get(0).source.toString().trim();
+            RuleBody wrappedBody = wrapElementInSequenceBody(baseElement);
+            element = "+".equals(postfix)
+                ? new OneOrMoreElement(wrappedBody)
+                : new OptionalElement(wrappedBody);
+        } else {
+            element = baseElement;
+        }
 
         // キャプチャ名: AnnotatedElementParser の filteredChildren から
         // AtSignParser の直後の IdentifierParser を探す
@@ -432,6 +446,11 @@ public class UBNFMapper {
         Optional<TypeofElement> typeofConstraint = findTypeofConstraintInAnnotatedElement(token);
 
         return new AnnotatedElement(element, captureName, typeofConstraint);
+    }
+
+    private static RuleBody wrapElementInSequenceBody(AtomicElement element) {
+        AnnotatedElement ae = new AnnotatedElement(element, Optional.empty(), Optional.empty());
+        return new SequenceBody(List.of(ae));
     }
 
     static Optional<String> findCaptureNameInAnnotatedElement(Token token) {

@@ -185,6 +185,7 @@ public sealed interface UBNFAST permits
         UBNFAST.GroupElement,
         UBNFAST.OptionalElement,
         UBNFAST.RepeatElement,
+        UBNFAST.OneOrMoreElement,
         UBNFAST.TerminalElement,
         UBNFAST.RuleRefElement {}
 
@@ -196,6 +197,9 @@ public sealed interface UBNFAST permits
 
     /** { RuleBody } */
     record RepeatElement(RuleBody body) implements AtomicElement {}
+
+    /** element+ — one or more occurrences */
+    record OneOrMoreElement(RuleBody body) implements AtomicElement {}
 
     /** 'literal' */
     record TerminalElement(String value) implements AtomicElement {}

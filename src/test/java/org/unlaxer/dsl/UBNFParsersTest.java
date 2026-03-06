@@ -261,6 +261,59 @@ public class UBNFParsersTest {
     }
 
     // =========================================================================
+    // Postfix quantifiers: + and ?
+    // =========================================================================
+
+    @Test
+    public void testAnnotatedElement_plusQuantifier() {
+        String input = "grammar G {\n"
+            + "  @whitespace: javaStyle\n"
+            + "  token ID = IdentifierParser\n"
+            + "  @root\n"
+            + "  Rule ::= ID+ ;\n"
+            + "}";
+        Parsed parsed = parse(UBNFParsers.getRootParser(), input);
+        assertTrue("ID+ should parse successfully", parsed.isSucceeded());
+    }
+
+    @Test
+    public void testAnnotatedElement_questionMarkQuantifier() {
+        String input = "grammar G {\n"
+            + "  @whitespace: javaStyle\n"
+            + "  token ID = IdentifierParser\n"
+            + "  @root\n"
+            + "  Rule ::= ID? ;\n"
+            + "}";
+        Parsed parsed = parse(UBNFParsers.getRootParser(), input);
+        assertTrue("ID? should parse successfully", parsed.isSucceeded());
+    }
+
+    @Test
+    public void testAnnotatedElement_plusOnTerminal() {
+        String input = "grammar G {\n"
+            + "  @whitespace: javaStyle\n"
+            + "  token ID = IdentifierParser\n"
+            + "  @root\n"
+            + "  Rule ::= 'x'+ ID ;\n"
+            + "}";
+        Parsed parsed = parse(UBNFParsers.getRootParser(), input);
+        assertTrue("'x'+ should parse successfully", parsed.isSucceeded());
+    }
+
+    @Test
+    public void testAnnotatedElement_plusWithCapture() {
+        String input = "grammar G {\n"
+            + "  @whitespace: javaStyle\n"
+            + "  token ID = IdentifierParser\n"
+            + "  @root\n"
+            + "  @mapping(FooExpr, params=[items])\n"
+            + "  Rule ::= ID+ @items ;\n"
+            + "}";
+        Parsed parsed = parse(UBNFParsers.getRootParser(), input);
+        assertTrue("ID+ @capture should parse successfully", parsed.isSucceeded());
+    }
+
+    // =========================================================================
     // UBNFFile（tinycalc.ubnf の内容でフル検証）
     // =========================================================================
 

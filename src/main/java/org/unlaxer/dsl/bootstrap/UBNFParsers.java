@@ -112,6 +112,45 @@ public class UBNFParsers {
         }
     }
 
+    public static class PlusParser extends SingleCharacterParser {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public boolean isMatch(char target) {
+            return '+' == target;
+        }
+    }
+
+    public static class QuestionMarkParser extends SingleCharacterParser {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public boolean isMatch(char target) {
+            return '?' == target;
+        }
+    }
+
+    /**
+     * PostfixQuantifier: '+' | '?'
+     * Appears optionally after an AtomicElement in AnnotatedElement.
+     */
+    public static class PostfixQuantifierParser extends LazyChoice {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                Parser.get(PlusParser.class),
+                Parser.get(QuestionMarkParser.class)
+            );
+        }
+
+        @Override
+        public Optional<RecursiveMode> getNotAstNodeSpecifier() {
+            return Optional.empty();
+        }
+    }
+
     public static class DigitParser extends SingleCharacterParser {
         private static final long serialVersionUID = 1L;
 
@@ -811,7 +850,8 @@ public class UBNFParsers {
     }
 
     /**
-     * AnnotatedElement: ['@typeof' '(' IDENTIFIER ')'] AtomicElement ['@' IDENTIFIER]
+     * AnnotatedElement: ['@typeof' '(' IDENTIFIER ')'] AtomicElement [PostfixQuantifier] ['@' IDENTIFIER]
+     * PostfixQuantifier: '+' | '?'
      */
     public static class AnnotatedElementParser extends UBNFLazyChain {
         private static final long serialVersionUID = 1L;
@@ -823,6 +863,9 @@ public class UBNFParsers {
                     Parser.get(TypeofElementParser.class)
                 ),
                 Parser.get(AtomicElementParser.class),
+                new org.unlaxer.parser.combinator.Optional(
+                    Parser.get(PostfixQuantifierParser.class)
+                ),
                 new org.unlaxer.parser.combinator.Optional(
                     new UBNFLazyChain() {
                         private static final long serialVersionUID = 1L;

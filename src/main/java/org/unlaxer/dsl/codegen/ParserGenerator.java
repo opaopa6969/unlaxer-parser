@@ -9,6 +9,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.InterleaveAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.LeftAssocAnnotation;
+import org.unlaxer.dsl.bootstrap.UBNFAST.OneOrMoreElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OptionalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.PrecedenceAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RepeatElement;
@@ -422,6 +423,19 @@ public class ParserGenerator implements CodeGenerator {
                     ctx.addHelper(ruleName, helperCode);
                 }
             }
+            case OneOrMoreElement one -> {
+                if (!isSingleRuleRef(one.body())) {
+                    int n = ctx.nextRepeat(ruleName);
+                    String helperName = ruleName + "OneOrMore" + n + "Parser";
+                    int[] before = ctx.snapshotCounters(ruleName);
+                    collectHelpersInBody(ctx, ruleName, one.body());
+                    int[] after = ctx.snapshotCounters(ruleName);
+                    ctx.restoreCounters(ruleName, before);
+                    String helperCode = generateHelperCode(ctx, ruleName, helperName, one.body());
+                    ctx.restoreCounters(ruleName, after);
+                    ctx.addHelper(ruleName, helperCode);
+                }
+            }
             case GroupElement g -> {
                 int n = ctx.nextGroup(ruleName);
                 String helperName = ruleName + "Group" + n + "Parser";
@@ -653,6 +667,21 @@ public class ParserGenerator implements CodeGenerator {
                     int n = ctx.nextOpt(ruleName);
                     String helperName = ruleName + "Opt" + n + "Parser";
                     yield "new Optional(" + helperName + ".class)";
+                }
+            }
+
+            case OneOrMoreElement one -> {
+                if (isSingleRuleRef(one.body())) {
+                    AtomicElement single = getSingleAtomicElementFrom(one.body());
+                    if (single instanceof RuleRefElement ref && isUntilToken(ctx, ref.name())) {
+                        yield "new OneOrMore(" + resolveParserExpression(ctx, ref.name()) + ")";
+                    }
+                    String parserClass = getSingleRuleRefClass(ctx, one.body());
+                    yield "new OneOrMore(" + parserClass + ")";
+                } else {
+                    int n = ctx.nextRepeat(ruleName);
+                    String helperName = ruleName + "OneOrMore" + n + "Parser";
+                    yield "new OneOrMore(" + helperName + ".class)";
                 }
             }
 

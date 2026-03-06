@@ -581,6 +581,64 @@ public class ParserGeneratorTest {
     }
 
     // =========================================================================
+    // Postfix quantifiers: + and ?
+    // =========================================================================
+
+    private static final String PLUS_GRAMMAR =
+        "grammar Items {\n" +
+        "  @package: org.example.items\n" +
+        "  @whitespace: javaStyle\n" +
+        "  token ID = IdentifierParser\n" +
+        "  @root\n" +
+        "  Items ::= ID+ ;\n" +
+        "}";
+
+    private static final String QUESTION_GRAMMAR =
+        "grammar Maybe {\n" +
+        "  @package: org.example.maybe\n" +
+        "  @whitespace: javaStyle\n" +
+        "  token ID = IdentifierParser\n" +
+        "  @root\n" +
+        "  Maybe ::= ID? ;\n" +
+        "}";
+
+    @Test
+    public void testPlusGeneratesOneOrMore() {
+        String source = generate(PLUS_GRAMMAR);
+        assertTrue("ID+ should generate OneOrMore",
+            source.contains("OneOrMore"));
+    }
+
+    @Test
+    public void testPlusUsesParserClass() {
+        String source = generate(PLUS_GRAMMAR);
+        assertTrue("ID+ should use IdentifierParser.class",
+            source.contains("IdentifierParser.class"));
+    }
+
+    @Test
+    public void testPlusDoesNotGenerateZeroOrMore() {
+        String source = generate(PLUS_GRAMMAR);
+        assertFalse("ID+ must not generate new ZeroOrMore(...)",
+            source.contains("new ZeroOrMore("));
+    }
+
+    @Test
+    public void testQuestionGeneratesOptional() {
+        String source = generate(QUESTION_GRAMMAR);
+        assertTrue("ID? should generate Optional",
+            source.contains("Optional(IdentifierParser.class)") ||
+            source.contains("new Optional("));
+    }
+
+    @Test
+    public void testQuestionDoesNotGenerateZeroOrMore() {
+        String source = generate(QUESTION_GRAMMAR);
+        assertFalse("ID? must not generate new ZeroOrMore(...)",
+            source.contains("new ZeroOrMore("));
+    }
+
+    // =========================================================================
     // ヘルパーメソッド
     // =========================================================================
 
