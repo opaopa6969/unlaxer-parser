@@ -139,6 +139,37 @@ public class UBNFParsers {
         }
     }
 
+    public static class PercentParser extends SingleCharacterParser {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public boolean isMatch(char target) {
+            return '%' == target;
+        }
+    }
+
+    /**
+     * SeparatedBy: '%' AtomicElement
+     * Appears optionally after an AtomicElement in AnnotatedElement.
+     * Produces elem % sep → elem (sep elem)*
+     */
+    public static class SeparatedByParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                Parser.get(PercentParser.class),
+                Parser.get(AtomicElementParser.class)
+            );
+        }
+
+        @Override
+        public Optional<RecursiveMode> getNotAstNodeSpecifier() {
+            return Optional.empty();
+        }
+    }
+
     /**
      * PostfixQuantifier: '+' | '?' | '*'
      * Appears optionally after an AtomicElement in AnnotatedElement.
@@ -564,9 +595,28 @@ public class UBNFParsers {
     }
 
     /**
+     * RegexExpressionParser: REGEX '(' STRING_LITERAL ')'
+     * 例: REGEX('[a-z]+')
+     */
+    public static class RegexExpressionParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                new WordParser("REGEX"),
+                Parser.get(LeftParenthesisParser.class),
+                Parser.get(SingleQuotedParser.class),
+                Parser.get(RightParenthesisParser.class)
+            );
+        }
+    }
+
+    /**
      * TokenValueParser: UntilExpressionParser | NegationExpressionParser
      *                 | LookaheadExpressionParser | NegativeLookaheadExpressionParser
      *                 | CharRangeExpressionParser | CIExpressionParser
+     *                 | RegexExpressionParser
      *                 | AnyKeywordParser | EofKeywordParser | EmptyKeywordParser
      *                 | QualifiedClassNameParser
      */
@@ -582,6 +632,7 @@ public class UBNFParsers {
                 Parser.get(NegativeLookaheadExpressionParser.class),
                 Parser.get(CharRangeExpressionParser.class),
                 Parser.get(CIExpressionParser.class),
+                Parser.get(RegexExpressionParser.class),
                 Parser.get(AnyKeywordParser.class),
                 Parser.get(EofKeywordParser.class),
                 Parser.get(EmptyKeywordParser.class),
@@ -894,6 +945,21 @@ public class UBNFParsers {
     }
 
     /**
+     * SkipAnnotation: '@skip'
+     * Marks a rule as transparent to the AST token tree.
+     */
+    public static class SkipAnnotationParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                new WordParser("@skip")
+            );
+        }
+    }
+
+    /**
      * SimpleAnnotation: '@' IDENTIFIER
      * （上記の特殊アノテーションにマッチしない場合のフォールバック）
      */
@@ -913,7 +979,7 @@ public class UBNFParsers {
      * Annotation: RootAnnotation | MappingAnnotation | WhitespaceAnnotation
      *           | InterleaveAnnotation | BackrefAnnotation | ScopeTreeAnnotation
      *           | LeftAssocAnnotation | RightAssocAnnotation
-     *           | PrecedenceAnnotation | SimpleAnnotation
+     *           | PrecedenceAnnotation | DocAnnotation | SkipAnnotation | SimpleAnnotation
      */
     public static class AnnotationParser extends LazyChoice {
         private static final long serialVersionUID = 1L;
@@ -931,6 +997,7 @@ public class UBNFParsers {
                 Parser.get(RightAssocAnnotationParser.class),
                 Parser.get(PrecedenceAnnotationParser.class),
                 Parser.get(DocAnnotationParser.class),
+                Parser.get(SkipAnnotationParser.class),
                 Parser.get(SimpleAnnotationParser.class)
             );
         }
@@ -1068,9 +1135,10 @@ public class UBNFParsers {
     }
 
     /**
-     * AnnotatedElement: ['@typeof' '(' IDENTIFIER ')'] AtomicElement [PostfixQuantifier | BoundedQuantifier] ['@' IDENTIFIER]
+     * AnnotatedElement: ['@typeof' '(' IDENTIFIER ')'] AtomicElement [PostfixQuantifier | BoundedQuantifier | SeparatedBy] ['@' IDENTIFIER]
      * PostfixQuantifier: '+' | '?' | '*'
      * BoundedQuantifier: '{' n [',' m?] '}'
+     * SeparatedBy: '%' AtomicElement
      */
     public static class AnnotatedElementParser extends UBNFLazyChain {
         private static final long serialVersionUID = 1L;
@@ -1083,7 +1151,7 @@ public class UBNFParsers {
                 ),
                 Parser.get(AtomicElementParser.class),
                 new org.unlaxer.parser.combinator.Optional(
-                    new Choice(PostfixQuantifierParser.class, BoundedQuantifierParser.class)
+                    new Choice(PostfixQuantifierParser.class, BoundedQuantifierParser.class, SeparatedByParser.class)
                 ),
                 new org.unlaxer.parser.combinator.Optional(
                     new UBNFLazyChain() {

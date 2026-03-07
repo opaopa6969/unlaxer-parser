@@ -9,6 +9,8 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.LeftAssocAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.BoundedRepeatElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ErrorElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.SeparatedElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.SkipAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OneOrMoreElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OptionalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RepeatElement;
@@ -58,10 +60,13 @@ public class MapperGenerator implements CodeGenerator {
         Map<String, RuleDecl> mappingRules = new LinkedHashMap<>();
         Map<String, String> mappedClassByRuleName = new LinkedHashMap<>();
         for (RuleDecl rule : grammar.rules()) {
-            getMappingAnnotation(rule).ifPresent(m -> {
-                mappingRules.putIfAbsent(m.className(), rule);
-                mappedClassByRuleName.putIfAbsent(rule.name(), m.className());
-            });
+            boolean isSkip = rule.annotations().stream().anyMatch(a -> a instanceof SkipAnnotation);
+            if (!isSkip) {
+                getMappingAnnotation(rule).ifPresent(m -> {
+                    mappingRules.putIfAbsent(m.className(), rule);
+                    mappedClassByRuleName.putIfAbsent(rule.name(), m.className());
+                });
+            }
         }
 
         StringBuilder sb = new StringBuilder();
@@ -1048,6 +1053,10 @@ public class MapperGenerator implements CodeGenerator {
             case OptionalElement optionalElement -> {
                 String inner = inferTypeFromBody(grammar, optionalElement.body());
                 yield "Optional<" + inner + ">";
+            }
+            case SeparatedElement sep -> {
+                String inner = inferTypeFromElement(grammar, sep.element());
+                yield "List<" + inner + ">";
             }
             case GroupElement ignored -> "Object";
             case ErrorElement ignored -> "Object";

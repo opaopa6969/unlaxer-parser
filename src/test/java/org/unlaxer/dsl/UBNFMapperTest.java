@@ -32,6 +32,8 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.ScopeTreeAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.SequenceBody;
 import org.unlaxer.dsl.bootstrap.UBNFAST.StringSettingValue;
 import org.unlaxer.dsl.bootstrap.UBNFAST.TerminalElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.SeparatedElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.SkipAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.TokenDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.UBNFFile;
 import org.unlaxer.dsl.bootstrap.UBNFMapper;
@@ -403,5 +405,51 @@ public class UBNFMapperTest {
         SequenceBody seq = choice.alternatives().get(0);
         AtomicElement element = seq.elements().get(0).element();
         assertTrue("ID? should produce OptionalElement", element instanceof OptionalElement);
+    }
+
+    @Test
+    public void testSeparatedElement_producesCorrectAST() {
+        String input = "grammar G {\n"
+            + "  @whitespace: javaStyle\n"
+            + "  token ID = IdentifierParser\n"
+            + "  @root\n"
+            + "  Rule ::= ID % ',' ;\n"
+            + "}";
+        GrammarDecl grammar = UBNFMapper.parse(input).grammars().get(0);
+        RuleDecl rule = grammar.rules().get(0);
+        ChoiceBody choice = (ChoiceBody) rule.body();
+        SequenceBody seq = choice.alternatives().get(0);
+        AtomicElement element = seq.elements().get(0).element();
+        assertTrue("ID % ',' should produce SeparatedElement", element instanceof SeparatedElement);
+        SeparatedElement sep = (SeparatedElement) element;
+        assertTrue("element should be RuleRefElement", sep.element() instanceof RuleRefElement);
+        assertTrue("separator should be TerminalElement", sep.separator() instanceof TerminalElement);
+    }
+
+    @Test
+    public void testSkipAnnotation_parsedCorrectly() {
+        String input = "grammar G {\n"
+            + "  @whitespace: javaStyle\n"
+            + "  @skip\n"
+            + "  @root\n"
+            + "  Comma ::= ',' ;\n"
+            + "}";
+        GrammarDecl grammar = UBNFMapper.parse(input).grammars().get(0);
+        RuleDecl rule = grammar.rules().get(0);
+        boolean hasSkip = rule.annotations().stream().anyMatch(a -> a instanceof SkipAnnotation);
+        assertTrue("@skip should produce SkipAnnotation", hasSkip);
+    }
+
+    @Test
+    public void testTokenDecl_regex() {
+        String input = "grammar G {\n"
+            + "  token ID = REGEX('[a-z]+')\n"
+            + "  @root\n"
+            + "  Rule ::= ID ;\n"
+            + "}";
+        GrammarDecl grammar = UBNFMapper.parse(input).grammars().get(0);
+        TokenDecl token = grammar.tokens().get(0);
+        assertTrue("REGEX token should produce TokenDecl.Regex", token instanceof TokenDecl.Regex);
+        assertEquals("[a-z]+", ((TokenDecl.Regex) token).pattern());
     }
 }

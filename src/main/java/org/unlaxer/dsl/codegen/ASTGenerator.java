@@ -8,6 +8,8 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.BoundedRepeatElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ErrorElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.SeparatedElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.SkipAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OneOrMoreElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OptionalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RepeatElement;
@@ -42,11 +44,15 @@ public class ASTGenerator implements CodeGenerator {
         String className = grammarName + "AST";
 
         // @mapping アノテーション付きルールを収集（クラス名で重複排除、順序保持）
+        // @skip が付いているルールは AST 生成対象外
         Map<String, RuleDecl> mappingRules = new LinkedHashMap<>();
         for (RuleDecl rule : grammar.rules()) {
-            getMappingAnnotation(rule).ifPresent(m -> {
-                mappingRules.putIfAbsent(m.className(), rule);
-            });
+            boolean isSkip = rule.annotations().stream().anyMatch(a -> a instanceof SkipAnnotation);
+            if (!isSkip) {
+                getMappingAnnotation(rule).ifPresent(m -> {
+                    mappingRules.putIfAbsent(m.className(), rule);
+                });
+            }
         }
 
         StringBuilder sb = new StringBuilder();
@@ -150,6 +156,10 @@ public class ASTGenerator implements CodeGenerator {
             case OptionalElement opt -> {
                 String inner = inferTypeFromBody(grammar, opt.body());
                 yield "Optional<" + inner + ">";
+            }
+            case SeparatedElement sep -> {
+                String inner = inferTypeFromElement(grammar, sep.element());
+                yield "List<" + inner + ">";
             }
             case GroupElement g -> "Object";
             case ErrorElement e -> "Object";

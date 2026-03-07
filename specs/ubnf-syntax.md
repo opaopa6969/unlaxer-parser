@@ -222,6 +222,23 @@ token KW_FROM   = CI('from')
 > **ユースケース**: SQL や HTML などの大文字小文字を区別しない言語。
 > MiniLang は区別しますが、`SELECT` を書いても `select` でも通したい場合に使います。
 
+#### `REGEX('pattern')` — 正規表現によるマッチ
+
+```ubnf
+token IDENTIFIER = REGEX('[a-zA-Z_][a-zA-Z0-9_]*')
+token INTEGER    = REGEX('[0-9]+')
+token FLOAT      = REGEX('[0-9]+\\.[0-9]+')
+```
+
+> **ユースケース**: 複雑な文字パターンを正規表現で簡潔に書きたいとき。
+> Java の `Pattern`（`java.util.regex`）形式の正規表現が使えます。
+>
+> **動作**: 現在位置に正規表現をアンカリングして適用し、マッチした長さ分のソースを消費します。
+> ゼロ幅マッチ（空文字列にマッチ）は失敗として扱われます。
+>
+> **生成コード**: `REGEX('pattern')` を使ったトークンには、
+> `org.unlaxer.dsl.runtime.RegexTokenParser` を継承したクラスが生成されます。
+
 ---
 
 ## コメント
@@ -399,6 +416,30 @@ Password ::= VISIBLE_CHAR{8,32} ;
 ArgList ::= Expr{1,} ;
 ```
 
+### `elem % sep` — セパレータ区切りリスト（1個以上）
+
+`elem % sep` は「`elem` が `sep` 区切りで1個以上並ぶ」という意味です。
+`elem (sep elem)*` と展開されます：
+
+```ubnf
+// カンマ区切りの引数リスト（最低1個）
+ArgList ::= '(' Expr % ',' ')' ;
+
+// セミコロン区切りの文のリスト
+StmtList ::= Statement % ';' ;
+
+// ルール参照もセパレータに使える
+ExprList ::= Expr % Comma ;
+```
+
+> **`{ ... }` との違い**:
+> - `{ sep elem }` は **0個以上**かつ先頭の `sep` が不要になる設計が難しい
+> - `elem % sep` は **1個以上** を自然に書け、よくある「カンマ区切りリスト」パターンに最適
+
+> **展開後の構造**: `elem % sep` はコード生成時に2つのヘルパークラスに展開されます:
+> - `RuleSep0BodyParser`: `sep elem`（2つ目以降の要素）
+> - `RuleSep0Parser`: `elem (RuleSep0BodyParser)*`
+
 ---
 
 ## キャプチャ（`@name`）
@@ -519,6 +560,26 @@ Block ::= '{' { Statement } '}' ;
 @doc('変数宣言。let キーワードで始まる')
 VarDecl ::= 'let' IDENTIFIER '=' Expression ;
 ```
+
+### `@skip` — AST から除外
+
+`@skip` を付けたルールはパースは行いますが、親ルールの AST ツリーから除外されます。
+空白や区切り文字など、意味のないトークンを構文上定義しながら AST に含めたくないときに使います：
+
+```ubnf
+@skip
+Comma ::= ',' ;
+
+// Comma は構文的に必要だが、AST には現れない
+ArgList ::= Arg % Comma ;
+```
+
+> **仕組み**: `@skip` ルールのパーサーは `getNotAstNodeSpecifier()` が
+> `RecursiveMode.containsRoot` を返すよう生成されます。
+> これにより `filteredChildren` からルート（`@skip` ルール自体）ごとフィルタされます。
+
+> **`@skip` と `%` の組み合わせ**: `elem % sep` の `sep` に `@skip` ルールを指定すると、
+> AST にはデータのみが残り、区切り記号は除外されます。
 
 ### `@typeof(captureName)` — 型制約
 
@@ -767,6 +828,7 @@ TokenValue   ::= CLASS_NAME
                | NEGATIVE_LOOKAHEAD('pattern')
                | CHAR_RANGE('min','max')
                | CI('word')
+               | REGEX('pattern')
                | ANY
                | EOF
                | EMPTY
@@ -781,13 +843,14 @@ Annotation   ::= '@root'
                | '@backref' '(' 'name' '=' IDENTIFIER ')'
                | '@scopeTree' '(' 'mode' '=' IDENTIFIER ')'
                | '@doc' '(' STRING ')'
+               | '@skip'
                | '@' IDENTIFIER
 
 RuleBody     ::= ChoiceBody
 ChoiceBody   ::= SequenceBody { '|' SequenceBody }
 SequenceBody ::= AnnotatedElement+
 
-AnnotatedElement ::= ['@typeof' '(' IDENTIFIER ')'] AtomicElement [Quantifier] ['@' IDENTIFIER]
+AnnotatedElement ::= ['@typeof' '(' IDENTIFIER ')'] AtomicElement [Quantifier | '%' AtomicElement] ['@' IDENTIFIER]
 Quantifier   ::= '+' | '?' | '*' | '{' INTEGER '}' | '{' INTEGER ',' [INTEGER] '}'
 
 AtomicElement ::= GroupElement
@@ -814,7 +877,7 @@ ErrorElement    ::= 'ERROR' '(' STRING ')'
 - `grammar` — grammar ブロックの開始
 - `token` — トークン宣言
 - `UNTIL`, `NEGATION`, `LOOKAHEAD`, `NEGATIVE_LOOKAHEAD` — トークンキーワード
-- `CHAR_RANGE`, `CI`, `ANY`, `EOF`, `EMPTY` — トークンキーワード
+- `CHAR_RANGE`, `CI`, `REGEX`, `ANY`, `EOF`, `EMPTY` — トークンキーワード
 - `ERROR` — エラーヒント要素
 - `params` — `@mapping` アノテーション内
 

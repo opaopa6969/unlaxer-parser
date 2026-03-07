@@ -1,7 +1,7 @@
 # UBNF 拡張ロードマップ
 
 > ステータス: draft
-> 最終更新: 2026-03-07 (T1-4, T2-1〜T2-3, T3-1, T3-2, T4-1〜T4-6 完了)
+> 最終更新: 2026-03-07 (T1-4, T2-1〜T2-3, T3-1, T3-2, T4-1〜T4-9 完了)
 > 関連: [specs/ubnf-syntax.md](../specs/ubnf-syntax.md) · [specs/open-questions.md](../specs/open-questions.md)
 
 ## 概要
@@ -224,13 +224,13 @@ rule id ::= letter (letter | digit)* ?{ !isReservedWord($$) } ;
 | T3-3   | セマンティック述語        | Low    | XL   | **保留**    |
 | T4-1   | `CHAR_RANGE('a','z')`     | ✅     | —    | **完了**    |
 | T4-2   | `ANY`                     | ✅     | —    | **完了**    |
-| T4-3   | `REGEX('pattern')`        | Low    | L    | 未実装      |
+| T4-3   | `REGEX('pattern')`        | ✅     | —    | **完了**    |
 | T4-4   | `CI('keyword')`           | ✅     | —    | **完了**    |
-| T4-5   | セパレータ糖衣 `%`         | Low    | M    | 未実装      |
+| T4-5   | セパレータ糖衣 `%`         | ✅     | —    | **完了**    |
 | T4-6   | `EOF` / `EMPTY`           | ✅     | —    | **完了**    |
 | T4-7   | `ERROR('msg')`            | ✅     | —    | **完了**    |
 | T4-8   | `@doc('text')`            | ✅     | —    | **完了**    |
-| T4-9   | `@skip`                   | Low    | M    | 未実装      |
+| T4-9   | `@skip`                   | ✅     | —    | **完了**    |
 
 工数目安: S=数時間 / M=1-2日 / L=数日 / XL=1週間以上
 

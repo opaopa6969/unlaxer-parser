@@ -26,6 +26,8 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.ErrorElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OneOrMoreElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OptionalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.DocAnnotation;
+import org.unlaxer.dsl.bootstrap.UBNFAST.SkipAnnotation;
+import org.unlaxer.dsl.bootstrap.UBNFAST.SeparatedElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.PrecedenceAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RepeatElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RightAssocAnnotation;
@@ -215,6 +217,13 @@ public class UBNFMapper {
             return new TokenDecl.CaseInsensitive(name, word);
         }
 
+        // REGEX('pattern') 形式のチェック
+        List<Token> regexTokens = findDescendants(token, UBNFParsers.RegexExpressionParser.class);
+        if (!regexTokens.isEmpty()) {
+            String pattern = extractQuotedValue(regexTokens.get(0));
+            return new TokenDecl.Regex(name, pattern);
+        }
+
         // ANY / EOF / EMPTY (parameterless) のチェック
         List<Token> anyTokens = findDescendants(token, UBNFParsers.AnyKeywordParser.class);
         if (!anyTokens.isEmpty()) return new TokenDecl.Any(name);
@@ -304,6 +313,8 @@ public class UBNFMapper {
                 result.add(toPrecedenceAnnotation(child));
             } else if (child.parser.getClass() == UBNFParsers.DocAnnotationParser.class) {
                 result.add(toDocAnnotation(child));
+            } else if (child.parser.getClass() == UBNFParsers.SkipAnnotationParser.class) {
+                result.add(new SkipAnnotation());
             } else if (child.parser.getClass() == UBNFParsers.SimpleAnnotationParser.class) {
                 result.add(toSimpleAnnotation(child));
             } else {
@@ -481,12 +492,18 @@ public class UBNFMapper {
     }
 
     static AnnotatedElement toAnnotatedElement(Token token) {
-        AtomicElement baseElement = toAtomicElement(token);
+        // AtomicElementParser のトークンを直接取得する（SeparatedByParser 内の AtomicElement と混同しないため）
+        List<Token> baseAtomicTokens = findDescendants(token, UBNFParsers.AtomicElementParser.class);
+        AtomicElement baseElement = baseAtomicTokens.isEmpty()
+            ? new RuleRefElement("?")
+            : toAtomicElement(baseAtomicTokens.get(0));
 
         // Postfix quantifier: '+' → OneOrMoreElement, '?' → OptionalElement, '*' → RepeatElement
         List<Token> postfixTokens = findDescendants(token, UBNFParsers.PostfixQuantifierParser.class);
         // Bounded quantifier: {n} / {n,m} / {n,} → BoundedRepeatElement
         List<Token> boundedTokens = findDescendants(token, UBNFParsers.BoundedQuantifierParser.class);
+        // Separated: % sep → SeparatedElement
+        List<Token> separatedTokens = findDescendants(token, UBNFParsers.SeparatedByParser.class);
         AtomicElement element;
         if (!postfixTokens.isEmpty()) {
             String postfix = postfixTokens.get(0).source.toString().trim();
@@ -498,6 +515,15 @@ public class UBNFMapper {
                     : new OptionalElement(wrappedBody);
         } else if (!boundedTokens.isEmpty()) {
             element = parseBoundedRepeat(boundedTokens.get(0), baseElement);
+        } else if (!separatedTokens.isEmpty()) {
+            // The SeparatedByParser contains: '%' AtomicElementParser
+            // Extract the separator's AtomicElement
+            List<Token> sepAtomicTokens = findDescendants(
+                separatedTokens.get(0), UBNFParsers.AtomicElementParser.class);
+            AtomicElement separator = sepAtomicTokens.isEmpty()
+                ? new RuleRefElement("ERROR_NO_SEPARATOR")
+                : toAtomicElement(sepAtomicTokens.get(0));
+            element = new SeparatedElement(baseElement, separator);
         } else {
             element = baseElement;
         }

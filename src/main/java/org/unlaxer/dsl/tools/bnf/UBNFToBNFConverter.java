@@ -14,6 +14,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.GlobalSetting;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.KeyValuePair;
 import org.unlaxer.dsl.bootstrap.UBNFAST.BoundedRepeatElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.SeparatedElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ErrorElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OneOrMoreElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OptionalElement;
@@ -153,6 +154,7 @@ public final class UBNFToBNFConverter {
             case UBNFAST.TokenDecl.Empty em              -> "EMPTY";
             case UBNFAST.TokenDecl.CharRange cr          -> "CHAR_RANGE('" + cr.min() + "','" + cr.max() + "')";
             case UBNFAST.TokenDecl.CaseInsensitive ci    -> "CI('" + ci.word() + "')";
+            case UBNFAST.TokenDecl.Regex rx              -> "REGEX('" + rx.pattern() + "')";
         };
 
         builder.append("(* token: ");
@@ -247,6 +249,8 @@ public final class UBNFToBNFConverter {
             builder.append("@doc('");
             builder.append(docAnnotation.text().replace("'", "\\'"));
             builder.append("')");
+        } else if (annotation instanceof UBNFAST.SkipAnnotation) {
+            builder.append("@skip");
         } else if (annotation instanceof UBNFAST.SimpleAnnotation simpleAnnotation) {
             builder.append("@");
             builder.append(simpleAnnotation.name());
@@ -352,6 +356,10 @@ public final class UBNFToBNFConverter {
             builder.append("\"");
         } else if (element instanceof RuleRefElement ruleRefElement) {
             builder.append(ruleRefElement.name());
+        } else if (element instanceof SeparatedElement separatedElement) {
+            convertAtomicElement(separatedElement.element(), builder, context);
+            builder.append(" % ");
+            convertAtomicElement(separatedElement.separator(), builder, context);
         } else if (element instanceof ErrorElement errorElement) {
             builder.append("ERROR('");
             builder.append(errorElement.message().replace("'", "\\'"));

@@ -505,4 +505,75 @@ public class UBNFParsersTest {
         Parsed parsed = parse(UBNFParsers.getRootParser(), input);
         assertTrue(parsed.isSucceeded());
     }
+
+    // =========================================================================
+    // T4-5: % separator
+    // =========================================================================
+
+    @Test
+    public void testAnnotatedElement_separatedByLiteral() {
+        String input = "grammar G {\n"
+            + "  @whitespace: javaStyle\n"
+            + "  token ID = IdentifierParser\n"
+            + "  @root\n"
+            + "  Rule ::= ID % ',' ;\n"
+            + "}";
+        Parsed parsed = parse(UBNFParsers.getRootParser(), input);
+        assertTrue("elem % sep should parse successfully", parsed.isSucceeded());
+    }
+
+    @Test
+    public void testAnnotatedElement_separatedByRuleRef() {
+        String input = "grammar G {\n"
+            + "  @whitespace: javaStyle\n"
+            + "  token ID = IdentifierParser\n"
+            + "  @root\n"
+            + "  Rule ::= Expr % Sep ;\n"
+            + "  Expr ::= ID ;\n"
+            + "  Sep ::= ',' ;\n"
+            + "}";
+        Parsed parsed = parse(UBNFParsers.getRootParser(), input);
+        assertTrue("elem % RuleRef should parse successfully", parsed.isSucceeded());
+    }
+
+    // =========================================================================
+    // T4-9: @skip annotation
+    // =========================================================================
+
+    @Test
+    public void testAnnotation_skip() {
+        Parsed parsed = parse(Parser.get(UBNFParsers.AnnotationParser.class), "@skip");
+        assertTrue("@skip annotation should parse successfully", parsed.isSucceeded());
+    }
+
+    @Test
+    public void testRuleDecl_withSkip() {
+        String input = "grammar G {\n"
+            + "  @whitespace: javaStyle\n"
+            + "  token COMMA = IdentifierParser\n"
+            + "  @skip\n"
+            + "  @root\n"
+            + "  Comma ::= ',' ;\n"
+            + "}";
+        Parsed parsed = parse(UBNFParsers.getRootParser(), input);
+        assertTrue("@skip rule should parse successfully", parsed.isSucceeded());
+    }
+
+    // =========================================================================
+    // T4-3: REGEX token
+    // =========================================================================
+
+    @Test
+    public void testTokenDecl_regex() {
+        Parsed parsed = parse(Parser.get(UBNFParsers.TokenDeclParser.class),
+            "token ID = REGEX('[a-zA-Z_][a-zA-Z0-9_]*')");
+        assertTrue("REGEX token should parse successfully", parsed.isSucceeded());
+    }
+
+    @Test
+    public void testTokenDecl_regexDigits() {
+        Parsed parsed = parse(Parser.get(UBNFParsers.TokenDeclParser.class),
+            "token DIGITS = REGEX('[0-9]+')");
+        assertTrue("REGEX digits token should parse successfully", parsed.isSucceeded());
+    }
 }

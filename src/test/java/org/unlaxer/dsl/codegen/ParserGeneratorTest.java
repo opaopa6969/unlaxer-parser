@@ -818,6 +818,82 @@ public class ParserGeneratorTest {
     }
 
     // =========================================================================
+    // T4-5: % separator
+    // =========================================================================
+
+    private static final String SEPARATED_GRAMMAR =
+        "grammar SepG {\n" +
+        "  @package: org.example.sep\n" +
+        "  @whitespace: javaStyle\n" +
+        "  token ID = IdentifierParser\n" +
+        "  @root\n" +
+        "  SepG ::= ID % ',' ;\n" +
+        "}";
+
+    @Test
+    public void testSeparatedGeneratesHelperClasses() {
+        String source = generate(SEPARATED_GRAMMAR);
+        assertTrue("% should generate Sep body helper class",
+            source.contains("Sep0BodyParser"));
+        assertTrue("% should generate Sep outer helper class",
+            source.contains("Sep0Parser"));
+    }
+
+    @Test
+    public void testSeparatedGeneratesZeroOrMore() {
+        String source = generate(SEPARATED_GRAMMAR);
+        assertTrue("% body helper should use ZeroOrMore",
+            source.contains("new ZeroOrMore("));
+    }
+
+    // =========================================================================
+    // T4-9: @skip
+    // =========================================================================
+
+    private static final String SKIP_GRAMMAR =
+        "grammar SkipG {\n" +
+        "  @package: org.example.skip\n" +
+        "  @whitespace: javaStyle\n" +
+        "  @skip\n" +
+        "  @root\n" +
+        "  Comma ::= ',' ;\n" +
+        "}";
+
+    @Test
+    public void testSkipGeneratesContainsRoot() {
+        String source = generate(SKIP_GRAMMAR);
+        assertTrue("@skip should generate getNotAstNodeSpecifier with containsRoot",
+            source.contains("RecursiveMode.containsRoot"));
+    }
+
+    // =========================================================================
+    // T4-3: REGEX
+    // =========================================================================
+
+    private static final String REGEX_GRAMMAR =
+        "grammar RxG {\n" +
+        "  @package: org.example.rx\n" +
+        "  @whitespace: javaStyle\n" +
+        "  token ID = REGEX('[a-zA-Z_][a-zA-Z0-9_]*')\n" +
+        "  @root\n" +
+        "  Rule ::= ID ;\n" +
+        "}";
+
+    @Test
+    public void testRegexGeneratesRegexTokenParser() {
+        String source = generate(REGEX_GRAMMAR);
+        assertTrue("REGEX should generate RegexTokenParser subclass",
+            source.contains("org.unlaxer.dsl.runtime.RegexTokenParser"));
+    }
+
+    @Test
+    public void testRegexGeneratesPatternInConstructor() {
+        String source = generate(REGEX_GRAMMAR);
+        assertTrue("REGEX should generate pattern string in constructor",
+            source.contains("[a-zA-Z_][a-zA-Z0-9_]*"));
+    }
+
+    // =========================================================================
     // ヘルパーメソッド
     // =========================================================================
 

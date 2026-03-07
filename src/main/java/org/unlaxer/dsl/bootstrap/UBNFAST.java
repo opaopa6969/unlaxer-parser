@@ -75,7 +75,8 @@ public sealed interface UBNFAST permits
         permits TokenDecl.Simple, TokenDecl.Until,
                 TokenDecl.Negation, TokenDecl.Lookahead, TokenDecl.NegativeLookahead,
                 TokenDecl.Any, TokenDecl.Eof, TokenDecl.Empty,
-                TokenDecl.CharRange, TokenDecl.CaseInsensitive {
+                TokenDecl.CharRange, TokenDecl.CaseInsensitive,
+                TokenDecl.Regex {
         String name();
 
         /**
@@ -113,6 +114,9 @@ public sealed interface UBNFAST permits
 
         /** token NAME = CI('keyword') — case-insensitive literal match */
         record CaseInsensitive(String name, String word) implements TokenDecl {}
+
+        /** token NAME = REGEX('pattern') — regex-based multi-char token matching */
+        record Regex(String name, String pattern) implements TokenDecl {}
     }
 
     // =========================================================================
@@ -143,6 +147,7 @@ public sealed interface UBNFAST permits
         UBNFAST.RightAssocAnnotation,
         UBNFAST.PrecedenceAnnotation,
         UBNFAST.DocAnnotation,
+        UBNFAST.SkipAnnotation,
         UBNFAST.SimpleAnnotation {}
 
     /** @root */
@@ -177,6 +182,12 @@ public sealed interface UBNFAST permits
 
     /** @doc("description text") — documentation comment, emitted as Java comment */
     record DocAnnotation(String text) implements Annotation {}
+
+    /**
+     * @skip — rule is parsed normally but its tokens are excluded from the parent's
+     * AST token tree (getNotAstNodeSpecifier returns containsRoot).
+     */
+    record SkipAnnotation() implements Annotation {}
 
     /** @name（上記以外の任意アノテーション） */
     record SimpleAnnotation(String name) implements Annotation {}
@@ -219,6 +230,7 @@ public sealed interface UBNFAST permits
         UBNFAST.RepeatElement,
         UBNFAST.OneOrMoreElement,
         UBNFAST.BoundedRepeatElement,
+        UBNFAST.SeparatedElement,
         UBNFAST.TerminalElement,
         UBNFAST.RuleRefElement,
         UBNFAST.ErrorElement {}
@@ -249,6 +261,12 @@ public sealed interface UBNFAST permits
 
     /** RuleRef（非終端記号参照） */
     record RuleRefElement(String name) implements AtomicElement {}
+
+    /**
+     * elem % sep — syntactic sugar for elem (sep elem)*.
+     * Represents a non-empty separated list.
+     */
+    record SeparatedElement(AtomicElement element, AtomicElement separator) implements AtomicElement {}
 
     /**
      * ERROR("message") — 常に失敗するエラーヒント要素。
