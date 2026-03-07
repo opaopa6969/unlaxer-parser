@@ -452,4 +452,25 @@ public class UBNFMapperTest {
         assertTrue("REGEX token should produce TokenDecl.Regex", token instanceof TokenDecl.Regex);
         assertEquals("[a-z]+", ((TokenDecl.Regex) token).pattern());
     }
+
+    @Test
+    public void testDeclaresAnnotation_parsedCorrectly() {
+        String input = "grammar G {\n"
+            + "  @whitespace: javaStyle\n"
+            + "  token VARNAME = IdentifierParser\n"
+            + "  @declares(symbol=varName)\n"
+            + "  @root\n"
+            + "  VarDecl ::= 'let' VARNAME @varName ';' ;\n"
+            + "}";
+        GrammarDecl grammar = UBNFMapper.parse(input).grammars().get(0);
+        RuleDecl rule = grammar.rules().get(0);
+        boolean hasDeclares = rule.annotations().stream()
+            .anyMatch(a -> a instanceof UBNFAST.DeclaresAnnotation);
+        assertTrue("@declares should produce DeclaresAnnotation", hasDeclares);
+        UBNFAST.DeclaresAnnotation decl = rule.annotations().stream()
+            .filter(a -> a instanceof UBNFAST.DeclaresAnnotation)
+            .map(a -> (UBNFAST.DeclaresAnnotation) a)
+            .findFirst().orElseThrow();
+        assertEquals("symbol capture should be 'varName'", "varName", decl.symbolCapture());
+    }
 }

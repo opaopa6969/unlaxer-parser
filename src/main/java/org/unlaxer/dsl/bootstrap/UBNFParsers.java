@@ -863,6 +863,25 @@ public class UBNFParsers {
     }
 
     /**
+     * DeclaresAnnotation: '@declares' '(' 'symbol' '=' IDENTIFIER ')'
+     */
+    public static class DeclaresAnnotationParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                new WordParser("@declares"),
+                Parser.get(LeftParenthesisParser.class),
+                new WordParser("symbol"),
+                Parser.get(EqualParser.class),
+                Parser.get(IdentifierParser.class),
+                Parser.get(RightParenthesisParser.class)
+            );
+        }
+    }
+
+    /**
      * LeftAssocAnnotation: '@leftAssoc'
      */
     public static class LeftAssocAnnotationParser extends UBNFLazyChain {
@@ -993,6 +1012,7 @@ public class UBNFParsers {
                 Parser.get(InterleaveAnnotationParser.class),
                 Parser.get(BackrefAnnotationParser.class),
                 Parser.get(ScopeTreeAnnotationParser.class),
+                Parser.get(DeclaresAnnotationParser.class),
                 Parser.get(LeftAssocAnnotationParser.class),
                 Parser.get(RightAssocAnnotationParser.class),
                 Parser.get(PrecedenceAnnotationParser.class),

@@ -894,6 +894,55 @@ public class ParserGeneratorTest {
     }
 
     // =========================================================================
+    // @scopeTree / @declares / @backref
+    // =========================================================================
+
+    private static final String SCOPE_TREE_GRAMMAR =
+        "grammar ScopeG {\n" +
+        "  @package: org.example.scope\n" +
+        "  @whitespace: javaStyle\n" +
+        "  token VARNAME = IdentifierParser\n" +
+        "  @root\n" +
+        "  @scopeTree(mode=lexical)\n" +
+        "  Program ::= { Statement } ;\n" +
+        "  Statement ::= VarDecl ;\n" +
+        "  @declares(symbol=varName)\n" +
+        "  VarDecl ::= 'let' VARNAME @varName ';' ;\n" +
+        "  @backref(name=varName)\n" +
+        "  VarRef ::= VARNAME @varName ;\n" +
+        "}";
+
+    @Test
+    public void testScopeTreeGeneratesTransactionListener() {
+        String source = generate(SCOPE_TREE_GRAMMAR);
+        assertTrue("@scopeTree should implement TransactionListener",
+            source.contains("implements org.unlaxer.listener.TransactionListener"));
+    }
+
+    @Test
+    public void testScopeTreeGeneratesEnterLeave() {
+        String source = generate(SCOPE_TREE_GRAMMAR);
+        assertTrue("@scopeTree should call ScopeStore.enter",
+            source.contains("ScopeStore.enter(ctx)"));
+        assertTrue("@scopeTree should call ScopeStore.leave in onCommit",
+            source.contains("ScopeStore.leave(ctx)"));
+    }
+
+    @Test
+    public void testDeclaresGeneratesDeclareCall() {
+        String source = generate(SCOPE_TREE_GRAMMAR);
+        assertTrue("@declares should call ScopeStore.declare",
+            source.contains("ScopeStore.declare(ctx"));
+    }
+
+    @Test
+    public void testDeclaresExtractsCaptureByName() {
+        String source = generate(SCOPE_TREE_GRAMMAR);
+        assertTrue("@declares should reference capture name 'varName'",
+            source.contains("\"varName\""));
+    }
+
+    // =========================================================================
     // ヘルパーメソッド
     // =========================================================================
 

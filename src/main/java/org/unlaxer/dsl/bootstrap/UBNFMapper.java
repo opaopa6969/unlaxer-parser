@@ -12,6 +12,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.AnnotatedElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.Annotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AtomicElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.BackrefAnnotation;
+import org.unlaxer.dsl.bootstrap.UBNFAST.DeclaresAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.BlockSettingValue;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ChoiceBody;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GlobalSetting;
@@ -305,6 +306,8 @@ public class UBNFMapper {
                 result.add(toBackrefAnnotation(child));
             } else if (child.parser.getClass() == UBNFParsers.ScopeTreeAnnotationParser.class) {
                 result.add(toScopeTreeAnnotation(child));
+            } else if (child.parser.getClass() == UBNFParsers.DeclaresAnnotationParser.class) {
+                result.add(toDeclaresAnnotation(child));
             } else if (child.parser.getClass() == UBNFParsers.LeftAssocAnnotationParser.class) {
                 result.add(new LeftAssocAnnotation());
             } else if (child.parser.getClass() == UBNFParsers.RightAssocAnnotationParser.class) {
@@ -364,6 +367,12 @@ public class UBNFMapper {
         List<Token> identifiers = findDescendants(token, UBNFParsers.IdentifierParser.class);
         String mode = identifiers.isEmpty() ? "" : identifiers.get(0).source.toString().trim();
         return new ScopeTreeAnnotation(mode);
+    }
+
+    static DeclaresAnnotation toDeclaresAnnotation(Token token) {
+        List<Token> identifiers = findDescendants(token, UBNFParsers.IdentifierParser.class);
+        String symbolCapture = identifiers.isEmpty() ? "" : identifiers.get(0).source.toString().trim();
+        return new DeclaresAnnotation(symbolCapture);
     }
 
     static SimpleAnnotation toSimpleAnnotation(Token token) {

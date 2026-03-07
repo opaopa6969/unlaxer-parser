@@ -576,4 +576,28 @@ public class UBNFParsersTest {
             "token DIGITS = REGEX('[0-9]+')");
         assertTrue("REGEX digits token should parse successfully", parsed.isSucceeded());
     }
+
+    // =========================================================================
+    // @declares annotation
+    // =========================================================================
+
+    @Test
+    public void testAnnotation_declares() {
+        Parsed parsed = parse(Parser.get(UBNFParsers.AnnotationParser.class),
+            "@declares(symbol=varName)");
+        assertTrue("@declares annotation should parse successfully", parsed.isSucceeded());
+    }
+
+    @Test
+    public void testRuleDecl_withDeclares() {
+        String input = "grammar G {\n"
+            + "  @whitespace: javaStyle\n"
+            + "  token VARNAME = IdentifierParser\n"
+            + "  @declares(symbol=varName)\n"
+            + "  @root\n"
+            + "  VarDecl ::= 'let' VARNAME @varName ';' ;\n"
+            + "}";
+        Parsed parsed = parse(UBNFParsers.getRootParser(), input);
+        assertTrue("@declares rule should parse successfully", parsed.isSucceeded());
+    }
 }

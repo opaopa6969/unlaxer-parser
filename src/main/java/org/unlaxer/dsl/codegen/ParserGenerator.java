@@ -3,6 +3,7 @@ package org.unlaxer.dsl.codegen;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AnnotatedElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AtomicElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.BackrefAnnotation;
+import org.unlaxer.dsl.bootstrap.UBNFAST.DeclaresAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.BlockSettingValue;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ChoiceBody;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
@@ -625,11 +626,17 @@ public class ParserGenerator implements CodeGenerator {
                 sb.append(indent).append("/** ").append(docText).append(" */\n");
             });
 
+        boolean hasScopeTreeDecl = rule.annotations().stream().anyMatch(a -> a instanceof ScopeTreeAnnotation);
+        boolean hasDeclaresDecl  = rule.annotations().stream().anyMatch(a -> a instanceof DeclaresAnnotation);
+        boolean needsTransactionListener = hasScopeTreeDecl || hasDeclaresDecl;
+        String implSuffix = needsTransactionListener
+            ? " implements org.unlaxer.listener.TransactionListener"
+            : "";
         sb.append(indent).append("public static class ").append(className);
         if (isChoice) {
-            sb.append(" extends LazyChoice {\n");
+            sb.append(" extends LazyChoice").append(implSuffix).append(" {\n");
         } else {
-            sb.append(" extends ").append(getChainClassName(ctx, ruleName)).append(" {\n");
+            sb.append(" extends ").append(getChainClassName(ctx, ruleName)).append(implSuffix).append(" {\n");
         }
         sb.append(indent).append("    private static final long serialVersionUID = 1L;\n");
         sb.append(indent).append("    @Override\n");
@@ -651,7 +658,104 @@ public class ParserGenerator implements CodeGenerator {
                 sb.append(indent).append("    public java.util.Optional<RecursiveMode> getNotAstNodeSpecifier() { return java.util.Optional.empty(); }\n");
             }
         }
+        // @scopeTree / @declares → TransactionListener 実装を生成
+        boolean hasScopeTree = rule.annotations().stream().anyMatch(a -> a instanceof ScopeTreeAnnotation);
+        boolean hasDeclares  = rule.annotations().stream().anyMatch(a -> a instanceof DeclaresAnnotation);
+        if (hasScopeTree || hasDeclares) {
+            sb.append(generateTransactionListenerMethods(rule, indent, hasScopeTree, hasDeclares));
+        }
         sb.append(indent).append("}\n\n");
+
+        return sb.toString();
+    }
+
+    /**
+     * @scopeTree / @declares アノテーション付きルールの TransactionListener メソッドを生成する。
+     *
+     * <p>@scopeTree: onBegin で ScopeStore.enter()、onCommit/onRollback で ScopeStore.leave()
+     * <p>@declares(symbol=x): onCommit で @x キャプチャのテキストを ScopeStore.declare() で登録
+     */
+    private String generateTransactionListenerMethods(
+        RuleDecl rule, String indent, boolean hasScopeTree, boolean hasDeclares) {
+
+        StringBuilder sb = new StringBuilder();
+        String i = indent + "    ";
+
+        // setLevel (no-op)
+        sb.append(i).append("@Override\n");
+        sb.append(i).append("public void setLevel(org.unlaxer.listener.OutputLevel level) {}\n");
+
+        // onOpen (no-op)
+        sb.append(i).append("@Override\n");
+        sb.append(i).append("public void onOpen(org.unlaxer.context.ParseContext ctx) {}\n");
+
+        // onBegin
+        sb.append(i).append("@Override\n");
+        sb.append(i).append("public void onBegin(org.unlaxer.context.ParseContext ctx, org.unlaxer.parser.Parser p) {\n");
+        if (hasScopeTree) {
+            sb.append(i).append("    org.unlaxer.dsl.runtime.ScopeStore.enter(ctx);\n");
+        }
+        sb.append(i).append("}\n");
+
+        // onCommit
+        sb.append(i).append("@Override\n");
+        sb.append(i).append("public void onCommit(org.unlaxer.context.ParseContext ctx, org.unlaxer.parser.Parser p, org.unlaxer.TokenList tokens) {\n");
+        if (hasScopeTree) {
+            sb.append(i).append("    org.unlaxer.dsl.runtime.ScopeStore.leave(ctx);\n");
+        }
+        if (hasDeclares) {
+            String symbolCapture = rule.annotations().stream()
+                .filter(a -> a instanceof DeclaresAnnotation)
+                .map(a -> ((DeclaresAnnotation) a).symbolCapture())
+                .findFirst().orElse("");
+            sb.append(i).append("    // @declares(symbol=").append(symbolCapture).append(")\n");
+            sb.append(i).append("    if (!tokens.isEmpty()) {\n");
+            sb.append(i).append("        org.unlaxer.Token ruleToken = tokens.get(0);\n");
+            sb.append(i).append("        String __symbolName = extractCaptureText(ruleToken, \"")
+              .append(escapeJava(symbolCapture)).append("\");\n");
+            sb.append(i).append("        if (__symbolName != null && !__symbolName.isEmpty()) {\n");
+            sb.append(i).append("            int __offset = extractCaptureOffset(ruleToken, \"")
+              .append(escapeJava(symbolCapture)).append("\");\n");
+            sb.append(i).append("            org.unlaxer.dsl.runtime.ScopeStore.declare(ctx, __symbolName, __offset);\n");
+            sb.append(i).append("        }\n");
+            sb.append(i).append("    }\n");
+        }
+        sb.append(i).append("}\n");
+
+        // onRollback
+        sb.append(i).append("@Override\n");
+        sb.append(i).append("public void onRollback(org.unlaxer.context.ParseContext ctx, org.unlaxer.parser.Parser p, org.unlaxer.TokenList tokens) {\n");
+        if (hasScopeTree) {
+            sb.append(i).append("    org.unlaxer.dsl.runtime.ScopeStore.leave(ctx);\n");
+        }
+        sb.append(i).append("}\n");
+
+        // onClose (no-op)
+        sb.append(i).append("@Override\n");
+        sb.append(i).append("public void onClose(org.unlaxer.context.ParseContext ctx) {}\n");
+
+        // extractCaptureText / extractCaptureOffset ヘルパー（インナーメソッド）
+        sb.append(i).append("private static String extractCaptureText(org.unlaxer.Token token, String captureName) {\n");
+        sb.append(i).append("    for (org.unlaxer.Token child : token.filteredChildren) {\n");
+        sb.append(i).append("        if (child.hasCaptureNameTag(captureName)) {\n");
+        sb.append(i).append("            return child.source != null ? child.source.sourceAsString().trim() : null;\n");
+        sb.append(i).append("        }\n");
+        sb.append(i).append("        String found = extractCaptureText(child, captureName);\n");
+        sb.append(i).append("        if (found != null) return found;\n");
+        sb.append(i).append("    }\n");
+        sb.append(i).append("    return null;\n");
+        sb.append(i).append("}\n");
+
+        sb.append(i).append("private static int extractCaptureOffset(org.unlaxer.Token token, String captureName) {\n");
+        sb.append(i).append("    for (org.unlaxer.Token child : token.filteredChildren) {\n");
+        sb.append(i).append("        if (child.hasCaptureNameTag(captureName)) {\n");
+        sb.append(i).append("            return child.source != null ? child.source.offsetFromRoot().value() : -1;\n");
+        sb.append(i).append("        }\n");
+        sb.append(i).append("        int found = extractCaptureOffset(child, captureName);\n");
+        sb.append(i).append("        if (found >= 0) return found;\n");
+        sb.append(i).append("    }\n");
+        sb.append(i).append("    return -1;\n");
+        sb.append(i).append("}\n");
 
         return sb.toString();
     }

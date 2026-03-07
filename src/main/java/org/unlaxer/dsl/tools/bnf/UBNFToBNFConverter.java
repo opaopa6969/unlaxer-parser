@@ -237,6 +237,10 @@ public final class UBNFToBNFConverter {
             builder.append("@scopeTree(mode=");
             builder.append(scopeTreeAnnotation.mode());
             builder.append(")");
+        } else if (annotation instanceof UBNFAST.DeclaresAnnotation declaresAnnotation) {
+            builder.append("@declares(symbol=");
+            builder.append(declaresAnnotation.symbolCapture());
+            builder.append(")");
         } else if (annotation instanceof UBNFAST.LeftAssocAnnotation) {
             builder.append("@leftAssoc");
         } else if (annotation instanceof UBNFAST.RightAssocAnnotation) {

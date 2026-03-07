@@ -143,6 +143,7 @@ public sealed interface UBNFAST permits
         UBNFAST.InterleaveAnnotation,
         UBNFAST.BackrefAnnotation,
         UBNFAST.ScopeTreeAnnotation,
+        UBNFAST.DeclaresAnnotation,
         UBNFAST.LeftAssocAnnotation,
         UBNFAST.RightAssocAnnotation,
         UBNFAST.PrecedenceAnnotation,
@@ -170,6 +171,9 @@ public sealed interface UBNFAST permits
 
     /** @scopeTree(mode=lexical) */
     record ScopeTreeAnnotation(String mode) implements Annotation {}
+
+    /** @declares(symbol=captureName) — このルールのパース成功時にキャプチャした識別子をスコープに登録する */
+    record DeclaresAnnotation(String symbolCapture) implements Annotation {}
 
     /** @leftAssoc */
     record LeftAssocAnnotation() implements Annotation {}
