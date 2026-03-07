@@ -942,6 +942,31 @@ public class ParserGeneratorTest {
             source.contains("\"varName\""));
     }
 
+    @Test
+    public void testBackrefScopeModeGeneratesIsDeclaredCheck() {
+        String source = generate(SCOPE_TREE_GRAMMAR);
+        assertTrue("@backref scope mode should call ScopeStore.isDeclared",
+            source.contains("ScopeStore.isDeclared(ctx"));
+    }
+
+    @Test
+    public void testBackrefScopeModeGeneratesAddDiagnostic() {
+        String source = generate(SCOPE_TREE_GRAMMAR);
+        assertTrue("@backref scope mode should call ScopeStore.addDiagnostic",
+            source.contains("ScopeStore.addDiagnostic(ctx"));
+    }
+
+    @Test
+    public void testBackrefScopeModeImplementsTransactionListener() {
+        String source = generate(SCOPE_TREE_GRAMMAR);
+        // VarRefParser (the @backref rule) must also be a TransactionListener
+        int varRefIdx = source.indexOf("class VarRefParser");
+        assertTrue("VarRefParser should exist", varRefIdx >= 0);
+        String varRefSection = source.substring(varRefIdx, Math.min(varRefIdx + 500, source.length()));
+        assertTrue("VarRefParser should implement TransactionListener",
+            varRefSection.contains("implements org.unlaxer.listener.TransactionListener"));
+    }
+
     // =========================================================================
     // ヘルパーメソッド
     // =========================================================================

@@ -628,7 +628,12 @@ public class ParserGenerator implements CodeGenerator {
 
         boolean hasScopeTreeDecl = rule.annotations().stream().anyMatch(a -> a instanceof ScopeTreeAnnotation);
         boolean hasDeclaresDecl  = rule.annotations().stream().anyMatch(a -> a instanceof DeclaresAnnotation);
-        boolean needsTransactionListener = hasScopeTreeDecl || hasDeclaresDecl;
+        // @backref: 文法内に @scopeTree があればスコープ参照モード → TransactionListener が必要
+        boolean hasBackrefDecl = rule.annotations().stream().anyMatch(a -> a instanceof BackrefAnnotation);
+        boolean grammarHasScopeTree = ctx.grammar.rules().stream()
+            .anyMatch(r -> r.annotations().stream().anyMatch(a -> a instanceof ScopeTreeAnnotation));
+        boolean backrefScopeMode = hasBackrefDecl && grammarHasScopeTree;
+        boolean needsTransactionListener = hasScopeTreeDecl || hasDeclaresDecl || backrefScopeMode;
         String implSuffix = needsTransactionListener
             ? " implements org.unlaxer.listener.TransactionListener"
             : "";
@@ -658,11 +663,11 @@ public class ParserGenerator implements CodeGenerator {
                 sb.append(indent).append("    public java.util.Optional<RecursiveMode> getNotAstNodeSpecifier() { return java.util.Optional.empty(); }\n");
             }
         }
-        // @scopeTree / @declares → TransactionListener 実装を生成
+        // @scopeTree / @declares / @backref(scopeMode) → TransactionListener 実装を生成
         boolean hasScopeTree = rule.annotations().stream().anyMatch(a -> a instanceof ScopeTreeAnnotation);
         boolean hasDeclares  = rule.annotations().stream().anyMatch(a -> a instanceof DeclaresAnnotation);
-        if (hasScopeTree || hasDeclares) {
-            sb.append(generateTransactionListenerMethods(rule, indent, hasScopeTree, hasDeclares));
+        if (hasScopeTree || hasDeclares || backrefScopeMode) {
+            sb.append(generateTransactionListenerMethods(ctx, rule, indent, hasScopeTree, hasDeclares, backrefScopeMode));
         }
         sb.append(indent).append("}\n\n");
 
@@ -676,7 +681,8 @@ public class ParserGenerator implements CodeGenerator {
      * <p>@declares(symbol=x): onCommit で @x キャプチャのテキストを ScopeStore.declare() で登録
      */
     private String generateTransactionListenerMethods(
-        RuleDecl rule, String indent, boolean hasScopeTree, boolean hasDeclares) {
+        GenContext ctx, RuleDecl rule, String indent,
+        boolean hasScopeTree, boolean hasDeclares, boolean backrefScopeMode) {
 
         StringBuilder sb = new StringBuilder();
         String i = indent + "    ";
@@ -708,16 +714,59 @@ public class ParserGenerator implements CodeGenerator {
                 .filter(a -> a instanceof DeclaresAnnotation)
                 .map(a -> ((DeclaresAnnotation) a).symbolCapture())
                 .findFirst().orElse("");
+            // キャプチャ名に対応する要素のパーサークラスを特定する
+            String captureParserClass = findCaptureParserClass(ctx, rule, symbolCapture);
             sb.append(i).append("    // @declares(symbol=").append(symbolCapture).append(")\n");
             sb.append(i).append("    if (!tokens.isEmpty()) {\n");
             sb.append(i).append("        org.unlaxer.Token ruleToken = tokens.get(0);\n");
-            sb.append(i).append("        String __symbolName = extractCaptureText(ruleToken, \"")
-              .append(escapeJava(symbolCapture)).append("\");\n");
-            sb.append(i).append("        if (__symbolName != null && !__symbolName.isEmpty()) {\n");
-            sb.append(i).append("            int __offset = extractCaptureOffset(ruleToken, \"")
-              .append(escapeJava(symbolCapture)).append("\");\n");
-            sb.append(i).append("            org.unlaxer.dsl.runtime.ScopeStore.declare(ctx, __symbolName, __offset);\n");
-            sb.append(i).append("        }\n");
+            if (captureParserClass != null) {
+                // 対応するパーサークラスが特定できた → getChildWithParser で直接取得
+                sb.append(i).append("        org.unlaxer.Token captureToken = ruleToken.getChildWithParser(")
+                  .append(captureParserClass).append(");\n");
+                sb.append(i).append("        if (captureToken != null && captureToken.source != null) {\n");
+                sb.append(i).append("            String __symbolName = captureToken.source.sourceAsString().trim();\n");
+                sb.append(i).append("            if (!__symbolName.isEmpty()) {\n");
+                sb.append(i).append("                int __offset = captureToken.source.offsetFromRoot().value();\n");
+                sb.append(i).append("                org.unlaxer.dsl.runtime.ScopeStore.declare(ctx, __symbolName, __offset);\n");
+                sb.append(i).append("            }\n");
+                sb.append(i).append("        }\n");
+            } else {
+                // フォールバック: filteredChildren を順に走査してnon-keyword を探す
+                sb.append(i).append("        for (org.unlaxer.Token child : ruleToken.filteredChildren) {\n");
+                sb.append(i).append("            if (child.source == null) continue;\n");
+                sb.append(i).append("            String __symbolName = child.source.sourceAsString().trim();\n");
+                sb.append(i).append("            if (!__symbolName.isEmpty()) {\n");
+                sb.append(i).append("                int __offset = child.source.offsetFromRoot().value();\n");
+                sb.append(i).append("                org.unlaxer.dsl.runtime.ScopeStore.declare(ctx, __symbolName, __offset);\n");
+                sb.append(i).append("                break;\n");
+                sb.append(i).append("            }\n");
+                sb.append(i).append("        }\n");
+            }
+            sb.append(i).append("    }\n");
+        }
+        if (backrefScopeMode) {
+            String backrefCapture = rule.annotations().stream()
+                .filter(a -> a instanceof BackrefAnnotation)
+                .map(a -> ((BackrefAnnotation) a).name())
+                .findFirst().orElse("");
+            String captureParserClass = findCaptureParserClass(ctx, rule, backrefCapture);
+            sb.append(i).append("    // @backref(name=").append(backrefCapture).append(") — scope reference mode\n");
+            sb.append(i).append("    if (!tokens.isEmpty()) {\n");
+            sb.append(i).append("        org.unlaxer.Token ruleToken = tokens.get(0);\n");
+            if (captureParserClass != null) {
+                sb.append(i).append("        org.unlaxer.Token refToken = ruleToken.getChildWithParser(")
+                  .append(captureParserClass).append(");\n");
+                sb.append(i).append("        if (refToken != null && refToken.source != null) {\n");
+                sb.append(i).append("            String __refName = refToken.source.sourceAsString().trim();\n");
+                sb.append(i).append("            if (!__refName.isEmpty() && !org.unlaxer.dsl.runtime.ScopeStore.isDeclared(ctx, __refName)) {\n");
+                sb.append(i).append("                int __offset = refToken.source.offsetFromRoot().value();\n");
+                sb.append(i).append("                org.unlaxer.dsl.runtime.ScopeStore.addDiagnostic(ctx,\n");
+                sb.append(i).append("                    \"未定義のシンボル: '\" + __refName + \"'\",\n");
+                sb.append(i).append("                    __offset, __refName.length(),\n");
+                sb.append(i).append("                    org.unlaxer.dsl.runtime.ScopeStore.Severity.WARNING);\n");
+                sb.append(i).append("            }\n");
+                sb.append(i).append("        }\n");
+            }
             sb.append(i).append("    }\n");
         }
         sb.append(i).append("}\n");
@@ -733,29 +782,6 @@ public class ParserGenerator implements CodeGenerator {
         // onClose (no-op)
         sb.append(i).append("@Override\n");
         sb.append(i).append("public void onClose(org.unlaxer.context.ParseContext ctx) {}\n");
-
-        // extractCaptureText / extractCaptureOffset ヘルパー（インナーメソッド）
-        sb.append(i).append("private static String extractCaptureText(org.unlaxer.Token token, String captureName) {\n");
-        sb.append(i).append("    for (org.unlaxer.Token child : token.filteredChildren) {\n");
-        sb.append(i).append("        if (child.hasCaptureNameTag(captureName)) {\n");
-        sb.append(i).append("            return child.source != null ? child.source.sourceAsString().trim() : null;\n");
-        sb.append(i).append("        }\n");
-        sb.append(i).append("        String found = extractCaptureText(child, captureName);\n");
-        sb.append(i).append("        if (found != null) return found;\n");
-        sb.append(i).append("    }\n");
-        sb.append(i).append("    return null;\n");
-        sb.append(i).append("}\n");
-
-        sb.append(i).append("private static int extractCaptureOffset(org.unlaxer.Token token, String captureName) {\n");
-        sb.append(i).append("    for (org.unlaxer.Token child : token.filteredChildren) {\n");
-        sb.append(i).append("        if (child.hasCaptureNameTag(captureName)) {\n");
-        sb.append(i).append("            return child.source != null ? child.source.offsetFromRoot().value() : -1;\n");
-        sb.append(i).append("        }\n");
-        sb.append(i).append("        int found = extractCaptureOffset(child, captureName);\n");
-        sb.append(i).append("        if (found >= 0) return found;\n");
-        sb.append(i).append("    }\n");
-        sb.append(i).append("    return -1;\n");
-        sb.append(i).append("}\n");
 
         return sb.toString();
     }
@@ -1615,6 +1641,28 @@ public class ParserGenerator implements CodeGenerator {
             .map(InterleaveAnnotation::profile)
             .findFirst()
             .orElse(null);
+    }
+
+    /**
+     * @declares(symbol=captureName) に対して、そのキャプチャ要素のパーサークラス式を返す。
+     * ルールのシーケンス本体から captureName に一致する AnnotatedElement を探し、
+     * その AtomicElement が RuleRefElement であればトークンパーサークラスを返す。
+     * 特定できなければ null を返す（フォールバックロジックが使われる）。
+     */
+    private String findCaptureParserClass(GenContext ctx, RuleDecl rule, String captureName) {
+        RuleBody body = rule.body();
+        if (!(body instanceof ChoiceBody choice)) return null;
+        for (SequenceBody seq : choice.alternatives()) {
+            for (AnnotatedElement ae : seq.elements()) {
+                if (ae.captureName().isPresent() && captureName.equals(ae.captureName().get())) {
+                    if (ae.element() instanceof RuleRefElement ref) {
+                        String parserClass = resolveParserClass(ctx, ref.name());
+                        return parserClass != null ? parserClass : null;
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     private String findBackrefName(RuleDecl rule) {

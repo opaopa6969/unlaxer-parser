@@ -2,6 +2,7 @@ package org.unlaxer.dsl.runtime;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
@@ -149,6 +150,45 @@ public final class ScopeStore {
     }
 
     // =========================================================================
+    // セマンティック diagnostics
+    // =========================================================================
+
+    private static final Name DIAGNOSTICS_KEY = Name.of(ScopeStore.class, "diagnostics");
+
+    /**
+     * セマンティック診断情報（未定義シンボルなど）を追加する。
+     * パース後に {@link #getDiagnostics(ParseContext)} で取得できる。
+     *
+     * @param ctx      パースコンテキスト
+     * @param message  診断メッセージ
+     * @param offset   問題箇所の char offset
+     * @param length   問題箇所の長さ
+     * @param severity {@link Severity}
+     */
+    public static void addDiagnostic(ParseContext ctx, String message, int offset, int length, Severity severity) {
+        getDiagnosticsInternal(ctx).add(new SymbolDiagnostic(message, offset, length, severity));
+    }
+
+    /**
+     * パース中に蓄積された diagnostics を返す。
+     * LSP diagnostics プロバイダや evaluator から呼ぶ。
+     */
+    public static List<SymbolDiagnostic> getDiagnostics(ParseContext ctx) {
+        return Collections.unmodifiableList(getDiagnosticsInternal(ctx));
+    }
+
+    /** diagnostics リストをクリアする（再パース前など）。 */
+    public static void clearDiagnostics(ParseContext ctx) {
+        getDiagnosticsInternal(ctx).clear();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<SymbolDiagnostic> getDiagnosticsInternal(ParseContext ctx) {
+        return (List<SymbolDiagnostic>) ctx.getGlobalScopeTreeMap()
+            .computeIfAbsent(DIAGNOSTICS_KEY, k -> new ArrayList<>());
+    }
+
+    // =========================================================================
     // 内部
     // =========================================================================
 
@@ -180,4 +220,17 @@ public final class ScopeStore {
      * @param sourceOffset 宣言位置（char offset）
      */
     public record SymbolInfo(String name, int sourceOffset) {}
+
+    /**
+     * セマンティック診断情報。
+     *
+     * @param message  診断メッセージ
+     * @param offset   問題箇所の char offset
+     * @param length   問題箇所の長さ（文字数）
+     * @param severity {@link Severity}
+     */
+    public record SymbolDiagnostic(String message, int offset, int length, Severity severity) {}
+
+    /** 診断の重大度 */
+    public enum Severity { ERROR, WARNING, INFO, HINT }
 }
