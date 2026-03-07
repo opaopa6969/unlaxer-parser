@@ -968,6 +968,43 @@ public class ParserGeneratorTest {
     }
 
     // =========================================================================
+    // @backref back-reference mode (no @scopeTree — XML tag matching)
+    // =========================================================================
+
+    private static final String BACKREF_GRAMMAR =
+        "grammar XmlG {\n" +
+        "  @package: org.example.xml\n" +
+        "  token TAG = IdentifierParser\n" +
+        "  @root\n" +
+        "  @backref(name=tag)\n" +
+        "  Element ::= '<' TAG @tag '>' '</' TAG @tag '>' ;\n" +
+        "}";
+
+    @Test
+    public void testBackrefBackrefModeImplementsTransactionListener() {
+        String source = generate(BACKREF_GRAMMAR);
+        int idx = source.indexOf("class ElementParser");
+        assertTrue("ElementParser should exist", idx >= 0);
+        String section = source.substring(idx, Math.min(idx + 500, source.length()));
+        assertTrue("@backref (no scopeTree) should implement TransactionListener",
+            section.contains("implements org.unlaxer.listener.TransactionListener"));
+    }
+
+    @Test
+    public void testBackrefBackrefModeGeneratesAddDiagnostic() {
+        String source = generate(BACKREF_GRAMMAR);
+        assertTrue("@backref back-reference mode should call ScopeStore.addDiagnostic",
+            source.contains("ScopeStore.addDiagnostic(ctx"));
+    }
+
+    @Test
+    public void testBackrefBackrefModeGeneratesFilteredChildrenCollect() {
+        String source = generate(BACKREF_GRAMMAR);
+        assertTrue("@backref back-reference mode should collect filteredChildren by parser class",
+            source.contains("filteredChildren.stream()"));
+    }
+
+    // =========================================================================
     // ヘルパーメソッド
     // =========================================================================
 

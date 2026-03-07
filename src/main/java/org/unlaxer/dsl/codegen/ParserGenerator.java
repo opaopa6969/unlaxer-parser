@@ -632,8 +632,9 @@ public class ParserGenerator implements CodeGenerator {
         boolean hasBackrefDecl = rule.annotations().stream().anyMatch(a -> a instanceof BackrefAnnotation);
         boolean grammarHasScopeTree = ctx.grammar.rules().stream()
             .anyMatch(r -> r.annotations().stream().anyMatch(a -> a instanceof ScopeTreeAnnotation));
-        boolean backrefScopeMode = hasBackrefDecl && grammarHasScopeTree;
-        boolean needsTransactionListener = hasScopeTreeDecl || hasDeclaresDecl || backrefScopeMode;
+        boolean backrefScopeMode    = hasBackrefDecl && grammarHasScopeTree;
+        boolean backrefBackrefMode  = hasBackrefDecl && !grammarHasScopeTree;
+        boolean needsTransactionListener = hasScopeTreeDecl || hasDeclaresDecl || backrefScopeMode || backrefBackrefMode;
         String implSuffix = needsTransactionListener
             ? " implements org.unlaxer.listener.TransactionListener"
             : "";
@@ -663,11 +664,11 @@ public class ParserGenerator implements CodeGenerator {
                 sb.append(indent).append("    public java.util.Optional<RecursiveMode> getNotAstNodeSpecifier() { return java.util.Optional.empty(); }\n");
             }
         }
-        // @scopeTree / @declares / @backref(scopeMode) → TransactionListener 実装を生成
+        // @scopeTree / @declares / @backref → TransactionListener 実装を生成
         boolean hasScopeTree = rule.annotations().stream().anyMatch(a -> a instanceof ScopeTreeAnnotation);
         boolean hasDeclares  = rule.annotations().stream().anyMatch(a -> a instanceof DeclaresAnnotation);
-        if (hasScopeTree || hasDeclares || backrefScopeMode) {
-            sb.append(generateTransactionListenerMethods(ctx, rule, indent, hasScopeTree, hasDeclares, backrefScopeMode));
+        if (hasScopeTree || hasDeclares || backrefScopeMode || backrefBackrefMode) {
+            sb.append(generateTransactionListenerMethods(ctx, rule, indent, hasScopeTree, hasDeclares, backrefScopeMode, backrefBackrefMode));
         }
         sb.append(indent).append("}\n\n");
 
@@ -682,7 +683,7 @@ public class ParserGenerator implements CodeGenerator {
      */
     private String generateTransactionListenerMethods(
         GenContext ctx, RuleDecl rule, String indent,
-        boolean hasScopeTree, boolean hasDeclares, boolean backrefScopeMode) {
+        boolean hasScopeTree, boolean hasDeclares, boolean backrefScopeMode, boolean backrefBackrefMode) {
 
         StringBuilder sb = new StringBuilder();
         String i = indent + "    ";
@@ -764,6 +765,40 @@ public class ParserGenerator implements CodeGenerator {
                 sb.append(i).append("                    \"未定義のシンボル: '\" + __refName + \"'\",\n");
                 sb.append(i).append("                    __offset, __refName.length(),\n");
                 sb.append(i).append("                    org.unlaxer.dsl.runtime.ScopeStore.Severity.WARNING);\n");
+                sb.append(i).append("            }\n");
+                sb.append(i).append("        }\n");
+            }
+            sb.append(i).append("    }\n");
+        }
+        if (backrefBackrefMode) {
+            String backrefCapture = rule.annotations().stream()
+                .filter(a -> a instanceof BackrefAnnotation)
+                .map(a -> ((BackrefAnnotation) a).name())
+                .findFirst().orElse("");
+            String captureParserClass = findCaptureParserClass(ctx, rule, backrefCapture);
+            sb.append(i).append("    // @backref(name=").append(backrefCapture).append(") — back-reference mode (same-rule token match)\n");
+            sb.append(i).append("    if (!tokens.isEmpty()) {\n");
+            sb.append(i).append("        org.unlaxer.Token ruleToken = tokens.get(0);\n");
+            if (captureParserClass != null) {
+                // filteredChildren から同パーサークラスの全トークンを収集し、テキストが一致するか検証
+                sb.append(i).append("        java.util.List<org.unlaxer.Token> __backrefTokens =\n");
+                sb.append(i).append("            (ruleToken.filteredChildren == null)\n");
+                sb.append(i).append("            ? java.util.Collections.emptyList()\n");
+                sb.append(i).append("            : ruleToken.filteredChildren.stream()\n");
+                sb.append(i).append("                .filter(c -> c.getParser() instanceof ").append(captureParserClass).append(")\n");
+                sb.append(i).append("                .collect(java.util.stream.Collectors.toList());\n");
+                sb.append(i).append("        if (__backrefTokens.size() >= 2) {\n");
+                sb.append(i).append("            String __expected = __backrefTokens.get(0).source == null ? \"\" : __backrefTokens.get(0).source.sourceAsString().trim();\n");
+                sb.append(i).append("            for (int __bi = 1; __bi < __backrefTokens.size(); __bi++) {\n");
+                sb.append(i).append("                org.unlaxer.Token __bt = __backrefTokens.get(__bi);\n");
+                sb.append(i).append("                if (__bt.source == null) continue;\n");
+                sb.append(i).append("                String __actual = __bt.source.sourceAsString().trim();\n");
+                sb.append(i).append("                if (!__expected.equals(__actual)) {\n");
+                sb.append(i).append("                    org.unlaxer.dsl.runtime.ScopeStore.addDiagnostic(ctx,\n");
+                sb.append(i).append("                        \"back-reference mismatch: expected '\" + __expected + \"' but got '\" + __actual + \"'\",\n");
+                sb.append(i).append("                        __bt.source.offsetFromRoot().value(), __actual.length(),\n");
+                sb.append(i).append("                        org.unlaxer.dsl.runtime.ScopeStore.Severity.ERROR);\n");
+                sb.append(i).append("                }\n");
                 sb.append(i).append("            }\n");
                 sb.append(i).append("        }\n");
             }
