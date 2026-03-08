@@ -349,4 +349,18 @@ record QuantifiedElement(AtomicElement element, Quantifier q) implements AtomicE
 | — | go-to-definition: `ScopeStore.resolve()` → LSP Definition | ✅ 実装済み |
 | — | find-references: スコープ内全参照を収集 → LSP References | ✅ 実装済み |
 | — | ImportDeclaration の `#method` optional 形式 | ✅ 実装済み（Session 2） |
+| LSE-1 | documentSymbol（アウトラインパネル） | ✅ 実装済み（Session 2） |
+| LSE-2 | rename（一括リファクタリング） | ✅ 実装済み（Session 2） |
+| LSE-3 | documentHighlight（同一識別子ハイライト） | ✅ 実装済み（Session 2） |
+| LSE-4 | signatureHelp（パラメータヒント） | ✅ 実装済み（Session 2） |
+| LSE-5 | codeLens（DAP連携評価）スタブ | ✅ 実装済み（Session 2） |
+
+### 新規バックログ（Tier 4: 拡張 LSP 機能）
+
+| ID | 内容 | 規模 | 優先度 | 備考 |
+|----|------|------|--------|------|
+| LSE-EXT-1 | signatureHelp 拡張（AST型情報抽出） | M | ⭐⭐⭐ | 次優先 |
+| LSE-EXT-2 | codeLens DAP 連携（実行結果表示） | L | ⭐⭐ | DAP bridge 必須 |
+| LSE-EXT-3 | documentSymbol 子シンボル（方法パラメータ） | M | ⭐⭐ | 階層化 UI |
+| LSE-EXT-4 | inlayHints（変数型ヒント） | L | ⭐ | オプション |
 

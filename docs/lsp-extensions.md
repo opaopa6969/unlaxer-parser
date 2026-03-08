@@ -376,6 +376,129 @@ L（DAP 連携、evaluator API 理解必須）
 
 ---
 
+## Tier 4 — 拡張 LSP 機能（2026-03-08 Session 2 追加）
+
+### LSE-EXT-1: signatureHelp 拡張（パラメータ型情報）
+
+**概要**: 現在の signatureHelp は簡略表示。AST から実際のパラメータ型情報を抽出して表示。
+
+**仕様**:
+- 現在: `method() → any`
+- 目標: `method($param1 as number, $param2 as string) → number`
+
+**実装アプローチ**:
+1. `ScopeStore.resolve()` でメソッド定義の AST ノードを取得
+2. MethodParameter 子ノードを走査してパラメータリスト抽出
+3. 各パラメータの型情報（ReturnType）を抽出
+4. SignatureInformation に ParameterInformation 配列を追加
+5. 括弧内のカーソル位置から activeParameter index を計算
+
+**実装難度**: M
+**優先度**: ⭐⭐⭐（signatureHelp の完全機能化）
+
+---
+
+### LSE-EXT-2: codeLens DAP 連携
+
+**概要**: codeLens から DAP evaluator を呼び出して、実際の評価結果をインラインで表示。
+
+**仕業**:
+1. codeLens の command クリック時に DAP evaluator を実行
+2. 非同期で評価結果を取得
+3. CodeLens 結果を LSP クライアントに返却（resolveCodeLens）
+4. VS Code に「= 42」のような結果を表示
+
+**実装アプローチ**:
+```java
+// codeLens: 基本的な lens generation
+@Override
+public CompletableFuture<List<? extends CodeLens>> codeLens(CodeLensParams params) {
+  // ... lens generation with null command
+  return CompletableFuture.completedFuture(lenses);
+}
+
+// codeLensResolve: DAP 連携で command を追加（非同期）
+@Override
+public CompletableFuture<CodeLens> resolveCodeLens(CodeLens unresolved) {
+  // Expression AST の offset から evaluator を呼び出し
+  // 結果を Command.title に設定
+  String result = evaluateExpressionAtOffset(...);
+  unresolved.setCommand(new Command("= " + result, ...));
+  return CompletableFuture.completedFuture(unresolved);
+}
+```
+
+**実装難度**: L（DAP bridge との統合）
+**優先度**: ⭐⭐（値の可視化）
+**依存**: TinyExpressionDapRuntimeBridge の evaluator API
+
+---
+
+### LSE-EXT-3: documentSymbol 子シンボル対応
+
+**概要**: 現在は単純な DocumentSymbol[]。メソッド内のパラメータを子シンボルとして表示。
+
+**仕業**:
+```
+Formula
+├─ variables
+│  ├─ $age (Number)
+│  └─ $name (String)
+├─ methods
+│  ├─ isAdult($age: Number) → Boolean
+│  │  └─ $age (Parameter)
+│  └─ greet($name: String) → String
+│     └─ $name (Parameter)
+└─ annotations
+```
+
+**実装アプローチ**:
+1. documentSymbol 時に各メソッドの MethodParameter 子ノードを走査
+2. DocumentSymbol.children フィールドに ParameterInformation として追加
+3. 階層化表示で VS Code の outline tree に反映
+
+**実装難度**: M
+**優先度**: ⭐⭐（階層化 UI 向上）
+
+---
+
+### LSE-EXT-4: inlayHints（変数型ヒント）
+
+**概要**: 変数宣言の型情報をコード上にインラインで表示。
+
+**表示イメージ**:
+```
+var $age as number set 42     // no hint needed (型明記)
+var $count = 10     ⟵ : number  // inlay hint
+var $name = 'John'  ⟵ : string  // inlay hint
+```
+
+**仕業**:
+```java
+@Override
+public CompletableFuture<List<? extends InlayHint>> inlayHint(InlayHintParams params) {
+  // declarations から型情報がない変数を検索
+  // 初期値の評価から型を推論
+  // InlayHint[] として返却
+}
+```
+
+**実装難度**: L（型推論エンジン必須）
+**優先度**: ⭐（オプション機能）
+
+---
+
+## 実装優先度表（拡張機能）
+
+| ID | 機能 | 規模 | 難度 | 優先度 | 依存 |
+|----|------|------|------|--------|------|
+| LSE-EXT-1 | signatureHelp 拡張 | M | 中 | ⭐⭐⭐ | AST traverse |
+| LSE-EXT-2 | codeLens DAP 連携 | L | 高 | ⭐⭐ | DAP bridge |
+| LSE-EXT-3 | documentSymbol 子ノード | M | 中 | ⭐⭐ | AST traverse |
+| LSE-EXT-4 | inlayHints 実装 | L | 高 | ⭐ | 型推論 |
+
+---
+
 ## 参考資料
 
 - [LSP Specification](https://microsoft.github.io/language-server-protocol/)
