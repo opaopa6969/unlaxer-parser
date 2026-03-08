@@ -219,9 +219,18 @@ RuleName ::= body ;
 1. 1つのルールに最大1回（MUST）
 2. `profile` は `javaStyle` または `commentsAndSpaces`（MUST）
 
+### 生成コードへの影響
+
+パーサージェネレータは以下を生成する:
+- `getInterleaveProfile(ruleName)` — ルールのインターリーブプロファイルを返す
+
+さらに `@interleave(profile=commentsAndSpaces)` は `createContext()` でパーサー生成に直接影響する:
+- 該当ルールに対して `DelimitedChain`（空白/コメント自動挿入）が選択される
+- `CPPComment` パーサーがデリミタクラスに追加される
+
 ### 実装状況
 
-メタデータとして受理。パーサー動作は未変更。
+**パーサー生成に反映済み**。`profile=commentsAndSpaces` の場合、生成パーサーが WhiteSpaceDelimitedChain を使用し、要素間にコメント/空白を自動許容する。メタデータ query API も生成される。
 
 ---
 
@@ -242,9 +251,21 @@ RuleName ::= body ;
 
 1. 1つのルールに最大1回（MUST）
 
+### 生成コードへの影響
+
+パーサージェネレータは以下を生成する:
+- `getBackrefName(ruleName)` — ルールの後方参照ターゲット名を返す
+
 ### 実装状況
 
-メタデータとして受理。パーサー動作は未変更。
+**メタデータ query API 生成済み**。ただし、生成された API を消費するセマンティック検証フェーズ（シンボルテーブルを参照して名前の一致を検証する）は未実装。
+
+### バックログ
+
+セマンティック分析フェーズの設計・実装が必要:
+- Evaluator または別フェーズでシンボルテーブルを構築
+- `getBackrefName()` で取得した名前が、先行するスコープ内で宣言されていることを検証
+- 検証失敗時のエラー報告（LSP diagnostics への統合）
 
 ---
 
@@ -281,7 +302,15 @@ RuleName ::= body ;
 
 ### 実装状況
 
-メタデータとして受理。パーサー生成でスコープメタデータ API を出力済み。パーサー動作は未変更。
+**メタデータ query API 生成済み（充実）**。`ScopeMode` enum、`ScopeTreeSpec` record、11以上のヘルパーメソッドが生成される。ただし、生成された API を消費するランタイムスコープ管理は未実装。
+
+### バックログ
+
+ランタイムスコープ管理の設計・実装が必要:
+- 生成パーサーのルール開始/終了時にスコープ enter/leave イベントを発火
+- スコープツリーの構築（lexical: 静的ネスト、dynamic: 実行時ネスト）
+- `@backref` と連携したシンボル解決（スコープ内の名前参照検証）
+- LSP での go-to-definition、find-references への統合
 
 ---
 
@@ -302,9 +331,11 @@ RuleName ::= body ;
 
 ## 現在の制限事項
 
-- `@interleave`, `@backref`, `@scopeTree` はメタデータのみで、パーサーの認識動作には影響しない
+- `@backref`: メタデータ query API は生成されるが、セマンティック検証フェーズ（シンボルテーブル参照による名前一致検証）は未実装
+- `@scopeTree`: メタデータ query API は充実しているが、ランタイムスコープ管理（スコープ enter/leave イベント発火、スコープツリー構築）は未実装
 - `@leftAssoc` はバリデーション対象だが、パーサー生成での直接的な消費は限定的
 
 ## 変更履歴
 
+- 2026-03-02: `@interleave`/`@backref`/`@scopeTree` の実装状況を実態に合わせて修正。バックログを追記
 - 2026-03-01: 既存 SPEC.md から移動・拡充

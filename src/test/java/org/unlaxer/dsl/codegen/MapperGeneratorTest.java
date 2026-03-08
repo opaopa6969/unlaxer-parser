@@ -189,7 +189,7 @@ public class MapperGeneratorTest {
         MapperGenerator gen = new MapperGenerator();
         String source = gen.generate(grammar).source();
         assertTrue("to method should call right fold",
-            source.contains("return foldRightAssocPowNode(left, ops, rights);"));
+            source.contains("foldRightAssocPowNode(left, ops, rights)"));
     }
 
     // =========================================================================

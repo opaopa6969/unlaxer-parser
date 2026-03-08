@@ -87,6 +87,38 @@ Current behavior:
 - Parser behavior is unchanged in this phase (metadata-only).
 - Validator contract (current): at most one per rule.
 
+### `@typeof(captureName)`
+
+- **Kind**: element-level annotation — appears as a standalone `AtomicElement` in a rule body sequence.
+- **Syntax**: `@typeof(name)` where `name` is the capture name of another element in the same rule.
+- **Semantics**: The annotated element (with its own `@ownCapture` suffix) must resolve to the same
+  Java type as the element captured under `name` at runtime.
+- **Parser behavior**: TypeofElement is invisible to the parser generator. It does not produce any
+  parser code in the emitted Chain. The parser matches the token structure unchanged.
+- **Mapper behavior**: The mapper generator resolves `@typeof(name)` to the same rule reference and
+  mapper function as the `name` capture. After mapping both fields, it emits a runtime type assertion:
+  ```java
+  if (name != null && ownCapture != null && !name.getClass().equals(ownCapture.getClass())) {
+      throw new IllegalArgumentException("@typeof constraint violated: ...");
+  }
+  ```
+- **Use case**: Enforce that `then`/`else` branches of an `if` expression use the same Expression
+  variant, preventing a type mismatch at evaluation time.
+- **Example**:
+  ```ubnf
+  @mapping(IfExpr, params=[condition, thenExpr, elseExpr])
+  IfExpression ::=
+    'if' '(' BooleanExpression @condition ')'
+    '{' Expression @thenExpr '}'
+    'else'
+    '{' @typeof(thenExpr) @elseExpr '}' ;
+  ```
+  In this example, `elseExpr` is mapped using `Expression`'s mapper (same as `thenExpr`), and a
+  runtime assertion ensures `thenExpr.getClass() == elseExpr.getClass()`.
+- **Validator error codes**:
+  - `E-TYPEOF-UNKNOWN-CAPTURE` — `captureName` refers to a capture not defined in this rule.
+  - `E-TYPEOF-MISSING-CAPTURE` — `@typeof(name)` element has no own capture name.
+
 ### `@scopeTree(mode=...)`
 
 - Current status: accepted as first-class rule annotation metadata.

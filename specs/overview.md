@@ -64,6 +64,13 @@ UBNF は以下の要素で構成される:
 | DAP | `DAPGenerator` | `XxxDAP.java` — Debug Adapter Protocol サーバー実装 |
 | DAPLauncher | `DAPLauncherGenerator` | `XxxDAPLauncher.java` — DAP サーバーのランチャー |
 
+## ツール
+
+| ツール | クラス名 | 説明 |
+|-------|---------|-----|
+| Railroad Diagram | `RailroadMain` | UBNF 文法を視覚化する SVG を生成。論理的 RTL 描画および動的デバッグ表示に対応。 |
+| BNF Converter | `UBNFToBNFMain` | UBNF を標準的な BNF 形式に変換。 |
+
 ## パイプライン
 
 ```

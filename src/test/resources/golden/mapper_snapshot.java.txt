@@ -17,13 +17,21 @@ public class SnapshotMapper {
 
     private SnapshotMapper() {}
 
+    private static final java.util.IdentityHashMap<Object, int[]> NODE_SOURCE_SPANS =
+        new java.util.IdentityHashMap<>();
+
     // =========================================================================
     // Entry Point
     // =========================================================================
 
     public static SnapshotAST.ExprNode parse(String source) {
+        return parse(source, null);
+    }
+
+    public static SnapshotAST.ExprNode parse(String source, String preferredAstSimpleName) {
+        NODE_SOURCE_SPANS.clear();
         Parser rootParser = SnapshotParsers.getRootParser();
-        ParseContext context = new ParseContext(StringSource.createRootSource(source));
+        ParseContext context = new ParseContext(createRootSourceCompat(source));
         Parsed parsed;
         try {
             parsed = rootParser.parse(context);
@@ -33,7 +41,7 @@ public class SnapshotMapper {
         if (!parsed.isSucceeded()) {
             throw new IllegalArgumentException("Parse failed: " + source);
         }
-        int consumed = parsed.getConsumed().source.sourceAsString().length();
+        int consumed = consumedLengthCompat(parsed.getConsumed());
         if (consumed != source.length()) {
             throw new IllegalArgumentException("Parse failed at offset " + consumed + ": " + source);
         }
@@ -48,7 +56,7 @@ public class SnapshotMapper {
         return toExprNode(mappingRoot);
     }
 
-    private static SnapshotAST mapNode(Token token) {
+    private static SnapshotAST mapToken(Token token) {
         if (token == null) {
             return null;
         }
@@ -58,13 +66,63 @@ public class SnapshotMapper {
         if (token.parser.getClass() == SnapshotParsers.TermParser.class) {
             return toTermNode(token);
         }
-        for (Token child : token.filteredChildren) {
-            SnapshotAST mapped = mapNode(child);
-            if (mapped != null) {
-                return mapped;
-            }
-        }
         return null;
+    }
+
+    private static Token findBestMappedToken(Token token, String preferredAstSimpleName) {
+        MappingCandidate best = findBestMappedToken(token, 0, null, preferredAstSimpleName);
+        return best == null ? null : best.token;
+    }
+
+    private static MappingCandidate findBestMappedToken(Token token, int depth, MappingCandidate best, String preferredAstSimpleName) {
+        if (token == null) {
+            return best;
+        }
+        SnapshotAST mapped = mapToken(token);
+        if (mapped != null) {
+            boolean preferred = preferredAstSimpleName == null
+                || preferredAstSimpleName.isBlank()
+                || mapped.getClass().getSimpleName().equals(preferredAstSimpleName);
+            MappingCandidate candidate = new MappingCandidate(token, depth, tokenStartOffsetCompat(token), preferred);
+            best = betterCandidate(best, candidate);
+        }
+        for (Token child : token.filteredChildren) {
+            best = findBestMappedToken(child, depth + 1, best, preferredAstSimpleName);
+        }
+        return best;
+    }
+
+    private static MappingCandidate betterCandidate(MappingCandidate current, MappingCandidate candidate) {
+        if (candidate == null) {
+            return current;
+        }
+        if (current == null) {
+            return candidate;
+        }
+        if (candidate.preferred != current.preferred) {
+            return candidate.preferred ? candidate : current;
+        }
+        if (candidate.depth < current.depth) {
+            return candidate;
+        }
+        if (candidate.depth > current.depth) {
+            return current;
+        }
+        return candidate.startOffset >= current.startOffset ? candidate : current;
+    }
+
+    private static final class MappingCandidate {
+        private final Token token;
+        private final int depth;
+        private final int startOffset;
+        private final boolean preferred;
+
+        private MappingCandidate(Token token, int depth, int startOffset, boolean preferred) {
+            this.token = token;
+            this.depth = depth;
+            this.startOffset = startOffset;
+            this.preferred = preferred;
+        }
     }
 
     // =========================================================================
@@ -84,19 +142,20 @@ public class SnapshotMapper {
             throw new IllegalArgumentException("Left operand not found for rule Expr");
         }
         SnapshotAST.TermNode left = toTermNode(leftToken);
-        List<String> op = new ArrayList<>();
-        List<SnapshotAST.TermNode> right = new ArrayList<>();
+        List<String> ops = new ArrayList<>();
+        List<SnapshotAST.TermNode> rights = new ArrayList<>();
         for (Token repeatToken : findDescendants(working, SnapshotParsers.ExprRepeat0Parser.class)) {
-            String opValue = firstTokenText(repeatToken);
+            Token opToken = findFirstDescendant(repeatToken, org.unlaxer.parser.elementary.WordParser.class);
+            String opValue = firstTokenText(opToken == null ? repeatToken : opToken);
             if (opValue != null && !opValue.isEmpty()) {
-                op.add(stripQuotes(opValue));
+                ops.add(stripQuotes(opValue));
             }
             Token rightToken = findFirstDescendant(repeatToken, SnapshotParsers.TermParser.class);
             if (rightToken != null) {
-                right.add(toTermNode(rightToken));
+                rights.add(toTermNode(rightToken));
             }
         }
-        return new SnapshotAST.ExprNode(left, op, right);
+        return registerNodeSourceSpan(new SnapshotAST.ExprNode(left, ops, rights), working);
     }
 
     static SnapshotAST.TermNode toTermNode(Token token) {
@@ -112,20 +171,25 @@ public class SnapshotMapper {
             throw new IllegalArgumentException("Left operand not found for rule Term");
         }
         String left = stripQuotes(firstTokenText(leftToken));
-        List<String> op = new ArrayList<>();
-        List<String> right = new ArrayList<>();
+        List<String> ops = new ArrayList<>();
+        List<String> rights = new ArrayList<>();
         for (Token repeatToken : findDescendants(working, SnapshotParsers.TermRepeat0Parser.class)) {
-            String opValue = firstTokenText(repeatToken);
+            Token opToken = findFirstDescendant(repeatToken, org.unlaxer.parser.elementary.WordParser.class);
+            String opValue = firstTokenText(opToken == null ? repeatToken : opToken);
             if (opValue != null && !opValue.isEmpty()) {
-                op.add(stripQuotes(opValue));
+                ops.add(stripQuotes(opValue));
             }
             Token rightToken = findFirstDescendant(repeatToken, SnapshotParsers.FactorParser.class);
             if (rightToken != null) {
-                right.add(stripQuotes(firstTokenText(rightToken)));
+                rights.add(stripQuotes(firstTokenText(rightToken)));
             }
         }
-        return new SnapshotAST.TermNode(left, op, right);
+        return registerNodeSourceSpan(new SnapshotAST.TermNode(left, ops, rights), working);
     }
+
+    // =========================================================================
+    // Fold Helpers (Right-Associative)
+    // =========================================================================
 
     // =========================================================================
     // Utilities
@@ -161,11 +225,28 @@ public class SnapshotMapper {
         return null;
     }
 
+    static Token findDescendantByIndex(Token token, Class<? extends Parser> parserClass, int index) {
+        if (index < 0) {
+            return null;
+        }
+        if (token != null && token.parser.getClass() == parserClass) {
+            if (index == 0) {
+                return token;
+            }
+            index = index - 1;
+        }
+        List<Token> descendants = findDescendants(token, parserClass);
+        if (index >= descendants.size()) {
+            return null;
+        }
+        return descendants.get(index);
+    }
+
     static String firstTokenText(Token token) {
         if (token == null) {
             return null;
         }
-        String raw = token.source == null ? null : token.source.sourceAsString();
+        String raw = tokenTextCompat(token);
         if (raw != null && !raw.isBlank()) {
             return raw.strip();
         }
@@ -178,6 +259,118 @@ public class SnapshotMapper {
         return raw == null ? null : raw.strip();
     }
 
+    static String tokenTextCompat(Token token) {
+        if (token == null) {
+            return null;
+        }
+        try {
+            java.lang.reflect.Method m = token.getClass().getMethod("getToken");
+            Object value = m.invoke(token);
+            if (value instanceof Optional<?> optional && optional.isPresent()) {
+                Object v = optional.get();
+                return v == null ? null : String.valueOf(v);
+            }
+        } catch (Throwable ignored) {}
+        try {
+            java.lang.reflect.Field f = token.getClass().getField("tokenString");
+            Object value = f.get(token);
+            if (value instanceof Optional<?> optional && optional.isPresent()) {
+                Object v = optional.get();
+                return v == null ? null : String.valueOf(v);
+            }
+        } catch (Throwable ignored) {}
+        try {
+            java.lang.reflect.Field f = token.getClass().getField("source");
+            Object src = f.get(token);
+            if (src != null) {
+                java.lang.reflect.Method m = src.getClass().getMethod("sourceAsString");
+                Object v = m.invoke(src);
+                return v == null ? null : String.valueOf(v);
+            }
+        } catch (Throwable ignored) {}
+        return null;
+    }
+
+    static int consumedLengthCompat(Token token) {
+        String text = tokenTextCompat(token);
+        return text == null ? 0 : text.length();
+    }
+
+    static int tokenStartOffsetCompat(Token token) {
+        if (token == null) {
+            return 0;
+        }
+        try {
+            java.lang.reflect.Field sourceField = token.getClass().getField("source");
+            Object source = sourceField.get(token);
+            if (source == null) {
+                return 0;
+            }
+            java.lang.reflect.Method offsetMethod = source.getClass().getMethod("offsetFromRoot");
+            Object offset = offsetMethod.invoke(source);
+            if (offset == null) {
+                return 0;
+            }
+            java.lang.reflect.Method valueMethod = offset.getClass().getMethod("value");
+            Object value = valueMethod.invoke(offset);
+            if (value instanceof Integer i) {
+                return i;
+            }
+            if (value instanceof Number n) {
+                return n.intValue();
+            }
+        } catch (Throwable ignored) {}
+        return 0;
+    }
+
+    static <T> T registerNodeSourceSpan(T node, Token token) {
+        if (node == null || token == null) {
+            return node;
+        }
+        int start = Math.max(0, tokenStartOffsetCompat(token));
+        int length = Math.max(0, consumedLengthCompat(token));
+        int end = start + length;
+        NODE_SOURCE_SPANS.put(node, new int[]{start, end});
+        return node;
+    }
+
+    public static Optional<int[]> sourceSpanOf(Object node) {
+        if (node == null) {
+            return Optional.empty();
+        }
+        int[] span = NODE_SOURCE_SPANS.get(node);
+        if (span == null || span.length < 2) {
+            return Optional.empty();
+        }
+        return Optional.of(new int[]{span[0], span[1]});
+    }
+
+    static StringSource createRootSourceCompat(String source) {
+        try {
+            java.lang.reflect.Method m = StringSource.class.getMethod("createRootSource", String.class);
+            Object v = m.invoke(null, source);
+            if (v instanceof StringSource s) {
+                return s;
+            }
+        } catch (Throwable ignored) {}
+        try {
+            for (java.lang.reflect.Constructor<?> c : StringSource.class.getDeclaredConstructors()) {
+                Class<?>[] types = c.getParameterTypes();
+                if (types.length == 0 || types[0] != String.class) {
+                    continue;
+                }
+                Object[] args = new Object[types.length];
+                args[0] = source;
+                c.setAccessible(true);
+                Object v = c.newInstance(args);
+                if (v instanceof StringSource s) {
+                    return s;
+                }
+            }
+        } catch (Throwable ignored) {}
+        throw new IllegalStateException("No compatible StringSource initializer found");
+    }
+
     static String stripQuotes(String quoted) {
         if (quoted == null) {
             return null;
@@ -188,5 +381,51 @@ public class SnapshotMapper {
             return quoted.substring(1, quoted.length() - 1);
         }
         return quoted;
+    }
+
+    static String identifierLikeText(Token token) {
+        if (token == null) {
+            return null;
+        }
+        String raw = tokenTextCompat(token);
+        String fromRaw = extractIdentifierLike(raw);
+        if (fromRaw != null) {
+            return fromRaw;
+        }
+        for (Token child : token.filteredChildren) {
+            String fromChild = identifierLikeText(child);
+            if (fromChild != null) {
+                return fromChild;
+            }
+        }
+        return extractIdentifierLike(firstTokenText(token));
+    }
+
+    static String extractIdentifierLike(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String text = raw.strip();
+        int start = -1;
+        int end = -1;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (start < 0) {
+                if (Character.isLetter(c) || c == '_') {
+                    start = i;
+                    end = i + 1;
+                }
+                continue;
+            }
+            if (Character.isLetterOrDigit(c) || c == '_') {
+                end = i + 1;
+                continue;
+            }
+            break;
+        }
+        if (start < 0 || end <= start) {
+            return null;
+        }
+        return text.substring(start, end);
     }
 }

@@ -120,9 +120,12 @@ grammar UBNF {
   @mapping(SequenceBody, params=[elements])
   SequenceBody ::= { AnnotatedElement } @elements ;
 
-  // 要素（キャプチャ名付き可）
-  @mapping(AnnotatedElement, params=[element, captureName])
-  AnnotatedElement ::= AtomicElement @element [ '@' IDENTIFIER @captureName ] ;
+  // 要素（@typeof制約とキャプチャ名付き可）
+  @mapping(AnnotatedElement, params=[typeofConstraint, element, captureName])
+  AnnotatedElement ::=
+      [ TypeofElement @typeofConstraint ]
+      AtomicElement @element
+      [ '@' IDENTIFIER @captureName ] ;
 
   // 基本要素
   AtomicElement ::=
@@ -151,6 +154,10 @@ grammar UBNF {
   // 非終端記号参照（先頭大文字 = クラス名、小文字 = ルール名）
   @mapping(RuleRefElement, params=[name])
   RuleRefElement ::= IDENTIFIER @name ;
+
+  // @typeof(captureName) — 要素レベルの型相関アノテーション
+  @mapping(TypeofElement, params=[captureName])
+  TypeofElement ::= '@typeof' '(' IDENTIFIER @captureName ')' ;
 
   // ドット区切り識別子（パッケージ名など）
   @mapping(DottedIdentifier, params=[parts])

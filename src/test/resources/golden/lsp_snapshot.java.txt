@@ -12,7 +12,7 @@ import org.unlaxer.parser.Parser;
 
 public class SnapshotLanguageServer implements LanguageServer, LanguageClientAware {
 
-    private static final List<String> KEYWORDS = List.of("grammar", "token", "@root", "@mapping", "@whitespace", "@interleave", "@backref", "@scopeTree", "@leftAssoc", "@rightAssoc", "@precedence", "params", "level", "profile", "name", "mode", "+", "*");
+    private static final List<String> KEYWORDS = List.of("grammar", "token", "@root", "@mapping", "@whitespace", "@interleave", "@backref", "@typeof", "@scopeTree", "@leftAssoc", "@rightAssoc", "@precedence", "params", "level", "profile", "name", "mode", "+", "*");
 
     private LanguageClient client;
     private final Map<String, DocumentState> documents = new HashMap<>();
@@ -64,7 +64,7 @@ public class SnapshotLanguageServer implements LanguageServer, LanguageClientAwa
 
     public ParseResult parseDocument(String uri, String content) {
         Parser parser = SnapshotParsers.getRootParser();
-        ParseContext context = new ParseContext(StringSource.createRootSource(content));
+        ParseContext context = new ParseContext(createRootSourceCompat(content));
         Parsed result = parser.parse(context);
         int consumedLength = 0;
         if (result.isSucceeded()) {
@@ -78,6 +78,32 @@ public class SnapshotLanguageServer implements LanguageServer, LanguageClientAwa
             publishDiagnostics(uri, content, parseResult);
         }
         return parseResult;
+    }
+
+    private static StringSource createRootSourceCompat(String source) {
+        try {
+            java.lang.reflect.Method m = StringSource.class.getMethod("createRootSource", String.class);
+            Object v = m.invoke(null, source);
+            if (v instanceof StringSource s) {
+                return s;
+            }
+        } catch (Throwable ignored) {}
+        try {
+            for (java.lang.reflect.Constructor<?> c : StringSource.class.getDeclaredConstructors()) {
+                Class<?>[] types = c.getParameterTypes();
+                if (types.length == 0 || types[0] != String.class) {
+                    continue;
+                }
+                Object[] args = new Object[types.length];
+                args[0] = source;
+                c.setAccessible(true);
+                Object v = c.newInstance(args);
+                if (v instanceof StringSource s) {
+                    return s;
+                }
+            }
+        } catch (Throwable ignored) {}
+        throw new IllegalStateException("No compatible StringSource initializer found");
     }
 
     private void publishDiagnostics(String uri, String content, ParseResult result) {

@@ -292,6 +292,7 @@ public class LSPGenerator implements CodeGenerator {
         kw.add("@whitespace");
         kw.add("@interleave");
         kw.add("@backref");
+        kw.add("@typeof");
         kw.add("@scopeTree");
         kw.add("@leftAssoc");
         kw.add("@rightAssoc");
