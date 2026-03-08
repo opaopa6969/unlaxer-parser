@@ -1,7 +1,7 @@
 # UBNF 拡張ロードマップ
 
 > ステータス: draft
-> 最終更新: 2026-03-07 (T1-4, T2-1〜T2-3, T3-1, T3-2, T4-1〜T4-9 完了)
+> 最終更新: 2026-03-08 (T1-4, T2-1〜T2-3, T3-1, T3-2, T4-1〜T4-9, @scopeTree/@declares/@backref 完了)
 > 関連: [specs/ubnf-syntax.md](../specs/ubnf-syntax.md) · [specs/open-questions.md](../specs/open-questions.md)
 
 ## 概要
