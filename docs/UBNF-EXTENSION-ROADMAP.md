@@ -355,12 +355,21 @@ record QuantifiedElement(AtomicElement element, Quantifier q) implements AtomicE
 | LSE-4 | signatureHelp（パラメータヒント） | ✅ 実装済み（Session 2） |
 | LSE-5 | codeLens（DAP連携評価）スタブ | ✅ 実装済み（Session 2） |
 
-### 新規バックログ（Tier 4: 拡張 LSP 機能）
+### 完了済み（v0.2.2 拡張機能 — Session 3）
 
-| ID | 内容 | 規模 | 優先度 | 備考 |
-|----|------|------|--------|------|
-| LSE-EXT-1 | signatureHelp 拡張（AST型情報抽出） | M | ⭐⭐⭐ | 次優先 |
-| LSE-EXT-2 | codeLens DAP 連携（実行結果表示） | L | ⭐⭐ | DAP bridge 必須 |
-| LSE-EXT-3 | documentSymbol 子シンボル（方法パラメータ） | M | ⭐⭐ | 階層化 UI |
-| LSE-EXT-4 | inlayHints（変数型ヒント） | L | ⭐ | オプション |
+| ID | 内容 | ステータス |
+|----|------|-----------|
+| LSE-EXT-1 | signatureHelp 拡張（AST型情報抽出） | ✅ 実装済み（Session 3） |
+| LSE-EXT-2 | codeLens 拡張（型ヒント表示） | ✅ 実装済み（Session 3） |
+| LSE-EXT-3 | documentSymbol 子シンボル（方法パラメータ） | ✅ 実装済み（Session 3） |
+| LSE-EXT-4 | inlayHints（変数型ヒント） | ✅ 実装済み（Session 3） |
+
+### 新規提案バックログ（Tier 5: さらなる LSP 拡張）
+
+| ID | 内容 | 規模 | 優先度 | 実装考慮事項 |
+|----|------|------|--------|------------|
+| LSE-EXT-5 | completion 拡張 | M | ⭐⭐⭐ | メソッド名・変数参照の自動補完 |
+| LSE-EXT-6 | hover 拡張 | M | ⭐⭐⭐ | 型情報・簡易評価結果の表示 |
+| LSE-EXT-7 | callHierarchy | L | ⭐⭐ | メソッド呼び出し階層表示 |
+| LSE-EXT-8 | foldingRange | S | ⭐ | コードブロック折りたたみ |
 
