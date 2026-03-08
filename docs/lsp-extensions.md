@@ -488,14 +488,234 @@ public CompletableFuture<List<? extends InlayHint>> inlayHint(InlayHintParams pa
 
 ---
 
-## 実装優先度表（拡張機能）
+## 実装優先度表（Tier 4: 拡張機能）
+
+| ID | 機能 | 規模 | 難度 | 優先度 | 依存 | ステータス |
+|----|------|------|------|--------|------|-----------|
+| LSE-EXT-1 | signatureHelp 拡張 | M | 中 | ⭐⭐⭐ | AST traverse | ✅ 完了 |
+| LSE-EXT-2 | codeLens DAP 連携 | L | 高 | ⭐⭐ | DAP bridge | ✅ 完了 |
+| LSE-EXT-3 | documentSymbol 子ノード | M | 中 | ⭐⭐ | AST traverse | ✅ 完了 |
+| LSE-EXT-4 | inlayHints 実装 | L | 高 | ⭐ | 型推論 | ✅ 完了 |
+
+---
+
+## Tier 5: さらなる LSP 拡張機能
+
+### LSE-EXT-5: completion 拡張（メソッド・変数補完）
+
+**概要**: 現在はキーワードのみ補完。メソッド名・変数参照・関数を自動補完。
+
+**表示イメージ**:
+```
+メソッド呼び出し時:
+  ism[TAB] ⟹ isAdult(...)    // メソッド補完
+  $[TAB]   ⟹ $age, $name ... // 変数補完
+
+変数参照時:
+  $a[TAB]  ⟹ $age, $admin    // マッチする変数候補
+```
+
+**実装アプローチ**:
+```java
+@Override
+public CompletableFuture<CompletionList> completion(CompletionParams params) {
+  // 1. カーソル前の単語を取得（word prefix）
+  String prefix = wordAt(content, position);
+
+  // 2. ScopeStore.getAllDeclarations() からメソッド・変数を取得
+  List<CompletionItem> items = new ArrayList<>();
+  for (SymbolInfo decl : declarations) {
+    if (decl.name().startsWith(prefix)) {
+      CompletionItem item = new CompletionItem(decl.name());
+      item.setKind(inferCompletionKind(decl.name()));
+      item.setDetail(inferTypeHint(decl.name()));
+      items.add(item);
+    }
+  }
+
+  // 3. キーワード補完も追加
+  items.addAll(keywordCompletions(prefix));
+
+  return CompletableFuture.completedFuture(new CompletionList(items));
+}
+```
+
+**推定型情報**:
+- `is*` / `check*` メソッド → Boolean 返却
+- `count*` / `get_number*` → Number 返却
+- `get_string*` / `format*` → String 返却
+- `$varName` 変数 → 宣言時の型情報
+
+**実装難度**: M
+**優先度**: ⭐⭐⭐（開発生産性向上）
+**依存**: ScopeStore.getAllDeclarations(), 型推定エンジン
+
+---
+
+### LSE-EXT-6: hover 拡張（型情報・シグネチャ表示）
+
+**概要**: 識別子にマウスホバーで型情報・メソッドシグネチャを表示。
+
+**表示イメージ**:
+```
+// ホバー時:
+var $age = 42        ⟸ Hover: $age: number
+var $name = 'John'   ⟸ Hover: $name: string
+isAdult($age)        ⟸ Hover: isAdult(age: number) → boolean
+$count + 10          ⟸ Hover: expression type: number
+```
+
+**実装アプローチ**:
+```java
+@Override
+public CompletableFuture<Hover> hover(HoverParams params) {
+  String word = wordAt(content, params.getPosition());
+
+  // 1. 宣言を検索（変数・メソッド）
+  Optional<SymbolInfo> decl = declarations.stream()
+      .filter(d -> d.name().equals(word))
+      .findFirst();
+
+  // 2. 型情報を構築
+  String typeInfo = decl
+      .map(d -> buildTypeHint(d))
+      .orElse("expression");
+
+  MarkupContent content = new MarkupContent("markdown", "```\n" + typeInfo + "\n```");
+  return CompletableFuture.completedFuture(new Hover(content));
+}
+
+private String buildTypeHint(SymbolInfo decl) {
+  if (decl.name().startsWith("is") || decl.name().startsWith("check")) {
+    return decl.name() + "() → boolean";
+  }
+  if (decl.name().startsWith("count")) {
+    return decl.name() + "() → number";
+  }
+  if (decl.name().startsWith("$")) {
+    // 変数の推定型
+    String type = inferVariableType(decl.name());
+    return decl.name() + ": " + type;
+  }
+  return decl.name();
+}
+```
+
+**実装難度**: M
+**優先度**: ⭐⭐⭐（開発体験向上）
+**依存**: ScopeStore, 型推定エンジン
+
+---
+
+### LSE-EXT-7: callHierarchy（メソッド呼び出し階層）
+
+**概要**: メソッドがどこから呼ばれているか、どこを呼んでいるか を階層表示。
+
+**表示イメージ**:
+```
+callHierarchy の UI:
+  ┌─ isAdult(age)
+  │  ├─ Incoming Calls (isAdult を呼び出す場所)
+  │  │  ├─ Formula フォーミュラ内 (Line 5)
+  │  │  └─ someOtherMethod 内 (Line 10)
+  │  └─ Outgoing Calls (isAdult が呼び出す)
+  │     ├─ $age > 18 (comparison)
+  │     └─ （内部メソッド呼び出しがあれば）
+```
+
+**実装アプローチ**:
+```java
+@Override
+public CompletableFuture<List<? extends CallHierarchyIncomingCall>>
+    incomingCalls(CallHierarchyIncomingCallsParams params) {
+
+  CallHierarchyItem item = params.getItem();
+  String methodName = item.getName();
+
+  // 1. getAllReferences() でこのメソッドへの参照を全検索
+  List<CallHierarchyIncomingCall> calls = references.stream()
+      .filter(ref -> ref.name().equals(methodName))
+      .map(ref -> new CallHierarchyIncomingCall(
+          new CallHierarchyItem(methodName, SymbolKind.Method, ...),
+          List.of(new Range(refStart, refEnd))
+      ))
+      .collect(toList());
+
+  return CompletableFuture.completedFuture(calls);
+}
+
+@Override
+public CompletableFuture<List<? extends CallHierarchyOutgoingCall>>
+    outgoingCalls(CallHierarchyOutgoingCallsParams params) {
+
+  // フォーミュラ内から他メソッドへの呼び出しを検出
+  // （複雑度が高いため、簡易版: 直接呼び出しのみ）
+  return CompletableFuture.completedFuture(List.of());
+}
+```
+
+**実装難度**: L（複数メソッド間の参照トラッキング）
+**優先度**: ⭐⭐（大規模フォーミュラ分析時に有用）
+**依存**: ScopeStore.getAllReferences(), AST traverse
+
+---
+
+### LSE-EXT-8: foldingRange（コードブロック折りたたみ）
+
+**概要**: if/match ブロックを折りたたみ対象として登録。
+
+**表示イメージ**:
+```
+if condition then    ⟸ [−]  ← クリックで折りたたみ
+  expression1
+  expression2
+else
+  expression3
+endif                ⟸ 対応するブロック終了
+```
+
+**実装アプローチ**:
+```java
+@Override
+public CompletableFuture<List<? extends FoldingRange>>
+    foldingRange(FoldingRangeParams params) {
+
+  List<FoldingRange> ranges = new ArrayList<>();
+
+  // 1. AST を走査して if/match ブロックを検出
+  // （Token ツリーから IfExpr, *MatchExpr を探索）
+
+  for (IfExpr ifExpr : findAllIfExpr(ast)) {
+    Position start = offsetToPosition(ifExpr.start());
+    Position end   = offsetToPosition(ifExpr.end());
+    FoldingRange range = new FoldingRange(start.getLine(), end.getLine());
+    range.setKind(FoldingRangeKind.Region);
+    ranges.add(range);
+  }
+
+  // 2. match ブロックも同様
+  for (NumberMatchExpr matchExpr : findAllMatchExpr(ast)) {
+    // ...
+  }
+
+  return CompletableFuture.completedFuture(ranges);
+}
+```
+
+**実装難度**: S（基本的なブロック検出のみ）
+**優先度**: ⭐（オプション機能）
+**依存**: AST traverse, Token offset 追跡
+
+---
+
+## Tier 5 実装優先度表
 
 | ID | 機能 | 規模 | 難度 | 優先度 | 依存 |
 |----|------|------|------|--------|------|
-| LSE-EXT-1 | signatureHelp 拡張 | M | 中 | ⭐⭐⭐ | AST traverse |
-| LSE-EXT-2 | codeLens DAP 連携 | L | 高 | ⭐⭐ | DAP bridge |
-| LSE-EXT-3 | documentSymbol 子ノード | M | 中 | ⭐⭐ | AST traverse |
-| LSE-EXT-4 | inlayHints 実装 | L | 高 | ⭐ | 型推論 |
+| LSE-EXT-5 | completion 拡張 | M | 中 | ⭐⭐⭐ | ScopeStore |
+| LSE-EXT-6 | hover 拡張 | M | 中 | ⭐⭐⭐ | ScopeStore, 型推論 |
+| LSE-EXT-7 | callHierarchy | L | 高 | ⭐⭐ | ScopeStore, AST |
+| LSE-EXT-8 | foldingRange | S | 低 | ⭐ | Token offset |
 
 ---
 
