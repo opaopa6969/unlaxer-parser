@@ -309,21 +309,44 @@ record QuantifiedElement(AtomicElement element, Quantifier q) implements AtomicE
 
 ---
 
-## Tier 5 — 残バックログ（2026-03-08 時点）
+## Tier 5 — 残バックログ（2026-03-08 Session 2 現在）
 
 ### 優先度: Low / 保留
 
 | # | 内容 | 規模 | 備考 |
 |---|------|------|------|
 | T3-3 | セマンティック述語 `?{ !isReservedWord($$) }` | XL | 設計未確定。保留 |
-| OQ-001 | `GrammarValidator` に `W-TOKEN-UNRESOLVED` 警告 | S | 任意改善 |
 | OQ-002 | セルフホスティング完全化（AST/Mapper 生成対応） | XL | 大規模。優先度低 |
 
-### LSP 拡張（tinyexpression 側）
+### LSP 拡張（tinyexpression 側） — **新規セクション**
 
-| # | 内容 | 規模 | 備考 |
-|---|------|------|------|
-| — | go-to-definition: `ScopeStore.resolve()` → LSP Definition | M | ScopeStore API 準備済み |
-| — | find-references: スコープ内全参照を収集 | M | ScopeStore API 準備済み |
-| — | ImportDeclaration の `#method` なし形式を UBNF に追加 | S | 手書きパーサーが対応済み |
+詳細仕様: [`docs/lsp-extensions.md`](./lsp-extensions.md)
+
+#### Phase 1（高優先度 ⭐⭐⭐）
+
+| ID | 内容 | 規模 | 難度 | 備考 |
+|----|------|------|------|------|
+| LSE-1 | documentSymbol（アウトライン） | M | 低 | ScopeStore.getAllDeclarations API 準備済み |
+| LSE-2 | rename（一括リファクタリング） | M | 中 | ScopeStore API 準備済み |
+
+#### Phase 2（中優先度 ⭐⭐）
+
+| ID | 内容 | 規模 | 難度 | 備考 |
+|----|------|------|------|------|
+| LSE-3 | documentHighlight（同一識別子ハイライト） | S | 低 | ScopeStore.getAllReferences API 準備済み |
+| LSE-4 | signatureHelp（パラメータヒント） | M | 中 | AST traverse 必須 |
+
+#### Phase 3（低優先度 ⭐）
+
+| ID | 内容 | 規模 | 難度 | 備考 |
+|----|------|------|------|------|
+| LSE-5 | codeLens（DAP連携評価表示） | L | 高 | DAP evaluator API 活用 |
+
+### 完了済み（v0.2.2 実装）
+
+| # | 内容 | ステータス |
+|---|------|-----------|
+| — | go-to-definition: `ScopeStore.resolve()` → LSP Definition | ✅ 実装済み |
+| — | find-references: スコープ内全参照を収集 → LSP References | ✅ 実装済み |
+| — | ImportDeclaration の `#method` optional 形式 | ✅ 実装済み（Session 2） |
 
