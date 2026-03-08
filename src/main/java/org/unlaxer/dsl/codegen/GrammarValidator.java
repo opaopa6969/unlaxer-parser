@@ -21,6 +21,8 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.RuleRefElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ScopeTreeAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.SequenceBody;
 import org.unlaxer.dsl.bootstrap.UBNFAST.StringSettingValue;
+import org.unlaxer.dsl.bootstrap.UBNFAST.TokenDecl;
+import org.unlaxer.dsl.bootstrap.UBNFAST.TypeofElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.WhitespaceAnnotation;
 
 import java.util.ArrayList;
@@ -81,6 +83,7 @@ public final class GrammarValidator {
 
         validateGlobalWhitespace(grammar, errors);
         validateRootPresence(grammar, errors);
+        validateTokens(grammar, errors);
 
         for (RuleDecl rule : grammar.rules()) {
             MappingAnnotation mapping = null;
@@ -119,6 +122,7 @@ public final class GrammarValidator {
             }
             validatePrecedence(rule, hasLeftAssoc, hasRightAssoc, precedenceAnnotations, errors);
             validateAdvancedAnnotations(rule, interleaveAnnotations, backrefAnnotations, scopeTreeAnnotations, errors);
+            validateTypeofElements(rule, errors);
         }
         validatePrecedenceTopology(grammar, errors);
         validateAssociativityConsistency(grammar, errors);
@@ -267,6 +271,71 @@ public final class GrammarValidator {
                 "W-GENERAL-NO-ROOT"
             );
         }
+    }
+
+    private static void validateTokens(GrammarDecl grammar, List<ValidationIssue> errors) {
+        Set<String> knownParserPackages = Set.of(
+            "org.unlaxer.parser.clang",
+            "org.unlaxer.parser.elementary",
+            "org.unlaxer.parser.posix"
+        );
+
+        for (TokenDecl token : grammar.tokens()) {
+            if (token instanceof TokenDecl.Simple simple) {
+                String parserClass = simple.parserClass();
+                if (parserClass == null || parserClass.isEmpty()) {
+                    continue;
+                }
+
+                // Check if parser class is resolvable
+                if (!isResolvableParserClass(parserClass, knownParserPackages)) {
+                    addError(
+                        errors,
+                        "token " + simple.name() + " references unresolved parser class: "
+                            + parserClass,
+                        "Ensure the parser class is fully qualified or in a known package "
+                            + "(org.unlaxer.parser.clang, elementary, posix).",
+                        "W-TOKEN-UNRESOLVED"
+                    );
+                }
+            }
+        }
+    }
+
+    private static boolean isResolvableParserClass(String parserClass, Set<String> knownParserPackages) {
+        // Check if it's a fully qualified class name (contains at least one dot)
+        if (!parserClass.contains(".")) {
+            return false;
+        }
+
+        // Check if it's in a known parser package
+        for (String knownPackage : knownParserPackages) {
+            if (parserClass.startsWith(knownPackage + ".")) {
+                return true;
+            }
+        }
+
+        // Accept fully qualified names from other packages (may be user-defined)
+        // A simple heuristic: if it looks like a fully qualified class name, accept it
+        // Format: package.path.ClassName (at least 2 parts)
+        String[] parts = parserClass.split("\\.");
+        if (parts.length >= 2) {
+            // Check that all parts except the last are lowercase (package convention)
+            // and the last part starts with uppercase (class name convention)
+            boolean hasValidPackagePart = true;
+            for (int i = 0; i < parts.length - 1; i++) {
+                if (parts[i].isEmpty() || !Character.isLowerCase(parts[i].charAt(0))) {
+                    hasValidPackagePart = false;
+                    break;
+                }
+            }
+            if (hasValidPackagePart && !parts[parts.length - 1].isEmpty()
+                && Character.isUpperCase(parts[parts.length - 1].charAt(0))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static void validateRuleWhitespace(RuleDecl rule, WhitespaceAnnotation w, List<ValidationIssue> errors) {
@@ -588,5 +657,70 @@ public final class GrammarValidator {
             case ChoiceBody choice when choice.alternatives().size() == 1 -> choice.alternatives().get(0);
             default -> null;
         };
+    }
+
+    // =========================================================================
+    // @typeof バリデーション
+    // =========================================================================
+
+    /** (TypeofElement.captureName → parent capture name) のペアを収集する */
+    private record TypeofUsage(String referencedCapture, String ownCapture) {}
+
+    private static void validateTypeofElements(RuleDecl rule, List<ValidationIssue> errors) {
+        List<TypeofUsage> usages = new ArrayList<>();
+        collectTypeofUsagesFromBody(rule.body(), usages);
+        if (usages.isEmpty()) {
+            return;
+        }
+
+        Set<String> captures = collectCaptureNames(rule.body());
+
+        for (TypeofUsage usage : usages) {
+            if (!captures.contains(usage.referencedCapture())) {
+                addRuleError(errors, rule.name(),
+                    "rule " + rule.name() + ": @typeof(" + usage.referencedCapture()
+                        + ") refers to unknown capture '" + usage.referencedCapture() + "'",
+                    "Use a capture name defined in the same rule (e.g. @captureRef).",
+                    "E-TYPEOF-UNKNOWN-CAPTURE");
+            }
+            if (usage.ownCapture() == null || usage.ownCapture().isEmpty()) {
+                addRuleError(errors, rule.name(),
+                    "rule " + rule.name() + ": @typeof(" + usage.referencedCapture()
+                        + ") must be paired with a capture name (e.g. @typeof(x) @myCapture)",
+                    "Add a capture name after @typeof(x).",
+                    "E-TYPEOF-MISSING-CAPTURE");
+            }
+        }
+    }
+
+    private static void collectTypeofUsagesFromBody(RuleBody body, List<TypeofUsage> usages) {
+        switch (body) {
+            case ChoiceBody choice -> {
+                for (SequenceBody seq : choice.alternatives()) {
+                    collectTypeofUsagesFromSequence(seq, usages);
+                }
+            }
+            case SequenceBody seq -> collectTypeofUsagesFromSequence(seq, usages);
+        }
+    }
+
+    private static void collectTypeofUsagesFromSequence(SequenceBody seq, List<TypeofUsage> usages) {
+        for (AnnotatedElement ae : seq.elements()) {
+            if (ae.typeofConstraint().isPresent()) {
+                TypeofElement te = ae.typeofConstraint().get();
+                usages.add(new TypeofUsage(te.captureName(), ae.captureName().orElse(null)));
+            } else {
+                collectTypeofUsagesFromAtomic(ae.element(), usages);
+            }
+        }
+    }
+
+    private static void collectTypeofUsagesFromAtomic(AtomicElement element, List<TypeofUsage> usages) {
+        switch (element) {
+            case GroupElement group -> collectTypeofUsagesFromBody(group.body(), usages);
+            case OptionalElement opt -> collectTypeofUsagesFromBody(opt.body(), usages);
+            case RepeatElement rep -> collectTypeofUsagesFromBody(rep.body(), usages);
+            default -> {}
+        }
     }
 }
