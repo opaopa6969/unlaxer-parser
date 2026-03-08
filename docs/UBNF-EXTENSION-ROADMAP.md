@@ -30,6 +30,7 @@ UBNF の表現力を段階的に ANTLR/EBNF 水準に引き上げるためのロ
 ✅ リテラル '...'（エスケープ \n \t \r \\ \' 対応）
 ✅ キャプチャ @name
 ✅ アノテーション @root, @mapping, @whitespace など
+✅ アノテーション @scopeTree / @declares / @backref（セマンティックスコープ）
 ✅ コメント (//)
 ```
 
@@ -305,3 +306,24 @@ record QuantifiedElement(AtomicElement element, Quantifier q) implements AtomicE
 - [specs/open-questions.md](../specs/open-questions.md) — 設計疑問
 - `org.unlaxer.parser.elementary.WildCardStringTerninatorParser` — UNTIL の実装基盤
 - `org.unlaxer.parser.combinator.MatchOnly` — LOOKAHEAD の実装候補
+
+---
+
+## Tier 5 — 残バックログ（2026-03-08 時点）
+
+### 優先度: Low / 保留
+
+| # | 内容 | 規模 | 備考 |
+|---|------|------|------|
+| T3-3 | セマンティック述語 `?{ !isReservedWord($$) }` | XL | 設計未確定。保留 |
+| OQ-001 | `GrammarValidator` に `W-TOKEN-UNRESOLVED` 警告 | S | 任意改善 |
+| OQ-002 | セルフホスティング完全化（AST/Mapper 生成対応） | XL | 大規模。優先度低 |
+
+### LSP 拡張（tinyexpression 側）
+
+| # | 内容 | 規模 | 備考 |
+|---|------|------|------|
+| — | go-to-definition: `ScopeStore.resolve()` → LSP Definition | M | ScopeStore API 準備済み |
+| — | find-references: スコープ内全参照を収集 | M | ScopeStore API 準備済み |
+| — | ImportDeclaration の `#method` なし形式を UBNF に追加 | S | 手書きパーサーが対応済み |
+
