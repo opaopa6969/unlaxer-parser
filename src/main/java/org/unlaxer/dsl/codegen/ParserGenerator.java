@@ -759,12 +759,15 @@ public class ParserGenerator implements CodeGenerator {
                   .append(captureParserClass).append(");\n");
                 sb.append(i).append("        if (refToken != null && refToken.source != null) {\n");
                 sb.append(i).append("            String __refName = refToken.source.sourceAsString().trim();\n");
-                sb.append(i).append("            if (!__refName.isEmpty() && !org.unlaxer.dsl.runtime.ScopeStore.isDeclared(ctx, __refName)) {\n");
+                sb.append(i).append("            if (!__refName.isEmpty()) {\n");
                 sb.append(i).append("                int __offset = refToken.source.offsetFromRoot().value();\n");
-                sb.append(i).append("                org.unlaxer.dsl.runtime.ScopeStore.addDiagnostic(ctx,\n");
-                sb.append(i).append("                    \"未定義のシンボル: '\" + __refName + \"'\",\n");
-                sb.append(i).append("                    __offset, __refName.length(),\n");
-                sb.append(i).append("                    org.unlaxer.dsl.runtime.ScopeStore.Severity.WARNING);\n");
+                sb.append(i).append("                org.unlaxer.dsl.runtime.ScopeStore.addReference(ctx, __refName, __offset, __refName.length());\n");
+                sb.append(i).append("                if (!org.unlaxer.dsl.runtime.ScopeStore.isDeclared(ctx, __refName)) {\n");
+                sb.append(i).append("                    org.unlaxer.dsl.runtime.ScopeStore.addDiagnostic(ctx,\n");
+                sb.append(i).append("                        \"未定義のシンボル: '\" + __refName + \"'\",\n");
+                sb.append(i).append("                        __offset, __refName.length(),\n");
+                sb.append(i).append("                        org.unlaxer.dsl.runtime.ScopeStore.Severity.WARNING);\n");
+                sb.append(i).append("                }\n");
                 sb.append(i).append("            }\n");
                 sb.append(i).append("        }\n");
             }

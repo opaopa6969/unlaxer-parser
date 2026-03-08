@@ -107,7 +107,9 @@ public final class ScopeStore {
         if (name == null || name.isEmpty()) return;
         Deque<Map<String, SymbolInfo>> stack = getStack(ctx);
         Map<String, SymbolInfo> scope = stack.isEmpty() ? getGlobalScope(ctx) : stack.peek();
-        scope.put(name, new SymbolInfo(name, sourceOffset));
+        SymbolInfo info = new SymbolInfo(name, sourceOffset);
+        scope.put(name, info);
+        getAllDeclarationsInternal(ctx).add(info);
     }
 
     /**
@@ -189,6 +191,60 @@ public final class ScopeStore {
     }
 
     // =========================================================================
+    // 宣言一覧（go-to-definition 用フラットリスト）
+    // =========================================================================
+
+    private static final Name ALL_DECLARATIONS_KEY = Name.of(ScopeStore.class, "allDeclarations");
+
+    /**
+     * パース中に {@link #declare} で登録されたすべての宣言をフラットリストで返す。
+     * スコープが閉じた後でも参照可能。
+     * LSP の go-to-definition で使用する。
+     */
+    public static List<SymbolInfo> getAllDeclarations(ParseContext ctx) {
+        return Collections.unmodifiableList(getAllDeclarationsInternal(ctx));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<SymbolInfo> getAllDeclarationsInternal(ParseContext ctx) {
+        return (List<SymbolInfo>) ctx.getGlobalScopeTreeMap()
+            .computeIfAbsent(ALL_DECLARATIONS_KEY, k -> new ArrayList<>());
+    }
+
+    // =========================================================================
+    // 参照一覧（find-references 用フラットリスト）
+    // =========================================================================
+
+    private static final Name ALL_REFERENCES_KEY = Name.of(ScopeStore.class, "allReferences");
+
+    /**
+     * @backref ルールが参照したシンボルを記録する（生成パーサーの onCommit から呼ぶ）。
+     *
+     * @param ctx    パースコンテキスト
+     * @param name   参照したシンボル名
+     * @param offset 参照箇所の char offset
+     * @param length 参照箇所の長さ
+     */
+    public static void addReference(ParseContext ctx, String name, int offset, int length) {
+        if (name == null || name.isEmpty()) return;
+        getAllReferencesInternal(ctx).add(new ReferenceInfo(name, offset, length));
+    }
+
+    /**
+     * パース中に記録されたすべての参照をフラットリストで返す。
+     * LSP の find-references で使用する。
+     */
+    public static List<ReferenceInfo> getAllReferences(ParseContext ctx) {
+        return Collections.unmodifiableList(getAllReferencesInternal(ctx));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<ReferenceInfo> getAllReferencesInternal(ParseContext ctx) {
+        return (List<ReferenceInfo>) ctx.getGlobalScopeTreeMap()
+            .computeIfAbsent(ALL_REFERENCES_KEY, k -> new ArrayList<>());
+    }
+
+    // =========================================================================
     // 内部
     // =========================================================================
 
@@ -233,4 +289,13 @@ public final class ScopeStore {
 
     /** 診断の重大度 */
     public enum Severity { ERROR, WARNING, INFO, HINT }
+
+    /**
+     * シンボルへの参照情報。
+     *
+     * @param name   参照したシンボル名
+     * @param offset 参照箇所の char offset
+     * @param length 参照箇所の長さ（文字数）
+     */
+    public record ReferenceInfo(String name, int offset, int length) {}
 }

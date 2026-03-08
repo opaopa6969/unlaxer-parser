@@ -6,7 +6,7 @@
 
 	<groupId>org.unlaxer</groupId>
 	<artifactId>unlaxer-dsl</artifactId>
-	<version>0.3.0</version>
+	<version>0.3.1</version>
 	<name>unlaxer-dsl</name>
 	<packaging>jar</packaging>
 
