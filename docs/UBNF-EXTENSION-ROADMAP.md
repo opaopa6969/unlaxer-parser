@@ -364,12 +364,20 @@ record QuantifiedElement(AtomicElement element, Quantifier q) implements AtomicE
 | LSE-EXT-3 | documentSymbol 子シンボル（方法パラメータ） | ✅ 実装済み（Session 3） |
 | LSE-EXT-4 | inlayHints（変数型ヒント） | ✅ 実装済み（Session 3） |
 
-### 新規提案バックログ（Tier 5: さらなる LSP 拡張）
+### 新規バックログ（Tier 5: さらなる LSP 拡張） — **計画化完了**
 
-| ID | 内容 | 規模 | 優先度 | 実装考慮事項 |
-|----|------|------|--------|------------|
-| LSE-EXT-5 | completion 拡張 | M | ⭐⭐⭐ | メソッド名・変数参照の自動補完 |
-| LSE-EXT-6 | hover 拡張 | M | ⭐⭐⭐ | 型情報・簡易評価結果の表示 |
-| LSE-EXT-7 | callHierarchy | L | ⭐⭐ | メソッド呼び出し階層表示 |
-| LSE-EXT-8 | foldingRange | S | ⭐ | コードブロック折りたたみ |
+詳細仕様: [`docs/lsp-extensions.md#Tier 5`](./lsp-extensions.md)
+
+| ID | 内容 | 規模 | 優先度 | Task # | ステータス |
+|----|------|------|--------|--------|-----------|
+| LSE-EXT-5 | completion 拡張 | M | ⭐⭐⭐ | #10 | 📋 計画化済み |
+| LSE-EXT-6 | hover 拡張 | M | ⭐⭐⭐ | #11 | 📋 計画化済み |
+| LSE-EXT-7 | callHierarchy | L | ⭐⭐ | #12 | 📋 計画化済み |
+| LSE-EXT-8 | foldingRange | S | ⭐ | #13 | 📋 計画化済み |
+
+**実装順序（優先度順）**:
+1. LSE-EXT-5: completion（開発生産性向上）
+2. LSE-EXT-6: hover（ユーザー体験向上）
+3. LSE-EXT-7: callHierarchy（大規模フォーミュラ対応）
+4. LSE-EXT-8: foldingRange（コード可読性向上）
 
