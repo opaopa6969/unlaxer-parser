@@ -372,7 +372,7 @@ record QuantifiedElement(AtomicElement element, Quantifier q) implements AtomicE
 |----|------|------|--------|--------|-----------|
 | LSE-EXT-5 | completion 拡張 | M | ⭐⭐⭐ | #10 | 📋 計画化済み |
 | LSE-EXT-6 | hover 拡張 | M | ⭐⭐⭐ | #11 | 📋 計画化済み |
-| LSE-EXT-7 | callHierarchy | L | ⭐⭐ | #12 | 📋 計画化済み |
+| LSE-EXT-7 | callHierarchy | L | ⭐⭐ | #12 | ⚠️ 実装不可（generated サーバー制限） |
 | LSE-EXT-8 | foldingRange | S | ⭐ | #13 | 📋 計画化済み |
 
 **実装順序（優先度順）**:

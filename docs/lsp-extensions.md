@@ -609,7 +609,51 @@ private String buildTypeHint(SymbolInfo decl) {
 
 ### LSE-EXT-7: callHierarchy（メソッド呼び出し階層）
 
+⚠️ **ステータス**: 実装不可 — generated サーバーの制限
+
 **概要**: メソッドがどこから呼ばれているか、どこを呼んでいるか を階層表示。
+
+**実装制限の詳細**:
+
+#### 🔴 Generated Server の制約
+
+`unlaxer-dsl` の **LSPGenerator** が生成する TextDocumentService は、デフォルトで以下のメソッドのみ実装します：
+
+**生成されるメソッド（最小限）**:
+- `completion()` — キーワード補完
+- `hover()` — AST 型情報の表示
+- `semanticTokensFull()` — トークン分類
+
+**生成されないメソッド（該当）**:
+- `prepareCallHierarchy()` ✗
+- `incomingCalls()` ✗
+- `outgoingCalls()` ✗
+
+**理由**:
+1. **LSPGenerator の設計スコープ**: 基本的な UBNF パーサー LSP サポートの最小実装
+2. **Advanced LSP 機能の非対応**: callHierarchy は generated コード内の hardcoded 処理ではなく、**拡張実装が前提**
+3. **Generation Philosophy**: パーサー生成に関連する機能（completion, hover, tokens）のみを automated generation
+
+#### 🔵 回避策
+
+TinyExpressionP4LanguageServerExt では他の拡張機能（documentSymbol, rename など）を手動実装しているが、callHierarchy は以下の理由で実装困難：
+
+1. **Signature Mismatch**: `TextDocumentService` インターフェースの expected signature と generated class の hierarchy が合致しない
+   ```java
+   // Expected by LSP4J
+   CompletableFuture<List<CallHierarchyItem>> prepareCallHierarchy(...)
+
+   // Generated class doesn't declare this method
+   // → @Override は使えず、新規メソッドとして定義するとシグネチャ不一致
+   ```
+
+2. **Optional Feature in LSP4J 0.23.1**: callHierarchy は LSP4J で optional 機能としており、generated server では未実装
+3. **Complex State Management**: incoming/outgoing calls は複数 AST ノードの参照トラッキングが必要（generated code では対応していない）
+
+#### ✅ 代替案
+
+- **rename** + **documentSymbol** 使用時の visual reference tracking（VS Code の outline + rename で実質的な呼び出し箇所の把握が可能）
+- **future enhancement**: generated server の LSPGenerator 拡張（priority: low）
 
 **表示イメージ**:
 ```
