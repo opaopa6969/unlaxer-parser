@@ -7,7 +7,7 @@
 	<parent>
 		<groupId>org.unlaxer</groupId>
 		<artifactId>unlaxer-parser</artifactId>
-		<version>2.6.0</version>
+		<version>${revision}</version>
 		<relativePath>../pom.xml</relativePath>
 	</parent>
 
@@ -18,9 +18,9 @@
 	<description>Unlaxer parser combinator inspired by RelaxNG</description>
 
 	<scm>
-		<connection>scm:https://opaopa6969@bitbucket.org/opaopa6969/unlaxer-common.git</connection>
-		<developerConnection>scm:https://opaopa6969@bitbucket.org/opaopa6969/unlaxer-common.git</developerConnection>
-		<url>scm:https://opaopa6969@bitbucket.org/opaopa6969/unlaxer-common.git</url>
+		<connection>scm:git:git@github.com:opaopa6969/unlaxer-parser.git</connection>
+		<developerConnection>scm:git:git@github.com:opaopa6969/unlaxer-parser.git</developerConnection>
+		<url>https://github.com/opaopa6969/unlaxer-parser/tree/master/unlaxer-common</url>
 	</scm>
 
 	<dependencies>

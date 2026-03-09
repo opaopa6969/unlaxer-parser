@@ -7,7 +7,7 @@
 	<parent>
 		<groupId>org.unlaxer</groupId>
 		<artifactId>unlaxer-parser</artifactId>
-		<version>2.6.0</version>
+		<version>${revision}</version>
 		<relativePath>../pom.xml</relativePath>
 	</parent>
 
@@ -18,9 +18,9 @@
 	<description>BNF拡張DSLからParser/AST/Mapper/LSP/DAPを自動生成するツール</description>
 
 	<scm>
-		<connection>scm:https://opaopa6969@bitbucket.org/opaopa6969/unlaxer-dsl.git</connection>
-		<developerConnection>scm:https://opaopa6969@bitbucket.org/opaopa6969/unlaxer-dsl.git</developerConnection>
-		<url>scm:https://opaopa6969@bitbucket.org/opaopa6969/unlaxer-dsl.git</url>
+		<connection>scm:git:git@github.com:opaopa6969/unlaxer-parser.git</connection>
+		<developerConnection>scm:git:git@github.com:opaopa6969/unlaxer-parser.git</developerConnection>
+		<url>https://github.com/opaopa6969/unlaxer-parser/tree/master/unlaxer-dsl</url>
 	</scm>
 
 	<properties>

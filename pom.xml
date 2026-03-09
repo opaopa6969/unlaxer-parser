@@ -6,7 +6,7 @@
 
 	<groupId>org.unlaxer</groupId>
 	<artifactId>unlaxer-parser</artifactId>
-	<version>2.6.0</version>
+	<version>${revision}</version>
 	<packaging>pom</packaging>
 
 	<name>unlaxer-parser</name>
@@ -41,6 +41,7 @@
 	</developers>
 
 	<properties>
+		<revision>2.6.0</revision> <!-- ここを変えるだけで全体が変わるようになります -->
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<maven.compiler.source>11</maven.compiler.source>
 		<maven.compiler.target>11</maven.compiler.target>
@@ -59,6 +60,33 @@
 
 	<build>
 		<plugins>
+			<!-- CI Friendly Versionsのためのプラグイン。deploy時に${revision}を実際のバージョンに置換する -->
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>flatten-maven-plugin</artifactId>
+				<version>1.6.0</version>
+				<configuration>
+					<updatePomFile>true</updatePomFile>
+					<flattenMode>resolveCiFriendliesOnly</flattenMode>
+				</configuration>
+				<executions>
+					<execution>
+						<id>flatten</id>
+						<phase>process-resources</phase>
+						<goals>
+							<goal>flatten</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>flatten.clean</id>
+						<phase>clean</phase>
+						<goals>
+							<goal>clean</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+
 			<plugin>
 				<groupId>org.sonatype.central</groupId>
 				<artifactId>central-publishing-maven-plugin</artifactId>
