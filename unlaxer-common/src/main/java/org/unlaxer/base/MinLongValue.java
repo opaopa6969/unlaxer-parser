@@ -1,0 +1,22 @@
+package org.unlaxer.base;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+public interface MinLongValue {
+	
+	public default long minLongValue(){
+		_MinLongValue annotation = getClass().getAnnotation(_MinLongValue.class);
+		return annotation == null ? 
+				Long.MIN_VALUE : 
+				annotation.value();
+	}
+	
+	@Retention(RetentionPolicy.RUNTIME)
+	@Target(ElementType.TYPE)
+	public @interface _MinLongValue{
+		long value();
+	}
+}

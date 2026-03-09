@@ -1,0 +1,7 @@
+**/.vscode/**
+**/.vscode-test/**
+**/out/test/**
+server/target/**
+server/src/**
+tools/**
+*.log

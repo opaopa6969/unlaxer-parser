@@ -1,0 +1,91 @@
+{
+  "name": "calculator-lsp",
+  "displayName": "Calculator DSL (LSP)",
+  "description": "VS Code extension for a tiny calculator DSL backed by a Java LSP server (LSP4J).",
+  "version": "0.1.0",
+  "publisher": "your-name",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:calculator"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "calculator",
+        "aliases": [
+          "Calculator",
+          "calculator"
+        ],
+        "extensions": [
+          ".calc"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "calculator",
+        "scopeName": "source.calculator",
+        "path": "./syntaxes/calculator.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "Calculator LSP",
+      "properties": {
+        "calculatorLsp.server.javaPath": {
+          "type": "string",
+          "default": "java",
+          "description": "Java executable to launch the language server (e.g. java, /path/to/java)."
+        },
+        "calculatorLsp.server.jarPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the calculator LSP server jar. If empty, the bundled jar in this extension will be used."
+        },
+        "calculatorLsp.server.jvmArgs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Extra JVM arguments (e.g. -Xmx512m)."
+        },
+        "calculatorLsp.fileExtensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            ".calc"
+          ],
+          "description": "File extensions to watch for the calculator language (must match contributes.languages.extensions)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint .",
+    "test": "node ./out/test/runTest.js",
+    "build:server": "cd server && mvn -q -DskipTests package && node ../tools/copyServerJar.js",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "@types/vscode": "^1.85.0",
+    "@vscode/test-electron": "^2.3.9",
+    "eslint": "^8.57.0",
+    "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  }
+}
