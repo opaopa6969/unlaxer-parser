@@ -1,0 +1,33 @@
+grammar TinyCalc {
+  @package: org.unlaxer.tinycalc.generated
+  @whitespace: javaStyle
+
+  token NUMBER     = NumberParser
+  token IDENTIFIER = IdentifierParser
+
+  @root
+  @mapping(TinyCalcProgram, params=[declarations, expression])
+  TinyCalc ::=
+    { VariableDeclaration } @declarations
+    Expression @expression ;
+
+  @mapping(VarDecl, params=[keyword, name, init])
+  VariableDeclaration ::=
+    ( 'var' | 'variable' ) @keyword
+    IDENTIFIER @name
+    [ 'set' Expression @init ]
+    ';' ;
+
+  @mapping(BinaryExpr, params=[left, op, right])
+  @leftAssoc
+  Expression ::= Term @left { ( '+' @op | '-' @op ) Term @right } ;
+
+  @mapping(BinaryExpr, params=[left, op, right])
+  @leftAssoc
+  Term ::= Factor @left { ( '*' @op | '/' @op ) Factor @right } ;
+
+  Factor ::=
+      '(' Expression ')'
+    | NUMBER
+    | IDENTIFIER ;
+}

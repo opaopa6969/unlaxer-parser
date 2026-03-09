@@ -1,0 +1,60 @@
+package org.example.snapshot;
+
+public abstract class SnapshotEvaluator<T> {
+
+    private DebugStrategy debugStrategy = DebugStrategy.NOOP;
+
+    public void setDebugStrategy(DebugStrategy strategy) {
+        this.debugStrategy = strategy;
+    }
+
+    public T eval(SnapshotAST node) {
+        debugStrategy.onEnter(node);
+        T result = evalInternal(node);
+        debugStrategy.onExit(node, result);
+        return result;
+    }
+
+    private T evalInternal(SnapshotAST node) {
+        return switch (node) {
+            case SnapshotAST.ExprNode n -> evalExprNode(n);
+            case SnapshotAST.TermNode n -> evalTermNode(n);
+        };
+    }
+
+    protected abstract T evalExprNode(SnapshotAST.ExprNode node);
+    protected abstract T evalTermNode(SnapshotAST.TermNode node);
+
+    // =========================================================================
+    // DebugStrategy
+    // =========================================================================
+
+    public interface DebugStrategy {
+        void onEnter(SnapshotAST node);
+        void onExit(SnapshotAST node, Object result);
+
+        DebugStrategy NOOP = new DebugStrategy() {
+            public void onEnter(SnapshotAST node) {}
+            public void onExit(SnapshotAST node, Object result) {}
+        };
+    }
+
+    public static class StepCounterStrategy implements DebugStrategy {
+        private int step = 0;
+        private final java.util.function.BiConsumer<Integer, SnapshotAST> onStep;
+
+        public StepCounterStrategy(
+            java.util.function.BiConsumer<Integer, SnapshotAST> onStep
+        ) {
+            this.onStep = onStep;
+        }
+
+        @Override
+        public void onEnter(SnapshotAST node) {
+            onStep.accept(step++, node);
+        }
+
+        @Override
+        public void onExit(SnapshotAST node, Object result) {}
+    }
+}

@@ -1,0 +1,2 @@
+{"event":"file","action":"conflict","path":"/path/to/out/org/example/valid/ValidAST.java"}
+{"event":"manifest-summary","mode":"generate","generatedAt":"2026-01-02T03:04:05Z","toolVersion":"<toolVersion>","argsHash":"<argsHash>","ok":false,"failReasonCode":"FAIL_ON_CONFLICT","exitCode":4,"warningsCount":0,"writtenCount":0,"skippedCount":0,"conflictCount":1,"dryRunCount":0}

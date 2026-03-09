@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://unlaxer.dev/schema/report-v1.ndjson.json",
+  "title": "unlaxer-dsl NDJSON Events v1",
+  "description": "Line-delimited event stream for CodegenMain --report-format ndjson.",
+  "oneOf": [
+    {
+      "title": "file-event",
+      "type": "object",
+      "required": ["event", "action", "path"],
+      "additionalProperties": false,
+      "properties": {
+        "event": { "const": "file" },
+        "action": { "enum": ["written", "skipped", "dry-run", "conflict", "cleaned"] },
+        "path": { "type": "string", "minLength": 1 }
+      }
+    },
+    {
+      "title": "validate-success",
+      "type": "object",
+      "required": ["event", "payload"],
+      "additionalProperties": false,
+      "properties": {
+        "event": { "const": "validate-success" },
+        "payload": { "$ref": "https://unlaxer.dev/schema/report-v1.json" }
+      }
+    },
+    {
+      "title": "validate-failure",
+      "type": "object",
+      "required": ["event", "payload"],
+      "additionalProperties": false,
+      "properties": {
+        "event": { "const": "validate-failure" },
+        "payload": { "$ref": "https://unlaxer.dev/schema/report-v1.json" }
+      }
+    },
+    {
+      "title": "strict-failure",
+      "type": "object",
+      "required": ["event", "payload"],
+      "additionalProperties": false,
+      "properties": {
+        "event": { "const": "strict-failure" },
+        "payload": { "$ref": "https://unlaxer.dev/schema/report-v1.json" }
+      }
+    },
+    {
+      "title": "warnings",
+      "type": "object",
+      "required": ["event", "payload"],
+      "additionalProperties": false,
+      "properties": {
+        "event": { "const": "warnings" },
+        "payload": { "$ref": "https://unlaxer.dev/schema/report-v1.json" }
+      }
+    },
+    {
+      "title": "generate-summary",
+      "type": "object",
+      "required": ["event", "payload"],
+      "additionalProperties": false,
+      "properties": {
+        "event": { "const": "generate-summary" },
+        "payload": { "$ref": "https://unlaxer.dev/schema/report-v1.json" }
+      }
+    },
+    {
+      "title": "cli-error",
+      "type": "object",
+      "required": ["event", "code", "message", "detail", "availableGenerators"],
+      "additionalProperties": false,
+      "properties": {
+        "event": { "const": "cli-error" },
+        "code": { "type": "string", "pattern": "^E-[A-Z0-9-]+$" },
+        "message": { "type": "string", "minLength": 1 },
+        "detail": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "minLength": 1 }
+          ]
+        },
+        "availableGenerators": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  ]
+}

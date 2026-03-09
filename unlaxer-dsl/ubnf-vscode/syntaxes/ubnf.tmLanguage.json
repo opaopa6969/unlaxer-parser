@@ -1,0 +1,39 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "UBNF",
+  "scopeName": "source.ubnf",
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#keyword" },
+    { "include": "#operator" },
+    { "include": "#annotation" },
+    { "include": "#string" },
+    { "include": "#typename" }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.line.double-slash.ubnf",
+      "match": "//.*$"
+    },
+    "keyword": {
+      "name": "keyword.control.ubnf",
+      "match": "\\b(grammar|token)\\b"
+    },
+    "operator": {
+      "name": "keyword.operator.ubnf",
+      "match": "::=|\\||;"
+    },
+    "annotation": {
+      "name": "storage.modifier.ubnf",
+      "match": "@(root|mapping|whitespace|leftAssoc)\\b"
+    },
+    "string": {
+      "name": "string.quoted.single.ubnf",
+      "match": "'[^']*'"
+    },
+    "typename": {
+      "name": "entity.name.type.ubnf",
+      "match": "\\b[A-Z][A-Z_0-9]*\\b"
+    }
+  }
+}

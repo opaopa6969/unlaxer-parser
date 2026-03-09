@@ -1,0 +1,13 @@
+{
+  "irVersion": "1.0",
+  "source": "examples/calc.expr",
+  "nodes": [
+    {
+      "id": "n0",
+      "kind": "Root",
+      "span": { "start": 0, "end": 2 },
+      "children": ["n0"]
+    }
+  ],
+  "diagnostics": []
+}

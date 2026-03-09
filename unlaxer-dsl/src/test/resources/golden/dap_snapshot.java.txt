@@ -1,0 +1,603 @@
+package org.example.snapshot;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import org.eclipse.lsp4j.debug.*;
+import org.eclipse.lsp4j.debug.services.*;
+import org.unlaxer.Parsed;
+import org.unlaxer.StringSource;
+import org.unlaxer.Token;
+import org.unlaxer.context.ParseContext;
+import org.unlaxer.parser.Parser;
+
+public class SnapshotDebugAdapter implements IDebugProtocolServer {
+
+    private IDebugProtocolClient client;
+    private String pendingProgram;
+    private String runtimeMode = "token";
+    private boolean stopOnEntry;
+    private String sourceContent = "";
+    private List<Token> stepPoints = new ArrayList<>();
+    private int stepIndex = 0;
+    private int astNodeCount = 0;
+    private List<String> astNodeTypes = new ArrayList<>();
+    private List<int[]> astNodeSpans = new ArrayList<>();
+    private Map<String, String> runtimeProbeVariables = new java.util.LinkedHashMap<>();
+    private Set<Integer> breakpointLines = new HashSet<>();
+
+    public void connect(IDebugProtocolClient client) {
+        this.client = client;
+    }
+
+    @Override
+    public CompletableFuture<Capabilities> initialize(InitializeRequestArguments args) {
+        Capabilities cap = new Capabilities();
+        cap.setSupportsConfigurationDoneRequest(true);
+        return CompletableFuture.completedFuture(cap);
+    }
+
+    @Override
+    public CompletableFuture<Void> launch(Map<String, Object> args) {
+        pendingProgram = (String) args.getOrDefault("program", "");
+        runtimeMode = String.valueOf(args.getOrDefault("runtimeMode", "token"));
+        stopOnEntry = Boolean.TRUE.equals(args.get("stopOnEntry"));
+        client.initialized();
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public CompletableFuture<Void> configurationDone(ConfigurationDoneArguments args) {
+        if (!parseAndCollectSteps()) {
+            return CompletableFuture.completedFuture(null); // error already sent
+        }
+        if (stopOnEntry && !stepPoints.isEmpty()) {
+            StoppedEventArguments stopped = new StoppedEventArguments();
+            stopped.setReason("entry");
+            stopped.setThreadId(1);
+            stopped.setAllThreadsStopped(true);
+            client.stopped(stopped);
+        } else if (!breakpointLines.isEmpty()) {
+            // run to first breakpoint
+            int bp = findBreakpointIndex(-1);
+            if (bp >= 0) {
+                stepIndex = bp;
+                StoppedEventArguments stopped = new StoppedEventArguments();
+                stopped.setReason("breakpoint");
+                stopped.setThreadId(1);
+                stopped.setAllThreadsStopped(true);
+                client.stopped(stopped);
+            } else {
+                sendOutput("stdout", "Parsed successfully: " + pendingProgram + "\n");
+                sendTerminated();
+            }
+        } else {
+            sendOutput("stdout", "Parsed successfully: " + pendingProgram + "\n");
+            sendTerminated();
+        }
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public CompletableFuture<SetBreakpointsResponse> setBreakpoints(SetBreakpointsArguments args) {
+        breakpointLines.clear();
+        SetBreakpointsResponse response = new SetBreakpointsResponse();
+        SourceBreakpoint[] requested = args.getBreakpoints();
+        int count = requested == null ? 0 : requested.length;
+        Breakpoint[] breakpoints = new Breakpoint[count];
+        for (int i = 0; i < count; i++) {
+            int line = requested[i].getLine();
+            breakpointLines.add(line);
+            Breakpoint bp = new Breakpoint();
+            bp.setVerified(true);
+            bp.setLine(line);
+            breakpoints[i] = bp;
+        }
+        response.setBreakpoints(breakpoints);
+        return CompletableFuture.completedFuture(response);
+    }
+
+    @Override
+    public CompletableFuture<Void> next(NextArguments args) {
+        stepIndex++;
+        if (stepIndex >= stepLimit()) {
+            sendOutput("stdout", "Completed: " + pendingProgram + "\n");
+            sendTerminated();
+        } else {
+            StoppedEventArguments stopped = new StoppedEventArguments();
+            stopped.setReason("step");
+            stopped.setThreadId(1);
+            stopped.setAllThreadsStopped(true);
+            client.stopped(stopped);
+        }
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public CompletableFuture<ContinueResponse> continue_(ContinueArguments args) {
+        ContinueResponse response = new ContinueResponse();
+        response.setAllThreadsContinued(true);
+        int bp = findBreakpointIndex(stepIndex);
+        if (bp >= 0) {
+            stepIndex = bp;
+            StoppedEventArguments stopped = new StoppedEventArguments();
+            stopped.setReason("breakpoint");
+            stopped.setThreadId(1);
+            stopped.setAllThreadsStopped(true);
+            client.stopped(stopped);
+        } else {
+            sendOutput("stdout", "Completed: " + pendingProgram + "\n");
+            sendTerminated();
+        }
+        return CompletableFuture.completedFuture(response);
+    }
+
+    @Override
+    public CompletableFuture<ThreadsResponse> threads() {
+        ThreadsResponse response = new ThreadsResponse();
+        org.eclipse.lsp4j.debug.Thread thread = new org.eclipse.lsp4j.debug.Thread();
+        thread.setId(1);
+        thread.setName("main");
+        response.setThreads(new org.eclipse.lsp4j.debug.Thread[]{thread});
+        return CompletableFuture.completedFuture(response);
+    }
+
+    @Override
+    public CompletableFuture<StackTraceResponse> stackTrace(StackTraceArguments args) {
+        StackTraceResponse response = new StackTraceResponse();
+        if (hasCurrentStep()) {
+            Token current = currentStepToken();
+            if (current == null) {
+                response.setStackFrames(new StackFrame[0]);
+                return CompletableFuture.completedFuture(response);
+            }
+            int charOffset = current.source.offsetFromRoot().value();
+            if (isAstRuntimeMode()) {
+                int[] span = currentAstSpan();
+                if (span != null) {
+                    charOffset = span[0];
+                }
+            }
+            int line = 0, col = 0;
+            for (int i = 0; i < charOffset && i < sourceContent.length(); i++) {
+                if (sourceContent.charAt(i) == '\n') { line++; col = 0; }
+                else { col++; }
+            }
+            StackFrame frame = new StackFrame();
+            frame.setId(0);
+            frame.setName(currentStepLabel() + " (" + (stepIndex + 1) + "/" + stepLimit() + ")");
+            frame.setLine(line + 1);   // DAP は 1-based
+            frame.setColumn(col + 1);
+            Source source = new Source();
+            source.setPath(pendingProgram);
+            source.setName(Path.of(pendingProgram).getFileName().toString());
+            frame.setSource(source);
+            response.setStackFrames(new StackFrame[]{frame});
+        } else if (pendingProgram != null && !pendingProgram.isEmpty()) {
+            StackFrame frame = new StackFrame();
+            frame.setId(0);
+            frame.setName("<program>");
+            frame.setLine(1);
+            frame.setColumn(0);
+            Source source = new Source();
+            source.setPath(pendingProgram);
+            frame.setSource(source);
+            response.setStackFrames(new StackFrame[]{frame});
+        } else {
+            response.setStackFrames(new StackFrame[0]);
+        }
+        return CompletableFuture.completedFuture(response);
+    }
+
+    @Override
+    public CompletableFuture<ScopesResponse> scopes(ScopesArguments args) {
+        ScopesResponse response = new ScopesResponse();
+        if (hasCurrentStep()) {
+            Scope scope = new Scope();
+            scope.setName(isAstRuntimeMode() ? "Current AST Node" : "Current Token");
+            scope.setVariablesReference(1);
+            scope.setExpensive(false);
+            response.setScopes(new Scope[]{scope});
+        } else {
+            response.setScopes(new Scope[0]);
+        }
+        return CompletableFuture.completedFuture(response);
+    }
+
+    @Override
+    public CompletableFuture<VariablesResponse> variables(VariablesArguments args) {
+        VariablesResponse response = new VariablesResponse();
+        if (hasCurrentStep()) {
+            Token current = currentStepToken();
+            if (current == null) {
+                response.setVariables(new Variable[0]);
+                return CompletableFuture.completedFuture(response);
+            }
+            String text = current.source.sourceAsString().strip();
+            String parserName = current.getParser().getClass().getSimpleName();
+            if (isAstRuntimeMode() && !astNodeTypes.isEmpty()) {
+                parserName = currentStepLabel();
+                text = currentAstSourceText();
+            }
+            Variable var = new Variable();
+            var.setName(parserName);
+            var.setValue("\"" + text.replace("\"", "\\\"") + "\"");
+            var.setType(isAstRuntimeMode() ? "ASTNode" : "Token");
+            var.setVariablesReference(0);
+            Variable mode = new Variable();
+            mode.setName("runtimeMode");
+            mode.setValue(runtimeMode);
+            mode.setType("String");
+            mode.setVariablesReference(0);
+            Variable astNodes = new Variable();
+            astNodes.setName("astNodeCount");
+            astNodes.setValue(String.valueOf(astNodeCount));
+            astNodes.setType("int");
+            astNodes.setVariablesReference(0);
+            Variable astCurrent = new Variable();
+            astCurrent.setName("astCurrentNode");
+            String currentAst = astNodeTypes.isEmpty()
+                ? ""
+                : astNodeTypes.get(Math.min(stepIndex, astNodeTypes.size() - 1));
+            astCurrent.setValue(currentAst);
+            astCurrent.setType("String");
+            astCurrent.setVariablesReference(0);
+            List<Variable> vars = new ArrayList<>();
+            vars.add(var);
+            vars.add(mode);
+            vars.add(astNodes);
+            vars.add(astCurrent);
+            for (Map.Entry<String, String> entry : runtimeProbeVariables.entrySet()) {
+                if ("runtimeMode".equals(entry.getKey())) {
+                    continue;
+                }
+                Variable runtimeVar = new Variable();
+                runtimeVar.setName(entry.getKey());
+                runtimeVar.setValue(entry.getValue());
+                runtimeVar.setType("String");
+                runtimeVar.setVariablesReference(0);
+                vars.add(runtimeVar);
+            }
+            response.setVariables(vars.toArray(new Variable[0]));
+        } else {
+            List<Variable> vars = new ArrayList<>();
+            for (Map.Entry<String, String> entry : runtimeProbeVariables.entrySet()) {
+                Variable runtimeVar = new Variable();
+                runtimeVar.setName(entry.getKey());
+                runtimeVar.setValue(entry.getValue());
+                runtimeVar.setType("String");
+                runtimeVar.setVariablesReference(0);
+                vars.add(runtimeVar);
+            }
+            response.setVariables(vars.toArray(new Variable[0]));
+        }
+        return CompletableFuture.completedFuture(response);
+    }
+
+    @Override
+    public CompletableFuture<Void> disconnect(DisconnectArguments args) {
+        System.exit(0);
+        return CompletableFuture.completedFuture(null);
+    }
+
+    private boolean parseAndCollectSteps() {
+        if (pendingProgram == null || pendingProgram.isEmpty()) {
+            sendOutput("stderr", "No program specified\n");
+            sendTerminated();
+            return false;
+        }
+        try {
+            sourceContent = Files.readString(Path.of(pendingProgram));
+        } catch (IOException e) {
+            sendOutput("stderr", "Cannot read file: " + pendingProgram + "\n");
+            sendTerminated();
+            return false;
+        }
+        Parser parser = SnapshotParsers.getRootParser();
+        ParseContext context = new ParseContext(createRootSourceCompat(sourceContent));
+        Parsed result = parser.parse(context);
+        context.close();
+        boolean fullParse = result.isSucceeded() &&
+            result.getConsumed().source.sourceAsString().length() == sourceContent.length();
+        if (!fullParse) {
+            int offset = result.isSucceeded()
+                ? result.getConsumed().source.sourceAsString().length() : 0;
+            sendOutput("stderr", "Parse error at offset " + offset + "\n");
+            sendTerminated();
+            return false;
+        }
+        stepPoints = new ArrayList<>();
+        collectStepPoints(result.getConsumed(), stepPoints);
+        if (stepPoints.isEmpty()) {
+            stepPoints.add(result.getConsumed()); // fallback: root token
+        }
+        if (isAstRuntimeMode()) {
+            collectAstSteps();
+            astNodeCount = astNodeTypes.size();
+        } else {
+            astNodeTypes = List.of();
+            astNodeSpans = List.of();
+            astNodeCount = 0;
+        }
+        stepIndex = 0;
+        collectRuntimeProbeVariables();
+        return true;
+    }
+
+    private void collectRuntimeProbeVariables() {
+        runtimeProbeVariables = new java.util.LinkedHashMap<>();
+        runtimeProbeVariables.put("runtimeMode", runtimeMode == null ? "" : runtimeMode);
+        if (sourceContent == null) {
+            return;
+        }
+        try {
+            Class<?> bridgeClass = Class.forName("org.unlaxer.tinyexpression.dap.TinyExpressionDapRuntimeBridge");
+            java.lang.reflect.Method method = bridgeClass.getMethod("debugVariables", String.class, String.class);
+            Object raw = method.invoke(null, sourceContent, runtimeMode);
+            if (!(raw instanceof Map<?, ?> map)) {
+                return;
+            }
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                Object key = entry.getKey();
+                if (key == null) {
+                    continue;
+                }
+                String value = entry.getValue() == null ? "" : String.valueOf(entry.getValue());
+                runtimeProbeVariables.put(String.valueOf(key), value);
+            }
+        } catch (Throwable ignored) {
+            // bridge is optional
+        }
+    }
+
+    private static StringSource createRootSourceCompat(String source) {
+        try {
+            java.lang.reflect.Method m = StringSource.class.getMethod("createRootSource", String.class);
+            Object v = m.invoke(null, source);
+            if (v instanceof StringSource s) {
+                return s;
+            }
+        } catch (Throwable ignored) {}
+        try {
+            for (java.lang.reflect.Constructor<?> c : StringSource.class.getDeclaredConstructors()) {
+                Class<?>[] types = c.getParameterTypes();
+                if (types.length == 0 || types[0] != String.class) {
+                    continue;
+                }
+                Object[] args = new Object[types.length];
+                args[0] = source;
+                c.setAccessible(true);
+                Object v = c.newInstance(args);
+                if (v instanceof StringSource s) {
+                    return s;
+                }
+            }
+        } catch (Throwable ignored) {}
+        throw new IllegalStateException("No compatible StringSource initializer found");
+    }
+
+    private void collectAstSteps() {
+        try {
+            Object ast = SnapshotMapper.parse(sourceContent);
+            List<String> types = new ArrayList<>();
+            List<int[]> spans = new ArrayList<>();
+            collectAstNodeMeta(ast, types, spans);
+            astNodeTypes = types;
+            astNodeSpans = spans;
+        } catch (Throwable ignored) {
+            astNodeTypes = List.of();
+            astNodeSpans = List.of();
+        }
+    }
+
+    private void collectAstNodeMeta(Object node, List<String> types, List<int[]> spans) {
+        if (node == null) {
+            return;
+        }
+        types.add(node.getClass().getSimpleName());
+        spans.add(sourceSpanOfAstNode(node));
+        java.lang.reflect.Method[] methods = node.getClass().getMethods();
+        for (java.lang.reflect.Method method : methods) {
+            if (method.getParameterCount() != 0) {
+                continue;
+            }
+            String name = method.getName();
+            if ("getClass".equals(name) || "hashCode".equals(name) || "toString".equals(name)) {
+                continue;
+            }
+            try {
+                Object value = method.invoke(node);
+                if (value == null) {
+                    continue;
+                }
+                if (value instanceof List<?> list) {
+                    for (Object element : list) {
+                        if (isAstNodeCandidate(element)) {
+                            collectAstNodeMeta(element, types, spans);
+                        }
+                    }
+                    continue;
+                }
+                if (isAstNodeCandidate(value)) {
+                    collectAstNodeMeta(value, types, spans);
+                }
+            } catch (Throwable ignored) {}
+        }
+    }
+
+    private int[] sourceSpanOfAstNode(Object node) {
+        try {
+            Class<?> mapperClass = Class.forName("org.example.snapshot.SnapshotMapper");
+            java.lang.reflect.Method method = mapperClass.getMethod("sourceSpanOf", Object.class);
+            Object raw = method.invoke(null, node);
+            if (raw instanceof java.util.Optional<?> optional && optional.isPresent()) {
+                Object rawSpan = optional.get();
+                if (!(rawSpan instanceof int[] value)) {
+                    return null;
+                }
+                if (value != null && value.length >= 2) {
+                    int start = Math.max(0, Math.min(value[0], sourceContent.length()));
+                    int end = Math.max(start, Math.min(value[1], sourceContent.length()));
+                    return new int[]{start, end};
+                }
+            }
+        } catch (Throwable ignored) {}
+        return null;
+    }
+
+    private boolean isAstNodeCandidate(Object value) {
+        if (value == null) {
+            return false;
+        }
+        String className = value.getClass().getName();
+        return className.startsWith("org.example.snapshot.SnapshotAST");
+    }
+
+    private int stepLimit() {
+        if (isAstRuntimeMode() && !astNodeTypes.isEmpty()) {
+            return astNodeTypes.size();
+        }
+        return stepPoints.size();
+    }
+
+    private boolean hasCurrentStep() {
+        return stepLimit() > 0 && stepIndex < stepLimit();
+    }
+
+    private Token currentStepToken() {
+        if (stepPoints.isEmpty()) {
+            return null;
+        }
+        if (isAstRuntimeMode() && !astNodeTypes.isEmpty()) {
+            int limit = Math.max(1, stepLimit());
+            int capped = Math.min(stepIndex, limit - 1);
+            int mapped = (int) Math.floor((double) capped * (stepPoints.size() - 1) / Math.max(1, limit - 1));
+            return stepPoints.get(Math.max(0, Math.min(mapped, stepPoints.size() - 1)));
+        }
+        return stepPoints.get(Math.max(0, Math.min(stepIndex, stepPoints.size() - 1)));
+    }
+
+    private String currentStepLabel() {
+        if (isAstRuntimeMode() && !astNodeTypes.isEmpty()) {
+            return astNodeTypes.get(Math.min(stepIndex, astNodeTypes.size() - 1));
+        }
+        Token current = currentStepToken();
+        return current == null ? "step" : current.getParser().getClass().getSimpleName();
+    }
+
+    private int[] currentAstSpan() {
+        if (!isAstRuntimeMode() || astNodeSpans.isEmpty()) {
+            return null;
+        }
+        int index = Math.min(stepIndex, astNodeSpans.size() - 1);
+        int[] span = astNodeSpans.get(index);
+        if (span == null || span.length < 2) {
+            return null;
+        }
+        return span;
+    }
+
+    private String currentAstSourceText() {
+        int[] span = currentAstSpan();
+        if (span == null) {
+            Token current = currentStepToken();
+            return current == null ? "" : current.source.sourceAsString().strip();
+        }
+        int start = Math.max(0, Math.min(span[0], sourceContent.length()));
+        int end = Math.max(start, Math.min(span[1], sourceContent.length()));
+        return sourceContent.substring(start, end).strip();
+    }
+
+    private void collectStepPoints(Token token, List<Token> out) {
+        if (isAstRuntimeMode()) {
+            collectAstStepPoints(token, out);
+            return;
+        }
+        collectTokenStepPoints(token, out);
+    }
+
+    private boolean isAstRuntimeMode() {
+        return "ast".equalsIgnoreCase(runtimeMode) || "ast_evaluator".equalsIgnoreCase(runtimeMode);
+    }
+
+    private void collectTokenStepPoints(Token token, List<Token> out) {
+        if (token == null) return;
+        if (token.filteredChildren == null || token.filteredChildren.isEmpty()) {
+            out.add(token);
+            return;
+        }
+        for (Token child : token.filteredChildren) {
+            collectTokenStepPoints(child, out);
+        }
+    }
+
+    private void collectAstStepPoints(Token token, List<Token> out) {
+        // Current fallback keeps token-level stepping; replace with AST-node stepping when mapper/evaluator runtime is wired.
+        collectTokenStepPoints(token, out);
+    }
+
+    private int getLineForToken(Token t) {
+        int charOffset = t.source.offsetFromRoot().value();
+        int line = 1;
+        for (int i = 0; i < charOffset && i < sourceContent.length(); i++) {
+            if (sourceContent.charAt(i) == '\n') { line++; }
+        }
+        return line;
+    }
+
+    private int findBreakpointIndex(int fromIndex) {
+        int limit = stepLimit();
+        for (int i = fromIndex + 1; i < limit; i++) {
+            if (breakpointLines.contains(getLineForStep(i))) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private int getLineForStep(int index) {
+        if (isAstRuntimeMode() && !astNodeSpans.isEmpty()) {
+            int[] span = astNodeSpans.get(Math.max(0, Math.min(index, astNodeSpans.size() - 1)));
+            if (span != null && span.length >= 2) {
+                return getLineForOffset(span[0]);
+            }
+        }
+        if (stepPoints.isEmpty()) {
+            return 1;
+        }
+        Token token = stepPoints.get(Math.max(0, Math.min(index, stepPoints.size() - 1)));
+        return getLineForToken(token);
+    }
+
+    private int getLineForOffset(int charOffset) {
+        int line = 1;
+        for (int i = 0; i < charOffset && i < sourceContent.length(); i++) {
+            if (sourceContent.charAt(i) == '\n') {
+                line++;
+            }
+        }
+        return line;
+    }
+
+    private void sendOutput(String category, String output) {
+        if (client == null) return;
+        OutputEventArguments event = new OutputEventArguments();
+        event.setCategory(category);
+        event.setOutput(output);
+        client.output(event);
+    }
+
+    private void sendTerminated() {
+        if (client == null) return;
+        client.terminated(new TerminatedEventArguments());
+        ExitedEventArguments exited = new ExitedEventArguments();
+        exited.setExitCode(0);
+        client.exited(exited);
+    }
+}

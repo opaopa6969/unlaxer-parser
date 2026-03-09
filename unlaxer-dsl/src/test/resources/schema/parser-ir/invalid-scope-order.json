@@ -1,0 +1,23 @@
+{
+  "irVersion": "1.0",
+  "source": "examples/calc.expr",
+  "nodes": [
+    {
+      "id": "n0",
+      "kind": "Root",
+      "span": { "start": 0, "end": 2 }
+    }
+  ],
+  "scopeEvents": [
+    {
+      "event": "define",
+      "scopeId": "s0",
+      "span": { "start": 0, "end": 1 },
+      "symbol": "x",
+      "kind": "variable"
+    },
+    { "event": "enterScope", "scopeId": "s0", "span": { "start": 0, "end": 2 } },
+    { "event": "leaveScope", "scopeId": "s0", "span": { "start": 0, "end": 2 } }
+  ],
+  "diagnostics": []
+}

@@ -1,0 +1,22 @@
+package org.example.snapshot;
+
+import java.util.List;
+import java.util.Optional;
+
+public sealed interface SnapshotAST permits
+    SnapshotAST.ExprNode,
+    SnapshotAST.TermNode {
+
+    record ExprNode(
+        SnapshotAST.TermNode left,
+        List<String> op,
+        List<SnapshotAST.TermNode> right
+    ) implements SnapshotAST {}
+
+    record TermNode(
+        String left,
+        List<String> op,
+        List<String> right
+    ) implements SnapshotAST {}
+
+}

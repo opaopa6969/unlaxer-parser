@@ -1,0 +1,35 @@
+{
+  "irVersion": "1.0",
+  "source": "sample.ubnf",
+  "nodes": [
+    {
+      "id": "Expr",
+      "kind": "RuleDecl",
+      "span": {
+        "start": 0,
+        "end": 10
+      }
+    }
+  ],
+  "diagnostics": [],
+  "scopeEvents": [
+    {
+      "event": "enterScope",
+      "scopeId": "s1",
+      "scopeMode": "lexical",
+      "span": {
+        "start": 0,
+        "end": 0
+      }
+    },
+    {
+      "event": "leaveScope",
+      "scopeId": "s1",
+      "scopeMode": "dynamic",
+      "span": {
+        "start": 1,
+        "end": 1
+      }
+    }
+  ]
+}

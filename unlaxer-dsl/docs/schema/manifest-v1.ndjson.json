@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://unlaxer.dev/schema/manifest-v1.ndjson.json",
+  "title": "unlaxer-dsl Manifest NDJSON v1",
+  "description": "Line-delimited manifest event stream emitted by CodegenMain with --output-manifest --manifest-format ndjson.",
+  "oneOf": [
+    {
+      "title": "file-event",
+      "type": "object",
+      "required": ["event", "action", "path"],
+      "additionalProperties": false,
+      "properties": {
+        "event": { "const": "file" },
+        "action": { "enum": ["written", "skipped", "dry-run", "conflict", "cleaned"] },
+        "path": { "type": "string", "minLength": 1 }
+      }
+    },
+    {
+      "title": "manifest-summary",
+      "type": "object",
+      "required": [
+        "event",
+        "mode",
+        "generatedAt",
+        "toolVersion",
+        "argsHash",
+        "ok",
+        "failReasonCode",
+        "exitCode",
+        "warningsCount",
+        "writtenCount",
+        "skippedCount",
+        "conflictCount",
+        "dryRunCount"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "ok": { "const": true }
+            }
+          },
+          "then": {
+            "properties": {
+              "failReasonCode": { "type": "null" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mode": { "const": "generate" },
+              "ok": { "const": false }
+            }
+          },
+          "then": {
+            "properties": {
+              "failReasonCode": {
+                "enum": ["FAIL_ON_SKIPPED", "FAIL_ON_CONFLICT", "FAIL_ON_CLEANED"]
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "event": { "const": "manifest-summary" },
+        "mode": { "enum": ["validate", "generate"] },
+        "generatedAt": { "type": "string", "format": "date-time" },
+        "toolVersion": { "type": "string", "minLength": 1 },
+        "argsHash": { "type": "string", "minLength": 1 },
+        "ok": { "type": "boolean" },
+        "failReasonCode": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "string",
+              "enum": [
+                "FAIL_ON_WARNING",
+                "FAIL_ON_WARNINGS_COUNT",
+                "FAIL_ON_SKIPPED",
+                "FAIL_ON_CONFLICT",
+                "FAIL_ON_CLEANED"
+              ]
+            }
+          ]
+        },
+        "exitCode": { "type": "integer", "minimum": 0 },
+        "warningsCount": { "type": "integer", "minimum": 0 },
+        "writtenCount": { "type": "integer", "minimum": 0 },
+        "skippedCount": { "type": "integer", "minimum": 0 },
+        "conflictCount": { "type": "integer", "minimum": 0 },
+        "dryRunCount": { "type": "integer", "minimum": 0 }
+      }
+    }
+  ]
+}

@@ -1,0 +1,202 @@
+package org.example.snapshot;
+
+import java.util.function.Supplier;
+import org.unlaxer.RecursiveMode;
+import org.unlaxer.parser.Parser;
+import org.unlaxer.parser.Parsers;
+import org.unlaxer.parser.combinator.*;
+import org.unlaxer.parser.elementary.WordParser;
+import org.unlaxer.parser.posix.SpaceParser;
+import org.unlaxer.reducer.TagBasedReducer.NodeKind;
+import org.unlaxer.util.cache.SupplierBoundCache;
+import org.unlaxer.parser.elementary.NumberParser;
+
+public class SnapshotParsers {
+
+    public static final int PRECEDENCE_EXPR = 10;
+    public static final int PRECEDENCE_TERM = 20;
+
+    public enum Assoc { LEFT, RIGHT, NONE }
+
+    public record OperatorSpec(String ruleName, int precedence, Assoc assoc) {}
+
+    private static final java.util.List<OperatorSpec> OPERATOR_SPECS = java.util.List.of(
+            new OperatorSpec("Expr", 10, Assoc.LEFT),
+            new OperatorSpec("Term", 20, Assoc.LEFT)
+    );
+
+    public static java.util.List<OperatorSpec> getOperatorSpecs() {
+        return OPERATOR_SPECS;
+    }
+
+    public static java.util.Optional<OperatorSpec> getOperatorSpec(String ruleName) {
+        return OPERATOR_SPECS.stream()
+            .filter(s -> s.ruleName().equals(ruleName))
+            .findFirst();
+    }
+
+    public static boolean isOperatorRule(String ruleName) {
+        return getOperatorSpec(ruleName).isPresent();
+    }
+
+    public static int getPrecedence(String ruleName) {
+        return getOperatorSpec(ruleName)
+            .map(OperatorSpec::precedence)
+            .orElse(-1);
+    }
+
+    public static Assoc getAssociativity(String ruleName) {
+        return getOperatorSpec(ruleName)
+            .map(OperatorSpec::assoc)
+            .orElse(Assoc.NONE);
+    }
+
+    public static java.util.Optional<OperatorSpec> getNextHigherPrecedence(String ruleName) {
+        return getOperatorSpec(ruleName)
+            .flatMap(current -> OPERATOR_SPECS.stream()
+                .filter(s -> s.precedence() > current.precedence())
+                .findFirst());
+    }
+
+    public static java.util.Optional<OperatorSpec> getLowestPrecedenceOperator() {
+        return OPERATOR_SPECS.isEmpty()
+            ? java.util.Optional.empty()
+            : java.util.Optional.of(OPERATOR_SPECS.get(0));
+    }
+
+    public static java.util.List<Integer> getPrecedenceLevels() {
+        return OPERATOR_SPECS.stream()
+            .map(OperatorSpec::precedence)
+            .distinct()
+            .toList();
+    }
+
+    public static java.util.List<OperatorSpec> getOperatorsAtPrecedence(int precedence) {
+        return OPERATOR_SPECS.stream()
+            .filter(s -> s.precedence() == precedence)
+            .toList();
+    }
+
+    public static java.util.Optional<Parser> getOperatorParser(String ruleName) {
+        return switch (ruleName) {
+            case "Expr" -> java.util.Optional.of(Parser.get(ExprParser.class));
+            case "Term" -> java.util.Optional.of(Parser.get(TermParser.class));
+            default -> java.util.Optional.empty();
+        };
+    }
+
+    public static java.util.List<Parser> getOperatorParsersAtPrecedence(int precedence) {
+        return getOperatorsAtPrecedence(precedence).stream()
+            .map(OperatorSpec::ruleName)
+            .map(rule -> getOperatorParser(rule).orElse(null))
+            .filter(java.util.Objects::nonNull)
+            .toList();
+    }
+
+    public static java.util.Optional<Parser> getLowestPrecedenceParser() {
+        return getLowestPrecedenceOperator()
+            .flatMap(spec -> getOperatorParser(spec.ruleName()));
+    }
+
+    // --- Base Chain (No Auto Delimiter) ---
+    public static abstract class SnapshotPlainLazyChain extends LazyChain {
+        private static final long serialVersionUID = 1L;
+        @Override
+        public void prepareChildren(Parsers c) {
+            if (!c.isEmpty()) return;
+            for (Parser p : getLazyParsers()) { c.add(p); }
+        }
+        public abstract Parsers getLazyParsers();
+        @Override
+        public java.util.Optional<RecursiveMode> getNotAstNodeSpecifier() { return java.util.Optional.empty(); }
+    }
+
+    // --- Whitespace Delimitor ---
+    public static class SnapshotSpaceDelimitor extends LazyZeroOrMore {
+        private static final long serialVersionUID = 1L;
+        @Override
+        public Supplier<Parser> getLazyParser() {
+            return new SupplierBoundCache<>(() -> Parser.get(SpaceParser.class));
+        }
+        @Override
+        public java.util.Optional<Parser> getLazyTerminatorParser() { return java.util.Optional.empty(); }
+    }
+
+    // --- Base Chain (Auto Delimiter) ---
+    public static abstract class SnapshotLazyChain extends LazyChain {
+        private static final long serialVersionUID = 1L;
+        private static final SnapshotSpaceDelimitor SPACE = createSpace();
+        private static SnapshotSpaceDelimitor createSpace() {
+            SnapshotSpaceDelimitor s = new SnapshotSpaceDelimitor();
+            s.addTag(NodeKind.notNode.getTag());
+            return s;
+        }
+        @Override
+        public void prepareChildren(Parsers c) {
+            if (!c.isEmpty()) return;
+            c.add(SPACE);
+            for (Parser p : getLazyParsers()) { c.add(p); c.add(SPACE); }
+        }
+        public abstract Parsers getLazyParsers();
+        @Override
+        public java.util.Optional<RecursiveMode> getNotAstNodeSpecifier() { return java.util.Optional.empty(); }
+    }
+
+    public static class ExprRepeat0Parser extends SnapshotLazyChain {
+        private static final long serialVersionUID = 1L;
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                new WordParser("+"),
+                Parser.get(TermParser.class)
+            );
+        }
+    }
+
+    public static class ExprParser extends SnapshotLazyChain {
+        private static final long serialVersionUID = 1L;
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                Parser.get(TermParser.class),
+                new ZeroOrMore(ExprRepeat0Parser.class)
+            );
+        }
+    }
+
+    public static class TermRepeat0Parser extends SnapshotLazyChain {
+        private static final long serialVersionUID = 1L;
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                new WordParser("*"),
+                Parser.get(FactorParser.class)
+            );
+        }
+    }
+
+    public static class TermParser extends SnapshotLazyChain {
+        private static final long serialVersionUID = 1L;
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                Parser.get(FactorParser.class),
+                new ZeroOrMore(TermRepeat0Parser.class)
+            );
+        }
+    }
+
+    public static class FactorParser extends SnapshotLazyChain {
+        private static final long serialVersionUID = 1L;
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                Parser.get(NumberParser.class)
+            );
+        }
+    }
+
+    public static Parser getRootParser() {
+        return Parser.get(ExprParser.class);
+    }
+}

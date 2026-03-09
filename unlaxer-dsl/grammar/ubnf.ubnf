@@ -1,0 +1,169 @@
+// UBNF (Unlaxer BNF) 文法定義（自己ホスティング用）
+// Phase 0: 文法定義確定
+//
+// この .ubnf ファイル自体が UBNF 記法で記述されている。
+// Bootstrap 完了時には、このファイルを unlaxer-dsl 自身で処理して
+// UBNFParsers.java 等を生成できることを目標とする。
+//
+// ルール宣言は ';' で終端する（ルール境界の曖昧さを排除するため）。
+
+grammar UBNF {
+
+  // ===== グローバル設定 =====
+  @package: org.unlaxer.dsl.bootstrap.generated
+  @whitespace: javaStyle
+  @comment: { line: '//' }
+
+  // ===== トークン定義 =====
+  token IDENTIFIER   = IdentifierParser
+  token STRING       = SingleQuotedParser
+  token CLASS_NAME   = IdentifierParser
+  token UNSIGNED_INTEGER = NumberParser
+
+  // ===== エントリーポイント =====
+  @root
+  @mapping(UBNFFile, params=[grammars])
+  UBNFFile ::= { GrammarDecl } @grammars ;
+
+  // ===== grammar ブロック =====
+  @mapping(GrammarDecl, params=[name, settings, tokens, rules])
+  GrammarDecl ::=
+    'grammar' IDENTIFIER @name
+    '{'
+      { GlobalSetting } @settings
+      { TokenDecl }     @tokens
+      { RuleDecl }      @rules
+    '}' ;
+
+  // ===== グローバル設定 =====
+  @mapping(GlobalSetting, params=[key, value])
+  GlobalSetting ::= '@' IDENTIFIER @key ':' SettingValue @value ;
+
+  SettingValue ::=
+      StringSettingValue
+    | BlockSettingValue ;
+
+  @mapping(StringSettingValue, params=[value])
+  StringSettingValue ::= DottedIdentifier @value ;
+
+  @mapping(BlockSettingValue, params=[entries])
+  BlockSettingValue ::= '{' { KeyValuePair } @entries '}' ;
+
+  @mapping(KeyValuePair, params=[key, value])
+  KeyValuePair ::= IDENTIFIER @key ':' STRING @value ;
+
+  // ===== トークン宣言 =====
+  @mapping(TokenDecl, params=[name, parserClass])
+  TokenDecl ::= 'token' IDENTIFIER @name '=' CLASS_NAME @parserClass ;
+
+  // ===== ルール宣言 =====
+  @mapping(RuleDecl, params=[annotations, name, body])
+  RuleDecl ::=
+    { Annotation } @annotations
+    IDENTIFIER @name
+    '::=' RuleBody @body
+    ';' ;
+
+  // ===== アノテーション =====
+  Annotation ::=
+      RootAnnotation
+    | MappingAnnotation
+    | WhitespaceAnnotation
+    | InterleaveAnnotation
+    | BackrefAnnotation
+    | ScopeTreeAnnotation
+    | LeftAssocAnnotation
+    | RightAssocAnnotation
+    | PrecedenceAnnotation
+    | SimpleAnnotation ;
+
+  @mapping(RootAnnotation)
+  RootAnnotation ::= '@root' ;
+
+  @mapping(MappingAnnotation, params=[className, paramNames])
+  MappingAnnotation ::=
+    '@mapping' '('
+      CLASS_NAME @className
+      [ ',' 'params' '=' '[' IDENTIFIER @paramNames { ',' IDENTIFIER @paramNames } ']' ]
+    ')' ;
+
+  @mapping(WhitespaceAnnotation, params=[style])
+  WhitespaceAnnotation ::= '@whitespace' [ '(' IDENTIFIER @style ')' ] ;
+
+  @mapping(InterleaveAnnotation, params=[profile])
+  InterleaveAnnotation ::= '@interleave' '(' 'profile' '=' IDENTIFIER @profile ')' ;
+
+  @mapping(BackrefAnnotation, params=[name])
+  BackrefAnnotation ::= '@backref' '(' 'name' '=' IDENTIFIER @name ')' ;
+
+  @mapping(ScopeTreeAnnotation, params=[mode])
+  ScopeTreeAnnotation ::= '@scopeTree' '(' 'mode' '=' IDENTIFIER @mode ')' ;
+
+  @mapping(LeftAssocAnnotation)
+  LeftAssocAnnotation ::= '@leftAssoc' ;
+
+  @mapping(RightAssocAnnotation)
+  RightAssocAnnotation ::= '@rightAssoc' ;
+
+  @mapping(PrecedenceAnnotation, params=[level])
+  PrecedenceAnnotation ::= '@precedence' '(' 'level' '=' UNSIGNED_INTEGER @level ')' ;
+
+  @mapping(SimpleAnnotation, params=[name])
+  SimpleAnnotation ::= '@' IDENTIFIER @name ;
+
+  // ===== ルール本体 =====
+  // 選択: A | B | C
+  @mapping(ChoiceBody, params=[alternatives])
+  ChoiceBody ::= SequenceBody @alternatives { '|' SequenceBody @alternatives } ;
+
+  // 連接: A B C
+  @mapping(SequenceBody, params=[elements])
+  SequenceBody ::= { AnnotatedElement } @elements ;
+
+  // 要素（@typeof制約とキャプチャ名付き可）
+  @mapping(AnnotatedElement, params=[typeofConstraint, element, captureName])
+  AnnotatedElement ::=
+      [ TypeofElement @typeofConstraint ]
+      AtomicElement @element
+      [ '@' IDENTIFIER @captureName ] ;
+
+  // 基本要素
+  AtomicElement ::=
+      GroupElement
+    | OptionalElement
+    | RepeatElement
+    | TerminalElement
+    | RuleRefElement ;
+
+  // ( A B | C )  グループ
+  @mapping(GroupElement, params=[body])
+  GroupElement ::= '(' RuleBody @body ')' ;
+
+  // [ A ]  省略可能
+  @mapping(OptionalElement, params=[body])
+  OptionalElement ::= '[' RuleBody @body ']' ;
+
+  // { A }  0回以上の繰り返し
+  @mapping(RepeatElement, params=[body])
+  RepeatElement ::= '{' RuleBody @body '}' ;
+
+  // 'keyword' または "keyword"
+  @mapping(TerminalElement, params=[value])
+  TerminalElement ::= STRING @value ;
+
+  // 非終端記号参照（先頭大文字 = クラス名、小文字 = ルール名）
+  @mapping(RuleRefElement, params=[name])
+  RuleRefElement ::= IDENTIFIER @name ;
+
+  // @typeof(captureName) — 要素レベルの型相関アノテーション
+  @mapping(TypeofElement, params=[captureName])
+  TypeofElement ::= '@typeof' '(' IDENTIFIER @captureName ')' ;
+
+  // ドット区切り識別子（パッケージ名など）
+  @mapping(DottedIdentifier, params=[parts])
+  DottedIdentifier ::= IDENTIFIER @parts { '.' IDENTIFIER @parts } ;
+
+  // ルール本体エントリーポイント（ChoiceBody に委譲）
+  RuleBody ::= ChoiceBody ;
+
+}

@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://unlaxer.dev/schema/report-v1.json",
+  "title": "unlaxer-dsl Codegen JSON Report v1",
+  "description": "Machine-readable report emitted by CodegenMain with --report-format json --report-version 1.",
+  "oneOf": [
+    {
+      "title": "validate-success",
+      "type": "object",
+      "required": [
+        "reportVersion",
+        "schemaVersion",
+        "schemaUrl",
+        "toolVersion",
+        "argsHash",
+        "generatedAt",
+        "mode",
+        "ok",
+        "grammarCount",
+        "warningsCount",
+        "issues"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "reportVersion": { "const": 1 },
+        "schemaVersion": { "const": "1.0" },
+        "schemaUrl": { "const": "https://unlaxer.dev/schema/report-v1.json" },
+        "toolVersion": { "type": "string", "minLength": 1 },
+        "argsHash": { "type": "string", "minLength": 1 },
+        "generatedAt": { "type": "string", "format": "date-time" },
+        "mode": { "const": "validate" },
+        "ok": { "const": true },
+        "grammarCount": { "type": "integer", "minimum": 0 },
+        "warningsCount": { "type": "integer", "minimum": 0 },
+        "issues": {
+          "type": "array",
+          "maxItems": 0,
+          "items": { "$ref": "#/$defs/validationIssue" }
+        }
+      }
+    },
+    {
+      "title": "validate-failure",
+      "type": "object",
+      "required": [
+        "reportVersion",
+        "schemaVersion",
+        "schemaUrl",
+        "toolVersion",
+        "argsHash",
+        "generatedAt",
+        "mode",
+        "ok",
+        "failReasonCode",
+        "issueCount",
+        "warningsCount",
+        "severityCounts",
+        "categoryCounts",
+        "issues"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "reportVersion": { "const": 1 },
+        "schemaVersion": { "const": "1.0" },
+        "schemaUrl": { "const": "https://unlaxer.dev/schema/report-v1.json" },
+        "toolVersion": { "type": "string", "minLength": 1 },
+        "argsHash": { "type": "string", "minLength": 1 },
+        "generatedAt": { "type": "string", "format": "date-time" },
+        "mode": { "const": "validate" },
+        "ok": { "const": false },
+        "failReasonCode": {
+          "oneOf": [
+            { "type": "null" },
+            { "enum": ["FAIL_ON_WARNING", "FAIL_ON_WARNINGS_COUNT"] }
+          ]
+        },
+        "issueCount": { "type": "integer", "minimum": 1 },
+        "warningsCount": { "type": "integer", "minimum": 0 },
+        "severityCounts": { "$ref": "#/$defs/countMap" },
+        "categoryCounts": { "$ref": "#/$defs/countMap" },
+        "issues": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/validationIssue" }
+        }
+      }
+    },
+    {
+      "title": "generate-result",
+      "type": "object",
+      "required": [
+        "reportVersion",
+        "schemaVersion",
+        "schemaUrl",
+        "toolVersion",
+        "argsHash",
+        "generatedAt",
+        "mode",
+        "ok",
+        "failReasonCode",
+        "grammarCount",
+        "generatedCount",
+        "warningsCount",
+        "writtenCount",
+        "skippedCount",
+        "conflictCount",
+        "dryRunCount",
+        "generatedFiles"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "ok": { "const": true }
+            }
+          },
+          "then": {
+            "properties": {
+              "failReasonCode": { "type": "null" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ok": { "const": false }
+            }
+          },
+          "then": {
+            "properties": {
+              "failReasonCode": {
+                "enum": ["FAIL_ON_SKIPPED", "FAIL_ON_CONFLICT", "FAIL_ON_CLEANED"]
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "reportVersion": { "const": 1 },
+        "schemaVersion": { "const": "1.0" },
+        "schemaUrl": { "const": "https://unlaxer.dev/schema/report-v1.json" },
+        "toolVersion": { "type": "string", "minLength": 1 },
+        "argsHash": { "type": "string", "minLength": 1 },
+        "generatedAt": { "type": "string", "format": "date-time" },
+        "mode": { "const": "generate" },
+        "ok": { "type": "boolean" },
+        "failReasonCode": {
+          "oneOf": [
+            { "type": "null" },
+            { "enum": ["FAIL_ON_SKIPPED", "FAIL_ON_CONFLICT", "FAIL_ON_CLEANED"] }
+          ]
+        },
+        "grammarCount": { "type": "integer", "minimum": 0 },
+        "generatedCount": { "type": "integer", "minimum": 0 },
+        "warningsCount": { "type": "integer", "minimum": 0 },
+        "writtenCount": { "type": "integer", "minimum": 0 },
+        "skippedCount": { "type": "integer", "minimum": 0 },
+        "conflictCount": { "type": "integer", "minimum": 0 },
+        "dryRunCount": { "type": "integer", "minimum": 0 },
+        "generatedFiles": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "countMap": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 1
+      }
+    },
+    "validationIssue": {
+      "type": "object",
+      "required": ["grammar", "rule", "code", "severity", "category", "message", "hint"],
+      "additionalProperties": false,
+      "properties": {
+        "grammar": { "type": "string", "minLength": 1 },
+        "rule": {
+          "oneOf": [
+            { "type": "string", "minLength": 1 },
+            { "type": "null" }
+          ]
+        },
+        "code": { "type": "string", "minLength": 1 },
+        "severity": { "type": "string", "minLength": 1 },
+        "category": { "type": "string", "minLength": 1 },
+        "message": { "type": "string", "minLength": 1 },
+        "hint": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

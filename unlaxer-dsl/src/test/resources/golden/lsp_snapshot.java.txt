@@ -1,0 +1,223 @@
+package org.example.snapshot;
+
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import org.eclipse.lsp4j.*;
+import org.eclipse.lsp4j.jsonrpc.messages.Either;
+import org.eclipse.lsp4j.services.*;
+import org.unlaxer.Parsed;
+import org.unlaxer.StringSource;
+import org.unlaxer.context.ParseContext;
+import org.unlaxer.parser.Parser;
+
+public class SnapshotLanguageServer implements LanguageServer, LanguageClientAware {
+
+    private static final List<String> KEYWORDS = List.of("grammar", "token", "@root", "@mapping", "@whitespace", "@interleave", "@backref", "@typeof", "@scopeTree", "@leftAssoc", "@rightAssoc", "@precedence", "params", "level", "profile", "name", "mode", "+", "*");
+
+    private LanguageClient client;
+    private final Map<String, DocumentState> documents = new HashMap<>();
+
+    public SnapshotLanguageServer() {}
+
+    @Override
+    public CompletableFuture<InitializeResult> initialize(InitializeParams params) {
+        ServerCapabilities capabilities = new ServerCapabilities();
+        capabilities.setTextDocumentSync(TextDocumentSyncKind.Full);
+        CompletionOptions completionOptions = new CompletionOptions();
+        completionOptions.setResolveProvider(false);
+        capabilities.setCompletionProvider(completionOptions);
+        capabilities.setHoverProvider(true);
+        SemanticTokensWithRegistrationOptions semanticTokensOptions =
+            new SemanticTokensWithRegistrationOptions();
+        semanticTokensOptions.setFull(true);
+        semanticTokensOptions.setLegend(new SemanticTokensLegend(
+            List.of("valid", "invalid"), List.of()));
+        capabilities.setSemanticTokensProvider(semanticTokensOptions);
+        return CompletableFuture.completedFuture(new InitializeResult(capabilities));
+    }
+
+    @Override
+    public CompletableFuture<Object> shutdown() {
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public void exit() {}
+
+    @Override
+    public void setTrace(SetTraceParams params) {}
+
+    @Override
+    public void connect(LanguageClient client) {
+        this.client = client;
+    }
+
+    @Override
+    public TextDocumentService getTextDocumentService() {
+        return new SnapshotLanguageServerTextDocumentService(this);
+    }
+
+    @Override
+    public WorkspaceService getWorkspaceService() {
+        return new SnapshotLanguageServerWorkspaceService();
+    }
+
+    public ParseResult parseDocument(String uri, String content) {
+        Parser parser = SnapshotParsers.getRootParser();
+        ParseContext context = new ParseContext(createRootSourceCompat(content));
+        Parsed result = parser.parse(context);
+        int consumedLength = 0;
+        if (result.isSucceeded()) {
+            consumedLength = result.getConsumed().source.sourceAsString().length();
+        }
+        context.close();
+        ParseResult parseResult = new ParseResult(
+            result.isSucceeded(), consumedLength, content.length());
+        documents.put(uri, new DocumentState(uri, content, parseResult));
+        if (client != null) {
+            publishDiagnostics(uri, content, parseResult);
+        }
+        return parseResult;
+    }
+
+    private static StringSource createRootSourceCompat(String source) {
+        try {
+            java.lang.reflect.Method m = StringSource.class.getMethod("createRootSource", String.class);
+            Object v = m.invoke(null, source);
+            if (v instanceof StringSource s) {
+                return s;
+            }
+        } catch (Throwable ignored) {}
+        try {
+            for (java.lang.reflect.Constructor<?> c : StringSource.class.getDeclaredConstructors()) {
+                Class<?>[] types = c.getParameterTypes();
+                if (types.length == 0 || types[0] != String.class) {
+                    continue;
+                }
+                Object[] args = new Object[types.length];
+                args[0] = source;
+                c.setAccessible(true);
+                Object v = c.newInstance(args);
+                if (v instanceof StringSource s) {
+                    return s;
+                }
+            }
+        } catch (Throwable ignored) {}
+        throw new IllegalStateException("No compatible StringSource initializer found");
+    }
+
+    private void publishDiagnostics(String uri, String content, ParseResult result) {
+        List<Diagnostic> diagnostics = new ArrayList<>();
+        if (result.consumedLength() < result.totalLength()) {
+            int errorStart = result.consumedLength();
+            Position startPos = offsetToPosition(content, errorStart);
+            Position endPos = offsetToPosition(content, result.totalLength());
+            Diagnostic diagnostic = new Diagnostic();
+            diagnostic.setRange(new Range(startPos, endPos));
+            diagnostic.setSeverity(DiagnosticSeverity.Error);
+            diagnostic.setMessage("Parse error at offset " + errorStart);
+            diagnostics.add(diagnostic);
+        }
+        client.publishDiagnostics(new PublishDiagnosticsParams(uri, diagnostics));
+    }
+
+    private Position offsetToPosition(String content, int offset) {
+        int line = 0;
+        int column = 0;
+        for (int i = 0; i < offset && i < content.length(); i++) {
+            if (content.charAt(i) == '\n') {
+                line++;
+                column = 0;
+            } else {
+                column++;
+            }
+        }
+        return new Position(line, column);
+    }
+
+    public record DocumentState(String uri, String content, ParseResult parseResult) {}
+
+    public record ParseResult(boolean succeeded, int consumedLength, int totalLength) {}
+
+    static class SnapshotLanguageServerTextDocumentService implements TextDocumentService {
+
+        private final SnapshotLanguageServer server;
+
+        SnapshotLanguageServerTextDocumentService(SnapshotLanguageServer server) {
+            this.server = server;
+        }
+
+        @Override
+        public void didOpen(DidOpenTextDocumentParams params) {
+            server.parseDocument(
+                params.getTextDocument().getUri(),
+                params.getTextDocument().getText());
+        }
+
+        @Override
+        public void didChange(DidChangeTextDocumentParams params) {
+            server.parseDocument(
+                params.getTextDocument().getUri(),
+                params.getContentChanges().get(0).getText());
+        }
+
+        @Override
+        public void didClose(DidCloseTextDocumentParams params) {
+            server.documents.remove(params.getTextDocument().getUri());
+        }
+
+        @Override
+        public void didSave(DidSaveTextDocumentParams params) {}
+
+        @Override
+        public CompletableFuture<Either<List<CompletionItem>, CompletionList>> completion(
+                CompletionParams params) {
+            List<CompletionItem> items = new ArrayList<>();
+            for (String kw : KEYWORDS) {
+                CompletionItem item = new CompletionItem(kw);
+                item.setKind(CompletionItemKind.Keyword);
+                items.add(item);
+            }
+            return CompletableFuture.completedFuture(Either.forLeft(items));
+        }
+
+        @Override
+        public CompletableFuture<Hover> hover(HoverParams params) {
+            String uri = params.getTextDocument().getUri();
+            DocumentState state = server.documents.get(uri);
+            if (state == null) {
+                return CompletableFuture.completedFuture(null);
+            }
+            String text;
+            if (state.parseResult().succeeded() &&
+                    state.parseResult().consumedLength() == state.parseResult().totalLength()) {
+                text = "Valid Snapshot";
+            } else {
+                text = "Parse error at offset " + state.parseResult().consumedLength();
+            }
+            MarkupContent content = new MarkupContent();
+            content.setKind("plaintext");
+            content.setValue(text);
+            return CompletableFuture.completedFuture(new Hover(content));
+        }
+
+        @Override
+        public CompletableFuture<SemanticTokens> semanticTokensFull(SemanticTokensParams params) {
+            String uri = params.getTextDocument().getUri();
+            DocumentState state = server.documents.get(uri);
+            if (state == null) {
+                return CompletableFuture.completedFuture(new SemanticTokens(Collections.emptyList()));
+            }
+            return CompletableFuture.completedFuture(new SemanticTokens(Collections.emptyList()));
+        }
+    }
+
+    static class SnapshotLanguageServerWorkspaceService implements WorkspaceService {
+
+        @Override
+        public void didChangeConfiguration(org.eclipse.lsp4j.DidChangeConfigurationParams params) {}
+
+        @Override
+        public void didChangeWatchedFiles(org.eclipse.lsp4j.DidChangeWatchedFilesParams params) {}
+    }
+}

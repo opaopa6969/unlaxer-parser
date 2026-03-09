@@ -1,0 +1,19 @@
+{
+  "irVersion": "1.0",
+  "source": "examples/calc.expr",
+  "nodes": [
+    {
+      "id": "n0",
+      "kind": "Root",
+      "span": { "start": 0, "end": 5 }
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "E-SYMBOL-UNRESOLVED",
+      "severity": "ERROR",
+      "span": { "start": 10, "end": 12 },
+      "message": "out of range diagnostic"
+    }
+  ]
+}

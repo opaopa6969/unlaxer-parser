@@ -1,0 +1,15 @@
+{
+  "irVersion": "1.0",
+  "source": "sample.ubnf",
+  "nodes": [
+    {
+      "id": "Expr",
+      "kind": "RuleDecl",
+      "span": {
+        "start": -1,
+        "end": 10
+      }
+    }
+  ],
+  "diagnostics": []
+}

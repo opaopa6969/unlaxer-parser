@@ -1,0 +1,19 @@
+{
+  "irVersion": "1.0",
+  "source": "examples/calc.expr",
+  "nodes": [
+    {
+      "id": "n0",
+      "kind": "Root",
+      "span": { "start": 0, "end": 1 }
+    }
+  ],
+  "annotations": [
+    {
+      "targetId": "n0",
+      "name": "mapping",
+      "payload": {}
+    }
+  ],
+  "diagnostics": []
+}

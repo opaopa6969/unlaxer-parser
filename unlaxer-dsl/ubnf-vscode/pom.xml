@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>org.unlaxer</groupId>
+    <artifactId>ubnf-vscode</artifactId>
+    <version>0.1.0</version>
+    <packaging>jar</packaging>
+    <description>UBNF VS Code 拡張 — grammar/ubnf.ubnf から VSIX を自動生成する</description>
+
+    <properties>
+        <maven.compiler.release>21</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <lsp4j.version>0.23.1</lsp4j.version>
+        <generated.sources.dir>${project.build.directory}/generated-sources/ubnf</generated.sources.dir>
+        <server.dist.dir>${project.basedir}/server-dist</server.dist.dir>
+        <vsix.output>${project.build.directory}/ubnf-lsp-${project.version}.vsix</vsix.output>
+    </properties>
+
+    <dependencies>
+        <!-- コード生成エンジン (CodegenMain + generators) -->
+        <dependency>
+            <groupId>org.unlaxer</groupId>
+            <artifactId>unlaxer-dsl</artifactId>
+            <version>0.1.0</version>
+        </dependency>
+        <!-- 生成コードが依存するランタイム -->
+        <dependency>
+            <groupId>org.unlaxer</groupId>
+            <artifactId>unlaxer-common</artifactId>
+            <version>2.2.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.lsp4j</groupId>
+            <artifactId>org.eclipse.lsp4j</artifactId>
+            <version>${lsp4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.lsp4j</groupId>
+            <artifactId>org.eclipse.lsp4j.jsonrpc</artifactId>
+            <version>${lsp4j.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+
+            <!--
+              Step 1 [generate-sources]: grammar/ubnf.ubnf を読み込み
+              CodegenMain で LSP サーバー・ランチャーを生成する。
+              Parser は手書き shim (UBNFParsers.java) があるため生成しない。
+            -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.3.0</version>
+                <executions>
+                    <execution>
+                        <id>generate-ubnf-sources</id>
+                        <phase>generate-sources</phase>
+                        <goals><goal>java</goal></goals>
+                        <configuration>
+                            <mainClass>org.unlaxer.dsl.CodegenMain</mainClass>
+                            <arguments>
+                                <argument>--grammar</argument>
+                                <argument>${project.basedir}/../grammar/ubnf.ubnf</argument>
+                                <argument>--output</argument>
+                                <argument>${generated.sources.dir}</argument>
+                                <argument>--generators</argument>
+                                <argument>LSP,Launcher</argument>
+                            </arguments>
+                            <includeProjectDependencies>true</includeProjectDependencies>
+                            <includePluginDependencies>false</includePluginDependencies>
+                        </configuration>
+                    </execution>
+
+                    <!--
+                      Step 5 [verify, after package]: npm install を実行する。
+                    -->
+                    <execution>
+                        <id>npm-install</id>
+                        <phase>verify</phase>
+                        <goals><goal>exec</goal></goals>
+                        <configuration>
+                            <executable>npm</executable>
+                            <workingDirectory>${project.basedir}</workingDirectory>
+                            <arguments>
+                                <argument>install</argument>
+                                <argument>--silent</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+
+                    <!--
+                      Step 6 [verify, after npm-install]: vsce package を実行。
+                      VSIX は target/ubnf-lsp-{version}.vsix に出力される。
+                    -->
+                    <execution>
+                        <id>vsce-package</id>
+                        <phase>verify</phase>
+                        <goals><goal>exec</goal></goals>
+                        <configuration>
+                            <executable>npx</executable>
+                            <workingDirectory>${project.basedir}</workingDirectory>
+                            <arguments>
+                                <argument>--yes</argument>
+                                <argument>@vscode/vsce</argument>
+                                <argument>package</argument>
+                                <argument>--out</argument>
+                                <argument>${vsix.output}</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!--
+              Step 2 [generate-sources]: 生成された Java ソースをコンパイル対象に追加する。
+            -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.5.0</version>
+                <executions>
+                    <execution>
+                        <id>add-generated-sources</id>
+                        <phase>generate-sources</phase>
+                        <goals><goal>add-source</goal></goals>
+                        <configuration>
+                            <sources>
+                                <source>${generated.sources.dir}</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!--
+              Step 3 [compile]: enable-preview を付けてコンパイルする。
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <release>21</release>
+                    <compilerArgs>
+                        <arg>--enable-preview</arg>
+                    </compilerArgs>
+                </configuration>
+            </plugin>
+
+            <!--
+              Step 4 [package]: 全依存を含む fat jar を target/ に生成する。
+              mainClass に UBNFLspLauncher を指定。
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.5.1</version>
+                <executions>
+                    <execution>
+                        <id>shade-server-jar</id>
+                        <phase>package</phase>
+                        <goals><goal>shade</goal></goals>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <shadedArtifactAttached>false</shadedArtifactAttached>
+                            <finalName>ubnf-lsp-server</finalName>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>org.unlaxer.dsl.bootstrap.generated.UBNFLspLauncher</mainClass>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!--
+              Step 4.5 [package, shade の直後]: fat jar を server-dist/ にコピーする。
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>copy-server-jar</id>
+                        <phase>package</phase>
+                        <goals><goal>run</goal></goals>
+                        <configuration>
+                            <target>
+                                <mkdir dir="${server.dist.dir}"/>
+                                <copy file="${project.build.directory}/ubnf-lsp-server.jar"
+                                      tofile="${server.dist.dir}/ubnf-lsp-server.jar"
+                                      overwrite="true"/>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+                <configuration>
+                    <argLine>--enable-preview</argLine>
+                    <skipTests>true</skipTests>
+                </configuration>
+            </plugin>
+
+        </plugins>
+    </build>
+</project>

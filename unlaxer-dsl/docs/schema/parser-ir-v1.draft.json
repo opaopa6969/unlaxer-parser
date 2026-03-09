@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://unlaxer.dev/schema/parser-ir-v1.draft.json",
+  "title": "unlaxer-dsl Parser Annotation IR v1 (Draft)",
+  "description": "Draft schema for parser-agnostic annotation IR used by downstream tooling.",
+  "type": "object",
+  "required": ["irVersion", "source", "nodes", "diagnostics"],
+  "additionalProperties": false,
+  "properties": {
+    "irVersion": { "const": "1.0" },
+    "source": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/node" }
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/diagnostic" }
+    },
+    "tokens": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/token" }
+    },
+    "trivia": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/token" }
+    },
+    "scopeEvents": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/scopeEvent" }
+    },
+    "annotations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/annotation" }
+    }
+  },
+  "$defs": {
+    "span": {
+      "type": "object",
+      "required": ["start", "end"],
+      "additionalProperties": false,
+      "properties": {
+        "start": { "type": "integer", "minimum": 0 },
+        "end": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "node": {
+      "type": "object",
+      "required": ["id", "kind", "span"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "minLength": 1 },
+        "span": { "$ref": "#/$defs/span" },
+        "parentId": { "type": "string", "minLength": 1 },
+        "children": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "text": { "type": "string" },
+        "attributes": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "token": {
+      "type": "object",
+      "required": ["kind", "span"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "type": "string", "minLength": 1 },
+        "span": { "$ref": "#/$defs/span" },
+        "text": { "type": "string" }
+      }
+    },
+    "scopeEvent": {
+      "type": "object",
+      "required": ["event", "scopeId", "span"],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": { "properties": { "event": { "const": "define" } } },
+          "then": {
+            "required": ["symbol", "kind"],
+            "not": { "required": ["scopeMode"] }
+          }
+        },
+        {
+          "if": { "properties": { "event": { "const": "use" } } },
+          "then": {
+            "required": ["symbol"],
+            "not": {
+              "anyOf": [
+                { "required": ["kind"] },
+                { "required": ["scopeMode"] }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "event": { "enum": ["enterScope", "leaveScope"] }
+            }
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                { "required": ["symbol"] },
+                { "required": ["kind"] },
+                { "required": ["targetScopeId"] }
+              ]
+            }
+          }
+        }
+      ],
+      "properties": {
+        "event": {
+          "enum": ["enterScope", "leaveScope", "define", "use"]
+        },
+        "scopeId": { "type": "string", "minLength": 1 },
+        "scopeMode": { "enum": ["lexical", "dynamic"] },
+        "span": { "$ref": "#/$defs/span" },
+        "symbol": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "minLength": 1 },
+        "targetScopeId": { "type": "string", "minLength": 1 }
+      }
+    },
+    "annotation": {
+      "type": "object",
+      "required": ["targetId", "name", "payload"],
+      "additionalProperties": false,
+      "properties": {
+        "targetId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "pattern": "^[a-z][a-zA-Z0-9-]*$" },
+        "payload": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": true
+        }
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "required": ["code", "severity", "span", "message"],
+      "additionalProperties": false,
+      "properties": {
+        "code": { "type": "string", "pattern": "^E-[A-Z0-9-]+$|^W-[A-Z0-9-]+$|^I-[A-Z0-9-]+$" },
+        "severity": { "enum": ["ERROR", "WARNING", "INFO"] },
+        "span": { "$ref": "#/$defs/span" },
+        "message": { "type": "string", "minLength": 1 },
+        "hint": { "type": "string", "minLength": 1 },
+        "related": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/diagnosticRelated" }
+        }
+      }
+    },
+    "diagnosticRelated": {
+      "type": "object",
+      "required": ["span", "message"],
+      "additionalProperties": false,
+      "properties": {
+        "span": { "$ref": "#/$defs/span" },
+        "message": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
