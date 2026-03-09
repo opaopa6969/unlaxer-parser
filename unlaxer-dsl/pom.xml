@@ -4,21 +4,18 @@
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
-	<groupId>org.unlaxer</groupId>
+	<parent>
+		<groupId>org.unlaxer</groupId>
+		<artifactId>unlaxer-parser</artifactId>
+		<version>2.5.0</version>
+		<relativePath>../pom.xml</relativePath>
+	</parent>
+
 	<artifactId>unlaxer-dsl</artifactId>
-	<version>0.3.1</version>
 	<name>unlaxer-dsl</name>
 	<packaging>jar</packaging>
 
 	<description>BNF拡張DSLからParser/AST/Mapper/LSP/DAPを自動生成するツール</description>
-	<url>https://bitbucket.org/opaopa6969/unlaxer/src/master/</url>
-
-	<licenses>
-		<license>
-			<name>MIT</name>
-			<url>https://opensource.org/licenses/MIT</url>
-		</license>
-	</licenses>
 
 	<scm>
 		<connection>scm:https://opaopa6969@bitbucket.org/opaopa6969/unlaxer-dsl.git</connection>
@@ -26,17 +23,8 @@
 		<url>scm:https://opaopa6969@bitbucket.org/opaopa6969/unlaxer-dsl.git</url>
 	</scm>
 
-	<developers>
-		<developer>
-			<name>opaopa6969</name>
-			<email>opaopa6969@gmail.com</email>
-			<id>opaopa6969</id>
-			<timezone>-9</timezone>
-		</developer>
-	</developers>
-
 	<properties>
-		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<!-- dslはJava 21が必要なので親の設定を上書き -->
 		<maven.compiler.source>21</maven.compiler.source>
 		<maven.compiler.target>21</maven.compiler.target>
 	</properties>
@@ -45,7 +33,7 @@
 		<dependency>
 			<groupId>org.unlaxer</groupId>
 			<artifactId>unlaxer-common</artifactId>
-			<version>2.5.0</version>
+			<version>${project.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>io.vavr</groupId>
@@ -93,16 +81,6 @@
 	<build>
 		<plugins>
 			<plugin>
-				<groupId>org.sonatype.central</groupId>
-				<artifactId>central-publishing-maven-plugin</artifactId>
-				<version>0.9.0</version>
-				<extensions>true</extensions>
-				<configuration>
-					<publishingServerId>central</publishingServerId>
-					<autoPublish>true</autoPublish>
-				</configuration>
-			</plugin>
-			<plugin>
 				<artifactId>maven-clean-plugin</artifactId>
 				<version>3.1.0</version>
 			</plugin>
@@ -141,19 +119,6 @@
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-source-plugin</artifactId>
-				<version>2.2.1</version>
-				<executions>
-					<execution>
-						<id>attach-sources</id>
-						<goals>
-							<goal>jar-no-fork</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-javadoc-plugin</artifactId>
 				<version>3.5.0</version>
 				<configuration>
@@ -172,37 +137,6 @@
 					</execution>
 				</executions>
 			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-gpg-plugin</artifactId>
-				<version>3.0.1</version>
-				<executions>
-					<execution>
-						<id>sign-artifacts</id>
-						<phase>package</phase>
-						<goals>
-							<goal>sign</goal>
-						</goals>
-						<configuration>
-							<gpgArguments>
-								<arg>--pinentry-mode</arg>
-								<arg>loopback</arg>
-							</gpgArguments>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
 		</plugins>
 	</build>
-
-	<distributionManagement>
-		<snapshotRepository>
-			<id>ossrh</id>
-			<url>https://oss.sonatype.org/content/repositories/snapshots</url>
-		</snapshotRepository>
-		<repository>
-			<id>ossrh</id>
-			<url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
-		</repository>
-	</distributionManagement>
 </project>
