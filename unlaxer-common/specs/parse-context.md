@@ -207,6 +207,55 @@ Map<Parser, Map<Name, Object>> scopeTreeMapByParser
 - `chosenParserByChoice` と `orderedParsersByNonOrdered` は ScopeTree に移行予定（ソース内 FIXME コメントあり）
 - メモ化機能（`doMemoize`）は完全には実装されていない
 
+---
+
+## 設計上の既知問題: ChainInterface と TransactionListener の自己呼び出し欠如
+
+### 問題の概要
+
+`ChainInterface.parse()` は `parseContext.begin(this)` / `parseContext.commit(this, tokenKind)` を呼ぶが、
+これは `TransactionListenerContainer.onBegin/onCommit/onRollback` を通じて **`listenerByName` に登録されたリスナーのみ** に転送される。
+
+UBNF のコード生成器（`LSPGenerator`、`ParserGenerator`）が生成するパーサークラスは
+`@declares` / `@backref` / `@scopeTree` の実装として `TransactionListener` を実装しているが、
+これらのパーサーは `listenerByName` に **自動登録されない**。
+
+その結果、生成パーサーの `onBegin` / `onCommit` / `onRollback` はフレームワーク内部では **一度も呼ばれない**。
+これにより `ScopeStore.declare()` 等が実行されず、LSP の go-to-definition や補完に必要なシンボル情報が蓄積されないという問題が生じる。
+
+### 根本修正案（unlaxer-common 側）
+
+`ChainInterface.parse()` 内で以下の自己呼び出しを追加することで解決できる:
+
+```java
+// begin 直後
+if (this instanceof TransactionListener tl) {
+    tl.onBegin(parseContext, this);
+}
+
+// commit 直後
+if (this instanceof TransactionListener tl) {
+    tl.onCommit(parseContext, this, committedTokens);
+}
+
+// rollback 直後
+if (this instanceof TransactionListener tl) {
+    tl.onRollback(parseContext, this, rollbackedTokens);
+}
+```
+
+**注意**: パーサーが `listenerByName` にも登録されている場合、この変更により二重呼び出しが発生する。
+既存の利用パターンを調査した上で適用すること（SHOULD）。
+
+### 現在の回避策（unlaxer-dsl 側）
+
+`ScopeStore.registerDispatcher(ParseContext ctx)` を `parseDocument()` 実行前に呼ぶことで、
+グローバルリスナーとしてディスパッチャーを登録し、生成パーサーへイベントを転送している。
+
+`LSPGenerator` は `@declares` / `@backref` / `@scopeTree` を持つ文法に対して
+`parseDocument()` 内でこの登録コードを自動生成する（unlaxer-dsl 2.7.0 以降）。
+
 ## 変更履歴
 
+- 2026-03-20: ChainInterface/TransactionListener 設計問題と回避策を追記
 - 2026-03-01: 初版作成
