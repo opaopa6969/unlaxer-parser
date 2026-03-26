@@ -472,5 +472,45 @@ public class UBNFMapperTest {
             .map(a -> (UBNFAST.DeclaresAnnotation) a)
             .findFirst().orElseThrow();
         assertEquals("symbol capture should be 'varName'", "varName", decl.symbolCapture());
+        assertNull("description should be null when not specified", decl.description());
+    }
+
+    @Test
+    public void testDeclaresWithDescriptionAnnotation_parsedCorrectly() {
+        String input = "grammar G {\n"
+            + "  @whitespace: javaStyle\n"
+            + "  token VARNAME = IdentifierParser\n"
+            + "  token DESCVAL = IdentifierParser\n"
+            + "  @declares(symbol=varName, description=desc)\n"
+            + "  @root\n"
+            + "  VarDecl ::= 'let' VARNAME @varName 'desc' DESCVAL @desc ';' ;\n"
+            + "}";
+        GrammarDecl grammar = UBNFMapper.parse(input).grammars().get(0);
+        RuleDecl rule = grammar.rules().get(0);
+        UBNFAST.DeclaresAnnotation decl = rule.annotations().stream()
+            .filter(a -> a instanceof UBNFAST.DeclaresAnnotation)
+            .map(a -> (UBNFAST.DeclaresAnnotation) a)
+            .findFirst().orElseThrow();
+        assertEquals("symbol capture should be 'varName'", "varName", decl.symbolCapture());
+        assertEquals("description capture should be 'desc'", "desc", decl.description());
+    }
+
+    @Test
+    public void testCatalogAnnotation_parsedCorrectly() {
+        String input = "grammar G {\n"
+            + "  @whitespace: javaStyle\n"
+            + "  token ID = IdentifierParser\n"
+            + "  @root\n"
+            + "  @catalog(context='variable')\n"
+            + "  @backref(name=varRef)\n"
+            + "  VarRef ::= '$' ID @varRef ;\n"
+            + "}";
+        GrammarDecl grammar = UBNFMapper.parse(input).grammars().get(0);
+        RuleDecl rule = grammar.rules().get(0);
+        UBNFAST.CatalogAnnotation catalog = rule.annotations().stream()
+            .filter(a -> a instanceof UBNFAST.CatalogAnnotation)
+            .map(a -> (UBNFAST.CatalogAnnotation) a)
+            .findFirst().orElseThrow();
+        assertEquals("catalog context should be 'variable'", "variable", catalog.context());
     }
 }

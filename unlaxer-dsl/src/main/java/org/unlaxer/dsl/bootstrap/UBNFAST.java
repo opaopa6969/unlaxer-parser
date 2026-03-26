@@ -144,6 +144,7 @@ public sealed interface UBNFAST permits
         UBNFAST.BackrefAnnotation,
         UBNFAST.ScopeTreeAnnotation,
         UBNFAST.DeclaresAnnotation,
+        UBNFAST.CatalogAnnotation,
         UBNFAST.LeftAssocAnnotation,
         UBNFAST.RightAssocAnnotation,
         UBNFAST.PrecedenceAnnotation,
@@ -172,8 +173,11 @@ public sealed interface UBNFAST permits
     /** @scopeTree(mode=lexical) */
     record ScopeTreeAnnotation(String mode) implements Annotation {}
 
-    /** @declares(symbol=captureName) — このルールのパース成功時にキャプチャした識別子をスコープに登録する */
-    record DeclaresAnnotation(String symbolCapture) implements Annotation {}
+    /** @declares(symbol=captureName[, description=descCaptureName]) — このルールのパース成功時にキャプチャした識別子をスコープに登録する */
+    record DeclaresAnnotation(String symbolCapture, String description) implements Annotation {}
+
+    /** @catalog(context='contextName') — このルールをカタログ変数補完・ホバーの対象とする */
+    record CatalogAnnotation(String context) implements Annotation {}
 
     /** @leftAssoc */
     record LeftAssocAnnotation() implements Annotation {}

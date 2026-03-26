@@ -12,7 +12,7 @@ import org.unlaxer.parser.Parser;
 
 public class SnapshotLanguageServer implements LanguageServer, LanguageClientAware {
 
-    private static final List<String> KEYWORDS = List.of("grammar", "token", "@root", "@mapping", "@whitespace", "@interleave", "@backref", "@typeof", "@scopeTree", "@leftAssoc", "@rightAssoc", "@precedence", "params", "level", "profile", "name", "mode", "+", "*");
+    private static final List<String> KEYWORDS = List.of("grammar", "token", "@root", "@mapping", "@whitespace", "@interleave", "@backref", "@typeof", "@scopeTree", "@leftAssoc", "@rightAssoc", "@precedence", "@declares", "@catalog", "params", "level", "profile", "name", "mode", "symbol", "context", "description", "+", "*");
 
     private LanguageClient client;
     private final Map<String, DocumentState> documents = new HashMap<>();

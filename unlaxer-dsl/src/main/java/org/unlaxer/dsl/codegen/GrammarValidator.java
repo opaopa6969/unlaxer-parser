@@ -4,6 +4,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.AnnotatedElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.Annotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AtomicElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.BackrefAnnotation;
+import org.unlaxer.dsl.bootstrap.UBNFAST.CatalogAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ChoiceBody;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement;
@@ -123,6 +124,7 @@ public final class GrammarValidator {
             validatePrecedence(rule, hasLeftAssoc, hasRightAssoc, precedenceAnnotations, errors);
             validateAdvancedAnnotations(rule, interleaveAnnotations, backrefAnnotations, scopeTreeAnnotations, errors);
             validateTypeofElements(rule, errors);
+            validateCatalogAnnotations(rule, errors);
         }
         validatePrecedenceTopology(grammar, errors);
         validateAssociativityConsistency(grammar, errors);
@@ -721,6 +723,24 @@ public final class GrammarValidator {
             case OptionalElement opt -> collectTypeofUsagesFromBody(opt.body(), usages);
             case RepeatElement rep -> collectTypeofUsagesFromBody(rep.body(), usages);
             default -> {}
+        }
+    }
+
+    // =========================================================================
+    // @catalog バリデーション
+    // =========================================================================
+
+    private static void validateCatalogAnnotations(RuleDecl rule, List<ValidationIssue> errors) {
+        boolean hasCatalog = rule.annotations().stream().anyMatch(a -> a instanceof CatalogAnnotation);
+        if (!hasCatalog) {
+            return;
+        }
+        Set<String> captures = collectCaptureNames(rule.body());
+        if (captures.isEmpty()) {
+            addRuleError(errors, rule.name(),
+                "rule " + rule.name() + " has @catalog but no capture names in its body",
+                "Add at least one @captureName in the rule body for catalog completion to work.",
+                "E-ANNOTATION-CATALOG-NO-CAPTURE");
         }
     }
 }

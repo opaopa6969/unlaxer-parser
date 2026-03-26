@@ -10,7 +10,11 @@ import java.util.Map;
 import java.util.Optional;
 
 import org.unlaxer.Name;
+import org.unlaxer.TokenList;
 import org.unlaxer.context.ParseContext;
+import org.unlaxer.listener.OutputLevel;
+import org.unlaxer.listener.TransactionListener;
+import org.unlaxer.parser.Parser;
 
 /**
  * UBNF の {@code @scopeTree} / {@code @declares} / {@code @backref} アノテーションが
@@ -59,6 +63,55 @@ import org.unlaxer.context.ParseContext;
 public final class ScopeStore {
 
     private ScopeStore() {}
+
+    // =========================================================================
+    // Dispatcher registration
+    // =========================================================================
+
+    private static final Name DISPATCHER_KEY = Name.of(ScopeStore.class, "scopeDispatcher");
+
+    /**
+     * {@link ParseContext} に ScopeStore ディスパッチャーリスナーを登録する。
+     *
+     * <p>UBNF コード生成器（{@code @declares} / {@code @backref} / {@code @scopeTree} を持つ文法）が
+     * 生成した {@link TransactionListener} 実装パーサーは、{@code ParseContext.listenerByName} に
+     * 自動登録されない。このため、フレームワークの {@link org.unlaxer.context.TransactionListenerContainer}
+     * は生成パーサーの {@code onBegin} / {@code onCommit} / {@code onRollback} を呼ばない。
+     *
+     * <p>このメソッドをパース前に一度呼ぶことで、ディスパッチャーがすべてのパーサーの
+     * トランザクションイベントを受け取り、{@link TransactionListener} を実装しているパーサーへ
+     * 転送する。
+     *
+     * <h3>設計メモ</h3>
+     * {@link org.unlaxer.parser.combinator.ChainInterface} がパーサーの {@code parse()} 内で
+     * {@code this instanceof TransactionListener} をチェックして自己呼び出しするよう変更すれば
+     * このディスパッチャーは不要になる（{@code unlaxer-common} 側の根本修正）。
+     * ただし既存の二重呼び出しリスクを避けるため、現時点では DSL 側の workaround として提供している。
+     *
+     * @param ctx パース開始前の {@link ParseContext}
+     */
+    public static void registerDispatcher(ParseContext ctx) {
+        ctx.addTransactionListener(DISPATCHER_KEY, new TransactionListener() {
+            @Override public void setLevel(OutputLevel level) {}
+            @Override public void onOpen(ParseContext parseContext) {}
+            @Override public void onBegin(ParseContext parseContext, Parser parser) {
+                if (parser instanceof TransactionListener tl) {
+                    tl.onBegin(parseContext, parser);
+                }
+            }
+            @Override public void onCommit(ParseContext parseContext, Parser parser, TokenList committedTokens) {
+                if (parser instanceof TransactionListener tl) {
+                    tl.onCommit(parseContext, parser, committedTokens);
+                }
+            }
+            @Override public void onRollback(ParseContext parseContext, Parser parser, TokenList rollbackedTokens) {
+                if (parser instanceof TransactionListener tl) {
+                    tl.onRollback(parseContext, parser, rollbackedTokens);
+                }
+            }
+            @Override public void onClose(ParseContext parseContext) {}
+        });
+    }
 
     /** globalScopeTreeMap のキー（スコープスタック） */
     private static final Name SCOPE_STACK_KEY = Name.of(ScopeStore.class, "scopeStack");

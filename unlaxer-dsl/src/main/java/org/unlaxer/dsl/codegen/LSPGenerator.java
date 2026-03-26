@@ -2,13 +2,17 @@ package org.unlaxer.dsl.codegen;
 
 import org.unlaxer.dsl.bootstrap.UBNFAST.AnnotatedElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AtomicElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.BackrefAnnotation;
+import org.unlaxer.dsl.bootstrap.UBNFAST.CatalogAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ChoiceBody;
+import org.unlaxer.dsl.bootstrap.UBNFAST.DeclaresAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OptionalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RepeatElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RuleBody;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RuleDecl;
+import org.unlaxer.dsl.bootstrap.UBNFAST.ScopeTreeAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.SequenceBody;
 import org.unlaxer.dsl.bootstrap.UBNFAST.StringSettingValue;
 import org.unlaxer.dsl.bootstrap.UBNFAST.TerminalElement;
@@ -31,6 +35,15 @@ public class LSPGenerator implements CodeGenerator {
         String parsersClass = grammarName + "Parsers";
 
         List<String> keywords = collectKeywords(grammar);
+        boolean hasCatalog = grammar.rules().stream()
+            .anyMatch(r -> r.annotations().stream().anyMatch(a -> a instanceof CatalogAnnotation));
+        // @declares / @backref / @scopeTree を持つ文法では生成パーサーが TransactionListener を実装する。
+        // ScopeStore.registerDispatcher() でパースコンテキストに転送リスナーを登録する必要がある。
+        boolean hasScopeStore = grammar.rules().stream()
+            .anyMatch(r -> r.annotations().stream().anyMatch(
+                a -> a instanceof DeclaresAnnotation
+                  || a instanceof BackrefAnnotation
+                  || a instanceof ScopeTreeAnnotation));
 
         StringBuilder sb = new StringBuilder();
         sb.append("package ").append(packageName).append(";\n\n");
@@ -44,6 +57,9 @@ public class LSPGenerator implements CodeGenerator {
         sb.append("import org.unlaxer.StringSource;\n");
         sb.append("import org.unlaxer.context.ParseContext;\n");
         sb.append("import org.unlaxer.parser.Parser;\n");
+        if (hasScopeStore) {
+            sb.append("import org.unlaxer.dsl.runtime.ScopeStore;\n");
+        }
         sb.append("\n");
 
         sb.append("public class ").append(serverClass)
@@ -60,12 +76,21 @@ public class LSPGenerator implements CodeGenerator {
         sb.append("    private LanguageClient client;\n");
         sb.append("    private final Map<String, DocumentState> documents = new HashMap<>();\n\n");
 
+        // Catalog infrastructure fields (when @catalog annotation present)
+        if (hasCatalog) {
+            sb.append("    protected volatile CatalogResolver catalogResolver = null;\n\n");
+            sb.append("    protected void setCatalogResolver(CatalogResolver r) { this.catalogResolver = r; }\n\n");
+        }
+
         // Constructor
         sb.append("    public ").append(serverClass).append("() {}\n\n");
 
         // initialize()
         sb.append("    @Override\n");
         sb.append("    public CompletableFuture<InitializeResult> initialize(InitializeParams params) {\n");
+        if (hasCatalog) {
+            sb.append("        initCatalogResolver(params);\n");
+        }
         sb.append("        ServerCapabilities capabilities = new ServerCapabilities();\n");
         sb.append("        capabilities.setTextDocumentSync(TextDocumentSyncKind.Full);\n");
         sb.append("        CompletionOptions completionOptions = new CompletionOptions();\n");
@@ -117,6 +142,9 @@ public class LSPGenerator implements CodeGenerator {
         sb.append("    public ParseResult parseDocument(String uri, String content) {\n");
         sb.append("        Parser parser = ").append(parsersClass).append(".getRootParser();\n");
         sb.append("        ParseContext context = new ParseContext(createRootSourceCompat(content));\n");
+        if (hasScopeStore) {
+            sb.append("        ScopeStore.registerDispatcher(context);\n");
+        }
         sb.append("        Parsed result = parser.parse(context);\n");
         sb.append("        int consumedLength = 0;\n");
         sb.append("        if (result.isSucceeded()) {\n");
@@ -188,6 +216,47 @@ public class LSPGenerator implements CodeGenerator {
         sb.append("        }\n");
         sb.append("        return new Position(line, column);\n");
         sb.append("    }\n\n");
+
+        // Catalog infrastructure methods
+        if (hasCatalog) {
+            String lowerName = grammarName.toLowerCase();
+            String upperName = grammarName.toUpperCase();
+            sb.append("    protected void initCatalogResolver(InitializeParams params) {\n");
+            sb.append("        if (catalogResolver != null) return;\n");
+            sb.append("        String path = null;\n");
+            sb.append("        Object initOptions = params.getInitializationOptions();\n");
+            sb.append("        if (initOptions instanceof Map<?,?> map) {\n");
+            sb.append("            Object v = map.get(\"catalogPath\");\n");
+            sb.append("            if (v instanceof String s && !s.isBlank()) path = s;\n");
+            sb.append("        }\n");
+            sb.append("        if (path == null) path = System.getProperty(\"").append(lowerName).append(".catalog.path\");\n");
+            sb.append("        if (path == null) path = System.getenv(\"").append(upperName).append("_CATALOG_PATH\");\n");
+            sb.append("        if (path != null && !path.isBlank()) catalogResolver = new FileCatalogResolver(path);\n");
+            sb.append("    }\n\n");
+
+            sb.append("    protected List<CompletionItem> catalogCompletion(String prefix) {\n");
+            sb.append("        if (catalogResolver == null || catalogResolver.isEmpty()) return List.of();\n");
+            sb.append("        List<CompletionItem> items = new ArrayList<>();\n");
+            sb.append("        for (CatalogEntry entry : catalogResolver.listAll()) {\n");
+            sb.append("            if (prefix.isEmpty() || entry.name().startsWith(prefix)) {\n");
+            sb.append("                CompletionItem item = new CompletionItem(entry.name());\n");
+            sb.append("                item.setKind(CompletionItemKind.Variable);\n");
+            sb.append("                if (entry.description() != null && !entry.description().isBlank()) {\n");
+            sb.append("                    item.setDetail(entry.description());\n");
+            sb.append("                }\n");
+            sb.append("                items.add(item);\n");
+            sb.append("            }\n");
+            sb.append("        }\n");
+            sb.append("        return items;\n");
+            sb.append("    }\n\n");
+
+            sb.append("    protected String catalogHover(String variableName) {\n");
+            sb.append("        if (catalogResolver == null) return null;\n");
+            sb.append("        CatalogEntry entry = catalogResolver.lookup(variableName);\n");
+            sb.append("        if (entry == null) return null;\n");
+            sb.append("        return entry.description() != null ? entry.description() : entry.name();\n");
+            sb.append("    }\n\n");
+        }
 
         // DocumentState record
         sb.append("    public record DocumentState(String uri, String content, ParseResult parseResult) {}\n\n");
@@ -278,6 +347,63 @@ public class LSPGenerator implements CodeGenerator {
         sb.append("        public void didChangeWatchedFiles(org.eclipse.lsp4j.DidChangeWatchedFilesParams params) {}\n");
         sb.append("    }\n");
 
+        // Catalog interfaces and FileCatalogResolver
+        if (hasCatalog) {
+            sb.append("\n");
+            sb.append("    public interface CatalogResolver {\n");
+            sb.append("        List<CatalogEntry> listAll();\n");
+            sb.append("        CatalogEntry lookup(String name);\n");
+            sb.append("        default boolean isEmpty() { return listAll().isEmpty(); }\n");
+            sb.append("    }\n\n");
+
+            sb.append("    public record CatalogEntry(String name, String description, String context, String sourcePath) {}\n\n");
+
+            sb.append("    public static class FileCatalogResolver implements CatalogResolver {\n");
+            sb.append("        private final List<CatalogEntry> entries = new ArrayList<>();\n\n");
+            sb.append("        public FileCatalogResolver(String pathSpec) {\n");
+            sb.append("            for (String path : pathSpec.split(java.io.File.pathSeparator)) {\n");
+            sb.append("                java.io.File f = new java.io.File(path.trim());\n");
+            sb.append("                if (!f.exists()) continue;\n");
+            sb.append("                if (f.isDirectory()) {\n");
+            sb.append("                    java.io.File[] files = f.listFiles(ff -> ff.getName().endsWith(\".tecatalog\"));\n");
+            sb.append("                    if (files != null) for (java.io.File cf : files) loadFile(cf);\n");
+            sb.append("                } else {\n");
+            sb.append("                    loadFile(f);\n");
+            sb.append("                }\n");
+            sb.append("            }\n");
+            sb.append("        }\n\n");
+            sb.append("        private void loadFile(java.io.File f) {\n");
+            sb.append("            try (java.io.BufferedReader br = new java.io.BufferedReader(new java.io.FileReader(f, java.nio.charset.StandardCharsets.UTF_8))) {\n");
+            sb.append("                String line;\n");
+            sb.append("                boolean canonical = false;\n");
+            sb.append("                boolean firstLine = true;\n");
+            sb.append("                while ((line = br.readLine()) != null) {\n");
+            sb.append("                    if (firstLine) { firstLine = false; canonical = line.startsWith(\"tinyexpression-catalog-v\"); continue; }\n");
+            sb.append("                    if (line.isBlank() || line.startsWith(\"#\")) continue;\n");
+            sb.append("                    if (canonical) {\n");
+            sb.append("                        String[] parts = line.split(\"\\\\|\", -1);\n");
+            sb.append("                        if (parts.length >= 3) {\n");
+            sb.append("                            String name = parts.length > 1 ? parts[1].trim() : \"\";\n");
+            sb.append("                            String desc = parts.length > 2 ? parts[2].trim() : \"\";\n");
+            sb.append("                            String ctx  = parts.length > 3 ? parts[3].trim() : \"\";\n");
+            sb.append("                            entries.add(new CatalogEntry(name, desc, ctx, f.getPath()));\n");
+            sb.append("                        }\n");
+            sb.append("                    } else {\n");
+            sb.append("                        String[] parts = line.split(\"\\\\|\", 2);\n");
+            sb.append("                        String name = parts[0].trim();\n");
+            sb.append("                        String desc = parts.length > 1 ? parts[1].trim() : \"\";\n");
+            sb.append("                        entries.add(new CatalogEntry(name, desc, \"\", f.getPath()));\n");
+            sb.append("                    }\n");
+            sb.append("                }\n");
+            sb.append("            } catch (java.io.IOException ignored) {}\n");
+            sb.append("        }\n\n");
+            sb.append("        @Override public List<CatalogEntry> listAll() { return Collections.unmodifiableList(entries); }\n");
+            sb.append("        @Override public CatalogEntry lookup(String name) {\n");
+            sb.append("            return entries.stream().filter(e -> e.name().equals(name)).findFirst().orElse(null);\n");
+            sb.append("        }\n");
+            sb.append("    }\n");
+        }
+
         sb.append("}\n");
 
         return new GeneratedSource(packageName, serverClass, sb.toString());
@@ -297,11 +423,16 @@ public class LSPGenerator implements CodeGenerator {
         kw.add("@leftAssoc");
         kw.add("@rightAssoc");
         kw.add("@precedence");
+        kw.add("@declares");
+        kw.add("@catalog");
         kw.add("params");
         kw.add("level");
         kw.add("profile");
         kw.add("name");
         kw.add("mode");
+        kw.add("symbol");
+        kw.add("context");
+        kw.add("description");
         for (RuleDecl rule : grammar.rules()) {
             collectFromBody(rule.body(), kw);
         }

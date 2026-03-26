@@ -882,6 +882,48 @@ public class UBNFParsers {
     }
 
     /**
+     * DeclaresAnnotation with description: '@declares' '(' 'symbol' '=' IDENTIFIER ',' 'description' '=' IDENTIFIER ')'
+     */
+    public static class DeclaresWithDescriptionAnnotationParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                new WordParser("@declares"),
+                Parser.get(LeftParenthesisParser.class),
+                new WordParser("symbol"),
+                Parser.get(EqualParser.class),
+                Parser.get(IdentifierParser.class),
+                Parser.get(CommaParser.class),
+                new WordParser("description"),
+                Parser.get(EqualParser.class),
+                Parser.get(IdentifierParser.class),
+                Parser.get(RightParenthesisParser.class)
+            );
+        }
+    }
+
+    /**
+     * CatalogAnnotation: '@catalog' '(' 'context' '=' SingleQuoted ')'
+     */
+    public static class CatalogAnnotationParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                new WordParser("@catalog"),
+                Parser.get(LeftParenthesisParser.class),
+                new WordParser("context"),
+                Parser.get(EqualParser.class),
+                Parser.get(SingleQuotedParser.class),
+                Parser.get(RightParenthesisParser.class)
+            );
+        }
+    }
+
+    /**
      * LeftAssocAnnotation: '@leftAssoc'
      */
     public static class LeftAssocAnnotationParser extends UBNFLazyChain {
@@ -997,7 +1039,8 @@ public class UBNFParsers {
     /**
      * Annotation: RootAnnotation | MappingAnnotation | WhitespaceAnnotation
      *           | InterleaveAnnotation | BackrefAnnotation | ScopeTreeAnnotation
-     *           | LeftAssocAnnotation | RightAssocAnnotation
+     *           | DeclaresWithDescriptionAnnotation | DeclaresAnnotation
+     *           | CatalogAnnotation | LeftAssocAnnotation | RightAssocAnnotation
      *           | PrecedenceAnnotation | DocAnnotation | SkipAnnotation | SimpleAnnotation
      */
     public static class AnnotationParser extends LazyChoice {
@@ -1012,7 +1055,9 @@ public class UBNFParsers {
                 Parser.get(InterleaveAnnotationParser.class),
                 Parser.get(BackrefAnnotationParser.class),
                 Parser.get(ScopeTreeAnnotationParser.class),
+                Parser.get(DeclaresWithDescriptionAnnotationParser.class),
                 Parser.get(DeclaresAnnotationParser.class),
+                Parser.get(CatalogAnnotationParser.class),
                 Parser.get(LeftAssocAnnotationParser.class),
                 Parser.get(RightAssocAnnotationParser.class),
                 Parser.get(PrecedenceAnnotationParser.class),

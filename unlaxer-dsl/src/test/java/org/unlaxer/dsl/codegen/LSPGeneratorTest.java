@@ -142,4 +142,46 @@ public class LSPGeneratorTest {
         assertTrue(result.source().contains("\"@rightAssoc\""));
         assertTrue(result.source().contains("\"@precedence\""));
     }
+
+    @Test
+    public void testContainsCatalogKeywords() {
+        assertTrue(result.source().contains("\"@catalog\""));
+        assertTrue(result.source().contains("\"@declares\""));
+        assertTrue(result.source().contains("\"context\""));
+        assertTrue(result.source().contains("\"description\""));
+        assertTrue(result.source().contains("\"symbol\""));
+    }
+
+    @Test
+    public void testGeneratesCatalogInfrastructure() {
+        String catalogGrammar =
+            "grammar CatalogTest {\n" +
+            "  @package: org.example.catalog\n" +
+            "  @whitespace: javaStyle\n" +
+            "  token IDENTIFIER = IdentifierParser\n" +
+            "  @root\n" +
+            "  @catalog(context='variable')\n" +
+            "  @backref(name=varRef)\n" +
+            "  VarRef ::= '$' IDENTIFIER @varRef ;\n" +
+            "}";
+        GrammarDecl grammar = UBNFMapper.parse(catalogGrammar).grammars().get(0);
+        CodeGenerator.GeneratedSource catalogResult = new LSPGenerator().generate(grammar);
+        String src = catalogResult.source();
+
+        assertTrue("should contain CatalogResolver interface", src.contains("interface CatalogResolver"));
+        assertTrue("should contain CatalogEntry record", src.contains("record CatalogEntry"));
+        assertTrue("should contain FileCatalogResolver class", src.contains("class FileCatalogResolver"));
+        assertTrue("should contain catalogCompletion method", src.contains("catalogCompletion("));
+        assertTrue("should contain catalogHover method", src.contains("catalogHover("));
+        assertTrue("should contain setCatalogResolver method", src.contains("setCatalogResolver("));
+        assertTrue("should call initCatalogResolver in initialize", src.contains("initCatalogResolver("));
+    }
+
+    @Test
+    public void testNoCatalogAnnotation_noCatalogInfrastructure() {
+        // TINYCALC_GRAMMAR has no @catalog — verify no catalog code is generated
+        String src = result.source();
+        assertTrue("no @catalog → no CatalogResolver", !src.contains("interface CatalogResolver"));
+        assertTrue("no @catalog → no FileCatalogResolver", !src.contains("FileCatalogResolver"));
+    }
 }

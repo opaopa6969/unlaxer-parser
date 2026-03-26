@@ -12,6 +12,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.AnnotatedElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.Annotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AtomicElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.BackrefAnnotation;
+import org.unlaxer.dsl.bootstrap.UBNFAST.CatalogAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.DeclaresAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.BlockSettingValue;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ChoiceBody;
@@ -306,8 +307,12 @@ public class UBNFMapper {
                 result.add(toBackrefAnnotation(child));
             } else if (child.parser.getClass() == UBNFParsers.ScopeTreeAnnotationParser.class) {
                 result.add(toScopeTreeAnnotation(child));
+            } else if (child.parser.getClass() == UBNFParsers.DeclaresWithDescriptionAnnotationParser.class) {
+                result.add(toDeclaresWithDescriptionAnnotation(child));
             } else if (child.parser.getClass() == UBNFParsers.DeclaresAnnotationParser.class) {
                 result.add(toDeclaresAnnotation(child));
+            } else if (child.parser.getClass() == UBNFParsers.CatalogAnnotationParser.class) {
+                result.add(toCatalogAnnotation(child));
             } else if (child.parser.getClass() == UBNFParsers.LeftAssocAnnotationParser.class) {
                 result.add(new LeftAssocAnnotation());
             } else if (child.parser.getClass() == UBNFParsers.RightAssocAnnotationParser.class) {
@@ -372,7 +377,20 @@ public class UBNFMapper {
     static DeclaresAnnotation toDeclaresAnnotation(Token token) {
         List<Token> identifiers = findDescendants(token, UBNFParsers.IdentifierParser.class);
         String symbolCapture = identifiers.isEmpty() ? "" : identifiers.get(0).source.toString().trim();
-        return new DeclaresAnnotation(symbolCapture);
+        return new DeclaresAnnotation(symbolCapture, null);
+    }
+
+    static DeclaresAnnotation toDeclaresWithDescriptionAnnotation(Token token) {
+        List<Token> identifiers = findDescendants(token, UBNFParsers.IdentifierParser.class);
+        String symbolCapture = identifiers.size() > 0 ? identifiers.get(0).source.toString().trim() : "";
+        String description = identifiers.size() > 1 ? identifiers.get(1).source.toString().trim() : null;
+        return new DeclaresAnnotation(symbolCapture, description);
+    }
+
+    static CatalogAnnotation toCatalogAnnotation(Token token) {
+        List<Token> quoted = findDescendants(token, org.unlaxer.parser.elementary.SingleQuotedParser.class);
+        String context = quoted.isEmpty() ? "" : stripQuotes(quoted.get(0).source.toString().trim());
+        return new CatalogAnnotation(context);
     }
 
     static SimpleAnnotation toSimpleAnnotation(Token token) {
