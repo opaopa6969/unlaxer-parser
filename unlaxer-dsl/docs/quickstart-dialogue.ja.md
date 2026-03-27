@@ -1,4 +1,4 @@
-[日本語](./quickstart-dialogue.ja.md) | [Index](./INDEX.ja.md)
+[English](./quickstart-dialogue.en.md) | [日本語](./quickstart-dialogue.ja.md) | [Index](./INDEX.ja.md)
 
 ---
 
@@ -773,4 +773,4 @@ protected Double evalVariableRef(VariableRef node) {
 
 ---
 
-[日本語](./quickstart-dialogue.ja.md) | [Index](./INDEX.ja.md)
+[English](./quickstart-dialogue.en.md) | [日本語](./quickstart-dialogue.ja.md) | [Index](./INDEX.ja.md)
