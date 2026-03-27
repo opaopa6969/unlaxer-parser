@@ -25,13 +25,13 @@
 - [Part 9: AST Filtering and Scope](#part-9-ast-filtering-and-scope)
 - [Part 10: Error Handling and Debugging](#part-10-error-handling-and-debugging)
 - [Part 11: Advanced Topics -- The Road to UBNF](#part-11-advanced-topics--the-road-to-ubnf)
-- [Part 12: Advanced Parsers -- The Forgotten Classes](#part-12-advanced-parsers--the-forgotten-classes)
+- [Part 12: Advanced Parsers -- The Forgotten Classes](#part-12--advanced-parsers--the-forgotten-classes)
 - [Appendix A: Parser Glossary](#appendix-a-parser-glossary)
 - [Appendix B: Complete Parser Reference for unlaxer-parser](#appendix-b-complete-parser-reference-for-unlaxer-parser)
 
 ---
 
-## Part 1: What Is a Parser?
+## Part 1 — What Is a Parser?
 
 [Next: Part 2 The World of Parsing Techniques ->](#part-2-the-world-of-parsing-techniques)
 
@@ -232,7 +232,7 @@ BinaryOp(+)
 
 ---
 
-## Part 2: The World of Parsing Techniques
+## Part 2 — The World of Parsing Techniques
 
 [<- Part 1: What Is a Parser?](#part-1-what-is-a-parser) | [Next: Part 3 Parser Combinator ->](#part-3-the-parser-combinator-approach)
 
@@ -530,7 +530,7 @@ Start with small parsers and combine them into bigger ones as needed.
 
 ---
 
-## Part 3: The Parser Combinator Approach
+## Part 3 — The Parser Combinator Approach
 
 [<- Part 2: The World of Parsing Techniques](#part-2-the-world-of-parsing-techniques) | [Next: Part 4 Terminal Parsers ->](#part-4-terminal-parsers)
 
@@ -741,7 +741,7 @@ parsers.add(new ZeroOrMore(
 
 ---
 
-## Part 4: Terminal Parsers
+## Part 4 — Terminal Parsers
 
 [<- Part 3: Parser Combinator](#part-3-the-parser-combinator-approach) | [Next: Part 5 Combinator Parsers ->](#part-5-combinator-parsers)
 
@@ -1061,7 +1061,7 @@ parsers.add(NumberVariableParser.class);
 
 ---
 
-## Part 5: Combinator Parsers
+## Part 5 — Combinator Parsers
 
 [<- Part 4: Terminal Parsers](#part-4-terminal-parsers) | [Next: Part 6 Left/Right Associativity ->](#part-6-left-associativity-right-associativity-and-operator-precedence)
 
@@ -1599,7 +1599,7 @@ public Parsers getLazyParsers(boolean withNakedVariable) {
 
 ---
 
-## Part 6: Left Associativity, Right Associativity, and Operator Precedence
+## Part 6 — Left Associativity, Right Associativity, and Operator Precedence
 
 [<- Part 5: Combinator Parsers](#part-5-combinator-parsers) | [Next: Part 7 Tokens and Parse Trees ->](#part-7-tokens-and-parse-trees)
 
@@ -1915,7 +1915,7 @@ public class PowerParser extends LazyChain {
 
 ---
 
-## Part 7: Tokens and Parse Trees
+## Part 7 — Tokens and Parse Trees
 
 [<- Part 6: Left/Right Associativity](#part-6-left-associativity-right-associativity-and-operator-precedence) | [Next: Part 8 Building Your Own Parser ->](#part-8-building-your-own-parser)
 
@@ -2212,7 +2212,7 @@ NumberExpressionParser "3 + 4 * 2"
 
 ---
 
-## Part 8: Building Your Own Parser
+## Part 8 — Building Your Own Parser
 
 [<- Part 7: Tokens and Parse Trees](#part-7-tokens-and-parse-trees) | [Next: Part 9 AST Filtering ->](#part-9-ast-filtering-and-scope)
 
@@ -2648,7 +2648,7 @@ new OneOrMore(Name.of("digits"), digitParser)
 
 ---
 
-## Part 9: AST Filtering and Scope
+## Part 9 — AST Filtering and Scope
 
 [<- Part 8: Building Your Own Parser](#part-8-building-your-own-parser) | [Next: Part 10 Error Handling ->](#part-10-error-handling-and-debugging)
 
@@ -2789,7 +2789,7 @@ public interface SuggestableParser {
 
 ---
 
-## Part 10: Error Handling and Debugging
+## Part 10 — Error Handling and Debugging
 
 [<- Part 9: AST Filtering](#part-9-ast-filtering-and-scope) | [Next: Part 11 Advanced Topics ->](#part-11-advanced-topics--the-road-to-ubnf)
 
@@ -3013,9 +3013,9 @@ If `Choice(A, B, C)` isn't working as expected, test A, B, C each individually. 
 
 ---
 
-## Part 11: Advanced Topics -- The Road to UBNF
+## Part 11 — Advanced Topics -- The Road to UBNF
 
-[<- Part 10: Error Handling](#part-10-error-handling-and-debugging) | [Next: Part 12 Advanced Parsers ->](#part-12-advanced-parsers--the-forgotten-classes)
+[<- Part 10: Error Handling](#part-10-error-handling-and-debugging) | [Next: Part 12 Advanced Parsers ->](#part-12--advanced-parsers--the-forgotten-classes)
 
 ---
 
@@ -3090,7 +3090,7 @@ Factor     = NUMBER | '(' Expression ')' ;
 
 **Newcomer**: I want to learn more.
 
-**Senior**: The unlaxer-dsl tutorial `tutorial-ubnf-to-lsp-dap-dialogue.ja.md` covers detailed UBNF usage. It teaches:
+**Senior**: The [UBNF to LSP/DAP Tutorial](../../unlaxer-dsl/docs/tutorial-ubnf-to-lsp-dap-dialogue.en.md) covers detailed UBNF usage. It teaches:
 
 1. Full UBNF syntax
 2. Generating LSP servers from UBNF
@@ -3155,11 +3155,11 @@ Part 11: Advanced
 
 ---
 
-[<- Part 10: Error Handling](#part-10-error-handling-and-debugging) | [Next: Part 12 Advanced Parsers ->](#part-12-advanced-parsers--the-forgotten-classes)
+[<- Part 10: Error Handling](#part-10-error-handling-and-debugging) | [Next: Part 12 Advanced Parsers ->](#part-12--advanced-parsers--the-forgotten-classes)
 
 ---
 
-## Part 12: Advanced Parsers -- The Forgotten Classes
+## Part 12 — Advanced Parsers — The Forgotten Classes
 
 [<- Part 11: Advanced Topics](#part-11-advanced-topics--the-road-to-ubnf) | [Next: Appendix A Glossary ->](#appendix-a-parser-glossary)
 
@@ -3259,12 +3259,68 @@ new ParserWrapper(name, innerParser, TokenKind.consumed, false)
 
 **Senior**: It's a mechanism for putting error messages and metadata into the parse tree. ErrorMessageParser is a real-world example of this.
 
+**Newcomer**: How exactly do you use ContainerParser?
+
+**Senior**: The easiest example to understand is ErrorMessageParser. Let's look at the actual code.
+
 ```java
-// ErrorMessageParser extends ContainerParser<String>
-// → Inserts error messages as Tokens during parsing
+public class ErrorMessageParser extends ContainerParser<String> implements TerminalSymbol {
+
+    String message;
+    boolean expectedHintOnly;
+
+    public ErrorMessageParser(String message) {
+        this(message, false);
+    }
+
+    // Holds the error message string
+    @Override
+    public String get() {
+        return message;
+    }
+
+    // Returns the error message with position information
+    @Override
+    public RangedContent<String> get(CursorRange position) {
+        return new ErrorMessage(position, message);
+    }
+}
 ```
 
-**Newcomer**: I see, so you can use the parse tree as a data container too.
+**Newcomer**: Ah, so it extends ContainerParser\<String\> and returns the error message string from get().
+
+**Senior**: Right. The parse() implementation is interesting too. ContainerParser's parse() creates an empty token with Token.empty() and adds it as a child of the current token. In other words, it inserts a token without consuming any input.
+
+```java
+// ContainerParser.parse() implementation:
+public Parsed parse(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
+    Token token = Token.empty(tokenKind, parseContext.getCursor(TokenKind.consumed), this);
+    parseContext.getCurrent().addToken(token);
+    return new Parsed(token);
+}
+```
+
+**Newcomer**: A token appears even though no input is consumed... that's unusual.
+
+**Senior**: And to extract the error information after parsing, you use getRangedContents().
+
+```java
+// Collect all error messages from the root token of the parse result
+List<RangedContent<String>> errors =
+    ContainerParser.getRangedContents(rootToken, ErrorMessageParser.class);
+
+// Each error contains position information (CursorRange) and a message
+for (RangedContent<String> error : errors) {
+    System.out.println(error.getContent());  // error message
+    System.out.println(error.getRange());    // position in source
+}
+```
+
+**Newcomer**: So you're using the parse tree as a carrier for error information.
+
+**Senior**: Exactly! LSP diagnostics can pull information from here. The key point is that parsing and error collection are unified. Just by traversing the parse tree, you get both syntactic information and error information at once.
+
+**Newcomer**: Not having to maintain a separate error list sounds convenient.
 
 ---
 
@@ -3290,6 +3346,39 @@ new ParserWrapper(name, innerParser, TokenKind.consumed, false)
 **Newcomer**: The joys of historical baggage...
 
 **Senior**: A classic programmer's dilemma.
+
+**Newcomer**: By the way, when exactly would you need to control propagation? The table alone doesn't give me a concrete picture...
+
+**Senior**: Let me explain with a concrete scenario. Think about the internals of QuotedParser.
+
+```
+You want to check the entire expression with lookahead (matchOnly):
+  MatchOnly(
+    Chain(
+      WordParser("'"),
+      ZeroOrMore(contentParser),  <- this also becomes matchOnly!
+      WordParser("'")
+    )
+  )
+
+Problem: If contentParser also becomes matchOnly,
+         it can't actually consume the quoted content.
+
+Solution: Block propagation with AllPropagationStopper
+  MatchOnly(
+    Chain(
+      WordParser("'"),
+      AllPropagationStopper(ZeroOrMore(contentParser)),  <- back to consumed
+      WordParser("'")
+    )
+  )
+```
+
+**Newcomer**: Ah, because the parent's matchOnly propagates down to its children, you need to declare "from this point on, go back to consumed" partway through.
+
+**Senior**: Exactly. AllPropagationStopper resets both TokenKind and invertMatch, so it completely says "from here on, it's normal mode." If you want partial control, use DoCounsumePropagationStopper (resets only TokenKind) or InvertMatchPropagationStopper (resets only invertMatch) as needed.
+
+**Newcomer**: So it's less about "stopping" propagation and more about "blocking it and resetting to defaults."
 
 ---
 
@@ -3351,6 +3440,42 @@ Not(WordParser("world"))
 
 **Senior**: Precisely. MatchOnly = positive lookahead, Not = negative lookahead. They correspond directly to PEG's & and !.
 
+**Newcomer**: I understand the theory, but how do you decide which to use in a real parser?
+
+**Senior**: Let me show you how they're used differently in practice. The typical use of Not is when you want to "match something while excluding certain kinds of tokens."
+
+```java
+// How Not is used in ExclusiveNakedVariableParser:
+// We want to match "identifiers that aren't type declarations"
+Chain(
+  Not(Choice(                    // <- "confirm the next thing isn't a type declaration"
+    WordParser("number"),
+    WordParser("string"),
+    WordParser("boolean")
+  )),
+  IdentifierParser               // <- "if it's not a type declaration, match it"
+)
+```
+
+**Newcomer**: I see -- you use Not to first confirm "it's not this," then match with the real parser.
+
+**Senior**: On the other hand, MatchOnly is often used to "confirm that a certain syntax starts here before diving into full parsing."
+
+```java
+// Confirm it "might be a function call" before parsing
+Chain(
+  MatchOnly(Chain(               // <- "confirm identifier + ( is coming"
+    IdentifierParser,
+    WordParser("(")
+  )),
+  FunctionCallParser             // <- "if confirmed, do the full parse"
+)
+```
+
+**Newcomer**: So MatchOnly is for "checking preconditions" and Not is for "checking exclusion conditions."
+
+**Senior**: That's a great way to think about it. Keep that mental model and you won't hesitate during design.
+
 ---
 
 ### 12.10 MappedSingleCharacterParserHolder -- Customizing Character Classes
@@ -3390,7 +3515,7 @@ Parser noX = holder.newWithout('x');
 
 ## Appendix A: Parser Glossary
 
-[<- Part 12: Advanced Parsers](#part-12-advanced-parsers--the-forgotten-classes) | [Next: Appendix B Complete Parser Reference ->](#appendix-b-complete-parser-reference-for-unlaxer-parser)
+[<- Part 12: Advanced Parsers](#part-12--advanced-parsers--the-forgotten-classes) | [Next: Appendix B Complete Parser Reference ->](#appendix-b-complete-parser-reference-for-unlaxer-parser)
 
 ---
 
