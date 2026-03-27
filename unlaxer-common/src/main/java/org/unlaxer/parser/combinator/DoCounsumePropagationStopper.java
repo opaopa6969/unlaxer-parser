@@ -6,7 +6,11 @@ import org.unlaxer.TokenKind;
 import org.unlaxer.context.ParseContext;
 import org.unlaxer.parser.Parser;
 
-public class DoCounsumePropagationStopper extends ConstructedSingleChildParser implements PropagationStopper {
+/**
+ * @deprecated Typo in class name. Use {@link DoConsumePropagationStopper} instead.
+ */
+@Deprecated(since = "2.7.0", forRemoval = true)
+public class DoCounsumePropagationStopper extends DoConsumePropagationStopper {
 
 	private static final long serialVersionUID = -8510339130971346858L;
 
@@ -18,12 +22,4 @@ public class DoCounsumePropagationStopper extends ConstructedSingleChildParser i
 		super(child);
 	}
 
-	@Override
-	public Parsed parse(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
-		
-		parseContext.startParse(this, parseContext, tokenKind, invertMatch);
-		Parsed parsed = getChild().parse(parseContext, TokenKind.consumed, invertMatch);
-		parseContext.endParse(this, parsed , parseContext, tokenKind, invertMatch);
-		return parsed;
-	}
 }
