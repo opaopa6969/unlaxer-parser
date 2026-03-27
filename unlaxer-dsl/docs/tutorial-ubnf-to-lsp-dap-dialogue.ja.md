@@ -1,3 +1,7 @@
+[English](./tutorial-ubnf-to-lsp-dap-dialogue.en.md) | [日本語](./tutorial-ubnf-to-lsp-dap-dialogue.ja.md) | [Index](./INDEX.md)
+
+---
+
 # UBNF から LSP/DAP まで -- 会話で学ぶ unlaxer-parser チュートリアル
 
 > **登場人物**
@@ -1409,3 +1413,6 @@ mvn test -Dtest=BackendSpeedComparisonTest -Dexec.skip=true
 | ファイル | 説明 |
 |---------|------|
 | `BackendSpeedComparisonTest.java` | 5バックエンド速度比較 |
+
+---
+[Index](./INDEX.md)
