@@ -58,12 +58,14 @@ public class MapperGenerator implements CodeGenerator {
             .findFirst();
 
         Map<String, RuleDecl> mappingRules = new LinkedHashMap<>();
+        Map<String, List<RuleDecl>> allMappingRules = new LinkedHashMap<>();
         Map<String, String> mappedClassByRuleName = new LinkedHashMap<>();
         for (RuleDecl rule : grammar.rules()) {
             boolean isSkip = rule.annotations().stream().anyMatch(a -> a instanceof SkipAnnotation);
             if (!isSkip) {
                 getMappingAnnotation(rule).ifPresent(m -> {
                     mappingRules.putIfAbsent(m.className(), rule);
+                    allMappingRules.computeIfAbsent(m.className(), k -> new ArrayList<>()).add(rule);
                     mappedClassByRuleName.putIfAbsent(rule.name(), m.className());
                 });
             }
@@ -144,13 +146,19 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("        if (token == null) {\n");
         sb.append("            return null;\n");
         sb.append("        }\n");
-        for (Map.Entry<String, RuleDecl> entry : mappingRules.entrySet()) {
+        // Include ALL parser classes that map to each AST class
+        Set<String> emittedParserClasses = new LinkedHashSet<>();
+        for (Map.Entry<String, List<RuleDecl>> entry : allMappingRules.entrySet()) {
             String className = entry.getKey();
-            RuleDecl rule = entry.getValue();
-            sb.append("        if (token.parser.getClass() == ").append(parsersClass).append(".")
-                .append(rule.name()).append("Parser.class) {\n");
-            sb.append("            return to").append(className).append("(token);\n");
-            sb.append("        }\n");
+            for (RuleDecl rule : entry.getValue()) {
+                String parserClassKey = rule.name() + "Parser";
+                if (emittedParserClasses.add(parserClassKey)) {
+                    sb.append("        if (token.parser.getClass() == ").append(parsersClass).append(".")
+                        .append(rule.name()).append("Parser.class) {\n");
+                    sb.append("            return to").append(className).append("(token);\n");
+                    sb.append("        }\n");
+                }
+            }
         }
         sb.append("        return null;\n");
         sb.append("    }\n\n");
@@ -259,6 +267,66 @@ public class MapperGenerator implements CodeGenerator {
                         tokenDeclByName,
                         ruleByName);
 
+                    // Check for additional rules mapping to the same AST class
+                    // (e.g., NumberExpression and NumberTerm both map to BinaryExpr)
+                    List<RuleDecl> additionalRules = allMappingRules.getOrDefault(className, List.of())
+                        .stream().filter(r -> r != rule && (isLeftAssocRule(r, getMappingAnnotation(r).orElse(null))
+                            || isRightAssocRule(r, getMappingAnnotation(r).orElse(null))))
+                        .toList();
+
+                    // Generate dispatch for additional rules first
+                    for (RuleDecl additionalRule : additionalRules) {
+                        String addRuleParserClass = parsersClass + "." + additionalRule.name() + "Parser.class";
+                        Optional<AssocShape> addAssocShape = findAssocShape(additionalRule, "left", "op", "right");
+                        if (addAssocShape.isPresent()) {
+                            AssocShape addShape = addAssocShape.get();
+                            String addRepeatParserClass = parsersClass + "." + additionalRule.name() + "Repeat" + addShape.repeatIndex + "Parser.class";
+                            String addLeftParserClass = parserClassLiteral(addShape.leftElement, parsersClass, tokenDeclByName, ruleByName)
+                                .orElse(addRuleParserClass);
+                            String addOpParserClass = parserClassLiteral(addShape.opElement, parsersClass, tokenDeclByName, ruleByName)
+                                .orElse("org.unlaxer.parser.elementary.WordParser.class");
+                            // For rules sharing the same @mapping class, left/right mappers
+                            // should call the shared mapping method recursively
+                            String addLeftMapper = "to" + className + "(addLeftToken)";
+                            String addRightMapper = "to" + className + "(addRightToken)";
+
+                            sb.append("        // Handle ").append(additionalRule.name()).append(" tokens (same @mapping class)\n");
+                            sb.append("        if (token.parser.getClass() == ").append(addRuleParserClass).append(") {\n");
+                            sb.append("            Token addLeftToken = findFirstDescendant(token, ").append(addLeftParserClass).append(");\n");
+                            sb.append("            if (addLeftToken == null) {\n");
+                            if (leafFallbackSupported) {
+                                sb.append("                String literal = stripQuotes(firstTokenText(token));\n");
+                                sb.append("                literal = literal == null ? \"\" : literal;\n");
+                                sb.append("                return registerNodeSourceSpan(new ").append(astClass).append(".").append(className)
+                                    .append("(null, List.of(literal), List.of()), token);\n");
+                            } else {
+                                sb.append("                throw new IllegalArgumentException(\"Left operand not found for rule ").append(additionalRule.name()).append("\");\n");
+                            }
+                            sb.append("            }\n");
+                            sb.append("            ").append(leftType).append(" addLeft = ").append(addLeftMapper).append(";\n");
+                            sb.append("            List<").append(opType).append("> addOps = new ArrayList<>();\n");
+                            sb.append("            List<").append(rightType).append("> addRights = new ArrayList<>();\n");
+                            sb.append("            for (Token addRepeatToken : findDirectDescendants(token, ").append(addRepeatParserClass).append(")) {\n");
+                            sb.append("                Token addOpToken = findFirstDescendant(addRepeatToken, ").append(addOpParserClass).append(");\n");
+                            sb.append("                String addOpValue = firstTokenText(addOpToken == null ? addRepeatToken : addOpToken);\n");
+                            sb.append("                if (addOpValue != null && !addOpValue.isEmpty()) {\n");
+                            sb.append("                    addOps.add(stripQuotes(addOpValue));\n");
+                            sb.append("                }\n");
+                            sb.append("                Token addRightToken = findFirstDescendant(addRepeatToken, ").append(addLeftParserClass).append(");\n");
+                            sb.append("                if (addRightToken != null) {\n");
+                            sb.append("                    addRights.add(").append(addRightMapper).append(");\n");
+                            sb.append("                }\n");
+                            sb.append("            }\n");
+                            sb.append("            if (addOps.isEmpty()) {\n");
+                            sb.append("                return registerNodeSourceSpan(new ").append(astClass).append(".").append(className)
+                                .append("(addLeft, List.of(), List.of()), token);\n");
+                            sb.append("            }\n");
+                            sb.append("            return registerNodeSourceSpan(new ").append(astClass).append(".").append(className)
+                                .append("(addLeft, addOps, addRights), token);\n");
+                            sb.append("        }\n");
+                        }
+                    }
+
                     sb.append("        Token working = token;\n");
                     sb.append("        if (working.parser.getClass() != ").append(ruleParserClass).append(") {\n");
                     sb.append("            working = findFirstDescendant(working, ").append(ruleParserClass).append(");\n");
@@ -287,7 +355,7 @@ public class MapperGenerator implements CodeGenerator {
                     sb.append("        ").append(leftType).append(" left = ").append(leftMapper).append(";\n");
                     sb.append("        List<").append(opType).append("> ops = new ArrayList<>();\n");
                     sb.append("        List<").append(rightType).append("> rights = new ArrayList<>();\n");
-                    sb.append("        for (Token repeatToken : findDescendants(working, ").append(repeatParserClass).append(")) {\n");
+                    sb.append("        for (Token repeatToken : findDirectDescendants(working, ").append(repeatParserClass).append(")) {\n");
                     sb.append("            Token opToken = findFirstDescendant(repeatToken, ").append(opParserClass).append(");\n");
                     sb.append("            String opValue = firstTokenText(opToken == null ? repeatToken : opToken);\n");
                     sb.append("            if (opValue != null && !opValue.isEmpty()) {\n");
@@ -512,6 +580,19 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("                results.add(child);\n");
         sb.append("            }\n");
         sb.append("            results.addAll(findDescendants(child, parserClass));\n");
+        sb.append("        }\n");
+        sb.append("        return results;\n");
+        sb.append("    }\n\n");
+
+        sb.append("    static List<Token> findDirectDescendants(Token token, Class<? extends Parser> parserClass) {\n");
+        sb.append("        List<Token> results = new ArrayList<>();\n");
+        sb.append("        if (token == null) {\n");
+        sb.append("            return results;\n");
+        sb.append("        }\n");
+        sb.append("        for (Token child : token.filteredChildren) {\n");
+        sb.append("            if (child.parser.getClass() == parserClass) {\n");
+        sb.append("                results.add(child);\n");
+        sb.append("            }\n");
         sb.append("        }\n");
         sb.append("        return results;\n");
         sb.append("    }\n\n");
