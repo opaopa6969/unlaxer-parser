@@ -1006,6 +1006,63 @@ public class UBNFParsers {
     }
 
     /**
+     * EvalParam: ',' IDENTIFIER '=' STRING_LITERAL
+     * A single key='value' pair inside an @eval annotation.
+     */
+    public static class EvalParamParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                Parser.get(CommaParser.class),
+                Parser.get(IdentifierParser.class),
+                Parser.get(EqualParser.class),
+                Parser.get(SingleQuotedParser.class)
+            );
+        }
+    }
+
+    /**
+     * EvalAnnotation: '@eval' '(' 'kind' '=' STRING_LITERAL [',' 'strategy' '=' STRING_LITERAL] (',' IDENTIFIER '=' STRING_LITERAL)* ')'
+     *
+     * Declares evaluation hints for the code generator.
+     */
+    public static class EvalAnnotationParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                new WordParser("@eval"),
+                Parser.get(LeftParenthesisParser.class),
+                new WordParser("kind"),
+                Parser.get(EqualParser.class),
+                Parser.get(SingleQuotedParser.class),
+                new org.unlaxer.parser.combinator.Optional(
+                    new UBNFLazyChain() {
+                        private static final long serialVersionUID = 1L;
+
+                        @Override
+                        public Parsers getLazyParsers() {
+                            return new Parsers(
+                                Parser.get(CommaParser.class),
+                                new WordParser("strategy"),
+                                Parser.get(EqualParser.class),
+                                Parser.get(SingleQuotedParser.class)
+                            );
+                        }
+                    }
+                ),
+                new ZeroOrMore(
+                    Parser.get(EvalParamParser.class)
+                ),
+                Parser.get(RightParenthesisParser.class)
+            );
+        }
+    }
+
+    /**
      * SkipAnnotation: '@skip'
      * Marks a rule as transparent to the AST token tree.
      */
@@ -1037,7 +1094,7 @@ public class UBNFParsers {
     }
 
     /**
-     * Annotation: RootAnnotation | MappingAnnotation | WhitespaceAnnotation
+     * Annotation: RootAnnotation | MappingAnnotation | EvalAnnotation | WhitespaceAnnotation
      *           | InterleaveAnnotation | BackrefAnnotation | ScopeTreeAnnotation
      *           | DeclaresWithDescriptionAnnotation | DeclaresAnnotation
      *           | CatalogAnnotation | LeftAssocAnnotation | RightAssocAnnotation
@@ -1051,6 +1108,7 @@ public class UBNFParsers {
             return new Parsers(
                 Parser.get(RootAnnotationParser.class),
                 Parser.get(MappingAnnotationParser.class),
+                Parser.get(EvalAnnotationParser.class),
                 Parser.get(WhitespaceAnnotationParser.class),
                 Parser.get(InterleaveAnnotationParser.class),
                 Parser.get(BackrefAnnotationParser.class),

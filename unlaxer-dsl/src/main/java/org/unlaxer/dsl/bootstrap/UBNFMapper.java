@@ -1,7 +1,9 @@
 package org.unlaxer.dsl.bootstrap;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.unlaxer.Parsed;
@@ -19,6 +21,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.ChoiceBody;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GlobalSetting;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.EvalAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.InterleaveAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.KeyValuePair;
 import org.unlaxer.dsl.bootstrap.UBNFAST.LeftAssocAnnotation;
@@ -299,6 +302,8 @@ public class UBNFMapper {
                 result.add(new RootAnnotation());
             } else if (child.parser.getClass() == UBNFParsers.MappingAnnotationParser.class) {
                 result.add(toMappingAnnotation(child));
+            } else if (child.parser.getClass() == UBNFParsers.EvalAnnotationParser.class) {
+                result.add(toEvalAnnotation(child));
             } else if (child.parser.getClass() == UBNFParsers.WhitespaceAnnotationParser.class) {
                 result.add(toWhitespaceAnnotation(child));
             } else if (child.parser.getClass() == UBNFParsers.InterleaveAnnotationParser.class) {
@@ -346,6 +351,34 @@ public class UBNFMapper {
                 .forEach(paramNames::add);
         }
         return new MappingAnnotation(className, List.copyOf(paramNames));
+    }
+
+    static EvalAnnotation toEvalAnnotation(Token token) {
+        // Collect all SingleQuotedParser descendants for positional values
+        List<Token> quoted = findDescendants(
+            token, org.unlaxer.parser.elementary.SingleQuotedParser.class);
+
+        // First quoted value is the 'kind'
+        String kind = quoted.size() > 0 ? stripQuotes(quoted.get(0).source.toString().trim()) : "";
+
+        // Second quoted value (if present) is the 'strategy'
+        String strategy = quoted.size() > 1 ? stripQuotes(quoted.get(1).source.toString().trim()) : "default";
+
+        // Remaining key=value pairs from EvalParamParser children
+        Map<String, String> params = new LinkedHashMap<>();
+        List<Token> evalParams = findDescendants(token, UBNFParsers.EvalParamParser.class);
+        for (Token paramToken : evalParams) {
+            List<Token> ids = findDescendants(paramToken, UBNFParsers.IdentifierParser.class);
+            List<Token> vals = findDescendants(
+                paramToken, org.unlaxer.parser.elementary.SingleQuotedParser.class);
+            if (!ids.isEmpty() && !vals.isEmpty()) {
+                String key = ids.get(0).source.toString().trim();
+                String value = stripQuotes(vals.get(0).source.toString().trim());
+                params.put(key, value);
+            }
+        }
+
+        return new EvalAnnotation(kind, strategy, Map.copyOf(params));
     }
 
     static WhitespaceAnnotation toWhitespaceAnnotation(Token token) {

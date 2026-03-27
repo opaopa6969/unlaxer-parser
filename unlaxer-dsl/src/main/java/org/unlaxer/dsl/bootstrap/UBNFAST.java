@@ -1,6 +1,7 @@
 package org.unlaxer.dsl.bootstrap;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -139,6 +140,7 @@ public sealed interface UBNFAST permits
     sealed interface Annotation extends UBNFAST permits
         UBNFAST.RootAnnotation,
         UBNFAST.MappingAnnotation,
+        UBNFAST.EvalAnnotation,
         UBNFAST.WhitespaceAnnotation,
         UBNFAST.InterleaveAnnotation,
         UBNFAST.BackrefAnnotation,
@@ -159,6 +161,22 @@ public sealed interface UBNFAST permits
     record MappingAnnotation(
         String className,
         List<String> paramNames
+    ) implements Annotation {}
+
+    /**
+     * @eval(kind='binary_arithmetic', strategy='default', strip_prefix='$')
+     *
+     * Declares evaluation hints for the code generator.
+     * <ul>
+     *   <li>kind — evaluation category: "binary_arithmetic", "variable_ref", "conditional", etc.</li>
+     *   <li>strategy — code-gen strategy: "default", "template", "manual"</li>
+     *   <li>params — additional key-value parameters (e.g. strip_prefix="$")</li>
+     * </ul>
+     */
+    record EvalAnnotation(
+        String kind,
+        String strategy,
+        Map<String, String> params
     ) implements Annotation {}
 
     /** @whitespace または @whitespace(style) */
