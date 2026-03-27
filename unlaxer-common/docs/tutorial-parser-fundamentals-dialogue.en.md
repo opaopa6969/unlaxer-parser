@@ -25,6 +25,7 @@
 - [Part 9: AST Filtering and Scope](#part-9-ast-filtering-and-scope)
 - [Part 10: Error Handling and Debugging](#part-10-error-handling-and-debugging)
 - [Part 11: Advanced Topics -- The Road to UBNF](#part-11-advanced-topics--the-road-to-ubnf)
+- [Part 12: Advanced Parsers -- The Forgotten Classes](#part-12-advanced-parsers--the-forgotten-classes)
 - [Appendix A: Parser Glossary](#appendix-a-parser-glossary)
 - [Appendix B: Complete Parser Reference for unlaxer-parser](#appendix-b-complete-parser-reference-for-unlaxer-parser)
 
@@ -3014,7 +3015,7 @@ If `Choice(A, B, C)` isn't working as expected, test A, B, C each individually. 
 
 ## Part 11: Advanced Topics -- The Road to UBNF
 
-[<- Part 10: Error Handling](#part-10-error-handling-and-debugging) | [Next: Appendix A Glossary ->](#appendix-a-parser-glossary)
+[<- Part 10: Error Handling](#part-10-error-handling-and-debugging) | [Next: Part 12 Advanced Parsers ->](#part-12-advanced-parsers--the-forgotten-classes)
 
 ---
 
@@ -3154,13 +3155,242 @@ Part 11: Advanced
 
 ---
 
-[<- Part 10: Error Handling](#part-10-error-handling-and-debugging) | [Next: Appendix A Glossary ->](#appendix-a-parser-glossary)
+[<- Part 10: Error Handling](#part-10-error-handling-and-debugging) | [Next: Part 12 Advanced Parsers ->](#part-12-advanced-parsers--the-forgotten-classes)
+
+---
+
+## Part 12: Advanced Parsers -- The Forgotten Classes
+
+[<- Part 11: Advanced Topics](#part-11-advanced-topics--the-road-to-ubnf) | [Next: Appendix A Glossary ->](#appendix-a-parser-glossary)
+
+---
+
+**Senior**: Actually, I'd forgotten about this, but... there are quite a few parsers in unlaxer-parser that we haven't covered yet.
+
+**Newcomer**: Wait, there are more? I thought we'd covered everything through Part 11.
+
+**Senior**: No, there are some where even I go "Huh, did I write this class?" They're utility-type parsers -- the unsung heroes working behind the scenes.
+
+**Newcomer**: Parsers that even their creator forgot about... Now I'm really curious.
+
+**Senior**: Alright, let me recall them one by one.
+
+---
+
+### 12.1 Flatten -- Flattening Nested Structures
+
+**Senior**: First up is Flatten. It flattens a Chain within a Chain by one level.
+
+**Newcomer**: What do you mean by "flatten"?
+
+**Senior**: For example, Chain(Chain(A, B), C) creates a token tree that's 3 levels deep. With Flatten, the child parser's children become direct children of the Flatten node, making the tree one level shallower.
+
+```java
+// Before: Chain(Chain(A, B), C) → Token tree is 3 levels deep
+// After:  Flatten(Chain(A, B)) → A, B are direct children, tree is 2 levels
+```
+
+**Newcomer**: That seems useful for refactoring when the parser hierarchy gets too deep.
+
+**Senior**: Exactly. When the AST has unnecessary nesting, it's harder to process. Flatten cleans it up nicely.
+
+---
+
+### 12.2 Reverse -- Reverse Order Matching
+
+**Senior**: Next is Reverse. As the name suggests, it reverses the order of a Chain's child parsers.
+
+**Newcomer**: Reverse? As in it internally uses Collections.reverse() to flip the child list?
+
+**Senior**: Yes. Normally matching proceeds left to right, but sometimes you want to try lower-priority parsers first.
+
+**Newcomer**: Couldn't you just write them in that order to begin with...
+
+**Senior**: When you're building parsers programmatically, you sometimes want to change the order after the fact. That's when this comes in handy.
+
+---
+
+### 12.3 TagWrapper / RecursiveTagWrapper -- Controlling the AST with Tags
+
+**Senior**: This one is important. TagWrapper adds or removes a tag (metadata) from a single parser.
+
+**Newcomer**: What kind of tag?
+
+**Senior**: Information used in AST filtering. You specify add or remove using TagWrapperAction. ASTNode and NotASTNode are actually concrete subclasses of this.
+
+**Newcomer**: Oh, so the ASTNode from Part 9 connects here!
+
+**Senior**: Right. And RecursiveTagWrapper applies tags recursively to all descendants. You can control the recursion scope with RecursiveMode -- ALL_CHILDREN for all descendants, DIRECT_CHILDREN for immediate children only.
+
+```java
+// ASTNode(parser) → This parser's tokens are included in filteredChildren
+// NotASTNode(parser) → This parser's tokens are excluded from filteredChildren
+// ASTNodeRecursive(parser) → All descendants are included in filteredChildren
+```
+
+**Newcomer**: There's even an ASTNodeRecursive. You can really fine-tune AST control.
+
+---
+
+### 12.4 ParserWrapper -- Forcing Parameter Overrides
+
+**Senior**: ParserWrapper ignores the TokenKind and invertMatch propagated from the parent and uses fixed values instead.
+
+**Newcomer**: Ignores propagation?
+
+**Senior**: For example, it's used internally by QuotedParser. There are cases where you want the inner parser to operate in consumed mode even when the parent is in matchOnly mode.
+
+```java
+// Even if the parent is in matchOnly mode, the inner parser runs in consumed mode
+new ParserWrapper(name, innerParser, TokenKind.consumed, false)
+```
+
+**Newcomer**: How is this different from MatchOnly?
+
+**Senior**: MatchOnly forces "don't consume." ParserWrapper lets you choose which mode to force. It's a more general-purpose control.
+
+---
+
+### 12.5 ContainerParser\<T\> -- Putting Non-Parser Things in the Parse Tree
+
+**Senior**: ContainerParser is an interesting one. It extends NoneChildParser, so it has no child parsers. Instead, get() returns data of any type T.
+
+**Newcomer**: A parser that doesn't parse?
+
+**Senior**: It's a mechanism for putting error messages and metadata into the parse tree. ErrorMessageParser is a real-world example of this.
+
+```java
+// ErrorMessageParser extends ContainerParser<String>
+// → Inserts error messages as Tokens during parsing
+```
+
+**Newcomer**: I see, so you can use the parse tree as a data container too.
+
+---
+
+### 12.6 PropagationStopper -- Controlling Propagation (All 4 Types)
+
+**Senior**: This is the one I'd forgotten about the most, haha.
+
+**Newcomer**: It makes me nervous when you say that with a laugh...
+
+**Senior**: Remember how TokenKind and invertMatch propagate from parent to child during parsing? Stoppers are parsers that halt this propagation. There are 4 types in total.
+
+| Class | TokenKind | invertMatch | Use Case |
+|--------|-----------|-------------|------|
+| AllPropagationStopper | Stopped -> consumed | Stopped -> false | Complete isolation |
+| DoCounsumePropagationStopper | Stopped -> consumed | Passes through | Force consume mode |
+| InvertMatchPropagationStopper | Passes through | Stopped -> false | Disable inversion logic |
+| NotPropagatableSource | Passes through | Inverted | Logical NOT |
+
+**Newcomer**: DoCounsume... Senior, that's a typo, right? It should be "Consume."
+
+**Senior**: Yeah, it's a typo of Consume. But fixing it would break API compatibility, so it stays.
+
+**Newcomer**: The joys of historical baggage...
+
+**Senior**: A classic programmer's dilemma.
+
+---
+
+### 12.7 Ordered -- The Opposite of NonOrdered
+
+**Senior**: Ordered is almost the same as Chain, but it's a marker that explicitly states "order matters."
+
+**Newcomer**: How is it different from Chain?
+
+**Senior**: Functionally, they're nearly identical. But by using it in contrast with NonOrdered (Interleave), the intent becomes clear. NonOrdered accepts any order; Ordered strictly goes left to right.
+
+**Newcomer**: So it's mainly about documentation value.
+
+**Senior**: Code is written for the people who read it.
+
+---
+
+### 12.8 ChildOccursWithTerminator -- Repetition with Terminators
+
+**Senior**: ChildOccursWithTerminator is the common base class for ZeroOrMore, OneOrMore, Optional, and Repeat.
+
+**Newcomer**: The parent of all repetition parsers.
+
+**Senior**: Right. Its distinctive feature is that it can hold a terminator parser. This lets you express the pattern "repeat until this character appears."
+
+```java
+// Example: Repeat elements until a semicolon appears
+new ZeroOrMore(elementParser, () -> Parser.get(SemiColonParser.class))
+```
+
+**Newcomer**: With a terminator, you can explicitly state when the repetition should end.
+
+**Senior**: It's really useful for parsing CSVs and delimiter-separated lists.
+
+---
+
+### 12.9 MatchOnly vs Not -- The Lookahead Twins
+
+**Senior**: MatchOnly and Not are the twins of lookahead. Neither one consumes input.
+
+**Newcomer**: Lookahead -- those are PEG's & and !, right?
+
+**Senior**: Exactly. Let's look at a concrete example.
+
+```
+Input: "hello"
+
+MatchOnly(WordParser("hello"))
+  → Success (but does not consume. Cursor stays at the start of "hello")
+
+Not(WordParser("hello"))
+  → Failure (the child succeeded, so Not fails)
+
+Not(WordParser("world"))
+  → Success (the child failed, so Not succeeds. Does not consume)
+```
+
+**Newcomer**: MatchOnly is positive lookahead, and Not is negative lookahead.
+
+**Senior**: Precisely. MatchOnly = positive lookahead, Not = negative lookahead. They correspond directly to PEG's & and !.
+
+---
+
+### 12.10 MappedSingleCharacterParserHolder -- Customizing Character Classes
+
+**Senior**: Last one -- MappedSingleCharacterParserHolder. It's a wrapper around MappedSingleCharacterParser.
+
+**Newcomer**: That's quite a long name...
+
+**Senior**: The functionality is simple. newWithout() lets you create a new parser that excludes specific characters.
+
+```java
+// Alphabet but excluding 'x'
+AlphabetParser alphabet = Parser.get(AlphabetParser.class);
+MappedSingleCharacterParserHolder holder = new MappedSingleCharacterParserHolder(alphabet);
+Parser noX = holder.newWithout('x');
+```
+
+**Newcomer**: So you can do something like the regex `[a-wyz]` programmatically.
+
+**Senior**: Exactly. It's useful when you need to dynamically customize character classes.
+
+---
+
+**Newcomer**: So there were this many utility parsers. Ten in total...
+
+**Senior**: In everyday use, the star players like Chain and Or are usually enough, but when you want to do something sophisticated, these supporting cast members really shine.
+
+**Newcomer**: I'm glad these forgotten parsers finally got their moment in the spotlight.
+
+**Senior**: As their creator, I'm reflecting on this. I need to properly maintain the documentation in the next version.
+
+---
+
+[<- Part 11: Advanced Topics](#part-11-advanced-topics--the-road-to-ubnf) | [Next: Appendix A Glossary ->](#appendix-a-parser-glossary)
 
 ---
 
 ## Appendix A: Parser Glossary
 
-[<- Part 11: Advanced Topics](#part-11-advanced-topics--the-road-to-ubnf) | [Next: Appendix B Complete Parser Reference ->](#appendix-b-complete-parser-reference-for-unlaxer-parser)
+[<- Part 12: Advanced Parsers](#part-12-advanced-parsers--the-forgotten-classes) | [Next: Appendix B Complete Parser Reference ->](#appendix-b-complete-parser-reference-for-unlaxer-parser)
 
 ---
 

@@ -25,6 +25,7 @@
 - [Part 9: AST フィルタリングとスコープ](#part-9-ast-フィルタリングとスコープ)
 - [Part 10: エラーハンドリングとデバッグ](#part-10-エラーハンドリングとデバッグ)
 - [Part 11: 応用 -- UBNF への道](#part-11-応用--ubnf-への道)
+- [Part 12: 高度なパーサー -- 知られざるクラスたち](#part-12-高度なパーサー--知られざるクラスたち)
 - [Appendix A: パーサー用語集](#appendix-a-パーサー用語集)
 - [Appendix B: unlaxer-parser 全パーサー一覧](#appendix-b-unlaxer-parser-全パーサー一覧)
 
@@ -3030,7 +3031,7 @@ new WhiteSpaceDelimitedChain(numberParser, new WordParser("+"), numberParser)
 
 ## Part 11: 応用 -- UBNF への道
 
-[← Part 10: エラーハンドリング →](#part-10-エラーハンドリングとデバッグ) | [次: Appendix A 用語集 →](#appendix-a-パーサー用語集)
+[← Part 10: エラーハンドリング →](#part-10-エラーハンドリングとデバッグ) | [次: Part 12 高度なパーサー →](#part-12-高度なパーサー--知られざるクラスたち)
 
 ---
 
@@ -3170,13 +3171,242 @@ Part 11: 応用
 
 ---
 
-[← Part 10: エラーハンドリング →](#part-10-エラーハンドリングとデバッグ) | [次: Appendix A 用語集 →](#appendix-a-パーサー用語集)
+[← Part 10: エラーハンドリング →](#part-10-エラーハンドリングとデバッグ) | [次: Part 12 高度なパーサー →](#part-12-高度なパーサー--知られざるクラスたち)
+
+---
+
+## Part 12: 高度なパーサー -- 知られざるクラスたち
+
+[← Part 11: 応用 →](#part-11-応用--ubnf-への道) | [次: Appendix A 用語集 →](#appendix-a-パーサー用語集)
+
+---
+
+**先輩**: 実は僕も忘れてたんだけど...unlaxer-parser にはまだ紹介してないパーサーが結構あるんだ。
+
+**後輩**: え、まだあるんですか？Part 11 まで来て全部カバーしたと思ってました。
+
+**先輩**: いや、実は自分でも「あれ、こんなクラスあったっけ？」ってなるやつがいくつかある。ユーティリティ系の、縁の下の力持ちたちだ。
+
+**後輩**: 作者が忘れるレベルのパーサー...逆に気になります。
+
+**先輩**: じゃあ、1つずつ思い出しながら紹介していこう。
+
+---
+
+### 12.1 Flatten -- ネストの平坦化
+
+**先輩**: まずは Flatten。これは Chain の中の Chain を1レベル平坦にするパーサーだ。
+
+**後輩**: 平坦にする、というのは？
+
+**先輩**: 例えば、Chain(Chain(A, B), C) だと Token tree が3レベルの深さになる。Flatten を使うと、子パーサーの children をそのまま自分の children にするから、ツリーが1レベル浅くなる。
+
+```java
+// Before: Chain(Chain(A, B), C) → Token tree is 3 levels deep
+// After:  Flatten(Chain(A, B)) → A, B are direct children, tree is 2 levels
+```
+
+**後輩**: パーサー階層が深くなりすぎた時のリファクタリングに使えそうですね。
+
+**先輩**: その通り。AST が無駄にネストしてると処理しにくいからね。Flatten で綺麗に整理できる。
+
+---
+
+### 12.2 Reverse -- 逆順マッチ
+
+**先輩**: 次は Reverse。名前の通り、Chain の子パーサーを逆順にする。
+
+**後輩**: 逆順？内部的に Collections.reverse() で子リストを反転するってことですか？
+
+**先輩**: そう。普通は左から右にマッチしていくけど、優先度の低いパーサーを先に試したいときに使える。
+
+**後輩**: 順番を変えたいなら最初からそう書けばいいのでは...
+
+**先輩**: プログラム的にパーサーを組み立てる場合、後から順番を変えたくなることがあるんだよ。そういう時に便利だ。
+
+---
+
+### 12.3 TagWrapper / RecursiveTagWrapper -- タグでASTをコントロール
+
+**先輩**: これは重要なやつだ。TagWrapper は1つのパーサーにタグ（メタデータ）を付与したり除去したりする。
+
+**後輩**: タグというのは？
+
+**先輩**: AST フィルタリングで使う情報だ。TagWrapperAction で add か remove を指定する。ASTNode と NotASTNode は実はこれの具象クラスなんだ。
+
+**後輩**: あ、Part 9 で出てきた ASTNode がここに繋がるんですね！
+
+**先輩**: そう。そして RecursiveTagWrapper は子孫まで再帰的にタグを適用する。RecursiveMode で再帰範囲を制御できる。ALL_CHILDREN なら全子孫、DIRECT_CHILDREN なら直接の子だけ。
+
+```java
+// ASTNode(parser) → このパーサーのTokenがfilteredChildrenに含まれる
+// NotASTNode(parser) → このパーサーのTokenがfilteredChildrenから除外される
+// ASTNodeRecursive(parser) → 子孫全てがfilteredChildrenに含まれる
+```
+
+**後輩**: ASTNodeRecursive まであるんですか。AST の制御が細かくできるんですね。
+
+---
+
+### 12.4 ParserWrapper -- パラメータの強制上書き
+
+**先輩**: ParserWrapper は、親から伝播される TokenKind と invertMatch を無視して固定値を使うパーサーだ。
+
+**後輩**: 伝播を無視する？
+
+**先輩**: 例えば QuotedParser の内部で使われている。親が matchOnly モードでも、中のパーサーは consumed モードで動いてほしい場面があるんだ。
+
+```java
+// 親が matchOnly モードでも、中のパーサーは consumed モードで動く
+new ParserWrapper(name, innerParser, TokenKind.consumed, false)
+```
+
+**後輩**: MatchOnly との違いは何ですか？
+
+**先輩**: MatchOnly は「消費しない」を強制する。ParserWrapper は「どんなモードを強制するか」を選べる。より汎用的なコントロールだね。
+
+---
+
+### 12.5 ContainerParser\<T\> -- パーサーじゃない物をパースツリーに入れる
+
+**先輩**: ContainerParser は面白いやつだ。NoneChildParser を継承していて、子パーサーがない。代わりに get() で任意の型 T のデータを返す。
+
+**後輩**: パーサーなのにパースしないんですか？
+
+**先輩**: パースツリーにエラーメッセージやメタデータを載せるための仕組みだ。ErrorMessageParser がこれの実例だよ。
+
+```java
+// ErrorMessageParser extends ContainerParser<String>
+// → パース中にエラーメッセージをTokenとして挿入
+```
+
+**後輩**: なるほど、パースツリーをデータの入れ物としても使えるわけですね。
+
+---
+
+### 12.6 PropagationStopper -- 伝播の制御（全4種）
+
+**先輩**: これは一番忘れてたやつだなw
+
+**後輩**: 先輩が笑いながら言うと不安になります...
+
+**先輩**: Parse 時に TokenKind と invertMatch が親から子に伝播するという話は覚えてる？Stopper はこの伝播を止めるパーサーだ。全部で4種類ある。
+
+| クラス | TokenKind | invertMatch | 用途 |
+|--------|-----------|-------------|------|
+| AllPropagationStopper | 停止→consumed | 停止→false | 完全遮断 |
+| DoCounsumePropagationStopper | 停止→consumed | 通過 | 消費モード強制 |
+| InvertMatchPropagationStopper | 通過 | 停止→false | 反転ロジック無効化 |
+| NotPropagatableSource | 通過 | 反転 | 論理NOT |
+
+**後輩**: DoCounsume... 先輩、これ typo ですよね？Consume の。
+
+**先輩**: うん、Consume の typo。でも直すと API 互換性壊れるから残してる。
+
+**後輩**: 歴史的経緯ってやつですね...
+
+**先輩**: プログラマーあるあるだ。
+
+---
+
+### 12.7 Ordered -- NonOrdered の反対
+
+**先輩**: Ordered は Chain とほぼ同じだけど「順序が重要」であることを明示するマーカーだ。
+
+**後輩**: Chain と何が違うんですか？
+
+**先輩**: 機能的にはほぼ同じ。でも NonOrdered（Interleave）と対比して使うことで、意図が明確になる。NonOrdered はどの順番でも OK、Ordered は必ず左から右だ。
+
+**後輩**: ドキュメンテーションとしての意味が大きいんですね。
+
+**先輩**: コードは読む人のために書くものだからね。
+
+---
+
+### 12.8 ChildOccursWithTerminator -- 終端付き繰り返し
+
+**先輩**: ChildOccursWithTerminator は ZeroOrMore, OneOrMore, Optional, Repeat の共通基底クラスだ。
+
+**後輩**: 繰り返し系のパーサーの親玉ですね。
+
+**先輩**: そう。特徴的なのは terminator（終端パーサー）を持てること。「この文字が来るまで繰り返す」というパターンが表現できる。
+
+```java
+// 例: セミコロンが来るまで要素を繰り返す
+new ZeroOrMore(elementParser, () -> Parser.get(SemiColonParser.class))
+```
+
+**後輩**: terminator があると、繰り返しの終了条件を明示できるんですね。
+
+**先輩**: CSV のパースや、区切り文字付きリストの処理で重宝するよ。
+
+---
+
+### 12.9 MatchOnly vs Not -- 先読みの双子
+
+**先輩**: MatchOnly と Not は先読み（lookahead）の双子だ。どちらも入力を消費しない。
+
+**後輩**: 先読みって、PEG の & と ! ですよね？
+
+**先輩**: その通り。具体例を見てみよう。
+
+```
+入力: "hello"
+
+MatchOnly(WordParser("hello"))
+  → 成功（ただし消費しない。カーソルは "hello" の先頭のまま）
+
+Not(WordParser("hello"))
+  → 失敗（子が成功したので Not は失敗）
+
+Not(WordParser("world"))
+  → 成功（子が失敗したので Not は成功。消費しない）
+```
+
+**後輩**: MatchOnly が正の先読み、Not が負の先読みですね。
+
+**先輩**: 正確だ。MatchOnly = positive lookahead、Not = negative lookahead。PEG の & と ! にそのまま対応する。
+
+---
+
+### 12.10 MappedSingleCharacterParserHolder -- 文字クラスのカスタマイズ
+
+**先輩**: 最後は MappedSingleCharacterParserHolder。MappedSingleCharacterParser のラッパーだ。
+
+**後輩**: 名前が長いですね...
+
+**先輩**: 機能はシンプルだよ。newWithout() で特定の文字を除外した新しいパーサーを作れる。
+
+```java
+// アルファベットだけど 'x' は除外
+AlphabetParser alphabet = Parser.get(AlphabetParser.class);
+MappedSingleCharacterParserHolder holder = new MappedSingleCharacterParserHolder(alphabet);
+Parser noX = holder.newWithout('x');
+```
+
+**後輩**: 正規表現の `[a-wyz]` みたいなことがプログラム的にできるんですね。
+
+**先輩**: そう。文字クラスを動的にカスタマイズしたい場面で使える。
+
+---
+
+**後輩**: こんなにユーティリティパーサーがあったんですね。全部で10個...
+
+**先輩**: 普段は Chain とか Or とかの主役級パーサーだけで事足りるけど、凝ったことをしようとすると、こういう脇役たちが効いてくる。
+
+**後輩**: 忘れられてたパーサーたちに光が当たって良かったです。
+
+**先輩**: 作者として反省してる。次のバージョンではドキュメントもちゃんと整備しないとな。
+
+---
+
+[← Part 11: 応用 →](#part-11-応用--ubnf-への道) | [次: Appendix A 用語集 →](#appendix-a-パーサー用語集)
 
 ---
 
 ## Appendix A: パーサー用語集
 
-[← Part 11: 応用 →](#part-11-応用--ubnf-への道) | [次: Appendix B 全パーサー一覧 →](#appendix-b-unlaxer-parser-全パーサー一覧)
+[← Part 12: 高度なパーサー →](#part-12-高度なパーサー--知られざるクラスたち) | [次: Appendix B 全パーサー一覧 →](#appendix-b-unlaxer-parser-全パーサー一覧)
 
 ---
 
