@@ -3525,6 +3525,105 @@ Parser noX = holder.newWithout('x');
 
 ---
 
+### 12.11 MatchedTokenParser -- 先読みした内容を再マッチ
+
+**後輩**: 「MatchedTokenParser って何ですか？MatchOnly とは違う？」
+
+**先輩**: 「MatchOnly は先読みするだけ。MatchedTokenParser は先読みで**覚えた内容**を後で再利用する。実はこれ、PEG の理論的限界を超えてるんだよ」
+
+**後輩**: 「え？PEG って万能じゃないんですか？」
+
+**先輩**: 「PEG は文脈自由言語を認識できるけど、**回文**（abcba みたいな前から読んでも後ろから読んでも同じ文字列）は認識できないことが知られてる。でも unlaxer ならできる」
+
+**後輩**: 「どうやって？」
+
+**先輩**: 「見てみよう。実際のテストコードがあるんだ」
+
+```java
+// 基本パターン: MatchOnly + MatchedTokenParser
+OneOrMore words = new OneOrMore(AsciiParser.class);
+MatchOnly wordLookahead = new MatchOnly(words);
+MatchedTokenParser matchedTokenParser = new MatchedTokenParser(wordLookahead);
+
+Chain chain = new Chain(
+    wordLookahead,        // 先読みして単語全体を覚える
+    matchedTokenParser    // 覚えた内容を再マッチ
+);
+testAllMatch(chain, "abcba", true);  // 回文にマッチ！
+```
+
+**先輩**: 「これが基本形。でも回文判定には5つのアプローチがある」
+
+#### アプローチ 1: sliceWithWord -- 単語を直接操作
+
+```java
+// 覚えた単語を前半・中央・後半に分割し、後半を反転して比較
+matchedTokenParser.sliceWithWord(word -> {
+    boolean hasPivot = word.length() % 2 == 1;
+    int halfSize = (word.length() - (hasPivot ? 1 : 0)) / 2;
+    return word.cursorRange(new CodePointIndex(0), new CodePointIndex(halfSize),
+        SourceKind.subSource, word.positionResolver());
+})
+```
+
+#### アプローチ 2: sliceWithSlicer -- Slicer API で操作
+
+```java
+// Slicer API を使ってスライス範囲を指定
+matchedTokenParser.slice(slicer -> {
+    boolean hasPivot = slicer.length() % 2 == 1;
+    slicer.end(new CodePointIndex((slicer.length() - (hasPivot ? 1 : 0)) / 2));
+})
+```
+
+#### アプローチ 3: effect -- 文字列変換で再マッチ
+
+```java
+// StringBuilder.reverse() で反転した文字列と再マッチ
+matchedTokenParser.effect(word ->
+    StringSource.createDetachedSource(new StringBuilder(word).reverse().toString()))
+```
+
+#### アプローチ 4: slice + step(-1) -- ステップ指定で反転
+
+```java
+// step(-1) で逆順にスライス
+matchedTokenParser.slice(slicer -> slicer.step(-1))
+```
+
+#### アプローチ 5: pythonian -- Python スライス記法
+
+```java
+// Python の [::-1] と同じ！
+matchedTokenParser.slice(slicer -> slicer.pythonian("::-1"))
+```
+
+**後輩**: 「え、Python の `[::-1]` が使えるんですか？」
+
+**先輩**: 「そう。`pythonian()` メソッドで Python のスライス記法をそのまま使える」
+
+**後輩**: 「これ、回文判定を1行で書けるってことですよね...」
+
+**先輩**: 「しかもパーサーコンビネータとして合成可能。他のパーサーと組み合わせて『回文で始まる文字列』とか書ける」
+
+**後輩**: 「PEG の限界を超えてるのに、記法は PEG と同じくらいシンプル...」
+
+**先輩**: 「コンビネータならできるだろって感覚なんだけどね。理論家は驚くかもしれないけどw」
+
+---
+
+#### MatchedTokenParser API まとめ
+
+| メソッド | 説明 |
+|---------|------|
+| `MatchedTokenParser(MatchOnly lookahead)` | 先読みパーサーを受け取ってインスタンスを生成 |
+| `.slice(consumer)` | 覚えた内容をスライスして再マッチ |
+| `.sliceWithWord(function)` | 覚えた単語に関数を適用して部分文字列を取得 |
+| `.effect(function)` | 覚えた内容を変換して再マッチ |
+| `.pythonian(string)` | Python スライス記法（例: `"::-1"` で反転） |
+
+---
+
 [← Part 11: 応用 →](#part-11--応用----ubnf-への道) | [次: Appendix A 用語集 →](#appendix-a-パーサー用語集)
 
 ---

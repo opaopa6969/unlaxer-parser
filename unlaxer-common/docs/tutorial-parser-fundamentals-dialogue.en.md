@@ -3509,6 +3509,106 @@ Parser noX = holder.newWithout('x');
 
 ---
 
+### 12.11 MatchedTokenParser -- Re-matching Lookahead Content
+
+**Newcomer**: What is MatchedTokenParser? Is it different from MatchOnly?
+
+**Senior**: MatchOnly just performs lookahead. MatchedTokenParser **remembers** the content from the lookahead and reuses it later. This actually goes **beyond the theoretical limits of PEG**.
+
+**Newcomer**: Wait, isn't PEG supposed to be universal?
+
+**Senior**: PEG can recognize context-free languages, but it's known that PEG **cannot recognize palindromes** -- strings like "abcba" that read the same forwards and backwards. But unlaxer can.
+
+**Newcomer**: How?
+
+**Senior**: Let me show you. There's actual test code for this.
+
+```java
+// Basic pattern: MatchOnly + MatchedTokenParser
+OneOrMore words = new OneOrMore(AsciiParser.class);
+MatchOnly wordLookahead = new MatchOnly(words);
+MatchedTokenParser matchedTokenParser = new MatchedTokenParser(wordLookahead);
+
+Chain chain = new Chain(
+    wordLookahead,        // Lookahead to remember the entire word
+    matchedTokenParser    // Re-match using the remembered content
+);
+testAllMatch(chain, "abcba", true);  // Matches a palindrome!
+```
+
+**Senior**: That's the basic form. But there are five different approaches to palindrome detection.
+
+#### Approach 1: sliceWithWord -- Direct Word Manipulation
+
+```java
+// Split the remembered word into first half, center, and second half,
+// then reverse the second half for comparison
+matchedTokenParser.sliceWithWord(word -> {
+    boolean hasPivot = word.length() % 2 == 1;
+    int halfSize = (word.length() - (hasPivot ? 1 : 0)) / 2;
+    return word.cursorRange(new CodePointIndex(0), new CodePointIndex(halfSize),
+        SourceKind.subSource, word.positionResolver());
+})
+```
+
+#### Approach 2: sliceWithSlicer -- Using the Slicer API
+
+```java
+// Use the Slicer API to specify the slice range
+matchedTokenParser.slice(slicer -> {
+    boolean hasPivot = slicer.length() % 2 == 1;
+    slicer.end(new CodePointIndex((slicer.length() - (hasPivot ? 1 : 0)) / 2));
+})
+```
+
+#### Approach 3: effect -- String Transformation and Re-match
+
+```java
+// Reverse using StringBuilder.reverse() and re-match
+matchedTokenParser.effect(word ->
+    StringSource.createDetachedSource(new StringBuilder(word).reverse().toString()))
+```
+
+#### Approach 4: slice + step(-1) -- Reversing with Step
+
+```java
+// Slice in reverse order with step(-1)
+matchedTokenParser.slice(slicer -> slicer.step(-1))
+```
+
+#### Approach 5: pythonian -- Python Slice Notation
+
+```java
+// Same as Python's [::-1]!
+matchedTokenParser.slice(slicer -> slicer.pythonian("::-1"))
+```
+
+**Newcomer**: Wait, you can use Python's `[::-1]`?
+
+**Senior**: Yes. The `pythonian()` method lets you use Python's slice notation directly.
+
+**Newcomer**: So you can write palindrome detection in a single line...
+
+**Senior**: And it's composable as a parser combinator. You can combine it with other parsers to write things like "a string that starts with a palindrome."
+
+**Newcomer**: It goes beyond PEG's limits, yet the notation is as simple as PEG...
+
+**Senior**: For me it just feels natural that a combinator should be able to do this. Theorists might be surprised though!
+
+---
+
+#### MatchedTokenParser API Summary
+
+| Method | Description |
+|--------|-------------|
+| `MatchedTokenParser(MatchOnly lookahead)` | Constructs an instance that takes a lookahead parser |
+| `.slice(consumer)` | Slices the remembered content and re-matches |
+| `.sliceWithWord(function)` | Applies a function to the remembered word to extract a substring |
+| `.effect(function)` | Transforms the remembered content and re-matches |
+| `.pythonian(string)` | Python slice notation (e.g., `"::-1"` for reversal) |
+
+---
+
 [<- Part 11: Advanced Topics](#part-11-advanced-topics--the-road-to-ubnf) | [Next: Appendix A Glossary ->](#appendix-a-parser-glossary)
 
 ---
