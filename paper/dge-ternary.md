@@ -539,6 +539,36 @@ TernaryExpression ::=
 
 この決定により G-04, G-05, G-06, G-07 が全て解決。
 
+### LSP リファクタリング: if ↔ ternary 変換
+
+作者: 「LSP で if ↔ ternary 変換のショートカットコマンドみたいなことは可能かね？」
+
+千石: 「D-01 で同じ IfExpr AST に変換すると決めましたから、これは非常に簡単です。AST は同じ、表面の構文だけが違う。LSP の CodeAction で:」
+
+```
+💡 "Convert to ternary"  — if式にカーソルがあるとき
+   if($price > 100){ $price * 0.9 }else{ $price }
+     ↓
+   ($price > 100 ? $price * 0.9 : $price)
+
+💡 "Convert to if-else"  — ternaryにカーソルがあるとき
+   ($price > 100 ? $price * 0.9 : $price)
+     ↓
+   if($price > 100){ $price * 0.9 }else{ $price }
+```
+
+今泉: 「同じ AST だから、逆方向のテキスト生成するだけってことですか？」
+
+千石: 「その通りです。NODE_SOURCE_SPANS でソース位置も分かりますから、置換範囲も特定できます。」
+
+作者: 「カッコがあれば ternary も読みやすいでしょ。if が冗長な時はワンクリックで変換できる。」
+
+ヤン: 「これ、`@mapping` が AST ↔ テキストの双方向変換を保証してるからできる技だね。UBNF の設計が効いてる。」
+
+  → **Backlog 追加: LSP CodeAction — if ↔ ternary 双方向変換**
+  → **Backlog 追加: LSP CodeAction — if chain → match 変換**
+  → **Backlog 追加: LSP CodeAction — Extract/Inline variable**
+
 ---
 
 ## Observe → Suggest → Act
