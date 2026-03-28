@@ -506,6 +506,41 @@ Phase 3: 型安全強化（オプション）
 
 ---
 
+## Addendum: 作者レビュー — 括弧必須の確定
+
+DGE Step 2（人間レビュー）で作者から以下のフィードバック:
+
+作者: 「`(bool ? a : b)` だと曖昧は残る？」
+
+Claude: 「外側の括弧があれば `?` と `:` のスコープが明確。ネスト禁止（D-03）と組み合わせれば曖昧さゼロ。」
+
+作者: 「僕はそれが安全だと思う。`bool ? a : b` は自然だけど、これはバグの温床。処理系の話だけじゃなく、プログラマが意図しない tree になる可能性がある。僕はいつも多段の時はカッコつけてるよ！」
+
+  → **D-08（追加）: ternary は外側の括弧を必須とする。`(condition ? then : else)` 形式のみ。**
+
+根拠:
+- 処理系の安全性（パーサーの曖昧さ排除）
+- **プログラマの安全性**（意図しないtreeを防ぐ）
+- DSLのユーザーはプログラマだけじゃなくビジネスの人もいる
+- 括弧があれば誰でも読める
+
+文法（確定版）:
+
+```ubnf
+@mapping(IfExpr, params=[condition, thenExpr, elseExpr])
+TernaryExpression ::=
+  '(' BooleanExpression @condition '?' Expression @thenExpr ':' Expression @elseExpr ')' ;
+```
+
+ネストは括弧で明示:
+```
+($a > 0 ? ($b > 0 ? 1 : 2) : 3)
+```
+
+この決定により G-04, G-05, G-06, G-07 が全て解決。
+
+---
+
 ## Observe → Suggest → Act
 
 ### O-S-A 1: 文法への TernaryExpr 追加
