@@ -10,6 +10,7 @@
 |---|-------------|------|
 | 1 | [5分で始める（Quick Start）](./quickstart-dialogue.ja.md) | 先輩と後輩の会話形式で学ぶクイックスタート -- 文法を書いて四則演算言語を50行で作る |
 | 2 | [UBNF から LSP/DAP までチュートリアル](./tutorial-ubnf-to-lsp-dap-dialogue.ja.md) | 先輩と後輩の会話形式で学ぶ包括的チュートリアル -- UBNF文法、コード生成パイプライン、AST構造、GGP、5つのバックエンド、@eval戦略、LSP、DAP |
+| 3 | [LLM時代とUnlaxer](./llm-era-and-unlaxer-dialogue.ja.md) | 会話で考える「フレームワークはまだ要るのか」 |
 
 ## その他のドキュメント
 
