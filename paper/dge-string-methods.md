@@ -164,23 +164,62 @@ Primary  ::= VariableRef | FunctionCall | '(' Expression ')'
 
 ヤン: 「僕もそう思う。チェーンは便利だけど、パーサーの複雑さが指数的に上がる。1段のドットメソッドだけにしよう。」
 
-  → **Gap 発見: ドット記法のチェーン深度を1段に制限するか、任意深度にするか。1段制限なら PEG の実装は単純。任意深度なら左再帰的パターンの処理が必要で PEG との相性が悪い。**
+今泉: 「ちょっと待ってください。そもそもの質問なんですけど、左から右にパースしていったら左辺の型って確定しませんか？」
 
-今泉: 「前もそうだったっけ？ 他の DSL でドットチェーンを1段に制限してる例ってあるんですか？」
+ヤン: 「...どういうこと？」
 
-ヤン: 「JEXL とか SpEL はチェーン可能だけど、あれは汎用式言語だからね。tinyexpression は業務ルール DSL だから、制限しても問題ないと思う。」
+今泉: 「`$name.toUpperCase().startsWith('HE')` をパースするとき:
+1. `$name` → String 型が確定
+2. `.toUpperCase()` → String を受けて String を返す。型が確定
+3. `.startsWith('HE')` → String を受けて Boolean を返す。型が確定
+各ステップで左辺の型が分かってますよね？」
 
-リヴァイ: 「PEG で左再帰を処理するには反復構文（`{ '.' method '(' args ')' }`）に書き換える。パーサーは VariableRef を受け取った後、`'.' method '(' args ')'` が繰り返しゼロ回以上続くかチェックする。1段制限なら `?`（オプション）でいい。」
+ヤン: 「......ああ。PEG の `{ }` (ZeroOrMore) で書けばいいのか。」
+
+```ubnf
+// 任意深度チェーン — 左再帰にならない！
+StringExpression ::= StringAtom { StringMethodChain } ;
+StringMethodChain ::= '.' StringMethodName '(' Arguments ')' ;
+```
+
+今泉: 「要するに、チェーンを『サポートするかどうか』という設計判断じゃなくて、左から型が確定するなら自動的にチェーンが可能になるってことですよね？ 制限する方がむしろ不自然じゃないですか？」
+
+千石: 「今泉さんの言う通りです。PEG の反復構文で自然にチェーンが書ける。1段制限は人為的な制約であって、パーサーの都合ではありません。」
+
+リヴァイ: 「...確かに。反復構文なら実装も1段と変わらない。」
+
+ヤン: 「ただし型遷移は考える必要がある。String→String のメソッド（toUpperCase, trim）はチェーン可能だけど、String→Number（length）や String→Boolean（startsWith）はチェーンの終端になる。」
 
 ```
-// 1段制限
-StringDotMethod ::= VariableRef '.' MethodName '(' Arguments ')'
-
-// 任意深度（左再帰回避）
-DotChain ::= VariableRef { '.' MethodName '(' Arguments ')' }
+$name              : String
+  .toUpperCase()   : String → String  (チェーン可能)
+  .trim()          : String → String  (チェーン可能)
+  .length()        : String → Number  (チェーン終端)
+  .startsWith('x') : String → Boolean (チェーン終端)
 ```
 
-  → **Gap 発見: PEG で左再帰的ドットチェーンを処理する場合、反復構文への書き換えが必要。この書き換えで AST の構造が変わる（フラットなリストになる vs ネストした木構造）。AST をどちらの形にするかの設計判断が必要。**
+今泉: 「パーサーレベルで型チェックするんですか？」
+
+ヤン: 「文法で分ければいい。StringChainable と StringTerminal を分ける。」
+
+```ubnf
+// String→String メソッド（チェーン可能）
+StringChainableMethod ::= '.toUpperCase' '(' ')' | '.toLowerCase' '(' ')' | '.trim' '(' ')' ;
+
+// String→Other メソッド（チェーン終端）
+StringTerminalToNumber  ::= '.length' '(' ')' ;
+StringTerminalToBoolean ::= '.startsWith' '(' Args ')' | '.contains' '(' Args ')' ;
+
+// チェーン構文
+StringChainExpr ::= StringAtom { StringChainableMethod } ;
+// 終端メソッドはチェーンの最後にだけ来る
+NumberFromString  ::= StringChainExpr StringTerminalToNumber ;
+BooleanFromString ::= StringChainExpr StringTerminalToBoolean ;
+```
+
+千石: 「これなら型安全がパーサーレベルで保証されます。`$name.startsWith('he').length()` は文法的に受理されない。正しい設計です。」
+
+  → **Gap 発見（修正）: ドットチェーンは制限不要。ZeroOrMore で自然に実現できる。ただし StringChainable（String→String）と StringTerminal（String→Other）の区別が文法レベルで必要。**
 
 ---
 
@@ -405,7 +444,7 @@ Phase 3 (要望次第):
 
 | # | 決定事項 | 根拠 | Scene |
 |---|---------|------|-------|
-| D-01 | ドットチェーンは1段に制限する | PEG パーサーの複雑さを抑える。業務ルール DSL に多段チェーンは不要 | Scene 4 |
+| D-01 | ドットチェーンは段数制限なし。StringChainable (String→String) と StringTerminal (String→Other) を文法で区別 | 左から型が確定するため ZeroOrMore で自然に実現可能。制限する方が不自然（今泉の指摘）。型安全はパーサーレベルで保証 | Scene 4 |
 | D-02 | どちらの記法でも同じ AST を生成する | Evaluator を1つに保つ。パーサーだけ2通り | Scene 5 |
 | D-03 | canonical は内部概念。ユーザーには両方を対等に提示する | ユーザー体験を損なわない | Scene 8 |
 | D-04 | `length` は括弧ありメソッド形式 `$s.length()` で統一する | プロパティアクセスは新しい文法カテゴリが必要で複雑さが増す | Scene 8 |
