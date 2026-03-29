@@ -1,0 +1,39 @@
+{
+  "name": "ubnf-lsp",
+  "displayName": "UBNF Language Support",
+  "description": "Syntax highlighting, completion, and diagnostics for UBNF grammar files",
+  "version": "0.1.0",
+  "publisher": "unlaxer",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:ubnf"
+  ],
+  "main": "./src/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "ubnf",
+        "aliases": [
+          "UBNF",
+          "Unlaxer BNF"
+        ],
+        "extensions": [
+          ".ubnf"
+        ],
+        "configuration": "./config/language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "ubnf",
+        "scopeName": "source.ubnf",
+        "path": "./syntaxes/ubnf.tmLanguage.json"
+      }
+    ]
+  }
+}

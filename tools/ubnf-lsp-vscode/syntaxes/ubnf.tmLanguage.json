@@ -1,0 +1,166 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "UBNF",
+  "scopeName": "source.ubnf",
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#grammar-block" },
+    { "include": "#annotation" },
+    { "include": "#token-decl" },
+    { "include": "#rule-decl-operator" },
+    { "include": "#keyword" },
+    { "include": "#string" },
+    { "include": "#capture-name" },
+    { "include": "#operator" },
+    { "include": "#identifier" }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.line.double-slash.ubnf",
+      "match": "//.*$"
+    },
+
+    "grammar-block": {
+      "match": "\\b(grammar)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+      "captures": {
+        "1": { "name": "keyword.control.grammar.ubnf" },
+        "2": { "name": "entity.name.type.grammar.ubnf" }
+      }
+    },
+
+    "token-decl": {
+      "match": "\\b(token)\\s+([A-Z_][A-Z0-9_]*)\\s*(=)\\s*([A-Za-z_][A-Za-z0-9_]*)",
+      "captures": {
+        "1": { "name": "keyword.control.token.ubnf" },
+        "2": { "name": "entity.name.type.token.ubnf" },
+        "3": { "name": "keyword.operator.assignment.ubnf" },
+        "4": { "name": "entity.name.class.parser.ubnf" }
+      }
+    },
+
+    "annotation": {
+      "patterns": [
+        { "include": "#annotation-with-params" },
+        { "include": "#annotation-simple" },
+        { "include": "#global-setting" }
+      ]
+    },
+
+    "annotation-with-params": {
+      "begin": "(@(?:mapping|interleave|backref|scopeTree|precedence|typeof|whitespace|eval|catalog))\\s*(\\()",
+      "beginCaptures": {
+        "1": { "name": "storage.type.annotation.ubnf" },
+        "2": { "name": "punctuation.paren.open.ubnf" }
+      },
+      "end": "\\)",
+      "endCaptures": {
+        "0": { "name": "punctuation.paren.close.ubnf" }
+      },
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#string" },
+        {
+          "name": "keyword.other.param-keyword.ubnf",
+          "match": "\\b(params|profile|name|mode|level|kind|strategy)\\b"
+        },
+        {
+          "name": "punctuation.separator.ubnf",
+          "match": "[,=]"
+        },
+        {
+          "name": "punctuation.bracket.open.ubnf",
+          "match": "\\["
+        },
+        {
+          "name": "punctuation.bracket.close.ubnf",
+          "match": "\\]"
+        },
+        {
+          "name": "entity.name.class.mapping-target.ubnf",
+          "match": "\\b[A-Z][A-Za-z0-9_]*\\b"
+        },
+        {
+          "name": "variable.parameter.ubnf",
+          "match": "\\b[a-z][A-Za-z0-9_]*\\b"
+        },
+        {
+          "name": "constant.numeric.ubnf",
+          "match": "\\b[0-9]+\\b"
+        }
+      ]
+    },
+
+    "annotation-simple": {
+      "name": "storage.type.annotation.ubnf",
+      "match": "@(root|mapping|leftAssoc|rightAssoc|precedence|eval|interleave|whitespace|declares|backref|catalog|scopeTree|skip|doc|typeof|package|comment)\\b"
+    },
+
+    "global-setting": {
+      "match": "(@[a-zA-Z_][a-zA-Z0-9_]*)\\s*(:)",
+      "captures": {
+        "1": { "name": "storage.type.annotation.ubnf" },
+        "2": { "name": "punctuation.separator.key-value.ubnf" }
+      }
+    },
+
+    "capture-name": {
+      "name": "variable.other.capture.ubnf",
+      "match": "@([a-z][A-Za-z0-9_]*)(?!\\s*[:(])",
+      "captures": {
+        "0": { "name": "variable.other.capture.ubnf" }
+      }
+    },
+
+    "keyword": {
+      "patterns": [
+        {
+          "name": "keyword.control.grammar.ubnf",
+          "match": "\\b(grammar|token)\\b"
+        }
+      ]
+    },
+
+    "rule-decl-operator": {
+      "name": "keyword.operator.definition.ubnf",
+      "match": "::="
+    },
+
+    "string": {
+      "name": "string.quoted.single.ubnf",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.ubnf",
+          "match": "\\\\."
+        }
+      ]
+    },
+
+    "operator": {
+      "patterns": [
+        {
+          "name": "keyword.operator.choice.ubnf",
+          "match": "\\|"
+        },
+        {
+          "name": "punctuation.terminator.rule.ubnf",
+          "match": ";"
+        }
+      ]
+    },
+
+    "identifier": {
+      "patterns": [
+        {
+          "name": "entity.name.type.rule-ref.ubnf",
+          "match": "\\b[A-Z][A-Za-z0-9_]*\\b"
+        },
+        {
+          "name": "variable.other.rule-ref.ubnf",
+          "match": "\\b[a-z][A-Za-z0-9_]*\\b"
+        }
+      ]
+    }
+  }
+}
