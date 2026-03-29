@@ -7,11 +7,13 @@ import java.util.Collections;
 import java.util.Collection;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.unlaxer.CodePointIndex;
 import org.unlaxer.CodePointLength;
@@ -72,6 +74,10 @@ public class ParseContext implements
   List<String> expectedParsersAtFarthestFailure = new ArrayList<String>();
   List<ParseFailureDiagnostics.ExpectedHintCandidate> expectedHintCandidatesAtFarthestFailure =
       new ArrayList<ParseFailureDiagnostics.ExpectedHintCandidate>();
+
+  // Trial recording for enriched parse failure diagnostics
+  private List<ParseFailureDiagnostics.TrialRecord> trialHistory = new ArrayList<>();
+  private boolean recordingTrials = false;
 	
 	public ParseContext(Source source, ParseContextEffector... parseContextEffectors) {
 	  parseContextByThread.set(this);
@@ -101,6 +107,25 @@ public class ParseContext implements
 		}
 		onClose(this);
 	}
+
+  // --- Trial recording API ---
+
+  public void startTrialRecording() {
+    recordingTrials = true;
+    trialHistory.clear();
+  }
+
+  public void stopTrialRecording() {
+    recordingTrials = false;
+  }
+
+  public List<ParseFailureDiagnostics.TrialRecord> getTrialHistory() {
+    return Collections.unmodifiableList(trialHistory);
+  }
+
+  public boolean isRecordingTrials() {
+    return recordingTrials;
+  }
 
 	@Override
 	public Map<Name, TransactionListener> getTransactionListenerByName() {
@@ -209,6 +234,18 @@ public class ParseContext implements
       if (parsed != null && parsed.isFailed()) {
         registerFailureCandidate(frame);
       }
+      // Record trial if trial recording is active
+      if (recordingTrials) {
+        int endPos = Transaction.super.getConsumedPosition().value();
+        boolean succeeded = parsed != null && parsed.isSucceeded();
+        int consumed = endPos - frame.startOffset;
+        trialHistory.add(new ParseFailureDiagnostics.TrialRecord(
+            parser.getClass().getSimpleName(),
+            frame.startOffset,
+            endPos,
+            succeeded,
+            consumed));
+      }
       parseFrames.pollFirst();
     }
     ParserListenerContainer.super.endParse(parser, parsed, parseContext, tokenKind, invertMatch);
@@ -221,6 +258,26 @@ public class ParseContext implements
     int column = source.codePointIndexInLineFrom(codePointIndex).value();
     List<ParseFailureDiagnostics.ParseStackElement> stack =
         farthestFailureStackElements.isEmpty() ? maxReachedStackElements : farthestFailureStackElements;
+
+    // Compute expected tokens from trial history and hint candidates
+    Set<String> expectedTokens = computeExpectedTokens();
+
+    // Find deepest matched rule and position
+    String deepestRule = "";
+    int deepestPos = 0;
+    for (ParseFailureDiagnostics.TrialRecord trial : trialHistory) {
+      if (trial.isSucceeded() && trial.getConsumed() > deepestPos) {
+        deepestPos = trial.getConsumed();
+        deepestRule = trial.getParserName();
+      }
+    }
+    // Also check stack elements for deepest matched rule
+    if (deepestRule.isEmpty() && !stack.isEmpty()) {
+      ParseFailureDiagnostics.ParseStackElement deepest = stack.get(stack.size() - 1);
+      deepestRule = deepest.getParserClassName();
+      deepestPos = Math.max(deepest.getMaxConsumedOffset(), deepest.getMaxMatchedOffset());
+    }
+
     return new ParseFailureDiagnostics(
         effectiveOffset,
         farthestConsumedOffset,
@@ -230,7 +287,45 @@ public class ParseContext implements
         stack,
         expectedParsersAtFarthestFailure,
         expectedHintCandidatesAtFarthestFailure,
-        farthestFailureOffset >= 0);
+        farthestFailureOffset >= 0,
+        trialHistory,
+        expectedTokens,
+        deepestRule,
+        deepestPos);
+  }
+
+  /**
+   * Compute expected tokens at the failure point by analyzing trial history
+   * and expected hint candidates.
+   */
+  Set<String> computeExpectedTokens() {
+    Set<String> tokens = new HashSet<>();
+
+    // Add from expected hint candidates (these come from TerminalSymbol analysis)
+    for (ParseFailureDiagnostics.ExpectedHintCandidate candidate : expectedHintCandidatesAtFarthestFailure) {
+      String hint = candidate.getDisplayHint();
+      if (hint != null && !hint.isBlank()) {
+        tokens.add(hint);
+      }
+    }
+
+    // Add from expectedParsersAtFarthestFailure
+    for (String parser : expectedParsersAtFarthestFailure) {
+      if (parser != null && !parser.isBlank()) {
+        tokens.add(parser);
+      }
+    }
+
+    // Analyze trial history: failed trials at the farthest failure offset
+    // indicate what was expected there
+    int failOffset = farthestFailureOffset >= 0 ? farthestFailureOffset : maxReachedOffset;
+    for (ParseFailureDiagnostics.TrialRecord trial : trialHistory) {
+      if (!trial.isSucceeded() && trial.getStartPosition() == failOffset && trial.getConsumed() == 0) {
+        tokens.add(trial.getParserName());
+      }
+    }
+
+    return tokens;
   }
 
   void trackCursorProgress() {
