@@ -24,9 +24,10 @@ public class LSPLauncherGenerator implements CodeGenerator {
         sb.append("import org.eclipse.lsp4j.jsonrpc.Launcher;\n");
         sb.append("\n");
 
-        sb.append("public class ").append(launcherClass).append(" {\n");
-        sb.append("    public static void main(String[] args) throws IOException {\n");
-        sb.append("        ").append(serverClass).append(" server = new ").append(serverClass).append("();\n");
+        sb.append("public abstract class ").append(launcherClass).append(" {\n\n");
+        sb.append("    protected abstract ").append(serverClass).append(" createServer();\n\n");
+        sb.append("    public void launch() throws IOException {\n");
+        sb.append("        ").append(serverClass).append(" server = createServer();\n");
         sb.append("        Launcher<LanguageClient> launcher =\n");
         sb.append("            LSPLauncher.createServerLauncher(server, System.in, System.out);\n");
         sb.append("        server.connect(launcher.getRemoteProxy());\n");

@@ -50,16 +50,16 @@ public class DAPGenerator implements CodeGenerator {
         sb.append("import org.unlaxer.parser.Parser;\n");
         sb.append("\n");
 
-        sb.append("public class ").append(adapterClass).append(" implements IDebugProtocolServer {\n\n");
+        sb.append("public abstract class ").append(adapterClass).append(" implements IDebugProtocolServer {\n\n");
 
         // fields
-        sb.append("    private IDebugProtocolClient client;\n");
-        sb.append("    private String pendingProgram;\n");
-        sb.append("    private String runtimeMode = \"token\";\n");
-        sb.append("    private boolean stopOnEntry;\n");
-        sb.append("    private String sourceContent = \"\";\n");
-        sb.append("    private List<Token> stepPoints = new ArrayList<>();\n");
-        sb.append("    private int stepIndex = 0;\n");
+        sb.append("    protected IDebugProtocolClient client;\n");
+        sb.append("    protected String pendingProgram;\n");
+        sb.append("    protected String runtimeMode = \"token\";\n");
+        sb.append("    protected boolean stopOnEntry;\n");
+        sb.append("    protected String sourceContent = \"\";\n");
+        sb.append("    protected List<Token> stepPoints = new ArrayList<>();\n");
+        sb.append("    protected int stepIndex = 0;\n");
         sb.append("    private int astNodeCount = 0;\n");
         sb.append("    private List<String> astNodeTypes = new ArrayList<>();\n");
         sb.append("    private List<int[]> astNodeSpans = new ArrayList<>();\n");
@@ -145,7 +145,9 @@ public class DAPGenerator implements CodeGenerator {
         // next() - advance one step
         sb.append("    @Override\n");
         sb.append("    public CompletableFuture<Void> next(NextArguments args) {\n");
+        sb.append("        onBeforeStep(stepIndex + 1, currentStepLabel());\n");
         sb.append("        stepIndex++;\n");
+        sb.append("        onAfterStep(stepIndex, currentStepLabel());\n");
         sb.append("        if (stepIndex >= stepLimit()) {\n");
         sb.append("            sendOutput(\"stdout\", \"Completed: \" + pendingProgram + \"\\n\");\n");
         sb.append("            sendTerminated();\n");
@@ -309,6 +311,8 @@ public class DAPGenerator implements CodeGenerator {
         sb.append("                runtimeVar.setVariablesReference(0);\n");
         sb.append("                vars.add(runtimeVar);\n");
         sb.append("            }\n");
+        sb.append("            java.util.List<Variable> extraVars = additionalVariables();\n");
+        sb.append("            if (extraVars != null) { vars.addAll(extraVars); }\n");
         sb.append("            response.setVariables(vars.toArray(new Variable[0]));\n");
         sb.append("        } else {\n");
         sb.append("            List<Variable> vars = new ArrayList<>();\n");
@@ -320,6 +324,8 @@ public class DAPGenerator implements CodeGenerator {
         sb.append("                runtimeVar.setVariablesReference(0);\n");
         sb.append("                vars.add(runtimeVar);\n");
         sb.append("            }\n");
+        sb.append("            java.util.List<Variable> extraVars = additionalVariables();\n");
+        sb.append("            if (extraVars != null) { vars.addAll(extraVars); }\n");
         sb.append("            response.setVariables(vars.toArray(new Variable[0]));\n");
         sb.append("        }\n");
         sb.append("        return CompletableFuture.completedFuture(response);\n");
@@ -635,6 +641,23 @@ public class DAPGenerator implements CodeGenerator {
         sb.append("            }\n");
         sb.append("        }\n");
         sb.append("        return line;\n");
+        sb.append("    }\n\n");
+
+        // --- GGP Hook methods (protected, default empty implementations) ---
+
+        sb.append("    // Hook: called before each step execution\n");
+        sb.append("    protected void onBeforeStep(int stepIndex, String stepLabel) {\n");
+        sb.append("        // Override to add pre-step logic\n");
+        sb.append("    }\n\n");
+
+        sb.append("    // Hook: called after each step execution\n");
+        sb.append("    protected void onAfterStep(int stepIndex, String stepLabel) {\n");
+        sb.append("        // Override to add post-step logic\n");
+        sb.append("    }\n\n");
+
+        sb.append("    // Hook: additional variables to display in debugger\n");
+        sb.append("    protected java.util.List<Variable> additionalVariables() {\n");
+        sb.append("        return java.util.Collections.emptyList();\n");
         sb.append("    }\n\n");
 
         // sendOutput()

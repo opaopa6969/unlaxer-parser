@@ -62,7 +62,7 @@ public class LSPGenerator implements CodeGenerator {
         }
         sb.append("\n");
 
-        sb.append("public class ").append(serverClass)
+        sb.append("public abstract class ").append(serverClass)
           .append(" implements LanguageServer, LanguageClientAware {\n\n");
 
         // KEYWORDS field
@@ -73,8 +73,8 @@ public class LSPGenerator implements CodeGenerator {
         }
         sb.append(");\n\n");
 
-        sb.append("    private LanguageClient client;\n");
-        sb.append("    private final Map<String, DocumentState> documents = new HashMap<>();\n\n");
+        sb.append("    protected LanguageClient client;\n");
+        sb.append("    protected final Map<String, DocumentState> documents = new HashMap<>();\n\n");
 
         // Catalog infrastructure fields (when @catalog annotation present)
         if (hasCatalog) {
@@ -103,6 +103,7 @@ public class LSPGenerator implements CodeGenerator {
         sb.append("        semanticTokensOptions.setLegend(new SemanticTokensLegend(\n");
         sb.append("            List.of(\"valid\", \"invalid\"), List.of()));\n");
         sb.append("        capabilities.setSemanticTokensProvider(semanticTokensOptions);\n");
+        sb.append("        configureAdditionalCapabilities(capabilities);\n");
         sb.append("        return CompletableFuture.completedFuture(new InitializeResult(capabilities));\n");
         sb.append("    }\n\n");
 
@@ -199,6 +200,10 @@ public class LSPGenerator implements CodeGenerator {
         sb.append("            diagnostic.setMessage(\"Parse error at offset \" + errorStart);\n");
         sb.append("            diagnostics.add(diagnostic);\n");
         sb.append("        }\n");
+        sb.append("        java.util.List<Diagnostic> additional = additionalDiagnostics(uri, content);\n");
+        sb.append("        if (additional != null && !additional.isEmpty()) {\n");
+        sb.append("            diagnostics.addAll(additional);\n");
+        sb.append("        }\n");
         sb.append("        client.publishDiagnostics(new PublishDiagnosticsParams(uri, diagnostics));\n");
         sb.append("    }\n\n");
 
@@ -215,6 +220,37 @@ public class LSPGenerator implements CodeGenerator {
         sb.append("            }\n");
         sb.append("        }\n");
         sb.append("        return new Position(line, column);\n");
+        sb.append("    }\n\n");
+
+        // --- GGP Hook methods (protected, default empty implementations) ---
+
+        sb.append("    // Hook: additional completion items (for metadata, language-specific keywords)\n");
+        sb.append("    protected java.util.List<CompletionItem> additionalCompletionItems(\n");
+        sb.append("            CompletionParams params, String documentContent) {\n");
+        sb.append("        return java.util.Collections.emptyList();\n");
+        sb.append("    }\n\n");
+
+        sb.append("    // Hook: additional diagnostics (for semantic validation)\n");
+        sb.append("    protected java.util.List<Diagnostic> additionalDiagnostics(\n");
+        sb.append("            String uri, String documentContent) {\n");
+        sb.append("        return java.util.Collections.emptyList();\n");
+        sb.append("    }\n\n");
+
+        sb.append("    // Hook: custom definition (for cross-references like dependsOn)\n");
+        sb.append("    protected org.eclipse.lsp4j.LocationLink customDefinition(\n");
+        sb.append("            DefinitionParams params, String documentContent) {\n");
+        sb.append("        return null;\n");
+        sb.append("    }\n\n");
+
+        sb.append("    // Hook: additional semantic tokens (for embedded languages like Java code blocks)\n");
+        sb.append("    protected int[] additionalSemanticTokenData(String uri, String documentContent) {\n");
+        sb.append("        return new int[0];\n");
+        sb.append("    }\n\n");
+
+        sb.append("    // Hook: configure additional server capabilities\n");
+        sb.append("    protected void configureAdditionalCapabilities(\n");
+        sb.append("            ServerCapabilities capabilities) {\n");
+        sb.append("        // Override to add capabilities\n");
         sb.append("    }\n\n");
 
         // Catalog infrastructure methods
@@ -303,6 +339,13 @@ public class LSPGenerator implements CodeGenerator {
         sb.append("                item.setKind(CompletionItemKind.Keyword);\n");
         sb.append("                items.add(item);\n");
         sb.append("            }\n");
+        sb.append("            String uri = params.getTextDocument().getUri();\n");
+        sb.append("            DocumentState state = server.documents.get(uri);\n");
+        sb.append("            String content = state != null ? state.content() : \"\";\n");
+        sb.append("            java.util.List<CompletionItem> additional = server.additionalCompletionItems(params, content);\n");
+        sb.append("            if (additional != null && !additional.isEmpty()) {\n");
+        sb.append("                items.addAll(additional);\n");
+        sb.append("            }\n");
         sb.append("            return CompletableFuture.completedFuture(Either.forLeft(items));\n");
         sb.append("        }\n\n");
 
@@ -334,6 +377,12 @@ public class LSPGenerator implements CodeGenerator {
         sb.append("            DocumentState state = server.documents.get(uri);\n");
         sb.append("            if (state == null) {\n");
         sb.append("                return CompletableFuture.completedFuture(new SemanticTokens(Collections.emptyList()));\n");
+        sb.append("            }\n");
+        sb.append("            int[] tokenData = server.additionalSemanticTokenData(uri, state.content());\n");
+        sb.append("            if (tokenData != null && tokenData.length > 0) {\n");
+        sb.append("                List<Integer> data = new ArrayList<>();\n");
+        sb.append("                for (int v : tokenData) { data.add(v); }\n");
+        sb.append("                return CompletableFuture.completedFuture(new SemanticTokens(data));\n");
         sb.append("            }\n");
         sb.append("            return CompletableFuture.completedFuture(new SemanticTokens(Collections.emptyList()));\n");
         sb.append("        }\n");
