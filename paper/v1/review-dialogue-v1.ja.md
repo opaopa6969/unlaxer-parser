@@ -1,5 +1,7 @@
 # 査読会話劇: ["From Grammar to IDE"](./from-grammar-to-ide.ja.md) v1 査読プロセス
 
+**[English version](./review-dialogue-v1.en.md)**
+
 ## 登場人物
 
 - **R1** (理論家/圏論原理主義者): 形式意味論と圏論的構造を重視。証明のない主張は「単なるエンジニアリングレポート」と見なす。

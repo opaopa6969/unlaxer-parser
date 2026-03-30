@@ -19,10 +19,10 @@
 
 | Ver | ドキュメント |
 |-----|-------------|
-| v1 | [査読会話劇: "From Grammar to IDE" v1 査読プロセス](./v1/review-dialogue-v1.ja.md) |
-| v2 | [査読会話劇 第2ラウンド: "From Grammar to IDE" v2 査読プロセス](./v2/review-dialogue-v2.ja.md) |
-| v4 | [査読会話劇 第3ラウンド: "From Grammar to IDE" v4 査読プロセス](./v4/review-dialogue-v4.ja.md) |
-| v5 | [査読会話劇 最終ラウンド: "From Grammar to IDE" v5 査読プロセス](./v5/review-dialogue-v5.ja.md) |
+| v1 | 査読会話劇: "From Grammar to IDE" v1 査読プロセス ([JA](./v1/review-dialogue-v1.ja.md) / [EN](./v1/review-dialogue-v1.en.md)) |
+| v2 | 査読会話劇 第2ラウンド: "From Grammar to IDE" v2 査読プロセス ([JA](./v2/review-dialogue-v2.ja.md) / [EN](./v2/review-dialogue-v2.en.md)) |
+| v4 | 査読会話劇 第3ラウンド: "From Grammar to IDE" v4 査読プロセス ([JA](./v4/review-dialogue-v4.ja.md) / [EN](./v4/review-dialogue-v4.en.md)) |
+| v5 | 査読会話劇 最終ラウンド: "From Grammar to IDE" v5 査読プロセス ([JA](./v5/review-dialogue-v5.ja.md) / [EN](./v5/review-dialogue-v5.en.md)) |
 
 ## DGE（Design Gap Exploration）セッション
 
