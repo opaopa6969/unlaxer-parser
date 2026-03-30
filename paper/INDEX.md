@@ -24,22 +24,6 @@
 | v4 | [査読会話劇 第3ラウンド: "From Grammar to IDE" v4 査読プロセス](./v4/review-dialogue-v4.ja.md) |
 | v5 | [査読会話劇 最終ラウンド: "From Grammar to IDE" v5 査読プロセス](./v5/review-dialogue-v5.ja.md) |
 
-## 論文バージョン
-
-| Ver | ドキュメント |
-|-----|-------------|
-| v1 | 文法からIDEへ: 単一の文法仕様からのパーサ、AST、評価器、LSP、DAPの統一的生成 ([JA](./v1/from-grammar-to-ide.ja.md) / [EN](./v1/from-grammar-to-ide.en.md)) |
-| v2 | From Grammar to IDE: 単一の文法仕様からのパーサ、AST、エバリュエータ、LSP、DAPの統一生成 ([JA](./v2/from-grammar-to-ide.ja.md) / [EN](./v2/from-grammar-to-ide.en.md)) |
-| v3 | 文法からIDEへ: 単一の文法仕様からのパーサー、AST、エバリュエータ、LSP、DAPの統一生成 ([JA](./v3/from-grammar-to-ide.ja.md) / [EN](./v3/from-grammar-to-ide.en.md)) |
-| v4 | 文法からIDEへ：単一文法仕様からのパーサー、AST、エバリュエータ、LSP、DAPの統一生成 ([JA](./v4/from-grammar-to-ide.ja.md) / [EN](./v4/from-grammar-to-ide.en.md)) |
-| v5 | 文法からIDEへ：単一文法仕様からのパーサー、AST、エバリュエータ、LSP、DAPの統一生成 ([JA](./v5/from-grammar-to-ide.ja.md) / [EN](./v5/from-grammar-to-ide.en.md)) |
-
-## 補遺
-
-| ドキュメント |
-|-------------|
-| [Addendum: Macro PEG Reference](./v2/ADDENDUM-macro-peg.md) |
-
 ## DGE（Design Gap Exploration）セッション
 
 | ドキュメント |
@@ -58,6 +42,22 @@
 | [P4TypedAstEvaluator での MethodInvocation と External 呼び出しの実装](./dge-method-invocation-and-externals.md) |
 | [残りの機能ギャップ — String連結, inTimeRange, String slice](./dge-remaining-gaps.md) |
 | [UBNF 用 VSCode 拡張 (VSIX) の設計](./dge-ubnf-vsix.md) |
+
+## 論文バージョン
+
+| Ver | ドキュメント |
+|-----|-------------|
+| v1 | 文法からIDEへ: 単一の文法仕様からのパーサ、AST、評価器、LSP、DAPの統一的生成 ([JA](./v1/from-grammar-to-ide.ja.md) / [EN](./v1/from-grammar-to-ide.en.md)) |
+| v2 | From Grammar to IDE: 単一の文法仕様からのパーサ、AST、エバリュエータ、LSP、DAPの統一生成 ([JA](./v2/from-grammar-to-ide.ja.md) / [EN](./v2/from-grammar-to-ide.en.md)) |
+| v3 | 文法からIDEへ: 単一の文法仕様からのパーサー、AST、エバリュエータ、LSP、DAPの統一生成 ([JA](./v3/from-grammar-to-ide.ja.md) / [EN](./v3/from-grammar-to-ide.en.md)) |
+| v4 | 文法からIDEへ：単一文法仕様からのパーサー、AST、エバリュエータ、LSP、DAPの統一生成 ([JA](./v4/from-grammar-to-ide.ja.md) / [EN](./v4/from-grammar-to-ide.en.md)) |
+| v5 | 文法からIDEへ：単一文法仕様からのパーサー、AST、エバリュエータ、LSP、DAPの統一生成 ([JA](./v5/from-grammar-to-ide.ja.md) / [EN](./v5/from-grammar-to-ide.en.md)) |
+
+## 補遺
+
+| ドキュメント |
+|-------------|
+| [Addendum: Macro PEG Reference](./v2/ADDENDUM-macro-peg.md) |
 
 ## バックログ
 
