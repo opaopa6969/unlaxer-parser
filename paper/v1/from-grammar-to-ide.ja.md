@@ -777,3 +777,14 @@ public class TinyCalcEvaluatorImpl extends TinyCalcEvaluator<Double> {
 ---
 
 *ACM SIGPLAN International Conference on Software Language Engineering (SLE), 2026 に投稿。*
+
+---
+
+## ナビゲーション
+
+[← インデックスに戻る](../INDEX.md)
+
+| 論文 (JA) | 査読 |
+|-----------|------|
+| **v1 — 現在** | [v1 査読](./review-dialogue-v1.ja.md) |
+| [v2 論文 →](../v2/from-grammar-to-ide.ja.md) | [v2 査読](../v2/review-dialogue-v2.ja.md) |

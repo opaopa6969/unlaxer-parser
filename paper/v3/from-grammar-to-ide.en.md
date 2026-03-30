@@ -1036,3 +1036,15 @@ Notable properties:
 ---
 
 *Accepted at the ACM SIGPLAN International Conference on Software Language Engineering (SLE), 2026.*
+
+---
+
+## Navigation
+
+[← Back to Index](../INDEX.md)
+
+| Paper (EN) | Review |
+|------------|--------|
+| [← v2 Paper](../v2/from-grammar-to-ide.en.md) | [v2 Review](../v2/review-dialogue-v2.ja.md) |
+| **v3 — current** | — |
+| [v4 Paper →](../v4/from-grammar-to-ide.en.md) | [v4 Review](../v4/review-dialogue-v4.ja.md) |

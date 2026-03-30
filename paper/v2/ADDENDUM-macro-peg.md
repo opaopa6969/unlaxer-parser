@@ -15,3 +15,9 @@ The MatchedTokenParser design was inspired by Macro PEG [Mizushima 2016], which 
 | PEG (Ford 2004) | Grammar notation | No | No |
 | Macro PEG (Mizushima) | Parameterized rules | Yes (grammar-level) | No |
 | unlaxer MatchedTokenParser | Combinator-level capture | Yes (object-level) | Yes (LSP/DAP) |
+
+---
+
+## ナビゲーション
+
+[← インデックスに戻る](../INDEX.md) | [v2 論文](./from-grammar-to-ide.ja.md) | [v2 査読](./review-dialogue-v2.ja.md)

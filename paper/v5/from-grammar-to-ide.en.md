@@ -1448,3 +1448,14 @@ The unresolved gaps are tracked as known limitations and are primarily related t
 ---
 
 *Accepted at the ACM SIGPLAN International Conference on Software Language Engineering (SLE), 2026.*
+
+---
+
+## Navigation
+
+[← Back to Index](../INDEX.md)
+
+| Paper (EN) | Review |
+|------------|--------|
+| [← v4 Paper](../v4/from-grammar-to-ide.en.md) | [v4 Review](../v4/review-dialogue-v4.ja.md) |
+| **v5 — current** | [v5 Review](./review-dialogue-v5.ja.md) |

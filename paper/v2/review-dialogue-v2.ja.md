@@ -898,3 +898,15 @@ Camera-ready 提出期限は4週間後です。
 *v1の査読（Weak Reject / Weak Accept / Reject）から、v2の査読（Borderline Accept / Accept / Weak Accept）への変化と、Accept with Minor Revisions の決定に至るPC議論を含む。*
 
 *全ての査読コメントは架空のものであるが、技術的内容は実際の論文の改善点を反映している。*
+
+---
+
+## ナビゲーション
+
+[← インデックスに戻る](../INDEX.md)
+
+| 査読 | 対応する論文 |
+|------|-------------|
+| [← v1 査読](../v1/review-dialogue-v1.ja.md) | [v1 論文](../v1/from-grammar-to-ide.ja.md) |
+| **v2 査読 — 現在** | [v2 論文](./from-grammar-to-ide.ja.md) |
+| [v4 査読 →](../v4/review-dialogue-v4.ja.md) | [v4 論文](../v4/from-grammar-to-ide.ja.md) |

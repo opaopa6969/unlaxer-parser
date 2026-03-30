@@ -777,3 +777,14 @@ This 35-line grammar and 17-line evaluator produce a complete calculator with pa
 ---
 
 *Submitted to the ACM SIGPLAN International Conference on Software Language Engineering (SLE), 2026.*
+
+---
+
+## Navigation
+
+[← Back to Index](../INDEX.md)
+
+| Paper (EN) | Review |
+|------------|--------|
+| **v1 — current** | [v1 Review](./review-dialogue-v1.ja.md) |
+| [v2 Paper →](../v2/from-grammar-to-ide.en.md) | [v2 Review](../v2/review-dialogue-v2.ja.md) |

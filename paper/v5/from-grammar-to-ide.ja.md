@@ -1397,3 +1397,14 @@ public class TinyCalcEvaluatorImpl extends TinyCalcEvaluator<Double> {
 | `DoConsumePropagationStopper` | `consumed` | 親の値 | matchOnlyコンテキスト内で消費を強制 |
 | `InvertMatchPropagationStopper` | 親の値 | `false` | NOT意味論のサブパーサーへの伝播を防止 |
 | `NotPropagatableSource` | 親の値 | `!親の値` | 反転フラグを反転して論理NOTを実装 |
+
+---
+
+## ナビゲーション
+
+[← インデックスに戻る](../INDEX.md)
+
+| 論文 (JA) | 査読 |
+|-----------|------|
+| [← v4 論文](../v4/from-grammar-to-ide.ja.md) | [v4 査読](../v4/review-dialogue-v4.ja.md) |
+| **v5 — 現在** | [v5 査読](./review-dialogue-v5.ja.md) |

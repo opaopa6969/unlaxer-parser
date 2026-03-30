@@ -765,3 +765,15 @@ Minor revision要求として以下を記録します：
 *R3の最後の言葉を借りれば：Don't make me regret this.*
 
 *著者の返答：月間10億トランザクションが、その答えだ。*
+
+---
+
+## ナビゲーション
+
+[← インデックスに戻る](../INDEX.md)
+
+| 査読 | 対応する論文 |
+|------|-------------|
+| [← v2 査読](../v2/review-dialogue-v2.ja.md) | [v2 論文](../v2/from-grammar-to-ide.ja.md) |
+| **v4 査読 — 現在** | [v4 論文](./from-grammar-to-ide.ja.md) |
+| [v5 査読 →](../v5/review-dialogue-v5.ja.md) | [v5 論文](../v5/from-grammar-to-ide.ja.md) |
