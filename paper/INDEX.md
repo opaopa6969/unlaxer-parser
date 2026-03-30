@@ -6,6 +6,15 @@
 
 ---
 
+## 査読会話劇
+
+| Ver | ドキュメント |
+|-----|-------------|
+| v1 | [査読会話劇: "From Grammar to IDE" v1 査読プロセス](./v1/review-dialogue-v1.ja.md) |
+| v2 | [査読会話劇 第2ラウンド: "From Grammar to IDE" v2 査読プロセス](./v2/review-dialogue-v2.ja.md) |
+| v4 | [査読会話劇 第3ラウンド: "From Grammar to IDE" v4 査読プロセス](./v4/review-dialogue-v4.ja.md) |
+| v5 | [査読会話劇 最終ラウンド: "From Grammar to IDE" v5 査読プロセス](./v5/review-dialogue-v5.ja.md) |
+
 ## 論文バージョン
 
 | Ver | ドキュメント |
@@ -20,15 +29,6 @@
 | v4 | [From Grammar to IDE: Unified Generation of Parser, AST, Evaluator, LSP, and DAP from a Single Grammar Specification (EN)](./v4/from-grammar-to-ide.en.md) |
 | v5 | [文法からIDEへ：単一文法仕様からのパーサー、AST、エバリュエータ、LSP、DAPの統一生成 (JA)](./v5/from-grammar-to-ide.ja.md) |
 | v5 | [From Grammar to IDE: Unified Generation of Parser, AST, Evaluator, LSP, and DAP from a Single Grammar Specification (EN)](./v5/from-grammar-to-ide.en.md) |
-
-## 査読会話劇
-
-| Ver | ドキュメント |
-|-----|-------------|
-| v1 | [査読会話劇: "From Grammar to IDE" v1 査読プロセス](./v1/review-dialogue-v1.ja.md) |
-| v2 | [査読会話劇 第2ラウンド: "From Grammar to IDE" v2 査読プロセス](./v2/review-dialogue-v2.ja.md) |
-| v4 | [査読会話劇 第3ラウンド: "From Grammar to IDE" v4 査読プロセス](./v4/review-dialogue-v4.ja.md) |
-| v5 | [査読会話劇 最終ラウンド: "From Grammar to IDE" v5 査読プロセス](./v5/review-dialogue-v5.ja.md) |
 
 ## 補遺
 
