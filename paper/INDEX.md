@@ -28,16 +28,11 @@
 
 | Ver | ドキュメント |
 |-----|-------------|
-| v1 | [文法からIDEへ: 単一の文法仕様からのパーサ、AST、評価器、LSP、DAPの統一的生成 (JA)](./v1/from-grammar-to-ide.ja.md) |
-| v1 | [From Grammar to IDE: Unified Generation of Parser, AST, Evaluator, LSP, and DAP from a Single Grammar Specification (EN)](./v1/from-grammar-to-ide.en.md) |
-| v2 | [From Grammar to IDE: 単一の文法仕様からのパーサ、AST、エバリュエータ、LSP、DAPの統一生成 (JA)](./v2/from-grammar-to-ide.ja.md) |
-| v2 | [From Grammar to IDE: Unified Generation of Parser, AST, Evaluator, LSP, and DAP from a Single Grammar Specification (EN)](./v2/from-grammar-to-ide.en.md) |
-| v3 | [文法からIDEへ: 単一の文法仕様からのパーサー、AST、エバリュエータ、LSP、DAPの統一生成 (JA)](./v3/from-grammar-to-ide.ja.md) |
-| v3 | [From Grammar to IDE: Unified Generation of Parser, AST, Evaluator, LSP, and DAP from a Single Grammar Specification (EN)](./v3/from-grammar-to-ide.en.md) |
-| v4 | [文法からIDEへ：単一文法仕様からのパーサー、AST、エバリュエータ、LSP、DAPの統一生成 (JA)](./v4/from-grammar-to-ide.ja.md) |
-| v4 | [From Grammar to IDE: Unified Generation of Parser, AST, Evaluator, LSP, and DAP from a Single Grammar Specification (EN)](./v4/from-grammar-to-ide.en.md) |
-| v5 | [文法からIDEへ：単一文法仕様からのパーサー、AST、エバリュエータ、LSP、DAPの統一生成 (JA)](./v5/from-grammar-to-ide.ja.md) |
-| v5 | [From Grammar to IDE: Unified Generation of Parser, AST, Evaluator, LSP, and DAP from a Single Grammar Specification (EN)](./v5/from-grammar-to-ide.en.md) |
+| v1 | 文法からIDEへ: 単一の文法仕様からのパーサ、AST、評価器、LSP、DAPの統一的生成 ([JA](./v1/from-grammar-to-ide.ja.md) / [EN](./v1/from-grammar-to-ide.en.md)) |
+| v2 | From Grammar to IDE: 単一の文法仕様からのパーサ、AST、エバリュエータ、LSP、DAPの統一生成 ([JA](./v2/from-grammar-to-ide.ja.md) / [EN](./v2/from-grammar-to-ide.en.md)) |
+| v3 | 文法からIDEへ: 単一の文法仕様からのパーサー、AST、エバリュエータ、LSP、DAPの統一生成 ([JA](./v3/from-grammar-to-ide.ja.md) / [EN](./v3/from-grammar-to-ide.en.md)) |
+| v4 | 文法からIDEへ：単一文法仕様からのパーサー、AST、エバリュエータ、LSP、DAPの統一生成 ([JA](./v4/from-grammar-to-ide.ja.md) / [EN](./v4/from-grammar-to-ide.en.md)) |
+| v5 | 文法からIDEへ：単一文法仕様からのパーサー、AST、エバリュエータ、LSP、DAPの統一生成 ([JA](./v5/from-grammar-to-ide.ja.md) / [EN](./v5/from-grammar-to-ide.en.md)) |
 
 ## 補遺
 
