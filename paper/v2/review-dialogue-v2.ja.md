@@ -1,4 +1,4 @@
-# 査読会話劇 第2ラウンド: "From Grammar to IDE" v2 査読プロセス
+# 査読会話劇 第2ラウンド: ["From Grammar to IDE"](./from-grammar-to-ide.ja.md) v2 査読プロセス
 
 ## 登場人物
 
