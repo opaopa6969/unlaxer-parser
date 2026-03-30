@@ -1,5 +1,7 @@
 # 架空論文 & DGE セッション
 
+**[English version](./INDEX.en.md)**
+
 > **本ドキュメント群はすべてフィクションです。**
 >
 > 架空の論文「From Grammar to IDE」を執筆し、それを DGE（Design Gap Exploration）手法で査読会話劇に仕立てたものです。
