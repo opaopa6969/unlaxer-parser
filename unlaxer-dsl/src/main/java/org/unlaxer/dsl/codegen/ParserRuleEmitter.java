@@ -27,6 +27,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.TerminalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.WhitespaceAnnotation;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -199,6 +200,92 @@ class ParserRuleEmitter {
     }
 
     /**
+     * Computes FOLLOW tokens for a rule by scanning the grammar for all references
+     * to the rule and collecting terminal elements that appear immediately after.
+     */
+    static List<String> computeFollowTokens(ParserGenerator.GenContext ctx, String ruleName) {
+        LinkedHashSet<String> tokens = new LinkedHashSet<>();
+        for (RuleDecl rule : ctx.grammar.rules()) {
+            collectFollowFromBody(rule.body(), ruleName, tokens);
+        }
+        return new ArrayList<>(tokens);
+    }
+
+    private static void collectFollowFromBody(RuleBody body, String targetRule, LinkedHashSet<String> tokens) {
+        switch (body) {
+            case ChoiceBody choice -> {
+                for (SequenceBody alt : choice.alternatives()) {
+                    collectFollowFromSequence(alt, targetRule, tokens);
+                }
+            }
+            case SequenceBody seq -> collectFollowFromSequence(seq, targetRule, tokens);
+        }
+    }
+
+    private static void collectFollowFromSequence(SequenceBody seq, String targetRule, LinkedHashSet<String> tokens) {
+        List<AnnotatedElement> elements = seq.elements();
+        for (int i = 0; i < elements.size(); i++) {
+            AtomicElement elem = elements.get(i).element();
+            // Direct reference: look at what follows
+            if (elem instanceof RuleRefElement ref && ref.name().equals(targetRule)) {
+                if (i + 1 < elements.size()) {
+                    collectFirstTerminals(elements.get(i + 1).element(), tokens);
+                }
+            }
+            // Reference inside a repeat: { TargetRule } — look at what follows the repeat
+            if (elem instanceof RepeatElement rep) {
+                if (containsRuleRef(rep.body(), targetRule)) {
+                    if (i + 1 < elements.size()) {
+                        collectFirstTerminals(elements.get(i + 1).element(), tokens);
+                    }
+                }
+                collectFollowFromBody(rep.body(), targetRule, tokens);
+            }
+            if (elem instanceof GroupElement g) {
+                collectFollowFromBody(g.body(), targetRule, tokens);
+            }
+            if (elem instanceof OptionalElement opt) {
+                collectFollowFromBody(opt.body(), targetRule, tokens);
+            }
+        }
+    }
+
+    private static void collectFirstTerminals(AtomicElement elem, LinkedHashSet<String> tokens) {
+        switch (elem) {
+            case TerminalElement t -> tokens.add(t.value());
+            case GroupElement g -> collectFirstTerminalsFromBody(g.body(), tokens);
+            default -> {}
+        }
+    }
+
+    private static void collectFirstTerminalsFromBody(RuleBody body, LinkedHashSet<String> tokens) {
+        switch (body) {
+            case ChoiceBody choice -> {
+                for (SequenceBody alt : choice.alternatives()) {
+                    if (false == alt.elements().isEmpty()) {
+                        collectFirstTerminals(alt.elements().get(0).element(), tokens);
+                    }
+                }
+            }
+            case SequenceBody seq -> {
+                if (false == seq.elements().isEmpty()) {
+                    collectFirstTerminals(seq.elements().get(0).element(), tokens);
+                }
+            }
+        }
+    }
+
+    private static boolean containsRuleRef(RuleBody body, String targetRule) {
+        return switch (body) {
+            case ChoiceBody choice -> choice.alternatives().stream()
+                .anyMatch(alt -> alt.elements().stream()
+                    .anyMatch(ae -> ae.element() instanceof RuleRefElement ref && ref.name().equals(targetRule)));
+            case SequenceBody seq -> seq.elements().stream()
+                .anyMatch(ae -> ae.element() instanceof RuleRefElement ref && ref.name().equals(targetRule));
+        };
+    }
+
+    /**
      * Returns the RecoveryAnnotation for the given rule, if present.
      */
     static Optional<RecoveryAnnotation> findRecoveryAnnotation(RuleDecl rule) {
@@ -237,16 +324,24 @@ class ParserRuleEmitter {
             sb.append(indent).append("    }\n");
             sb.append(indent).append("}\n\n");
         } else if (mode == RecoveryMode.AUTO) {
-            // Auto-infer: use ";" as default fallback
+            // Auto-infer sync tokens from grammar FOLLOW set
+            List<String> followTokens = computeFollowTokens(ctx, ruleName);
+            if (followTokens.isEmpty()) {
+                followTokens = List.of(";"); // fallback
+            }
+            String syncArgs = followTokens.stream()
+                .map(t -> "\"" + ParserCodegenUtil.escapeString(t) + "\"")
+                .collect(Collectors.joining(", "));
             sb.append(indent).append("public static class ").append(wrapperName)
               .append(" extends org.unlaxer.parser.combinator.SyncPointRecoveryParser {\n");
             sb.append(indent).append("    private static final long serialVersionUID = 1L;\n");
             sb.append(indent).append("    public ").append(wrapperName).append("() {\n");
-            sb.append(indent).append("        super(Parser.get(").append(className).append(".class), \";\");\n");
+            sb.append(indent).append("        super(Parser.get(").append(className).append(".class), ").append(syncArgs).append(");\n");
             sb.append(indent).append("    }\n");
             sb.append(indent).append("}\n\n");
         } else {
-            // SKIP mode
+            // SKIP mode: on failure, skip one character and return success with error marker.
+            // This ensures the AST always has a node (Hejlsberg principle: always produce an AST).
             sb.append(indent).append("public static class ").append(wrapperName)
               .append(" extends org.unlaxer.parser.combinator.ConstructedSingleChildParser {\n");
             sb.append(indent).append("    private static final long serialVersionUID = 1L;\n");
@@ -255,12 +350,19 @@ class ParserRuleEmitter {
             sb.append(indent).append("    }\n");
             sb.append(indent).append("    @Override\n");
             sb.append(indent).append("    public org.unlaxer.Parsed parse(org.unlaxer.context.ParseContext parseContext, org.unlaxer.TokenKind tokenKind, boolean invertMatch) {\n");
+            sb.append(indent).append("        parseContext.begin(this);\n");
             sb.append(indent).append("        org.unlaxer.Parsed result = getChild().parse(parseContext, tokenKind, invertMatch);\n");
             sb.append(indent).append("        if (result.isSucceeded()) {\n");
-            sb.append(indent).append("            return result;\n");
+            sb.append(indent).append("            return parseContext.commit(this, tokenKind).toParsed();\n");
             sb.append(indent).append("        }\n");
-            sb.append(indent).append("        // Skip mode: return failed parse as-is (error node generated by child)\n");
-            sb.append(indent).append("        return org.unlaxer.Parsed.FAILED;\n");
+            sb.append(indent).append("        parseContext.rollback(this);\n");
+            sb.append(indent).append("        // Skip mode: advance cursor by one character, embed error marker, return success\n");
+            sb.append(indent).append("        if (parseContext.source.isEmpty() || parseContext.isAtEnd()) {\n");
+            sb.append(indent).append("            return org.unlaxer.Parsed.FAILED;\n");
+            sb.append(indent).append("        }\n");
+            sb.append(indent).append("        parseContext.begin(this);\n");
+            sb.append(indent).append("        parseContext.advanceCursor(1);\n");
+            sb.append(indent).append("        return parseContext.commit(this, tokenKind).toParsed();\n");
             sb.append(indent).append("    }\n");
             sb.append(indent).append("}\n\n");
         }
