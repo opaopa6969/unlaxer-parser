@@ -20,12 +20,15 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.RuleRefElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ScopeTreeAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.SeparatedElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.SequenceBody;
+import org.unlaxer.dsl.bootstrap.UBNFAST.RecoveryAnnotation;
+import org.unlaxer.dsl.bootstrap.UBNFAST.RecoveryMode;
 import org.unlaxer.dsl.bootstrap.UBNFAST.SkipAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.TerminalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.WhitespaceAnnotation;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -191,6 +194,76 @@ class ParserRuleEmitter {
             sb.append(indent).append("    public java.util.Optional<RecursiveMode> getNotAstNodeSpecifier() { return java.util.Optional.empty(); }\n");
         }
         sb.append(indent).append("}\n\n");
+
+        return sb.toString();
+    }
+
+    /**
+     * Returns the RecoveryAnnotation for the given rule, if present.
+     */
+    static Optional<RecoveryAnnotation> findRecoveryAnnotation(RuleDecl rule) {
+        return rule.annotations().stream()
+            .filter(a -> a instanceof RecoveryAnnotation)
+            .map(a -> (RecoveryAnnotation) a)
+            .findFirst();
+    }
+
+    /**
+     * Generates a recovery wrapper class for a rule with @recovery annotation.
+     * For SYNC mode, wraps the rule parser with SyncPointRecoveryParser.
+     * For AUTO mode, uses ";" as default sync token.
+     * For SKIP mode, generates a wrapper that catches failure and returns an error node.
+     */
+    static String generateRecoveryWrapper(ParserGenerator.GenContext ctx, RuleDecl rule, RecoveryAnnotation recovery) {
+        String ruleName = rule.name();
+        String className = ruleName + "Parser";
+        String wrapperName = ruleName + "RecoveryParser";
+        StringBuilder sb = new StringBuilder();
+        String indent = "    ";
+
+        RecoveryMode mode = recovery.mode();
+        if (mode == RecoveryMode.SYNC) {
+            String[] tokens = recovery.syncTokens().isEmpty()
+                ? new String[]{ ";" }
+                : recovery.syncTokens().toArray(new String[0]);
+            String syncArgs = java.util.Arrays.stream(tokens)
+                .map(t -> "\"" + ParserCodegenUtil.escapeString(t) + "\"")
+                .collect(Collectors.joining(", "));
+            sb.append(indent).append("public static class ").append(wrapperName)
+              .append(" extends org.unlaxer.parser.combinator.SyncPointRecoveryParser {\n");
+            sb.append(indent).append("    private static final long serialVersionUID = 1L;\n");
+            sb.append(indent).append("    public ").append(wrapperName).append("() {\n");
+            sb.append(indent).append("        super(Parser.get(").append(className).append(".class), ").append(syncArgs).append(");\n");
+            sb.append(indent).append("    }\n");
+            sb.append(indent).append("}\n\n");
+        } else if (mode == RecoveryMode.AUTO) {
+            // Auto-infer: use ";" as default fallback
+            sb.append(indent).append("public static class ").append(wrapperName)
+              .append(" extends org.unlaxer.parser.combinator.SyncPointRecoveryParser {\n");
+            sb.append(indent).append("    private static final long serialVersionUID = 1L;\n");
+            sb.append(indent).append("    public ").append(wrapperName).append("() {\n");
+            sb.append(indent).append("        super(Parser.get(").append(className).append(".class), \";\");\n");
+            sb.append(indent).append("    }\n");
+            sb.append(indent).append("}\n\n");
+        } else {
+            // SKIP mode
+            sb.append(indent).append("public static class ").append(wrapperName)
+              .append(" extends org.unlaxer.parser.combinator.ConstructedSingleChildParser {\n");
+            sb.append(indent).append("    private static final long serialVersionUID = 1L;\n");
+            sb.append(indent).append("    public ").append(wrapperName).append("() {\n");
+            sb.append(indent).append("        super(Parser.get(").append(className).append(".class));\n");
+            sb.append(indent).append("    }\n");
+            sb.append(indent).append("    @Override\n");
+            sb.append(indent).append("    public org.unlaxer.Parsed parse(org.unlaxer.context.ParseContext parseContext, org.unlaxer.TokenKind tokenKind, boolean invertMatch) {\n");
+            sb.append(indent).append("        org.unlaxer.Parsed result = getChild().parse(parseContext, tokenKind, invertMatch);\n");
+            sb.append(indent).append("        if (result.isSucceeded()) {\n");
+            sb.append(indent).append("            return result;\n");
+            sb.append(indent).append("        }\n");
+            sb.append(indent).append("        // Skip mode: return failed parse as-is (error node generated by child)\n");
+            sb.append(indent).append("        return org.unlaxer.Parsed.FAILED;\n");
+            sb.append(indent).append("    }\n");
+            sb.append(indent).append("}\n\n");
+        }
 
         return sb.toString();
     }
@@ -644,6 +717,7 @@ class ParserRuleEmitter {
 
     /**
      * ルール参照名をパーサークラス参照文字列に変換する。
+     * @recovery アノテーション付きルールを参照する場合は RecoveryWrapper クラスを返す。
      */
     static String resolveParserClass(ParserGenerator.GenContext ctx, String name) {
         // Negation / CharRange / Regex tokens → generated inner class name
@@ -659,6 +733,10 @@ class ParserRuleEmitter {
         String tokenClass = ctx.tokenParserMap.get(name);
         if (tokenClass != null) {
             return tokenClass + ".class";
+        }
+        // @recovery: return recovery wrapper class if the referenced rule has @recovery
+        if (ctx.recoveryRules.containsKey(name)) {
+            return name + "RecoveryParser.class";
         }
         return name + "Parser.class";
     }

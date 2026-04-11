@@ -151,6 +151,7 @@ public sealed interface UBNFAST permits
         UBNFAST.RightAssocAnnotation,
         UBNFAST.PrecedenceAnnotation,
         UBNFAST.DocAnnotation,
+        UBNFAST.RecoveryAnnotation,
         UBNFAST.SkipAnnotation,
         UBNFAST.SimpleAnnotation {}
 
@@ -208,6 +209,16 @@ public sealed interface UBNFAST permits
 
     /** @doc("description text") — documentation comment, emitted as Java comment */
     record DocAnnotation(String text) implements Annotation {}
+
+    /** Recovery mode for @recovery annotation */
+    enum RecoveryMode { SYNC, AUTO, SKIP }
+
+    /**
+     * @recovery(sync=';') or @recovery(auto) or @recovery(skip)
+     * Declarative error recovery: when this rule's parser fails,
+     * recover by skipping to a sync point and continue parsing.
+     */
+    record RecoveryAnnotation(RecoveryMode mode, List<String> syncTokens) implements Annotation {}
 
     /**
      * @skip — rule is parsed normally but its tokens are excluded from the parent's

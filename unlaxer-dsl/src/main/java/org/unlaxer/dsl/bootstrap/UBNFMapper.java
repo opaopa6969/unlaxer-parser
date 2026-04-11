@@ -31,6 +31,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.ErrorElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OneOrMoreElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OptionalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.DocAnnotation;
+import org.unlaxer.dsl.bootstrap.UBNFAST.RecoveryAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.SkipAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.SeparatedElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.PrecedenceAnnotation;
@@ -326,6 +327,8 @@ public class UBNFMapper {
                 result.add(toPrecedenceAnnotation(child));
             } else if (child.parser.getClass() == UBNFParsers.DocAnnotationParser.class) {
                 result.add(toDocAnnotation(child));
+            } else if (child.parser.getClass() == UBNFParsers.RecoveryAnnotationParser.class) {
+                result.add(toRecoveryAnnotation(child));
             } else if (child.parser.getClass() == UBNFParsers.SkipAnnotationParser.class) {
                 result.add(new SkipAnnotation());
             } else if (child.parser.getClass() == UBNFParsers.SimpleAnnotationParser.class) {
@@ -424,6 +427,27 @@ public class UBNFMapper {
         List<Token> quoted = findDescendants(token, org.unlaxer.parser.elementary.SingleQuotedParser.class);
         String context = quoted.isEmpty() ? "" : stripQuotes(quoted.get(0).source.toString().trim());
         return new CatalogAnnotation(context);
+    }
+
+    static RecoveryAnnotation toRecoveryAnnotation(Token token) {
+        // Detect sync mode by presence of SingleQuotedParser descendant
+        List<Token> quoted = findDescendants(token, org.unlaxer.parser.elementary.SingleQuotedParser.class);
+        if (false == quoted.isEmpty()) {
+            String syncValue = stripQuotes(quoted.get(0).source.toString().trim());
+            List<String> syncTokens = java.util.Arrays.stream(syncValue.split(","))
+                .map(String::trim)
+                .filter(s -> false == s.isEmpty())
+                .toList();
+            return new RecoveryAnnotation(UBNFAST.RecoveryMode.SYNC, syncTokens);
+        }
+        // Detect auto vs skip by looking for WordParser descendants
+        List<Token> wordTokens = findDescendants(token, org.unlaxer.parser.elementary.WordParser.class);
+        boolean hasAutoKeyword = wordTokens.stream()
+            .anyMatch(t -> "auto".equals(t.source.toString().trim()));
+        if (hasAutoKeyword) {
+            return new RecoveryAnnotation(UBNFAST.RecoveryMode.AUTO, List.of());
+        }
+        return new RecoveryAnnotation(UBNFAST.RecoveryMode.SKIP, List.of());
     }
 
     static SimpleAnnotation toSimpleAnnotation(Token token) {

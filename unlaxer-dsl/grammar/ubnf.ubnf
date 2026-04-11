@@ -75,6 +75,7 @@ grammar UBNF {
     | LeftAssocAnnotation
     | RightAssocAnnotation
     | PrecedenceAnnotation
+    | RecoveryAnnotation
     | SimpleAnnotation ;
 
   @mapping(RootAnnotation)
@@ -107,6 +108,9 @@ grammar UBNF {
 
   @mapping(PrecedenceAnnotation, params=[level])
   PrecedenceAnnotation ::= '@precedence' '(' 'level' '=' UNSIGNED_INTEGER @level ')' ;
+
+  @mapping(RecoveryAnnotation, params=[mode, syncTokens])
+  RecoveryAnnotation ::= '@recovery' '(' ( 'sync' '=' STRING @syncTokens | IDENTIFIER @mode ) ')' ;
 
   @mapping(SimpleAnnotation, params=[name])
   SimpleAnnotation ::= '@' IDENTIFIER @name ;

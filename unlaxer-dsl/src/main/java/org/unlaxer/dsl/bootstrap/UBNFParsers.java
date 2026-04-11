@@ -1063,6 +1063,54 @@ public class UBNFParsers {
     }
 
     /**
+     * RecoveryAnnotation: '@recovery' '(' ( 'sync' '=' STRING | 'auto' | 'skip' ) ')'
+     * Declarative error recovery for UBNF rules.
+     */
+    public static class RecoveryAnnotationParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                new WordParser("@recovery"),
+                Parser.get(LeftParenthesisParser.class),
+                new LazyChoice() {
+                    private static final long serialVersionUID = 1L;
+
+                    @Override
+                    public Parsers getLazyParsers() {
+                        return new Parsers(
+                            // sync='tokens'
+                            new UBNFLazyChain() {
+                                private static final long serialVersionUID = 1L;
+
+                                @Override
+                                public Parsers getLazyParsers() {
+                                    return new Parsers(
+                                        new WordParser("sync"),
+                                        Parser.get(EqualParser.class),
+                                        Parser.get(SingleQuotedParser.class)
+                                    );
+                                }
+                            },
+                            // auto
+                            new WordParser("auto"),
+                            // skip
+                            new WordParser("skip")
+                        );
+                    }
+
+                    @Override
+                    public Optional<RecursiveMode> getNotAstNodeSpecifier() {
+                        return Optional.empty();
+                    }
+                },
+                Parser.get(RightParenthesisParser.class)
+            );
+        }
+    }
+
+    /**
      * SkipAnnotation: '@skip'
      * Marks a rule as transparent to the AST token tree.
      */
@@ -1120,6 +1168,7 @@ public class UBNFParsers {
                 Parser.get(RightAssocAnnotationParser.class),
                 Parser.get(PrecedenceAnnotationParser.class),
                 Parser.get(DocAnnotationParser.class),
+                Parser.get(RecoveryAnnotationParser.class),
                 Parser.get(SkipAnnotationParser.class),
                 Parser.get(SimpleAnnotationParser.class)
             );

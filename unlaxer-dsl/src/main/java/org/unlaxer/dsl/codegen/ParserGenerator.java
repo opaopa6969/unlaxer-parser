@@ -53,6 +53,8 @@ public class ParserGenerator implements CodeGenerator {
         final Map<String, int[]> helperCounters = new LinkedHashMap<>(); // rule -> [repeat,opt,group,sep]
         boolean needsCPPComment = false;
         final List<String> delimitorClasses = new ArrayList<>();
+        /** rule name -> RecoveryAnnotation (for rules that have @recovery) */
+        final Map<String, org.unlaxer.dsl.bootstrap.UBNFAST.RecoveryAnnotation> recoveryRules = new LinkedHashMap<>();
 
         GenContext(GrammarDecl grammar) {
             this.grammar = grammar;
@@ -190,6 +192,9 @@ public class ParserGenerator implements CodeGenerator {
                 sb.append(helper);
             }
             sb.append(ParserRuleEmitter.generateRuleClass(ctx, rule));
+            // @recovery: generate recovery wrapper class after the rule class
+            ParserRuleEmitter.findRecoveryAnnotation(rule)
+                .ifPresent(ra -> sb.append(ParserRuleEmitter.generateRecoveryWrapper(ctx, rule, ra)));
         }
 
         // ファクトリメソッド
@@ -241,6 +246,12 @@ public class ParserGenerator implements CodeGenerator {
                 ? (hasGlobalWhitespace || hasGlobalComment || "commentsandspaces".equals(interleaveProfile))
                 : !"none".equals(style);
             ctx.useDelimitedChainByRule.put(rule.name(), useDelimited);
+        }
+
+        // Collect @recovery annotations for rules
+        for (RuleDecl rule : grammar.rules()) {
+            ParserRuleEmitter.findRecoveryAnnotation(rule)
+                .ifPresent(ra -> ctx.recoveryRules.put(rule.name(), ra));
         }
 
         return ctx;
