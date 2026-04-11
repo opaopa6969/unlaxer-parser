@@ -59,10 +59,19 @@ class ParserRuleEmitter {
     // =========================================================================
 
     sealed interface ElementModel {
+        // リーフ
         record WordMatch(String word) implements ElementModel {}
         record ClassRef(String className) implements ElementModel {}
-        record InlineExpression(String expression) implements ElementModel {}
         record ErrorExpected(String message) implements ElementModel {}
+        // インライントークン（各種別を型で区別）
+        record UntilParser(String terminator) implements ElementModel {}
+        record LookaheadParser(String pattern) implements ElementModel {}
+        record NegLookaheadParser(String pattern) implements ElementModel {}
+        record AnyCharParser() implements ElementModel {}
+        record EofParser() implements ElementModel {}
+        record EmptyParser() implements ElementModel {}
+        record IgnoreCaseWord(String word) implements ElementModel {}
+        // コンビネータ
         record ZeroOrMoreOf(ElementModel inner) implements ElementModel {}
         record OneOrMoreOf(ElementModel inner) implements ElementModel {}
         record OptionalOf(ElementModel inner) implements ElementModel {}
@@ -168,47 +177,7 @@ class ParserRuleEmitter {
                 }
                 case HelperSpec.SepHelper sep -> {
                     ctx.restoreCounters(ruleName, sep.counterState());
-                    String elemCode = generateElementCode(ctx, ruleName, sep.element());
-                    String sepCode  = generateElementCode(ctx, ruleName, sep.separator());
-                    String chainClass = getChainClassName(ctx, ruleName);
-                    IndentedWriter bw = new IndentedWriter(1);
-                    bw.line("public static class " + sep.bodyName() + " extends " + chainClass + " {");
-                    bw.indent();
-                    bw.line("private static final long serialVersionUID = 1L;");
-                    bw.line("@Override");
-                    bw.line("public Parsers getLazyParsers() {");
-                    bw.indent();
-                    bw.line("return new Parsers(");
-                    bw.indent();
-                    bw.line(sepCode + ",");
-                    bw.line(elemCode);
-                    bw.dedent();
-                    bw.line(");");
-                    bw.dedent();
-                    bw.line("}");
-                    bw.dedent();
-                    bw.line("}");
-                    bw.blankLine();
-                    ctx.addHelper(ruleName, bw.build());
-                    IndentedWriter ow = new IndentedWriter(1);
-                    ow.line("public static class " + sep.outerName() + " extends " + chainClass + " {");
-                    ow.indent();
-                    ow.line("private static final long serialVersionUID = 1L;");
-                    ow.line("@Override");
-                    ow.line("public Parsers getLazyParsers() {");
-                    ow.indent();
-                    ow.line("return new Parsers(");
-                    ow.indent();
-                    ow.line(elemCode + ",");
-                    ow.line("new ZeroOrMore(" + sep.bodyName() + ".class)");
-                    ow.dedent();
-                    ow.line(");");
-                    ow.dedent();
-                    ow.line("}");
-                    ow.dedent();
-                    ow.line("}");
-                    ow.blankLine();
-                    ctx.addHelper(ruleName, ow.build());
+                    generateSepHelperCode(ctx, ruleName, sep);
                 }
             }
         }
@@ -244,6 +213,56 @@ class ParserRuleEmitter {
         w.blankLine();
 
         return w.build();
+    }
+
+    /**
+     * SeparatedElement 用ヘルパー2クラス（body + outer）のコードを生成して ctx に追加する。
+     * ChainHelper の generateHelperCode と対称的な役割。
+     */
+    static void generateSepHelperCode(ParserGenerator.GenContext ctx, String ruleName, HelperSpec.SepHelper sep) {
+        String elemCode = generateElementCode(ctx, ruleName, sep.element());
+        String sepCode  = generateElementCode(ctx, ruleName, sep.separator());
+        String chainClass = getChainClassName(ctx, ruleName);
+
+        IndentedWriter bw = new IndentedWriter(1);
+        bw.line("public static class " + sep.bodyName() + " extends " + chainClass + " {");
+        bw.indent();
+        bw.line("private static final long serialVersionUID = 1L;");
+        bw.line("@Override");
+        bw.line("public Parsers getLazyParsers() {");
+        bw.indent();
+        bw.line("return new Parsers(");
+        bw.indent();
+        bw.line(sepCode + ",");
+        bw.line(elemCode);
+        bw.dedent();
+        bw.line(");");
+        bw.dedent();
+        bw.line("}");
+        bw.dedent();
+        bw.line("}");
+        bw.blankLine();
+        ctx.addHelper(ruleName, bw.build());
+
+        IndentedWriter ow = new IndentedWriter(1);
+        ow.line("public static class " + sep.outerName() + " extends " + chainClass + " {");
+        ow.indent();
+        ow.line("private static final long serialVersionUID = 1L;");
+        ow.line("@Override");
+        ow.line("public Parsers getLazyParsers() {");
+        ow.indent();
+        ow.line("return new Parsers(");
+        ow.indent();
+        ow.line(elemCode + ",");
+        ow.line("new ZeroOrMore(" + sep.bodyName() + ".class)");
+        ow.dedent();
+        ow.line(");");
+        ow.dedent();
+        ow.line("}");
+        ow.dedent();
+        ow.line("}");
+        ow.blankLine();
+        ctx.addHelper(ruleName, ow.build());
     }
 
     /**
@@ -1015,37 +1034,28 @@ class ParserRuleEmitter {
     static ElementModel resolveRuleRefModel(ParserGenerator.GenContext ctx, String name) {
         String terminator = ctx.tokenUntilMap.get(name);
         if (terminator != null) {
-            return new ElementModel.InlineExpression(
-                "new org.unlaxer.parser.elementary.WildCardStringTerninatorParser(\""
-                + ParserCodegenUtil.escapeString(terminator) + "\")");
+            return new ElementModel.UntilParser(terminator);
         }
         String laPattern = ctx.tokenLookaheadMap.get(name);
         if (laPattern != null) {
-            return new ElementModel.InlineExpression(
-                "new MatchOnly(new WordParser(\"" + ParserCodegenUtil.escapeString(laPattern) + "\"))");
+            return new ElementModel.LookaheadParser(laPattern);
         }
         String nlaPattern = ctx.tokenNegLookaheadMap.get(name);
         if (nlaPattern != null) {
-            return new ElementModel.InlineExpression(
-                "new Not(new WordParser(\"" + ParserCodegenUtil.escapeString(nlaPattern) + "\"))");
+            return new ElementModel.NegLookaheadParser(nlaPattern);
         }
         if (ctx.tokenAnySet.contains(name)) {
-            return new ElementModel.InlineExpression(
-                "new org.unlaxer.parser.elementary.WildCardCharacterParser()");
+            return new ElementModel.AnyCharParser();
         }
         if (ctx.tokenEofSet.contains(name)) {
-            return new ElementModel.InlineExpression(
-                "new org.unlaxer.parser.elementary.EndOfSourceParser()");
+            return new ElementModel.EofParser();
         }
         if (ctx.tokenEmptySet.contains(name)) {
-            return new ElementModel.InlineExpression(
-                "new org.unlaxer.parser.elementary.EmptyParser()");
+            return new ElementModel.EmptyParser();
         }
         String ciWord = ctx.tokenCIMap.get(name);
         if (ciWord != null) {
-            return new ElementModel.InlineExpression(
-                "new org.unlaxer.parser.elementary.IgnoreCaseWordParser(\""
-                + ParserCodegenUtil.escapeString(ciWord) + "\")");
+            return new ElementModel.IgnoreCaseWord(ciWord);
         }
         return new ElementModel.ClassRef(resolveParserClass(ctx, name));
     }
@@ -1060,11 +1070,25 @@ class ParserRuleEmitter {
                 "new WordParser(\"" + ParserCodegenUtil.escapeString(m.word()) + "\")";
             case ElementModel.ClassRef m ->
                 "Parser.get(" + m.className() + ")";
-            case ElementModel.InlineExpression m ->
-                m.expression();
             case ElementModel.ErrorExpected m ->
                 "org.unlaxer.parser.ErrorMessageParser.expected(\""
                 + ParserCodegenUtil.escapeString(m.message()) + "\")";
+            case ElementModel.UntilParser m ->
+                "new org.unlaxer.parser.elementary.WildCardStringTerninatorParser(\""
+                + ParserCodegenUtil.escapeString(m.terminator()) + "\")";
+            case ElementModel.LookaheadParser m ->
+                "new MatchOnly(new WordParser(\"" + ParserCodegenUtil.escapeString(m.pattern()) + "\"))";
+            case ElementModel.NegLookaheadParser m ->
+                "new Not(new WordParser(\"" + ParserCodegenUtil.escapeString(m.pattern()) + "\"))";
+            case ElementModel.AnyCharParser m ->
+                "new org.unlaxer.parser.elementary.WildCardCharacterParser()";
+            case ElementModel.EofParser m ->
+                "new org.unlaxer.parser.elementary.EndOfSourceParser()";
+            case ElementModel.EmptyParser m ->
+                "new org.unlaxer.parser.elementary.EmptyParser()";
+            case ElementModel.IgnoreCaseWord m ->
+                "new org.unlaxer.parser.elementary.IgnoreCaseWordParser(\""
+                + ParserCodegenUtil.escapeString(m.word()) + "\")";
             case ElementModel.ZeroOrMoreOf m ->
                 "new ZeroOrMore(" + renderInner(m.inner()) + ")";
             case ElementModel.OneOrMoreOf m ->
