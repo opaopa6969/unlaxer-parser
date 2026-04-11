@@ -39,6 +39,44 @@ class ParserRuleEmitter {
 
     private ParserRuleEmitter() {}
 
+    /**
+     * Lightweight indentation-aware writer for generating inner class code.
+     * Replaces raw {@code sb.append(indent).append(...)} chains with
+     * structured {@link #line}, {@link #openBlock} / {@link #closeBlock} calls.
+     */
+    private static final class IndentedWriter {
+        private final StringBuilder sb = new StringBuilder();
+        private int indent;
+
+        IndentedWriter(int baseIndent) { this.indent = baseIndent; }
+
+        /** Append one indented line (with trailing newline). */
+        IndentedWriter line(String text) {
+            sb.append("    ".repeat(indent)).append(text).append('\n');
+            return this;
+        }
+
+        /** Append a blank line (no indentation, just newline). */
+        IndentedWriter blankLine() {
+            sb.append('\n');
+            return this;
+        }
+
+        /** Append raw text without any indentation or trailing newline. */
+        IndentedWriter raw(String text) {
+            sb.append(text);
+            return this;
+        }
+
+        /** Increase indent level by one. */
+        IndentedWriter indent() { indent++; return this; }
+
+        /** Decrease indent level by one. */
+        IndentedWriter dedent() { indent--; return this; }
+
+        String build() { return sb.toString(); }
+    }
+
     static void collectHelpers(ParserGenerator.GenContext ctx, RuleDecl rule) {
         collectHelpersInBody(ctx, rule.name(), rule.body());
     }
@@ -138,30 +176,44 @@ class ParserRuleEmitter {
                 String sepCode  = generateElementCode(ctx, ruleName, sep.separator());
                 ctx.restoreCounters(ruleName, after);
                 String chainClass = getChainClassName(ctx, ruleName);
-                String bodyHelper =
-                    "    public static class " + bodyHelperName + " extends " + chainClass + " {\n" +
-                    "        private static final long serialVersionUID = 1L;\n" +
-                    "        @Override\n" +
-                    "        public Parsers getLazyParsers() {\n" +
-                    "            return new Parsers(\n" +
-                    "                " + sepCode + ",\n" +
-                    "                " + elemCode + "\n" +
-                    "            );\n" +
-                    "        }\n" +
-                    "    }\n\n";
-                ctx.addHelper(ruleName, bodyHelper);
-                String outerHelper =
-                    "    public static class " + outerHelperName + " extends " + chainClass + " {\n" +
-                    "        private static final long serialVersionUID = 1L;\n" +
-                    "        @Override\n" +
-                    "        public Parsers getLazyParsers() {\n" +
-                    "            return new Parsers(\n" +
-                    "                " + elemCode + ",\n" +
-                    "                new ZeroOrMore(" + bodyHelperName + ".class)\n" +
-                    "            );\n" +
-                    "        }\n" +
-                    "    }\n\n";
-                ctx.addHelper(ruleName, outerHelper);
+                IndentedWriter bw = new IndentedWriter(1);
+                bw.line("public static class " + bodyHelperName + " extends " + chainClass + " {");
+                bw.indent();
+                bw.line("private static final long serialVersionUID = 1L;");
+                bw.line("@Override");
+                bw.line("public Parsers getLazyParsers() {");
+                bw.indent();
+                bw.line("return new Parsers(");
+                bw.indent();
+                bw.line(sepCode + ",");
+                bw.line(elemCode);
+                bw.dedent();
+                bw.line(");");
+                bw.dedent();
+                bw.line("}");
+                bw.dedent();
+                bw.line("}");
+                bw.blankLine();
+                ctx.addHelper(ruleName, bw.build());
+                IndentedWriter ow = new IndentedWriter(1);
+                ow.line("public static class " + outerHelperName + " extends " + chainClass + " {");
+                ow.indent();
+                ow.line("private static final long serialVersionUID = 1L;");
+                ow.line("@Override");
+                ow.line("public Parsers getLazyParsers() {");
+                ow.indent();
+                ow.line("return new Parsers(");
+                ow.indent();
+                ow.line(elemCode + ",");
+                ow.line("new ZeroOrMore(" + bodyHelperName + ".class)");
+                ow.dedent();
+                ow.line(");");
+                ow.dedent();
+                ow.line("}");
+                ow.dedent();
+                ow.line("}");
+                ow.blankLine();
+                ctx.addHelper(ruleName, ow.build());
             }
             default -> {} // TerminalElement, RuleRefElement, ErrorElement
         }
@@ -174,29 +226,29 @@ class ParserRuleEmitter {
      */
     static String generateHelperCode(ParserGenerator.GenContext ctx, String ruleName, String helperName, RuleBody body) {
         boolean isChoice = isMultiChoice(body);
-        StringBuilder sb = new StringBuilder();
-        String indent = "    ";
+        String baseClass = isChoice ? "LazyChoice" : getChainClassName(ctx, ruleName);
+        IndentedWriter w = new IndentedWriter(1);
 
-        sb.append(indent).append("public static class ").append(helperName);
+        w.line("public static class " + helperName + " extends " + baseClass + " {");
+        w.indent();
+        w.line("private static final long serialVersionUID = 1L;");
+        w.line("@Override");
+        w.line("public Parsers getLazyParsers() {");
+        w.indent();
+        w.line("return new Parsers(");
+        w.raw(generateBodyElements(ctx, ruleName, body, "    ".repeat(4)));
+        w.line(");");
+        w.dedent();
+        w.line("}");
         if (isChoice) {
-            sb.append(" extends LazyChoice {\n");
-        } else {
-            sb.append(" extends ").append(getChainClassName(ctx, ruleName)).append(" {\n");
+            w.line("@Override");
+            w.line("public java.util.Optional<RecursiveMode> getNotAstNodeSpecifier() { return java.util.Optional.empty(); }");
         }
-        sb.append(indent).append("    private static final long serialVersionUID = 1L;\n");
-        sb.append(indent).append("    @Override\n");
-        sb.append(indent).append("    public Parsers getLazyParsers() {\n");
-        sb.append(indent).append("        return new Parsers(\n");
-        sb.append(generateBodyElements(ctx, ruleName, body, indent + "            "));
-        sb.append(indent).append("        );\n");
-        sb.append(indent).append("    }\n");
-        if (isChoice) {
-            sb.append(indent).append("    @Override\n");
-            sb.append(indent).append("    public java.util.Optional<RecursiveMode> getNotAstNodeSpecifier() { return java.util.Optional.empty(); }\n");
-        }
-        sb.append(indent).append("}\n\n");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
 
-        return sb.toString();
+        return w.build();
     }
 
     /**
@@ -305,8 +357,7 @@ class ParserRuleEmitter {
         String ruleName = rule.name();
         String className = ruleName + "Parser";
         String wrapperName = ruleName + "RecoveryParser";
-        StringBuilder sb = new StringBuilder();
-        String indent = "    ";
+        IndentedWriter w = new IndentedWriter(1);
 
         RecoveryMode mode = recovery.mode();
         if (mode == RecoveryMode.SYNC) {
@@ -316,13 +367,17 @@ class ParserRuleEmitter {
             String syncArgs = java.util.Arrays.stream(tokens)
                 .map(t -> "\"" + ParserCodegenUtil.escapeString(t) + "\"")
                 .collect(Collectors.joining(", "));
-            sb.append(indent).append("public static class ").append(wrapperName)
-              .append(" extends org.unlaxer.parser.combinator.SyncPointRecoveryParser {\n");
-            sb.append(indent).append("    private static final long serialVersionUID = 1L;\n");
-            sb.append(indent).append("    public ").append(wrapperName).append("() {\n");
-            sb.append(indent).append("        super(Parser.get(").append(className).append(".class), ").append(syncArgs).append(");\n");
-            sb.append(indent).append("    }\n");
-            sb.append(indent).append("}\n\n");
+            w.line("public static class " + wrapperName + " extends org.unlaxer.parser.combinator.SyncPointRecoveryParser {");
+            w.indent();
+            w.line("private static final long serialVersionUID = 1L;");
+            w.line("public " + wrapperName + "() {");
+            w.indent();
+            w.line("super(Parser.get(" + className + ".class), " + syncArgs + ");");
+            w.dedent();
+            w.line("}");
+            w.dedent();
+            w.line("}");
+            w.blankLine();
         } else if (mode == RecoveryMode.AUTO) {
             // Auto-infer sync tokens from grammar FOLLOW set
             List<String> followTokens = computeFollowTokens(ctx, ruleName);
@@ -332,42 +387,56 @@ class ParserRuleEmitter {
             String syncArgs = followTokens.stream()
                 .map(t -> "\"" + ParserCodegenUtil.escapeString(t) + "\"")
                 .collect(Collectors.joining(", "));
-            sb.append(indent).append("public static class ").append(wrapperName)
-              .append(" extends org.unlaxer.parser.combinator.SyncPointRecoveryParser {\n");
-            sb.append(indent).append("    private static final long serialVersionUID = 1L;\n");
-            sb.append(indent).append("    public ").append(wrapperName).append("() {\n");
-            sb.append(indent).append("        super(Parser.get(").append(className).append(".class), ").append(syncArgs).append(");\n");
-            sb.append(indent).append("    }\n");
-            sb.append(indent).append("}\n\n");
+            w.line("public static class " + wrapperName + " extends org.unlaxer.parser.combinator.SyncPointRecoveryParser {");
+            w.indent();
+            w.line("private static final long serialVersionUID = 1L;");
+            w.line("public " + wrapperName + "() {");
+            w.indent();
+            w.line("super(Parser.get(" + className + ".class), " + syncArgs + ");");
+            w.dedent();
+            w.line("}");
+            w.dedent();
+            w.line("}");
+            w.blankLine();
         } else {
             // SKIP mode: on failure, skip one character and return success with error marker.
             // This ensures the AST always has a node (Hejlsberg principle: always produce an AST).
-            sb.append(indent).append("public static class ").append(wrapperName)
-              .append(" extends org.unlaxer.parser.combinator.ConstructedSingleChildParser {\n");
-            sb.append(indent).append("    private static final long serialVersionUID = 1L;\n");
-            sb.append(indent).append("    public ").append(wrapperName).append("() {\n");
-            sb.append(indent).append("        super(Parser.get(").append(className).append(".class));\n");
-            sb.append(indent).append("    }\n");
-            sb.append(indent).append("    @Override\n");
-            sb.append(indent).append("    public org.unlaxer.Parsed parse(org.unlaxer.context.ParseContext parseContext, org.unlaxer.TokenKind tokenKind, boolean invertMatch) {\n");
-            sb.append(indent).append("        parseContext.begin(this);\n");
-            sb.append(indent).append("        org.unlaxer.Parsed result = getChild().parse(parseContext, tokenKind, invertMatch);\n");
-            sb.append(indent).append("        if (result.isSucceeded()) {\n");
-            sb.append(indent).append("            return parseContext.commit(this, tokenKind).toParsed();\n");
-            sb.append(indent).append("        }\n");
-            sb.append(indent).append("        parseContext.rollback(this);\n");
-            sb.append(indent).append("        // Skip mode: advance cursor by one character, embed error marker, return success\n");
-            sb.append(indent).append("        if (parseContext.source.isEmpty() || parseContext.isAtEnd()) {\n");
-            sb.append(indent).append("            return org.unlaxer.Parsed.FAILED;\n");
-            sb.append(indent).append("        }\n");
-            sb.append(indent).append("        parseContext.begin(this);\n");
-            sb.append(indent).append("        parseContext.advanceCursor(1);\n");
-            sb.append(indent).append("        return parseContext.commit(this, tokenKind).toParsed();\n");
-            sb.append(indent).append("    }\n");
-            sb.append(indent).append("}\n\n");
+            w.line("public static class " + wrapperName + " extends org.unlaxer.parser.combinator.ConstructedSingleChildParser {");
+            w.indent();
+            w.line("private static final long serialVersionUID = 1L;");
+            w.line("public " + wrapperName + "() {");
+            w.indent();
+            w.line("super(Parser.get(" + className + ".class));");
+            w.dedent();
+            w.line("}");
+            w.line("@Override");
+            w.line("public org.unlaxer.Parsed parse(org.unlaxer.context.ParseContext parseContext, org.unlaxer.TokenKind tokenKind, boolean invertMatch) {");
+            w.indent();
+            w.line("parseContext.begin(this);");
+            w.line("org.unlaxer.Parsed result = getChild().parse(parseContext, tokenKind, invertMatch);");
+            w.line("if (result.isSucceeded()) {");
+            w.indent();
+            w.line("return parseContext.commit(this, tokenKind).toParsed();");
+            w.dedent();
+            w.line("}");
+            w.line("parseContext.rollback(this);");
+            w.line("// Skip mode: advance cursor by one character, embed error marker, return success");
+            w.line("if (parseContext.source.isEmpty() || parseContext.isAtEnd()) {");
+            w.indent();
+            w.line("return org.unlaxer.Parsed.FAILED;");
+            w.dedent();
+            w.line("}");
+            w.line("parseContext.begin(this);");
+            w.line("parseContext.advanceCursor(1);");
+            w.line("return parseContext.commit(this, tokenKind).toParsed();");
+            w.dedent();
+            w.line("}");
+            w.dedent();
+            w.line("}");
+            w.blankLine();
         }
 
-        return sb.toString();
+        return w.build();
     }
 
     static String generateRuleClass(ParserGenerator.GenContext ctx, RuleDecl rule) {
@@ -376,8 +445,7 @@ class ParserRuleEmitter {
         ParserGenerator.RightAssocShape rightAssocShape = getRightAssocShape(rule);
         boolean isChoice = rightAssocShape != null || isMultiChoice(rule.body());
 
-        StringBuilder sb = new StringBuilder();
-        String indent = "    ";
+        IndentedWriter w = new IndentedWriter(1);
 
         // @doc annotation → Javadoc comment
         rule.annotations().stream()
@@ -385,7 +453,7 @@ class ParserRuleEmitter {
             .map(a -> ((DocAnnotation) a).text())
             .findFirst()
             .ifPresent(docText -> {
-                sb.append(indent).append("/** ").append(docText).append(" */\n");
+                w.line("/** " + docText + " */");
             });
 
         boolean hasScopeTreeDecl = rule.annotations().stream().anyMatch(a -> a instanceof ScopeTreeAnnotation);
@@ -400,74 +468,77 @@ class ParserRuleEmitter {
         String implSuffix = needsTransactionListener
             ? " implements org.unlaxer.listener.TransactionListener"
             : "";
-        sb.append(indent).append("public static class ").append(className);
-        if (isChoice) {
-            sb.append(" extends LazyChoice").append(implSuffix).append(" {\n");
-        } else {
-            sb.append(" extends ").append(getChainClassName(ctx, ruleName)).append(implSuffix).append(" {\n");
-        }
-        sb.append(indent).append("    private static final long serialVersionUID = 1L;\n");
-        sb.append(indent).append("    @Override\n");
-        sb.append(indent).append("    public Parsers getLazyParsers() {\n");
-        sb.append(indent).append("        return new Parsers(\n");
+        String baseClass = isChoice ? "LazyChoice" : getChainClassName(ctx, ruleName);
+        w.line("public static class " + className + " extends " + baseClass + implSuffix + " {");
+        w.indent();
+        w.line("private static final long serialVersionUID = 1L;");
+        w.line("@Override");
+        w.line("public Parsers getLazyParsers() {");
+        w.indent();
+        w.line("return new Parsers(");
         if (rightAssocShape != null) {
-            sb.append(generateRightAssocElements(ctx, ruleName, className, rightAssocShape, indent + "            "));
+            w.raw(generateRightAssocElements(ctx, ruleName, className, rightAssocShape, "    ".repeat(4)));
         } else {
-            sb.append(generateBodyElements(ctx, ruleName, rule.body(), indent + "            "));
+            w.raw(generateBodyElements(ctx, ruleName, rule.body(), "    ".repeat(4)));
         }
-        sb.append(indent).append("        );\n");
-        sb.append(indent).append("    }\n");
+        w.line(");");
+        w.dedent();
+        w.line("}");
         boolean hasSkip = rule.annotations().stream().anyMatch(a -> a instanceof SkipAnnotation);
         if (isChoice || hasSkip) {
-            sb.append(indent).append("    @Override\n");
+            w.line("@Override");
             if (hasSkip) {
-                sb.append(indent).append("    public java.util.Optional<RecursiveMode> getNotAstNodeSpecifier() { return java.util.Optional.of(RecursiveMode.containsRoot); }\n");
+                w.line("public java.util.Optional<RecursiveMode> getNotAstNodeSpecifier() { return java.util.Optional.of(RecursiveMode.containsRoot); }");
             } else {
-                sb.append(indent).append("    public java.util.Optional<RecursiveMode> getNotAstNodeSpecifier() { return java.util.Optional.empty(); }\n");
+                w.line("public java.util.Optional<RecursiveMode> getNotAstNodeSpecifier() { return java.util.Optional.empty(); }");
             }
         }
         // @scopeTree / @declares / @backref → TransactionListener 実装を生成
         boolean hasScopeTree = rule.annotations().stream().anyMatch(a -> a instanceof ScopeTreeAnnotation);
         boolean hasDeclares  = rule.annotations().stream().anyMatch(a -> a instanceof DeclaresAnnotation);
         if (hasScopeTree || hasDeclares || backrefScopeMode || backrefBackrefMode) {
-            sb.append(generateTransactionListenerMethods(ctx, rule, indent, hasScopeTree, hasDeclares, backrefScopeMode, backrefBackrefMode));
+            w.raw(generateTransactionListenerMethods(ctx, rule, hasScopeTree, hasDeclares, backrefScopeMode, backrefBackrefMode));
         }
-        sb.append(indent).append("}\n\n");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
 
-        return sb.toString();
+        return w.build();
     }
 
     /**
      * @scopeTree / @declares アノテーション付きルールの TransactionListener メソッドを生成する。
      */
     static String generateTransactionListenerMethods(
-        ParserGenerator.GenContext ctx, RuleDecl rule, String indent,
+        ParserGenerator.GenContext ctx, RuleDecl rule,
         boolean hasScopeTree, boolean hasDeclares, boolean backrefScopeMode, boolean backrefBackrefMode) {
 
-        StringBuilder sb = new StringBuilder();
-        String i = indent + "    ";
+        IndentedWriter w = new IndentedWriter(2);
 
         // setLevel (no-op)
-        sb.append(i).append("@Override\n");
-        sb.append(i).append("public void setLevel(org.unlaxer.listener.OutputLevel level) {}\n");
+        w.line("@Override");
+        w.line("public void setLevel(org.unlaxer.listener.OutputLevel level) {}");
 
         // onOpen (no-op)
-        sb.append(i).append("@Override\n");
-        sb.append(i).append("public void onOpen(org.unlaxer.context.ParseContext ctx) {}\n");
+        w.line("@Override");
+        w.line("public void onOpen(org.unlaxer.context.ParseContext ctx) {}");
 
         // onBegin
-        sb.append(i).append("@Override\n");
-        sb.append(i).append("public void onBegin(org.unlaxer.context.ParseContext ctx, org.unlaxer.parser.Parser p) {\n");
+        w.line("@Override");
+        w.line("public void onBegin(org.unlaxer.context.ParseContext ctx, org.unlaxer.parser.Parser p) {");
         if (hasScopeTree) {
-            sb.append(i).append("    org.unlaxer.dsl.runtime.ScopeStore.enter(ctx);\n");
+            w.indent();
+            w.line("org.unlaxer.dsl.runtime.ScopeStore.enter(ctx);");
+            w.dedent();
         }
-        sb.append(i).append("}\n");
+        w.line("}");
 
         // onCommit
-        sb.append(i).append("@Override\n");
-        sb.append(i).append("public void onCommit(org.unlaxer.context.ParseContext ctx, org.unlaxer.parser.Parser p, org.unlaxer.TokenList tokens) {\n");
+        w.line("@Override");
+        w.line("public void onCommit(org.unlaxer.context.ParseContext ctx, org.unlaxer.parser.Parser p, org.unlaxer.TokenList tokens) {");
+        w.indent();
         if (hasScopeTree) {
-            sb.append(i).append("    org.unlaxer.dsl.runtime.ScopeStore.leave(ctx);\n");
+            w.line("org.unlaxer.dsl.runtime.ScopeStore.leave(ctx);");
         }
         if (hasDeclares) {
             String symbolCapture = rule.annotations().stream()
@@ -476,33 +547,42 @@ class ParserRuleEmitter {
                 .findFirst().orElse("");
             // キャプチャ名に対応する要素のパーサークラスを特定する
             String captureParserClass = findCaptureParserClass(ctx, rule, symbolCapture);
-            sb.append(i).append("    // @declares(symbol=").append(symbolCapture).append(")\n");
-            sb.append(i).append("    if (!tokens.isEmpty()) {\n");
-            sb.append(i).append("        org.unlaxer.Token ruleToken = tokens.get(0);\n");
+            w.line("// @declares(symbol=" + symbolCapture + ")");
+            w.line("if (!tokens.isEmpty()) {");
+            w.indent();
+            w.line("org.unlaxer.Token ruleToken = tokens.get(0);");
             if (captureParserClass != null) {
                 // 対応するパーサークラスが特定できた → getChildWithParser で直接取得
-                sb.append(i).append("        org.unlaxer.Token captureToken = ruleToken.getChildWithParser(")
-                  .append(captureParserClass).append(");\n");
-                sb.append(i).append("        if (captureToken != null && captureToken.source != null) {\n");
-                sb.append(i).append("            String __symbolName = captureToken.source.sourceAsString().trim();\n");
-                sb.append(i).append("            if (!__symbolName.isEmpty()) {\n");
-                sb.append(i).append("                int __offset = captureToken.source.offsetFromRoot().value();\n");
-                sb.append(i).append("                org.unlaxer.dsl.runtime.ScopeStore.declare(ctx, __symbolName, __offset);\n");
-                sb.append(i).append("            }\n");
-                sb.append(i).append("        }\n");
+                w.line("org.unlaxer.Token captureToken = ruleToken.getChildWithParser(" + captureParserClass + ");");
+                w.line("if (captureToken != null && captureToken.source != null) {");
+                w.indent();
+                w.line("String __symbolName = captureToken.source.sourceAsString().trim();");
+                w.line("if (!__symbolName.isEmpty()) {");
+                w.indent();
+                w.line("int __offset = captureToken.source.offsetFromRoot().value();");
+                w.line("org.unlaxer.dsl.runtime.ScopeStore.declare(ctx, __symbolName, __offset);");
+                w.dedent();
+                w.line("}");
+                w.dedent();
+                w.line("}");
             } else {
                 // フォールバック: filteredChildren を順に走査してnon-keyword を探す
-                sb.append(i).append("        for (org.unlaxer.Token child : ruleToken.filteredChildren) {\n");
-                sb.append(i).append("            if (child.source == null) continue;\n");
-                sb.append(i).append("            String __symbolName = child.source.sourceAsString().trim();\n");
-                sb.append(i).append("            if (!__symbolName.isEmpty()) {\n");
-                sb.append(i).append("                int __offset = child.source.offsetFromRoot().value();\n");
-                sb.append(i).append("                org.unlaxer.dsl.runtime.ScopeStore.declare(ctx, __symbolName, __offset);\n");
-                sb.append(i).append("                break;\n");
-                sb.append(i).append("            }\n");
-                sb.append(i).append("        }\n");
+                w.line("for (org.unlaxer.Token child : ruleToken.filteredChildren) {");
+                w.indent();
+                w.line("if (child.source == null) continue;");
+                w.line("String __symbolName = child.source.sourceAsString().trim();");
+                w.line("if (!__symbolName.isEmpty()) {");
+                w.indent();
+                w.line("int __offset = child.source.offsetFromRoot().value();");
+                w.line("org.unlaxer.dsl.runtime.ScopeStore.declare(ctx, __symbolName, __offset);");
+                w.line("break;");
+                w.dedent();
+                w.line("}");
+                w.dedent();
+                w.line("}");
             }
-            sb.append(i).append("    }\n");
+            w.dedent();
+            w.line("}");
         }
         if (backrefScopeMode) {
             String backrefCapture = rule.annotations().stream()
@@ -510,27 +590,34 @@ class ParserRuleEmitter {
                 .map(a -> ((BackrefAnnotation) a).name())
                 .findFirst().orElse("");
             String captureParserClass = findCaptureParserClass(ctx, rule, backrefCapture);
-            sb.append(i).append("    // @backref(name=").append(backrefCapture).append(") — scope reference mode\n");
-            sb.append(i).append("    if (!tokens.isEmpty()) {\n");
-            sb.append(i).append("        org.unlaxer.Token ruleToken = tokens.get(0);\n");
+            w.line("// @backref(name=" + backrefCapture + ") \u2014 scope reference mode");
+            w.line("if (!tokens.isEmpty()) {");
+            w.indent();
+            w.line("org.unlaxer.Token ruleToken = tokens.get(0);");
             if (captureParserClass != null) {
-                sb.append(i).append("        org.unlaxer.Token refToken = ruleToken.getChildWithParser(")
-                  .append(captureParserClass).append(");\n");
-                sb.append(i).append("        if (refToken != null && refToken.source != null) {\n");
-                sb.append(i).append("            String __refName = refToken.source.sourceAsString().trim();\n");
-                sb.append(i).append("            if (!__refName.isEmpty()) {\n");
-                sb.append(i).append("                int __offset = refToken.source.offsetFromRoot().value();\n");
-                sb.append(i).append("                org.unlaxer.dsl.runtime.ScopeStore.addReference(ctx, __refName, __offset, __refName.length());\n");
-                sb.append(i).append("                if (!org.unlaxer.dsl.runtime.ScopeStore.isDeclared(ctx, __refName)) {\n");
-                sb.append(i).append("                    org.unlaxer.dsl.runtime.ScopeStore.addDiagnostic(ctx,\n");
-                sb.append(i).append("                        \"未定義のシンボル: '\" + __refName + \"'\",\n");
-                sb.append(i).append("                        __offset, __refName.length(),\n");
-                sb.append(i).append("                        org.unlaxer.dsl.runtime.ScopeStore.Severity.WARNING);\n");
-                sb.append(i).append("                }\n");
-                sb.append(i).append("            }\n");
-                sb.append(i).append("        }\n");
+                w.line("org.unlaxer.Token refToken = ruleToken.getChildWithParser(" + captureParserClass + ");");
+                w.line("if (refToken != null && refToken.source != null) {");
+                w.indent();
+                w.line("String __refName = refToken.source.sourceAsString().trim();");
+                w.line("if (!__refName.isEmpty()) {");
+                w.indent();
+                w.line("int __offset = refToken.source.offsetFromRoot().value();");
+                w.line("org.unlaxer.dsl.runtime.ScopeStore.addReference(ctx, __refName, __offset, __refName.length());");
+                w.line("if (!org.unlaxer.dsl.runtime.ScopeStore.isDeclared(ctx, __refName)) {");
+                w.indent();
+                w.line("org.unlaxer.dsl.runtime.ScopeStore.addDiagnostic(ctx,");
+                w.line("    \"未定義のシンボル: '\" + __refName + \"'\",");
+                w.line("    __offset, __refName.length(),");
+                w.line("    org.unlaxer.dsl.runtime.ScopeStore.Severity.WARNING);");
+                w.dedent();
+                w.line("}");
+                w.dedent();
+                w.line("}");
+                w.dedent();
+                w.line("}");
             }
-            sb.append(i).append("    }\n");
+            w.dedent();
+            w.line("}");
         }
         if (backrefBackrefMode) {
             String backrefCapture = rule.annotations().stream()
@@ -538,49 +625,60 @@ class ParserRuleEmitter {
                 .map(a -> ((BackrefAnnotation) a).name())
                 .findFirst().orElse("");
             String captureParserClass = findCaptureParserClass(ctx, rule, backrefCapture);
-            sb.append(i).append("    // @backref(name=").append(backrefCapture).append(") — back-reference mode (same-rule token match)\n");
-            sb.append(i).append("    if (!tokens.isEmpty()) {\n");
-            sb.append(i).append("        org.unlaxer.Token ruleToken = tokens.get(0);\n");
+            w.line("// @backref(name=" + backrefCapture + ") \u2014 back-reference mode (same-rule token match)");
+            w.line("if (!tokens.isEmpty()) {");
+            w.indent();
+            w.line("org.unlaxer.Token ruleToken = tokens.get(0);");
             if (captureParserClass != null) {
                 // filteredChildren から同パーサークラスの全トークンを収集し、テキストが一致するか検証
-                sb.append(i).append("        java.util.List<org.unlaxer.Token> __backrefTokens =\n");
-                sb.append(i).append("            (ruleToken.filteredChildren == null)\n");
-                sb.append(i).append("            ? java.util.Collections.emptyList()\n");
-                sb.append(i).append("            : ruleToken.filteredChildren.stream()\n");
-                sb.append(i).append("                .filter(c -> c.getParser() instanceof ").append(captureParserClass).append(")\n");
-                sb.append(i).append("                .collect(java.util.stream.Collectors.toList());\n");
-                sb.append(i).append("        if (__backrefTokens.size() >= 2) {\n");
-                sb.append(i).append("            String __expected = __backrefTokens.get(0).source == null ? \"\" : __backrefTokens.get(0).source.sourceAsString().trim();\n");
-                sb.append(i).append("            for (int __bi = 1; __bi < __backrefTokens.size(); __bi++) {\n");
-                sb.append(i).append("                org.unlaxer.Token __bt = __backrefTokens.get(__bi);\n");
-                sb.append(i).append("                if (__bt.source == null) continue;\n");
-                sb.append(i).append("                String __actual = __bt.source.sourceAsString().trim();\n");
-                sb.append(i).append("                if (!__expected.equals(__actual)) {\n");
-                sb.append(i).append("                    org.unlaxer.dsl.runtime.ScopeStore.addDiagnostic(ctx,\n");
-                sb.append(i).append("                        \"back-reference mismatch: expected '\" + __expected + \"' but got '\" + __actual + \"'\",\n");
-                sb.append(i).append("                        __bt.source.offsetFromRoot().value(), __actual.length(),\n");
-                sb.append(i).append("                        org.unlaxer.dsl.runtime.ScopeStore.Severity.ERROR);\n");
-                sb.append(i).append("                }\n");
-                sb.append(i).append("            }\n");
-                sb.append(i).append("        }\n");
+                w.line("java.util.List<org.unlaxer.Token> __backrefTokens =");
+                w.line("    (ruleToken.filteredChildren == null)");
+                w.line("    ? java.util.Collections.emptyList()");
+                w.line("    : ruleToken.filteredChildren.stream()");
+                w.line("        .filter(c -> c.getParser() instanceof " + captureParserClass + ")");
+                w.line("        .collect(java.util.stream.Collectors.toList());");
+                w.line("if (__backrefTokens.size() >= 2) {");
+                w.indent();
+                w.line("String __expected = __backrefTokens.get(0).source == null ? \"\" : __backrefTokens.get(0).source.sourceAsString().trim();");
+                w.line("for (int __bi = 1; __bi < __backrefTokens.size(); __bi++) {");
+                w.indent();
+                w.line("org.unlaxer.Token __bt = __backrefTokens.get(__bi);");
+                w.line("if (__bt.source == null) continue;");
+                w.line("String __actual = __bt.source.sourceAsString().trim();");
+                w.line("if (!__expected.equals(__actual)) {");
+                w.indent();
+                w.line("org.unlaxer.dsl.runtime.ScopeStore.addDiagnostic(ctx,");
+                w.line("    \"back-reference mismatch: expected '\" + __expected + \"' but got '\" + __actual + \"'\",");
+                w.line("    __bt.source.offsetFromRoot().value(), __actual.length(),");
+                w.line("    org.unlaxer.dsl.runtime.ScopeStore.Severity.ERROR);");
+                w.dedent();
+                w.line("}");
+                w.dedent();
+                w.line("}");
+                w.dedent();
+                w.line("}");
             }
-            sb.append(i).append("    }\n");
+            w.dedent();
+            w.line("}");
         }
-        sb.append(i).append("}\n");
+        w.dedent();
+        w.line("}");
 
         // onRollback
-        sb.append(i).append("@Override\n");
-        sb.append(i).append("public void onRollback(org.unlaxer.context.ParseContext ctx, org.unlaxer.parser.Parser p, org.unlaxer.TokenList tokens) {\n");
+        w.line("@Override");
+        w.line("public void onRollback(org.unlaxer.context.ParseContext ctx, org.unlaxer.parser.Parser p, org.unlaxer.TokenList tokens) {");
         if (hasScopeTree) {
-            sb.append(i).append("    org.unlaxer.dsl.runtime.ScopeStore.leave(ctx);\n");
+            w.indent();
+            w.line("org.unlaxer.dsl.runtime.ScopeStore.leave(ctx);");
+            w.dedent();
         }
-        sb.append(i).append("}\n");
+        w.line("}");
 
         // onClose (no-op)
-        sb.append(i).append("@Override\n");
-        sb.append(i).append("public void onClose(org.unlaxer.context.ParseContext ctx) {}\n");
+        w.line("@Override");
+        w.line("public void onClose(org.unlaxer.context.ParseContext ctx) {}");
 
-        return sb.toString();
+        return w.build();
     }
 
     static String generateRightAssocElements(
@@ -593,22 +691,29 @@ class ParserRuleEmitter {
         String baseCode = generateElementCode(ctx, ruleName, shape.base());
         String opCode = generateElementCode(ctx, ruleName, shape.op());
         String chainClass = getChainClassName(ctx, ruleName);
-        StringBuilder sb = new StringBuilder();
+        int level = indent.length() / 4;
+        IndentedWriter w = new IndentedWriter(level);
 
-        sb.append(indent).append("new ").append(chainClass).append("() {\n");
-        sb.append(indent).append("    private static final long serialVersionUID = 1L;\n");
-        sb.append(indent).append("    @Override\n");
-        sb.append(indent).append("    public Parsers getLazyParsers() {\n");
-        sb.append(indent).append("        return new Parsers(\n");
-        sb.append(indent).append("            ").append(baseCode).append(",\n");
-        sb.append(indent).append("            ").append(opCode).append(",\n");
-        sb.append(indent).append("            Parser.get(").append(className).append(".class)\n");
-        sb.append(indent).append("        );\n");
-        sb.append(indent).append("    }\n");
-        sb.append(indent).append("},\n");
-        sb.append(indent).append(baseCode).append("\n");
+        w.line("new " + chainClass + "() {");
+        w.indent();
+        w.line("private static final long serialVersionUID = 1L;");
+        w.line("@Override");
+        w.line("public Parsers getLazyParsers() {");
+        w.indent();
+        w.line("return new Parsers(");
+        w.indent();
+        w.line(baseCode + ",");
+        w.line(opCode + ",");
+        w.line("Parser.get(" + className + ".class)");
+        w.dedent();
+        w.line(");");
+        w.dedent();
+        w.line("}");
+        w.dedent();
+        w.line("},");
+        w.line(baseCode);
 
-        return sb.toString();
+        return w.build();
     }
 
     /**
@@ -655,28 +760,34 @@ class ParserRuleEmitter {
 
         // 複数要素 → 匿名 TinyCalcLazyChain
         String chainClass = getChainClassName(ctx, ruleName);
-        String innerIndent = baseIndent + "    ";
-        StringBuilder sb = new StringBuilder();
-        sb.append("new ").append(chainClass).append("() {\n");
-        sb.append(innerIndent).append("private static final long serialVersionUID = 1L;\n");
-        sb.append(innerIndent).append("@Override\n");
-        sb.append(innerIndent).append("public Parsers getLazyParsers() {\n");
-        sb.append(innerIndent).append("    return new Parsers(\n");
+        int innerLevel = baseIndent.length() / 4 + 1;
+        IndentedWriter w = new IndentedWriter(innerLevel);
 
         List<String> elemCodes = new ArrayList<>();
         for (AnnotatedElement ae : elements) {
             elemCodes.add(generateElementCode(ctx, ruleName, ae.element()));
         }
+
+        // First line has no leading indent (caller adds it via indent + c)
+        StringBuilder result = new StringBuilder();
+        result.append("new ").append(chainClass).append("() {\n");
+        w.line("private static final long serialVersionUID = 1L;");
+        w.line("@Override");
+        w.line("public Parsers getLazyParsers() {");
+        w.indent();
+        w.line("return new Parsers(");
+        String elemIndent = "    ".repeat(innerLevel + 2);
         String elemsJoined = elemCodes.stream()
-            .map(c -> innerIndent + "        " + c)
+            .map(c -> elemIndent + c)
             .collect(Collectors.joining(",\n"));
-        sb.append(elemsJoined).append("\n");
+        w.raw(elemsJoined + "\n");
+        w.line(");");
+        w.dedent();
+        w.line("}");
+        result.append(w.build());
+        result.append(baseIndent).append("}");
 
-        sb.append(innerIndent).append("    );\n");
-        sb.append(innerIndent).append("}\n");
-        sb.append(baseIndent).append("}");
-
-        return sb.toString();
+        return result.toString();
     }
 
     /**
