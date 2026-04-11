@@ -1,9 +1,9 @@
 // UBNF (Unlaxer BNF) 文法定義（自己ホスティング用）
-// Phase 0: 文法定義確定
+// Phase 1: 完全文法（全構文サポート）
 //
 // この .ubnf ファイル自体が UBNF 記法で記述されている。
-// Bootstrap 完了時には、このファイルを unlaxer-dsl 自身で処理して
-// UBNFParsers.java 等を生成できることを目標とする。
+// Self-hosting: このファイルを unlaxer-dsl 自身で処理して
+// UBNFParsers.java 等を生成する。
 //
 // ルール宣言は ';' で終端する（ルール境界の曖昧さを排除するため）。
 
@@ -15,10 +15,11 @@ grammar UBNF {
   @comment: { line: '//' }
 
   // ===== トークン定義 =====
-  token IDENTIFIER   = IdentifierParser
-  token STRING       = SingleQuotedParser
-  token CLASS_NAME   = IdentifierParser
-  token UNSIGNED_INTEGER = NumberParser
+  token IDENTIFIER        = IdentifierParser
+  token STRING            = SingleQuotedParser
+  token CLASS_NAME        = IdentifierParser
+  token UNSIGNED_INTEGER  = NumberParser
+  token DIGIT             = DigitParser
 
   // ===== エントリーポイント =====
   @root
@@ -53,8 +54,63 @@ grammar UBNF {
   KeyValuePair ::= IDENTIFIER @key ':' STRING @value ;
 
   // ===== トークン宣言 =====
-  @mapping(TokenDecl, params=[name, parserClass])
-  TokenDecl ::= 'token' IDENTIFIER @name '=' CLASS_NAME @parserClass ;
+  // token NAME = VALUE （VALUE はクラス名または式）
+  @mapping(TokenDecl, params=[name, value])
+  TokenDecl ::= 'token' IDENTIFIER @name '=' TokenValue @value ;
+
+  // トークン値: 式またはクラス名
+  TokenValue ::=
+      UntilExpression
+    | NegationExpression
+    | LookaheadExpression
+    | NegativeLookaheadExpression
+    | CharRangeExpression
+    | CIExpression
+    | RegexExpression
+    | AnyExpression
+    | EofExpression
+    | EmptyExpression
+    | DottedIdentifier ;
+
+  // UNTIL('terminator')
+  @mapping(UntilExpression, params=[terminator])
+  UntilExpression ::= 'UNTIL' '(' STRING @terminator ')' ;
+
+  // NEGATION('chars')
+  @mapping(NegationExpression, params=[chars])
+  NegationExpression ::= 'NEGATION' '(' STRING @chars ')' ;
+
+  // LOOKAHEAD('pattern')
+  @mapping(LookaheadExpression, params=[pattern])
+  LookaheadExpression ::= 'LOOKAHEAD' '(' STRING @pattern ')' ;
+
+  // NEGATIVE_LOOKAHEAD('pattern')
+  @mapping(NegativeLookaheadExpression, params=[pattern])
+  NegativeLookaheadExpression ::= 'NEGATIVE_LOOKAHEAD' '(' STRING @pattern ')' ;
+
+  // CHAR_RANGE('a','z')
+  @mapping(CharRangeExpression, params=[min, max])
+  CharRangeExpression ::= 'CHAR_RANGE' '(' STRING @min ',' STRING @max ')' ;
+
+  // CI('keyword')
+  @mapping(CIExpression, params=[word])
+  CIExpression ::= 'CI' '(' STRING @word ')' ;
+
+  // REGEX('pattern')
+  @mapping(RegexExpression, params=[pattern])
+  RegexExpression ::= 'REGEX' '(' STRING @pattern ')' ;
+
+  // ANY
+  @mapping(AnyExpression)
+  AnyExpression ::= 'ANY' ;
+
+  // EOF
+  @mapping(EofExpression)
+  EofExpression ::= 'EOF' ;
+
+  // EMPTY
+  @mapping(EmptyExpression)
+  EmptyExpression ::= 'EMPTY' ;
 
   // ===== ルール宣言 =====
   @mapping(RuleDecl, params=[annotations, name, body])
@@ -68,14 +124,19 @@ grammar UBNF {
   Annotation ::=
       RootAnnotation
     | MappingAnnotation
+    | EvalAnnotation
     | WhitespaceAnnotation
     | InterleaveAnnotation
     | BackrefAnnotation
     | ScopeTreeAnnotation
+    | DeclaresAnnotation
+    | CatalogAnnotation
     | LeftAssocAnnotation
     | RightAssocAnnotation
     | PrecedenceAnnotation
+    | DocAnnotation
     | RecoveryAnnotation
+    | SkipAnnotation
     | SimpleAnnotation ;
 
   @mapping(RootAnnotation)
@@ -87,6 +148,9 @@ grammar UBNF {
       CLASS_NAME @className
       [ ',' 'params' '=' '[' IDENTIFIER @paramNames { ',' IDENTIFIER @paramNames } ']' ]
     ')' ;
+
+  @mapping(EvalAnnotation, params=[entries])
+  EvalAnnotation ::= '@eval' '(' KeyValuePair @entries { ',' KeyValuePair @entries } ')' ;
 
   @mapping(WhitespaceAnnotation, params=[style])
   WhitespaceAnnotation ::= '@whitespace' [ '(' IDENTIFIER @style ')' ] ;
@@ -100,6 +164,12 @@ grammar UBNF {
   @mapping(ScopeTreeAnnotation, params=[mode])
   ScopeTreeAnnotation ::= '@scopeTree' '(' 'mode' '=' IDENTIFIER @mode ')' ;
 
+  @mapping(DeclaresAnnotation, params=[symbol, description])
+  DeclaresAnnotation ::= '@declares' '(' 'symbol' '=' IDENTIFIER @symbol [ ',' 'description' '=' STRING @description ] ')' ;
+
+  @mapping(CatalogAnnotation, params=[context])
+  CatalogAnnotation ::= '@catalog' '(' 'context' '=' STRING @context ')' ;
+
   @mapping(LeftAssocAnnotation)
   LeftAssocAnnotation ::= '@leftAssoc' ;
 
@@ -109,8 +179,14 @@ grammar UBNF {
   @mapping(PrecedenceAnnotation, params=[level])
   PrecedenceAnnotation ::= '@precedence' '(' 'level' '=' UNSIGNED_INTEGER @level ')' ;
 
+  @mapping(DocAnnotation, params=[text])
+  DocAnnotation ::= '@doc' '(' STRING @text ')' ;
+
   @mapping(RecoveryAnnotation, params=[mode, syncTokens])
   RecoveryAnnotation ::= '@recovery' '(' ( 'sync' '=' STRING @syncTokens | IDENTIFIER @mode ) ')' ;
+
+  @mapping(SkipAnnotation)
+  SkipAnnotation ::= '@skip' ;
 
   @mapping(SimpleAnnotation, params=[name])
   SimpleAnnotation ::= '@' IDENTIFIER @name ;
@@ -124,18 +200,33 @@ grammar UBNF {
   @mapping(SequenceBody, params=[elements])
   SequenceBody ::= { AnnotatedElement } @elements ;
 
-  // 要素（@typeof制約とキャプチャ名付き可）
+  // 要素（@typeof制約とキャプチャ名付き可、後置量化子付き可）
   @mapping(AnnotatedElement, params=[typeofConstraint, element, captureName])
   AnnotatedElement ::=
       [ TypeofElement @typeofConstraint ]
       AtomicElement @element
+      [ PostfixQuantifier ]
+      [ SeparatedBy ]
       [ '@' IDENTIFIER @captureName ] ;
+
+  // 後置量化子: + ? *
+  PostfixQuantifier ::= '+' | '?' | '*' ;
+
+  // 分離リスト: % Separator
+  SeparatedBy ::= '%' AtomicElement ;
+
+  // 有界量化子: {n} {n,m} {n,}
+  BoundedQuantifier ::= '{' Digits [ ',' [ Digits ] ] '}' ;
+
+  Digits ::= DIGIT { DIGIT } ;
 
   // 基本要素
   AtomicElement ::=
       GroupElement
     | OptionalElement
     | RepeatElement
+    | BoundedQuantifier
+    | ErrorElement
     | TerminalElement
     | RuleRefElement ;
 
@@ -151,11 +242,15 @@ grammar UBNF {
   @mapping(RepeatElement, params=[body])
   RepeatElement ::= '{' RuleBody @body '}' ;
 
-  // 'keyword' または "keyword"
+  // ERROR('message')  エラーヒント
+  @mapping(ErrorElement, params=[message])
+  ErrorElement ::= 'ERROR' '(' STRING @message ')' ;
+
+  // 'keyword'  端末記号
   @mapping(TerminalElement, params=[value])
   TerminalElement ::= STRING @value ;
 
-  // 非終端記号参照（先頭大文字 = クラス名、小文字 = ルール名）
+  // 非終端記号参照
   @mapping(RuleRefElement, params=[name])
   RuleRefElement ::= IDENTIFIER @name ;
 
@@ -163,7 +258,7 @@ grammar UBNF {
   @mapping(TypeofElement, params=[captureName])
   TypeofElement ::= '@typeof' '(' IDENTIFIER @captureName ')' ;
 
-  // ドット区切り識別子（パッケージ名など）
+  // ドット区切り識別子（パッケージ名・クラス名）
   @mapping(DottedIdentifier, params=[parts])
   DottedIdentifier ::= IDENTIFIER @parts { '.' IDENTIFIER @parts } ;
 
