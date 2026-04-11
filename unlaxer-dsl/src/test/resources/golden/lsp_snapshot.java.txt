@@ -10,12 +10,12 @@ import org.unlaxer.StringSource;
 import org.unlaxer.context.ParseContext;
 import org.unlaxer.parser.Parser;
 
-public class SnapshotLanguageServer implements LanguageServer, LanguageClientAware {
+public abstract class SnapshotLanguageServer implements LanguageServer, LanguageClientAware {
 
     private static final List<String> KEYWORDS = List.of("grammar", "token", "@root", "@mapping", "@whitespace", "@interleave", "@backref", "@typeof", "@scopeTree", "@leftAssoc", "@rightAssoc", "@precedence", "@declares", "@catalog", "params", "level", "profile", "name", "mode", "symbol", "context", "description", "+", "*");
 
-    private LanguageClient client;
-    private final Map<String, DocumentState> documents = new HashMap<>();
+    protected LanguageClient client;
+    protected final Map<String, DocumentState> documents = new HashMap<>();
 
     public SnapshotLanguageServer() {}
 
@@ -33,6 +33,7 @@ public class SnapshotLanguageServer implements LanguageServer, LanguageClientAwa
         semanticTokensOptions.setLegend(new SemanticTokensLegend(
             List.of("valid", "invalid"), List.of()));
         capabilities.setSemanticTokensProvider(semanticTokensOptions);
+        configureAdditionalCapabilities(capabilities);
         return CompletableFuture.completedFuture(new InitializeResult(capabilities));
     }
 
@@ -118,6 +119,10 @@ public class SnapshotLanguageServer implements LanguageServer, LanguageClientAwa
             diagnostic.setMessage("Parse error at offset " + errorStart);
             diagnostics.add(diagnostic);
         }
+        java.util.List<Diagnostic> additional = additionalDiagnostics(uri, content);
+        if (additional != null && !additional.isEmpty()) {
+            diagnostics.addAll(additional);
+        }
         client.publishDiagnostics(new PublishDiagnosticsParams(uri, diagnostics));
     }
 
@@ -133,6 +138,35 @@ public class SnapshotLanguageServer implements LanguageServer, LanguageClientAwa
             }
         }
         return new Position(line, column);
+    }
+
+    // Hook: additional completion items (for metadata, language-specific keywords)
+    protected java.util.List<CompletionItem> additionalCompletionItems(
+            CompletionParams params, String documentContent) {
+        return java.util.Collections.emptyList();
+    }
+
+    // Hook: additional diagnostics (for semantic validation)
+    protected java.util.List<Diagnostic> additionalDiagnostics(
+            String uri, String documentContent) {
+        return java.util.Collections.emptyList();
+    }
+
+    // Hook: custom definition (for cross-references like dependsOn)
+    protected org.eclipse.lsp4j.LocationLink customDefinition(
+            DefinitionParams params, String documentContent) {
+        return null;
+    }
+
+    // Hook: additional semantic tokens (for embedded languages like Java code blocks)
+    protected int[] additionalSemanticTokenData(String uri, String documentContent) {
+        return new int[0];
+    }
+
+    // Hook: configure additional server capabilities
+    protected void configureAdditionalCapabilities(
+            ServerCapabilities capabilities) {
+        // Override to add capabilities
     }
 
     public record DocumentState(String uri, String content, ParseResult parseResult) {}
@@ -178,6 +212,13 @@ public class SnapshotLanguageServer implements LanguageServer, LanguageClientAwa
                 item.setKind(CompletionItemKind.Keyword);
                 items.add(item);
             }
+            String uri = params.getTextDocument().getUri();
+            DocumentState state = server.documents.get(uri);
+            String content = state != null ? state.content() : "";
+            java.util.List<CompletionItem> additional = server.additionalCompletionItems(params, content);
+            if (additional != null && !additional.isEmpty()) {
+                items.addAll(additional);
+            }
             return CompletableFuture.completedFuture(Either.forLeft(items));
         }
 
@@ -207,6 +248,12 @@ public class SnapshotLanguageServer implements LanguageServer, LanguageClientAwa
             DocumentState state = server.documents.get(uri);
             if (state == null) {
                 return CompletableFuture.completedFuture(new SemanticTokens(Collections.emptyList()));
+            }
+            int[] tokenData = server.additionalSemanticTokenData(uri, state.content());
+            if (tokenData != null && tokenData.length > 0) {
+                List<Integer> data = new ArrayList<>();
+                for (int v : tokenData) { data.add(v); }
+                return CompletableFuture.completedFuture(new SemanticTokens(data));
             }
             return CompletableFuture.completedFuture(new SemanticTokens(Collections.emptyList()));
         }

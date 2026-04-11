@@ -197,8 +197,8 @@ public class DAPGeneratorTest {
     }
 
     @Test
-    public void testLauncherHasMainMethod() {
-        assertTrue(launcherResult.source().contains("public static void main(String[] args)"));
+    public void testLauncherHasLaunchMethod() {
+        assertTrue(launcherResult.source().contains("public void launch()"));
     }
 
     @Test

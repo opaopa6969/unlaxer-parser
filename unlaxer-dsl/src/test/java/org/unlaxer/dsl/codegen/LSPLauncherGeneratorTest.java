@@ -43,8 +43,8 @@ public class LSPLauncherGeneratorTest {
     }
 
     @Test
-    public void testContainsMainMethod() {
-        assertTrue(result.source().contains("main("));
+    public void testContainsLaunchMethod() {
+        assertTrue(result.source().contains("launch("));
     }
 
     @Test

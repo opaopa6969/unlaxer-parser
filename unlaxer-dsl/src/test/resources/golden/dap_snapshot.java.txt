@@ -17,15 +17,15 @@ import org.unlaxer.Token;
 import org.unlaxer.context.ParseContext;
 import org.unlaxer.parser.Parser;
 
-public class SnapshotDebugAdapter implements IDebugProtocolServer {
+public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
 
-    private IDebugProtocolClient client;
-    private String pendingProgram;
-    private String runtimeMode = "token";
-    private boolean stopOnEntry;
-    private String sourceContent = "";
-    private List<Token> stepPoints = new ArrayList<>();
-    private int stepIndex = 0;
+    protected IDebugProtocolClient client;
+    protected String pendingProgram;
+    protected String runtimeMode = "token";
+    protected boolean stopOnEntry;
+    protected String sourceContent = "";
+    protected List<Token> stepPoints = new ArrayList<>();
+    protected int stepIndex = 0;
     private int astNodeCount = 0;
     private List<String> astNodeTypes = new ArrayList<>();
     private List<int[]> astNodeSpans = new ArrayList<>();
@@ -105,7 +105,9 @@ public class SnapshotDebugAdapter implements IDebugProtocolServer {
 
     @Override
     public CompletableFuture<Void> next(NextArguments args) {
+        onBeforeStep(stepIndex + 1, currentStepLabel());
         stepIndex++;
+        onAfterStep(stepIndex, currentStepLabel());
         if (stepIndex >= stepLimit()) {
             sendOutput("stdout", "Completed: " + pendingProgram + "\n");
             sendTerminated();
@@ -264,6 +266,8 @@ public class SnapshotDebugAdapter implements IDebugProtocolServer {
                 runtimeVar.setVariablesReference(0);
                 vars.add(runtimeVar);
             }
+            java.util.List<Variable> extraVars = additionalVariables();
+            if (extraVars != null) { vars.addAll(extraVars); }
             response.setVariables(vars.toArray(new Variable[0]));
         } else {
             List<Variable> vars = new ArrayList<>();
@@ -275,6 +279,8 @@ public class SnapshotDebugAdapter implements IDebugProtocolServer {
                 runtimeVar.setVariablesReference(0);
                 vars.add(runtimeVar);
             }
+            java.util.List<Variable> extraVars = additionalVariables();
+            if (extraVars != null) { vars.addAll(extraVars); }
             response.setVariables(vars.toArray(new Variable[0]));
         }
         return CompletableFuture.completedFuture(response);
@@ -583,6 +589,21 @@ public class SnapshotDebugAdapter implements IDebugProtocolServer {
             }
         }
         return line;
+    }
+
+    // Hook: called before each step execution
+    protected void onBeforeStep(int stepIndex, String stepLabel) {
+        // Override to add pre-step logic
+    }
+
+    // Hook: called after each step execution
+    protected void onAfterStep(int stepIndex, String stepLabel) {
+        // Override to add post-step logic
+    }
+
+    // Hook: additional variables to display in debugger
+    protected java.util.List<Variable> additionalVariables() {
+        return java.util.Collections.emptyList();
     }
 
     private void sendOutput(String category, String output) {

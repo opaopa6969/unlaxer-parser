@@ -5,9 +5,12 @@ import org.eclipse.lsp4j.debug.launch.DSPLauncher;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolClient;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
 
-public class SnapshotDapLauncher {
-    public static void main(String[] args) throws IOException {
-        SnapshotDebugAdapter adapter = new SnapshotDebugAdapter();
+public abstract class SnapshotDapLauncher {
+
+    protected abstract SnapshotDebugAdapter createAdapter();
+
+    public void launch() throws IOException {
+        SnapshotDebugAdapter adapter = createAdapter();
         Launcher<IDebugProtocolClient> launcher =
             DSPLauncher.createServerLauncher(adapter, System.in, System.out);
         adapter.connect(launcher.getRemoteProxy());
