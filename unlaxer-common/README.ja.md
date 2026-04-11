@@ -1189,8 +1189,8 @@ public class MyCharParser implements Parser {
         }
 
         // 現在文字を取得
-        CodePointString str = context.source.getCodePointString();
-        int codePoint = str.getCodePointAt(cursor.getCodePointIndex());
+        Source source = context.source;
+        int codePoint = source.getCodePointAt(cursor.getCodePointIndex());
 
         // マッチ判定
         if (codePoint == expected) {

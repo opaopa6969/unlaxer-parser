@@ -253,7 +253,7 @@ if (this instanceof TransactionListener tl) {
 グローバルリスナーとしてディスパッチャーを登録し、生成パーサーへイベントを転送している。
 
 `LSPGenerator` は `@declares` / `@backref` / `@scopeTree` を持つ文法に対して
-`parseDocument()` 内でこの登録コードを自動生成する（unlaxer-dsl 2.7.0 以降）。
+`parseDocument()` 内でこの登録コードを自動生成する（unlaxer-dsl 2.8.0 以降）。
 
 ## 変更履歴
 

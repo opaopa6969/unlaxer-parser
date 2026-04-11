@@ -112,12 +112,12 @@ From this, unlaxer generates:
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-common</artifactId>
-        <version>2.5.0</version>
+        <version>2.8.0</version>
     </dependency>
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-dsl</artifactId>
-        <version>2.5.0</version>
+        <version>2.8.0</version>
     </dependency>
 </dependencies>
 ```

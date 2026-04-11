@@ -29,7 +29,7 @@ unlaxer-parser is a Java framework that generates a complete language processing
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
-        <unlaxer.version>2.5.0</unlaxer.version>
+        <unlaxer.version>2.8.0</unlaxer.version>
     </properties>
 
     <dependencies>

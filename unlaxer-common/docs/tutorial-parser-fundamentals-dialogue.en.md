@@ -3787,14 +3787,6 @@ matchedTokenParser.slice(slicer -> slicer.pythonian("::-1"))
 |---------|------|
 | `ASTNode` | Include this parser's tokens in AST |
 | `NotASTNode` | Exclude this parser's tokens from AST |
-| `ASTNodeRecursive` | Recursively include in AST |
-| `NotASTNodeRecursive` | Recursively exclude from AST |
-| `ASTNodeRecursiveGrandChildren` | Recursively include grandchildren and beyond in AST |
-| `NotASTNodeRecursiveGrandChildren` | Recursively exclude grandchildren and beyond from AST |
-| `NotASTChildrenOnlyLazyChain` | NotAST for children only |
-| `NotASTChildrenOnlyLazyChoice` | NotAST for children only |
-| `NotASTLazyChain` | NotAST LazyChain |
-| `NotASTLazyChoice` | NotAST LazyChoice |
 
 #### Whitespace Handling
 
@@ -3810,12 +3802,9 @@ matchedTokenParser.slice(slicer -> slicer.pythonian("::-1"))
 | `ParserWrapper` | Wrap a parser in another parser |
 | `ParserHolder` | Parser holder (for deferred reference) |
 | `TagWrapper` | Add tags to a parser |
-| `RecursiveTagWrapper` | Recursively add tags |
 | `ContainerParser` | Parser container |
 | `Flatten` | Flatten nested tokens |
 | `PropagationStopper` | Stop propagation |
-| `AllPropagationStopper` | Stop all propagation |
-| `DoCounsumePropagationStopper` | Stop propagation on consumption |
 | `InvertMatchPropagationStopper` | Stop propagation on inverted match |
 | `NotPropagatableSource` | Non-propagatable source |
 | `AbstractPropagatableSource` | Base for propagatable sources |
@@ -3835,7 +3824,6 @@ matchedTokenParser.slice(slicer -> slicer.pythonian("::-1"))
 | Class | Description |
 |---------|------|
 | `SingleChildCollectingParser` | Parser collecting from a single child |
-| `NoneChildCollectingParser` | Childless collecting parser |
 | `NoneChildParser` | Childless parser |
 | `PredicateAnyMatchForParsedParser` | Predicate-based any match |
 
@@ -3846,10 +3834,6 @@ matchedTokenParser.slice(slicer -> slicer.pythonian("::-1"))
 | `LazyCombinatorParser` | Base for Lazy combinators |
 | `ConstructedCombinatorParser` | Base for Constructed combinators |
 | `ConstructedSingleChildParser` | Base for single-child Constructed combinators |
-| `ConstructedMultiChildParser` | Base for multi-child Constructed combinators |
-| `ConstructedMultiChildCollectingParser` | Base for collecting multi-child Constructed combinators |
-| `LazyMultiChildParser` | Base for multi-child Lazy combinators |
-| `LazyMultiChildCollectingParser` | Base for collecting multi-child Lazy combinators |
 | `ChainInterface` | Chain behavior interface |
 | `ChoiceInterface` | Choice behavior interface |
 | `ChoiceCommitAction` | Choice success action |

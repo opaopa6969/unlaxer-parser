@@ -3802,14 +3802,6 @@ matchedTokenParser.slice(slicer -> slicer.pythonian("::-1"))
 |---------|------|
 | `ASTNode` | このパーサーのトークンをASTに含む |
 | `NotASTNode` | このパーサーのトークンをASTから除外 |
-| `ASTNodeRecursive` | 再帰的にASTに含む |
-| `NotASTNodeRecursive` | 再帰的にASTから除外 |
-| `ASTNodeRecursiveGrandChildren` | 孫以降を再帰的にASTに含む |
-| `NotASTNodeRecursiveGrandChildren` | 孫以降を再帰的にASTから除外 |
-| `NotASTChildrenOnlyLazyChain` | 子ノードのみNotAST |
-| `NotASTChildrenOnlyLazyChoice` | 子ノードのみNotAST |
-| `NotASTLazyChain` | NotAST付きLazyChain |
-| `NotASTLazyChoice` | NotAST付きLazyChoice |
 
 #### 空白処理
 
@@ -3825,12 +3817,9 @@ matchedTokenParser.slice(slicer -> slicer.pythonian("::-1"))
 | `ParserWrapper` | パーサーを別のパーサーでラップ |
 | `ParserHolder` | パーサーのホルダー（遅延参照用） |
 | `TagWrapper` | パーサーにタグを付与 |
-| `RecursiveTagWrapper` | 再帰的にタグを付与 |
 | `ContainerParser` | パーサーのコンテナ |
 | `Flatten` | ネストされたトークンを平坦化 |
 | `PropagationStopper` | 伝播の停止 |
-| `AllPropagationStopper` | 全ての伝播を停止 |
-| `DoCounsumePropagationStopper` | 消費時の伝播停止 |
 | `InvertMatchPropagationStopper` | 反転マッチ時の伝播停止 |
 | `NotPropagatableSource` | 伝播不可ソース |
 | `AbstractPropagatableSource` | 伝播可能ソースの基底 |
@@ -3850,7 +3839,6 @@ matchedTokenParser.slice(slicer -> slicer.pythonian("::-1"))
 | クラス名 | 説明 |
 |---------|------|
 | `SingleChildCollectingParser` | 1つの子から収集するパーサー |
-| `NoneChildCollectingParser` | 子なし収集パーサー |
 | `NoneChildParser` | 子なしパーサー |
 | `PredicateAnyMatchForParsedParser` | 述語による任意マッチ |
 
@@ -3861,10 +3849,6 @@ matchedTokenParser.slice(slicer -> slicer.pythonian("::-1"))
 | `LazyCombinatorParser` | Lazy版コンビネータの基底 |
 | `ConstructedCombinatorParser` | Constructed版コンビネータの基底 |
 | `ConstructedSingleChildParser` | 1子のConstructedコンビネータ基底 |
-| `ConstructedMultiChildParser` | 複数子のConstructedコンビネータ基底 |
-| `ConstructedMultiChildCollectingParser` | 複数子の収集Constructedコンビネータ基底 |
-| `LazyMultiChildParser` | 複数子のLazyコンビネータ基底 |
-| `LazyMultiChildCollectingParser` | 複数子の収集Lazyコンビネータ基底 |
 | `ChainInterface` | Chainの振る舞いインターフェース |
 | `ChoiceInterface` | Choiceの振る舞いインターフェース |
 | `ChoiceCommitAction` | Choice成功時のアクション |

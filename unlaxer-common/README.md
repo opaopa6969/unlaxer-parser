@@ -1189,8 +1189,8 @@ public class MyCharParser implements Parser {
         }
         
         // Get current character
-        CodePointString str = context.source.getCodePointString();
-        int codePoint = str.getCodePointAt(cursor.getCodePointIndex());
+        Source source = context.source;
+        int codePoint = source.getCodePointAt(cursor.getCodePointIndex());
         
         // Check match
         if (codePoint == expected) {
