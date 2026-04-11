@@ -39,145 +39,161 @@ class ParserRuleEmitter {
 
     private ParserRuleEmitter() {}
 
-    static void collectHelpers(ParserGenerator.GenContext ctx, RuleDecl rule) {
-        collectHelpersInBody(ctx, rule.name(), rule.body());
+    // =========================================================================
+    // HelperSpec: 分析フェーズで収集し、emission フェーズでコード生成する中間表現
+    // =========================================================================
+
+    sealed interface HelperSpec {
+        int[] counterState();
+
+        record ChainHelper(String name, RuleBody body, int[] counterState) implements HelperSpec {}
+        record SepHelper(String bodyName, String outerName,
+                         AtomicElement element, AtomicElement separator,
+                         int[] counterState) implements HelperSpec {}
     }
 
-    static void collectHelpersInBody(ParserGenerator.GenContext ctx, String ruleName, RuleBody body) {
+    // =========================================================================
+    // Phase 1a: 分析 — AST を走査してヘルパー仕様を収集（コード生成なし）
+    // =========================================================================
+
+    static List<HelperSpec> analyzeHelpers(ParserGenerator.GenContext ctx, RuleDecl rule) {
+        List<HelperSpec> specs = new ArrayList<>();
+        analyzeHelpersInBody(ctx, rule.name(), rule.body(), specs);
+        return specs;
+    }
+
+    static void analyzeHelpersInBody(ParserGenerator.GenContext ctx, String ruleName, RuleBody body, List<HelperSpec> specs) {
         switch (body) {
             case ChoiceBody choice -> {
                 for (SequenceBody alt : choice.alternatives()) {
-                    collectHelpersInSequence(ctx, ruleName, alt);
+                    analyzeHelpersInSequence(ctx, ruleName, alt, specs);
                 }
             }
-            case SequenceBody seq -> collectHelpersInSequence(ctx, ruleName, seq);
+            case SequenceBody seq -> analyzeHelpersInSequence(ctx, ruleName, seq, specs);
         }
     }
 
-    static void collectHelpersInSequence(ParserGenerator.GenContext ctx, String ruleName, SequenceBody seq) {
+    static void analyzeHelpersInSequence(ParserGenerator.GenContext ctx, String ruleName, SequenceBody seq, List<HelperSpec> specs) {
         for (AnnotatedElement ae : seq.elements()) {
-            collectHelpersInElement(ctx, ruleName, ae.element());
+            analyzeHelpersInElement(ctx, ruleName, ae.element(), specs);
         }
     }
 
-    static void collectHelpersInElement(ParserGenerator.GenContext ctx, String ruleName, AtomicElement element) {
+    static void analyzeHelpersInElement(ParserGenerator.GenContext ctx, String ruleName, AtomicElement element, List<HelperSpec> specs) {
         switch (element) {
             case RepeatElement rep -> {
                 if (!isSingleRuleRef(rep.body())) {
                     int n = ctx.nextRepeat(ruleName);
                     String helperName = ruleName + "Repeat" + n + "Parser";
-                    int[] before = ctx.snapshotCounters(ruleName);
-                    collectHelpersInBody(ctx, ruleName, rep.body());
-                    int[] after = ctx.snapshotCounters(ruleName);
-                    ctx.restoreCounters(ruleName, before);
-                    String helperCode = generateHelperCode(ctx, ruleName, helperName, rep.body());
-                    ctx.restoreCounters(ruleName, after);
-                    ctx.addHelper(ruleName, helperCode);
+                    int[] counterState = ctx.snapshotCounters(ruleName);
+                    analyzeHelpersInBody(ctx, ruleName, rep.body(), specs);
+                    specs.add(new HelperSpec.ChainHelper(helperName, rep.body(), counterState));
                 }
             }
             case OptionalElement opt -> {
                 if (!isSingleAtomicElement(opt.body())) {
                     int n = ctx.nextOpt(ruleName);
                     String helperName = ruleName + "Opt" + n + "Parser";
-                    int[] before = ctx.snapshotCounters(ruleName);
-                    collectHelpersInBody(ctx, ruleName, opt.body());
-                    int[] after = ctx.snapshotCounters(ruleName);
-                    ctx.restoreCounters(ruleName, before);
-                    String helperCode = generateHelperCode(ctx, ruleName, helperName, opt.body());
-                    ctx.restoreCounters(ruleName, after);
-                    ctx.addHelper(ruleName, helperCode);
+                    int[] counterState = ctx.snapshotCounters(ruleName);
+                    analyzeHelpersInBody(ctx, ruleName, opt.body(), specs);
+                    specs.add(new HelperSpec.ChainHelper(helperName, opt.body(), counterState));
                 }
             }
             case OneOrMoreElement one -> {
                 if (!isSingleRuleRef(one.body())) {
                     int n = ctx.nextRepeat(ruleName);
                     String helperName = ruleName + "OneOrMore" + n + "Parser";
-                    int[] before = ctx.snapshotCounters(ruleName);
-                    collectHelpersInBody(ctx, ruleName, one.body());
-                    int[] after = ctx.snapshotCounters(ruleName);
-                    ctx.restoreCounters(ruleName, before);
-                    String helperCode = generateHelperCode(ctx, ruleName, helperName, one.body());
-                    ctx.restoreCounters(ruleName, after);
-                    ctx.addHelper(ruleName, helperCode);
+                    int[] counterState = ctx.snapshotCounters(ruleName);
+                    analyzeHelpersInBody(ctx, ruleName, one.body(), specs);
+                    specs.add(new HelperSpec.ChainHelper(helperName, one.body(), counterState));
                 }
             }
             case BoundedRepeatElement bounded -> {
                 if (!isSingleRuleRef(bounded.body())) {
                     int n = ctx.nextRepeat(ruleName);
                     String helperName = ruleName + "Bounded" + n + "Parser";
-                    int[] before = ctx.snapshotCounters(ruleName);
-                    collectHelpersInBody(ctx, ruleName, bounded.body());
-                    int[] after = ctx.snapshotCounters(ruleName);
-                    ctx.restoreCounters(ruleName, before);
-                    String helperCode = generateHelperCode(ctx, ruleName, helperName, bounded.body());
-                    ctx.restoreCounters(ruleName, after);
-                    ctx.addHelper(ruleName, helperCode);
+                    int[] counterState = ctx.snapshotCounters(ruleName);
+                    analyzeHelpersInBody(ctx, ruleName, bounded.body(), specs);
+                    specs.add(new HelperSpec.ChainHelper(helperName, bounded.body(), counterState));
                 }
             }
             case GroupElement g -> {
                 int n = ctx.nextGroup(ruleName);
                 String helperName = ruleName + "Group" + n + "Parser";
-                int[] before = ctx.snapshotCounters(ruleName);
-                collectHelpersInBody(ctx, ruleName, g.body());
-                int[] after = ctx.snapshotCounters(ruleName);
-                ctx.restoreCounters(ruleName, before);
-                String helperCode = generateHelperCode(ctx, ruleName, helperName, g.body());
-                ctx.restoreCounters(ruleName, after);
-                ctx.addHelper(ruleName, helperCode);
+                int[] counterState = ctx.snapshotCounters(ruleName);
+                analyzeHelpersInBody(ctx, ruleName, g.body(), specs);
+                specs.add(new HelperSpec.ChainHelper(helperName, g.body(), counterState));
             }
             case SeparatedElement sep -> {
                 int n = ctx.nextSep(ruleName);
                 String bodyHelperName = ruleName + "Sep" + n + "BodyParser";
                 String outerHelperName = ruleName + "Sep" + n + "Parser";
-                int[] before = ctx.snapshotCounters(ruleName);
-                collectHelpersInElement(ctx, ruleName, sep.element());
-                collectHelpersInElement(ctx, ruleName, sep.separator());
-                int[] after = ctx.snapshotCounters(ruleName);
-                ctx.restoreCounters(ruleName, before);
-                String elemCode = generateElementCode(ctx, ruleName, sep.element());
-                String sepCode  = generateElementCode(ctx, ruleName, sep.separator());
-                ctx.restoreCounters(ruleName, after);
-                String chainClass = getChainClassName(ctx, ruleName);
-                IndentedWriter bw = new IndentedWriter(1);
-                bw.line("public static class " + bodyHelperName + " extends " + chainClass + " {");
-                bw.indent();
-                bw.line("private static final long serialVersionUID = 1L;");
-                bw.line("@Override");
-                bw.line("public Parsers getLazyParsers() {");
-                bw.indent();
-                bw.line("return new Parsers(");
-                bw.indent();
-                bw.line(sepCode + ",");
-                bw.line(elemCode);
-                bw.dedent();
-                bw.line(");");
-                bw.dedent();
-                bw.line("}");
-                bw.dedent();
-                bw.line("}");
-                bw.blankLine();
-                ctx.addHelper(ruleName, bw.build());
-                IndentedWriter ow = new IndentedWriter(1);
-                ow.line("public static class " + outerHelperName + " extends " + chainClass + " {");
-                ow.indent();
-                ow.line("private static final long serialVersionUID = 1L;");
-                ow.line("@Override");
-                ow.line("public Parsers getLazyParsers() {");
-                ow.indent();
-                ow.line("return new Parsers(");
-                ow.indent();
-                ow.line(elemCode + ",");
-                ow.line("new ZeroOrMore(" + bodyHelperName + ".class)");
-                ow.dedent();
-                ow.line(");");
-                ow.dedent();
-                ow.line("}");
-                ow.dedent();
-                ow.line("}");
-                ow.blankLine();
-                ctx.addHelper(ruleName, ow.build());
+                int[] counterState = ctx.snapshotCounters(ruleName);
+                analyzeHelpersInElement(ctx, ruleName, sep.element(), specs);
+                analyzeHelpersInElement(ctx, ruleName, sep.separator(), specs);
+                specs.add(new HelperSpec.SepHelper(bodyHelperName, outerHelperName, sep.element(), sep.separator(), counterState));
             }
             default -> {} // TerminalElement, RuleRefElement, ErrorElement
+        }
+    }
+
+    // =========================================================================
+    // Phase 1b: emission — 各 HelperSpec からコードを生成
+    // =========================================================================
+
+    static void emitAnalyzedHelpers(ParserGenerator.GenContext ctx, String ruleName, List<HelperSpec> specs) {
+        for (HelperSpec spec : specs) {
+            switch (spec) {
+                case HelperSpec.ChainHelper chain -> {
+                    ctx.restoreCounters(ruleName, chain.counterState());
+                    String helperCode = generateHelperCode(ctx, ruleName, chain.name(), chain.body());
+                    ctx.addHelper(ruleName, helperCode);
+                }
+                case HelperSpec.SepHelper sep -> {
+                    ctx.restoreCounters(ruleName, sep.counterState());
+                    String elemCode = generateElementCode(ctx, ruleName, sep.element());
+                    String sepCode  = generateElementCode(ctx, ruleName, sep.separator());
+                    String chainClass = getChainClassName(ctx, ruleName);
+                    IndentedWriter bw = new IndentedWriter(1);
+                    bw.line("public static class " + sep.bodyName() + " extends " + chainClass + " {");
+                    bw.indent();
+                    bw.line("private static final long serialVersionUID = 1L;");
+                    bw.line("@Override");
+                    bw.line("public Parsers getLazyParsers() {");
+                    bw.indent();
+                    bw.line("return new Parsers(");
+                    bw.indent();
+                    bw.line(sepCode + ",");
+                    bw.line(elemCode);
+                    bw.dedent();
+                    bw.line(");");
+                    bw.dedent();
+                    bw.line("}");
+                    bw.dedent();
+                    bw.line("}");
+                    bw.blankLine();
+                    ctx.addHelper(ruleName, bw.build());
+                    IndentedWriter ow = new IndentedWriter(1);
+                    ow.line("public static class " + sep.outerName() + " extends " + chainClass + " {");
+                    ow.indent();
+                    ow.line("private static final long serialVersionUID = 1L;");
+                    ow.line("@Override");
+                    ow.line("public Parsers getLazyParsers() {");
+                    ow.indent();
+                    ow.line("return new Parsers(");
+                    ow.indent();
+                    ow.line(elemCode + ",");
+                    ow.line("new ZeroOrMore(" + sep.bodyName() + ".class)");
+                    ow.dedent();
+                    ow.line(");");
+                    ow.dedent();
+                    ow.line("}");
+                    ow.dedent();
+                    ow.line("}");
+                    ow.blankLine();
+                    ctx.addHelper(ruleName, ow.build());
+                }
+            }
         }
     }
 

@@ -137,10 +137,11 @@ public class ParserGenerator implements CodeGenerator {
 
         GenContext ctx = createContext(grammar);
 
-        // Phase 1: 全ルールのヘルパーを事前収集
+        // Phase 1: 全ルールのヘルパーを分析→生成（analyze/emit 分離）
         for (RuleDecl rule : grammar.rules()) {
             ctx.resetCounters(rule.name());
-            ParserRuleEmitter.collectHelpers(ctx, rule);
+            java.util.List<ParserRuleEmitter.HelperSpec> specs = ParserRuleEmitter.analyzeHelpers(ctx, rule);
+            ParserRuleEmitter.emitAnalyzedHelpers(ctx, rule.name(), specs);
         }
 
         StringBuilder sb = new StringBuilder();
