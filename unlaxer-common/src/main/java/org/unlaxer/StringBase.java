@@ -6,7 +6,6 @@ import java.lang.Character;
 import java.lang.IllegalArgumentException;
 import java.lang.Object;
 import java.lang.String;
-import java.lang.StringBuffer;
 import java.nio.charset.Charset;
 import java.util.Locale;
 import java.util.regex.PatternSyntaxException;
@@ -105,47 +104,6 @@ public interface StringBase extends CharSequence{
   boolean equals(Object anObject);
 
   /**
-   * Compares this string to the specified {@code StringBuffer}.  The result
-   * is {@code true} if and only if this {@code String} represents the same
-   * sequence of characters as the specified {@code StringBuffer}. This method
-   * synchronizes on the {@code StringBuffer}.
-   *
-   * <p>For finer-grained String comparison, refer to
-   * {@link java.text.Collator}.
-   *
-   * @param  sb
-   *         The {@code StringBuffer} to compare this {@code String} against
-   *
-   * @return  {@code true} if this {@code String} represents the same
-   *          sequence of characters as the specified {@code StringBuffer},
-   *          {@code false} otherwise
-   *
-   * @since  1.4
-   */
-  boolean contentEquals(StringBuffer sb);
-
-  /**
-   * Compares this string to the specified {@code CharSequence}.  The
-   * result is {@code true} if and only if this {@code String} represents the
-   * same sequence of char values as the specified sequence. Note that if the
-   * {@code CharSequence} is a {@code StringBuffer} then the method
-   * synchronizes on it.
-   *
-   * <p>For finer-grained String comparison, refer to
-   * {@link java.text.Collator}.
-   *
-   * @param  cs
-   *         The sequence to compare this {@code String} against
-   *
-   * @return  {@code true} if this {@code String} represents the same
-   *          sequence of char values as the specified sequence, {@code
-   *          false} otherwise
-   *
-   * @since  1.5
-   */
-  boolean contentEquals(CharSequence cs);
-  
-  /**
    * Compares this {@code String} to another {@code String}, ignoring case
    * considerations.  Two strings are considered equal ignoring case if they
    * are of the same length and corresponding characters in the two strings
@@ -220,27 +178,6 @@ public interface StringBase extends CharSequence{
    *          lexicographically greater than the string argument.
    */
   int compareTo(String anotherString);
-  
-  /**
-   * Compares two strings lexicographically, ignoring case
-   * differences. This method returns an integer whose sign is that of
-   * calling {@code compareTo} with normalized versions of the strings
-   * where case differences have been eliminated by calling
-   * {@code Character.toLowerCase(Character.toUpperCase(character))} on
-   * each character.
-   * <p>
-   * Note that this method does <em>not</em> take locale into account,
-   * and will result in an unsatisfactory ordering for certain locales.
-   * The {@link java.text.Collator} class provides locale-sensitive comparison.
-   *
-   * @param   str   the {@code String} to be compared.
-   * @return  a negative integer, zero, or a positive integer as the
-   *          specified String is greater than, equal to, or less
-   *          than this String, ignoring case considerations.
-   * @see     java.text.Collator
-   * @since   1.2
-   */
-  int compareToIgnoreCase(String str);
   
   /**
    * Tests if this string starts with the specified prefix.
@@ -576,49 +513,6 @@ public interface StringBase extends CharSequence{
    */
   boolean contains(CharSequence s);
 
-  /**
-   * Replaces the first substring of this string that matches the given <a
-   * href="../util/regex/Pattern.html#sum">regular expression</a> with the
-   * given replacement.
-   *
-   * <p> An invocation of this method of the form
-   * <i>str</i>{@code .replaceFirst(}<i>regex</i>{@code ,} <i>repl</i>{@code )}
-   * yields exactly the same result as the expression
-   *
-   * <blockquote>
-   * <code>
-   * {@link java.util.regex.Pattern}.{@link
-   * java.util.regex.Pattern#compile compile}(<i>regex</i>).{@link
-   * java.util.regex.Pattern#matcher(java.lang.CharSequence) matcher}(<i>str</i>).{@link
-   * java.util.regex.Matcher#replaceFirst replaceFirst}(<i>repl</i>)
-   * </code>
-   * </blockquote>
-   *
-   *<p>
-   * Note that backslashes ({@code \}) and dollar signs ({@code $}) in the
-   * replacement string may cause the results to be different than if it were
-   * being treated as a literal replacement string; see
-   * {@link java.util.regex.Matcher#replaceFirst}.
-   * Use {@link java.util.regex.Matcher#quoteReplacement} to suppress the special
-   * meaning of these characters, if desired.
-   *
-   * @param   regex
-   *          the regular expression to which this string is to be matched
-   * @param   replacement
-   *          the string to be substituted for the first match
-   *
-   * @return  The resulting {@code String}
-   *
-   * @throws  PatternSyntaxException
-   *          if the regular expression's syntax is invalid
-   *
-   * @see java.util.regex.Pattern
-   *
-   * @since 1.4
-   * @spec JSR-51
-   */
-  String replaceFirst(String regex, String replacement);
-  
   /**
    * Replaces each substring of this string that matches the given <a
    * href="../util/regex/Pattern.html#sum">regular expression</a> with the
@@ -1039,58 +933,6 @@ public interface StringBase extends CharSequence{
   String strip();
   
   /**
-   * Returns a string whose value is this string, with all leading
-   * {@link Character#isWhitespace(int) white space} removed.
-   * <p>
-   * If this {@code String} object represents an empty string,
-   * or if all code points in this string are
-   * {@link Character#isWhitespace(int) white space}, then an empty string
-   * is returned.
-   * <p>
-   * Otherwise, returns a substring of this string beginning with the first
-   * code point that is not a {@link Character#isWhitespace(int) white space}
-   * up to to and including the last code point of this string.
-   * <p>
-   * This method may be used to trim
-   * {@link Character#isWhitespace(int) white space} from
-   * the beginning of a string.
-   *
-   * @return  a string whose value is this string, with all leading white
-   *          space removed
-   *
-   * @see Character#isWhitespace(int)
-   *
-   * @since 11
-   */
-  String stripLeading();
-  
-  /**
-   * Returns a string whose value is this string, with all trailing
-   * {@link Character#isWhitespace(int) white space} removed.
-   * <p>
-   * If this {@code String} object represents an empty string,
-   * or if all characters in this string are
-   * {@link Character#isWhitespace(int) white space}, then an empty string
-   * is returned.
-   * <p>
-   * Otherwise, returns a substring of this string beginning with the first
-   * code point of this string up to and including the last code point
-   * that is not a {@link Character#isWhitespace(int) white space}.
-   * <p>
-   * This method may be used to trim
-   * {@link Character#isWhitespace(int) white space} from
-   * the end of a string.
-   *
-   * @return  a string whose value is this string, with all trailing white
-   *          space removed
-   *
-   * @see Character#isWhitespace(int)
-   *
-   * @since 11
-   */
-  String stripTrailing();
-  
-  /**
    * Returns {@code true} if the string is empty or contains only
    * {@link Character#isWhitespace(int) white space} codepoints,
    * otherwise {@code false}.
@@ -1176,32 +1018,6 @@ public interface StringBase extends CharSequence{
    *          the character sequence represented by this string.
    */
   char[] toCharArray();
-
-  /**
-   * Returns a canonical representation for the string object.
-   * <p>
-   * A pool of strings, initially empty, is maintained privately by the
-   * class {@code String}.
-   * <p>
-   * When the intern method is invoked, if the pool already contains a
-   * string equal to this {@code String} object as determined by
-   * the {@link #equals(Object)} method, then the string from the pool is
-   * returned. Otherwise, this {@code String} object is added to the
-   * pool and a reference to this {@code String} object is returned.
-   * <p>
-   * It follows that for any two strings {@code s} and {@code t},
-   * {@code s.intern() == t.intern()} is {@code true}
-   * if and only if {@code s.equals(t)} is {@code true}.
-   * <p>
-   * All literal strings and string-valued constant expressions are
-   * interned. String literals are defined in section 3.10.5 of the
-   * <cite>The Java&trade; Language Specification</cite>.
-   *
-   * @return  a string that has the same contents as this string, but is
-   *          guaranteed to be from a pool of unique strings.
-   * @jls 3.10.5 String Literals
-   */
-  String intern();
 
   /**
    * Returns a string whose value is the concatenation of this

@@ -213,13 +213,6 @@ public interface Source extends CodePointAccessor, PositionResolver {
         CodePointOffset.ZERO);
   }
 
-  default Source replaceFirst(String regex, CodePointAccessor replacement) {
-    return parentSourceAndStringToSource().apply(
-        thisSource(),
-        replaceFirst(regex, replacement.toString()),
-        CodePointOffset.ZERO);
-  }
-
   default Source replaceAll(String regex, CodePointAccessor replacement) {
     return parentSourceAndStringToSource().apply(
         thisSource(),
@@ -309,16 +302,6 @@ public interface Source extends CodePointAccessor, PositionResolver {
 
     return parentSourceAndStringToSource().apply(
         thisSource(), strip(), CodePointOffset.ZERO);
-  }
-
-  default Source stripLeadingAsStringInterface() {
-    return parentSourceAndStringToSource().apply(
-        thisSource(), stripLeading(), CodePointOffset.ZERO);
-  }
-
-  default Source stripTrailingAsStringInterface() {
-    return parentSourceAndStringToSource().apply(
-        thisSource(), stripTrailing(), CodePointOffset.ZERO);
   }
 
   default Stream<Source> linesAsStringInterface() {

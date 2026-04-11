@@ -73,10 +73,6 @@ public interface CodePointAccessor extends Comparable<CodePointAccessor>, String
     return compareTo(anotherString.source());
   }
 
-  default int compareToIgnoreCase(CodePointAccessor str) {
-    return compareToIgnoreCase(str.toString());
-  }
-  
   default boolean regionMatches(CodePointIndex toffset, String other, CodePointIndex ooffset, Length len) {
     return stringIndexAccessor().regionMatches(toStringIndex(toffset).value(), other , toStringIndex(ooffset).value(), len.value());
   }

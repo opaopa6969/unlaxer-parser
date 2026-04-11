@@ -251,16 +251,6 @@ public class StringSource2 implements Source {
   }
 
   @Override
-  public boolean contentEquals(StringBuffer sb) {
-    return sourceString.contentEquals(sb);
-  }
-
-  @Override
-  public boolean contentEquals(CharSequence cs) {
-    return sourceString.contentEquals(cs);
-  }
-
-  @Override
   public boolean equalsIgnoreCase(String anotherString) {
     return sourceString.equalsIgnoreCase(anotherString);
   }
@@ -268,11 +258,6 @@ public class StringSource2 implements Source {
   @Override
   public int compareTo(String anotherString) {
     return sourceString.compareTo(anotherString);
-  }
-
-  @Override
-  public int compareToIgnoreCase(String str) {
-    return sourceString.compareToIgnoreCase(str);
   }
 
   @Override
@@ -351,11 +336,6 @@ public class StringSource2 implements Source {
   }
 
   @Override
-  public String replaceFirst(String regex, String replacement) {
-    return sourceString.replaceFirst(regex, replacement);
-  }
-
-  @Override
   public String replaceAll(String regex, String replacement) {
     return sourceString.replaceAll(regex, replacement);
   }
@@ -406,16 +386,6 @@ public class StringSource2 implements Source {
   }
 
   @Override
-  public String stripLeading() {
-    return sourceString.stripLeading();
-  }
-
-  @Override
-  public String stripTrailing() {
-    return sourceString.stripTrailing();
-  }
-
-  @Override
   public boolean isBlank() {
     return sourceString.isBlank();
   }
@@ -438,11 +408,6 @@ public class StringSource2 implements Source {
   @Override
   public char[] toCharArray() {
     return sourceString.toCharArray();
-  }
-
-  @Override
-  public String intern() {
-    return sourceString.intern();
   }
 
   @Override
