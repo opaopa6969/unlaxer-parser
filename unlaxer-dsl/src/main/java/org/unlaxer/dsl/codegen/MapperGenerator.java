@@ -80,20 +80,20 @@ public class MapperGenerator implements CodeGenerator {
         emitEntryPoint(sb, grammar, astClass, parsersClass, rootClassName, rootRule);
 
         // ----- mapToken -----
-        MapperRuleEmitter.emitMapTokenMethod(sb, astClass, parsersClass, allMappingRules);
+        sb.append(MapperRuleEmitter.emitMapTokenMethod(astClass, parsersClass, allMappingRules));
 
         // ----- findBestMappedToken -----
-        MapperRuleEmitter.emitFindBestMappedToken(sb, astClass);
+        sb.append(MapperRuleEmitter.emitFindBestMappedToken(astClass));
 
         // ----- Mapping Methods -----
-        MapperRuleEmitter.emitMappingMethods(sb, grammar, astClass, parsersClass,
-            mappingRules, allMappingRules, mappedClassByRuleName, tokenDeclByName, ruleByName);
+        sb.append(MapperRuleEmitter.emitMappingMethods(grammar, astClass, parsersClass,
+            mappingRules, allMappingRules, mappedClassByRuleName, tokenDeclByName, ruleByName));
 
         // ----- Fold Helpers -----
-        MapperRuleEmitter.emitFoldHelpers(sb, grammar, astClass, mappingRules);
+        sb.append(MapperRuleEmitter.emitFoldHelpers(grammar, astClass, mappingRules));
 
         // ----- Utilities -----
-        MapperRuleEmitter.emitUtilities(sb);
+        sb.append(MapperRuleEmitter.emitUtilities());
 
         sb.append("}\n");
 

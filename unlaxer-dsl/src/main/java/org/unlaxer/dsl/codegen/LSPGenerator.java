@@ -30,49 +30,54 @@ public class LSPGenerator implements CodeGenerator {
                   || a instanceof BackrefAnnotation
                   || a instanceof ScopeTreeAnnotation));
 
-        StringBuilder sb = new StringBuilder();
-        sb.append("package ").append(packageName).append(";\n\n");
+        IndentedWriter w = new IndentedWriter(0);
+        w.line("package " + packageName + ";");
+        w.blankLine();
 
         // ----- Imports -----
-        LSPServerEmitter.emitImports(sb, hasScopeStore);
+        LSPServerEmitter.emitImports(w, hasScopeStore);
 
-        sb.append("public abstract class ").append(serverClass)
-          .append(" implements LanguageServer, LanguageClientAware {\n\n");
+        w.line("public abstract class " + serverClass
+              + " implements LanguageServer, LanguageClientAware {");
+        w.blankLine();
+
+        w.indent();
 
         // ----- Fields & constructor -----
-        LSPServerEmitter.emitFieldsAndConstructor(sb, serverClass, keywords, hasCatalog);
+        LSPServerEmitter.emitFieldsAndConstructor(w, serverClass, keywords, hasCatalog);
 
         // ----- Lifecycle methods -----
-        LSPServerEmitter.emitLifecycleMethods(sb, serverClass, hasCatalog);
+        LSPServerEmitter.emitLifecycleMethods(w, serverClass, hasCatalog);
 
         // ----- parseDocument & utilities -----
-        LSPServerEmitter.emitParseDocument(sb, parsersClass, hasScopeStore);
+        LSPServerEmitter.emitParseDocument(w, parsersClass, hasScopeStore);
 
         // ----- Hook methods -----
-        LSPServerEmitter.emitHookMethods(sb);
+        LSPServerEmitter.emitHookMethods(w);
 
         // ----- Catalog methods -----
         if (hasCatalog) {
-            LSPServerEmitter.emitCatalogMethods(sb, grammarName);
+            LSPServerEmitter.emitCatalogMethods(w, grammarName);
         }
 
         // ----- Records -----
-        LSPServerEmitter.emitRecords(sb);
+        LSPServerEmitter.emitRecords(w);
 
         // ----- TextDocumentService inner class -----
-        LSPServerEmitter.emitTextDocumentService(sb, serverClass, grammarName);
+        LSPServerEmitter.emitTextDocumentService(w, serverClass, grammarName);
 
         // ----- WorkspaceService inner class -----
-        LSPServerEmitter.emitWorkspaceService(sb, serverClass);
+        LSPServerEmitter.emitWorkspaceService(w, serverClass);
 
         // ----- Catalog interfaces -----
         if (hasCatalog) {
-            LSPServerEmitter.emitCatalogInterfaces(sb);
+            LSPServerEmitter.emitCatalogInterfaces(w);
         }
 
-        sb.append("}\n");
+        w.dedent();
+        w.line("}");
 
-        return new GeneratedSource(packageName, serverClass, sb.toString());
+        return new GeneratedSource(packageName, serverClass, w.build());
     }
 
     private String getPackageName(GrammarDecl grammar) {

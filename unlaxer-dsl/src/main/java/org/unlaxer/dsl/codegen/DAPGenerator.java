@@ -28,64 +28,69 @@ public class DAPGenerator implements CodeGenerator {
         String parsersClass = grammarName + "Parsers";
         String mapperClass = grammarName + "Mapper";
 
-        StringBuilder sb = new StringBuilder();
+        IndentedWriter w = new IndentedWriter(0);
 
-        sb.append("package ").append(packageName).append(";\n\n");
+        w.line("package " + packageName + ";");
+        w.blankLine();
 
-        sb.append("import java.io.IOException;\n");
-        sb.append("import java.nio.file.Files;\n");
-        sb.append("import java.nio.file.Path;\n");
-        sb.append("import java.util.ArrayList;\n");
-        sb.append("import java.util.HashSet;\n");
-        sb.append("import java.util.List;\n");
-        sb.append("import java.util.Map;\n");
-        sb.append("import java.util.Set;\n");
-        sb.append("import java.util.concurrent.CompletableFuture;\n");
-        sb.append("import org.eclipse.lsp4j.debug.*;\n");
-        sb.append("import org.eclipse.lsp4j.debug.services.*;\n");
-        sb.append("import org.unlaxer.Parsed;\n");
-        sb.append("import org.unlaxer.StringSource;\n");
-        sb.append("import org.unlaxer.Token;\n");
-        sb.append("import org.unlaxer.context.ParseContext;\n");
-        sb.append("import org.unlaxer.parser.Parser;\n");
-        sb.append("\n");
+        w.line("import java.io.IOException;");
+        w.line("import java.nio.file.Files;");
+        w.line("import java.nio.file.Path;");
+        w.line("import java.util.ArrayList;");
+        w.line("import java.util.HashSet;");
+        w.line("import java.util.List;");
+        w.line("import java.util.Map;");
+        w.line("import java.util.Set;");
+        w.line("import java.util.concurrent.CompletableFuture;");
+        w.line("import org.eclipse.lsp4j.debug.*;");
+        w.line("import org.eclipse.lsp4j.debug.services.*;");
+        w.line("import org.unlaxer.Parsed;");
+        w.line("import org.unlaxer.StringSource;");
+        w.line("import org.unlaxer.Token;");
+        w.line("import org.unlaxer.context.ParseContext;");
+        w.line("import org.unlaxer.parser.Parser;");
+        w.blankLine();
 
-        sb.append("public abstract class ").append(adapterClass).append(" implements IDebugProtocolServer {\n\n");
+        w.line("public abstract class " + adapterClass + " implements IDebugProtocolServer {");
+        w.blankLine();
+
+        w.indent();
 
         // ----- Fields & connect -----
-        DAPProtocolEmitter.emitFieldsAndConnect(sb);
+        DAPProtocolEmitter.emitFieldsAndConnect(w);
 
         // ----- DAP protocol methods -----
-        DAPProtocolEmitter.emitInitialize(sb);
-        DAPProtocolEmitter.emitLaunch(sb);
-        DAPProtocolEmitter.emitConfigurationDone(sb);
-        DAPProtocolEmitter.emitSetBreakpoints(sb);
-        DAPProtocolEmitter.emitNext(sb);
-        DAPProtocolEmitter.emitContinue(sb);
-        DAPProtocolEmitter.emitThreads(sb);
-        DAPProtocolEmitter.emitStackTrace(sb);
-        DAPProtocolEmitter.emitScopes(sb);
-        DAPProtocolEmitter.emitVariables(sb);
-        DAPProtocolEmitter.emitDisconnect(sb);
+        DAPProtocolEmitter.emitInitialize(w);
+        DAPProtocolEmitter.emitLaunch(w);
+        DAPProtocolEmitter.emitConfigurationDone(w);
+        DAPProtocolEmitter.emitSetBreakpoints(w);
+        DAPProtocolEmitter.emitNext(w);
+        DAPProtocolEmitter.emitContinue(w);
+        DAPProtocolEmitter.emitThreads(w);
+        DAPProtocolEmitter.emitStackTrace(w);
+        DAPProtocolEmitter.emitScopes(w);
+        DAPProtocolEmitter.emitVariables(w);
+        DAPProtocolEmitter.emitDisconnect(w);
 
         // ----- Runtime / stepping methods -----
-        DAPRuntimeEmitter.emitParseAndCollectSteps(sb, parsersClass);
-        DAPRuntimeEmitter.emitCollectRuntimeProbeVariables(sb);
-        DAPRuntimeEmitter.emitCreateRootSourceCompat(sb);
-        DAPRuntimeEmitter.emitAstMethods(sb, packageName, grammarName, mapperClass);
-        DAPRuntimeEmitter.emitStepHelpers(sb);
-        DAPRuntimeEmitter.emitCollectStepPoints(sb);
-        DAPRuntimeEmitter.emitBreakpointHelpers(sb);
+        DAPRuntimeEmitter.emitParseAndCollectSteps(w, parsersClass);
+        DAPRuntimeEmitter.emitCollectRuntimeProbeVariables(w);
+        DAPRuntimeEmitter.emitCreateRootSourceCompat(w);
+        DAPRuntimeEmitter.emitAstMethods(w, packageName, grammarName, mapperClass);
+        DAPRuntimeEmitter.emitStepHelpers(w);
+        DAPRuntimeEmitter.emitCollectStepPoints(w);
+        DAPRuntimeEmitter.emitBreakpointHelpers(w);
 
         // ----- Hook methods -----
-        DAPRuntimeEmitter.emitHookMethods(sb);
+        DAPRuntimeEmitter.emitHookMethods(w);
 
         // ----- Output utilities -----
-        DAPRuntimeEmitter.emitOutputUtilities(sb);
+        DAPRuntimeEmitter.emitOutputUtilities(w);
 
-        sb.append("}\n");
+        w.dedent();
+        w.line("}");
 
-        return new GeneratedSource(packageName, adapterClass, sb.toString());
+        return new GeneratedSource(packageName, adapterClass, w.build());
     }
 
     private String getPackageName(GrammarDecl grammar) {

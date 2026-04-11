@@ -25,12 +25,16 @@ class MapperRuleEmitter {
     /**
      * mapToken() メソッドを生成する。
      */
-    static void emitMapTokenMethod(StringBuilder sb, String astClass, String parsersClass,
+    static String emitMapTokenMethod(String astClass, String parsersClass,
             Map<String, List<RuleDecl>> allMappingRules) {
-        sb.append("    private static ").append(astClass).append(" mapToken(Token token) {\n");
-        sb.append("        if (token == null) {\n");
-        sb.append("            return null;\n");
-        sb.append("        }\n");
+        IndentedWriter w = new IndentedWriter(1);
+        w.line("private static " + astClass + " mapToken(Token token) {");
+        w.indent();
+        w.line("if (token == null) {");
+        w.indent();
+        w.line("return null;");
+        w.dedent();
+        w.line("}");
         // Include ALL parser classes that map to each AST class
         Set<String> emittedParserClasses = new LinkedHashSet<>();
         for (Map.Entry<String, List<RuleDecl>> entry : allMappingRules.entrySet()) {
@@ -38,88 +42,128 @@ class MapperRuleEmitter {
             for (RuleDecl rule : entry.getValue()) {
                 String parserClassKey = rule.name() + "Parser";
                 if (emittedParserClasses.add(parserClassKey)) {
-                    sb.append("        if (token.parser.getClass() == ").append(parsersClass).append(".")
-                        .append(rule.name()).append("Parser.class) {\n");
-                    sb.append("            return to").append(className).append("(token);\n");
-                    sb.append("        }\n");
+                    w.line("if (token.parser.getClass() == " + parsersClass + "."
+                        + rule.name() + "Parser.class) {");
+                    w.indent();
+                    w.line("return to" + className + "(token);");
+                    w.dedent();
+                    w.line("}");
                 }
             }
         }
-        sb.append("        return null;\n");
-        sb.append("    }\n\n");
+        w.line("return null;");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
+        return w.build();
     }
 
     /**
      * findBestMappedToken 関連メソッドと MappingCandidate 内部クラスを生成する。
      */
-    static void emitFindBestMappedToken(StringBuilder sb, String astClass) {
-        sb.append("    private static Token findBestMappedToken(Token token, String preferredAstSimpleName) {\n");
-        sb.append("        MappingCandidate best = findBestMappedToken(token, 0, null, preferredAstSimpleName);\n");
-        sb.append("        return best == null ? null : best.token;\n");
-        sb.append("    }\n\n");
+    static String emitFindBestMappedToken(String astClass) {
+        IndentedWriter w = new IndentedWriter(1);
+        w.line("private static Token findBestMappedToken(Token token, String preferredAstSimpleName) {");
+        w.indent();
+        w.line("MappingCandidate best = findBestMappedToken(token, 0, null, preferredAstSimpleName);");
+        w.line("return best == null ? null : best.token;");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
 
-        sb.append("    private static MappingCandidate findBestMappedToken(Token token, int depth, MappingCandidate best, String preferredAstSimpleName) {\n");
-        sb.append("        if (token == null) {\n");
-        sb.append("            return best;\n");
-        sb.append("        }\n");
-        sb.append("        ").append(astClass).append(" mapped = mapToken(token);\n");
-        sb.append("        if (mapped != null) {\n");
-        sb.append("            boolean preferred = preferredAstSimpleName == null\n");
-        sb.append("                || preferredAstSimpleName.isBlank()\n");
-        sb.append("                || mapped.getClass().getSimpleName().equals(preferredAstSimpleName);\n");
-        sb.append("            MappingCandidate candidate = new MappingCandidate(token, depth, tokenStartOffsetCompat(token), preferred);\n");
-        sb.append("            best = betterCandidate(best, candidate);\n");
-        sb.append("        }\n");
-        sb.append("        for (Token child : token.filteredChildren) {\n");
-        sb.append("            best = findBestMappedToken(child, depth + 1, best, preferredAstSimpleName);\n");
-        sb.append("        }\n");
-        sb.append("        return best;\n");
-        sb.append("    }\n\n");
+        w.line("private static MappingCandidate findBestMappedToken(Token token, int depth, MappingCandidate best, String preferredAstSimpleName) {");
+        w.indent();
+        w.line("if (token == null) {");
+        w.indent();
+        w.line("return best;");
+        w.dedent();
+        w.line("}");
+        w.line(astClass + " mapped = mapToken(token);");
+        w.line("if (mapped != null) {");
+        w.indent();
+        w.line("boolean preferred = preferredAstSimpleName == null");
+        w.line("    || preferredAstSimpleName.isBlank()");
+        w.line("    || mapped.getClass().getSimpleName().equals(preferredAstSimpleName);");
+        w.line("MappingCandidate candidate = new MappingCandidate(token, depth, tokenStartOffsetCompat(token), preferred);");
+        w.line("best = betterCandidate(best, candidate);");
+        w.dedent();
+        w.line("}");
+        w.line("for (Token child : token.filteredChildren) {");
+        w.indent();
+        w.line("best = findBestMappedToken(child, depth + 1, best, preferredAstSimpleName);");
+        w.dedent();
+        w.line("}");
+        w.line("return best;");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
 
-        sb.append("    private static MappingCandidate betterCandidate(MappingCandidate current, MappingCandidate candidate) {\n");
-        sb.append("        if (candidate == null) {\n");
-        sb.append("            return current;\n");
-        sb.append("        }\n");
-        sb.append("        if (current == null) {\n");
-        sb.append("            return candidate;\n");
-        sb.append("        }\n");
-        sb.append("        if (candidate.preferred != current.preferred) {\n");
-        sb.append("            return candidate.preferred ? candidate : current;\n");
-        sb.append("        }\n");
-        sb.append("        if (candidate.depth < current.depth) {\n");
-        sb.append("            return candidate;\n");
-        sb.append("        }\n");
-        sb.append("        if (candidate.depth > current.depth) {\n");
-        sb.append("            return current;\n");
-        sb.append("        }\n");
-        sb.append("        return candidate.startOffset >= current.startOffset ? candidate : current;\n");
-        sb.append("    }\n\n");
+        w.line("private static MappingCandidate betterCandidate(MappingCandidate current, MappingCandidate candidate) {");
+        w.indent();
+        w.line("if (candidate == null) {");
+        w.indent();
+        w.line("return current;");
+        w.dedent();
+        w.line("}");
+        w.line("if (current == null) {");
+        w.indent();
+        w.line("return candidate;");
+        w.dedent();
+        w.line("}");
+        w.line("if (candidate.preferred != current.preferred) {");
+        w.indent();
+        w.line("return candidate.preferred ? candidate : current;");
+        w.dedent();
+        w.line("}");
+        w.line("if (candidate.depth < current.depth) {");
+        w.indent();
+        w.line("return candidate;");
+        w.dedent();
+        w.line("}");
+        w.line("if (candidate.depth > current.depth) {");
+        w.indent();
+        w.line("return current;");
+        w.dedent();
+        w.line("}");
+        w.line("return candidate.startOffset >= current.startOffset ? candidate : current;");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
 
-        sb.append("    private static final class MappingCandidate {\n");
-        sb.append("        private final Token token;\n");
-        sb.append("        private final int depth;\n");
-        sb.append("        private final int startOffset;\n");
-        sb.append("        private final boolean preferred;\n\n");
-        sb.append("        private MappingCandidate(Token token, int depth, int startOffset, boolean preferred) {\n");
-        sb.append("            this.token = token;\n");
-        sb.append("            this.depth = depth;\n");
-        sb.append("            this.startOffset = startOffset;\n");
-        sb.append("            this.preferred = preferred;\n");
-        sb.append("        }\n");
-        sb.append("    }\n\n");
+        w.line("private static final class MappingCandidate {");
+        w.indent();
+        w.line("private final Token token;");
+        w.line("private final int depth;");
+        w.line("private final int startOffset;");
+        w.line("private final boolean preferred;");
+        w.blankLine();
+        w.line("private MappingCandidate(Token token, int depth, int startOffset, boolean preferred) {");
+        w.indent();
+        w.line("this.token = token;");
+        w.line("this.depth = depth;");
+        w.line("this.startOffset = startOffset;");
+        w.line("this.preferred = preferred;");
+        w.dedent();
+        w.line("}");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
+        return w.build();
     }
 
     /**
      * 各 mapping ルールに対応する toXxx() メソッドを生成する。
      */
-    static void emitMappingMethods(StringBuilder sb, GrammarDecl grammar, String astClass, String parsersClass,
+    static String emitMappingMethods(GrammarDecl grammar, String astClass, String parsersClass,
             Map<String, RuleDecl> mappingRules, Map<String, List<RuleDecl>> allMappingRules,
             Map<String, String> mappedClassByRuleName,
             Map<String, TokenDecl> tokenDeclByName, Map<String, RuleDecl> ruleByName) {
 
-        sb.append("    // =========================================================================\n");
-        sb.append("    // Mapping Methods\n");
-        sb.append("    // =========================================================================\n\n");
+        IndentedWriter w = new IndentedWriter(1);
+        w.line("// =========================================================================");
+        w.line("// Mapping Methods");
+        w.line("// =========================================================================");
+        w.blankLine();
 
         for (Map.Entry<String, RuleDecl> entry : mappingRules.entrySet()) {
             String className = entry.getKey();
@@ -128,22 +172,26 @@ class MapperRuleEmitter {
             boolean leftAssoc = MapperElementUtil.isLeftAssocRule(rule, mapping);
             boolean rightAssoc = MapperElementUtil.isRightAssocRule(rule, mapping);
 
-            sb.append("    static ").append(astClass).append(".").append(className)
-              .append(" to").append(className).append("(Token token) {\n");
+            w.line("static " + astClass + "." + className
+              + " to" + className + "(Token token) {");
+            w.indent();
 
             if (leftAssoc || rightAssoc) {
-                emitAssocMappingBody(sb, grammar, astClass, parsersClass, className, rule, mapping,
+                emitAssocMappingBody(w, grammar, astClass, parsersClass, className, rule, mapping,
                     rightAssoc, allMappingRules, mappedClassByRuleName, tokenDeclByName, ruleByName);
             } else {
-                emitPlainMappingBody(sb, grammar, astClass, parsersClass, className, rule, mapping,
+                emitPlainMappingBody(w, grammar, astClass, parsersClass, className, rule, mapping,
                     mappedClassByRuleName, tokenDeclByName, ruleByName);
             }
 
-            sb.append("    }\n\n");
+            w.dedent();
+            w.line("}");
+            w.blankLine();
         }
+        return w.build();
     }
 
-    private static void emitAssocMappingBody(StringBuilder sb, GrammarDecl grammar,
+    private static void emitAssocMappingBody(IndentedWriter w, GrammarDecl grammar,
             String astClass, String parsersClass, String className,
             RuleDecl rule, MappingAnnotation mapping, boolean rightAssoc,
             Map<String, List<RuleDecl>> allMappingRules,
@@ -193,62 +241,74 @@ class MapperRuleEmitter {
 
             // Generate dispatch for additional rules first
             for (RuleDecl additionalRule : additionalRules) {
-                emitAdditionalAssocRuleDispatch(sb, astClass, parsersClass, className,
+                emitAdditionalAssocRuleDispatch(w, astClass, parsersClass, className,
                     additionalRule, leftType, opType, rightType, leafFallbackSupported,
                     tokenDeclByName, ruleByName);
             }
 
-            sb.append("        Token working = token;\n");
-            sb.append("        if (working.parser.getClass() != ").append(ruleParserClass).append(") {\n");
-            sb.append("            working = findFirstDescendant(working, ").append(ruleParserClass).append(");\n");
-            sb.append("        }\n");
-            sb.append("        if (working == null) {\n");
+            w.line("Token working = token;");
+            w.line("if (working.parser.getClass() != " + ruleParserClass + ") {");
+            w.indent();
+            w.line("working = findFirstDescendant(working, " + ruleParserClass + ");");
+            w.dedent();
+            w.line("}");
+            w.line("if (working == null) {");
+            w.indent();
             if (leafFallbackSupported) {
-                sb.append("            String literal = stripQuotes(firstTokenText(token));\n");
-                sb.append("            literal = literal == null ? \"\" : literal;\n");
-                sb.append("            return registerNodeSourceSpan(new ").append(astClass).append(".").append(className)
-                    .append("(null, List.of(literal), List.of()), token);\n");
+                w.line("String literal = stripQuotes(firstTokenText(token));");
+                w.line("literal = literal == null ? \"\" : literal;");
+                w.line("return registerNodeSourceSpan(new " + astClass + "." + className
+                    + "(null, List.of(literal), List.of()), token);");
             } else {
-                sb.append("            throw new IllegalArgumentException(\"Mapping token not found for rule ").append(rule.name()).append("\");\n");
+                w.line("throw new IllegalArgumentException(\"Mapping token not found for rule " + rule.name() + "\");");
             }
-            sb.append("        }\n");
-            sb.append("        Token leftToken = findFirstDescendant(working, ").append(leftParserClass).append(");\n");
-            sb.append("        if (leftToken == null) {\n");
+            w.dedent();
+            w.line("}");
+            w.line("Token leftToken = findFirstDescendant(working, " + leftParserClass + ");");
+            w.line("if (leftToken == null) {");
+            w.indent();
             if (leafFallbackSupported) {
-                sb.append("            String literal = stripQuotes(firstTokenText(working));\n");
-                sb.append("            literal = literal == null ? \"\" : literal;\n");
-                sb.append("            return registerNodeSourceSpan(new ").append(astClass).append(".").append(className)
-                    .append("(null, List.of(literal), List.of()), working);\n");
+                w.line("String literal = stripQuotes(firstTokenText(working));");
+                w.line("literal = literal == null ? \"\" : literal;");
+                w.line("return registerNodeSourceSpan(new " + astClass + "." + className
+                    + "(null, List.of(literal), List.of()), working);");
             } else {
-                sb.append("            throw new IllegalArgumentException(\"Left operand not found for rule ").append(rule.name()).append("\");\n");
+                w.line("throw new IllegalArgumentException(\"Left operand not found for rule " + rule.name() + "\");");
             }
-            sb.append("        }\n");
-            sb.append("        ").append(leftType).append(" left = ").append(leftMapper).append(";\n");
-            sb.append("        List<").append(opType).append("> ops = new ArrayList<>();\n");
-            sb.append("        List<").append(rightType).append("> rights = new ArrayList<>();\n");
-            sb.append("        for (Token repeatToken : findDirectDescendants(working, ").append(repeatParserClass).append(")) {\n");
-            sb.append("            Token opToken = findFirstDescendant(repeatToken, ").append(opParserClass).append(");\n");
-            sb.append("            String opValue = firstTokenText(opToken == null ? repeatToken : opToken);\n");
-            sb.append("            if (opValue != null && !opValue.isEmpty()) {\n");
-            sb.append("                ops.add(stripQuotes(opValue));\n");
-            sb.append("            }\n");
-            sb.append("            Token rightToken = findFirstDescendant(repeatToken, ").append(rightParserClass).append(");\n");
-            sb.append("            if (rightToken != null) {\n");
-            sb.append("                rights.add(").append(rightMapper).append(");\n");
-            sb.append("            }\n");
-            sb.append("        }\n");
+            w.dedent();
+            w.line("}");
+            w.line(leftType + " left = " + leftMapper + ";");
+            w.line("List<" + opType + "> ops = new ArrayList<>();");
+            w.line("List<" + rightType + "> rights = new ArrayList<>();");
+            w.line("for (Token repeatToken : findDirectDescendants(working, " + repeatParserClass + ")) {");
+            w.indent();
+            w.line("Token opToken = findFirstDescendant(repeatToken, " + opParserClass + ");");
+            w.line("String opValue = firstTokenText(opToken == null ? repeatToken : opToken);");
+            w.line("if (opValue != null && !opValue.isEmpty()) {");
+            w.indent();
+            w.line("ops.add(stripQuotes(opValue));");
+            w.dedent();
+            w.line("}");
+            w.line("Token rightToken = findFirstDescendant(repeatToken, " + rightParserClass + ");");
+            w.line("if (rightToken != null) {");
+            w.indent();
+            w.line("rights.add(" + rightMapper + ");");
+            w.dedent();
+            w.line("}");
+            w.dedent();
+            w.line("}");
             if (rightAssoc) {
-                sb.append("        return registerNodeSourceSpan(foldRightAssoc").append(className).append("(left, ops, rights), working);\n");
+                w.line("return registerNodeSourceSpan(foldRightAssoc" + className + "(left, ops, rights), working);");
             } else {
-                sb.append("        return registerNodeSourceSpan(new ").append(astClass).append(".").append(className).append("(left, ops, rights), working);\n");
+                w.line("return registerNodeSourceSpan(new " + astClass + "." + className + "(left, ops, rights), working);");
             }
         } else {
-            sb.append("        throw new IllegalArgumentException(\"Unsupported assoc mapping shape for rule: ")
-              .append(rule.name()).append("\");\n");
+            w.line("throw new IllegalArgumentException(\"Unsupported assoc mapping shape for rule: "
+              + rule.name() + "\");");
         }
     }
 
-    private static void emitAdditionalAssocRuleDispatch(StringBuilder sb,
+    private static void emitAdditionalAssocRuleDispatch(IndentedWriter w,
             String astClass, String parsersClass, String className,
             RuleDecl additionalRule, String leftType, String opType, String rightType,
             boolean leafFallbackSupported,
@@ -269,44 +329,56 @@ class MapperRuleEmitter {
             String addLeftMapper = "to" + className + "(addLeftToken)";
             String addRightMapper = "to" + className + "(addRightToken)";
 
-            sb.append("        // Handle ").append(additionalRule.name()).append(" tokens (same @mapping class)\n");
-            sb.append("        if (token.parser.getClass() == ").append(addRuleParserClass).append(") {\n");
-            sb.append("            Token addLeftToken = findFirstDescendant(token, ").append(addLeftParserClass).append(");\n");
-            sb.append("            if (addLeftToken == null) {\n");
+            w.line("// Handle " + additionalRule.name() + " tokens (same @mapping class)");
+            w.line("if (token.parser.getClass() == " + addRuleParserClass + ") {");
+            w.indent();
+            w.line("Token addLeftToken = findFirstDescendant(token, " + addLeftParserClass + ");");
+            w.line("if (addLeftToken == null) {");
+            w.indent();
             if (leafFallbackSupported) {
-                sb.append("                String literal = stripQuotes(firstTokenText(token));\n");
-                sb.append("                literal = literal == null ? \"\" : literal;\n");
-                sb.append("                return registerNodeSourceSpan(new ").append(astClass).append(".").append(className)
-                    .append("(null, List.of(literal), List.of()), token);\n");
+                w.line("String literal = stripQuotes(firstTokenText(token));");
+                w.line("literal = literal == null ? \"\" : literal;");
+                w.line("return registerNodeSourceSpan(new " + astClass + "." + className
+                    + "(null, List.of(literal), List.of()), token);");
             } else {
-                sb.append("                throw new IllegalArgumentException(\"Left operand not found for rule ").append(additionalRule.name()).append("\");\n");
+                w.line("throw new IllegalArgumentException(\"Left operand not found for rule " + additionalRule.name() + "\");");
             }
-            sb.append("            }\n");
-            sb.append("            ").append(leftType).append(" addLeft = ").append(addLeftMapper).append(";\n");
-            sb.append("            List<").append(opType).append("> addOps = new ArrayList<>();\n");
-            sb.append("            List<").append(rightType).append("> addRights = new ArrayList<>();\n");
-            sb.append("            for (Token addRepeatToken : findDirectDescendants(token, ").append(addRepeatParserClass).append(")) {\n");
-            sb.append("                Token addOpToken = findFirstDescendant(addRepeatToken, ").append(addOpParserClass).append(");\n");
-            sb.append("                String addOpValue = firstTokenText(addOpToken == null ? addRepeatToken : addOpToken);\n");
-            sb.append("                if (addOpValue != null && !addOpValue.isEmpty()) {\n");
-            sb.append("                    addOps.add(stripQuotes(addOpValue));\n");
-            sb.append("                }\n");
-            sb.append("                Token addRightToken = findFirstDescendant(addRepeatToken, ").append(addLeftParserClass).append(");\n");
-            sb.append("                if (addRightToken != null) {\n");
-            sb.append("                    addRights.add(").append(addRightMapper).append(");\n");
-            sb.append("                }\n");
-            sb.append("            }\n");
-            sb.append("            if (addOps.isEmpty()) {\n");
-            sb.append("                return registerNodeSourceSpan(new ").append(astClass).append(".").append(className)
-                .append("(addLeft, List.of(), List.of()), token);\n");
-            sb.append("            }\n");
-            sb.append("            return registerNodeSourceSpan(new ").append(astClass).append(".").append(className)
-                .append("(addLeft, addOps, addRights), token);\n");
-            sb.append("        }\n");
+            w.dedent();
+            w.line("}");
+            w.line(leftType + " addLeft = " + addLeftMapper + ";");
+            w.line("List<" + opType + "> addOps = new ArrayList<>();");
+            w.line("List<" + rightType + "> addRights = new ArrayList<>();");
+            w.line("for (Token addRepeatToken : findDirectDescendants(token, " + addRepeatParserClass + ")) {");
+            w.indent();
+            w.line("Token addOpToken = findFirstDescendant(addRepeatToken, " + addOpParserClass + ");");
+            w.line("String addOpValue = firstTokenText(addOpToken == null ? addRepeatToken : addOpToken);");
+            w.line("if (addOpValue != null && !addOpValue.isEmpty()) {");
+            w.indent();
+            w.line("addOps.add(stripQuotes(addOpValue));");
+            w.dedent();
+            w.line("}");
+            w.line("Token addRightToken = findFirstDescendant(addRepeatToken, " + addLeftParserClass + ");");
+            w.line("if (addRightToken != null) {");
+            w.indent();
+            w.line("addRights.add(" + addRightMapper + ");");
+            w.dedent();
+            w.line("}");
+            w.dedent();
+            w.line("}");
+            w.line("if (addOps.isEmpty()) {");
+            w.indent();
+            w.line("return registerNodeSourceSpan(new " + astClass + "." + className
+                + "(addLeft, List.of(), List.of()), token);");
+            w.dedent();
+            w.line("}");
+            w.line("return registerNodeSourceSpan(new " + astClass + "." + className
+                + "(addLeft, addOps, addRights), token);");
+            w.dedent();
+            w.line("}");
         }
     }
 
-    private static void emitPlainMappingBody(StringBuilder sb, GrammarDecl grammar,
+    private static void emitPlainMappingBody(IndentedWriter w, GrammarDecl grammar,
             String astClass, String parsersClass, String className,
             RuleDecl rule, MappingAnnotation mapping,
             Map<String, String> mappedClassByRuleName,
@@ -320,27 +392,27 @@ class MapperRuleEmitter {
             String type = MapperTypeResolver.inferType(grammar, rule, param);
             List<AtomicElement> capturedElements = MapperElementUtil.findCapturedElements(rule.body(), param);
             if (capturedElements.isEmpty()) {
-                sb.append("        ").append(type).append(" ").append(param)
-                    .append(" = ").append(MapperTypeResolver.defaultValueForType(type)).append(";\n");
+                w.line(type + " " + param
+                    + " = " + MapperTypeResolver.defaultValueForType(type) + ";");
                 continue;
             }
 
             Optional<String> listElementType = MapperTypeResolver.unwrapListType(type);
             if (listElementType.isPresent()) {
-                emitListParam(sb, parsersClass, ruleParserClass, grammar, param, type,
+                emitListParam(w, parsersClass, ruleParserClass, grammar, param, type,
                     listElementType.get(), capturedElements, mappedClassByRuleName, tokenDeclByName, ruleByName);
                 continue;
             }
 
             Optional<String> optionalElementType = MapperTypeResolver.unwrapOptionalType(type);
             if (optionalElementType.isPresent()) {
-                emitOptionalParam(sb, parsersClass, ruleParserClass, grammar, param, type,
+                emitOptionalParam(w, parsersClass, ruleParserClass, grammar, param, type,
                     optionalElementType.get(), capturedElements, scalarCaptureIndexByParserClass,
                     mappedClassByRuleName, tokenDeclByName, ruleByName);
                 continue;
             }
 
-            emitScalarParam(sb, parsersClass, ruleParserClass, grammar, param, type,
+            emitScalarParam(w, parsersClass, ruleParserClass, grammar, param, type,
                 capturedElements, scalarCaptureIndexByParserClass,
                 mappedClassByRuleName, tokenDeclByName, ruleByName);
         }
@@ -348,37 +420,39 @@ class MapperRuleEmitter {
         for (Map.Entry<String, String> constraint : typeofConstraints.entrySet()) {
             String ownCapture = constraint.getKey();
             String refCapture = constraint.getValue();
-            sb.append("        if (").append(refCapture).append(" != null && ")
-                .append(ownCapture).append(" != null && !")
-                .append(refCapture).append(".getClass().equals(")
-                .append(ownCapture).append(".getClass())) {\n");
-            sb.append("            throw new IllegalArgumentException(\"@typeof constraint violated: ")
-                .append(ownCapture).append(" must be same type as ")
-                .append(refCapture).append(", expected \" + ")
-                .append(refCapture).append(".getClass().getSimpleName() + \" but got \" + ")
-                .append(ownCapture).append(".getClass().getSimpleName());\n");
-            sb.append("        }\n");
+            w.line("if (" + refCapture + " != null && "
+                + ownCapture + " != null && !"
+                + refCapture + ".getClass().equals("
+                + ownCapture + ".getClass())) {");
+            w.indent();
+            w.line("throw new IllegalArgumentException(\"@typeof constraint violated: "
+                + ownCapture + " must be same type as "
+                + refCapture + ", expected \" + "
+                + refCapture + ".getClass().getSimpleName() + \" but got \" + "
+                + ownCapture + ".getClass().getSimpleName());");
+            w.dedent();
+            w.line("}");
         }
-        sb.append("        ").append(astClass).append(".").append(className).append(" mapped = new ")
-            .append(astClass).append(".").append(className).append("(\n");
+        w.line(astClass + "." + className + " mapped = new "
+            + astClass + "." + className + "(");
         for (int i = 0; i < mapping.paramNames().size(); i++) {
             String param = mapping.paramNames().get(i);
             String suffix = i < mapping.paramNames().size() - 1 ? "," : "";
-            sb.append("            ").append(param).append(suffix)
-                .append(" // ").append(param).append("\n");
+            w.line("    " + param + suffix
+                + " // " + param);
         }
-        sb.append("        );\n");
-        sb.append("        return registerNodeSourceSpan(mapped, token);\n");
+        w.line(");");
+        w.line("return registerNodeSourceSpan(mapped, token);");
     }
 
-    private static void emitListParam(StringBuilder sb, String parsersClass, String ruleParserClass,
+    private static void emitListParam(IndentedWriter w, String parsersClass, String ruleParserClass,
             GrammarDecl grammar, String param, String type, String elementType,
             List<AtomicElement> capturedElements,
             Map<String, String> mappedClassByRuleName,
             Map<String, TokenDecl> tokenDeclByName, Map<String, RuleDecl> ruleByName) {
 
-        sb.append("        List<").append(elementType).append("> ").append(param)
-            .append(" = new ArrayList<>();\n");
+        w.line("List<" + elementType + "> " + param
+            + " = new ArrayList<>();");
         for (int i = 0; i < capturedElements.size(); i++) {
             AtomicElement element = capturedElements.get(i);
             AtomicElement normalized = MapperElementUtil.normalizeCapturedElement(element).orElse(element);
@@ -396,23 +470,25 @@ class MapperRuleEmitter {
                 mappedClassByRuleName,
                 tokenDeclByName,
                 ruleByName);
-            sb.append("        for (Token ").append(tokenVarName)
-                .append(" : findDescendants(token, ").append(parserClass).append(")) {\n");
-            sb.append("            ").append(param).append(".add(").append(mapExpression).append(");\n");
-            sb.append("        }\n");
+            w.line("for (Token " + tokenVarName
+                + " : findDescendants(token, " + parserClass + ")) {");
+            w.indent();
+            w.line(param + ".add(" + mapExpression + ");");
+            w.dedent();
+            w.line("}");
         }
     }
 
-    private static void emitOptionalParam(StringBuilder sb, String parsersClass, String ruleParserClass,
+    private static void emitOptionalParam(IndentedWriter w, String parsersClass, String ruleParserClass,
             GrammarDecl grammar, String param, String type, String elementType,
             List<AtomicElement> capturedElements,
             Map<String, Integer> scalarCaptureIndexByParserClass,
             Map<String, String> mappedClassByRuleName,
             Map<String, TokenDecl> tokenDeclByName, Map<String, RuleDecl> ruleByName) {
 
-        sb.append("        Optional<").append(elementType).append("> ").append(param)
-            .append(" = Optional.empty();\n");
-        sb.append("        boolean found_").append(MapperElementUtil.safeName(param)).append(" = false;\n");
+        w.line("Optional<" + elementType + "> " + param
+            + " = Optional.empty();");
+        w.line("boolean found_" + MapperElementUtil.safeName(param) + " = false;");
         for (int i = 0; i < capturedElements.size(); i++) {
             AtomicElement element = capturedElements.get(i);
             AtomicElement normalized = MapperElementUtil.normalizeCapturedElement(element).orElse(element);
@@ -433,28 +509,32 @@ class MapperRuleEmitter {
                 mappedClassByRuleName,
                 tokenDeclByName,
                 ruleByName);
-            sb.append("        if (!found_").append(MapperElementUtil.safeName(param)).append(") {\n");
-            sb.append("            Token ").append(tokenVarName)
-                .append(" = findDescendantByIndex(token, ").append(parserClass).append(", ")
-                .append(parserOccurrenceIndex).append(");\n");
-            sb.append("            if (").append(tokenVarName).append(" != null) {\n");
-            sb.append("                ").append(param).append(" = Optional.ofNullable(").append(mapExpression).append(");\n");
-            sb.append("                found_").append(MapperElementUtil.safeName(param)).append(" = true;\n");
-            sb.append("            }\n");
-            sb.append("        }\n");
+            w.line("if (!found_" + MapperElementUtil.safeName(param) + ") {");
+            w.indent();
+            w.line("Token " + tokenVarName
+                + " = findDescendantByIndex(token, " + parserClass + ", "
+                + parserOccurrenceIndex + ");");
+            w.line("if (" + tokenVarName + " != null) {");
+            w.indent();
+            w.line(param + " = Optional.ofNullable(" + mapExpression + ");");
+            w.line("found_" + MapperElementUtil.safeName(param) + " = true;");
+            w.dedent();
+            w.line("}");
+            w.dedent();
+            w.line("}");
         }
     }
 
-    private static void emitScalarParam(StringBuilder sb, String parsersClass, String ruleParserClass,
+    private static void emitScalarParam(IndentedWriter w, String parsersClass, String ruleParserClass,
             GrammarDecl grammar, String param, String type,
             List<AtomicElement> capturedElements,
             Map<String, Integer> scalarCaptureIndexByParserClass,
             Map<String, String> mappedClassByRuleName,
             Map<String, TokenDecl> tokenDeclByName, Map<String, RuleDecl> ruleByName) {
 
-        sb.append("        ").append(type).append(" ").append(param)
-            .append(" = ").append(MapperTypeResolver.defaultValueForType(type)).append(";\n");
-        sb.append("        boolean assigned_").append(MapperElementUtil.safeName(param)).append(" = false;\n");
+        w.line(type + " " + param
+            + " = " + MapperTypeResolver.defaultValueForType(type) + ";");
+        w.line("boolean assigned_" + MapperElementUtil.safeName(param) + " = false;");
         for (int i = 0; i < capturedElements.size(); i++) {
             AtomicElement element = capturedElements.get(i);
             AtomicElement normalized = MapperElementUtil.normalizeCapturedElement(element).orElse(element);
@@ -475,27 +555,33 @@ class MapperRuleEmitter {
                 mappedClassByRuleName,
                 tokenDeclByName,
                 ruleByName);
-            sb.append("        if (!assigned_").append(MapperElementUtil.safeName(param)).append(") {\n");
-            sb.append("            Token ").append(tokenVarName)
-                .append(" = findDescendantByIndex(token, ").append(parserClass).append(", ")
-                .append(parserOccurrenceIndex).append(");\n");
-            sb.append("            if (").append(tokenVarName).append(" != null) {\n");
-                sb.append("                ").append(param).append(" = ").append(mapExpression).append(";\n");
-            sb.append("                assigned_").append(MapperElementUtil.safeName(param)).append(" = true;\n");
-            sb.append("            }\n");
-            sb.append("        }\n");
+            w.line("if (!assigned_" + MapperElementUtil.safeName(param) + ") {");
+            w.indent();
+            w.line("Token " + tokenVarName
+                + " = findDescendantByIndex(token, " + parserClass + ", "
+                + parserOccurrenceIndex + ");");
+            w.line("if (" + tokenVarName + " != null) {");
+            w.indent();
+            w.line(param + " = " + mapExpression + ";");
+            w.line("assigned_" + MapperElementUtil.safeName(param) + " = true;");
+            w.dedent();
+            w.line("}");
+            w.dedent();
+            w.line("}");
         }
     }
 
     /**
      * 右結合ルール用の fold ヘルパーメソッドを生成する。
      */
-    static void emitFoldHelpers(StringBuilder sb, GrammarDecl grammar, String astClass,
+    static String emitFoldHelpers(GrammarDecl grammar, String astClass,
             Map<String, RuleDecl> mappingRules) {
 
-        sb.append("    // =========================================================================\n");
-        sb.append("    // Fold Helpers (Right-Associative)\n");
-        sb.append("    // =========================================================================\n\n");
+        IndentedWriter w = new IndentedWriter(1);
+        w.line("// =========================================================================");
+        w.line("// Fold Helpers (Right-Associative)");
+        w.line("// =========================================================================");
+        w.blankLine();
 
         for (Map.Entry<String, RuleDecl> entry : mappingRules.entrySet()) {
             String className = entry.getKey();
@@ -511,288 +597,442 @@ class MapperRuleEmitter {
                     String opType = MapperTypeResolver.unwrapListType(MapperTypeResolver.inferType(grammar, rule, "op")).orElse("String");
                     String rightType = MapperTypeResolver.unwrapListType(MapperTypeResolver.inferType(grammar, rule, "right")).orElse("Object");
 
-                    sb.append("    static ").append(astClass).append(".").append(className)
-                      .append(" foldRightAssoc").append(className).append("(\n");
-                    sb.append("            ").append(leftType).append(" left,\n");
-                    sb.append("            java.util.List<").append(opType).append("> ops,\n");
-                    sb.append("            java.util.List<").append(rightType).append("> rights) {\n");
-                    sb.append("        if (ops.isEmpty() || rights.isEmpty()) {\n");
-                    sb.append("            return new ").append(astClass).append(".").append(className)
-                      .append("(left, ops, rights);\n");
-                    sb.append("        }\n");
-                    sb.append("        // Right-associative fold: a op b op c => a op (b op c)\n");
-                    sb.append("        ").append(rightType).append(" right = rights.get(rights.size() - 1);\n");
-                    sb.append("        ").append(opType).append(" op = ops.get(ops.size() - 1);\n");
-                    sb.append("        java.util.List<").append(opType).append("> restOps = new java.util.ArrayList<>(ops);\n");
-                    sb.append("        java.util.List<").append(rightType).append("> restRights = new java.util.ArrayList<>(rights);\n");
-                    sb.append("        restOps.remove(restOps.size() - 1);\n");
-                    sb.append("        restRights.remove(restRights.size() - 1);\n");
-                    sb.append("        if (restRights.size() > 0) {\n");
-                    sb.append("            right = foldRightAssoc").append(className).append("(right, restOps, restRights);\n");
-                    sb.append("        }\n");
-                    sb.append("        java.util.List<").append(opType).append("> singleOp = java.util.List.of(op);\n");
-                    sb.append("        java.util.List<").append(rightType).append("> singleRight = java.util.List.of(right);\n");
-                    sb.append("        return new ").append(astClass).append(".").append(className)
-                      .append("(left, singleOp, singleRight);\n");
-                    sb.append("    }\n\n");
+                    w.line("static " + astClass + "." + className
+                      + " foldRightAssoc" + className + "(");
+                    w.line("        " + leftType + " left,");
+                    w.line("        java.util.List<" + opType + "> ops,");
+                    w.line("        java.util.List<" + rightType + "> rights) {");
+                    w.indent();
+                    w.line("if (ops.isEmpty() || rights.isEmpty()) {");
+                    w.indent();
+                    w.line("return new " + astClass + "." + className
+                      + "(left, ops, rights);");
+                    w.dedent();
+                    w.line("}");
+                    w.line("// Right-associative fold: a op b op c => a op (b op c)");
+                    w.line(rightType + " right = rights.get(rights.size() - 1);");
+                    w.line(opType + " op = ops.get(ops.size() - 1);");
+                    w.line("java.util.List<" + opType + "> restOps = new java.util.ArrayList<>(ops);");
+                    w.line("java.util.List<" + rightType + "> restRights = new java.util.ArrayList<>(rights);");
+                    w.line("restOps.remove(restOps.size() - 1);");
+                    w.line("restRights.remove(restRights.size() - 1);");
+                    w.line("if (restRights.size() > 0) {");
+                    w.indent();
+                    w.line("right = foldRightAssoc" + className + "(right, restOps, restRights);");
+                    w.dedent();
+                    w.line("}");
+                    w.line("java.util.List<" + opType + "> singleOp = java.util.List.of(op);");
+                    w.line("java.util.List<" + rightType + "> singleRight = java.util.List.of(right);");
+                    w.line("return new " + astClass + "." + className
+                      + "(left, singleOp, singleRight);");
+                    w.dedent();
+                    w.line("}");
+                    w.blankLine();
                 }
             }
         }
+        return w.build();
     }
 
     /**
      * ユーティリティメソッド群（findDescendants, firstTokenText 等）を生成する。
      */
-    static void emitUtilities(StringBuilder sb) {
-        sb.append("    // =========================================================================\n");
-        sb.append("    // Utilities\n");
-        sb.append("    // =========================================================================\n\n");
+    static String emitUtilities() {
+        IndentedWriter w = new IndentedWriter(1);
+        w.line("// =========================================================================");
+        w.line("// Utilities");
+        w.line("// =========================================================================");
+        w.blankLine();
 
-        sb.append("    static List<Token> findDescendants(Token token, Class<? extends Parser> parserClass) {\n");
-        sb.append("        List<Token> results = new ArrayList<>();\n");
-        sb.append("        if (token == null) {\n");
-        sb.append("            return results;\n");
-        sb.append("        }\n");
-        sb.append("        for (Token child : token.filteredChildren) {\n");
-        sb.append("            if (child.parser.getClass() == parserClass) {\n");
-        sb.append("                results.add(child);\n");
-        sb.append("            }\n");
-        sb.append("            results.addAll(findDescendants(child, parserClass));\n");
-        sb.append("        }\n");
-        sb.append("        return results;\n");
-        sb.append("    }\n\n");
+        w.line("static List<Token> findDescendants(Token token, Class<? extends Parser> parserClass) {");
+        w.indent();
+        w.line("List<Token> results = new ArrayList<>();");
+        w.line("if (token == null) {");
+        w.indent();
+        w.line("return results;");
+        w.dedent();
+        w.line("}");
+        w.line("for (Token child : token.filteredChildren) {");
+        w.indent();
+        w.line("if (child.parser.getClass() == parserClass) {");
+        w.indent();
+        w.line("results.add(child);");
+        w.dedent();
+        w.line("}");
+        w.line("results.addAll(findDescendants(child, parserClass));");
+        w.dedent();
+        w.line("}");
+        w.line("return results;");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
 
-        sb.append("    static List<Token> findDirectDescendants(Token token, Class<? extends Parser> parserClass) {\n");
-        sb.append("        List<Token> results = new ArrayList<>();\n");
-        sb.append("        if (token == null) {\n");
-        sb.append("            return results;\n");
-        sb.append("        }\n");
-        sb.append("        for (Token child : token.filteredChildren) {\n");
-        sb.append("            if (child.parser.getClass() == parserClass) {\n");
-        sb.append("                results.add(child);\n");
-        sb.append("            }\n");
-        sb.append("        }\n");
-        sb.append("        return results;\n");
-        sb.append("    }\n\n");
+        w.line("static List<Token> findDirectDescendants(Token token, Class<? extends Parser> parserClass) {");
+        w.indent();
+        w.line("List<Token> results = new ArrayList<>();");
+        w.line("if (token == null) {");
+        w.indent();
+        w.line("return results;");
+        w.dedent();
+        w.line("}");
+        w.line("for (Token child : token.filteredChildren) {");
+        w.indent();
+        w.line("if (child.parser.getClass() == parserClass) {");
+        w.indent();
+        w.line("results.add(child);");
+        w.dedent();
+        w.line("}");
+        w.dedent();
+        w.line("}");
+        w.line("return results;");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
 
-        sb.append("    static Token findFirstDescendant(Token token, Class<? extends Parser> parserClass) {\n");
-        sb.append("        if (token == null) {\n");
-        sb.append("            return null;\n");
-        sb.append("        }\n");
-        sb.append("        if (token.parser.getClass() == parserClass) {\n");
-        sb.append("            return token;\n");
-        sb.append("        }\n");
-        sb.append("        for (Token child : token.filteredChildren) {\n");
-        sb.append("            Token found = findFirstDescendant(child, parserClass);\n");
-        sb.append("            if (found != null) {\n");
-        sb.append("                return found;\n");
-        sb.append("            }\n");
-        sb.append("        }\n");
-        sb.append("        return null;\n");
-        sb.append("    }\n\n");
+        w.line("static Token findFirstDescendant(Token token, Class<? extends Parser> parserClass) {");
+        w.indent();
+        w.line("if (token == null) {");
+        w.indent();
+        w.line("return null;");
+        w.dedent();
+        w.line("}");
+        w.line("if (token.parser.getClass() == parserClass) {");
+        w.indent();
+        w.line("return token;");
+        w.dedent();
+        w.line("}");
+        w.line("for (Token child : token.filteredChildren) {");
+        w.indent();
+        w.line("Token found = findFirstDescendant(child, parserClass);");
+        w.line("if (found != null) {");
+        w.indent();
+        w.line("return found;");
+        w.dedent();
+        w.line("}");
+        w.dedent();
+        w.line("}");
+        w.line("return null;");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
 
-        sb.append("    static Token findDescendantByIndex(Token token, Class<? extends Parser> parserClass, int index) {\n");
-        sb.append("        if (index < 0) {\n");
-        sb.append("            return null;\n");
-        sb.append("        }\n");
-        sb.append("        if (token != null && token.parser.getClass() == parserClass) {\n");
-        sb.append("            if (index == 0) {\n");
-        sb.append("                return token;\n");
-        sb.append("            }\n");
-        sb.append("            index = index - 1;\n");
-        sb.append("        }\n");
-        sb.append("        List<Token> descendants = findDescendants(token, parserClass);\n");
-        sb.append("        if (index >= descendants.size()) {\n");
-        sb.append("            return null;\n");
-        sb.append("        }\n");
-        sb.append("        return descendants.get(index);\n");
-        sb.append("    }\n\n");
+        w.line("static Token findDescendantByIndex(Token token, Class<? extends Parser> parserClass, int index) {");
+        w.indent();
+        w.line("if (index < 0) {");
+        w.indent();
+        w.line("return null;");
+        w.dedent();
+        w.line("}");
+        w.line("if (token != null && token.parser.getClass() == parserClass) {");
+        w.indent();
+        w.line("if (index == 0) {");
+        w.indent();
+        w.line("return token;");
+        w.dedent();
+        w.line("}");
+        w.line("index = index - 1;");
+        w.dedent();
+        w.line("}");
+        w.line("List<Token> descendants = findDescendants(token, parserClass);");
+        w.line("if (index >= descendants.size()) {");
+        w.indent();
+        w.line("return null;");
+        w.dedent();
+        w.line("}");
+        w.line("return descendants.get(index);");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
 
-        sb.append("    static String firstTokenText(Token token) {\n");
-        sb.append("        if (token == null) {\n");
-        sb.append("            return null;\n");
-        sb.append("        }\n");
-        sb.append("        String raw = tokenTextCompat(token);\n");
-        sb.append("        if (raw != null && !raw.isBlank()) {\n");
-        sb.append("            return raw.strip();\n");
-        sb.append("        }\n");
-        sb.append("        for (Token child : token.filteredChildren) {\n");
-        sb.append("            String found = firstTokenText(child);\n");
-        sb.append("            if (found != null && !found.isEmpty()) {\n");
-        sb.append("                return found;\n");
-        sb.append("            }\n");
-        sb.append("        }\n");
-        sb.append("        return raw == null ? null : raw.strip();\n");
-        sb.append("    }\n\n");
+        w.line("static String firstTokenText(Token token) {");
+        w.indent();
+        w.line("if (token == null) {");
+        w.indent();
+        w.line("return null;");
+        w.dedent();
+        w.line("}");
+        w.line("String raw = tokenTextCompat(token);");
+        w.line("if (raw != null && !raw.isBlank()) {");
+        w.indent();
+        w.line("return raw.strip();");
+        w.dedent();
+        w.line("}");
+        w.line("for (Token child : token.filteredChildren) {");
+        w.indent();
+        w.line("String found = firstTokenText(child);");
+        w.line("if (found != null && !found.isEmpty()) {");
+        w.indent();
+        w.line("return found;");
+        w.dedent();
+        w.line("}");
+        w.dedent();
+        w.line("}");
+        w.line("return raw == null ? null : raw.strip();");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
 
-        sb.append("    static String tokenTextCompat(Token token) {\n");
-        sb.append("        if (token == null) {\n");
-        sb.append("            return null;\n");
-        sb.append("        }\n");
-        sb.append("        try {\n");
-        sb.append("            java.lang.reflect.Method m = token.getClass().getMethod(\"getToken\");\n");
-        sb.append("            Object value = m.invoke(token);\n");
-        sb.append("            if (value instanceof Optional<?> optional && optional.isPresent()) {\n");
-        sb.append("                Object v = optional.get();\n");
-        sb.append("                return v == null ? null : String.valueOf(v);\n");
-        sb.append("            }\n");
-        sb.append("        } catch (Throwable ignored) {}\n");
-        sb.append("        try {\n");
-        sb.append("            java.lang.reflect.Field f = token.getClass().getField(\"tokenString\");\n");
-        sb.append("            Object value = f.get(token);\n");
-        sb.append("            if (value instanceof Optional<?> optional && optional.isPresent()) {\n");
-        sb.append("                Object v = optional.get();\n");
-        sb.append("                return v == null ? null : String.valueOf(v);\n");
-        sb.append("            }\n");
-        sb.append("        } catch (Throwable ignored) {}\n");
-        sb.append("        try {\n");
-        sb.append("            java.lang.reflect.Field f = token.getClass().getField(\"source\");\n");
-        sb.append("            Object src = f.get(token);\n");
-        sb.append("            if (src != null) {\n");
-        sb.append("                java.lang.reflect.Method m = src.getClass().getMethod(\"sourceAsString\");\n");
-        sb.append("                Object v = m.invoke(src);\n");
-        sb.append("                return v == null ? null : String.valueOf(v);\n");
-        sb.append("            }\n");
-        sb.append("        } catch (Throwable ignored) {}\n");
-        sb.append("        return null;\n");
-        sb.append("    }\n\n");
+        w.line("static String tokenTextCompat(Token token) {");
+        w.indent();
+        w.line("if (token == null) {");
+        w.indent();
+        w.line("return null;");
+        w.dedent();
+        w.line("}");
+        w.line("try {");
+        w.indent();
+        w.line("java.lang.reflect.Method m = token.getClass().getMethod(\"getToken\");");
+        w.line("Object value = m.invoke(token);");
+        w.line("if (value instanceof Optional<?> optional && optional.isPresent()) {");
+        w.indent();
+        w.line("Object v = optional.get();");
+        w.line("return v == null ? null : String.valueOf(v);");
+        w.dedent();
+        w.line("}");
+        w.dedent();
+        w.line("} catch (Throwable ignored) {}");
+        w.line("try {");
+        w.indent();
+        w.line("java.lang.reflect.Field f = token.getClass().getField(\"tokenString\");");
+        w.line("Object value = f.get(token);");
+        w.line("if (value instanceof Optional<?> optional && optional.isPresent()) {");
+        w.indent();
+        w.line("Object v = optional.get();");
+        w.line("return v == null ? null : String.valueOf(v);");
+        w.dedent();
+        w.line("}");
+        w.dedent();
+        w.line("} catch (Throwable ignored) {}");
+        w.line("try {");
+        w.indent();
+        w.line("java.lang.reflect.Field f = token.getClass().getField(\"source\");");
+        w.line("Object src = f.get(token);");
+        w.line("if (src != null) {");
+        w.indent();
+        w.line("java.lang.reflect.Method m = src.getClass().getMethod(\"sourceAsString\");");
+        w.line("Object v = m.invoke(src);");
+        w.line("return v == null ? null : String.valueOf(v);");
+        w.dedent();
+        w.line("}");
+        w.dedent();
+        w.line("} catch (Throwable ignored) {}");
+        w.line("return null;");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
 
-        sb.append("    static int consumedLengthCompat(Token token) {\n");
-        sb.append("        String text = tokenTextCompat(token);\n");
-        sb.append("        return text == null ? 0 : text.length();\n");
-        sb.append("    }\n\n");
+        w.line("static int consumedLengthCompat(Token token) {");
+        w.indent();
+        w.line("String text = tokenTextCompat(token);");
+        w.line("return text == null ? 0 : text.length();");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
 
-        sb.append("    static int tokenStartOffsetCompat(Token token) {\n");
-        sb.append("        if (token == null) {\n");
-        sb.append("            return 0;\n");
-        sb.append("        }\n");
-        sb.append("        try {\n");
-        sb.append("            java.lang.reflect.Field sourceField = token.getClass().getField(\"source\");\n");
-        sb.append("            Object source = sourceField.get(token);\n");
-        sb.append("            if (source == null) {\n");
-        sb.append("                return 0;\n");
-        sb.append("            }\n");
-        sb.append("            java.lang.reflect.Method offsetMethod = source.getClass().getMethod(\"offsetFromRoot\");\n");
-        sb.append("            Object offset = offsetMethod.invoke(source);\n");
-        sb.append("            if (offset == null) {\n");
-        sb.append("                return 0;\n");
-        sb.append("            }\n");
-        sb.append("            java.lang.reflect.Method valueMethod = offset.getClass().getMethod(\"value\");\n");
-        sb.append("            Object value = valueMethod.invoke(offset);\n");
-        sb.append("            if (value instanceof Integer i) {\n");
-        sb.append("                return i;\n");
-        sb.append("            }\n");
-        sb.append("            if (value instanceof Number n) {\n");
-        sb.append("                return n.intValue();\n");
-        sb.append("            }\n");
-        sb.append("        } catch (Throwable ignored) {}\n");
-        sb.append("        return 0;\n");
-        sb.append("    }\n\n");
+        w.line("static int tokenStartOffsetCompat(Token token) {");
+        w.indent();
+        w.line("if (token == null) {");
+        w.indent();
+        w.line("return 0;");
+        w.dedent();
+        w.line("}");
+        w.line("try {");
+        w.indent();
+        w.line("java.lang.reflect.Field sourceField = token.getClass().getField(\"source\");");
+        w.line("Object source = sourceField.get(token);");
+        w.line("if (source == null) {");
+        w.indent();
+        w.line("return 0;");
+        w.dedent();
+        w.line("}");
+        w.line("java.lang.reflect.Method offsetMethod = source.getClass().getMethod(\"offsetFromRoot\");");
+        w.line("Object offset = offsetMethod.invoke(source);");
+        w.line("if (offset == null) {");
+        w.indent();
+        w.line("return 0;");
+        w.dedent();
+        w.line("}");
+        w.line("java.lang.reflect.Method valueMethod = offset.getClass().getMethod(\"value\");");
+        w.line("Object value = valueMethod.invoke(offset);");
+        w.line("if (value instanceof Integer i) {");
+        w.indent();
+        w.line("return i;");
+        w.dedent();
+        w.line("}");
+        w.line("if (value instanceof Number n) {");
+        w.indent();
+        w.line("return n.intValue();");
+        w.dedent();
+        w.line("}");
+        w.dedent();
+        w.line("} catch (Throwable ignored) {}");
+        w.line("return 0;");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
 
-        sb.append("    static <T> T registerNodeSourceSpan(T node, Token token) {\n");
-        sb.append("        if (node == null || token == null) {\n");
-        sb.append("            return node;\n");
-        sb.append("        }\n");
-        sb.append("        int start = Math.max(0, tokenStartOffsetCompat(token));\n");
-        sb.append("        int length = Math.max(0, consumedLengthCompat(token));\n");
-        sb.append("        int end = start + length;\n");
-        sb.append("        NODE_SOURCE_SPANS.put(node, new int[]{start, end});\n");
-        sb.append("        return node;\n");
-        sb.append("    }\n\n");
+        w.line("static <T> T registerNodeSourceSpan(T node, Token token) {");
+        w.indent();
+        w.line("if (node == null || token == null) {");
+        w.indent();
+        w.line("return node;");
+        w.dedent();
+        w.line("}");
+        w.line("int start = Math.max(0, tokenStartOffsetCompat(token));");
+        w.line("int length = Math.max(0, consumedLengthCompat(token));");
+        w.line("int end = start + length;");
+        w.line("NODE_SOURCE_SPANS.put(node, new int[]{start, end});");
+        w.line("return node;");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
 
-        sb.append("    public static Optional<int[]> sourceSpanOf(Object node) {\n");
-        sb.append("        if (node == null) {\n");
-        sb.append("            return Optional.empty();\n");
-        sb.append("        }\n");
-        sb.append("        int[] span = NODE_SOURCE_SPANS.get(node);\n");
-        sb.append("        if (span == null || span.length < 2) {\n");
-        sb.append("            return Optional.empty();\n");
-        sb.append("        }\n");
-        sb.append("        return Optional.of(new int[]{span[0], span[1]});\n");
-        sb.append("    }\n\n");
+        w.line("public static Optional<int[]> sourceSpanOf(Object node) {");
+        w.indent();
+        w.line("if (node == null) {");
+        w.indent();
+        w.line("return Optional.empty();");
+        w.dedent();
+        w.line("}");
+        w.line("int[] span = NODE_SOURCE_SPANS.get(node);");
+        w.line("if (span == null || span.length < 2) {");
+        w.indent();
+        w.line("return Optional.empty();");
+        w.dedent();
+        w.line("}");
+        w.line("return Optional.of(new int[]{span[0], span[1]});");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
 
-        sb.append("    static StringSource createRootSourceCompat(String source) {\n");
-        sb.append("        try {\n");
-        sb.append("            java.lang.reflect.Method m = StringSource.class.getMethod(\"createRootSource\", String.class);\n");
-        sb.append("            Object v = m.invoke(null, source);\n");
-        sb.append("            if (v instanceof StringSource s) {\n");
-        sb.append("                return s;\n");
-        sb.append("            }\n");
-        sb.append("        } catch (Throwable ignored) {}\n");
-        sb.append("        try {\n");
-        sb.append("            for (java.lang.reflect.Constructor<?> c : StringSource.class.getDeclaredConstructors()) {\n");
-        sb.append("                Class<?>[] types = c.getParameterTypes();\n");
-        sb.append("                if (types.length == 0 || types[0] != String.class) {\n");
-        sb.append("                    continue;\n");
-        sb.append("                }\n");
-        sb.append("                Object[] args = new Object[types.length];\n");
-        sb.append("                args[0] = source;\n");
-        sb.append("                c.setAccessible(true);\n");
-        sb.append("                Object v = c.newInstance(args);\n");
-        sb.append("                if (v instanceof StringSource s) {\n");
-        sb.append("                    return s;\n");
-        sb.append("                }\n");
-        sb.append("            }\n");
-        sb.append("        } catch (Throwable ignored) {}\n");
-        sb.append("        throw new IllegalStateException(\"No compatible StringSource initializer found\");\n");
-        sb.append("    }\n\n");
+        w.line("static StringSource createRootSourceCompat(String source) {");
+        w.indent();
+        w.line("try {");
+        w.indent();
+        w.line("java.lang.reflect.Method m = StringSource.class.getMethod(\"createRootSource\", String.class);");
+        w.line("Object v = m.invoke(null, source);");
+        w.line("if (v instanceof StringSource s) {");
+        w.indent();
+        w.line("return s;");
+        w.dedent();
+        w.line("}");
+        w.dedent();
+        w.line("} catch (Throwable ignored) {}");
+        w.line("try {");
+        w.indent();
+        w.line("for (java.lang.reflect.Constructor<?> c : StringSource.class.getDeclaredConstructors()) {");
+        w.indent();
+        w.line("Class<?>[] types = c.getParameterTypes();");
+        w.line("if (types.length == 0 || types[0] != String.class) {");
+        w.indent();
+        w.line("continue;");
+        w.dedent();
+        w.line("}");
+        w.line("Object[] args = new Object[types.length];");
+        w.line("args[0] = source;");
+        w.line("c.setAccessible(true);");
+        w.line("Object v = c.newInstance(args);");
+        w.line("if (v instanceof StringSource s) {");
+        w.indent();
+        w.line("return s;");
+        w.dedent();
+        w.line("}");
+        w.dedent();
+        w.line("}");
+        w.dedent();
+        w.line("} catch (Throwable ignored) {}");
+        w.line("throw new IllegalStateException(\"No compatible StringSource initializer found\");");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
 
-        sb.append("    static String stripQuotes(String quoted) {\n");
-        sb.append("        if (quoted == null) {\n");
-        sb.append("            return null;\n");
-        sb.append("        }\n");
-        sb.append("        if (quoted.length() >= 2\n");
-        sb.append("            && '\\'' == quoted.charAt(0)\n");
-        sb.append("            && '\\'' == quoted.charAt(quoted.length() - 1)) {\n");
-        sb.append("            return quoted.substring(1, quoted.length() - 1);\n");
-        sb.append("        }\n");
-        sb.append("        return quoted;\n");
-        sb.append("    }\n");
-        sb.append("\n");
-        sb.append("    static String identifierLikeText(Token token) {\n");
-        sb.append("        if (token == null) {\n");
-        sb.append("            return null;\n");
-        sb.append("        }\n");
-        sb.append("        String raw = tokenTextCompat(token);\n");
-        sb.append("        String fromRaw = extractIdentifierLike(raw);\n");
-        sb.append("        if (fromRaw != null) {\n");
-        sb.append("            return fromRaw;\n");
-        sb.append("        }\n");
-        sb.append("        for (Token child : token.filteredChildren) {\n");
-        sb.append("            String fromChild = identifierLikeText(child);\n");
-        sb.append("            if (fromChild != null) {\n");
-        sb.append("                return fromChild;\n");
-        sb.append("            }\n");
-        sb.append("        }\n");
-        sb.append("        return extractIdentifierLike(firstTokenText(token));\n");
-        sb.append("    }\n");
-        sb.append("\n");
-        sb.append("    static String extractIdentifierLike(String raw) {\n");
-        sb.append("        if (raw == null) {\n");
-        sb.append("            return null;\n");
-        sb.append("        }\n");
-        sb.append("        String text = raw.strip();\n");
-        sb.append("        int start = -1;\n");
-        sb.append("        int end = -1;\n");
-        sb.append("        for (int i = 0; i < text.length(); i++) {\n");
-        sb.append("            char c = text.charAt(i);\n");
-        sb.append("            if (start < 0) {\n");
-        sb.append("                if (Character.isLetter(c) || c == '_') {\n");
-        sb.append("                    start = i;\n");
-        sb.append("                    end = i + 1;\n");
-        sb.append("                }\n");
-        sb.append("                continue;\n");
-        sb.append("            }\n");
-        sb.append("            if (Character.isLetterOrDigit(c) || c == '_') {\n");
-        sb.append("                end = i + 1;\n");
-        sb.append("                continue;\n");
-        sb.append("            }\n");
-        sb.append("            break;\n");
-        sb.append("        }\n");
-        sb.append("        if (start < 0 || end <= start) {\n");
-        sb.append("            return null;\n");
-        sb.append("        }\n");
-        sb.append("        return text.substring(start, end);\n");
-        sb.append("    }\n");
+        w.line("static String stripQuotes(String quoted) {");
+        w.indent();
+        w.line("if (quoted == null) {");
+        w.indent();
+        w.line("return null;");
+        w.dedent();
+        w.line("}");
+        w.line("if (quoted.length() >= 2");
+        w.line("    && '\\'' == quoted.charAt(0)");
+        w.line("    && '\\'' == quoted.charAt(quoted.length() - 1)) {");
+        w.indent();
+        w.line("return quoted.substring(1, quoted.length() - 1);");
+        w.dedent();
+        w.line("}");
+        w.line("return quoted;");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
+        w.line("static String identifierLikeText(Token token) {");
+        w.indent();
+        w.line("if (token == null) {");
+        w.indent();
+        w.line("return null;");
+        w.dedent();
+        w.line("}");
+        w.line("String raw = tokenTextCompat(token);");
+        w.line("String fromRaw = extractIdentifierLike(raw);");
+        w.line("if (fromRaw != null) {");
+        w.indent();
+        w.line("return fromRaw;");
+        w.dedent();
+        w.line("}");
+        w.line("for (Token child : token.filteredChildren) {");
+        w.indent();
+        w.line("String fromChild = identifierLikeText(child);");
+        w.line("if (fromChild != null) {");
+        w.indent();
+        w.line("return fromChild;");
+        w.dedent();
+        w.line("}");
+        w.dedent();
+        w.line("}");
+        w.line("return extractIdentifierLike(firstTokenText(token));");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
+        w.line("static String extractIdentifierLike(String raw) {");
+        w.indent();
+        w.line("if (raw == null) {");
+        w.indent();
+        w.line("return null;");
+        w.dedent();
+        w.line("}");
+        w.line("String text = raw.strip();");
+        w.line("int start = -1;");
+        w.line("int end = -1;");
+        w.line("for (int i = 0; i < text.length(); i++) {");
+        w.indent();
+        w.line("char c = text.charAt(i);");
+        w.line("if (start < 0) {");
+        w.indent();
+        w.line("if (Character.isLetter(c) || c == '_') {");
+        w.indent();
+        w.line("start = i;");
+        w.line("end = i + 1;");
+        w.dedent();
+        w.line("}");
+        w.line("continue;");
+        w.dedent();
+        w.line("}");
+        w.line("if (Character.isLetterOrDigit(c) || c == '_') {");
+        w.indent();
+        w.line("end = i + 1;");
+        w.line("continue;");
+        w.dedent();
+        w.line("}");
+        w.line("break;");
+        w.dedent();
+        w.line("}");
+        w.line("if (start < 0 || end <= start) {");
+        w.indent();
+        w.line("return null;");
+        w.dedent();
+        w.line("}");
+        w.line("return text.substring(start, end);");
+        w.dedent();
+        w.line("}");
+        return w.build();
     }
 }
