@@ -438,8 +438,8 @@ public class StringSource implements Source {
 
   @Override
   public boolean equals(Object obj) {
-    if (obj instanceof Source) {
-      return sourceString.equals(((Source) obj).sourceAsString());
+    if (obj instanceof Source source) {
+      return sourceString.equals(source.sourceAsString());
     }
     return sourceString.equals(obj);
   }

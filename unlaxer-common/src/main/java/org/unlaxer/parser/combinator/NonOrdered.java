@@ -108,8 +108,8 @@ public class NonOrdered extends ConstructedCombinatorParser {
 		@Override
 		public void effect(Parser parser, ParseContext parseContext) {
 
-			if (false == determineds.isEmpty() && parser instanceof NonOrdered) {
-				parseContext.orderedParsersByNonOrdered.put((NonOrdered)parser, determineds);
+			if (false == determineds.isEmpty() && parser instanceof NonOrdered nonOrdered) {
+				parseContext.orderedParsersByNonOrdered.put(nonOrdered, determineds);
 			}
 		}
 	}

@@ -1026,7 +1026,7 @@ public class DigitParser extends SingleCharacterParser {
 
 **後輩**: `WildCardStringParser` は非貪欲マッチなんですか？
 
-**先輩**: そう。`WildCardStringParser` は `WildCardStringTerninatorParser` と組み合わせて使い、「ここからここまでの間の何でも」というパターンを表現する。貪欲にしてしまうと入力の最後まで食べてしまうからね。
+**先輩**: そう。`WildCardStringParser` は `WildCardStringTerminatorParser` と組み合わせて使い、「ここからここまでの間の何でも」というパターンを表現する。貪欲にしてしまうと入力の最後まで食べてしまうからね。
 
 ---
 
@@ -3712,7 +3712,7 @@ matchedTokenParser.slice(slicer -> slicer.pythonian("::-1"))
 | `WildCardStringParser` | ワイルドカード | 任意の文字列（終端まで） |
 | `WildCardLineParser` | ワイルドカード | 行末まで任意の文字列 |
 | `WildCardInterleaveParser` | ワイルドカード | 順不同マッチ用 |
-| `WildCardStringTerninatorParser` | ワイルドカード | ワイルドカード文字列の終端 |
+| `WildCardStringTerminatorParser` | ワイルドカード | ワイルドカード文字列の終端 |
 | `MultipleParser` | 繰り返し | 複数回マッチ |
 | `ParenthesesParser` | 括弧 | `( ... )` で囲まれた内容 |
 | `NamedParenthesesParser` | 括弧 | 名前付き括弧 |

@@ -32,8 +32,8 @@ public class Names{
 	@Override
 	public boolean equals(Object other) {
 		
-		if(other instanceof Names){
-			return ((Names)other).toString().equals(toString());
+		if(other instanceof Names names){
+			return names.toString().equals(toString());
 		}
 		return false;
 	}

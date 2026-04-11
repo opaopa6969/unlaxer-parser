@@ -895,8 +895,7 @@ class ParserRuleEmitter {
         }
 
         // First line has no leading indent (caller adds it via indent + c)
-        StringBuilder result = new StringBuilder();
-        result.append("new ").append(chainClass).append("() {\n");
+        w.raw("new " + chainClass + "() {\n");
         w.line("private static final long serialVersionUID = 1L;");
         w.line("@Override");
         w.line("public Parsers getLazyParsers() {");
@@ -910,10 +909,9 @@ class ParserRuleEmitter {
         w.line(");");
         w.dedent();
         w.line("}");
-        result.append(w.build());
-        result.append(baseIndent).append("}");
+        w.raw(baseIndent + "}");
 
-        return result.toString();
+        return w.build();
     }
 
     /**
@@ -1074,7 +1072,7 @@ class ParserRuleEmitter {
                 "org.unlaxer.parser.ErrorMessageParser.expected(\""
                 + ParserCodegenUtil.escapeString(m.message()) + "\")";
             case ElementModel.UntilParser m ->
-                "new org.unlaxer.parser.elementary.WildCardStringTerninatorParser(\""
+                "new org.unlaxer.parser.elementary.WildCardStringTerminatorParser(\""
                 + ParserCodegenUtil.escapeString(m.terminator()) + "\")";
             case ElementModel.LookaheadParser m ->
                 "new MatchOnly(new WordParser(\"" + ParserCodegenUtil.escapeString(m.pattern()) + "\"))";
@@ -1177,7 +1175,7 @@ class ParserRuleEmitter {
     static String resolveParserExpression(ParserGenerator.GenContext ctx, String name) {
         String terminator = ctx.tokenUntilMap.get(name);
         if (terminator != null) {
-            return "new org.unlaxer.parser.elementary.WildCardStringTerninatorParser(\""
+            return "new org.unlaxer.parser.elementary.WildCardStringTerminatorParser(\""
                 + ParserCodegenUtil.escapeString(terminator) + "\")";
         }
         String laPattern = ctx.tokenLookaheadMap.get(name);

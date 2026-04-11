@@ -147,8 +147,8 @@ public class MatchedTokenParser extends AbstractParser{//extends ConstructedSing
 	@Override
 	public Parsed parse(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
 		
-		if(targetParser instanceof ReferenceParser){
-			targetParser = ((ReferenceParser)targetParser).getMatchedParser()
+		if(targetParser instanceof ReferenceParser referenceParser){
+			targetParser = referenceParser.getMatchedParser()
 				.orElseThrow(()->new IllegalArgumentException("specified matched parser not found yet."));
 		}
 		
@@ -190,8 +190,8 @@ public class MatchedTokenParser extends AbstractParser{//extends ConstructedSing
 	@Override
 	public Parsed parse(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
 		
-		if(targetParser instanceof ReferenceParser){
-			targetParser = ((ReferenceParser)targetParser).getMatchedParser()
+		if(targetParser instanceof ReferenceParser referenceParser){
+			targetParser = referenceParser.getMatchedParser()
 				.orElseThrow(()->new IllegalArgumentException("specified matched parser not found yet."));
 		}
 		

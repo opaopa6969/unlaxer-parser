@@ -16,8 +16,8 @@ public class ChoiceCommitAction implements AdditionalPreCommitAction {
 	@Override
 	public void effect(Parser parser, ParseContext parseContext) {
 		
-		if (chosen != null && parser instanceof ChoiceInterface) {
-			parseContext.chosenParserByChoice.put((ChoiceInterface) parser, chosen);
+		if (chosen != null && parser instanceof ChoiceInterface choiceInterface) {
+			parseContext.chosenParserByChoice.put(choiceInterface, chosen);
 		}
 	}
 }

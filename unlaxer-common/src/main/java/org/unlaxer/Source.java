@@ -18,25 +18,7 @@ import org.unlaxer.util.function.TriFunction;
 
 public interface Source extends CodePointAccessor, PositionResolver {
 
-  public static class Origin {
-    final Source root;
-    final CursorRange rangeInRoot;
-
-    public Origin(Source root, CursorRange rangeInRoot) {
-      super();
-      this.root = root;
-      this.rangeInRoot = rangeInRoot;
-    }
-
-    public Source root() {
-      return root;
-    }
-
-    public CursorRange rangeInRoot() {
-      return rangeInRoot;
-    }
-
-  }
+  public record Origin(Source root, CursorRange rangeInRoot) {}
 
   public enum SourceKind {
     root,

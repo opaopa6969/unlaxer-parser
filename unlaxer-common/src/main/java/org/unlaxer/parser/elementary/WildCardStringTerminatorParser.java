@@ -14,33 +14,33 @@ import org.unlaxer.parser.combinator.Choice;
 import org.unlaxer.parser.combinator.MatchOnly;
 import org.unlaxer.parser.combinator.ZeroOrMore;
 
-public class WildCardStringTerninatorParser extends ZeroOrMore implements StaticParser {
+public class WildCardStringTerminatorParser extends ZeroOrMore implements StaticParser {
 
 	private static final long serialVersionUID = -3386398191774012367L;
 
 	static final Parser wildCardStringParser = new WildCardStringParser();
 
-	public WildCardStringTerninatorParser(boolean isTerminatorIsMatchOnly, String... excludes) {
+	public WildCardStringTerminatorParser(boolean isTerminatorIsMatchOnly, String... excludes) {
 		super(wildCardStringParser, createTerminator(isTerminatorIsMatchOnly, excludes));
 	}
 
-	public WildCardStringTerninatorParser(String... excludes) {
+	public WildCardStringTerminatorParser(String... excludes) {
 		this(true, excludes);
 	}
 
-	public WildCardStringTerninatorParser(boolean isTerminatorIsMatchOnly, Parser terminator) {
+	public WildCardStringTerminatorParser(boolean isTerminatorIsMatchOnly, Parser terminator) {
 		super(wildCardStringParser, isTerminatorIsMatchOnly ? new MatchOnly(terminator) : terminator);
 	}
 
-	public WildCardStringTerninatorParser(Parser terminator) {
+	public WildCardStringTerminatorParser(Parser terminator) {
 		this(true, terminator);
 	}
 
-	public WildCardStringTerninatorParser(Name name, boolean isTerminatorIsMatchOnly, String... excludes) {
+	public WildCardStringTerminatorParser(Name name, boolean isTerminatorIsMatchOnly, String... excludes) {
 		super(name, wildCardStringParser, createTerminator(isTerminatorIsMatchOnly, excludes));
 	}
 
-	public WildCardStringTerninatorParser(Name name, String... excludes) {
+	public WildCardStringTerminatorParser(Name name, String... excludes) {
 		super(name, wildCardStringParser, createTerminator(true, excludes));
 	}
 

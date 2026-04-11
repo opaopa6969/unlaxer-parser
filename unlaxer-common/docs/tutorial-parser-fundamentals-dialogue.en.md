@@ -1026,7 +1026,7 @@ public class DigitParser extends SingleCharacterParser {
 
 **Newcomer**: Is `WildCardStringParser` a non-greedy match?
 
-**Senior**: Yes. `WildCardStringParser` is used in combination with `WildCardStringTerninatorParser` to express "anything between here and there." Making it greedy would consume everything to the end of the input.
+**Senior**: Yes. `WildCardStringParser` is used in combination with `WildCardStringTerminatorParser` to express "anything between here and there." Making it greedy would consume everything to the end of the input.
 
 ---
 
@@ -3697,7 +3697,7 @@ matchedTokenParser.slice(slicer -> slicer.pythonian("::-1"))
 | `WildCardStringParser` | Wildcard | Any string (up to terminator) |
 | `WildCardLineParser` | Wildcard | Any string to end of line |
 | `WildCardInterleaveParser` | Wildcard | For unordered matching |
-| `WildCardStringTerninatorParser` | Wildcard | Wildcard string terminator |
+| `WildCardStringTerminatorParser` | Wildcard | Wildcard string terminator |
 | `MultipleParser` | Repetition | Multiple match |
 | `ParenthesesParser` | Parentheses | Content wrapped in `( ... )` |
 | `NamedParenthesesParser` | Parentheses | Named parentheses |

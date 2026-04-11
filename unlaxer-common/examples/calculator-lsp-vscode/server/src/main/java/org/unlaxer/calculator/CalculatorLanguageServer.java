@@ -289,7 +289,7 @@ public class CalculatorLanguageServer implements LanguageServer, LanguageClientA
 
             DocumentState state = server.getDocuments().get(uri);
             if (state == null) {
-                return CompletableFuture.completedFuture(Either.forLeft(Collections.emptyList()));
+                return CompletableFuture.completedFuture(Either.forLeft(List.of()));
             }
 
             List<CompletionItem> items = getCompletionItems(state.content, position);
@@ -364,7 +364,7 @@ public class CalculatorLanguageServer implements LanguageServer, LanguageClientA
             DocumentState state = server.getDocuments().get(uri);
 
             if (state == null) {
-                return CompletableFuture.completedFuture(new SemanticTokens(Collections.emptyList()));
+                return CompletableFuture.completedFuture(new SemanticTokens(List.of()));
             }
 
             List<Integer> data = buildSemanticTokens(state.content, state.parseResult);

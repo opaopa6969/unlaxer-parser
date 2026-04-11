@@ -559,17 +559,17 @@ public class ParserGeneratorTest {
         "}";
 
     @Test
-    public void testUntilTokenGeneratesWildCardStringTerninatorParser() {
+    public void testUntilTokenGeneratesWildCardStringTerminatorParser() {
         String source = generate(UNTIL_GRAMMAR);
-        assertTrue("UNTIL token should generate WildCardStringTerninatorParser",
-            source.contains("WildCardStringTerninatorParser"));
+        assertTrue("UNTIL token should generate WildCardStringTerminatorParser",
+            source.contains("WildCardStringTerminatorParser"));
     }
 
     @Test
     public void testUntilTokenIncludesTerminatorString() {
         String source = generate(UNTIL_GRAMMAR);
         assertTrue("UNTIL token should embed the terminator string",
-            source.contains("WildCardStringTerninatorParser(\"```\")"));
+            source.contains("WildCardStringTerminatorParser(\"```\")"));
     }
 
     @Test

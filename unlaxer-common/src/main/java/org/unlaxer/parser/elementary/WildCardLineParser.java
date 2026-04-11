@@ -10,7 +10,7 @@ public class WildCardLineParser extends LazyChain{
 	public Parsers getLazyParsers() {
 	    return new Parsers(
 	        Parser.get(StartOfLineParser.class),
-	        new WildCardStringTerninatorParser(
+	        new WildCardStringTerminatorParser(
 	    		true ,
 	    		Parser.get(LineTerminatorParser.class)
 	        ),

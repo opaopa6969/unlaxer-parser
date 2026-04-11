@@ -8,7 +8,7 @@ import org.unlaxer.TokenPrinter;
 import org.unlaxer.listener.OutputLevel;
 import org.unlaxer.parser.combinator.Chain;
 
-public class WildCardStringTerninatorParserTest extends ParserTestBase{
+public class WildCardStringTerminatorParserTest extends ParserTestBase{
 
   @Test
   public void test() {
@@ -21,10 +21,10 @@ public class WildCardStringTerninatorParserTest extends ParserTestBase{
     			new WordParser("---END_OF_PART--/"),
     			new LineTerminatorParser()
 		);
-    	WildCardStringTerninatorParser wildCardStringTerninatorParser = 
-    			new WildCardStringTerninatorParser(true,chain);
+    	WildCardStringTerminatorParser wildCardStringTerminatorParser = 
+    			new WildCardStringTerminatorParser(true,chain);
     	
-    	TestResult testAllMatch = testPartialMatch(wildCardStringTerninatorParser, "u\n---END_OF_PART--/\nsushi","u\n");
+    	TestResult testAllMatch = testPartialMatch(wildCardStringTerminatorParser, "u\n---END_OF_PART--/\nsushi","u\n");
     	Token rootToken = testAllMatch.parsed.getRootToken();
     	System.out.println(TokenPrinter.get(rootToken)); 
 		String token = rootToken.getSource().sourceAsString();
@@ -34,11 +34,11 @@ public class WildCardStringTerninatorParserTest extends ParserTestBase{
     {
       
       WordParser abc = new WordParser("abc");
-      WildCardStringTerninatorParser wildCardStringTerninatorParser = new WildCardStringTerninatorParser("\n");
+      WildCardStringTerminatorParser wildCardStringTerminatorParser = new WildCardStringTerminatorParser("\n");
       LineTerminatorParser lineTerminatorParser = new LineTerminatorParser();
       
-      Chain wildCardAbc = new Chain(wildCardStringTerninatorParser , lineTerminatorParser , abc);
-      Chain wildCardLT= new Chain(wildCardStringTerninatorParser , lineTerminatorParser);
+      Chain wildCardAbc = new Chain(wildCardStringTerminatorParser , lineTerminatorParser , abc);
+      Chain wildCardLT= new Chain(wildCardStringTerminatorParser , lineTerminatorParser);
       
       testAllMatch(wildCardLT, "nikuniku\n");
       testAllMatch(wildCardAbc, "nikuniku\nabc");
@@ -47,12 +47,12 @@ public class WildCardStringTerninatorParserTest extends ParserTestBase{
     {
       
       WordParser abc = new WordParser("abc");
-      WildCardStringTerninatorParser wildCardStringTerninatorParser = new WildCardStringTerninatorParser(new LineTerminatorParser());
+      WildCardStringTerminatorParser wildCardStringTerminatorParser = new WildCardStringTerminatorParser(new LineTerminatorParser());
       LineTerminatorParser lineTerminatorParser = new LineTerminatorParser();
 
-      Chain wildCard= new Chain(wildCardStringTerninatorParser);
-      Chain wildCardAbc = new Chain(wildCardStringTerninatorParser , lineTerminatorParser , abc);
-      Chain wildCardLT= new Chain(wildCardStringTerninatorParser , lineTerminatorParser);
+      Chain wildCard= new Chain(wildCardStringTerminatorParser);
+      Chain wildCardAbc = new Chain(wildCardStringTerminatorParser , lineTerminatorParser , abc);
+      Chain wildCardLT= new Chain(wildCardStringTerminatorParser , lineTerminatorParser);
       
       testAllMatch(wildCard, "nikuniku");
       testAllMatch(wildCardLT, "nikuniku\n");

@@ -48,9 +48,9 @@ token CODE_BODY = UNTIL('```')
 
 - `UBNFAST.TokenDecl` を sealed interface (`Simple` / `Until`) に変更
 - `UntilExpressionParser` / `TokenValueParser` を追加
-- `ParserGenerator` が `WildCardStringTerninatorParser("terminator")` を生成
+- `ParserGenerator` が `WildCardStringTerminatorParser("terminator")` を生成
 
-**関連 API**: `org.unlaxer.parser.elementary.WildCardStringTerninatorParser`
+**関連 API**: `org.unlaxer.parser.elementary.WildCardStringTerminatorParser`
 
 ---
 
@@ -304,7 +304,7 @@ record QuantifiedElement(AtomicElement element, Quantifier q) implements AtomicE
 
 - [specs/ubnf-syntax.md](../specs/ubnf-syntax.md) — 現在の構文仕様
 - [specs/open-questions.md](../specs/open-questions.md) — 設計疑問
-- `org.unlaxer.parser.elementary.WildCardStringTerninatorParser` — UNTIL の実装基盤
+- `org.unlaxer.parser.elementary.WildCardStringTerminatorParser` — UNTIL の実装基盤
 - `org.unlaxer.parser.combinator.MatchOnly` — LOOKAHEAD の実装候補
 
 ---
