@@ -1,26 +1,13 @@
 package org.unlaxer.dsl.codegen;
 
-import org.unlaxer.dsl.bootstrap.UBNFAST.AnnotatedElement;
-import org.unlaxer.dsl.bootstrap.UBNFAST.AtomicElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.BackrefAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.CatalogAnnotation;
-import org.unlaxer.dsl.bootstrap.UBNFAST.ChoiceBody;
 import org.unlaxer.dsl.bootstrap.UBNFAST.DeclaresAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
-import org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement;
-import org.unlaxer.dsl.bootstrap.UBNFAST.OptionalElement;
-import org.unlaxer.dsl.bootstrap.UBNFAST.RepeatElement;
-import org.unlaxer.dsl.bootstrap.UBNFAST.RuleBody;
-import org.unlaxer.dsl.bootstrap.UBNFAST.RuleDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ScopeTreeAnnotation;
-import org.unlaxer.dsl.bootstrap.UBNFAST.SequenceBody;
 import org.unlaxer.dsl.bootstrap.UBNFAST.StringSettingValue;
-import org.unlaxer.dsl.bootstrap.UBNFAST.TerminalElement;
 
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
  * GrammarDecl から {Name}LanguageServer.java を生成する。
@@ -34,11 +21,9 @@ public class LSPGenerator implements CodeGenerator {
         String serverClass = grammarName + "LanguageServer";
         String parsersClass = grammarName + "Parsers";
 
-        List<String> keywords = collectKeywords(grammar);
+        List<String> keywords = LSPServerEmitter.collectKeywords(grammar);
         boolean hasCatalog = grammar.rules().stream()
             .anyMatch(r -> r.annotations().stream().anyMatch(a -> a instanceof CatalogAnnotation));
-        // @declares / @backref / @scopeTree を持つ文法では生成パーサーが TransactionListener を実装する。
-        // ScopeStore.registerDispatcher() でパースコンテキストに転送リスナーを登録する必要がある。
         boolean hasScopeStore = grammar.rules().stream()
             .anyMatch(r -> r.annotations().stream().anyMatch(
                 a -> a instanceof DeclaresAnnotation
@@ -48,472 +33,46 @@ public class LSPGenerator implements CodeGenerator {
         StringBuilder sb = new StringBuilder();
         sb.append("package ").append(packageName).append(";\n\n");
 
-        sb.append("import java.util.*;\n");
-        sb.append("import java.util.concurrent.CompletableFuture;\n");
-        sb.append("import org.eclipse.lsp4j.*;\n");
-        sb.append("import org.eclipse.lsp4j.jsonrpc.messages.Either;\n");
-        sb.append("import org.eclipse.lsp4j.services.*;\n");
-        sb.append("import org.unlaxer.Parsed;\n");
-        sb.append("import org.unlaxer.StringSource;\n");
-        sb.append("import org.unlaxer.context.ParseContext;\n");
-        sb.append("import org.unlaxer.parser.Parser;\n");
-        if (hasScopeStore) {
-            sb.append("import org.unlaxer.dsl.runtime.ScopeStore;\n");
-        }
-        sb.append("\n");
+        // ----- Imports -----
+        LSPServerEmitter.emitImports(sb, hasScopeStore);
 
         sb.append("public abstract class ").append(serverClass)
           .append(" implements LanguageServer, LanguageClientAware {\n\n");
 
-        // KEYWORDS field
-        sb.append("    private static final List<String> KEYWORDS = List.of(");
-        for (int i = 0; i < keywords.size(); i++) {
-            if (i > 0) sb.append(", ");
-            sb.append("\"").append(keywords.get(i)).append("\"");
-        }
-        sb.append(");\n\n");
+        // ----- Fields & constructor -----
+        LSPServerEmitter.emitFieldsAndConstructor(sb, serverClass, keywords, hasCatalog);
 
-        sb.append("    protected LanguageClient client;\n");
-        sb.append("    protected final Map<String, DocumentState> documents = new HashMap<>();\n\n");
+        // ----- Lifecycle methods -----
+        LSPServerEmitter.emitLifecycleMethods(sb, serverClass, hasCatalog);
 
-        // Catalog infrastructure fields (when @catalog annotation present)
+        // ----- parseDocument & utilities -----
+        LSPServerEmitter.emitParseDocument(sb, parsersClass, hasScopeStore);
+
+        // ----- Hook methods -----
+        LSPServerEmitter.emitHookMethods(sb);
+
+        // ----- Catalog methods -----
         if (hasCatalog) {
-            sb.append("    protected volatile CatalogResolver catalogResolver = null;\n\n");
-            sb.append("    protected void setCatalogResolver(CatalogResolver r) { this.catalogResolver = r; }\n\n");
+            LSPServerEmitter.emitCatalogMethods(sb, grammarName);
         }
 
-        // Constructor
-        sb.append("    public ").append(serverClass).append("() {}\n\n");
+        // ----- Records -----
+        LSPServerEmitter.emitRecords(sb);
 
-        // initialize()
-        sb.append("    @Override\n");
-        sb.append("    public CompletableFuture<InitializeResult> initialize(InitializeParams params) {\n");
+        // ----- TextDocumentService inner class -----
+        LSPServerEmitter.emitTextDocumentService(sb, serverClass, grammarName);
+
+        // ----- WorkspaceService inner class -----
+        LSPServerEmitter.emitWorkspaceService(sb, serverClass);
+
+        // ----- Catalog interfaces -----
         if (hasCatalog) {
-            sb.append("        initCatalogResolver(params);\n");
-        }
-        sb.append("        ServerCapabilities capabilities = new ServerCapabilities();\n");
-        sb.append("        capabilities.setTextDocumentSync(TextDocumentSyncKind.Full);\n");
-        sb.append("        CompletionOptions completionOptions = new CompletionOptions();\n");
-        sb.append("        completionOptions.setResolveProvider(false);\n");
-        sb.append("        capabilities.setCompletionProvider(completionOptions);\n");
-        sb.append("        capabilities.setHoverProvider(true);\n");
-        sb.append("        SemanticTokensWithRegistrationOptions semanticTokensOptions =\n");
-        sb.append("            new SemanticTokensWithRegistrationOptions();\n");
-        sb.append("        semanticTokensOptions.setFull(true);\n");
-        sb.append("        semanticTokensOptions.setLegend(new SemanticTokensLegend(\n");
-        sb.append("            List.of(\"valid\", \"invalid\"), List.of()));\n");
-        sb.append("        capabilities.setSemanticTokensProvider(semanticTokensOptions);\n");
-        sb.append("        configureAdditionalCapabilities(capabilities);\n");
-        sb.append("        return CompletableFuture.completedFuture(new InitializeResult(capabilities));\n");
-        sb.append("    }\n\n");
-
-        // shutdown()
-        sb.append("    @Override\n");
-        sb.append("    public CompletableFuture<Object> shutdown() {\n");
-        sb.append("        return CompletableFuture.completedFuture(null);\n");
-        sb.append("    }\n\n");
-
-        // exit()
-        sb.append("    @Override\n");
-        sb.append("    public void exit() {}\n\n");
-
-        // setTrace()
-        sb.append("    @Override\n");
-        sb.append("    public void setTrace(SetTraceParams params) {}\n\n");
-
-        // connect()
-        sb.append("    @Override\n");
-        sb.append("    public void connect(LanguageClient client) {\n");
-        sb.append("        this.client = client;\n");
-        sb.append("    }\n\n");
-
-        // getTextDocumentService()
-        sb.append("    @Override\n");
-        sb.append("    public TextDocumentService getTextDocumentService() {\n");
-        sb.append("        return new ").append(serverClass).append("TextDocumentService(this);\n");
-        sb.append("    }\n\n");
-
-        // getWorkspaceService()
-        sb.append("    @Override\n");
-        sb.append("    public WorkspaceService getWorkspaceService() {\n");
-        sb.append("        return new ").append(serverClass).append("WorkspaceService();\n");
-        sb.append("    }\n\n");
-
-        // parseDocument()
-        sb.append("    public ParseResult parseDocument(String uri, String content) {\n");
-        sb.append("        Parser parser = ").append(parsersClass).append(".getRootParser();\n");
-        sb.append("        ParseContext context = new ParseContext(createRootSourceCompat(content));\n");
-        if (hasScopeStore) {
-            sb.append("        ScopeStore.registerDispatcher(context);\n");
-        }
-        sb.append("        Parsed result = parser.parse(context);\n");
-        sb.append("        int consumedLength = 0;\n");
-        sb.append("        if (result.isSucceeded()) {\n");
-        sb.append("            consumedLength = result.getConsumed().source.sourceAsString().length();\n");
-        sb.append("        }\n");
-        sb.append("        context.close();\n");
-        sb.append("        ParseResult parseResult = new ParseResult(\n");
-        sb.append("            result.isSucceeded(), consumedLength, content.length());\n");
-        sb.append("        documents.put(uri, new DocumentState(uri, content, parseResult));\n");
-        sb.append("        if (client != null) {\n");
-        sb.append("            publishDiagnostics(uri, content, parseResult);\n");
-        sb.append("        }\n");
-        sb.append("        return parseResult;\n");
-        sb.append("    }\n\n");
-
-        sb.append("    private static StringSource createRootSourceCompat(String source) {\n");
-        sb.append("        try {\n");
-        sb.append("            java.lang.reflect.Method m = StringSource.class.getMethod(\"createRootSource\", String.class);\n");
-        sb.append("            Object v = m.invoke(null, source);\n");
-        sb.append("            if (v instanceof StringSource s) {\n");
-        sb.append("                return s;\n");
-        sb.append("            }\n");
-        sb.append("        } catch (Throwable ignored) {}\n");
-        sb.append("        try {\n");
-        sb.append("            for (java.lang.reflect.Constructor<?> c : StringSource.class.getDeclaredConstructors()) {\n");
-        sb.append("                Class<?>[] types = c.getParameterTypes();\n");
-        sb.append("                if (types.length == 0 || types[0] != String.class) {\n");
-        sb.append("                    continue;\n");
-        sb.append("                }\n");
-        sb.append("                Object[] args = new Object[types.length];\n");
-        sb.append("                args[0] = source;\n");
-        sb.append("                c.setAccessible(true);\n");
-        sb.append("                Object v = c.newInstance(args);\n");
-        sb.append("                if (v instanceof StringSource s) {\n");
-        sb.append("                    return s;\n");
-        sb.append("                }\n");
-        sb.append("            }\n");
-        sb.append("        } catch (Throwable ignored) {}\n");
-        sb.append("        throw new IllegalStateException(\"No compatible StringSource initializer found\");\n");
-        sb.append("    }\n\n");
-
-        // publishDiagnostics()
-        sb.append("    private void publishDiagnostics(String uri, String content, ParseResult result) {\n");
-        sb.append("        List<Diagnostic> diagnostics = new ArrayList<>();\n");
-        sb.append("        if (result.consumedLength() < result.totalLength()) {\n");
-        sb.append("            int errorStart = result.consumedLength();\n");
-        sb.append("            Position startPos = offsetToPosition(content, errorStart);\n");
-        sb.append("            Position endPos = offsetToPosition(content, result.totalLength());\n");
-        sb.append("            Diagnostic diagnostic = new Diagnostic();\n");
-        sb.append("            diagnostic.setRange(new Range(startPos, endPos));\n");
-        sb.append("            diagnostic.setSeverity(DiagnosticSeverity.Error);\n");
-        sb.append("            diagnostic.setMessage(\"Parse error at offset \" + errorStart);\n");
-        sb.append("            diagnostics.add(diagnostic);\n");
-        sb.append("        }\n");
-        sb.append("        java.util.List<Diagnostic> additional = additionalDiagnostics(uri, content);\n");
-        sb.append("        if (additional != null && !additional.isEmpty()) {\n");
-        sb.append("            diagnostics.addAll(additional);\n");
-        sb.append("        }\n");
-        sb.append("        client.publishDiagnostics(new PublishDiagnosticsParams(uri, diagnostics));\n");
-        sb.append("    }\n\n");
-
-        // offsetToPosition()
-        sb.append("    private Position offsetToPosition(String content, int offset) {\n");
-        sb.append("        int line = 0;\n");
-        sb.append("        int column = 0;\n");
-        sb.append("        for (int i = 0; i < offset && i < content.length(); i++) {\n");
-        sb.append("            if (content.charAt(i) == '\\n') {\n");
-        sb.append("                line++;\n");
-        sb.append("                column = 0;\n");
-        sb.append("            } else {\n");
-        sb.append("                column++;\n");
-        sb.append("            }\n");
-        sb.append("        }\n");
-        sb.append("        return new Position(line, column);\n");
-        sb.append("    }\n\n");
-
-        // --- GGP Hook methods (protected, default empty implementations) ---
-
-        sb.append("    // Hook: additional completion items (for metadata, language-specific keywords)\n");
-        sb.append("    protected java.util.List<CompletionItem> additionalCompletionItems(\n");
-        sb.append("            CompletionParams params, String documentContent) {\n");
-        sb.append("        return java.util.Collections.emptyList();\n");
-        sb.append("    }\n\n");
-
-        sb.append("    // Hook: additional diagnostics (for semantic validation)\n");
-        sb.append("    protected java.util.List<Diagnostic> additionalDiagnostics(\n");
-        sb.append("            String uri, String documentContent) {\n");
-        sb.append("        return java.util.Collections.emptyList();\n");
-        sb.append("    }\n\n");
-
-        sb.append("    // Hook: custom definition (for cross-references like dependsOn)\n");
-        sb.append("    protected org.eclipse.lsp4j.LocationLink customDefinition(\n");
-        sb.append("            DefinitionParams params, String documentContent) {\n");
-        sb.append("        return null;\n");
-        sb.append("    }\n\n");
-
-        sb.append("    // Hook: additional semantic tokens (for embedded languages like Java code blocks)\n");
-        sb.append("    protected int[] additionalSemanticTokenData(String uri, String documentContent) {\n");
-        sb.append("        return new int[0];\n");
-        sb.append("    }\n\n");
-
-        sb.append("    // Hook: configure additional server capabilities\n");
-        sb.append("    protected void configureAdditionalCapabilities(\n");
-        sb.append("            ServerCapabilities capabilities) {\n");
-        sb.append("        // Override to add capabilities\n");
-        sb.append("    }\n\n");
-
-        // Catalog infrastructure methods
-        if (hasCatalog) {
-            String lowerName = grammarName.toLowerCase();
-            String upperName = grammarName.toUpperCase();
-            sb.append("    protected void initCatalogResolver(InitializeParams params) {\n");
-            sb.append("        if (catalogResolver != null) return;\n");
-            sb.append("        String path = null;\n");
-            sb.append("        Object initOptions = params.getInitializationOptions();\n");
-            sb.append("        if (initOptions instanceof Map<?,?> map) {\n");
-            sb.append("            Object v = map.get(\"catalogPath\");\n");
-            sb.append("            if (v instanceof String s && !s.isBlank()) path = s;\n");
-            sb.append("        }\n");
-            sb.append("        if (path == null) path = System.getProperty(\"").append(lowerName).append(".catalog.path\");\n");
-            sb.append("        if (path == null) path = System.getenv(\"").append(upperName).append("_CATALOG_PATH\");\n");
-            sb.append("        if (path != null && !path.isBlank()) catalogResolver = new FileCatalogResolver(path);\n");
-            sb.append("    }\n\n");
-
-            sb.append("    protected List<CompletionItem> catalogCompletion(String prefix) {\n");
-            sb.append("        if (catalogResolver == null || catalogResolver.isEmpty()) return List.of();\n");
-            sb.append("        List<CompletionItem> items = new ArrayList<>();\n");
-            sb.append("        for (CatalogEntry entry : catalogResolver.listAll()) {\n");
-            sb.append("            if (prefix.isEmpty() || entry.name().startsWith(prefix)) {\n");
-            sb.append("                CompletionItem item = new CompletionItem(entry.name());\n");
-            sb.append("                item.setKind(CompletionItemKind.Variable);\n");
-            sb.append("                if (entry.description() != null && !entry.description().isBlank()) {\n");
-            sb.append("                    item.setDetail(entry.description());\n");
-            sb.append("                }\n");
-            sb.append("                items.add(item);\n");
-            sb.append("            }\n");
-            sb.append("        }\n");
-            sb.append("        return items;\n");
-            sb.append("    }\n\n");
-
-            sb.append("    protected String catalogHover(String variableName) {\n");
-            sb.append("        if (catalogResolver == null) return null;\n");
-            sb.append("        CatalogEntry entry = catalogResolver.lookup(variableName);\n");
-            sb.append("        if (entry == null) return null;\n");
-            sb.append("        return entry.description() != null ? entry.description() : entry.name();\n");
-            sb.append("    }\n\n");
-        }
-
-        // DocumentState record
-        sb.append("    public record DocumentState(String uri, String content, ParseResult parseResult) {}\n\n");
-
-        // ParseResult record
-        sb.append("    public record ParseResult(boolean succeeded, int consumedLength, int totalLength) {}\n\n");
-
-        // TextDocumentService inner class
-        sb.append("    static class ").append(serverClass).append("TextDocumentService implements TextDocumentService {\n\n");
-        sb.append("        private final ").append(serverClass).append(" server;\n\n");
-        sb.append("        ").append(serverClass).append("TextDocumentService(").append(serverClass).append(" server) {\n");
-        sb.append("            this.server = server;\n");
-        sb.append("        }\n\n");
-
-        sb.append("        @Override\n");
-        sb.append("        public void didOpen(DidOpenTextDocumentParams params) {\n");
-        sb.append("            server.parseDocument(\n");
-        sb.append("                params.getTextDocument().getUri(),\n");
-        sb.append("                params.getTextDocument().getText());\n");
-        sb.append("        }\n\n");
-
-        sb.append("        @Override\n");
-        sb.append("        public void didChange(DidChangeTextDocumentParams params) {\n");
-        sb.append("            server.parseDocument(\n");
-        sb.append("                params.getTextDocument().getUri(),\n");
-        sb.append("                params.getContentChanges().get(0).getText());\n");
-        sb.append("        }\n\n");
-
-        sb.append("        @Override\n");
-        sb.append("        public void didClose(DidCloseTextDocumentParams params) {\n");
-        sb.append("            server.documents.remove(params.getTextDocument().getUri());\n");
-        sb.append("        }\n\n");
-
-        sb.append("        @Override\n");
-        sb.append("        public void didSave(DidSaveTextDocumentParams params) {}\n\n");
-
-        // completion()
-        sb.append("        @Override\n");
-        sb.append("        public CompletableFuture<Either<List<CompletionItem>, CompletionList>> completion(\n");
-        sb.append("                CompletionParams params) {\n");
-        sb.append("            List<CompletionItem> items = new ArrayList<>();\n");
-        sb.append("            for (String kw : KEYWORDS) {\n");
-        sb.append("                CompletionItem item = new CompletionItem(kw);\n");
-        sb.append("                item.setKind(CompletionItemKind.Keyword);\n");
-        sb.append("                items.add(item);\n");
-        sb.append("            }\n");
-        sb.append("            String uri = params.getTextDocument().getUri();\n");
-        sb.append("            DocumentState state = server.documents.get(uri);\n");
-        sb.append("            String content = state != null ? state.content() : \"\";\n");
-        sb.append("            java.util.List<CompletionItem> additional = server.additionalCompletionItems(params, content);\n");
-        sb.append("            if (additional != null && !additional.isEmpty()) {\n");
-        sb.append("                items.addAll(additional);\n");
-        sb.append("            }\n");
-        sb.append("            return CompletableFuture.completedFuture(Either.forLeft(items));\n");
-        sb.append("        }\n\n");
-
-        // hover()
-        sb.append("        @Override\n");
-        sb.append("        public CompletableFuture<Hover> hover(HoverParams params) {\n");
-        sb.append("            String uri = params.getTextDocument().getUri();\n");
-        sb.append("            DocumentState state = server.documents.get(uri);\n");
-        sb.append("            if (state == null) {\n");
-        sb.append("                return CompletableFuture.completedFuture(null);\n");
-        sb.append("            }\n");
-        sb.append("            String text;\n");
-        sb.append("            if (state.parseResult().succeeded() &&\n");
-        sb.append("                    state.parseResult().consumedLength() == state.parseResult().totalLength()) {\n");
-        sb.append("                text = \"Valid ").append(grammarName).append("\";\n");
-        sb.append("            } else {\n");
-        sb.append("                text = \"Parse error at offset \" + state.parseResult().consumedLength();\n");
-        sb.append("            }\n");
-        sb.append("            MarkupContent content = new MarkupContent();\n");
-        sb.append("            content.setKind(\"plaintext\");\n");
-        sb.append("            content.setValue(text);\n");
-        sb.append("            return CompletableFuture.completedFuture(new Hover(content));\n");
-        sb.append("        }\n\n");
-
-        // semanticTokensFull()
-        sb.append("        @Override\n");
-        sb.append("        public CompletableFuture<SemanticTokens> semanticTokensFull(SemanticTokensParams params) {\n");
-        sb.append("            String uri = params.getTextDocument().getUri();\n");
-        sb.append("            DocumentState state = server.documents.get(uri);\n");
-        sb.append("            if (state == null) {\n");
-        sb.append("                return CompletableFuture.completedFuture(new SemanticTokens(Collections.emptyList()));\n");
-        sb.append("            }\n");
-        sb.append("            int[] tokenData = server.additionalSemanticTokenData(uri, state.content());\n");
-        sb.append("            if (tokenData != null && tokenData.length > 0) {\n");
-        sb.append("                List<Integer> data = new ArrayList<>();\n");
-        sb.append("                for (int v : tokenData) { data.add(v); }\n");
-        sb.append("                return CompletableFuture.completedFuture(new SemanticTokens(data));\n");
-        sb.append("            }\n");
-        sb.append("            return CompletableFuture.completedFuture(new SemanticTokens(Collections.emptyList()));\n");
-        sb.append("        }\n");
-        sb.append("    }\n\n");
-
-        // WorkspaceService inner class
-        sb.append("    static class ").append(serverClass).append("WorkspaceService implements WorkspaceService {\n\n");
-        sb.append("        @Override\n");
-        sb.append("        public void didChangeConfiguration(org.eclipse.lsp4j.DidChangeConfigurationParams params) {}\n\n");
-        sb.append("        @Override\n");
-        sb.append("        public void didChangeWatchedFiles(org.eclipse.lsp4j.DidChangeWatchedFilesParams params) {}\n");
-        sb.append("    }\n");
-
-        // Catalog interfaces and FileCatalogResolver
-        if (hasCatalog) {
-            sb.append("\n");
-            sb.append("    public interface CatalogResolver {\n");
-            sb.append("        List<CatalogEntry> listAll();\n");
-            sb.append("        CatalogEntry lookup(String name);\n");
-            sb.append("        default boolean isEmpty() { return listAll().isEmpty(); }\n");
-            sb.append("    }\n\n");
-
-            sb.append("    public record CatalogEntry(String name, String description, String context, String sourcePath) {}\n\n");
-
-            sb.append("    public static class FileCatalogResolver implements CatalogResolver {\n");
-            sb.append("        private final List<CatalogEntry> entries = new ArrayList<>();\n\n");
-            sb.append("        public FileCatalogResolver(String pathSpec) {\n");
-            sb.append("            for (String path : pathSpec.split(java.io.File.pathSeparator)) {\n");
-            sb.append("                java.io.File f = new java.io.File(path.trim());\n");
-            sb.append("                if (!f.exists()) continue;\n");
-            sb.append("                if (f.isDirectory()) {\n");
-            sb.append("                    java.io.File[] files = f.listFiles(ff -> ff.getName().endsWith(\".tecatalog\"));\n");
-            sb.append("                    if (files != null) for (java.io.File cf : files) loadFile(cf);\n");
-            sb.append("                } else {\n");
-            sb.append("                    loadFile(f);\n");
-            sb.append("                }\n");
-            sb.append("            }\n");
-            sb.append("        }\n\n");
-            sb.append("        private void loadFile(java.io.File f) {\n");
-            sb.append("            try (java.io.BufferedReader br = new java.io.BufferedReader(new java.io.FileReader(f, java.nio.charset.StandardCharsets.UTF_8))) {\n");
-            sb.append("                String line;\n");
-            sb.append("                boolean canonical = false;\n");
-            sb.append("                boolean firstLine = true;\n");
-            sb.append("                while ((line = br.readLine()) != null) {\n");
-            sb.append("                    if (firstLine) { firstLine = false; canonical = line.startsWith(\"tinyexpression-catalog-v\"); continue; }\n");
-            sb.append("                    if (line.isBlank() || line.startsWith(\"#\")) continue;\n");
-            sb.append("                    if (canonical) {\n");
-            sb.append("                        String[] parts = line.split(\"\\\\|\", -1);\n");
-            sb.append("                        if (parts.length >= 3) {\n");
-            sb.append("                            String name = parts.length > 1 ? parts[1].trim() : \"\";\n");
-            sb.append("                            String desc = parts.length > 2 ? parts[2].trim() : \"\";\n");
-            sb.append("                            String ctx  = parts.length > 3 ? parts[3].trim() : \"\";\n");
-            sb.append("                            entries.add(new CatalogEntry(name, desc, ctx, f.getPath()));\n");
-            sb.append("                        }\n");
-            sb.append("                    } else {\n");
-            sb.append("                        String[] parts = line.split(\"\\\\|\", 2);\n");
-            sb.append("                        String name = parts[0].trim();\n");
-            sb.append("                        String desc = parts.length > 1 ? parts[1].trim() : \"\";\n");
-            sb.append("                        entries.add(new CatalogEntry(name, desc, \"\", f.getPath()));\n");
-            sb.append("                    }\n");
-            sb.append("                }\n");
-            sb.append("            } catch (java.io.IOException ignored) {}\n");
-            sb.append("        }\n\n");
-            sb.append("        @Override public List<CatalogEntry> listAll() { return Collections.unmodifiableList(entries); }\n");
-            sb.append("        @Override public CatalogEntry lookup(String name) {\n");
-            sb.append("            return entries.stream().filter(e -> e.name().equals(name)).findFirst().orElse(null);\n");
-            sb.append("        }\n");
-            sb.append("    }\n");
+            LSPServerEmitter.emitCatalogInterfaces(sb);
         }
 
         sb.append("}\n");
 
         return new GeneratedSource(packageName, serverClass, sb.toString());
-    }
-
-    private List<String> collectKeywords(GrammarDecl grammar) {
-        Set<String> kw = new LinkedHashSet<>();
-        kw.add("grammar");
-        kw.add("token");
-        kw.add("@root");
-        kw.add("@mapping");
-        kw.add("@whitespace");
-        kw.add("@interleave");
-        kw.add("@backref");
-        kw.add("@typeof");
-        kw.add("@scopeTree");
-        kw.add("@leftAssoc");
-        kw.add("@rightAssoc");
-        kw.add("@precedence");
-        kw.add("@declares");
-        kw.add("@catalog");
-        kw.add("params");
-        kw.add("level");
-        kw.add("profile");
-        kw.add("name");
-        kw.add("mode");
-        kw.add("symbol");
-        kw.add("context");
-        kw.add("description");
-        for (RuleDecl rule : grammar.rules()) {
-            collectFromBody(rule.body(), kw);
-        }
-        return new ArrayList<>(kw);
-    }
-
-    private void collectFromBody(RuleBody body, Set<String> acc) {
-        switch (body) {
-            case ChoiceBody cb -> {
-                for (var alt : cb.alternatives()) collectFromBody(alt, acc);
-            }
-            case SequenceBody sb -> {
-                for (AnnotatedElement ae : sb.elements()) collectFromElement(ae.element(), acc);
-            }
-        }
-    }
-
-    private void collectFromElement(AtomicElement element, Set<String> acc) {
-        switch (element) {
-            case TerminalElement t -> acc.add(stripQuotes(t.value()));
-            case GroupElement g -> collectFromBody(g.body(), acc);
-            case OptionalElement o -> collectFromBody(o.body(), acc);
-            case RepeatElement r -> collectFromBody(r.body(), acc);
-            default -> {}
-        }
-    }
-
-    private String stripQuotes(String value) {
-        if (value.length() >= 2 && value.startsWith("'") && value.endsWith("'")) {
-            return value.substring(1, value.length() - 1);
-        }
-        return value;
     }
 
     private String getPackageName(GrammarDecl grammar) {
