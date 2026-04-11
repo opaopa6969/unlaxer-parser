@@ -27,9 +27,11 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.TerminalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.WhitespaceAnnotation;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -50,6 +52,21 @@ class ParserRuleEmitter {
         record SepHelper(String bodyName, String outerName,
                          AtomicElement element, AtomicElement separator,
                          int[] counterState) implements HelperSpec {}
+    }
+
+    // =========================================================================
+    // ElementModel: 解決フェーズの中間表現（副作用なしでレンダリング可能）
+    // =========================================================================
+
+    sealed interface ElementModel {
+        record WordMatch(String word) implements ElementModel {}
+        record ClassRef(String className) implements ElementModel {}
+        record InlineExpression(String expression) implements ElementModel {}
+        record ErrorExpected(String message) implements ElementModel {}
+        record ZeroOrMoreOf(ElementModel inner) implements ElementModel {}
+        record OneOrMoreOf(ElementModel inner) implements ElementModel {}
+        record OptionalOf(ElementModel inner) implements ElementModel {}
+        record BoundedRepeatOf(ElementModel inner, String min, String max) implements ElementModel {}
     }
 
     // =========================================================================
@@ -232,77 +249,165 @@ class ParserRuleEmitter {
     /**
      * Computes FOLLOW tokens for a rule by scanning the grammar for all references
      * to the rule and collecting terminal elements that appear immediately after.
+     * When the element following a rule reference is itself a rule reference, the
+     * FIRST set of that rule is computed recursively.
      */
     static List<String> computeFollowTokens(ParserGenerator.GenContext ctx, String ruleName) {
         LinkedHashSet<String> tokens = new LinkedHashSet<>();
         for (RuleDecl rule : ctx.grammar.rules()) {
-            collectFollowFromBody(rule.body(), ruleName, tokens);
+            collectFollowFromBody(ctx, rule.body(), ruleName, tokens);
         }
         return new ArrayList<>(tokens);
     }
 
-    private static void collectFollowFromBody(RuleBody body, String targetRule, LinkedHashSet<String> tokens) {
+    private static void collectFollowFromBody(
+            ParserGenerator.GenContext ctx, RuleBody body, String targetRule, LinkedHashSet<String> tokens) {
         switch (body) {
             case ChoiceBody choice -> {
                 for (SequenceBody alt : choice.alternatives()) {
-                    collectFollowFromSequence(alt, targetRule, tokens);
+                    collectFollowFromSequence(ctx, alt, targetRule, tokens);
                 }
             }
-            case SequenceBody seq -> collectFollowFromSequence(seq, targetRule, tokens);
+            case SequenceBody seq -> collectFollowFromSequence(ctx, seq, targetRule, tokens);
         }
     }
 
-    private static void collectFollowFromSequence(SequenceBody seq, String targetRule, LinkedHashSet<String> tokens) {
+    private static void collectFollowFromSequence(
+            ParserGenerator.GenContext ctx, SequenceBody seq, String targetRule, LinkedHashSet<String> tokens) {
         List<AnnotatedElement> elements = seq.elements();
         for (int i = 0; i < elements.size(); i++) {
             AtomicElement elem = elements.get(i).element();
             // Direct reference: look at what follows
             if (elem instanceof RuleRefElement ref && ref.name().equals(targetRule)) {
                 if (i + 1 < elements.size()) {
-                    collectFirstTerminals(elements.get(i + 1).element(), tokens);
+                    collectFirstTerminals(ctx, elements.get(i + 1).element(), tokens, new HashSet<>());
                 }
             }
             // Reference inside a repeat: { TargetRule } — look at what follows the repeat
             if (elem instanceof RepeatElement rep) {
                 if (containsRuleRef(rep.body(), targetRule)) {
                     if (i + 1 < elements.size()) {
-                        collectFirstTerminals(elements.get(i + 1).element(), tokens);
+                        collectFirstTerminals(ctx, elements.get(i + 1).element(), tokens, new HashSet<>());
                     }
                 }
-                collectFollowFromBody(rep.body(), targetRule, tokens);
+                collectFollowFromBody(ctx, rep.body(), targetRule, tokens);
+            }
+            if (elem instanceof OneOrMoreElement oneOrMore) {
+                if (containsRuleRef(oneOrMore.body(), targetRule)) {
+                    if (i + 1 < elements.size()) {
+                        collectFirstTerminals(ctx, elements.get(i + 1).element(), tokens, new HashSet<>());
+                    }
+                }
+                collectFollowFromBody(ctx, oneOrMore.body(), targetRule, tokens);
+            }
+            if (elem instanceof BoundedRepeatElement bounded) {
+                if (containsRuleRef(bounded.body(), targetRule)) {
+                    if (i + 1 < elements.size()) {
+                        collectFirstTerminals(ctx, elements.get(i + 1).element(), tokens, new HashSet<>());
+                    }
+                }
+                collectFollowFromBody(ctx, bounded.body(), targetRule, tokens);
             }
             if (elem instanceof GroupElement g) {
-                collectFollowFromBody(g.body(), targetRule, tokens);
+                collectFollowFromBody(ctx, g.body(), targetRule, tokens);
             }
             if (elem instanceof OptionalElement opt) {
-                collectFollowFromBody(opt.body(), targetRule, tokens);
+                collectFollowFromBody(ctx, opt.body(), targetRule, tokens);
             }
         }
     }
 
-    private static void collectFirstTerminals(AtomicElement elem, LinkedHashSet<String> tokens) {
+    /**
+     * Collects the FIRST set of terminals that can start parsing of the given element.
+     * When a RuleRefElement is encountered, the referenced rule is resolved from the
+     * grammar and its FIRST set is computed recursively. The visited set prevents
+     * infinite recursion for left-recursive grammars.
+     */
+    private static void collectFirstTerminals(
+            ParserGenerator.GenContext ctx, AtomicElement elem, LinkedHashSet<String> tokens, Set<String> visited) {
         switch (elem) {
             case TerminalElement t -> tokens.add(t.value());
-            case GroupElement g -> collectFirstTerminalsFromBody(g.body(), tokens);
+            case GroupElement g -> collectFirstTerminalsFromBody(ctx, g.body(), tokens, visited);
+            case OptionalElement opt -> collectFirstTerminalsFromBody(ctx, opt.body(), tokens, visited);
+            case RepeatElement rep -> collectFirstTerminalsFromBody(ctx, rep.body(), tokens, visited);
+            case OneOrMoreElement oneOrMore -> collectFirstTerminalsFromBody(ctx, oneOrMore.body(), tokens, visited);
+            case BoundedRepeatElement bounded -> collectFirstTerminalsFromBody(ctx, bounded.body(), tokens, visited);
+            case SeparatedElement sep -> collectFirstTerminals(ctx, sep.element(), tokens, visited);
+            case RuleRefElement ref -> {
+                String refName = ref.name();
+                if (false == visited.contains(refName)) {
+                    visited.add(refName);
+                    Optional<RuleDecl> resolved = findRuleByName(ctx, refName);
+                    resolved.ifPresent(ruleDecl ->
+                        collectFirstTerminalsFromBody(ctx, ruleDecl.body(), tokens, visited));
+                }
+            }
             default -> {}
         }
     }
 
-    private static void collectFirstTerminalsFromBody(RuleBody body, LinkedHashSet<String> tokens) {
+    /**
+     * Collects FIRST set terminals from a rule body. For sequences, if the first element
+     * is nullable (optional or repeat), continues to the next element's FIRST set.
+     */
+    private static void collectFirstTerminalsFromBody(
+            ParserGenerator.GenContext ctx, RuleBody body, LinkedHashSet<String> tokens, Set<String> visited) {
         switch (body) {
             case ChoiceBody choice -> {
                 for (SequenceBody alt : choice.alternatives()) {
                     if (false == alt.elements().isEmpty()) {
-                        collectFirstTerminals(alt.elements().get(0).element(), tokens);
+                        collectFirstFromSequenceElements(ctx, alt.elements(), 0, tokens, visited);
                     }
                 }
             }
             case SequenceBody seq -> {
                 if (false == seq.elements().isEmpty()) {
-                    collectFirstTerminals(seq.elements().get(0).element(), tokens);
+                    collectFirstFromSequenceElements(ctx, seq.elements(), 0, tokens, visited);
                 }
             }
         }
+    }
+
+    /**
+     * Collects FIRST terminals starting from the given index in a sequence.
+     * If the element at the current index is nullable (optional or repeat),
+     * its FIRST set is collected and then processing continues to the next element.
+     */
+    private static void collectFirstFromSequenceElements(
+            ParserGenerator.GenContext ctx, List<AnnotatedElement> elements, int startIndex,
+            LinkedHashSet<String> tokens, Set<String> visited) {
+        for (int i = startIndex; i < elements.size(); i++) {
+            AtomicElement elem = elements.get(i).element();
+            collectFirstTerminals(ctx, elem, tokens, visited);
+            // If the element is nullable, also look at what follows
+            if (false == isNullableElement(elem)) {
+                break;
+            }
+        }
+    }
+
+    /**
+     * Returns true if the given element can match the empty string (is nullable).
+     * Optional elements, repeat elements (zero-or-more), and bounded repeat elements
+     * with min == 0 are nullable.
+     */
+    private static boolean isNullableElement(AtomicElement elem) {
+        if (elem instanceof OptionalElement || elem instanceof RepeatElement) {
+            return true;
+        }
+        if (elem instanceof BoundedRepeatElement bounded) {
+            return bounded.min() == 0;
+        }
+        return false;
+    }
+
+    /**
+     * Looks up a rule by name from the grammar in the given context.
+     */
+    private static Optional<RuleDecl> findRuleByName(ParserGenerator.GenContext ctx, String ruleName) {
+        return ctx.grammar.rules().stream()
+            .filter(rule -> rule.name().equals(ruleName))
+            .findFirst();
     }
 
     private static boolean containsRuleRef(RuleBody body, String targetRule) {
@@ -377,8 +482,10 @@ class ParserRuleEmitter {
             w.line("}");
             w.blankLine();
         } else {
-            // SKIP mode: on failure, skip one character and return success with error marker.
-            // This ensures the AST always has a node (Hejlsberg principle: always produce an AST).
+            // SKIP mode: on failure, skip until a FOLLOW set token is found and return
+            // success with error marker. This ensures the AST always has a node
+            // (Hejlsberg principle: always produce an AST).
+            List<String> skipFollowTokens = computeFollowTokens(ctx, ruleName);
             w.line("public static class " + wrapperName + " extends org.unlaxer.parser.combinator.ConstructedSingleChildParser {");
             w.indent();
             w.line("private static final long serialVersionUID = 1L;");
@@ -398,14 +505,36 @@ class ParserRuleEmitter {
             w.dedent();
             w.line("}");
             w.line("parseContext.rollback(this);");
-            w.line("// Skip mode: advance cursor by one character, embed error marker, return success");
+            w.line("// Skip mode: advance cursor until a FOLLOW set token is found");
             w.line("if (parseContext.source.isEmpty() || parseContext.isAtEnd()) {");
             w.indent();
             w.line("return org.unlaxer.Parsed.FAILED;");
             w.dedent();
             w.line("}");
             w.line("parseContext.begin(this);");
-            w.line("parseContext.advanceCursor(1);");
+            if (skipFollowTokens.isEmpty()) {
+                // No FOLLOW tokens known — fall back to skipping a single character
+                w.line("parseContext.advanceCursor(1);");
+            } else {
+                // Generate a loop that advances until a FOLLOW set token is found
+                w.line("String remainingSource = parseContext.source.substring(parseContext.getCursor());");
+                // Build the condition to check for any FOLLOW token
+                String followCondition = skipFollowTokens.stream()
+                    .map(t -> "false == remainingSource.startsWith(\"" + ParserCodegenUtil.escapeString(t) + "\", skipOffset)")
+                    .collect(Collectors.joining(" && "));
+                w.line("int skipOffset = 0;");
+                w.line("while (skipOffset < remainingSource.length() && " + followCondition + ") {");
+                w.indent();
+                w.line("skipOffset++;");
+                w.dedent();
+                w.line("}");
+                w.line("if (skipOffset == 0) {");
+                w.indent();
+                w.line("skipOffset = 1; // always advance at least one character to avoid infinite loop");
+                w.dedent();
+                w.line("}");
+                w.line("parseContext.advanceCursor(skipOffset);");
+            }
             w.line("return parseContext.commit(this, tokenKind).toParsed();");
             w.dedent();
             w.line("}");
@@ -770,25 +899,34 @@ class ParserRuleEmitter {
 
     /**
      * 単一の AtomicElement をコードに変換する。
+     * 内部的に resolveElement（解決）と renderElement（レンダリング）に分離。
      */
     static String generateElementCode(ParserGenerator.GenContext ctx, String ruleName, AtomicElement element) {
-        return switch (element) {
-            case TerminalElement t -> "new WordParser(\"" + ParserCodegenUtil.escapeString(t.value()) + "\")";
+        return renderElement(resolveElement(ctx, ruleName, element));
+    }
 
-            case RuleRefElement r -> resolveParserExpression(ctx, r.name());
+    // =========================================================================
+    // resolveElement: AtomicElement → ElementModel（副作用: カウンタ増分）
+    // =========================================================================
+
+    static ElementModel resolveElement(ParserGenerator.GenContext ctx, String ruleName, AtomicElement element) {
+        return switch (element) {
+            case TerminalElement t -> new ElementModel.WordMatch(t.value());
+
+            case RuleRefElement r -> resolveRuleRefModel(ctx, r.name());
 
             case RepeatElement rep -> {
                 if (isSingleRuleRef(rep.body())) {
                     AtomicElement single = getSingleAtomicElementFrom(rep.body());
                     if (single instanceof RuleRefElement ref && isInlineToken(ctx, ref.name())) {
-                        yield "new ZeroOrMore(" + resolveParserExpression(ctx, ref.name()) + ")";
+                        yield new ElementModel.ZeroOrMoreOf(resolveRuleRefModel(ctx, ref.name()));
                     }
                     String parserClass = getSingleRuleRefClass(ctx, rep.body());
-                    yield "new ZeroOrMore(" + parserClass + ")";
+                    yield new ElementModel.ZeroOrMoreOf(new ElementModel.ClassRef(parserClass));
                 } else {
                     int n = ctx.nextRepeat(ruleName);
                     String helperName = ruleName + "Repeat" + n + "Parser";
-                    yield "new ZeroOrMore(" + helperName + ".class)";
+                    yield new ElementModel.ZeroOrMoreOf(new ElementModel.ClassRef(helperName + ".class"));
                 }
             }
 
@@ -797,20 +935,20 @@ class ParserRuleEmitter {
                     AtomicElement inner = getSingleAtomicElementFrom(opt.body());
                     if (inner instanceof RuleRefElement ref) {
                         if (isInlineToken(ctx, ref.name())) {
-                            yield "new Optional(" + resolveParserExpression(ctx, ref.name()) + ")";
+                            yield new ElementModel.OptionalOf(resolveRuleRefModel(ctx, ref.name()));
                         }
-                        yield "new Optional(" + resolveParserClass(ctx, ref.name()) + ")";
+                        yield new ElementModel.OptionalOf(new ElementModel.ClassRef(resolveParserClass(ctx, ref.name())));
                     } else if (inner instanceof TerminalElement t) {
-                        yield "new Optional(new WordParser(\"" + ParserCodegenUtil.escapeString(t.value()) + "\"))";
+                        yield new ElementModel.OptionalOf(new ElementModel.WordMatch(t.value()));
                     } else {
                         int n = ctx.nextOpt(ruleName);
                         String helperName = ruleName + "Opt" + n + "Parser";
-                        yield "new Optional(" + helperName + ".class)";
+                        yield new ElementModel.OptionalOf(new ElementModel.ClassRef(helperName + ".class"));
                     }
                 } else {
                     int n = ctx.nextOpt(ruleName);
                     String helperName = ruleName + "Opt" + n + "Parser";
-                    yield "new Optional(" + helperName + ".class)";
+                    yield new ElementModel.OptionalOf(new ElementModel.ClassRef(helperName + ".class"));
                 }
             }
 
@@ -818,14 +956,14 @@ class ParserRuleEmitter {
                 if (isSingleRuleRef(one.body())) {
                     AtomicElement single = getSingleAtomicElementFrom(one.body());
                     if (single instanceof RuleRefElement ref && isInlineToken(ctx, ref.name())) {
-                        yield "new OneOrMore(" + resolveParserExpression(ctx, ref.name()) + ")";
+                        yield new ElementModel.OneOrMoreOf(resolveRuleRefModel(ctx, ref.name()));
                     }
                     String parserClass = getSingleRuleRefClass(ctx, one.body());
-                    yield "new OneOrMore(" + parserClass + ")";
+                    yield new ElementModel.OneOrMoreOf(new ElementModel.ClassRef(parserClass));
                 } else {
                     int n = ctx.nextRepeat(ruleName);
                     String helperName = ruleName + "OneOrMore" + n + "Parser";
-                    yield "new OneOrMore(" + helperName + ".class)";
+                    yield new ElementModel.OneOrMoreOf(new ElementModel.ClassRef(helperName + ".class"));
                 }
             }
 
@@ -840,31 +978,108 @@ class ParserRuleEmitter {
                         // inline tokens don't have a .class reference — wrap in helper
                         int n = ctx.nextRepeat(ruleName);
                         String helperName = ruleName + "Bounded" + n + "Parser";
-                        yield "new Repeat(" + helperName + ".class, " + minStr + ", " + maxStr + ")";
+                        yield new ElementModel.BoundedRepeatOf(
+                            new ElementModel.ClassRef(helperName + ".class"), minStr, maxStr);
                     }
                     String parserClass = getSingleRuleRefClass(ctx, bounded.body());
-                    yield "new Repeat(" + parserClass + ", " + minStr + ", " + maxStr + ")";
+                    yield new ElementModel.BoundedRepeatOf(
+                        new ElementModel.ClassRef(parserClass), minStr, maxStr);
                 } else {
                     int n = ctx.nextRepeat(ruleName);
                     String helperName = ruleName + "Bounded" + n + "Parser";
-                    yield "new Repeat(" + helperName + ".class, " + minStr + ", " + maxStr + ")";
+                    yield new ElementModel.BoundedRepeatOf(
+                        new ElementModel.ClassRef(helperName + ".class"), minStr, maxStr);
                 }
             }
 
             case GroupElement g -> {
                 int n = ctx.nextGroup(ruleName);
                 String helperName = ruleName + "Group" + n + "Parser";
-                yield "Parser.get(" + helperName + ".class)";
+                yield new ElementModel.ClassRef(helperName + ".class");
             }
 
             case SeparatedElement sep -> {
                 int n = ctx.nextSep(ruleName);
                 String outerHelperName = ruleName + "Sep" + n + "Parser";
-                yield "Parser.get(" + outerHelperName + ".class)";
+                yield new ElementModel.ClassRef(outerHelperName + ".class");
             }
 
-            case ErrorElement err ->
-                "org.unlaxer.parser.ErrorMessageParser.expected(\"" + ParserCodegenUtil.escapeString(err.message()) + "\")";
+            case ErrorElement err -> new ElementModel.ErrorExpected(err.message());
+        };
+    }
+
+    // =========================================================================
+    // resolveRuleRefModel: ルール参照名 → ElementModel（副作用なし）
+    // =========================================================================
+
+    static ElementModel resolveRuleRefModel(ParserGenerator.GenContext ctx, String name) {
+        String terminator = ctx.tokenUntilMap.get(name);
+        if (terminator != null) {
+            return new ElementModel.InlineExpression(
+                "new org.unlaxer.parser.elementary.WildCardStringTerninatorParser(\""
+                + ParserCodegenUtil.escapeString(terminator) + "\")");
+        }
+        String laPattern = ctx.tokenLookaheadMap.get(name);
+        if (laPattern != null) {
+            return new ElementModel.InlineExpression(
+                "new MatchOnly(new WordParser(\"" + ParserCodegenUtil.escapeString(laPattern) + "\"))");
+        }
+        String nlaPattern = ctx.tokenNegLookaheadMap.get(name);
+        if (nlaPattern != null) {
+            return new ElementModel.InlineExpression(
+                "new Not(new WordParser(\"" + ParserCodegenUtil.escapeString(nlaPattern) + "\"))");
+        }
+        if (ctx.tokenAnySet.contains(name)) {
+            return new ElementModel.InlineExpression(
+                "new org.unlaxer.parser.elementary.WildCardCharacterParser()");
+        }
+        if (ctx.tokenEofSet.contains(name)) {
+            return new ElementModel.InlineExpression(
+                "new org.unlaxer.parser.elementary.EndOfSourceParser()");
+        }
+        if (ctx.tokenEmptySet.contains(name)) {
+            return new ElementModel.InlineExpression(
+                "new org.unlaxer.parser.elementary.EmptyParser()");
+        }
+        String ciWord = ctx.tokenCIMap.get(name);
+        if (ciWord != null) {
+            return new ElementModel.InlineExpression(
+                "new org.unlaxer.parser.elementary.IgnoreCaseWordParser(\""
+                + ParserCodegenUtil.escapeString(ciWord) + "\")");
+        }
+        return new ElementModel.ClassRef(resolveParserClass(ctx, name));
+    }
+
+    // =========================================================================
+    // renderElement / renderInner: ElementModel → String（純粋レンダリング）
+    // =========================================================================
+
+    static String renderElement(ElementModel model) {
+        return switch (model) {
+            case ElementModel.WordMatch m ->
+                "new WordParser(\"" + ParserCodegenUtil.escapeString(m.word()) + "\")";
+            case ElementModel.ClassRef m ->
+                "Parser.get(" + m.className() + ")";
+            case ElementModel.InlineExpression m ->
+                m.expression();
+            case ElementModel.ErrorExpected m ->
+                "org.unlaxer.parser.ErrorMessageParser.expected(\""
+                + ParserCodegenUtil.escapeString(m.message()) + "\")";
+            case ElementModel.ZeroOrMoreOf m ->
+                "new ZeroOrMore(" + renderInner(m.inner()) + ")";
+            case ElementModel.OneOrMoreOf m ->
+                "new OneOrMore(" + renderInner(m.inner()) + ")";
+            case ElementModel.OptionalOf m ->
+                "new Optional(" + renderInner(m.inner()) + ")";
+            case ElementModel.BoundedRepeatOf m ->
+                "new Repeat(" + renderInner(m.inner()) + ", " + m.min() + ", " + m.max() + ")";
+        };
+    }
+
+    static String renderInner(ElementModel model) {
+        return switch (model) {
+            case ElementModel.ClassRef m -> m.className();
+            default -> renderElement(model);
         };
     }
 
