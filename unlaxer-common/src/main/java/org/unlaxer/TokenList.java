@@ -257,7 +257,7 @@ public class TokenList implements List<Token>{
     
     Optional<Token> firstPrintableToken = tokens.firstPrintableToken();
     if(tokens.isEmpty() || firstPrintableToken.isEmpty()) {
-      return StringSource.createSubSource("", null , new CodePointOffset(0));
+      return StringSource.createDetachedSource("");
     }
     
     String collect = tokens.stream()

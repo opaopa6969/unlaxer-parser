@@ -41,7 +41,6 @@ public interface Source extends CodePointAccessor, PositionResolver {
   public enum SourceKind {
     root,
     detached,
-    attached,
     subSource;
 
     public boolean isRoot() {
@@ -50,10 +49,6 @@ public interface Source extends CodePointAccessor, PositionResolver {
 
     public boolean isDetached() {
       return this == detached;
-    }
-
-    public boolean isAttached() {
-      return this == attached;
     }
 
     public boolean isSubSource() {

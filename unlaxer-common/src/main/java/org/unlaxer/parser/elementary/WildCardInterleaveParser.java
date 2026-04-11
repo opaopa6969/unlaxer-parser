@@ -51,9 +51,8 @@ public abstract class WildCardInterleaveParser extends LazyZeroOrMore{
               TokenKind.consumed,
               StringSource.createDetachedSource(
                   characters.toString(),
-                  thisParserParsed.source.root(),
-                  new CodePointOffset(current.position())
-              ), 
+                  thisParserParsed.source.root()
+              ),
               Parser.get(WildCardStringParser.class)
            );
           concatted.add(token2);

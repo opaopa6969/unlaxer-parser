@@ -35,7 +35,7 @@ public class SourceComprehensiveTest {
   public void testCreateDetachedSource() {
     StringSource source = StringSource.createDetachedSource("detached");
     assertEquals("detached", source.toString());
-    assertTrue(source.isRoot()); // detached sources are treated as roots
+    assertFalse(source.isRoot()); // detached is not root; it's an independent coordinate system
     assertEquals(SourceKind.detached, source.sourceKind());
   }
 
@@ -241,8 +241,8 @@ public class SourceComprehensiveTest {
   @Test
   public void testRootParent() {
     StringSource source = StringSource.createRootSource("test");
-    // root's parent is itself
-    assertTrue(source.parent().isPresent());
+    // root has no parent
+    assertFalse(source.parent().isPresent());
     assertEquals(source, source.root());
   }
 
@@ -270,11 +270,9 @@ public class SourceComprehensiveTest {
     assertEquals(SourceKind.subSource, sub.sourceKind());
   }
 
-  @Test
+  @Test(expected = NullPointerException.class)
   public void testCreateSubSourceWithNullParent() {
-    // When parent is null, createSubSource falls back to detached
-    StringSource sub = StringSource.createSubSource("test", null, new CodePointOffset(0));
-    assertEquals("test", sub.sourceAsString());
-    assertEquals(SourceKind.detached, sub.sourceKind());
+    // null rootSource is a programming error; use createDetachedSource instead
+    StringSource.createSubSource("test", null, new CodePointOffset(0));
   }
 }
