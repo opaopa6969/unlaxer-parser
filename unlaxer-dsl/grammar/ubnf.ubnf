@@ -113,7 +113,9 @@ grammar UBNF {
   EmptyExpression ::= 'EMPTY' ;
 
   // ===== ルール宣言 =====
+  // @declares: ルール名を定義として登録 → LSP の Go-to-Definition の対象
   @mapping(RuleDecl, params=[annotations, name, body])
+  @declares(symbol=name)
   RuleDecl ::=
     { Annotation } @annotations
     IDENTIFIER @name
@@ -251,7 +253,9 @@ grammar UBNF {
   TerminalElement ::= STRING @value ;
 
   // 非終端記号参照
+  // @backref: ルール参照 → 定義へのジャンプ (Go-to-Definition)
   @mapping(RuleRefElement, params=[name])
+  @backref(name=name)
   RuleRefElement ::= IDENTIFIER @name ;
 
   // @typeof(captureName) — 要素レベルの型相関アノテーション

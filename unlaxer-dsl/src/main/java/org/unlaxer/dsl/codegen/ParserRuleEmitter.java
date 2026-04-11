@@ -756,12 +756,16 @@ class ParserRuleEmitter {
             w.indent();
             w.line("org.unlaxer.Token ruleToken = tokens.get(0);");
             if (captureParserClass != null) {
+                // instanceof は class リテラルを取らないので .class を除去
+                String instanceofClass = captureParserClass.endsWith(".class")
+                    ? captureParserClass.substring(0, captureParserClass.length() - ".class".length())
+                    : captureParserClass;
                 // filteredChildren から同パーサークラスの全トークンを収集し、テキストが一致するか検証
                 w.line("java.util.List<org.unlaxer.Token> __backrefTokens =");
                 w.line("    (ruleToken.filteredChildren == null)");
                 w.line("    ? java.util.Collections.emptyList()");
                 w.line("    : ruleToken.filteredChildren.stream()");
-                w.line("        .filter(c -> c.getParser() instanceof " + captureParserClass + ")");
+                w.line("        .filter(c -> c.getParser() instanceof " + instanceofClass + ")");
                 w.line("        .collect(java.util.stream.Collectors.toList());");
                 w.line("if (__backrefTokens.size() >= 2) {");
                 w.indent();
