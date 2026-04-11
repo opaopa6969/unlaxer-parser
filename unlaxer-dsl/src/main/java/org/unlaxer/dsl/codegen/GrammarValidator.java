@@ -27,6 +27,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.TypeofElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.WhitespaceAnnotation;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -70,6 +71,9 @@ public final class GrammarValidator {
             }
             if (code.startsWith("E-ANNOTATION-")) {
                 return "ANNOTATION";
+            }
+            if (code.startsWith("E-RULE-")) {
+                return "RULE";
             }
             return "GENERAL";
         }
@@ -128,6 +132,7 @@ public final class GrammarValidator {
         }
         validatePrecedenceTopology(grammar, errors);
         validateAssociativityConsistency(grammar, errors);
+        validateUndefinedRuleRefs(grammar, errors);
 
         return List.copyOf(errors);
     }
@@ -732,7 +737,7 @@ public final class GrammarValidator {
 
     private static void validateCatalogAnnotations(RuleDecl rule, List<ValidationIssue> errors) {
         boolean hasCatalog = rule.annotations().stream().anyMatch(a -> a instanceof CatalogAnnotation);
-        if (!hasCatalog) {
+        if (false == hasCatalog) {
             return;
         }
         Set<String> captures = collectCaptureNames(rule.body());
@@ -742,5 +747,120 @@ public final class GrammarValidator {
                 "Add at least one @captureName in the rule body for catalog completion to work.",
                 "E-ANNOTATION-CATALOG-NO-CAPTURE");
         }
+    }
+
+    // =========================================================================
+    // E-RULE-UNDEFINED: 未定義ルール参照の検出 + Levenshtein による候補提示
+    // =========================================================================
+
+    /**
+     * Validates that all RuleRefElement references in rule bodies point to
+     * defined rules or tokens. When an undefined reference is found, suggests
+     * the closest known name using Levenshtein distance.
+     */
+    private static void validateUndefinedRuleRefs(GrammarDecl grammar, List<ValidationIssue> errors) {
+        Set<String> definedNames = new LinkedHashSet<>();
+        for (RuleDecl rule : grammar.rules()) {
+            definedNames.add(rule.name());
+        }
+        for (TokenDecl token : grammar.tokens()) {
+            definedNames.add(token.name());
+        }
+
+        for (RuleDecl rule : grammar.rules()) {
+            Set<String> refs = collectReferencedRuleNames(rule.body());
+            for (String refName : refs) {
+                if (false == definedNames.contains(refName)) {
+                    String suggestion = suggestSimilarName(refName, definedNames);
+                    String hint;
+                    if (suggestion != null) {
+                        hint = "Did you mean '" + suggestion + "'?";
+                    } else {
+                        hint = "Define a rule or token named '" + refName + "'.";
+                    }
+                    addRuleError(errors, rule.name(),
+                        "rule " + rule.name() + " references undefined rule or token '"
+                            + refName + "'",
+                        hint,
+                        "E-RULE-UNDEFINED");
+                }
+            }
+        }
+    }
+
+    /**
+     * Suggests the closest matching name from a collection of known names
+     * using Levenshtein distance. Returns null if no name is within the
+     * threshold (distance <= 2).
+     *
+     * @param unknown the unknown name to find a match for
+     * @param known   the collection of known valid names
+     * @return the closest match, or null if none within threshold
+     */
+    static String suggestSimilarName(String unknown, Collection<String> known) {
+        if (unknown == null || known == null || known.isEmpty()) {
+            return null;
+        }
+
+        int threshold = 2;
+        String bestMatch = null;
+        int bestDistance = threshold + 1;
+
+        for (String candidate : known) {
+            int distance = levenshteinDistance(unknown, candidate);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestMatch = candidate;
+            }
+        }
+
+        if (bestDistance <= threshold) {
+            return bestMatch;
+        }
+        return null;
+    }
+
+    /**
+     * Computes the Levenshtein edit distance between two strings.
+     *
+     * @param a first string
+     * @param b second string
+     * @return the minimum number of single-character edits (insert, delete, substitute)
+     */
+    private static int levenshteinDistance(String a, String b) {
+        if (a == null) {
+            return (b == null) ? 0 : b.length();
+        }
+        if (b == null) {
+            return a.length();
+        }
+
+        int lengthA = a.length();
+        int lengthB = b.length();
+
+        // previous and current row of the DP matrix
+        int[] previousRow = new int[lengthB + 1];
+        int[] currentRow = new int[lengthB + 1];
+
+        for (int j = 0; j <= lengthB; j++) {
+            previousRow[j] = j;
+        }
+
+        for (int i = 1; i <= lengthA; i++) {
+            currentRow[0] = i;
+            for (int j = 1; j <= lengthB; j++) {
+                int cost = (a.charAt(i - 1) == b.charAt(j - 1)) ? 0 : 1;
+                int insertion = currentRow[j - 1] + 1;
+                int deletion = previousRow[j] + 1;
+                int substitution = previousRow[j - 1] + cost;
+                currentRow[j] = Math.min(Math.min(insertion, deletion), substitution);
+            }
+            // swap rows
+            int[] temp = previousRow;
+            previousRow = currentRow;
+            currentRow = temp;
+        }
+
+        return previousRow[lengthB];
     }
 }

@@ -1,8 +1,12 @@
 package org.unlaxer.dsl.codegen;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.junit.Assert.assertEquals;
+
+import java.util.List;
+import java.util.Set;
 
 import org.junit.Test;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
@@ -462,6 +466,144 @@ public class GrammarValidatorTest {
         var issues = GrammarValidator.validate(grammar);
         assertTrue(!issues.isEmpty());
         assertEquals("ANNOTATION", issues.get(0).category());
+    }
+
+    // =========================================================================
+    // Levenshtein suggestSimilarName tests
+    // =========================================================================
+
+    @Test
+    public void testSuggestSimilarNameExactMatch() {
+        String result = GrammarValidator.suggestSimilarName("Expr", Set.of("Expr", "Term", "Factor"));
+        assertEquals("Expr", result);
+    }
+
+    @Test
+    public void testSuggestSimilarNameCloseMatch() {
+        // "Epxr" is distance 2 from "Expr" (transposition = 2 edits in Levenshtein)
+        String result = GrammarValidator.suggestSimilarName("Exprs", Set.of("Expr", "Term", "Factor"));
+        assertEquals("Expr", result);
+    }
+
+    @Test
+    public void testSuggestSimilarNameOneCharDifference() {
+        String result = GrammarValidator.suggestSimilarName("Tern", Set.of("Expr", "Term", "Factor"));
+        assertEquals("Term", result);
+    }
+
+    @Test
+    public void testSuggestSimilarNameNoMatch() {
+        // "XYZ" is far from all candidates
+        String result = GrammarValidator.suggestSimilarName("XYZ", Set.of("Expression", "Statement", "Declaration"));
+        assertNull(result);
+    }
+
+    @Test
+    public void testSuggestSimilarNameEmptyKnown() {
+        String result = GrammarValidator.suggestSimilarName("Expr", Set.of());
+        assertNull(result);
+    }
+
+    @Test
+    public void testSuggestSimilarNameNullUnknown() {
+        String result = GrammarValidator.suggestSimilarName(null, Set.of("Expr"));
+        assertNull(result);
+    }
+
+    @Test
+    public void testSuggestSimilarNamePicksClosest() {
+        // "Fator" is distance 1 from "Factor", distance 2 from "Factr", distance >2 from "Expr"
+        String result = GrammarValidator.suggestSimilarName("Fator", Set.of("Expr", "Factor", "Term"));
+        assertEquals("Factor", result);
+    }
+
+    // =========================================================================
+    // E-RULE-UNDEFINED validation tests
+    // =========================================================================
+
+    @Test
+    public void testUndefinedRuleRefFails() {
+        GrammarDecl grammar = parseGrammar(
+            "grammar G {\n"
+                + "  @package: org.example\n"
+                + "  @root\n"
+                + "  Start ::= Undefined ;\n"
+                + "}"
+        );
+
+        List<GrammarValidator.ValidationIssue> issues = GrammarValidator.validate(grammar);
+        boolean hasUndefined = issues.stream()
+            .anyMatch(issue -> "E-RULE-UNDEFINED".equals(issue.code()));
+        assertTrue("expected E-RULE-UNDEFINED error", hasUndefined);
+
+        GrammarValidator.ValidationIssue undefinedIssue = issues.stream()
+            .filter(issue -> "E-RULE-UNDEFINED".equals(issue.code()))
+            .findFirst()
+            .orElseThrow();
+        assertTrue(undefinedIssue.message().contains("'Undefined'"));
+        assertEquals("RULE", undefinedIssue.category());
+    }
+
+    @Test
+    public void testUndefinedRuleRefWithSuggestion() {
+        GrammarDecl grammar = parseGrammar(
+            "grammar G {\n"
+                + "  @package: org.example\n"
+                + "  @root\n"
+                + "  Start ::= Tern ;\n"
+                + "  Term ::= 'n' ;\n"
+                + "}"
+        );
+
+        List<GrammarValidator.ValidationIssue> issues = GrammarValidator.validate(grammar);
+        boolean hasUndefined = issues.stream()
+            .anyMatch(issue -> "E-RULE-UNDEFINED".equals(issue.code()));
+        assertTrue("expected E-RULE-UNDEFINED error", hasUndefined);
+
+        GrammarValidator.ValidationIssue undefinedIssue = issues.stream()
+            .filter(issue -> "E-RULE-UNDEFINED".equals(issue.code()))
+            .findFirst()
+            .orElseThrow();
+        assertTrue(undefinedIssue.message().contains("'Tern'"));
+        assertTrue(undefinedIssue.hint().contains("Did you mean 'Term'?"));
+    }
+
+    @Test
+    public void testDefinedRuleRefPasses() {
+        GrammarDecl grammar = parseGrammar(
+            "grammar G {\n"
+                + "  @package: org.example\n"
+                + "  @root\n"
+                + "  Start ::= Term ;\n"
+                + "  Term ::= 'n' ;\n"
+                + "}"
+        );
+
+        List<GrammarValidator.ValidationIssue> issues = GrammarValidator.validate(grammar);
+        boolean hasUndefined = issues.stream()
+            .anyMatch(issue -> "E-RULE-UNDEFINED".equals(issue.code()));
+        assertTrue("should have no E-RULE-UNDEFINED error", false == hasUndefined);
+    }
+
+    @Test
+    public void testUndefinedRuleRefNoSuggestionForDistantName() {
+        GrammarDecl grammar = parseGrammar(
+            "grammar G {\n"
+                + "  @package: org.example\n"
+                + "  @root\n"
+                + "  Start ::= CompletelyWrong ;\n"
+                + "  Term ::= 'n' ;\n"
+                + "}"
+        );
+
+        List<GrammarValidator.ValidationIssue> issues = GrammarValidator.validate(grammar);
+        GrammarValidator.ValidationIssue undefinedIssue = issues.stream()
+            .filter(issue -> "E-RULE-UNDEFINED".equals(issue.code()))
+            .findFirst()
+            .orElseThrow();
+        // Should NOT contain "Did you mean" since distance is too large
+        assertTrue(undefinedIssue.hint().contains("Define a rule or token"));
+        assertTrue(false == undefinedIssue.hint().contains("Did you mean"));
     }
 
     private GrammarDecl parseGrammar(String source) {
