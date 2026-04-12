@@ -100,10 +100,16 @@ public class ASTGenerator implements CodeGenerator {
 
         // ----- Pass 2: 中間 sealed interface ごとの permits リストを構築 -----
         // 各 record が「どの中間 sealed の permits に含まれるか」も逆引きで保持する。
+        // nested と同名 (= ユーザーが @mapping(Foo) Choice と @mapping(Foo.X) を併記)
+        // した場合は nested を優先する (より具体的な inner record 構造を持つため、
+        // 中間 sealed の宣言は nested 側に統合される)。
         Map<String, List<String>> midSealedPermits = new LinkedHashMap<>();
         Map<String, String> recordToMidSealed = new LinkedHashMap<>();
         for (Map.Entry<String, RuleDecl> entry : midSealedRules.entrySet()) {
             String midSealedName = entry.getKey();
+            if (nestedRules.containsKey(midSealedName)) {
+                continue;
+            }
             List<String> permits = computeMidSealedPermits(entry.getValue(), grammar);
             midSealedPermits.put(midSealedName, permits);
             for (String permittedRecord : permits) {
@@ -175,8 +181,13 @@ public class ASTGenerator implements CodeGenerator {
 
     /**
      * 中間 sealed interface の候補かを判定する。
-     * 条件: @mapping(SimpleName) で params 無し、body が複数 alternative の Choice、
+     * 条件: @mapping(SimpleName) で params 無し、body が Choice、
      *       各 alt が単一 RuleRef のみ (= sum-type の典型形)。
+     *
+     * <p>1 alternative でも候補とする — その場合は permits 1 つの sealed
+     * interface (type-alias 的な使い方) になる。手書き UBNFAST の
+     * {@code RuleBody ::= ChoiceBody} のような中間 wrapper 型を表現する
+     * ために必要。</p>
      */
     private boolean isMidSealedCandidate(RuleDecl rule, MappingAnnotation mapping) {
         if (!mapping.paramNames().isEmpty()) {
@@ -188,7 +199,7 @@ public class ASTGenerator implements CodeGenerator {
         if (!(rule.body() instanceof ChoiceBody choice)) {
             return false;
         }
-        if (choice.alternatives().size() < 2) {
+        if (choice.alternatives().isEmpty()) {
             return false;
         }
         for (SequenceBody seq : choice.alternatives()) {

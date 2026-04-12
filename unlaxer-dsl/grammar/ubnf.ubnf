@@ -10,6 +10,10 @@
 grammar UBNF {
 
   // ===== グローバル設定 =====
+  // 生成物は org.unlaxer.dsl.bootstrap.generated に出る (= ubnf-vscode の
+  // mainClass / unlaxer-dsl の SelfHostingTest が参照するパッケージ)。
+  // 完全 self-hosting (手書き 3 ファイルを生成版で完全置換) は別 Issue で扱う —
+  // grammar/experimental/README.md 参照。
   @package: org.unlaxer.dsl.bootstrap.generated
   @whitespace: javaStyle
   @comment: { line: '//' }
