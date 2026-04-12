@@ -23,7 +23,6 @@ public class StringSource implements Source {
   private final SourceKind sourceKind;
   private final CodePointOffset offsetFromParent;
   private final CodePointOffset offsetFromRoot;
-  private final StringIndexAccessor stringIndexAccessor;
   private final CursorRange cursorRange;
 
   public static StringSource create(String source, SourceKind sourceKind) {
@@ -84,8 +83,6 @@ public class StringSource implements Source {
     // ✅ subSource 以外は独立 resolver（=positionInRoot は 0起点）
     this.positionResolver = PositionResolver.createPositionResolver(codePoints);
 
-    this.stringIndexAccessor = new StringIndexAccessorImpl(source);
-
     // root/detached の cursorRange は自分座標（0起点）でOK
     this.cursorRange = CursorRange.fromRootOffset(
         CodePointOffset.ZERO,
@@ -118,8 +115,6 @@ public class StringSource implements Source {
     // ✅ subSource は root resolver を使う（root座標共有）
     this.positionResolver = this.root;
 
-    this.stringIndexAccessor = new StringIndexAccessorImpl(source.sourceAsString());
-
     // ✅ root座標系の offset を合成して cursorRange を作る
     this.offsetFromRoot = parent.offsetFromRoot().newWithPlus(offsetFromParent);
     this.cursorRange = CursorRange.fromRootOffset(
@@ -149,8 +144,6 @@ public class StringSource implements Source {
 
     // ✅ subSource は root resolver を使う（root座標共有）
     this.positionResolver = this.root;
-
-    this.stringIndexAccessor = new StringIndexAccessorImpl(source);
 
     // ✅ root座標系の offset を合成して cursorRange を作る
     this.offsetFromRoot = parent.offsetFromRoot().newWithPlus(offsetFromParent);
@@ -473,11 +466,6 @@ public class StringSource implements Source {
       return new CodePointIndexWithNegativeValue(stringIndex.value());
     }
     return new CodePointIndexWithNegativeValue(toCodePointIndex(stringIndex.toStringIndex()));
-  }
-
-  @Override
-  public StringIndexAccessor stringIndexAccessor() {
-    return stringIndexAccessor;
   }
 
   public static String toString(CodePointAccessor codePointAccessor) {

@@ -159,7 +159,7 @@ public interface Source extends CodePointAccessor, PositionResolver {
   default Source subSource(CodePointIndex beginIndex) {
     return parentSourceAndStringToSource().apply(
         thisSource(),
-        stringIndexAccessor().substring(toStringIndex(beginIndex).value()),
+        sourceAsString().substring(toStringIndex(beginIndex).value()),
         new CodePointOffset(beginIndex));
   }
 
