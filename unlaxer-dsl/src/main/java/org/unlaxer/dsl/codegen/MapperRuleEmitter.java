@@ -45,7 +45,7 @@ class MapperRuleEmitter {
                     w.line("if (token.parser.getClass() == " + parsersClass + "."
                         + rule.name() + "Parser.class) {");
                     w.indent();
-                    w.line("return to" + className + "(token);");
+                    w.line("return to" + MapperElementUtil.methodNameFor(className) + "(token);");
                     w.dedent();
                     w.line("}");
                 }
@@ -173,7 +173,7 @@ class MapperRuleEmitter {
             boolean rightAssoc = MapperElementUtil.isRightAssocRule(rule, mapping);
 
             w.line("static " + astClass + "." + className
-              + " to" + className + "(Token token) {");
+              + " to" + MapperElementUtil.methodNameFor(className) + "(Token token) {");
             w.indent();
 
             if (leftAssoc || rightAssoc) {
@@ -298,7 +298,7 @@ class MapperRuleEmitter {
             w.dedent();
             w.line("}");
             if (rightAssoc) {
-                w.line("return registerNodeSourceSpan(foldRightAssoc" + className + "(left, ops, rights), working);");
+                w.line("return registerNodeSourceSpan(foldRightAssoc" + MapperElementUtil.methodNameFor(className) + "(left, ops, rights), working);");
             } else {
                 w.line("return registerNodeSourceSpan(new " + astClass + "." + className + "(left, ops, rights), working);");
             }
@@ -326,8 +326,8 @@ class MapperRuleEmitter {
                 .orElse("org.unlaxer.parser.elementary.WordParser.class");
             // For rules sharing the same @mapping class, left/right mappers
             // should call the shared mapping method recursively
-            String addLeftMapper = "to" + className + "(addLeftToken)";
-            String addRightMapper = "to" + className + "(addRightToken)";
+            String addLeftMapper = "to" + MapperElementUtil.methodNameFor(className) + "(addLeftToken)";
+            String addRightMapper = "to" + MapperElementUtil.methodNameFor(className) + "(addRightToken)";
 
             w.line("// Handle " + additionalRule.name() + " tokens (same @mapping class)");
             w.line("if (token.parser.getClass() == " + addRuleParserClass + ") {");
@@ -598,7 +598,7 @@ class MapperRuleEmitter {
                     String rightType = MapperTypeResolver.unwrapListType(MapperTypeResolver.inferType(grammar, rule, "right")).orElse("Object");
 
                     w.line("static " + astClass + "." + className
-                      + " foldRightAssoc" + className + "(");
+                      + " foldRightAssoc" + MapperElementUtil.methodNameFor(className) + "(");
                     w.line("        " + leftType + " left,");
                     w.line("        java.util.List<" + opType + "> ops,");
                     w.line("        java.util.List<" + rightType + "> rights) {");
@@ -618,7 +618,7 @@ class MapperRuleEmitter {
                     w.line("restRights.remove(restRights.size() - 1);");
                     w.line("if (restRights.size() > 0) {");
                     w.indent();
-                    w.line("right = foldRightAssoc" + className + "(right, restOps, restRights);");
+                    w.line("right = foldRightAssoc" + MapperElementUtil.methodNameFor(className) + "(right, restOps, restRights);");
                     w.dedent();
                     w.line("}");
                     w.line("java.util.List<" + opType + "> singleOp = java.util.List.of(op);");

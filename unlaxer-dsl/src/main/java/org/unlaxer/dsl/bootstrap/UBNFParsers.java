@@ -758,7 +758,13 @@ public class UBNFParsers {
     }
 
     /**
-     * MappingAnnotation: '@mapping' '(' CLASS_NAME [',' 'params' '=' '[' IDENTIFIER+ ']'] ')'
+     * MappingAnnotation: '@mapping' '(' DOTTED_CLASS_NAME [',' 'params' '=' '[' IDENTIFIER+ ']'] ')'
+     *
+     * <p>Class name accepts dot notation (e.g. {@code TokenDecl.Simple}) so that
+     * the AST can be emitted as a sealed interface {@code TokenDecl} containing
+     * inner records {@code Simple}, {@code Until}, ... — see
+     * {@link org.unlaxer.dsl.codegen.ASTGenerator} for the generation rules
+     * and {@code docs/dotted-mapping.md} for the user-facing guide.</p>
      */
     public static class MappingAnnotationParser extends UBNFLazyChain {
         private static final long serialVersionUID = 1L;
@@ -768,7 +774,7 @@ public class UBNFParsers {
             return new Parsers(
                 new WordParser("@mapping"),
                 Parser.get(LeftParenthesisParser.class),
-                Parser.get(IdentifierParser.class),
+                Parser.get(DottedIdentifierParser.class),
                 new org.unlaxer.parser.combinator.Optional(
                     Parser.get(MappingParamsParser.class)
                 ),

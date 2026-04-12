@@ -342,8 +342,14 @@ public class UBNFMapper {
     }
 
     static MappingAnnotation toMappingAnnotation(Token token) {
-        List<Token> identifiers = findDescendants(token, UBNFParsers.IdentifierParser.class);
-        String className = identifiers.isEmpty() ? "" : identifiers.get(0).source.toString().trim();
+        // Class name is the first DottedIdentifier under @mapping(...).
+        // It may be a single name ("Foo") or dotted ("Outer.Inner") — both are
+        // preserved verbatim, and ASTGenerator decides how to render them
+        // (flat record vs sealed-interface-with-inner-record).
+        List<Token> dottedIds = findDescendants(token, UBNFParsers.DottedIdentifierParser.class);
+        String className = dottedIds.isEmpty()
+            ? ""
+            : dottedIds.get(0).source.toString().trim();
 
         List<String> paramNames = new ArrayList<>();
         List<Token> paramTokens = findDescendants(token, UBNFParsers.ParameterListParser.class);

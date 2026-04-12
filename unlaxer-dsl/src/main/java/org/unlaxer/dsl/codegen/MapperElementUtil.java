@@ -161,6 +161,19 @@ class MapperElementUtil {
         };
     }
 
+    /**
+     * Convert a (possibly dotted) AST class name like {@code "Outer.Inner"}
+     * into a Java identifier suffix usable in method names like {@code "toOuterInner"}.
+     * For non-dotted names this is the identity. Used by all sites that emit
+     * helper method names tied to a {@code @mapping} class name.
+     */
+    static String methodNameFor(String className) {
+        if (className == null || className.indexOf('.') < 0) {
+            return className;
+        }
+        return className.replace(".", "");
+    }
+
     static String mapExpressionForElement(AtomicElement element, String tokenVar,
         Map<String, String> mappedClassByRuleName,
         Map<String, TokenDecl> tokenDeclByName,
@@ -169,7 +182,7 @@ class MapperElementUtil {
         if (element instanceof RuleRefElement ruleRefElement) {
             String name = ruleRefElement.name();
             if (mappedClassByRuleName.containsKey(name)) {
-                return "to" + mappedClassByRuleName.get(name) + "(" + tokenVar + ")";
+                return "to" + methodNameFor(mappedClassByRuleName.get(name)) + "(" + tokenVar + ")";
             }
             if (tokenDeclByName.containsKey(name)) {
                 TokenDecl tokenDecl = tokenDeclByName.get(name);

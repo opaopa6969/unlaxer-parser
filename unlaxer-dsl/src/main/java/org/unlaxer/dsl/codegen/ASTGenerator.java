@@ -34,6 +34,30 @@ import java.util.stream.Collectors;
  *
  * <p>@mapping アノテーション付きのルールを sealed interface の permits として生成し、
  * 各ルールに対応する record を内部型として生成する。</p>
+ *
+ * <p><b>Dotted mapping (Issue #8):</b> {@code @mapping(Outer.Inner)} を許容する。
+ * 同じ {@code Outer} を持つ複数のルールが宣言されると、{@code Outer} を sealed
+ * interface として暗黙宣言し、各 {@code Inner} を {@code Outer} の inner record
+ * として生成する。これにより、ユーザーは flat record スタイル (現状) と
+ * sealed inner record スタイル (Hejlsberg 流) のどちらも自由に書ける。</p>
+ *
+ * <p>例:
+ * <pre>{@code
+ * @mapping(TokenDecl.Simple, params=[name, parserClass])
+ * SimpleToken ::= ... ;
+ *
+ * @mapping(TokenDecl.Until, params=[name, terminator])
+ * UntilToken ::= ... ;
+ * }</pre>
+ * ↓ 生成される AST:
+ * <pre>{@code
+ * sealed interface XxxAST permits XxxAST.TokenDecl {
+ *   sealed interface TokenDecl extends XxxAST permits TokenDecl.Simple, TokenDecl.Until {
+ *     record Simple(String name, String parserClass) implements TokenDecl {}
+ *     record Until(String name, String terminator) implements TokenDecl {}
+ *   }
+ * }
+ * }</pre>
  */
 public class ASTGenerator implements CodeGenerator {
 
@@ -43,15 +67,47 @@ public class ASTGenerator implements CodeGenerator {
         String grammarName = grammar.name();
         String className = grammarName + "AST";
 
-        // @mapping アノテーション付きルールを収集（クラス名で重複排除、順序保持）
-        // @skip が付いているルールは AST 生成対象外
-        Map<String, RuleDecl> mappingRules = new LinkedHashMap<>();
+        // ----- Pass 1: ルールを 3 系統に分類 -----
+        // - midSealedRules: @mapping(SealedName) + body が「複数 alt の Choice、各 alt が単一 RuleRef」
+        //                   → SealedName を中間 sealed interface として生成
+        // - nestedRules:    @mapping(Outer.Inner) → Outer を sealed として inner record を入れる
+        // - flatRules:      @mapping(Foo) で params あり → record Foo を直下に出力
+        // @skip が付いているルールは AST 生成対象外。
+        Map<String, RuleDecl> flatRules = new LinkedHashMap<>();
+        Map<String, Map<String, RuleDecl>> nestedRules = new LinkedHashMap<>();
+        Map<String, RuleDecl> midSealedRules = new LinkedHashMap<>();
         for (RuleDecl rule : grammar.rules()) {
             boolean isSkip = rule.annotations().stream().anyMatch(a -> a instanceof SkipAnnotation);
-            if (!isSkip) {
-                getMappingAnnotation(rule).ifPresent(m -> {
-                    mappingRules.putIfAbsent(m.className(), rule);
-                });
+            if (isSkip) {
+                continue;
+            }
+            getMappingAnnotation(rule).ifPresent(m -> {
+                String name = m.className();
+                if (isMidSealedCandidate(rule, m)) {
+                    midSealedRules.putIfAbsent(name, rule);
+                } else if (name.contains(".")) {
+                    int dot = name.indexOf('.');
+                    String outer = name.substring(0, dot);
+                    String inner = name.substring(dot + 1);
+                    nestedRules
+                        .computeIfAbsent(outer, k -> new LinkedHashMap<>())
+                        .putIfAbsent(inner, rule);
+                } else {
+                    flatRules.putIfAbsent(name, rule);
+                }
+            });
+        }
+
+        // ----- Pass 2: 中間 sealed interface ごとの permits リストを構築 -----
+        // 各 record が「どの中間 sealed の permits に含まれるか」も逆引きで保持する。
+        Map<String, List<String>> midSealedPermits = new LinkedHashMap<>();
+        Map<String, String> recordToMidSealed = new LinkedHashMap<>();
+        for (Map.Entry<String, RuleDecl> entry : midSealedRules.entrySet()) {
+            String midSealedName = entry.getKey();
+            List<String> permits = computeMidSealedPermits(entry.getValue(), grammar);
+            midSealedPermits.put(midSealedName, permits);
+            for (String permittedRecord : permits) {
+                recordToMidSealed.putIfAbsent(permittedRecord, midSealedName);
             }
         }
 
@@ -61,38 +117,175 @@ public class ASTGenerator implements CodeGenerator {
         sb.append("import java.util.Optional;\n");
         sb.append("\n");
 
-        if (mappingRules.isEmpty()) {
+        if (flatRules.isEmpty() && nestedRules.isEmpty() && midSealedRules.isEmpty()) {
             sb.append("public interface ").append(className).append(" {}\n");
             return new GeneratedSource(packageName, className, sb.toString());
         }
 
-        String permitsClause = mappingRules.keySet().stream()
+        // ----- Pass 3: ルート AST sealed interface の permits 句を構築 -----
+        // 中間 sealed 配下の record は AST permit から外し、中間 sealed 名を代わりに入れる。
+        java.util.LinkedHashSet<String> astPermits = new java.util.LinkedHashSet<>();
+        for (String name : flatRules.keySet()) {
+            if (!recordToMidSealed.containsKey(name)) {
+                astPermits.add(name);
+            }
+        }
+        for (String outer : nestedRules.keySet()) {
+            astPermits.add(outer);
+        }
+        astPermits.addAll(midSealedRules.keySet());
+
+        String permitsClause = astPermits.stream()
             .map(name -> className + "." + name)
             .collect(Collectors.joining(",\n    "));
 
         sb.append("public sealed interface ").append(className).append(" permits\n")
           .append("    ").append(permitsClause).append(" {\n\n");
 
-        for (Map.Entry<String, RuleDecl> entry : mappingRules.entrySet()) {
+        // ----- Pass 4: 出力 -----
+        // 中間 sealed interface 宣言を先に出す (permit する record 群より前である必要はないが
+        // 読みやすさのため)。
+        for (Map.Entry<String, List<String>> entry : midSealedPermits.entrySet()) {
+            emitMidSealed(sb, entry.getKey(), entry.getValue(), className);
+        }
+
+        // flat record (中間 sealed 配下でないもののみ)
+        for (Map.Entry<String, RuleDecl> entry : flatRules.entrySet()) {
             String recordName = entry.getKey();
+            if (nestedRules.containsKey(recordName)) {
+                continue; // nested 優先
+            }
             RuleDecl rule = entry.getValue();
             MappingAnnotation mapping = getMappingAnnotation(rule).get();
+            String parentType = recordToMidSealed.getOrDefault(recordName, className);
+            emitRecord(sb, "    ", recordName, rule, mapping, grammar, parentType);
+        }
 
-            sb.append("    record ").append(recordName).append("(\n");
-
-            List<String> fields = new ArrayList<>();
-            for (String param : mapping.paramNames()) {
-                String type = inferType(grammar, rule, param);
-                fields.add("        " + type + " " + param);
-            }
-
-            sb.append(String.join(",\n", fields)).append("\n");
-            sb.append("    ) implements ").append(className).append(" {}\n\n");
+        // nested sealed (Outer.Inner)
+        for (Map.Entry<String, Map<String, RuleDecl>> entry : nestedRules.entrySet()) {
+            String outerName = entry.getKey();
+            Map<String, RuleDecl> inners = entry.getValue();
+            emitNestedSealed(sb, outerName, inners, grammar, className);
         }
 
         sb.append("}\n");
 
         return new GeneratedSource(packageName, className, sb.toString());
+    }
+
+    /**
+     * 中間 sealed interface の候補かを判定する。
+     * 条件: @mapping(SimpleName) で params 無し、body が複数 alternative の Choice、
+     *       各 alt が単一 RuleRef のみ (= sum-type の典型形)。
+     */
+    private boolean isMidSealedCandidate(RuleDecl rule, MappingAnnotation mapping) {
+        if (!mapping.paramNames().isEmpty()) {
+            return false;
+        }
+        if (mapping.className().contains(".")) {
+            return false;
+        }
+        if (!(rule.body() instanceof ChoiceBody choice)) {
+            return false;
+        }
+        if (choice.alternatives().size() < 2) {
+            return false;
+        }
+        for (SequenceBody seq : choice.alternatives()) {
+            if (seq.elements().size() != 1) {
+                return false;
+            }
+            if (!(seq.elements().get(0).element() instanceof RuleRefElement)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Choice の各 alternative の RuleRef が指すルールの @mapping クラス名を集めて
+     * 中間 sealed の permits リストとする。
+     *
+     * <ul>
+     *   <li>flat record (@mapping(Foo))           → permits に "Foo"</li>
+     *   <li>nested inner (@mapping(Sealed.Inner)) → outer が当該 sealed と一致するときに
+     *                                               permits に "Inner" (= 自分の inner)</li>
+     * </ul>
+     *
+     * @mapping のないルールや別の sealed 配下の record はスキップ。
+     */
+    private List<String> computeMidSealedPermits(RuleDecl midSealedRule, GrammarDecl grammar) {
+        if (!(midSealedRule.body() instanceof ChoiceBody choice)) {
+            return List.of();
+        }
+        String midSealedName = getMappingAnnotation(midSealedRule).map(MappingAnnotation::className).orElse("");
+        List<String> permits = new ArrayList<>();
+        for (SequenceBody seq : choice.alternatives()) {
+            AtomicElement element = seq.elements().get(0).element();
+            if (element instanceof RuleRefElement ref) {
+                Optional<MappingAnnotation> m = findMappingForRule(grammar, ref.name());
+                m.ifPresent(mapping -> {
+                    String name = mapping.className();
+                    int dot = name.indexOf('.');
+                    if (dot < 0) {
+                        // flat record → そのまま permit に入れる
+                        permits.add(name);
+                    } else {
+                        String outer = name.substring(0, dot);
+                        String inner = name.substring(dot + 1);
+                        // 自分の inner のみ permit に入れる (nested sealed の構造内)
+                        if (outer.equals(midSealedName)) {
+                            permits.add(inner);
+                        }
+                    }
+                });
+            }
+        }
+        return permits;
+    }
+
+    private void emitRecord(StringBuilder sb, String indent, String recordName, RuleDecl rule,
+            MappingAnnotation mapping, GrammarDecl grammar, String parentTypeName) {
+        sb.append(indent).append("record ").append(recordName).append("(\n");
+        List<String> fields = new ArrayList<>();
+        for (String param : mapping.paramNames()) {
+            String type = inferType(grammar, rule, param);
+            fields.add(indent + "    " + type + " " + param);
+        }
+        sb.append(String.join(",\n", fields)).append("\n");
+        sb.append(indent).append(") implements ").append(parentTypeName).append(" {}\n\n");
+    }
+
+    private void emitNestedSealed(StringBuilder sb, String outerName,
+            Map<String, RuleDecl> inners, GrammarDecl grammar, String astClassName) {
+        String innerPermits = inners.keySet().stream()
+            .map(name -> outerName + "." + name)
+            .collect(Collectors.joining(",\n        "));
+        sb.append("    sealed interface ").append(outerName)
+          .append(" extends ").append(astClassName).append(" permits\n")
+          .append("        ").append(innerPermits).append(" {\n\n");
+        for (Map.Entry<String, RuleDecl> entry : inners.entrySet()) {
+            String recordName = entry.getKey();
+            RuleDecl rule = entry.getValue();
+            MappingAnnotation mapping = getMappingAnnotation(rule).get();
+            emitRecord(sb, "        ", recordName, rule, mapping, grammar, outerName);
+        }
+        sb.append("    }\n\n");
+    }
+
+    private void emitMidSealed(StringBuilder sb, String midSealedName, List<String> permits,
+            String astClassName) {
+        if (permits.isEmpty()) {
+            // permits が空の sealed interface は宣言できない。エッジケースとして
+            // 通常 interface にフォールバック。
+            sb.append("    interface ").append(midSealedName)
+              .append(" extends ").append(astClassName).append(" {}\n\n");
+            return;
+        }
+        String permitsList = permits.stream().collect(Collectors.joining(",\n        "));
+        sb.append("    sealed interface ").append(midSealedName)
+          .append(" extends ").append(astClassName).append(" permits\n")
+          .append("        ").append(permitsList).append(" {}\n\n");
     }
 
     // =========================================================================

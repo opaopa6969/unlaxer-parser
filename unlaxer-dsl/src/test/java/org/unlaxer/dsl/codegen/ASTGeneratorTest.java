@@ -177,6 +177,68 @@ public class ASTGeneratorTest {
     }
 
     // =========================================================================
+    // ドット記法 + 中間 sealed interface (Issue #8)
+    // =========================================================================
+
+    private static final String DOTTED_GRAMMAR =
+        "grammar Dotted {\n" +
+        "  @package: x.y\n" +
+        "  @whitespace: javaStyle\n" +
+        "  token IDENT = org.unlaxer.parser.clang.IdentifierParser\n" +
+        "  token NUM   = org.unlaxer.parser.elementary.NumberParser\n" +
+        "\n" +
+        "  @root\n" +
+        "  @mapping(Program, params=[items])\n" +
+        "  Program ::= { Item } @items ;\n" +
+        "\n" +
+        // 中間 sealed: Item = ItemA | ItemB → flat record の sum
+        "  @mapping(Item)\n" +
+        "  Item ::= ItemA | ItemB ;\n" +
+        "  @mapping(ItemA, params=[name])\n" +
+        "  ItemA ::= 'a' IDENT @name ;\n" +
+        "  @mapping(ItemB, params=[value])\n" +
+        "  ItemB ::= 'b' NUM @value ;\n" +
+        "\n" +
+        // sealed inner record スタイル: TokenLike = SimpleT | UntilT (どちらも TokenLike.X)
+        "  @mapping(TokenLike)\n" +
+        "  TokenLike ::= SimpleT | UntilT ;\n" +
+        "  @mapping(TokenLike.Simple, params=[name])\n" +
+        "  SimpleT ::= 'simple' IDENT @name ;\n" +
+        "  @mapping(TokenLike.Until, params=[name])\n" +
+        "  UntilT ::= 'until' IDENT @name ;\n" +
+        "}";
+
+    @Test
+    public void testMidSealedInterfaceForFlatAlternatives() {
+        GrammarDecl grammar = parseGrammar(DOTTED_GRAMMAR);
+        String source = new ASTGenerator().generate(grammar).source();
+        // Item は中間 sealed として宣言される
+        assertTrue("Item must be a sealed interface", source.contains("sealed interface Item extends DottedAST permits"));
+        assertTrue("Item permits ItemA", source.contains("ItemA"));
+        assertTrue("Item permits ItemB", source.contains("ItemB"));
+        // 各 alternative record は Item を implements する
+        assertTrue("ItemA implements Item",
+            source.matches("(?s).*record\\s+ItemA\\s*\\([^)]*\\)\\s*implements\\s+Item\\s*\\{\\}.*"));
+        assertTrue("ItemB implements Item",
+            source.matches("(?s).*record\\s+ItemB\\s*\\([^)]*\\)\\s*implements\\s+Item\\s*\\{\\}.*"));
+        // ルート AST の permits は Item を含み、ItemA/ItemB は含まない (中間 sealed 配下なので)
+        assertTrue("AST permits Item", source.contains("DottedAST.Item"));
+    }
+
+    @Test
+    public void testNestedInnerRecordViaDotted() {
+        GrammarDecl grammar = parseGrammar(DOTTED_GRAMMAR);
+        String source = new ASTGenerator().generate(grammar).source();
+        // TokenLike は sealed inner record を持つ
+        assertTrue("TokenLike sealed wrapper", source.contains("sealed interface TokenLike extends DottedAST permits"));
+        assertTrue("TokenLike.Simple inner", source.contains("TokenLike.Simple"));
+        assertTrue("TokenLike.Until inner",  source.contains("TokenLike.Until"));
+        // Inner record の implements は親 (TokenLike) を指す
+        assertTrue("inner Simple implements TokenLike",
+            source.matches("(?s).*record\\s+Simple\\s*\\([^)]*\\)\\s*implements\\s+TokenLike\\s*\\{\\}.*"));
+    }
+
+    // =========================================================================
     // ヘルパー
     // =========================================================================
 
