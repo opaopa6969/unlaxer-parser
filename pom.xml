@@ -16,6 +16,12 @@
 	<modules>
 		<module>unlaxer-common</module>
 		<module>unlaxer-dsl</module>
+		<!-- VS Code 拡張 (リファレンス実装兼ドッグフード)。
+		     unlaxer-dsl/ubnf-vscode は ubnf.ubnf 自身の IDE (#4)。
+		     unlaxer-dsl/tinycalc-vscode は教育用デモ DSL。
+		     どちらも npm/vsce が必要 (verify フェーズ)。 -->
+		<module>unlaxer-dsl/ubnf-vscode</module>
+		<module>unlaxer-dsl/tinycalc-vscode</module>
 	</modules>
 
 	<scm>

@@ -15,11 +15,12 @@ grammar UBNF {
   @comment: { line: '//' }
 
   // ===== トークン定義 =====
-  token IDENTIFIER        = IdentifierParser
-  token STRING            = SingleQuotedParser
-  token CLASS_NAME        = IdentifierParser
-  token UNSIGNED_INTEGER  = NumberParser
-  token DIGIT             = DigitParser
+  // 完全修飾名で書く: GrammarValidator が静的に解決可能 (W-TOKEN-UNRESOLVED 警告ゼロ)
+  token IDENTIFIER        = org.unlaxer.parser.clang.IdentifierParser
+  token STRING            = org.unlaxer.parser.elementary.SingleQuotedParser
+  token CLASS_NAME        = org.unlaxer.parser.clang.IdentifierParser
+  token UNSIGNED_INTEGER  = org.unlaxer.parser.elementary.NumberParser
+  token DIGIT             = org.unlaxer.parser.posix.DigitParser
 
   // ===== エントリーポイント =====
   @root

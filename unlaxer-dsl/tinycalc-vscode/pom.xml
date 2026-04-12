@@ -4,11 +4,16 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>org.unlaxer</groupId>
+    <parent>
+        <groupId>org.unlaxer</groupId>
+        <artifactId>unlaxer-parser</artifactId>
+        <version>${revision}</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
     <artifactId>tinycalc-vscode</artifactId>
-    <version>0.1.0</version>
     <packaging>jar</packaging>
-    <description>TinyCalc VS Code 拡張 — grammar/tinycalc.ubnf から VSIX を自動生成する</description>
+    <description>TinyCalc VS Code 拡張 — grammar/tinycalc.ubnf から VSIX を自動生成する (教育用デモ DSL)</description>
 
     <properties>
         <maven.compiler.release>21</maven.compiler.release>
@@ -24,13 +29,13 @@
         <dependency>
             <groupId>org.unlaxer</groupId>
             <artifactId>unlaxer-dsl</artifactId>
-            <version>0.1.0</version>
+            <version>${project.version}</version>
         </dependency>
         <!-- 生成コードが依存するランタイム -->
         <dependency>
             <groupId>org.unlaxer</groupId>
             <artifactId>unlaxer-common</artifactId>
-            <version>2.2.0</version>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>org.eclipse.lsp4j</groupId>
