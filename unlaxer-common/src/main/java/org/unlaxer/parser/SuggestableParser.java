@@ -69,7 +69,7 @@ public abstract class SuggestableParser extends AbstractTokenParser implements T
 		for(int endIndex= test.length() ; endIndex > 0 ; endIndex--){
 			String currentTest = test.substring(0, endIndex);
 			for(Source targetString :targetStrings){
-				if(targetString.startsWith(currentTest)){
+				if(targetString.sourceAsString().startsWith(currentTest)){
 					suggests.words.add(targetString.toString());
 				}
 			}

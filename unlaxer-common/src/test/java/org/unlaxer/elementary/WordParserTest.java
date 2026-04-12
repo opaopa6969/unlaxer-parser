@@ -31,7 +31,7 @@ public class WordParserTest extends ParserTestBase{
 		
 		WordParser slice = wordParser.slice(slicer->{slicer
 		    .begin(new CodePointIndex(0))
-		    .end(word->new CodePointIndex(word.indexOf(" ")));
+		    .end(word->new CodePointIndex(word.sourceAsString().indexOf(" ")));
 		});
 		testAllMatch(slice, "This");
 

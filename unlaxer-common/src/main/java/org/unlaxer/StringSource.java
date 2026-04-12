@@ -1,13 +1,9 @@
 package org.unlaxer;
 
-import java.io.UnsupportedEncodingException;
-import java.nio.charset.Charset;
 import java.util.Arrays;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
-import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import org.unlaxer.util.function.TriFunction;
@@ -226,191 +222,6 @@ public class StringSource implements Source {
   }
 
   @Override
-  public char charAt(int index) {
-    return sourceString.charAt(index);
-  }
-
-  @Override
-  public byte[] getBytes(String charsetName) throws UnsupportedEncodingException {
-    return sourceString.getBytes(charsetName);
-  }
-
-  @Override
-  public byte[] getBytes(Charset charset) {
-    return sourceString.getBytes(charset);
-  }
-
-  @Override
-  public byte[] getBytes() {
-    return sourceString.getBytes();
-  }
-
-  @Override
-  public boolean equalsIgnoreCase(String anotherString) {
-    return sourceString.equalsIgnoreCase(anotherString);
-  }
-
-  @Override
-  public int compareTo(String anotherString) {
-    return sourceString.compareTo(anotherString);
-  }
-
-  @Override
-  public boolean startsWith(String prefix) {
-    return sourceString.startsWith(prefix);
-  }
-
-  @Override
-  public boolean endsWith(String suffix) {
-    return sourceString.endsWith(suffix);
-  }
-
-  @Override
-  public int indexOf(int ch) {
-    return sourceString.indexOf(ch);
-  }
-
-  @Override
-  public int lastIndexOf(int ch) {
-    return sourceString.lastIndexOf(ch);
-  }
-
-  @Override
-  public int indexOf(String str) {
-    return sourceString.indexOf(str);
-  }
-
-  @Override
-  public int lastIndexOf(String str) {
-    return sourceString.lastIndexOf(str);
-  }
-
-  @Override
-  public int indexOf(int ch, int fromIndex) {
-    return sourceString.indexOf(ch, fromIndex);
-  }
-
-  @Override
-  public int lastIndexOf(int ch, int fromIndex) {
-    return sourceString.lastIndexOf(ch, fromIndex);
-  }
-
-  @Override
-  public int lastIndexOf(String str, int fromIndex) {
-    return sourceString.lastIndexOf(str, fromIndex);
-  }
-
-  @Override
-  public int indexOf(String str, int fromIndex) {
-    return sourceString.indexOf(str, fromIndex);
-  }
-
-  @Override
-  public CharSequence subSequence(int beginIndex, int endIndex) {
-    return sourceString.subSequence(beginIndex, endIndex);
-  }
-
-  @Override
-  public String concat(String str) {
-    return sourceString.concat(str);
-  }
-
-  @Override
-  public String replace(char oldChar, char newChar) {
-    return sourceString.replace(oldChar, newChar);
-  }
-
-  @Override
-  public boolean matches(String regex) {
-    return sourceString.matches(regex);
-  }
-
-  @Override
-  public boolean contains(CharSequence s) {
-    return sourceString.contains(s);
-  }
-
-  @Override
-  public String replaceAll(String regex, String replacement) {
-    return sourceString.replaceAll(regex, replacement);
-  }
-
-  @Override
-  public String replace(CharSequence target, CharSequence replacement) {
-    return sourceString.replace(target, replacement);
-  }
-
-  @Override
-  public String[] split(String regex, int limit) {
-    return sourceString.split(regex, limit);
-  }
-
-  @Override
-  public String[] split(String regex) {
-    return sourceString.split(regex);
-  }
-
-  @Override
-  public String toLowerCase(Locale locale) {
-    return sourceString.toLowerCase(locale);
-  }
-
-  @Override
-  public String toLowerCase() {
-    return sourceString.toLowerCase();
-  }
-
-  @Override
-  public String toUpperCase(Locale locale) {
-    return sourceString.toUpperCase(locale);
-  }
-
-  @Override
-  public String toUpperCase() {
-    return sourceString.toUpperCase();
-  }
-
-  @Override
-  public String trim() {
-    return sourceString.trim();
-  }
-
-  @Override
-  public String strip() {
-    return sourceString.strip();
-  }
-
-  @Override
-  public boolean isBlank() {
-    return sourceString.isBlank();
-  }
-
-  @Override
-  public Stream<String> lines() {
-    return sourceString.lines();
-  }
-
-  @Override
-  public IntStream chars() {
-    return sourceString.chars();
-  }
-
-  @Override
-  public IntStream codePoints() {
-    return sourceString.codePoints();
-  }
-
-  @Override
-  public char[] toCharArray() {
-    return sourceString.toCharArray();
-  }
-
-  @Override
-  public String repeat(int count) {
-    return sourceString.repeat(count);
-  }
-
-  @Override
   public StringIndex toStringIndex(CodePointIndex codePointIndex) {
     StringIndex stringIndexFrom = positionResolver.stringIndexInRootFrom(codePointIndex);
     if (stringIndexFrom == null) {
@@ -445,11 +256,6 @@ public class StringSource implements Source {
   @Override
   public Source source() {
     return this;
-  }
-
-  @Override
-  public int length() {
-    return sourceAsString().length();
   }
 
   @Override

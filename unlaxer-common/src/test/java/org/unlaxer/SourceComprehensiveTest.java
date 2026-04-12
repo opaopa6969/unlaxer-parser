@@ -140,30 +140,30 @@ public class SourceComprehensiveTest {
   @Test
   public void testContains() {
     StringSource source = StringSource.createRootSource("hello world");
-    assertTrue(source.contains("world"));
-    assertFalse(source.contains("xyz"));
+    assertTrue(source.sourceAsString().contains("world"));
+    assertFalse(source.sourceAsString().contains("xyz"));
   }
 
   @Test
   public void testStartsWith() {
     StringSource source = StringSource.createRootSource("hello world");
-    assertTrue(source.startsWith("hello"));
-    assertFalse(source.startsWith("world"));
+    assertTrue(source.sourceAsString().startsWith("hello"));
+    assertFalse(source.sourceAsString().startsWith("world"));
   }
 
   @Test
   public void testEndsWith() {
     StringSource source = StringSource.createRootSource("hello world");
-    assertTrue(source.endsWith("world"));
-    assertFalse(source.endsWith("hello"));
+    assertTrue(source.sourceAsString().endsWith("world"));
+    assertFalse(source.sourceAsString().endsWith("hello"));
   }
 
   @Test
   public void testIndexOf() {
     StringSource source = StringSource.createRootSource("abcabc");
-    assertEquals(0, source.indexOf("abc"));
-    assertEquals(3, source.indexOf("abc", 1));
-    assertEquals(0, source.indexOf('a'));
+    assertEquals(0, source.sourceAsString().indexOf("abc"));
+    assertEquals(3, source.sourceAsString().indexOf("abc", 1));
+    assertEquals(0, source.sourceAsString().indexOf('a'));
   }
 
   @Test
@@ -177,9 +177,9 @@ public class SourceComprehensiveTest {
 
   @Test
   public void testIsBlank() {
-    assertTrue(StringSource.createRootSource("").isBlank());
-    assertTrue(StringSource.createRootSource("  ").isBlank());
-    assertFalse(StringSource.createRootSource("a").isBlank());
+    assertTrue(StringSource.createRootSource("").sourceAsString().isBlank());
+    assertTrue(StringSource.createRootSource("  ").sourceAsString().isBlank());
+    assertFalse(StringSource.createRootSource("a").sourceAsString().isBlank());
   }
 
   // --- Source joining ---

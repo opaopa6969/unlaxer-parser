@@ -4,20 +4,16 @@ import java.util.Optional;
 
 import org.unlaxer.Source.SourceKind;
 
-public interface CodePointAccessor extends Comparable<CodePointAccessor>, StringBase {
+public interface CodePointAccessor extends Comparable<CodePointAccessor> {
 
 
   StringIndex toStringIndex(CodePointIndex codePointIndex);
   StringIndexWithNegativeValue toStringIndex(CodePointIndexWithNegativeValue codePointIndex);
   CodePointIndex toCodePointIndex(StringIndex stringIndex);
   CodePointIndexWithNegativeValue toCodePointIndexWithNegativeValue(StringIndexWithNegativeValue stringIndex);
+
   /**
-   * Returns the length of this string.
-   * The length is equal to the number of <a href="Character.html#unicode">Unicode
-   * code units</a> in the string.
-   *
-   * @return  the length of the sequence of characters represented by this
-   *          object.
+   * Returns the length of this string in {@code char} units (UTF-16 code units).
    */
   StringLength stringLength();
 
@@ -25,8 +21,12 @@ public interface CodePointAccessor extends Comparable<CodePointAccessor>, String
 
   String sourceAsString();
 
-  default Optional<String> nonEmptyString(){
-    if(isEmpty()) {
+  default boolean isEmpty() {
+    return sourceAsString().isEmpty();
+  }
+
+  default Optional<String> nonEmptyString() {
+    if (isEmpty()) {
       return Optional.empty();
     }
     return Optional.of(sourceAsString());
@@ -61,8 +61,9 @@ public interface CodePointAccessor extends Comparable<CodePointAccessor>, String
     return sourceAsString().equalsIgnoreCase(anotherString.sourceAsString());
   }
 
-  default int compareTo(CodePointAccessor  anotherString) {
-    return compareTo(anotherString.source());
+  @Override
+  default int compareTo(CodePointAccessor anotherString) {
+    return sourceAsString().compareTo(anotherString.sourceAsString());
   }
 
   default boolean regionMatches(CodePointIndex toffset, String other, CodePointIndex ooffset, Length len) {
@@ -94,12 +95,12 @@ public interface CodePointAccessor extends Comparable<CodePointAccessor>, String
   }
 
   default boolean startsWith(CodePointAccessor prefix) {
-    return startsWith(prefix.source());
+    return sourceAsString().startsWith(prefix.sourceAsString());
   }
 
 
   default boolean endsWith(CodePointAccessor suffix) {
-    return endsWith(suffix.source());
+    return sourceAsString().endsWith(suffix.sourceAsString());
   }
 
   default CodePointIndexWithNegativeValue indexOf(CodePoint codePoint, CodePointIndex fromIndex) {
@@ -110,8 +111,9 @@ public interface CodePointAccessor extends Comparable<CodePointAccessor>, String
 
 
   default CodePointIndexWithNegativeValue lastIndexOf(CodePoint codePoint) {
+    int idx = sourceAsString().lastIndexOf(codePoint.value());
     return new CodePointIndexWithNegativeValue(
-        toCodePointIndex(new StringIndex(lastIndexOf(codePoint.value()))));
+        toCodePointIndexWithNegativeValue(new StringIndexWithNegativeValue(idx)));
   }
 
   default CodePointIndexWithNegativeValue lastIndexOf(CodePoint codePoint, CodePointIndex fromIndex) {
@@ -121,8 +123,9 @@ public interface CodePointAccessor extends Comparable<CodePointAccessor>, String
   }
 
   default CodePointIndexWithNegativeValue indexOf(CodePointAccessor str) {
+    int idx = sourceAsString().indexOf(str.sourceAsString());
     return new CodePointIndexWithNegativeValue(
-        toCodePointIndex(new StringIndex(indexOf(str.source()))));
+        toCodePointIndexWithNegativeValue(new StringIndexWithNegativeValue(idx)));
   }
 
   default CodePointIndex indexOf(CodePointAccessor str, CodePointIndex fromIndex) {
@@ -132,8 +135,9 @@ public interface CodePointAccessor extends Comparable<CodePointAccessor>, String
   }
 
   default CodePointIndex lastIndexOf(CodePointAccessor str) {
+    int idx = sourceAsString().lastIndexOf(str.sourceAsString());
     return new CodePointIndex(
-        toCodePointIndexWithNegativeValue(new StringIndexWithNegativeValue(lastIndexOf(str.source()))));
+        toCodePointIndexWithNegativeValue(new StringIndexWithNegativeValue(idx)));
   }
 
   default CodePointIndex lastIndexOf(CodePointAccessor str, CodePointIndex fromIndex) {
@@ -171,8 +175,8 @@ public interface CodePointAccessor extends Comparable<CodePointAccessor>, String
 
 
   default Optional<CodePointIndex> codePointIndexOf(int ch) {
-    int indexOf = indexOf(ch);
-    if(indexOf < 0) {
+    int indexOf = sourceAsString().indexOf(ch);
+    if (indexOf < 0) {
       return Optional.empty();
     }
     return Optional.of(toCodePointIndex(new StringIndex(indexOf)));
@@ -183,8 +187,8 @@ public interface CodePointAccessor extends Comparable<CodePointAccessor>, String
   }
 
   default Optional<CodePointIndex> codePointIndexOf(int ch, int fromIndex) {
-    int indexOf = indexOf(ch,fromIndex);
-    if(indexOf < 0) {
+    int indexOf = sourceAsString().indexOf(ch, fromIndex);
+    if (indexOf < 0) {
       return Optional.empty();
     }
     return Optional.of(toCodePointIndex(new StringIndex(indexOf)));
@@ -196,8 +200,8 @@ public interface CodePointAccessor extends Comparable<CodePointAccessor>, String
 
 
   default Optional<CodePointIndex> codePointLastIndexOf(int ch) {
-    int indexOf = lastIndexOf(ch);
-    if(indexOf < 0) {
+    int indexOf = sourceAsString().lastIndexOf(ch);
+    if (indexOf < 0) {
       return Optional.empty();
     }
     return Optional.of(toCodePointIndex(new StringIndex(indexOf)));
@@ -208,8 +212,8 @@ public interface CodePointAccessor extends Comparable<CodePointAccessor>, String
   }
 
   default Optional<CodePointIndex> codePointLastIndexOf(int ch, int fromIndex) {
-    int indexOf = lastIndexOf(ch,fromIndex);
-    if(indexOf < 0) {
+    int indexOf = sourceAsString().lastIndexOf(ch, fromIndex);
+    if (indexOf < 0) {
       return Optional.empty();
     }
     return Optional.of(toCodePointIndex(new StringIndex(indexOf)));
@@ -221,8 +225,8 @@ public interface CodePointAccessor extends Comparable<CodePointAccessor>, String
 
 
   default Optional<CodePointIndex> codePointIndexOf(String str) {
-    int indexOf = indexOf(str);
-    if(indexOf < 0) {
+    int indexOf = sourceAsString().indexOf(str);
+    if (indexOf < 0) {
       return Optional.empty();
     }
     return Optional.of(toCodePointIndex(new StringIndex(indexOf)));
@@ -233,8 +237,8 @@ public interface CodePointAccessor extends Comparable<CodePointAccessor>, String
   }
 
   default Optional<CodePointIndex> codePointLastIndexOf(String str) {
-    int indexOf = lastIndexOf(str);
-    if(indexOf < 0) {
+    int indexOf = sourceAsString().lastIndexOf(str);
+    if (indexOf < 0) {
       return Optional.empty();
     }
     return Optional.of(toCodePointIndex(new StringIndex(indexOf)));
@@ -245,36 +249,36 @@ public interface CodePointAccessor extends Comparable<CodePointAccessor>, String
   }
 
   default Optional<CodePointIndex> codePointLastIndexOf(String str, int fromIndex) {
-    int indexOf = lastIndexOf(str,fromIndex);
-    if(indexOf < 0) {
+    int indexOf = sourceAsString().lastIndexOf(str, fromIndex);
+    if (indexOf < 0) {
       return Optional.empty();
     }
     return Optional.of(toCodePointIndex(new StringIndex(indexOf)));
   }
 
   default Optional<CodePointIndex> codePointLastIndexOf(String str, CodePointIndex fromIndex) {
-    return codePointLastIndexOf(str,fromIndex.value());
+    return codePointLastIndexOf(str, fromIndex.value());
   }
 
   default Optional<CodePointIndex> codePointLastIndexOf(Source str, CodePointIndex fromIndex) {
-    return codePointLastIndexOf(str.sourceAsString(),fromIndex.value());
+    return codePointLastIndexOf(str.sourceAsString(), fromIndex.value());
   }
 
 
   default Optional<CodePointIndex> codePointIndexOf(String str, int fromIndex) {
-    int indexOf = indexOf(str,fromIndex);
-    if(indexOf < 0) {
+    int indexOf = sourceAsString().indexOf(str, fromIndex);
+    if (indexOf < 0) {
       return Optional.empty();
     }
     return Optional.of(toCodePointIndex(new StringIndex(indexOf)));
   }
 
   default Optional<CodePointIndex> codePointIndexOf(String str, CodePointIndex fromIndex) {
-    return codePointIndexOf(str,fromIndex.value());
+    return codePointIndexOf(str, fromIndex.value());
   }
 
   default Optional<CodePointIndex> codePointIndexOf(Source str, CodePointIndex fromIndex) {
-    return codePointIndexOf(str.sourceAsString(),fromIndex.value());
+    return codePointIndexOf(str.sourceAsString(), fromIndex.value());
   }
 
 }

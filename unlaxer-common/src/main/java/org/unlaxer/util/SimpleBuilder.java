@@ -105,7 +105,7 @@ public class SimpleBuilder implements CharSequence{
   }
 
   public SimpleBuilder lines(Source lines) {
-    String[] split = lines.split("\n");
+    String[] split = lines.sourceAsString().split("\n");
     for (String line : split) {
       tab();
       append(line + lf);
@@ -145,7 +145,7 @@ public class SimpleBuilder implements CharSequence{
   
   public SimpleBuilder w(Source word) {
     word = word == null ? StringSource.EMPTY : word;
-    append("\"" + word.replaceAll("\"", "\\\"") + "\"");
+    append("\"" + word.sourceAsString().replaceAll("\"", "\\\"") + "\"");
     return this;
   }
 
