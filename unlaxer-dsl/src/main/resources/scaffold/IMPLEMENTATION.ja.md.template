@@ -1,0 +1,139 @@
+# {{ClassName}} DSL 実装ガイド
+
+scaffold を実用的な DSL に育てていく手順です。
+
+> English: [IMPLEMENTATION.md](IMPLEMENTATION.md)
+
+## 1. ビルドパイプライン全体像
+
+```
+grammar/{{name}}.ubnf
+        │
+        ▼  (mvn generate-sources)
+target/generated-sources/{{name}}/
+        │ {{ClassName}}Parsers.java
+        │ {{ClassName}}AST.java
+        │ {{ClassName}}Mapper.java
+        │ {{ClassName}}LanguageServer.java
+        │ {{ClassName}}LspLauncher.java
+{{#dap}}        │ {{ClassName}}DebugAdapter.java
+        │ {{ClassName}}DapLauncher.java
+{{/dap}}        ▼  (mvn package — shade)
+target/{{name}}-lsp-server.jar          # 全依存込みの fat jar
+        ▼  (antrun copy)
+vscode-extension/server-dist/{{name}}-lsp-server.jar
+        ▼  (mvn verify — npm install + vsce package)
+target/{{name}}-lsp-0.1.0.vsix          # 最終成果物
+```
+
+## 2. 文法を編集する
+
+`grammar/{{name}}.ubnf` が唯一の真実。
+
+典型的な追加例：
+
+```ubnf
+@mapping(IfExpr, params=[condition, then, else])
+IfExpression ::=
+  'if' '(' Expression @condition ')' Expression @then
+  [ 'else' Expression @else ] ;
+```
+
+編集後：
+
+```bash
+mvn generate-sources         # parser / AST / LSP{{#dap}} / DAP{{/dap}} を再生成
+mvn package                  # fat jar を再ビルド
+```
+
+UBNF の全構文（`@root`, `@mapping`, `@whitespace`, `@leftAssoc`, `@catalog`,
+`@declares`, `@backref`, `@recovery` などの注釈）は unlaxer-dsl の
+ドキュメントを参照してください。
+
+## 3. TextMate 文法を再生成する
+
+`vscode-extension/syntaxes/{{name}}.tmLanguage.json` は `unlaxer init` 時に
+**一度だけ** 生成されます。新キーワードを追加した場合：
+
+```bash
+unlaxer init {{name}} --from grammar/{{name}}.ubnf --syntax-only \
+        --output-dir .
+```
+
+(もしくは JSON を直接編集してください — ただの TextMate grammar です)
+
+## 4. LSP サーバーをカスタマイズする
+
+`{{ClassName}}LanguageServer` は **abstract** で、launcher が無名サブクラスを
+生成します：
+
+```java
+// {{ClassName}}LspLauncher.java (生成)
+public class {{ClassName}}LspLauncher extends ... {
+    @Override
+    protected {{ClassName}}LanguageServer createServer() {
+        return new {{ClassName}}LanguageServer() {
+            // hover / completion / code-action をここでオーバーライド
+        };
+    }
+}
+```
+
+独自挙動を追加したい場合は launcher を編集する、あるいは
+`src/main/java/` 以下に自前のサブクラスを用意してください。
+
+## 5. DAP サーバーをカスタマイズする
+{{#dap}}
+`{{ClassName}}DebugAdapter` も同様に abstract です。`evaluate(...)`,
+`setBreakpoints(...)` などを launcher 側でオーバーライドできます。
+
+**サンプル文法が「素直な」形をしている理由:** DAP は AST/Mapper クラスを
+必要とし、それらは関連する全ルールに `@mapping(...)` がついている時のみ
+生成されます。同梱の `grammar/{{name}}.ubnf` は `@mapping` を使う一方で、
+**`@leftAssoc`/`@rightAssoc` は意図的に避けて** います。これは現行
+`GrammarValidator` が結合性つきルールに対し正準形を厳密に要求するため
+(`Base @left { Op @op Right @right }` + `@precedence(level=...)` +
+`@mapping` の params 一致)。文法がその形に達するまでは、優先順位は
+サンプルの `Expression`/`Term` のように単純な繰り返しで表現するのが安全です。
+準備ができたら、必要なアノテーションを一括で追加して再生成してください。
+{{/dap}}{{^dap}}
+この scaffold では DAP は無効 (デフォルト) です。
+最も簡単な有効化方法は `--with-dap` で再生成することです：
+
+```bash
+unlaxer init {{name}} --with-dap --output-dir ../{{name}}-dap
+diff -r ../{{name}} ../{{name}}-dap   # 差分を確認
+```
+
+**DAP がオプトインである理由。** DAP は AST/Mapper を必要とし、それらは
+AST ノードを生成する全ルールに `@mapping(...)` が必要です。同梱の "DAP なし"
+サンプル文法は scaffold が素のまま動くよう、意図的に `@mapping` を省いて
+います。`--with-dap` テンプレートは `@mapping` 込みの少しリッチなサンプル
+を出します (ただし `@leftAssoc` は依然避けています — セクション 8 参照)。
+{{/dap}}
+
+## 6. 手書きコードは `src/main/java/` に
+
+生成物はすべて `target/generated-sources/{{name}}/` に出ます。
+自分で書くコードは `src/main/java/{{packagePath}}/` に置けば、生成クラスを
+そのまま import できます。
+
+## 7. VSIX を公開する
+
+```bash
+make all                              # target/{{name}}-lsp-0.1.0.vsix を作成
+npx @vscode/vsce login your-publisher # 初回のみ
+npx @vscode/vsce publish              # Marketplace に公開
+```
+
+## 8. トラブルシューティング
+
+| 症状 | 原因 |
+|---|---|
+| `mvn` が `unlaxer-dsl` を見つけられない | unlaxer-parser リポジトリで `mvn install` するか、Maven Central に成果物が公開されるのを待つ |
+| `tsc` が `vscode-languageclient` でエラー | `vscode-extension/` で `npm install` を実行 |
+| LSP がアクティベートしない | VS Code の **{{ClassName}} LSP** 出力チャンネルを確認 |
+| サーバーは起動するが診断が出ない | ファイル拡張子が `{{extension}}` で、`package.json:contributes.languages.extensions` と一致しているか確認 |
+| `Grammar validation failed` で `E-ASSOC-MISSING-CAPTURE` / `E-ASSOC-NO-PRECEDENCE` / `E-MAPPING-MISSING-CAPTURE` | `@leftAssoc`/`@rightAssoc` を正準形にせず追加した。結合性アノテーションを外して `Base { Op Right }` の素朴な繰り返しに戻すか、**全部** を揃える: `@precedence(level=N)` / `@left`/`@op`/`@right` キャプチャ / `@mapping(..., params=[left, op, right])` |
+| コンパイル時 `cannot find symbol: variable {{ClassName}}Mapper` | DAP を有効にしたが `--generators` に `AST,Mapper` が含まれていない。`unlaxer init ... --with-dap` で再生成するか、`pom.xml` の `<argument>` に `AST,Mapper` を追加 |
+| `W-TOKEN-UNRESOLVED` 警告 (`IdentifierParser` / `NumberParser`) | この警告は無視して構わない — パーサークラスは `unlaxer-common` 内にあり、コンパイル時に解決される。トークンを完全修飾名にすれば抑止可能 (例: `token NUMBER = org.unlaxer.parser.elementary.NumberParser`) |

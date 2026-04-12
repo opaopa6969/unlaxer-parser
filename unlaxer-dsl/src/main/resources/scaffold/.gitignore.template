@@ -1,0 +1,8 @@
+target/
+vscode-extension/node_modules/
+vscode-extension/out/
+vscode-extension/server-dist/
+*.vsix
+.idea/
+.vscode/
+*.iml

@@ -1,0 +1,23 @@
+# {{ClassName}} VS Code Extension — convenience targets.
+# `make all` performs the full pipeline: codegen → fat jar → npm install → vsix.
+
+.PHONY: all generate compile package vsix install-vsix clean
+
+all: vsix
+
+# Step 1+2+3: codegen + javac + fat jar shade + copy to vscode-extension/server-dist
+package:
+	mvn -B clean package
+
+# Step 4+5: npm install + vsce package (runs in `verify` phase)
+vsix:
+	mvn -B clean verify
+
+install-vsix: vsix
+	@VSIX=$$(ls -t target/{{name}}-lsp-*.vsix | head -1) && \
+	echo "Installing $$VSIX" && \
+	code --install-extension $$VSIX
+
+clean:
+	mvn -B clean
+	rm -rf vscode-extension/node_modules vscode-extension/out vscode-extension/server-dist

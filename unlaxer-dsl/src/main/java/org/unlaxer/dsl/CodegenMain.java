@@ -9,6 +9,8 @@ import java.util.List;
 
 import org.unlaxer.dsl.bootstrap.UBNFAST.UBNFFile;
 import org.unlaxer.dsl.bootstrap.UBNFMapper;
+import org.unlaxer.dsl.init.InitCliParser;
+import org.unlaxer.dsl.init.InitRunner;
 import org.unlaxer.dsl.ir.GrammarToParserIrExporter;
 import org.unlaxer.dsl.ir.ParserIrConformanceValidator;
 import org.unlaxer.dsl.ir.ParserIrJsonWriter;
@@ -33,7 +35,43 @@ public class CodegenMain {
     }
 
     static int run(String[] args, PrintStream out, PrintStream err) {
+        // Subcommand dispatch: `unlaxer init <name> [...]` is handled
+        // by InitRunner. Existing flag-based invocations are unaffected.
+        if (args.length > 0 && "init".equals(args[0])) {
+            String[] rest = new String[args.length - 1];
+            System.arraycopy(args, 1, rest, 0, rest.length);
+            return runInit(rest, out, err);
+        }
         return runWithClock(args, out, err, Clock.systemUTC());
+    }
+
+    private static int runInit(String[] args, PrintStream out, PrintStream err) {
+        try {
+            InitCliParser.InitOptions opts = InitCliParser.parse(args);
+            return InitRunner.run(opts, out, err);
+        } catch (InitCliParser.InitUsageException e) {
+            if (e.getMessage() != null && !e.getMessage().isBlank()) {
+                err.println(e.getMessage());
+            }
+            if (e.showUsage()) {
+                printInitUsage(err);
+            }
+            return EXIT_CLI_ERROR;
+        }
+    }
+
+    private static void printInitUsage(PrintStream err) {
+        err.println(
+            "Usage: unlaxer init <name>\n"
+                + "  [--package <pkg>]        default: org.example.<name>\n"
+                + "  [--group-id <gid>]       default: derived from package\n"
+                + "  [--extension <.ext>]     default: .<name>\n"
+                + "  [--output-dir <dir>]     default: ./<name>\n"
+                + "  [--from <file.ubnf>]     default: built-in sample grammar\n"
+                + "  [--with-dap]             include DAP debug support (requires @mapping)\n"
+                + "  [--syntax-only]          regenerate syntaxes/*.tmLanguage.json only\n"
+                + "  [--force]                overwrite non-empty output directory"
+        );
     }
 
     static int runWithClock(String[] args, PrintStream out, PrintStream err, Clock clock) {

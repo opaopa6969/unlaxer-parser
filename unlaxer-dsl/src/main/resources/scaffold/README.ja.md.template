@@ -1,0 +1,64 @@
+# {{ClassName}}
+
+`unlaxer init` で生成された **{{ClassName}}** DSL の VS Code 拡張プロジェクトです。
+
+このプロジェクトには以下が含まれます：
+
+- `grammar/{{name}}.ubnf` から自動生成される Java 製 **LSP サーバー**
+- {{#dap}}ステップ実行可能な **DAP (Debug Adapter Protocol)** サーバー
+- {{/dap}}{{^dap}}*(DAP デバッグは **未同梱** — 必要なら `unlaxer init --with-dap` で再生成してください)*
+- {{/dap}}fat jar を内蔵した **VS Code 拡張**
+
+> English: [README.md](README.md)
+
+## クイックスタート (10分)
+
+```bash
+# 1. すべてビルド (codegen → fat jar → npm install → vsix)
+make all
+
+# 2. ローカルの VS Code にインストール
+make install-vsix
+
+# 3. {{extension}} 拡張子のファイルを開く
+```
+
+## プロジェクト構成
+
+```
+{{name}}/
+├── grammar/{{name}}.ubnf            # DSL 定義 (編集対象)
+├── pom.xml                            # Maven (codegen + fat jar + vsix)
+├── Makefile                           # ショートカットターゲット
+├── vscode-extension/
+│   ├── package.json
+│   ├── language-configuration.json
+│   ├── tsconfig.json
+│   ├── syntaxes/{{name}}.tmLanguage.json   # 自動生成 (再生成は codegen 経由)
+│   ├── src/extension.ts
+│   └── server-dist/                  # `mvn package` で fat jar が配置される
+├── IMPLEMENTATION.md
+├── IMPLEMENTATION.ja.md               # 実装ガイド (日本語)
+└── README.md / README.ja.md
+```
+
+## 次のステップ
+
+実装ガイド **[IMPLEMENTATION.ja.md](IMPLEMENTATION.ja.md)** ([English](IMPLEMENTATION.md)) を参照：
+
+- `grammar/{{name}}.ubnf` の拡張方法
+- Parser / LSP{{#dap}} / DAP{{/dap}} の再生成手順
+- TextMate ハイライトのカスタマイズ
+- LSP 機能 (hover / completion / code-action) の追加方法
+- VSIX の公開手順
+
+## 必要環境
+
+- JDK 21+ (preview features 有効)
+- Maven 3.9+
+- Node.js 18+ / npm
+- VS Code 1.85+
+
+## ライセンス
+
+MIT (またはお好みで編集してください)。

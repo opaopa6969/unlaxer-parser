@@ -1,0 +1,2 @@
+# server-dist/ holds the bundled fat jar produced by `mvn package`.
+# Generated at build time — do not commit jars.
