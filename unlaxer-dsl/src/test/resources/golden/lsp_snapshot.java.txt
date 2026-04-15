@@ -9,6 +9,7 @@ import org.unlaxer.Parsed;
 import org.unlaxer.StringSource;
 import org.unlaxer.context.ParseContext;
 import org.unlaxer.parser.Parser;
+import org.unlaxer.parser.incremental.IncrementalParseCache;
 
 public abstract class SnapshotLanguageServer implements LanguageServer, LanguageClientAware {
 
@@ -63,7 +64,7 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
         return new SnapshotLanguageServerWorkspaceService();
     }
 
-    public ParseResult parseDocument(String uri, String content) {
+    private ParseResult doParse(String content) {
         Parser parser = SnapshotParsers.getRootParser();
         ParseContext context = new ParseContext(createRootSourceCompat(content));
         Parsed result = parser.parse(context);
@@ -72,9 +73,36 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
             consumedLength = result.getConsumed().source.sourceAsString().length();
         }
         context.close();
-        ParseResult parseResult = new ParseResult(
-            result.isSucceeded(), consumedLength, content.length());
-        documents.put(uri, new DocumentState(uri, content, parseResult));
+        return new ParseResult(result.isSucceeded(), consumedLength, content.length());
+    }
+
+    public ParseResult parseDocument(String uri, String content) {
+        ParseResult parseResult = doParse(content);
+        documents.put(uri, new DocumentState(uri, content, parseResult, new IncrementalParseCache()));
+        if (client != null) {
+            publishDiagnostics(uri, content, parseResult);
+        }
+        return parseResult;
+    }
+
+    public ParseResult parseDocumentIncremental(String uri, String content) {
+        DocumentState previous = documents.get(uri);
+        if (previous != null && previous.content().equals(content)) {
+            return previous.parseResult();
+        }
+        IncrementalParseCache cache = previous != null ? previous.cache() : new IncrementalParseCache();
+        List<String> chunks = cache.splitIntoChunks(content, ";");
+        boolean anyChanged = chunks.stream().anyMatch(c -> !cache.isCached(c));
+        if (!anyChanged && previous != null) {
+            return previous.parseResult();
+        }
+        ParseResult parseResult = doParse(content);
+        int offset = 0;
+        for (String chunk : chunks) {
+            cache.put(chunk, null, offset);
+            offset += chunk.length();
+        }
+        documents.put(uri, new DocumentState(uri, content, parseResult, cache));
         if (client != null) {
             publishDiagnostics(uri, content, parseResult);
         }
@@ -169,7 +197,24 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
         // Override to add capabilities
     }
 
-    public record DocumentState(String uri, String content, ParseResult parseResult) {}
+    public static class DocumentState {
+        private final String uri;
+        private final String content;
+        private final ParseResult parseResult;
+        private final IncrementalParseCache cache;
+
+        public DocumentState(String uri, String content, ParseResult parseResult, IncrementalParseCache cache) {
+            this.uri = uri;
+            this.content = content;
+            this.parseResult = parseResult;
+            this.cache = cache;
+        }
+
+        public String uri() { return uri; }
+        public String content() { return content; }
+        public ParseResult parseResult() { return parseResult; }
+        public IncrementalParseCache cache() { return cache; }
+    }
 
     public record ParseResult(boolean succeeded, int consumedLength, int totalLength) {}
 
@@ -190,7 +235,7 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
 
         @Override
         public void didChange(DidChangeTextDocumentParams params) {
-            server.parseDocument(
+            server.parseDocumentIncremental(
                 params.getTextDocument().getUri(),
                 params.getContentChanges().get(0).getText());
         }

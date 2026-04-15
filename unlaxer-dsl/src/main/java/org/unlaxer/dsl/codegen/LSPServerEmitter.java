@@ -35,6 +35,7 @@ class LSPServerEmitter {
         w.line("import org.unlaxer.StringSource;");
         w.line("import org.unlaxer.context.ParseContext;");
         w.line("import org.unlaxer.parser.Parser;");
+        w.line("import org.unlaxer.parser.incremental.IncrementalParseCache;");
         if (hasScopeStore) {
             w.line("import org.unlaxer.dsl.runtime.ScopeStore;");
         }
@@ -147,8 +148,8 @@ class LSPServerEmitter {
 
     /** parseDocument() および関連ユーティリティメソッドを出力する。 */
     static void emitParseDocument(IndentedWriter w, String parsersClass, boolean hasScopeStore) {
-        // parseDocument()
-        w.line("public ParseResult parseDocument(String uri, String content) {");
+        // doParse() — パースコアロジック（副作用なし）
+        w.line("private ParseResult doParse(String content) {");
         w.indent();
         w.line("Parser parser = " + parsersClass + ".getRootParser();");
         w.line("ParseContext context = new ParseContext(createRootSourceCompat(content));");
@@ -163,9 +164,52 @@ class LSPServerEmitter {
         w.dedent();
         w.line("}");
         w.line("context.close();");
-        w.line("ParseResult parseResult = new ParseResult(");
-        w.line("    result.isSucceeded(), consumedLength, content.length());");
-        w.line("documents.put(uri, new DocumentState(uri, content, parseResult));");
+        w.line("return new ParseResult(result.isSucceeded(), consumedLength, content.length());");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
+
+        // parseDocument() — フルパース（didOpen 用）
+        w.line("public ParseResult parseDocument(String uri, String content) {");
+        w.indent();
+        w.line("ParseResult parseResult = doParse(content);");
+        w.line("documents.put(uri, new DocumentState(uri, content, parseResult, new IncrementalParseCache()));");
+        w.line("if (client != null) {");
+        w.indent();
+        w.line("publishDiagnostics(uri, content, parseResult);");
+        w.dedent();
+        w.line("}");
+        w.line("return parseResult;");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
+
+        // parseDocumentIncremental() — チャンクキャッシュを活用（didChange 用）
+        w.line("public ParseResult parseDocumentIncremental(String uri, String content) {");
+        w.indent();
+        w.line("DocumentState previous = documents.get(uri);");
+        w.line("if (previous != null && previous.content().equals(content)) {");
+        w.indent();
+        w.line("return previous.parseResult();");
+        w.dedent();
+        w.line("}");
+        w.line("IncrementalParseCache cache = previous != null ? previous.cache() : new IncrementalParseCache();");
+        w.line("List<String> chunks = cache.splitIntoChunks(content, \";\");");
+        w.line("boolean anyChanged = chunks.stream().anyMatch(c -> !cache.isCached(c));");
+        w.line("if (!anyChanged && previous != null) {");
+        w.indent();
+        w.line("return previous.parseResult();");
+        w.dedent();
+        w.line("}");
+        w.line("ParseResult parseResult = doParse(content);");
+        w.line("int offset = 0;");
+        w.line("for (String chunk : chunks) {");
+        w.indent();
+        w.line("cache.put(chunk, null, offset);");
+        w.line("offset += chunk.length();");
+        w.dedent();
+        w.line("}");
+        w.line("documents.put(uri, new DocumentState(uri, content, parseResult, cache));");
         w.line("if (client != null) {");
         w.indent();
         w.line("publishDiagnostics(uri, content, parseResult);");
@@ -376,7 +420,28 @@ class LSPServerEmitter {
 
     /** DocumentState/ParseResult レコードを出力する。 */
     static void emitRecords(IndentedWriter w) {
-        w.line("public record DocumentState(String uri, String content, ParseResult parseResult) {}");
+        w.line("public static class DocumentState {");
+        w.indent();
+        w.line("private final String uri;");
+        w.line("private final String content;");
+        w.line("private final ParseResult parseResult;");
+        w.line("private final IncrementalParseCache cache;");
+        w.blankLine();
+        w.line("public DocumentState(String uri, String content, ParseResult parseResult, IncrementalParseCache cache) {");
+        w.indent();
+        w.line("this.uri = uri;");
+        w.line("this.content = content;");
+        w.line("this.parseResult = parseResult;");
+        w.line("this.cache = cache;");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
+        w.line("public String uri() { return uri; }");
+        w.line("public String content() { return content; }");
+        w.line("public ParseResult parseResult() { return parseResult; }");
+        w.line("public IncrementalParseCache cache() { return cache; }");
+        w.dedent();
+        w.line("}");
         w.blankLine();
         w.line("public record ParseResult(boolean succeeded, int consumedLength, int totalLength) {}");
         w.blankLine();
@@ -409,7 +474,7 @@ class LSPServerEmitter {
         w.line("@Override");
         w.line("public void didChange(DidChangeTextDocumentParams params) {");
         w.indent();
-        w.line("server.parseDocument(");
+        w.line("server.parseDocumentIncremental(");
         w.line("    params.getTextDocument().getUri(),");
         w.line("    params.getContentChanges().get(0).getText());");
         w.dedent();

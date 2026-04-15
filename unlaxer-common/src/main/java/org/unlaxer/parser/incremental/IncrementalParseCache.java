@@ -58,8 +58,9 @@ public class IncrementalParseCache {
      * Split source into chunks at the given delimiters.
      * The delimiter is kept at the end of each chunk (except possibly the last chunk).
      *
-     * <p>This is a simple text-level split. For production use with nested expressions
-     * or string literals, a token-level split should be used instead (see DGE gap G4, G5).</p>
+     * <p>String literals ({@code '...'} and {@code "..."}) are respected:
+     * delimiters inside quotes are not treated as chunk boundaries.
+     * Backslash escapes ({@code \'}, {@code \"}) inside literals are handled correctly.</p>
      *
      * @param source the source text to split
      * @param delimiters the delimiter characters to split on (e.g. ",", ";")
@@ -75,18 +76,26 @@ public class IncrementalParseCache {
 
         List<String> chunks = new ArrayList<>();
         StringBuilder current = new StringBuilder();
+        char quoteChar = 0;
 
         for (int i = 0; i < source.length(); i++) {
             char ch = source.charAt(i);
             current.append(ch);
 
-            if (isDelimiter(ch, delimiters)) {
+            if (quoteChar != 0) {
+                if (ch == '\\' && i + 1 < source.length()) {
+                    current.append(source.charAt(++i));
+                } else if (ch == quoteChar) {
+                    quoteChar = 0;
+                }
+            } else if (ch == '\'' || ch == '"') {
+                quoteChar = ch;
+            } else if (isDelimiter(ch, delimiters)) {
                 chunks.add(current.toString());
                 current.setLength(0);
             }
         }
 
-        // Add remaining text as final chunk (if any)
         if (current.length() > 0) {
             chunks.add(current.toString());
         }
@@ -183,6 +192,16 @@ public class IncrementalParseCache {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 unavailable", e);
         }
+    }
+
+    /**
+     * Return true if the given chunk is present in the cache (regardless of whether its token is null).
+     *
+     * @param chunkText the text of the chunk to check
+     * @return true if the chunk has been cached
+     */
+    public boolean isCached(String chunkText) {
+        return cache.containsKey(hash(chunkText));
     }
 
     /**

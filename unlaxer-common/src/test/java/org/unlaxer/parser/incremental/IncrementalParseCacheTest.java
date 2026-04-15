@@ -83,6 +83,39 @@ public class IncrementalParseCacheTest {
         assertEquals("c,", chunks.get(2));
     }
 
+    @Test
+    public void splitIntoChunks_semicolonInsideSingleQuotes_notSplit() {
+        // ubnf.ubnf line 128: ';' ; — semicolon inside literal must not be a chunk boundary
+        List<String> chunks = cache.splitIntoChunks("RuleDecl ::= ';' ;", ";");
+        assertEquals(1, chunks.size());
+        assertEquals("RuleDecl ::= ';' ;", chunks.get(0));
+    }
+
+    @Test
+    public void splitIntoChunks_semicolonInsideDoubleQuotes_notSplit() {
+        List<String> chunks = cache.splitIntoChunks("rule ::= \"a;b\" ;", ";");
+        assertEquals(1, chunks.size());
+        assertEquals("rule ::= \"a;b\" ;", chunks.get(0));
+    }
+
+    @Test
+    public void splitIntoChunks_multipleRulesWithQuotedSemicolon() {
+        // Two rules: first contains ';' literal, second is plain
+        String src = "RuleA ::= ';' ;\nRuleB ::= 'x' ;";
+        List<String> chunks = cache.splitIntoChunks(src, ";");
+        assertEquals(2, chunks.size());
+        assertEquals("RuleA ::= ';' ;", chunks.get(0));
+        assertEquals("\nRuleB ::= 'x' ;", chunks.get(1));
+    }
+
+    @Test
+    public void splitIntoChunks_escapedQuoteInsideLiteral() {
+        // '\'' — escaped single quote inside single-quoted literal
+        List<String> chunks = cache.splitIntoChunks("rule ::= '\\'' ;", ";");
+        assertEquals(1, chunks.size());
+        assertEquals("rule ::= '\\'' ;", chunks.get(0));
+    }
+
     // --- Cache hit/miss tests ---
 
     @Test
