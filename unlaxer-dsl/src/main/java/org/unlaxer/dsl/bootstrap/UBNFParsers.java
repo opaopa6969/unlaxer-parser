@@ -1205,7 +1205,8 @@ public class UBNFParsers {
     }
 
     /**
-     * RuleRefElement: IDENTIFIER
+     * RuleRefElement: [ IDENTIFIER '.' ] IDENTIFIER
+     * 名前空間付き参照 (json.Value) をサポート。
      */
     public static class RuleRefElementParser extends UBNFLazyChain {
         private static final long serialVersionUID = 1L;
@@ -1213,6 +1214,16 @@ public class UBNFParsers {
         @Override
         public Parsers getLazyParsers() {
             return new Parsers(
+                new ZeroOrMore(new LazyChain() {
+                    private static final long serialVersionUID = 1L;
+                    @Override
+                    public Parsers getLazyParsers() {
+                        return new Parsers(
+                            Parser.get(IdentifierParser.class),
+                            Parser.get(PointParser.class)
+                        );
+                    }
+                }),
                 Parser.get(IdentifierParser.class)
             );
         }
@@ -1455,6 +1466,23 @@ public class UBNFParsers {
     /**
      * GrammarDecl: 'grammar' IDENTIFIER '{' GlobalSetting* TokenDecl* RuleDecl+ '}'
      */
+    /**
+     * ImportDecl: '@import' IDENTIFIER 'from' STRING
+     */
+    public static class ImportDeclParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                new WordParser("@import"),
+                Parser.get(IdentifierParser.class),
+                new WordParser("from"),
+                Parser.get(SingleQuotedParser.class)
+            );
+        }
+    }
+
     public static class GrammarDeclParser extends UBNFLazyChain {
         private static final long serialVersionUID = 1L;
 
@@ -1464,6 +1492,7 @@ public class UBNFParsers {
                 new WordParser("grammar"),
                 Parser.get(IdentifierParser.class),
                 Parser.get(LeftBraceParser.class),
+                new ZeroOrMore(Parser.get(ImportDeclParser.class)),
                 new ZeroOrMore(Parser.get(GlobalSettingParser.class)),
                 new ZeroOrMore(Parser.get(TokenDeclParser.class)),
                 new OneOrMore(Parser.get(RuleDeclParser.class)),

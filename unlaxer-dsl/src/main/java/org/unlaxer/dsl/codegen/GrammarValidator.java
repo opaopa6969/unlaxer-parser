@@ -1,5 +1,6 @@
 package org.unlaxer.dsl.codegen;
 
+import org.unlaxer.dsl.bootstrap.UBNFAST;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AnnotatedElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.Annotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AtomicElement;
@@ -268,6 +269,14 @@ public final class GrammarValidator {
     }
 
     private static void validateRootPresence(GrammarDecl grammar, List<ValidationIssue> errors) {
+        // ライブラリ grammar (@import を持つ grammar からインポートされる側) は @root 不要
+        // import 宣言を持つ grammar 自身はエントリーポイントを持つので通常通り検証する
+        // ただし、ルールが全て alias.Name 形式（import 展開後）の場合はスキップ
+        boolean allRulesAreImported = !grammar.rules().isEmpty() &&
+            grammar.rules().stream().allMatch(r -> r.name().contains("."));
+        if (allRulesAreImported) {
+            return;
+        }
         boolean hasRootRule = grammar.rules().stream()
             .anyMatch(rule -> rule.annotations().stream().anyMatch(a -> a instanceof RootAnnotation));
         if (!hasRootRule) {
@@ -605,7 +614,13 @@ public final class GrammarValidator {
 
     private static void collectReferencedRuleNamesFromAtomic(AtomicElement element, Set<String> refs) {
         switch (element) {
-            case RuleRefElement ref -> refs.add(ref.name());
+            case RuleRefElement ref -> {
+                // 名前空間付き参照 (alias.RuleName) はそのまま追加
+                String fullName = ref.namespace()
+                    .map(ns -> ns + "." + ref.name())
+                    .orElse(ref.name());
+                refs.add(fullName);
+            }
             case GroupElement group -> collectReferencedRuleNamesFromBody(group.body(), refs);
             case OptionalElement opt -> collectReferencedRuleNamesFromBody(opt.body(), refs);
             case RepeatElement rep -> collectReferencedRuleNamesFromBody(rep.body(), refs);
@@ -766,10 +781,20 @@ public final class GrammarValidator {
         for (TokenDecl token : grammar.tokens()) {
             definedNames.add(token.name());
         }
+        // import エイリアスを収集: alias.* 形式の参照はバリデーションをスキップ
+        Set<String> importAliases = new LinkedHashSet<>();
+        for (UBNFAST.ImportDecl imp : grammar.imports()) {
+            importAliases.add(imp.alias());
+        }
 
         for (RuleDecl rule : grammar.rules()) {
             Set<String> refs = collectReferencedRuleNames(rule.body());
             for (String refName : refs) {
+                // alias.RuleName 形式の参照は import エイリアスがあれば有効とみなす
+                int dot = refName.indexOf('.');
+                if (dot > 0 && importAliases.contains(refName.substring(0, dot))) {
+                    continue;
+                }
                 if (false == definedNames.contains(refName)) {
                     String suggestion = suggestSimilarName(refName, definedNames);
                     String hint;

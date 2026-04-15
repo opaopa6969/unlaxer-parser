@@ -31,11 +31,17 @@ grammar UBNF {
   @mapping(UBNFFile, params=[grammars])
   UBNFFile ::= { GrammarDecl } @grammars ;
 
+  // ===== import 宣言 =====
+  // @import alias from 'path' — 別ファイルの文法をインポートする
+  @mapping(ImportDecl, params=[alias, path])
+  ImportDecl ::= '@import' IDENTIFIER @alias 'from' STRING @path ;
+
   // ===== grammar ブロック =====
-  @mapping(GrammarDecl, params=[name, settings, tokens, rules])
+  @mapping(GrammarDecl, params=[name, imports, settings, tokens, rules])
   GrammarDecl ::=
     'grammar' IDENTIFIER @name
     '{'
+      { ImportDecl }    @imports
       { GlobalSetting } @settings
       { TokenDecl }     @tokens
       { RuleDecl }      @rules
@@ -259,9 +265,10 @@ grammar UBNF {
 
   // 非終端記号参照
   // @backref: ルール参照 → 定義へのジャンプ (Go-to-Definition)
-  @mapping(RuleRefElement, params=[name])
+  // namespace は @import で導入されたエイリアス (例: json.Value → namespace=json, name=Value)
+  @mapping(RuleRefElement, params=[namespace, name])
   @backref(name=name)
-  RuleRefElement ::= IDENTIFIER @name ;
+  RuleRefElement ::= [ IDENTIFIER @namespace '.' ] IDENTIFIER @name ;
 
   // @typeof(captureName) — 要素レベルの型相関アノテーション
   @mapping(TypeofElement, params=[captureName])

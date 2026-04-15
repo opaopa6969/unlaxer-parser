@@ -1,10 +1,13 @@
 package org.unlaxer.dsl.bootstrap;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import org.unlaxer.Parsed;
 import org.unlaxer.StringSource;
@@ -40,7 +43,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.RightAssocAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RootAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RuleBody;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RuleDecl;
-import org.unlaxer.dsl.bootstrap.UBNFAST.RuleRefElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.ImportDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RuleRefElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ScopeTreeAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.SequenceBody;
@@ -90,6 +93,125 @@ public class UBNFMapper {
     }
 
     // =========================================================================
+    // import サポート
+    // =========================================================================
+
+    /**
+     * import されたファイルのソース文字列を返す関数型インターフェース。
+     * テスト時は Map ベースのインメモリ実装で差し替え可能。
+     */
+    @FunctionalInterface
+    public interface ImportResolver {
+        /**
+         * @param path @import で指定されたパス文字列（シングルクォートを除いた値）
+         * @return ファイル内容。解決できない場合は null を返す
+         */
+        String resolve(String path);
+
+        /** Map ベースのインメモリ実装（テスト用） */
+        static ImportResolver ofMap(Map<String, String> sources) {
+            return path -> sources.get(path);
+        }
+    }
+
+    /**
+     * @import を解決しながら UBNF をパースする。
+     * 循環 import は {@link IllegalStateException} をスローする。
+     *
+     * @param source       メインの UBNF ソース文字列
+     * @param resolver     import パスをソース文字列に変換するリゾルバー
+     * @return パース＋import 解決済みの UBNFFile
+     */
+    public static UBNFFile parseWithImports(String source, ImportResolver resolver) {
+        Map<String, GrammarDecl> resolved = new HashMap<>();
+        Set<String> inStack = new HashSet<>();
+        UBNFFile file = parse(source);
+        for (GrammarDecl grammar : file.grammars()) {
+            resolveImports(grammar, resolver, resolved, inStack);
+        }
+        return new UBNFFile(file.grammars().stream()
+            .map(g -> attachImportedGrammars(g, resolved))
+            .toList());
+    }
+
+    private static void resolveImports(
+            GrammarDecl grammar,
+            ImportResolver resolver,
+            Map<String, GrammarDecl> resolved,
+            Set<String> inStack) {
+        for (ImportDecl imp : grammar.imports()) {
+            String path = imp.path();
+            if (resolved.containsKey(path)) {
+                continue;
+            }
+            if (inStack.contains(path)) {
+                throw new IllegalStateException(
+                    "循環 import を検出しました: " + path + " (スタック: " + inStack + ")");
+            }
+            String importedSource = resolver.resolve(path);
+            if (importedSource == null) {
+                throw new IllegalArgumentException("import が解決できません: '" + path + "'");
+            }
+            inStack.add(path);
+            UBNFFile importedFile = parse(importedSource);
+            for (GrammarDecl importedGrammar : importedFile.grammars()) {
+                resolveImports(importedGrammar, resolver, resolved, inStack);
+                resolved.put(path, importedGrammar);
+            }
+            inStack.remove(path);
+        }
+    }
+
+    private static GrammarDecl attachImportedGrammars(
+            GrammarDecl grammar, Map<String, GrammarDecl> resolved) {
+        if (grammar.imports().isEmpty()) {
+            return grammar;
+        }
+        // import されたルール/トークンを名前空間付きで統合
+        List<TokenDecl> allTokens = new ArrayList<>(grammar.tokens());
+        List<RuleDecl> allRules = new ArrayList<>(grammar.rules());
+        for (ImportDecl imp : grammar.imports()) {
+            GrammarDecl imported = resolved.get(imp.path());
+            if (imported == null) {
+                continue;
+            }
+            String alias = imp.alias();
+            // トークンを alias.TokenName として追加
+            for (TokenDecl token : imported.tokens()) {
+                allTokens.add(prefixTokenDecl(token, alias));
+            }
+            // ルールを alias.RuleName として追加
+            for (RuleDecl rule : imported.rules()) {
+                allRules.add(prefixRuleDecl(rule, alias));
+            }
+        }
+        return new GrammarDecl(grammar.name(), grammar.imports(),
+            grammar.settings(), allTokens, allRules);
+    }
+
+    private static TokenDecl prefixTokenDecl(TokenDecl token, String alias) {
+        String prefixed = alias + "." + token.name();
+        return switch (token) {
+            case UBNFAST.TokenDecl.Simple t -> new UBNFAST.TokenDecl.Simple(prefixed, t.parserClass());
+            case UBNFAST.TokenDecl.Until t -> new UBNFAST.TokenDecl.Until(prefixed, t.terminator());
+            case UBNFAST.TokenDecl.Negation t -> new UBNFAST.TokenDecl.Negation(prefixed, t.excludedChars());
+            case UBNFAST.TokenDecl.Lookahead t -> new UBNFAST.TokenDecl.Lookahead(prefixed, t.pattern());
+            case UBNFAST.TokenDecl.NegativeLookahead t -> new UBNFAST.TokenDecl.NegativeLookahead(prefixed, t.pattern());
+            case UBNFAST.TokenDecl.Any t -> new UBNFAST.TokenDecl.Any(prefixed);
+            case UBNFAST.TokenDecl.Eof t -> new UBNFAST.TokenDecl.Eof(prefixed);
+            case UBNFAST.TokenDecl.Empty t -> new UBNFAST.TokenDecl.Empty(prefixed);
+            case UBNFAST.TokenDecl.CharRange t -> new UBNFAST.TokenDecl.CharRange(prefixed, t.min(), t.max());
+            case UBNFAST.TokenDecl.CaseInsensitive t -> new UBNFAST.TokenDecl.CaseInsensitive(prefixed, t.word());
+            case UBNFAST.TokenDecl.Regex t -> new UBNFAST.TokenDecl.Regex(prefixed, t.pattern());
+        };
+    }
+
+    private static RuleDecl prefixRuleDecl(RuleDecl rule, String alias) {
+        String prefixed = alias + "." + rule.name();
+        return new RuleDecl(rule.annotations(), prefixed, rule.body());
+    }
+
+    // =========================================================================
     // ファイルレベル変換
     // =========================================================================
 
@@ -104,6 +226,11 @@ public class UBNFMapper {
     static GrammarDecl toGrammarDecl(Token token) {
         List<Token> identifiers = findDescendants(token, UBNFParsers.IdentifierParser.class);
         String name = identifiers.isEmpty() ? "" : identifiers.get(0).source.toString().trim();
+
+        List<ImportDecl> imports = findDescendants(token, UBNFParsers.ImportDeclParser.class)
+            .stream()
+            .map(UBNFMapper::toImportDecl)
+            .toList();
 
         List<GlobalSetting> settings = findDescendants(token, UBNFParsers.GlobalSettingParser.class)
             .stream()
@@ -120,7 +247,15 @@ public class UBNFMapper {
             .map(UBNFMapper::toRuleDecl)
             .toList();
 
-        return new GrammarDecl(name, settings, tokens, rules);
+        return new GrammarDecl(name, imports, settings, tokens, rules);
+    }
+
+    static ImportDecl toImportDecl(Token token) {
+        List<Token> identifiers = findDescendants(token, UBNFParsers.IdentifierParser.class);
+        String alias = identifiers.isEmpty() ? "" : identifiers.get(0).source.toString().trim();
+        List<Token> strings = findDescendants(token, org.unlaxer.parser.elementary.SingleQuotedParser.class);
+        String path = strings.isEmpty() ? "" : stripQuotes(strings.get(0).source.toString().trim());
+        return new ImportDecl(alias, path);
     }
 
     // =========================================================================
@@ -739,10 +874,15 @@ public class UBNFMapper {
                 : stripQuotes(quotedTokens.get(0).source.toString().trim());
             return new TerminalElement(value);
         }
-        // RuleRefElement（fallback）
+        // RuleRefElement（fallback）: [ namespace '.' ] name
         List<Token> refTokens = findDescendants(token, UBNFParsers.RuleRefElementParser.class);
         if (false == refTokens.isEmpty()) {
             List<Token> identifiers = findDescendants(refTokens.get(0), UBNFParsers.IdentifierParser.class);
+            if (identifiers.size() >= 2) {
+                String namespace = identifiers.get(0).source.toString().trim();
+                String name = identifiers.get(1).source.toString().trim();
+                return new RuleRefElement(Optional.of(namespace), name);
+            }
             String name = identifiers.isEmpty() ? "" : identifiers.get(0).source.toString().trim();
             return new RuleRefElement(name);
         }

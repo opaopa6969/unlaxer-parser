@@ -11,6 +11,7 @@ import java.util.Optional;
  * UBNFMapper によってパースツリー（Token）から生成される。
  */
 public sealed interface UBNFAST permits
+    UBNFAST.ImportDecl,
     UBNFAST.UBNFFile,
     UBNFAST.GrammarDecl,
     UBNFAST.GlobalSetting,
@@ -29,19 +30,30 @@ public sealed interface UBNFAST permits
     // =========================================================================
 
     /**
+     * ImportDecl: @import alias from 'path'
+     */
+    record ImportDecl(String alias, String path) implements UBNFAST {}
+
+    /**
      * UBNFFile: 1つ以上の GrammarDecl を含むファイル全体
      */
     record UBNFFile(List<GrammarDecl> grammars) implements UBNFAST {}
 
     /**
-     * GrammarDecl: grammar NAME { settings... tokens... rules... }
+     * GrammarDecl: grammar NAME { imports... settings... tokens... rules... }
      */
     record GrammarDecl(
         String name,
+        List<ImportDecl> imports,
         List<GlobalSetting> settings,
         List<TokenDecl> tokens,
         List<RuleDecl> rules
-    ) implements UBNFAST {}
+    ) implements UBNFAST {
+        /** imports なしで構築するコンビニエンスコンストラクタ（既存コードの互換性維持）*/
+        public GrammarDecl(String name, List<GlobalSetting> settings, List<TokenDecl> tokens, List<RuleDecl> rules) {
+            this(name, List.of(), settings, tokens, rules);
+        }
+    }
 
     // =========================================================================
     // グローバル設定
@@ -296,8 +308,16 @@ public sealed interface UBNFAST permits
     /** 'literal' */
     record TerminalElement(String value) implements AtomicElement {}
 
-    /** RuleRef（非終端記号参照） */
-    record RuleRefElement(String name) implements AtomicElement {}
+    /**
+     * RuleRef（非終端記号参照）。
+     * namespace が存在する場合は @import で導入されたエイリアス (例: json.Value)。
+     */
+    record RuleRefElement(Optional<String> namespace, String name) implements AtomicElement {
+        /** 名前空間なし（ローカル参照）のコンビニエンスコンストラクタ */
+        public RuleRefElement(String name) {
+            this(Optional.empty(), name);
+        }
+    }
 
     /**
      * elem % sep — syntactic sugar for elem (sep elem)*.
