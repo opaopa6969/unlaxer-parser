@@ -16,6 +16,12 @@ public class CodePointIndex extends IntegerValue<CodePointIndex>{
 //    this.sourceKind = sourceKind;
 //  }
 
+  public static final CodePointIndex ZERO = new CodePointIndex(0);
+
+  public static CodePointIndex of(int value) {
+    return new CodePointIndex(value);
+  }
+
   public CodePointIndex(int value) {
     super(value);
   }

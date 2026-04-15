@@ -6,6 +6,12 @@ import org.unlaxer.base.IntegerValue;
 @_MinIntegerValue(0)
 public class CodePointLength extends IntegerValue<CodePointLength>{
   
+  public static final CodePointLength ZERO = new CodePointLength(0);
+
+  public static CodePointLength of(int value) {
+    return new CodePointLength(value);
+  }
+
   public CodePointLength(int value) {
     super(value);
   }

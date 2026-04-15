@@ -116,7 +116,7 @@ implements Comparable<T> , Serializable , MinIntegerValue , MaxIntegerValue , Nu
     return create(value/dividing.value);
   }
 
-  public boolean greaterThean(IntegerValue<?> right) {
+  public boolean greaterThan(IntegerValue<?> right) {
     return gt(right);
   }
 
@@ -133,7 +133,7 @@ implements Comparable<T> , Serializable , MinIntegerValue , MaxIntegerValue , Nu
   }
   
   public boolean lessEquals(IntegerValue<?> right) {
-    return lt(right);
+    return le(right);
   }
   
   public boolean le(IntegerValue<?> right) {
@@ -168,7 +168,7 @@ implements Comparable<T> , Serializable , MinIntegerValue , MaxIntegerValue , Nu
     return value() > right;
   }
   
-  public boolean greaterThean(int right) {
+  public boolean greaterThan(int right) {
     return gt(right);
   }
 
@@ -181,7 +181,7 @@ implements Comparable<T> , Serializable , MinIntegerValue , MaxIntegerValue , Nu
   }
   
   public boolean lessEquals(int right) {
-    return lt(right);
+    return le(right);
   }
   
   public boolean le(int right) {
