@@ -11,6 +11,7 @@
 		<relativePath>../pom.xml</relativePath>
 	</parent>
 
+	<groupId>org.unlaxer</groupId>
 	<artifactId>unlaxer-common</artifactId>
 	<name>unlaxer-common</name>
 	<packaging>jar</packaging>

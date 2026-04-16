@@ -11,6 +11,7 @@
 		<relativePath>../pom.xml</relativePath>
 	</parent>
 
+	<groupId>org.unlaxer</groupId>
 	<artifactId>unlaxer-dsl</artifactId>
 	<name>unlaxer-dsl</name>
 	<packaging>jar</packaging>
