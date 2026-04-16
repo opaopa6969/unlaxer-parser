@@ -165,7 +165,8 @@ public sealed interface UBNFAST permits
         UBNFAST.DocAnnotation,
         UBNFAST.RecoveryAnnotation,
         UBNFAST.SkipAnnotation,
-        UBNFAST.SimpleAnnotation {}
+        UBNFAST.SimpleAnnotation,
+        UBNFAST.CommonFieldAnnotation {}
 
     /** @root */
     record RootAnnotation() implements Annotation {}
@@ -240,6 +241,12 @@ public sealed interface UBNFAST permits
 
     /** @name（上記以外の任意アノテーション） */
     record SimpleAnnotation(String name) implements Annotation {}
+
+    /**
+     * @commonField(field1, field2, ...) — sealed interface の全 permit が共通で持つフィールドを
+     * abstract method として宣言する。ASTGenerator が sealed interface 生成時に利用する。
+     */
+    record CommonFieldAnnotation(List<String> fieldNames) implements Annotation {}
 
     // =========================================================================
     // ルール本体

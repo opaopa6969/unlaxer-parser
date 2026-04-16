@@ -466,6 +466,8 @@ public class UBNFMapper {
                 result.add(toRecoveryAnnotation(child));
             } else if (child.parser.getClass() == UBNFParsers.SkipAnnotationParser.class) {
                 result.add(new SkipAnnotation());
+            } else if (child.parser.getClass() == UBNFParsers.CommonFieldAnnotationParser.class) {
+                result.add(toCommonFieldAnnotation(child));
             } else if (child.parser.getClass() == UBNFParsers.SimpleAnnotationParser.class) {
                 result.add(toSimpleAnnotation(child));
             } else {
@@ -589,6 +591,14 @@ public class UBNFMapper {
             return new RecoveryAnnotation(UBNFAST.RecoveryMode.AUTO, List.of());
         }
         return new RecoveryAnnotation(UBNFAST.RecoveryMode.SKIP, List.of());
+    }
+
+    static UBNFAST.CommonFieldAnnotation toCommonFieldAnnotation(Token token) {
+        List<Token> identifiers = findDescendants(token, UBNFParsers.IdentifierParser.class);
+        List<String> fieldNames = identifiers.stream()
+            .map(t -> t.source.toString().trim())
+            .toList();
+        return new UBNFAST.CommonFieldAnnotation(fieldNames);
     }
 
     static SimpleAnnotation toSimpleAnnotation(Token token) {

@@ -1,5 +1,6 @@
 package org.unlaxer.dsl.codegen;
 
+import org.unlaxer.dsl.bootstrap.UBNFAST;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AnnotatedElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AtomicElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ChoiceBody;
@@ -152,7 +153,7 @@ public class ASTGenerator implements CodeGenerator {
         // 中間 sealed interface 宣言を先に出す (permit する record 群より前である必要はないが
         // 読みやすさのため)。
         for (Map.Entry<String, List<String>> entry : midSealedPermits.entrySet()) {
-            emitMidSealed(sb, entry.getKey(), entry.getValue(), className);
+            emitMidSealed(sb, entry.getKey(), entry.getValue(), className, grammar);
         }
 
         // flat record (中間 sealed 配下でないもののみ)
@@ -285,18 +286,52 @@ public class ASTGenerator implements CodeGenerator {
     }
 
     private void emitMidSealed(StringBuilder sb, String midSealedName, List<String> permits,
-            String astClassName) {
+            String astClassName, GrammarDecl grammar) {
         if (permits.isEmpty()) {
-            // permits が空の sealed interface は宣言できない。エッジケースとして
-            // 通常 interface にフォールバック。
             sb.append("    interface ").append(midSealedName)
               .append(" extends ").append(astClassName).append(" {}\n\n");
             return;
         }
         String permitsList = permits.stream().collect(Collectors.joining(",\n        "));
+        // @commonField アノテーションで abstract method を生成
+        List<String> commonFields = grammar.rules().stream()
+            .filter(r -> {
+                MappingAnnotation m = getMappingAnnotation(r).orElse(null);
+                return m != null && m.className().equals(midSealedName);
+            })
+            .flatMap(r -> r.annotations().stream())
+            .filter(a -> a instanceof UBNFAST.CommonFieldAnnotation)
+            .flatMap(a -> ((UBNFAST.CommonFieldAnnotation) a).fieldNames().stream())
+            .distinct()
+            .toList();
+
         sb.append("    sealed interface ").append(midSealedName)
           .append(" extends ").append(astClassName).append(" permits\n")
-          .append("        ").append(permitsList).append(" {}\n\n");
+          .append("        ").append(permitsList).append(" {");
+        if (commonFields.isEmpty()) {
+            sb.append("}\n\n");
+        } else {
+            sb.append("\n");
+            for (String field : commonFields) {
+                String type = inferCommonFieldType(grammar, midSealedName, field, astClassName);
+                sb.append("        ").append(type).append(" ").append(field).append("();\n");
+            }
+            sb.append("    }\n\n");
+        }
+    }
+
+    private String inferCommonFieldType(GrammarDecl grammar, String sealedName,
+            String fieldName, String astClassName) {
+        // 最初の permit ルールで型を推論
+        return grammar.rules().stream()
+            .filter(r -> {
+                MappingAnnotation m = getMappingAnnotation(r).orElse(null);
+                return m != null && m.className().startsWith(sealedName + ".");
+            })
+            .map(r -> inferType(grammar, r, fieldName))
+            .filter(t -> !"Object".equals(t))
+            .findFirst()
+            .orElse("String");
     }
 
     // =========================================================================

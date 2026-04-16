@@ -1148,11 +1148,38 @@ public class UBNFParsers {
     }
 
     /**
+     * CommonFieldAnnotation: '@commonField' '(' IDENTIFIER { ',' IDENTIFIER } ')'
+     */
+    public static class CommonFieldAnnotationParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                new WordParser("@commonField"),
+                Parser.get(LeftParenthesisParser.class),
+                Parser.get(IdentifierParser.class),
+                new ZeroOrMore(new LazyChain() {
+                    private static final long serialVersionUID = 1L;
+                    @Override
+                    public Parsers getLazyParsers() {
+                        return new Parsers(
+                            Parser.get(org.unlaxer.parser.posix.CommaParser.class),
+                            Parser.get(IdentifierParser.class)
+                        );
+                    }
+                }),
+                Parser.get(RightParenthesisParser.class)
+            );
+        }
+    }
+
+    /**
      * Annotation: RootAnnotation | MappingAnnotation | EvalAnnotation | WhitespaceAnnotation
      *           | InterleaveAnnotation | BackrefAnnotation | ScopeTreeAnnotation
      *           | DeclaresWithDescriptionAnnotation | DeclaresAnnotation
      *           | CatalogAnnotation | LeftAssocAnnotation | RightAssocAnnotation
-     *           | PrecedenceAnnotation | DocAnnotation | SkipAnnotation | SimpleAnnotation
+     *           | PrecedenceAnnotation | DocAnnotation | SkipAnnotation | CommonFieldAnnotation | SimpleAnnotation
      */
     public static class AnnotationParser extends LazyChoice {
         private static final long serialVersionUID = 1L;
@@ -1176,6 +1203,7 @@ public class UBNFParsers {
                 Parser.get(DocAnnotationParser.class),
                 Parser.get(RecoveryAnnotationParser.class),
                 Parser.get(SkipAnnotationParser.class),
+                Parser.get(CommonFieldAnnotationParser.class),
                 Parser.get(SimpleAnnotationParser.class)
             );
         }

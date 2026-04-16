@@ -150,6 +150,7 @@ grammar UBNF {
     | DocAnnotation
     | RecoveryAnnotation
     | SkipAnnotation
+    | CommonFieldAnnotation
     | SimpleAnnotation ;
 
   @mapping(RootAnnotation)
@@ -200,6 +201,11 @@ grammar UBNF {
 
   @mapping(SkipAnnotation)
   SkipAnnotation ::= '@skip' ;
+
+  // @commonField(field1, field2, ...) — sealed interface 共通メソッド宣言
+  @mapping(CommonFieldAnnotation, params=[fieldNames])
+  CommonFieldAnnotation ::=
+    '@commonField' '(' IDENTIFIER @fieldNames { ',' IDENTIFIER @fieldNames } ')' ;
 
   @mapping(SimpleAnnotation, params=[name])
   SimpleAnnotation ::= '@' IDENTIFIER @name ;
