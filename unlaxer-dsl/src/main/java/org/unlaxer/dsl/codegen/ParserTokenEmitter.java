@@ -68,6 +68,13 @@ class ParserTokenEmitter {
                 continue;
             }
             String wrapperName = ParserCodegenUtil.toParserClassName(tokenName);
+            // ルール名由来のパーサー名と衝突する場合はスキップ（例: token CODE_START vs rule CodeStart）
+            String ruleNameEquivalent = wrapperName.endsWith("Parser")
+                ? wrapperName.substring(0, wrapperName.length() - "Parser".length())
+                : wrapperName;
+            if (ctx.ruleNames.contains(ruleNameEquivalent)) {
+                continue;
+            }
             sb.append("    // --- Simple token wrapper for ").append(tokenName).append(" ---\n");
             sb.append("    public static class ").append(wrapperName)
               .append(" extends ").append(parserClass).append(" {\n");
