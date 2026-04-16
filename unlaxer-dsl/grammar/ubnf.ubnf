@@ -219,6 +219,7 @@ grammar UBNF {
       [ TypeofElement @typeofConstraint ]
       AtomicElement @element
       [ PostfixQuantifier ]
+      [ BoundedQuantifier ]
       [ SeparatedBy ]
       [ '@' IDENTIFIER @captureName ] ;
 
@@ -234,14 +235,15 @@ grammar UBNF {
   Digits ::= DIGIT { DIGIT } ;
 
   // 基本要素
+  // RepeatElement を BoundedQuantifier より先に配置して '{' の曖昧性を回避
+  // QuantifiedRef（IDENTIFIER ベース）を最後に配置
   AtomicElement ::=
       GroupElement
     | OptionalElement
     | RepeatElement
-    | BoundedQuantifier
     | ErrorElement
     | TerminalElement
-    | RuleRefElement ;
+    | QuantifiedRef ;
 
   // ( A B | C )  グループ
   @mapping(GroupElement, params=[body])
@@ -263,12 +265,11 @@ grammar UBNF {
   @mapping(TerminalElement, params=[value])
   TerminalElement ::= STRING @value ;
 
-  // 非終端記号参照
+  // 識別子参照（名前空間付き namespace.RuleName も対応）
   // @backref: ルール参照 → 定義へのジャンプ (Go-to-Definition)
-  // namespace は @import で導入されたエイリアス (例: json.Value → namespace=json, name=Value)
-  @mapping(RuleRefElement, params=[namespace, name])
+  // @mapping なし透過: toAtomicElement が直接 RuleRefElement に変換
   @backref(name=name)
-  RuleRefElement ::= [ IDENTIFIER @namespace '.' ] IDENTIFIER @name ;
+  QuantifiedRef ::= [ IDENTIFIER @namespace '.' ] IDENTIFIER @name ;
 
   // @typeof(captureName) — 要素レベルの型相関アノテーション
   @mapping(TypeofElement, params=[captureName])

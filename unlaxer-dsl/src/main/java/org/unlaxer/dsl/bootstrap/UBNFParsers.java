@@ -1230,6 +1230,22 @@ public class UBNFParsers {
     }
 
     /**
+     * QuantifiedRef: [ IDENTIFIER '.' ] IDENTIFIER
+     * RuleRefElement と同じパターン。AtomicElement の最後の選択肢として配置（IDENTIFIER ベース）。
+     * 後置量化子は AnnotatedElementParser が担う（従来通り）。
+     */
+    public static class QuantifiedRefParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                Parser.get(RuleRefElementParser.class)
+            );
+        }
+    }
+
+    /**
      * GroupElement: '(' RuleBody ')'
      * Circular: references RuleBodyParser
      */
@@ -1307,13 +1323,15 @@ public class UBNFParsers {
 
         @Override
         public Parsers getLazyParsers() {
+            // 先頭トークンで即コミット可能なものを先に配置し、
+            // IDENTIFIER ベースの QuantifiedRef を最後に配置して backtracking 爆発を回避する。
             return new Parsers(
-                Parser.get(GroupElementParser.class),
-                Parser.get(OptionalElementParser.class),
-                Parser.get(RepeatElementParser.class),
-                Parser.get(ErrorElementParser.class),
-                Parser.get(TerminalElementParser.class),
-                Parser.get(RuleRefElementParser.class)
+                Parser.get(GroupElementParser.class),    // (
+                Parser.get(OptionalElementParser.class), // [
+                Parser.get(RepeatElementParser.class),   // { (BoundedQuantifier より先)
+                Parser.get(ErrorElementParser.class),    // 'ERROR'
+                Parser.get(TerminalElementParser.class), // '
+                Parser.get(QuantifiedRefParser.class)    // IDENTIFIER + optional suffix
             );
         }
 

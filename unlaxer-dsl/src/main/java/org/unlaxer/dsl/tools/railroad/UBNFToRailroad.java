@@ -106,11 +106,11 @@ public class UBNFToRailroad {
             return new RailroadDiagram.Repeat(nextId(repeatElement), inner);
         }
         if (atomicElement instanceof OneOrMoreElement oneOrMoreElement) {
-            RailroadDiagram inner = convertRuleBody(oneOrMoreElement.body(), grammarName);
+            RailroadDiagram inner = convertAtomicElement(oneOrMoreElement.body(), grammarName);
             return new RailroadDiagram.Repeat(nextId(oneOrMoreElement), inner);
         }
         if (atomicElement instanceof BoundedRepeatElement boundedRepeatElement) {
-            RailroadDiagram inner = convertRuleBody(boundedRepeatElement.body(), grammarName);
+            RailroadDiagram inner = convertAtomicElement(boundedRepeatElement.body(), grammarName);
             return new RailroadDiagram.Repeat(nextId(boundedRepeatElement), inner);
         }
         if (atomicElement instanceof GroupElement groupElement) {

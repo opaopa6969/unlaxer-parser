@@ -90,6 +90,7 @@ public final class GrammarValidator {
         validateGlobalWhitespace(grammar, errors);
         validateRootPresence(grammar, errors);
         validateTokens(grammar, errors);
+        validateBoundedRepeatElements(grammar, errors);
 
         for (RuleDecl rule : grammar.rules()) {
             MappingAnnotation mapping = null;
@@ -508,6 +509,40 @@ public final class GrammarValidator {
                     "E-PRECEDENCE-MIXED-ASSOC");
             }
         }
+    }
+
+    private static void validateBoundedRepeatElements(GrammarDecl grammar, List<ValidationIssue> errors) {
+        for (RuleDecl rule : grammar.rules()) {
+            collectBoundedElements(rule.body()).forEach(bounded -> {
+                if (bounded.max() != UBNFAST.BoundedRepeatElement.UNBOUNDED && bounded.min() > bounded.max()) {
+                    addRuleError(errors, rule.name(),
+                        "rule " + rule.name() + " has BoundedRepeatElement with min=" + bounded.min()
+                            + " > max=" + bounded.max(),
+                        "Ensure min <= max in {min,max} quantifier.",
+                        "E-BOUNDED-INVALID");
+                }
+            });
+        }
+    }
+
+    private static java.util.stream.Stream<UBNFAST.BoundedRepeatElement> collectBoundedElements(UBNFAST.RuleBody body) {
+        return switch (body) {
+            case UBNFAST.ChoiceBody choice -> choice.alternatives().stream()
+                .flatMap(seq -> seq.elements().stream())
+                .flatMap(ae -> collectBoundedFromAtomic(ae.element()));
+            case UBNFAST.SequenceBody seq -> seq.elements().stream()
+                .flatMap(ae -> collectBoundedFromAtomic(ae.element()));
+        };
+    }
+
+    private static java.util.stream.Stream<UBNFAST.BoundedRepeatElement> collectBoundedFromAtomic(UBNFAST.AtomicElement element) {
+        return switch (element) {
+            case UBNFAST.BoundedRepeatElement b -> java.util.stream.Stream.of(b);
+            case UBNFAST.GroupElement g -> collectBoundedElements(g.body());
+            case UBNFAST.OptionalElement o -> collectBoundedElements(o.body());
+            case UBNFAST.RepeatElement r -> collectBoundedElements(r.body());
+            default -> java.util.stream.Stream.empty();
+        };
     }
 
     private static void addRuleError(

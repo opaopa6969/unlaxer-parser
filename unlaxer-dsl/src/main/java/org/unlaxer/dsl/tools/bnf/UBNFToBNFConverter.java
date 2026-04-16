@@ -341,10 +341,10 @@ public final class UBNFToBNFConverter {
             convertRuleBody(repeatElement.body(), builder, context);
             builder.append(" }");
         } else if (element instanceof OneOrMoreElement oneOrMoreElement) {
-            convertRuleBody(oneOrMoreElement.body(), builder, context);
+            convertAtomicElement(oneOrMoreElement.body(), builder, context);
             builder.append("+");
         } else if (element instanceof BoundedRepeatElement boundedRepeatElement) {
-            convertRuleBody(boundedRepeatElement.body(), builder, context);
+            convertAtomicElement(boundedRepeatElement.body(), builder, context);
             builder.append("{");
             builder.append(boundedRepeatElement.min());
             if (boundedRepeatElement.max() != boundedRepeatElement.min()) {

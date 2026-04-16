@@ -153,8 +153,8 @@ public final class TmLanguageEmitter {
             case GroupElement g -> collectFromBody(g.body(), acc);
             case OptionalElement o -> collectFromBody(o.body(), acc);
             case RepeatElement r -> collectFromBody(r.body(), acc);
-            case OneOrMoreElement r -> collectFromBody(r.body(), acc);
-            case BoundedRepeatElement r -> collectFromBody(r.body(), acc);
+            case OneOrMoreElement r -> collectFromElement(r.body(), acc);
+            case BoundedRepeatElement r -> collectFromElement(r.body(), acc);
             case SeparatedElement se -> {
                 collectFromElement(se.element(), acc);
                 collectFromElement(se.separator(), acc);

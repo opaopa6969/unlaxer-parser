@@ -110,8 +110,9 @@ public class SelfHostingTest {
 
     @Test
     public void testRuleRefElementParserExists() {
-        assertTrue("should contain RuleRefElementParser",
-            generatedSource.contains("class RuleRefElementParser"));
+        // RuleRefElement ルールは QuantifiedRef に置き換えられた
+        assertTrue("should contain QuantifiedRefParser",
+            generatedSource.contains("class QuantifiedRefParser"));
     }
 
     @Test

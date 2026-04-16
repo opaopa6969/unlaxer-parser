@@ -88,6 +88,10 @@ class ParserRuleEmitter {
         return specs;
     }
 
+    static void analyzeHelpersInBody(ParserGenerator.GenContext ctx, String ruleName, AtomicElement body, List<HelperSpec> specs) {
+        analyzeHelpersInElement(ctx, ruleName, body, specs);
+    }
+
     static void analyzeHelpersInBody(ParserGenerator.GenContext ctx, String ruleName, RuleBody body, List<HelperSpec> specs) {
         switch (body) {
             case ChoiceBody choice -> {
@@ -131,7 +135,7 @@ class ParserRuleEmitter {
                     String helperName = ruleName + "OneOrMore" + n + "Parser";
                     int[] counterState = ctx.snapshotCounters(ruleName);
                     analyzeHelpersInBody(ctx, ruleName, one.body(), specs);
-                    specs.add(new HelperSpec.ChainHelper(helperName, one.body(), counterState));
+                    specs.add(new HelperSpec.ChainHelper(helperName, atomicAsRuleBody(one.body()), counterState));
                 }
             }
             case BoundedRepeatElement bounded -> {
@@ -140,7 +144,7 @@ class ParserRuleEmitter {
                     String helperName = ruleName + "Bounded" + n + "Parser";
                     int[] counterState = ctx.snapshotCounters(ruleName);
                     analyzeHelpersInBody(ctx, ruleName, bounded.body(), specs);
-                    specs.add(new HelperSpec.ChainHelper(helperName, bounded.body(), counterState));
+                    specs.add(new HelperSpec.ChainHelper(helperName, atomicAsRuleBody(bounded.body()), counterState));
                 }
             }
             case GroupElement g -> {
@@ -280,6 +284,11 @@ class ParserRuleEmitter {
     }
 
     private static void collectFollowFromBody(
+            ParserGenerator.GenContext ctx, AtomicElement body, String targetRule, LinkedHashSet<String> tokens) {
+        // Single AtomicElement has no internal sequence follow tokens
+    }
+
+    private static void collectFollowFromBody(
             ParserGenerator.GenContext ctx, RuleBody body, String targetRule, LinkedHashSet<String> tokens) {
         switch (body) {
             case ChoiceBody choice -> {
@@ -370,6 +379,11 @@ class ParserRuleEmitter {
      * is nullable (optional or repeat), continues to the next element's FIRST set.
      */
     private static void collectFirstTerminalsFromBody(
+            ParserGenerator.GenContext ctx, AtomicElement body, LinkedHashSet<String> tokens, Set<String> visited) {
+        collectFirstTerminals(ctx, body, tokens, visited);
+    }
+
+    private static void collectFirstTerminalsFromBody(
             ParserGenerator.GenContext ctx, RuleBody body, LinkedHashSet<String> tokens, Set<String> visited) {
         switch (body) {
             case ChoiceBody choice -> {
@@ -427,6 +441,10 @@ class ParserRuleEmitter {
         return ctx.grammar.rules().stream()
             .filter(rule -> rule.name().equals(ruleName))
             .findFirst();
+    }
+
+    private static boolean containsRuleRef(AtomicElement body, String targetRule) {
+        return body instanceof RuleRefElement ref && ref.name().equals(targetRule);
     }
 
     private static boolean containsRuleRef(RuleBody body, String targetRule) {
@@ -1120,9 +1138,24 @@ class ParserRuleEmitter {
         return single instanceof RuleRefElement;
     }
 
+    /** AtomicElement を単一要素の SequenceBody に包む */
+    static RuleBody atomicAsRuleBody(AtomicElement element) {
+        return new SequenceBody(List.of(new AnnotatedElement(element, Optional.empty(), Optional.empty())));
+    }
+
+    /** AtomicElement overload: body が直接 RuleRefElement か */
+    static boolean isSingleRuleRef(AtomicElement body) {
+        return body instanceof RuleRefElement;
+    }
+
     /** body が単一の AtomicElement だけを含むか */
     static boolean isSingleAtomicElement(RuleBody body) {
         return getSingleAtomicElementFrom(body) != null;
+    }
+
+    /** AtomicElement overload: body IS the element */
+    static AtomicElement getSingleAtomicElementFrom(AtomicElement body) {
+        return body;
     }
 
     /** body から単一の AtomicElement を取り出す（なければ null） */
@@ -1145,6 +1178,14 @@ class ParserRuleEmitter {
             return resolveParserClass(ctx, ref.name());
         }
         throw new IllegalStateException("Expected single RuleRef body");
+    }
+
+    /** AtomicElement overload: element が直接 RuleRefElement のとき */
+    static String getSingleRuleRefClass(ParserGenerator.GenContext ctx, AtomicElement body) {
+        if (body instanceof RuleRefElement ref) {
+            return resolveParserClass(ctx, ref.name());
+        }
+        throw new IllegalStateException("Expected RuleRefElement body");
     }
 
     /**

@@ -91,11 +91,11 @@ class MapperTypeResolver {
                 yield "List<" + inner + ">";
             }
             case OneOrMoreElement oneOrMoreElement -> {
-                String inner = inferTypeFromBody(grammar, oneOrMoreElement.body());
+                String inner = inferTypeFromElement(grammar, oneOrMoreElement.body());
                 yield "List<" + inner + ">";
             }
             case BoundedRepeatElement boundedRepeatElement -> {
-                String inner = inferTypeFromBody(grammar, boundedRepeatElement.body());
+                String inner = inferTypeFromElement(grammar, boundedRepeatElement.body());
                 yield "List<" + inner + ">";
             }
             case OptionalElement optionalElement -> {

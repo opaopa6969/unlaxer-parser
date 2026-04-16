@@ -386,9 +386,8 @@ public class UBNFMapperTest {
         ChoiceBody choice = (ChoiceBody) rule.body();
         SequenceBody seq = choice.alternatives().get(0);
         OneOrMoreElement one = (OneOrMoreElement) seq.elements().get(0).element();
-        SequenceBody inner = (SequenceBody) one.body();
         assertTrue("inner element should be RuleRefElement",
-            inner.elements().get(0).element() instanceof RuleRefElement);
+            one.body() instanceof RuleRefElement);
     }
 
     @Test

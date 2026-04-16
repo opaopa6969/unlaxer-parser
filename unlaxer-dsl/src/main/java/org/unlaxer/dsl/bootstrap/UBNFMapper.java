@@ -732,17 +732,14 @@ public class UBNFMapper {
         AtomicElement element;
         if (!postfixTokens.isEmpty()) {
             String postfix = postfixTokens.get(0).source.toString().trim();
-            RuleBody wrappedBody = wrapElementInSequenceBody(baseElement);
             element = "+".equals(postfix)
-                ? new OneOrMoreElement(wrappedBody)
+                ? new OneOrMoreElement(baseElement)
                 : "*".equals(postfix)
-                    ? new RepeatElement(wrappedBody)
-                    : new OptionalElement(wrappedBody);
+                    ? new RepeatElement(wrapElementInSequenceBody(baseElement))
+                    : new OptionalElement(wrapElementInSequenceBody(baseElement));
         } else if (!boundedTokens.isEmpty()) {
             element = parseBoundedRepeat(boundedTokens.get(0), baseElement);
         } else if (!separatedTokens.isEmpty()) {
-            // The SeparatedByParser contains: '%' AtomicElementParser
-            // Extract the separator's AtomicElement
             List<Token> sepAtomicTokens = findDescendants(
                 separatedTokens.get(0), UBNFParsers.AtomicElementParser.class);
             AtomicElement separator = sepAtomicTokens.isEmpty()
@@ -753,11 +750,7 @@ public class UBNFMapper {
             element = baseElement;
         }
 
-        // キャプチャ名: AnnotatedElementParser の filteredChildren から
-        // AtSignParser の直後の IdentifierParser を探す
         Optional<String> captureName = findCaptureNameInAnnotatedElement(token);
-
-        // @typeof 制約: AnnotatedElementParser のプレフィックス TypeofElementParser を探す
         Optional<TypeofElement> typeofConstraint = findTypeofConstraintInAnnotatedElement(token);
 
         return new AnnotatedElement(element, captureName, typeofConstraint);
@@ -790,8 +783,7 @@ public class UBNFMapper {
             String maxStr = inner.substring(commaIdx + 1).trim();
             max = maxStr.isEmpty() ? BoundedRepeatElement.UNBOUNDED : Integer.parseInt(maxStr);
         }
-        RuleBody wrappedBody = wrapElementInSequenceBody(baseElement);
-        return new BoundedRepeatElement(wrappedBody, min, max);
+        return new BoundedRepeatElement(baseElement, min, max);
     }
 
     static Optional<String> findCaptureNameInAnnotatedElement(Token token) {
@@ -874,24 +866,85 @@ public class UBNFMapper {
                 : stripQuotes(quotedTokens.get(0).source.toString().trim());
             return new TerminalElement(value);
         }
-        // RuleRefElement（fallback）: [ namespace '.' ] name
-        List<Token> refTokens = findDescendants(token, UBNFParsers.RuleRefElementParser.class);
-        if (false == refTokens.isEmpty()) {
-            List<Token> identifiers = findDescendants(refTokens.get(0), UBNFParsers.IdentifierParser.class);
-            if (identifiers.size() >= 2) {
-                String namespace = identifiers.get(0).source.toString().trim();
-                String name = identifiers.get(1).source.toString().trim();
-                return new RuleRefElement(Optional.of(namespace), name);
+        // QuantifiedRef / RuleRefElement: [ namespace '.' ] name
+        List<Token> quantifiedTokens = findDescendants(token, UBNFParsers.QuantifiedRefParser.class);
+        if (false == quantifiedTokens.isEmpty()) {
+            List<Token> refTokens = findDescendants(quantifiedTokens.get(0), UBNFParsers.RuleRefElementParser.class);
+            if (false == refTokens.isEmpty()) {
+                List<Token> identifiers = findDescendants(refTokens.get(0), UBNFParsers.IdentifierParser.class);
+                if (identifiers.size() >= 2) {
+                    String namespace = identifiers.get(0).source.toString().trim();
+                    String name = identifiers.get(1).source.toString().trim();
+                    return new RuleRefElement(Optional.of(namespace), name);
+                }
+                String name = identifiers.isEmpty() ? "" : identifiers.get(0).source.toString().trim();
+                return new RuleRefElement(name);
             }
-            String name = identifiers.isEmpty() ? "" : identifiers.get(0).source.toString().trim();
-            return new RuleRefElement(name);
         }
-        // AtomicElementParser 直下の IdentifierParser が RuleRef になることもある
+        // AtomicElementParser 直下の IdentifierParser が RuleRef になることもある（フォールバック）
         List<Token> identifiers = findDescendants(token, UBNFParsers.IdentifierParser.class);
         if (false == identifiers.isEmpty()) {
             return new RuleRefElement(identifiers.get(0).source.toString().trim());
         }
         return new RuleRefElement("?");
+    }
+
+    /**
+     * QuantifiedRef トークンを suffix に応じて適切な AtomicElement に変換する。
+     * suffix なし → RuleRefElement
+     * '+' → OneOrMoreElement
+     * '?' → OptionalElement
+     * '*' → RepeatElement
+     * '{n,m}' → BoundedRepeatElement
+     * '%' sep → SeparatedElement
+     */
+    static AtomicElement toQuantifiedRef(Token token) {
+        // ベース: RuleRefElement (namespace + name)
+        List<Token> refTokens = findDescendants(token, UBNFParsers.RuleRefElementParser.class);
+        RuleRefElement base;
+        if (false == refTokens.isEmpty()) {
+            List<Token> identifiers = findDescendants(refTokens.get(0), UBNFParsers.IdentifierParser.class);
+            if (identifiers.size() >= 2) {
+                String namespace = identifiers.get(0).source.toString().trim();
+                String name = identifiers.get(1).source.toString().trim();
+                base = new RuleRefElement(Optional.of(namespace), name);
+            } else {
+                String name = identifiers.isEmpty() ? "" : identifiers.get(0).source.toString().trim();
+                base = new RuleRefElement(name);
+            }
+        } else {
+            base = new RuleRefElement("?");
+        }
+
+        // PostfixQuantifier suffix
+        List<Token> postfixTokens = findDescendants(token, UBNFParsers.PostfixQuantifierParser.class);
+        if (false == postfixTokens.isEmpty()) {
+            String postfix = postfixTokens.get(0).source.toString().trim();
+            return "+".equals(postfix)
+                ? new OneOrMoreElement(base)
+                : "*".equals(postfix)
+                    ? new RepeatElement(wrapElementInSequenceBody(base))
+                    : new OptionalElement(wrapElementInSequenceBody(base));
+        }
+
+        // BoundedQuantifier suffix
+        List<Token> boundedTokens = findDescendants(token, UBNFParsers.BoundedQuantifierParser.class);
+        if (false == boundedTokens.isEmpty()) {
+            return parseBoundedRepeat(boundedTokens.get(0), base);
+        }
+
+        // SeparatedBy suffix
+        List<Token> separatedTokens = findDescendants(token, UBNFParsers.SeparatedByParser.class);
+        if (false == separatedTokens.isEmpty()) {
+            List<Token> sepAtomicTokens = findDescendants(
+                separatedTokens.get(0), UBNFParsers.AtomicElementParser.class);
+            AtomicElement separator = sepAtomicTokens.isEmpty()
+                ? new RuleRefElement("ERROR_NO_SEPARATOR")
+                : toAtomicElement(sepAtomicTokens.get(0));
+            return new SeparatedElement(base, separator);
+        }
+
+        return base;
     }
 
     // =========================================================================

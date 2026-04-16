@@ -354,11 +354,11 @@ public class ASTGenerator implements CodeGenerator {
                 yield "List<" + inner + ">";
             }
             case OneOrMoreElement one -> {
-                String inner = inferTypeFromBody(grammar, one.body());
+                String inner = inferTypeFromElement(grammar, one.body());
                 yield "List<" + inner + ">";
             }
             case BoundedRepeatElement bounded -> {
-                String inner = inferTypeFromBody(grammar, bounded.body());
+                String inner = inferTypeFromElement(grammar, bounded.body());
                 yield "List<" + inner + ">";
             }
             case OptionalElement opt -> {

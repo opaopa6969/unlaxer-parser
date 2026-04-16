@@ -294,13 +294,13 @@ public sealed interface UBNFAST permits
     record RepeatElement(RuleBody body) implements AtomicElement {}
 
     /** element+ — one or more occurrences */
-    record OneOrMoreElement(RuleBody body) implements AtomicElement {}
+    record OneOrMoreElement(AtomicElement body) implements AtomicElement {}
 
     /**
      * element{n} / element{n,m} / element{n,} — bounded repetition.
      * max == Integer.MAX_VALUE means unbounded (i.e. {n,}).
      */
-    record BoundedRepeatElement(RuleBody body, int min, int max) implements AtomicElement {
+    record BoundedRepeatElement(AtomicElement body, int min, int max) implements AtomicElement {
         /** Sentinel value used to represent an open upper bound ({n,}). */
         public static final int UNBOUNDED = Integer.MAX_VALUE;
     }
