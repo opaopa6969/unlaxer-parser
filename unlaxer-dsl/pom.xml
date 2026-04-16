@@ -16,6 +16,15 @@
 	<packaging>jar</packaging>
 
 	<description>BNF拡張DSLからParser/AST/Mapper/LSP/DAPを自動生成するツール</description>
+	<url>https://github.com/opaopa6969/unlaxer-parser</url>
+
+	<developers>
+		<developer>
+			<id>opaopa6969</id>
+			<name>hisayuki ookubo</name>
+			<email>opaopa6969@gmail.com</email>
+		</developer>
+	</developers>
 
 	<scm>
 		<connection>scm:git:git@github.com:opaopa6969/unlaxer-parser.git</connection>
