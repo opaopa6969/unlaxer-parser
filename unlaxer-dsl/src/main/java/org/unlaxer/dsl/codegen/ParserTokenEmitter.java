@@ -47,6 +47,37 @@ class ParserTokenEmitter {
     }
 
     /**
+     * Simple トークンごとに wrapper 内部クラスを生成する。
+     * 生成版 Parsers を使うとき、手書き Mapper の findDescendants(token, XxxParsers.IdentifierParser.class)
+     * が正しく機能するために必要（Plan S 達成）。
+     *
+     * 例: token IDENTIFIER = org.unlaxer.parser.clang.IdentifierParser
+     *   → public static class IdentifierParser extends org.unlaxer.parser.clang.IdentifierParser {}
+     */
+    static String generateSimpleTokenWrappers(ParserGenerator.GenContext ctx) {
+        if (ctx.tokenParserMap.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<String, String> e : ctx.tokenParserMap.entrySet()) {
+            String tokenName = e.getKey();
+            String parserClass = e.getValue();
+            // 完全修飾名（パッケージあり）のみ wrapper を生成する。
+            // 短いクラス名はそのまま参照するため wrapper 不要。
+            if (!parserClass.contains(".")) {
+                continue;
+            }
+            String wrapperName = ParserCodegenUtil.toParserClassName(tokenName);
+            sb.append("    // --- Simple token wrapper for ").append(tokenName).append(" ---\n");
+            sb.append("    public static class ").append(wrapperName)
+              .append(" extends ").append(parserClass).append(" {\n");
+            sb.append("        private static final long serialVersionUID = 1L;\n");
+            sb.append("    }\n\n");
+        }
+        return sb.toString();
+    }
+
+    /**
      * NEGATION トークンごとに SingleCharacterParser 内部クラスを生成する。
      * 例: token NOT_QUOTE = NEGATION('"')
      *   → public static class NotQuoteParser extends SingleCharacterParser { ... }

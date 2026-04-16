@@ -180,7 +180,8 @@ public class ParserGenerator implements CodeGenerator {
             sb.append(generateDelimitedChainClass(ctx));
         }
 
-        // NEGATION / CHAR_RANGE / REGEX トークン用の生成内部クラス
+        // Simple / NEGATION / CHAR_RANGE / REGEX トークン用の生成内部クラス
+        sb.append(ParserTokenEmitter.generateSimpleTokenWrappers(ctx));
         sb.append(ParserTokenEmitter.generateNegationClasses(ctx));
         sb.append(ParserTokenEmitter.generateCharRangeClasses(ctx));
         sb.append(ParserTokenEmitter.generateRegexClasses(ctx));

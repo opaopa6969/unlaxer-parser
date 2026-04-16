@@ -1164,6 +1164,11 @@ class ParserRuleEmitter {
         }
         String tokenClass = ctx.tokenParserMap.get(name);
         if (tokenClass != null) {
+            // 完全修飾名は wrapper inner class 経由で参照（Plan S: findDescendants 互換）
+            // 短いクラス名はそのまま参照
+            if (tokenClass.contains(".")) {
+                return ParserCodegenUtil.toParserClassName(name) + ".class";
+            }
             return tokenClass + ".class";
         }
         // @recovery: return recovery wrapper class if the referenced rule has @recovery

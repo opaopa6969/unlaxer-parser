@@ -214,7 +214,7 @@ grammar UBNF {
   SequenceBody ::= { AnnotatedElement } @elements ;
 
   // 要素（@typeof制約とキャプチャ名付き可、後置量化子付き可）
-  @mapping(AnnotatedElement, params=[typeofConstraint, element, captureName])
+  @mapping(AnnotatedElement, params=[element, captureName, typeofConstraint])
   AnnotatedElement ::=
       [ TypeofElement @typeofConstraint ]
       AtomicElement @element
