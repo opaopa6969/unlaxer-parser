@@ -343,7 +343,11 @@ public class ASTGenerator implements CodeGenerator {
             case TerminalElement t -> "String";
             case RuleRefElement r -> {
                 Optional<MappingAnnotation> mapping = findMappingForRule(grammar, r.name());
-                yield mapping.map(m -> astClassName + "." + m.className()).orElse("String");
+                if (mapping.isPresent()) {
+                    yield astClassName + "." + mapping.get().className();
+                }
+                String tokenType = MapperTypeResolver.inferTypeFromTokenName(grammar, r.name());
+                yield tokenType != null ? tokenType : "String";
             }
             case RepeatElement rep -> {
                 String inner = inferTypeFromBody(grammar, rep.body());

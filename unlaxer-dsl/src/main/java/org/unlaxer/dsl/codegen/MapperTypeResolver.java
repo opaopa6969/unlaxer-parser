@@ -1,5 +1,7 @@
 package org.unlaxer.dsl.codegen;
 
+import java.util.Map;
+import org.unlaxer.dsl.bootstrap.UBNFAST;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AnnotatedElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AtomicElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.BoundedRepeatElement;
@@ -77,7 +79,12 @@ class MapperTypeResolver {
                     .filter(a -> a instanceof MappingAnnotation)
                     .map(a -> (MappingAnnotation) a)
                     .findFirst();
-                yield mapping.map(m -> astClassName + "." + m.className()).orElse("String");
+                if (mapping.isPresent()) {
+                    yield astClassName + "." + mapping.get().className();
+                }
+                // token 型推論: parser class 名から Java 型を導出
+                String tokenType = inferTypeFromTokenName(grammar, ruleRefElement.name());
+                yield tokenType != null ? tokenType : "String";
             }
             case RepeatElement repeatElement -> {
                 String inner = inferTypeFromBody(grammar, repeatElement.body());
@@ -102,6 +109,30 @@ class MapperTypeResolver {
             case GroupElement ignored -> "Object";
             case ErrorElement ignored -> "Object";
         };
+    }
+
+    private static final Map<String, String> NUMERIC_PARSER_TYPES = Map.of(
+        "NumberParser", "int",
+        "DigitParser", "int"
+    );
+
+    /**
+     * token 名から Java 型を推論する。
+     * token UNSIGNED_INTEGER = NumberParser → "int"
+     * @return Java 型文字列、推論できない場合は null
+     */
+    static String inferTypeFromTokenName(GrammarDecl grammar, String tokenName) {
+        return grammar.tokens().stream()
+            .filter(t -> t.name().equals(tokenName) && t instanceof UBNFAST.TokenDecl.Simple)
+            .map(t -> (UBNFAST.TokenDecl.Simple) t)
+            .map(t -> {
+                String pc = t.parserClass();
+                String simpleName = pc.contains(".") ? pc.substring(pc.lastIndexOf('.') + 1) : pc;
+                return NUMERIC_PARSER_TYPES.get(simpleName);
+            })
+            .filter(type -> type != null)
+            .findFirst()
+            .orElse(null);
     }
 
     /** TypeofElement を参照するキャプチャ名から実際の AtomicElement に解決する */

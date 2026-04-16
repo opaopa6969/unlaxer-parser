@@ -205,6 +205,10 @@ class MapperElementUtil {
         Map<String, String> mappedClassByRuleName,
         Map<String, TokenDecl> tokenDeclByName,
         Map<String, RuleDecl> ruleByName) {
+        if ("int".equals(targetType) || "long".equals(targetType)) {
+            String parseMethod = "int".equals(targetType) ? "Integer.parseInt" : "Long.parseLong";
+            return parseMethod + "(firstTokenText(" + tokenVar + "))";
+        }
         if (!"String".equals(targetType)) {
             return mapExpressionForElement(element, tokenVar, mappedClassByRuleName, tokenDeclByName, ruleByName);
         }
