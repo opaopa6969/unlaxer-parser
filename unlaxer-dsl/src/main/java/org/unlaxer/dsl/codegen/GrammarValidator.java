@@ -92,6 +92,7 @@ public final class GrammarValidator {
         validateTokens(grammar, errors);
         validateBoundedRepeatElements(grammar, errors);
         validateCommonFields(grammar, errors);
+        validateEnumRules(grammar, errors);
 
         for (RuleDecl rule : grammar.rules()) {
             MappingAnnotation mapping = null;
@@ -508,6 +509,30 @@ public final class GrammarValidator {
                         + " mixes associativity: " + existing + " and " + assoc,
                     "Use one associativity per precedence level.",
                     "E-PRECEDENCE-MIXED-ASSOC");
+            }
+        }
+    }
+
+    private static void validateEnumRules(GrammarDecl grammar, List<ValidationIssue> errors) {
+        for (RuleDecl rule : grammar.rules()) {
+            boolean isEnum = rule.annotations().stream()
+                .anyMatch(a -> a instanceof UBNFAST.EnumAnnotation);
+            if (!isEnum) {
+                continue;
+            }
+            // @enum ルールは Choice+Terminal のみ許容
+            boolean allTerminals = switch (rule.body()) {
+                case UBNFAST.ChoiceBody choice -> choice.alternatives().stream()
+                    .allMatch(seq -> seq.elements().size() == 1
+                        && seq.elements().get(0).element() instanceof UBNFAST.TerminalElement);
+                case UBNFAST.SequenceBody seq -> seq.elements().size() == 1
+                    && seq.elements().get(0).element() instanceof UBNFAST.TerminalElement;
+            };
+            if (!allTerminals) {
+                addRuleError(errors, rule.name(),
+                    "@enum rule " + rule.name() + " must consist only of terminal literals (e.g. 'a' | 'b')",
+                    "Use only quoted string literals as alternatives in an @enum rule.",
+                    "E-ENUM-NON-TERMINAL");
             }
         }
     }

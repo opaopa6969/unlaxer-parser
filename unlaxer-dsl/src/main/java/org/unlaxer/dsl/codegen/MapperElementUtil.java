@@ -1,5 +1,6 @@
 package org.unlaxer.dsl.codegen;
 
+import org.unlaxer.dsl.bootstrap.UBNFAST;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AnnotatedElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AtomicElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ChoiceBody;
@@ -208,6 +209,18 @@ class MapperElementUtil {
         if ("int".equals(targetType) || "long".equals(targetType)) {
             String parseMethod = "int".equals(targetType) ? "Integer.parseInt" : "Long.parseLong";
             return parseMethod + "(firstTokenText(" + tokenVar + "))";
+        }
+        // enum 型: ASTClass.EnumName 形式 → fromText 生成
+        // enum ルール名はドット後がルール名と一致する（例: MyAST.RecoveryMode）
+        if (targetType.contains(".") && !targetType.startsWith("List<") && !targetType.startsWith("Optional<")) {
+            // enum 型かどうかの確認: ruleByName に @enum ルールがあれば
+            String simpleName = targetType.substring(targetType.lastIndexOf('.') + 1);
+            boolean isEnum = ruleByName.containsKey(simpleName) &&
+                ruleByName.get(simpleName).annotations().stream()
+                    .anyMatch(a -> a instanceof UBNFAST.EnumAnnotation);
+            if (isEnum) {
+                return targetType + ".fromText(stripQuotes(firstTokenText(" + tokenVar + ")))";
+            }
         }
         if (!"String".equals(targetType)) {
             return mapExpressionForElement(element, tokenVar, mappedClassByRuleName, tokenDeclByName, ruleByName);

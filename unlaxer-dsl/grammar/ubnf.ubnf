@@ -151,6 +151,7 @@ grammar UBNF {
     | RecoveryAnnotation
     | SkipAnnotation
     | CommonFieldAnnotation
+    | EnumAnnotation
     | SimpleAnnotation ;
 
   @mapping(RootAnnotation)
@@ -206,6 +207,10 @@ grammar UBNF {
   @mapping(CommonFieldAnnotation, params=[fieldNames])
   CommonFieldAnnotation ::=
     '@commonField' '(' IDENTIFIER @fieldNames { ',' IDENTIFIER @fieldNames } ')' ;
+
+  // @enum — Choice+Terminal ルールを Java enum として生成する
+  @mapping(EnumAnnotation)
+  EnumAnnotation ::= '@enum' ;
 
   @mapping(SimpleAnnotation, params=[name])
   SimpleAnnotation ::= '@' IDENTIFIER @name ;

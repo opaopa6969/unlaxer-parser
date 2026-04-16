@@ -82,6 +82,14 @@ class MapperTypeResolver {
                 if (mapping.isPresent()) {
                     yield astClassName + "." + mapping.get().className();
                 }
+                // @enum ルール参照 → enum 型として推論
+                boolean isEnum = grammar.rules().stream()
+                    .filter(r -> r.name().equals(ruleRefElement.name()))
+                    .flatMap(r -> r.annotations().stream())
+                    .anyMatch(a -> a instanceof UBNFAST.EnumAnnotation);
+                if (isEnum) {
+                    yield astClassName + "." + ruleRefElement.name();
+                }
                 // token 型推論: parser class 名から Java 型を導出
                 String tokenType = inferTypeFromTokenName(grammar, ruleRefElement.name());
                 yield tokenType != null ? tokenType : "String";

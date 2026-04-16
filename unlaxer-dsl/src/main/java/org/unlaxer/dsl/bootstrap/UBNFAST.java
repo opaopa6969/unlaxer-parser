@@ -166,7 +166,8 @@ public sealed interface UBNFAST permits
         UBNFAST.RecoveryAnnotation,
         UBNFAST.SkipAnnotation,
         UBNFAST.SimpleAnnotation,
-        UBNFAST.CommonFieldAnnotation {}
+        UBNFAST.CommonFieldAnnotation,
+        UBNFAST.EnumAnnotation {}
 
     /** @root */
     record RootAnnotation() implements Annotation {}
@@ -247,6 +248,13 @@ public sealed interface UBNFAST permits
      * abstract method として宣言する。ASTGenerator が sealed interface 生成時に利用する。
      */
     record CommonFieldAnnotation(List<String> fieldNames) implements Annotation {}
+
+    /**
+     * @enum — Choice+Terminal ルールを Java enum として生成する。
+     * 例: @enum RecoveryMode ::= 'sync' | 'auto' | 'skip' ;
+     * → public enum RecoveryMode { SYNC, AUTO, SKIP; ... fromText(String) }
+     */
+    record EnumAnnotation() implements Annotation {}
 
     // =========================================================================
     // ルール本体

@@ -77,9 +77,15 @@ public class ASTGenerator implements CodeGenerator {
         Map<String, RuleDecl> flatRules = new LinkedHashMap<>();
         Map<String, Map<String, RuleDecl>> nestedRules = new LinkedHashMap<>();
         Map<String, RuleDecl> midSealedRules = new LinkedHashMap<>();
+        List<RuleDecl> enumRules = new ArrayList<>();
         for (RuleDecl rule : grammar.rules()) {
             boolean isSkip = rule.annotations().stream().anyMatch(a -> a instanceof SkipAnnotation);
             if (isSkip) {
+                continue;
+            }
+            boolean isEnum = rule.annotations().stream().anyMatch(a -> a instanceof UBNFAST.EnumAnnotation);
+            if (isEnum) {
+                enumRules.add(rule);
                 continue;
             }
             getMappingAnnotation(rule).ifPresent(m -> {
@@ -173,6 +179,11 @@ public class ASTGenerator implements CodeGenerator {
             String outerName = entry.getKey();
             Map<String, RuleDecl> inners = entry.getValue();
             emitNestedSealed(sb, outerName, inners, grammar, className);
+        }
+
+        // enum ルール
+        for (RuleDecl enumRule : enumRules) {
+            sb.append(generateEnumClass(enumRule, "    "));
         }
 
         sb.append("}\n");
@@ -318,6 +329,74 @@ public class ASTGenerator implements CodeGenerator {
             }
             sb.append("    }\n\n");
         }
+    }
+
+    /**
+     * @enum アノテーション付きルールから Java enum クラスを生成する。
+     * 'sync' → SYNC, 'camelCase' → CAMEL_CASE, 'kebab-case' → KEBAB_CASE
+     */
+    private String generateEnumClass(RuleDecl rule, String indent) {
+        String enumName = rule.name();
+        List<String> literals = collectTerminalLiterals(rule.body());
+        if (literals.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append(indent).append("public enum ").append(enumName).append(" {\n");
+        List<String> constNames = literals.stream()
+            .map(ASTGenerator::toEnumConstantName)
+            .toList();
+        sb.append(indent).append("    ")
+          .append(String.join(", ", constNames)).append(";\n\n");
+        // fromText(String text) factory
+        sb.append(indent).append("    public static ").append(enumName)
+          .append(" fromText(String text) {\n");
+        sb.append(indent).append("        return switch (text) {\n");
+        for (int i = 0; i < literals.size(); i++) {
+            sb.append(indent).append("            case \"").append(literals.get(i))
+              .append("\" -> ").append(constNames.get(i)).append(";\n");
+        }
+        sb.append(indent).append("            default -> throw new IllegalArgumentException(")
+          .append("\"Unknown ").append(enumName).append(": \" + text);\n");
+        sb.append(indent).append("        };\n");
+        sb.append(indent).append("    }\n");
+        sb.append(indent).append("}\n\n");
+        return sb.toString();
+    }
+
+    private static String toEnumConstantName(String literal) {
+        // camelCase → CAMEL_CASE, kebab-case → KEBAB_CASE, simple → SIMPLE
+        StringBuilder sb = new StringBuilder();
+        boolean prevLower = false;
+        for (char c : literal.toCharArray()) {
+            if (c == '-' || c == '_' || c == ' ') {
+                sb.append('_');
+                prevLower = false;
+            } else if (Character.isUpperCase(c) && prevLower) {
+                sb.append('_').append(c);
+                prevLower = false;
+            } else {
+                sb.append(Character.toUpperCase(c));
+                prevLower = Character.isLowerCase(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    private List<String> collectTerminalLiterals(UBNFAST.RuleBody body) {
+        return switch (body) {
+            case UBNFAST.ChoiceBody choice -> choice.alternatives().stream()
+                .flatMap(seq -> seq.elements().stream())
+                .map(ae -> ae.element())
+                .filter(e -> e instanceof UBNFAST.TerminalElement)
+                .map(e -> ((UBNFAST.TerminalElement) e).value())
+                .toList();
+            case UBNFAST.SequenceBody seq -> seq.elements().stream()
+                .map(ae -> ae.element())
+                .filter(e -> e instanceof UBNFAST.TerminalElement)
+                .map(e -> ((UBNFAST.TerminalElement) e).value())
+                .toList();
+        };
     }
 
     private String inferCommonFieldType(GrammarDecl grammar, String sealedName,

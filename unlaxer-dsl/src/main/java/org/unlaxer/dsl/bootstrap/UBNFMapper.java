@@ -466,6 +466,8 @@ public class UBNFMapper {
                 result.add(toRecoveryAnnotation(child));
             } else if (child.parser.getClass() == UBNFParsers.SkipAnnotationParser.class) {
                 result.add(new SkipAnnotation());
+            } else if (child.parser.getClass() == UBNFParsers.EnumAnnotationParser.class) {
+                result.add(new UBNFAST.EnumAnnotation());
             } else if (child.parser.getClass() == UBNFParsers.CommonFieldAnnotationParser.class) {
                 result.add(toCommonFieldAnnotation(child));
             } else if (child.parser.getClass() == UBNFParsers.SimpleAnnotationParser.class) {

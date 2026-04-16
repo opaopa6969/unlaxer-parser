@@ -1148,6 +1148,18 @@ public class UBNFParsers {
     }
 
     /**
+     * EnumAnnotation: '@enum'
+     */
+    public static class EnumAnnotationParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(new WordParser("@enum"));
+        }
+    }
+
+    /**
      * CommonFieldAnnotation: '@commonField' '(' IDENTIFIER { ',' IDENTIFIER } ')'
      */
     public static class CommonFieldAnnotationParser extends UBNFLazyChain {
@@ -1204,6 +1216,7 @@ public class UBNFParsers {
                 Parser.get(RecoveryAnnotationParser.class),
                 Parser.get(SkipAnnotationParser.class),
                 Parser.get(CommonFieldAnnotationParser.class),
+                Parser.get(EnumAnnotationParser.class),
                 Parser.get(SimpleAnnotationParser.class)
             );
         }
