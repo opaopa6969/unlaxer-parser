@@ -1,4 +1,4 @@
-[English](./README.md) | [日本語](./README.ja.md)
+[English](./README.md) | [日本語](./README-ja.md)
 
 ---
 
@@ -13,11 +13,35 @@
 
 # unlaxer-parser
 
-**Write a grammar, get a language -- Parser + AST + Evaluator + LSP + DAP, all generated**
+**Write a grammar, get a language — Parser + AST + Evaluator + LSP + DAP, all generated**
 
 [![Maven Central](https://img.shields.io/maven-central/v/org.unlaxer/unlaxer-common)](https://central.sonatype.com/artifact/org.unlaxer/unlaxer-common)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Java 21+](https://img.shields.io/badge/Java-21%2B-orange.svg)]()
+[![Version](https://img.shields.io/badge/version-3.0.1-blue)]()
+
+---
+
+> **Version notice — 3.0.1**: This release contains a patch fix for the Simple wrapper generation bug (issue #22). If you depend on `unlaxer-common` or `unlaxer-dsl` at `2.x`, see [CHANGELOG](./CHANGELOG.md) and the [downstream drift warning](#downstream-drift-warning) below.
+
+---
+
+## Table of Contents
+
+- [The Problem](#the-problem)
+- [The Solution](#the-solution)
+- [Quick Example](#quick-example)
+- [What Gets Generated](#what-gets-generated)
+- [5-Minute Quick Start](#5-minute-quick-start)
+- [Architecture](#architecture)
+- [Bootstrap and Self-Hosting](#bootstrap-and-self-hosting)
+- [Real-World Example](#real-world-example)
+- [Downstream Drift Warning](#downstream-drift-warning)
+- [Documentation](#documentation)
+- [Why unlaxer?](#why-unlaxer)
+- [Project Structure](#project-structure)
+- [foundation-poisonpills Note](#foundation-poisonpills-note)
+- [License](#license)
 
 ---
 
@@ -58,7 +82,7 @@ Write a **UBNF grammar** (~300 lines). Run the generator. Get everything.
         +---> DAP server         (breakpoints, step, variables)
 ```
 
-You write **only** the evaluation logic -- typically 50-200 lines of `evalXxx` methods.
+You write **only** the evaluation logic — typically 50–200 lines of `evalXxx` methods.
 
 ---
 
@@ -112,12 +136,12 @@ From this, unlaxer generates:
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-common</artifactId>
-        <version>2.8.0</version>
+        <version>3.0.1</version>
     </dependency>
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-dsl</artifactId>
-        <version>2.8.0</version>
+        <version>3.0.1</version>
     </dependency>
 </dependencies>
 ```
@@ -163,7 +187,7 @@ grammar TinyCalc {
             <phase>generate-sources</phase>
             <goals><goal>java</goal></goals>
             <configuration>
-                <mainClass>org.unlaxer.dsl.UbnfCodeGenerator</mainClass>
+                <mainClass>org.unlaxer.dsl.CodegenMain</mainClass>
                 <arguments>
                     <argument>${project.basedir}/src/main/resources/TinyCalc.ubnf</argument>
                     <argument>${project.build.directory}/generated-sources/ubnf</argument>
@@ -224,6 +248,8 @@ var result = new CalcEvaluator().eval(ast);
 System.out.println(result);  // 7.0
 ```
 
+See [docs/getting-started.md](./docs/getting-started.md) for the full walkthrough.
+
 ---
 
 ## Architecture
@@ -234,6 +260,7 @@ System.out.println(result);  // 7.0
                     +--------+---------+
                              |
                       code generation
+                      (unlaxer-dsl)
                              |
             +----------------+----------------+
             |                |                |
@@ -255,6 +282,22 @@ System.out.println(result);  // 7.0
                               +-----------+    +-----------+
 ```
 
+See [docs/architecture.md](./docs/architecture.md) for the full pipeline, combinator catalog, and ParserIR design.
+
+---
+
+## Bootstrap and Self-Hosting
+
+As of 3.0.x, unlaxer-dsl has crossed the **bootstrap threshold**: the UBNF grammar file `unlaxer-dsl/grammar/ubnf.ubnf` is itself written in UBNF and processed by unlaxer-dsl to regenerate `UBNFParsers.java`, `UBNFAST.java`, and `UBNFMapper.java`.
+
+This means:
+
+- The hand-written bootstrap files are now verification targets, not the source of truth
+- Every grammar feature added to UBNF is exercised by the self-hosted parse of `ubnf.ubnf`
+- The bootstrap path is: `ubnf.ubnf` → codegen → `bootstrap/generated/` → used by next codegen cycle
+
+See [docs/architecture.md — Bootstrap](./docs/architecture.md#bootstrap-and-self-hosting) for details.
+
 ---
 
 ## Real-World Example
@@ -269,15 +312,31 @@ System.out.println(result);  // 7.0
 
 ---
 
+## Downstream Drift Warning
+
+> **Warning**: The following downstream projects were built against **unlaxer-parser 2.x** and have not yet been validated against 3.0.1. API changes in `UBNFAST`, `UBNFMapper`, and `CodegenMain` entry point may cause breakage.
+
+| Downstream project | Last validated against | Status |
+|--------------------|----------------------|--------|
+| [tinyexpression](https://github.com/opaopa6969/tinyexpression) | 2.8.0 | Unverified against 3.0.1 |
+| [onigiri-parser](https://github.com/opaopa6969/onigiri-parser) | 2.6.0 | Unverified against 3.0.1 |
+| [fraud-alert](https://github.com/opaopa6969/fraud-alert) | 2.8.0 | Unverified against 3.0.1 |
+
+Before upgrading, check the [CHANGELOG](./CHANGELOG.md) for the `2.8.0 → 3.0.0` breaking changes section.
+
+---
+
 ## Documentation
 
-| Tutorial | Description | Language |
-|----------|-------------|----------|
-| Parser Fundamentals | Core parser combinator concepts (unlaxer-common) | [JA](./unlaxer-common/docs/tutorial-parser-fundamentals-dialogue.ja.md) |
-| UBNF to LSP/DAP | Full pipeline: grammar to IDE support (unlaxer-dsl) | [EN](./unlaxer-dsl/docs/tutorial-ubnf-to-lsp-dap-dialogue.en.md) / [JA](./unlaxer-dsl/docs/tutorial-ubnf-to-lsp-dap-dialogue.ja.md) |
-| LLM Era and Unlaxer | Why frameworks still matter in the age of LLMs | [JA](./unlaxer-dsl/docs/llm-era-and-unlaxer-dialogue.ja.md) |
-| Quick Start (5 minutes) | Dialogue-format getting started guide | [JA](./unlaxer-dsl/docs/quickstart-dialogue.ja.md) |
-| Implementation Guide | Building tinyexpression end-to-end | [tinyexpression repo](https://github.com/opaopa6969/tinyexpression) |
+| Document | Description | Languages |
+|----------|-------------|-----------|
+| [Getting Started](./docs/getting-started.md) | Maven setup, first grammar, full walkthrough | [EN](./docs/getting-started.md) / [JA](./docs/getting-started-ja.md) |
+| [UBNF Guide](./docs/ubnf-guide.md) | Full UBNF syntax, all annotations, feature matrix | [EN](./docs/ubnf-guide.md) / [JA](./docs/ubnf-guide-ja.md) |
+| [Architecture](./docs/architecture.md) | Bootstrap pipeline, combinator catalog, ParserIR | [EN](./docs/architecture.md) / [JA](./docs/architecture-ja.md) |
+| [Parser Fundamentals](./unlaxer-common/docs/tutorial-parser-fundamentals-dialogue.en.md) | Core parser combinator concepts | [EN](./unlaxer-common/docs/tutorial-parser-fundamentals-dialogue.en.md) / [JA](./unlaxer-common/docs/tutorial-parser-fundamentals-dialogue.ja.md) |
+| [UBNF to LSP/DAP Tutorial](./unlaxer-dsl/docs/tutorial-ubnf-to-lsp-dap-dialogue.en.md) | Full pipeline: grammar to IDE support | [EN](./unlaxer-dsl/docs/tutorial-ubnf-to-lsp-dap-dialogue.en.md) / [JA](./unlaxer-dsl/docs/tutorial-ubnf-to-lsp-dap-dialogue.ja.md) |
+| [Quick Start (5 min)](./unlaxer-dsl/docs/quickstart-dialogue.en.md) | Dialogue-format getting started guide | [EN](./unlaxer-dsl/docs/quickstart-dialogue.en.md) / [JA](./unlaxer-dsl/docs/quickstart-dialogue.ja.md) |
+| [LLM Era and Unlaxer](./unlaxer-dsl/docs/llm-era-and-unlaxer-dialogue.en.md) | Why frameworks still matter in the age of LLMs | [EN](./unlaxer-dsl/docs/llm-era-and-unlaxer-dialogue.en.md) / [JA](./unlaxer-dsl/docs/llm-era-and-unlaxer-dialogue.ja.md) |
 
 ---
 
@@ -294,6 +353,7 @@ System.out.println(result);  // 7.0
 | Grammar annotations | No | No | No | **Yes** (`@mapping`, `@leftAssoc`, `@eval`, ...) |
 | Operator associativity | In grammar | In grammar | Manual | **`@leftAssoc` / `@rightAssoc`** |
 | Zero dependencies | No | No | No | **Yes** (unlaxer-common) |
+| Bootstrap / self-hosting | No | Yes | No | **Yes** (since 3.0.0) |
 
 unlaxer is designed for Java teams who want to go from grammar to working IDE support with minimal boilerplate.
 
@@ -304,11 +364,23 @@ unlaxer is designed for Java teams who want to go from grammar to working IDE su
 ```
 unlaxer-parser/
   +-- unlaxer-common/     Core parser combinator library (zero dependencies)
-  +-- unlaxer-dsl/         Code generator: UBNF -> Parsers + AST + Mapper + Evaluator + LSP + DAP
+  |     +-- src/          ~50 combinators, ~30 elementary parsers
+  |     +-- docs/         Parser fundamentals tutorial
+  +-- unlaxer-dsl/        Code generator: UBNF -> Parsers + AST + Mapper + Evaluator + LSP + DAP
+  |     +-- grammar/      ubnf.ubnf (self-hosted grammar definition)
+  |     +-- src/          Bootstrap parsers, codegen pipeline, IR
+  |     +-- docs/         UBNF tutorials, extension roadmap, ParserIR design
+  +-- docs/               Top-level guides (architecture, UBNF guide, getting started)
 ```
 
-- **[unlaxer-common](./unlaxer-common/)** -- Parser combinators inspired by RELAX NG. Infinite lookahead, backtracking, comprehensive logging. Pure Java, zero dependencies.
-- **[unlaxer-dsl](./unlaxer-dsl/)** -- Reads `.ubnf` grammar files and generates all the Java code you need.
+- **[unlaxer-common](./unlaxer-common/)** — Parser combinators inspired by RELAX NG. Infinite lookahead, backtracking, comprehensive logging. Pure Java, zero dependencies.
+- **[unlaxer-dsl](./unlaxer-dsl/)** — Reads `.ubnf` grammar files and generates all the Java code you need.
+
+---
+
+## foundation-poisonpills Note
+
+Some internal integration tests and codegen fixtures reference a module named `foundation-poisonpills`. This module is not published to Maven Central and is not part of the public API. Its purpose is internal adversarial testing of the parser combinator core (inputs designed to trigger worst-case backtracking). **You do not need it** to use unlaxer-parser. If you see a build error mentioning `foundation-poisonpills`, you are likely running the full internal test suite, which requires the private module to be present on the local classpath.
 
 ---
 
