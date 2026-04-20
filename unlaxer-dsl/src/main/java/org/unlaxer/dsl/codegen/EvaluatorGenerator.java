@@ -43,6 +43,7 @@ public class EvaluatorGenerator implements CodeGenerator {
 
         StringBuilder sb = new StringBuilder();
         sb.append("package ").append(packageName).append(";\n\n");
+        sb.append(CodeGenerator.generatedAnnotation("org.unlaxer.dsl.codegen.EvaluatorGenerator"));
         sb.append("public abstract class ").append(evalClass).append("<T> {\n\n");
 
         // DebugStrategy フィールドとセッター

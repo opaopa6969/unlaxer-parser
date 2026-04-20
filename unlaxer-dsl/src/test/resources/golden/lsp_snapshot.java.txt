@@ -11,6 +11,7 @@ import org.unlaxer.context.ParseContext;
 import org.unlaxer.parser.Parser;
 import org.unlaxer.parser.incremental.IncrementalParseCache;
 
+@javax.annotation.processing.Generated("org.unlaxer.dsl.codegen.LSPGenerator")
 public abstract class SnapshotLanguageServer implements LanguageServer, LanguageClientAware {
 
     private static final List<String> KEYWORDS = List.of("grammar", "token", "@root", "@mapping", "@whitespace", "@interleave", "@backref", "@typeof", "@scopeTree", "@leftAssoc", "@rightAssoc", "@precedence", "@declares", "@catalog", "params", "level", "profile", "name", "mode", "symbol", "context", "description", "+", "*");

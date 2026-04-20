@@ -11,6 +11,7 @@ import org.unlaxer.reducer.TagBasedReducer.NodeKind;
 import org.unlaxer.util.cache.SupplierBoundCache;
 import org.unlaxer.parser.elementary.NumberParser;
 
+@javax.annotation.processing.Generated("org.unlaxer.dsl.codegen.ParserGenerator")
 public class SnapshotParsers {
 
     public static final int PRECEDENCE_EXPR = 10;

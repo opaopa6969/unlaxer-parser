@@ -10,6 +10,7 @@ import org.unlaxer.Token;
 import org.unlaxer.context.ParseContext;
 import org.unlaxer.parser.Parser;
 
+@javax.annotation.processing.Generated("org.unlaxer.dsl.codegen.MapperGenerator")
 /**
  * SnapshotRightAssoc parse tree (Token) -> SnapshotRightAssocAST mapper.
  */

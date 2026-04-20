@@ -17,6 +17,7 @@ import org.unlaxer.Token;
 import org.unlaxer.context.ParseContext;
 import org.unlaxer.parser.Parser;
 
+@javax.annotation.processing.Generated("org.unlaxer.dsl.codegen.DAPGenerator")
 public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
 
     protected IDebugProtocolClient client;

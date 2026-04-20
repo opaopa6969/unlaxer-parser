@@ -3,6 +3,7 @@ package org.example.snapshot;
 import java.util.List;
 import java.util.Optional;
 
+@javax.annotation.processing.Generated("org.unlaxer.dsl.codegen.ASTGenerator")
 public sealed interface SnapshotAST permits
     SnapshotAST.ExprNode,
     SnapshotAST.TermNode {

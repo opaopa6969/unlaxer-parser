@@ -63,6 +63,7 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("import org.unlaxer.context.ParseContext;\n");
         sb.append("import org.unlaxer.parser.Parser;\n\n");
 
+        sb.append(CodeGenerator.generatedAnnotation("org.unlaxer.dsl.codegen.MapperGenerator"));
         sb.append("/**\n");
         sb.append(" * ").append(grammarName).append(" parse tree (Token) -> ")
           .append(astClass).append(" mapper.\n");

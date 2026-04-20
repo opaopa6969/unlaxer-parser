@@ -166,6 +166,7 @@ public class ParserGenerator implements CodeGenerator {
             sb.append(tokenImport).append("\n");
         }
         sb.append("\n");
+        sb.append(CodeGenerator.generatedAnnotation("org.unlaxer.dsl.codegen.ParserGenerator"));
 
         // クラス宣言
         sb.append("public class ").append(className).append(" {\n\n");

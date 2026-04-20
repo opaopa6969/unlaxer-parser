@@ -51,6 +51,7 @@ public class DAPGenerator implements CodeGenerator {
         w.line("import org.unlaxer.parser.Parser;");
         w.blankLine();
 
+        w.line(CodeGenerator.generatedAnnotation("org.unlaxer.dsl.codegen.DAPGenerator").stripTrailing());
         w.line("public abstract class " + adapterClass + " implements IDebugProtocolServer {");
         w.blankLine();
 

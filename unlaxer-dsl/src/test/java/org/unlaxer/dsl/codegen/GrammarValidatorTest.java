@@ -1,11 +1,13 @@
 package org.unlaxer.dsl.codegen;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import org.junit.Test;
@@ -604,6 +606,107 @@ public class GrammarValidatorTest {
         // Should NOT contain "Did you mean" since distance is too large
         assertTrue(undefinedIssue.hint().contains("Define a rule or token"));
         assertTrue(false == undefinedIssue.hint().contains("Did you mean"));
+    }
+
+    // =========================================================================
+    // validateWithWarnings / left-recursion detection tests
+    // =========================================================================
+
+    @Test
+    public void testValidateWithWarningsNoLeftRecursion() {
+        GrammarDecl grammar = parseGrammar(
+            "grammar G {\n"
+                + "  @package: org.example\n"
+                + "  @root\n"
+                + "  Start ::= Term ;\n"
+                + "  Term ::= 'n' ;\n"
+                + "}"
+        );
+
+        Optional<List<String>> result = GrammarValidator.validateWithWarnings(grammar);
+        assertFalse("no left-recursion expected", result.isPresent());
+    }
+
+    @Test
+    public void testValidateWithWarningsDirectLeftRecursion() {
+        // Direct left-recursion: Expr ::= Expr '+' Term | Term
+        GrammarDecl grammar = parseGrammar(
+            "grammar G {\n"
+                + "  @package: org.example\n"
+                + "  @root\n"
+                + "  Expr ::= Expr | 'n' ;\n"
+                + "}"
+        );
+
+        Optional<List<String>> result = GrammarValidator.validateWithWarnings(grammar);
+        assertTrue("direct left-recursion should produce warning", result.isPresent());
+        List<String> warnings = result.get();
+        assertFalse("warnings list must not be empty", warnings.isEmpty());
+        assertTrue("warning message should mention Expr -> Expr",
+            warnings.stream().anyMatch(w -> w.contains("W-LEFT-RECURSION")));
+        assertTrue("warning message should contain rule name",
+            warnings.stream().anyMatch(w -> w.contains("Expr")));
+    }
+
+    @Test
+    public void testValidateWithWarningsIndirectLeftRecursion() {
+        // Indirect left-recursion: A ::= B ...; B ::= A ...
+        GrammarDecl grammar = parseGrammar(
+            "grammar G {\n"
+                + "  @package: org.example\n"
+                + "  @root\n"
+                + "  A ::= B ;\n"
+                + "  B ::= A ;\n"
+                + "}"
+        );
+
+        Optional<List<String>> result = GrammarValidator.validateWithWarnings(grammar);
+        assertTrue("indirect left-recursion should produce warning", result.isPresent());
+        List<String> warnings = result.get();
+        assertFalse("warnings list must not be empty", warnings.isEmpty());
+        assertTrue("warning should mention W-LEFT-RECURSION",
+            warnings.stream().anyMatch(w -> w.contains("W-LEFT-RECURSION")));
+    }
+
+    @Test
+    public void testValidateWithWarningsDoesNotThrowOnExistingGrammars() {
+        // Verifies that left-recursion detection never throws, even for complex grammars
+        GrammarDecl grammar = parseGrammar(
+            "grammar G {\n"
+                + "  @package: org.example\n"
+                + "  @root\n"
+                + "  @mapping(ExprNode, params=[left, op, right])\n"
+                + "  @leftAssoc\n"
+                + "  @precedence(level=10)\n"
+                + "  Expr ::= Term @left { '+' @op Term @right } ;\n"
+                + "  @mapping(TermNode, params=[left, op, right])\n"
+                + "  @leftAssoc\n"
+                + "  @precedence(level=20)\n"
+                + "  Term ::= Factor @left { '*' @op Factor @right } ;\n"
+                + "  Factor ::= 'n' ;\n"
+                + "}"
+        );
+
+        // Must not throw; the result is unimportant for this well-formed grammar
+        Optional<List<String>> result = GrammarValidator.validateWithWarnings(grammar);
+        // Well-formed grammar — no left-recursion expected
+        assertFalse("well-formed grammar should have no left-recursion warnings", result.isPresent());
+    }
+
+    @Test
+    public void testValidateWithWarningsReturnsEmptyOptionalForNonRecursiveGrammar() {
+        GrammarDecl grammar = parseGrammar(
+            "grammar G {\n"
+                + "  @package: org.example\n"
+                + "  @root\n"
+                + "  S ::= A B ;\n"
+                + "  A ::= 'a' ;\n"
+                + "  B ::= 'b' ;\n"
+                + "}"
+        );
+
+        Optional<List<String>> result = GrammarValidator.validateWithWarnings(grammar);
+        assertFalse("non-recursive grammar should return empty optional", result.isPresent());
     }
 
     private GrammarDecl parseGrammar(String source) {

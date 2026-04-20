@@ -6,6 +6,20 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ---
 
+## [3.0.2] - 2026-04-20
+
+### Added
+
+- **Left-recursion detection** (#25, #26): `GrammarValidator.validateWithWarnings(GrammarDecl)` new method that detects direct and indirect left-recursive cycles in a grammar and returns `Optional<List<String>>` warnings. **Warning only — never throws.** Existing grammars continue to parse without modification.
+- **`@Generated` annotation** (#24): All codegen output files now carry `@javax.annotation.processing.Generated("<GeneratorClass>")`. Enables IDEs and tools (e.g. Checkstyle, SonarQube) to skip generated code. No breaking API change.
+
+### Notes
+
+- No API changes from 3.0.1. Safe to upgrade without code changes.
+- CI workflow already present at `.github/workflows/maven.yml`; no new workflow needed.
+
+---
+
 ## [3.0.1] - 2026-04-19
 
 ### Fixed

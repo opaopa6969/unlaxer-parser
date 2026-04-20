@@ -23,7 +23,7 @@ public class LSPLauncherGenerator implements CodeGenerator {
         sb.append("import org.eclipse.lsp4j.services.LanguageClient;\n");
         sb.append("import org.eclipse.lsp4j.jsonrpc.Launcher;\n");
         sb.append("\n");
-
+        sb.append(CodeGenerator.generatedAnnotation("org.unlaxer.dsl.codegen.LSPLauncherGenerator"));
         sb.append("public abstract class ").append(launcherClass).append(" {\n\n");
         sb.append("    protected abstract ").append(serverClass).append(" createServer();\n\n");
         sb.append("    public void launch() throws IOException {\n");

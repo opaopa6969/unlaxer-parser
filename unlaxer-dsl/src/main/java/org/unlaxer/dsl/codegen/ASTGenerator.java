@@ -129,6 +129,7 @@ public class ASTGenerator implements CodeGenerator {
         sb.append("import java.util.List;\n");
         sb.append("import java.util.Optional;\n");
         sb.append("\n");
+        sb.append(CodeGenerator.generatedAnnotation("org.unlaxer.dsl.codegen.ASTGenerator"));
 
         if (flatRules.isEmpty() && nestedRules.isEmpty() && midSealedRules.isEmpty()) {
             sb.append("public interface ").append(className).append(" {}\n");

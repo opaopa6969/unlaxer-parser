@@ -1,5 +1,6 @@
 package org.example.snapshot;
 
+@javax.annotation.processing.Generated("org.unlaxer.dsl.codegen.EvaluatorGenerator")
 public abstract class SnapshotEvaluator<T> {
 
     private DebugStrategy debugStrategy = DebugStrategy.NOOP;

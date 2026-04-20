@@ -37,6 +37,7 @@ public class LSPGenerator implements CodeGenerator {
         // ----- Imports -----
         LSPServerEmitter.emitImports(w, hasScopeStore);
 
+        w.line(CodeGenerator.generatedAnnotation("org.unlaxer.dsl.codegen.LSPGenerator").stripTrailing());
         w.line("public abstract class " + serverClass
               + " implements LanguageServer, LanguageClientAware {");
         w.blankLine();
