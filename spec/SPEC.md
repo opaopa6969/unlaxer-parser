@@ -133,6 +133,24 @@ UBNF 文法ファイルを読み込み、unlaxer-common ベースの Java コー
   └──────────────────────────────────────────┘
 ```
 
+```mermaid
+graph TB
+    A[".ubnf grammar file"] --> B["CodegenMain\n(CLI entry point)"]
+    B --> C["UBNF Parsing Phase\nUBNFParsers (bootstrap)\nUBNFMapper"]
+    C --> D["UBNFAST\n(typed AST of grammar)"]
+    D --> E["GrammarValidator"]
+    D --> F["ParserIR Export\n(optional SPI)"]
+    E --> G["Code Generation Phase"]
+    G --> G1["ParserGenerator\n→ XxxParsers.java"]
+    G --> G2["ASTGenerator\n→ XxxAST.java"]
+    G --> G3["MapperGenerator\n→ XxxMapper.java"]
+    G --> G4["EvaluatorGenerator\n→ XxxEvaluator.java"]
+    G --> G5["LSPGenerator\n→ XxxLSP.java"]
+    G --> G6["LSPLauncherGenerator\n→ XxxLSPLauncher.java"]
+    G --> G7["DAPGenerator\n→ XxxDAP.java"]
+    G --> G8["DAPLauncherGenerator\n→ XxxDAPLauncher.java"]
+```
+
 ### 1.5 セルフホスティング
 
 unlaxer-dsl は 3.0.0 でセルフホスティングを達成した。UBNF 文法自体が UBNF で記述されており、unlaxer-dsl 自身でパーサーを生成できる。
@@ -158,6 +176,25 @@ Step 5: SelfHostingTest: 生成パーサーで ubnf.ubnf をパース
 - **ドキュメント**: `ubnf.ubnf` が UBNF 構文の機械可読な正規仕様となる
 
 手書きブートストラップファイル（`org.unlaxer.dsl.bootstrap.UBNFParsers` 等）は凍結された参照実装として保持され続ける。生成ファイル（`org.unlaxer.dsl.bootstrap.generated.*`）がライブ実装である。
+
+```mermaid
+sequenceDiagram
+    participant G as ubnf.ubnf
+    participant B as bootstrap<br/>(手書き)
+    participant CM as CodegenMain
+    participant GEN as generated<br/>(生成物)
+    participant SHT as SelfHostingTest
+
+    CM->>B: ubnf.ubnf を手書きパーサーで処理
+    B->>CM: UBNFAST (手書き)
+    CM->>GEN: 生成 UBNFParsers / UBNFAST / UBNFMapper を出力
+    SHT->>GEN: 生成パーサーで ubnf.ubnf を再パース
+    GEN->>SHT: UBNFAST (生成)
+    SHT->>B: 手書きパーサーで ubnf.ubnf を再パース
+    B->>SHT: UBNFAST (手書き)
+    SHT->>SHT: 生成 UBNFAST == 手書き UBNFAST を検証
+    Note over SHT: 一致すれば self-hosting テスト PASS
+```
 
 ### 1.6 競合比較
 
@@ -750,6 +787,69 @@ UBNFAST.UBNFFile
 ```
 
 **3.0.0 破壊的変更**: `UBNFAST.TokenDecl` が sealed 化された。2.x では `TokenDecl` が単一クラスだったが、3.0.0 以降は sealed hierarchy になっている。`instanceof` チェックのコードは更新が必要。
+
+```mermaid
+classDiagram
+    class UBNFFile {
+        +List~GrammarDecl~ grammars
+    }
+    class GrammarDecl {
+        +String name
+        +List~ImportDecl~ imports
+        +List~GlobalSetting~ settings
+        +List~TokenDecl~ tokens
+        +List~RuleDecl~ rules
+    }
+    class TokenDecl {
+        <<sealed>>
+        +String name
+    }
+    class Simple { +String className }
+    class Until { +String terminator }
+    class Negation { +String parser }
+    class Lookahead { +String pattern }
+    class NegativeLookahead { +String pattern }
+    class RuleDecl {
+        +String name
+        +List~Annotation~ annotations
+        +RuleBody body
+    }
+    class Annotation { <<sealed>> }
+    class RootAnnotation
+    class MappingAnnotation { +String className; +List~String~ params }
+    class LeftAssocAnnotation
+    class RightAssocAnnotation
+    class PrecedenceAnnotation { +int level }
+    class RuleBody { <<sealed>> }
+    class SequenceBody { +List~RuleBody~ elements }
+    class ChoiceBody { +List~RuleBody~ alternatives }
+    class RuleRef { +String name }
+    class TokenRef { +String name }
+    class LiteralRef { +String value }
+    class QuantifiedRef { +RuleBody element; +Quantifier q }
+
+    UBNFFile "1" --> "*" GrammarDecl
+    GrammarDecl "1" --> "*" TokenDecl
+    GrammarDecl "1" --> "*" RuleDecl
+    TokenDecl <|-- Simple
+    TokenDecl <|-- Until
+    TokenDecl <|-- Negation
+    TokenDecl <|-- Lookahead
+    TokenDecl <|-- NegativeLookahead
+    RuleDecl "1" --> "*" Annotation
+    RuleDecl "1" --> "1" RuleBody
+    Annotation <|-- RootAnnotation
+    Annotation <|-- MappingAnnotation
+    Annotation <|-- LeftAssocAnnotation
+    Annotation <|-- RightAssocAnnotation
+    Annotation <|-- PrecedenceAnnotation
+    RuleBody <|-- SequenceBody
+    RuleBody <|-- ChoiceBody
+    RuleBody <|-- RuleRef
+    RuleBody <|-- TokenRef
+    RuleBody <|-- LiteralRef
+    RuleBody <|-- QuantifiedRef
+```
 
 ### 5.2 アノテーションセマンティクス詳細
 
@@ -1558,6 +1658,24 @@ ParserTestBase.setLevel(OutputLevel.withTag);    // タグ情報付きログ
 **背景**: PEG パーサーモデルにおいて左再帰は理論的にランタイム無限ループを引き起こす可能性がある。`GrammarValidator` がコード生成前に検出することで、実行時問題を早期に発見できる。
 
 **検出アルゴリズム**: 直接左再帰（`A ::= A ...`）と間接左再帰（`A ::= B ...`, `B ::= A ...`）の両方を検出。ルール依存グラフを構築してサイクルを列挙する。
+
+```mermaid
+flowchart TD
+    A([validateWithWarnings 開始]) --> B[GrammarDecl からルール一覧を取得]
+    B --> C[各ルールの先頭参照を収集\n→ 依存グラフ構築]
+    C --> D{未訪問ルールが残っているか}
+    D -- Yes --> E[ルールを選択して DFS 開始]
+    E --> F{先頭参照がルール参照か}
+    F -- No --> D
+    F -- Yes --> G{参照先がすでに訪問スタックにあるか}
+    G -- No --> H[参照先を再帰的に DFS]
+    H --> D
+    G -- Yes --> I[サイクル検出\nW-LEFT-RECURSION 警告を生成]
+    I --> J[サイクルパスを文字列リストとして記録]
+    J --> D
+    D -- No --> K[Optional に警告リストを包んで返す]
+    K --> L([validateWithWarnings 終了\n例外スローなし])
+```
 
 ### 10.2 パースキャッシュ（メモ化）
 
