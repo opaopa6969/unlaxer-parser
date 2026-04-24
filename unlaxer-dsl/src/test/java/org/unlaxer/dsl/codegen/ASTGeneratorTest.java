@@ -239,6 +239,156 @@ public class ASTGeneratorTest {
     }
 
     // =========================================================================
+    // @enum — Java enum generation (3.0.0)
+    // =========================================================================
+
+    // Grammar that uses @enum: the enum rules are siblings of @mapping rules so the generator
+    // enters the sealed-interface path and emits the enum classes.
+    private static final String ENUM_GRAMMAR =
+        "grammar EnumDemo {\n" +
+        "  @package: org.example.enumdemo\n" +
+        "\n" +
+        "  @enum\n" +
+        "  RecoveryMode ::= 'sync' | 'auto' | 'skip' ;\n" +
+        "\n" +
+        "  @enum\n" +
+        "  LogLevel ::= 'debug' | 'info' | 'warn' | 'error' ;\n" +
+        "\n" +
+        "  @root\n" +
+        "  @mapping(Config, params=[name])\n" +
+        "  Config ::= 'cfg' RecoveryMode @name ;\n" +
+        "}";
+
+    @Test
+    public void testEnumRuleGeneratesEnumClass() {
+        GrammarDecl grammar = parseGrammar(ENUM_GRAMMAR);
+        ASTGenerator gen = new ASTGenerator();
+        String source = gen.generate(grammar).source();
+        assertTrue("should generate enum RecoveryMode", source.contains("public enum RecoveryMode {"));
+    }
+
+    @Test
+    public void testEnumConstantsAreUpperCase() {
+        GrammarDecl grammar = parseGrammar(ENUM_GRAMMAR);
+        ASTGenerator gen = new ASTGenerator();
+        String source = gen.generate(grammar).source();
+        assertTrue("should contain SYNC constant", source.contains("SYNC"));
+        assertTrue("should contain AUTO constant", source.contains("AUTO"));
+        assertTrue("should contain SKIP constant", source.contains("SKIP"));
+    }
+
+    @Test
+    public void testEnumHasFromTextFactory() {
+        GrammarDecl grammar = parseGrammar(ENUM_GRAMMAR);
+        ASTGenerator gen = new ASTGenerator();
+        String source = gen.generate(grammar).source();
+        assertTrue("should have fromText factory method",
+            source.contains("public static RecoveryMode fromText(String text)"));
+    }
+
+    @Test
+    public void testFromTextSwitchCoversAllLiterals() {
+        GrammarDecl grammar = parseGrammar(ENUM_GRAMMAR);
+        ASTGenerator gen = new ASTGenerator();
+        String source = gen.generate(grammar).source();
+        assertTrue("fromText should handle 'sync'", source.contains("case \"sync\" -> SYNC;"));
+        assertTrue("fromText should handle 'auto'", source.contains("case \"auto\" -> AUTO;"));
+        assertTrue("fromText should handle 'skip'", source.contains("case \"skip\" -> SKIP;"));
+    }
+
+    @Test
+    public void testFromTextHasDefaultThrow() {
+        GrammarDecl grammar = parseGrammar(ENUM_GRAMMAR);
+        ASTGenerator gen = new ASTGenerator();
+        String source = gen.generate(grammar).source();
+        assertTrue("fromText should throw on unknown",
+            source.contains("throw new IllegalArgumentException(\"Unknown RecoveryMode: \" + text)"));
+    }
+
+    @Test
+    public void testMultipleEnumRulesAllGenerated() {
+        GrammarDecl grammar = parseGrammar(ENUM_GRAMMAR);
+        ASTGenerator gen = new ASTGenerator();
+        String source = gen.generate(grammar).source();
+        assertTrue("should generate RecoveryMode enum", source.contains("public enum RecoveryMode {"));
+        assertTrue("should generate LogLevel enum", source.contains("public enum LogLevel {"));
+    }
+
+    @Test
+    public void testEnumConstantNameCamelCase() {
+        // camelCase literals → CAMEL_CASE constant names; kebab-case → KEBAB_CASE.
+        // The grammar needs at least one @mapping rule so the generator enters the sealed-interface
+        // path and emits enum classes.
+        String grammar =
+            "grammar CamelEnum {\n" +
+            "  @package: org.example\n" +
+            "  @enum\n" +
+            "  SomeEnum ::= 'camelCase' | 'kebab-case' ;\n" +
+            "  @root\n" +
+            "  @mapping(Root, params=[value])\n" +
+            "  Root ::= 'root' SomeEnum @value ;\n" +
+            "}";
+        GrammarDecl g = parseGrammar(grammar);
+        String source = new ASTGenerator().generate(g).source();
+        assertTrue("camelCase → CAMEL_CASE", source.contains("CAMEL_CASE"));
+        assertTrue("kebab-case → KEBAB_CASE", source.contains("KEBAB_CASE"));
+    }
+
+    // =========================================================================
+    // @commonField — sealed interface method promotion (3.0.0)
+    // =========================================================================
+
+    // Grammar for @commonField: the annotation goes on the mid-sealed (parent) rule that
+    // aggregates alternatives.  Alternatives must use flat (non-dotted) @mapping names so
+    // the mid-sealed path is taken.  The implementation at emitMidSealed() collects
+    // @commonField from rules whose @mapping className equals the midSealedName ("Node").
+    private static final String COMMON_FIELD_GRAMMAR =
+        "grammar Expr {\n" +
+        "  @package: org.example.expr\n" +
+        "  @whitespace: javaStyle\n" +
+        "\n" +
+        "  token IDENT = org.unlaxer.parser.clang.IdentifierParser\n" +
+        "\n" +
+        "  @root\n" +
+        "  @mapping(Node)\n" +
+        "  @commonField(left)\n" +
+        "  Node ::= AddNode | SubNode ;\n" +
+        "\n" +
+        "  @mapping(AddNode, params=[left, right])\n" +
+        "  AddNode ::= IDENT @left '+' IDENT @right ;\n" +
+        "\n" +
+        "  @mapping(SubNode, params=[left, right])\n" +
+        "  SubNode ::= IDENT @left '-' IDENT @right ;\n" +
+        "}";
+
+    @Test
+    public void testCommonFieldAppearsAsAbstractMethodInSealedInterface() {
+        GrammarDecl grammar = parseGrammar(COMMON_FIELD_GRAMMAR);
+        ASTGenerator gen = new ASTGenerator();
+        String source = gen.generate(grammar).source();
+        assertTrue("sealed interface Node should have left() abstract method",
+            source.contains("left();"));
+    }
+
+    @Test
+    public void testCommonFieldSealedInterfaceIsGenerated() {
+        GrammarDecl grammar = parseGrammar(COMMON_FIELD_GRAMMAR);
+        ASTGenerator gen = new ASTGenerator();
+        String source = gen.generate(grammar).source();
+        assertTrue("should generate sealed interface Node with permits",
+            source.contains("sealed interface Node extends ExprAST permits"));
+    }
+
+    @Test
+    public void testCommonFieldPermittedRecordsAreGenerated() {
+        GrammarDecl grammar = parseGrammar(COMMON_FIELD_GRAMMAR);
+        ASTGenerator gen = new ASTGenerator();
+        String source = gen.generate(grammar).source();
+        assertTrue("should have AddNode record", source.contains("record AddNode("));
+        assertTrue("should have SubNode record", source.contains("record SubNode("));
+    }
+
+    // =========================================================================
     // ヘルパー
     // =========================================================================
 
