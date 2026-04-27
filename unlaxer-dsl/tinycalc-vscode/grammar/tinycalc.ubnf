@@ -2,8 +2,8 @@ grammar TinyCalc {
   @package: org.unlaxer.tinycalc.generated
   @whitespace: javaStyle
 
-  token NUMBER     = NumberParser
-  token IDENTIFIER = IdentifierParser
+  token NUMBER     = org.unlaxer.parser.elementary.NumberParser
+  token IDENTIFIER = org.unlaxer.parser.clang.IdentifierParser
 
   @root
   @mapping(TinyCalcProgram, params=[declarations, expression])
@@ -20,11 +20,16 @@ grammar TinyCalc {
 
   @mapping(BinaryExpr, params=[left, op, right])
   @leftAssoc
-  Expression ::= Term @left { ( '+' @op | '-' @op ) Term @right } ;
+  @precedence(level=10)
+  Expression ::= Term @left { AddOp @op Term @right } ;
 
   @mapping(BinaryExpr, params=[left, op, right])
   @leftAssoc
-  Term ::= Factor @left { ( '*' @op | '/' @op ) Factor @right } ;
+  @precedence(level=20)
+  Term ::= Factor @left { MulOp @op Factor @right } ;
+
+  AddOp ::= '+' | '-' ;
+  MulOp ::= '*' | '/' ;
 
   Factor ::=
       '(' Expression ')'

@@ -78,7 +78,7 @@
                                 <argument>--output</argument>
                                 <argument>${generated.sources.dir}</argument>
                                 <argument>--generators</argument>
-                                <argument>Parser,LSP,Launcher,DAP,DAPLauncher</argument>
+                                <argument>AST,Mapper,Parser,LSP,Launcher,DAP,DAPLauncher</argument>
                             </arguments>
                             <includeProjectDependencies>true</includeProjectDependencies>
                             <includePluginDependencies>false</includePluginDependencies>
