@@ -98,76 +98,36 @@ UBNF 文法ファイルを読み込み、unlaxer-common ベースの Java コー
 
 ### 1.4 パイプライン概要
 
-```
-┌────────────────────────────────────────────────┐
-│  .ubnf grammar file (e.g., TinyCalc.ubnf)      │
-└──────────────────────┬─────────────────────────┘
-                       │  CodegenMain (CLI entry point)
-                       │
-         ┌─────────────▼─────────────┐
-         │  UBNF Parsing Phase        │
-         │  UBNFParsers (bootstrap)   │
-         │  UBNFMapper                │
-         └─────────────┬─────────────┘
-                       │
-         ┌─────────────▼─────────────┐
-         │  UBNFAST                   │
-         │  (typed AST of grammar)    │
-         └─────┬────────────┬─────────┘
-               │            │
-     ┌─────────▼──┐    ┌────▼────────────┐
-     │ Grammar    │    │ ParserIR Export  │
-     │ Validator  │    │ (optional SPI)   │
-     └─────────┬──┘    └─────────────────┘
-               │
-  ┌────────────▼────────────────────────────┐
-  │  Code Generation Phase                   │
-  │  ParserGenerator  → XxxParsers.java      │
-  │  ASTGenerator     → XxxAST.java          │
-  │  MapperGenerator  → XxxMapper.java       │
-  │  EvaluatorGenerator → XxxEvaluator.java  │
-  │  LSPGenerator     → XxxLSP.java          │
-  │  LSPLauncherGenerator → XxxLSPLauncher   │
-  │  DAPGenerator     → XxxDAP.java          │
-  │  DAPLauncherGenerator → XxxDAPLauncher   │
-  └──────────────────────────────────────────┘
-```
-
 ```mermaid
 graph TB
-    A[".ubnf grammar file"] --> B["CodegenMain\n(CLI entry point)"]
-    B --> C["UBNF Parsing Phase\nUBNFParsers (bootstrap)\nUBNFMapper"]
-    C --> D["UBNFAST\n(typed AST of grammar)"]
+    A[".ubnf grammar file"] --> B["CodegenMain<br/>(CLI entry point)"]
+    B --> C["UBNF Parsing Phase<br/>UBNFParsers (bootstrap)<br/>UBNFMapper"]
+    C --> D["UBNFAST<br/>(typed AST of grammar)"]
     D --> E["GrammarValidator"]
-    D --> F["ParserIR Export\n(optional SPI)"]
+    D --> F["ParserIR Export<br/>(optional SPI)"]
     E --> G["Code Generation Phase"]
-    G --> G1["ParserGenerator\n→ XxxParsers.java"]
-    G --> G2["ASTGenerator\n→ XxxAST.java"]
-    G --> G3["MapperGenerator\n→ XxxMapper.java"]
-    G --> G4["EvaluatorGenerator\n→ XxxEvaluator.java"]
-    G --> G5["LSPGenerator\n→ XxxLSP.java"]
-    G --> G6["LSPLauncherGenerator\n→ XxxLSPLauncher.java"]
-    G --> G7["DAPGenerator\n→ XxxDAP.java"]
-    G --> G8["DAPLauncherGenerator\n→ XxxDAPLauncher.java"]
+    G --> G1["ParserGenerator<br/>→ XxxParsers.java"]
+    G --> G2["ASTGenerator<br/>→ XxxAST.java"]
+    G --> G3["MapperGenerator<br/>→ XxxMapper.java"]
+    G --> G4["EvaluatorGenerator<br/>→ XxxEvaluator.java"]
+    G --> G5["LSPGenerator<br/>→ XxxLSP.java"]
+    G --> G6["LSPLauncherGenerator<br/>→ XxxLSPLauncher.java"]
+    G --> G7["DAPGenerator<br/>→ XxxDAP.java"]
+    G --> G8["DAPLauncherGenerator<br/>→ XxxDAPLauncher.java"]
 ```
 
 ### 1.5 セルフホスティング
 
 unlaxer-dsl は 3.0.0 でセルフホスティングを達成した。UBNF 文法自体が UBNF で記述されており、unlaxer-dsl 自身でパーサーを生成できる。
 
-```
-Step 1: grammar/ubnf.ubnf  （UBNF 文法を UBNF で記述した正規仕様）
-           ↓
-Step 2: 手書き UBNFParsers / UBNFAST / UBNFMapper
-        （org.unlaxer.dsl.bootstrap — 参照・検証用に保持）
-           ↓
-Step 3: CodegenMain が ubnf.ubnf を手書きパーサーで処理
-           ↓
-Step 4: 生成 UBNFParsers / UBNFAST / UBNFMapper
-        （org.unlaxer.dsl.bootstrap.generated — ライブ実装）
-           ↓
-Step 5: SelfHostingTest: 生成パーサーで ubnf.ubnf をパース
-        → 手書きブートストラップと出力が一致することを検証
+```mermaid
+flowchart TD
+    S1["Step 1: grammar/ubnf.ubnf<br/>（UBNF 文法を UBNF で記述した正規仕様）"]
+    S2["Step 2: 手書き UBNFParsers / UBNFAST / UBNFMapper<br/>（org.unlaxer.dsl.bootstrap — 参照・検証用に保持）"]
+    S3["Step 3: CodegenMain が ubnf.ubnf を手書きパーサーで処理"]
+    S4["Step 4: 生成 UBNFParsers / UBNFAST / UBNFMapper<br/>（org.unlaxer.dsl.bootstrap.generated — ライブ実装）"]
+    S5["Step 5: SelfHostingTest: 生成パーサーで ubnf.ubnf をパース<br/>→ 手書きブートストラップと出力が一致することを検証"]
+    S1 --> S2 --> S3 --> S4 --> S5
 ```
 
 意義:
@@ -688,12 +648,17 @@ parse(ParseContext) → Parsed
 
 状態の管理は `ParseContext` がトランザクションスタック（`Deque<TransactionElement>`）を通じて行う。
 
-```
-ParseContext
-  └── tokenStack: Deque<TransactionElement>
-        └── TransactionElement
-              ├── cursor: カーソル位置のコピー
-              └── tokens: このトランザクション内で生成されたトークンリスト
+```mermaid
+graph TD
+    PC["ParseContext"]
+    TS["tokenStack: Deque&lt;TransactionElement&gt;"]
+    TE["TransactionElement"]
+    CUR["cursor: カーソル位置のコピー"]
+    TOK["tokens: このトランザクション内で生成されたトークンリスト"]
+    PC --> TS
+    TS --> TE
+    TE --> CUR
+    TE --> TOK
 ```
 
 トランザクション操作:
@@ -746,45 +711,6 @@ ParseContext
 ### 5.1 UBNFAST 階層（sealed インタフェース）
 
 `UBNFAST` は UBNF 文法の parsed 表現を型安全な sealed インタフェース階層で表現する:
-
-```
-UBNFAST.UBNFFile
-  └── UBNFAST.GrammarDecl (name, imports, settings, tokens, rules)
-        ├── UBNFAST.GlobalSetting (key, value)
-        ├── UBNFAST.TokenDecl (sealed: 3.0.0 で sealed 化)
-        │     ├── Simple              (token NAME = ClassName)
-        │     ├── Until               (UNTIL('terminator'))
-        │     ├── Negation            (NEGATION(parser))
-        │     ├── Lookahead           (LOOKAHEAD('pattern'))
-        │     └── NegativeLookahead   (NEGATIVE_LOOKAHEAD('pattern'))
-        └── UBNFAST.RuleDecl (name, annotations, body)
-              ├── UBNFAST.Annotation (sealed)
-              │     ├── RootAnnotation
-              │     ├── MappingAnnotation (className, params[])
-              │     ├── LeftAssocAnnotation
-              │     ├── RightAssocAnnotation
-              │     ├── PrecedenceAnnotation (level)
-              │     ├── WhitespaceAnnotation (style)
-              │     ├── InterleaveAnnotation (profile)
-              │     ├── BackrefAnnotation (name)
-              │     ├── ScopeTreeAnnotation (mode)
-              │     ├── DeclaresAnnotation (symbol)
-              │     ├── DocAnnotation (text)
-              │     ├── SkipAnnotation
-              │     └── SimpleAnnotation (name)
-              └── UBNFAST.RuleBody (sealed: AtomicElement 階層)
-                    ├── SequenceBody
-                    ├── ChoiceBody
-                    ├── GroupBody
-                    ├── QuantifiedRef   (element + quantifier: ?, *, +, {n}, {n,m}, {n,})
-                    ├── RuleRef         (他のルールへの参照)
-                    ├── TokenRef        (トークンへの参照)
-                    ├── LiteralRef      (文字列リテラル, 例: '+')
-                    ├── CaptureRef      (@name アノテーション付き要素)
-                    ├── SeparatorRef    (elem % sep 区切りリスト)
-                    ├── TypeofElement   (@typeof(captureName) 型制約)
-                    └── ErrorElement    (ERROR('msg') ヒント)
-```
 
 **3.0.0 破壊的変更**: `UBNFAST.TokenDecl` が sealed 化された。2.x では `TokenDecl` が単一クラスだったが、3.0.0 以降は sealed hierarchy になっている。`instanceof` チェックのコードは更新が必要。
 
@@ -1203,16 +1129,25 @@ token.getChildFromAstNodes(index)
 
 **ドキュメント構造**:
 
-```
-ParserIrDocument
-  ├── irVersion: "1.0"          (required)
-  ├── source: string             (required)
-  ├── nodes: [IrNode]            (required, 少なくとも1ノード)
-  ├── diagnostics: [IrDiagnostic] (required, 空でも可)
-  ├── tokens: [IrToken]          (optional)
-  ├── trivia: [IrTrivia]         (optional)
-  ├── scopeEvents: [IrScopeEvent] (optional)
-  └── annotations: [IrAnnotation] (optional)
+```mermaid
+graph TD
+    DOC["ParserIrDocument"]
+    F1["irVersion: &quot;1.0&quot; (required)"]
+    F2["source: string (required)"]
+    F3["nodes: [IrNode] (required, 少なくとも1ノード)"]
+    F4["diagnostics: [IrDiagnostic] (required, 空でも可)"]
+    F5["tokens: [IrToken] (optional)"]
+    F6["trivia: [IrTrivia] (optional)"]
+    F7["scopeEvents: [IrScopeEvent] (optional)"]
+    F8["annotations: [IrAnnotation] (optional)"]
+    DOC --> F1
+    DOC --> F2
+    DOC --> F3
+    DOC --> F4
+    DOC --> F5
+    DOC --> F6
+    DOC --> F7
+    DOC --> F8
 ```
 
 **IrNode フィールド**:
@@ -1662,7 +1597,7 @@ ParserTestBase.setLevel(OutputLevel.withTag);    // タグ情報付きログ
 ```mermaid
 flowchart TD
     A([validateWithWarnings 開始]) --> B[GrammarDecl からルール一覧を取得]
-    B --> C[各ルールの先頭参照を収集\n→ 依存グラフ構築]
+    B --> C["各ルールの先頭参照を収集<br/>→ 依存グラフ構築"]
     C --> D{未訪問ルールが残っているか}
     D -- Yes --> E[ルールを選択して DFS 開始]
     E --> F{先頭参照がルール参照か}
@@ -1670,11 +1605,11 @@ flowchart TD
     F -- Yes --> G{参照先がすでに訪問スタックにあるか}
     G -- No --> H[参照先を再帰的に DFS]
     H --> D
-    G -- Yes --> I[サイクル検出\nW-LEFT-RECURSION 警告を生成]
+    G -- Yes --> I["サイクル検出<br/>W-LEFT-RECURSION 警告を生成"]
     I --> J[サイクルパスを文字列リストとして記録]
     J --> D
     D -- No --> K[Optional に警告リストを包んで返す]
-    K --> L([validateWithWarnings 終了\n例外スローなし])
+    K --> L(["validateWithWarnings 終了<br/>例外スローなし"])
 ```
 
 ### 10.2 パースキャッシュ（メモ化）
@@ -1915,12 +1850,15 @@ AST ノードが完全に型付けされ、`String` へのキャストや型チ�
 
 生成された LSP / DAP サーバーはスタンドアロンで動作する。unlaxer-dsl への実行時依存は不要（生成コードのランタイム依存は unlaxer-common のみ）。
 
-```
-プロダクション DSL プロジェクトの依存グラフ:
-  MyDSLProject
-    └── unlaxer-common:3.0.2  (runtime)
-    └── [生成コード: MyDSLParsers, MyDSLAST, MyDSLMapper, etc.]
-    ×   unlaxer-dsl           (不要、ビルド時のみ)
+```mermaid
+graph TD
+    PROJ["MyDSLProject"]
+    COMMON["unlaxer-common:3.0.2 (runtime)"]
+    GENCODE["生成コード: MyDSLParsers, MyDSLAST,<br/>MyDSLMapper, etc."]
+    DSL["unlaxer-dsl<br/>（不要、ビルド時のみ）"]
+    PROJ --> COMMON
+    PROJ --> GENCODE
+    PROJ -. "× 実行時不要" .-> DSL
 ```
 
 ### 12.6 ロードマップ（Roadmap）
@@ -2292,12 +2230,17 @@ Statement ::=
 
 `ScopeStore`（`org.unlaxer.dsl.runtime.ScopeStore`）は `ParseContext.globalScopeTreeMap` に以下の構造でスコープを管理する:
 
-```
-Key: ScopeStore.SCOPE_STACK（定数）
-Value: Deque<Map<String, SymbolInfo>>
-  └── 先頭: 最内側スコープ
-  └── 末尾: 最外側スコープ
-       └── SymbolInfo: { name: String, ruleName: String, sourceOffset: int }
+```mermaid
+graph TD
+    KEY["Key: ScopeStore.SCOPE_STACK（定数）"]
+    VAL["Value: Deque&lt;Map&lt;String, SymbolInfo&gt;&gt;"]
+    INNER["先頭: 最内側スコープ"]
+    OUTER["末尾: 最外側スコープ"]
+    SYM["SymbolInfo: { name: String,<br/>ruleName: String, sourceOffset: int }"]
+    KEY --> VAL
+    VAL --> INNER
+    VAL --> OUTER
+    OUTER --> SYM
 ```
 
 `enter(ctx)` は新しい `HashMap` をスタックの先頭にプッシュする。`leave(ctx)` は先頭からポップする。`declare(ctx, name)` は先頭 Map にシンボルを追加する。`isDeclared(ctx, name)` はスタックを先頭から順に検索する（lexical scope チェーン）。
