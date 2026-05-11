@@ -30,37 +30,20 @@
 
 ## パイプライン概要
 
-```
-  ┌──────────────────────────────────────────────────────────────┐
-  │  .ubnf 文法ファイル（例: TinyCalc.ubnf）                      │
-  └─────────────────────────┬────────────────────────────────────┘
-                            │  CodegenMain（CLI エントリポイント）
-                            │
-              ┌─────────────▼─────────────┐
-              │  UBNF パースフェーズ        │
-              │  UBNFParsers (bootstrap)   │
-              │  UBNFMapper                │
-              └─────────────┬─────────────┘
-                            │
-              ┌─────────────▼─────────────┐
-              │  UBNFAST                   │
-              │（文法の型付き AST）          │
-              └─────┬────────────┬─────────┘
-                    │            │
-          ┌─────────▼──┐    ┌────▼────────────┐
-          │ Grammar    │    │ ParserIR エクスポート│
-          │ Validator  │    │（オプション SPI）  │
-          └─────────┬──┘    └─────────────────┘
-                    │
-       ┌────────────▼────────────────────────────┐
-       │  コード生成フェーズ                        │
-       │  ParserGenerator  → Parsers.java          │
-       │  ASTGenerator     → AST.java              │
-       │  MapperGenerator  → Mapper.java           │
-       │  EvaluatorGenerator → Evaluator.java      │
-       │  LSPGenerator     → LSP サーバー           │
-       │  DAPGenerator     → DAP アダプター         │
-       └─────────────────────────────────────────-┘
+```mermaid
+flowchart TD
+    G[".ubnf 文法ファイル（例: TinyCalc.ubnf）"]
+    Parse["UBNF パースフェーズ<br/>UBNFParsers (bootstrap)<br/>UBNFMapper"]
+    AST["UBNFAST<br/>（文法の型付き AST）"]
+    Val[Grammar Validator]
+    IR["ParserIR エクスポート<br/>（オプション SPI）"]
+    Codegen["コード生成フェーズ<br/>ParserGenerator → Parsers.java<br/>ASTGenerator → AST.java<br/>MapperGenerator → Mapper.java<br/>EvaluatorGenerator → Evaluator.java<br/>LSPGenerator → LSP サーバー<br/>DAPGenerator → DAP アダプター"]
+
+    G -- "CodegenMain（CLI エントリポイント）" --> Parse
+    Parse --> AST
+    AST --> Val
+    AST --> IR
+    Val --> Codegen
 ```
 
 ---
@@ -141,21 +124,36 @@ bootstrap パーサー（`org.unlaxer.dsl.bootstrap` 内の `UBNFParsers`、`UBN
 
 `UBNFAST` は解析された文法を表す sealed-interface AST です：
 
-```
-UBNFAST.UBNFFile
-  └── UBNFAST.GrammarDecl (name, imports, settings, tokens, rules)
-        ├── UBNFAST.GlobalSetting (key, value)
-        ├── UBNFAST.TokenDecl (sealed: Simple | Until | Negation | Lookahead | NegativeLookahead)
-        └── UBNFAST.RuleDecl (name, annotations, body)
-              └── UBNFAST.RuleBody (sealed: AtomicElement 階層)
-                    ├── UBNFAST.SequenceBody
-                    ├── UBNFAST.ChoiceBody
-                    ├── UBNFAST.GroupBody
-                    ├── UBNFAST.QuantifiedRef（要素 + 量化子 ?, *, + をラップ）
-                    ├── UBNFAST.RuleRef（別のルールへの参照）
-                    ├── UBNFAST.TokenRef（トークンへの参照）
-                    ├── UBNFAST.LiteralRef（クォートされた文字列、例 '+'）
-                    └── UBNFAST.CaptureRef（要素への @name アノテーション）
+```mermaid
+flowchart TD
+    File[UBNFAST.UBNFFile]
+    Decl["UBNFAST.GrammarDecl<br/>(name, imports, settings, tokens, rules)"]
+    GS["UBNFAST.GlobalSetting (key, value)"]
+    Tok["UBNFAST.TokenDecl<br/>(sealed: Simple | Until | Negation | Lookahead | NegativeLookahead)"]
+    Rule["UBNFAST.RuleDecl<br/>(name, annotations, body)"]
+    Body["UBNFAST.RuleBody (sealed: AtomicElement 階層)"]
+    Seq[SequenceBody]
+    Cho[ChoiceBody]
+    Grp[GroupBody]
+    Quant["QuantifiedRef<br/>（要素 + 量化子 ?,*,+）"]
+    RRef["RuleRef（別のルールへの参照）"]
+    TRef["TokenRef（トークンへの参照）"]
+    LRef["LiteralRef（クォート文字列）"]
+    CRef["CaptureRef（@name アノテーション）"]
+
+    File --> Decl
+    Decl --> GS
+    Decl --> Tok
+    Decl --> Rule
+    Rule --> Body
+    Body --> Seq
+    Body --> Cho
+    Body --> Grp
+    Body --> Quant
+    Body --> RRef
+    Body --> TRef
+    Body --> LRef
+    Body --> CRef
 ```
 
 `RuleDecl` のアノテーション型：
@@ -242,17 +240,16 @@ codegen パイプライン（mapper → evaluator → LSP → DAP）は、本質
 
 ### ドキュメント構造
 
-```
-ParserIrDocument
-  ├── irVersion: "1.0"
-  ├── source:（パスまたは論理 id）
-  ├── nodes: [IrNode]          （必須）
-  ├── diagnostics: [IrDiagnostic]  （必須、空でも可）
-  ├── tokens: [IrToken]        （オプション）
-  ├── trivia: [IrTrivia]       （オプション）
-  ├── scopeEvents: [IrScopeEvent]  （オプション）
-  └── annotations: [IrAnnotation]  （オプション）
-```
+| フィールド | 型 | 要件 |
+|------------|------|------|
+| `irVersion` | `"1.0"` | 必須 |
+| `source` | パスまたは論理 id | 必須 |
+| `nodes` | `[IrNode]` | 必須 |
+| `diagnostics` | `[IrDiagnostic]` | 必須（空でも可） |
+| `tokens` | `[IrToken]` | オプション |
+| `trivia` | `[IrTrivia]` | オプション |
+| `scopeEvents` | `[IrScopeEvent]` | オプション |
+| `annotations` | `[IrAnnotation]` | オプション |
 
 各 `IrNode` は以下を保持します：`id`、`kind`、`span.start`、`span.end`、オプションの `parentId`、`children`、`text`、`attributes`。
 

@@ -65,21 +65,24 @@ These subsystems are tightly coupled. A single grammar change cascades across al
 
 Write a **UBNF grammar** (~300 lines). Run the generator. Get everything.
 
-```
-  .ubnf grammar file
-        |
-        v
-  +-----------------+
-  | unlaxer-dsl     |
-  |  code generator |
-  +-----------------+
-        |
-        +---> Parsers.java      (parser combinators)
-        +---> AST.java           (sealed interfaces + records)
-        +---> Mapper.java        (parse tree -> AST)
-        +---> Evaluator.java     (visitor skeleton)
-        +---> LSP server         (completion, diagnostics, hover)
-        +---> DAP server         (breakpoints, step, variables)
+```mermaid
+flowchart TD
+    Grammar[.ubnf grammar file]
+    DSL["<b>unlaxer-dsl</b><br/>code generator"]
+    Parsers["Parsers.java<br/>(parser combinators)"]
+    AST["AST.java<br/>(sealed interfaces + records)"]
+    Mapper["Mapper.java<br/>(parse tree -> AST)"]
+    Eval["Evaluator.java<br/>(visitor skeleton)"]
+    LSP["LSP server<br/>(completion, diagnostics, hover)"]
+    DAP["DAP server<br/>(breakpoints, step, variables)"]
+
+    Grammar --> DSL
+    DSL --> Parsers
+    DSL --> AST
+    DSL --> Mapper
+    DSL --> Eval
+    DSL --> LSP
+    DSL --> DAP
 ```
 
 You write **only** the evaluation logic — typically 50–200 lines of `evalXxx` methods.
@@ -254,32 +257,28 @@ See [docs/getting-started.md](./docs/getting-started.md) for the full walkthroug
 
 ## Architecture
 
-```
-                    +------------------+
-                    |   .ubnf grammar  |
-                    +--------+---------+
-                             |
-                      code generation
-                      (unlaxer-dsl)
-                             |
-            +----------------+----------------+
-            |                |                |
-     +------v------+  +-----v------+  +------v------+
-     |   Parsers   |  |    AST     |  |   Mapper    |
-     | (combinator |  | (sealed    |  | (parse tree |
-     |   chain)    |  |  records)  |  |  -> AST)    |
-     +------+------+  +-----+------+  +------+------+
-            |                |                |
-            v                v                v
-     +------+------+  +-----+------+  +------v------+
-     |  Parse Tree |->|  AST Tree  |->|  Evaluator  |
-     +-------------+  +------------+  +------+------+
-                                             |
-                                    +--------+--------+
-                                    |                 |
-                              +-----v-----+    +-----v-----+
-                              | LSP Server|    | DAP Server|
-                              +-----------+    +-----------+
+```mermaid
+flowchart TD
+    G[.ubnf grammar]
+    Gen["code generation<br/>(unlaxer-dsl)"]
+    Parsers["Parsers<br/>(combinator chain)"]
+    AST["AST<br/>(sealed records)"]
+    Mapper["Mapper<br/>(parse tree → AST)"]
+    PT[Parse Tree]
+    AT[AST Tree]
+    Eval[Evaluator]
+    LSP[LSP Server]
+    DAP[DAP Server]
+
+    G --> Gen
+    Gen --> Parsers
+    Gen --> AST
+    Gen --> Mapper
+    Parsers --> PT --> AT --> Eval
+    AST --> AT
+    Mapper --> AT
+    Eval --> LSP
+    Eval --> DAP
 ```
 
 See [docs/architecture.md](./docs/architecture.md) for the full pipeline, combinator catalog, and ParserIR design.

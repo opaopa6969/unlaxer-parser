@@ -10,26 +10,17 @@ UBNF の文法を UBNF 自身で記述（self-hosting）し、自動生成され
 
 ## 3. Bootstrap Architecture
 
-```
-                    ┌─────────────────────────┐
-                    │  ubnf.ubnf (meta-grammar) │
-                    └────────────┬────────────┘
-                                 │
-              ┌──────────────────┴──────────────────┐
-              │                                      │
-     Stage 0 (手書き)                        Stage 1+ (生成)
-  ┌───────────────────┐               ┌───────────────────┐
-  │ UBNFParsers.java  │──── parse ───→│ UBNFParsers.java  │
-  │ UBNFMapper.java   │               │ UBNFAST.java      │
-  │ UBNFAST.java      │               │ UBNFMapper.java   │
-  │ (手書き 1,501行)   │               │ UBNFLSPServer.java│ ★新規
-  └───────────────────┘               │ UBNFLSPLauncher   │ ★新規
-                                      └───────────────────┘
-                                               │
-                                      fixpoint 検証:
-                                      Stage 1 で ubnf.ubnf を parse
-                                      → Stage 2 を生成
-                                      → Stage 1 == Stage 2 ✓
+```mermaid
+flowchart TD
+    Meta["ubnf.ubnf (meta-grammar)"]
+    Stage0["<b>Stage 0 (手書き)</b><br/>UBNFParsers.java<br/>UBNFMapper.java<br/>UBNFAST.java<br/>(手書き 1,501行)"]
+    Stage1["<b>Stage 1+ (生成)</b><br/>UBNFParsers.java<br/>UBNFAST.java<br/>UBNFMapper.java<br/>UBNFLSPServer.java ★新規<br/>UBNFLSPLauncher ★新規"]
+    Fix["fixpoint 検証:<br/>Stage 1 で ubnf.ubnf を parse<br/>→ Stage 2 を生成<br/>→ Stage 1 == Stage 2 ✓"]
+
+    Meta --> Stage0
+    Meta --> Stage1
+    Stage0 -- parse --> Stage1
+    Stage1 --> Fix
 ```
 
 ## 4. Phases

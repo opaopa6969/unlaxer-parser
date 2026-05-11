@@ -186,34 +186,19 @@ System.out.println(treeText);
 
 ## Data Flow Summary
 
-```
-         input string
-            |
-     StringSource.createRootSource("1+2*3")
-            |
-            v
-    +-----------------+
-    |   ParseContext   |
-    +-----------------+
-            |
-     parser.parse(context)
-            |
-            v
-    +-----------------+
-    |     Parsed      |
-    +-----------------+
-            |
-     parsed.getRootToken()
-            |
-            v
-    +-----------------+
-    |   Token Tree    |
-    +-----------------+
-            |
-     TokenPrinter.get(token)
-            |
-            v
-       text output
+```mermaid
+flowchart TD
+    In[input string]
+    Source["StringSource.createRootSource('1+2*3')"]
+    PC[ParseContext]
+    Parsed[Parsed]
+    Token[Token Tree]
+    Out[text output]
+
+    In --> Source --> PC
+    PC -- "parser.parse(context)" --> Parsed
+    Parsed -- "parsed.getRootToken()" --> Token
+    Token -- "TokenPrinter.get(token)" --> Out
 ```
 
 ---

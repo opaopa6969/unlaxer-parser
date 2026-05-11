@@ -1123,44 +1123,25 @@ tokenStack.pop();
 
 #### Flow Diagram
 
-```
-User Code
-    ↓
-parser.parse(parseContext)
-    ↓
-Parser.parse() method
-    ↓
-Check cursor position
-    ↓
-┌─────────────────────────┐
-│  Begin Transaction      │
-│  (push to stack)        │
-└─────────────────────────┘
-    ↓
-Try to match input
-    ↓
-    ├─── Success ─────────┐
-    │                     ↓
-    │              Create Token
-    │                     ↓
-    │              Advance Cursor
-    │                     ↓
-    │              ┌──────────────────┐
-    │              │ Commit           │
-    │              │ (pop stack)      │
-    │              └──────────────────┘
-    │                     ↓
-    │              Return Parsed{succeeded, token}
-    │
-    └─── Failure ─────────┐
-                          ↓
-                   ┌──────────────────┐
-                   │ Rollback         │
-                   │ (pop stack,      │
-                   │  restore cursor) │
-                   └──────────────────┘
-                          ↓
-                   Return Parsed{failed}
+```mermaid
+flowchart TD
+    User[User Code]
+    Call["parser.parse(parseContext)"]
+    Method["Parser.parse() method"]
+    Check[Check cursor position]
+    Begin["Begin Transaction<br/>(push to stack)"]
+    Try[Try to match input]
+    Q{結果?}
+    Tok[Create Token]
+    Adv[Advance Cursor]
+    Commit["Commit<br/>(pop stack)"]
+    RetOk["Return Parsed{succeeded, token}"]
+    Rollback["Rollback<br/>(pop stack, restore cursor)"]
+    RetFail["Return Parsed{failed}"]
+
+    User --> Call --> Method --> Check --> Begin --> Try --> Q
+    Q -- Success --> Tok --> Adv --> Commit --> RetOk
+    Q -- Failure --> Rollback --> RetFail
 ```
 
 ### Implementing Custom Combinators

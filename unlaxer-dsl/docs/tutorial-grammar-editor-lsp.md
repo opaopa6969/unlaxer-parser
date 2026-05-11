@@ -5,16 +5,19 @@ unlaxer は「文法 → 言語ツールチェーン」ジェネレータ。そ�
 
 ## アーキテクチャ
 
-```
-ubnf.ubnf (UBNF自身の文法)
-    │
-    ├─ ParserGenerator → UBNFParsers.java (生成)
-    ├─ ASTGenerator    → UBNFAST.java (生成)
-    ├─ MapperGenerator → UBNFMapper.java (生成)
-    └─ LSPGenerator    → UBNFLSPServer.java (生成) ★
-                            │
-                            └─ @declares → ルール定義登録
-                               @backref  → Go-to-Definition
+```mermaid
+flowchart TD
+    Ubnf["ubnf.ubnf (UBNF自身の文法)"]
+    PG["ParserGenerator → UBNFParsers.java (生成)"]
+    AG["ASTGenerator → UBNFAST.java (生成)"]
+    MG["MapperGenerator → UBNFMapper.java (生成)"]
+    LG["LSPGenerator → UBNFLSPServer.java (生成) ★"]
+    Ann["@declares → ルール定義登録<br/>@backref → Go-to-Definition"]
+
+    Ubnf --> PG
+    Ubnf --> AG
+    Ubnf --> MG
+    Ubnf --> LG --> Ann
 ```
 
 ## 現状 (v2.9.0 時点)

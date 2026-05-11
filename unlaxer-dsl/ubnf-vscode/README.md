@@ -27,19 +27,18 @@ enough to specify itself**.
 
 ## How it is built
 
-```
-unlaxer-dsl/grammar/ubnf.ubnf   ← source of truth
-       │
-       ▼  CodegenMain --generators LSP,Launcher
-target/generated-sources/ubnf/org/unlaxer/dsl/bootstrap/generated/
-       │ UBNFLanguageServer.java
-       │ UBNFLspLauncher.java
-       ▼  maven-shade-plugin
-target/ubnf-lsp-server.jar (fat jar)
-       ▼  antrun copy
-server-dist/ubnf-lsp-server.jar
-       ▼  npm install + vsce package
-target/ubnf-lsp-0.1.0.vsix     ← install this in VS Code
+```mermaid
+flowchart TD
+    Src["unlaxer-dsl/grammar/ubnf.ubnf<br/>(source of truth)"]
+    Gen["target/generated-sources/ubnf/org/unlaxer/dsl/bootstrap/generated/<br/>UBNFLanguageServer.java<br/>UBNFLspLauncher.java"]
+    Jar["target/ubnf-lsp-server.jar (fat jar)"]
+    Dist[server-dist/ubnf-lsp-server.jar]
+    Vsix["target/ubnf-lsp-0.1.0.vsix<br/>(install this in VS Code)"]
+
+    Src -- "CodegenMain --generators LSP,Launcher" --> Gen
+    Gen -- "maven-shade-plugin" --> Jar
+    Jar -- "antrun copy" --> Dist
+    Dist -- "npm install + vsce package" --> Vsix
 ```
 
 All of this is wrapped in `pom.xml` so a top-level `mvn -B package`

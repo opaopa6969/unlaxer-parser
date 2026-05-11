@@ -58,22 +58,35 @@ AlphabetNumericUnderScore ::= AlphabetUnderScore | Digit
 
 TinyCalcの文法は、**演算子の優先順位** を構造的に表現しています：
 
-```
-TinyCalc
-├── VariableDeclarations（0個以上の変数宣言）
-│   └── VariableDeclaration
-│       ├── キーワード: var | variable
-│       ├── 識別子
-│       ├── [初期化: set Expression]
-│       └── セミコロン
-└── Expression（最も低い優先順位: + -）
-    └── Term（次の優先順位: * /）
-        └── Factor（最も高い優先順位）
-            ├── FunctionCall（関数呼び出し）
-            ├── UnaryExpression（単項演算子）
-            ├── Number（数値リテラル）
-            ├── Identifier（識別子）
-            └── '(' Expression ')'（括弧式）
+```mermaid
+flowchart TD
+    TC[TinyCalc]
+    VD["VariableDeclarations（0個以上）"]
+    VDOne[VariableDeclaration]
+    Kw["キーワード: var | variable"]
+    Id[識別子]
+    Init["[初期化: set Expression]"]
+    Semi[セミコロン]
+    Expr["Expression<br/>（最も低い優先順位: + -）"]
+    Term["Term<br/>（次の優先順位: * /）"]
+    Factor["Factor<br/>（最も高い優先順位）"]
+    FC[FunctionCall]
+    Un[UnaryExpression]
+    Num[Number]
+    Idt[Identifier]
+    Paren["'(' Expression ')'"]
+
+    TC --> VD --> VDOne
+    VDOne --> Kw
+    VDOne --> Id
+    VDOne --> Init
+    VDOne --> Semi
+    TC --> Expr --> Term --> Factor
+    Factor --> FC
+    Factor --> Un
+    Factor --> Num
+    Factor --> Idt
+    Factor --> Paren
 ```
 
 ### 演算子の優先順位

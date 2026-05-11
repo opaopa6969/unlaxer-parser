@@ -534,25 +534,19 @@ Tree-sitter の特徴:
 
 **先輩:** 比較表にまとめよう。
 
-```
-┌─────────────────────┬──────────────┬──────────────┬──────────────┐
-│                     │  ANTLR + LLM │ Tree-sitter  │ Unlaxer + LLM│
-│                     │              │   + LLM      │              │
-├─────────────────────┼──────────────┼──────────────┼──────────────┤
-│ パーサー生成         │ ✅ 堅い      │ ✅ 堅い      │ ✅ 堅い      │
-│ 型付き AST          │ ❌ 手書き    │ ❌ 汎用ノード │ ✅ 自動生成  │
-│ AST マッパー         │ ❌ 手書き    │ ❌ 手書き    │ ✅ 自動生成  │
-│ Evaluator 基底      │ ❌ なし      │ ❌ なし      │ ✅ 自動生成  │
-│ exhaustive switch   │ ❌           │ ❌           │ ✅           │
-│ GGP                 │ ❌           │ ❌           │ ✅           │
-│ LSP                 │ ❌ 手書き    │ △ 部分的    │ ✅ 自動生成  │
-│ DAP                 │ ❌ 手書き    │ ❌ 手書き    │ ✅ 自動生成  │
-│ Java ネイティブ      │ ✅           │ ❌ C + JNI   │ ✅           │
-│ LLM の学習コスト    │ 低い         │ 中程度       │ 中程度       │
-│ LLM がバグを入れる  │ AST/Eval層   │ 全層         │ eval 層のみ  │
-│   余地がある層       │              │              │              │
-└─────────────────────┴──────────────┴──────────────┴──────────────┘
-```
+|  | ANTLR + LLM | Tree-sitter + LLM | Unlaxer + LLM |
+|---|---|---|---|
+| パーサー生成 | ✅ 堅い | ✅ 堅い | ✅ 堅い |
+| 型付き AST | ❌ 手書き | ❌ 汎用ノード | ✅ 自動生成 |
+| AST マッパー | ❌ 手書き | ❌ 手書き | ✅ 自動生成 |
+| Evaluator 基底 | ❌ なし | ❌ なし | ✅ 自動生成 |
+| exhaustive switch | ❌ | ❌ | ✅ |
+| GGP | ❌ | ❌ | ✅ |
+| LSP | ❌ 手書き | △ 部分的 | ✅ 自動生成 |
+| DAP | ❌ 手書き | ❌ 手書き | ✅ 自動生成 |
+| Java ネイティブ | ✅ | ❌ C + JNI | ✅ |
+| LLM の学習コスト | 低い | 中程度 | 中程度 |
+| LLM がバグを入れる余地がある層 | AST/Eval層 | 全層 | eval 層のみ |
 
 **後輩:** 「LLM がバグを入れる余地がある層」が面白いですね。Unlaxer だと eval 層だけ。
 
@@ -658,20 +652,16 @@ public record BinaryExpr(
 
 **先輩:** BackendSpeedComparisonTest の結果を見せよう。
 
-```
-┌──────────────────────┬────────────────┬───────────┐
-│ バックエンド          │ 実行時間/call  │ 相対速度   │
-├──────────────────────┼────────────────┼───────────┤
-│ compile-hand (JIT)   │    0.02 μs     │   1.0x    │
-│ P4-typed-eval (new)  │    0.15 μs     │   7.5x    │
-│ P4-typed-reuse       │    0.08 μs     │   4.0x    │
-│ ast-hand-cached      │    0.30 μs     │  15.0x    │
-│ ast-hand-full        │    5.00 μs     │ 250.0x    │
-│ P4-reflection        │  110.00 μs     │ 5500.0x   │
-└──────────────────────┴────────────────┴───────────┘
+| バックエンド | 実行時間/call | 相対速度 |
+|---|---:|---:|
+| compile-hand (JIT) | 0.02 μs | 1.0x |
+| P4-typed-eval (new) | 0.15 μs | 7.5x |
+| P4-typed-reuse | 0.08 μs | 4.0x |
+| ast-hand-cached | 0.30 μs | 15.0x |
+| ast-hand-full | 5.00 μs | 250.0x |
+| P4-reflection | 110.00 μs | 5500.0x |
 
 P4-typed-reuse vs P4-reflection = 約1,400倍高速
-```
 
 **後輩:** 1400倍！？
 
@@ -859,26 +849,36 @@ String javaSource = java.build();
 
 **先輩:** 最終的な目標はこう。
 
-```
-UBNF 文法ファイル (350行)
-  ↓ unlaxer-dsl codegen
-  ├── Parsers.java        — パーサーコンビネータ群
-  ├── AST.java            — sealed interface + records
-  ├── Mapper.java         — Token → AST 変換
-  ├── Evaluator.java      — abstract 基底 (@eval で大半自動)
-  ├── LSPServer.java      — Language Server Protocol
-  ├── DAPServer.java      — Debug Adapter Protocol
-  └── VSCode Extension    — エディタプラグイン
+```mermaid
+flowchart TD
+    Grammar["UBNF 文法ファイル (350行)"]
+    Codegen[unlaxer-dsl codegen]
+    Parsers["Parsers.java — パーサーコンビネータ群"]
+    AST["AST.java — sealed interface + records"]
+    Mapper["Mapper.java — Token → AST 変換"]
+    Eval["Evaluator.java — abstract 基底 (@eval で大半自動)"]
+    LSP["LSPServer.java — Language Server Protocol"]
+    DAP["DAPServer.java — Debug Adapter Protocol"]
+    VSCode["VSCode Extension — エディタプラグイン"]
 
-人間が書くもの:
-  - UBNF 文法
-  - 特殊な eval ロジック（@eval でカバーできないもの）
-
-LLM が書くもの:
-  - 特殊な eval ロジックの実装
-  - テスト
-  - ドキュメント
+    Grammar --> Codegen
+    Codegen --> Parsers
+    Codegen --> AST
+    Codegen --> Mapper
+    Codegen --> Eval
+    Codegen --> LSP
+    Codegen --> DAP
+    Codegen --> VSCode
 ```
+
+**人間が書くもの:**
+- UBNF 文法
+- 特殊な eval ロジック（@eval でカバーできないもの）
+
+**LLM が書くもの:**
+- 特殊な eval ロジックの実装
+- テスト
+- ドキュメント
 
 **後輩:** UBNF を書くだけで言語処理系 + LSP + DAP が手に入る。それってつまり……
 

@@ -41,21 +41,24 @@ DSL を構築するには、通常 **6つ以上のサブシステム** を手作
 
 **UBNF 文法**（約300行）を書いて、ジェネレータを実行するだけ。すべてが手に入ります。
 
-```
-  .ubnf grammar file
-        |
-        v
-  +-----------------+
-  | unlaxer-dsl     |
-  |  code generator |
-  +-----------------+
-        |
-        +---> Parsers.java      (パーサーコンビネータ)
-        +---> AST.java           (sealed interface + record)
-        +---> Mapper.java        (パースツリー -> AST)
-        +---> Evaluator.java     (ビジターのスケルトン)
-        +---> LSP server         (補完、診断、ホバー)
-        +---> DAP server         (ブレークポイント、ステップ、変数)
+```mermaid
+flowchart TD
+    Grammar[.ubnf grammar file]
+    DSL["<b>unlaxer-dsl</b><br/>code generator"]
+    Parsers["Parsers.java<br/>(パーサーコンビネータ)"]
+    AST["AST.java<br/>(sealed interface + record)"]
+    Mapper["Mapper.java<br/>(パースツリー → AST)"]
+    Eval["Evaluator.java<br/>(ビジターのスケルトン)"]
+    LSP["LSP server<br/>(補完、診断、ホバー)"]
+    DAP["DAP server<br/>(ブレークポイント、ステップ、変数)"]
+
+    Grammar --> DSL
+    DSL --> Parsers
+    DSL --> AST
+    DSL --> Mapper
+    DSL --> Eval
+    DSL --> LSP
+    DSL --> DAP
 ```
 
 あなたが書くのは**評価ロジックだけ** -- 通常 50〜200 行の `evalXxx` メソッドです。
@@ -228,31 +231,28 @@ System.out.println(result);  // 7.0
 
 ## アーキテクチャ
 
-```
-                    +------------------+
-                    |   .ubnf grammar  |
-                    +--------+---------+
-                             |
-                      code generation
-                             |
-            +----------------+----------------+
-            |                |                |
-     +------v------+  +-----v------+  +------v------+
-     |   Parsers   |  |    AST     |  |   Mapper    |
-     | (combinator |  | (sealed    |  | (parse tree |
-     |   chain)    |  |  records)  |  |  -> AST)    |
-     +------+------+  +-----+------+  +------+------+
-            |                |                |
-            v                v                v
-     +------+------+  +-----+------+  +------v------+
-     |  Parse Tree |->|  AST Tree  |->|  Evaluator  |
-     +-------------+  +------------+  +------+------+
-                                             |
-                                    +--------+--------+
-                                    |                 |
-                              +-----v-----+    +-----v-----+
-                              | LSP Server|    | DAP Server|
-                              +-----------+    +-----------+
+```mermaid
+flowchart TD
+    G[.ubnf grammar]
+    Gen[code generation]
+    Parsers["Parsers<br/>(combinator chain)"]
+    AST["AST<br/>(sealed records)"]
+    Mapper["Mapper<br/>(parse tree → AST)"]
+    PT[Parse Tree]
+    AT[AST Tree]
+    Eval[Evaluator]
+    LSP[LSP Server]
+    DAP[DAP Server]
+
+    G --> Gen
+    Gen --> Parsers
+    Gen --> AST
+    Gen --> Mapper
+    Parsers --> PT --> AT --> Eval
+    AST --> AT
+    Mapper --> AT
+    Eval --> LSP
+    Eval --> DAP
 ```
 
 ---

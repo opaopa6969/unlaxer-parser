@@ -193,34 +193,19 @@ System.out.println(treeText);
 
 ## データフローまとめ
 
-```
-         入力文字列
-            |
-     StringSource.createRootSource("1+2*3")
-            |
-            v
-    +-----------------+
-    |   ParseContext   |  ← Source + Cursor + TokenStack + Listeners
-    +-----------------+
-            |
-     parser.parse(context)
-            |
-            v
-    +-----------------+
-    |     Parsed      |  ← Status + Token
-    +-----------------+
-            |
-     parsed.getRootToken()
-            |
-            v
-    +-----------------+
-    |   Token Tree    |  ← 木構造のパース結果
-    +-----------------+
-            |
-     TokenPrinter.get(token)
-            |
-            v
-       文字列表現
+```mermaid
+flowchart TD
+    In[入力文字列]
+    Source["StringSource.createRootSource('1+2*3')"]
+    PC["ParseContext<br/>Source + Cursor + TokenStack + Listeners"]
+    Parsed["Parsed<br/>Status + Token"]
+    Token["Token Tree<br/>木構造のパース結果"]
+    Out[文字列表現]
+
+    In --> Source --> PC
+    PC -- "parser.parse(context)" --> Parsed
+    Parsed -- "parsed.getRootToken()" --> Token
+    Token -- "TokenPrinter.get(token)" --> Out
 ```
 
 ---

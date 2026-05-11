@@ -534,25 +534,19 @@ Tree-sitter characteristics:
 
 **Senior:** Let me put it in a comparison table.
 
-```
-+---------------------+--------------+--------------+--------------+
-|                     |  ANTLR + LLM | Tree-sitter  | Unlaxer + LLM|
-|                     |              |   + LLM      |              |
-+---------------------+--------------+--------------+--------------+
-| Parser generation   | OK  Solid    | OK  Solid    | OK  Solid    |
-| Typed AST           | NO  Manual   | NO  Generic  | OK  Auto     |
-| AST mapper          | NO  Manual   | NO  Manual   | OK  Auto     |
-| Evaluator base      | NO  None     | NO  None     | OK  Auto     |
-| exhaustive switch   | NO           | NO           | OK           |
-| GGP                 | NO           | NO           | OK           |
-| LSP                 | NO  Manual   | ~   Partial  | OK  Auto     |
-| DAP                 | NO  Manual   | NO  Manual   | OK  Auto     |
-| Java native         | OK           | NO  C + JNI  | OK           |
-| LLM learning cost   | Low          | Medium       | Medium       |
-| Layers where LLM    | AST/Eval     | All layers   | eval layer   |
-|   can introduce bugs|  layers      |              |  only        |
-+---------------------+--------------+--------------+--------------+
-```
+|  | ANTLR + LLM | Tree-sitter + LLM | Unlaxer + LLM |
+|---|---|---|---|
+| Parser generation | OK Solid | OK Solid | OK Solid |
+| Typed AST | NO Manual | NO Generic | OK Auto |
+| AST mapper | NO Manual | NO Manual | OK Auto |
+| Evaluator base | NO None | NO None | OK Auto |
+| exhaustive switch | NO | NO | OK |
+| GGP | NO | NO | OK |
+| LSP | NO Manual | ~ Partial | OK Auto |
+| DAP | NO Manual | NO Manual | OK Auto |
+| Java native | OK | NO C + JNI | OK |
+| LLM learning cost | Low | Medium | Medium |
+| Layers where LLM can introduce bugs | AST/Eval layers | All layers | eval layer only |
 
 **Newcomer:** "Layers where LLM can introduce bugs" is interesting. With Unlaxer, it's the eval layer only.
 
@@ -658,20 +652,16 @@ public record BinaryExpr(
 
 **Senior:** Let me show you the BackendSpeedComparisonTest results.
 
-```
-+----------------------+----------------+-----------+
-| Backend              | Time/call      | Relative  |
-+----------------------+----------------+-----------+
-| compile-hand (JIT)   |    0.02 us     |   1.0x    |
-| P4-typed-eval (new)  |    0.15 us     |   7.5x    |
-| P4-typed-reuse       |    0.08 us     |   4.0x    |
-| ast-hand-cached      |    0.30 us     |  15.0x    |
-| ast-hand-full        |    5.00 us     | 250.0x    |
-| P4-reflection        |  110.00 us     | 5500.0x   |
-+----------------------+----------------+-----------+
+| Backend | Time/call | Relative |
+|---|---:|---:|
+| compile-hand (JIT) | 0.02 us | 1.0x |
+| P4-typed-eval (new) | 0.15 us | 7.5x |
+| P4-typed-reuse | 0.08 us | 4.0x |
+| ast-hand-cached | 0.30 us | 15.0x |
+| ast-hand-full | 5.00 us | 250.0x |
+| P4-reflection | 110.00 us | 5500.0x |
 
 P4-typed-reuse vs P4-reflection = approximately 1,400x faster
-```
 
 **Newcomer:** 1,400x?!
 
@@ -859,26 +849,36 @@ String javaSource = java.build();
 
 **Senior:** The ultimate goal looks like this.
 
-```
-UBNF grammar file (350 lines)
-  | unlaxer-dsl codegen
-  |-- Parsers.java        -- Parser combinator chain
-  |-- AST.java            -- sealed interface + records
-  |-- Mapper.java         -- Token -> AST conversion
-  |-- Evaluator.java      -- abstract base (@eval automates most)
-  |-- LSPServer.java      -- Language Server Protocol
-  |-- DAPServer.java      -- Debug Adapter Protocol
-  +-- VSCode Extension    -- Editor plugin
+```mermaid
+flowchart TD
+    Grammar["UBNF grammar file (350 lines)"]
+    Codegen[unlaxer-dsl codegen]
+    Parsers["Parsers.java — Parser combinator chain"]
+    AST["AST.java — sealed interface + records"]
+    Mapper["Mapper.java — Token → AST conversion"]
+    Eval["Evaluator.java — abstract base (@eval automates most)"]
+    LSP["LSPServer.java — Language Server Protocol"]
+    DAP["DAPServer.java — Debug Adapter Protocol"]
+    VSCode["VSCode Extension — Editor plugin"]
 
-What humans write:
-  - UBNF grammar
-  - Special eval logic (things @eval can't cover)
-
-What LLMs write:
-  - Implementation of special eval logic
-  - Tests
-  - Documentation
+    Grammar --> Codegen
+    Codegen --> Parsers
+    Codegen --> AST
+    Codegen --> Mapper
+    Codegen --> Eval
+    Codegen --> LSP
+    Codegen --> DAP
+    Codegen --> VSCode
 ```
+
+**What humans write:**
+- UBNF grammar
+- Special eval logic (things @eval can't cover)
+
+**What LLMs write:**
+- Implementation of special eval logic
+- Tests
+- Documentation
 
 **Newcomer:** Write a UBNF and you get a language processing system + LSP + DAP. That means...
 

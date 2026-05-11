@@ -47,19 +47,18 @@ mvn -B package
 
 Internally:
 
-```
-ubnf.ubnf
-   │  (mvn generate-sources)
-   ▼
-target/generated-sources/ubnf/org/unlaxer/dsl/bootstrap/generated/
-   │ UBNFLanguageServer.java
-   │ UBNFLspLauncher.java
-   ▼  (mvn package — shade)
-target/ubnf-lsp-server.jar (fat jar)
-   ▼  (antrun copy)
-server-dist/ubnf-lsp-server.jar
-   ▼  (mvn verify — npm install + vsce package)
-target/ubnf-lsp-0.1.0.vsix
+```mermaid
+flowchart TD
+    Ubnf[ubnf.ubnf]
+    Gen["target/generated-sources/ubnf/org/unlaxer/dsl/bootstrap/generated/<br/>UBNFLanguageServer.java<br/>UBNFLspLauncher.java"]
+    Jar["target/ubnf-lsp-server.jar (fat jar)"]
+    Dist[server-dist/ubnf-lsp-server.jar]
+    Vsix[target/ubnf-lsp-0.1.0.vsix]
+
+    Ubnf -- "mvn generate-sources" --> Gen
+    Gen -- "mvn package — shade" --> Jar
+    Jar -- "antrun copy" --> Dist
+    Dist -- "mvn verify — npm install + vsce package" --> Vsix
 ```
 
 ## UBNFLanguageServer features

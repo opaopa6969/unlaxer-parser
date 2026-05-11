@@ -257,28 +257,48 @@ public static class TinyCalcParser extends WhiteSpaceDelimitedLazyChain {
 
 ## パーサー定義の全体像
 
-```
-TinyCalcParser (WhiteSpaceDelimitedLazyChain)
-├── VariableDeclarationsParser (LazyZeroOrMore)
-│   └── VariableDeclarationParser (WhiteSpaceDelimitedLazyChain)
-│       ├── VarKeywordParser (Choice): "variable" | "var"
-│       ├── IdentifierParser (LazyChain)
-│       ├── Optional
-│       │   └── VariableInitializerParser: "set" Expression
-│       └── SemicolonParser
-└── ExpressionParser (WhiteSpaceDelimitedLazyChain)
-    ├── TermParser (WhiteSpaceDelimitedLazyChain)
-    │   ├── FactorParser (LazyChoice)
-    │   │   ├── FunctionCallParser (LazyChoice)
-    │   │   │   ├── TwoArgFunctionParser
-    │   │   │   ├── SingleArgFunctionParser
-    │   │   │   └── NoArgFunctionParser
-    │   │   ├── UnaryExpressionParser (LazyChain)
-    │   │   ├── NumberParser (既存)
-    │   │   ├── IdentifierParser (LazyChain)
-    │   │   └── ParenExpressionParser ← Expression (循環!)
-    │   └── ZeroOrMore: MulOp Factor
-    └── ZeroOrMore: AddOp Term
+```mermaid
+flowchart TD
+    TCP["TinyCalcParser<br/>(WhiteSpaceDelimitedLazyChain)"]
+    VDs["VariableDeclarationsParser<br/>(LazyZeroOrMore)"]
+    VD["VariableDeclarationParser<br/>(WhiteSpaceDelimitedLazyChain)"]
+    Var["VarKeywordParser (Choice): 'variable' | 'var'"]
+    IP["IdentifierParser (LazyChain)"]
+    Opt[Optional]
+    VI["VariableInitializerParser: 'set' Expression"]
+    Semi[SemicolonParser]
+    EP["ExpressionParser<br/>(WhiteSpaceDelimitedLazyChain)"]
+    TP["TermParser<br/>(WhiteSpaceDelimitedLazyChain)"]
+    FP["FactorParser (LazyChoice)"]
+    FC["FunctionCallParser (LazyChoice)"]
+    TwoArg[TwoArgFunctionParser]
+    SingleArg[SingleArgFunctionParser]
+    NoArg[NoArgFunctionParser]
+    UE["UnaryExpressionParser (LazyChain)"]
+    Num["NumberParser (既存)"]
+    IP2["IdentifierParser (LazyChain)"]
+    Paren["ParenExpressionParser ← Expression (循環!)"]
+    MulZ["ZeroOrMore: MulOp Factor"]
+    AddZ["ZeroOrMore: AddOp Term"]
+
+    TCP --> VDs --> VD
+    VD --> Var
+    VD --> IP
+    VD --> Opt --> VI
+    VD --> Semi
+    TCP --> EP
+    EP --> TP
+    TP --> FP
+    FC --> TwoArg
+    FC --> SingleArg
+    FC --> NoArg
+    FP --> FC
+    FP --> UE
+    FP --> Num
+    FP --> IP2
+    FP --> Paren
+    TP --> MulZ
+    EP --> AddZ
 ```
 
 ---

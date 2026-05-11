@@ -76,19 +76,27 @@ public static class ExpressionParser extends WhiteSpaceDelimitedLazyChain {
 
 ## TinyCalc における循環参照の全体像
 
-```
-ExpressionParser ──→ TermParser ──→ FactorParser
-       ↑                                  │
-       │                                  ├──→ FunctionCallParser
-       │                                  │       │
-       │                                  │       ├──→ SingleArgFunctionParser ──→ ExpressionParser ⟲
-       │                                  │       └──→ TwoArgFunctionParser ───→ ExpressionParser ⟲
-       │                                  │
-       │                                  ├──→ UnaryExpressionParser ──→ FactorParser ⟲
-       │                                  │
-       │                                  └──→ ParenExpressionParser ──→ ExpressionParser ⟲
-       │
-       └───────────────────────────────────────── ⟲ 循環参照ポイント
+```mermaid
+flowchart TD
+    EP[ExpressionParser]
+    TP[TermParser]
+    FP[FactorParser]
+    FC[FunctionCallParser]
+    Single[SingleArgFunctionParser]
+    Two[TwoArgFunctionParser]
+    UE[UnaryExpressionParser]
+    Paren[ParenExpressionParser]
+
+    EP --> TP --> FP
+    FP --> FC
+    FC --> Single
+    FC --> Two
+    FP --> UE
+    FP --> Paren
+    Single -. 循環参照 .-> EP
+    Two -. 循環参照 .-> EP
+    UE -. 循環参照 .-> FP
+    Paren -. 循環参照 .-> EP
 ```
 
 循環参照のポイントは3箇所：

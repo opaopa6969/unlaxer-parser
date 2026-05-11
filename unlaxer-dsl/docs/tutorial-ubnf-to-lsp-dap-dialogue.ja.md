@@ -596,24 +596,24 @@ public class P4TypedJavaCodeEmitter extends TinyExpressionP4Evaluator<String> {
 
 **先輩:** 本当。歴史的経緯もあるんだけど、今は5系統ある。
 
-```
-  式文字列 "$a + $b * 2"
-     │
-  ┌──┴───────────────────────────────────┐
-  │                                       │
-  ▼                                       ▼
-[compile系: 式→Javaコード→javac→実行]    [AST系: 式→AST→再帰評価]
-  │                                       │
-  ├─[1] compile-hand                      ├─[3] ast-hand
-  │     JavaCodeCalculatorV3              │     AstNumberExpressionEvaluator
-  │                                       │     (@TinyAstNodeアノテーション駆動)
-  └─[2] compile-dsl                       ├─[4] P4-reflection
-        DslJavaCodeCalculator             │     GeneratedP4ValueAstEvaluator
-        → P4TypedJavaCodeEmitter          │     (リフレクション、レガシー)
-                                          │
-                                          └─[5] P4-typed ★推奨
-                                                P4TypedAstEvaluator
-                                                (sealed switch, 高速)
+```mermaid
+flowchart TD
+    Expr["式文字列 '$a + $b * 2'"]
+    Compile["compile系: 式→Javaコード→javac→実行"]
+    AST["AST系: 式→AST→再帰評価"]
+    C1["[1] compile-hand<br/>JavaCodeCalculatorV3"]
+    C2["[2] compile-dsl<br/>DslJavaCodeCalculator<br/>→ P4TypedJavaCodeEmitter"]
+    A3["[3] ast-hand<br/>AstNumberExpressionEvaluator<br/>(@TinyAstNodeアノテーション駆動)"]
+    A4["[4] P4-reflection<br/>GeneratedP4ValueAstEvaluator<br/>(リフレクション、レガシー)"]
+    A5["[5] P4-typed ★推奨<br/>P4TypedAstEvaluator<br/>(sealed switch, 高速)"]
+
+    Expr --> Compile
+    Expr --> AST
+    Compile --> C1
+    Compile --> C2
+    AST --> A3
+    AST --> A4
+    AST --> A5
 ```
 
 **後輩:** compile系は式を Java コードに変換して javac でコンパイルするんですよね。高速そう。
@@ -881,17 +881,25 @@ MethodInvocation ::= MethodInvocationHeader IDENTIFIER @name '(' [ Arguments ] '
 
 **先輩:** 変わる。3層構造になる。
 
-```
-TinyExpressionP4Evaluator<T>           ← 生成 (abstract, sealed switch dispatch)
-  │
-  ├─ P4DefaultAstEvaluator<Object>     ← 生成 (@eval default/template の実装)
-  │     evalBinaryExpr()               ← @eval(kind=binary_arithmetic) が生成
-  │     evalVariableRefExpr()          ← @eval(kind=variable_ref) が生成
-  │     evalMethodInvocationExpr()     ← abstract (strategy=manual)
-  │
-  └─ MyCustomEvaluator<Object>         ← 手書き (extends P4DefaultAstEvaluator)
-        evalMethodInvocationExpr()     ← manual の実装
-        evalBinaryExpr()               ← 必要ならオーバーライド可能
+```mermaid
+classDiagram
+    class TinyExpressionP4Evaluator~T~ {
+        <<abstract>>
+        sealed switch dispatch (生成)
+    }
+    class P4DefaultAstEvaluator~Object~ {
+        生成 (@eval default/template の実装)
+        +evalBinaryExpr() : @eval(kind=binary_arithmetic) が生成
+        +evalVariableRefExpr() : @eval(kind=variable_ref) が生成
+        +evalMethodInvocationExpr()* : abstract (strategy=manual)
+    }
+    class MyCustomEvaluator~Object~ {
+        手書き
+        +evalMethodInvocationExpr() : manual の実装
+        +evalBinaryExpr() : 必要ならオーバーライド可能
+    }
+    TinyExpressionP4Evaluator <|-- P4DefaultAstEvaluator
+    P4DefaultAstEvaluator <|-- MyCustomEvaluator
 ```
 
 **後輩:** 中間層の `P4DefaultAstEvaluator` が生成されて、人間が書くクラスの abstract メソッドが減る！
@@ -1177,27 +1185,21 @@ public static Map<String, String> debugVariables(String formulaSource, String ru
 
 **先輩:** OK。`"$price * 1.1"` という式が来たとしよう。全体のフローはこう。
 
-```
-1. ユーザーが式を入力: "$price * 1.1"
-          │
-2. AstEvaluatorCalculator がエントリーポイント
-          │
-   ┌──────┴──────────────────────────┐
-   │                                  │
-   ▼                                  ▼
-3a. P4 AST パス                     3b. JavaCode fallback パス
-   │                                  │
-   TinyExpressionP4Mapper.parse()     JavaCodeCalculatorV3
-   │                                  │
-   Token ツリー → sealed AST          式 → Java コード → javac → .class
-   │                                  │
-   P4TypedAstEvaluator.eval()         .class.evaluate(context)
-   │                                  │
-   └──────────┬───────────────────────┘
-              │
-4. CalculationContext から $price の値を取得
-              │
-5. 計算結果を返す
+```mermaid
+flowchart TD
+    U["1. ユーザーが式を入力: '$price * 1.1'"]
+    E[2. AstEvaluatorCalculator がエントリーポイント]
+    P4["<b>3a. P4 AST パス</b><br/>TinyExpressionP4Mapper.parse()<br/>Token ツリー → sealed AST<br/>P4TypedAstEvaluator.eval()"]
+    Java["<b>3b. JavaCode fallback パス</b><br/>JavaCodeCalculatorV3<br/>式 → Java コード → javac → .class<br/>.class.evaluate(context)"]
+    Ctx["4. CalculationContext から $price の値を取得"]
+    Ret[5. 計算結果を返す]
+
+    U --> E
+    E --> P4
+    E --> Java
+    P4 --> Ctx
+    Java --> Ctx
+    Ctx --> Ret
 ```
 
 **後輩:** `AstEvaluatorCalculator` が最初に P4 AST パスを試して、ダメなら JavaCode に fallback する？
