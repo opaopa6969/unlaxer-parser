@@ -191,7 +191,7 @@ public class ParseContext implements
   }
   
   public  Source peek(CodePointIndex startIndexInclusive, CodePointIndex endIndexExclusive) {
-    return peek(startIndexInclusive, endIndexExclusive);
+    return getSource().peek(startIndexInclusive, endIndexExclusive);
   }
   
   static ThreadLocal<ParseContext> parseContextByThread = new ThreadLocal<>();
