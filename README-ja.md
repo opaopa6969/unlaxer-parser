@@ -18,11 +18,11 @@
 [![Maven Central](https://img.shields.io/maven-central/v/org.unlaxer/unlaxer-common)](https://central.sonatype.com/artifact/org.unlaxer/unlaxer-common)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Java 21+](https://img.shields.io/badge/Java-21%2B-orange.svg)]()
-[![Version](https://img.shields.io/badge/version-3.0.1-blue)]()
+[![Version](https://img.shields.io/badge/version-3.0.4-blue)]()
 
 ---
 
-> **バージョン通知 — 3.0.1**: このリリースには Simple wrapper 生成バグのパッチ修正が含まれています（issue #22）。`unlaxer-common` または `unlaxer-dsl` の `2.x` に依存している場合は、[CHANGELOG](./CHANGELOG.md) と下記の[downstream ドリフト警告](#downstream-ドリフト警告)を参照してください。
+> **バージョン通知 — 3.0.4**: このパッチリリースは、3.0.3 で `@scopeTree`/`@declares`/`@backref` のスコープ機能（LSP definition / linked editing / hover-set / completion）が静かに壊れていたリグレッションを修正します。tinyexpression の downstream 検証で発見されました。**3.0.2 は Maven Central に公開されていません** — 3.0.1 からは 3.0.3 または 3.0.4 へ直接アップグレードしてください。`unlaxer-common` または `unlaxer-dsl` の `2.x` に依存している場合は、[CHANGELOG](./CHANGELOG.md) と下記の[downstream ドリフト警告](#downstream-ドリフト警告)を参照してください。
 
 ---
 
@@ -139,12 +139,12 @@ MulOp ::= '*' | '/' ;
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-common</artifactId>
-        <version>3.0.1</version>
+        <version>3.0.4</version>
     </dependency>
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-dsl</artifactId>
-        <version>3.0.1</version>
+        <version>3.0.4</version>
     </dependency>
 </dependencies>
 ```
@@ -313,15 +313,15 @@ flowchart TD
 
 ## Downstream ドリフト警告
 
-> **警告**: 以下の downstream プロジェクトは **unlaxer-parser 2.x** に対してビルドされており、3.0.1 に対してはまだ検証されていません。`UBNFAST`、`UBNFMapper`、`CodegenMain` エントリポイントの API 変更によって、ビルドが失敗する可能性があります。
+> **警告**: 以下の downstream プロジェクトの一部は元々 **unlaxer-parser 2.x** に対してビルドされたものです。`UBNFAST`、`UBNFMapper`、`CodegenMain` エントリポイントの API 変更によってビルドが失敗する可能性があるため、アップグレード前に各プロジェクトの最終検証バージョンを確認してください。
 
 | Downstream プロジェクト | 最終検証バージョン | ステータス |
 |----------------------|----------------|----------|
-| [tinyexpression](https://github.com/opaopa6969/tinyexpression) | 2.8.0 | 3.0.1 未検証 |
-| [onigiri-parser](https://github.com/opaopa6969/onigiri-parser) | 2.6.0 | 3.0.1 未検証 |
-| [fraud-alert](https://github.com/opaopa6969/fraud-alert) | 2.8.0 | 3.0.1 未検証 |
+| [tinyexpression](https://github.com/opaopa6969/tinyexpression) | 3.0.4 | 検証済み。`p4-smoke`（86 テスト）+ LSP smoke（25 テスト）パス（[#28](https://github.com/opaopa6969/unlaxer-parser/issues/28), #38） |
+| [onigiri-parser](https://github.com/opaopa6969/onigiri-parser) | 3.0.1 | `mvn compile` 成功（[#27](https://github.com/opaopa6969/unlaxer-parser/issues/27)） |
+| [fraud-alert](https://github.com/opaopa6969/fraud-alert) | 2.8.0 | 3.x 未検証 |
 
-アップグレード前に、[CHANGELOG](./CHANGELOG.md) の `2.8.0 → 3.0.0` 破壊的変更セクションを確認してください。
+アップグレード前に、[2.x → 3.x 移行ガイド](./docs/migration-2.x-to-3.x-ja.md)と [CHANGELOG](./CHANGELOG.md) の `2.8.0 → 3.0.0` 破壊的変更セクションを確認してください。
 
 ---
 

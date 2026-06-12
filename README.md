@@ -18,11 +18,11 @@
 [![Maven Central](https://img.shields.io/maven-central/v/org.unlaxer/unlaxer-common)](https://central.sonatype.com/artifact/org.unlaxer/unlaxer-common)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Java 21+](https://img.shields.io/badge/Java-21%2B-orange.svg)]()
-[![Version](https://img.shields.io/badge/version-3.0.1-blue)]()
+[![Version](https://img.shields.io/badge/version-3.0.4-blue)]()
 
 ---
 
-> **Version notice — 3.0.1**: This release contains a patch fix for the Simple wrapper generation bug (issue #22). If you depend on `unlaxer-common` or `unlaxer-dsl` at `2.x`, see [CHANGELOG](./CHANGELOG.md) and the [downstream drift warning](#downstream-drift-warning) below.
+> **Version notice — 3.0.4**: This patch release fixes a 3.0.3 regression where `@scopeTree`/`@declares`/`@backref` scope features (LSP definition, linked editing, hover-set, completion) were silently broken. It was found by tinyexpression downstream verification. **3.0.2 was never published to Maven Central** — upgrade directly from 3.0.1 to 3.0.3 or 3.0.4. If you depend on `unlaxer-common` or `unlaxer-dsl` at `2.x`, see [CHANGELOG](./CHANGELOG.md) and the [downstream drift warning](#downstream-drift-warning) below.
 
 ---
 
@@ -140,12 +140,12 @@ From this, unlaxer generates:
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-common</artifactId>
-        <version>3.0.1</version>
+        <version>3.0.4</version>
     </dependency>
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-dsl</artifactId>
-        <version>3.0.1</version>
+        <version>3.0.4</version>
     </dependency>
 </dependencies>
 ```
@@ -314,11 +314,11 @@ See [docs/architecture.md — Bootstrap](./docs/architecture.md#bootstrap-and-se
 
 ## Downstream Drift Warning
 
-> **Warning**: The following downstream projects were built against **unlaxer-parser 2.x** and have not yet been validated against 3.0.1. API changes in `UBNFAST`, `UBNFMapper`, and `CodegenMain` entry point may cause breakage.
+> **Warning**: Some of the following downstream projects were originally built against **unlaxer-parser 2.x**. API changes in `UBNFAST`, `UBNFMapper`, and the `CodegenMain` entry point may cause breakage; check each project's last-validated version before upgrading.
 
 | Downstream project | Last validated against | Status |
 |--------------------|----------------------|--------|
-| [tinyexpression](https://github.com/opaopa6969/tinyexpression) | 3.0.2 | Migrated; build success ([#28](https://github.com/opaopa6969/unlaxer-parser/issues/28)) |
+| [tinyexpression](https://github.com/opaopa6969/tinyexpression) | 3.0.4 | Verified; `p4-smoke` (86 tests) + LSP smoke (25 tests) pass ([#28](https://github.com/opaopa6969/unlaxer-parser/issues/28), #38) |
 | [onigiri-parser](https://github.com/opaopa6969/onigiri-parser) | 3.0.1 | `mvn compile` success ([#27](https://github.com/opaopa6969/unlaxer-parser/issues/27)) |
 | [fraud-alert](https://github.com/opaopa6969/fraud-alert) | 2.8.0 | Unverified against 3.x |
 
