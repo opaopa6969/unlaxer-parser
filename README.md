@@ -37,6 +37,7 @@
 - [Bootstrap and Self-Hosting](#bootstrap-and-self-hosting)
 - [Real-World Example](#real-world-example)
 - [Downstream Drift Warning](#downstream-drift-warning)
+- [API Deprecation Policy](#api-deprecation-policy)
 - [Documentation](#documentation)
 - [Why unlaxer?](#why-unlaxer)
 - [Project Structure](#project-structure)
@@ -317,11 +318,17 @@ See [docs/architecture.md — Bootstrap](./docs/architecture.md#bootstrap-and-se
 
 | Downstream project | Last validated against | Status |
 |--------------------|----------------------|--------|
-| [tinyexpression](https://github.com/opaopa6969/tinyexpression) | 2.8.0 | Unverified against 3.0.1 |
-| [onigiri-parser](https://github.com/opaopa6969/onigiri-parser) | 2.6.0 | Unverified against 3.0.1 |
-| [fraud-alert](https://github.com/opaopa6969/fraud-alert) | 2.8.0 | Unverified against 3.0.1 |
+| [tinyexpression](https://github.com/opaopa6969/tinyexpression) | 3.0.2 | Migrated; build success ([#28](https://github.com/opaopa6969/unlaxer-parser/issues/28)) |
+| [onigiri-parser](https://github.com/opaopa6969/onigiri-parser) | 3.0.1 | `mvn compile` success ([#27](https://github.com/opaopa6969/unlaxer-parser/issues/27)) |
+| [fraud-alert](https://github.com/opaopa6969/fraud-alert) | 2.8.0 | Unverified against 3.x |
 
-Before upgrading, check the [CHANGELOG](./CHANGELOG.md) for the `2.8.0 → 3.0.0` breaking changes section.
+Before upgrading, read the [2.x → 3.x migration guide](./docs/migration-2.x-to-3.x.md) ([JA](./docs/migration-2.x-to-3.x-ja.md)) and the [CHANGELOG](./CHANGELOG.md) `2.8.0 → 3.0.0` breaking changes section.
+
+---
+
+## API Deprecation Policy
+
+Public API removals and renames go through at least **one minor version with an `@Deprecated` bridge** before the symbol is removed. The CHANGELOG marks every such change as **Breaking** in the version that deprecates it and the version that removes it. The 3.0.0 removals (`StringSource(String)`, `StringBase`, `WildCardStringTerninatorParser`, …) predate this policy; downstream feedback ([#27](https://github.com/opaopa6969/unlaxer-parser/issues/27), [#28](https://github.com/opaopa6969/unlaxer-parser/issues/28)) is why it now exists.
 
 ---
 
@@ -332,6 +339,7 @@ Before upgrading, check the [CHANGELOG](./CHANGELOG.md) for the `2.8.0 → 3.0.0
 | [Getting Started](./docs/getting-started.md) | Maven setup, first grammar, full walkthrough | [EN](./docs/getting-started.md) / [JA](./docs/getting-started-ja.md) |
 | [UBNF Guide](./docs/ubnf-guide.md) | Full UBNF syntax, all annotations, feature matrix | [EN](./docs/ubnf-guide.md) / [JA](./docs/ubnf-guide-ja.md) |
 | [Architecture](./docs/architecture.md) | Bootstrap pipeline, combinator catalog, ParserIR | [EN](./docs/architecture.md) / [JA](./docs/architecture-ja.md) |
+| [Migration 2.x → 3.x](./docs/migration-2.x-to-3.x.md) | Breaking changes, replacements, pre-flight validation | [EN](./docs/migration-2.x-to-3.x.md) / [JA](./docs/migration-2.x-to-3.x-ja.md) |
 | [Parser Fundamentals](./unlaxer-common/docs/tutorial-parser-fundamentals-dialogue.en.md) | Core parser combinator concepts | [EN](./unlaxer-common/docs/tutorial-parser-fundamentals-dialogue.en.md) / [JA](./unlaxer-common/docs/tutorial-parser-fundamentals-dialogue.ja.md) |
 | [UBNF to LSP/DAP Tutorial](./unlaxer-dsl/docs/tutorial-ubnf-to-lsp-dap-dialogue.en.md) | Full pipeline: grammar to IDE support | [EN](./unlaxer-dsl/docs/tutorial-ubnf-to-lsp-dap-dialogue.en.md) / [JA](./unlaxer-dsl/docs/tutorial-ubnf-to-lsp-dap-dialogue.ja.md) |
 | [Quick Start (5 min)](./unlaxer-dsl/docs/quickstart-dialogue.en.md) | Dialogue-format getting started guide | [EN](./unlaxer-dsl/docs/quickstart-dialogue.en.md) / [JA](./unlaxer-dsl/docs/quickstart-dialogue.ja.md) |
@@ -379,7 +387,7 @@ unlaxer-parser/
 
 ## foundation-poisonpills Note
 
-Some internal integration tests and codegen fixtures reference a module named `foundation-poisonpills`. This module is not published to Maven Central and is not part of the public API. Its purpose is internal adversarial testing of the parser combinator core (inputs designed to trigger worst-case backtracking). **You do not need it** to use unlaxer-parser. If you see a build error mentioning `foundation-poisonpills`, you are likely running the full internal test suite, which requires the private module to be present on the local classpath.
+Some internal integration tests and codegen fixtures reference a module named `foundation-poisonpills`. The artifact `org.unlaxer:unlaxer-foundation-poisonpills` is published to Maven Central (1.0.0) for build convenience, but it is **internal-only and not part of the public API**: no compatibility guarantees apply, and downstream projects should not depend on it directly. Its purpose is internal adversarial testing of the parser combinator core (inputs designed to trigger worst-case backtracking). **You do not need it** to use unlaxer-parser. If you see a build error mentioning `foundation-poisonpills`, you are likely running the full internal test suite, which requires the private module to be present on the local classpath.
 
 ---
 

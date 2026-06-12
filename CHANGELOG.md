@@ -6,6 +6,26 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- **`ParseContext.peek(CodePointIndex, CodePointIndex)` infinite recursion** (#32): the overload delegated to itself and threw `StackOverflowError` when called. It now delegates to the source. Originally reported in the 2026-05-30 source review (#30).
+- **`SingleCharacterParser` supplementary code point handling** (#33): matching is now code-point based. A new overridable `isMatch(int codePoint)` hook is available; the default delegates to `isMatch(char)` for BMP code points and rejects supplementary ones. `WildCardCharacterParser` continues to match supplementary characters (e.g. emoji). `isMatch(char)` subclass contracts are unchanged.
+
+### Added
+
+- **Left-recursion warnings in the codegen pipeline** (#36): `CodegenMain`/`CodegenRunner` now report `W-LEFT-RECURSION` issues through the standard validation report machinery (stderr summary, `--strict`, `--fail-on warning`, report files). New structured API: `GrammarValidator.detectLeftRecursionIssues(GrammarDecl)`.
+- **`W-TOKEN-UNRESOLVED` fully-qualified-name suggestions** (#36): when a token declaration uses an unqualified parser class name that exists in a bundled parser package, the warning hint lists the candidates (e.g. `Did you mean 'org.unlaxer.parser.elementary.NumberParser'?`).
+- **Migration guide** (#35): `docs/migration-2.x-to-3.x.md` (+ Japanese) consolidating all 2.x → 3.x breaking changes and a pre-flight validation procedure, based on downstream feedback (#27, #28).
+
+### Notes
+
+- The 3.0.0 "Removed" section below was amended retroactively: `new StringSource(String)`, `StringBase`/`StringSource2`/`StringIndexAccessor*`, and `WildCardStringTerninatorParser` were removed in 3.0.0 but previously undocumented (#27, #28).
+- README now documents the API deprecation policy and clarifies the `foundation-poisonpills` artifact status.
+
+---
+
 ## [3.0.2] - 2026-04-20
 
 ### Added
@@ -15,7 +35,8 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ### Notes
 
-- No API changes from 3.0.1. Safe to upgrade without code changes.
+- No API changes from 3.0.1. Safe to upgrade **from 3.0.1** without code changes.
+- Projects upgrading from **2.x** must review the [3.0.0 breaking changes](#300---2026-04-18) below and the [2.x → 3.x migration guide](./docs/migration-2.x-to-3.x.md). Earlier revisions of the 3.0.0 entry omitted several removals (e.g. `new StringSource(String)`); they are now listed under 3.0.0 Removed (reported by downstream feedback #27, #28).
 - CI workflow already present at `.github/workflows/maven.yml`; no new workflow needed.
 
 ---
@@ -58,6 +79,9 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 ### Removed
 
 - `UbnfCodeGenerator` (old CLI class) — removed. Use `CodegenMain`.
+- **`new StringSource(String)`** (single-argument constructor) — removed during the StringSource/StringSource2 unification. Use `StringSource.createRootSource(String)` instead. *(Added to this entry retroactively — reported by tinyexpression, #28.)*
+- **`StringBase`, `StringIndexAccessor`, `StringIndexAccessorImpl`, `StringSource2`** — removed; replaced by Java 21 standard APIs and the unified `StringSource` (#7). *(Added retroactively — reported by onigiri-parser, #27.)*
+- **`WildCardStringTerninatorParser`** (typo class name) — removed; use the correctly spelled `WildCardStringTerminatorParser`. Note the constructor signature is `WildCardStringTerminatorParser(boolean, Parser)`. *(Added retroactively — #27, #28.)*
 
 ### Downstream Drift Warning
 
