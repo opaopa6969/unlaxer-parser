@@ -31,18 +31,31 @@ public interface TransactionListenerContainer{
 			.forEach(listener->listener.onOpen(parseContext));
 	}
 	
+	// parser 自身が TransactionListener を実装する場合は、登録済み listener と
+	// 同じペイロードで自己通知する (issue #30 指摘3 / #34)。発火元はここに
+	// 集約されているため、Chain 以外の parser でも・collect 済みの正しい
+	// トークンでも通知が一致する。
 	public default void onBegin(ParseContext parseContext , Parser parser){
+		if (parser instanceof TransactionListener self) {
+			self.onBegin(parseContext, parser);
+		}
 		getTransactionListenerByName().values().stream()
 			.forEach(listener->listener.onBegin(parseContext,parser));
 	}
-	
+
 	public default void onCommit(
 			ParseContext parseContext , Parser parser , TokenList committedTokens){
+		if (parser instanceof TransactionListener self) {
+			self.onCommit(parseContext, parser, committedTokens);
+		}
 		getTransactionListenerByName().values().stream()
 			.forEach(listener->listener.onCommit(parseContext,parser,committedTokens));
 	}
 	public default void onRollback(
 			ParseContext parseContext , Parser parser , TokenList rollbackedTokens){
+		if (parser instanceof TransactionListener self) {
+			self.onRollback(parseContext, parser, rollbackedTokens);
+		}
 		getTransactionListenerByName().values().stream()
 			.forEach(listener->listener.onRollback(parseContext,parser,rollbackedTokens));
 	}

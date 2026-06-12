@@ -68,56 +68,22 @@ public final class ScopeStore {
     // Dispatcher registration
     // =========================================================================
 
-    private static final Name DISPATCHER_KEY = Name.of(ScopeStore.class, "scopeDispatcher");
-
     /**
-     * {@link ParseContext} に ScopeStore ディスパッチャーリスナーを登録する。
+     * 旧 workaround: {@link ParseContext} に ScopeStore ディスパッチャーリスナーを登録する。
      *
-     * <p>UBNF コード生成器（{@code @declares} / {@code @backref} / {@code @scopeTree} を持つ文法）が
-     * 生成した {@link TransactionListener} 実装パーサーは、{@code ParseContext.listenerByName} に
-     * 自動登録されない。このため、フレームワークの {@link org.unlaxer.context.TransactionListenerContainer}
-     * は生成パーサーの {@code onBegin} / {@code onCommit} / {@code onRollback} を呼ばない。
-     *
-     * <p>このメソッドをパース前に一度呼ぶことで、ディスパッチャーがすべてのパーサーの
-     * トランザクションイベントを受け取り、{@link TransactionListener} を実装しているパーサーへ
-     * 転送する。
-     *
-     * <h3>設計メモ</h3>
-     * {@link org.unlaxer.parser.combinator.ChainInterface} がパーサーの {@code parse()} 内で
-     * {@code this instanceof TransactionListener} をチェックして自己呼び出しするよう変更すれば
-     * このディスパッチャーは不要になる（{@code unlaxer-common} 側の根本修正）。
-     * ただし既存の二重呼び出しリスクを避けるため、現時点では DSL 側の workaround として提供している。
+     * @deprecated {@link org.unlaxer.context.TransactionListenerContainer} が
+     *     begin/commit/rollback の発火時に、parser 自身が {@link TransactionListener} を
+     *     実装していれば登録済み listener と同じペイロードで自己通知するようになった
+     *     (unlaxer-common 側の根本修正)。このディスパッチャーは不要になり、登録すると
+     *     二重通知になるため <b>no-op</b> に変更した。呼び出しは無害なので既存コードは
+     *     そのまま動くが、新規コードでは呼ぶ必要はない。
      *
      * @param ctx パース開始前の {@link ParseContext}
      */
+    @Deprecated
     public static void registerDispatcher(ParseContext ctx) {
-        ctx.addTransactionListener(DISPATCHER_KEY, new TransactionListener() {
-            // ChainInterface.parse() は自身が TransactionListener を実装する場合に
-            // onBegin/onCommit/onRollback を直接呼ぶ (unlaxer-common 側の根本修正、
-            // PR #31)。二重通知を避けるため、ChainInterface 実装 parser には
-            // ディスパッチャーから転送しない。
-            private boolean selfNotifying(Parser parser) {
-                return parser instanceof org.unlaxer.parser.combinator.ChainInterface;
-            }
-            @Override public void setLevel(OutputLevel level) {}
-            @Override public void onOpen(ParseContext parseContext) {}
-            @Override public void onBegin(ParseContext parseContext, Parser parser) {
-                if (parser instanceof TransactionListener tl && !selfNotifying(parser)) {
-                    tl.onBegin(parseContext, parser);
-                }
-            }
-            @Override public void onCommit(ParseContext parseContext, Parser parser, TokenList committedTokens) {
-                if (parser instanceof TransactionListener tl && !selfNotifying(parser)) {
-                    tl.onCommit(parseContext, parser, committedTokens);
-                }
-            }
-            @Override public void onRollback(ParseContext parseContext, Parser parser, TokenList rollbackedTokens) {
-                if (parser instanceof TransactionListener tl && !selfNotifying(parser)) {
-                    tl.onRollback(parseContext, parser, rollbackedTokens);
-                }
-            }
-            @Override public void onClose(ParseContext parseContext) {}
-        });
+        // no-op: TransactionListenerContainer が自己通知するため転送は不要。
+        // 登録すると二重通知になるので何もしない。
     }
 
     /** globalScopeTreeMap のキー（スコープスタック） */

@@ -6,6 +6,19 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ---
 
+## [3.0.4] - 2026-06-12
+
+### Fixed
+
+- **Regression in 3.0.3: `@scopeTree`/`@declares`/`@backref` scope features silently broken** (found by tinyexpression downstream verification): `ChainInterface.parse()`'s self-notification (introduced in 3.0.3 via #31) passed the raw pre-collect child token list to `onCommit`, while the dispatcher path passed the collected rule token. Generated listeners therefore never registered symbol declarations — LSP definition / linked-editing / hover-set / completion features broke. Self-notification now lives in `TransactionListenerContainer` (the single source of begin/commit/rollback events), guaranteeing payload parity for all parser types. `ChainInterface.parse()` is reverted to its 3.0.2 body, which also removes an unconditional `TokenList` copy on every failed chain parse (performance).
+- `ScopeStore.registerDispatcher` is now a deprecated **no-op**: the container's self-notification makes forwarding redundant, and keeping the dispatcher active would double-notify. Existing callers remain source- and behavior-compatible.
+
+### Notes
+
+- Downstream verification: tinyexpression `p4-smoke` (86 tests) and LSP module smoke (25 tests) pass against 3.0.4; both had failures against 3.0.3.
+
+---
+
 ## [3.0.3] - 2026-06-12
 
 ### Fixed
