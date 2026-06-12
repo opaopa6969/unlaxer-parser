@@ -1,0 +1,65 @@
+{
+  "UBNF grammar skeleton": {
+    "prefix": "grammar",
+    "body": [
+      "grammar ${1:Name} {",
+      "  @package: ${2:org.example}",
+      "",
+      "  token ${3:NUMBER} = org.unlaxer.parser.elementary.NumberParser",
+      "  token ${4:IDENTIFIER} = org.unlaxer.parser.clang.IdentifierParser",
+      "",
+      "  @root",
+      "  ${5:Start} ::= ${6:NUMBER} ;",
+      "}"
+    ],
+    "description": "Grammar block with package, tokens and a @root rule"
+  },
+  "Mapped rule": {
+    "prefix": "mapped-rule",
+    "body": [
+      "@mapping(${1:TypeName}, params=[${2:left}, ${3:right}])",
+      "${4:RuleName} ::= ${5:Element} @${2:left} ${6:Element} @${3:right} ;"
+    ],
+    "description": "Rule with @mapping record generation"
+  },
+  "Left-assoc binary rule": {
+    "prefix": "binary-rule",
+    "body": [
+      "@mapping(${1:BinaryExpr}, params=[left, op, right])",
+      "@leftAssoc",
+      "${2:Expression} ::= ${3:Term} @left { ${4:Op} @op ${3:Term} @right } ;"
+    ],
+    "description": "Left-associative binary expression rule"
+  },
+  "Enum rule": {
+    "prefix": "enum-rule",
+    "body": [
+      "@enum",
+      "${1:Kind} ::= '${2:a}' | '${3:b}' ;"
+    ],
+    "description": "@enum rule generating a Java enum"
+  },
+  "Token declaration": {
+    "prefix": "token",
+    "body": ["token ${1:NAME} = ${2:org.unlaxer.parser.elementary.NumberParser}"],
+    "description": "Token declaration with fully qualified parser class"
+  },
+  "UNTIL token": {
+    "prefix": "until",
+    "body": ["token ${1:BODY} = UNTIL('${2:```}')"],
+    "description": "Token matching everything up to a terminator"
+  },
+  "Grammar import": {
+    "prefix": "import",
+    "body": ["@import ${1:alias} from '${2:path/to/base.ubnf}'"],
+    "description": "Import rules from another grammar"
+  },
+  "Scope rule": {
+    "prefix": "scope-rule",
+    "body": [
+      "@scopeTree(mode=${1:lexical})",
+      "${2:Block} ::= '{' { ${3:Statement} } '}' ;"
+    ],
+    "description": "Scope boundary rule for @declares/@backref"
+  }
+}

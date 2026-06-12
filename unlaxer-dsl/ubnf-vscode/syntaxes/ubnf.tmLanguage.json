@@ -4,36 +4,118 @@
   "scopeName": "source.ubnf",
   "patterns": [
     { "include": "#comment" },
-    { "include": "#keyword" },
-    { "include": "#operator" },
-    { "include": "#annotation" },
     { "include": "#string" },
-    { "include": "#typename" }
+    { "include": "#annotation-with-args" },
+    { "include": "#annotation" },
+    { "include": "#capture" },
+    { "include": "#keyword" },
+    { "include": "#token-function" },
+    { "include": "#rule-declaration" },
+    { "include": "#token-declaration" },
+    { "include": "#fqn" },
+    { "include": "#token-name" },
+    { "include": "#typename" },
+    { "include": "#number" },
+    { "include": "#operator" },
+    { "include": "#quantifier" }
   ],
   "repository": {
     "comment": {
       "name": "comment.line.double-slash.ubnf",
       "match": "//.*$"
     },
+    "string": {
+      "name": "string.quoted.single.ubnf",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.ubnf",
+          "match": "\\\\[nrt\\\\']"
+        }
+      ]
+    },
+    "annotation-with-args": {
+      "begin": "(@(?:mapping|precedence|scopeTree|declares|backref|recovery|interleave|typeof|catalog|commonField|doc))\\s*(\\()",
+      "beginCaptures": {
+        "1": { "name": "storage.modifier.annotation.ubnf" },
+        "2": { "name": "punctuation.definition.arguments.begin.ubnf" }
+      },
+      "end": "\\)",
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.arguments.end.ubnf" }
+      },
+      "patterns": [
+        { "include": "#string" },
+        { "include": "#number" },
+        {
+          "name": "variable.parameter.ubnf",
+          "match": "\\b(params|level|mode|symbol|name|context|description)\\b(?=\\s*=)"
+        },
+        {
+          "name": "entity.name.type.record.ubnf",
+          "match": "\\b[A-Z]\\w*\\b"
+        },
+        {
+          "name": "variable.other.capture-ref.ubnf",
+          "match": "\\b[a-z]\\w*\\b"
+        }
+      ]
+    },
+    "annotation": {
+      "name": "storage.modifier.annotation.ubnf",
+      "match": "@(root|mapping|whitespace|leftAssoc|rightAssoc|precedence|enum|commonField|scopeTree|declares|backref|import|recovery|skip|interleave|typeof|catalog|eval|doc|package|comment)\\b"
+    },
+    "capture": {
+      "name": "variable.other.capture.ubnf",
+      "match": "@[a-z]\\w*\\b"
+    },
     "keyword": {
       "name": "keyword.control.ubnf",
-      "match": "\\b(grammar|token)\\b"
+      "match": "\\b(grammar|token|from|params)\\b"
+    },
+    "token-function": {
+      "name": "support.function.token-type.ubnf",
+      "match": "\\b(UNTIL|NEGATION|LOOKAHEAD|NEGATIVE_LOOKAHEAD|CHAR_RANGE|REGEX|ANY|EOF|EMPTY|CI)\\b"
+    },
+    "rule-declaration": {
+      "match": "^\\s*([A-Za-z_]\\w*)\\s*(::=)",
+      "captures": {
+        "1": { "name": "entity.name.function.rule.ubnf" },
+        "2": { "name": "keyword.operator.define.ubnf" }
+      }
+    },
+    "token-declaration": {
+      "match": "^\\s*(token)\\s+([A-Z][A-Z0-9_]*)\\s*(=)",
+      "captures": {
+        "1": { "name": "keyword.control.ubnf" },
+        "2": { "name": "constant.other.token.ubnf" },
+        "3": { "name": "keyword.operator.assignment.ubnf" }
+      }
+    },
+    "fqn": {
+      "name": "entity.name.namespace.fqn.ubnf",
+      "match": "\\b[a-z]\\w*(?:\\.[\\w]+){2,}\\b"
+    },
+    "token-name": {
+      "name": "constant.other.token.ubnf",
+      "match": "\\b[A-Z][A-Z0-9_]+\\b"
+    },
+    "typename": {
+      "name": "entity.name.type.rule-ref.ubnf",
+      "match": "\\b[A-Z]\\w*\\b"
+    },
+    "number": {
+      "name": "constant.numeric.ubnf",
+      "match": "\\b\\d+\\b"
     },
     "operator": {
       "name": "keyword.operator.ubnf",
-      "match": "::=|\\||;"
+      "match": "::=|\\||;|=|\\{|\\}|\\[|\\]|\\(|\\)"
     },
-    "annotation": {
-      "name": "storage.modifier.ubnf",
-      "match": "@(root|mapping|whitespace|leftAssoc)\\b"
-    },
-    "string": {
-      "name": "string.quoted.single.ubnf",
-      "match": "'[^']*'"
-    },
-    "typename": {
-      "name": "entity.name.type.ubnf",
-      "match": "\\b[A-Z][A-Z_0-9]*\\b"
+    "quantifier": {
+      "name": "keyword.operator.quantifier.ubnf",
+      "match": "[+*?%]"
     }
   }
 }

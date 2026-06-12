@@ -6,6 +6,18 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **Rich UBNF VS Code extension** (`ubnf-vscode` 0.2.0): the UBNF grammar editor is now on par with the tinyexpression extension. `UBNFLanguageServerExt` wires `GrammarValidator` into live diagnostics (all `E-*`/`W-*` codes incl. left-recursion), adds quick fixes (`W-TOKEN-UNRESOLVED` → insert fully qualified parser class), context-aware completion (annotation snippets, bundled parser FQNs, declared rule/token names, block snippets), hover docs for annotations and rules, go-to-definition / references / rename / linked editing, document outline, folding, signature help for annotation arguments, and a full semantic-token highlighter. The TextMate grammar was rewritten (15 scopes), client-side snippets added, and the extension now reports server start failures.
+
+### Fixed
+
+- **ubnf-vscode server jar was unlaunchable**: the shaded jar's `Main-Class` pointed at the abstract generated `UBNFLspLauncher` (no `main`). It now points at `UBNFLspLauncherExt`.
+
+---
+
 ## [3.0.4] - 2026-06-12
 
 ### Fixed
