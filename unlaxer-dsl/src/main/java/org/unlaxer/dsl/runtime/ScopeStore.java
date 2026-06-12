@@ -92,20 +92,27 @@ public final class ScopeStore {
      */
     public static void registerDispatcher(ParseContext ctx) {
         ctx.addTransactionListener(DISPATCHER_KEY, new TransactionListener() {
+            // ChainInterface.parse() は自身が TransactionListener を実装する場合に
+            // onBegin/onCommit/onRollback を直接呼ぶ (unlaxer-common 側の根本修正、
+            // PR #31)。二重通知を避けるため、ChainInterface 実装 parser には
+            // ディスパッチャーから転送しない。
+            private boolean selfNotifying(Parser parser) {
+                return parser instanceof org.unlaxer.parser.combinator.ChainInterface;
+            }
             @Override public void setLevel(OutputLevel level) {}
             @Override public void onOpen(ParseContext parseContext) {}
             @Override public void onBegin(ParseContext parseContext, Parser parser) {
-                if (parser instanceof TransactionListener tl) {
+                if (parser instanceof TransactionListener tl && !selfNotifying(parser)) {
                     tl.onBegin(parseContext, parser);
                 }
             }
             @Override public void onCommit(ParseContext parseContext, Parser parser, TokenList committedTokens) {
-                if (parser instanceof TransactionListener tl) {
+                if (parser instanceof TransactionListener tl && !selfNotifying(parser)) {
                     tl.onCommit(parseContext, parser, committedTokens);
                 }
             }
             @Override public void onRollback(ParseContext parseContext, Parser parser, TokenList rollbackedTokens) {
-                if (parser instanceof TransactionListener tl) {
+                if (parser instanceof TransactionListener tl && !selfNotifying(parser)) {
                     tl.onRollback(parseContext, parser, rollbackedTokens);
                 }
             }
