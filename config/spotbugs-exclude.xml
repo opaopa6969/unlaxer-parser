@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SpotBugs baseline / exclusions for unlaxer-parser (issue #37).
+
+  Policy: generated code is excluded wholesale; pre-existing design-level
+  findings are baselined with narrowly-scoped Match entries below. New code
+  must stay clean — do not widen these entries; add a new narrowly-scoped
+  one with a justification comment instead.
+-->
+<FindBugsFilter>
+
+  <!-- Generated code: carries @Generated and is regenerated from ubnf.ubnf.
+       Fix the generator, not the output. -->
+  <Match>
+    <Package name="~org\.unlaxer\.dsl\.bootstrap\.generated.*"/>
+  </Match>
+
+  <!-- Baseline: parsers are Serializable but token/cursor graphs are not
+       actually serialized in practice. Serialization design is pre-existing
+       debt across the core token types. -->
+  <Match>
+    <Bug pattern="SE_BAD_FIELD"/>
+  </Match>
+
+  <!-- Baseline: Specifier/NameSpecifier implement intentional cross-type
+       equals (matching against Enum/String/Class specifiers by design). -->
+  <Match>
+    <Or>
+      <Class name="org.unlaxer.Specifier"/>
+      <Class name="org.unlaxer.base.Specifier"/>
+      <Class name="org.unlaxer.util.NameSpecifier"/>
+      <Class name="org.unlaxer.StringSource"/>
+      <Class name="org.unlaxer.util.SimpleBuilder"/>
+    </Or>
+    <Bug pattern="EQ_CHECK_FOR_OPERAND_NOT_COMPATIBLE_WITH_THIS"/>
+  </Match>
+
+  <!-- Baseline: NullSafetyConcurrentHashMap re-checks nulls by design
+       (it is the null-safety wrapper itself). -->
+  <Match>
+    <Class name="org.unlaxer.util.NullSafetyConcurrentHashMap"/>
+    <Bug pattern="RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE"/>
+  </Match>
+
+  <!-- Baseline: TypedToken is @Deprecated and scheduled for removal. -->
+  <Match>
+    <Class name="org.unlaxer.TypedToken"/>
+    <Bug pattern="MF_CLASS_MASKS_FIELD"/>
+  </Match>
+
+</FindBugsFilter>

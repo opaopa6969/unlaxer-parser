@@ -149,4 +149,60 @@
 			</plugin>
 		</plugins>
 	</build>
+
+	<profiles>
+		<!-- 静的解析 (issue #37)。CI から -Pstatic-analysis で起動する。
+		     Error Prone は確実にバグである ERROR 級チェックのみ有効化。
+		     生成コード (bootstrap/generated) は対象外。 -->
+		<profile>
+			<id>static-analysis</id>
+			<build>
+				<plugins>
+					<plugin>
+						<artifactId>maven-compiler-plugin</artifactId>
+						<version>3.13.0</version>
+						<configuration>
+							<source>21</source>
+							<target>21</target>
+							<fork>true</fork>
+							<compilerArgs>
+								<arg>--enable-preview</arg>
+								<arg>-XDcompilePolicy=simple</arg>
+								<arg>-XDaddTypeAnnotationsToSymbol=true</arg>
+								<arg>--should-stop=ifError=FLOW</arg>
+								<arg>-Xplugin:ErrorProne -XepDisableAllChecks -Xep:InfiniteRecursion:ERROR -Xep:SelfAssignment:ERROR -Xep:SelfEquals:ERROR -Xep:SelfComparison:ERROR -Xep:ArrayEquals:ERROR -Xep:ArrayHashCode:ERROR -Xep:EqualsNaN:ERROR -Xep:IdentityBinaryExpression:ERROR -Xep:ComparableType:ERROR -XepExcludedPaths:.*/bootstrap/generated/.*</arg>
+								<arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
+								<arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
+								<arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</arg>
+								<arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED</arg>
+								<arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED</arg>
+								<arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED</arg>
+								<arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</arg>
+								<arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</arg>
+								<arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
+								<arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
+							</compilerArgs>
+							<annotationProcessorPaths>
+								<path>
+									<groupId>com.google.errorprone</groupId>
+									<artifactId>error_prone_core</artifactId>
+									<version>2.50.0</version>
+								</path>
+							</annotationProcessorPaths>
+						</configuration>
+					</plugin>
+					<plugin>
+						<groupId>com.github.spotbugs</groupId>
+						<artifactId>spotbugs-maven-plugin</artifactId>
+						<version>4.10.2.0</version>
+						<configuration>
+							<effort>Default</effort>
+							<threshold>High</threshold>
+							<excludeFilterFile>${project.basedir}/../config/spotbugs-exclude.xml</excludeFilterFile>
+						</configuration>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
 </project>

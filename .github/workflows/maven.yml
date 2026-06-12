@@ -22,3 +22,11 @@ jobs:
         
     - name: Build with Maven
       run: mvn -B clean test
+
+    # 静的解析 (issue #37): Error Prone (compile 時) + SpotBugs。
+    # 生成コードは除外 (config/spotbugs-exclude.xml / -XepExcludedPaths)。
+    - name: Static analysis (Error Prone + SpotBugs)
+      run: >
+        mvn -B -Pstatic-analysis -pl unlaxer-common,unlaxer-dsl
+        clean test-compile
+        com.github.spotbugs:spotbugs-maven-plugin:4.10.2.0:check

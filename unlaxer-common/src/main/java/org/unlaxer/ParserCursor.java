@@ -45,7 +45,7 @@ public class ParserCursor{
 	}
 	
 	 public void addMatchedPosition(Index adding){
-	   addMatchedPosition(adding);
+	   addMatchedPosition(new CodePointOffset(adding));
   }
 	
 	public EndExclusiveCursor getCursor(TokenKind tokenKind){

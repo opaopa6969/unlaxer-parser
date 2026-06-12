@@ -378,7 +378,7 @@ public class StringSource implements Source {
     return sourceKind == SourceKind.root;
   }
 
-  public static Source EMPTY = StringSource.createDetachedSource("");
+  public static final Source EMPTY = StringSource.createDetachedSource("");
 
   @Override
   public StringIndex stringIndexInRootFrom(CodePointIndex codePointIndex) {

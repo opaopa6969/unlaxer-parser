@@ -31,11 +31,16 @@ public class Names{
 	 */
 	@Override
 	public boolean equals(Object other) {
-		
+
 		if(other instanceof Names names){
 			return names.toString().equals(toString());
 		}
 		return false;
+	}
+
+	@Override
+	public int hashCode() {
+		return toString().hashCode();
 	}
 
 }
