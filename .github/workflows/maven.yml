@@ -31,6 +31,40 @@ jobs:
         clean test-compile
         com.github.spotbugs:spotbugs-maven-plugin:4.10.2.0:check
 
+  # UBNF VSIX を成果物として添付する。タグ push 時の Release 添付は
+  # release-vsix.yml を参照。
+  vsix:
+    name: UBNF VSIX (ubnf-vscode)
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Set up Node.js (for vsce)
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install unlaxer to local repo
+      run: mvn -B -pl .,unlaxer-common,unlaxer-dsl install -DskipTests -Dgpg.skip=true
+
+    - name: Build ubnf-vscode VSIX
+      run: mvn -B -pl unlaxer-dsl/ubnf-vscode verify -Dgpg.skip=true
+
+    - name: Upload VSIX artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ubnf-lsp-vsix
+        path: unlaxer-dsl/ubnf-vscode/target/*.vsix
+        if-no-files-found: error
+
   # downstream 検証: 3.0.3 の @scopeTree リグレッションは unlaxer 自身の
   # テストでは検出されず tinyexpression の LSP smoke で発覚した (#38)。
   # ビルド中の unlaxer に対して downstream の smoke を回し、再発を防ぐ。
