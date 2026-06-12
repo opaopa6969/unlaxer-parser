@@ -18,5 +18,10 @@ public class WildCardCharacterParser extends SingleCharacterParser{
 	public boolean isMatch(char target) {
 		return true;
 	}
+
+	@Override
+	public boolean isMatch(int codePoint) {
+		return true;
+	}
 	
 }
