@@ -184,22 +184,51 @@ public final class GrammarValidator {
      * ({@code A ::= B ...; B ::= A ...}) cycles are reported.
      */
     static List<String> detectLeftRecursion(GrammarDecl grammar) {
+        List<String> warnings = new ArrayList<>();
+        for (String cycleKey : detectLeftRecursionCycles(grammar)) {
+            warnings.add("W-LEFT-RECURSION: left-recursive cycle detected: " + cycleKey);
+        }
+        return warnings;
+    }
+
+    /**
+     * Structured variant of {@link #validateWithWarnings(GrammarDecl)}. Returns
+     * one {@code W-LEFT-RECURSION} issue per detected cycle so that left-recursion
+     * warnings flow through the standard validation report machinery
+     * ({@code --fail-on}, {@code --strict}, report files). Never returns errors.
+     */
+    public static List<ValidationIssue> detectLeftRecursionIssues(GrammarDecl grammar) {
+        List<ValidationIssue> issues = new ArrayList<>();
+        for (String cycleKey : detectLeftRecursionCycles(grammar)) {
+            int firstArrow = cycleKey.indexOf(" ->");
+            String firstRule = firstArrow < 0 ? cycleKey : cycleKey.substring(0, firstArrow);
+            issues.add(new ValidationIssue(
+                "W-LEFT-RECURSION",
+                "left-recursive cycle detected: " + cycleKey,
+                "Rewrite using repetition (e.g. A ::= B { Op B }) or right recursion.",
+                firstRule
+            ));
+        }
+        return List.copyOf(issues);
+    }
+
+    private static List<String> detectLeftRecursionCycles(GrammarDecl grammar) {
         // Build rule map
         Map<String, RuleDecl> ruleMap = new LinkedHashMap<>();
         for (RuleDecl rule : grammar.rules()) {
             ruleMap.put(rule.name(), rule);
         }
 
-        List<String> warnings = new ArrayList<>();
+        List<String> cycles = new ArrayList<>();
         Set<String> reported = new LinkedHashSet<>();
 
         for (String startName : ruleMap.keySet()) {
             // DFS: track current path for cycle detection
             List<String> path = new ArrayList<>();
             Set<String> onStack = new LinkedHashSet<>();
-            findLeftRecursion(startName, ruleMap, path, onStack, reported, warnings);
+            findLeftRecursion(startName, ruleMap, path, onStack, reported, cycles);
         }
-        return warnings;
+        return cycles;
     }
 
     /**
@@ -284,7 +313,7 @@ public final class GrammarValidator {
         List<String> path,
         Set<String> onStack,
         Set<String> reported,
-        List<String> warnings
+        List<String> cycles
     ) {
         if (onStack.contains(current)) {
             // Cycle detected — the cycle starts where current first appears in path
@@ -299,9 +328,7 @@ public final class GrammarValidator {
             String cycleKey = String.join(" -> ", cycle);
             if (!reported.contains(cycleKey)) {
                 reported.add(cycleKey);
-                warnings.add(
-                    "W-LEFT-RECURSION: left-recursive cycle detected: " + cycleKey
-                );
+                cycles.add(cycleKey);
             }
             return;
         }
@@ -316,7 +343,7 @@ public final class GrammarValidator {
 
         Set<String> nextRefs = leftmostRuleRefs(rule.body());
         for (String next : nextRefs) {
-            findLeftRecursion(next, ruleMap, path, onStack, reported, warnings);
+            findLeftRecursion(next, ruleMap, path, onStack, reported, cycles);
         }
 
         path.remove(path.size() - 1);
@@ -480,17 +507,51 @@ public final class GrammarValidator {
 
                 // Check if parser class is resolvable
                 if (!isResolvableParserClass(parserClass, knownParserPackages)) {
+                    String hint = "Ensure the parser class is fully qualified or in a known package "
+                        + "(org.unlaxer.parser.clang, elementary, posix).";
+                    List<String> candidates = fullyQualifiedCandidates(parserClass);
+                    if (!candidates.isEmpty()) {
+                        hint = "Did you mean '" + String.join("' or '", candidates) + "'? " + hint;
+                    }
                     addError(
                         errors,
                         "token " + simple.name() + " references unresolved parser class: "
                             + parserClass,
-                        "Ensure the parser class is fully qualified or in a known package "
-                            + "(org.unlaxer.parser.clang, elementary, posix).",
+                        hint,
                         "W-TOKEN-UNRESOLVED"
                     );
                 }
             }
         }
+    }
+
+    /**
+     * Probes well-known parser packages for a class with the given simple name
+     * and returns the fully qualified candidates, sorted for deterministic
+     * output. Returns an empty list when the name is already qualified.
+     */
+    private static List<String> fullyQualifiedCandidates(String parserClass) {
+        if (parserClass.contains(".")) {
+            return List.of();
+        }
+        List<String> candidatePackages = List.of(
+            "org.unlaxer.parser.elementary",
+            "org.unlaxer.parser.posix",
+            "org.unlaxer.parser.clang",
+            "org.unlaxer.parser.combinator",
+            "org.unlaxer.parser.ascii"
+        );
+        List<String> candidates = new ArrayList<>();
+        for (String candidatePackage : candidatePackages) {
+            String candidate = candidatePackage + "." + parserClass;
+            try {
+                Class.forName(candidate, false, GrammarValidator.class.getClassLoader());
+                candidates.add(candidate);
+            } catch (ClassNotFoundException e) {
+                // not present in this package
+            }
+        }
+        return candidates;
     }
 
     private static boolean isResolvableParserClass(String parserClass, Set<String> knownParserPackages) {

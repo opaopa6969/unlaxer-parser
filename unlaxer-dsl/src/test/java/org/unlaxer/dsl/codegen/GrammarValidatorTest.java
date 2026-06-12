@@ -709,6 +709,89 @@ public class GrammarValidatorTest {
         assertFalse("non-recursive grammar should return empty optional", result.isPresent());
     }
 
+    // =========================================================================
+    // detectLeftRecursionIssues (structured) tests
+    // =========================================================================
+
+    @Test
+    public void testDetectLeftRecursionIssuesReturnsStructuredWarning() {
+        GrammarDecl grammar = parseGrammar(
+            "grammar G {\n"
+                + "  @package: org.example\n"
+                + "  @root\n"
+                + "  Expr ::= Expr | 'n' ;\n"
+                + "}"
+        );
+
+        List<GrammarValidator.ValidationIssue> issues =
+            GrammarValidator.detectLeftRecursionIssues(grammar);
+        assertFalse("direct left-recursion should produce an issue", issues.isEmpty());
+        GrammarValidator.ValidationIssue issue = issues.get(0);
+        assertEquals("W-LEFT-RECURSION", issue.code());
+        assertEquals("WARNING", issue.severity());
+        assertEquals("Expr", issue.rule());
+        assertTrue("message should contain the cycle",
+            issue.message().contains("Expr -> Expr"));
+    }
+
+    @Test
+    public void testDetectLeftRecursionIssuesEmptyForCleanGrammar() {
+        GrammarDecl grammar = parseGrammar(
+            "grammar G {\n"
+                + "  @package: org.example\n"
+                + "  @root\n"
+                + "  S ::= A ;\n"
+                + "  A ::= 'a' ;\n"
+                + "}"
+        );
+
+        assertTrue(GrammarValidator.detectLeftRecursionIssues(grammar).isEmpty());
+    }
+
+    // =========================================================================
+    // W-TOKEN-UNRESOLVED hint tests
+    // =========================================================================
+
+    @Test
+    public void testTokenUnresolvedHintSuggestsFullyQualifiedName() {
+        GrammarDecl grammar = parseGrammar(
+            "grammar G {\n"
+                + "  @package: org.example\n"
+                + "  token NUMBER = NumberParser\n"
+                + "  @root\n"
+                + "  Start ::= NUMBER ;\n"
+                + "}"
+        );
+
+        List<GrammarValidator.ValidationIssue> issues = GrammarValidator.validate(grammar);
+        GrammarValidator.ValidationIssue unresolved = issues.stream()
+            .filter(issue -> "W-TOKEN-UNRESOLVED".equals(issue.code()))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("expected W-TOKEN-UNRESOLVED issue"));
+        assertTrue("hint should suggest the fully qualified candidate: " + unresolved.hint(),
+            unresolved.hint().contains("org.unlaxer.parser.elementary.NumberParser"));
+    }
+
+    @Test
+    public void testTokenUnresolvedHintWithoutCandidateKeepsGenericHint() {
+        GrammarDecl grammar = parseGrammar(
+            "grammar G {\n"
+                + "  @package: org.example\n"
+                + "  token X = NoSuchParserClass\n"
+                + "  @root\n"
+                + "  Start ::= X ;\n"
+                + "}"
+        );
+
+        List<GrammarValidator.ValidationIssue> issues = GrammarValidator.validate(grammar);
+        GrammarValidator.ValidationIssue unresolved = issues.stream()
+            .filter(issue -> "W-TOKEN-UNRESOLVED".equals(issue.code()))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("expected W-TOKEN-UNRESOLVED issue"));
+        assertFalse("hint should not contain a bogus suggestion",
+            unresolved.hint().contains("Did you mean"));
+    }
+
     private GrammarDecl parseGrammar(String source) {
         return UBNFMapper.parse(source).grammars().get(0);
     }

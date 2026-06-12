@@ -67,7 +67,7 @@ token IDENTIFIER = org.unlaxer.parser.clang.IdentifierParser
 token NUMBER     = org.unlaxer.parser.elementary.NumberParser
 ```
 
-短縮形（非修飾クラス名）も使用できますが、`W-TOKEN-UNRESOLVED` 警告が発生します。警告を抑制するには完全修飾名を使用してください。
+短縮形（非修飾クラス名）も使用できますが、`W-TOKEN-UNRESOLVED` 警告が発生します。警告を抑制するには完全修飾名を使用してください。短縮名が同梱パーサーパッケージ（`org.unlaxer.parser.elementary`, `posix`, `clang`, `combinator`, `ascii`）のクラスに一致する場合、警告の hint に完全修飾名の候補が列挙されます（例: `Did you mean 'org.unlaxer.parser.elementary.NumberParser'?`）。
 
 ### UNTIL トークン
 

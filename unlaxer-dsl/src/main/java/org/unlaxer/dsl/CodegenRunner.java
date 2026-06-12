@@ -429,7 +429,8 @@ final class CodegenRunner {
     private static List<ReportJsonWriter.ValidationIssueRow> collectValidationRows(UBNFFile file) {
         List<ReportJsonWriter.ValidationIssueRow> validationRows = new ArrayList<>();
         for (GrammarDecl grammar : file.grammars()) {
-            List<GrammarValidator.ValidationIssue> issues = GrammarValidator.validate(grammar);
+            List<GrammarValidator.ValidationIssue> issues = new ArrayList<>(GrammarValidator.validate(grammar));
+            issues.addAll(GrammarValidator.detectLeftRecursionIssues(grammar));
             for (GrammarValidator.ValidationIssue issue : issues) {
                 validationRows.add(new ReportJsonWriter.ValidationIssueRow(
                     grammar.name(),

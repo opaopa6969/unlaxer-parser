@@ -67,7 +67,7 @@ token IDENTIFIER = org.unlaxer.parser.clang.IdentifierParser
 token NUMBER     = org.unlaxer.parser.elementary.NumberParser
 ```
 
-The short form (unqualified class name) is allowed but produces a `W-TOKEN-UNRESOLVED` warning. Use fully qualified names to suppress warnings.
+The short form (unqualified class name) is allowed but produces a `W-TOKEN-UNRESOLVED` warning. Use fully qualified names to suppress warnings. When the short name matches a class in a bundled parser package (`org.unlaxer.parser.elementary`, `posix`, `clang`, `combinator`, `ascii`), the warning's hint lists the fully qualified candidates, e.g. `Did you mean 'org.unlaxer.parser.elementary.NumberParser'?`.
 
 ### UNTIL token
 
