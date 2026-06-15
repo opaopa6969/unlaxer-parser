@@ -256,6 +256,23 @@ public class SnapshotMapper {
         return descendants.get(index);
     }
 
+    static Token findDescendantByIndexWithText(Token token, Class<? extends Parser> parserClass, String text, int index) {
+        if (index < 0) {
+            return null;
+        }
+        int seen = 0;
+        for (Token candidate : findDescendants(token, parserClass)) {
+            String candidateText = firstTokenText(candidate);
+            if (candidateText != null && candidateText.equals(text)) {
+                if (seen == index) {
+                    return candidate;
+                }
+                seen = seen + 1;
+            }
+        }
+        return null;
+    }
+
     static String firstTokenText(Token token) {
         if (token == null) {
             return null;

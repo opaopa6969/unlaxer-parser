@@ -91,6 +91,7 @@ public final class GrammarValidator {
         validateGlobalWhitespace(grammar, errors);
         validateRootPresence(grammar, errors);
         validateTokens(grammar, errors);
+        validateRuleTokenParserNameCollision(grammar, errors);
         validateBoundedRepeatElements(grammar, errors);
         validateCommonFields(grammar, errors);
         validateEnumRules(grammar, errors);
@@ -521,6 +522,50 @@ public final class GrammarValidator {
                         "W-TOKEN-UNRESOLVED"
                     );
                 }
+            }
+        }
+    }
+
+    /**
+     * Detects a rule whose generated parser class name ({@code <RuleName>Parser})
+     * collides with the simple name of a token's parser class. The code generator
+     * emits a token wrapper class named after the token parser's simple name; if a
+     * rule produces a class of the same name, references resolve to the rule class
+     * instead of the token wrapper, producing infinite self-recursion that throws
+     * {@code IllegalStateException: transaction nest is illegal} at parse time and
+     * silently disables the generated parser. (unlaxer-parser#41)
+     */
+    private static void validateRuleTokenParserNameCollision(GrammarDecl grammar, List<ValidationIssue> errors) {
+        Map<String, String> tokenParserBySimpleName = new LinkedHashMap<>();
+        for (TokenDecl token : grammar.tokens()) {
+            if (token instanceof TokenDecl.Simple simple) {
+                String parserClass = simple.parserClass();
+                if (parserClass == null || parserClass.isEmpty()) {
+                    continue;
+                }
+                int dot = parserClass.lastIndexOf('.');
+                String simpleName = dot >= 0 ? parserClass.substring(dot + 1) : parserClass;
+                tokenParserBySimpleName.putIfAbsent(simpleName, parserClass);
+            }
+        }
+        if (tokenParserBySimpleName.isEmpty()) {
+            return;
+        }
+        for (RuleDecl rule : grammar.rules()) {
+            String generatedParserName = rule.name() + "Parser";
+            String collidingTokenParser = tokenParserBySimpleName.get(generatedParserName);
+            if (collidingTokenParser != null) {
+                addRuleError(
+                    errors,
+                    rule.name(),
+                    "rule '" + rule.name() + "' generates parser class '" + generatedParserName
+                        + "' which collides with the token parser class '" + collidingTokenParser
+                        + "'. The generated rule parser shadows the token wrapper and self-recurses "
+                        + "(infinite recursion -> 'transaction nest is illegal' at parse time).",
+                    "Rename the rule so its generated <Name>Parser differs from the token parser's "
+                        + "simple name (e.g. '" + rule.name() + "Rule' or a domain-specific name).",
+                    "E-RULE-TOKEN-NAME-COLLISION"
+                );
             }
         }
     }

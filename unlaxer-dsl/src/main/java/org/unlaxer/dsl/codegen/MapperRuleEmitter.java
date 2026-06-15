@@ -1,6 +1,7 @@
 package org.unlaxer.dsl.codegen;
 
 import org.unlaxer.dsl.bootstrap.UBNFAST.AtomicElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.TerminalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RuleDecl;
@@ -540,9 +541,6 @@ class MapperRuleEmitter {
             AtomicElement normalized = MapperElementUtil.normalizeCapturedElement(element).orElse(element);
             String parserClass = MapperElementUtil.parserClassLiteral(normalized, parsersClass, tokenDeclByName, ruleByName)
                 .orElse(ruleParserClass);
-            int parserOccurrenceIndex =
-                scalarCaptureIndexByParserClass.getOrDefault(parserClass, 0);
-            scalarCaptureIndexByParserClass.put(parserClass, parserOccurrenceIndex + 1);
             String tokenVarName = "paramToken_" + MapperElementUtil.safeName(param) + "_" + i;
             String candidateType = MapperTypeResolver.inferTypeFromElement(grammar, normalized);
             if (!MapperTypeResolver.isTypeCompatible(type, candidateType) && !"String".equals(type)) {
@@ -555,11 +553,33 @@ class MapperRuleEmitter {
                 mappedClassByRuleName,
                 tokenDeclByName,
                 ruleByName);
+
+            // A literal keyword alternative (e.g. 'true' @value) compiles to a generic
+            // WordParser lookup. WordParser also matches structural literals like "(",
+            // "&", ")", so a plain findDescendantByIndex(WordParser, n) can capture the
+            // wrong token (e.g. "(" of a parenthesised sub-expression), shadowing later
+            // structural alternatives. Match the literal by TEXT so only the intended
+            // keyword token is captured. (unlaxer-parser#42)
+            boolean isWordParserTerminal = normalized instanceof TerminalElement
+                && parserClass.endsWith("WordParser.class");
             w.line("if (!assigned_" + MapperElementUtil.safeName(param) + ") {");
             w.indent();
-            w.line("Token " + tokenVarName
-                + " = findDescendantByIndex(token, " + parserClass + ", "
-                + parserOccurrenceIndex + ");");
+            if (isWordParserTerminal) {
+                String literalText = stripLiteralQuotes(((TerminalElement) normalized).value());
+                String occKey = parserClass + " " + literalText;
+                int occ = scalarCaptureIndexByParserClass.getOrDefault(occKey, 0);
+                scalarCaptureIndexByParserClass.put(occKey, occ + 1);
+                w.line("Token " + tokenVarName
+                    + " = findDescendantByIndexWithText(token, " + parserClass + ", "
+                    + quote(literalText) + ", " + occ + ");");
+            } else {
+                int parserOccurrenceIndex =
+                    scalarCaptureIndexByParserClass.getOrDefault(parserClass, 0);
+                scalarCaptureIndexByParserClass.put(parserClass, parserOccurrenceIndex + 1);
+                w.line("Token " + tokenVarName
+                    + " = findDescendantByIndex(token, " + parserClass + ", "
+                    + parserOccurrenceIndex + ");");
+            }
             w.line("if (" + tokenVarName + " != null) {");
             w.indent();
             w.line(param + " = " + mapExpression + ";");
@@ -569,6 +589,39 @@ class MapperRuleEmitter {
             w.dedent();
             w.line("}");
         }
+    }
+
+    /** Generation-time strip of surrounding single/double quotes from a UBNF literal. */
+    private static String stripLiteralQuotes(String v) {
+        if (v == null) {
+            return "";
+        }
+        String s = v.strip();
+        if (s.length() >= 2) {
+            char a = s.charAt(0);
+            char b = s.charAt(s.length() - 1);
+            if ((a == '\'' && b == '\'') || (a == '"' && b == '"')) {
+                return s.substring(1, s.length() - 1);
+            }
+        }
+        return s;
+    }
+
+    /** Emit a Java string literal for the given text. */
+    private static String quote(String text) {
+        StringBuilder sb = new StringBuilder("\"");
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            switch (c) {
+                case '"' -> sb.append("\\\"");
+                case '\\' -> sb.append("\\\\");
+                case '\n' -> sb.append("\\n");
+                case '\r' -> sb.append("\\r");
+                case '\t' -> sb.append("\\t");
+                default -> sb.append(c);
+            }
+        }
+        return sb.append("\"").toString();
     }
 
     /**
@@ -740,6 +793,37 @@ class MapperRuleEmitter {
         w.dedent();
         w.line("}");
         w.line("return descendants.get(index);");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
+
+        // Find the index-th descendant of parserClass whose text equals `text`.
+        // Used for literal-keyword captures so generic WordParser lookups do not
+        // capture structural literals like "(" / "&". (unlaxer-parser#42)
+        w.line("static Token findDescendantByIndexWithText(Token token, Class<? extends Parser> parserClass, String text, int index) {");
+        w.indent();
+        w.line("if (index < 0) {");
+        w.indent();
+        w.line("return null;");
+        w.dedent();
+        w.line("}");
+        w.line("int seen = 0;");
+        w.line("for (Token candidate : findDescendants(token, parserClass)) {");
+        w.indent();
+        w.line("String candidateText = firstTokenText(candidate);");
+        w.line("if (candidateText != null && candidateText.equals(text)) {");
+        w.indent();
+        w.line("if (seen == index) {");
+        w.indent();
+        w.line("return candidate;");
+        w.dedent();
+        w.line("}");
+        w.line("seen = seen + 1;");
+        w.dedent();
+        w.line("}");
+        w.dedent();
+        w.line("}");
+        w.line("return null;");
         w.dedent();
         w.line("}");
         w.blankLine();
