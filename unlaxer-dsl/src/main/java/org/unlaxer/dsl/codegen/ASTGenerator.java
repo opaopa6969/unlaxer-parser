@@ -427,6 +427,15 @@ public class ASTGenerator implements CodeGenerator {
             return "Object";
         }
         String innerType = mergeCapturedTypes(grammar, captures);
+        // unlaxer-parser #43: widen heterogeneous left/right-assoc operands to the base
+        // AST interface so the fold can hold any factor's mapped node (e.g. AbsExpr),
+        // not just the assoc's own class. Only number-style folds (operand nominally the
+        // assoc class itself) are widened — mirrors MapperRuleEmitter#shouldWidenAssocOperands,
+        // so source-string-leaf folds keep their String operands.
+        if (("left".equals(fieldName) || "right".equals(fieldName))
+            && isWidenedAssocOperand(grammar, rule, innerType)) {
+            innerType = grammar.name() + "AST";
+        }
         boolean inOptional = captures.stream().anyMatch(CaptureResult::inOptional);
         boolean inRepeat = captures.stream().anyMatch(CaptureResult::inRepeat);
         if (inRepeat) {
@@ -436,6 +445,42 @@ public class ASTGenerator implements CodeGenerator {
             return "Optional<" + innerType + ">";
         }
         return innerType;
+    }
+
+    /**
+     * True if {@code rule} is a left/right-assoc rule whose @mapping class has a
+     * heterogeneous operand (see MapperElementUtil#assocClassHasHeterogeneousOperand).
+     */
+    private boolean isWidenedAssocOperand(GrammarDecl grammar, RuleDecl rule, String narrowInnerType) {
+        MappingAnnotation mapping = MapperElementUtil.getMappingAnnotation(rule).orElse(null);
+        if (mapping == null) {
+            return false;
+        }
+        if (!MapperElementUtil.isLeftAssocRule(rule, mapping)
+            && !MapperElementUtil.isRightAssocRule(rule, mapping)) {
+            return false;
+        }
+        String className = mapping.className();
+        // Only number-style folds: the operand nominally resolves to the assoc class
+        // itself. Excludes source-string-leaf folds whose operands resolve to String.
+        if (!(grammar.name() + "AST." + className).equals(narrowInnerType)) {
+            return false;
+        }
+        Map<String, RuleDecl> ruleByName = new LinkedHashMap<>();
+        List<RuleDecl> rulesForClass = new ArrayList<>();
+        for (RuleDecl r : grammar.rules()) {
+            ruleByName.put(r.name(), r);
+            MappingAnnotation m = MapperElementUtil.getMappingAnnotation(r).orElse(null);
+            if (m != null && m.className().equals(className)) {
+                rulesForClass.add(r);
+            }
+        }
+        Map<String, UBNFAST.TokenDecl> tokenDeclByName = new LinkedHashMap<>();
+        for (UBNFAST.TokenDecl t : grammar.tokens()) {
+            tokenDeclByName.put(t.name(), t);
+        }
+        return MapperElementUtil.assocClassHasHeterogeneousOperand(
+            className, rulesForClass, ruleByName, tokenDeclByName);
     }
 
     private String mergeCapturedTypes(GrammarDecl grammar, List<CaptureResult> captures) {
