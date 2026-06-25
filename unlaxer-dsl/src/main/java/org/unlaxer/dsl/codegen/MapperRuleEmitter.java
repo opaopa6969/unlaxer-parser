@@ -764,6 +764,12 @@ class MapperRuleEmitter {
         w.line("// =========================================================================");
         w.blankLine();
 
+        w.line("// Collects rule-level (top-level) occurrences of parserClass: once a child");
+        w.line("// matches, we do NOT recurse into it, so a captured operand's own nested");
+        w.line("// same-class descendants are not counted. This keeps positional captures");
+        w.line("// (findDescendantByIndex) and variadic captures aligned with the grammar");
+        w.line("// structure — e.g. in \"toUpperCase('abc')=='ABC'\" the two StringExpression");
+        w.line("// operands are indices 0 and 1, not 0 and (the nested 'abc') 1.");
         w.line("static List<Token> findDescendants(Token token, Class<? extends Parser> parserClass) {");
         w.indent();
         w.line("List<Token> results = new ArrayList<>();");
@@ -778,8 +784,11 @@ class MapperRuleEmitter {
         w.indent();
         w.line("results.add(child);");
         w.dedent();
-        w.line("}");
+        w.line("} else {");
+        w.indent();
         w.line("results.addAll(findDescendants(child, parserClass));");
+        w.dedent();
+        w.line("}");
         w.dedent();
         w.line("}");
         w.line("return results;");

@@ -186,6 +186,12 @@ public class SnapshotRightAssocMapper {
     // Utilities
     // =========================================================================
 
+    // Collects rule-level (top-level) occurrences of parserClass: once a child
+    // matches, we do NOT recurse into it, so a captured operand's own nested
+    // same-class descendants are not counted. This keeps positional captures
+    // (findDescendantByIndex) and variadic captures aligned with the grammar
+    // structure — e.g. in "toUpperCase('abc')=='ABC'" the two StringExpression
+    // operands are indices 0 and 1, not 0 and (the nested 'abc') 1.
     static List<Token> findDescendants(Token token, Class<? extends Parser> parserClass) {
         List<Token> results = new ArrayList<>();
         if (token == null) {
@@ -194,8 +200,9 @@ public class SnapshotRightAssocMapper {
         for (Token child : token.filteredChildren) {
             if (child.parser.getClass() == parserClass) {
                 results.add(child);
+            } else {
+                results.addAll(findDescendants(child, parserClass));
             }
-            results.addAll(findDescendants(child, parserClass));
         }
         return results;
     }
