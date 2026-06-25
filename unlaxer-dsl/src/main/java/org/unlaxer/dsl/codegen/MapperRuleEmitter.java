@@ -187,6 +187,12 @@ class MapperRuleEmitter {
             w.dedent();
             w.line("}");
             w.blankLine();
+
+            // unlaxer-parser #43: operand-dispatch helper for heterogeneous assoc folds.
+            if ((leftAssoc || rightAssoc) && shouldWidenAssocOperands(
+                    grammar, astClass, className, rule, allMappingRules, ruleByName, tokenDeclByName)) {
+                emitAssocOperandHelper(w, astClass, className);
+            }
         }
         return w.build();
     }
@@ -211,6 +217,20 @@ class MapperRuleEmitter {
                 && "String".equals(opType)
                 && (astClass + "." + className).equals(rightType);
 
+            // unlaxer-parser #43: when an operand can be a non-spine mapped node (e.g. a
+            // MathFunction factor), widen operands to the base AST interface and dispatch
+            // each operand to its real mapped type via the generated helper, instead of
+            // recursing through the assoc mapper (which descends past the function wrapper).
+            // Gated on leafFallbackSupported so only number-style folds (operand fields ==
+            // the assoc class) are affected; source-string-leaf folds keep their design.
+            boolean heterogeneousOperand = leafFallbackSupported && MapperElementUtil.assocClassHasHeterogeneousOperand(
+                className, allMappingRules.getOrDefault(className, List.of()), ruleByName, tokenDeclByName);
+            String operandHelper = "mapAssocOperandTo" + MapperElementUtil.methodNameFor(className);
+            if (heterogeneousOperand) {
+                leftType = astClass;
+                rightType = astClass;
+            }
+
             String ruleParserClass = parsersClass + "." + rule.name() + "Parser.class";
             String repeatParserClass = parsersClass + "." + rule.name() + "Repeat" + assocShape.repeatIndex() + "Parser.class";
             String leftParserClass = MapperElementUtil.parserClassLiteral(assocShape.leftElement(), parsersClass, tokenDeclByName, ruleByName)
@@ -220,18 +240,22 @@ class MapperRuleEmitter {
             String rightParserClass = MapperElementUtil.parserClassLiteral(assocShape.rightElement(), parsersClass, tokenDeclByName, ruleByName)
                 .orElse(ruleParserClass);
 
-            String leftMapper = MapperElementUtil.mapExpressionForElement(
-                assocShape.leftElement(),
-                "leftToken",
-                mappedClassByRuleName,
-                tokenDeclByName,
-                ruleByName);
-            String rightMapper = MapperElementUtil.mapExpressionForElement(
-                assocShape.rightElement(),
-                "rightToken",
-                mappedClassByRuleName,
-                tokenDeclByName,
-                ruleByName);
+            String leftMapper = heterogeneousOperand
+                ? operandHelper + "(leftToken)"
+                : MapperElementUtil.mapExpressionForElement(
+                    assocShape.leftElement(),
+                    "leftToken",
+                    mappedClassByRuleName,
+                    tokenDeclByName,
+                    ruleByName);
+            String rightMapper = heterogeneousOperand
+                ? operandHelper + "(rightToken)"
+                : MapperElementUtil.mapExpressionForElement(
+                    assocShape.rightElement(),
+                    "rightToken",
+                    mappedClassByRuleName,
+                    tokenDeclByName,
+                    ruleByName);
 
             // Check for additional rules mapping to the same AST class
             List<RuleDecl> additionalRules = allMappingRules.getOrDefault(className, List.of())
@@ -243,6 +267,7 @@ class MapperRuleEmitter {
             for (RuleDecl additionalRule : additionalRules) {
                 emitAdditionalAssocRuleDispatch(w, astClass, parsersClass, className,
                     additionalRule, leftType, opType, rightType, leafFallbackSupported,
+                    heterogeneousOperand, operandHelper,
                     tokenDeclByName, ruleByName);
             }
 
@@ -312,6 +337,7 @@ class MapperRuleEmitter {
             String astClass, String parsersClass, String className,
             RuleDecl additionalRule, String leftType, String opType, String rightType,
             boolean leafFallbackSupported,
+            boolean heterogeneousOperand, String operandHelper,
             Map<String, TokenDecl> tokenDeclByName, Map<String, RuleDecl> ruleByName) {
 
         String addRuleParserClass = parsersClass + "." + additionalRule.name() + "Parser.class";
@@ -324,10 +350,15 @@ class MapperRuleEmitter {
                 .orElse(addRuleParserClass);
             String addOpParserClass = MapperElementUtil.parserClassLiteral(addShape.opElement(), parsersClass, tokenDeclByName, ruleByName)
                 .orElse("org.unlaxer.parser.elementary.WordParser.class");
-            // For rules sharing the same @mapping class, left/right mappers
-            // should call the shared mapping method recursively
-            String addLeftMapper = "to" + MapperElementUtil.methodNameFor(className) + "(addLeftToken)";
-            String addRightMapper = "to" + MapperElementUtil.methodNameFor(className) + "(addRightToken)";
+            // For rules sharing the same @mapping class, left/right mappers should call
+            // the shared mapping method recursively — unless the operand is heterogeneous
+            // (#43), in which case dispatch each operand to its real mapped type.
+            String addLeftMapper = heterogeneousOperand
+                ? operandHelper + "(addLeftToken)"
+                : "to" + MapperElementUtil.methodNameFor(className) + "(addLeftToken)";
+            String addRightMapper = heterogeneousOperand
+                ? operandHelper + "(addRightToken)"
+                : "to" + MapperElementUtil.methodNameFor(className) + "(addRightToken)";
 
             w.line("// Handle " + additionalRule.name() + " tokens (same @mapping class)");
             w.line("if (token.parser.getClass() == " + addRuleParserClass + ") {");
@@ -378,6 +409,69 @@ class MapperRuleEmitter {
         }
     }
 
+    /**
+     * Whether a left/right-assoc rule's operands should be widened to the base AST
+     * interface and dispatched per-operand (#43). True only for number-style folds —
+     * operand fields nominally equal the assoc class and the operator is a String — that
+     * also have a heterogeneous (transparent, multi-class) operand. Source-string-leaf
+     * folds (e.g. string concatenation) are excluded, preserving their existing design.
+     */
+    private static boolean shouldWidenAssocOperands(GrammarDecl grammar, String astClass,
+            String className, RuleDecl rule, Map<String, List<RuleDecl>> allMappingRules,
+            Map<String, RuleDecl> ruleByName, Map<String, TokenDecl> tokenDeclByName) {
+        String leftType = MapperTypeResolver.inferType(grammar, rule, "left");
+        String opType = MapperTypeResolver.unwrapListType(
+            MapperTypeResolver.inferType(grammar, rule, "op")).orElse("String");
+        String rightType = MapperTypeResolver.unwrapListType(
+            MapperTypeResolver.inferType(grammar, rule, "right")).orElse("Object");
+        boolean numberStyleFold = (astClass + "." + className).equals(leftType)
+            && "String".equals(opType)
+            && (astClass + "." + className).equals(rightType);
+        return numberStyleFold && MapperElementUtil.assocClassHasHeterogeneousOperand(
+            className, allMappingRules.getOrDefault(className, List.of()), ruleByName, tokenDeclByName);
+    }
+
+    /**
+     * Emits a helper that maps a single assoc operand token to its real AST node:
+     * dispatch the token directly if recognised, else find the shallowest mappable
+     * descendant (so a function factor maps to its function node instead of being
+     * skipped), else fall back to a numeric/text literal leaf. (unlaxer-parser #43)
+     */
+    private static void emitAssocOperandHelper(IndentedWriter w, String astClass, String className) {
+        String helper = "mapAssocOperandTo" + MapperElementUtil.methodNameFor(className);
+        w.line("static " + astClass + " " + helper + "(Token token) {");
+        w.indent();
+        w.line("if (token == null) {");
+        w.indent();
+        w.line("return null;");
+        w.dedent();
+        w.line("}");
+        w.line(astClass + " direct = mapToken(token);");
+        w.line("if (direct != null) {");
+        w.indent();
+        w.line("return direct;");
+        w.dedent();
+        w.line("}");
+        w.line("Token best = findBestMappedToken(token, null);");
+        w.line("if (best != null) {");
+        w.indent();
+        w.line(astClass + " mapped = mapToken(best);");
+        w.line("if (mapped != null) {");
+        w.indent();
+        w.line("return mapped;");
+        w.dedent();
+        w.line("}");
+        w.dedent();
+        w.line("}");
+        w.line("String literal = stripQuotes(firstTokenText(token));");
+        w.line("literal = literal == null ? \"\" : literal;");
+        w.line("return registerNodeSourceSpan(new " + astClass + "." + className
+            + "(null, List.of(literal), List.of()), token);");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
+    }
+
     private static void emitPlainMappingBody(IndentedWriter w, GrammarDecl grammar,
             String astClass, String parsersClass, String className,
             RuleDecl rule, MappingAnnotation mapping,
@@ -400,7 +494,8 @@ class MapperRuleEmitter {
             Optional<String> listElementType = MapperTypeResolver.unwrapListType(type);
             if (listElementType.isPresent()) {
                 emitListParam(w, parsersClass, ruleParserClass, grammar, param, type,
-                    listElementType.get(), capturedElements, mappedClassByRuleName, tokenDeclByName, ruleByName);
+                    listElementType.get(), capturedElements, scalarCaptureIndexByParserClass,
+                    mappedClassByRuleName, tokenDeclByName, ruleByName);
                 continue;
             }
 
@@ -448,16 +543,28 @@ class MapperRuleEmitter {
     private static void emitListParam(IndentedWriter w, String parsersClass, String ruleParserClass,
             GrammarDecl grammar, String param, String type, String elementType,
             List<AtomicElement> capturedElements,
+            Map<String, Integer> scalarCaptureIndexByParserClass,
             Map<String, String> mappedClassByRuleName,
             Map<String, TokenDecl> tokenDeclByName, Map<String, RuleDecl> ruleByName) {
 
         w.line("List<" + elementType + "> " + param
             + " = new ArrayList<>();");
+        // A capture name can appear more than once for the same parser class — typically a
+        // variadic `X @c { ',' X @c }` (one direct element + one in the repeat). Emit a
+        // single findDescendants loop per parser class (deduplicated), and skip the leading
+        // descendants already claimed by scalar captures of that same class (e.g. the
+        // `@value`/`@first` operand): otherwise the variadic list would re-collect the value
+        // and duplicate every element — which made `'z'.in('a','b')` always true and
+        // `min(3,5,1)` carry its first arg twice. (unlaxer-parser #43 case 3)
+        java.util.Set<String> emittedParserClasses = new java.util.LinkedHashSet<>();
         for (int i = 0; i < capturedElements.size(); i++) {
             AtomicElement element = capturedElements.get(i);
             AtomicElement normalized = MapperElementUtil.normalizeCapturedElement(element).orElse(element);
             String parserClass = MapperElementUtil.parserClassLiteral(normalized, parsersClass, tokenDeclByName, ruleByName)
                 .orElse(ruleParserClass);
+            if (!emittedParserClasses.add(parserClass)) {
+                continue;
+            }
             String tokenVarName = "paramToken_" + MapperElementUtil.safeName(param) + "_" + i;
             String candidateType = MapperTypeResolver.inferTypeFromElement(grammar, normalized);
             if (!MapperTypeResolver.isTypeCompatible(elementType, candidateType) && !"String".equals(elementType)) {
@@ -470,12 +577,25 @@ class MapperRuleEmitter {
                 mappedClassByRuleName,
                 tokenDeclByName,
                 ruleByName);
-            w.line("for (Token " + tokenVarName
-                + " : findDescendants(token, " + parserClass + ")) {");
-            w.indent();
-            w.line(param + ".add(" + mapExpression + ");");
-            w.dedent();
-            w.line("}");
+            int skip = scalarCaptureIndexByParserClass.getOrDefault(parserClass, 0);
+            if (skip > 0) {
+                String idxVar = "idx_" + MapperElementUtil.safeName(param) + "_" + i;
+                w.line("int " + idxVar + " = 0;");
+                w.line("for (Token " + tokenVarName
+                    + " : findDescendants(token, " + parserClass + ")) {");
+                w.indent();
+                w.line("if (" + idxVar + "++ < " + skip + ") { continue; }");
+                w.line(param + ".add(" + mapExpression + ");");
+                w.dedent();
+                w.line("}");
+            } else {
+                w.line("for (Token " + tokenVarName
+                    + " : findDescendants(token, " + parserClass + ")) {");
+                w.indent();
+                w.line(param + ".add(" + mapExpression + ");");
+                w.dedent();
+                w.line("}");
+            }
         }
     }
 
@@ -644,6 +764,12 @@ class MapperRuleEmitter {
         w.line("// =========================================================================");
         w.blankLine();
 
+        w.line("// Collects rule-level (top-level) occurrences of parserClass: once a child");
+        w.line("// matches, we do NOT recurse into it, so a captured operand's own nested");
+        w.line("// same-class descendants are not counted. This keeps positional captures");
+        w.line("// (findDescendantByIndex) and variadic captures aligned with the grammar");
+        w.line("// structure — e.g. in \"toUpperCase('abc')=='ABC'\" the two StringExpression");
+        w.line("// operands are indices 0 and 1, not 0 and (the nested 'abc') 1.");
         w.line("static List<Token> findDescendants(Token token, Class<? extends Parser> parserClass) {");
         w.indent();
         w.line("List<Token> results = new ArrayList<>();");
@@ -658,8 +784,11 @@ class MapperRuleEmitter {
         w.indent();
         w.line("results.add(child);");
         w.dedent();
-        w.line("}");
+        w.line("} else {");
+        w.indent();
         w.line("results.addAll(findDescendants(child, parserClass));");
+        w.dedent();
+        w.line("}");
         w.dedent();
         w.line("}");
         w.line("return results;");

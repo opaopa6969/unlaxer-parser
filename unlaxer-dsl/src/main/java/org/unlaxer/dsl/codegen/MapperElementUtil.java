@@ -77,6 +77,142 @@ class MapperElementUtil {
         return Optional.empty();
     }
 
+    // =========================================================================
+    // Heterogeneous assoc-operand detection (unlaxer-parser #43)
+    //
+    // A left/right-assoc rule folds operands that come from a lower-precedence
+    // rule (e.g. a Factor). When that operand rule is a *transparent* alternation
+    // (no @mapping) whose alternatives map to AST classes other than the assoc's
+    // own class — e.g. NumberFactor → MathFunction(AbsExpr) | '(' NumberExpression ')'(BinaryExpr)
+    // — the operand can be any of those node types at runtime. The default fold
+    // recursed into the operand via the assoc mapper, descending past the function
+    // wrapper and dropping it. For such heterogeneous classes we widen the operand
+    // field/variable type to the base AST interface and dispatch each operand to its
+    // actual mapped type. Homogeneous classes (operand only ever the assoc class or a
+    // literal token) keep the previous behaviour, so their generated code is unchanged.
+    // =========================================================================
+
+    /**
+     * Returns true if any left/right-assoc rule mapping to {@code className} has an
+     * operand that can resolve to an AST class other than {@code className}.
+     */
+    static boolean assocClassHasHeterogeneousOperand(String className, List<RuleDecl> rulesForClass,
+        Map<String, RuleDecl> ruleByName, Map<String, TokenDecl> tokenDeclByName) {
+        for (RuleDecl rule : rulesForClass) {
+            MappingAnnotation mapping = getMappingAnnotation(rule).orElse(null);
+            if (mapping == null) {
+                continue;
+            }
+            if (!isLeftAssocRule(rule, mapping) && !isRightAssocRule(rule, mapping)) {
+                continue;
+            }
+            Optional<AssocShape> shape = findAssocShape(rule, "left", "op", "right");
+            if (shape.isEmpty()) {
+                continue;
+            }
+            for (AtomicElement operand : List.of(shape.get().leftElement(), shape.get().rightElement())) {
+                if (operandReachesForeignMappedClass(operand, className, ruleByName, tokenDeclByName)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * True if {@code operand} references a <em>transparent</em> rule (no {@code @mapping})
+     * that can resolve to a mapped AST class <em>other than</em> {@code assocClassName}.
+     * That is the problem case: {@link #mapExpressionForElement} degrades a transparent
+     * rule reference to {@code firstTokenText}, silently dropping the foreign node it wraps
+     * (e.g. a MathFunction factor mapping to AbsExpr). A transparent operand that only ever
+     * reaches the assoc class itself (e.g. a parenthesised sub-expression) is fine and is
+     * NOT widened, keeping pure-arithmetic grammars byte-identical. Operands referencing a
+     * @mapping'd rule already dispatch to that rule's mapper and never trigger widening.
+     */
+    private static boolean operandReachesForeignMappedClass(AtomicElement operand,
+        String assocClassName, Map<String, RuleDecl> ruleByName, Map<String, TokenDecl> tokenDeclByName) {
+        if (!(operand instanceof RuleRefElement ref)) {
+            return false;
+        }
+        RuleDecl rule = ruleByName.get(ref.name());
+        if (rule == null || getMappingAnnotation(rule).isPresent()) {
+            return false;
+        }
+        for (String reachable : reachableMappedClasses(operand, ruleByName, tokenDeclByName)) {
+            if (!reachable.equals(assocClassName)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The set of @mapping class names a captured operand element can resolve to at
+     * runtime. A reference to a @mapping'd rule contributes that class and stops; a
+     * reference to a transparent rule (no @mapping) descends into all its rule
+     * references; token/terminal references contribute nothing (they become literals).
+     */
+    static java.util.Set<String> reachableMappedClasses(AtomicElement element,
+        Map<String, RuleDecl> ruleByName, Map<String, TokenDecl> tokenDeclByName) {
+        java.util.Set<String> out = new java.util.LinkedHashSet<>();
+        if (element instanceof RuleRefElement ref) {
+            collectReachableMappedClasses(ref.name(), ruleByName, tokenDeclByName, out, new java.util.HashSet<>());
+        }
+        return out;
+    }
+
+    private static void collectReachableMappedClasses(String name, Map<String, RuleDecl> ruleByName,
+        Map<String, TokenDecl> tokenDeclByName, java.util.Set<String> out, java.util.Set<String> visited) {
+        if (name == null || !visited.add(name)) {
+            return;
+        }
+        if (tokenDeclByName.containsKey(name)) {
+            return;
+        }
+        RuleDecl rule = ruleByName.get(name);
+        if (rule == null) {
+            return;
+        }
+        Optional<MappingAnnotation> mapping = getMappingAnnotation(rule);
+        if (mapping.isPresent()) {
+            out.add(mapping.get().className());
+            return;
+        }
+        for (RuleRefElement ref : collectRuleRefs(rule.body())) {
+            collectReachableMappedClasses(ref.name(), ruleByName, tokenDeclByName, out, visited);
+        }
+    }
+
+    /** All rule references appearing anywhere in a rule body (recursively). */
+    static List<RuleRefElement> collectRuleRefs(RuleBody body) {
+        List<RuleRefElement> refs = new ArrayList<>();
+        collectRuleRefsFromBody(body, refs);
+        return refs;
+    }
+
+    private static void collectRuleRefsFromBody(RuleBody body, List<RuleRefElement> refs) {
+        switch (body) {
+            case ChoiceBody choice -> choice.alternatives().forEach(seq -> collectRuleRefsFromBody(seq, refs));
+            case SequenceBody seq -> seq.elements().forEach(e -> collectRuleRefsFromElement(e.element(), refs));
+        }
+    }
+
+    private static void collectRuleRefsFromElement(AtomicElement element, List<RuleRefElement> refs) {
+        switch (element) {
+            case RuleRefElement ref -> refs.add(ref);
+            case GroupElement g -> collectRuleRefsFromBody(g.body(), refs);
+            case OptionalElement o -> collectRuleRefsFromBody(o.body(), refs);
+            case RepeatElement r -> collectRuleRefsFromBody(r.body(), refs);
+            case UBNFAST.OneOrMoreElement one -> collectRuleRefsFromElement(one.body(), refs);
+            case UBNFAST.BoundedRepeatElement b -> collectRuleRefsFromElement(b.body(), refs);
+            case UBNFAST.SeparatedElement s -> {
+                collectRuleRefsFromElement(s.element(), refs);
+                collectRuleRefsFromElement(s.separator(), refs);
+            }
+            default -> { }
+        }
+    }
+
     static Optional<SequenceBody> firstSequence(RuleBody body) {
         return switch (body) {
             case SequenceBody sequenceBody -> Optional.of(sequenceBody);
