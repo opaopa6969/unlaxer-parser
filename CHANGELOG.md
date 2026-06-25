@@ -8,11 +8,21 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ## [Unreleased]
 
+---
+
+## [3.0.5] - 2026-06-25
+
+### Fixed
+
+- **MapperGenerator collapsed heterogeneous assoc operands to `firstTokenText` (#43 family)**: left-/right-associative rules (`@leftAssoc`/`@precedence`) whose operands were function or conditional factors (e.g. `abs(-3)+pow(2,3)`) dropped the function node or recursed into `StackOverflowError`. Operands are now mapped to their real AST node via `mapAssocOperand*` (#43 case 1).
+- **Variadic `{ ',' X @rest }` capture re-collected the leading scalar (#43 case 3)**: a variadic list re-walked the first operand, so e.g. range-membership checks evaluated as always-true. The repeat capture now skips the leading scalar.
+- **Generated `findDescendants` recursed past rule boundaries**: it collected nested matches, so `findDescendantByIndex(StringExpr, 1)` could pick a deeply-nested literal instead of the rule-level operand, breaking `node.left()/right()` resolution (e.g. string comparison). It now collects rule-level matches only.
+
 ### Added
 
 - **Rich UBNF VS Code extension** (`ubnf-vscode` 0.2.0): the UBNF grammar editor is now on par with the tinyexpression extension. `UBNFLanguageServerExt` wires `GrammarValidator` into live diagnostics (all `E-*`/`W-*` codes incl. left-recursion), adds quick fixes (`W-TOKEN-UNRESOLVED` → insert fully qualified parser class), context-aware completion (annotation snippets, bundled parser FQNs, declared rule/token names, block snippets), hover docs for annotations and rules, go-to-definition / references / rename / linked editing, document outline, folding, signature help for annotation arguments, and a full semantic-token highlighter. The TextMate grammar was rewritten (15 scopes), client-side snippets added, and the extension now reports server start failures.
 
-### Fixed
+### Fixed (ubnf-vscode)
 
 - **ubnf-vscode server jar was unlaunchable**: the shaded jar's `Main-Class` pointed at the abstract generated `UBNFLspLauncher` (no `main`). It now points at `UBNFLspLauncherExt`.
 
