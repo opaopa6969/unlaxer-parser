@@ -494,7 +494,8 @@ class MapperRuleEmitter {
             Optional<String> listElementType = MapperTypeResolver.unwrapListType(type);
             if (listElementType.isPresent()) {
                 emitListParam(w, parsersClass, ruleParserClass, grammar, param, type,
-                    listElementType.get(), capturedElements, mappedClassByRuleName, tokenDeclByName, ruleByName);
+                    listElementType.get(), capturedElements, scalarCaptureIndexByParserClass,
+                    mappedClassByRuleName, tokenDeclByName, ruleByName);
                 continue;
             }
 
@@ -542,16 +543,28 @@ class MapperRuleEmitter {
     private static void emitListParam(IndentedWriter w, String parsersClass, String ruleParserClass,
             GrammarDecl grammar, String param, String type, String elementType,
             List<AtomicElement> capturedElements,
+            Map<String, Integer> scalarCaptureIndexByParserClass,
             Map<String, String> mappedClassByRuleName,
             Map<String, TokenDecl> tokenDeclByName, Map<String, RuleDecl> ruleByName) {
 
         w.line("List<" + elementType + "> " + param
             + " = new ArrayList<>();");
+        // A capture name can appear more than once for the same parser class — typically a
+        // variadic `X @c { ',' X @c }` (one direct element + one in the repeat). Emit a
+        // single findDescendants loop per parser class (deduplicated), and skip the leading
+        // descendants already claimed by scalar captures of that same class (e.g. the
+        // `@value`/`@first` operand): otherwise the variadic list would re-collect the value
+        // and duplicate every element — which made `'z'.in('a','b')` always true and
+        // `min(3,5,1)` carry its first arg twice. (unlaxer-parser #43 case 3)
+        java.util.Set<String> emittedParserClasses = new java.util.LinkedHashSet<>();
         for (int i = 0; i < capturedElements.size(); i++) {
             AtomicElement element = capturedElements.get(i);
             AtomicElement normalized = MapperElementUtil.normalizeCapturedElement(element).orElse(element);
             String parserClass = MapperElementUtil.parserClassLiteral(normalized, parsersClass, tokenDeclByName, ruleByName)
                 .orElse(ruleParserClass);
+            if (!emittedParserClasses.add(parserClass)) {
+                continue;
+            }
             String tokenVarName = "paramToken_" + MapperElementUtil.safeName(param) + "_" + i;
             String candidateType = MapperTypeResolver.inferTypeFromElement(grammar, normalized);
             if (!MapperTypeResolver.isTypeCompatible(elementType, candidateType) && !"String".equals(elementType)) {
@@ -564,12 +577,25 @@ class MapperRuleEmitter {
                 mappedClassByRuleName,
                 tokenDeclByName,
                 ruleByName);
-            w.line("for (Token " + tokenVarName
-                + " : findDescendants(token, " + parserClass + ")) {");
-            w.indent();
-            w.line(param + ".add(" + mapExpression + ");");
-            w.dedent();
-            w.line("}");
+            int skip = scalarCaptureIndexByParserClass.getOrDefault(parserClass, 0);
+            if (skip > 0) {
+                String idxVar = "idx_" + MapperElementUtil.safeName(param) + "_" + i;
+                w.line("int " + idxVar + " = 0;");
+                w.line("for (Token " + tokenVarName
+                    + " : findDescendants(token, " + parserClass + ")) {");
+                w.indent();
+                w.line("if (" + idxVar + "++ < " + skip + ") { continue; }");
+                w.line(param + ".add(" + mapExpression + ");");
+                w.dedent();
+                w.line("}");
+            } else {
+                w.line("for (Token " + tokenVarName
+                    + " : findDescendants(token, " + parserClass + ")) {");
+                w.indent();
+                w.line(param + ".add(" + mapExpression + ");");
+                w.dedent();
+                w.line("}");
+            }
         }
     }
 
