@@ -271,6 +271,20 @@ public class SnapshotRightAssocMapper {
         return descendants.get(index);
     }
 
+    static Token findCapturedToken(Token token, Class<? extends Parser> parserClass, int index) {
+        if (index < 0) {
+            return null;
+        }
+        List<Token> direct = findDirectDescendants(token, parserClass);
+        if (index < direct.size()) {
+            return direct.get(index);
+        }
+        if (!direct.isEmpty()) {
+            return null;
+        }
+        return findDescendantByIndex(token, parserClass, index);
+    }
+
     static String firstTokenText(Token token) {
         if (token == null) {
             return null;

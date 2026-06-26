@@ -287,6 +287,19 @@ class MapperElementUtil {
                 if (tokenDeclByName.containsKey(ruleRefElement.name())) {
                     TokenDecl tokenDecl = tokenDeclByName.get(ruleRefElement.name());
                     if (isIdentifierToken(tokenDecl)) {
+                        // Mirror ParserRuleEmitter.resolveParserClass exactly so the mapper
+                        // references the SAME class the parser put in the tree (findDescendants
+                        // matches by exact getClass()). A fully-qualified token parser is wrapped
+                        // in a generated subclass (ParserTokenEmitter, "Plan S: findDescendants
+                        // 互換"); a short-named one is referenced directly via the parser's import.
+                        // Previously this always emitted the base clang class, so for FQN tokens
+                        // the capture (VariableRef @name, import @alias/@method) silently resolved
+                        // to empty and only the source-snippet shadow recovered it.
+                        // (tinyexpression #32: empty VariableRefExpr.name on the pure AST path)
+                        String parserClass = tokenDecl.parserClass();
+                        if (parserClass != null && parserClass.contains(".")) {
+                            yield Optional.of(parsersClass + "." + ParserCodegenUtil.toParserClassName(ruleRefElement.name()) + ".class");
+                        }
                         yield Optional.of("org.unlaxer.parser.clang.IdentifierParser.class");
                     }
                     yield Optional.empty();
