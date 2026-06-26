@@ -279,9 +279,15 @@ class MapperRuleEmitter {
             String rightParserClass = MapperElementUtil.parserClassLiteral(assocShape.rightElement(), parsersClass, tokenDeclByName, ruleByName)
                 .orElse(ruleParserClass);
 
+            // Use target-type-aware mapping so that Object operands bound to a transparent
+            // mapped choice (e.g. StringConcatExpr's StringTerm operands) resolve the real
+            // matched node via mapTransparentValue instead of being flattened to source text.
+            // For AST-class / String target types this delegates to mapExpressionForElement,
+            // preserving existing fold behavior. (tinyexpression #32 string-concat widening)
             String leftMapper = heterogeneousOperand
                 ? operandHelper + "(leftToken)"
-                : MapperElementUtil.mapExpressionForElement(
+                : MapperElementUtil.mapExpressionForTargetType(
+                    leftType,
                     assocShape.leftElement(),
                     "leftToken",
                     mappedClassByRuleName,
@@ -289,7 +295,8 @@ class MapperRuleEmitter {
                     ruleByName);
             String rightMapper = heterogeneousOperand
                 ? operandHelper + "(rightToken)"
-                : MapperElementUtil.mapExpressionForElement(
+                : MapperElementUtil.mapExpressionForTargetType(
+                    rightType,
                     assocShape.rightElement(),
                     "rightToken",
                     mappedClassByRuleName,

@@ -10,6 +10,16 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ---
 
+## [3.0.7] - 2026-06-26
+
+### Fixed
+
+- **Associative folds flattened transparent-choice operands to source text (#43 family; tinyexpression #32)**: a `@leftAssoc`/`@rightAssoc` rule whose operands reference a transparent mapped choice with no `@mapping` of its own (e.g. `StringExpression ::= StringTerm @left { '+' @op StringTerm @right }`, where `StringTerm ::= StringMatchExpression | SliceExpression | VariableRef | …`) inferred its operand fields as `String` and emitted `stripQuotes(firstTokenText(token))`, silently dropping the matched node. Such operands are now inferred as `Object` and resolved to their real AST node via the existing `mapTransparentValue(token)` helper. The same widening applies to comparison rules over transparent choices (e.g. `BooleanEqualityExpression ::= BooleanComparable @left EqualityOp @op BooleanComparable @right`). Downstream (tinyexpression #32) this makes string concatenation and boolean-equality operands evaluate faithfully on the AST instead of via a source re-parse.
+  - `MapperTypeResolver.inferTypeFromElement` and `ASTGenerator.inferTypeFromElement` now yield `Object` (not `String`) for a reference to a transparent mapped choice, via the new `MapperTypeResolver.isTransparentMappedChoice` (same ≥2-distinct-mapped-alternatives criterion as `MapperElementUtil.isTransparentMappedChoice`).
+  - `MapperRuleEmitter`'s assoc-fold emission now maps left/right operands through `mapExpressionForTargetType` (which routes `Object` + transparent choice to `mapTransparentValue`), delegating to the prior `mapExpressionForElement` behavior for AST-class / `String` operand types — so number-style and node-operand folds are unchanged.
+
+---
+
 ## [3.0.6] - 2026-06-26
 
 ### Fixed

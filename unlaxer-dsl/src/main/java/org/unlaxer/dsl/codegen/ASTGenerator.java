@@ -507,7 +507,14 @@ public class ASTGenerator implements CodeGenerator {
                     yield astClassName + "." + mapping.get().className();
                 }
                 String tokenType = MapperTypeResolver.inferTypeFromTokenName(grammar, r.name());
-                yield tokenType != null ? tokenType : "String";
+                if (tokenType != null) {
+                    yield tokenType;
+                }
+                // 透過 mapped choice（異種選択肢）は単一スカラーに収束しない → Object
+                if (MapperTypeResolver.isTransparentMappedChoice(grammar, r.name())) {
+                    yield "Object";
+                }
+                yield "String";
             }
             case RepeatElement rep -> {
                 String inner = inferTypeFromBody(grammar, rep.body());
