@@ -10,6 +10,15 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ---
 
+## [3.0.8] - 2026-06-27
+
+### Fixed
+
+- **Mapper captures used a global descendant index that miscounted across nesting (tinyexpression #32, load-bearing `if` shadow)**: scalar/optional capture resolution emitted `findDescendantByIndex(token, ParserClass, n)`, which recurses through ALL descendants. When the captured parser class also appears nested inside a *sibling* capture's subtree, the global Nth-of-class index points at the wrong node. Concretely, `IfExpression`'s `@thenExpr`/`@elseExpr` (`Expression`) were mis-resolved to an `Expression` nested inside the `@condition` — e.g. `if(min(0,0)==0){1}else{0}` mapped `thenExpr` to a `0` from the condition instead of the literal `1`, so the pure-AST evaluation took the wrong branch. Captures are direct children of the rule's Chain, so resolution is now **structural-position based**: new `findCapturedToken` prefers the rule token's direct children (`findDirectDescendants`) and only falls back to the global descendant index when no direct child of the class exists — backward-compatible where the old index was already correct. Fixes if-branch and slice-index resolution on the AST path (downstream tinyexpression: `min`/`max` and many `if(...)` cases now evaluate faithfully without the source shadow).
+- **`@name`/identifier-token captures resolved to empty on the AST path (#43 family; tinyexpression #32)**: for a fully-qualified token parser, the parse tree holds the generated *wrapper* subclass (`<Grammar>Parsers.IdentifierParser`, per ParserTokenEmitter / `resolveParserClass` "Plan S"), but `MapperElementUtil.parserClassLiteral` referenced the base `org.unlaxer.parser.clang.IdentifierParser`. Since `findDescendants` matches by exact `getClass()`, the capture silently came back empty (e.g. `VariableRefExpr.name`, import `@alias`/`@method`), and only the source-snippet shadow recovered it. It now mirrors `resolveParserClass` exactly: the wrapper class for fully-qualified token parsers, the base class for short-named ones.
+
+---
+
 ## [3.0.7] - 2026-06-26
 
 ### Fixed

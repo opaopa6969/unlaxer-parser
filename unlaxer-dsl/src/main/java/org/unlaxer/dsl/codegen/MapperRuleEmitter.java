@@ -678,7 +678,7 @@ class MapperRuleEmitter {
             w.line("if (!found_" + MapperElementUtil.safeName(param) + ") {");
             w.indent();
             w.line("Token " + tokenVarName
-                + " = findDescendantByIndex(token, " + parserClass + ", "
+                + " = findCapturedToken(token, " + parserClass + ", "
                 + parserOccurrenceIndex + ");");
             w.line("if (" + tokenVarName + " != null) {");
             w.indent();
@@ -724,7 +724,7 @@ class MapperRuleEmitter {
             w.line("if (!assigned_" + MapperElementUtil.safeName(param) + ") {");
             w.indent();
             w.line("Token " + tokenVarName
-                + " = findDescendantByIndex(token, " + parserClass + ", "
+                + " = findCapturedToken(token, " + parserClass + ", "
                 + parserOccurrenceIndex + ");");
             w.line("if (" + tokenVarName + " != null) {");
             w.indent();
@@ -915,6 +915,37 @@ class MapperRuleEmitter {
         w.dedent();
         w.line("}");
         w.line("return descendants.get(index);");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
+
+        // Resolve a captured token by STRUCTURAL POSITION: prefer the rule token's direct
+        // children, falling back to the global descendant index only when no direct child of
+        // the parser class exists. A global descendant index miscounts whenever the captured
+        // parser class also appears nested inside a SIBLING capture's subtree — e.g.
+        // IfExpression's @thenExpr/@elseExpr (Expression) vs the Expressions inside its
+        // @condition (min(0,0)==0), or a nested slice's outer index vs the inner slice's.
+        // Captures are direct children of the rule's Chain, so direct-first resolution is
+        // both correct there and backward-compatible elsewhere. (tinyexpression #32)
+        w.line("static Token findCapturedToken(Token token, Class<? extends Parser> parserClass, int index) {");
+        w.indent();
+        w.line("if (index < 0) {");
+        w.indent();
+        w.line("return null;");
+        w.dedent();
+        w.line("}");
+        w.line("List<Token> direct = findDirectDescendants(token, parserClass);");
+        w.line("if (index < direct.size()) {");
+        w.indent();
+        w.line("return direct.get(index);");
+        w.dedent();
+        w.line("}");
+        w.line("if (!direct.isEmpty()) {");
+        w.indent();
+        w.line("return null;");
+        w.dedent();
+        w.line("}");
+        w.line("return findDescendantByIndex(token, parserClass, index);");
         w.dedent();
         w.line("}");
         w.blankLine();
