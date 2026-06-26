@@ -92,7 +92,14 @@ class MapperTypeResolver {
                 }
                 // token 型推論: parser class 名から Java 型を導出
                 String tokenType = inferTypeFromTokenName(grammar, ruleRefElement.name());
-                yield tokenType != null ? tokenType : "String";
+                if (tokenType != null) {
+                    yield tokenType;
+                }
+                // 透過 mapped choice（異種選択肢）は単一スカラーに収束しない → Object
+                if (isTransparentMappedChoice(grammar, ruleRefElement.name())) {
+                    yield "Object";
+                }
+                yield "String";
             }
             case RepeatElement repeatElement -> {
                 String inner = inferTypeFromBody(grammar, repeatElement.body());
@@ -141,6 +148,50 @@ class MapperTypeResolver {
             .filter(type -> type != null)
             .findFirst()
             .orElse(null);
+    }
+
+    /**
+     * 参照先ルールが「透過 mapped choice」かどうか判定する。
+     * すなわち、自身に @mapping を持たず、本体が choice で、その単一 RuleRef 選択肢が
+     * ≥2 の異なる AST クラス（@mapping）にマップする場合 true。
+     * このようなルール参照は単一のスカラー型に収束しないため、型は Object とすべき。
+     * 例: StringTerm（StringMatchExpression | SliceExpression | VariableRef | ... の透過 choice）。
+     *
+     * 判定基準は {@link MapperElementUtil#isTransparentMappedChoice} と揃えており、
+     * 型推論（フィールド型）と mapper 生成式（mapTransparentValue）が一致するようにしている。
+     */
+    static boolean isTransparentMappedChoice(GrammarDecl grammar, String ruleName) {
+        Optional<RuleDecl> ruleOpt = grammar.rules().stream()
+            .filter(r -> r.name().equals(ruleName))
+            .findFirst();
+        if (ruleOpt.isEmpty()) {
+            return false;
+        }
+        RuleDecl rule = ruleOpt.get();
+        // 自身に @mapping があるなら透過ではない（その AST クラスに解決される）
+        boolean hasMapping = rule.annotations().stream().anyMatch(a -> a instanceof MappingAnnotation);
+        if (hasMapping) {
+            return false;
+        }
+        if (!(rule.body() instanceof ChoiceBody choice)) {
+            return false;
+        }
+        Set<String> mappedClasses = new LinkedHashSet<>();
+        for (SequenceBody alt : choice.alternatives()) {
+            if (alt.elements().size() != 1) {
+                continue;
+            }
+            if (alt.elements().get(0).element() instanceof RuleRefElement ref) {
+                grammar.rules().stream()
+                    .filter(r -> r.name().equals(ref.name()))
+                    .flatMap(r -> r.annotations().stream())
+                    .filter(a -> a instanceof MappingAnnotation)
+                    .map(a -> ((MappingAnnotation) a).className())
+                    .findFirst()
+                    .ifPresent(mappedClasses::add);
+            }
+        }
+        return mappedClasses.size() >= 2;
     }
 
     /** TypeofElement を参照するキャプチャ名から実際の AtomicElement に解決する */
