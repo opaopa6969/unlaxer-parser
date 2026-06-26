@@ -126,6 +126,24 @@ public class SnapshotMapper {
         }
     }
 
+    private static Object mapTransparentValue(Token token) {
+        if (token == null) {
+            return null;
+        }
+        SnapshotAST direct = mapToken(token);
+        if (direct != null) {
+            return direct;
+        }
+        Token best = findBestMappedToken(token, null);
+        if (best != null) {
+            SnapshotAST mapped = mapToken(best);
+            if (mapped != null) {
+                return mapped;
+            }
+        }
+        return stripQuotes(firstTokenText(token));
+    }
+
     // =========================================================================
     // Mapping Methods
     // =========================================================================

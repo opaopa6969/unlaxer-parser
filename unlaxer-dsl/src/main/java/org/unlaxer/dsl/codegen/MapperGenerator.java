@@ -86,6 +86,9 @@ public class MapperGenerator implements CodeGenerator {
         // ----- findBestMappedToken -----
         sb.append(MapperRuleEmitter.emitFindBestMappedToken(astClass));
 
+        // ----- mapTransparentValue (heterogeneous @value node resolution) -----
+        sb.append(MapperRuleEmitter.emitMapTransparentValue(astClass));
+
         // ----- Mapping Methods -----
         sb.append(MapperRuleEmitter.emitMappingMethods(grammar, astClass, parsersClass,
             mappingRules, allMappingRules, mappedClassByRuleName, tokenDeclByName, ruleByName));

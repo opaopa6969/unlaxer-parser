@@ -123,6 +123,24 @@ public class SnapshotRightAssocMapper {
         }
     }
 
+    private static Object mapTransparentValue(Token token) {
+        if (token == null) {
+            return null;
+        }
+        SnapshotRightAssocAST direct = mapToken(token);
+        if (direct != null) {
+            return direct;
+        }
+        Token best = findBestMappedToken(token, null);
+        if (best != null) {
+            SnapshotRightAssocAST mapped = mapToken(best);
+            if (mapped != null) {
+                return mapped;
+            }
+        }
+        return stripQuotes(firstTokenText(token));
+    }
+
     // =========================================================================
     // Mapping Methods
     // =========================================================================

@@ -59,6 +59,45 @@ class MapperRuleEmitter {
     }
 
     /**
+     * mapTransparentValue() を生成する。@mapping を持たない透過的 choice ルールを
+     * 値として捉えた heterogeneous(Object) フィールド向けに、マッチした選択肢の実 AST
+     * ノードを解決する。ノードが見つからなければ firstTokenText にフォールバック。
+     * (unlaxer-parser #43 family / tinyexpression #32)
+     */
+    static String emitMapTransparentValue(String astClass) {
+        IndentedWriter w = new IndentedWriter(1);
+        w.line("private static Object mapTransparentValue(Token token) {");
+        w.indent();
+        w.line("if (token == null) {");
+        w.indent();
+        w.line("return null;");
+        w.dedent();
+        w.line("}");
+        w.line(astClass + " direct = mapToken(token);");
+        w.line("if (direct != null) {");
+        w.indent();
+        w.line("return direct;");
+        w.dedent();
+        w.line("}");
+        w.line("Token best = findBestMappedToken(token, null);");
+        w.line("if (best != null) {");
+        w.indent();
+        w.line(astClass + " mapped = mapToken(best);");
+        w.line("if (mapped != null) {");
+        w.indent();
+        w.line("return mapped;");
+        w.dedent();
+        w.line("}");
+        w.dedent();
+        w.line("}");
+        w.line("return stripQuotes(firstTokenText(token));");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
+        return w.build();
+    }
+
+    /**
      * findBestMappedToken 関連メソッドと MappingCandidate 内部クラスを生成する。
      */
     static String emitFindBestMappedToken(String astClass) {

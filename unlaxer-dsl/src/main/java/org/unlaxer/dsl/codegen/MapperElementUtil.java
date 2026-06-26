@@ -358,6 +358,16 @@ class MapperElementUtil {
                 return targetType + ".fromText(stripQuotes(firstTokenText(" + tokenVar + ")))";
             }
         }
+        // A heterogeneous Object @value bound to a transparent choice rule (no @mapping of
+        // its own, alternatives mapping to several different AST classes — e.g. a
+        // BooleanComparable ::= InMethod | IsPresentFunction | ... rule) was previously
+        // flattened to firstTokenText, silently dropping the real node it wraps. Resolve the
+        // matched alternative's node instead. Object-typed, so a node or the text fallback
+        // both fit the field. (unlaxer-parser #43 family / tinyexpression #32)
+        if ("Object".equals(targetType) && element instanceof RuleRefElement transparentRef
+            && isTransparentMappedChoice(ruleByName.get(transparentRef.name()), mappedClassByRuleName)) {
+            return "mapTransparentValue(" + tokenVar + ")";
+        }
         if (!"String".equals(targetType)) {
             return mapExpressionForElement(element, tokenVar, mappedClassByRuleName, tokenDeclByName, ruleByName);
         }
@@ -368,6 +378,33 @@ class MapperElementUtil {
             }
         }
         return "stripQuotes(firstTokenText(" + tokenVar + "))";
+    }
+
+    /**
+     * True if {@code rule} is a "transparent choice" used as a heterogeneous {@code Object}
+     * capture: it has no {@code @mapping} of its own and its body is a choice whose
+     * single-RuleRef alternatives map to two or more distinct AST classes. Such a capture's
+     * field is inferred as {@code Object}, so the matched alternative's node must be resolved
+     * at runtime rather than dropped to {@code firstTokenText}. (unlaxer-parser #43 family)
+     */
+    static boolean isTransparentMappedChoice(RuleDecl rule, Map<String, String> mappedClassByRuleName) {
+        if (rule == null || getMappingAnnotation(rule).isPresent()) {
+            return false;
+        }
+        if (!(rule.body() instanceof ChoiceBody choice)) {
+            return false;
+        }
+        java.util.Set<String> mappedClasses = new java.util.LinkedHashSet<>();
+        for (SequenceBody alternative : choice.alternatives()) {
+            if (alternative.elements().size() != 1) {
+                continue;
+            }
+            AtomicElement element = alternative.elements().get(0).element();
+            if (element instanceof RuleRefElement ref && mappedClassByRuleName.containsKey(ref.name())) {
+                mappedClasses.add(mappedClassByRuleName.get(ref.name()));
+            }
+        }
+        return mappedClasses.size() >= 2;
     }
 
     static boolean isIdentifierToken(TokenDecl tokenDecl) {

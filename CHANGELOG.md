@@ -10,6 +10,14 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ---
 
+## [3.0.6] - 2026-06-26
+
+### Fixed
+
+- **MapperGenerator dropped heterogeneous `@value` captures to source text (#43 family)**: a `@value` bound to a transparent choice rule with no `@mapping` of its own whose alternatives map to several different AST classes (e.g. `BooleanFactor ::= … | BooleanComparable @value`, where `BooleanComparable ::= InMethod | IsPresentFunction | …`) was emitted as `stripQuotes(firstTokenText(token))`, silently flattening the matched node (an `InExpr`, `IsPresentExpr`, …) to its source string. The generated mapper now resolves the real node via a new `mapTransparentValue(token)` helper (`mapToken` → `findBestMappedToken` → text fallback), so the `Object`-typed field carries the actual AST node. Downstream (tinyexpression #32) this makes `.in()` / `isPresent` / dot-predicate boolean factors inside `if(...)` conditions evaluate faithfully on the AST instead of via a source re-parse. New `MapperElementUtil.isTransparentMappedChoice` gates the change (≥2 distinct mapped alternatives → `Object` field, so emitting a node-or-text value is type-safe). Golden mapper snapshots updated.
+
+---
+
 ## [3.0.5] - 2026-06-25
 
 ### Fixed
