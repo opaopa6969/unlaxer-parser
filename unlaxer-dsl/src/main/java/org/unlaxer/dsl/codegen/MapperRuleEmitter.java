@@ -220,7 +220,7 @@ class MapperRuleEmitter {
                     rightAssoc, allMappingRules, mappedClassByRuleName, tokenDeclByName, ruleByName);
             } else {
                 emitPlainMappingBody(w, grammar, astClass, parsersClass, className, rule, mapping,
-                    mappedClassByRuleName, tokenDeclByName, ruleByName);
+                    allMappingRules, mappedClassByRuleName, tokenDeclByName, ruleByName);
             }
 
             w.dedent();
@@ -521,6 +521,41 @@ class MapperRuleEmitter {
     private static void emitPlainMappingBody(IndentedWriter w, GrammarDecl grammar,
             String astClass, String parsersClass, String className,
             RuleDecl rule, MappingAnnotation mapping,
+            Map<String, List<RuleDecl>> allMappingRules,
+            Map<String, String> mappedClassByRuleName,
+            Map<String, TokenDecl> tokenDeclByName, Map<String, RuleDecl> ruleByName) {
+
+        // Multiple non-assoc rules can map to the same AST class with DIFFERENT capture
+        // structures (e.g. SliceExpr: SliceBaseExpression's @value is a SliceBaseReceiver,
+        // SliceNestedExpression's @value is a SliceBaseExpression i.e. the mapped class
+        // itself). A single resolution body generated from one representative rule mis-resolves
+        // tokens of the other rule. Dispatch each ADDITIONAL rule by the token's parser class;
+        // the representative rule stays the unguarded fallback. Exactly one rule is guarded and
+        // the other falls through, so the result is correct regardless of which is representative.
+        // Single-rule classes and structurally-identical rules (e.g. IfExpr's ArgumentTernary)
+        // are unaffected in behavior. (tinyexpression #32: nested slice value)
+        List<RuleDecl> additionalRules = allMappingRules.getOrDefault(className, List.of()).stream()
+            .filter(r -> r != rule)
+            .filter(r -> {
+                MappingAnnotation m = MapperElementUtil.getMappingAnnotation(r).orElse(null);
+                return !MapperElementUtil.isLeftAssocRule(r, m) && !MapperElementUtil.isRightAssocRule(r, m);
+            })
+            .toList();
+        for (RuleDecl additionalRule : additionalRules) {
+            w.line("if (token.parser.getClass() == " + parsersClass + "." + additionalRule.name() + "Parser.class) {");
+            w.indent();
+            emitPlainMappingResolution(w, grammar, astClass, parsersClass, className, additionalRule, mapping,
+                mappedClassByRuleName, tokenDeclByName, ruleByName);
+            w.dedent();
+            w.line("}");
+        }
+        emitPlainMappingResolution(w, grammar, astClass, parsersClass, className, rule, mapping,
+            mappedClassByRuleName, tokenDeclByName, ruleByName);
+    }
+
+    private static void emitPlainMappingResolution(IndentedWriter w, GrammarDecl grammar,
+            String astClass, String parsersClass, String className,
+            RuleDecl rule, MappingAnnotation mapping,
             Map<String, String> mappedClassByRuleName,
             Map<String, TokenDecl> tokenDeclByName, Map<String, RuleDecl> ruleByName) {
 
@@ -803,11 +838,61 @@ class MapperRuleEmitter {
     /**
      * ユーティリティメソッド群（findDescendants, firstTokenText 等）を生成する。
      */
-    static String emitUtilities() {
+    static String emitUtilities(String parsersClass, java.util.Set<String> mappedRuleNames) {
         IndentedWriter w = new IndentedWriter(1);
         w.line("// =========================================================================");
         w.line("// Utilities");
         w.line("// =========================================================================");
+        w.blankLine();
+
+        // Parser classes of rules that map to their own AST node. A capture's bounded
+        // descendant search must NOT cross into one of these, because it is a SEPARATE
+        // captured sub-expression — e.g. a nested slice's outer @step search must stop at
+        // the inner slice (SliceBaseExpression) rather than leak in and grab its step.
+        w.line("private static final java.util.Set<Class<?>> CAPTURE_BOUNDARY_PARSERS = java.util.Set.of(");
+        w.indent();
+        java.util.List<String> boundaryRules = new java.util.ArrayList<>(mappedRuleNames);
+        if (boundaryRules.isEmpty()) {
+            // Set.of() with no args is fine, but keep a stable form.
+            w.dedent();
+            w.line(");");
+        } else {
+            for (int i = 0; i < boundaryRules.size(); i++) {
+                String suffix = i < boundaryRules.size() - 1 ? "," : "";
+                w.line(parsersClass + "." + boundaryRules.get(i) + "Parser.class" + suffix);
+            }
+            w.dedent();
+            w.line(");");
+        }
+        w.blankLine();
+
+        // Like findDescendants, but stops at capture-boundary tokens (separate mapped nodes),
+        // so a capture absent at this level does not leak into a nested sub-expression of the
+        // same parser class. Used as findCapturedToken's fallback. (tinyexpression #32)
+        w.line("static List<Token> findDescendantsBounded(Token token, Class<? extends Parser> parserClass) {");
+        w.indent();
+        w.line("List<Token> results = new ArrayList<>();");
+        w.line("if (token == null) {");
+        w.indent();
+        w.line("return results;");
+        w.dedent();
+        w.line("}");
+        w.line("for (Token child : token.filteredChildren) {");
+        w.indent();
+        w.line("if (child.parser.getClass() == parserClass) {");
+        w.indent();
+        w.line("results.add(child);");
+        w.dedent();
+        w.line("} else if (!CAPTURE_BOUNDARY_PARSERS.contains(child.parser.getClass())) {");
+        w.indent();
+        w.line("results.addAll(findDescendantsBounded(child, parserClass));");
+        w.dedent();
+        w.line("}");
+        w.dedent();
+        w.line("}");
+        w.line("return results;");
+        w.dedent();
+        w.line("}");
         w.blankLine();
 
         w.line("// Collects rule-level (top-level) occurrences of parserClass: once a child");
@@ -945,7 +1030,11 @@ class MapperRuleEmitter {
         w.line("return null;");
         w.dedent();
         w.line("}");
-        w.line("return findDescendantByIndex(token, parserClass, index);");
+        // Fallback for captures nested under anonymous wrappers (Optional/Group/Repeat): a
+        // bounded descendant search that does NOT cross capture boundaries, so an absent
+        // capture at this level cannot leak into a nested mapped sub-expression.
+        w.line("List<Token> bounded = findDescendantsBounded(token, parserClass);");
+        w.line("return index < bounded.size() ? bounded.get(index) : null;");
         w.dedent();
         w.line("}");
         w.blankLine();

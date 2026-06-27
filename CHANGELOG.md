@@ -10,6 +10,15 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ---
 
+## [3.0.9] - 2026-06-27
+
+### Fixed
+
+- **Multiple non-assoc rules mapping to one AST class only generated from one rule (tinyexpression #32, nested slice)**: when two `@mapping` rules target the same class with DIFFERENT capture structures — e.g. `SliceExpr`: `SliceBaseExpression`'s `@value` is a `SliceBaseReceiver` while `SliceNestedExpression`'s `@value` is a `SliceBaseExpression` (the mapped class itself) — the generated `to<Class>` was emitted from a single representative rule and mis-resolved tokens of the other rule (a nested slice `'gateman'[::-1][0:4]` dropped the inner `[::-1]`, grabbing the innermost receiver). `emitPlainMappingBody` now dispatches each additional non-assoc rule by `token.parser.getClass()` (resolution extracted to `emitPlainMappingResolution`), with the representative rule as the unguarded fallback — exactly one rule is guarded and the other falls through, so the result is correct regardless of representative choice. Single-rule and structurally-identical multi-rule classes (e.g. `IfExpr`'s `ArgumentTernary`) are behavior-unchanged.
+- **`findCapturedToken` fallback leaked an absent capture into a nested sub-expression**: the global descendant fallback let an outer slice's ABSENT `@step` (`[0:4]`) match the inner `[::-1]`'s step. The fallback is now a BOUNDED descendant search (`findDescendantsBounded`) that stops at `CAPTURE_BOUNDARY_PARSERS` — the set of all rule parser classes that map to their own AST node — so a capture missing at this level cannot cross into a separate captured sub-node. Captures genuinely nested under anonymous wrappers (Optional/Group/Repeat) still resolve. `MapperRuleEmitter.emitUtilities` now takes `(parsersClass, mappedRuleNames)`.
+
+---
+
 ## [3.0.8] - 2026-06-27
 
 ### Fixed
