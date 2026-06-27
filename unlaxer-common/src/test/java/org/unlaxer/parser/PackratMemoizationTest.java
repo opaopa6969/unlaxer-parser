@@ -115,6 +115,37 @@ public class PackratMemoizationTest {
 		}
 	}
 
+	private String signature(org.unlaxer.Token token) {
+		StringBuilder builder = new StringBuilder();
+		appendSignature(token, builder);
+		return builder.toString();
+	}
+
+	private void appendSignature(org.unlaxer.Token token, StringBuilder builder) {
+		builder.append(token.parser == null ? "?" : token.parser.getClass().getSimpleName());
+		builder.append('[').append(token.getToken().orElse("")).append("](");
+		token.getChildren(t -> true, org.unlaxer.Token.ChildrenKind.original)
+			.forEach(child -> appendSignature(child, builder));
+		builder.append(')');
+	}
+
+	/**
+	 * Success memoization must replay a structurally identical token tree (deep-copied, freshly
+	 * parented) — not just the same success/failure verdict. Compares the full parsed tree with
+	 * memoization on vs off for inputs whose sub-trees are revisited under backtracking.
+	 */
+	@Test
+	public void successMemoizationPreservesTokenTree() {
+		String[] sources = { "x!", "(x!)!", "((x!)!)!", "(((x!)!)!)!" };
+		for (String source : sources) {
+			Parsed off = parse(source, false);
+			Parsed on = parse(source, true);
+			assertTrue("expected success for '" + source + "'", off.isSucceeded() && on.isSucceeded());
+			assertEquals("token tree parity for '" + source + "'",
+				signature(off.getRootToken()), signature(on.getRootToken()));
+		}
+	}
+
 	/**
 	 * Deeply nested failing input. Off would be ~2^depth (intractable); on collapses to linear.
 	 * The wall-clock bound proves the exponential is gone — if memoization regressed, this hangs.

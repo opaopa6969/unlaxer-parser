@@ -4,8 +4,13 @@ import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
 
+import org.unlaxer.CodePointLength;
+import org.unlaxer.Parsed;
+import org.unlaxer.Token;
 import org.unlaxer.TokenKind;
 import org.unlaxer.TokenList;
+import org.unlaxer.TransactionElement;
+import org.unlaxer.context.Transaction.AdditionalCommitAction;
 import org.unlaxer.listener.TransactionListener;
 import org.unlaxer.parser.Parser;
 import org.unlaxer.parser.Parsers;
@@ -41,22 +46,28 @@ public final class PackratMemoTable {
   /** A memoized outcome. {@link #FAILED} marks a known failure; success carries replay data. */
   public static final class Entry {
 
-    public static final Entry FAILED = new Entry(true, null, 0, 0);
+    public static final Entry FAILED = new Entry(true, null, 0, 0, null);
 
     private final boolean failed;
     private final TokenList tokens;
     private final int endConsumed;
     private final int endMatched;
+    private final Parser chosenChild;
 
-    private Entry(boolean failed, TokenList tokens, int endConsumed, int endMatched) {
+    private Entry(boolean failed, TokenList tokens, int endConsumed, int endMatched, Parser chosenChild) {
       this.failed = failed;
       this.tokens = tokens;
       this.endConsumed = endConsumed;
       this.endMatched = endMatched;
+      this.chosenChild = chosenChild;
     }
 
-    public static Entry success(TokenList tokens, int endConsumed, int endMatched) {
-      return new Entry(false, tokens, endConsumed, endMatched);
+    /**
+     * @param chosenChild for a choice rule, the alternative that matched (needed to replay
+     *     {@code ChoiceCommitAction}); null for chains and plain rules.
+     */
+    public static Entry success(TokenList tokens, int endConsumed, int endMatched, Parser chosenChild) {
+      return new Entry(false, tokens, endConsumed, endMatched, chosenChild);
     }
 
     public boolean isFailed() {
@@ -74,21 +85,71 @@ public final class PackratMemoTable {
     public int endMatched() {
       return endMatched;
     }
+
+    public Parser chosenChild() {
+      return chosenChild;
+    }
   }
 
   /**
-   * True when {@code parser} has already failed at the current position (a known dead end), so a
-   * retry can short-circuit instead of re-deriving the whole sub-tree. No-op (returns false) when
-   * memoization is disabled, so default parsing is unaffected.
+   * The memoized outcome for {@code parser} at the current position, or null to proceed with a
+   * normal parse (no entry, or memoization disabled). A non-null result is either a known failure
+   * ({@link Entry#isFailed()}) or a success to replay via {@link #replaySuccess}.
    */
-  public static boolean isMemoizedFailure(
+  public static Entry lookup(
       ParseContext parseContext, Parser parser, TokenKind tokenKind, boolean invertMatch) {
     if (false == parseContext.isMemoizeEnabled()) {
-      return false;
+      return null;
     }
-    Entry entry = parseContext.getPackratMemoTable()
+    return parseContext.getPackratMemoTable()
         .get(parser, positionKeyOf(parseContext, tokenKind, invertMatch));
-    return entry != null && entry.isFailed();
+  }
+
+  /**
+   * Record that {@code parser} succeeded at {@code startKey} consuming up to (endConsumed,
+   * endMatched), capturing a snapshot of its tokens for replay. Only stored for success-memoizable
+   * parsers (see {@link #isSuccessMemoizable}); no-op otherwise or when memoization is disabled.
+   * {@code rawTokens} is the rule's transaction-element token list captured BEFORE commit.
+   */
+  public static void memoizeSuccess(ParseContext parseContext, Parser parser, PositionKey startKey,
+      TokenList rawTokens, int endConsumed, int endMatched, Parser chosenChild) {
+    if (false == parseContext.isMemoizeEnabled()) {
+      return;
+    }
+    PackratMemoTable table = parseContext.getPackratMemoTable();
+    if (false == table.isSuccessMemoizable(parser)) {
+      return;
+    }
+    TokenList snapshot = new TokenList();
+    snapshot.addAll(rawTokens);
+    table.put(parser, startKey, Entry.success(snapshot, endConsumed, endMatched, chosenChild));
+  }
+
+  /**
+   * Replay a memoized success without re-deriving the sub-tree: open a transaction for the rule,
+   * splice in DEEP COPIES of the cached tokens (their mutable parent pointers must not be shared —
+   * see {@link Token#deepCopy()}), advance the cursor to the cached end, then commit so the normal
+   * merge/collect/cursor-propagation and any commit actions run exactly as on a fresh parse.
+   */
+  public static Parsed replaySuccess(ParseContext parseContext, Parser parser, TokenKind tokenKind,
+      boolean invertMatch, Entry entry, AdditionalCommitAction... commitActions) {
+    parseContext.startParse(parser, parseContext, tokenKind, invertMatch);
+    parseContext.begin(parser);
+    TransactionElement current = parseContext.getCurrent();
+    for (Token token : entry.tokens()) {
+      current.getTokens().add(token.deepCopy());
+    }
+    int consumeDelta = entry.endConsumed() - current.getPosition(TokenKind.consumed).value();
+    if (consumeDelta > 0) {
+      parseContext.consume(new CodePointLength(consumeDelta));
+    }
+    int matchDelta = entry.endMatched() - current.getPosition(TokenKind.matchOnly).value();
+    if (matchDelta > 0) {
+      parseContext.matchOnly(new CodePointLength(matchDelta));
+    }
+    Parsed committed = new Parsed(parseContext.commit(parser, tokenKind, commitActions));
+    parseContext.endParse(parser, committed, parseContext, tokenKind, invertMatch);
+    return committed;
   }
 
   /**
