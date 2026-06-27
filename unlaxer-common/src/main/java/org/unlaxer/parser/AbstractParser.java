@@ -14,8 +14,11 @@ import org.unlaxer.Name;
 import org.unlaxer.Parsed;
 import org.unlaxer.Tag;
 import org.unlaxer.TokenKind;
+import org.unlaxer.TokenList;
+import org.unlaxer.TransactionElement;
 import org.unlaxer.ast.ASTNodeKind;
 import org.unlaxer.context.ParseContext;
+import org.unlaxer.context.PackratMemoTable;
 
 public abstract class AbstractParser implements Parser {
 	
@@ -68,22 +71,44 @@ public abstract class AbstractParser implements Parser {
 	
 	@Override
 	public Parsed parse(ParseContext parseContext , TokenKind tokenKind ,boolean invertMatch) {
-		
+
+		// Opt-in packrat memoization (issue #40). A cached failure short-circuits instead of
+		// re-deriving the sub-tree; a cached success is replayed. This collapses the exponential
+		// re-parsing that ambiguous-paren expression grammars trigger under backtracking. Off by
+		// default, so default parsing is unaffected.
+		PackratMemoTable.Entry memo = PackratMemoTable.lookup(parseContext, this, tokenKind, invertMatch);
+		if (memo != null) {
+			if (memo.isFailed()) {
+				return Parsed.FAILED;
+			}
+			return PackratMemoTable.replaySuccess(parseContext, this, tokenKind, invertMatch, memo);
+		}
+		PackratMemoTable.PositionKey startKey = parseContext.isMemoizeEnabled()
+			? PackratMemoTable.positionKeyOf(parseContext, tokenKind, invertMatch) : null;
+
 		parseContext.startParse(this, parseContext, tokenKind, invertMatch);
-		
+
 		parseContext.begin(this);
 		Parsed parsed = getParser().parse(parseContext,tokenKind,invertMatch);
-		
+
 		if(parsed.isSucceeded()){
+			TransactionElement current = parseContext.getCurrent();
+			int endConsumed = current.getPosition(TokenKind.consumed).value();
+			int endMatched = current.getPosition(TokenKind.matchOnly).value();
+			TokenList ruleTokens = current.getTokens();
 			Committed commited = parseContext.commit(this , tokenKind);
 
 			Parsed succeededParsed = new Parsed(commited);
 			parseContext.endParse(this, succeededParsed , parseContext, tokenKind, invertMatch);
+			if (startKey != null) {
+				PackratMemoTable.memoizeSuccess(parseContext, this, startKey, ruleTokens, endConsumed, endMatched, null);
+			}
 			return succeededParsed;
 		}
-		
+
 		parseContext.rollback(this);
 		parseContext.endParse(this, Parsed.FAILED , parseContext, tokenKind, invertMatch);
+		PackratMemoTable.memoizeFailure(parseContext, this, tokenKind, invertMatch);
 		return Parsed.FAILED;
 	}
 

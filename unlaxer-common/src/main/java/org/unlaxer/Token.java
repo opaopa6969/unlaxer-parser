@@ -108,6 +108,30 @@ public class Token implements Serializable{
 		    
 	}
 	
+	/**
+	 * Returns a deep copy of this token sub-tree with fresh {@link Token} instances. Because
+	 * {@link #parent} is mutable and is rewritten whenever a token is placed under a new parent,
+	 * a cached token sub-tree must be copied before being spliced into another parse tree (e.g.
+	 * packrat success memoization, issue #40) — otherwise replaying it would re-parent the shared
+	 * instances and corrupt the original tree. {@link Source} is immutable and is shared; the
+	 * {@code extraObjectByName}/{@code relatedTokenByName} side-maps are copied shallowly.
+	 */
+	public Token deepCopy() {
+		Token copy;
+		if (originalChildren.isEmpty()) {
+			copy = new Token(tokenKind, source, parser);
+		} else {
+			TokenList copiedChildren = new TokenList();
+			for (Token child : originalChildren) {
+				copiedChildren.add(child.deepCopy());
+			}
+			copy = new Token(tokenKind, source, parser, copiedChildren);
+		}
+		copy.extraObjectByName.putAll(extraObjectByName);
+		copy.relatedTokenByName.putAll(relatedTokenByName);
+		return copy;
+	}
+
 	public Token setParent(Token parentToken) {
 		parent = Optional.ofNullable(parentToken);
 		return this;

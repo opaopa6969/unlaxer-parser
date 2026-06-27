@@ -8,6 +8,11 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ## [Unreleased]
 
+### Added
+- **Opt-in packrat memoization** (`unlaxer-common`, issue #40). Enable per parse session via `parseContext.enableMemoize()` or `new ParseContext(source, ParseContext.memoize())`. Memoizes the outcome of parsing a rule (`ChainInterface`/`ChoiceInterface`/`AbstractParser`) at a position, keyed by `(parser identity, consumed, matched, tokenKind, invertMatch)`, collapsing the exponential backtracking that ambiguous-paren expression grammars trigger (downstream hang in opaopa6969/tinyexpression#19). **Off by default — default parsing is byte-for-byte unaffected** (full `unlaxer-common` suite green: 108 test files, 0 failures).
+  - **Failure memoization**: a rule that already failed at a position cannot succeed on a retry, so the retry short-circuits instead of re-deriving the whole sub-tree. A failing input that was ~2^depth (≈11.5s at depth 18, intractable beyond) parses in milliseconds. A `TransactionListener` (scope tree / declarations / back-reference) is never failure-memoized, since its outcome can depend on mutable scope state.
+  - **Success memoization**: a rule that already succeeded at a position replays its cached tokens (deep-copied via `Token.deepCopy()` — `parent` is mutable, so shared instances would corrupt the tree) and advances the cursor, instead of re-deriving. Only applied to **success-memoizable** rules — those whose sub-tree contains no `TransactionListener` — so scope/declaration/back-reference side effects are never skipped. Token-tree parity (on vs off) is verified by test. NOTE: because expression rules that reference variables embed a `@backref` (`VariableRef`) listener, they are excluded from success memoization; failure memoization already collapses the exponential for those grammars (see `docs/packrat-memoization.md`).
+
 ---
 
 ## [3.0.9] - 2026-06-27
