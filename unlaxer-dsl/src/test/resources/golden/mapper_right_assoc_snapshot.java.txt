@@ -204,6 +204,25 @@ public class SnapshotRightAssocMapper {
     // Utilities
     // =========================================================================
 
+    private static final java.util.Set<Class<?>> CAPTURE_BOUNDARY_PARSERS = java.util.Set.of(
+        SnapshotRightAssocParsers.ExprParser.class
+    );
+
+    static List<Token> findDescendantsBounded(Token token, Class<? extends Parser> parserClass) {
+        List<Token> results = new ArrayList<>();
+        if (token == null) {
+            return results;
+        }
+        for (Token child : token.filteredChildren) {
+            if (child.parser.getClass() == parserClass) {
+                results.add(child);
+            } else if (!CAPTURE_BOUNDARY_PARSERS.contains(child.parser.getClass())) {
+                results.addAll(findDescendantsBounded(child, parserClass));
+            }
+        }
+        return results;
+    }
+
     // Collects rule-level (top-level) occurrences of parserClass: once a child
     // matches, we do NOT recurse into it, so a captured operand's own nested
     // same-class descendants are not counted. This keeps positional captures
@@ -282,7 +301,8 @@ public class SnapshotRightAssocMapper {
         if (!direct.isEmpty()) {
             return null;
         }
-        return findDescendantByIndex(token, parserClass, index);
+        List<Token> bounded = findDescendantsBounded(token, parserClass);
+        return index < bounded.size() ? bounded.get(index) : null;
     }
 
     static String firstTokenText(Token token) {
