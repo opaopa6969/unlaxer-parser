@@ -8,6 +8,9 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ## [Unreleased]
 
+### Added
+- **Opt-in packrat failure memoization** (`unlaxer-common`, issue #40). Enable per parse session via `parseContext.enableMemoize()` or `new ParseContext(source, ParseContext.memoize())`. When a rule (`ChainInterface`/`ChoiceInterface`/`AbstractParser`) has already failed at a position, a retry short-circuits instead of re-deriving the whole sub-tree, collapsing the exponential backtracking that ambiguous-paren expression grammars trigger (downstream hang in opaopa6969/tinyexpression#19). A failing input that was ~2^depth (≈11.5s at depth 18, intractable beyond) parses in milliseconds with memoization on. **Off by default — default parsing is byte-for-byte unaffected** (full `unlaxer-common` suite green: 109 test files, 0 failures). A `TransactionListener` (scope tree / declarations / back-reference) is never failure-memoized, since its outcome can depend on mutable scope state. Success memoization (replaying a cached sub-tree) is scaffolded in `PackratMemoTable` but not yet wired — it requires scope-effect replay and is gated for a follow-up.
+
 ---
 
 ## [3.0.9] - 2026-06-27

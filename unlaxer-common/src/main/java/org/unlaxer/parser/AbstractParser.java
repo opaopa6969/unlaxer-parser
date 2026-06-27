@@ -16,6 +16,7 @@ import org.unlaxer.Tag;
 import org.unlaxer.TokenKind;
 import org.unlaxer.ast.ASTNodeKind;
 import org.unlaxer.context.ParseContext;
+import org.unlaxer.context.PackratMemoTable;
 
 public abstract class AbstractParser implements Parser {
 	
@@ -68,12 +69,20 @@ public abstract class AbstractParser implements Parser {
 	
 	@Override
 	public Parsed parse(ParseContext parseContext , TokenKind tokenKind ,boolean invertMatch) {
-		
+
+		// Opt-in packrat failure memoization (issue #40). When a rule has already failed at this
+		// exact position it cannot succeed on a retry, so short-circuit instead of re-deriving the
+		// whole sub-tree. This collapses the exponential re-parsing that ambiguous-paren expression
+		// grammars trigger under backtracking. Off by default, so default parsing is unaffected.
+		if (PackratMemoTable.isMemoizedFailure(parseContext, this, tokenKind, invertMatch)) {
+			return Parsed.FAILED;
+		}
+
 		parseContext.startParse(this, parseContext, tokenKind, invertMatch);
-		
+
 		parseContext.begin(this);
 		Parsed parsed = getParser().parse(parseContext,tokenKind,invertMatch);
-		
+
 		if(parsed.isSucceeded()){
 			Committed commited = parseContext.commit(this , tokenKind);
 
@@ -81,9 +90,10 @@ public abstract class AbstractParser implements Parser {
 			parseContext.endParse(this, succeededParsed , parseContext, tokenKind, invertMatch);
 			return succeededParsed;
 		}
-		
+
 		parseContext.rollback(this);
 		parseContext.endParse(this, Parsed.FAILED , parseContext, tokenKind, invertMatch);
+		PackratMemoTable.memoizeFailure(parseContext, this, tokenKind, invertMatch);
 		return Parsed.FAILED;
 	}
 

@@ -39,8 +39,10 @@ public class ParseContext implements
 	ParserListenerContainer,
 	GlobalScopeTree , ParserContextScopeTree{
 
-  // TODO store successfully token's <position,tokens> map
+  // Opt-in packrat memoization (issue #40). Off by default — default parsing is unaffected.
 	boolean doMemoize;
+
+	PackratMemoTable packratMemoTable;
 
 	public final Source source;
 
@@ -97,6 +99,31 @@ public class ParseContext implements
 	@Override
 	public Deque<TransactionElement> getTokenStack(){
 		return tokenStack;
+	}
+
+	/**
+	 * Enable opt-in packrat memoization (issue #40) for this parse session. Use either
+	 * {@code parseContext.enableMemoize()} or {@code new ParseContext(source, ParseContext.memoize())}.
+	 * Off by default, so default parsing is unaffected.
+	 */
+	public void enableMemoize() {
+		this.doMemoize = true;
+		if (this.packratMemoTable == null) {
+			this.packratMemoTable = new PackratMemoTable();
+		}
+	}
+
+	public boolean isMemoizeEnabled() {
+		return doMemoize;
+	}
+
+	public PackratMemoTable getPackratMemoTable() {
+		return packratMemoTable;
+	}
+
+	/** A {@link ParseContextEffector} that turns on packrat memoization at construction time. */
+	public static ParseContextEffector memoize() {
+		return ParseContext::enableMemoize;
 	}
 
 	@Override
