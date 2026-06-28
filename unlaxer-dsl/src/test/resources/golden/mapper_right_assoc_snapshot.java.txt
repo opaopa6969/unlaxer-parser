@@ -21,6 +21,9 @@ public class SnapshotRightAssocMapper {
     private static final java.util.IdentityHashMap<Object, int[]> NODE_SOURCE_SPANS =
         new java.util.IdentityHashMap<>();
 
+    private static final java.util.IdentityHashMap<Token, SnapshotRightAssocAST> MAP_MEMO =
+        new java.util.IdentityHashMap<>();
+
     // =========================================================================
     // Entry Point
     // =========================================================================
@@ -31,6 +34,7 @@ public class SnapshotRightAssocMapper {
 
     public static SnapshotRightAssocAST.PowNode parse(String source, String preferredAstSimpleName) {
         NODE_SOURCE_SPANS.clear();
+        MAP_MEMO.clear();
         Parser rootParser = SnapshotRightAssocParsers.getRootParser();
         ParseContext context = new ParseContext(createRootSourceCompat(source));
         Parsed parsed;
@@ -58,6 +62,18 @@ public class SnapshotRightAssocMapper {
     }
 
     private static SnapshotRightAssocAST mapToken(Token token) {
+        if (token == null) {
+            return null;
+        }
+        if (MAP_MEMO.containsKey(token)) {
+            return MAP_MEMO.get(token);
+        }
+        SnapshotRightAssocAST memoized = mapTokenUncached(token);
+        MAP_MEMO.put(token, memoized);
+        return memoized;
+    }
+
+    private static SnapshotRightAssocAST mapTokenUncached(Token token) {
         if (token == null) {
             return null;
         }
@@ -326,31 +342,20 @@ public class SnapshotRightAssocMapper {
         if (token == null) {
             return null;
         }
-        try {
-            java.lang.reflect.Method m = token.getClass().getMethod("getToken");
-            Object value = m.invoke(token);
-            if (value instanceof Optional<?> optional && optional.isPresent()) {
-                Object v = optional.get();
-                return v == null ? null : String.valueOf(v);
-            }
-        } catch (Throwable ignored) {}
-        try {
-            java.lang.reflect.Field f = token.getClass().getField("tokenString");
-            Object value = f.get(token);
-            if (value instanceof Optional<?> optional && optional.isPresent()) {
-                Object v = optional.get();
-                return v == null ? null : String.valueOf(v);
-            }
-        } catch (Throwable ignored) {}
-        try {
-            java.lang.reflect.Field f = token.getClass().getField("source");
-            Object src = f.get(token);
-            if (src != null) {
-                java.lang.reflect.Method m = src.getClass().getMethod("sourceAsString");
-                Object v = m.invoke(src);
-                return v == null ? null : String.valueOf(v);
-            }
-        } catch (Throwable ignored) {}
+        Optional<String> tokenValue = token.getToken();
+        if (tokenValue != null && tokenValue.isPresent()) {
+            String v = tokenValue.get();
+            return v == null ? null : String.valueOf(v);
+        }
+        if (token.tokenString != null && token.tokenString.isPresent()) {
+            String v = token.tokenString.get();
+            return v == null ? null : String.valueOf(v);
+        }
+        org.unlaxer.Source src = token.source;
+        if (src != null) {
+            String v = src.sourceAsString();
+            return v == null ? null : String.valueOf(v);
+        }
         return null;
     }
 
@@ -363,27 +368,15 @@ public class SnapshotRightAssocMapper {
         if (token == null) {
             return 0;
         }
-        try {
-            java.lang.reflect.Field sourceField = token.getClass().getField("source");
-            Object source = sourceField.get(token);
-            if (source == null) {
-                return 0;
-            }
-            java.lang.reflect.Method offsetMethod = source.getClass().getMethod("offsetFromRoot");
-            Object offset = offsetMethod.invoke(source);
-            if (offset == null) {
-                return 0;
-            }
-            java.lang.reflect.Method valueMethod = offset.getClass().getMethod("value");
-            Object value = valueMethod.invoke(offset);
-            if (value instanceof Integer i) {
-                return i;
-            }
-            if (value instanceof Number n) {
-                return n.intValue();
-            }
-        } catch (Throwable ignored) {}
-        return 0;
+        org.unlaxer.Source source = token.source;
+        if (source == null) {
+            return 0;
+        }
+        org.unlaxer.CodePointOffset offset = source.offsetFromRoot();
+        if (offset == null) {
+            return 0;
+        }
+        return offset.value();
     }
 
     static <T> T registerNodeSourceSpan(T node, Token token) {

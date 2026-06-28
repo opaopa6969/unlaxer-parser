@@ -72,6 +72,10 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("    private ").append(mapperClass).append("() {}\n\n");
         sb.append("    private static final java.util.IdentityHashMap<Object, int[]> NODE_SOURCE_SPANS =\n");
         sb.append("        new java.util.IdentityHashMap<>();\n\n");
+        // Per-parse memo of token -> mapped AST node; see mapToken. Cleared at the start of parse().
+        // (tinyexpression #49)
+        sb.append("    private static final java.util.IdentityHashMap<Token, ").append(astClass).append("> MAP_MEMO =\n");
+        sb.append("        new java.util.IdentityHashMap<>();\n\n");
 
         String rootClassName = rootRule.flatMap(MapperElementUtil::getMappingAnnotation)
             .map(m -> astClass + "." + m.className())
@@ -119,6 +123,7 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("    }\n\n");
         sb.append("    public static ").append(rootClassName).append(" parse(String source, String preferredAstSimpleName) {\n");
         sb.append("        NODE_SOURCE_SPANS.clear();\n");
+        sb.append("        MAP_MEMO.clear();\n");
         sb.append("        Parser rootParser = ").append(parsersClass).append(".getRootParser();\n");
         sb.append("        ParseContext context = new ParseContext(createRootSourceCompat(source));\n");
         sb.append("        Parsed parsed;\n");

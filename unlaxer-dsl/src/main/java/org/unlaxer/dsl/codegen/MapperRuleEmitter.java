@@ -28,7 +28,30 @@ class MapperRuleEmitter {
     static String emitMapTokenMethod(String astClass, String parsersClass,
             Map<String, List<RuleDecl>> allMappingRules) {
         IndentedWriter w = new IndentedWriter(1);
+        // Memoized wrapper. mapToken is otherwise re-invoked on the same token objects O(depth) times
+        // (findBestMappedToken probes every node, and each mapping method resolves its operands via
+        // findBestMappedToken again), so a deeply nested expression re-constructs the same subtrees
+        // millions of times. Memoizing by token identity collapses that to one construction per token.
+        // (tinyexpression #49)
         w.line("private static " + astClass + " mapToken(Token token) {");
+        w.indent();
+        w.line("if (token == null) {");
+        w.indent();
+        w.line("return null;");
+        w.dedent();
+        w.line("}");
+        w.line("if (MAP_MEMO.containsKey(token)) {");
+        w.indent();
+        w.line("return MAP_MEMO.get(token);");
+        w.dedent();
+        w.line("}");
+        w.line(astClass + " memoized = mapTokenUncached(token);");
+        w.line("MAP_MEMO.put(token, memoized);");
+        w.line("return memoized;");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
+        w.line("private static " + astClass + " mapTokenUncached(Token token) {");
         w.indent();
         w.line("if (token == null) {");
         w.indent();
@@ -1067,6 +1090,11 @@ class MapperRuleEmitter {
         w.line("}");
         w.blankLine();
 
+        // Token is always org.unlaxer.Token (imported in the generated mapper): getToken()/tokenString/
+        // source are public and stable, so call them directly. The previous getClass().getMethod/getField
+        // reflection allocated a Method/Field + PublicMethods$MethodList + Class[] on every call; under
+        // deeply nested expressions this was, together with the per-token re-mapping, the dominant
+        // allocation that drove parse time and GC. (tinyexpression #49)
         w.line("static String tokenTextCompat(Token token) {");
         w.indent();
         w.line("if (token == null) {");
@@ -1074,43 +1102,26 @@ class MapperRuleEmitter {
         w.line("return null;");
         w.dedent();
         w.line("}");
-        w.line("try {");
+        w.line("Optional<String> tokenValue = token.getToken();");
+        w.line("if (tokenValue != null && tokenValue.isPresent()) {");
         w.indent();
-        w.line("java.lang.reflect.Method m = token.getClass().getMethod(\"getToken\");");
-        w.line("Object value = m.invoke(token);");
-        w.line("if (value instanceof Optional<?> optional && optional.isPresent()) {");
-        w.indent();
-        w.line("Object v = optional.get();");
+        w.line("String v = tokenValue.get();");
         w.line("return v == null ? null : String.valueOf(v);");
         w.dedent();
         w.line("}");
-        w.dedent();
-        w.line("} catch (Throwable ignored) {}");
-        w.line("try {");
+        w.line("if (token.tokenString != null && token.tokenString.isPresent()) {");
         w.indent();
-        w.line("java.lang.reflect.Field f = token.getClass().getField(\"tokenString\");");
-        w.line("Object value = f.get(token);");
-        w.line("if (value instanceof Optional<?> optional && optional.isPresent()) {");
-        w.indent();
-        w.line("Object v = optional.get();");
+        w.line("String v = token.tokenString.get();");
         w.line("return v == null ? null : String.valueOf(v);");
         w.dedent();
         w.line("}");
-        w.dedent();
-        w.line("} catch (Throwable ignored) {}");
-        w.line("try {");
-        w.indent();
-        w.line("java.lang.reflect.Field f = token.getClass().getField(\"source\");");
-        w.line("Object src = f.get(token);");
+        w.line("org.unlaxer.Source src = token.source;");
         w.line("if (src != null) {");
         w.indent();
-        w.line("java.lang.reflect.Method m = src.getClass().getMethod(\"sourceAsString\");");
-        w.line("Object v = m.invoke(src);");
+        w.line("String v = src.sourceAsString();");
         w.line("return v == null ? null : String.valueOf(v);");
         w.dedent();
         w.line("}");
-        w.dedent();
-        w.line("} catch (Throwable ignored) {}");
         w.line("return null;");
         w.dedent();
         w.line("}");
@@ -1131,37 +1142,19 @@ class MapperRuleEmitter {
         w.line("return 0;");
         w.dedent();
         w.line("}");
-        w.line("try {");
-        w.indent();
-        w.line("java.lang.reflect.Field sourceField = token.getClass().getField(\"source\");");
-        w.line("Object source = sourceField.get(token);");
+        w.line("org.unlaxer.Source source = token.source;");
         w.line("if (source == null) {");
         w.indent();
         w.line("return 0;");
         w.dedent();
         w.line("}");
-        w.line("java.lang.reflect.Method offsetMethod = source.getClass().getMethod(\"offsetFromRoot\");");
-        w.line("Object offset = offsetMethod.invoke(source);");
+        w.line("org.unlaxer.CodePointOffset offset = source.offsetFromRoot();");
         w.line("if (offset == null) {");
         w.indent();
         w.line("return 0;");
         w.dedent();
         w.line("}");
-        w.line("java.lang.reflect.Method valueMethod = offset.getClass().getMethod(\"value\");");
-        w.line("Object value = valueMethod.invoke(offset);");
-        w.line("if (value instanceof Integer i) {");
-        w.indent();
-        w.line("return i;");
-        w.dedent();
-        w.line("}");
-        w.line("if (value instanceof Number n) {");
-        w.indent();
-        w.line("return n.intValue();");
-        w.dedent();
-        w.line("}");
-        w.dedent();
-        w.line("} catch (Throwable ignored) {}");
-        w.line("return 0;");
+        w.line("return offset.value();");
         w.dedent();
         w.line("}");
         w.blankLine();
