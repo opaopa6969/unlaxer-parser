@@ -280,14 +280,15 @@ public class StringSource implements Source {
 
   @Override
   public Source peek(CodePointIndex startIndexInclusive, CodePointLength length) {
-    CodePointOffset offset = new CodePointOffset(startIndexInclusive);
-
+    // subSource(start, length) already produces a StringSource over codePoints[start, start+length)
+    // with parent=this and the same root offset; the previous implementation wrapped that result in
+    // a SECOND StringSource at the same offset, doubling the String + int[] copies on every peek
+    // (the dominant allocation in deeply nested grammars — #19/#40). The wrap is redundant: the
+    // single subSource is byte-for-byte equivalent. (perf #40 follow-up)
     if (startIndexInclusive.value() + length.value() > codePoints.length) {
-      return new StringSource(this,
-          subSource(startIndexInclusive, new CodePointLength(0)),
-          offset);
+      return subSource(startIndexInclusive, new CodePointLength(0));
     }
-    return new StringSource(this, subSource(startIndexInclusive, length), offset);
+    return subSource(startIndexInclusive, length);
   }
 
   @Override
