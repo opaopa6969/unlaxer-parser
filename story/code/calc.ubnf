@@ -1,0 +1,22 @@
+grammar TinyCalc {
+
+  @package: story.calc
+  @whitespace: javaStyle
+
+  token NUMBER = org.unlaxer.parser.elementary.NumberParser
+  token EOF    = org.unlaxer.parser.elementary.EndOfSourceParser
+
+  @root
+  Formula ::= Expression EOF ;
+
+  @mapping(AddExpr, params=[left, op, right])
+  Expression ::= Term @left { AddOp @op Term @right } ;
+
+  @mapping(MulExpr, params=[left, op, right])
+  Term ::= Factor @left { MulOp @op Factor @right } ;
+
+  Factor ::= NUMBER | '(' Expression ')' ;
+
+  AddOp ::= '+' | '-' ;
+  MulOp ::= '*' | '/' ;
+}
