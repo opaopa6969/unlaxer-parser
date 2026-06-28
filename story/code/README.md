@@ -1,33 +1,45 @@
 # story/code — 物語に対応する「実際に動くコード」
 
-各章の技術を、**実行可能な最小コード**で確かめられるようにする付録。物語（`story/*.ja.md`）と対で読むと、比喩が本物のコードに着地する。
+各章の技術を、**実行可能な最小コード**で確かめられる付録。物語（`story/*.ja.md`）と対で読むと、
+比喩が本物のコードに着地し、初心者が「踏み抜く床」を自分の手で踏める。
 
-## 実行のしかた
+## 共通の準備
 ```bash
-CP=$HOME/.m2/repository/org/unlaxer/unlaxer-common/3.0.11/unlaxer-common-3.0.11.jar
-javac -cp "$CP" -d out story/code/Ch02Arithmetic.java
-java  -cp "out:$CP" Ch02Arithmetic
+COMMON=$HOME/.m2/repository/org/unlaxer/unlaxer-common/3.0.11/unlaxer-common-3.0.11.jar
+DSL=$HOME/.m2/repository/org/unlaxer/unlaxer-dsl/3.0.11/unlaxer-dsl-3.0.11.jar
+# unlaxer-common / unlaxer-dsl はローカル mvn install 済みであること（バージョンは適宜）。
+# UBNF 生成系は dsl の依存(vavr/lsp4j)も要るので、tinyexpression のクラスパスを足すのが簡単。
 ```
-（`unlaxer-common` をローカル `mvn -pl unlaxer-common install` 済みであること。バージョンは適宜読み替え。）
 
-## いま入っているもの
-- **Ch02Arithmetic.java** — 第二章。三階建て（Expression ⊃ Term ⊃ Factor）を**本物の Unlaxer コンビネータ**（`Chain`/`Choice`/`OneOrMore`/`ZeroOrMore`/`DigitParser`/`MultipleParser`/`PlusParser`…）で組んで `1+2*3` をパースする。コンパイル＆実行可。
+## 索引（章 → コード → 何を学ぶ / どの床を踏み抜くか）
 
-### 実装メモ（正直な落とし穴）
-Unlaxer の公開 AST ビュー（`Token.filteredChildren`）は、`Chain`/`Choice` などの**構造コンビネータを畳んで葉トークンだけ**を見せる（生の parse 木 `children(original)` は package-private）。そのため、手組みの無名コンビネータでは「× が + の下に入れ子」という**構造を木として可視化・評価するのが難しい**。構造を見せる／評価するには:
-1. **ルールに名前を付けて AST ノードとして残す**、または
-2. **UBNF から生成する経路**（第五章）を使う＝生成された構造つき AST（`TinyExpressionP4AST`）と評価器（`P4TypedAstEvaluator`）。これは tinyexpression リポジトリ側で実際に `1+2*3 → 7` を返す。
+| 章 | ファイル | 学べること / 踏み抜く床 |
+|---|---|---|
+| 第2章 | `Ch02Arithmetic.java` | 優先順位＝形の深さ。Chain/Choice/OneOrMore/ZeroOrMore/DigitParser で三階建てを手組み。平らな文法だと `1+2*3=9` |
+| 第3章 | `Ch03TreeWalk.java` | **どぶ板①**：手組み木の公開ASTビュー(filteredChildren)は平ら→歩くと「また9」 |
+| 第5章 | `calc.ubnf` / `TinyCalcRun.java` | 一枚のUBNFから Parser/AST/Mapper を**生成**。構造つきAST(AddExpr⊃MulExpr)を歩いて 7 |
+| 〃 | `calc-leftrec.ubnf` | **どぶ板②**：左再帰 `Expression ::= Expression …`。生成は通るのに parse で `transaction nest is illegal` |
+| 第7章 | `calc-var.ubnf` / `TinyCalcVarRun.java` | 評価器＝木をその場で歩く。文脈(context)から `$price` を引く。同じ式・多数の値。**どぶ板③**：未定義変数 |
+| 第8章 | `TinyCalcEmit.java` | Javaコード生成（鍛える剣）。**どぶ板④**：葉を写すと `$price` が残りコンパイル不能→`ctx.get(...)` に翻訳 |
+| 第10-11章 | `PackratDemo.java` | **指数爆発を実測**：曖昧入れ子で深さ別 memoize OFF(8:149ms→16:4087ms＝指数) vs ON(0〜3ms, 深さ40でも1ms) |
 
-→ つまり「手で組む（第二〜四章）」と「紙から生成する（第五章〜）」の差は、**この付録のコードの書き味の差**としても体験できる。
+## 各ファイルの実行手順
+- **コンビネータ系（手組み）**: `Ch02Arithmetic` / `Ch03TreeWalk` / `PackratDemo`
+  ```bash
+  javac -cp "$COMMON" -d out story/code/Ch02Arithmetic.java && java -cp "out:$COMMON" Ch02Arithmetic
+  ```
+- **UBNF生成系**: `calc*.ubnf` → 生成 → walker/emitter をコンパイル（各 .java 冒頭にコマンド）
+  ```bash
+  java -cp "$DSL:$COMMON:<deps>" org.unlaxer.dsl.CodegenMain \
+       --grammar story/code/calc.ubnf --output gen --generators Parser,AST,Mapper
+  javac -cp "$COMMON" -d out $(find gen -name '*.java') story/code/TinyCalcRun.java
+  java  -cp "out:$COMMON" TinyCalcRun
+  ```
 
-## 拡張計画（倍以上の volume へ）
-- 各章にコード付録を追加:
-  - ch03: 木を歩く評価器（名前付きルール or 生成ASTで `1+2*3→7`）
-  - ch05: **UBNF を一枚書いて、Parser/AST/評価器を生成**する最小デモ（CodegenMain）
-  - ch06: 三項のカッコ必須を、文法と「失敗→診断」で見せる
-  - ch07/08: 評価器 vs Javaコード生成（同じ式・二つの実行、出力を並べる）
-  - ch10/11: 指数バックトラックの計測 → packrat memo ON/OFF の時間差を実測表示
-  - ch13: 生成器（MapperGenerator）への mapToken メモ化パッチ（現実の #49 と対応）
-- **新章（VSCode/LSP）**: `tinyexpression-p4-lsp-vscode` を題材に、文法から IDE が生まれるまでをコード付きで（候補・赤波線・hover）。
+## 設計メモ（手組み vs 生成）
+Unlaxer の公開 AST ビューは構造コンビネータを畳む（`Ch03TreeWalk` の「平ら」）。だから手組みは
+**評価のために構造を保つのが大変**。UBNF から生成すると、構造つき AST と歩く係が一緒に出てくる
+（`TinyCalcRun`）。「手で潰した経験」があるほど、生成のありがたみが骨身にしみる——という順序で
+物語と対応している（第三章 → 第五章）。
 
-> いずれも「実行可能な状態」を優先。物語の各幕末に、対応するコードへのリンクを置く運用にすると、parser を知らない読者は物語だけ、手を動かしたい読者はコードへ、と二層で楽しめる。
+> 技術的背骨は現実の unlaxer-parser #19/#40/#49 と対応（指数バックトラック→packrat→mapTokenメモ化の根治）。
