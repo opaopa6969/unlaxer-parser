@@ -18,11 +18,11 @@
 [![Maven Central](https://img.shields.io/maven-central/v/org.unlaxer/unlaxer-common)](https://central.sonatype.com/artifact/org.unlaxer/unlaxer-common)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Java 21+](https://img.shields.io/badge/Java-21%2B-orange.svg)]()
-[![Version](https://img.shields.io/badge/version-3.0.4-blue)]()
+[![Version](https://img.shields.io/badge/version-3.0.10-blue)]()
 
 ---
 
-> **バージョン通知 — 3.0.4**: このパッチリリースは、3.0.3 で `@scopeTree`/`@declares`/`@backref` のスコープ機能（LSP definition / linked editing / hover-set / completion）が静かに壊れていたリグレッションを修正します。tinyexpression の downstream 検証で発見されました。**3.0.2 は Maven Central に公開されていません** — 3.0.1 からは 3.0.3 または 3.0.4 へ直接アップグレードしてください。`unlaxer-common` または `unlaxer-dsl` の `2.x` に依存している場合は、[CHANGELOG](./CHANGELOG.md) と下記の[downstream ドリフト警告](#downstream-ドリフト警告)を参照してください。
+> **最新リリース — 3.0.10**: `unlaxer-common` に **オプトインの packrat メモ化** を追加しました（デフォルト無効。既定のパースはバイト単位で不変）。曖昧な括弧付き数式文法が引き起こす指数的バックトラッキングを抑え込みます。全履歴は [CHANGELOG](./CHANGELOG.md) を参照してください。履歴上の注意: **3.0.2 は Maven Central に公開されていません** — 3.0.1 からアップグレードする場合は 3.0.3 以降へ直接進んでください。`unlaxer-common` または `unlaxer-dsl` の `2.x` に依存している場合は、[CHANGELOG](./CHANGELOG.md) と下記の[downstream ドリフト警告](#downstream-ドリフト警告)を参照してください。
 
 ---
 
@@ -139,12 +139,12 @@ MulOp ::= '*' | '/' ;
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-common</artifactId>
-        <version>3.0.4</version>
+        <version>3.0.10</version>
     </dependency>
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-dsl</artifactId>
-        <version>3.0.4</version>
+        <version>3.0.10</version>
     </dependency>
 </dependencies>
 ```
@@ -287,13 +287,13 @@ flowchart TD
 
 ## Bootstrap と自己ホスティング
 
-3.0.x から、unlaxer-dsl は **bootstrap しきい値** を超えました：UBNF 文法ファイル `unlaxer-dsl/grammar/ubnf.ubnf` 自体が UBNF で記述されており、unlaxer-dsl 自身によって処理されて `UBNFParsers.java`、`UBNFAST.java`、`UBNFMapper.java` を再生成します。
+UBNF 文法ファイル `unlaxer-dsl/grammar/ubnf.ubnf` 自体が UBNF で記述されており、unlaxer-dsl は自身のコードジェネレータをこれに対して実行できます。この自己適用は**現時点では部分的**です。保証されること・されないことを正確に記します：
 
-これが意味すること：
+- **live 実装は手書きの bootstrap** である `org.unlaxer.dsl.bootstrap`（`UBNFParsers`、`UBNFAST`、`UBNFMapper`）です。本番の codegen（`CodegenMain` / `CodegenRunner`）はこれら手書きクラスを import します。
+- ジェネレータは `ubnf.ubnf` から `UBNFParsers` を再生成でき、自己ホスティングテストは生成ソースがコンパイル可能で構造的に妥当であることを確認します。現在チェックインされている生成版 `UBNFParsers`（`bootstrap/generated/` 配下）は、手書きパーサーへ**委譲するだけの薄い shim** です。生成版の `UBNFAST` / `UBNFMapper` は**存在しません**。
+- 生成版 `UBNFMapper` がまだ無いため、fixpoint テスト（`SelfHostingTest` / `SelfHostingRoundTripTest`）は両 stage で手書き `UBNFMapper` を再利用します。テスト自身のコメントが認めているとおり、これは**真の fixpoint ではありません** — 保証されるのは生成が**決定的**であること（stage 1 の出力 == stage 2 の出力）であって、生成されたツールチェーンが端から端まで自身を再生成できることではありません。
 
-- 手書きの bootstrap ファイルは今や検証対象であり、ソースオブトゥルースではない
-- UBNF に追加されたすべての文法機能は `ubnf.ubnf` の自己ホスト済みパースによって検証される
-- Bootstrap パスは `ubnf.ubnf` → codegen → `bootstrap/generated/` → 次の codegen サイクルで使用
+要するに、「UBNF が UBNF を記述する」ことと「パーサージェネレータの決定的な自己適用」は実現済みですが、完全に自己ホスティングされたパイプライン（生成パーサー**および**生成マッパーが自身を再生成する）はまだ完成していません。
 
 詳細は [docs/architecture-ja.md — Bootstrap](./docs/architecture-ja.md#bootstrap-と自己ホスティング) を参照してください。
 
@@ -379,7 +379,7 @@ unlaxer-parser/
 
 ## foundation-poisonpills について
 
-一部の内部統合テストと codegen フィクスチャは、`foundation-poisonpills` という名前のモジュールを参照しています。このモジュールは Maven Central に公開されておらず、パブリック API の一部でもありません。その目的は、パーサーコンビネータのコアに対する内部的な敵対的テスト（最悪ケースのバックトラッキングを引き起こすように設計された入力）です。**unlaxer-parser を使用するためにこのモジュールは必要ありません**。`foundation-poisonpills` に関するビルドエラーが表示される場合は、プライベートモジュールがローカルのクラスパスに存在する必要がある完全な内部テストスイートを実行している可能性が高いです。
+他の `org.unlaxer` 関連資料で `foundation-poisonpills` という名前を目にすることがあります。これはパーサーのモジュールでは**なく**、**unlaxer-parser はこれを一切参照していません**（本リポジトリにそのような依存・テスト・codegen フィクスチャは存在しません）。これは独立したリポジトリにある**別プロジェクト** `org.unlaxer:unlaxer-foundation-poisonpills-parent` で、パースやバックトラッキングとは無関係な、Java 向けの汎用**故障注入（fault injection）ツールキット**です。`Poisoned.trigger(...)` で注入点を設け、実行時に `ThrowPill`（例外を投げる）や `DelayPill`（遅延を注入する）などの「pill」を差し込んで、コードがどれだけ丁寧に失敗するかを検証します。その CHANGELOG には 2026-01-15 付の `1.0.0` リリースが記録されており、親 POM は現在 `1.2.0-SNAPSHOT` です。**unlaxer-parser のビルドや使用にこのモジュールは必要ありません**。
 
 ---
 

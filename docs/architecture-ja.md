@@ -4,7 +4,7 @@
 
 # unlaxer-parser アーキテクチャ
 
-**バージョン**: 3.0.4
+**バージョン**: 3.0.10
 
 このドキュメントでは、`.ubnf` 文法ファイルから動作する言語実装までの全パイプライン、`unlaxer-common` と `unlaxer-dsl` の内部構造、bootstrap / 自己ホスティングの仕組み、そして ParserIR 設計について説明します。
 
@@ -118,7 +118,7 @@ flowchart TD
 
 bootstrap パーサー（`org.unlaxer.dsl.bootstrap` 内の `UBNFParsers`、`UBNFMapper`、`UBNFAST`）が `.ubnf` ファイルを読み込み、`UBNFAST.UBNFFile` 値を生成します。
 
-3.0.0 以降、これらの bootstrap ファイルは自身が `grammar/ubnf.ubnf` に対して `unlaxer-dsl` を実行することで生成されています。生成された出力は `org.unlaxer.dsl.bootstrap.generated` に存在します。
+`org.unlaxer.dsl.bootstrap` にあるこれら手書きの bootstrap クラスが、codegen が使用する **live 実装** です（`CodegenMain` / `CodegenRunner` はこれらを直接 import します）。`unlaxer-dsl` は `grammar/ubnf.ubnf` から `UBNFParsers` を `org.unlaxer.dsl.bootstrap.generated` に再生成することもできますが、その生成クラスは現在、手書きパーサーへ委譲するだけの薄い shim です。正確な状況は [Bootstrap と自己ホスティング](#bootstrap-と自己ホスティング) を参照してください。
 
 ### UBNFAST
 
@@ -177,47 +177,54 @@ flowchart TD
 
 | コード | 条件 |
 |--------|------|
-| `W-TOKEN-UNRESOLVED` | トークンが静的に解決できないクラス名を参照している |
-| `W-RULE-UNDEFINED` | ルールボディが文法内で定義されていないルール名を参照している |
-| `W-MAPPING-PARAM-ORDER` | `@mapping params=` リストの順序がルールボディのキャプチャ順序と一致しない |
-| `W-WRAPPER-CONFLICT` | Simple wrapper 名が既存のルール名と衝突している（3.0.1 で修正） |
+| `W-GENERAL-NO-ROOT` | 文法に `@root` ルールが無い（かつ全ルールが import ではない） |
+| `W-LEFT-RECURSION` | ルール間に左再帰の循環が検出された |
+| `W-TOKEN-UNRESOLVED` | `token` が静的に解決できないパーサークラス名を参照している（同梱パーサーに一致する場合は完全修飾名の hint を提示） |
 
 ### コード生成フェーズ
 
-検証済みの `UBNFAST` に対して6つのジェネレーターが順次実行されます：
+検証済みの `UBNFAST` に対して8つのジェネレーターが順次実行されます（`CodegenRunner.generatorMap()` に登録）：
 
 | ジェネレーター | 出力 | 主要ロジック |
 |--------------|------|------------|
-| `ParserGenerator` | `XxxParsers.java` | 各ルール → `ConstructedCombinatorParser` サブクラス。`@leftAssoc` ルールはループ構造を取得 |
 | `ASTGenerator` | `XxxAST.java` | 各 `@mapping` → レコード。文法のすべてのレコード → sealed interface。`@enum` → Java enum |
+| `ParserGenerator` | `XxxParsers.java` | 各ルール → `ConstructedCombinatorParser` サブクラス。`@leftAssoc` ルールはループ構造を取得 |
 | `MapperGenerator` | `XxxMapper.java` | パースツリーを走査し、名前でキャプチャをマッチし、レコードを構築 |
 | `EvaluatorGenerator` | `XxxEvaluator.java` | 抽象ビジター：AST ノード型ごとに1つの `evalXxx(XxxNode)` メソッド |
 | `LSPGenerator` | `XxxLanguageServer.java` | LSP4J ベースのサーバー：補完、診断、ホバー、定義へのジャンプ |
+| `LSPLauncherGenerator` | `XxxLSPLauncher.java` | 生成された LSP サーバーのスタンドアロン起動エントリポイント |
 | `DAPGenerator` | `XxxDebugAdapter.java` | DAP ベースのアダプター：ブレークポイント、ステッピング、変数インスペクション |
+| `DAPLauncherGenerator` | `XxxDAPLauncher.java` | 生成された DAP アダプターのスタンドアロン起動エントリポイント |
 
 ---
 
 ## Bootstrap と自己ホスティング
 
-Bootstrap シーケンスは以下の通りです：
+自己適用は**現時点では部分的**です。実際のシーケンスは以下の通りです：
 
 ```
 ステップ1: grammar/ubnf.ubnf  (UBNF 構文を記述する UBNF 文法)
            │
            ▼
 ステップ2: 手書きの UBNFParsers / UBNFAST / UBNFMapper
-          (org.unlaxer.dsl.bootstrap — リファレンスとして保持)
+          (org.unlaxer.dsl.bootstrap — これが LIVE 実装)
            │
            ▼
-ステップ3: CodegenMain が手書きのパーサーを使って ubnf.ubnf を処理
+ステップ3: CodegenMain / CodegenRunner が手書きの UBNFMapper + UBNFAST を
+          使って .ubnf を処理
            │
            ▼
-ステップ4: 生成された UBNFParsers / UBNFAST / UBNFMapper
-          (org.unlaxer.dsl.bootstrap.generated)
+ステップ4: ParserGenerator は ubnf.ubnf から UBNFParsers を再生成できる。
+          チェックイン済みの生成クラス (org.unlaxer.dsl.bootstrap.generated
+          .UBNFParsers) は手書きパーサーへ委譲するだけの薄い shim。
+          生成版の UBNFAST / UBNFMapper は存在しない。
            │
            ▼
-ステップ5: SelfHostingTest が検証: 生成されたパーサーで ubnf.ubnf をパース
-          → 出力が手書きの bootstrap と一致することを確認
+ステップ5: SelfHostingTest / SelfHostingRoundTripTest は、再生成された
+          パーサーソースがコンパイル可能で構造的に妥当なこと、および生成が
+          決定的であること (stage 1 の出力 == stage 2) を検証する。
+          両 stage とも手書き UBNFMapper を再利用するため、テスト自身の
+          コメントが述べる通り、これはまだ真の fixpoint ではない。
 ```
 
 この重要性：
@@ -226,7 +233,7 @@ Bootstrap シーケンスは以下の通りです：
 - **リグレッションガード**: codegen への変更が UBNF 文法を壊した場合、即座に検出される。
 - **ドキュメント**: `ubnf.ubnf` は UBNF 構文の正規の機械可読仕様として機能する。
 
-bootstrap ファイル（`org.unlaxer.dsl.bootstrap.UBNFParsers` など）はコンパイル可能な状態に保たれ、フリーズされたリファレンスとしてテストされます。生成されたファイル（`org.unlaxer.dsl.bootstrap.generated.*`）がライブ実装です。
+現時点で保証されるのは、パーサージェネレータの自己適用の**決定性**であって、完全に自己ホスティングされたツールチェーンではありません。live 実装は手書きの `org.unlaxer.dsl.bootstrap.*` パッケージであり、生成版 `org.unlaxer.dsl.bootstrap.generated.UBNFParsers` の shim はそれへ委譲します。生成版の `UBNFAST` / `UBNFMapper` はまだ存在しません。このギャップを埋めること（パイプラインが端から端まで自身を再生成できる、生成されたマッパー）が残りの課題です。
 
 ---
 
