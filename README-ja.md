@@ -192,8 +192,12 @@ grammar TinyCalc {
             <configuration>
                 <mainClass>org.unlaxer.dsl.CodegenMain</mainClass>
                 <arguments>
+                    <argument>--grammar</argument>
                     <argument>${project.basedir}/src/main/resources/TinyCalc.ubnf</argument>
+                    <argument>--output</argument>
                     <argument>${project.build.directory}/generated-sources/ubnf</argument>
+                    <argument>--generators</argument>
+                    <argument>AST,Parser,Mapper,Evaluator</argument>
                 </arguments>
             </configuration>
         </execution>

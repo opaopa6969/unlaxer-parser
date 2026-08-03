@@ -101,8 +101,12 @@ Add the `exec-maven-plugin` to run the unlaxer code generator during `generate-s
                     <configuration>
                         <mainClass>org.unlaxer.dsl.CodegenMain</mainClass>
                         <arguments>
+                            <argument>--grammar</argument>
                             <argument>${project.basedir}/src/main/resources/tinycalc.ubnf</argument>
+                            <argument>--output</argument>
                             <argument>${project.build.directory}/generated-sources/ubnf</argument>
+                            <argument>--generators</argument>
+                            <argument>AST,Parser,Mapper,Evaluator</argument>
                         </arguments>
                     </configuration>
                 </execution>

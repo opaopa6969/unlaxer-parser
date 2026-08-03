@@ -1365,11 +1365,11 @@ ndjson モードでは `stdout` は JSON-lines のみ（MUST）。`stderr` も J
 
 | パス | 内容 |
 |------|------|
-| `docs/schema/report-v1.json` | JSON レポートスキーマ |
-| `docs/schema/report-v1.ndjson.json` | NDJSON イベントスキーマ |
-| `docs/schema/manifest-v1.json` | マニフェスト JSON スキーマ |
-| `docs/schema/manifest-v1.ndjson.json` | マニフェスト NDJSON スキーマ |
-| `docs/schema/parser-ir-v1.draft.json` | Parser IR スキーマ（Draft） |
+| `unlaxer-dsl/docs/schema/report-v1.json` | JSON レポートスキーマ |
+| `unlaxer-dsl/docs/schema/report-v1.ndjson.json` | NDJSON イベントスキーマ |
+| `unlaxer-dsl/docs/schema/manifest-v1.json` | マニフェスト JSON スキーマ |
+| `unlaxer-dsl/docs/schema/manifest-v1.ndjson.json` | マニフェスト NDJSON スキーマ |
+| `unlaxer-dsl/docs/schema/parser-ir-v1.draft.json` | Parser IR スキーマ（Draft） |
 
 JSON レポート例:
 
