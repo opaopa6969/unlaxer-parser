@@ -5,7 +5,7 @@ set -euo pipefail
 # Resolves the classpath for Java CLI tools, then starts the Node.js MCP server.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_DIR="$(dirname "$SCRIPT_DIR")"
+REPO_DIR="$SCRIPT_DIR"
 
 export JAVA_HOME="${JAVA_HOME:-/home/opa/opt/jdk-21.0.12.1}"
 export PATH="$JAVA_HOME/bin:$PATH"
