@@ -1,0 +1,25 @@
+{
+  "id": "unlaxer-parser",
+  "name": "Unlaxer Parser MCP",
+  "description": "UBNF文法からParser/AST/Mapper/Evaluator/LSP/DAPを生成するコードジェネレータのMCPラッパー。validate/generate/export_parser_ir/validate_parser_ir/generate_railroad/convert_to_ebnf/init",
+  "type": "node",
+  "hostname": "unlaxer.unlaxer.org",
+  "port": 9228,
+  "host": "192.168.1.50",
+  "runtime": "systemd",
+  "exec_start": "/home/opa/unlaxer-parser/run.sh",
+  "user": "opa",
+  "auth": "minRole:MEMBER",
+  "health_check": "/healthz",
+  "tags": ["mcp", "parser", "code-generator", "ubnf", "java", "unlaxer-workspace"],
+  "repo_url": "https://github.com/opaopa6969/unlaxer-parser",
+  "mcp": {
+    "enabled": true,
+    "port": 9228,
+    "path": "/mcp",
+    "namespace": "unlaxer",
+    "min_role": "MEMBER",
+    "timeoutMs": 110000,
+    "description": "UBNF文法の検証・コード生成・Parser IR エクスポート・railway diagram 生成・EBNF変換・DSLプロジェクトscaffold"
+  }
+}

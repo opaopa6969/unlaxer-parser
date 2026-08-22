@@ -398,3 +398,54 @@ MIT ライセンス。詳細は [LICENSE](./LICENSE) を参照してください
 ## 著者
 
 [opaopa6969](https://github.com/opaopa6969)
+
+---
+
+## MCP サーバ
+
+unlaxer-parser は [volta](https://github.com/opaopa6969/volta-mcp) ファサード（`https://mcp.unlaxer.org/mcp`）で namespace **`unlaxer`** として MCP サーバを提供しています。
+
+### Tools
+
+| Tool | 説明 | 副作用 |
+|------|------|--------|
+| `unlaxer__validate` | UBNF文法を検証する | read |
+| `unlaxer__generate` | UBNF文法からコードを生成する | write (dry-run デフォルト) |
+| `unlaxer__export_parser_ir` | Parser IR を JSON でエクスポートする | read |
+| `unlaxer__validate_parser_ir` | Parser IR を検証する | read |
+| `unlaxer__generate_railroad` | Railway diagram を生成する (SVG/PNG/markdown) | write |
+| `unlaxer__convert_to_ebnf` | UBNF を EBNF に変換する | read |
+| `unlaxer__init` | DSL プロジェクトを scaffold する | write |
+
+### Resources
+
+- `unlaxer://spec` — 機械可読な能力仕様 (JSON)
+- `unlaxer://guide` — 使い方ガイド (markdown)
+- `unlaxer://ubnf-guide` — UBNF 構文ガイド (markdown)
+
+### Skills
+
+- `write_ubnf_grammar` — UBNF 文法を書く手順
+- `build_dsl_with_unlaxer` — unlaxer で DSL を構築する手順
+
+### ローカル起動
+
+```bash
+# 先にビルド
+mvn -pl unlaxer-dsl -am compile -DskipTests
+
+# MCP サーバ起動（デフォルトポート 9228）
+PORT=9228 node mcp/server.mjs
+
+# ヘルスチェック
+curl http://127.0.0.1:9228/healthz
+```
+
+### volta 参加状況
+
+- Hostname: `unlaxer.unlaxer.org`
+- Port: 9228
+- Namespace: `unlaxer`
+- Min role: MEMBER
+
+設計の詳細は `docs/mcp/DESIGN.md`、デプロイ状況は `docs/mcp/STATUS.md` を参照してください。

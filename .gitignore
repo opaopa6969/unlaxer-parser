@@ -9,3 +9,4 @@ dist/
 .next/
 .nuxt/
 bower_components/
+mcp/classpath.txt

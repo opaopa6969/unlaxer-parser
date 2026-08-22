@@ -407,3 +407,54 @@ Contributions are welcome. Please open an issue or pull request on [GitHub](http
 ## Author
 
 [opaopa6969](https://github.com/opaopa6969)
+
+---
+
+## MCP Server
+
+unlaxer-parser is exposed as an **MCP (Model Context Protocol) server** on the [volta](https://github.com/opaopa6969/volta-mcp) facade at `https://mcp.unlaxer.org/mcp` under namespace **`unlaxer`**.
+
+### Tools
+
+| Tool | Description | Side effect |
+|------|-------------|-------------|
+| `unlaxer__validate` | Validate a UBNF grammar file | read |
+| `unlaxer__generate` | Generate Parser/AST/Mapper/Evaluator code from UBNF | write (dry-run default) |
+| `unlaxer__export_parser_ir` | Export Parser IR as JSON | read |
+| `unlaxer__validate_parser_ir` | Validate a Parser IR JSON | read |
+| `unlaxer__generate_railroad` | Generate railroad diagrams (SVG/PNG/markdown) | write |
+| `unlaxer__convert_to_ebnf` | Convert UBNF to EBNF | read |
+| `unlaxer__init` | Scaffold a new DSL project | write |
+
+### Resources
+
+- `unlaxer://spec` — Machine-readable capability spec (JSON)
+- `unlaxer://guide` — Usage guide (markdown)
+- `unlaxer://ubnf-guide` — UBNF syntax guide (markdown)
+
+### Skills
+
+- `write_ubnf_grammar` — How to write UBNF grammar
+- `build_dsl_with_unlaxer` — How to build a DSL project with unlaxer
+
+### Running locally
+
+```bash
+# Build first
+mvn -pl unlaxer-dsl -am compile -DskipTests
+
+# Start MCP server (default port 9228)
+PORT=9228 node mcp/server.mjs
+
+# Health check
+curl http://127.0.0.1:9228/healthz
+```
+
+### volta participation
+
+- Hostname: `unlaxer.unlaxer.org`
+- Port: 9228
+- Namespace: `unlaxer`
+- Min role: MEMBER
+
+See `docs/mcp/DESIGN.md` for the full design and `docs/mcp/STATUS.md` for deployment status.
