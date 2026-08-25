@@ -26,20 +26,27 @@ public interface ParserListenerContainer{
 		return getParserListenerByName().remove(name);
 	}
 	
-	public default void startParse(Parser parser , ParseContext parseContext , 
+	public default void startParse(Parser parser , ParseContext parseContext ,
 			TokenKind tokenKind , boolean invertMatch){
-		
-		for(Entry<Name , ParserListener> parserListener: parseContext.getParserListeners()){
-			parserListener.getValue().onStart(parser, parseContext, tokenKind, invertMatch);
+
+		java.util.Collection<ParserListener> listeners = parseContext.getParserListenerByName().values();
+		if (listeners.isEmpty()) {
+			return;
+		}
+		for (ParserListener parserListener : listeners) {
+			parserListener.onStart(parser, parseContext, tokenKind, invertMatch);
 		}
 	}
-	
-	public default void endParse(Parser parser , Parsed parsed , ParseContext parseContext , 
+
+	public default void endParse(Parser parser , Parsed parsed , ParseContext parseContext ,
 			TokenKind tokenKind , boolean invertMatch){
-		
-		for(Entry<Name , ParserListener> parserListener: parseContext.getParserListeners()){
-			parserListener.getValue()
-			.onEnd(parser , parsed ,  parseContext, tokenKind, invertMatch);
+
+		java.util.Collection<ParserListener> listeners = parseContext.getParserListenerByName().values();
+		if (listeners.isEmpty()) {
+			return;
+		}
+		for (ParserListener parserListener : listeners) {
+			parserListener.onEnd(parser , parsed ,  parseContext, tokenKind, invertMatch);
 		}
 	}
 	
