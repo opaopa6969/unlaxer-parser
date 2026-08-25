@@ -8,7 +8,17 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ## [Unreleased]
 
+---
+
+## [3.0.12] - 2026-08-26
+
+### Added
+- **Runnable generated DAP/VSIX path**: `DAPLauncherGenerator` now emits a concrete stdio launcher with `main()`, so a UBNF project generated with `DAP,DAPLauncher` can be started directly from a VSIX. The scaffold and TinyCalc example default to AST stepping and entry stop, and a generated-adapter smoke test covers launch, stop, stack, and variables.
+- **Application runtime hook for generated DAP adapters**: generated adapters expose `runtimeVariables(source, runtimeMode, launchArguments)`. UBNF continues to generate protocol, source mapping, breakpoints, and structural stepping; language-specific evaluation and typed variables can be supplied without coupling `unlaxer-dsl` to an application runtime.
+
 ### Changed
+- DAP launch uses standard `program` with `formulaSource` retained as a compatibility alias, and separates execution `runtimeMode` from structural `steppingMode`.
+- AST stepping fails explicitly when AST mapping is unavailable instead of silently switching to token stepping.
 - `StringSource.peek` no longer double-allocates: it returned `new StringSource(this, subSource(...), offset)`, wrapping an already-equivalent `subSource` in a second `StringSource` (a redundant String + int[] copy on every peek — a hot path in deeply nested grammars). Now returns the single `subSource` directly. Byte-for-byte equivalent; full `unlaxer-common` suite green (108 files). NOTE: this halves peek allocation but does **not** by itself bring the deeply nested-`if` formula (tinyexpression #19 example 5) under a second — that case is GC/allocation-bound and needs dedicated profiling (its cost is not `(rule,position)` re-derivation, which memoization already removes).
 
 ---

@@ -22,7 +22,7 @@
 
 ---
 
-> **Latest release — 3.0.10**: adds **opt-in packrat memoization** in `unlaxer-common` (off by default; default parsing is byte-for-byte unchanged) that collapses the exponential backtracking ambiguous-parenthesis expression grammars can trigger. See the [CHANGELOG](./CHANGELOG.md) for the full history. Historical note: **3.0.2 was never published to Maven Central** — if upgrading from 3.0.1, go directly to 3.0.3 or later. If you depend on `unlaxer-common` or `unlaxer-dsl` at `2.x`, see the [CHANGELOG](./CHANGELOG.md) and the [downstream drift warning](#downstream-drift-warning) below.
+> **Latest release — 3.0.12**: makes the generated UBNF → DAP → VSIX path directly runnable, adds an application runtime hook, separates execution and stepping modes, and removes silent AST-to-token stepping fallback. See the [CHANGELOG](./CHANGELOG.md) for the full history. Historical note: **3.0.2 was never published to Maven Central** — if upgrading from 3.0.1, go directly to 3.0.3 or later. If you depend on `unlaxer-common` or `unlaxer-dsl` at `2.x`, see the [CHANGELOG](./CHANGELOG.md) and the [downstream drift warning](#downstream-drift-warning) below.
 
 ---
 
