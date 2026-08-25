@@ -4,7 +4,7 @@
 
 # unlaxer-parser 入門ガイド
 
-**バージョン**: 3.0.4
+**バージョン**: 3.0.10
 
 このガイドでは、unlaxer-parser を使って完全な計算機言語をゼロから構築する手順を説明します — Maven の設定、文法の記述、コード生成、そして動作するエバリュエーターの実装まで。
 
@@ -62,12 +62,12 @@ cd tinycalc
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-common</artifactId>
-        <version>3.0.4</version>
+        <version>3.0.10</version>
     </dependency>
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-dsl</artifactId>
-        <version>3.0.4</version>
+        <version>3.0.10</version>
     </dependency>
 
     <!-- テスト用 -->
@@ -101,8 +101,12 @@ cd tinycalc
                     <configuration>
                         <mainClass>org.unlaxer.dsl.CodegenMain</mainClass>
                         <arguments>
+                            <argument>--grammar</argument>
                             <argument>${project.basedir}/src/main/resources/tinycalc.ubnf</argument>
+                            <argument>--output</argument>
                             <argument>${project.build.directory}/generated-sources/ubnf</argument>
+                            <argument>--generators</argument>
+                            <argument>AST,Parser,Mapper,Evaluator</argument>
                         </arguments>
                     </configuration>
                 </execution>

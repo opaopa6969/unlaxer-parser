@@ -36,28 +36,47 @@ public interface TransactionListenerContainer{
 	// 集約されているため、Chain 以外の parser でも・collect 済みの正しい
 	// トークンでも通知が一致する。
 	public default void onBegin(ParseContext parseContext , Parser parser){
-		if (parser instanceof TransactionListener self) {
-			self.onBegin(parseContext, parser);
+		boolean parserIsListener = parser instanceof TransactionListener;
+		java.util.Collection<TransactionListener> listeners = getTransactionListenerByName().values();
+		if (false == parserIsListener && listeners.isEmpty()) {
+			return;
 		}
-		getTransactionListenerByName().values().stream()
-			.forEach(listener->listener.onBegin(parseContext,parser));
+		if (parserIsListener) {
+			((TransactionListener) parser).onBegin(parseContext, parser);
+		}
+		for (TransactionListener listener : listeners) {
+			listener.onBegin(parseContext, parser);
+		}
 	}
 
 	public default void onCommit(
 			ParseContext parseContext , Parser parser , TokenList committedTokens){
-		if (parser instanceof TransactionListener self) {
-			self.onCommit(parseContext, parser, committedTokens);
+		boolean parserIsListener = parser instanceof TransactionListener;
+		java.util.Collection<TransactionListener> listeners = getTransactionListenerByName().values();
+		if (false == parserIsListener && listeners.isEmpty()) {
+			return;
 		}
-		getTransactionListenerByName().values().stream()
-			.forEach(listener->listener.onCommit(parseContext,parser,committedTokens));
+		if (parserIsListener) {
+			((TransactionListener) parser).onCommit(parseContext, parser, committedTokens);
+		}
+		for (TransactionListener listener : listeners) {
+			listener.onCommit(parseContext, parser, committedTokens);
+		}
 	}
+
 	public default void onRollback(
 			ParseContext parseContext , Parser parser , TokenList rollbackedTokens){
-		if (parser instanceof TransactionListener self) {
-			self.onRollback(parseContext, parser, rollbackedTokens);
+		boolean parserIsListener = parser instanceof TransactionListener;
+		java.util.Collection<TransactionListener> listeners = getTransactionListenerByName().values();
+		if (false == parserIsListener && listeners.isEmpty()) {
+			return;
 		}
-		getTransactionListenerByName().values().stream()
-			.forEach(listener->listener.onRollback(parseContext,parser,rollbackedTokens));
+		if (parserIsListener) {
+			((TransactionListener) parser).onRollback(parseContext, parser, rollbackedTokens);
+		}
+		for (TransactionListener listener : listeners) {
+			listener.onRollback(parseContext, parser, rollbackedTokens);
+		}
 	}
 	public default void onClose(ParseContext parseContext){
 		getTransactionListenerByName().values().stream()

@@ -1,0 +1,14 @@
+{
+  "name": "unlaxer-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server wrapping unlaxer-parser Java CLI tools",
+  "type": "module",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node test-e2e.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0"
+  }
+}

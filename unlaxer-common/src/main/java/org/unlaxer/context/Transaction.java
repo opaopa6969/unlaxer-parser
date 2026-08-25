@@ -71,21 +71,32 @@ public interface Transaction extends TransactionListenerContainer , ParseContext
    * @param actions effect ParseContext at committing phase if needed
    * @return last added Tokens
    */
-  public default Committed commit(Parser parser, TokenKind tokenKind , AdditionalCommitAction... actions) {
-    
-    List<AdditionalCommitAction> allActions = new ArrayList<>();
-    
-    allActions.addAll(getActions());
-    
-    if(actions.length >0) {
-      
-      for (AdditionalCommitAction action :actions) {
+	public default Committed commit(Parser parser, TokenKind tokenKind , AdditionalCommitAction... actions) {
+
+    Collection<AdditionalCommitAction> persistentActions = getActions();
+    boolean hasArgActions = actions.length > 0;
+    boolean hasPersistentActions = false == persistentActions.isEmpty();
+
+    List<AdditionalCommitAction> allActions;
+    if (false == hasArgActions && false == hasPersistentActions) {
+      allActions = java.util.Collections.emptyList();
+    } else if (false == hasArgActions) {
+      allActions = new ArrayList<>(persistentActions);
+    } else if (false == hasPersistentActions) {
+      allActions = new ArrayList<>(actions.length);
+      for (AdditionalCommitAction action : actions) {
+        allActions.add(action);
+      }
+    } else {
+      allActions = new ArrayList<>(persistentActions.size() + actions.length);
+      allActions.addAll(persistentActions);
+      for (AdditionalCommitAction action : actions) {
         allActions.add(action);
       }
     }
-      
+
     ParseContext parseContext = get();
-    
+
     for (AdditionalCommitAction action : allActions) {
       if (action instanceof AdditionalPreCommitAction) {
         ((AdditionalPreCommitAction) action).effect(parser, parseContext);
@@ -95,18 +106,18 @@ public interface Transaction extends TransactionListenerContainer , ParseContext
     TransactionElement current = getTokenStack().pollFirst();
     TransactionElement parent = getCurrent();
     parent.setCursor(new ParserCursor(current.getParserCursor(),false));
-    
-    boolean outputCollected = doCreateMetaToken() || 
-        false == parser instanceof MetaFunctionParser || 
+
+    boolean outputCollected = doCreateMetaToken() ||
+        false == parser instanceof MetaFunctionParser ||
         parser instanceof LazyInstance;
 
     Committed committed;
 
     if (parser instanceof CollectingParser && outputCollected) {
-      
+
       Token collected = ((CollectingParser) parser).collect(
           current.tokens, tokenKind , tokenKind.passFilter);
-      
+
       parent.tokens.add(collected);
       onCommit(parseContext, parser, TokenList.of(collected));
       committed = new Committed(collected, current.tokens);
@@ -118,10 +129,20 @@ public interface Transaction extends TransactionListenerContainer , ParseContext
       committed = new Committed(current.tokens);
     }
 
-    for (AdditionalCommitAction action : getActions()) {
-      if (action instanceof AdditionalPostCommitAction) {
-        ((AdditionalPostCommitAction) action)
-          .effect(parser, parseContext , committed);
+    if (hasPersistentActions) {
+      for (AdditionalCommitAction action : persistentActions) {
+        if (action instanceof AdditionalPostCommitAction) {
+          ((AdditionalPostCommitAction) action)
+            .effect(parser, parseContext , committed);
+        }
+      }
+    }
+    if (hasArgActions) {
+      for (AdditionalCommitAction action : actions) {
+        if (action instanceof AdditionalPostCommitAction) {
+          ((AdditionalPostCommitAction) action)
+            .effect(parser, parseContext , committed);
+        }
       }
     }
     return committed;

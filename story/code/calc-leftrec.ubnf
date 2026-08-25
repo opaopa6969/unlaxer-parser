@@ -1,0 +1,13 @@
+grammar TinyCalcLR {
+  @package: story.calclr
+  @whitespace: javaStyle
+  token NUMBER = org.unlaxer.parser.elementary.NumberParser
+  token EOF    = org.unlaxer.parser.elementary.EndOfSourceParser
+  @root
+  Formula ::= Expression EOF ;
+  Expression ::= Expression AddOp Term | Term ;
+  Term ::= Term MulOp Factor | Factor ;
+  Factor ::= NUMBER | '(' Expression ')' ;
+  AddOp ::= '+' | '-' ;
+  MulOp ::= '*' | '/' ;
+}

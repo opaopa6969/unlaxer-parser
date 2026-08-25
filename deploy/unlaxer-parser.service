@@ -1,0 +1,16 @@
+[Unit]
+Description=Unlaxer Parser MCP Server
+After=network.target
+
+[Service]
+Type=simple
+Environment=PORT=9228
+Environment=JAVA_HOME=/home/opa/opt/jdk-21.0.12.1
+EnvironmentFile=-/home/opa/volta-secrets/unlaxer-parser.env
+ExecStart=/home/opa/unlaxer-parser/run.sh
+WorkingDirectory=/home/opa/unlaxer-parser
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

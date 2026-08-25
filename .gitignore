@@ -9,3 +9,6 @@ dist/
 .next/
 .nuxt/
 bower_components/
+# scratch / temporary logs
+scratch-*.log
+mcp/classpath.txt
