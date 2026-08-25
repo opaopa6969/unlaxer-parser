@@ -1,4 +1,4 @@
-[English](./tutorial-tinycalc-level2.en.md) | [日本語](./tutorial-tinycalc-level2.ja.md) | [Index](./INDEX.ja.md)
+[日本語](./tutorial-tinycalc-level2.ja.md) | [Index](./INDEX.ja.md)
 
 ---
 
@@ -704,4 +704,4 @@ code --install-extension tinycalc-lsp-0.1.0.vsix
 
 ---
 
-[English](./tutorial-tinycalc-level2.en.md) | [日本語](./tutorial-tinycalc-level2.ja.md) | [Index](./INDEX.ja.md)
+[日本語](./tutorial-tinycalc-level2.ja.md) | [Index](./INDEX.ja.md)

@@ -21,11 +21,27 @@ implements Comparable<T> , Serializable , MinIntegerValue , MaxIntegerValue , Nu
         "value is out of range(" + minIntegerValue() + " - " + maxIntegerValue() + "):" + value);
     }
     
-    int numberOfDigits = (int) ((value == 0 ? 0 :Math.log10(value))+1);
-    if(minLength() > numberOfDigits|| maxLength() < numberOfDigits) {
-      throw new IllegalArgumentException(
-        "number of value's digits is out of range(" + minLength() + " - " + maxLength() + "):" + value);
+    // digit-length check skipped for hot IntegerValue subtypes whose bounds are
+    // (0, Integer.MAX_VALUE). Subtypes with tighter bounds override skipLengthCheck().
+    if (false == skipLengthCheck()) {
+      int numberOfDigits = (int) ((value == 0 ? 0 :Math.log10(value))+1);
+      if(minLength() > numberOfDigits|| maxLength() < numberOfDigits) {
+        throw new IllegalArgumentException(
+          "number of value's digits is out of range(" + minLength() + " - " + maxLength() + "):" + value);
+      }
     }
+  }
+
+  /**
+   * Return true to skip the digit-length check in the constructor. Default is false
+   * (preserves existing behaviour). Subtypes whose {@code minLength()} == 0 and
+   * {@code maxLength()} == {@link Integer#MAX_VALUE} — i.e. the length check can never
+   * fail — may override to return true and avoid the {@link Math#log10} cost on every
+   * construction. This is a performance-only override; it must not change the set of
+   * accepted values.
+   */
+  protected boolean skipLengthCheck() {
+    return false;
   }
   
   public int value() {

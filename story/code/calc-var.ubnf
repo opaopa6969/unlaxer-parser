@@ -1,0 +1,23 @@
+grammar TinyCalcVar {
+  @package: story.calcvar
+  @whitespace: javaStyle
+  token NUMBER     = org.unlaxer.parser.elementary.NumberParser
+  token IDENTIFIER = org.unlaxer.parser.clang.IdentifierParser
+  token EOF        = org.unlaxer.parser.elementary.EndOfSourceParser
+
+  @root
+  Formula ::= Expression EOF ;
+
+  @mapping(AddExpr, params=[left, op, right])
+  Expression ::= Term @left { AddOp @op Term @right } ;
+  @mapping(MulExpr, params=[left, op, right])
+  Term ::= Factor @left { MulOp @op Factor @right } ;
+
+  Factor ::= NUMBER | VariableRef | '(' Expression ')' ;
+
+  @mapping(VarRef, params=[name])
+  VariableRef ::= '$' IDENTIFIER @name ;
+
+  AddOp ::= '+' | '-' ;
+  MulOp ::= '*' | '/' ;
+}

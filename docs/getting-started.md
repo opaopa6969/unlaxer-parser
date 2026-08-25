@@ -4,7 +4,7 @@
 
 # Getting Started with unlaxer-parser
 
-**Version**: 3.0.4
+**Version**: 3.0.10
 
 This guide walks you through building a complete calculator language with unlaxer-parser from scratch — Maven setup, grammar, code generation, and a working evaluator.
 
@@ -62,12 +62,12 @@ Edit `pom.xml` to require Java 21 and add unlaxer:
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-common</artifactId>
-        <version>3.0.4</version>
+        <version>3.0.10</version>
     </dependency>
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-dsl</artifactId>
-        <version>3.0.4</version>
+        <version>3.0.10</version>
     </dependency>
 
     <!-- for tests -->
@@ -101,8 +101,12 @@ Add the `exec-maven-plugin` to run the unlaxer code generator during `generate-s
                     <configuration>
                         <mainClass>org.unlaxer.dsl.CodegenMain</mainClass>
                         <arguments>
+                            <argument>--grammar</argument>
                             <argument>${project.basedir}/src/main/resources/tinycalc.ubnf</argument>
+                            <argument>--output</argument>
                             <argument>${project.build.directory}/generated-sources/ubnf</argument>
+                            <argument>--generators</argument>
+                            <argument>AST,Parser,Mapper,Evaluator</argument>
                         </arguments>
                     </configuration>
                 </execution>
