@@ -18,11 +18,11 @@
 [![Maven Central](https://img.shields.io/maven-central/v/org.unlaxer/unlaxer-common)](https://central.sonatype.com/artifact/org.unlaxer/unlaxer-common)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Java 21+](https://img.shields.io/badge/Java-21%2B-orange.svg)]()
-[![Version](https://img.shields.io/badge/version-3.0.4-blue)]()
+[![Version](https://img.shields.io/badge/version-3.0.10-blue)]()
 
 ---
 
-> **Version notice — 3.0.4**: This patch release fixes a 3.0.3 regression where `@scopeTree`/`@declares`/`@backref` scope features (LSP definition, linked editing, hover-set, completion) were silently broken. It was found by tinyexpression downstream verification. **3.0.2 was never published to Maven Central** — upgrade directly from 3.0.1 to 3.0.3 or 3.0.4. If you depend on `unlaxer-common` or `unlaxer-dsl` at `2.x`, see [CHANGELOG](./CHANGELOG.md) and the [downstream drift warning](#downstream-drift-warning) below.
+> **Latest release — 3.0.10**: adds **opt-in packrat memoization** in `unlaxer-common` (off by default; default parsing is byte-for-byte unchanged) that collapses the exponential backtracking ambiguous-parenthesis expression grammars can trigger. See the [CHANGELOG](./CHANGELOG.md) for the full history. Historical note: **3.0.2 was never published to Maven Central** — if upgrading from 3.0.1, go directly to 3.0.3 or later. If you depend on `unlaxer-common` or `unlaxer-dsl` at `2.x`, see the [CHANGELOG](./CHANGELOG.md) and the [downstream drift warning](#downstream-drift-warning) below.
 
 ---
 
@@ -140,12 +140,12 @@ From this, unlaxer generates:
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-common</artifactId>
-        <version>3.0.4</version>
+        <version>3.0.10</version>
     </dependency>
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-dsl</artifactId>
-        <version>3.0.4</version>
+        <version>3.0.10</version>
     </dependency>
 </dependencies>
 ```
@@ -193,8 +193,12 @@ grammar TinyCalc {
             <configuration>
                 <mainClass>org.unlaxer.dsl.CodegenMain</mainClass>
                 <arguments>
+                    <argument>--grammar</argument>
                     <argument>${project.basedir}/src/main/resources/TinyCalc.ubnf</argument>
+                    <argument>--output</argument>
                     <argument>${project.build.directory}/generated-sources/ubnf</argument>
+                    <argument>--generators</argument>
+                    <argument>AST,Parser,Mapper,Evaluator</argument>
                 </arguments>
             </configuration>
         </execution>
@@ -288,13 +292,13 @@ See [docs/architecture.md](./docs/architecture.md) for the full pipeline, combin
 
 ## Bootstrap and Self-Hosting
 
-As of 3.0.x, unlaxer-dsl has crossed the **bootstrap threshold**: the UBNF grammar file `unlaxer-dsl/grammar/ubnf.ubnf` is itself written in UBNF and processed by unlaxer-dsl to regenerate `UBNFParsers.java`, `UBNFAST.java`, and `UBNFMapper.java`.
+The UBNF grammar file `unlaxer-dsl/grammar/ubnf.ubnf` is itself written in UBNF, and unlaxer-dsl can run its own code generator over it. This self-application is **partial today**; here is exactly what is and isn't guaranteed:
 
-This means:
+- The **live implementation is the hand-written bootstrap** in `org.unlaxer.dsl.bootstrap` (`UBNFParsers`, `UBNFAST`, `UBNFMapper`). Production codegen (`CodegenMain` / `CodegenRunner`) imports these hand-written classes.
+- The generator can regenerate a `UBNFParsers` from `ubnf.ubnf`, and the self-hosting tests confirm the generated source compiles and is structurally sound. The generated `UBNFParsers` currently checked in (under `bootstrap/generated/`) is a thin shim that **delegates back to the hand-written parser**; there is **no** generated `UBNFAST` or `UBNFMapper`.
+- Because no generated `UBNFMapper` exists yet, the fixpoint tests (`SelfHostingTest`, `SelfHostingRoundTripTest`) reuse the hand-written `UBNFMapper` in both stages. As their own comments note, this is **not a true fixpoint** — what they guarantee is that generation is **deterministic** (stage-1 output == stage-2 output), not that a generated toolchain reproduces itself end to end.
 
-- The hand-written bootstrap files are now verification targets, not the source of truth
-- Every grammar feature added to UBNF is exercised by the self-hosted parse of `ubnf.ubnf`
-- The bootstrap path is: `ubnf.ubnf` → codegen → `bootstrap/generated/` → used by next codegen cycle
+In short: UBNF describing UBNF, plus deterministic self-application of the parser generator, are in place; a fully self-hosted pipeline (generated parser *and* generated mapper regenerating themselves) is not yet complete.
 
 See [docs/architecture.md — Bootstrap](./docs/architecture.md#bootstrap-and-self-hosting) for details.
 
@@ -388,7 +392,7 @@ unlaxer-parser/
 
 ## foundation-poisonpills Note
 
-Some internal integration tests and codegen fixtures reference a module named `foundation-poisonpills`. The artifact `org.unlaxer:unlaxer-foundation-poisonpills` is published to Maven Central (1.0.0) for build convenience, but it is **internal-only and not part of the public API**: no compatibility guarantees apply, and downstream projects should not depend on it directly. Its purpose is internal adversarial testing of the parser combinator core (inputs designed to trigger worst-case backtracking). **You do not need it** to use unlaxer-parser. If you see a build error mentioning `foundation-poisonpills`, you are likely running the full internal test suite, which requires the private module to be present on the local classpath.
+You may see the name `foundation-poisonpills` in other `org.unlaxer` material. It is **not** a parser module and **unlaxer-parser does not reference it** (there is no such dependency, test, or codegen fixture in this repository). It is a **separate project** — `org.unlaxer:unlaxer-foundation-poisonpills-parent`, in its own repository — and it is a general-purpose **fault-injection toolkit for Java**, unrelated to parsing or backtracking: you mark injection points with `Poisoned.trigger(...)` and lace them at runtime with "pills" such as `ThrowPill` (raise an exception) or `DelayPill` (inject latency) to test how gracefully code fails. Its CHANGELOG records a `1.0.0` release dated 2026-01-15; its parent POM is currently `1.2.0-SNAPSHOT`. **You do not need it** to build or use unlaxer-parser.
 
 ---
 
@@ -403,3 +407,54 @@ Contributions are welcome. Please open an issue or pull request on [GitHub](http
 ## Author
 
 [opaopa6969](https://github.com/opaopa6969)
+
+---
+
+## MCP Server
+
+unlaxer-parser is exposed as an **MCP (Model Context Protocol) server** on the [volta](https://github.com/opaopa6969/volta-mcp) facade at `https://mcp.unlaxer.org/mcp` under namespace **`unlaxer`**.
+
+### Tools
+
+| Tool | Description | Side effect |
+|------|-------------|-------------|
+| `unlaxer__validate` | Validate a UBNF grammar file | read |
+| `unlaxer__generate` | Generate Parser/AST/Mapper/Evaluator code from UBNF | write (dry-run default) |
+| `unlaxer__export_parser_ir` | Export Parser IR as JSON | read |
+| `unlaxer__validate_parser_ir` | Validate a Parser IR JSON | read |
+| `unlaxer__generate_railroad` | Generate railroad diagrams (SVG/PNG/markdown) | write |
+| `unlaxer__convert_to_ebnf` | Convert UBNF to EBNF | read |
+| `unlaxer__init` | Scaffold a new DSL project | write |
+
+### Resources
+
+- `unlaxer://spec` — Machine-readable capability spec (JSON)
+- `unlaxer://guide` — Usage guide (markdown)
+- `unlaxer://ubnf-guide` — UBNF syntax guide (markdown)
+
+### Skills
+
+- `write_ubnf_grammar` — How to write UBNF grammar
+- `build_dsl_with_unlaxer` — How to build a DSL project with unlaxer
+
+### Running locally
+
+```bash
+# Build first
+mvn -pl unlaxer-dsl -am compile -DskipTests
+
+# Start MCP server (default port 9228)
+PORT=9228 node mcp/server.mjs
+
+# Health check
+curl http://127.0.0.1:9228/healthz
+```
+
+### volta participation
+
+- Hostname: `unlaxer.unlaxer.org`
+- Port: 9228
+- Namespace: `unlaxer`
+- Min role: MEMBER
+
+See `docs/mcp/DESIGN.md` for the full design and `docs/mcp/STATUS.md` for deployment status.

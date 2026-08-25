@@ -45,6 +45,11 @@ public class CodePointIndex extends IntegerValue<CodePointIndex>{
   }
 
   @Override
+  protected boolean skipLengthCheck() {
+    return true;
+  }
+
+  @Override
   public CodePointIndex create(IntegerValue<?> i) {
     return new CodePointIndex(i);
   }

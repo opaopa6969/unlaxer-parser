@@ -1,0 +1,166 @@
+{
+  "repo": "unlaxer-parser",
+  "surveyed_at": "2026-08-22T00:00:00Z",
+  "kind": "library",
+  "summary": "Java 向けパーサコンボネータライブラリ（unlaxer-common）と UBNF→Parser/AST/Mapper/Evaluator/LSP/DAP コード生成器（unlaxer-dsl）。Maven Central で org.unlaxer:unlaxer-common / unlaxer-dsl として配布中（v3.0.11-SNAPSHOT）。CLI ツール（CodegenMain, RailroadMain, UBNFToBNFMain）を持ち、HTTP API・MCP・volta manifest は未実装。",
+  "decision": "wrap",
+  "decision_reason": "CodegenMain は --validate-only / --dry-run / --export-parser-ir / --report-format ndjson などエージェント向きのフラグを既に備えており、薄く包むだけで MCP tool になる。文法検証・コード生成・Parser IR エクスポートは他サービス（scaffolding, LSP テスト, tinyexpression 等）と組み合わせる絵が描ける。JVM 常駐プロセスにすれば起動コストを償却でき、複数文法の連続検証・生成に価値がある。ただし既存 CLI のフラグが既に self-contained なので、MCP で包む価値は『他サービスとの協調』にあり、単体 CLI で済む場合は skip でもよい。",
+  "existing": {
+    "http_api": false,
+    "cli": true,
+    "mcp": false,
+    "healthz": false,
+    "volta_manifest": false,
+    "hosted_url": null
+  },
+  "proposed_namespace": "unlaxer",
+  "capabilities": [
+    {
+      "verb": "UBNF文法を検証する",
+      "kind": "tool",
+      "name": "validate",
+      "io": "{grammar_file_path} → {ok, errors[], warnings[]}",
+      "side_effect": "read",
+      "long_running": false,
+      "maps_to": "CodegenMain --validate-only --grammar <file>"
+    },
+    {
+      "verb": "UBNF文法からコードを生成する",
+      "kind": "tool",
+      "name": "generate",
+      "io": "{grammar_file, output_dir, generators[]?} → {generated_files[], report}",
+      "side_effect": "write",
+      "long_running": false,
+      "maps_to": "CodegenMain --grammar <file> --output <dir> --generators AST,Parser,Mapper,Evaluator --dry-run?"
+    },
+    {
+      "verb": "Parser IRをエクスポートする",
+      "kind": "tool",
+      "name": "export_parser_ir",
+      "io": "{grammar_file} → parser-ir.json",
+      "side_effect": "write",
+      "long_running": false,
+      "maps_to": "CodegenMain --export-parser-ir <file> --grammar <ubnf>"
+    },
+    {
+      "verb": "Parser IRを検証する",
+      "kind": "tool",
+      "name": "validate_parser_ir",
+      "io": "{parser_ir_file} → {ok, errors[]}",
+      "side_effect": "read",
+      "long_running": false,
+      "maps_to": "CodegenMain --validate-parser-ir <file>"
+    },
+    {
+      "verb": "UBNFからrailway diagramを生成する",
+      "kind": "tool",
+      "name": "generate_railroad",
+      "io": "{grammar_file, output_dir?, format?} → {svg_files[]}",
+      "side_effect": "write",
+      "long_running": false,
+      "maps_to": "RailroadMain <input.ubnf> [output-dir] [--format svg|png|both|markdown]"
+    },
+    {
+      "verb": "UBNFをEBNFに変換する",
+      "kind": "tool",
+      "name": "convert_to_ebnf",
+      "io": "{grammar_file} → ebnf_text",
+      "side_effect": "read",
+      "long_running": false,
+      "maps_to": "UBNFToBNFMain <input.ubnf> [--keep-annotations]"
+    },
+    {
+      "verb": "DSLプロジェクトをscaffoldする",
+      "kind": "tool",
+      "name": "init",
+      "io": "{name, package?, with_dap?} → {project_dir, files[]}",
+      "side_effect": "write",
+      "long_running": false,
+      "maps_to": "CodegenMain init <name> [--package <pkg>] [--with-dap]"
+    },
+    {
+      "verb": "能力の仕様",
+      "kind": "resource",
+      "name": "spec",
+      "uri": "unlaxer://spec"
+    },
+    {
+      "verb": "UBNF文法ガイド",
+      "kind": "resource",
+      "name": "ubnf_guide",
+      "uri": "unlaxer://ubnf_guide"
+    },
+    {
+      "verb": "使い方",
+      "kind": "resource",
+      "name": "guide",
+      "uri": "unlaxer://guide"
+    },
+    {
+      "verb": "UBNF文法を書く手順",
+      "kind": "skill",
+      "name": "write_ubnf_grammar",
+      "locality": "global"
+    },
+    {
+      "verb": "unlaxerでDSLを構築する手順",
+      "kind": "skill",
+      "name": "build_dsl_with_unlaxer",
+      "locality": "global"
+    }
+  ],
+  "composition_examples": [
+    "unlaxer__validate → unlaxer__generate → (scaffoldingサービス)__create_project → (code-server)__open のように、文法定義からプロジェクト立ち上げまでを自動化",
+    "unlaxer__export_parser_ir → (他の解析サービス)__analyze_ir のように、Parser IR を中間表現として他サービスに渡す",
+    "unlaxer__generate_railroad → (design__compose_page_starter) のように、生成した railroad diagram をドキュメントに埋め込む"
+  ],
+  "dependencies": [
+    {
+      "repo": "tinyexpression",
+      "direction": "depends_on",
+      "capability": "unlaxer-common / unlaxer-dsl Maven artifact",
+      "exists_now": false,
+      "note": "tinyexpression は unlaxer-parser の Maven artifact に依存。MCP 入口としては未接続"
+    },
+    {
+      "repo": "fraud-alert",
+      "direction": "depends_on",
+      "capability": "unlaxer-common / unlaxer-dsl Maven artifact (2.x)",
+      "exists_now": false,
+      "note": "fraud-alert は 2.x 依存で 3.x 未検証。MCP 入口としては未接続"
+    },
+    {
+      "repo": "onigiri-parser",
+      "direction": "depends_on",
+      "capability": "unlaxer-common / unlaxer-dsl Maven artifact",
+      "exists_now": false,
+      "note": "onigiri-parser は 3.0.1 で検証済み。MCP 入口としては未接続"
+    }
+  ],
+  "library_serve": {
+    "needed": true,
+    "new_work": [
+      "healthz",
+      "PORT",
+      "volta.service.json",
+      "systemd unit",
+      "MCP server (Streamable HTTP /mcp)"
+    ],
+    "runtime": "java",
+    "estimated_effort": "M"
+  },
+  "risks": [
+    "JVM 常駐プロセスのメモリ消費（~200-400MB）",
+    "コード生成 tool はファイルシステムに書き込むため、出力ディレクトリのサンドボックスが必要",
+    "Java 21+ が必要（volta のランタイムに Java がインストールされている必要がある）",
+    "破壊的操作（init --force, --clean-output）には confirm フラグが必要",
+    "Maven Central への deploy 機能は MCP に公開しない（リリース手順は別途）"
+  ],
+  "open_questions": [
+    "volta の稼働ノードに Java 21+ の JDK がインストールされているか？",
+    "MCP サーバは unlaxer-dsl の fat jar で起動するか、それとも Spring/Spark 等の軽量フレームワークを使うか？",
+    "コード生成の出力先は一時ディレクトリ固定か、呼び出し側が指定するか？",
+    "既存 CLI の --report-format ndjson をそのまま MCP の出力として使うか、MCP 用に変換層を挟むか？",
+    "tinyexpression/onigiri-parser 等、unlaxer-parser で作られた DSL の MCP 化を将来的に統合するか（親子関係）？"
+  ]
+}

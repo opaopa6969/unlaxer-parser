@@ -4,7 +4,7 @@
 
 # UBNF Language Guide
 
-**Version**: 3.0.4
+**Version**: 3.0.10
 
 UBNF (Unlaxer BNF) is the grammar definition language for unlaxer-parser. It is a typed, annotation-driven extension of EBNF designed to express not just recognition semantics but also code generation intent.
 
@@ -287,22 +287,94 @@ Marks a rule as a scope boundary. The code generator emits `enterScope` and `lea
 Block ::= '{' { Statement } '}' ;
 ```
 
-### `@declares`
+### `@declares(symbol=capture)`
 
-Marks a capture as a symbol definition within the current scope (used with `@scopeTree`):
+Marks a capture as a symbol definition within the current scope (used with `@scopeTree`). The `symbol=` argument names the capture that holds the declared name, and an optional `description=` string may follow:
 
 ```ubnf
-@declares
+@declares(symbol=name)
 VarDecl ::= 'var' IDENTIFIER @name '=' Expression ;
 ```
 
-### `@backref`
+### `@backref(name=capture)`
 
-Marks a capture as a symbol use that must have been defined earlier in scope:
+Marks a capture as a symbol use that must have been defined earlier in scope. The `name=` argument names the capture that holds the referenced name:
 
 ```ubnf
-@backref
+@backref(name=name)
 VarRef ::= IDENTIFIER @name ;
+```
+
+### `@eval(key: 'value', ...)`
+
+Attaches key/value evaluation metadata to a rule; consumed by the evaluator generator. Each entry is `identifier: 'string'`:
+
+```ubnf
+@eval(kind: 'binary')
+Expression ::= Term @left { AddOp @op Term @right } ;
+```
+
+### `@precedence(level=N)`
+
+Assigns an integer precedence level to a rule (used together with the associativity annotations for operator-precedence handling). `N` is an unsigned integer:
+
+```ubnf
+@precedence(level=2)
+@leftAssoc
+Term ::= Factor @left { MulOp @op Factor @right } ;
+```
+
+### `@interleave(profile=name)`
+
+Marks a rule for interleaved parsing under the named profile (e.g. whitespace/comment interleaving policy). The `profile=` argument is an identifier:
+
+```ubnf
+@interleave(profile=default)
+Document ::= { Element } ;
+```
+
+### `@doc('...')`
+
+Attaches a documentation string to a rule; the generator carries it through to generated artifacts (e.g. hover text). Takes a single string literal:
+
+```ubnf
+@doc('A top-level statement.')
+Statement ::= Assignment | Expression ;
+```
+
+### `@recovery(sync='...' | mode)`
+
+Marks a rule for error recovery. Either give a sync-token string via `sync='...'`, or a bare recovery-mode identifier. The parser generator emits a recovery wrapper for the rule:
+
+```ubnf
+@recovery(sync=';')
+Statement ::= Assignment ';' ;
+```
+
+### `@catalog(context='...')`
+
+Tags a rule with a catalog context string, consumed by the LSP generator to drive context-aware completion. Takes a single string literal:
+
+```ubnf
+@catalog(context='functions')
+FunctionName ::= IDENTIFIER @name ;
+```
+
+### `@skip`
+
+Marks a rule so that **no** AST record is generated for it and the mapper skips it (the rule participates in parsing but is elided from the AST). Takes no arguments:
+
+```ubnf
+@skip
+Separator ::= ',' ;
+```
+
+### `@typeof(capture)` (element-level)
+
+An element-level annotation written **inside** a rule body (not on the rule). It correlates the annotated element's type with the named capture:
+
+```ubnf
+Assignment ::= IDENTIFIER @name @typeof(value) '=' Expression @value ;
 ```
 
 ---
@@ -384,15 +456,21 @@ The imported rules are available under the alias namespace.
 | `@enum` | annotation | Stable (v3.0+) |
 | `@commonField` | annotation | Stable (v3.0+) |
 | `@scopeTree` | annotation | Stable (v2.8+) |
-| `@declares` | annotation | Stable (v2.8+) |
-| `@backref` | annotation | Stable (v2.8+) |
+| `@declares(symbol=...)` | annotation | Stable (v2.8+) |
+| `@backref(name=...)` | annotation | Stable (v2.8+) |
+| `@eval` | annotation | Recognized (generator support) |
+| `@precedence(level=...)` | annotation | Recognized (generator support) |
+| `@interleave(profile=...)` | annotation | Recognized (generator support) |
+| `@doc('...')` | annotation | Recognized (generator support) |
+| `@recovery(...)` | annotation | Recognized (generator support) |
+| `@catalog(context=...)` | annotation | Recognized (generator support) |
+| `@skip` | annotation | Recognized (generator support) |
+| `@typeof(...)` | element-level annotation | Recognized (generator support) |
 | `UNTIL(...)` token | token form | Stable (v2.8+) |
 | `NEGATION(...)` token | token form | Stable (v2.8+) |
 | `LOOKAHEAD(...)` token | token form | Stable (v2.8+) |
 | `NEGATIVE_LOOKAHEAD(...)` token | token form | Stable (v2.8+) |
 | `@import` | grammar directive | Stable (v3.0+) |
-| Interleave | planned | Roadmap (Tier 2) |
-| Backreference matching | planned | Roadmap (Tier 3) |
 
 ---
 

@@ -4,7 +4,7 @@
 
 # UBNF 言語ガイド
 
-**バージョン**: 3.0.4
+**バージョン**: 3.0.10
 
 UBNF（Unlaxer BNF）は unlaxer-parser の文法定義言語です。認識セマンティクスだけでなく、コード生成の意図も表現するために設計された、型付きでアノテーション駆動の EBNF 拡張です。
 
@@ -287,22 +287,94 @@ VariableRef ::= IDENTIFIER @name ;
 Block ::= '{' { Statement } '}' ;
 ```
 
-### `@declares`
+### `@declares(symbol=capture)`
 
-キャプチャを現在のスコープ内のシンボル定義としてマークします（`@scopeTree` と組み合わせて使用）：
+キャプチャを現在のスコープ内のシンボル定義としてマークします（`@scopeTree` と組み合わせて使用）。`symbol=` 引数で、宣言される名前を保持するキャプチャを指定します。任意で `description=` 文字列を続けられます：
 
 ```ubnf
-@declares
+@declares(symbol=name)
 VarDecl ::= 'var' IDENTIFIER @name '=' Expression ;
 ```
 
-### `@backref`
+### `@backref(name=capture)`
 
-キャプチャを、スコープ内で以前に定義されていなければならないシンボル使用としてマークします：
+キャプチャを、スコープ内で以前に定義されていなければならないシンボル使用としてマークします。`name=` 引数で、参照される名前を保持するキャプチャを指定します：
 
 ```ubnf
-@backref
+@backref(name=name)
 VarRef ::= IDENTIFIER @name ;
+```
+
+### `@eval(key: 'value', ...)`
+
+ルールに key/value の評価メタデータを付与します。エバリュエータジェネレータが消費します。各エントリは `識別子: '文字列'` の形です：
+
+```ubnf
+@eval(kind: 'binary')
+Expression ::= Term @left { AddOp @op Term @right } ;
+```
+
+### `@precedence(level=N)`
+
+ルールに整数の優先順位レベルを割り当てます（演算子優先順位の処理で結合性アノテーションと併用）。`N` は符号なし整数です：
+
+```ubnf
+@precedence(level=2)
+@leftAssoc
+Term ::= Factor @left { MulOp @op Factor @right } ;
+```
+
+### `@interleave(profile=name)`
+
+ルールを、指定プロファイルによるインターリーブ解析の対象としてマークします（空白／コメントのインターリーブ方針など）。`profile=` 引数は識別子です：
+
+```ubnf
+@interleave(profile=default)
+Document ::= { Element } ;
+```
+
+### `@doc('...')`
+
+ルールにドキュメント文字列を付与します。ジェネレータはこれを生成物（ホバーテキストなど）へ引き継ぎます。文字列リテラルを1つ取ります：
+
+```ubnf
+@doc('トップレベルの文。')
+Statement ::= Assignment | Expression ;
+```
+
+### `@recovery(sync='...' | mode)`
+
+ルールをエラー回復の対象としてマークします。`sync='...'` で同期トークン文字列を与えるか、回復モードの識別子を裸で与えます。パーサージェネレータがそのルールに回復ラッパーを生成します：
+
+```ubnf
+@recovery(sync=';')
+Statement ::= Assignment ';' ;
+```
+
+### `@catalog(context='...')`
+
+ルールにカタログコンテキスト文字列を付与します。LSP ジェネレータがコンテキスト対応補完の駆動に消費します。文字列リテラルを1つ取ります：
+
+```ubnf
+@catalog(context='functions')
+FunctionName ::= IDENTIFIER @name ;
+```
+
+### `@skip`
+
+ルールに AST レコードを**生成させず**、マッパーがそれをスキップするようにマークします（そのルールはパースには参加しますが AST からは除外されます）。引数はありません：
+
+```ubnf
+@skip
+Separator ::= ',' ;
+```
+
+### `@typeof(capture)`（要素レベル）
+
+ルール本体の**中**に記述する要素レベルのアノテーションです（ルールに付けるものではありません）。注釈された要素の型を、指定キャプチャと相関させます：
+
+```ubnf
+Assignment ::= IDENTIFIER @name @typeof(value) '=' Expression @value ;
 ```
 
 ---
@@ -381,15 +453,21 @@ grammar ExtendedCalc {
 | `@enum` | アノテーション | 安定 (v3.0+) |
 | `@commonField` | アノテーション | 安定 (v3.0+) |
 | `@scopeTree` | アノテーション | 安定 (v2.8+) |
-| `@declares` | アノテーション | 安定 (v2.8+) |
-| `@backref` | アノテーション | 安定 (v2.8+) |
+| `@declares(symbol=...)` | アノテーション | 安定 (v2.8+) |
+| `@backref(name=...)` | アノテーション | 安定 (v2.8+) |
+| `@eval` | アノテーション | 認識（ジェネレータ対応あり） |
+| `@precedence(level=...)` | アノテーション | 認識（ジェネレータ対応あり） |
+| `@interleave(profile=...)` | アノテーション | 認識（ジェネレータ対応あり） |
+| `@doc('...')` | アノテーション | 認識（ジェネレータ対応あり） |
+| `@recovery(...)` | アノテーション | 認識（ジェネレータ対応あり） |
+| `@catalog(context=...)` | アノテーション | 認識（ジェネレータ対応あり） |
+| `@skip` | アノテーション | 認識（ジェネレータ対応あり） |
+| `@typeof(...)` | 要素レベルアノテーション | 認識（ジェネレータ対応あり） |
 | `UNTIL(...)` トークン | トークン形式 | 安定 (v2.8+) |
 | `NEGATION(...)` トークン | トークン形式 | 安定 (v2.8+) |
 | `LOOKAHEAD(...)` トークン | トークン形式 | 安定 (v2.8+) |
 | `NEGATIVE_LOOKAHEAD(...)` トークン | トークン形式 | 安定 (v2.8+) |
 | `@import` | 文法ディレクティブ | 安定 (v3.0+) |
-| インターリーブ | 計画中 | ロードマップ（Tier 2） |
-| 後方参照マッチング | 計画中 | ロードマップ（Tier 3） |
 
 ---
 
