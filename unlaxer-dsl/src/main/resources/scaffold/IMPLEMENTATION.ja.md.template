@@ -84,8 +84,25 @@ public class {{ClassName}}LspLauncher extends ... {
 
 ## 5. DAP サーバーをカスタマイズする
 {{#dap}}
-`{{ClassName}}DebugAdapter` も同様に abstract です。`evaluate(...)`,
-`setBreakpoints(...)` などを launcher 側でオーバーライドできます。
+生成された `{{ClassName}}DapLauncher` は `main(...)` を持つため、そのままVSIXから
+起動できます。構文デバッグは `program`, `stopOnEntry`, `steppingMode` だけで動きます。
+
+実行時の値を表示する場合は `{{ClassName}}DebugAdapter` のサブクラスで
+`runtimeVariables(...)` をオーバーライドし、独自launcherの `createAdapter()` から返します。
+UBNFから生成される範囲はDAPプロトコル、AST/token停止位置、ブレークポイント、
+stack/scopesです。入力値の型付けと評価器はアプリケーション固有です。
+
+```java
+@Override
+protected Map<String, String> runtimeVariables(
+    String source, String runtimeMode, Map<String, Object> launchArguments) {
+  return applicationRuntime.debugVariables(source, runtimeMode, launchArguments.get("variables"));
+}
+```
+
+評価意味をDAP専用DSLへ複製せず、構造は `@mapping`、実行意味は `@eval` または
+アプリケーション評価器を正としてください。追加のdebug DSLを設ける場合も、停止位置や
+表示値などのpresentation policyだけに限定します。
 
 **サンプル文法が「素直な」形をしている理由:** DAP は AST/Mapper クラスを
 必要とし、それらは関連する全ルールに `@mapping(...)` がついている時のみ
@@ -136,4 +153,6 @@ npx @vscode/vsce publish              # Marketplace に公開
 | サーバーは起動するが診断が出ない | ファイル拡張子が `{{extension}}` で、`package.json:contributes.languages.extensions` と一致しているか確認 |
 | `Grammar validation failed` で `E-ASSOC-MISSING-CAPTURE` / `E-ASSOC-NO-PRECEDENCE` / `E-MAPPING-MISSING-CAPTURE` | `@leftAssoc`/`@rightAssoc` を正準形にせず追加した。結合性アノテーションを外して `Base { Op Right }` の素朴な繰り返しに戻すか、**全部** を揃える: `@precedence(level=N)` / `@left`/`@op`/`@right` キャプチャ / `@mapping(..., params=[left, op, right])` |
 | コンパイル時 `cannot find symbol: variable {{ClassName}}Mapper` | DAP を有効にしたが `--generators` に `AST,Mapper` が含まれていない。`unlaxer init ... --with-dap` で再生成するか、`pom.xml` の `<argument>` に `AST,Mapper` を追加 |
+| F5ですぐ終了する | `stopOnEntry` が `false` でブレークポイントもない。`stopOnEntry: true` を指定する |
+| `AST stepping unavailable` | `steppingMode: ast` でMapperがASTを生成できなかった。tokenへ自動fallbackしないため、`@mapping` とMapper生成を直す |
 | `W-TOKEN-UNRESOLVED` 警告 (`IdentifierParser` / `NumberParser`) | この警告は無視して構わない — パーサークラスは `unlaxer-common` 内にあり、コンパイル時に解決される。トークンを完全修飾名にすれば抑止可能 (例: `token NUMBER = org.unlaxer.parser.elementary.NumberParser`) |

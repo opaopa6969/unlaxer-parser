@@ -5,11 +5,11 @@
   <parent>
     <groupId>org.unlaxer</groupId>
     <artifactId>unlaxer-parser</artifactId>
-    <version>3.0.11</version>
+    <version>3.0.12</version>
   </parent>
   <groupId>org.unlaxer</groupId>
   <artifactId>unlaxer-dsl</artifactId>
-  <version>3.0.11</version>
+  <version>3.0.12</version>
   <name>unlaxer-dsl</name>
   <description>BNF拡張DSLからParser/AST/Mapper/LSP/DAPを自動生成するツール</description>
   <url>https://github.com/opaopa6969/unlaxer-parser</url>

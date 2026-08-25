@@ -8,15 +8,17 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.StringSettingValue;
  *
  * 生成されるデバッグアダプターは DAP (Debug Adapter Protocol) over stdio で動作する。
  *
- * stopOnEntry: false (デフォルト)
+ * stopOnEntry: false
  *   launch → configurationDone → parse → 結果を Debug Console に出力 → terminated
  *
  * stopOnEntry: true (ステップ実行)
  *   launch → configurationDone → parse → stopped(entry)
  *   → [F10] next → stopped(step) → ... → terminated
  *   → [F5]  continue → terminated
- *   stackTrace: 現在トークンの行/列をエディタで強調
- *   variables:  現在トークンのテキストと parser 名を表示
+ *   steppingMode=token: パーストークン単位で停止
+ *   steppingMode=ast: 生成 AST ノード単位で停止（Mapper 失敗時の token fallback なし）
+ *   stackTrace: 現在ノードの行/列をエディタで強調
+ *   variables: 現在ノードと runtimeVariables(...) フックの値を表示
  */
 public class DAPGenerator implements CodeGenerator {
 

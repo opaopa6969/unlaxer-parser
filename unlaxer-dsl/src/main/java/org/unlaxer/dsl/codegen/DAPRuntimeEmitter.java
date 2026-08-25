@@ -56,6 +56,14 @@ class DAPRuntimeEmitter {
         w.indent();
         w.line("collectAstSteps();");
         w.line("astNodeCount = astNodeTypes.size();");
+        w.line("if (astNodeCount == 0) {");
+        w.indent();
+        w.line("String detail = astStepError == null || astStepError.isBlank() ? \"no mapped AST nodes\" : astStepError;");
+        w.line("sendOutput(\"stderr\", \"AST stepping unavailable: \" + detail + \"\\n\");");
+        w.line("sendTerminated();");
+        w.line("return false;");
+        w.dedent();
+        w.line("}");
         w.dedent();
         w.line("} else {");
         w.indent();
@@ -78,6 +86,7 @@ class DAPRuntimeEmitter {
         w.indent();
         w.line("runtimeProbeVariables = new java.util.LinkedHashMap<>();");
         w.line("runtimeProbeVariables.put(\"runtimeMode\", runtimeMode == null ? \"\" : runtimeMode);");
+        w.line("runtimeProbeVariables.put(\"steppingMode\", steppingMode == null ? \"\" : steppingMode);");
         w.line("if (sourceContent == null) {");
         w.indent();
         w.line("return;");
@@ -85,30 +94,13 @@ class DAPRuntimeEmitter {
         w.line("}");
         w.line("try {");
         w.indent();
-        w.line("Class<?> bridgeClass = Class.forName(\"org.unlaxer.tinyexpression.dap.TinyExpressionDapRuntimeBridge\");");
-        w.line("java.lang.reflect.Method method = bridgeClass.getMethod(\"debugVariables\", String.class, String.class);");
-        w.line("Object raw = method.invoke(null, sourceContent, runtimeMode);");
-        w.line("if (!(raw instanceof Map<?, ?> map)) {");
-        w.indent();
-        w.line("return;");
+        w.line("Map<String, String> values = runtimeVariables(sourceContent, runtimeMode, launchArguments);");
+        w.line("if (values != null) { runtimeProbeVariables.putAll(values); }");
         w.dedent();
-        w.line("}");
-        w.line("for (Map.Entry<?, ?> entry : map.entrySet()) {");
+        w.line("} catch (Throwable error) {");
         w.indent();
-        w.line("Object key = entry.getKey();");
-        w.line("if (key == null) {");
-        w.indent();
-        w.line("continue;");
-        w.dedent();
-        w.line("}");
-        w.line("String value = entry.getValue() == null ? \"\" : String.valueOf(entry.getValue());");
-        w.line("runtimeProbeVariables.put(String.valueOf(key), value);");
-        w.dedent();
-        w.line("}");
-        w.dedent();
-        w.line("} catch (Throwable ignored) {");
-        w.indent();
-        w.line("// bridge is optional");
+        w.line("String message = error.getMessage() == null ? \"\" : error.getMessage();");
+        w.line("runtimeProbeVariables.put(\"debugRuntimeError\", error.getClass().getSimpleName() + \":\" + message);");
         w.dedent();
         w.line("}");
         w.dedent();
@@ -164,6 +156,7 @@ class DAPRuntimeEmitter {
     static void emitAstMethods(IndentedWriter w, String packageName, String grammarName, String mapperClass) {
         w.line("private void collectAstSteps() {");
         w.indent();
+        w.line("astStepError = \"\";");
         w.line("try {");
         w.indent();
         w.line("Object ast = " + mapperClass + ".parse(sourceContent);");
@@ -173,10 +166,12 @@ class DAPRuntimeEmitter {
         w.line("astNodeTypes = types;");
         w.line("astNodeSpans = spans;");
         w.dedent();
-        w.line("} catch (Throwable ignored) {");
+        w.line("} catch (Throwable error) {");
         w.indent();
         w.line("astNodeTypes = List.of();");
         w.line("astNodeSpans = List.of();");
+        w.line("String message = error.getMessage() == null ? \"\" : error.getMessage();");
+        w.line("astStepError = error.getClass().getSimpleName() + \":\" + message;");
         w.dedent();
         w.line("}");
         w.dedent();
@@ -393,7 +388,30 @@ class DAPRuntimeEmitter {
 
         w.line("private boolean isAstRuntimeMode() {");
         w.indent();
-        w.line("return \"ast\".equalsIgnoreCase(runtimeMode) || \"ast_evaluator\".equalsIgnoreCase(runtimeMode);");
+        w.line("return \"ast\".equalsIgnoreCase(steppingMode);");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
+
+        w.line("private static String inferSteppingMode(String runtimeMode) {");
+        w.indent();
+        w.line("if (runtimeMode == null) return \"token\";");
+        w.line("String normalized = runtimeMode.strip().toLowerCase(java.util.Locale.ROOT).replace('_', '-');");
+        w.line("return normalized.equals(\"ast\") || normalized.endsWith(\"-ast\")");
+        w.line("    || normalized.contains(\"ast-evaluator\") ? \"ast\" : \"token\";");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
+
+        w.line("private static String firstNonBlankLaunchArgument(Map<String, Object> args, String... names) {");
+        w.indent();
+        w.line("for (String name : names) {");
+        w.indent();
+        w.line("Object value = args.get(name);");
+        w.line("if (value != null && !String.valueOf(value).isBlank()) return String.valueOf(value);");
+        w.dedent();
+        w.line("}");
+        w.line("return \"\";");
         w.dedent();
         w.line("}");
         w.blankLine();
@@ -418,7 +436,7 @@ class DAPRuntimeEmitter {
 
         w.line("private void collectAstStepPoints(Token token, List<Token> out) {");
         w.indent();
-        w.line("// Current fallback keeps token-level stepping; replace with AST-node stepping when mapper/evaluator runtime is wired.");
+        w.line("// Tokens remain a source-location index; stepLimit() is driven exclusively by mapped AST nodes.");
         w.line("collectTokenStepPoints(token, out);");
         w.dedent();
         w.line("}");
@@ -501,6 +519,15 @@ class DAPRuntimeEmitter {
 
     /** GGP フックメソッドを出力する。 */
     static void emitHookMethods(IndentedWriter w) {
+        w.line("// Hook: application-specific runtime evaluation and variables");
+        w.line("protected Map<String, String> runtimeVariables(String source, String runtimeMode,");
+        w.line("        Map<String, Object> launchArguments) {");
+        w.indent();
+        w.line("return Map.of();");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
+
         w.line("// Hook: called before each step execution");
         w.line("protected void onBeforeStep(int stepIndex, String stepLabel) {");
         w.indent();
