@@ -6,7 +6,7 @@
 
 ## 1. What unlaxer-parser Does
 
-unlaxer-parser is a Java framework that generates a complete language processing system -- parser, AST, mapper, evaluator skeleton, LSP server, and DAP debugger -- from a single UBNF grammar file. Unlike traditional parser generators (ANTLR, etc.) that only produce a parser, unlaxer generates the entire pipeline from grammar to IDE support. You write a `.ubnf` grammar, run `mvn compile`, and get 4-6 Java source files ready to use.
+unlaxer-parser is a Java framework that generates a language processing system -- parser, AST, mapper, evaluator skeleton, LSP server, and structural DAP debugger -- from a UBNF grammar. UBNF generates debugger structure and protocol handling; application runtime values are connected through a generated hook rather than inferred from syntax alone.
 
 ---
 
@@ -29,7 +29,7 @@ unlaxer-parser is a Java framework that generates a complete language processing
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
-        <unlaxer.version>2.8.0</unlaxer.version>
+        <unlaxer.version>3.0.12</unlaxer.version>
     </properties>
 
     <dependencies>
@@ -57,10 +57,14 @@ unlaxer-parser is a Java framework that generates a complete language processing
                         <phase>generate-sources</phase>
                         <goals><goal>java</goal></goals>
                         <configuration>
-                            <mainClass>org.unlaxer.dsl.UbnfCodeGenerator</mainClass>
+                            <mainClass>org.unlaxer.dsl.CodegenMain</mainClass>
                             <arguments>
+                                <argument>--grammar</argument>
                                 <argument>${project.basedir}/src/main/resources/MyLang.ubnf</argument>
+                                <argument>--output</argument>
                                 <argument>${project.build.directory}/generated-sources/ubnf</argument>
+                                <argument>--generators</argument>
+                                <argument>Parser,AST,Mapper,Evaluator,LSP,Launcher,DAP,DAPLauncher</argument>
                             </arguments>
                         </configuration>
                     </execution>
@@ -106,10 +110,12 @@ grammar MyLang {
 
   @mapping(BinaryExpr, params=[left, op, right])
   @leftAssoc
+  @precedence(level=10)
   Expression ::= Term @left { AddOp @op Term @right } ;
 
   @mapping(BinaryExpr, params=[left, op, right])
   @leftAssoc
+  @precedence(level=20)
   Term ::= Factor @left { MulOp @op Factor @right } ;
 
   Factor ::= NUMBER | '(' Expression ')' ;
@@ -134,7 +140,9 @@ target/generated-sources/ubnf/com/example/mylang/
   MyLangMapper.java       -- Token tree -> AST conversion
   MyLangEvaluator.java    -- abstract evaluator base class
   MyLangLanguageServer.java  -- LSP server (if LSP generation is enabled)
+  MyLangLspLauncher.java     -- runnable LSP main class
   MyLangDebugAdapter.java    -- DAP server (if DAP generation is enabled)
+  MyLangDapLauncher.java     -- runnable DAP main class used by the VSIX
 ```
 
 ### Step 5: Implement the Evaluator
@@ -748,11 +756,24 @@ mylang-vscode/
             },
             "stopOnEntry": {
               "type": "boolean",
-              "default": false
+              "default": true
+            },
+            "steppingMode": {
+              "type": "string",
+              "enum": ["ast", "token"],
+              "default": "ast"
             }
           }
         }
-      }
+      },
+      "initialConfigurations": [{
+        "type": "mylang",
+        "request": "launch",
+        "name": "Debug MyLang",
+        "program": "${file}",
+        "stopOnEntry": true,
+        "steppingMode": "ast"
+      }]
     }],
     "configuration": {
       "title": "MyLang LSP",
@@ -851,20 +872,40 @@ export async function deactivate(): Promise<void> {
 ### Build and Package
 
 ```bash
-# 1. Build the LSP/DAP server JAR
-cd mylang-server && mvn package -DskipTests
-cp target/mylang-lsp-server.jar ../mylang-vscode/server-dist/
+# The generated Maven scaffold runs codegen, compilation, fat-jar packaging,
+# TypeScript compilation, and VSIX packaging in one lifecycle.
+mvn verify
+# Output: target/mylang-lsp-<version>.vsix
 
-# 2. Build the VSIX
-cd mylang-vscode
-npm install
-npm run compile
-npx @vscode/vsce package
-# Output: mylang-lsp-0.1.0.vsix
-
-# 3. Install locally
-code --install-extension mylang-lsp-0.1.0.vsix
+# Install locally
+code --install-extension target/mylang-lsp-<version>.vsix
 ```
+
+### DAP generation boundary
+
+The generated adapter provides DAP initialization, `program` loading, `stopOnEntry`,
+`next`, `continue`, line breakpoints, stack frames, scopes, token steps, and AST steps.
+`steppingMode: ast` requires generated `AST` and `Mapper`; mapping failure is reported and
+does not silently switch to token mode.
+
+Execution values cannot be derived from grammar alone. Subclass the generated adapter and
+override its runtime hook:
+
+```java
+@Override
+protected Map<String, String> runtimeVariables(
+    String source, String runtimeMode, Map<String, Object> launchArguments) {
+  return myRuntime.debugVariables(source, runtimeMode, launchArguments.get("variables"));
+}
+```
+
+The default AST stepper is structural, not evaluator time travel. An application that needs
+per-node before/after values must instrument its evaluator and expose those snapshots through
+the adapter hook.
+
+Keep syntax and AST structure in UBNF `@mapping`, and execution semantics in `@eval` or the
+application evaluator. If a separate debug DSL is introduced, restrict it to presentation
+policy (stop points, scope names, visible values) rather than duplicating evaluator semantics.
 
 ---
 

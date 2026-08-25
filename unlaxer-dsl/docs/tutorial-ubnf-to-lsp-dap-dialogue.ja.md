@@ -1041,21 +1041,27 @@ public class DAPGenerator implements CodeGenerator {
 
 **後輩:** 生成される DAP サーバーは何ができるんですか？
 
-**先輩:** `DAPGenerator` のコメントに書いてある。2つのモードがある。
+**先輩:** 起動方法と停止構造を別々に指定する。
 
 ```
-stopOnEntry: false (デフォルト)
+stopOnEntry: false
   launch → configurationDone → parse → 結果を Debug Console に出力 → terminated
 
 stopOnEntry: true (ステップ実行)
   launch → configurationDone → parse → stopped(entry)
   → [F10] next → stopped(step) → ... → terminated
   → [F5]  continue → terminated
+
+steppingMode: token
+  パーストークン単位で停止
+
+steppingMode: ast
+  @mapping から生成した AST ノードと source span 単位で停止
 ```
 
 **後輩:** `stopOnEntry: true` でステップ実行できるんですね！ VSCode の F10 で1ステップずつ進められる。
 
-**先輩:** そう。パースツリーの各トークンがステップポイントになる。現在のトークンの行と列をスタックトレースとして返すから、エディタ上でハイライトされる。
+**先輩:** そう。`steppingMode` が `token` ならパーストークン、`ast` なら生成ASTノードがステップポイントになる。現在位置をスタックトレースとして返すから、エディタ上でハイライトされる。ASTの生成に失敗した場合はトークンへ黙って切り替えず、デバッグエラーとして終了する。
 
 ```java
 // 生成コード — configurationDone()
@@ -1087,70 +1093,34 @@ if (stopOnEntry && !stepPoints.isEmpty()) {
 }
 ```
 
-**後輩:** すごい。文法を書くだけでデバッガが手に入るって……
+**後輩:** ここまで全部UBNFから生成できるんですか？ 実行時の変数や評価結果も？
 
-**先輩:** さらに面白いのが、`TinyExpressionP4Evaluator` に組み込まれた `DebugStrategy`。
+**先輩:** 境界がある。UBNFから確実に生成できるのはDAPプロトコル、構文位置、AST巡回、ブレークポイント、スタック、スコープだ。入力変数の型や実際の評価器は言語固有なので、生成アダプターの `runtimeVariables(...)` フックへ接続する。
 
 ```java
-// TinyExpressionP4Evaluator.java（生成コード）
-public interface DebugStrategy {
-    void onEnter(TinyExpressionP4AST node);
-    void onExit(TinyExpressionP4AST node, Object result);
-
-    DebugStrategy NOOP = new DebugStrategy() {
-        public void onEnter(TinyExpressionP4AST node) {}
-        public void onExit(TinyExpressionP4AST node, Object result) {}
-    };
+// 生成された XxxDebugAdapter
+protected Map<String, String> runtimeVariables(
+    String source,
+    String runtimeMode,
+    Map<String, Object> launchArguments
+) {
+    return Map.of();
 }
 ```
 
-**後輩:** `onEnter` と `onExit` で AST ノードの出入りを監視できる。Strategy パターンだ！
+**後輩:** DAP専用の別DSLを作るべきですか？
 
-**先輩:** デフォルトは `NOOP` で何もしない。デバッグ時だけ実装を差し替える。`StepCounterStrategy` がそう。
+**先輩:** 実行意味をもう一度DAP用DSLへ書くのは避ける。文法とASTはUBNFの `@mapping`、評価意味は既存の `@eval` またはアプリの評価器を唯一の定義にする。将来追加するなら「どのノードで止めるか」「何をVariablesへ見せるか」だけを記述する薄いデバッグ定義で十分だ。
 
-```java
-// TinyExpressionP4Evaluator.java（生成コード）
-public static class StepCounterStrategy implements DebugStrategy {
-    private int step = 0;
-    private final java.util.function.BiConsumer<Integer, TinyExpressionP4AST> onStep;
-
-    public StepCounterStrategy(
-        java.util.function.BiConsumer<Integer, TinyExpressionP4AST> onStep
-    ) {
-        this.onStep = onStep;
-    }
-
-    @Override
-    public void onEnter(TinyExpressionP4AST node) {
-        onStep.accept(step++, node);
-    }
-
-    @Override
-    public void onExit(TinyExpressionP4AST node, Object result) {}
-}
-```
-
-**後輩:** `step++` でステップ番号を数えて、コールバックに通知する。これで DAP の「次のステップ」が実現できるわけですね。
-
-**先輩:** そう。評価器の `eval()` メソッドの中で `debugStrategy.onEnter(node)` が呼ばれるから、通常実行時はオーバーヘッドなし（NOOP）、デバッグ時だけステップカウントが走る。
-
-```java
-// TinyExpressionP4Evaluator.eval() — 生成コード
-public T eval(TinyExpressionP4AST node) {
-    debugStrategy.onEnter(node);      // ← デバッグフック
-    T result = evalInternal(node);
-    debugStrategy.onExit(node, result); // ← デバッグフック
-    return result;
-}
-```
-
-**後輩:** パフォーマンスに影響しないのは大事ですね。
-
-**先輩:** `TinyExpressionDapRuntimeBridge` は DAP と実際の式評価を橋渡しする。
+**先輩:** TinyExpressionでは手書きのDebugAdapterサブクラスがこのフックを本体ランタイムへ型付きで接続する。
 
 ```java
 // TinyExpressionDapRuntimeBridge.java
-public static Map<String, String> debugVariables(String formulaSource, String runtimeMode) {
+public static Map<String, String> debugVariables(
+    String formulaSource,
+    String runtimeMode,
+    Map<String, ?> variables
+) {
     LinkedHashMap<String, String> vars = new LinkedHashMap<>();
     vars.put("bridgeAttached", "true");
 
@@ -1159,7 +1129,8 @@ public static Map<String, String> debugVariables(String formulaSource, String ru
     vars.put("selectedExecutionBackend", backend.name());
 
     Calculator calculator = CalculatorCreatorRegistry.forBackend(backend).create(...);
-    Object value = calculator.apply(CalculationContext.newConcurrentContext());
+    CalculationContext context = createContext(variables);
+    Object value = calculator.apply(context);
     vars.put("evaluationResult", String.valueOf(value));
     // ...
 }
@@ -1169,13 +1140,28 @@ public static Map<String, String> debugVariables(String formulaSource, String ru
 
 **先輩:** そう。`debugVariables()` が返す Map が VSCode の Variables ビューに表示される。どのバックエンドが使われてるか、評価結果は何か、P4 マッパーが使えたかどうかとか、全部見える。
 
-**後輩:** デバッグ中に `runtimeMode` を変えて比較もできる？
+**後輩:** `runtimeMode` と `steppingMode` は別なんですね。
 
-**先輩:** launch.json で `runtimeMode` を指定できる。`"token"` でトークンレベル、`"p4-ast"` で P4 AST レベル、`"javacode"` でコード生成パスなど。
+**先輩:** そう。`runtimeMode` は評価バックエンド、`steppingMode` は停止位置の構造だ。例えばP4 Javaコード生成バックエンドを、生成AST上でステップ表示できる。
+
+**先輩:** なお標準のASTステップは構造デバッグで、F10のたびに評価器を1ノードだけ進めるtime-travel実行ではない。ノードごとのbefore/after値が必要な言語は、評価器をinstrumentして同じフックへスナップショットを渡す。
+
+```json
+{
+  "type": "tinyexpressionP4",
+  "request": "launch",
+  "name": "Debug TinyExpression",
+  "program": "${file}",
+  "runtimeMode": "p4-ast",
+  "steppingMode": "ast",
+  "stopOnEntry": true,
+  "variables": { "score": 42, "inputName": "alice" }
+}
+```
 
 **後輩:** LSP と DAP が文法から自動生成されるって、パーサージェネレータの域を超えてますね。
 
-**先輩:** unlaxer-parser の目標は「DSL 開発のための統合開発環境」。文法を書くだけで、パーサー、AST、エバリュエータ、LSP、DAP が全部手に入る世界。まだ道半ばだけど、方向性は見えてる。
+**先輩:** unlaxer-parser の目標は「DSL 開発のための統合開発環境」。UBNFだけで構造デバッガまでは生成できる。実行値デバッガは評価意味との接続が必要で、その境界も生成アダプターのフックとして固定されている、というのが現在の正確な状態だ。
 
 ---
 

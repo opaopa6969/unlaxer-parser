@@ -23,13 +23,16 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
     protected IDebugProtocolClient client;
     protected String pendingProgram;
     protected String runtimeMode = "token";
+    protected String steppingMode = "token";
     protected boolean stopOnEntry;
+    protected Map<String, Object> launchArguments = Map.of();
     protected String sourceContent = "";
     protected List<Token> stepPoints = new ArrayList<>();
     protected int stepIndex = 0;
     private int astNodeCount = 0;
     private List<String> astNodeTypes = new ArrayList<>();
     private List<int[]> astNodeSpans = new ArrayList<>();
+    private String astStepError = "";
     private Map<String, String> runtimeProbeVariables = new java.util.LinkedHashMap<>();
     private Set<Integer> breakpointLines = new HashSet<>();
 
@@ -46,9 +49,11 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
 
     @Override
     public CompletableFuture<Void> launch(Map<String, Object> args) {
-        pendingProgram = (String) args.getOrDefault("program", "");
-        runtimeMode = String.valueOf(args.getOrDefault("runtimeMode", "token"));
-        stopOnEntry = Boolean.TRUE.equals(args.get("stopOnEntry"));
+        launchArguments = args == null ? Map.of() : new java.util.LinkedHashMap<>(args);
+        pendingProgram = firstNonBlankLaunchArgument(launchArguments, "program", "formulaSource");
+        runtimeMode = String.valueOf(launchArguments.getOrDefault("runtimeMode", "token"));
+        steppingMode = String.valueOf(launchArguments.getOrDefault("steppingMode", inferSteppingMode(runtimeMode)));
+        stopOnEntry = Boolean.TRUE.equals(launchArguments.get("stopOnEntry"));
         client.initialized();
         return CompletableFuture.completedFuture(null);
     }
@@ -327,6 +332,12 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
         if (isAstRuntimeMode()) {
             collectAstSteps();
             astNodeCount = astNodeTypes.size();
+            if (astNodeCount == 0) {
+                String detail = astStepError == null || astStepError.isBlank() ? "no mapped AST nodes" : astStepError;
+                sendOutput("stderr", "AST stepping unavailable: " + detail + "\n");
+                sendTerminated();
+                return false;
+            }
         } else {
             astNodeTypes = List.of();
             astNodeSpans = List.of();
@@ -340,26 +351,16 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
     private void collectRuntimeProbeVariables() {
         runtimeProbeVariables = new java.util.LinkedHashMap<>();
         runtimeProbeVariables.put("runtimeMode", runtimeMode == null ? "" : runtimeMode);
+        runtimeProbeVariables.put("steppingMode", steppingMode == null ? "" : steppingMode);
         if (sourceContent == null) {
             return;
         }
         try {
-            Class<?> bridgeClass = Class.forName("org.unlaxer.tinyexpression.dap.TinyExpressionDapRuntimeBridge");
-            java.lang.reflect.Method method = bridgeClass.getMethod("debugVariables", String.class, String.class);
-            Object raw = method.invoke(null, sourceContent, runtimeMode);
-            if (!(raw instanceof Map<?, ?> map)) {
-                return;
-            }
-            for (Map.Entry<?, ?> entry : map.entrySet()) {
-                Object key = entry.getKey();
-                if (key == null) {
-                    continue;
-                }
-                String value = entry.getValue() == null ? "" : String.valueOf(entry.getValue());
-                runtimeProbeVariables.put(String.valueOf(key), value);
-            }
-        } catch (Throwable ignored) {
-            // bridge is optional
+            Map<String, String> values = runtimeVariables(sourceContent, runtimeMode, launchArguments);
+            if (values != null) { runtimeProbeVariables.putAll(values); }
+        } catch (Throwable error) {
+            String message = error.getMessage() == null ? "" : error.getMessage();
+            runtimeProbeVariables.put("debugRuntimeError", error.getClass().getSimpleName() + ":" + message);
         }
     }
 
@@ -390,6 +391,7 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
     }
 
     private void collectAstSteps() {
+        astStepError = "";
         try {
             Object ast = SnapshotMapper.parse(sourceContent);
             List<String> types = new ArrayList<>();
@@ -397,9 +399,11 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
             collectAstNodeMeta(ast, types, spans);
             astNodeTypes = types;
             astNodeSpans = spans;
-        } catch (Throwable ignored) {
+        } catch (Throwable error) {
             astNodeTypes = List.of();
             astNodeSpans = List.of();
+            String message = error.getMessage() == null ? "" : error.getMessage();
+            astStepError = error.getClass().getSimpleName() + ":" + message;
         }
     }
 
@@ -530,7 +534,22 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
     }
 
     private boolean isAstRuntimeMode() {
-        return "ast".equalsIgnoreCase(runtimeMode) || "ast_evaluator".equalsIgnoreCase(runtimeMode);
+        return "ast".equalsIgnoreCase(steppingMode);
+    }
+
+    private static String inferSteppingMode(String runtimeMode) {
+        if (runtimeMode == null) return "token";
+        String normalized = runtimeMode.strip().toLowerCase(java.util.Locale.ROOT).replace('_', '-');
+        return normalized.equals("ast") || normalized.endsWith("-ast")
+            || normalized.contains("ast-evaluator") ? "ast" : "token";
+    }
+
+    private static String firstNonBlankLaunchArgument(Map<String, Object> args, String... names) {
+        for (String name : names) {
+            Object value = args.get(name);
+            if (value != null && !String.valueOf(value).isBlank()) return String.valueOf(value);
+        }
+        return "";
     }
 
     private void collectTokenStepPoints(Token token, List<Token> out) {
@@ -545,7 +564,7 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
     }
 
     private void collectAstStepPoints(Token token, List<Token> out) {
-        // Current fallback keeps token-level stepping; replace with AST-node stepping when mapper/evaluator runtime is wired.
+        // Tokens remain a source-location index; stepLimit() is driven exclusively by mapped AST nodes.
         collectTokenStepPoints(token, out);
     }
 
@@ -590,6 +609,12 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
             }
         }
         return line;
+    }
+
+    // Hook: application-specific runtime evaluation and variables
+    protected Map<String, String> runtimeVariables(String source, String runtimeMode,
+            Map<String, Object> launchArguments) {
+        return Map.of();
     }
 
     // Hook: called before each step execution

@@ -27,8 +27,13 @@ public class DAPLauncherGenerator implements CodeGenerator {
         sb.append("import org.eclipse.lsp4j.jsonrpc.Launcher;\n");
         sb.append("\n");
         sb.append(CodeGenerator.generatedAnnotation("org.unlaxer.dsl.codegen.DAPLauncherGenerator"));
-        sb.append("public abstract class ").append(launcherClass).append(" {\n\n");
-        sb.append("    protected abstract ").append(adapterClass).append(" createAdapter();\n\n");
+        sb.append("public class ").append(launcherClass).append(" {\n\n");
+        sb.append("    protected ").append(adapterClass).append(" createAdapter() {\n");
+        sb.append("        return new ").append(adapterClass).append("() {};\n");
+        sb.append("    }\n\n");
+        sb.append("    public static void main(String[] args) throws IOException {\n");
+        sb.append("        new ").append(launcherClass).append("().launch();\n");
+        sb.append("    }\n\n");
         sb.append("    public void launch() throws IOException {\n");
         sb.append("        ").append(adapterClass).append(" adapter = createAdapter();\n");
         sb.append("        Launcher<IDebugProtocolClient> launcher =\n");

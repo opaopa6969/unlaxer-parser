@@ -67,6 +67,34 @@ public class DAPGeneratorTest {
     }
 
     @Test
+    public void testAdapterAcceptsProgramAndLegacyFormulaSourceLaunchKeys() {
+        assertTrue(adapterResult.source().contains(
+            "firstNonBlankLaunchArgument(launchArguments, \"program\", \"formulaSource\")"));
+    }
+
+    @Test
+    public void testAdapterSeparatesExecutionAndSteppingModes() {
+        assertTrue(adapterResult.source().contains("protected String runtimeMode = \"token\""));
+        assertTrue(adapterResult.source().contains("protected String steppingMode = \"token\""));
+        assertTrue(adapterResult.source().contains("return \"ast\".equalsIgnoreCase(steppingMode)"));
+    }
+
+    @Test
+    public void testAdapterExposesTypedRuntimeIntegrationHook() {
+        assertTrue(adapterResult.source().contains(
+            "protected Map<String, String> runtimeVariables(String source, String runtimeMode,"));
+        assertTrue(adapterResult.source().contains(
+            "runtimeVariables(sourceContent, runtimeMode, launchArguments)"));
+        assertTrue(!adapterResult.source().contains("org.unlaxer.tinyexpression"));
+    }
+
+    @Test
+    public void testAstSteppingFailsExplicitlyWhenAstCannotBeMapped() {
+        assertTrue(adapterResult.source().contains("AST stepping unavailable:"));
+        assertTrue(adapterResult.source().contains("return false;"));
+    }
+
+    @Test
     public void testAdapterHasConfigurationDone() {
         assertTrue(adapterResult.source().contains("configurationDone("));
     }
@@ -199,6 +227,13 @@ public class DAPGeneratorTest {
     @Test
     public void testLauncherHasLaunchMethod() {
         assertTrue(launcherResult.source().contains("public void launch()"));
+    }
+
+    @Test
+    public void testLauncherIsDirectlyRunnableFromVsix() {
+        assertTrue(launcherResult.source().contains("public static void main(String[] args)"));
+        assertTrue(launcherResult.source().contains("return new TinyCalcDebugAdapter() {}"));
+        assertTrue(!launcherResult.source().contains("public abstract class TinyCalcDapLauncher"));
     }
 
     @Test

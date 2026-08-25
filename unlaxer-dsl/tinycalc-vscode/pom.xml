@@ -52,6 +52,12 @@
             <artifactId>org.eclipse.lsp4j.debug</artifactId>
             <version>${lsp4j.version}</version>
         </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.13.2</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -236,7 +242,6 @@
                 <version>3.2.5</version>
                 <configuration>
                     <argLine>--enable-preview</argLine>
-                    <skipTests>true</skipTests>
                 </configuration>
             </plugin>
 

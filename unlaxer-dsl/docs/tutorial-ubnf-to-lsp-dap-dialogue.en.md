@@ -1041,21 +1041,27 @@ public class DAPGenerator implements CodeGenerator {
 
 **Newcomer:** What can the generated DAP server do?
 
-**Senior:** It's documented in `DAPGenerator`'s comments. There are two modes.
+**Senior:** Launch behavior and stepping structure are configured separately.
 
 ```
-stopOnEntry: false (default)
+stopOnEntry: false
   launch -> configurationDone -> parse -> output result to Debug Console -> terminated
 
 stopOnEntry: true (step execution)
   launch -> configurationDone -> parse -> stopped(entry)
   -> [F10] next -> stopped(step) -> ... -> terminated
   -> [F5]  continue -> terminated
+
+steppingMode: token
+  stop at parse-tree tokens
+
+steppingMode: ast
+  stop at generated AST nodes and their source spans
 ```
 
 **Newcomer:** With `stopOnEntry: true`, you can step through! Advance one step at a time with F10 in VSCode.
 
-**Senior:** Right. Each token in the parse tree becomes a step point. The current token's line and column are returned as a stack trace, which gets highlighted in the editor.
+**Senior:** Right. With `steppingMode: token`, parse-tree tokens are step points. With `steppingMode: ast`, generated AST nodes are step points. If AST mapping fails, the adapter reports a debug error instead of silently falling back to token stepping.
 
 ```java
 // Generated code -- configurationDone()
@@ -1087,70 +1093,34 @@ if (stopOnEntry && !stepPoints.isEmpty()) {
 }
 ```
 
-**Newcomer:** Amazing. Getting a debugger just by writing grammar...
+**Newcomer:** Can all of that be generated from UBNF, including runtime variables and values?
 
-**Senior:** What's even more interesting is the `DebugStrategy` built into `TinyExpressionP4Evaluator`.
+**Senior:** There is an explicit boundary. UBNF can generate the DAP protocol, source positions, AST traversal, breakpoints, stacks, and scopes. Variable types and the real evaluator are language-specific, so the generated adapter exposes a `runtimeVariables(...)` hook.
 
 ```java
-// TinyExpressionP4Evaluator.java (generated code)
-public interface DebugStrategy {
-    void onEnter(TinyExpressionP4AST node);
-    void onExit(TinyExpressionP4AST node, Object result);
-
-    DebugStrategy NOOP = new DebugStrategy() {
-        public void onEnter(TinyExpressionP4AST node) {}
-        public void onExit(TinyExpressionP4AST node, Object result) {}
-    };
+// Generated XxxDebugAdapter
+protected Map<String, String> runtimeVariables(
+    String source,
+    String runtimeMode,
+    Map<String, Object> launchArguments
+) {
+    return Map.of();
 }
 ```
 
-**Newcomer:** `onEnter` and `onExit` let you monitor entering and exiting AST nodes. It's the Strategy pattern!
+**Newcomer:** Should there be a separate DSL just for DAP?
 
-**Senior:** Default is `NOOP` which does nothing. The implementation is swapped only during debugging. `StepCounterStrategy` is an example.
+**Senior:** We should not duplicate execution semantics in a DAP-only DSL. Syntax and AST structure belong in UBNF `@mapping`; evaluation semantics belong in existing `@eval` declarations or the application's evaluator. A future debug declaration only needs presentation policy: where to stop and which values to expose.
 
-```java
-// TinyExpressionP4Evaluator.java (generated code)
-public static class StepCounterStrategy implements DebugStrategy {
-    private int step = 0;
-    private final java.util.function.BiConsumer<Integer, TinyExpressionP4AST> onStep;
-
-    public StepCounterStrategy(
-        java.util.function.BiConsumer<Integer, TinyExpressionP4AST> onStep
-    ) {
-        this.onStep = onStep;
-    }
-
-    @Override
-    public void onEnter(TinyExpressionP4AST node) {
-        onStep.accept(step++, node);
-    }
-
-    @Override
-    public void onExit(TinyExpressionP4AST node, Object result) {}
-}
-```
-
-**Newcomer:** `step++` counts step numbers and notifies the callback. This is how DAP's "next step" is realized.
-
-**Senior:** Right. Since `debugStrategy.onEnter(node)` is called inside the evaluator's `eval()` method, there's no overhead during normal execution (NOOP), and step counting only runs during debugging.
-
-```java
-// TinyExpressionP4Evaluator.eval() -- generated code
-public T eval(TinyExpressionP4AST node) {
-    debugStrategy.onEnter(node);      // <- debug hook
-    T result = evalInternal(node);
-    debugStrategy.onExit(node, result); // <- debug hook
-    return result;
-}
-```
-
-**Newcomer:** Not impacting performance is important.
-
-**Senior:** `TinyExpressionDapRuntimeBridge` bridges DAP and actual expression evaluation.
+**Senior:** TinyExpression connects that generated hook to its real runtime in a hand-written DebugAdapter subclass.
 
 ```java
 // TinyExpressionDapRuntimeBridge.java
-public static Map<String, String> debugVariables(String formulaSource, String runtimeMode) {
+public static Map<String, String> debugVariables(
+    String formulaSource,
+    String runtimeMode,
+    Map<String, ?> variables
+) {
     LinkedHashMap<String, String> vars = new LinkedHashMap<>();
     vars.put("bridgeAttached", "true");
 
@@ -1159,7 +1129,8 @@ public static Map<String, String> debugVariables(String formulaSource, String ru
     vars.put("selectedExecutionBackend", backend.name());
 
     Calculator calculator = CalculatorCreatorRegistry.forBackend(backend).create(...);
-    Object value = calculator.apply(CalculationContext.newConcurrentContext());
+    CalculationContext context = createContext(variables);
+    Object value = calculator.apply(context);
     vars.put("evaluationResult", String.valueOf(value));
     // ...
 }
@@ -1169,13 +1140,28 @@ public static Map<String, String> debugVariables(String formulaSource, String ru
 
 **Senior:** Yes. The Map returned by `debugVariables()` is displayed in VSCode's Variables view. You can see which backend is being used, what the evaluation result is, whether the P4 mapper was available, and more.
 
-**Newcomer:** Can you change `runtimeMode` during debugging to compare?
+**Newcomer:** So `runtimeMode` and `steppingMode` are different?
 
-**Senior:** You can specify `runtimeMode` in launch.json. `"token"` for token level, `"p4-ast"` for P4 AST level, `"javacode"` for code generation path, etc.
+**Senior:** Exactly. `runtimeMode` selects the evaluation backend; `steppingMode` selects the structural stop model. A P4 Java-code backend can still be displayed as generated AST steps.
+
+**Senior:** The standard AST stepper is structural; F10 does not advance an evaluator one node at a time or provide time travel. Languages that need per-node before/after values must instrument their evaluator and expose snapshots through the same hook.
+
+```json
+{
+  "type": "tinyexpressionP4",
+  "request": "launch",
+  "name": "Debug TinyExpression",
+  "program": "${file}",
+  "runtimeMode": "p4-ast",
+  "steppingMode": "ast",
+  "stopOnEntry": true,
+  "variables": { "score": 42, "inputName": "alice" }
+}
+```
 
 **Newcomer:** LSP and DAP auto-generated from grammar... that goes beyond what a parser generator does.
 
-**Senior:** unlaxer-parser's goal is an "integrated development environment for DSL development." A world where writing grammar alone gives you parser, AST, evaluator, LSP, and DAP. Still a work in progress, but the direction is clear.
+**Senior:** unlaxer-parser's goal is an integrated environment for DSL development. UBNF alone can generate a structural debugger. A runtime-value debugger additionally needs evaluation semantics, and the generated adapter now makes that boundary explicit.
 
 ---
 

@@ -23,7 +23,7 @@ Create a VSCode extension manifest with:
 - Language registration (id, aliases, extensions, configuration)
 - TextMate grammar reference
 - LSP server configuration (javaPath, jarPath, jvmArgs)
-- DAP debugger registration (launch with program and stopOnEntry)
+- DAP debugger registration (`program`, `stopOnEntry: true`, `steppingMode: ast`)
 - Dependencies: `vscode-languageclient` ^9.0.1
 - DevDependencies: `@types/vscode`, `@types/node`, `typescript`, `@vscode/vsce`
 
@@ -118,23 +118,13 @@ new vscode.DebugAdapterExecutable(javaPath, [
 ### Build Steps
 
 ```bash
-# 1. Build the Java LSP/DAP server
-cd {{LANGUAGE_ID}}-server
-mvn package -DskipTests
-mkdir -p ../{{LANGUAGE_ID}}-vscode/server-dist
-cp target/{{LANGUAGE_ID}}-lsp-server.jar ../{{LANGUAGE_ID}}-vscode/server-dist/
+# The generated scaffold owns the full lifecycle:
+# UBNF -> Java codegen -> fat JAR -> TypeScript -> VSIX
+mvn verify
+# Output: target/{{LANGUAGE_ID}}-lsp-<version>.vsix
 
-# 2. Build the extension
-cd ../{{LANGUAGE_ID}}-vscode
-npm install
-npm run compile
-
-# 3. Package as VSIX
-npx @vscode/vsce package
-# Output: {{LANGUAGE_ID}}-lsp-0.1.0.vsix
-
-# 4. Install
-code --install-extension {{LANGUAGE_ID}}-lsp-0.1.0.vsix
+# Install
+code --install-extension target/{{LANGUAGE_ID}}-lsp-<version>.vsix
 ```
 
 ### Checklist Before Returning
@@ -145,5 +135,9 @@ code --install-extension {{LANGUAGE_ID}}-lsp-0.1.0.vsix
 - [ ] TextMate grammar `scopeName` matches `source.{{LANGUAGE_ID}}`
 - [ ] Extension uses `--enable-preview` JVM flag (required for sealed interfaces)
 - [ ] DAP factory uses `-cp` (not `-jar`) to specify main class
+- [ ] Generated `{{GRAMMAR_NAME}}DapLauncher` has a runnable `main(...)`
+- [ ] Initial launch configuration passes `program`, `stopOnEntry`, and `steppingMode`
+- [ ] `steppingMode: ast` is used only with `AST,Mapper` generation enabled
+- [ ] Runtime values, if needed, are supplied through `runtimeVariables(...)`
 - [ ] `server-dist/` directory contains the fat JAR
 - [ ] `deactivate()` stops the LSP client

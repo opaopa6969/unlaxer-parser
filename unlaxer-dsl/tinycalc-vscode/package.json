@@ -52,7 +52,13 @@
               "stopOnEntry": {
                 "type": "boolean",
                 "description": "Pause before running (shows source in editor).",
-                "default": false
+                "default": true
+              },
+              "steppingMode": {
+                "type": "string",
+                "enum": ["ast", "token"],
+                "description": "Structural stepping model.",
+                "default": "ast"
               }
             }
           }
@@ -63,7 +69,8 @@
             "request": "launch",
             "name": "Debug TinyCalc File",
             "program": "${file}",
-            "stopOnEntry": false
+            "stopOnEntry": true,
+            "steppingMode": "ast"
           }
         ],
         "configurationSnippets": [

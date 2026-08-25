@@ -971,8 +971,8 @@ mvn verify
 
 | Phase | Process | Output |
 |---|---|---|
-| `generate-sources` | `CodegenMain` reads `grammar/tinycalc.ubnf` and generates Java sources (Parser, LSP, Launcher, DAP, DAPLauncher) | `target/generated-sources/tinycalc/` |
-| `compile` | Compiles the 5 generated classes | `target/classes/` |
+| `generate-sources` | `CodegenMain` reads `grammar/tinycalc.ubnf` and generates Java sources (Parser, AST, Mapper, LSP, Launcher, DAP, DAPLauncher) | `target/generated-sources/tinycalc/` |
+| `compile` | Compiles the generated parser, AST/Mapper, LSP, and DAP classes | `target/classes/` |
 | `package` | Creates fat jar with `maven-shade-plugin` (includes both LSP and DAP classes) and copies to `server-dist/` | `target/tinycalc-lsp-server.jar` |
 | `verify` | `npm install` -> `npx vsce package` (also compiles TypeScript internally) | `target/tinycalc-lsp-0.1.0.vsix` |
 
@@ -1005,11 +1005,11 @@ the file is parsed and results appear in the Debug Console.
 }
 ```
 
-**Step run (`stopOnEntry: true`):**
+**AST step run (`stopOnEntry: true`, scaffold default):**
 
-With `stopOnEntry: true`, token-by-token stepping is enabled.
-Parsing stops at the first token, and `F10` (next) advances one token at a time.
-The Variables panel shows the current token text and parser class name.
+Parsing stops at the first generated AST node, and `F10` advances one AST node at a time.
+Set `steppingMode` to `token` only when token-level inspection is desired. AST mapping
+failure is reported as an error and does not silently fall back to token stepping.
 
 ```json
 {
@@ -1020,7 +1020,8 @@ The Variables panel shows the current token text and parser class name.
       "request": "launch",
       "name": "Step TinyCalc File",
       "program": "${file}",
-      "stopOnEntry": true
+      "stopOnEntry": true,
+      "steppingMode": "ast"
     }
   ]
 }
@@ -1029,12 +1030,27 @@ The Variables panel shows the current token text and parser class name.
 | Action | Description |
 |---|---|
 | `F5` (Continue) | Run until next breakpoint (or finish if none) |
-| `F10` (Next) | Move to the next token |
-| Variables panel | Shows current token text and parser class name |
-| Editor highlight | Automatically indicates current token line/column |
+| `F10` (Next) | Move to the next AST node (or token in explicit token mode) |
+| Variables panel | Shows the current node plus values returned by `runtimeVariables(...)` |
+| Editor highlight | Indicates the current node's source span |
 | Breakpoint | Click gutter (left of line number) to set. Becomes active immediately with `verified: true` |
 
 **LSP and DAP are packaged in the same fat jar.** The extension launches LSP via `-jar`, and DAP via `-cp ... TinyCalcDapLauncher`.
+
+The generated DAP is deliberately split at the semantic boundary:
+
+- Generated from UBNF: protocol handling, launch lifecycle, source loading, AST/token steps,
+  breakpoints, stack frames, scopes, and variables transport.
+- Application-specific: typed input binding, evaluation, side effects, and runtime values.
+  Connect these by subclassing the generated adapter and overriding
+  `runtimeVariables(String source, String runtimeMode, Map<String,Object> launchArguments)`.
+
+Generated AST stepping is structural: `F10` changes the selected syntax/AST node. It is not
+incremental evaluator execution unless the application adapter supplies an instrumented evaluator.
+
+Do not duplicate evaluator semantics in a DAP-only DSL. Use UBNF `@mapping` for structure,
+existing `@eval` declarations (or the application evaluator) for execution semantics, and keep
+future debug declarations limited to presentation policy such as stop points and visible values.
 
 ---
 

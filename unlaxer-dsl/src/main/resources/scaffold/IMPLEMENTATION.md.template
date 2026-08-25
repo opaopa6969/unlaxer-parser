@@ -83,8 +83,27 @@ non-generated subclass under `src/main/java/`).
 
 ## 5. Customizing the DAP server
 {{#dap}}
-`{{ClassName}}DebugAdapter` is similarly abstract. Override
-`evaluate(...)`, `setBreakpoints(...)` etc. in your launcher.
+The generated `{{ClassName}}DapLauncher` has a `main(...)` method and is directly
+runnable by the VSIX. Structural debugging needs only `program`, `stopOnEntry`,
+and `steppingMode`.
+
+To expose runtime values, subclass `{{ClassName}}DebugAdapter`, override
+`runtimeVariables(...)`, and return that adapter from a custom launcher's
+`createAdapter()`. UBNF generates the DAP protocol, AST/token stop locations,
+breakpoints, stacks, and scopes. Typed inputs and evaluator state remain
+application-specific.
+
+```java
+@Override
+protected Map<String, String> runtimeVariables(
+    String source, String runtimeMode, Map<String, Object> launchArguments) {
+  return applicationRuntime.debugVariables(source, runtimeMode, launchArguments.get("variables"));
+}
+```
+
+Do not duplicate execution semantics in a DAP-only DSL. Keep structure in
+`@mapping`, execution semantics in `@eval` or the application evaluator, and any
+future debug DSL limited to presentation policy such as stop points and visible values.
 
 **Why this scaffold ships a "plain" sample grammar:** DAP needs the AST and
 Mapper classes, which are emitted only when every relevant rule carries
@@ -137,4 +156,6 @@ npx @vscode/vsce publish              # publishes to the Marketplace
 | Server starts but no diagnostics | Check that the file extension is `{{extension}}` and matches `package.json:contributes.languages.extensions`. |
 | `Grammar validation failed` with `E-ASSOC-MISSING-CAPTURE` / `E-ASSOC-NO-PRECEDENCE` / `E-MAPPING-MISSING-CAPTURE` | You added `@leftAssoc`/`@rightAssoc` without the full canonical shape. Either drop the associativity annotation (use plain `Base { Op Right }`) or supply **all** of: `@precedence(level=N)`, `@left`/`@op`/`@right` captures, and `@mapping(..., params=[left, op, right])`. |
 | `cannot find symbol: variable {{ClassName}}Mapper` during compile | DAP is enabled but `--generators` does not include `AST,Mapper`. Either regenerate with `unlaxer init ... --with-dap` (which sets generators correctly), or add `AST,Mapper` to the `<argument>` list in `pom.xml`. |
+| F5 terminates immediately | `stopOnEntry` is false and no breakpoint was set. Use `stopOnEntry: true`. |
+| `AST stepping unavailable` | AST mapping failed in `steppingMode: ast`. There is no automatic token fallback; fix `@mapping` and Mapper generation. |
 | `W-TOKEN-UNRESOLVED` warnings about `IdentifierParser` / `NumberParser` | These warnings are safe to ignore — the parser classes ship inside `unlaxer-common` and are resolved at compile time. Suppress them by qualifying the token (e.g. `token NUMBER = org.unlaxer.parser.elementary.NumberParser`). |

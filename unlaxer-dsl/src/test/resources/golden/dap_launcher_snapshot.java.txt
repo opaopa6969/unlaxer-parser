@@ -6,9 +6,15 @@ import org.eclipse.lsp4j.debug.services.IDebugProtocolClient;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
 
 @javax.annotation.processing.Generated("org.unlaxer.dsl.codegen.DAPLauncherGenerator")
-public abstract class SnapshotDapLauncher {
+public class SnapshotDapLauncher {
 
-    protected abstract SnapshotDebugAdapter createAdapter();
+    protected SnapshotDebugAdapter createAdapter() {
+        return new SnapshotDebugAdapter() {};
+    }
+
+    public static void main(String[] args) throws IOException {
+        new SnapshotDapLauncher().launch();
+    }
 
     public void launch() throws IOException {
         SnapshotDebugAdapter adapter = createAdapter();

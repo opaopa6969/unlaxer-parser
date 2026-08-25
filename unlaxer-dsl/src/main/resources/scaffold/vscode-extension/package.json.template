@@ -52,7 +52,13 @@
               "stopOnEntry": {
                 "type": "boolean",
                 "description": "Pause before running (shows source in editor).",
-                "default": false
+                "default": true
+              },
+              "steppingMode": {
+                "type": "string",
+                "enum": ["ast", "token"],
+                "description": "Structural stepping model. Use ast when AST and Mapper are generated.",
+                "default": "ast"
               }
             }
           }
@@ -63,7 +69,8 @@
             "request": "launch",
             "name": "Debug {{ClassName}} File",
             "program": "${file}",
-            "stopOnEntry": false
+            "stopOnEntry": true,
+            "steppingMode": "ast"
           }
         ],
         "configurationSnippets": [
@@ -74,7 +81,9 @@
               "type": "{{name}}",
               "request": "launch",
               "name": "${1:Debug {{ClassName}} File}",
-              "program": "^\"\\${file}\""
+              "program": "^\"\\${file}\"",
+              "stopOnEntry": true,
+              "steppingMode": "ast"
             }
           }
         ]
