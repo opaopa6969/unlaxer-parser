@@ -13,6 +13,7 @@
 
     <artifactId>ubnf-vscode</artifactId>
     <packaging>jar</packaging>
+    <name>UBNF VS Code Extension</name>
     <description>UBNF VS Code 拡張 — grammar/ubnf.ubnf から VSIX を自動生成する (Issue #4 dogfooding)</description>
 
     <properties>
@@ -232,6 +233,22 @@
                 <configuration>
                     <argLine>--enable-preview</argLine>
                 </configuration>
+            </plugin>
+
+            <!-- Maven Central requires a javadoc artifact for every published JAR. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>3.5.0</version>
+                <configuration>
+                    <doclint>none</doclint>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>attach-javadocs</id>
+                        <goals><goal>jar</goal></goals>
+                    </execution>
+                </executions>
             </plugin>
 
         </plugins>
