@@ -165,6 +165,24 @@ public class DAPGeneratorTest {
     }
 
     @Test
+    public void testAdapterCanSelectSourceFromContainerDocument() {
+        assertTrue(adapterResult.source().contains(
+            "protected DebugSource resolveDebugSource(String program, String originalSource,"));
+        assertTrue(adapterResult.source().contains(
+            "DebugSource debugSource = resolveDebugSource(pendingProgram, originalSource, launchArguments)"));
+        assertTrue(adapterResult.source().contains("sourceContent = debugSource.content()"));
+        assertTrue(adapterResult.source().contains("Cannot prepare debug source:"));
+    }
+
+    @Test
+    public void testAdapterMapsSelectedSourceLinesBackToOriginalDocument() {
+        assertTrue(adapterResult.source().contains("protected int sourceLineOffset = 0"));
+        assertTrue(adapterResult.source().contains("sourceLineOffset = Math.max(0, debugSource.lineOffset())"));
+        assertTrue(adapterResult.source().contains("frame.setLine(line + sourceLineOffset + 1)"));
+        assertTrue(adapterResult.source().contains("return line + sourceLineOffset"));
+    }
+
+    @Test
     public void testAdapterScopesHasVariablesReference() {
         assertTrue(adapterResult.source().contains("setVariablesReference(1)"));
     }

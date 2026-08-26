@@ -1,6 +1,5 @@
 package org.example.snapshot;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -27,6 +26,7 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
     protected boolean stopOnEntry;
     protected Map<String, Object> launchArguments = Map.of();
     protected String sourceContent = "";
+    protected int sourceLineOffset = 0;
     protected List<Token> stepPoints = new ArrayList<>();
     protected int stepIndex = 0;
     private int astNodeCount = 0;
@@ -180,7 +180,7 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
             StackFrame frame = new StackFrame();
             frame.setId(0);
             frame.setName(currentStepLabel() + " (" + (stepIndex + 1) + "/" + stepLimit() + ")");
-            frame.setLine(line + 1);   // DAP は 1-based
+            frame.setLine(line + sourceLineOffset + 1);   // DAP is 1-based
             frame.setColumn(col + 1);
             Source source = new Source();
             source.setPath(pendingProgram);
@@ -191,7 +191,7 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
             StackFrame frame = new StackFrame();
             frame.setId(0);
             frame.setName("<program>");
-            frame.setLine(1);
+            frame.setLine(sourceLineOffset + 1);
             frame.setColumn(0);
             Source source = new Source();
             source.setPath(pendingProgram);
@@ -305,9 +305,17 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
             return false;
         }
         try {
-            sourceContent = Files.readString(Path.of(pendingProgram));
-        } catch (IOException e) {
-            sendOutput("stderr", "Cannot read file: " + pendingProgram + "\n");
+            String originalSource = Files.readString(Path.of(pendingProgram));
+            DebugSource debugSource = resolveDebugSource(pendingProgram, originalSource, launchArguments);
+            if (debugSource == null || debugSource.content() == null) {
+                throw new IllegalArgumentException("resolveDebugSource returned no content");
+            }
+            sourceContent = debugSource.content();
+            sourceLineOffset = Math.max(0, debugSource.lineOffset());
+        } catch (Throwable e) {
+            String message = e.getMessage() == null ? "" : ": " + e.getMessage();
+            sendOutput("stderr", "Cannot prepare debug source: " + pendingProgram
+                + " (" + e.getClass().getSimpleName() + message + ")\n");
             sendTerminated();
             return false;
         }
@@ -574,7 +582,7 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
         for (int i = 0; i < charOffset && i < sourceContent.length(); i++) {
             if (sourceContent.charAt(i) == '\n') { line++; }
         }
-        return line;
+        return line + sourceLineOffset;
     }
 
     private int findBreakpointIndex(int fromIndex) {
@@ -608,7 +616,16 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
                 line++;
             }
         }
-        return line;
+        return line + sourceLineOffset;
+    }
+
+    /** Selected source slice and its zero-based line offset in the original document. */
+    protected record DebugSource(String content, int lineOffset) {}
+
+    // Hook: select a debuggable source slice from a container document
+    protected DebugSource resolveDebugSource(String program, String originalSource,
+            Map<String, Object> launchArguments) {
+        return new DebugSource(originalSource, 0);
     }
 
     // Hook: application-specific runtime evaluation and variables

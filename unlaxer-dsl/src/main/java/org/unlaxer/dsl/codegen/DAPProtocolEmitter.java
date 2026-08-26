@@ -19,6 +19,7 @@ class DAPProtocolEmitter {
         w.line("protected boolean stopOnEntry;");
         w.line("protected Map<String, Object> launchArguments = Map.of();");
         w.line("protected String sourceContent = \"\";");
+        w.line("protected int sourceLineOffset = 0;");
         w.line("protected List<Token> stepPoints = new ArrayList<>();");
         w.line("protected int stepIndex = 0;");
         w.line("private int astNodeCount = 0;");
@@ -254,7 +255,7 @@ class DAPProtocolEmitter {
         w.line("StackFrame frame = new StackFrame();");
         w.line("frame.setId(0);");
         w.line("frame.setName(currentStepLabel() + \" (\" + (stepIndex + 1) + \"/\" + stepLimit() + \")\");");
-        w.line("frame.setLine(line + 1);   // DAP は 1-based");
+        w.line("frame.setLine(line + sourceLineOffset + 1);   // DAP is 1-based");
         w.line("frame.setColumn(col + 1);");
         w.line("Source source = new Source();");
         w.line("source.setPath(pendingProgram);");
@@ -267,7 +268,7 @@ class DAPProtocolEmitter {
         w.line("StackFrame frame = new StackFrame();");
         w.line("frame.setId(0);");
         w.line("frame.setName(\"<program>\");");
-        w.line("frame.setLine(1);");
+        w.line("frame.setLine(sourceLineOffset + 1);");
         w.line("frame.setColumn(0);");
         w.line("Source source = new Source();");
         w.line("source.setPath(pendingProgram);");

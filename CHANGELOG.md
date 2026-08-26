@@ -8,6 +8,9 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ## [Unreleased]
 
+### Added
+- Generated DAP adapters can now override `resolveDebugSource(...)` to select a line-aligned DSL slice from a container document while retaining the original file path, line mapping, and breakpoint coordinates. The default hook preserves the prior whole-file behavior.
+
 ---
 
 ## [3.0.13] - 2026-08-26

@@ -1045,6 +1045,13 @@ The generated DAP is deliberately split at the semantic boundary:
   Connect these by subclassing the generated adapter and overriding
   `runtimeVariables(String source, String runtimeMode, Map<String,Object> launchArguments)`.
 
+For a container format such as a metadata header followed by an embedded DSL, override
+`resolveDebugSource(String program, String originalSource, Map<String,Object> launchArguments)`.
+Return `new DebugSource(selectedText, zeroBasedLineOffset)` to make the generated parser and
+AST step over only the selected DSL while stack frames and breakpoints still point into the
+original file. The selected text must start at a line boundary. The default implementation
+returns the complete source with offset `0`.
+
 Generated AST stepping is structural: `F10` changes the selected syntax/AST node. It is not
 incremental evaluator execution unless the application adapter supplies an instrumented evaluator.
 
