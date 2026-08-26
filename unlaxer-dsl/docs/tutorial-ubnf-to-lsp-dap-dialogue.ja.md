@@ -948,7 +948,7 @@ public class LSPGenerator implements CodeGenerator {
 **先輩:** `TinyExpressionP4LanguageServer.java` が生成される。中身は lsp4j ベースの LSP サーバーで、以下の機能が自動生成される。
 
 1. **キーワード補完** — 文法中のキーワードリテラルから自動収集
-2. **リアルタイム構文診断** — パーサーを使って解析し、エラー位置を Diagnostic として返す
+2. **リアルタイム構文診断** — パーサーを使って解析し、期待されるトークンとエラー位置を Diagnostic として返す
 3. **ホバー情報** — トークンの種類や対応する文法ルールを表示
 4. **セマンティックトークン** — 有効/無効のトークンを色分け
 
@@ -972,7 +972,7 @@ private static final List<String> KEYWORDS = List.of(
 
 **後輩:** 診断機能はどうやって動くんですか？
 
-**先輩:** ユーザーがエディタでテキストを変更するたびに `parseDocument()` が呼ばれる。生成されたパーサーで解析して、失敗したらエラー位置を Diagnostic として返す。
+**先輩:** ユーザーがエディタでテキストを変更するたびに `parseDocument()` が呼ばれる。生成されたパーサーで解析して、失敗したら最も遠くまで進んだ失敗位置、期待トークン、最深ルールを Diagnostic として返す。
 
 ```java
 // 生成コード — parseDocument()
@@ -990,9 +990,13 @@ public ParseResult parseDocument(String uri, String content) {
 }
 ```
 
-**後輩:** パース結果の `consumedLength` がソース全体の長さと一致しなければエラー？
+**後輩:** 以前みたいに `consumedLength` だけを見るのではないんですね？
 
-**先輩:** そう。`consumedLength < content.length()` なら、その位置から先がパースできなかった。VSCode 上で赤い波線が表示される。
+**先輩:** そう。PEG は候補を試して戻るから、単なる消費長より「最遠失敗位置」の方が直す場所に近い。VS Code には `Expected ')' (in FunctionCallParser)` のように表示し、文書の残り全部ではなく失敗した1文字だけに赤い波線を出す。空入力でパース自体が失敗した場合も診断される。
+
+**後輩:** LLM が修正するときも、その英語メッセージを読ませるんですか？
+
+**先輩:** メッセージは人向けだ。LLMや拡張機能は `Diagnostic.data` の `code=ULX-PARSE-001`、位置、`expectedTokens`、`expectedHints`、`expectedParsers`、`deepestMatchedRule` を使う。同じ失敗を、人には短い説明、機械には安定した構造で渡すんだ。
 
 **後輩:** セマンティックトークンって何ですか？
 

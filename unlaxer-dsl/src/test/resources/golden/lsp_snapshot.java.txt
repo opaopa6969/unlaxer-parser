@@ -8,6 +8,7 @@ import org.eclipse.lsp4j.services.*;
 import org.unlaxer.Parsed;
 import org.unlaxer.StringSource;
 import org.unlaxer.context.ParseContext;
+import org.unlaxer.context.ParseFailureDiagnostics;
 import org.unlaxer.parser.Parser;
 import org.unlaxer.parser.incremental.IncrementalParseCache;
 
@@ -73,8 +74,24 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
         if (result.isSucceeded()) {
             consumedLength = result.getConsumed().source.sourceAsString().length();
         }
+        ParseFailureDiagnostics failure = context.getParseFailureDiagnostics();
+        int farthestFailureOffset = codePointOffsetToStringOffset(content, failure.getFarthestOffset());
+        int errorOffset = result.isSucceeded() ? consumedLength : farthestFailureOffset;
+        if (failure.hasFailureCandidate()) {
+            errorOffset = Math.max(errorOffset, farthestFailureOffset);
+        }
+        errorOffset = Math.max(0, Math.min(errorOffset, content.length()));
+        List<String> expectedTokens = failure.getExpectedTokens().stream()
+            .filter(s -> s != null && !s.isBlank()).distinct().sorted().limit(20).toList();
+        List<String> expectedHints = failure.getExpectedHintCandidates().stream()
+            .map(ParseFailureDiagnostics.ExpectedHintCandidate::getDisplayHint)
+            .filter(s -> s != null && !s.isBlank()).distinct().sorted().limit(20).toList();
+        List<String> expectedParsers = failure.getExpectedParsers().stream()
+            .filter(s -> s != null && !s.isBlank()).distinct().sorted().limit(20).toList();
+        String deepestMatchedRule = failure.getDeepestMatchedRule();
         context.close();
-        return new ParseResult(result.isSucceeded(), consumedLength, content.length());
+        return new ParseResult(result.isSucceeded(), consumedLength, content.length(),
+            errorOffset, expectedTokens, expectedHints, expectedParsers, deepestMatchedRule);
     }
 
     public ParseResult parseDocument(String uri, String content) {
@@ -138,14 +155,33 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
 
     private void publishDiagnostics(String uri, String content, ParseResult result) {
         List<Diagnostic> diagnostics = new ArrayList<>();
-        if (result.consumedLength() < result.totalLength()) {
-            int errorStart = result.consumedLength();
+        if (!result.succeeded() || result.consumedLength() < result.totalLength()) {
+            int errorStart = result.errorOffset();
+            int errorEnd = Math.min(result.totalLength(), errorStart + 1);
             Position startPos = offsetToPosition(content, errorStart);
-            Position endPos = offsetToPosition(content, result.totalLength());
+            Position endPos = offsetToPosition(content, errorEnd);
             Diagnostic diagnostic = new Diagnostic();
             diagnostic.setRange(new Range(startPos, endPos));
             diagnostic.setSeverity(DiagnosticSeverity.Error);
-            diagnostic.setMessage("Parse error at offset " + errorStart);
+            diagnostic.setCode(Either.forLeft("ULX-PARSE-001"));
+            diagnostic.setSource("unlaxer");
+            diagnostic.setMessage(parseErrorMessage(result));
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("schemaVersion", 1);
+            data.put("code", "ULX-PARSE-001");
+            data.put("kind", "syntax");
+            data.put("offset", errorStart);
+            data.put("line", startPos.getLine());
+            data.put("character", startPos.getCharacter());
+            data.put("consumedLength", result.consumedLength());
+            data.put("totalLength", result.totalLength());
+            data.put("expectedTokens", result.expectedTokens());
+            data.put("expectedHints", result.expectedHints());
+            data.put("expectedParsers", result.expectedParsers());
+            if (result.deepestMatchedRule() != null && !result.deepestMatchedRule().isBlank()) {
+                data.put("deepestMatchedRule", result.deepestMatchedRule());
+            }
+            diagnostic.setData(data);
             diagnostics.add(diagnostic);
         }
         java.util.List<Diagnostic> additional = additionalDiagnostics(uri, content);
@@ -153,6 +189,24 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
             diagnostics.addAll(additional);
         }
         client.publishDiagnostics(new PublishDiagnosticsParams(uri, diagnostics));
+    }
+
+    private String parseErrorMessage(ParseResult result) {
+        List<String> expected = !result.expectedTokens().isEmpty() ? result.expectedTokens()
+            : (!result.expectedHints().isEmpty() ? result.expectedHints() : result.expectedParsers());
+        String message = expected.isEmpty()
+            ? "Parse error at offset " + result.errorOffset()
+            : "Expected " + String.join(" or ", expected);
+        if (result.deepestMatchedRule() != null && !result.deepestMatchedRule().isBlank()) {
+            message += " (in " + result.deepestMatchedRule() + ")";
+        }
+        return message;
+    }
+
+    private int codePointOffsetToStringOffset(String content, int codePointOffset) {
+        int safeCodePointOffset = Math.max(0, Math.min(codePointOffset,
+            content.codePointCount(0, content.length())));
+        return content.offsetByCodePoints(0, safeCodePointOffset);
     }
 
     private Position offsetToPosition(String content, int offset) {
@@ -217,7 +271,20 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
         public IncrementalParseCache cache() { return cache; }
     }
 
-    public record ParseResult(boolean succeeded, int consumedLength, int totalLength) {}
+    public record ParseResult(
+        boolean succeeded,
+        int consumedLength,
+        int totalLength,
+        int errorOffset,
+        List<String> expectedTokens,
+        List<String> expectedHints,
+        List<String> expectedParsers,
+        String deepestMatchedRule) {
+        public ParseResult(boolean succeeded, int consumedLength, int totalLength) {
+            this(succeeded, consumedLength, totalLength, consumedLength,
+                List.of(), List.of(), List.of(), "");
+        }
+    }
 
     static class SnapshotLanguageServerTextDocumentService implements TextDocumentService {
 
@@ -280,7 +347,7 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
                     state.parseResult().consumedLength() == state.parseResult().totalLength()) {
                 text = "Valid Snapshot";
             } else {
-                text = "Parse error at offset " + state.parseResult().consumedLength();
+                text = server.parseErrorMessage(state.parseResult());
             }
             MarkupContent content = new MarkupContent();
             content.setKind("plaintext");

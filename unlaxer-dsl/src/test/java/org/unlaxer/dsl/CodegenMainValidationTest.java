@@ -157,6 +157,33 @@ public class CodegenMainValidationTest {
     }
 
     @Test
+    public void testRuleTokenParserNameCollisionHasStableJsonDiagnostic() throws Exception {
+        String source = """
+            grammar InvalidCollision {
+              @package: org.example.invalid
+              token CODE_START = org.example.CodeStartParser
+              @root
+              CodeStart ::= CODE_START ;
+            }
+            """;
+
+        Path grammarFile = Files.createTempFile("codegen-main-name-collision", ".ubnf");
+        Files.writeString(grammarFile, source);
+
+        RunResult result = runCodegen(
+            "--grammar", grammarFile.toString(),
+            "--validate-only",
+            "--report-format", "json"
+        );
+
+        assertEquals(CodegenMain.EXIT_VALIDATION_ERROR, result.exitCode());
+        assertTrue(result.err().contains("\"code\":\"E-RULE-TOKEN-NAME-COLLISION\""));
+        assertTrue(result.err().contains("\"category\":\"RULE\""));
+        assertTrue(result.err().contains("\"rule\":\"CodeStart\""));
+        assertTrue(result.err().contains("CodeStartParser"));
+    }
+
+    @Test
     public void testValidateOnlyJsonSuccessReport() throws Exception {
         String source = """
             grammar Valid {

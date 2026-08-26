@@ -34,6 +34,7 @@ class LSPServerEmitter {
         w.line("import org.unlaxer.Parsed;");
         w.line("import org.unlaxer.StringSource;");
         w.line("import org.unlaxer.context.ParseContext;");
+        w.line("import org.unlaxer.context.ParseFailureDiagnostics;");
         w.line("import org.unlaxer.parser.Parser;");
         w.line("import org.unlaxer.parser.incremental.IncrementalParseCache;");
         if (hasScopeStore) {
@@ -163,8 +164,26 @@ class LSPServerEmitter {
         w.line("consumedLength = result.getConsumed().source.sourceAsString().length();");
         w.dedent();
         w.line("}");
+        w.line("ParseFailureDiagnostics failure = context.getParseFailureDiagnostics();");
+        w.line("int farthestFailureOffset = codePointOffsetToStringOffset(content, failure.getFarthestOffset());");
+        w.line("int errorOffset = result.isSucceeded() ? consumedLength : farthestFailureOffset;");
+        w.line("if (failure.hasFailureCandidate()) {");
+        w.indent();
+        w.line("errorOffset = Math.max(errorOffset, farthestFailureOffset);");
+        w.dedent();
+        w.line("}");
+        w.line("errorOffset = Math.max(0, Math.min(errorOffset, content.length()));");
+        w.line("List<String> expectedTokens = failure.getExpectedTokens().stream()");
+        w.line("    .filter(s -> s != null && !s.isBlank()).distinct().sorted().limit(20).toList();");
+        w.line("List<String> expectedHints = failure.getExpectedHintCandidates().stream()");
+        w.line("    .map(ParseFailureDiagnostics.ExpectedHintCandidate::getDisplayHint)");
+        w.line("    .filter(s -> s != null && !s.isBlank()).distinct().sorted().limit(20).toList();");
+        w.line("List<String> expectedParsers = failure.getExpectedParsers().stream()");
+        w.line("    .filter(s -> s != null && !s.isBlank()).distinct().sorted().limit(20).toList();");
+        w.line("String deepestMatchedRule = failure.getDeepestMatchedRule();");
         w.line("context.close();");
-        w.line("return new ParseResult(result.isSucceeded(), consumedLength, content.length());");
+        w.line("return new ParseResult(result.isSucceeded(), consumedLength, content.length(),");
+        w.line("    errorOffset, expectedTokens, expectedHints, expectedParsers, deepestMatchedRule);");
         w.dedent();
         w.line("}");
         w.blankLine();
@@ -265,15 +284,36 @@ class LSPServerEmitter {
         w.line("private void publishDiagnostics(String uri, String content, ParseResult result) {");
         w.indent();
         w.line("List<Diagnostic> diagnostics = new ArrayList<>();");
-        w.line("if (result.consumedLength() < result.totalLength()) {");
+        w.line("if (!result.succeeded() || result.consumedLength() < result.totalLength()) {");
         w.indent();
-        w.line("int errorStart = result.consumedLength();");
+        w.line("int errorStart = result.errorOffset();");
+        w.line("int errorEnd = Math.min(result.totalLength(), errorStart + 1);");
         w.line("Position startPos = offsetToPosition(content, errorStart);");
-        w.line("Position endPos = offsetToPosition(content, result.totalLength());");
+        w.line("Position endPos = offsetToPosition(content, errorEnd);");
         w.line("Diagnostic diagnostic = new Diagnostic();");
         w.line("diagnostic.setRange(new Range(startPos, endPos));");
         w.line("diagnostic.setSeverity(DiagnosticSeverity.Error);");
-        w.line("diagnostic.setMessage(\"Parse error at offset \" + errorStart);");
+        w.line("diagnostic.setCode(Either.forLeft(\"ULX-PARSE-001\"));");
+        w.line("diagnostic.setSource(\"unlaxer\");");
+        w.line("diagnostic.setMessage(parseErrorMessage(result));");
+        w.line("Map<String, Object> data = new LinkedHashMap<>();");
+        w.line("data.put(\"schemaVersion\", 1);");
+        w.line("data.put(\"code\", \"ULX-PARSE-001\");");
+        w.line("data.put(\"kind\", \"syntax\");");
+        w.line("data.put(\"offset\", errorStart);");
+        w.line("data.put(\"line\", startPos.getLine());");
+        w.line("data.put(\"character\", startPos.getCharacter());");
+        w.line("data.put(\"consumedLength\", result.consumedLength());");
+        w.line("data.put(\"totalLength\", result.totalLength());");
+        w.line("data.put(\"expectedTokens\", result.expectedTokens());");
+        w.line("data.put(\"expectedHints\", result.expectedHints());");
+        w.line("data.put(\"expectedParsers\", result.expectedParsers());");
+        w.line("if (result.deepestMatchedRule() != null && !result.deepestMatchedRule().isBlank()) {");
+        w.indent();
+        w.line("data.put(\"deepestMatchedRule\", result.deepestMatchedRule());");
+        w.dedent();
+        w.line("}");
+        w.line("diagnostic.setData(data);");
         w.line("diagnostics.add(diagnostic);");
         w.dedent();
         w.line("}");
@@ -284,6 +324,35 @@ class LSPServerEmitter {
         w.dedent();
         w.line("}");
         w.line("client.publishDiagnostics(new PublishDiagnosticsParams(uri, diagnostics));");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
+
+        // parseErrorMessage()
+        w.line("private String parseErrorMessage(ParseResult result) {");
+        w.indent();
+        w.line("List<String> expected = !result.expectedTokens().isEmpty() ? result.expectedTokens()");
+        w.line("    : (!result.expectedHints().isEmpty() ? result.expectedHints() : result.expectedParsers());");
+        w.line("String message = expected.isEmpty()");
+        w.line("    ? \"Parse error at offset \" + result.errorOffset()");
+        w.line("    : \"Expected \" + String.join(\" or \", expected);");
+        w.line("if (result.deepestMatchedRule() != null && !result.deepestMatchedRule().isBlank()) {");
+        w.indent();
+        w.line("message += \" (in \" + result.deepestMatchedRule() + \")\";");
+        w.dedent();
+        w.line("}");
+        w.line("return message;");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
+
+        // The parser runtime counts Unicode code points, while LSP positions use
+        // UTF-16 code units. Convert before building ranges and Diagnostic.data.
+        w.line("private int codePointOffsetToStringOffset(String content, int codePointOffset) {");
+        w.indent();
+        w.line("int safeCodePointOffset = Math.max(0, Math.min(codePointOffset,");
+        w.line("    content.codePointCount(0, content.length())));");
+        w.line("return content.offsetByCodePoints(0, safeCodePointOffset);");
         w.dedent();
         w.line("}");
         w.blankLine();
@@ -443,7 +512,24 @@ class LSPServerEmitter {
         w.dedent();
         w.line("}");
         w.blankLine();
-        w.line("public record ParseResult(boolean succeeded, int consumedLength, int totalLength) {}");
+        w.line("public record ParseResult(");
+        w.line("    boolean succeeded,");
+        w.line("    int consumedLength,");
+        w.line("    int totalLength,");
+        w.line("    int errorOffset,");
+        w.line("    List<String> expectedTokens,");
+        w.line("    List<String> expectedHints,");
+        w.line("    List<String> expectedParsers,");
+        w.line("    String deepestMatchedRule) {");
+        w.indent();
+        w.line("public ParseResult(boolean succeeded, int consumedLength, int totalLength) {");
+        w.indent();
+        w.line("this(succeeded, consumedLength, totalLength, consumedLength,");
+        w.line("    List.of(), List.of(), List.of(), \"\");");
+        w.dedent();
+        w.line("}");
+        w.dedent();
+        w.line("}");
         w.blankLine();
     }
 
@@ -539,7 +625,7 @@ class LSPServerEmitter {
         w.dedent();
         w.line("} else {");
         w.indent();
-        w.line("text = \"Parse error at offset \" + state.parseResult().consumedLength();");
+        w.line("text = server.parseErrorMessage(state.parseResult());");
         w.dedent();
         w.line("}");
         w.line("MarkupContent content = new MarkupContent();");

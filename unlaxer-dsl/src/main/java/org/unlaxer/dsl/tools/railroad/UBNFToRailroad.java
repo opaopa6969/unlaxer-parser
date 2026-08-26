@@ -28,14 +28,22 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class UBNFToRailroad {
 
-    private static String nextId(Object node) {
-        return String.valueOf(System.identityHashCode(node));
+    private static final ThreadLocal<AtomicInteger> NODE_IDS =
+        ThreadLocal.withInitial(AtomicInteger::new);
+
+    private static String nextId(Object ignored) {
+        return "rr-" + NODE_IDS.get().getAndIncrement();
     }
 
     private UBNFToRailroad() {}
 
     public static RailroadDiagram convertRule(RuleDecl rule, String grammarName) {
-        return convertRuleBody(rule.body(), grammarName);
+        NODE_IDS.set(new AtomicInteger());
+        try {
+            return convertRuleBody(rule.body(), grammarName);
+        } finally {
+            NODE_IDS.remove();
+        }
     }
 
     public static RailroadDiagram convertRule(RuleDecl rule) {

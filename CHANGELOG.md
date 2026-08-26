@@ -10,6 +10,19 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ---
 
+## [3.0.13] - 2026-08-26
+
+### Added
+- Generated LSP syntax diagnostics now expose the stable code `ULX-PARSE-001`, the farthest failure position, expected tokens/hints/parsers, and the deepest matched rule. The same values are included in `Diagnostic.data` as a deterministic repair envelope for editor extensions and LLM clients.
+- Grammar validation now rejects rule/token names that resolve to the same generated parser class with `E-RULE-TOKEN-NAME-COLLISION`, preventing a generated parser from silently recursing into itself at runtime.
+- Generated DAP adapters expose their runtime-variable refresh hook to language-specific adapters, allowing a typed application context to be edited and re-evaluated without hand-editing generated code.
+
+### Fixed
+- Generated LSP servers now diagnose failed empty input and underline only the failing character (or the zero-width EOF position) instead of marking the entire remaining document. Parser code-point offsets are converted to LSP UTF-16 positions, including after non-BMP characters. Hover uses the same actionable parse message as diagnostics.
+- Railroad SVG node IDs are now deterministic traversal IDs instead of JVM identity hashes, so regenerating an unchanged grammar no longer creates review noise for humans or LLMs.
+
+---
+
 ## [3.0.12] - 2026-08-26
 
 ### Added
