@@ -622,10 +622,15 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
     /** Selected source slice and its zero-based line offset in the original document. */
     protected record DebugSource(String content, int lineOffset) {}
 
+    /** Factory usable by subclasses in a different package. */
+    protected final DebugSource debugSource(String content, int lineOffset) {
+        return new DebugSource(content, lineOffset);
+    }
+
     // Hook: select a debuggable source slice from a container document
     protected DebugSource resolveDebugSource(String program, String originalSource,
             Map<String, Object> launchArguments) {
-        return new DebugSource(originalSource, 0);
+        return debugSource(originalSource, 0);
     }
 
     // Hook: application-specific runtime evaluation and variables

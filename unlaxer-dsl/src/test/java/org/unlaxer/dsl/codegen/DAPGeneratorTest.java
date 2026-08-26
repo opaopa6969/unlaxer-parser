@@ -172,6 +172,8 @@ public class DAPGeneratorTest {
             "DebugSource debugSource = resolveDebugSource(pendingProgram, originalSource, launchArguments)"));
         assertTrue(adapterResult.source().contains("sourceContent = debugSource.content()"));
         assertTrue(adapterResult.source().contains("Cannot prepare debug source:"));
+        assertTrue(adapterResult.source().contains(
+            "protected final DebugSource debugSource(String content, int lineOffset)"));
     }
 
     @Test

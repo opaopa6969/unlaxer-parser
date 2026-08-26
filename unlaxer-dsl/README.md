@@ -1047,7 +1047,7 @@ The generated DAP is deliberately split at the semantic boundary:
 
 For a container format such as a metadata header followed by an embedded DSL, override
 `resolveDebugSource(String program, String originalSource, Map<String,Object> launchArguments)`.
-Return `new DebugSource(selectedText, zeroBasedLineOffset)` to make the generated parser and
+Return `debugSource(selectedText, zeroBasedLineOffset)` to make the generated parser and
 AST step over only the selected DSL while stack frames and breakpoints still point into the
 original file. The selected text must start at a line boundary. The default implementation
 returns the complete source with offset `0`.

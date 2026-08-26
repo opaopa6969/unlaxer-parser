@@ -533,11 +533,19 @@ class DAPRuntimeEmitter {
         w.line("protected record DebugSource(String content, int lineOffset) {}");
         w.blankLine();
 
+        w.line("/** Factory usable by subclasses in a different package. */");
+        w.line("protected final DebugSource debugSource(String content, int lineOffset) {");
+        w.indent();
+        w.line("return new DebugSource(content, lineOffset);");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
+
         w.line("// Hook: select a debuggable source slice from a container document");
         w.line("protected DebugSource resolveDebugSource(String program, String originalSource,");
         w.line("        Map<String, Object> launchArguments) {");
         w.indent();
-        w.line("return new DebugSource(originalSource, 0);");
+        w.line("return debugSource(originalSource, 0);");
         w.dedent();
         w.line("}");
         w.blankLine();
