@@ -21,11 +21,21 @@ class DAPRuntimeEmitter {
         w.line("}");
         w.line("try {");
         w.indent();
-        w.line("sourceContent = Files.readString(Path.of(pendingProgram));");
-        w.dedent();
-        w.line("} catch (IOException e) {");
+        w.line("String originalSource = Files.readString(Path.of(pendingProgram));");
+        w.line("DebugSource debugSource = resolveDebugSource(pendingProgram, originalSource, launchArguments);");
+        w.line("if (debugSource == null || debugSource.content() == null) {");
         w.indent();
-        w.line("sendOutput(\"stderr\", \"Cannot read file: \" + pendingProgram + \"\\n\");");
+        w.line("throw new IllegalArgumentException(\"resolveDebugSource returned no content\");");
+        w.dedent();
+        w.line("}");
+        w.line("sourceContent = debugSource.content();");
+        w.line("sourceLineOffset = Math.max(0, debugSource.lineOffset());");
+        w.dedent();
+        w.line("} catch (Throwable e) {");
+        w.indent();
+        w.line("String message = e.getMessage() == null ? \"\" : \": \" + e.getMessage();");
+        w.line("sendOutput(\"stderr\", \"Cannot prepare debug source: \" + pendingProgram");
+        w.line("    + \" (\" + e.getClass().getSimpleName() + message + \")\\n\");");
         w.line("sendTerminated();");
         w.line("return false;");
         w.dedent();
@@ -454,7 +464,7 @@ class DAPRuntimeEmitter {
         w.line("if (sourceContent.charAt(i) == '\\n') { line++; }");
         w.dedent();
         w.line("}");
-        w.line("return line;");
+        w.line("return line + sourceLineOffset;");
         w.dedent();
         w.line("}");
         w.blankLine();
@@ -511,7 +521,7 @@ class DAPRuntimeEmitter {
         w.line("}");
         w.dedent();
         w.line("}");
-        w.line("return line;");
+        w.line("return line + sourceLineOffset;");
         w.dedent();
         w.line("}");
         w.blankLine();
@@ -519,6 +529,27 @@ class DAPRuntimeEmitter {
 
     /** GGP フックメソッドを出力する。 */
     static void emitHookMethods(IndentedWriter w) {
+        w.line("/** Selected source slice and its zero-based line offset in the original document. */");
+        w.line("protected record DebugSource(String content, int lineOffset) {}");
+        w.blankLine();
+
+        w.line("/** Factory usable by subclasses in a different package. */");
+        w.line("protected final DebugSource debugSource(String content, int lineOffset) {");
+        w.indent();
+        w.line("return new DebugSource(content, lineOffset);");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
+
+        w.line("// Hook: select a debuggable source slice from a container document");
+        w.line("protected DebugSource resolveDebugSource(String program, String originalSource,");
+        w.line("        Map<String, Object> launchArguments) {");
+        w.indent();
+        w.line("return debugSource(originalSource, 0);");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
+
         w.line("// Hook: application-specific runtime evaluation and variables");
         w.line("protected Map<String, String> runtimeVariables(String source, String runtimeMode,");
         w.line("        Map<String, Object> launchArguments) {");

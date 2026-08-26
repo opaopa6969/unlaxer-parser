@@ -35,7 +35,6 @@ public class DAPGenerator implements CodeGenerator {
         w.line("package " + packageName + ";");
         w.blankLine();
 
-        w.line("import java.io.IOException;");
         w.line("import java.nio.file.Files;");
         w.line("import java.nio.file.Path;");
         w.line("import java.util.ArrayList;");
