@@ -134,6 +134,29 @@ public class LSPGeneratorTest {
     }
 
     @Test
+    public void testGeneratesActionableMachineReadableParseDiagnostics() {
+        String src = result.source();
+
+        assertTrue(src.contains("ParseFailureDiagnostics failure"));
+        assertTrue(src.contains("ULX-PARSE-001"));
+        assertTrue(src.contains("diagnostic.setData(data)"));
+        assertTrue(src.contains("data.put(\"expectedTokens\""));
+        assertTrue(src.contains("data.put(\"expectedHints\""));
+        assertTrue(src.contains("data.put(\"expectedParsers\""));
+        assertTrue(src.contains("data.put(\"deepestMatchedRule\""));
+        assertTrue(src.contains("int errorEnd = Math.min(result.totalLength(), errorStart + 1)"));
+        assertTrue(src.contains("if (!result.succeeded() || result.consumedLength() < result.totalLength())"));
+        assertTrue(src.contains("codePointOffsetToStringOffset(content, failure.getFarthestOffset())"));
+        assertTrue(src.contains("content.offsetByCodePoints(0, safeCodePointOffset)"));
+    }
+
+    @Test
+    public void testKeepsThreeArgumentParseResultConstructorForExtensions() {
+        assertTrue(result.source().contains(
+            "public ParseResult(boolean succeeded, int consumedLength, int totalLength)"));
+    }
+
+    @Test
     public void testContainsAnnotationCompletionKeywords() {
         assertTrue(result.source().contains("\"@interleave\""));
         assertTrue(result.source().contains("\"@backref\""));

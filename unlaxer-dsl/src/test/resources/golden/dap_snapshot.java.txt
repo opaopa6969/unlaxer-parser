@@ -348,7 +348,7 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
         return true;
     }
 
-    private void collectRuntimeProbeVariables() {
+    protected void collectRuntimeProbeVariables() {
         runtimeProbeVariables = new java.util.LinkedHashMap<>();
         runtimeProbeVariables.put("runtimeMode", runtimeMode == null ? "" : runtimeMode);
         runtimeProbeVariables.put("steppingMode", steppingMode == null ? "" : steppingMode);

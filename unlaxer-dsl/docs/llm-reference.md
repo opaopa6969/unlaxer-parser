@@ -540,21 +540,62 @@ Expression ::= Term { AddOp Term }
 Expression ::= Term { AddOp Term } ;
 ```
 
-### Mistake 6: Token Name Reuse
+### Mistake 6: Generated Parser Name Collision
 
-**Problem**: Unexpected parsing behavior.
+**Problem**: Code generation reports `E-RULE-TOKEN-NAME-COLLISION`.
 
-**Cause**: Using the same name for a token and a rule.
+**Cause**: A rule and token resolve to the same generated Java parser class. For
+fully qualified token parsers, `UPPER_SNAKE_CASE` token names become
+`CamelCaseParser`; rule names become `RuleNameParser`. Before validation was
+added, this could compile and then recurse into the rule parser itself at runtime.
 
 ```ubnf
 // WRONG
-token NUMBER = NumberParser
-NUMBER ::= '-' NUMBER | NUMBER ;  // Conflicts with token
+token CODE_START = org.example.CodeStartParser
+CodeStart ::= CODE_START ; // both resolve to CodeStartParser
 
 // CORRECT
-token NUMBER = NumberParser
-NumericLiteral ::= [ '-' ] NUMBER ;
+token CODE_START = org.example.CodeStartParser
+CodeBlockStart ::= CODE_START ;
 ```
+
+Do not infer the Java name by eye. Run validation and consume its stable code:
+
+```bash
+java --enable-preview -jar unlaxer-dsl.jar \
+  --grammar src/main/ubnf/mylang.ubnf \
+  --validate-only --report-format json
+```
+
+### Generated LSP Syntax Diagnostic Contract
+
+Generated language servers report syntax failures with code `ULX-PARSE-001`.
+The human-facing `message` prefers expected tokens, then grammar hints, then
+parser names, and appends the deepest matched rule when available. The range
+covers one failing UTF-16 character, or is zero-width at EOF.
+
+For automated repair, read `Diagnostic.data` instead of parsing the message:
+
+```json
+{
+  "schemaVersion": 1,
+  "code": "ULX-PARSE-001",
+  "kind": "syntax",
+  "offset": 12,
+  "line": 0,
+  "character": 12,
+  "consumedLength": 10,
+  "totalLength": 18,
+  "expectedTokens": ["')'", "','"],
+  "expectedHints": [],
+  "expectedParsers": ["ArgumentParser"],
+  "deepestMatchedRule": "FunctionCallParser"
+}
+```
+
+All expected-value arrays are deduplicated, sorted, and capped at 20 entries.
+Use `code`, location, and expected values as the repair contract; treat the
+message as presentation text.
 
 ---
 

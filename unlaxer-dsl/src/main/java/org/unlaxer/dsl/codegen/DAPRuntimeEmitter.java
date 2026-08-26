@@ -82,7 +82,7 @@ class DAPRuntimeEmitter {
 
     /** collectRuntimeProbeVariables() を出力する。 */
     static void emitCollectRuntimeProbeVariables(IndentedWriter w) {
-        w.line("private void collectRuntimeProbeVariables() {");
+        w.line("protected void collectRuntimeProbeVariables() {");
         w.indent();
         w.line("runtimeProbeVariables = new java.util.LinkedHashMap<>();");
         w.line("runtimeProbeVariables.put(\"runtimeMode\", runtimeMode == null ? \"\" : runtimeMode);");

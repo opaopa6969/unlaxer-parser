@@ -91,6 +91,7 @@ public final class GrammarValidator {
         validateGlobalWhitespace(grammar, errors);
         validateRootPresence(grammar, errors);
         validateTokens(grammar, errors);
+        validateRuleTokenParserNameCollisions(grammar, errors);
         validateBoundedRepeatElements(grammar, errors);
         validateCommonFields(grammar, errors);
         validateEnumRules(grammar, errors);
@@ -522,6 +523,46 @@ public final class GrammarValidator {
                     );
                 }
             }
+        }
+    }
+
+    /**
+     * Detects names that make a token reference resolve to its surrounding rule parser.
+     * Without this check the generated parser compiles, but recursively calls itself at
+     * runtime instead of the declared token parser.
+     */
+    private static void validateRuleTokenParserNameCollisions(
+        GrammarDecl grammar,
+        List<ValidationIssue> errors
+    ) {
+        Map<String, String> ruleByParserName = new LinkedHashMap<>();
+        for (RuleDecl rule : grammar.rules()) {
+            ruleByParserName.put(rule.name() + "Parser", rule.name());
+        }
+
+        for (TokenDecl token : grammar.tokens()) {
+            if (!(token instanceof TokenDecl.Simple simple)) {
+                continue;
+            }
+            String parserClass = simple.parserClass();
+            if (parserClass == null || parserClass.isBlank()) {
+                continue;
+            }
+            String generatedReference = parserClass.contains(".")
+                ? ParserCodegenUtil.toParserClassName(simple.name())
+                : parserClass;
+            String collidingRule = ruleByParserName.get(generatedReference);
+            if (collidingRule == null) {
+                continue;
+            }
+            addRuleError(
+                errors,
+                collidingRule,
+                "rule " + collidingRule + " and token " + simple.name()
+                    + " both resolve to generated parser class " + generatedReference,
+                "Rename the rule or token so their generated parser class names differ.",
+                "E-RULE-TOKEN-NAME-COLLISION"
+            );
         }
     }
 

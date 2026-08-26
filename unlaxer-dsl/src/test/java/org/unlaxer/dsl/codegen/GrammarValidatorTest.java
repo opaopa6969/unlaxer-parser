@@ -792,6 +792,59 @@ public class GrammarValidatorTest {
             unresolved.hint().contains("Did you mean"));
     }
 
+    @Test
+    public void testRuleTokenParserNameCollisionIsRejected() {
+        GrammarDecl grammar = parseGrammar(
+            "grammar G {\n"
+                + "  @package: org.example\n"
+                + "  token CODE_START = org.example.CodeStartParser\n"
+                + "  @root\n"
+                + "  CodeStart ::= CODE_START ;\n"
+                + "}"
+        );
+
+        GrammarValidator.ValidationIssue collision = GrammarValidator.validate(grammar).stream()
+            .filter(issue -> "E-RULE-TOKEN-NAME-COLLISION".equals(issue.code()))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("expected rule/token parser-name collision"));
+
+        assertEquals("ERROR", collision.severity());
+        assertEquals("RULE", collision.category());
+        assertEquals("CodeStart", collision.rule());
+        assertTrue(collision.message().contains("CodeStartParser"));
+        assertTrue(collision.message().contains("CODE_START"));
+    }
+
+    @Test
+    public void testShortTokenParserNameCollisionIsRejected() {
+        GrammarDecl grammar = parseGrammar(
+            "grammar G {\n"
+                + "  @package: org.example\n"
+                + "  token VALUE = ValueParser\n"
+                + "  @root\n"
+                + "  Value ::= VALUE ;\n"
+                + "}"
+        );
+
+        assertTrue(GrammarValidator.validate(grammar).stream()
+            .anyMatch(issue -> "E-RULE-TOKEN-NAME-COLLISION".equals(issue.code())));
+    }
+
+    @Test
+    public void testDifferentGeneratedTokenAndRuleParserNamesAreAccepted() {
+        GrammarDecl grammar = parseGrammar(
+            "grammar G {\n"
+                + "  @package: org.example\n"
+                + "  token CODE_START = org.example.CodeStartParser\n"
+                + "  @root\n"
+                + "  CodeBlockStart ::= CODE_START ;\n"
+                + "}"
+        );
+
+        assertFalse(GrammarValidator.validate(grammar).stream()
+            .anyMatch(issue -> "E-RULE-TOKEN-NAME-COLLISION".equals(issue.code())));
+    }
+
     private GrammarDecl parseGrammar(String source) {
         return UBNFMapper.parse(source).grammars().get(0);
     }

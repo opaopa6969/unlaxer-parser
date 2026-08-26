@@ -69,9 +69,12 @@ The generated LSP exposes:
    `@root`, `@mapping`, `@whitespace`, `@interleave`, `@backref`,
    `@typeof`, `@scopeTree`, `@leftAssoc`, `@rightAssoc`,
    `@precedence`, `::=`, `;`, …).
-2. **Parse diagnostics** — error position + message.
+2. **Parse diagnostics** — a one-character failure range, stable code
+   `ULX-PARSE-001`, expected tokens/hints/parsers, and the deepest matched rule.
+   The structured values are also placed in LSP `Diagnostic.data`, so an editor,
+   code action, or LLM can consume the same repair contract shown to a person.
 3. **Semantic tokens** — valid/invalid token classes with extension hooks.
-4. **Hover** — "Valid UBNF" or parse error offset.
+4. **Hover** — "Valid UBNF" or the same actionable parse message used by diagnostics.
 5. **Grammar-Guided Programming hooks** — extension points for custom
    completions, diagnostics, definition jumps, semantic tokens, and
    server capabilities (`additionalCompletionItems()` etc.).

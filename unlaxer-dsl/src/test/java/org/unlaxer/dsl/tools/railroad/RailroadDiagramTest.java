@@ -29,6 +29,27 @@ import org.unlaxer.dsl.bootstrap.UBNFMapper;
  */
 public class RailroadDiagramTest {
 
+    @Test
+    public void generatedSvgIdsAreStableAcrossEquivalentParses() {
+        String grammar = """
+            grammar StableIds {
+              Root ::= ( 'a' | 'b' ) Tail ;
+              Tail ::= { 'c' } ;
+            }
+            """;
+
+        RuleDecl first = UBNFMapper.parse(grammar).grammars().get(0).rules().get(0);
+        RuleDecl second = UBNFMapper.parse(grammar).grammars().get(0).rules().get(0);
+
+        String firstSvg = RailroadDiagram.renderFullDiagram(
+            first.name(), UBNFToRailroad.convertRule(first, "StableIds"), "StableIds");
+        String secondSvg = RailroadDiagram.renderFullDiagram(
+            second.name(), UBNFToRailroad.convertRule(second, "StableIds"), "StableIds");
+
+        assertEquals(firstSvg, secondSvg);
+        assertTrue(firstSvg.contains("id=\"rr-"));
+    }
+
     // =========================================================================
     // Helper — load grammar/ubnf.ubnf
     // =========================================================================

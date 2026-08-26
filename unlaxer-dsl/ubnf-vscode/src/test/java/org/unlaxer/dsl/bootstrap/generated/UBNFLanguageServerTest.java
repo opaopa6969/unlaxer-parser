@@ -142,8 +142,8 @@ public class UBNFLanguageServerTest {
             .get();
         assertNotNull(hover);
         MarkupContent content = (MarkupContent) hover.getContents().getRight();
-        assertTrue("hover should describe the parse error",
-            content.getValue().startsWith("Parse error at offset"));
+        assertTrue("hover should describe the expected syntax: " + content.getValue(),
+            content.getValue().startsWith("Expected "));
     }
 
     @Test

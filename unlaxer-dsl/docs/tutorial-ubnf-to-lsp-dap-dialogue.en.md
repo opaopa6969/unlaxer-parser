@@ -948,7 +948,7 @@ public class LSPGenerator implements CodeGenerator {
 **Senior:** `TinyExpressionP4LanguageServer.java` is generated. It's an lsp4j-based LSP server with these auto-generated features:
 
 1. **Keyword completion** -- Automatically collected from keyword literals in the grammar
-2. **Real-time syntax diagnostics** -- Parses using the generated parser and returns error positions as Diagnostics
+2. **Real-time syntax diagnostics** -- Parses using the generated parser and returns expected tokens and error positions as Diagnostics
 3. **Hover information** -- Displays token type and corresponding grammar rule
 4. **Semantic tokens** -- Color-codes valid/invalid tokens
 
@@ -972,7 +972,7 @@ private static final List<String> KEYWORDS = List.of(
 
 **Newcomer:** How does the diagnostics feature work?
 
-**Senior:** Every time the user changes text in the editor, `parseDocument()` is called. It parses using the generated parser and returns error positions as Diagnostics on failure.
+**Senior:** Every time the user changes text in the editor, `parseDocument()` is called. It parses using the generated parser and returns the farthest failure position, expected tokens, and deepest matched rule as a Diagnostic on failure.
 
 ```java
 // Generated code -- parseDocument()
@@ -990,9 +990,13 @@ public ParseResult parseDocument(String uri, String content) {
 }
 ```
 
-**Newcomer:** If the parse result's `consumedLength` doesn't match the full source length, it's an error?
+**Newcomer:** So it no longer looks only at `consumedLength`?
 
-**Senior:** Right. If `consumedLength < content.length()`, everything from that position onward couldn't be parsed. A red squiggly line appears in VSCode.
+**Senior:** Right. PEG parsers try candidates and backtrack, so the farthest failure is usually closer to the place a person should repair. VS Code shows a message such as `Expected ')' (in FunctionCallParser)` and underlines only the failing character, not the entire remainder of the document. A failed empty input is diagnosed too.
+
+**Newcomer:** Should an LLM parse that English message when it proposes a fix?
+
+**Senior:** The message is for people. An LLM or editor extension should consume `Diagnostic.data`: `code=ULX-PARSE-001`, the location, `expectedTokens`, `expectedHints`, `expectedParsers`, and `deepestMatchedRule`. The same failure is concise prose for a person and a stable structure for a machine.
 
 **Newcomer:** What are semantic tokens?
 
