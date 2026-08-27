@@ -4,6 +4,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.AtomicElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RuleDecl;
+import org.unlaxer.dsl.bootstrap.UBNFAST.TerminalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.TokenDecl;
 
 import java.util.ArrayList;
@@ -764,9 +765,6 @@ class MapperRuleEmitter {
             AtomicElement normalized = MapperElementUtil.normalizeCapturedElement(element).orElse(element);
             String parserClass = MapperElementUtil.parserClassLiteral(normalized, parsersClass, tokenDeclByName, ruleByName)
                 .orElse(ruleParserClass);
-            int parserOccurrenceIndex =
-                scalarCaptureIndexByParserClass.getOrDefault(parserClass, 0);
-            scalarCaptureIndexByParserClass.put(parserClass, parserOccurrenceIndex + 1);
             String tokenVarName = "paramToken_" + MapperElementUtil.safeName(param) + "_" + i;
             String candidateType = MapperTypeResolver.inferTypeFromElement(grammar, normalized);
             if (!MapperTypeResolver.isTypeCompatible(type, candidateType) && !"String".equals(type)) {
@@ -779,11 +777,27 @@ class MapperRuleEmitter {
                 mappedClassByRuleName,
                 tokenDeclByName,
                 ruleByName);
+            boolean isWordParserTerminal = normalized instanceof TerminalElement
+                && parserClass.endsWith("WordParser.class");
             w.line("if (!assigned_" + MapperElementUtil.safeName(param) + ") {");
             w.indent();
-            w.line("Token " + tokenVarName
-                + " = findCapturedToken(token, " + parserClass + ", "
-                + parserOccurrenceIndex + ");");
+            if (isWordParserTerminal) {
+                String literalText = ((TerminalElement) normalized).value();
+                String occurrenceKey = parserClass + "\n" + literalText;
+                int occurrenceIndex = scalarCaptureIndexByParserClass.getOrDefault(occurrenceKey, 0);
+                scalarCaptureIndexByParserClass.put(occurrenceKey, occurrenceIndex + 1);
+                w.line("Token " + tokenVarName
+                    + " = findCapturedTokenWithText(token, " + parserClass + ", \""
+                    + ParserCodegenUtil.escapeString(literalText) + "\", "
+                    + occurrenceIndex + ");");
+            } else {
+                int parserOccurrenceIndex =
+                    scalarCaptureIndexByParserClass.getOrDefault(parserClass, 0);
+                scalarCaptureIndexByParserClass.put(parserClass, parserOccurrenceIndex + 1);
+                w.line("Token " + tokenVarName
+                    + " = findCapturedToken(token, " + parserClass + ", "
+                    + parserOccurrenceIndex + ");");
+            }
             w.line("if (" + tokenVarName + " != null) {");
             w.indent();
             w.line(param + " = " + mapExpression + ";");
@@ -1058,6 +1072,57 @@ class MapperRuleEmitter {
         // capture at this level cannot leak into a nested mapped sub-expression.
         w.line("List<Token> bounded = findDescendantsBounded(token, parserClass);");
         w.line("return index < bounded.size() ? bounded.get(index) : null;");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
+
+        // Literal captures share WordParser with every structural literal. Match by
+        // parser class and exact token text while preserving findCapturedToken's
+        // direct-child and capture-boundary semantics. (unlaxer-parser #42)
+        w.line("static Token findCapturedTokenWithText(Token token, Class<? extends Parser> parserClass, String text, int index) {");
+        w.indent();
+        w.line("if (index < 0) {");
+        w.indent();
+        w.line("return null;");
+        w.dedent();
+        w.line("}");
+        w.line("List<Token> direct = findDirectDescendants(token, parserClass);");
+        w.line("int seen = 0;");
+        w.line("for (Token candidate : direct) {");
+        w.indent();
+        w.line("if (text.equals(firstTokenText(candidate))) {");
+        w.indent();
+        w.line("if (seen == index) {");
+        w.indent();
+        w.line("return candidate;");
+        w.dedent();
+        w.line("}");
+        w.line("seen = seen + 1;");
+        w.dedent();
+        w.line("}");
+        w.dedent();
+        w.line("}");
+        w.line("if (!direct.isEmpty()) {");
+        w.indent();
+        w.line("return null;");
+        w.dedent();
+        w.line("}");
+        w.line("seen = 0;");
+        w.line("for (Token candidate : findDescendantsBounded(token, parserClass)) {");
+        w.indent();
+        w.line("if (text.equals(firstTokenText(candidate))) {");
+        w.indent();
+        w.line("if (seen == index) {");
+        w.indent();
+        w.line("return candidate;");
+        w.dedent();
+        w.line("}");
+        w.line("seen = seen + 1;");
+        w.dedent();
+        w.line("}");
+        w.dedent();
+        w.line("}");
+        w.line("return null;");
         w.dedent();
         w.line("}");
         w.blankLine();

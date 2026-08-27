@@ -321,6 +321,35 @@ public class SnapshotRightAssocMapper {
         return index < bounded.size() ? bounded.get(index) : null;
     }
 
+    static Token findCapturedTokenWithText(Token token, Class<? extends Parser> parserClass, String text, int index) {
+        if (index < 0) {
+            return null;
+        }
+        List<Token> direct = findDirectDescendants(token, parserClass);
+        int seen = 0;
+        for (Token candidate : direct) {
+            if (text.equals(firstTokenText(candidate))) {
+                if (seen == index) {
+                    return candidate;
+                }
+                seen = seen + 1;
+            }
+        }
+        if (!direct.isEmpty()) {
+            return null;
+        }
+        seen = 0;
+        for (Token candidate : findDescendantsBounded(token, parserClass)) {
+            if (text.equals(firstTokenText(candidate))) {
+                if (seen == index) {
+                    return candidate;
+                }
+                seen = seen + 1;
+            }
+        }
+        return null;
+    }
+
     static String firstTokenText(Token token) {
         if (token == null) {
             return null;
