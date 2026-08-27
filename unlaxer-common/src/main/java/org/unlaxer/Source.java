@@ -170,6 +170,20 @@ public interface Source extends CharSequence, CodePointAccessor, PositionResolve
   }
 
 //  Function<String,Source> stringToSource();
+  /**
+   * Converts a source to its string representation.
+   *
+   * <p>The default keeps implementations compiled against the legacy misspelled
+   * method source-compatible. New callers should use this correctly named API.
+   */
+  default Function<Source, String> sourceToString() {
+    return sourceToStgring();
+  }
+
+  /**
+   * @deprecated Use {@link #sourceToString()}.
+   */
+  @Deprecated(since = "3.0.15", forRemoval = false)
   Function<Source, String> sourceToStgring();
 
   TriFunction<Source, String, CodePointOffset, Source> parentSourceAndStringToSource();
