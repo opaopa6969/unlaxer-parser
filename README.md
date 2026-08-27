@@ -140,12 +140,12 @@ From this, unlaxer generates:
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-common</artifactId>
-        <version>3.0.10</version>
+        <version>3.0.14</version>
     </dependency>
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-dsl</artifactId>
-        <version>3.0.10</version>
+        <version>3.0.14</version>
     </dependency>
 </dependencies>
 ```

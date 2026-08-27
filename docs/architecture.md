@@ -4,7 +4,7 @@
 
 # unlaxer-parser Architecture
 
-**Version**: 3.0.10
+**Version**: 3.0.14
 
 This document describes the full pipeline from a `.ubnf` grammar file to a running language implementation, the internal structure of `unlaxer-common` and `unlaxer-dsl`, the bootstrap / self-hosting mechanism, and the ParserIR design.
 
