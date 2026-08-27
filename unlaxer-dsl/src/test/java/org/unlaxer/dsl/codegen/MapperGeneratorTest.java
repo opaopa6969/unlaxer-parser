@@ -56,6 +56,14 @@ public class MapperGeneratorTest {
         "  Atom ::= NUMBER ;\n" +
         "}";
 
+    private static final String LITERAL_CAPTURE_GRAMMAR =
+        "grammar BooleanCapture {\n" +
+        "  @package: org.example.booleancapture\n" +
+        "  @root\n" +
+        "  @mapping(BooleanFactorExpr, params=[value])\n" +
+        "  BooleanFactor ::= 'true' @value | 'false' @value | '(' BooleanFactor @value ')' ;\n" +
+        "}";
+
     @Test
     public void testGeneratedPackageName() {
         GrammarDecl grammar = parseGrammar(TINYCALC_GRAMMAR);
@@ -172,6 +180,19 @@ public class MapperGeneratorTest {
         assertTrue("should mention keyword param", source.contains("keyword"));
         assertTrue("should mention name param", source.contains("name"));
         assertTrue("should mention init param", source.contains("init"));
+    }
+
+    @Test
+    public void testLiteralCaptureMatchesWordParserByText() {
+        GrammarDecl grammar = parseGrammar(LITERAL_CAPTURE_GRAMMAR);
+        String source = new MapperGenerator().generate(grammar).source();
+
+        assertTrue("true capture should be bound by literal text",
+            source.contains("findCapturedTokenWithText(token, "
+                + "org.unlaxer.parser.elementary.WordParser.class, \"true\", 0)"));
+        assertTrue("false capture should be bound by literal text",
+            source.contains("findCapturedTokenWithText(token, "
+                + "org.unlaxer.parser.elementary.WordParser.class, \"false\", 0)"));
     }
 
     @Test
