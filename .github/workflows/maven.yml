@@ -23,6 +23,7 @@ jobs:
     - name: Validate Central release guard
       run: |
         python3 scripts/tests/test_central_release_guard.py
+        python3 scripts/tests/test_version_sync.py
         bash -n scripts/release-central.sh
         
     - name: Build with Maven
