@@ -6,6 +6,12 @@ This page covers the three release channels: Maven Central (libraries), GitHub A
 
 ## 1. Maven Central (unlaxer-common / unlaxer-dsl)
 
+Central publications use one organization-wide release train slot per UTC
+calendar month. The canonical policy and queue are
+[`release/README.md`](../release/README.md) and
+[`release/central-release-queue.yml`](../release/central-release-queue.yml).
+VSIX- or documentation-only changes do not use Central.
+
 ```bash
 # 1. Bump the version — one place only
 #    pom.xml: <revision>X.Y.Z</revision>
@@ -14,13 +20,18 @@ This page covers the three release channels: Maven Central (libraries), GitHub A
 
 # 3. Commit, push, and confirm CI is green (including the downstream smoke job)
 
-# 4. Deploy — ALWAYS include the parent POM (-pl .):
-mvn -B -pl .,unlaxer-common,unlaxer-dsl clean deploy
+# 4. Read-only organization usage report
+scripts/release-central.sh
+
+# 5. Publish only when the monthly slot is available
+scripts/release-central.sh --execute --confirm org.unlaxer/YYYY-MM
 ```
 
 Notes:
 
 - **Never skip `-pl .`** — the child POMs reference the parent POM, and 3.0.0–3.0.2 era publishes omitted it, leaving consumers with unresolvable parents.
+- The POM defaults to `skipPublishing=true`. A direct `mvn deploy` does not upload; use the guarded script.
+- The script requires a clean `master` matching `origin/master`, an unpublished release version, and available organization capacity.
 - `central-publishing-maven-plugin` validates and auto-publishes; sync to `repo1.maven.org` takes **15–60 minutes** after "validated".
 - Do this **in the same sitting** as writing the CHANGELOG entry. 3.0.2 was documented but never published, which broke downstream CI for weeks (#27, #35).
 - Verify: `curl -s https://repo1.maven.org/maven2/org/unlaxer/unlaxer-common/maven-metadata.xml | grep latest`
@@ -40,14 +51,18 @@ Local build: `mvn -pl unlaxer-dsl/ubnf-vscode verify` → `unlaxer-dsl/ubnf-vsco
 
 ## 3. UBNF VSIX — GitHub Release (permanent)
 
+VSIX releases are independent of the Central monthly slot and may ship when
+needed. VSIX-, walkthrough-, or documentation-only changes do not bump the
+Maven `revision` and do not trigger a Central publication.
+
 Pushing a `v*` tag triggers `.github/workflows/release-vsix.yml`, which builds
 the VSIX, creates a GitHub Release with auto-generated notes, and attaches the
 file permanently:
 
 ```bash
-git tag -a vX.Y.Z -m "unlaxer-parser X.Y.Z"
-git push origin vX.Y.Z
-# → https://github.com/opaopa6969/unlaxer-parser/releases/tag/vX.Y.Z
+git tag -a vsix-vX.Y.Z -m "UBNF VSIX X.Y.Z"
+git push origin vsix-vX.Y.Z
+# → https://github.com/opaopa6969/unlaxer-parser/releases/tag/vsix-vX.Y.Z
 ```
 
 Re-running on an existing tag overwrites the asset (`--clobber`), so a failed
@@ -61,7 +76,9 @@ VS Code run **Extensions: Install from VSIX...**.
 - [ ] `pom.xml` `<revision>` bumped
 - [ ] CHANGELOG section dated (no stale "Unreleased" content shipping silently)
 - [ ] CI green on `master` (build + static analysis + downstream smoke + VSIX)
-- [ ] `mvn -B -pl .,unlaxer-common,unlaxer-dsl clean deploy`
+- [ ] selected in the canonical Central release queue
+- [ ] monthly slot checked with `scripts/release-central.sh`
+- [ ] published through the guarded `--execute --confirm ...` path
 - [ ] repo1 sync confirmed
-- [ ] `git tag vX.Y.Z && git push origin vX.Y.Z` (Release + VSIX)
+- [ ] if needed, `git tag vsix-vX.Y.Z && git push origin vsix-vX.Y.Z` (VSIX only)
 - [ ] Close downstream-facing issues and notify downstream projects if breaking

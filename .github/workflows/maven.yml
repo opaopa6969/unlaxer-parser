@@ -19,6 +19,11 @@ jobs:
         java-version: '21'
         distribution: 'temurin'
         cache: maven
+
+    - name: Validate Central release guard
+      run: |
+        python3 scripts/tests/test_central_release_guard.py
+        bash -n scripts/release-central.sh
         
     - name: Build with Maven
       run: mvn -B clean test
