@@ -52,6 +52,7 @@ public class ParserGenerator implements CodeGenerator {
         boolean hasDelimitedChain = false;
         final Map<String, int[]> helperCounters = new LinkedHashMap<>(); // rule -> [repeat,opt,group,sep]
         boolean needsCPPComment = false;
+        boolean needsBlockComment = false;
         final List<String> delimitorClasses = new ArrayList<>();
         /** rule name -> RecoveryAnnotation (for rules that have @recovery) */
         final Map<String, org.unlaxer.dsl.bootstrap.UBNFAST.RecoveryAnnotation> recoveryRules = new LinkedHashMap<>();
@@ -160,6 +161,9 @@ public class ParserGenerator implements CodeGenerator {
         if (ctx.needsCPPComment) {
             sb.append("import org.unlaxer.parser.clang.CPPComment;\n");
         }
+        if (ctx.needsBlockComment) {
+            sb.append("import org.unlaxer.parser.clang.BlockComment;\n");
+        }
         sb.append("import org.unlaxer.reducer.TagBasedReducer.NodeKind;\n");
         sb.append("import org.unlaxer.util.cache.SupplierBoundCache;\n");
         for (String tokenImport : ParserTokenEmitter.resolveTokenImports(grammar)) {
@@ -228,25 +232,32 @@ public class ParserGenerator implements CodeGenerator {
         boolean anyRuleRequestsDelimited = grammar.rules().stream()
             .map(ParserRuleEmitter::getRuleWhitespaceStyle)
             .anyMatch(style -> style != null && !"none".equals(style));
-        boolean anyRuleInterleaveComments = grammar.rules().stream()
+        boolean anyRuleInterleaveDelimited = grammar.rules().stream()
             .map(ParserRuleEmitter::getRuleInterleaveProfile)
-            .anyMatch(profile -> "commentsandspaces".equals(profile));
+            .anyMatch(profile -> "javastyle".equals(profile) || "commentsandspaces".equals(profile));
 
-        ctx.hasDelimitedChain = hasGlobalWhitespace || hasGlobalComment || anyRuleRequestsDelimited || anyRuleInterleaveComments;
+        ctx.hasDelimitedChain = hasGlobalWhitespace || hasGlobalComment
+            || anyRuleRequestsDelimited || anyRuleInterleaveDelimited;
 
-        if (ctx.hasDelimitedChain && (hasGlobalWhitespace || anyRuleRequestsDelimited || anyRuleInterleaveComments)) {
+        if (ctx.hasDelimitedChain && (hasGlobalWhitespace || anyRuleRequestsDelimited || anyRuleInterleaveDelimited)) {
             ctx.delimitorClasses.add("SpaceParser.class");
         }
-        if (hasGlobalComment || anyRuleInterleaveComments) {
+        if (hasGlobalComment || hasGlobalWhitespace || anyRuleRequestsDelimited || anyRuleInterleaveDelimited) {
             ctx.needsCPPComment = true;
             ctx.delimitorClasses.add("CPPComment.class");
+        }
+        if (hasGlobalWhitespace || anyRuleRequestsDelimited || anyRuleInterleaveDelimited) {
+            ctx.needsBlockComment = true;
+            ctx.delimitorClasses.add("BlockComment.class");
         }
 
         for (RuleDecl rule : grammar.rules()) {
             String style = ParserRuleEmitter.getRuleWhitespaceStyle(rule); // null => inherit global
             String interleaveProfile = ParserRuleEmitter.getRuleInterleaveProfile(rule);
             boolean useDelimited = style == null
-                ? (hasGlobalWhitespace || hasGlobalComment || "commentsandspaces".equals(interleaveProfile))
+                ? (hasGlobalWhitespace || hasGlobalComment
+                    || "javastyle".equals(interleaveProfile)
+                    || "commentsandspaces".equals(interleaveProfile))
                 : !"none".equals(style);
             ctx.useDelimitedChainByRule.put(rule.name(), useDelimited);
         }
