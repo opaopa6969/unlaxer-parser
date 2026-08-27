@@ -194,7 +194,7 @@ public class StringSource implements Source {
               codePointOffset
           );
 
-  static Function<Source, String> stringInterfaceToStgring = StringSource::toString;
+  static Function<Source, String> sourceToString = StringSource::toString;
 
   @Override
   public TriFunction<Source, String, CodePointOffset, Source> parentSourceAndStringToSource() {
@@ -202,8 +202,17 @@ public class StringSource implements Source {
   }
 
   @Override
+  public Function<Source, String> sourceToString() {
+    return sourceToString;
+  }
+
+  /**
+   * @deprecated Use {@link #sourceToString()}.
+   */
+  @Deprecated(since = "3.0.15", forRemoval = false)
+  @Override
   public Function<Source, String> sourceToStgring() {
-    return stringInterfaceToStgring;
+    return sourceToString();
   }
 
   @Override

@@ -14,7 +14,7 @@ import org.unlaxer.parser.combinator.OneOrMore;
 import org.unlaxer.parser.posix.AsciiParser;
 import org.unlaxer.parser.referencer.MatchedTokenParser;
 
-public class Usage003_01_Palidrome extends ParserTestBase {
+public class Usage003_01_Palindrome extends ParserTestBase {
 	
 	@Test
 	public void testPalindrome() {

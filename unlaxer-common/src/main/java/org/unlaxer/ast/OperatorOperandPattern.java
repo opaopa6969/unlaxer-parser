@@ -9,33 +9,33 @@ public enum OperatorOperandPattern{
 	 *    /  \
 	 *  (1)  (2)   <-operands nodes (child)
 	 */
-	Tree(HierarcyLevel.self,HierarcyLevel.child),
+	Tree(HierarchyLevel.self,HierarchyLevel.child),
 	
 	/**
 	 * 	source : "1+2+3"
 	 * 
  	 *   (Plus)  (1)  (2)  (3) (child)
 	 */
-	FlatOneOperator(HierarcyLevel.child,HierarcyLevel.child),
+	FlatOneOperator(HierarchyLevel.child,HierarchyLevel.child),
 	
 	/**
 	 * 	source : "1+2-3+4"
 	 * 
  	 *   (Plus)  (1)  (2)  (minus) (3) 　(Plus)  (4) (child)
 	 */
-	FlatSomeOperatorAndOperands(HierarcyLevel.child,HierarcyLevel.child),
+	FlatSomeOperatorAndOperands(HierarchyLevel.child,HierarchyLevel.child),
 	;
-	HierarcyLevel operatorLevel;
-	HierarcyLevel operandLevel;
-	
-	private OperatorOperandPattern(HierarcyLevel operatorLevel, HierarcyLevel operandLevel) {
+	HierarchyLevel operatorLevel;
+	HierarchyLevel operandLevel;
+
+	private OperatorOperandPattern(HierarchyLevel operatorLevel, HierarchyLevel operandLevel) {
 		this.operatorLevel = operatorLevel;
 		this.operandLevel = operandLevel;
 	}
-	HierarcyLevel operatorLevel() {
+	public HierarchyLevel operatorLevel() {
 		return operatorLevel;
 	}
-	HierarcyLevel operandLevel() {
+	public HierarchyLevel operandLevel() {
 		return operandLevel;
 	}
 	
