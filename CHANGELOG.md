@@ -8,6 +8,13 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ## [Unreleased]
 
+### Changed
+- Maven Central publication now defaults to bundle-only mode and requires the organization-wide monthly release guard to opt into upload. The Central publishing plugin is updated to 0.11.0 so token identifiers are not written to release logs.
+
+---
+
+## [3.0.14] - 2026-08-26
+
 ### Added
 - Generated DAP adapters can now override `resolveDebugSource(...)` to select a line-aligned DSL slice from a container document while retaining the original file path, line mapping, and breakpoint coordinates. The default hook preserves the prior whole-file behavior.
 
