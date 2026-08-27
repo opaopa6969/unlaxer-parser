@@ -399,6 +399,17 @@ public class ParserGeneratorTest {
             source.contains("import org.unlaxer.parser.clang.CPPComment;"));
         assertTrue("should include CPPComment in generated delimitor",
             source.contains("CPPComment.class"));
+        assertTrue("should import BlockComment for Java-style comments",
+            source.contains("import org.unlaxer.parser.clang.BlockComment;"));
+        assertTrue("should include BlockComment in generated delimitor",
+            source.contains("BlockComment.class"));
+    }
+
+    @Test
+    public void testGlobalJavaStyleWhitespaceIncludesBothCommentForms() {
+        String source = generate(TINYCALC_GRAMMAR);
+        assertTrue(source.contains("CPPComment.class"));
+        assertTrue(source.contains("BlockComment.class"));
     }
 
     @Test

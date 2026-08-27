@@ -7,6 +7,8 @@ import org.unlaxer.parser.Parsers;
 import org.unlaxer.parser.combinator.*;
 import org.unlaxer.parser.elementary.WordParser;
 import org.unlaxer.parser.posix.SpaceParser;
+import org.unlaxer.parser.clang.CPPComment;
+import org.unlaxer.parser.clang.BlockComment;
 import org.unlaxer.reducer.TagBasedReducer.NodeKind;
 import org.unlaxer.util.cache.SupplierBoundCache;
 import org.unlaxer.parser.elementary.NumberParser;
@@ -114,7 +116,7 @@ public class SnapshotRightAssocParsers {
         private static final long serialVersionUID = 1L;
         @Override
         public Supplier<Parser> getLazyParser() {
-            return new SupplierBoundCache<>(() -> Parser.get(SpaceParser.class));
+            return new SupplierBoundCache<>(() -> new Choice(SpaceParser.class, CPPComment.class, BlockComment.class));
         }
         @Override
         public java.util.Optional<Parser> getLazyTerminatorParser() { return java.util.Optional.empty(); }
