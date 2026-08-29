@@ -541,16 +541,10 @@ public final class GrammarValidator {
         }
 
         for (TokenDecl token : grammar.tokens()) {
-            if (!(token instanceof TokenDecl.Simple simple)) {
+            String generatedReference = generatedTokenParserClassName(token);
+            if (generatedReference == null) {
                 continue;
             }
-            String parserClass = simple.parserClass();
-            if (parserClass == null || parserClass.isBlank()) {
-                continue;
-            }
-            String generatedReference = parserClass.contains(".")
-                ? ParserCodegenUtil.toParserClassName(simple.name())
-                : parserClass;
             String collidingRule = ruleByParserName.get(generatedReference);
             if (collidingRule == null) {
                 continue;
@@ -558,12 +552,45 @@ public final class GrammarValidator {
             addRuleError(
                 errors,
                 collidingRule,
-                "rule " + collidingRule + " and token " + simple.name()
+                "rule " + collidingRule + " and token " + token.name()
                     + " both resolve to generated parser class " + generatedReference,
                 "Rename the rule or token so their generated parser class names differ.",
                 "E-RULE-TOKEN-NAME-COLLISION"
             );
         }
+    }
+
+    /**
+     * Returns the generated parser class name a token declaration resolves to,
+     * or {@code null} when the token does not produce a generated wrapper class
+     * (e.g. {@code Any}, {@code Eof}, {@code Empty}) or the reference is blank.
+     *
+     * <p>For {@link TokenDecl.Simple} the user-supplied short class name is kept
+     * when present (mirroring {@link ParserTokenEmitter}); all other kinds —
+     * {@code Negation}, {@code CharRange}, {@code Regex}, {@code Until},
+     * {@code CaseInsensitive}, … — always derive their class name from the
+     * token name via {@link ParserCodegenUtil#toParserClassName}.
+     */
+    private static String generatedTokenParserClassName(TokenDecl token) {
+        if (token instanceof TokenDecl.Simple simple) {
+            String parserClass = simple.parserClass();
+            if (parserClass == null || parserClass.isBlank()) {
+                return null;
+            }
+            return parserClass.contains(".")
+                ? ParserCodegenUtil.toParserClassName(simple.name())
+                : parserClass;
+        }
+        // Non-Simple tokens that emit a generated class all use the token-name-derived
+        // class name. Until / CaseInsensitive / Negation / CharRange / Regex fall here.
+        return switch (token) {
+            case TokenDecl.Until ignored -> ParserCodegenUtil.toParserClassName(token.name());
+            case TokenDecl.Negation ignored -> ParserCodegenUtil.toParserClassName(token.name());
+            case TokenDecl.CharRange ignored -> ParserCodegenUtil.toParserClassName(token.name());
+            case TokenDecl.Regex ignored -> ParserCodegenUtil.toParserClassName(token.name());
+            case TokenDecl.CaseInsensitive ignored -> ParserCodegenUtil.toParserClassName(token.name());
+            default -> null; // Any, Eof, Empty, Lookahead, NegativeLookahead emit no parser class
+        };
     }
 
     /**

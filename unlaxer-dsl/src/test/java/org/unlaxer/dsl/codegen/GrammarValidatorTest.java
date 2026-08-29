@@ -845,6 +845,74 @@ public class GrammarValidatorTest {
             .anyMatch(issue -> "E-RULE-TOKEN-NAME-COLLISION".equals(issue.code())));
     }
 
+    @Test
+    public void testRegexTokenRuleNameCollisionIsRejected() {
+        GrammarDecl grammar = parseGrammar(
+            "grammar G {\n"
+                + "  @package: org.example\n"
+                + "  token ID = REGEX('[a-z]+')\n"
+                + "  @root\n"
+                + "  Id ::= ID ;\n"
+                + "}"
+        );
+
+        GrammarValidator.ValidationIssue collision = GrammarValidator.validate(grammar).stream()
+            .filter(issue -> "E-RULE-TOKEN-NAME-COLLISION".equals(issue.code()))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("expected REGEX token/rule parser-name collision"));
+
+        assertEquals("ERROR", collision.severity());
+        assertEquals("RULE", collision.category());
+        assertEquals("Id", collision.rule());
+        assertTrue(collision.message().contains("IdParser"));
+        assertTrue(collision.message().contains("ID"));
+    }
+
+    @Test
+    public void testNegationTokenRuleNameCollisionIsRejected() {
+        GrammarDecl grammar = parseGrammar(
+            "grammar G {\n"
+                + "  @package: org.example\n"
+                + "  token NOT_QUOTE = NEGATION('\"')\n"
+                + "  @root\n"
+                + "  NotQuote ::= NOT_QUOTE ;\n"
+                + "}"
+        );
+
+        assertTrue(GrammarValidator.validate(grammar).stream()
+            .anyMatch(issue -> "E-RULE-TOKEN-NAME-COLLISION".equals(issue.code())));
+    }
+
+    @Test
+    public void testCharRangeTokenRuleNameCollisionIsRejected() {
+        GrammarDecl grammar = parseGrammar(
+            "grammar G {\n"
+                + "  @package: org.example\n"
+                + "  token LOWER = CHAR_RANGE('a','z')\n"
+                + "  @root\n"
+                + "  Lower ::= LOWER ;\n"
+                + "}"
+        );
+
+        assertTrue(GrammarValidator.validate(grammar).stream()
+            .anyMatch(issue -> "E-RULE-TOKEN-NAME-COLLISION".equals(issue.code())));
+    }
+
+    @Test
+    public void testNonCollidingRegexTokenIsAccepted() {
+        GrammarDecl grammar = parseGrammar(
+            "grammar G {\n"
+                + "  @package: org.example\n"
+                + "  token ID = REGEX('[a-z]+')\n"
+                + "  @root\n"
+                + "  Identifier ::= ID ;\n"
+                + "}"
+        );
+
+        assertFalse(GrammarValidator.validate(grammar).stream()
+            .anyMatch(issue -> "E-RULE-TOKEN-NAME-COLLISION".equals(issue.code())));
+    }
+
     private GrammarDecl parseGrammar(String source) {
         return UBNFMapper.parse(source).grammars().get(0);
     }
