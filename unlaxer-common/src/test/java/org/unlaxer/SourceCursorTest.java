@@ -188,6 +188,23 @@ public class SourceCursorTest {
     }
 
     @Test
+    public void peekLastClipsNegativeStartToZero() {
+        // endIndexInclusive(2) - length(5) = -3 -> clipped to 0; result is peek(0,2)
+        StringSource source = StringSource.createRootSource("abcdef");
+        Source peeked = source.peekLast(new CodePointIndex(2), new CodePointLength(5));
+        assertEquals("ab", peeked.sourceAsString());
+    }
+
+    @Test
+    public void peekLastClipsNegativeStartToZeroAtHead() {
+        // At the very head: endIndex=0, length=1 -> start would be -1 -> clipped to 0
+        // peek(0,0) yields an empty (non-present) Source
+        StringSource source = StringSource.createRootSource("abcdef");
+        Source peeked = source.peekLast(new CodePointIndex(0), new CodePointLength(1));
+        assertFalse("clipped peek(0,0) is empty", peeked.isPresent());
+    }
+
+    @Test
     public void surrogatePairCodePointLength() {
         // Emoji is a surrogate pair: string length != codepoint length
         String emoji = "\uD83D\uDE00"; // grinning face
