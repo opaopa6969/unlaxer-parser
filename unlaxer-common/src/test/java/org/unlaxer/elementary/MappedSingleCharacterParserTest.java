@@ -1,6 +1,10 @@
 package org.unlaxer.elementary;
 
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
 import org.junit.Test;
+import org.unlaxer.Parsed;
 import org.unlaxer.ParserTestBase;
 import org.unlaxer.parser.combinator.OneOrMore;
 import org.unlaxer.parser.elementary.MappedSingleCharacterParser;
@@ -17,6 +21,40 @@ public class MappedSingleCharacterParserTest extends ParserTestBase {
 		testPartialMatch(oneOrMore, "$%(&", "$%");
 		testUnMatch(oneOrMore, "()");
 
+	}
+
+	@Test
+	public void invertedSetMatchesNonAsciiBmp() {
+		MappedSingleCharacterParser notA = new MappedSingleCharacterParser(true, "a");
+		testSucceededOnly(notA, "È");
+		testSucceededOnly(notA, "Ω");
+		testSucceededOnly(notA, "あ");
+	}
+
+	@Test
+	public void invertedSetRejectsListedChar() {
+		MappedSingleCharacterParser notA = new MappedSingleCharacterParser(true, "a");
+		testUnMatch(notA, "a");
+	}
+
+	@Test
+	public void nonInvertedSetRejectsNonAsciiBmp() {
+		MappedSingleCharacterParser onlyA = new MappedSingleCharacterParser(false, "a");
+		testUnMatch(onlyA, "È");
+	}
+
+	@Test
+	public void invertedSetMatchesSupplementaryCodePoint() {
+		MappedSingleCharacterParser notA = new MappedSingleCharacterParser(true, "a");
+		Parsed parsed = parse(notA, "𝄞");
+		assertTrue(parsed.isSucceeded());
+	}
+
+	@Test
+	public void nonInvertedSetRejectsSupplementaryCodePoint() {
+		MappedSingleCharacterParser onlyA = new MappedSingleCharacterParser(false, "a");
+		Parsed parsed = parse(onlyA, "𝄞");
+		assertFalse(parsed.isSucceeded());
 	}
 
 }
