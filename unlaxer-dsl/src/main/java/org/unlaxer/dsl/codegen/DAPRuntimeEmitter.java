@@ -263,8 +263,9 @@ class DAPRuntimeEmitter {
         w.line("}");
         w.line("if (value != null && value.length >= 2) {");
         w.indent();
-        w.line("int start = Math.max(0, Math.min(value[0], sourceContent.length()));");
-        w.line("int end = Math.max(start, Math.min(value[1], sourceContent.length()));");
+        w.line("int maxCodePointOffset = sourceContent.codePointCount(0, sourceContent.length());");
+        w.line("int start = Math.max(0, Math.min(value[0], maxCodePointOffset));");
+        w.line("int end = Math.max(start, Math.min(value[1], maxCodePointOffset));");
         w.line("return new int[]{start, end};");
         w.dedent();
         w.line("}");
@@ -373,8 +374,8 @@ class DAPRuntimeEmitter {
         w.line("return current == null ? \"\" : current.source.sourceAsString().strip();");
         w.dedent();
         w.line("}");
-        w.line("int start = Math.max(0, Math.min(span[0], sourceContent.length()));");
-        w.line("int end = Math.max(start, Math.min(span[1], sourceContent.length()));");
+        w.line("int start = Math.max(0, Math.min(codePointOffsetToStringOffset(span[0]), sourceContent.length()));");
+        w.line("int end = Math.max(start, Math.min(codePointOffsetToStringOffset(span[1]), sourceContent.length()));");
         w.line("return sourceContent.substring(start, end).strip();");
         w.dedent();
         w.line("}");
@@ -455,9 +456,21 @@ class DAPRuntimeEmitter {
 
     /** ブレークポイント関連ヘルパーメソッドを出力する。 */
     static void emitBreakpointHelpers(IndentedWriter w) {
+        // The parser runtime counts Unicode code points, while String indices and
+        // the DAP line/column model use UTF-16 code units. Convert before walking
+        // the source so breakpoints land on the right line after non-BMP characters.
+        w.line("private int codePointOffsetToStringOffset(int codePointOffset) {");
+        w.indent();
+        w.line("int safeCodePointOffset = Math.max(0, Math.min(codePointOffset,");
+        w.line("    sourceContent.codePointCount(0, sourceContent.length())));");
+        w.line("return sourceContent.offsetByCodePoints(0, safeCodePointOffset);");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
+
         w.line("private int getLineForToken(Token t) {");
         w.indent();
-        w.line("int charOffset = t.source.offsetFromRoot().value();");
+        w.line("int charOffset = codePointOffsetToStringOffset(t.source.offsetFromRoot().value());");
         w.line("int line = 1;");
         w.line("for (int i = 0; i < charOffset && i < sourceContent.length(); i++) {");
         w.indent();
@@ -509,8 +522,9 @@ class DAPRuntimeEmitter {
         w.line("}");
         w.blankLine();
 
-        w.line("private int getLineForOffset(int charOffset) {");
+        w.line("private int getLineForOffset(int codePointOffset) {");
         w.indent();
+        w.line("int charOffset = codePointOffsetToStringOffset(codePointOffset);");
         w.line("int line = 1;");
         w.line("for (int i = 0; i < charOffset && i < sourceContent.length(); i++) {");
         w.indent();

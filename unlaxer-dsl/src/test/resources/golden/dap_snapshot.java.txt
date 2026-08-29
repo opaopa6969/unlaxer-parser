@@ -461,8 +461,9 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
                     return null;
                 }
                 if (value != null && value.length >= 2) {
-                    int start = Math.max(0, Math.min(value[0], sourceContent.length()));
-                    int end = Math.max(start, Math.min(value[1], sourceContent.length()));
+                    int maxCodePointOffset = sourceContent.codePointCount(0, sourceContent.length());
+                    int start = Math.max(0, Math.min(value[0], maxCodePointOffset));
+                    int end = Math.max(start, Math.min(value[1], maxCodePointOffset));
                     return new int[]{start, end};
                 }
             }
@@ -528,8 +529,8 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
             Token current = currentStepToken();
             return current == null ? "" : current.source.sourceAsString().strip();
         }
-        int start = Math.max(0, Math.min(span[0], sourceContent.length()));
-        int end = Math.max(start, Math.min(span[1], sourceContent.length()));
+        int start = Math.max(0, Math.min(codePointOffsetToStringOffset(span[0]), sourceContent.length()));
+        int end = Math.max(start, Math.min(codePointOffsetToStringOffset(span[1]), sourceContent.length()));
         return sourceContent.substring(start, end).strip();
     }
 
@@ -576,8 +577,14 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
         collectTokenStepPoints(token, out);
     }
 
+    private int codePointOffsetToStringOffset(int codePointOffset) {
+        int safeCodePointOffset = Math.max(0, Math.min(codePointOffset,
+            sourceContent.codePointCount(0, sourceContent.length())));
+        return sourceContent.offsetByCodePoints(0, safeCodePointOffset);
+    }
+
     private int getLineForToken(Token t) {
-        int charOffset = t.source.offsetFromRoot().value();
+        int charOffset = codePointOffsetToStringOffset(t.source.offsetFromRoot().value());
         int line = 1;
         for (int i = 0; i < charOffset && i < sourceContent.length(); i++) {
             if (sourceContent.charAt(i) == '\n') { line++; }
@@ -609,7 +616,8 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
         return getLineForToken(token);
     }
 
-    private int getLineForOffset(int charOffset) {
+    private int getLineForOffset(int codePointOffset) {
+        int charOffset = codePointOffsetToStringOffset(codePointOffset);
         int line = 1;
         for (int i = 0; i < charOffset && i < sourceContent.length(); i++) {
             if (sourceContent.charAt(i) == '\n') {
