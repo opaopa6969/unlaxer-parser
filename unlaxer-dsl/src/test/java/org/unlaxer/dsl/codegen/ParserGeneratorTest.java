@@ -905,6 +905,70 @@ public class ParserGeneratorTest {
     }
 
     // =========================================================================
+    // T4-4: REGEX / NEGATION / CHAR_RANGE token vs rule name collision
+    // =========================================================================
+
+    private static final String REGEX_COLLISION_GRAMMAR =
+        "grammar RxCollideG {\n" +
+        "  @package: org.example.rxcollide\n" +
+        "  @whitespace: javaStyle\n" +
+        "  token ID = REGEX('[a-z]+')\n" +
+        "  @root\n" +
+        "  Id ::= ID ;\n" +
+        "}";
+
+    @Test
+    public void testRegexTokenSkipsClassWhenCollidingWithRule() {
+        String source = generate(REGEX_COLLISION_GRAMMAR);
+        long idParserCount = java.util.regex.Pattern.compile("class IdParser\\b")
+            .matcher(source).results().count();
+        assertEquals("IdParser must be emitted exactly once (rule side only); duplicate class would fail to compile",
+            1L, idParserCount);
+        assertFalse("REGEX wrapper for colliding token ID must not be emitted",
+            source.contains("REGEX parser for token ID"));
+    }
+
+    private static final String NEGATION_COLLISION_GRAMMAR =
+        "grammar NegCollideG {\n" +
+        "  @package: org.example.negcollide\n" +
+        "  @whitespace: javaStyle\n" +
+        "  token NOT_QUOTE = NEGATION('\"')\n" +
+        "  @root\n" +
+        "  NotQuote ::= NOT_QUOTE ;\n" +
+        "}";
+
+    @Test
+    public void testNegationTokenSkipsClassWhenCollidingWithRule() {
+        String source = generate(NEGATION_COLLISION_GRAMMAR);
+        long notQuoteParserCount = java.util.regex.Pattern.compile("class NotQuoteParser\\b")
+            .matcher(source).results().count();
+        assertEquals("NotQuoteParser must be emitted exactly once (rule side only)",
+            1L, notQuoteParserCount);
+        assertFalse("NEGATION wrapper for colliding token NOT_QUOTE must not be emitted",
+            source.contains("NEGATION parser for token NOT_QUOTE"));
+    }
+
+    private static final String CHAR_RANGE_COLLISION_GRAMMAR =
+        "grammar CharRangeCollideG {\n" +
+        "  @package: org.example.charrangecollide\n" +
+        "  @whitespace: javaStyle\n" +
+        "  token LOWER = CHAR_RANGE('a','z')\n" +
+        "  @root\n" +
+        "  Lower ::= LOWER ;\n" +
+        "}";
+
+    @Test
+    public void testCharRangeTokenSkipsClassWhenCollidingWithRule() {
+        String source = generate(CHAR_RANGE_COLLISION_GRAMMAR);
+        long lowerParserCount = java.util.regex.Pattern.compile("class LowerParser\\b")
+            .matcher(source).results().count();
+        assertEquals("LowerParser must be emitted exactly once (rule side only)",
+            1L, lowerParserCount);
+        assertFalse("CHAR_RANGE wrapper for colliding token LOWER must not be emitted",
+            source.contains("CHAR_RANGE parser for token LOWER"));
+    }
+
+    // =========================================================================
     // @scopeTree / @declares / @backref
     // =========================================================================
 

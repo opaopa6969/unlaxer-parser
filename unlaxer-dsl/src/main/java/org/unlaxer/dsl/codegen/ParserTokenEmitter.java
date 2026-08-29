@@ -96,6 +96,9 @@ class ParserTokenEmitter {
             String tokenName = e.getKey();
             String excluded = e.getValue();
             String className = ParserCodegenUtil.toParserClassName(tokenName);
+            if (collidesWithRuleName(className, ctx)) {
+                continue;
+            }
             sb.append("    // --- NEGATION parser for token ").append(tokenName).append(" ---\n");
             sb.append("    public static class ").append(className)
               .append(" extends org.unlaxer.parser.elementary.SingleCharacterParser {\n");
@@ -124,6 +127,9 @@ class ParserTokenEmitter {
             char min = (char) e.getValue()[0];
             char max = (char) e.getValue()[1];
             String className = ParserCodegenUtil.toParserClassName(tokenName); // same camelCase logic
+            if (collidesWithRuleName(className, ctx)) {
+                continue;
+            }
             sb.append("    // --- CHAR_RANGE parser for token ").append(tokenName).append(" ---\n");
             sb.append("    public static class ").append(className)
               .append(" extends org.unlaxer.parser.elementary.SingleCharacterParser {\n");
@@ -150,6 +156,9 @@ class ParserTokenEmitter {
             String tokenName = e.getKey();
             String pattern = e.getValue();
             String className = ParserCodegenUtil.toParserClassName(tokenName);
+            if (collidesWithRuleName(className, ctx)) {
+                continue;
+            }
             sb.append("    // --- REGEX parser for token ").append(tokenName).append(" ---\n");
             sb.append("    public static class ").append(className)
               .append(" extends org.unlaxer.dsl.runtime.RegexTokenParser {\n");
@@ -160,5 +169,17 @@ class ParserTokenEmitter {
             sb.append("    }\n\n");
         }
         return sb.toString();
+    }
+
+    /**
+     * Mirrors {@link #generateSimpleTokenWrappers}'s skip guard: returns true when the
+     * generated token parser class name collides with a rule-derived parser class name,
+     * which would produce a duplicate class in the generated {@code Parsers} class.
+     */
+    private static boolean collidesWithRuleName(String wrapperName, ParserGenerator.GenContext ctx) {
+        String ruleNameEquivalent = wrapperName.endsWith("Parser")
+            ? wrapperName.substring(0, wrapperName.length() - "Parser".length())
+            : wrapperName;
+        return ctx.ruleNames.contains(ruleNameEquivalent);
     }
 }
