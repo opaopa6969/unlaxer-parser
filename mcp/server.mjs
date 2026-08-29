@@ -2,7 +2,7 @@
 import http from 'node:http';
 import { randomUUID, webcrypto } from 'node:crypto';
 import { execFile } from 'node:child_process';
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, realpath } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,6 +18,57 @@ if (!globalThis.crypto) {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
 const VERSION = '1.0.0';
+
+const TMP_ROOT = '/tmp';
+const MAX_IR_INLINE_BYTES = 2 * 1024 * 1024;
+
+async function resolveReal(p) {
+  try {
+    return await realpath(p);
+  } catch {
+    return null;
+  }
+}
+
+async function assertReadableInRepo(userPath, label) {
+  const abs = path.resolve(REPO_ROOT, userPath);
+  const realRepo = await resolveReal(REPO_ROOT);
+  const realAbs = await resolveReal(abs);
+  if (!realAbs) {
+    throw new Error(`${label}: file not found: ${userPath}`);
+  }
+  if (!realAbs.startsWith(realRepo + path.sep) && realAbs !== realRepo) {
+    throw new Error(`${label}: path must stay inside the repository: ${userPath}`);
+  }
+  return abs;
+}
+
+async function assertWritableInTmp(userPath, label) {
+  const abs = path.resolve(userPath);
+  if (!abs.startsWith(TMP_ROOT + '/')) {
+    throw new Error(`${label}: writable path must be under ${TMP_ROOT}: ${userPath}`);
+  }
+  return abs;
+}
+
+async function assertReadableFileInTmp(userPath, label) {
+  const abs = path.resolve(userPath);
+  if (!abs.startsWith(TMP_ROOT + '/')) {
+    throw new Error(`${label}: file path must be under ${TMP_ROOT}: ${userPath}`);
+  }
+  const realAbs = await resolveReal(abs);
+  if (!realAbs) {
+    throw new Error(`${label}: file not found: ${userPath}`);
+  }
+  return abs;
+}
+
+async function assertInlineIr(parserIr) {
+  const buf = Buffer.byteLength(parserIr, 'utf8');
+  if (buf > MAX_IR_INLINE_BYTES) {
+    throw new Error(`parser_ir: inline payload too large (${buf} bytes, max ${MAX_IR_INLINE_BYTES})`);
+  }
+}
 
 function log(...a) {
   process.stderr.write('[unlaxer-mcp] ' + a.map(x => typeof x === 'string' ? x : JSON.stringify(x)).join(' ') + '\n');
@@ -76,16 +127,27 @@ function errorResult(msg) {
   return { isError: true, content: [{ type: 'text', text: msg }] };
 }
 
+function guard(fn) {
+  return async (args) => {
+    try {
+      return await fn(args);
+    } catch (e) {
+      return errorResult(String(e?.message || e));
+    }
+  };
+}
+
 function createServer() {
   const server = new McpServer({ name: 'unlaxer-parser', version: VERSION });
 
   server.tool(
     'validate',
     'UBNF文法を検証する（read・副作用なし）',
-    { grammar_file: z.string().describe('UBNF文法ファイルのパス（リポジトリルート相対または絶対）') },
-    async (args) => {
+    { grammar_file: z.string().describe('UBNF文法ファイルのパス（リポジトリルート相対）') },
+    guard(async (args) => {
+      const grammarFile = await assertReadableInRepo(args.grammar_file, 'grammar_file');
       const res = await runJava('org.unlaxer.dsl.CodegenMain', [
-        '--validate-only', '--grammar', args.grammar_file, '--report-format', 'ndjson',
+        '--validate-only', '--grammar', grammarFile, '--report-format', 'ndjson',
       ]);
       if (res.exitCode === 0) {
         const events = parseNdjson(res.stdout);
@@ -93,7 +155,7 @@ function createServer() {
       }
       const events = parseNdjson(res.stdout);
       return jsonResult({ ok: false, exitCode: res.exitCode, events, stderr: res.stderr });
-    }
+    })
   );
 
   server.tool(
@@ -101,14 +163,16 @@ function createServer() {
     'UBNF文法からコードを生成する（write・dry_runデフォルトtrue）',
     {
       grammar_file: z.string().describe('UBNF文法ファイルのパス'),
-      output_dir: z.string().describe('出力ディレクトリ'),
+      output_dir: z.string().describe('出力ディレクトリ（/tmp 配下のみ）'),
       generators: z.string().optional().describe('カンマ区切り: AST,Parser,Mapper,Evaluator,LSP,Launcher,DAP,DAPLauncher'),
       dry_run: z.boolean().optional().describe('true=生成計画のみ（デフォルトtrue）'),
       clean_output: z.boolean().optional().describe('true=出力ディレクトリをクリーン（confirm必要）'),
       confirm: z.boolean().optional().describe('clean_output=trueのとき必須'),
     },
-    async (args) => {
-      const cliArgs = ['--grammar', args.grammar_file, '--output', args.output_dir, '--report-format', 'ndjson'];
+    guard(async (args) => {
+      const grammarFile = await assertReadableInRepo(args.grammar_file, 'grammar_file');
+      const outputDir = await assertWritableInTmp(args.output_dir, 'output_dir');
+      const cliArgs = ['--grammar', grammarFile, '--output', outputDir, '--report-format', 'ndjson'];
       if (args.generators) cliArgs.push('--generators', args.generators);
       if (args.dry_run !== false) cliArgs.push('--dry-run');
       if (args.clean_output) {
@@ -120,7 +184,7 @@ function createServer() {
       const res = await runJava('org.unlaxer.dsl.CodegenMain', cliArgs);
       const events = parseNdjson(res.stdout);
       return jsonResult({ ok: res.exitCode === 0, exitCode: res.exitCode, events, stderr: res.stderr });
-    }
+    })
   );
 
   server.tool(
@@ -128,12 +192,15 @@ function createServer() {
     'Parser IRをエクスポートする（read・JSONを返す）',
     {
       grammar_file: z.string().describe('UBNF文法ファイルのパス'),
-      output_file: z.string().optional().describe('出力ファイルパス（省略時は標準出力に返す）'),
+      output_file: z.string().optional().describe('出力ファイルパス（/tmp 配下のみ。省略時は自動生成）'),
     },
-    async (args) => {
-      const irFile = args.output_file || path.join('/tmp', `parser-ir-${Date.now()}.json`);
+    guard(async (args) => {
+      const grammarFile = await assertReadableInRepo(args.grammar_file, 'grammar_file');
+      const irFile = args.output_file
+        ? await assertWritableInTmp(args.output_file, 'output_file')
+        : path.join('/tmp', `parser-ir-${Date.now()}.json`);
       const res = await runJava('org.unlaxer.dsl.CodegenMain', [
-        '--grammar', args.grammar_file, '--export-parser-ir', irFile, '--report-format', 'ndjson',
+        '--grammar', grammarFile, '--export-parser-ir', irFile, '--report-format', 'ndjson',
       ]);
       if (res.exitCode === 0) {
         const events = parseNdjson(res.stdout);
@@ -143,25 +210,29 @@ function createServer() {
       }
       const events = parseNdjson(res.stdout);
       return jsonResult({ ok: false, exitCode: res.exitCode, events, stderr: res.stderr });
-    }
+    })
   );
 
   server.tool(
     'validate_parser_ir',
     'Parser IRを検証する（read・副作用なし）',
-    { parser_ir: z.string().describe('Parser IR JSON文字列 または ファイルパス') },
-    async (args) => {
-      let irPath = args.parser_ir;
-      if (args.parser_ir.trim().startsWith('{')) {
+    { parser_ir: z.string().describe('Parser IR JSON文字列 または /tmp 配下のファイルパス') },
+    guard(async (args) => {
+      let irPath;
+      const trimmed = args.parser_ir.trim();
+      if (trimmed.startsWith('{')) {
+        await assertInlineIr(args.parser_ir);
         irPath = path.join('/tmp', `parser-ir-validate-${Date.now()}.json`);
         await writeFile(irPath, args.parser_ir);
+      } else {
+        irPath = await assertReadableFileInTmp(args.parser_ir, 'parser_ir');
       }
       const res = await runJava('org.unlaxer.dsl.CodegenMain', [
         '--validate-parser-ir', irPath, '--report-format', 'ndjson',
       ]);
       const events = parseNdjson(res.stdout);
       return jsonResult({ ok: res.exitCode === 0, exitCode: res.exitCode, events, stderr: res.stderr });
-    }
+    })
   );
 
   server.tool(
@@ -169,15 +240,17 @@ function createServer() {
     'UBNFからrailway diagramを生成する（write・SVG/PNG/markdown）',
     {
       grammar_file: z.string().describe('UBNF文法ファイルのパス'),
-      output_dir: z.string().describe('出力ディレクトリ'),
+      output_dir: z.string().describe('出力ディレクトリ（/tmp 配下のみ）'),
       format: z.enum(['svg', 'png', 'both', 'markdown']).optional().describe('出力フォーマット（デフォルトsvg）'),
     },
-    async (args) => {
-      const cliArgs = [args.grammar_file, args.output_dir];
+    guard(async (args) => {
+      const grammarFile = await assertReadableInRepo(args.grammar_file, 'grammar_file');
+      const outputDir = await assertWritableInTmp(args.output_dir, 'output_dir');
+      const cliArgs = [grammarFile, outputDir];
       if (args.format) cliArgs.push('--format', args.format);
       const res = await runJava('org.unlaxer.dsl.tools.railroad.RailroadMain', cliArgs);
       return jsonResult({ ok: res.exitCode === 0, exitCode: res.exitCode, stdout: res.stdout, stderr: res.stderr });
-    }
+    })
   );
 
   server.tool(
@@ -187,29 +260,35 @@ function createServer() {
       grammar_file: z.string().describe('UBNF文法ファイルのパス'),
       keep_annotations: z.boolean().optional().describe('true=アノテーションを保持'),
     },
-    async (args) => {
-      const cliArgs = [args.grammar_file];
+    guard(async (args) => {
+      const grammarFile = await assertReadableInRepo(args.grammar_file, 'grammar_file');
+      const cliArgs = [grammarFile];
       if (args.keep_annotations) cliArgs.push('--keep-annotations');
       const res = await runJava('org.unlaxer.dsl.tools.bnf.UBNFToBNFMain', cliArgs);
       return jsonResult({ ok: res.exitCode === 0, exitCode: res.exitCode, ebnf: res.stdout, stderr: res.stderr });
-    }
+    })
   );
 
   server.tool(
     'init',
     'DSLプロジェクトをscaffoldする（write・confirm必要）',
     {
-      name: z.string().describe('DSL名'),
+      name: z.string().describe('DSL名（ディレクトリ名として安全な文字列）'),
       package: z.string().optional().describe('Javaパッケージ名（省略時: org.example.<name>）'),
-      output_dir: z.string().optional().describe('出力ディレクトリ（省略時: ./<name>）'),
+      output_dir: z.string().optional().describe('出力ディレクトリ（/tmp 配下のみ。省略時: /tmp/<name>）'),
       with_dap: z.boolean().optional().describe('DAP debug supportを含める'),
       force: z.boolean().optional().describe('既存ディレクトリを上書き（confirm必要）'),
       confirm: z.boolean().optional().describe('force=trueのとき必須'),
     },
-    async (args) => {
-      const cliArgs = ['init', args.name];
+    guard(async (args) => {
+      if (!args.name || /[^A-Za-z0-9_-]/.test(args.name)) {
+        return errorResult('name: 使用可能な文字は A-Z a-z 0-9 _ - のみです');
+      }
+      const outputDir = args.output_dir
+        ? await assertWritableInTmp(args.output_dir, 'output_dir')
+        : path.join('/tmp', args.name);
+      const cliArgs = ['init', args.name, '--output-dir', outputDir];
       if (args.package) cliArgs.push('--package', args.package);
-      if (args.output_dir) cliArgs.push('--output-dir', args.output_dir);
       if (args.with_dap) cliArgs.push('--with-dap');
       if (args.force) {
         if (!args.confirm) {
@@ -219,7 +298,7 @@ function createServer() {
       }
       const res = await runJava('org.unlaxer.dsl.CodegenMain', cliArgs);
       return jsonResult({ ok: res.exitCode === 0, exitCode: res.exitCode, stdout: res.stdout, stderr: res.stderr });
-    }
+    })
   );
 
   server.resource(

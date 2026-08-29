@@ -109,6 +109,42 @@ async function main() {
       if (parsed.ok) { ok('init'); } else { ng('init', JSON.stringify(parsed).slice(0, 200)); }
     } catch (e) { ng('init', e.message); }
 
+    // --- security: path traversal / arbitrary path rejection ---
+    async function expectRejected(name, toolName, args) {
+      try {
+        const r = await client.callTool({ name: toolName, arguments: args });
+        if (r.isError) {
+          ok(`sec: ${name}`);
+          return;
+        }
+        const parsed = JSON.parse(r.content[0].text);
+        if (parsed && parsed.isError) {
+          ok(`sec: ${name}`);
+        } else {
+          ng(`sec: ${name}`, `expected rejection, got: ${JSON.stringify(parsed).slice(0, 200)}`);
+        }
+      } catch (e) { ng(`sec: ${name}`, e.message); }
+    }
+
+    // grammar_file traversal (read outside repo)
+    await expectRejected('validate traversal', 'validate', { grammar_file: '../../../etc/passwd' });
+    await expectRejected('validate absolute', 'validate', { grammar_file: '/etc/passwd' });
+    await expectRejected('convert_to_ebnf traversal', 'convert_to_ebnf', { grammar_file: '../secret.ubnf' });
+    await expectRejected('export_parser_ir traversal', 'export_parser_ir', { grammar_file: '../../../etc/shadow' });
+
+    // output_dir / output_file outside /tmp (write anywhere)
+    await expectRejected('generate output_dir', 'generate', { grammar_file: 'story/code/calc.ubnf', output_dir: '/etc/unlaxer-evil', dry_run: true });
+    await expectRejected('export_parser_ir output_file', 'export_parser_ir', { grammar_file: 'story/code/calc.ubnf', output_file: '/etc/unlaxer-evil.json' });
+    await expectRejected('generate_railroad output_dir', 'generate_railroad', { grammar_file: 'story/code/calc.ubnf', output_dir: '/root/unlaxer-evil' });
+    await expectRejected('init output_dir', 'init', { name: 'evil', output_dir: '/etc/unlaxer-evil' });
+
+    // init name with path separators (writes to arbitrary dir)
+    await expectRejected('init name slash', 'init', { name: '../../../etc/unlaxer-evil', output_dir: '/tmp/mcp-sec-init' });
+    await expectRejected('init name dot', 'init', { name: '..', output_dir: '/tmp/mcp-sec-init' });
+
+    // validate_parser_ir file path outside /tmp
+    await expectRejected('validate_parser_ir path', 'validate_parser_ir', { parser_ir: '/etc/passwd' });
+
     // resources
     try {
       const res = await client.readResource({ uri: 'unlaxer://spec' });
