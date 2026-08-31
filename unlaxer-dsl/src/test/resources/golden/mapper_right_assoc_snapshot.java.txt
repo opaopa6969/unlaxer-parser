@@ -28,6 +28,35 @@ public class SnapshotRightAssocMapper {
     // Entry Point
     // =========================================================================
 
+    /** Selected parse-tree token and its generated AST mapping. */
+    public record MappedAst(Token token, SnapshotRightAssocAST ast) {}
+
+    /** Maps an already parsed token tree without accessing mapper internals. */
+    public static MappedAst mapParsedToken(Token rootToken) {
+        return mapParsedToken(rootToken, null);
+    }
+
+    /**
+     * Maps an already parsed token tree, preferring an AST type by simple name.
+     * The returned token is the token selected for the returned AST.
+     */
+    public static MappedAst mapParsedToken(Token rootToken, String preferredAstSimpleName) {
+        if (rootToken == null) {
+            throw new IllegalArgumentException("rootToken must not be null");
+        }
+        NODE_SOURCE_SPANS.clear();
+        MAP_MEMO.clear();
+        Token selectedToken = findBestMappedToken(rootToken, preferredAstSimpleName);
+        if (selectedToken == null) {
+            throw new IllegalArgumentException("No mapped node found in token tree");
+        }
+        SnapshotRightAssocAST mapped = mapToken(selectedToken);
+        if (mapped == null) {
+            throw new IllegalArgumentException("Selected token could not be mapped");
+        }
+        return new MappedAst(selectedToken, mapped);
+    }
+
     public static SnapshotRightAssocAST.PowNode parse(String source) {
         return parse(source, null);
     }

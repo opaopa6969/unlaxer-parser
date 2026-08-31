@@ -47,7 +47,7 @@
 	</developers>
 
 	<properties>
-		<revision>3.0.14</revision> <!-- ここを変えるだけで全体が変わるようになります -->
+		<revision>3.0.15</revision> <!-- ここを変えるだけで全体が変わるようになります -->
 		<!-- Central upload is opt-in through scripts/release-central.sh. -->
 		<skipPublishing>true</skipPublishing>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
