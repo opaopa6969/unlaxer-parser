@@ -713,6 +713,22 @@ public class TinyCalcMapper {
 }
 ```
 
+When a parse tree was obtained through another `Parser`, use the generated Mapper's
+public API. There is no need to reflect into private `mapToken` methods or internal
+caches. The result contains both the selected `Token` and AST, allowing the caller to
+verify the selected source range.
+
+```java
+TinyCalcMapper.MappedAst result =
+    TinyCalcMapper.mapParsedToken(rootToken, "BinaryExpr");
+Token selectedToken = result.token();
+TinyCalcAST ast = result.ast();
+```
+
+`preferredAstSimpleName` controls candidate preference. Use `mapParsedToken(rootToken)`
+when no preference is needed. Each call resets mapper state; null input, no mapping
+candidate, and mapping failure are reported explicitly as `IllegalArgumentException`.
+
 **Post-generation work (manual implementation):**
 
 `to{ClassName}` methods in `TinyCalcMapper` are generated as TODO skeletons. Implement actual field extraction logic using `findDescendants()`.

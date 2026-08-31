@@ -738,6 +738,21 @@ public class TinyCalcMapper {
 }
 ```
 
+既に別の `Parser` で取得した parse tree を変換する場合は、生成 Mapper の public API を使う。
+private な `mapToken` や内部キャッシュへ reflection でアクセスする必要はない。戻り値には、
+候補選択後の `Token` と AST の両方が含まれるため、呼び出し側で source range も検証できる。
+
+```java
+TinyCalcMapper.MappedAst result =
+    TinyCalcMapper.mapParsedToken(rootToken, "BinaryExpr");
+Token selectedToken = result.token();
+TinyCalcAST ast = result.ast();
+```
+
+`preferredAstSimpleName` は候補の優先順位を指定する。省略時は `mapParsedToken(rootToken)` を使う。
+各呼び出しで Mapper の mapping 状態は初期化され、null、mapping 候補なし、mapping 不能は
+`IllegalArgumentException` として明示的に失敗する。
+
 **生成後の作業（手動実装箇所）：**
 
 `TinyCalcMapper` の `to{ClassName}` メソッドは TODO コメント付きのスケルトンとして生成される。`findDescendants()` を使って実際のフィールド抽出ロジックを実装する。

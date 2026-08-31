@@ -8,11 +8,24 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ## [Unreleased]
 
+## [3.0.15] - 2026-09-01
+
+### Added
+- Generated Mappers expose `mapParsedToken(Token[, preferredAstSimpleName])` and return both the selected token and mapped AST. Consumers can map an existing parse tree without reflection into private mapper methods or state.
+- Public parser boundary behavior now has regression coverage for source cursors, repeat bounds, case-insensitive words, and supplementary code points.
+
 ### Deprecated
 - Correctly spelled public APIs now replace `Source.sourceToStgring()`, `NonTerminallSymbol`, and `HierarcyLevel`. The misspelled symbols remain as source- and behavior-compatible deprecated bridges and will not be removed before 3.2.0.
 
 ### Changed
 - Maven Central publication now defaults to bundle-only mode and requires the organization-wide monthly release guard to opt into upload. The Central publishing plugin is updated to 0.11.0 so token identifiers are not written to release logs.
+
+### Fixed
+- The `javaStyle` whitespace profile now generates both line and block comment parsers.
+- Generated DAP adapters convert parser code-point offsets to UTF-16 coordinates, including non-BMP source characters.
+- Rule/token parser-name collisions are diagnosed for regex, negation, and character-range tokens, and their duplicate wrappers are not emitted.
+- `MappedSingleCharacterParser` no longer indexes its ASCII lookup table for non-ASCII input in inverted mode.
+- The MCP server rejects unsafe input/output paths instead of allowing traversal outside its intended roots.
 
 ---
 
