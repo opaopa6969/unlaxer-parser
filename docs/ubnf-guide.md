@@ -4,7 +4,7 @@
 
 # UBNF Language Guide
 
-**Version**: 3.0.14
+**Version**: 3.0.15
 
 UBNF (Unlaxer BNF) is the grammar definition language for unlaxer-parser. It is a typed, annotation-driven extension of EBNF designed to express not just recognition semantics but also code generation intent.
 
