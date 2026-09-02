@@ -77,7 +77,7 @@ public class MappedSingleCharacterParser extends SingleCharacterParser implement
 
 	private static void set(boolean setFlag, boolean[] flags, char... matches) {
 		for (char c : matches) {
-			if (c > 128) {
+			if (c >= 128) {
 				throw charMustBeLessThan128.get();
 			}
 			flags[c] = setFlag;
@@ -98,7 +98,7 @@ public class MappedSingleCharacterParser extends SingleCharacterParser implement
 	private void set(boolean setFlag, boolean[] flags, Range... matches) {
 		for (Range range : matches) {
 			for (int c = range.startIndexInclusive; c <= range.endIndexExclusive; c++) {
-				if (c > 128) {
+				if (c >= 128) {
 					throw charMustBeLessThan128.get();
 				}
 				flags[c] = setFlag;
