@@ -105,10 +105,77 @@ public class RustBackendTest {
         }
     }
 
+    @Test public void sharedMappingsAreDeduplicatedButTheirSchemasMustAgree() {
+        String source = """
+            grammar Shared {
+              @root Root ::= First | Second;
+              @mapping(Value, params=[value]) First ::= 'a' @value;
+              @mapping(Value, params=[value]) Second ::= 'b' @value;
+            }
+            """;
+        var files = new RustBackend().generate(UBNFMapper.parse(source).grammars().get(0));
+        assertEquals(1, files.get(1).content().split("r#Value \\{ span: Span", -1).length - 1);
+        assertEquals(1, files.get(4).content().split("fn eval_value", -1).length - 1);
+        assertTrue(files.get(3).content().contains("1 => Ok(vec![Ast::r#Value"));
+        assertTrue(files.get(3).content().contains("2 => Ok(vec![Ast::r#Value"));
+        reject(source.replace("'b' @value", "[ 'b' ] @value"), "incompatible shared mapping schema");
+        reject(source.replace("Second ::= 'b' @value", "Second ::= 'b' @other")
+            .replace("@mapping(Value, params=[value]) Second", "@mapping(Value, params=[other]) Second"), "incompatible shared mapping schema");
+        reject(source.replace("@mapping(Value, params=[value]) Second", "@mapping(VALUE, params=[value]) Second"), "mapping method collision");
+    }
+
+    @Test public void leftAssocMetadataDoesNotRewriteTheGrammarAndInvalidShapesAreRejected() {
+        String source = """
+            grammar Operators {
+              @root @leftAssoc @precedence(level=10) @mapping(Binary, params=[left, op, right])
+              Root ::= 'x' @left { '+' @op 'x' @right };
+            }
+            """;
+        var files = new RustBackend().generate(UBNFMapper.parse(source).grammars().get(0));
+        var plain = new RustBackend().generate(UBNFMapper.parse(source.replace("@leftAssoc @precedence(level=10)", "")).grammars().get(0));
+        assertEquals(plain.get(1), files.get(1));
+        assertEquals(plain.get(3), files.get(3));
+        assertEquals(plain.get(4), files.get(4));
+        assertTrue(files.get(2).content().contains("precedence: 10, associativity: Associativity::Left"));
+        var defaults = new RustBackend().generate(UBNFMapper.parse(source.replace("@precedence(level=10)", "")).grammars().get(0));
+        assertTrue(defaults.get(2).content().contains("precedence: -1, associativity: Associativity::Left"));
+        var precedenceOnly = new RustBackend().generate(UBNFMapper.parse(source.replace("@leftAssoc", "")).grammars().get(0));
+        assertTrue(precedenceOnly.get(2).content().contains("precedence: 10, associativity: Associativity::None"));
+        reject(source.replace("@leftAssoc", "@leftAssoc @leftAssoc"), "duplicate @leftAssoc");
+        reject(source.replace("@precedence(level=10)", "@precedence(level=10) @precedence(level=20)"), "duplicate @precedence");
+        reject(source.replace("@leftAssoc", "@rightAssoc"), "annotation RightAssoc");
+        reject(source.replace("{ '+' @op 'x' @right }", "'+' @op 'x' @right"), "@leftAssoc requires");
+        reject(source.replace("'x' @left", "[ 'x' ] @left"), "@leftAssoc requires");
+        reject(source.replace("'+' @op 'x' @right", "'x' @right '+' @op"), "@leftAssoc requires");
+        reject(source.replace("params=[left, op, right]", "params=[right, op, left]"), "@leftAssoc requires");
+        reject(source.replace("'x' @right", "[ 'x' ] @right"), "@leftAssoc requires");
+        reject(source.replace("'x' @left", "('x' @op) @left"), "@leftAssoc requires");
+        reject(source.replace("'x' @left", "('x' @right) @left"), "@leftAssoc requires");
+        reject(source.replace("'+' @op", "('+' @op) @op"), "@leftAssoc requires");
+    }
+
     private void reject(String source, String reason) {
         var grammar = UBNFMapper.parse(source).grammars().get(0);
         var error = assertThrows(IllegalArgumentException.class, () -> new RustBackend().generate(grammar));
         assertTrue(error.getMessage(), error.getMessage().contains(reason));
+    }
+
+    @Test public void cliValidatesOperatorMetadataBeforeCreatingArtifacts() throws Exception {
+        String source = Files.readString(Path.of("src/test/resources/associative/Operators.ubnf"));
+        for (String invalid : new String[]{source.replace("level=10", "level=30"),
+                source.replace("@leftAssoc", ""), source.replace("@precedence(level=10)", ""),
+                source.replace("NumericLiteral", "Number")}) {
+            Path grammar = temporary.newFile().toPath();
+            Files.writeString(grammar, invalid);
+            Path output = temporary.getRoot().toPath().resolve(grammar.getFileName() + "-generated");
+            assertEquals(3, run("generate", "--target", "rust", "--grammar", grammar.toString(), "--output", output.toString()));
+            assertFalse(Files.exists(output));
+        }
+        Path grammar = temporary.newFile().toPath();
+        Files.writeString(grammar, source);
+        Path output = temporary.getRoot().toPath().resolve("operators-generated");
+        assertEquals(0, run("generate", "--target", "rust", "--grammar", grammar.toString(), "--output", output.toString()));
+        assertTrue(Files.isRegularFile(output.resolve("ast.rs")));
     }
 
     @Test public void cliChecksDriftAndProtectsHandwrittenFiles() throws Exception {

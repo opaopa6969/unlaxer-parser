@@ -69,9 +69,23 @@ runtimeは規則IDで参照する文法を実行し、入力とCST node arenaを
 - `IdentifierParser`、`SingleQuotedParser`、`DoubleQuotedParser`、`EndOfSourceParser`の短名または既定packageの完全修飾名。字句とmapperの契約は下記参照。
 - `ANY`・`EOF`・`EMPTY`・`CHAR_RANGE`・`NEGATION`・`UNTIL`・`LOOKAHEAD`・`NEGATIVE_LOOKAHEAD`。詳細は下記のprimitive互換契約を参照。
 - `@mapping`とterminal/rule/group/quantifierへのcapture。全capture名の集合とparamsが一致し、同名captureのtext/node型が整合すること。欠ける選択肢はoptional、繰り返しや同名の複数出現はlistとして推論する。
+- 同じfield名・順序・text/node型・cardinalityを持つ複数ruleのshared mapping。AST variantとSemantics methodは一つに統合し、ruleごとのcaptureとspanは保持する。
+- `@leftAssoc`の`Left @left { Op @op Right @right }`形と`params=[left, op, right]`、`@precedence(level=N)`。詳細は下記参照。
 - `@whitespace: javaStyle`（ASCII空白、行/ブロックコメント）または`none`。未指定は`none`。`@package`はRustでは使用しない。
 
-imports、外部token parser、`@typeof`、`@eval`等の他のannotation、左再帰、混合text/node choiceなどは明示的に拒否する。mapping名・field名はASCII識別子に制限し、Rustのraw identifierで出力する。`self`/`Self`/`super`/`crate`、fieldの`span`/`semantics`、重複mapping名・生成method名は拒否する。rootはちょうど1つのAST nodeへ解決される必要がある。optionalの先にある参照も左再帰検査に含め、空一致の可能性がある無限反復は生成前に拒否する。
+imports、外部token parser、`@typeof`、`@eval`、`@rightAssoc`等の他のannotation、左再帰、混合text/node choiceなどは明示的に拒否する。mapping名・field名はASCII識別子に制限し、Rustのraw identifierで出力する。`self`/`Self`/`super`/`crate`、fieldの`span`/`semantics`、shared mappingのschema不一致・異なるmappingからの生成method名衝突は拒否する。rootはちょうど1つのAST nodeへ解決される必要がある。optionalの先にある参照も左再帰検査に含め、空一致の可能性がある無限反復は生成前に拒否する。
+
+### 演算子の列と優先順位
+
+`@leftAssoc`はJavaと同様、単一leftと`Vec`のop/rightを生成する。自動の二分木化や評価ではなく、手書きSemanticsが左からfoldする契約である。左右のoperandは同じtext/node種別で各出現が単一値、opはtextでなければならない。同名variantを使う加減算・乗除算の規則でも、enumとtraitの重複定義は生じない。
+
+`parser::OPERATORS`はrule名、`i32`のprecedence、`Associativity::{Left,None}`を保持する生成metadataで、level→rule名の順に並ぶ。構文の優先順位はruleの参照階層で定義する。CLIの共通`GrammarValidator`はassoc/precedenceの併記・非負level・operand側が高優先であることを要求し、不整合な文法を生成前に拒否する。共通検証のERRORを拒否し、Javaクラス解決のWARNINGはRust token対応の根拠にしない。token対応はRust側の明示allowlistで検証する。
+
+低水準の`RustBackend.generate`を直接呼ぶ場合は、Java各generatorと同様、共通validatorの呼出しは利用者側の責任である。この直接APIでは結合性だけのlevelは`-1`、precedenceだけの結合性は`None`として記録する。比較テストのmetadata逆転モードはvalidatorを意図的に迂回した性質検査で、数値自体が構文を組み替えないことを確認する。逆転した文法がCLIで受理されるという意味ではない。
+
+[`associative/Operators.ubnf`](../unlaxer-dsl/src/test/resources/associative/Operators.ubnf)とcorpusは共有Binary variant・明示的な数値leaf・括弧・非可換演算・コメント中のUnicodeを検証する。これはtinyexpression全体ではなく、数値意味論もtinyexpressionのf32仕様ではない。実tinyexpressionのunmapped text/node混在factorとJavaの特殊なnull/literal leaf表現、右結合は別途対応する。
+
+24入力×metadata 2設定の48ケースで受理・両cursorをJavaと比較し、受理28ケースの全AST field/spanを照合する。Rustの評価値は別途corpusの期待値と比較し、共有variantのSemantics未実装は実`rustc`の`E0046`で検出する。結果は`target/rust-associative.tsv`とCI artifactへ保存する。これにより見つかったJavaの未縮約CST上のassoc反復欠落は[issue #138](https://github.com/opaopa6969/unlaxer-parser/issues/138)で修正した。
 
 | captureの個数 | AST text / node | Semantics引数 text / node |
 |---|---|---|

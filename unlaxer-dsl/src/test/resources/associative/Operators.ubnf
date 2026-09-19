@@ -1,0 +1,16 @@
+grammar Operators {
+  @package: org.example.operators
+  @whitespace: javaStyle
+  token NUMBER = NumberParser
+
+  @root @mapping(Binary, params=[left, op, right]) @leftAssoc @precedence(level=10)
+  Expression ::= Term @left { AddOp @op Term @right };
+
+  @mapping(Binary, params=[left, op, right]) @leftAssoc @precedence(level=20)
+  Term ::= Factor @left { MulOp @op Factor @right };
+
+  AddOp ::= '+' | '-';
+  MulOp ::= '*' | '/';
+  Factor ::= NumericLiteral | '(' Expression ')';
+  @mapping(Number, params=[value]) NumericLiteral ::= (NUMBER) @value;
+}

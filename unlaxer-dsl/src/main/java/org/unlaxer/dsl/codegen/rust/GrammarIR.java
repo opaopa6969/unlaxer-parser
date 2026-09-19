@@ -5,7 +5,13 @@ import java.util.List;
 /** Target-neutral structural subset; deliberately separate from the metadata-only Parser IR. */
 public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     public GrammarIR { rules = List.copyOf(rules); }
-    public record Rule(String name, Expression body, Mapping mapping) {}
+    public record Rule(String name, Expression body, Mapping mapping, Operator operator) {}
+    /** Precedence is metadata: the rule graph, not these numbers, determines parsing order. */
+    public record Operator(Associativity associativity, int precedence) {}
+    public enum Associativity { LEFT, NONE }
+    public List<Mapping> mappings() {
+        return rules.stream().map(Rule::mapping).filter(java.util.Objects::nonNull).distinct().toList();
+    }
     public record Mapping(String name, List<Field> fields) {
         public Mapping { fields = List.copyOf(fields); }
     }
