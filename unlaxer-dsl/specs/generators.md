@@ -144,7 +144,8 @@ Rust backend の direct number capture は現段階で `String` であり、Java
 同じ AST class を複数の優先順位ルールで共有する場合も、各ルールの反復だけを集める。
 元 CST では反復 helper は `ZeroOrMore` の直下にあるため、その wrapper だけを透過する。
 括弧内などの operand rule には探索を広げず、内側の演算子を外側のリストへ混入させない。
-旧来の縮約済み token を `mapParsedTokenWithSourceMap` へ渡す経路も保持する。
+宣言rootのidentityと必要なcaptureを保持している旧来の縮約済み token は
+`mapParsedTokenWithSourceMap` へ渡せる。縮約でrootが除去された場合の制約は下記を参照。
 
 typed leaf は実際の mapped class として保持する。source span は各 mapped rule の
 消費範囲であり、`javaStyle` delimiter が消費した末尾空白・コメントを含むことがある。
@@ -165,7 +166,40 @@ source span を持つ。同じ mapping class の追加 rule でも自身の結�
 旧 package-private `foldRightAssoc{ClassName}` は生成しなくなったため、Parser と Mapper を
 一緒に再生成する。`parse` / `parseWithSourceMap` は root transaction の token を使用する。
 
-`getRootToken` が choice root を除去した token を汎用 mapping API へ渡すケースは #146 で追跡する。
+### 汎用 token mapping の root 境界（#146）
+
+`mapParsedToken` / `mapParsedTokenWithSourceMap` は再parseもCST縮約も行わない。
+文法の `@root` 自体が `@mapping` を持つ場合、渡すtokenはその宣言rootのparser classを
+持つ必要がある。欠けていれば `IllegalArgumentException: Mapped root token is missing for ...`
+を投げる。子孫の同名parserやmutableな `Token.parent`、source spanからrootを推測しない。
+preferred AST型を指定しても、この入力チェックは省略しない。
+
+`ChoiceInterface.parse` は選ばれた子の `Parsed` を返すので、`parsed.getRootToken(false)`
+でさえ外側のmapped rootを持たないことがある。`getRootToken(true)`も復元はしない。
+その場合はcontextを閉じる前に、次のようにcommitされたrootを確保する。
+
+```java
+Parser parser = ExampleParsers.getRootParser();
+Token root;
+try (ParseContext context = new ParseContext(StringSource.createRootSource(source))) {
+    Parsed parsed = parser.parse(context);
+    if (!parsed.isSucceeded() || !context.allConsumed()) {
+        throw new IllegalArgumentException("Parse failed");
+    }
+    root = context.getCurrent().getTokens().stream()
+        .filter(token -> token.parser == parser).findFirst().orElseThrow();
+}
+var mapped = ExampleMapper.mapParsedTokenWithSourceMap(root);
+```
+
+普通の文字列入力には `parse` / `parseWithSourceMap` がこのroot確保を行うので推奨する。
+mapped rootの代わりに任意の子孫tokenや外部wrapperを渡して自動探索させる旧動作は、
+外側の演算が黙って失われるため拒否する。`@root` がunmappedの文法では、従来の
+子孫mapped node選択とpreferred型選択を維持する。
+
+zero-width captureを保つには元CSTを使用する。縮約で削除済みのcapture情報を汎用APIが
+復元できるとは限らない。root identityの検査は生/縮約済みtoken共通であり、
+この検査のために縮約を再有効化することはない。
 
 ### 共有する結合 AST の型契約（#145）
 
