@@ -31,14 +31,6 @@ final class SemanticCardinalityConformance {
     }
 
     void verify(boolean java, boolean rust) throws Exception {
-        verify(java, rust, false);
-    }
-
-    void verifyKnownDivergences() throws Exception {
-        verify(true, true, true);
-    }
-
-    private void verify(boolean java, boolean rust, boolean knownDivergence) throws Exception {
         Path library = root.resolve("libunlaxer_runtime.rlib");
         Path nativeBinary = root.resolve("native/debug/unlaxer");
         if (rust) {
@@ -48,7 +40,8 @@ final class SemanticCardinalityConformance {
                 "-p", "unlaxer-generator", "--target-dir", root.resolve("native").toString()), ""));
         }
         String template = Files.readString(fixtures.resolve("Grammar.ubnf.txt"));
-        var corpus = JsonParser.parseString(Files.readString(fixtures.resolve(knownDivergence ? "known-divergences.json" : "corpus.json"))).getAsJsonArray();
+        var corpus = JsonParser.parseString(Files.readString(fixtures.resolve("corpus.json"))).getAsJsonArray();
+        corpus.addAll(JsonParser.parseString(Files.readString(fixtures.resolve("pure-alias.json"))).getAsJsonArray());
         var report = new ArrayList<>(List.of("grammar\tinput\tjava\trust"));
         var failures = new ArrayList<String>();
         for (var entry : corpus) {
@@ -86,13 +79,28 @@ final class SemanticCardinalityConformance {
                     verifyResult(fixture, row, results.get(i), true);
                     if (!java) report.add(name + "\t" + row.get("input") + "\tnull\t" + results.get(i));
                 }
+                if (fixture.has("javaType")) {
+                    Files.writeString(dir.resolve("main.rs"), """
+                        mod generated;
+                        struct Stale;
+                        impl generated::evaluator::Semantics for Stale { type Output = (); }
+                        fn main() {}
+                        """);
+                    var stale = run(List.of("rustc", "--edition=2021", "--extern", "unlaxer_runtime=" + library,
+                        dir.resolve("main.rs").toString(), "-o", dir.resolve("stale").toString()), "");
+                    assertNotEquals(name + " stale semantics must fail", 0, stale.code());
+                    assertTrue(stale.output(), stale.output().contains("E0046"));
+                    assertTrue(stale.output(), stale.output().contains("eval_box"));
+                }
             }
             if (java) {
                 try (var loader = compileJava(grammar, dir)) {
                     var mapper = loader.loadClass("org.example.semantic.SemanticMapper");
                     var parser = (org.unlaxer.parser.Parser) loader.loadClass("org.example.semantic.SemanticParsers").getMethod("getRootParser").invoke(null);
                     var type = loader.loadClass("org.example.semantic.SemanticAST$Box").getMethod("values").getReturnType();
-                    if (knownDivergence) assertEquals(name + " known legacy Java lexical API", String.class, type);
+                    if (fixture.has("javaType")) assertEquals(name + " semantic field type",
+                        fixture.get("javaType").getAsString(), loader.loadClass("org.example.semantic.SemanticAST$Box")
+                            .getMethod("values").getGenericReturnType().getTypeName());
                     switch (fixture.get("cardinality").getAsString()) {
                         case "optional" -> assertEquals(name + " Optional field", Optional.class, type);
                         case "many" -> assertEquals(name + " Many field", List.class, type);
@@ -123,11 +131,7 @@ final class SemanticCardinalityConformance {
                             var actual = results.get(i);
                             actualRust = actual;
                             assertEquals(name + " " + row + " both cursors", result.get("prefix"), actual.get("prefix"));
-                            if (knownDivergence && row.has("value")) {
-                                assertNotEquals(name + " explicit known alias API difference", result.get("ast"), actual.get("ast"));
-                            } else {
-                                assertEquals(name + " " + row + " all fields/node spans", result.get("ast"), actual.get("ast"));
-                            }
+                            assertEquals(name + " " + row + " all fields/node spans", result.get("ast"), actual.get("ast"));
                         }
                         report.add(name + "\t" + row.get("input") + "\t" + result + "\t" + actualRust);
                     }
@@ -138,7 +142,7 @@ final class SemanticCardinalityConformance {
             }
         }
         String mode = java && rust ? "both" : java ? "java" : "rust";
-        Files.write(Path.of("target/semantic-cardinality-" + (knownDivergence ? "known-divergence-" : "") + mode + ".tsv"), report, StandardCharsets.UTF_8);
+        Files.write(Path.of("target/semantic-cardinality-" + mode + ".tsv"), report, StandardCharsets.UTF_8);
         assertTrue(String.join("\n", failures), failures.isEmpty());
     }
 
@@ -146,7 +150,7 @@ final class SemanticCardinalityConformance {
         String context = fixture.get("name") + " " + row;
         assertEquals(context + " acceptance", row.has("value"), !result.get("ast").isJsonNull());
         if (!row.has("value")) return;
-        assertEquals(context + " independent value/order", !rust && row.has("javaValue") ? row.get("javaValue") : row.get("value"), result.get("value"));
+        assertEquals(context + " independent value/order", row.get("value"), result.get("value"));
         String input = row.get("input").getAsString();
         var ast = result.getAsJsonObject("ast");
         assertEquals("Box", ast.get("type").getAsString());
@@ -177,7 +181,7 @@ final class SemanticCardinalityConformance {
         var span = ast.getAsJsonArray("span");
         int left = span.get(0).getAsInt(), right = span.get(1).getAsInt();
         assertTrue(ast.toString(), start <= left && left <= right && right <= end);
-        if (ast.get("type").getAsString().equals("Leaf")) {
+        if (List.of("Leaf", "Other").contains(ast.get("type").getAsString())) {
             String source = input.substring(input.offsetByCodePoints(0, left), input.offsetByCodePoints(0, right));
             assertTrue(ast.toString(), source.contains(ast.getAsJsonObject("fields").get("text").getAsString()));
         }
@@ -188,7 +192,7 @@ final class SemanticCardinalityConformance {
         if (value.isJsonArray()) { for (var child : value.getAsJsonArray()) collectNodeSpans(child, result); return; }
         if (!value.isJsonObject()) return;
         var ast = value.getAsJsonObject();
-        if (ast.get("type").getAsString().equals("Leaf")) {
+        if (List.of("Leaf", "Other").contains(ast.get("type").getAsString())) {
             var entry = ast.getAsJsonArray("span").deepCopy();
             entry.add(ast.getAsJsonObject("fields").get("text"));
             result.add(entry);
@@ -201,8 +205,9 @@ final class SemanticCardinalityConformance {
         if (value.isJsonPrimitive()) return List.of("T:" + value.getAsString());
         if (value.isJsonArray()) return value.getAsJsonArray().asList().stream().flatMap(item -> values(item).stream()).toList();
         var node = value.getAsJsonObject();
-        assertEquals("Leaf", node.get("type").getAsString());
-        return List.of("L:" + node.getAsJsonObject("fields").get("text").getAsString());
+        String type = node.get("type").getAsString();
+        assertTrue(node.toString(), List.of("Leaf", "Other").contains(type));
+        return List.of((type.equals("Leaf") ? "L:" : "O:") + node.getAsJsonObject("fields").get("text").getAsString());
     }
 
     private String probe(JsonObject fixture) throws Exception {
@@ -219,6 +224,7 @@ final class SemanticCardinalityConformance {
             format!("[{texts}]")
             """ : "let _ = values; \"[]\".into()";
         return Files.readString(fixtures.resolve("probe.rs.txt"))
+            .replace("EXTRA_SEMANTICS", fixture.has("other") ? "fn eval_other(&mut self, text: &str, _: Span) -> Self::Output { vec![format!(\"O:{text}\")] }" : "")
             .replace("VALUE_IMPORT", mixed ? "use generated::ast::AstValue;" : "")
             .replace("FIELD_TYPE", type).replace("TEXT_SPANS", spans).replace("VALUE_ITER", iterator)
             .replace("EVAL_ITEM", mixed ? "match value { AstValue::Text { text, .. } => vec![format!(\"T:{text}\")], AstValue::Node(node) => evaluate(node, self) }" : "evaluate(value, self)");

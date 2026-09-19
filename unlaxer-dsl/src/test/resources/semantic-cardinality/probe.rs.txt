@@ -7,6 +7,7 @@ struct Values;
 impl Semantics for Values {
     type Output = Vec<String>;
     fn eval_leaf(&mut self, text: &str, _: Span) -> Self::Output { vec![format!("L:{text}")] }
+    EXTRA_SEMANTICS
     fn eval_box(&mut self, values: FIELD_TYPE, _: Span) -> Self::Output {
         VALUE_ITER.flat_map(|value| { EVAL_ITEM }).collect()
     }
