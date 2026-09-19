@@ -1,8 +1,10 @@
-# Fictional Paper & DGE Sessions
+# Paper Draft and Simulated Reviews / DGE Sessions
 
 **[日本語版](./INDEX.md)**
 
-> **All documents in this collection are entirely fictional.**
+The current submission-oriented draft is **[v6: From Grammar to Debugger](./v6/from-grammar-to-debugger.en.md)** ([Japanese](./v6/from-grammar-to-debugger.ja.md)), with [artifact instructions and design](./v6/artifact.md) and [v5 errata](./v6/errata.md). It is an implementation-backed Tool Paper draft, not an accepted publication.
+
+> **The historical v1–v5 papers and review dialogues below contain fictional material; they are not actual conference reviews or acceptance decisions.**
 >
 > A fictional paper "From Grammar to IDE" was written, then turned into a peer review drama using the DGE (Design Gap Exploration) methodology.
 >

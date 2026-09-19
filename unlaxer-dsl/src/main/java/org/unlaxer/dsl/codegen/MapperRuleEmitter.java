@@ -1232,7 +1232,8 @@ class MapperRuleEmitter {
         w.dedent();
         w.line("}");
         w.line("int start = Math.max(0, tokenStartOffsetCompat(token));");
-        w.line("int length = Math.max(0, consumedLengthCompat(token));");
+        w.line("String text = tokenTextCompat(token);");
+        w.line("int length = text == null ? 0 : text.codePointCount(0, text.length());");
         w.line("int end = start + length;");
         w.line("NODE_SOURCE_SPANS.put(node, new int[]{start, end});");
         w.line("return node;");
@@ -1240,7 +1241,8 @@ class MapperRuleEmitter {
         w.line("}");
         w.blankLine();
 
-        w.line("public static Optional<int[]> sourceSpanOf(Object node) {");
+        w.line("/** Legacy lookup for the latest mapping; use SourceMappedAst to retain positions. */");
+        w.line("public static synchronized Optional<int[]> sourceSpanOf(Object node) {");
         w.indent();
         w.line("if (node == null) {");
         w.indent();

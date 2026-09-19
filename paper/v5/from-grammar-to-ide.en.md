@@ -1,5 +1,6 @@
-> **Accepted at SLE 2026 (Software Language Engineering)**
-> Camera-ready version. All reviewer concerns addressed; all three reviewers Accept.
+> **Historical simulated paper; not an actual submission, acceptance, or peer-review outcome.**
+> Claims about palindromes, the seven-element monoid, performance, effort, and generation scope are withdrawn or qualified.
+> See the corrected [v6](../v6/from-grammar-to-debugger.en.md) and [errata](../v6/errata.md).
 
 # From Grammar to IDE: Unified Generation of Parser, AST, Evaluator, LSP, and DAP from a Single Grammar Specification
 

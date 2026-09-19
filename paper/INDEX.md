@@ -1,8 +1,10 @@
-# 架空論文 & DGE セッション
+# 論文草稿と模擬査読・DGEセッション
 
 **[English version](./INDEX.en.md)**
 
-> **本ドキュメント群はすべてフィクションです。**
+投稿準備用の最新版は **[v6: 文法からデバッガへ](./v6/from-grammar-to-debugger.ja.md)**（[英語](./v6/from-grammar-to-debugger.en.md)）です。[再現手順と拡張設計](./v6/artifact.md)、[v5訂正表](./v6/errata.md) を併記しています。v6は実装・実行可能な検証に基づくTool Paper草稿であり、投稿・採録済みではありません。
+
+> **以下のv1〜v5の論文・査読会話劇はフィクションを含む開発記録です。実際の学会査読・採録結果ではありません。**
 >
 > 架空の論文「From Grammar to IDE」を執筆し、それを DGE（Design Gap Exploration）手法で査読会話劇に仕立てたものです。
 >

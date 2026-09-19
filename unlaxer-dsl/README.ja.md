@@ -753,6 +753,20 @@ TinyCalcAST ast = result.ast();
 各呼び出しで Mapper の mapping 状態は初期化され、null、mapping 候補なし、mapping 不能は
 `IllegalArgumentException` として明示的に失敗する。
 
+次の文書を解析した後も位置を参照する場合は、ソースマップを保持する。
+
+```java
+var mapped = TinyCalcMapper.parseWithSourceMap("1+1");
+TinyCalcMapper.parse("999");
+int[] span = mapped.sourceSpanOf(mapped.ast()).orElseThrow();
+```
+
+既存の木には `mapParsedTokenWithSourceMap(rootToken)` を使える。snapshotはnodeのidentityで
+区別し、取得配列をコピーする。位置はUnicodeコードポイント単位の半開区間であり、Javaの
+substringやLSPのUTF-16位置には明示変換が必要。合成nodeには位置がない場合がある。
+mappingとsnapshot作成は生成mapperごとに直列化する。従来の `sourceSpanOf(node)` は最新の
+mapping専用。[設計と再現可能な言語進化実験](../paper/v6/artifact.md)も参照。
+
 **生成後の作業（手動実装箇所）：**
 
 `TinyCalcMapper` の `to{ClassName}` メソッドは TODO コメント付きのスケルトンとして生成される。`findDescendants()` を使って実際のフィールド抽出ロジックを実装する。

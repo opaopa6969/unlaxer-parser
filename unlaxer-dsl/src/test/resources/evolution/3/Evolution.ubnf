@@ -1,0 +1,16 @@
+grammar Evolution {
+  @package: org.example.evolution
+  @whitespace: javaStyle
+  token NUMBER = NumberParser
+  @root
+  Expression ::= Conditional | Negation | Binary | Literal ;
+  @mapping(Binary, params=[left, op, right])
+  Binary ::= Literal @left ( '+' @op | '*' @op ) Literal @right ;
+  @mapping(Number, params=[value])
+  Literal ::= Digits @value ;
+  Digits ::= NUMBER ;
+  @mapping(Negation, params=[value])
+  Negation ::= 'neg' '(' Expression @value ')' ;
+  @mapping(Conditional, params=[condition, thenExpr, elseExpr])
+  Conditional ::= 'if' '(' Literal @condition ',' Expression @thenExpr ',' Expression @elseExpr ')' ;
+}

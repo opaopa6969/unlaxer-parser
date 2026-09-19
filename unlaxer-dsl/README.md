@@ -729,6 +729,21 @@ TinyCalcAST ast = result.ast();
 when no preference is needed. Each call resets mapper state; null input, no mapping
 candidate, and mapping failure are reported explicitly as `IllegalArgumentException`.
 
+To retain positions after parsing another document, keep a source-map snapshot:
+
+```java
+var mapped = TinyCalcMapper.parseWithSourceMap("1+1");
+TinyCalcMapper.parse("999");
+int[] span = mapped.sourceSpanOf(mapped.ast()).orElseThrow();
+```
+
+`mapParsedTokenWithSourceMap(rootToken)` provides the same lifetime for an existing
+tree. Snapshots use node identity, return defensive copies, and report half-open
+Unicode **code-point** offsets (convert explicitly for Java substring or LSP UTF-16
+positions). Synthetic nodes may have no span. Mapping and snapshot creation are
+serialized per generated mapper. Legacy `sourceSpanOf(node)` only covers the latest
+mapping. See the [design and reproducible evolution experiment](../paper/v6/artifact.md).
+
 **Post-generation work (manual implementation):**
 
 `to{ClassName}` methods in `TinyCalcMapper` are generated as TODO skeletons. Implement actual field extraction logic using `findDescendants()`.

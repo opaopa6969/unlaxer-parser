@@ -31,6 +31,33 @@ public class SnapshotRightAssocMapper {
     /** Selected parse-tree token and its generated AST mapping. */
     public record MappedAst(Token token, SnapshotRightAssocAST ast) {}
 
+    /** Immutable identity-based source map; offsets are code points, end exclusive. */
+    public static final class SourceMappedAst<T extends SnapshotRightAssocAST> {
+        private final T ast;
+        private final java.util.IdentityHashMap<Object, int[]> spans = new java.util.IdentityHashMap<>();
+
+        private SourceMappedAst(T ast) {
+            this.ast = ast;
+            NODE_SOURCE_SPANS.forEach((node, span) -> spans.put(node, span.clone()));
+        }
+
+        public T ast() { return ast; }
+
+        public Optional<int[]> sourceSpanOf(Object node) {
+            int[] span = spans.get(node);
+            return span == null ? Optional.empty() : Optional.of(span.clone());
+        }
+    }
+
+    /** Retains source spans across subsequent parses. Synthetic nodes may have no span. */
+    public static synchronized SourceMappedAst<SnapshotRightAssocAST.PowNode> parseWithSourceMap(String source) {
+        return new SourceMappedAst<>(parse(source));
+    }
+
+    public static synchronized SourceMappedAst<SnapshotRightAssocAST> mapParsedTokenWithSourceMap(Token token) {
+        return new SourceMappedAst<>(mapParsedToken(token).ast());
+    }
+
     /** Maps an already parsed token tree without accessing mapper internals. */
     public static MappedAst mapParsedToken(Token rootToken) {
         return mapParsedToken(rootToken, null);
@@ -40,7 +67,7 @@ public class SnapshotRightAssocMapper {
      * Maps an already parsed token tree, preferring an AST type by simple name.
      * The returned token is the token selected for the returned AST.
      */
-    public static MappedAst mapParsedToken(Token rootToken, String preferredAstSimpleName) {
+    public static synchronized MappedAst mapParsedToken(Token rootToken, String preferredAstSimpleName) {
         if (rootToken == null) {
             throw new IllegalArgumentException("rootToken must not be null");
         }
@@ -61,7 +88,7 @@ public class SnapshotRightAssocMapper {
         return parse(source, null);
     }
 
-    public static SnapshotRightAssocAST.PowNode parse(String source, String preferredAstSimpleName) {
+    public static synchronized SnapshotRightAssocAST.PowNode parse(String source, String preferredAstSimpleName) {
         NODE_SOURCE_SPANS.clear();
         MAP_MEMO.clear();
         Parser rootParser = SnapshotRightAssocParsers.getRootParser();
@@ -442,13 +469,15 @@ public class SnapshotRightAssocMapper {
             return node;
         }
         int start = Math.max(0, tokenStartOffsetCompat(token));
-        int length = Math.max(0, consumedLengthCompat(token));
+        String text = tokenTextCompat(token);
+        int length = text == null ? 0 : text.codePointCount(0, text.length());
         int end = start + length;
         NODE_SOURCE_SPANS.put(node, new int[]{start, end});
         return node;
     }
 
-    public static Optional<int[]> sourceSpanOf(Object node) {
+    /** Legacy lookup for the latest mapping; use SourceMappedAst to retain positions. */
+    public static synchronized Optional<int[]> sourceSpanOf(Object node) {
         if (node == null) {
             return Optional.empty();
         }
