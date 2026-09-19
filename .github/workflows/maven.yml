@@ -169,8 +169,8 @@ jobs:
       uses: actions/checkout@v4
       with:
         repository: opaopa6969/tinyexpression
-        # Consumer migration for #163; pin the matching compatibility oracle.
-        ref: 70c70cc810537e9fddd2d3e2bd65b2919d936300
+        # Consumer migration and real token oracle; update deliberately with their contracts.
+        ref: 854c1f4a7be07eed8007ce90541a0996ee2c93aa
         path: tinyexpression
 
     - name: Point tinyexpression at the unlaxer under test
@@ -196,6 +196,24 @@ jobs:
     - name: Install tinyexpression (for LSP smoke)
       working-directory: tinyexpression
       run: mvn -B install -DskipTests -Dgpg.skip=true
+
+    - name: Set up Rust for actual tinyexpression token conformance
+      run: |
+        rustup toolchain install 1.85.0 --profile minimal
+        rustup default 1.85.0
+
+    - name: Compare real tinyexpression StringLiteralParser with both Rust generators
+      working-directory: unlaxer-parser
+      run: |
+        mvn -B -pl unlaxer-dsl test -Dtest=TinyStringTokenConformanceTest -DrustConformance=true \
+          -Dtinyexpression.classes="$GITHUB_WORKSPACE/tinyexpression/target/classes"
+        test -s unlaxer-dsl/target/rust-tiny-string.tsv
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: tiny-string-token-conformance
+        path: unlaxer-parser/unlaxer-dsl/target/rust-tiny-string.tsv
+        if-no-files-found: error
 
     # 3.0.3 リグレッションを実際に検出したのはこの LSP smoke
     - name: tinyexpression LSP smoke
