@@ -275,7 +275,7 @@ public class SnapshotMapper {
         SnapshotAST.TermNode left = toTermNode(leftToken);
         List<String> ops = new ArrayList<>();
         List<SnapshotAST.TermNode> rights = new ArrayList<>();
-        for (Token repeatToken : findDirectDescendants(working, SnapshotParsers.ExprRepeat0Parser.class)) {
+        for (Token repeatToken : findAssocRepetitions(working, SnapshotParsers.ExprRepeat0Parser.class)) {
             Token opToken = findFirstDescendant(repeatToken, org.unlaxer.parser.elementary.WordParser.class);
             String opValue = firstTokenText(opToken == null ? repeatToken : opToken);
             if (opValue != null && !opValue.isEmpty()) {
@@ -304,7 +304,7 @@ public class SnapshotMapper {
         String left = stripQuotes(firstTokenText(leftToken));
         List<String> ops = new ArrayList<>();
         List<String> rights = new ArrayList<>();
-        for (Token repeatToken : findDirectDescendants(working, SnapshotParsers.TermRepeat0Parser.class)) {
+        for (Token repeatToken : findAssocRepetitions(working, SnapshotParsers.TermRepeat0Parser.class)) {
             Token opToken = findFirstDescendant(repeatToken, org.unlaxer.parser.elementary.WordParser.class);
             String opValue = firstTokenText(opToken == null ? repeatToken : opToken);
             if (opValue != null && !opValue.isEmpty()) {
@@ -387,6 +387,19 @@ public class SnapshotMapper {
                 results.add(child);
             } else {
                 results.addAll(findDescendants(child, parserClass));
+            }
+        }
+        return results;
+    }
+
+    static List<Token> findAssocRepetitions(Token token, Class<? extends Parser> parserClass) {
+        List<Token> results = new ArrayList<>();
+        if (token == null) return results;
+        for (Token child : token.filteredChildren) {
+            if (child.parser.getClass() == parserClass) {
+                results.add(child);
+            } else if (child.parser.getClass() == org.unlaxer.parser.combinator.ZeroOrMore.class) {
+                results.addAll(findDirectDescendants(child, parserClass));
             }
         }
         return results;

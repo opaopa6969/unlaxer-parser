@@ -400,7 +400,7 @@ class MapperRuleEmitter {
             w.line(leftType + " left = " + leftMapper + ";");
             w.line("List<" + opType + "> ops = new ArrayList<>();");
             w.line("List<" + rightType + "> rights = new ArrayList<>();");
-            w.line("for (Token repeatToken : findDirectDescendants(working, " + repeatParserClass + ")) {");
+            w.line("for (Token repeatToken : findAssocRepetitions(working, " + repeatParserClass + ")) {");
             w.indent();
             w.line("Token opToken = findFirstDescendant(repeatToken, " + opParserClass + ");");
             w.line("String opValue = firstTokenText(opToken == null ? repeatToken : opToken);");
@@ -474,7 +474,7 @@ class MapperRuleEmitter {
             w.line(leftType + " addLeft = " + addLeftMapper + ";");
             w.line("List<" + opType + "> addOps = new ArrayList<>();");
             w.line("List<" + rightType + "> addRights = new ArrayList<>();");
-            w.line("for (Token addRepeatToken : findDirectDescendants(token, " + addRepeatParserClass + ")) {");
+            w.line("for (Token addRepeatToken : findAssocRepetitions(token, " + addRepeatParserClass + ")) {");
             w.indent();
             w.line("Token addOpToken = findFirstDescendant(addRepeatToken, " + addOpParserClass + ");");
             w.line("String addOpValue = firstTokenText(addOpToken == null ? addRepeatToken : addOpToken);");
@@ -878,6 +878,31 @@ class MapperRuleEmitter {
         w.line("} else {");
         w.indent();
         w.line("results.addAll(findDescendants(child, parserClass));");
+        w.dedent();
+        w.line("}");
+        w.dedent();
+        w.line("}");
+        w.line("return results;");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
+
+        // Assoc repeats are direct children in legacy reduced trees, but retain their
+        // ZeroOrMore wrapper in the source-preserving CST. Do not recurse into operand
+        // rules: parenthesized expressions can contain the very same repeat class.
+        w.line("static List<Token> findAssocRepetitions(Token token, Class<? extends Parser> parserClass) {");
+        w.indent();
+        w.line("List<Token> results = new ArrayList<>();");
+        w.line("if (token == null) return results;");
+        w.line("for (Token child : token.filteredChildren) {");
+        w.indent();
+        w.line("if (child.parser.getClass() == parserClass) {");
+        w.indent();
+        w.line("results.add(child);");
+        w.dedent();
+        w.line("} else if (child.parser.getClass() == org.unlaxer.parser.combinator.ZeroOrMore.class) {");
+        w.indent();
+        w.line("results.addAll(findDirectDescendants(child, parserClass));");
         w.dedent();
         w.line("}");
         w.dedent();
