@@ -180,11 +180,21 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("    /**\n");
         sb.append("     * Maps an already parsed token tree, preferring an AST type by simple name.\n");
         sb.append("     * The returned token is the token selected for the returned AST.\n");
+        sb.append("     * A mapped grammar root must be present as the input token itself.\n");
+        sb.append("     * Use the committed parser root, not a choice's root-stripped Parsed token.\n");
         sb.append("     */\n");
         sb.append("    public static synchronized MappedAst mapParsedToken(Token rootToken, String preferredAstSimpleName) {\n");
         sb.append("        if (rootToken == null) {\n");
         sb.append("            throw new IllegalArgumentException(\"rootToken must not be null\");\n");
         sb.append("        }\n");
+        if (rootRule.isPresent() && MapperElementUtil.getMappingAnnotation(rootRule.get()).isPresent()) {
+            String ruleName = rootRule.get().name();
+            sb.append("        if (rootToken.parser.getClass() != ").append(parsersClass).append(".")
+                .append(ruleName).append("Parser.class) {\n");
+            sb.append("            throw new IllegalArgumentException(\"Mapped root token is missing for ")
+                .append(ruleName).append("; pass the committed parser root from ParseContext.getCurrent().getTokens(), not a root-stripped token\");\n");
+            sb.append("        }\n");
+        }
         sb.append("        NODE_SOURCE_SPANS.clear();\n");
         sb.append("        MAP_MEMO.clear();\n");
         sb.append("        Token selectedToken = findBestMappedToken(rootToken, preferredAstSimpleName);\n");
