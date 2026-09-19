@@ -671,8 +671,9 @@ class MapperRuleEmitter {
         w.indent();
         for (int i = 0; i < sites.size(); i++) {
             CaptureBindingPlan.Site site = sites.get(i);
+            boolean boundText = MapperElementUtil.usesBoundTextCapture(site.element(), ruleByName, tokenDeclByName);
             AtomicElement normalized = MapperElementUtil.normalizeCapturedElement(site.element()).orElse(site.element());
-            String parserClass = MapperElementUtil.parserClassLiteral(normalized, parsersClass, tokenDeclByName, ruleByName)
+            String parserClass = boundText ? null : MapperElementUtil.parserClassLiteral(normalized, parsersClass, tokenDeclByName, ruleByName)
                 .orElse(null);
             String candidateType = MapperTypeResolver.inferTypeFromElement(grammar, normalized);
             if (!MapperTypeResolver.isTypeCompatible(valueType, candidateType) && !"String".equals(valueType)) continue;
@@ -683,7 +684,8 @@ class MapperRuleEmitter {
                 : "findDescendants(" + siteToken + ", " + parserClass + ").stream().findFirst().orElse(null)") + ";");
             w.line("if (" + valueToken + " != null) {");
             w.indent();
-            String expression = MapperElementUtil.mapExpressionForTargetType(valueType, normalized, valueToken,
+            String expression = boundText ? "stripQuotes(firstTokenText(" + valueToken + "))"
+                : MapperElementUtil.mapExpressionForTargetType(valueType, normalized, valueToken,
                 mappedClassByRuleName, tokenDeclByName, ruleByName);
             w.line(listType.isPresent() ? param + ".add(" + expression + ");"
                 : optionalType.isPresent() ? param + " = Optional.ofNullable(" + expression + ");"

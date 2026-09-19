@@ -146,6 +146,17 @@ repeat の要素や構造上の literal を別 field へ流用しない。量指
 capture は各値へ binding し、separated の separator は含めない。同名 capture の
 複数箇所は入力中の出現順に取り出し、別の mapped rule の内部へは探索しない。
 
+文字列だけで構成される group/choice と複数要素の量指定子 body は、
+先頭の token ではなく binding 先の source 全体を値にする（#132）。
+例えば `T=IdentifierParser` の `(T ':' T) @value` は `a:b`、
+`(T | '!') @value` は一致した枝に応じて識別子または `!` を返す。
+optional/list でも各 binding の範囲を使い、外側の未 capture 要素を拾わない。
+既存の文字列変換（外側空白の strip と単引用符だけの除去）を適用し、
+内部の区切り文字やコメントは消さない。group の `Object` 型等の公開 API は維持する。
+数値 token の直接 capture は引き続き `int`/boxed 型へ厳密に変換するが、
+`(N ':' T)` のような複合 capture を先頭の数値へ縮めたり数値に変換したりしない。
+mapped AST/enum の参照を含む compound はこの文字列化の対象外で、従来の型付き dispatch を維持する。
+
 ParserGenerator は位置専用の `__CaptureSite` と `__CaptureBinding` を生成する。
 `Parser.get` の共有 parser に capture metadata を書き込むことはない。CST には
 capture wrapper が増えるため、手書きの木の走査は追加ノードを考慮する必要がある。
