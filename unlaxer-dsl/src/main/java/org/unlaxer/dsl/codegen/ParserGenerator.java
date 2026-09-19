@@ -10,6 +10,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.TokenDecl;
 import org.unlaxer.RecursiveMode;
 
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -52,6 +53,8 @@ public class ParserGenerator implements CodeGenerator {
         final Map<String, Boolean> useDelimitedChainByRule = new LinkedHashMap<>();
         boolean hasDelimitedChain = false;
         final Map<String, int[]> helperCounters = new LinkedHashMap<>(); // rule -> [repeat,opt,group,sep]
+        // A helper belongs to a grammar site, not to an emission traversal or structurally equal element.
+        final Map<String, Map<AtomicElement, String>> helperNames = new LinkedHashMap<>();
         boolean needsCPPComment = false;
         boolean needsBlockComment = false;
         final List<String> delimitorClasses = new ArrayList<>();
@@ -113,14 +116,16 @@ public class ParserGenerator implements CodeGenerator {
             return helperCounters.computeIfAbsent(ruleName, k -> new int[]{0,0,0,0})[3]++;
         }
 
-        int[] snapshotCounters(String ruleName) {
-            int[] c = helperCounters.computeIfAbsent(ruleName, k -> new int[]{0, 0, 0, 0});
-            return new int[]{c[0], c[1], c[2], c[3]};
+        void registerHelper(String ruleName, AtomicElement element, String name) {
+            helperNames.computeIfAbsent(ruleName, k -> new IdentityHashMap<>()).put(element, name);
         }
 
-        void restoreCounters(String ruleName, int[] snapshot) {
-            int[] c = helperCounters.computeIfAbsent(ruleName, k -> new int[]{0, 0, 0, 0});
-            c[0] = snapshot[0]; c[1] = snapshot[1]; c[2] = snapshot[2]; c[3] = snapshot[3];
+        String helperName(String ruleName, AtomicElement element) {
+            String name = helperNames.getOrDefault(ruleName, Map.of()).get(element);
+            if (name == null) {
+                throw new IllegalStateException("Helper not analyzed for rule " + ruleName + ": " + element);
+            }
+            return name;
         }
 
         void addHelper(String ruleName, String code) {
@@ -220,7 +225,6 @@ public class ParserGenerator implements CodeGenerator {
 
         // Phase 2: 各ルールのヘルパー + ルールクラスを出力
         for (RuleDecl rule : grammar.rules()) {
-            ctx.resetCounters(rule.name());
             List<String> ruleHelpers = ctx.helpers.getOrDefault(rule.name(), List.of());
             for (String helper : ruleHelpers) {
                 sb.append(helper);

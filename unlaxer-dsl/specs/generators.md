@@ -66,6 +66,14 @@ public interface CodeGenerator {
 - `@scopeTree` に基づくスコープツリーメタデータ API
 - `@rightAssoc` ルールの右再帰 Choice 構造
 
+### 補助パーサーの文法位置
+
+group・optional・repeat・separated の補助クラス名は、分析時にルール内の文法位置へ割り当てる。
+生成時は同じ位置の名前を参照し、生成順による再採番は行わない。
+これにより、入れ子の補助パーサーが後続の兄弟要素の参照をずらさない。
+内容が同一の要素も別の位置として扱い、capture の所属を保持する。
+既存のクラス命名規則と宣言順は維持する。修正前に生成した入れ子を含むパーサーは再生成が必要。
+
 ### 演算子メタデータ API（@precedence 使用時）
 
 - `PRECEDENCE_{RULE_NAME}` 定数
