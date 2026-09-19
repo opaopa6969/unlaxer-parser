@@ -506,6 +506,21 @@ VarDecl ::= 'let' IDENTIFIER @name '=' Expression @value ;
 `@mapping` を付けると、`VarDeclAST(String name, ExpressionAST value)` のような
 Java のデータクラスが自動生成されます。
 
+`params` を省略した場合、トークン参照・未マッピングのルール参照・リテラル・
+列などは、フィールドを持たない具象 `record` を生成します。
+たとえば `token T=EMPTY; @mapping(Item) Part ::= T;` は `record Item()` です。
+空ノードも mapper で生成され、その位置は source map に保持されます。
+
+例外は、単純なクラス名を持つマッピングで、全選択肢がそれぞれ単一の
+**別のマッピング済みルール**を参照する場合です。参照先のマッピング名は単純名、
+または同じ親名内の dotted 名である必要があります。この場合は中間 `sealed interface`
+を生成し、mapper は選択されたルールの具象ノードを返します。選択肢が一つでも
+同じ扱いなので、`@mapping(Node) Root ::= Leaf; @mapping(Item) Leaf ::= 'a';`
+では `Node` は `Item` を許可するインターフェースです。トークン宣言は、この意味での
+マッピング済みルールには含まれません。複数段の別名や複数の和型が同じ派生型を
+共有する場合も、Java の直接の `extends` / `implements` 関係を生成します。
+`@mapping(Node.Item)` は `Node` 内の具象 record を生成します。
+
 ### `@leftAssoc` / `@rightAssoc` — 演算子の結合性
 
 同じ優先度の演算子が並んだとき、左から結合するか右から結合するかを指定します：

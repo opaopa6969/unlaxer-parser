@@ -239,7 +239,10 @@ class MapperRuleEmitter {
               + " to" + MapperElementUtil.methodNameFor(className) + "(Token token) {");
             w.indent();
 
-            if (leftAssoc || rightAssoc) {
+            List<RuleDecl> sumVariants = MappingShape.sumVariants(grammar, rule, mapping);
+            if (!sumVariants.isEmpty()) {
+                emitSumMappingBody(w, parsersClass, className, sumVariants);
+            } else if (leftAssoc || rightAssoc) {
                 emitAssocMappingBody(w, grammar, astClass, parsersClass, className, rule, mapping,
                     rightAssoc, allMappingRules, mappedClassByRuleName, tokenDeclByName, ruleByName);
             } else {
@@ -258,6 +261,28 @@ class MapperRuleEmitter {
             }
         }
         return w.build();
+    }
+
+    private static void emitSumMappingBody(IndentedWriter w, String parsersClass, String className,
+            List<RuleDecl> variants) {
+        // Visit every variant at a depth before descending: B may itself contain A.
+        w.line("java.util.ArrayDeque<Token> pending = new java.util.ArrayDeque<>();");
+        w.line("pending.addAll(token.getOriginalChildren());");
+        w.line("while (!pending.isEmpty()) {");
+        w.indent();
+        w.line("Token candidate = pending.removeFirst();");
+        for (RuleDecl variant : variants) {
+            String target = MapperElementUtil.getMappingAnnotation(variant).orElseThrow().className();
+            w.line("if (candidate.parser.getClass() == " + parsersClass + "." + variant.name() + "Parser.class) {");
+            w.indent();
+            w.line("return to" + MapperElementUtil.methodNameFor(target) + "(candidate);");
+            w.dedent();
+            w.line("}");
+        }
+        w.line("pending.addAll(candidate.getOriginalChildren());");
+        w.dedent();
+        w.line("}");
+        w.line("throw new IllegalArgumentException(\"Mapped variant not found for " + className + "\");");
     }
 
     private static void emitAssocMappingBody(IndentedWriter w, GrammarDecl grammar,

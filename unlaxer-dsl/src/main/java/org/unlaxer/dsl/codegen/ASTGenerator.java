@@ -90,7 +90,7 @@ public class ASTGenerator implements CodeGenerator {
             }
             getMappingAnnotation(rule).ifPresent(m -> {
                 String name = m.className();
-                if (isMidSealedCandidate(rule, m)) {
+                if (!MappingShape.sumVariants(grammar, rule, m).isEmpty()) {
                     midSealedRules.putIfAbsent(name, rule);
                 } else if (name.contains(".")) {
                     int dot = name.indexOf('.');
@@ -111,7 +111,7 @@ public class ASTGenerator implements CodeGenerator {
         // した場合は nested を優先する (より具体的な inner record 構造を持つため、
         // 中間 sealed の宣言は nested 側に統合される)。
         Map<String, List<String>> midSealedPermits = new LinkedHashMap<>();
-        Map<String, String> recordToMidSealed = new LinkedHashMap<>();
+        Map<String, Set<String>> recordToMidSealed = new LinkedHashMap<>();
         for (Map.Entry<String, RuleDecl> entry : midSealedRules.entrySet()) {
             String midSealedName = entry.getKey();
             if (nestedRules.containsKey(midSealedName)) {
@@ -120,7 +120,7 @@ public class ASTGenerator implements CodeGenerator {
             List<String> permits = computeMidSealedPermits(entry.getValue(), grammar);
             midSealedPermits.put(midSealedName, permits);
             for (String permittedRecord : permits) {
-                recordToMidSealed.putIfAbsent(permittedRecord, midSealedName);
+                recordToMidSealed.computeIfAbsent(permittedRecord, ignored -> new LinkedHashSet<>()).add(midSealedName);
             }
         }
 
@@ -145,9 +145,11 @@ public class ASTGenerator implements CodeGenerator {
             }
         }
         for (String outer : nestedRules.keySet()) {
-            astPermits.add(outer);
+            if (!recordToMidSealed.containsKey(outer)) astPermits.add(outer);
         }
-        astPermits.addAll(midSealedRules.keySet());
+        for (String name : midSealedRules.keySet()) {
+            if (!recordToMidSealed.containsKey(name)) astPermits.add(name);
+        }
 
         String permitsClause = astPermits.stream()
             .map(name -> className + "." + name)
@@ -160,7 +162,8 @@ public class ASTGenerator implements CodeGenerator {
         // 中間 sealed interface 宣言を先に出す (permit する record 群より前である必要はないが
         // 読みやすさのため)。
         for (Map.Entry<String, List<String>> entry : midSealedPermits.entrySet()) {
-            emitMidSealed(sb, entry.getKey(), entry.getValue(), className, grammar);
+            String parentTypes = String.join(", ", recordToMidSealed.getOrDefault(entry.getKey(), Set.of(className)));
+            emitMidSealed(sb, entry.getKey(), entry.getValue(), className, parentTypes, grammar);
         }
 
         // flat record (中間 sealed 配下でないもののみ)
@@ -171,7 +174,7 @@ public class ASTGenerator implements CodeGenerator {
             }
             RuleDecl rule = entry.getValue();
             MappingAnnotation mapping = getMappingAnnotation(rule).get();
-            String parentType = recordToMidSealed.getOrDefault(recordName, className);
+            String parentType = String.join(", ", recordToMidSealed.getOrDefault(recordName, Set.of(className)));
             emitRecord(sb, "    ", recordName, rule, mapping, grammar, parentType);
         }
 
@@ -179,7 +182,8 @@ public class ASTGenerator implements CodeGenerator {
         for (Map.Entry<String, Map<String, RuleDecl>> entry : nestedRules.entrySet()) {
             String outerName = entry.getKey();
             Map<String, RuleDecl> inners = entry.getValue();
-            emitNestedSealed(sb, outerName, inners, grammar, className);
+            String parentTypes = String.join(", ", recordToMidSealed.getOrDefault(outerName, Set.of(className)));
+            emitNestedSealed(sb, outerName, inners, grammar, parentTypes);
         }
 
         // enum ルール
@@ -190,40 +194,6 @@ public class ASTGenerator implements CodeGenerator {
         sb.append("}\n");
 
         return new GeneratedSource(packageName, className, sb.toString());
-    }
-
-    /**
-     * 中間 sealed interface の候補かを判定する。
-     * 条件: @mapping(SimpleName) で params 無し、body が Choice、
-     *       各 alt が単一 RuleRef のみ (= sum-type の典型形)。
-     *
-     * <p>1 alternative でも候補とする — その場合は permits 1 つの sealed
-     * interface (type-alias 的な使い方) になる。手書き UBNFAST の
-     * {@code RuleBody ::= ChoiceBody} のような中間 wrapper 型を表現する
-     * ために必要。</p>
-     */
-    private boolean isMidSealedCandidate(RuleDecl rule, MappingAnnotation mapping) {
-        if (!mapping.paramNames().isEmpty()) {
-            return false;
-        }
-        if (mapping.className().contains(".")) {
-            return false;
-        }
-        if (!(rule.body() instanceof ChoiceBody choice)) {
-            return false;
-        }
-        if (choice.alternatives().isEmpty()) {
-            return false;
-        }
-        for (SequenceBody seq : choice.alternatives()) {
-            if (seq.elements().size() != 1) {
-                return false;
-            }
-            if (!(seq.elements().get(0).element() instanceof RuleRefElement)) {
-                return false;
-            }
-        }
-        return true;
     }
 
     /**
@@ -265,7 +235,7 @@ public class ASTGenerator implements CodeGenerator {
                 });
             }
         }
-        return permits;
+        return permits.stream().distinct().toList();
     }
 
     private void emitRecord(StringBuilder sb, String indent, String recordName, RuleDecl rule,
@@ -298,11 +268,9 @@ public class ASTGenerator implements CodeGenerator {
     }
 
     private void emitMidSealed(StringBuilder sb, String midSealedName, List<String> permits,
-            String astClassName, GrammarDecl grammar) {
+            String astClassName, String parentTypes, GrammarDecl grammar) {
         if (permits.isEmpty()) {
-            sb.append("    interface ").append(midSealedName)
-              .append(" extends ").append(astClassName).append(" {}\n\n");
-            return;
+            throw new IllegalStateException("Mapped sum has no permitted types: " + midSealedName);
         }
         String permitsList = permits.stream().collect(Collectors.joining(",\n        "));
         // @commonField アノテーションで abstract method を生成
@@ -318,7 +286,7 @@ public class ASTGenerator implements CodeGenerator {
             .toList();
 
         sb.append("    sealed interface ").append(midSealedName)
-          .append(" extends ").append(astClassName).append(" permits\n")
+          .append(" extends ").append(parentTypes).append(" permits\n")
           .append("        ").append(permitsList).append(" {");
         if (commonFields.isEmpty()) {
             sb.append("}\n\n");

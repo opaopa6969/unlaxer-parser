@@ -209,8 +209,20 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("        Parser rootParser = ").append(parsersClass).append(".getRootParser();\n");
         sb.append("        ParseContext context = new ParseContext(createRootSourceCompat(source));\n");
         sb.append("        Parsed parsed;\n");
+        sb.append("        Token rootToken = null;\n");
         sb.append("        try {\n");
         sb.append("            parsed = rootParser.parse(context);\n");
+        // ChoiceInterface returns its winning child's Parsed, while commit stores the
+        // actual mapped choice wrapper in the context. Retain that root before closing.
+        sb.append("            if (parsed.isSucceeded()) {\n");
+        sb.append("                rootToken = parsed.getRootToken(false);\n");
+        sb.append("                for (Token committed : context.getCurrent().getTokens()) {\n");
+        sb.append("                    if (committed.parser == rootParser) {\n");
+        sb.append("                        rootToken = committed;\n");
+        sb.append("                        break;\n");
+        sb.append("                    }\n");
+        sb.append("                }\n");
+        sb.append("            }\n");
         sb.append("        } finally {\n");
         sb.append("            context.close();\n");
         sb.append("        }\n");
@@ -223,7 +235,6 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("        }\n");
         // Capture-site metadata includes successful zero-width matches. The generic reducer
         // drops empty children and mutates the CST, so typed mapping must use the original tree.
-        sb.append("        Token rootToken = parsed.getRootToken(false);\n");
 
         if (rootRule.isPresent() && MapperElementUtil.getMappingAnnotation(rootRule.get()).isPresent()) {
             RuleDecl rr = rootRule.get();
