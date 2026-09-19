@@ -46,12 +46,9 @@ class ParserRuleEmitter {
     // =========================================================================
 
     sealed interface HelperSpec {
-        int[] counterState();
-
-        record ChainHelper(String name, RuleBody body, int[] counterState) implements HelperSpec {}
+        record ChainHelper(String name, RuleBody body) implements HelperSpec {}
         record SepHelper(String bodyName, String outerName,
-                         AtomicElement element, AtomicElement separator,
-                         int[] counterState) implements HelperSpec {}
+                         AtomicElement element, AtomicElement separator) implements HelperSpec {}
     }
 
     // =========================================================================
@@ -116,9 +113,9 @@ class ParserRuleEmitter {
                 if (!isSingleRuleRef(rep.body())) {
                     int n = ctx.nextRepeat(ruleName);
                     String helperName = ruleName + "Repeat" + n + "Parser";
-                    int[] counterState = ctx.snapshotCounters(ruleName);
+                    ctx.registerHelper(ruleName, element, helperName);
                     analyzeHelpersInBody(ctx, ruleName, rep.body(), specs);
-                    specs.add(new HelperSpec.ChainHelper(helperName, rep.body(), counterState));
+                    specs.add(new HelperSpec.ChainHelper(helperName, rep.body()));
                 }
             }
             case OptionalElement opt -> {
@@ -127,44 +124,44 @@ class ParserRuleEmitter {
                             || getSingleAtomicElementFrom(opt.body()) instanceof TerminalElement)) {
                     int n = ctx.nextOpt(ruleName);
                     String helperName = ruleName + "Opt" + n + "Parser";
-                    int[] counterState = ctx.snapshotCounters(ruleName);
+                    ctx.registerHelper(ruleName, element, helperName);
                     analyzeHelpersInBody(ctx, ruleName, opt.body(), specs);
-                    specs.add(new HelperSpec.ChainHelper(helperName, opt.body(), counterState));
+                    specs.add(new HelperSpec.ChainHelper(helperName, opt.body()));
                 }
             }
             case OneOrMoreElement one -> {
                 if (!isSingleRuleRef(one.body())) {
                     int n = ctx.nextRepeat(ruleName);
                     String helperName = ruleName + "OneOrMore" + n + "Parser";
-                    int[] counterState = ctx.snapshotCounters(ruleName);
+                    ctx.registerHelper(ruleName, element, helperName);
                     analyzeHelpersInBody(ctx, ruleName, one.body(), specs);
-                    specs.add(new HelperSpec.ChainHelper(helperName, atomicAsRuleBody(one.body()), counterState));
+                    specs.add(new HelperSpec.ChainHelper(helperName, atomicAsRuleBody(one.body())));
                 }
             }
             case BoundedRepeatElement bounded -> {
                 if (!isSingleRuleRef(bounded.body())) {
                     int n = ctx.nextRepeat(ruleName);
                     String helperName = ruleName + "Bounded" + n + "Parser";
-                    int[] counterState = ctx.snapshotCounters(ruleName);
+                    ctx.registerHelper(ruleName, element, helperName);
                     analyzeHelpersInBody(ctx, ruleName, bounded.body(), specs);
-                    specs.add(new HelperSpec.ChainHelper(helperName, atomicAsRuleBody(bounded.body()), counterState));
+                    specs.add(new HelperSpec.ChainHelper(helperName, atomicAsRuleBody(bounded.body())));
                 }
             }
             case GroupElement g -> {
                 int n = ctx.nextGroup(ruleName);
                 String helperName = ruleName + "Group" + n + "Parser";
-                int[] counterState = ctx.snapshotCounters(ruleName);
+                ctx.registerHelper(ruleName, element, helperName);
                 analyzeHelpersInBody(ctx, ruleName, g.body(), specs);
-                specs.add(new HelperSpec.ChainHelper(helperName, g.body(), counterState));
+                specs.add(new HelperSpec.ChainHelper(helperName, g.body()));
             }
             case SeparatedElement sep -> {
                 int n = ctx.nextSep(ruleName);
                 String bodyHelperName = ruleName + "Sep" + n + "BodyParser";
                 String outerHelperName = ruleName + "Sep" + n + "Parser";
-                int[] counterState = ctx.snapshotCounters(ruleName);
+                ctx.registerHelper(ruleName, element, outerHelperName);
                 analyzeHelpersInElement(ctx, ruleName, sep.element(), specs);
                 analyzeHelpersInElement(ctx, ruleName, sep.separator(), specs);
-                specs.add(new HelperSpec.SepHelper(bodyHelperName, outerHelperName, sep.element(), sep.separator(), counterState));
+                specs.add(new HelperSpec.SepHelper(bodyHelperName, outerHelperName, sep.element(), sep.separator()));
             }
             default -> {} // TerminalElement, RuleRefElement, ErrorElement
         }
@@ -178,12 +175,10 @@ class ParserRuleEmitter {
         for (HelperSpec spec : specs) {
             switch (spec) {
                 case HelperSpec.ChainHelper chain -> {
-                    ctx.restoreCounters(ruleName, chain.counterState());
                     String helperCode = generateHelperCode(ctx, ruleName, chain.name(), chain.body());
                     ctx.addHelper(ruleName, helperCode);
                 }
                 case HelperSpec.SepHelper sep -> {
-                    ctx.restoreCounters(ruleName, sep.counterState());
                     generateSepHelperCode(ctx, ruleName, sep);
                 }
             }
@@ -956,7 +951,7 @@ class ParserRuleEmitter {
     }
 
     // =========================================================================
-    // resolveElement: AtomicElement → ElementModel（副作用: カウンタ増分）
+    // resolveElement: AtomicElement → ElementModel（分析済みの文法位置から解決、採番しない）
     // =========================================================================
 
     static ElementModel resolveElement(ParserGenerator.GenContext ctx, String ruleName, AtomicElement element) {
@@ -970,8 +965,7 @@ class ParserRuleEmitter {
                     AtomicElement single = getSingleAtomicElementFrom(rep.body());
                     yield new ElementModel.ZeroOrMoreOf(resolveElement(ctx, ruleName, single));
                 } else {
-                    int n = ctx.nextRepeat(ruleName);
-                    String helperName = ruleName + "Repeat" + n + "Parser";
+                    String helperName = ctx.helperName(ruleName, element);
                     yield new ElementModel.ZeroOrMoreOf(new ElementModel.ClassRef(helperName + ".class"));
                 }
             }
@@ -982,13 +976,11 @@ class ParserRuleEmitter {
                     if (inner instanceof RuleRefElement || inner instanceof TerminalElement) {
                         yield new ElementModel.OptionalOf(resolveElement(ctx, ruleName, inner));
                     } else {
-                        int n = ctx.nextOpt(ruleName);
-                        String helperName = ruleName + "Opt" + n + "Parser";
+                        String helperName = ctx.helperName(ruleName, element);
                         yield new ElementModel.OptionalOf(new ElementModel.ClassRef(helperName + ".class"));
                     }
                 } else {
-                    int n = ctx.nextOpt(ruleName);
-                    String helperName = ruleName + "Opt" + n + "Parser";
+                    String helperName = ctx.helperName(ruleName, element);
                     yield new ElementModel.OptionalOf(new ElementModel.ClassRef(helperName + ".class"));
                 }
             }
@@ -998,8 +990,7 @@ class ParserRuleEmitter {
                     AtomicElement single = getSingleAtomicElementFrom(one.body());
                     yield new ElementModel.OneOrMoreOf(resolveElement(ctx, ruleName, single));
                 } else {
-                    int n = ctx.nextRepeat(ruleName);
-                    String helperName = ruleName + "OneOrMore" + n + "Parser";
+                    String helperName = ctx.helperName(ruleName, element);
                     yield new ElementModel.OneOrMoreOf(new ElementModel.ClassRef(helperName + ".class"));
                 }
             }
@@ -1014,22 +1005,19 @@ class ParserRuleEmitter {
                     yield new ElementModel.BoundedRepeatOf(
                         resolveElement(ctx, ruleName, single), minStr, maxStr);
                 } else {
-                    int n = ctx.nextRepeat(ruleName);
-                    String helperName = ruleName + "Bounded" + n + "Parser";
+                    String helperName = ctx.helperName(ruleName, element);
                     yield new ElementModel.BoundedRepeatOf(
                         new ElementModel.ClassRef(helperName + ".class"), minStr, maxStr);
                 }
             }
 
             case GroupElement g -> {
-                int n = ctx.nextGroup(ruleName);
-                String helperName = ruleName + "Group" + n + "Parser";
+                String helperName = ctx.helperName(ruleName, element);
                 yield new ElementModel.ClassRef(helperName + ".class");
             }
 
             case SeparatedElement sep -> {
-                int n = ctx.nextSep(ruleName);
-                String outerHelperName = ruleName + "Sep" + n + "Parser";
+                String outerHelperName = ctx.helperName(ruleName, element);
                 yield new ElementModel.ClassRef(outerHelperName + ".class");
             }
 
