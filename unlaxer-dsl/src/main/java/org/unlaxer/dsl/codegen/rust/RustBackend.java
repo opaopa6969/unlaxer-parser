@@ -32,7 +32,32 @@ public final class RustBackend {
 
     private String ast(GrammarIR ir) {
         StringBuilder out = new StringBuilder(HEADER);
-        out.append("use unlaxer_runtime::{Span, json_string};\n\n#[allow(non_snake_case, non_camel_case_types)]\n#[derive(Debug, Clone, PartialEq)]\npub enum Ast {\n");
+        out.append("use unlaxer_runtime::{Span, json_string};\n\n");
+        if (hasValues(ir)) out.append("""
+            #[derive(Debug, Clone, PartialEq)]
+            pub enum AstValue {
+                Text { text: String, span: Span },
+                Node(Box<Ast>),
+            }
+
+            impl AstValue {
+                pub fn span(&self) -> Span {
+                    match self {
+                        Self::Text { span, .. } => *span,
+                        Self::Node(node) => node.span(),
+                    }
+                }
+
+                pub fn canonical_json(&self) -> String {
+                    match self {
+                        Self::Text { text, .. } => json_string(text),
+                        Self::Node(node) => node.canonical_json(),
+                    }
+                }
+            }
+
+            """);
+        out.append("#[allow(non_snake_case, non_camel_case_types)]\n#[derive(Debug, Clone, PartialEq)]\npub enum Ast {\n");
         for (Mapping mapping : ir.mappings()) {
             out.append("    r#").append(mapping.name()).append(" { span: Span");
             for (Field field : mapping.fields()) out.append(", r#").append(field.name()).append(": ")
@@ -133,6 +158,7 @@ public final class RustBackend {
             case Delimited delimited -> "Expr::Sequence(vec![" + expression(delimited.child()) + "])";
             case Choice choice -> "Expr::Choice(vec![" + expressions(choice.alternatives()) + "])";
             case Capture capture -> "Expr::Capture(" + quote(capture.name()) + ", Box::new(" + expression(capture.expression()) + "))";
+            case TextValue text -> "Expr::TextValue(Box::new(" + expression(text.child()) + "))";
             case OptionalExpr optional -> expression(optional.child()) + ".optional_java()";
             case Repeat repeat -> expression(repeat.child()) + ".repeat_java(" + repeat.min() + ", "
                 + (repeat.max() == null ? "None" : "Some(" + repeat.max() + ")") + ")";
@@ -146,6 +172,7 @@ public final class RustBackend {
 
     private String mapper(GrammarIR ir) {
         StringBuilder out = new StringBuilder(HEADER);
+        if (hasValues(ir)) out.append("use super::ast::AstValue;\n");
         out.append("use super::ast::Ast;\nuse unlaxer_runtime::Tree;\n\n");
         out.append("""
             pub fn map(tree: &Tree) -> Result<Ast, String> {
@@ -163,6 +190,25 @@ public final class RustBackend {
                 Ok(found)
             }
             """);
+        if (hasValues(ir)) {
+            out.append("""
+
+                fn map_values(tree: &Tree, ids: &[usize]) -> Result<Vec<AstValue>, String> {
+                    let mut found = Vec::new();
+                    for &id in ids {
+                        let node = &tree.nodes[id];
+                        match node.rule {
+                            unlaxer_runtime::TEXT_VALUE_RULE => found.push(AstValue::Text {
+                                text: unlaxer_runtime::java_capture_text(tree.text(node.span)).to_owned(),
+                                span: node.span,
+                            }),
+                """);
+            List<String> ids = new ArrayList<>();
+            for (int i = 0; i < ir.rules().size(); i++) if (ir.rules().get(i).mapping() != null) ids.add(Integer.toString(i));
+            out.append("            ").append(String.join(" | ", ids))
+                .append(" => found.extend(map_node(tree, id)?.into_iter().map(|node| AstValue::Node(Box::new(node)))),\n")
+                .append("            _ => found.extend(map_values(tree, &node.children)?),\n        }\n    }\n    Ok(found)\n}\n");
+        }
         if (ir.rules().stream().filter(r -> r.mapping() != null).flatMap(r -> r.mapping().fields().stream())
             .anyMatch(f -> f.cardinality() == Cardinality.OPTIONAL)) out.append("""
 
@@ -184,6 +230,7 @@ public final class RustBackend {
                 out.append("            r#").append(field.name()).append(": {\n                let mut values = Vec::new();\n")
                     .append("                for capture in node.captures.iter().filter(|c| c.name == ").append(quote(field.name())).append(") {\n");
                 if (field.kind() == Kind.NODE) out.append("                    values.extend(map_nodes(tree, &capture.nodes)?);\n");
+                else if (field.kind() == Kind.VALUE) out.append("                    values.extend(map_values(tree, &capture.nodes)?);\n");
                 else out.append("                    values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).to_owned());\n");
                 out.append("                }\n                ").append(mappedValue(field)).append("\n            },\n");
             }
@@ -195,6 +242,7 @@ public final class RustBackend {
 
     private String evaluator(GrammarIR ir) {
         StringBuilder out = new StringBuilder(HEADER);
+        if (hasValues(ir)) out.append("use super::ast::AstValue;\n");
         out.append("use super::ast::Ast;\nuse unlaxer_runtime::Span;\n\n#[allow(non_snake_case)]\npub trait Semantics {\n    type Output;\n");
         for (Mapping mapping : ir.mappings()) {
             out.append("    fn ").append(RustGrammarLowering.methodName(mapping.name())).append("(&mut self");
@@ -205,7 +253,7 @@ public final class RustBackend {
         out.append("}\n\n#[allow(non_snake_case)]\npub fn evaluate<S: Semantics>(node: &Ast, semantics: &mut S) -> S::Output {\n    match node {\n");
         for (Mapping mapping : ir.mappings()) {
             var args = new ArrayList<>(mapping.fields().stream().map(f -> "r#" + f.name()
-                + (f.cardinality() == Cardinality.OPTIONAL ? ".as_deref()" : "")).toList());
+                + (f.cardinality() == Cardinality.OPTIONAL ? (f.kind() == Kind.VALUE ? ".as_ref()" : ".as_deref()") : "")).toList());
             args.add("*span");
             out.append("        ").append(pattern(mapping, "Ast")).append(" => semantics.")
                 .append(RustGrammarLowering.methodName(mapping.name())).append("(").append(String.join(", ", args)).append("),\n");
@@ -219,10 +267,20 @@ public final class RustBackend {
     }
 
     private static String fieldType(Field field, boolean borrowed) {
+        String one = switch (field.kind()) {
+            case NODE -> borrowed ? "&Ast" : "Box<Ast>";
+            case TEXT -> borrowed ? "&str" : "String";
+            case VALUE -> borrowed ? "&AstValue" : "AstValue";
+        };
+        String element = switch (field.kind()) {
+            case NODE -> "Ast";
+            case TEXT -> "String";
+            case VALUE -> "AstValue";
+        };
         return switch (field.cardinality()) {
-            case ONE -> field.kind() == Kind.NODE ? (borrowed ? "&Ast" : "Box<Ast>") : (borrowed ? "&str" : "String");
-            case OPTIONAL -> "Option<" + (field.kind() == Kind.NODE ? (borrowed ? "&Ast" : "Box<Ast>") : (borrowed ? "&str" : "String")) + ">";
-            case MANY -> (borrowed ? "&[" : "Vec<") + (field.kind() == Kind.NODE ? "Ast" : "String") + (borrowed ? "]" : ">");
+            case ONE -> one;
+            case OPTIONAL -> "Option<" + one + ">";
+            case MANY -> (borrowed ? "&[" : "Vec<") + element + (borrowed ? "]" : ">");
         };
     }
 
@@ -237,12 +295,16 @@ public final class RustBackend {
 
     private static String fieldJson(Field field) {
         String name = "r#" + field.name();
-        String value = field.kind() == Kind.NODE ? "value.canonical_json()" : "json_string(value)";
+        String value = field.kind() != Kind.TEXT ? "value.canonical_json()" : "json_string(value)";
         return switch (field.cardinality()) {
-            case ONE -> field.kind() == Kind.NODE ? name + ".canonical_json()" : "json_string(" + name + ")";
+            case ONE -> field.kind() != Kind.TEXT ? name + ".canonical_json()" : "json_string(" + name + ")";
             case OPTIONAL -> name + ".as_ref().map_or_else(|| \"null\".to_owned(), |value| " + value + ")";
             case MANY -> "format!(\"[{}]\", " + name + ".iter().map(|value| " + value + ").collect::<Vec<_>>().join(\",\"))";
         };
+    }
+
+    private static boolean hasValues(GrammarIR ir) {
+        return ir.mappings().stream().flatMap(mapping -> mapping.fields().stream()).anyMatch(field -> field.kind() == Kind.VALUE);
     }
 
     static String quote(String value) {

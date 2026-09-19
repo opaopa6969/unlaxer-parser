@@ -12,6 +12,8 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.unlaxer.dsl.bootstrap.UBNFMapper;
 import org.unlaxer.dsl.codegen.rust.RustBackend;
+import org.unlaxer.dsl.codegen.rust.GrammarIR;
+import org.unlaxer.dsl.codegen.rust.RustGrammarLowering;
 
 public class RustBackendTest {
     @Rule public TemporaryFolder temporary = new TemporaryFolder();
@@ -123,6 +125,108 @@ public class RustBackendTest {
         reject(source.replace("Second ::= 'b' @value", "Second ::= 'b' @other")
             .replace("@mapping(Value, params=[value]) Second", "@mapping(Value, params=[other]) Second"), "incompatible shared mapping schema");
         reject(source.replace("@mapping(Value, params=[value]) Second", "@mapping(VALUE, params=[value]) Second"), "mapping method collision");
+    }
+
+    @Test public void mixedValuesKeepTextBranchesAndCardinalityInGeneratedApis() {
+        String source = """
+            grammar Mixed {
+              @root @mapping(RootValue, params=[one, maybe, many])
+              Root ::= Value @one ':' [Value] @maybe ':' {Value} @many;
+              Value ::= 'literal' | Leaf;
+              @mapping(Leaf, params=[text]) Leaf ::= 'node' @text;
+            }
+            """;
+        var grammar = UBNFMapper.parse(source).grammars().get(0);
+        var ir = RustGrammarLowering.lower(grammar);
+        assertEquals(List.of(GrammarIR.Kind.VALUE, GrammarIR.Kind.VALUE, GrammarIR.Kind.VALUE),
+            ir.rules().get(0).mapping().fields().stream().map(GrammarIR.Field::kind).toList());
+        var files = new RustBackend().generate(grammar);
+        assertTrue(files.get(1).content().contains("r#one: AstValue, r#maybe: Option<AstValue>, r#many: Vec<AstValue>"));
+        assertTrue(files.get(4).content().contains("r#one: &AstValue, r#maybe: Option<&AstValue>, r#many: &[AstValue]"));
+        assertTrue(files.get(4).content().contains("r#maybe.as_ref()"));
+        assertTrue(files.get(2).content().contains("Expr::TextValue(Box::new(Expr::Literal(\"literal\")))"));
+        assertTrue(files.get(3).content().contains("unlaxer_runtime::TEXT_VALUE_RULE => found.push(AstValue::Text"));
+        assertTrue(files.get(3).content().contains("0 | 2 => found.extend(map_node"));
+        assertTrue(files.get(3).content().contains("values.extend(map_values(tree, &capture.nodes)?);"));
+    }
+
+    @Test public void sharedMappingsJoinKindsBeforeRewritingAllCaptureSites() {
+        String first = "@mapping(Box, params=[value]) First ::= 'a' @value;";
+        String second = "@mapping(Box, params=[value]) Second ::= Leaf @value;";
+        String leaf = "@mapping(Leaf, params=[text]) Leaf ::= 'b' @text;";
+        for (String declarations : List.of(first + second + leaf, second + leaf + first)) {
+            var grammar = UBNFMapper.parse("grammar Shared { @root Root ::= First | Second; " + declarations + " }")
+                .grammars().get(0);
+            var ir = RustGrammarLowering.lower(grammar);
+            assertEquals(2, ir.mappings().size());
+            ir.rules().stream().filter(rule -> rule.mapping() != null && rule.mapping().name().equals("Box"))
+                .forEach(rule -> assertEquals(GrammarIR.Kind.VALUE, rule.mapping().fields().get(0).kind()));
+            var files = new RustBackend().generate(grammar);
+            assertTrue(files.get(2).content().contains("Expr::Capture(\"value\", Box::new(Expr::TextValue(Box::new(Expr::Literal(\"a\")))))"));
+            assertEquals(1, files.get(1).content().split("r#Box \\{ span: Span", -1).length - 1);
+        }
+    }
+
+    @Test public void nestedMixedChoicesAndSemanticSequencesAreRetained() {
+        String source = """
+            grammar Mixed {
+              @root @mapping(Box, params=[value]) Root ::= (Value Leaf) @value;
+              Value ::= [('a' | Leaf)];
+              @mapping(Leaf, params=[text]) Leaf ::= 'b' @text;
+            }
+            """;
+        var grammar = UBNFMapper.parse(source).grammars().get(0);
+        var field = RustGrammarLowering.lower(grammar).rules().get(0).mapping().fields().get(0);
+        assertEquals(new GrammarIR.Field("value", GrammarIR.Kind.VALUE, GrammarIR.Cardinality.MANY), field);
+        assertTrue(new RustBackend().generate(grammar).get(2).content().contains("Expr::TextValue(Box::new(Expr::Literal(\"a\")))"));
+        reject(source.replace("(Value Leaf) @value", "Leaf % Value @value"), "mapped separator");
+    }
+
+    @Test public void mixedUncapturedChoicesDoNotChangeExistingArtifacts() {
+        String source = """
+            grammar Mixed {
+              @root @mapping(Box) Root ::= 'a' | Leaf;
+              @mapping(Leaf) Leaf ::= 'b';
+            }
+            """;
+        var files = new RustBackend().generate(UBNFMapper.parse(source).grammars().get(0));
+        assertFalse(files.get(1).content().contains("AstValue"));
+        assertFalse(files.get(2).content().contains("TextValue"));
+        assertFalse(files.get(3).content().contains("map_values"));
+    }
+
+    @Test public void sharedAssocSchemasValidateLocallyBeforePromotion() {
+        String source = """
+            grammar Shared {
+              @root Root ::= First | Second;
+              @leftAssoc @mapping(Binary, params=[left,op,right])
+              First ::= 'a' @left {'+' @op 'a' @right};
+              @leftAssoc @mapping(Binary, params=[left,op,right])
+              Second ::= Leaf @left {'+' @op Leaf @right};
+              @mapping(Leaf) Leaf ::= 'b';
+            }
+            """;
+        var ir = RustGrammarLowering.lower(UBNFMapper.parse(source).grammars().get(0));
+        assertEquals(ir.rules().get(1).mapping(), ir.rules().get(2).mapping());
+        assertEquals(List.of(GrammarIR.Kind.VALUE, GrammarIR.Kind.TEXT, GrammarIR.Kind.VALUE),
+            ir.rules().get(1).mapping().fields().stream().map(GrammarIR.Field::kind).toList());
+        reject(source.replace("'a' @right", "Leaf @right"), "@leftAssoc requires");
+        reject(source.replace("Leaf @left", "[Leaf] @left"), "@leftAssoc requires");
+    }
+
+    @Test public void rightAssocSyntheticChoiceDoesNotBecomeATextValueBranch() {
+        String source = """
+            grammar MixedPower {
+              @root @mapping(Box, params=[value]) Root ::= ('z' | Expr) @value;
+              @rightAssoc @mapping(Power, params=[left,op,right])
+              Expr ::= 'x' @left {'^' @op Expr @right};
+            }
+            """;
+        String parser = new RustBackend().generate(UBNFMapper.parse(source).grammars().get(0)).get(2).content();
+        assertTrue(parser.contains("Expr::TextValue(Box::new(Expr::Literal(\"z\")))"));
+        String power = parser.lines().filter(line -> line.contains("Rule { name: \"Expr\"")).findFirst().orElseThrow();
+        assertTrue(power.contains("Expr::Choice"));
+        assertFalse(power.contains("TextValue"));
     }
 
     @Test public void leftAssocMetadataDoesNotRewriteTheGrammarAndInvalidShapesAreRejected() {
