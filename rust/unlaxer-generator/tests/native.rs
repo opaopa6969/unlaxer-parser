@@ -133,6 +133,108 @@ fn native_generated_operator_modules_compile_and_execute() {
 }
 
 #[test]
+fn native_nested_captures_keep_all_values_scopes_and_list_semantics() {
+    let directory = Directory::new();
+    let library = directory.0.join("libunlaxer_runtime.rlib");
+    success(
+        Command::new("rustc")
+            .args([
+                "--edition=2021",
+                "--crate-type=rlib",
+                "--crate-name=unlaxer_runtime",
+            ])
+            .arg(repo().join("unlaxer-runtime/src/lib.rs"))
+            .arg("-o")
+            .arg(&library)
+            .output()
+            .unwrap(),
+    );
+    let cases: &[(&str, &str, &[&str], &[usize])] = &[
+        ("('a' @name 'b') @name", "ab", &["a", "ab"], &[0, 0]),
+        ("('a' @name) @name", "a", &["a", "a"], &[0, 0]),
+        ("[ 'a' @name ] @name '!'", "a!", &["a", "a"], &[0, 0]),
+        ("[ 'a' @name ] @name '!'", "!", &[], &[]),
+        (
+            "{ 'a' @name } @name '!'",
+            "aa!",
+            &["a", "a", "a", "a"],
+            &[0, 0, 1, 1],
+        ),
+        (
+            "('a' @name)+ @name '!'",
+            "aa!",
+            &["a", "a", "a", "a"],
+            &[0, 0, 1, 1],
+        ),
+        (
+            "('a' @name){1,2} @name '!'",
+            "aa!",
+            &["a", "a", "a", "a"],
+            &[0, 0, 1, 1],
+        ),
+        (
+            "('a' @name) % ',' @name '!'",
+            "a,a!",
+            &["a", "a", "a", "a"],
+            &[0, 0, 2, 2],
+        ),
+        ("('a' @name '😀') @name", "a😀", &["a", "a😀"], &[0, 0]),
+    ];
+    for (index, (body, input, expected, offsets)) in cases.iter().enumerate() {
+        let path = directory.0.join(format!("case-{index}"));
+        fs::create_dir(&path).unwrap();
+        let grammar = path.join("Nested.ubnf");
+        fs::write(
+            &grammar,
+            format!(
+                "grammar Nested {{ @root @scopeTree(mode=lexical) \
+            @declares(symbol=name) @mapping(Item,params=[name]) Root ::= {body}; }}"
+            ),
+        )
+        .unwrap();
+        success(invoke(&grammar, &path.join("generated"), false));
+        success(invoke(&grammar, &path.join("generated"), true));
+        fs::write(path.join("main.rs"), format!(r#"
+mod generated;
+use generated::ast::Ast;
+use generated::evaluator::{{Semantics, evaluate}};
+use unlaxer_runtime::Span;
+struct Evaluator;
+impl Semantics for Evaluator {{
+    type Output = String;
+    fn eval_item(&mut self, name: &[String], _: Span) -> String {{ name.join("|") }}
+}}
+fn main() {{
+    let expected: &[&str] = &{expected:?};
+    let offsets: &[usize] = &{offsets:?};
+    let tree = generated::parser::parse_tree({input:?}).unwrap();
+    assert_eq!(tree.scopes().all_declarations().iter().map(|s| s.name.as_str()).collect::<Vec<_>>(), expected);
+    assert_eq!(tree.scopes().all_declarations().iter().map(|s| s.source_offset).collect::<Vec<_>>(), offsets);
+    let ast = generated::mapper::map(&tree).unwrap();
+    drop(tree);
+    assert_eq!(ast.span(), Span {{ start: 0, end: {length} }});
+    assert_eq!(evaluate(&ast, &mut Evaluator), expected.join("|"));
+    let Ast::Item {{ name, .. }} = ast;
+    assert_eq!(name, expected);
+}}
+"#, length = input.chars().count())).unwrap();
+        let binary = path.join("probe");
+        success(
+            Command::new("rustc")
+                .arg("--edition=2021")
+                .arg(path.join("main.rs"))
+                .arg("--extern")
+                .arg(format!("unlaxer_runtime={}", library.display()))
+                .arg("-o")
+                .arg(&binary)
+                .output()
+                .unwrap(),
+        );
+        success(Command::new(&binary).output().unwrap());
+    }
+}
+
+#[test]
 fn native_right_associative_generation_evaluates_recursive_owned_nodes() {
     let directory = Directory::new();
     let library = directory.0.join("libunlaxer_runtime.rlib");
