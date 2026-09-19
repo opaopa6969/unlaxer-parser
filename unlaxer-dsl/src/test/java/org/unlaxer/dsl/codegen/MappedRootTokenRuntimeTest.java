@@ -11,6 +11,11 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
 import javax.tools.DiagnosticCollector;
 import javax.tools.JavaFileObject;
 import javax.tools.SimpleJavaFileObject;
@@ -31,6 +36,7 @@ public class MappedRootTokenRuntimeTest {
         @root @mapping(Power, params=[left,op,right]) @rightAssoc @precedence(level=10)
         Expr ::= Atom @left { '^' @op Expr @right };
         Atom ::= NUMBER;
+        @mapping(Number, params=[value]) Alternate ::= (NUMBER) @value;
         """;
 
     private URLClassLoader compile(String rules) throws Exception {
@@ -80,7 +86,8 @@ public class MappedRootTokenRuntimeTest {
     }
 
     private void assertRejected(Class<?> mapper, Token stripped, String rootName) throws Exception {
-        for (String method : List.of("mapParsedToken", "mapParsedTokenWithSourceMap")) {
+        for (String method : List.of("mapParsedToken", "mapParsedTokenWithSourceMap",
+                "selectParsedTokenWithSourceMap")) {
             var error = assertThrows(method, InvocationTargetException.class,
                 () -> mapper.getMethod(method, Token.class).invoke(null, stripped));
             assertTrue(error.getCause().toString(), error.getCause() instanceof IllegalArgumentException);
@@ -89,6 +96,15 @@ public class MappedRootTokenRuntimeTest {
         var error = assertThrows(InvocationTargetException.class,
             () -> mapper.getMethod("mapParsedToken", Token.class, String.class).invoke(null, stripped, "Power"));
         assertTrue(error.getCause().getMessage(), error.getCause().getMessage().contains("Mapped root token is missing for " + rootName));
+        error = assertThrows(InvocationTargetException.class,
+            () -> mapper.getMethod("selectParsedTokenWithSourceMap", Token.class, String.class)
+                .invoke(null, stripped, "Power"));
+        assertTrue(error.getCause().getMessage(), error.getCause().getMessage().contains("Mapped root token is missing for " + rootName));
+    }
+
+    private Object selectSubtree(Class<?> mapper, Token token, String preferred) throws Exception {
+        return mapper.getMethod("selectSubtreeTokenWithSourceMap", Token.class, String.class)
+            .invoke(null, token, preferred);
     }
 
     @Test public void rawAndReducedChoiceResultsCannotSelectNestedRecursiveRoot() throws Exception {
@@ -106,6 +122,111 @@ public class MappedRootTokenRuntimeTest {
                     }
                 }
             }
+        }
+    }
+
+    @Test public void alternateEntryTokensMapExplicitlyWithoutWeakeningRootValidation() throws Exception {
+        try (var loader = compile(RIGHT)) {
+            Class<?> mapper = mapper(loader);
+            @SuppressWarnings("unchecked")
+            Class<? extends Parser> alternateClass = (Class<? extends Parser>)
+                loader.loadClass("org.example.roottoken.RootTokenParsers$AlternateParser");
+            Parser atomParser = Parser.get(alternateClass);
+            Token atom;
+            try (var context = new ParseContext(StringSource.createRootSource(" /*😀*/42 "))) {
+                var parsed = atomParser.parse(context);
+                assertTrue(parsed.isSucceeded());
+                assertTrue(context.allConsumed());
+                atom = committed(context, atomParser);
+            }
+            assertRejected(mapper, atom, "Expr");
+            Object selected = selectSubtree(mapper, atom, "Number");
+            assertSame(atom, field(selected, "token"));
+            Object snapshot = field(selected, "sourceMap");
+            Object ast = field(snapshot, "ast");
+            assertEquals("Number", ast.getClass().getSimpleName());
+            assertEquals("42", field(ast, "value"));
+            assertSpan(snapshot, ast, 0, " /*😀*/42 ".codePointCount(0, " /*😀*/42 ".length()));
+            parse(loader, "9^8");
+            assertSpan(snapshot, ast, 0, " /*😀*/42 ".codePointCount(0, " /*😀*/42 ".length()));
+
+            Object mapped = mapper.getMethod("mapSubtreeToken", Token.class).invoke(null, atom);
+            assertSame(atom, field(mapped, "token"));
+            assertEquals(ast, field(mapped, "ast"));
+            Object directSnapshot = mapper.getMethod("mapSubtreeTokenWithSourceMap", Token.class).invoke(null, atom);
+            assertEquals(ast, field(directSnapshot, "ast"));
+            assertSpan(directSnapshot, field(directSnapshot, "ast"), 0,
+                " /*😀*/42 ".codePointCount(0, " /*😀*/42 ".length()));
+
+            var nullError = assertThrows(InvocationTargetException.class,
+                () -> mapper.getMethod("mapSubtreeToken", Token.class).invoke(null, new Object[]{null}));
+            assertEquals("subtreeToken must not be null", nullError.getCause().getMessage());
+
+            @SuppressWarnings("unchecked")
+            Class<? extends Parser> unmappedClass = (Class<? extends Parser>)
+                loader.loadClass("org.example.roottoken.RootTokenParsers$AtomParser");
+            Parser unmappedParser = Parser.get(unmappedClass);
+            Token unmapped;
+            try (var context = new ParseContext(StringSource.createRootSource("5"))) {
+                assertTrue(unmappedParser.parse(context).isSucceeded());
+                unmapped = committed(context, unmappedParser);
+            }
+            var unmappedError = assertThrows(InvocationTargetException.class,
+                () -> mapper.getMethod("mapSubtreeToken", Token.class).invoke(null, unmapped));
+            assertEquals("No mapped node found in token tree", unmappedError.getCause().getMessage());
+        }
+    }
+
+    @Test public void alternateEntrySnapshotsStayIndependentAcrossConcurrentMappings() throws Exception {
+        try (var loader = compile(RIGHT)) {
+            Class<?> mapper = mapper(loader);
+            @SuppressWarnings("unchecked")
+            Class<? extends Parser> alternateClass = (Class<? extends Parser>)
+                loader.loadClass("org.example.roottoken.RootTokenParsers$AlternateParser");
+            Parser alternate = Parser.get(alternateClass);
+            List<String> inputs = List.of("1", "22", "333", "4444");
+            List<Token> tokens = new java.util.ArrayList<>();
+            for (String input : inputs) {
+                try (var context = new ParseContext(StringSource.createRootSource(input))) {
+                    assertTrue(alternate.parse(context).isSucceeded());
+                    assertTrue(context.allConsumed());
+                    tokens.add(committed(context, alternate));
+                }
+            }
+            var barrier = new CyclicBarrier(inputs.size());
+            List<Callable<Void>> jobs = IntStream.range(0, inputs.size()).mapToObj(index -> (Callable<Void>) () -> {
+                for (int iteration = 0; iteration < 20; iteration++) {
+                    Object selected = selectSubtree(mapper, tokens.get(index), "Number");
+                    Object snapshot = field(selected, "sourceMap");
+                    Object ast = field(snapshot, "ast");
+                    barrier.await(20, TimeUnit.SECONDS);
+                    assertEquals(inputs.get(index), field(ast, "value"));
+                    assertSpan(snapshot, ast, 0, inputs.get(index).length());
+                }
+                return null;
+            }).toList();
+            try (var executor = Executors.newFixedThreadPool(inputs.size())) {
+                for (var future : executor.invokeAll(jobs)) future.get(30, TimeUnit.SECONDS);
+            }
+        }
+    }
+
+    @Test public void subtreeApiRejectsTokensFromAnotherGeneratedGrammar() throws Exception {
+        try (var expectedLoader = compile(RIGHT); var foreignLoader = compile(RIGHT)) {
+            @SuppressWarnings("unchecked")
+            Class<? extends Parser> foreignClass = (Class<? extends Parser>)
+                foreignLoader.loadClass("org.example.roottoken.RootTokenParsers$AlternateParser");
+            Parser foreignParser = Parser.get(foreignClass);
+            Token foreign;
+            try (var context = new ParseContext(StringSource.createRootSource("7"))) {
+                assertTrue(foreignParser.parse(context).isSucceeded());
+                foreign = committed(context, foreignParser);
+            }
+            var error = assertThrows(InvocationTargetException.class,
+                () -> mapper(expectedLoader).getMethod("mapSubtreeToken", Token.class)
+                    .invoke(null, foreign));
+            assertEquals("subtreeToken must be produced by a rule parser from this generated grammar",
+                error.getCause().getMessage());
         }
     }
 

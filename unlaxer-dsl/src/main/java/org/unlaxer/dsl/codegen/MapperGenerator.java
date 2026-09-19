@@ -180,6 +180,10 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("    public static synchronized SourceMappedAst<").append(astClass).append("> mapParsedTokenWithSourceMap(Token token) {\n");
         sb.append("        return new SourceMappedAst<>(mapParsedToken(token).ast());\n");
         sb.append("    }\n\n");
+        sb.append("    /** Maps an alternate parser entry and retains its identity-based source snapshot. */\n");
+        sb.append("    public static synchronized SourceMappedAst<").append(astClass).append("> mapSubtreeTokenWithSourceMap(Token token) {\n");
+        sb.append("        return new SourceMappedAst<>(mapSubtreeToken(token).ast());\n");
+        sb.append("    }\n\n");
         sb.append("    /** Selected token and the identity-based source snapshot from the same mapping. */\n");
         sb.append("    public record SourceMappedSelection(Token token, SourceMappedAst<").append(astClass)
             .append("> sourceMap) {}\n\n");
@@ -194,6 +198,20 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("     */\n");
         sb.append("    public static synchronized SourceMappedSelection selectParsedTokenWithSourceMap(Token token, String preferredAstSimpleName) {\n");
         sb.append("        MappedAst selected = mapParsedToken(token, preferredAstSimpleName);\n");
+        sb.append("        return new SourceMappedSelection(selected.token(), new SourceMappedAst<>(selected.ast()));\n");
+        sb.append("    }\n\n");
+        sb.append("    public static SourceMappedSelection selectSubtreeTokenWithSourceMap(Token token) {\n");
+        sb.append("        return selectSubtreeTokenWithSourceMap(token, null);\n");
+        sb.append("    }\n\n");
+        sb.append("    /**\n");
+        sb.append("     * Maps an explicitly selected parser entry without requiring the grammar's @root token.\n");
+        sb.append("     * Mapping and snapshot capture share the mapper lock; later parses cannot replace these spans.\n");
+        sb.append("     * Use this only for a committed token produced by an intentional alternate parser entry.\n");
+        sb.append("     * The token must belong to this generated grammar and contain a mapped node.\n");
+        sb.append("     * The caller must verify full-input consumption before calling this method.\n");
+        sb.append("     */\n");
+        sb.append("    public static synchronized SourceMappedSelection selectSubtreeTokenWithSourceMap(Token token, String preferredAstSimpleName) {\n");
+        sb.append("        MappedAst selected = mapSubtreeToken(token, preferredAstSimpleName);\n");
         sb.append("        return new SourceMappedSelection(selected.token(), new SourceMappedAst<>(selected.ast()));\n");
         sb.append("    }\n\n");
         sb.append("    /** Maps an already parsed token tree without accessing mapper internals. */\n");
@@ -218,9 +236,39 @@ public class MapperGenerator implements CodeGenerator {
                 .append(ruleName).append("; pass the committed parser root from ParseContext.getCurrent().getTokens(), not a root-stripped token\");\n");
             sb.append("        }\n");
         }
+        sb.append("        return mapTokenTree(rootToken, preferredAstSimpleName);\n");
+        sb.append("    }\n\n");
+        sb.append("    /** Maps a committed token from an intentional alternate parser entry. */\n");
+        sb.append("    public static MappedAst mapSubtreeToken(Token subtreeToken) {\n");
+        sb.append("        return mapSubtreeToken(subtreeToken, null);\n");
+        sb.append("    }\n\n");
+        sb.append("    /** Maps a committed alternate-entry token, preferring an AST type by simple name. */\n");
+        sb.append("    public static synchronized MappedAst mapSubtreeToken(Token subtreeToken, String preferredAstSimpleName) {\n");
+        sb.append("        if (subtreeToken == null) {\n");
+        sb.append("            throw new IllegalArgumentException(\"subtreeToken must not be null\");\n");
+        sb.append("        }\n");
+        sb.append("        if (!isGeneratedRuleToken(subtreeToken)) {\n");
+        sb.append("            throw new IllegalArgumentException(\"subtreeToken must be produced by a rule parser from this generated grammar\");\n");
+        sb.append("        }\n");
+        sb.append("        return mapTokenTree(subtreeToken, preferredAstSimpleName);\n");
+        sb.append("    }\n\n");
+        sb.append("    private static boolean isGeneratedRuleToken(Token token) {\n");
+        sb.append("        if (token.parser == null) return false;\n");
+        sb.append("        Class<?> parserClass = token.parser.getClass();\n");
+        sb.append("        return ");
+        if (grammar.rules().isEmpty()) sb.append("false");
+        for (int i = 0; i < grammar.rules().size(); i++) {
+            RuleDecl rule = grammar.rules().get(i);
+            if (i > 0) sb.append("\n            || ");
+            sb.append("parserClass == ").append(parsersClass).append(".")
+                .append(rule.name()).append("Parser.class");
+        }
+        sb.append(";\n");
+        sb.append("    }\n\n");
+        sb.append("    private static MappedAst mapTokenTree(Token token, String preferredAstSimpleName) {\n");
         sb.append("        NODE_SOURCE_SPANS.clear();\n");
         sb.append("        MAP_MEMO.clear();\n");
-        sb.append("        Token selectedToken = findBestMappedToken(rootToken, preferredAstSimpleName);\n");
+        sb.append("        Token selectedToken = findBestMappedToken(token, preferredAstSimpleName);\n");
         sb.append("        if (selectedToken == null) {\n");
         sb.append("            throw new IllegalArgumentException(\"No mapped node found in token tree\");\n");
         sb.append("        }\n");
