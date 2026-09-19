@@ -1,6 +1,7 @@
 package org.unlaxer.dsl.codegen;
 
 import org.unlaxer.dsl.bootstrap.UBNFAST.BackrefAnnotation;
+import org.unlaxer.dsl.bootstrap.UBNFAST.DeclaresAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.InterleaveAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.LeftAssocAnnotation;
@@ -182,10 +183,40 @@ class ParserMetadataEmitter {
         boolean hasInterleave = grammar.rules().stream().anyMatch(ParserMetadataEmitter::hasInterleaveAnnotation);
         boolean hasBackref = grammar.rules().stream().anyMatch(ParserMetadataEmitter::hasBackrefAnnotation);
         boolean hasScopeTree = grammar.rules().stream().anyMatch(ParserMetadataEmitter::hasScopeTreeAnnotation);
-        if (!hasInterleave && !hasBackref && !hasScopeTree) {
+        boolean hasDeclares = grammar.rules().stream().anyMatch(rule -> rule.annotations().stream()
+            .anyMatch(annotation -> annotation instanceof DeclaresAnnotation));
+        if (!hasInterleave && !hasBackref && !hasScopeTree && !hasDeclares) {
             return "";
         }
         IndentedWriter w = new IndentedWriter(1);
+        if (hasDeclares) {
+            w.line("// Description is preserved metadata; scope parsing does not evaluate it.");
+            w.line("public record DeclaresSpec(String ruleName, String symbolCapture, java.util.Optional<String> description) {}");
+            w.line("public static java.util.Optional<DeclaresSpec> getDeclaresSpec(String ruleName) {");
+            w.line("    return switch (ruleName) {");
+            List<String> declaredRules = new ArrayList<>();
+            for (RuleDecl rule : grammar.rules()) {
+                var declaration = rule.annotations().stream().filter(DeclaresAnnotation.class::isInstance)
+                    .map(DeclaresAnnotation.class::cast).findFirst();
+                if (declaration.isEmpty()) continue;
+                DeclaresAnnotation value = declaration.get();
+                String ruleName = "\"" + ParserCodegenUtil.escapeString(rule.name()) + "\"";
+                String description = value.description() == null ? "java.util.Optional.empty()"
+                    : "java.util.Optional.of(\"" + ParserCodegenUtil.escapeString(value.description()) + "\")";
+                declaredRules.add(ruleName);
+                w.line("        case " + ruleName + " -> java.util.Optional.of(new DeclaresSpec("
+                    + ruleName + ", \"" + ParserCodegenUtil.escapeString(value.symbolCapture()) + "\", "
+                    + description + "));");
+            }
+            w.line("        default -> java.util.Optional.empty();");
+            w.line("    };");
+            w.line("}");
+            w.line("public static java.util.List<DeclaresSpec> getDeclaresSpecs() {");
+            w.line("    return java.util.List.of(" + String.join(", ", declaredRules) + ").stream()");
+            w.line("        .map(rule -> getDeclaresSpec(rule).orElseThrow()).toList();");
+            w.line("}");
+            w.blankLine();
+        }
         if (hasInterleave) {
             w.line("public static java.util.Optional<String> getInterleaveProfile(String ruleName) {");
             w.line("    return switch (ruleName) {");
