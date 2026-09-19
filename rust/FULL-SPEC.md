@@ -24,7 +24,7 @@
 | Identifier・Single/DoubleQuoted・EndOfSource token binding | UBNF生成・runtime実装 | 22文法78入力の受理/両cursor比較と受理48 AST/spanのfixture。ASCII identifier、生escape、single quoteだけ除去するJava mapper契約。tinyexpression文字列評価は別途検証 |
 | CASE_INSENSITIVE・REGEX・任意外部token | 未対応 | Unicode/regex方言を確定。任意Java parserクラスとtinyexpression固有bindingはRust実装または明示adapterを要求 |
 | imports・複数grammar・namespace・global/rule trivia・interleave | 一部のみ | 現在は単一grammarとglobal javaStyle/none。依存解決・循環・文法別ID・局所設定を検証 |
-| mapping・capture・source-preserving AST | scalar/optional/list/groupと混在Text/Node値を生成。Rustはspan付きAstValue、JavaはObject系。shared mappingの型joinは宣言順非依存。Java位置binding #116・zero-field生成 #129・複合text capture #132・混在値 #156を修正 | 単一capture内の複数semantic子はJava scalar/Rust Vecの差が残る（#160）。入れ子container型、再帰的unmapped rule、mapped alias/sumのbackend間契約、typeof/commonField/enum、全Java capture規則との互換性 |
+| mapping・capture・source-preserving AST | scalar/optional/list/groupと混在Text/Node値を生成。Rustはspan付きAstValue、JavaはObject系。shared mappingの型joinは宣言順非依存。単一capture内の複数semantic子とhelper内部optional/repeatのcardinality・全値収集を両言語で実装（#160）。Java位置binding #116・zero-field生成 #129・複合text capture #132・混在値 #156を修正 | 入れ子container型、再帰的unmapped rule、純粋なmapped alias/sumのbackend間契約、typeof/commonField/enum、全Java capture規則との互換性 |
 | evaluator dispatch・網羅性 | 限定範囲で生成済み | 新nodeのE0004/E0046検証を拡張。eval annotation、型境界、短絡評価を追加。Java sum/dotted evaluatorの不具合 #130 は修正済み |
 | leftAssoc/rightAssoc/precedence | canonical leftAssocとrightAssoc、precedence metadata、schemaを統合したshared mapping、混在factorを生成 | 左辺＋op/right列と右再帰、文法階層による優先順位を検証。非canonical右結合形、Javaの特殊null/literal leafとRust AstValueの構造互換は未完了。Java raw CST反復欠落 #138・右結合 #139 は独立修正 |
 | backref・MatchedToken相当 | context-wide replayのみ | UBNF annotation、名前の寿命・入れ子・伝播、コピー言語のpositive/negative test |

@@ -281,7 +281,11 @@ impl Lowering<'_> {
                 rule.mapping = Some(variants[&mapping.name].clone());
             }
             if needs_values {
-                rule.body = self.project_text_values(&rule.body, rule.mapping.as_ref())?;
+                rule.body = if rule.mapping.is_none() {
+                    self.project_helper_value(&rule.body)?
+                } else {
+                    self.project_text_values(&rule.body, rule.mapping.as_ref())?
+                };
             }
             if rule
                 .operator
@@ -629,6 +633,21 @@ impl Lowering<'_> {
         }
     }
 
+    /// Preserve a helper's scalar semantic value, but never collapse its collection.
+    /// Container children use the same boundary so inline repeated groups retain
+    /// their own delimiters even when an outer capture collects many values.
+    fn project_helper_value(&self, expression: &Expression) -> Result<Expression> {
+        let projected = self.project_text_values(expression, None)?;
+        let shape = self.shape(expression, &mut HashSet::new())?;
+        Ok(
+            if shape.kind == Kind::Value && shape.cardinality != Cardinality::Many {
+                Expression::ValueBoundary(Box::new(projected))
+            } else {
+                projected
+            },
+        )
+    }
+
     /// Preserve each lexical alternative as a CST node before a value mapper visits it.
     /// The original bodies remain untouched for shape analysis (including recursive references).
     fn project_text_values(
@@ -692,15 +711,27 @@ impl Lowering<'_> {
                     .collect::<Result<_>>()?,
             ),
             Expression::OptionalExpr(child) => {
-                Expression::OptionalExpr(Box::new(self.project_text_values(child, mapping)?))
+                Expression::OptionalExpr(Box::new(if mapping.is_none() {
+                    self.project_helper_value(child)?
+                } else {
+                    self.project_text_values(child, mapping)?
+                }))
             }
             Expression::Repeat { child, min, max } => Expression::Repeat {
-                child: Box::new(self.project_text_values(child, mapping)?),
+                child: Box::new(if mapping.is_none() {
+                    self.project_helper_value(child)?
+                } else {
+                    self.project_text_values(child, mapping)?
+                }),
                 min: *min,
                 max: *max,
             },
             Expression::Separated { child, separator } => Expression::Separated {
-                child: Box::new(self.project_text_values(child, mapping)?),
+                child: Box::new(if mapping.is_none() {
+                    self.project_helper_value(child)?
+                } else {
+                    self.project_text_values(child, mapping)?
+                }),
                 separator: Box::new(self.project_text_values(separator, mapping)?),
             },
             Expression::Delimited(child) => {

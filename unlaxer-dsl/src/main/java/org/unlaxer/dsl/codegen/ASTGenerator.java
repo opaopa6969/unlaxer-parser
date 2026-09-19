@@ -390,6 +390,10 @@ public class ASTGenerator implements CodeGenerator {
      * ルール内の指定フィールド名に対応する Java 型を推論する。
      */
     String inferType(GrammarDecl grammar, RuleDecl rule, String fieldName) {
+        return new SemanticCardinality(grammar).fieldType(rule, fieldName, inferLegacyType(grammar, rule, fieldName));
+    }
+
+    private String inferLegacyType(GrammarDecl grammar, RuleDecl rule, String fieldName) {
         Optional<SharedAssocSchema> shared = SharedAssocSchema.resolve(grammar, rule);
         if (shared.isPresent()) return shared.get().fieldType(fieldName);
         Optional<String> plain = SharedPlainSchema.fieldType(grammar, rule, fieldName);

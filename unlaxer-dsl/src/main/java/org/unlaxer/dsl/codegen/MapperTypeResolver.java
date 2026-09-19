@@ -38,6 +38,10 @@ class MapperTypeResolver {
 
     // inferType logic is borrowed from ASTGenerator to keep generated constructor argument types compile-safe.
     static String inferType(GrammarDecl grammar, RuleDecl rule, String fieldName) {
+        return new SemanticCardinality(grammar).fieldType(rule, fieldName, inferLegacyType(grammar, rule, fieldName));
+    }
+
+    private static String inferLegacyType(GrammarDecl grammar, RuleDecl rule, String fieldName) {
         List<CaptureResult> captures = findCapturedTypes(rule.body(), fieldName);
         if (captures.isEmpty()) {
             return "Object";

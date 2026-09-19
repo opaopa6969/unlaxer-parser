@@ -219,3 +219,70 @@ fn mixed_projection_rejects_incompatible_containers_and_semantic_separators() {
         assert!(error.contains("mapped separator") || error.contains("incompatible shared mapping schema"),"{error}");
     }
 }
+
+#[test]
+fn many_helpers_retain_each_scalar_item_boundary_without_joining_the_list() {
+    let directory = Directory::new();
+    let library = library(&directory.0);
+    for (index, (body, cases)) in [
+        ("{ Outer }", r#"("",vec![]),("(a)",vec!["(a)"]),("(a)(x)(😀)",vec!["(a)","node:x","(😀)"]),("(a)(a)",vec!["(a)","(a)"])"#),
+        ("{ '(' Factor ')' }", r#"("",vec![]),("(a)",vec!["(a)"]),("(a)(x)(😀)",vec!["(a)","node:x","(😀)"]),("(a)(a)",vec!["(a)","(a)"])"#),
+        ("Outer % ','", r#"("(a)",vec!["(a)"]),("(a),(x),(😀)",vec!["(a)","node:x","(😀)"]),("(a),(a)",vec!["(a)","(a)"])"#),
+        ("('(' Factor ')') % ','", r#"("(a)",vec!["(a)"]),("(a),(x),(😀)",vec!["(a)","node:x","(😀)"]),("(a),(a)",vec!["(a)","(a)"])"#),
+        ("Outer Outer", r#"("(a)(x)",vec!["(a)","node:x"]),("(a)(a)",vec!["(a)","(a)"]),("(x)(😀)",vec!["node:x","(😀)"])"#),
+        ("[ Outer ] [ Outer ]", r#"("",vec![]),("(a)",vec!["(a)"]),("(a)(x)",vec!["(a)","node:x"]),("(a)(a)",vec!["(a)","(a)"])"#),
+        ("[ '(' Factor ')' ] [ '<' Factor '>' ]", r#"("",vec![]),("(a)",vec!["(a)"]),("<a>",vec!["<a>"]),("(a)<x>",vec!["(a)","node:x"]),("(a)<a>",vec!["(a)","<a>"])"#),
+    ].into_iter().enumerate() {
+        let grammar=format!("grammar G {{ @root @mapping(Collection,params=[values]) Document ::= Items @values; Items ::= {body}; Outer ::= '(' Factor ')'; Factor ::= 'a' | '😀' | Leaf; @mapping(Leaf,params=[value]) Leaf ::= 'x' @value; }}");
+        let probe=r#"
+mod generated;
+use generated::{ast::{Ast,AstValue},evaluator::{Semantics,evaluate}};
+use unlaxer_runtime::Span;
+struct Eval;
+impl Semantics for Eval {
+    type Output=Vec<String>;
+    fn eval_leaf(&mut self,value:&str,_:Span)->Vec<String>{vec![format!("node:{value}")]}
+    fn eval_collection(&mut self,values:&[AstValue],_:Span)->Vec<String>{values.iter().map(|value|match value{AstValue::Text{text,..}=>text.clone(),AstValue::Node(node)=>evaluate(node,self).join("")}).collect()}
+}
+fn main(){
+    for (source,expected) in [// CASES
+    ]{
+        let tree=generated::parser::parse_tree(source).unwrap();
+        let ast=generated::mapper::map(&tree).unwrap();drop(tree);
+        assert_eq!(evaluate(&ast,&mut Eval),expected,"{source}");
+        let Ast::Collection{values,..}=&ast else{panic!("collection")};
+        for value in values{
+            if let AstValue::Text{text,span}=value{
+                let slice:String=source.chars().skip(span.start).take(span.end-span.start).collect();
+                assert_eq!(&slice,text);assert_eq!(span.end-span.start,3);
+            }
+        }
+    }
+}
+"#.replace("// CASES",cases);
+        generate_and_run(&directory.0.join(format!("items-{index}")),&library,&grammar,&probe);
+    }
+}
+
+#[test]
+fn optional_helper_retains_absence_and_scalar_delimiters() {
+    let directory = Directory::new();
+    let library = library(&directory.0);
+    generate_and_run(&directory.0.join("optional"),&library,
+        "grammar G { @root @mapping(Box,params=[value]) Document ::= Outer @value; Outer ::= '(' [Factor] ')'; Factor ::= 'a' | Leaf; @mapping(Leaf) Leaf ::= 'x'; }",
+        r#"
+mod generated;
+use generated::ast::{Ast,AstValue};
+fn main(){for source in ["()","(a)","(x)"] {
+    let tree=generated::parser::parse_tree(source).unwrap();
+    let ast=generated::mapper::map(&tree).unwrap();drop(tree);
+    let Ast::Box{value,..}=ast else{panic!("box")};
+    match (source,value){
+        ("()",None)=>{},
+        ("(a)",Some(AstValue::Text{text,span}))=>{assert_eq!(text,"(a)");assert_eq!(span,unlaxer_runtime::Span{start:0,end:3});},
+        ("(x)",Some(AstValue::Node(node)))=>assert!(matches!(*node,Ast::Leaf{..})),
+        _=>panic!("incorrect optional helper projection"),
+    }
+}}
+"#);
+}
