@@ -119,7 +119,8 @@ final class SemanticCardinalityConformance {
                 }
             }
         }
-        Files.write(Path.of("target/semantic-cardinality-" + (java ? "java" : "rust") + ".tsv"), report, StandardCharsets.UTF_8);
+        String mode = java && rust ? "both" : java ? "java" : "rust";
+        Files.write(Path.of("target/semantic-cardinality-" + mode + ".tsv"), report, StandardCharsets.UTF_8);
     }
 
     private void verifyResult(JsonObject fixture, JsonObject row, JsonObject result, boolean rust) {
