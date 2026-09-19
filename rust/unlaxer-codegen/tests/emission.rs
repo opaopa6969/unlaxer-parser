@@ -63,8 +63,6 @@ fn generated_modules_compile_evaluate_and_require_semantics() {
         fs::create_dir(&output).unwrap();
         let mut ir = support::fixture(if fixture == "names" {
             "evolution"
-        } else if fixture == "mixed" {
-            include_str!("support/mixed_probe.rs.txt")
         } else if fixture == "right" {
             "shared"
         } else {
@@ -97,6 +95,8 @@ fn main() { let tree=generated::parser::parse_tree("if(1, 3*3, neg(2))").unwrap(
 "#
         } else if fixture == "fields" {
             r#"fn main() {let tree=generated::parser::parse_tree("name 'hi' \"x\" 1 2 3").unwrap(); let ast=generated::mapper::map(&tree).unwrap(); drop(tree); let json=ast.canonical_json(); assert!(json.contains("hi")); assert!(json.contains("children"));}"#
+        } else if fixture == "mixed" {
+            include_str!("support/mixed_probe.rs.txt")
         } else if fixture == "right" {
             r#"fn main() {use generated::parser::{Associativity,OPERATORS}; for source in ["a","b"] {let tree=generated::parser::parse_tree(source).unwrap(); let ast=generated::mapper::map(&tree).unwrap(); assert!(ast.canonical_json().contains(source));} assert_eq!(OPERATORS[0].rule,"Right"); assert_eq!(OPERATORS[0].associativity,Associativity::Right); assert_eq!(OPERATORS[1].associativity,Associativity::Left);}"#
         } else {

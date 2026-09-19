@@ -181,13 +181,13 @@ pub fn fixture(name: &str) -> GrammarIr {
             ),
             rule(
                 "Mixed",
-                Choice(vec![
+                Sequence(vec![Choice(vec![
                     TextValue(Box::new(IdentifierToken)),
                     TextValue(Box::new(QuotedToken('\''))),
                     TextValue(Box::new(Literal("😀".into()))),
                     Reference(2),
                     Literal("!".into()),
-                ]),
+                ])]),
                 None,
             ),
             rule(

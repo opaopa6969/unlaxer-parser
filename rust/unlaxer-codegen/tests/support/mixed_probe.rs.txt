@@ -25,7 +25,7 @@ fn main() {
         ("😀:' hi ':'a' 😀 3", vec!["😀"," hi ","a","😀","3"]),
         ("a:b:", vec!["a","b"]),
     ] {
-        let tree = generated::parser::parse_tree(input).unwrap();
+        let tree = generated::parser::parse_tree(input).unwrap_or_else(|error| panic!("{input}: {error:?}"));
         let ast = generated::mapper::map(&tree).unwrap();
         drop(tree);
         assert_eq!(evaluate(&ast, &mut Eval),expected);
