@@ -29,12 +29,14 @@ jobs:
     - name: Cross-language fixtures, compile failures, and generated-file drift
       run: >
         mvn -B -pl unlaxer-common,unlaxer-dsl -am test
-        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest -DrustConformance=true
+        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest -DrustConformance=true
         -Dsurefire.failIfNoSpecifiedTests=false
     - name: Require rule trivia conformance evidence
       run: test -s unlaxer-dsl/target/rust-rule-trivia.tsv
     - name: Require transactional scope conformance evidence
       run: test -s unlaxer-dsl/target/rust-scope-store.tsv
+    - name: Require generated scope annotation conformance evidence
+      run: test -s unlaxer-dsl/target/rust-scope-annotations.tsv
     - uses: actions/upload-artifact@v4
       with:
         name: rust-conformance
@@ -57,6 +59,7 @@ jobs:
           unlaxer-dsl/target/rust-native-generator.tsv
           unlaxer-dsl/target/rust-rule-trivia.tsv
           unlaxer-dsl/target/rust-scope-store.tsv
+          unlaxer-dsl/target/rust-scope-annotations.tsv
         if-no-files-found: error
     - name: Build and smoke-test the native subset example
       run: |

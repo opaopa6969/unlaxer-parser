@@ -180,7 +180,10 @@ let matched = context.parse(&MyParser)?;
 `with_scope` は子スコープを開き、成功後は名前を隠してイベント履歴を保持し、失敗時は
 開始前へ戻す。scope store も parser の rollback 対象で、context ごとに独立する。
 [transactional scope の契約](../docs/transactional-scopes.md)を参照。
-これは runtime API の対応であり、Rust の `@scopeTree` / `@declares` / `@backref` 生成は未対応。
+`@scopeTree` / `@declares` / scope付き文法の`@backref`も両frontendから生成する。
+`RuleEffects`がmode・description・対象capture名を保持し、`Tree.scopes()`でowned snapshotを得られる。
+両modeは解析時stackであり、評価時のdynamic環境を意味しない。
+[生成スコープの契約とJava移行](../docs/generated-scope-effects.md)を参照。
 
 生成器は`rules()`・`parse_context(&mut ParseContext)`も出力する。context入口は現在位置からの**prefix解析**であり、全入力検証は従来の`parse_tree[_detailed]`、または後続の`Expr::Eof`を使う。文法とtrivia設定は呼出中だけ切り替わり、入力と利用者状態は共通。`matched.root_node()`から`context.tree(root)`で所有されたsnapshotを取り、その文法のmapperへ渡す。異なる文法のrule IDはローカルなので、複数文法のnodeを一つのmapperに混ぜない。node IDはcontext内だけで有効で、rollbackされた結果は再利用しない。
 
@@ -256,7 +259,7 @@ v6と同じ[`evolution/{0,1,2,3}`](../unlaxer-dsl/src/test/resources/evolution/)
 
 差分実験で見つかったJava mapperのcapture選択不具合[issue #116](https://github.com/opaopa6969/unlaxer-parser/issues/116)は、生成parserの文法位置bindingで修正した。欠損optionalがrepeat側のItemを奪うことや、literalの代わりに区切りを拾うことを防ぎ、plus/bounded/separatedも各値の出現順に対応する。旧`javaKnown`不具合snapshotを除き、正しい期待ASTとの一致とJava/Rust相互一致を検査する。双方の結果は`target/rust-cardinality.tsv`とCI artifactに保存する。
 
-Javaではparserとmapperを同じgenerator revisionで**一緒に再生成**する必要がある。新mapperは新parserの`__CaptureBinding` metadataを必要とし、旧parserとの混在は非互換（コンパイルエラー）になる。旧parser＋旧mapperの組はそのまま利用できるが、旧capture不具合も残る。追加wrapperは専用instanceであり`Parser.get`の共有instanceは変更しない。scope/backref listenerではwrapperだけを透過して従来のrule境界を維持する。入れ子量指定子の内側に置いたcaptureは検証済みだが、`[ { Item } ] @values`のような外側captureの`Optional<List<_>>`再構築はJava/Rust双方の未完了項目で、今回の位置binding修正とは別である。
+Javaではparserとmapperを同じgenerator revisionで**一緒に再生成**する必要がある。新mapperは新parserの`__CaptureBinding` metadataを必要とし、旧parserとの混在は非互換（コンパイルエラー）になる。旧parser＋旧mapperの組はそのまま利用できるが、旧capture不具合も残る。追加wrapperは専用instanceであり`Parser.get`の共有instanceは変更しない。scope付き文法の宣言/参照listenerも位置bindingを使い、別ルール内部へは入らない（#176）。scopeなしbackrefの旧経路は変更しない。入れ子量指定子の内側に置いたcaptureは検証済みだが、`[ { Item } ] @values`のような外側captureの`Optional<List<_>>`再構築はJava/Rust双方の未完了項目で、今回の位置binding修正とは別である。
 
 数値は既存evolutionと同じ`Digits ::= NUMBER`のtext用rule経由でcaptureする。[issue #115](https://github.com/opaopa6969/unlaxer-parser/issues/115)のJava直接captureの不正なprimitive初期化とgeneric型は修正した。scalarの既存`int` APIを維持し、optional/listは`Integer`へboxingする。Java mapperは`Integer.parseInt`により小数・指数・overflowを明示的に拒否し、Rust mapperは字句を`String`として保持する。この型・変換契約はまだ同値ではない。
 

@@ -119,9 +119,11 @@ style の比較は trim 後、大文字小文字を区別しない。rule の引
 
 | コード | 条件 |
 |--------|------|
-| `E-ANNOTATION-DUPLICATE` | 同一アノテーションが1つのルールに複数回宣言されている |
-| `E-ANNOTATION-INVALID-PROFILE` | `@interleave` の `profile` が不正な値 |
-| `E-ANNOTATION-INVALID-MODE` | `@scopeTree` の `mode` が不正な値 |
+| `E-ANNOTATION-DUPLICATE-INTERLEAVE` / `-BACKREF` / `-SCOPETREE` / `-DECLARES` | 該当アノテーションが1つのルールに複数回宣言されている |
+| `E-ANNOTATION-INTERLEAVE-PROFILE` | `@interleave` の `profile` が不正な値 |
+| `E-ANNOTATION-SCOPETREE-MODE` | `@scopeTree` の `mode` が不正な値 |
+| `E-ANNOTATION-DECLARES-CAPTURE` | `@declares(symbol=...)` の対象captureが同じルール本体に存在しない |
+| `E-ANNOTATION-BACKREF-CAPTURE` | scope付き文法で`@backref(name=...)` の対象captureが同じルール本体に存在しない |
 
 ---
 
