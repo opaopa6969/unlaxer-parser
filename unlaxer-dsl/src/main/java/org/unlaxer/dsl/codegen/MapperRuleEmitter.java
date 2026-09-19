@@ -366,6 +366,13 @@ class MapperRuleEmitter {
                     tokenDeclByName, ruleByName);
             }
 
+            if (rightAssoc) {
+                emitRightAssocMapping(w, astClass, className, rule, ruleParserClass,
+                    leftType, opType, rightType, leftMapper, rightMapper, leafFallbackSupported,
+                    MapperElementUtil.parserClassLiteral(assocShape.leftElement(), parsersClass, tokenDeclByName, ruleByName).orElse(null));
+                return;
+            }
+
             w.line("Token working = token;");
             w.line("if (working.parser.getClass() != " + ruleParserClass + ") {");
             w.indent();
@@ -417,11 +424,7 @@ class MapperRuleEmitter {
             w.line("}");
             w.dedent();
             w.line("}");
-            if (rightAssoc) {
-                w.line("return registerNodeSourceSpan(foldRightAssoc" + MapperElementUtil.methodNameFor(className) + "(left, ops, rights), working);");
-            } else {
-                w.line("return registerNodeSourceSpan(new " + astClass + "." + className + "(left, ops, rights), working);");
-            }
+            w.line("return registerNodeSourceSpan(new " + astClass + "." + className + "(left, ops, rights), working);");
         } else {
             w.line("throw new IllegalArgumentException(\"Unsupported assoc mapping shape for rule: "
               + rule.name() + "\");");
@@ -458,6 +461,17 @@ class MapperRuleEmitter {
             w.line("// Handle " + additionalRule.name() + " tokens (same @mapping class)");
             w.line("if (token.parser.getClass() == " + addRuleParserClass + ") {");
             w.indent();
+            if (MapperElementUtil.isRightAssocRule(additionalRule,
+                    MapperElementUtil.getMappingAnnotation(additionalRule).orElse(null))) {
+                emitRightAssocMapping(w, astClass, className, additionalRule, addRuleParserClass,
+                    leftType, opType, rightType,
+                    addLeftMapper.replace("addLeftToken", "leftToken"),
+                    addRightMapper.replace("addRightToken", "rightToken"), leafFallbackSupported,
+                    MapperElementUtil.parserClassLiteral(addShape.leftElement(), parsersClass, tokenDeclByName, ruleByName).orElse(null));
+                w.dedent();
+                w.line("}");
+                return;
+            }
             w.line("Token addLeftToken = findFirstDescendant(token, " + addLeftParserClass + ");");
             w.line("if (addLeftToken == null) {");
             w.indent();
@@ -502,6 +516,56 @@ class MapperRuleEmitter {
             w.dedent();
             w.line("}");
         }
+    }
+
+    /** The canonical parser already builds Base Op Self | Base; never fold its right subtree again. */
+    private static void emitRightAssocMapping(IndentedWriter w, String astClass, String className,
+            RuleDecl rule, String ruleParserClass, String leftType, String opType, String rightType,
+            String leftMapper, String rightMapper, boolean leafFallbackSupported, String leftParserClass) {
+        CaptureBindingPlan bindings = new CaptureBindingPlan(rule);
+        w.line("Token working = token;");
+        w.line("if (working.parser.getClass() != " + ruleParserClass + ") {");
+        w.indent();
+        w.line("working = findFirstDescendant(working, " + ruleParserClass + ");");
+        w.dedent();
+        w.line("}");
+        w.line("if (working == null) {");
+        w.indent();
+        if (leafFallbackSupported) {
+            w.line("String literal = stripQuotes(firstTokenText(token));");
+            w.line("return registerNodeSourceSpan(new " + astClass + "." + className
+                + "(null, List.of(literal == null ? \"\" : literal), List.of()), token);");
+        } else {
+            w.line("throw new IllegalArgumentException(\"Mapping token not found for rule "
+                + ParserCodegenUtil.escapeString(rule.name()) + "\");");
+        }
+        w.dedent();
+        w.line("}");
+        for (String capture : List.of("left", "op", "right")) {
+            String ids = bindings.sites(capture).stream()
+                .map(site -> "\"" + ParserCodegenUtil.escapeString(site.id()) + "\"")
+                .collect(java.util.stream.Collectors.joining(", "));
+            w.line("List<Token> " + capture + "Sites = findCaptureSites(working, java.util.Set.of(" + ids + "));");
+        }
+        w.line("if (leftSites.size() != 1 || opSites.size() > 1 || opSites.size() != rightSites.size()) {");
+        w.indent();
+        w.line("throw new IllegalArgumentException(\"Invalid right-associative capture shape for rule "
+            + ParserCodegenUtil.escapeString(rule.name()) + "\");");
+        w.dedent();
+        w.line("}");
+        w.line("Token leftToken = " + (leftParserClass == null ? "leftSites.get(0)"
+            : "findFirstDescendant(leftSites.get(0), " + leftParserClass + ")") + ";");
+        w.line(leftType + " left = " + leftMapper + ";");
+        w.line("List<" + opType + "> ops = new ArrayList<>();");
+        w.line("List<" + rightType + "> rights = new ArrayList<>();");
+        w.line("if (!opSites.isEmpty()) {");
+        w.indent();
+        w.line("ops.add(stripQuotes(firstTokenText(opSites.get(0))));");
+        w.line("Token rightToken = rightSites.get(0);");
+        w.line("rights.add(" + rightMapper + ");");
+        w.dedent();
+        w.line("}");
+        w.line("return registerNodeSourceSpan(new " + astClass + "." + className + "(left, ops, rights), working);");
     }
 
     /**
@@ -702,69 +766,6 @@ class MapperRuleEmitter {
             w.line("if (" + param + " == null) throw new IllegalArgumentException(\"Required numeric capture not found: "
                 + ParserCodegenUtil.escapeString(param) + "\");");
         }
-    }
-
-    /**
-     * 右結合ルール用の fold ヘルパーメソッドを生成する。
-     */
-    static String emitFoldHelpers(GrammarDecl grammar, String astClass,
-            Map<String, RuleDecl> mappingRules) {
-
-        IndentedWriter w = new IndentedWriter(1);
-        w.line("// =========================================================================");
-        w.line("// Fold Helpers (Right-Associative)");
-        w.line("// =========================================================================");
-        w.blankLine();
-
-        for (Map.Entry<String, RuleDecl> entry : mappingRules.entrySet()) {
-            String className = entry.getKey();
-            RuleDecl rule = entry.getValue();
-            MappingAnnotation mapping = MapperElementUtil.getMappingAnnotation(rule).orElseThrow();
-            boolean rightAssoc = MapperElementUtil.isRightAssocRule(rule, mapping);
-
-            if (rightAssoc) {
-                Optional<MapperElementUtil.AssocShape> assocShapeOpt =
-                    MapperElementUtil.findAssocShape(rule, "left", "op", "right");
-                if (assocShapeOpt.isPresent()) {
-                    String leftType = MapperTypeResolver.inferType(grammar, rule, "left");
-                    String opType = MapperTypeResolver.unwrapListType(MapperTypeResolver.inferType(grammar, rule, "op")).orElse("String");
-                    String rightType = MapperTypeResolver.unwrapListType(MapperTypeResolver.inferType(grammar, rule, "right")).orElse("Object");
-
-                    w.line("static " + astClass + "." + className
-                      + " foldRightAssoc" + MapperElementUtil.methodNameFor(className) + "(");
-                    w.line("        " + leftType + " left,");
-                    w.line("        java.util.List<" + opType + "> ops,");
-                    w.line("        java.util.List<" + rightType + "> rights) {");
-                    w.indent();
-                    w.line("if (ops.isEmpty() || rights.isEmpty()) {");
-                    w.indent();
-                    w.line("return new " + astClass + "." + className
-                      + "(left, ops, rights);");
-                    w.dedent();
-                    w.line("}");
-                    w.line("// Right-associative fold: a op b op c => a op (b op c)");
-                    w.line(rightType + " right = rights.get(rights.size() - 1);");
-                    w.line(opType + " op = ops.get(ops.size() - 1);");
-                    w.line("java.util.List<" + opType + "> restOps = new java.util.ArrayList<>(ops);");
-                    w.line("java.util.List<" + rightType + "> restRights = new java.util.ArrayList<>(rights);");
-                    w.line("restOps.remove(restOps.size() - 1);");
-                    w.line("restRights.remove(restRights.size() - 1);");
-                    w.line("if (restRights.size() > 0) {");
-                    w.indent();
-                    w.line("right = foldRightAssoc" + MapperElementUtil.methodNameFor(className) + "(right, restOps, restRights);");
-                    w.dedent();
-                    w.line("}");
-                    w.line("java.util.List<" + opType + "> singleOp = java.util.List.of(op);");
-                    w.line("java.util.List<" + rightType + "> singleRight = java.util.List.of(right);");
-                    w.line("return new " + astClass + "." + className
-                      + "(left, singleOp, singleRight);");
-                    w.dedent();
-                    w.line("}");
-                    w.blankLine();
-                }
-            }
-        }
-        return w.build();
     }
 
     /**

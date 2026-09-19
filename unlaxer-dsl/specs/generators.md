@@ -136,7 +136,7 @@ Rust backend の direct number capture は現段階で `String` であり、Java
 
 - Token 木から AST（record）へのマッピングメソッド群
 - 各 `@mapping` ルールに対応する `mapXxx(Token)` メソッド
-- `@rightAssoc` ルール用の `foldRightAssoc{ClassName}` ヘルパースケルトン
+- `@rightAssoc` の右再帰 CST から各ノードへの位置 binding 付きマッピング
 
 ### 左結合の AST と元 CST（#138）
 
@@ -151,7 +151,22 @@ typed leaf は実際の mapped class として保持する。source span は各 
 優先順位の構文構造は rule 間の参照で決まり、`@precedence` 数値はその参照関係の検証と
 メタデータ API に使う（数値を書くだけで parser の選択順を並べ替えない）。
 
-右結合の生成 mapper に残る型不一致・反復木の不整合は #139 で別途追跡する。
+### 右結合の再帰構造（#139）
+
+canonical な `Base @left { Op @op Self @right }` は parser が
+`Base Op Self | Base` の右再帰に変換する。`@right` も通常の位置 binding を保ち、
+mapper は現在の rule 呼び出しに属する `left` / `op` / `right` だけを取り出す。
+各 AST の `op` / `right` リストは基底なら空、再帰なら要素が1つになり、
+`2^3^2` は `2^(3^2)` に相当する構造になる。再 fold は行わない。
+
+公開 record の field 型は維持し、例えば `String left` と `List<Pow> right` のように
+左と右が異なる型でも生成コードをコンパイルできる。内側ノードも各再帰 rule の
+source span を持つ。同じ mapping class の追加 rule でも自身の結合指定を使用する。
+旧 package-private `foldRightAssoc{ClassName}` は生成しなくなったため、Parser と Mapper を
+一緒に再生成する。`parse` / `parseWithSourceMap` は root transaction の token を使用する。
+
+共有 mapping の異種 operand 型が代表 rule の宣言順により矛盾するケースは #145、
+`getRootToken` が choice root を除去した token を汎用 mapping API へ渡すケースは #146 で追跡する。
 
 ### Capture の位置 binding と再生成（#116）
 
