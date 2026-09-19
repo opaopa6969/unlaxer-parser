@@ -1,0 +1,30 @@
+mod generated;
+use generated::{ast::Ast, evaluator::{evaluate, Semantics}};
+use unlaxer_runtime::Span;
+use std::io::{self, BufRead};
+
+struct Calculator;
+impl Semantics for Calculator {
+    type Output = f64;
+    fn eval_item(&mut self, value: &str, _: Span) -> f64 {
+        value.parse().unwrap()
+    }
+    fn eval_container(&mut self, head: Option<&Ast>, values: &[Ast], tail: Option<&str>, flags: &[String], _: Span) -> f64 {
+        head.map_or(0.0, |node| evaluate(node, self))
+            + values.iter().map(|node| evaluate(node, self)).sum::<f64>()
+            + if tail.is_some() { 1.0 } else { 0.0 }
+            + flags.len() as f64
+    }
+}
+fn main() {
+    for line in io::stdin().lock().lines() {
+        match generated::parser::parse_tree(&line.unwrap()) {
+            Ok(tree) => {
+                let ast = generated::mapper::map(&tree).unwrap();
+                drop(tree);
+                println!("{{\"ok\":true,\"ast\":{},\"value\":{}}}", ast.canonical_json(), evaluate(&ast, &mut Calculator));
+            }
+            Err(_) => println!("{{\"ok\":false}}"),
+        }
+    }
+}

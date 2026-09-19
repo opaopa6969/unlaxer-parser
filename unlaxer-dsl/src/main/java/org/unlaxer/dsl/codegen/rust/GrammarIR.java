@@ -9,9 +9,15 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     public record Mapping(String name, List<Field> fields) {
         public Mapping { fields = List.copyOf(fields); }
     }
-    public record Field(String name, Kind kind) {}
+    public record Field(String name, Kind kind, Cardinality cardinality) {}
     public enum Kind { TEXT, NODE }
-    public sealed interface Expression permits Literal, NumberToken, Reference, Sequence, Choice, Capture {}
+    public enum Cardinality { ONE, OPTIONAL, MANY }
+    public sealed interface Expression permits Literal, NumberToken, Reference, Sequence, Choice, Capture,
+        OptionalExpr, Repeat, Separated {}
+    public record OptionalExpr(Expression child) implements Expression {}
+    /** A null maximum denotes unbounded repetition. */
+    public record Repeat(Expression child, int min, Integer max) implements Expression {}
+    public record Separated(Expression child, Expression separator) implements Expression {}
     public record Literal(String text) implements Expression {}
     public record NumberToken() implements Expression {}
     public record Reference(int rule) implements Expression {}

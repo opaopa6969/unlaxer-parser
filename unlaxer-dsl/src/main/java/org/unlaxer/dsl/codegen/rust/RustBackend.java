@@ -33,7 +33,7 @@ public final class RustBackend {
             var mapping = rule.mapping();
             out.append("    r#").append(mapping.name()).append(" { span: Span");
             for (Field field : mapping.fields()) out.append(", r#").append(field.name()).append(": ")
-                .append(field.kind() == Kind.NODE ? "Box<Ast>" : "String");
+                .append(fieldType(field, false));
             out.append(" },\n");
         }
         out.append("}\n\n#[allow(non_snake_case)]\nimpl Ast {\n    pub fn span(&self) -> Span {\n        match self {\n");
@@ -47,7 +47,7 @@ public final class RustBackend {
             out.append("                let fields: Vec<String> = vec![\n");
             for (Field field : mapping.fields()) {
                 out.append("                    format!(\"{}:{}\", json_string(").append(quote(field.name())).append("), ")
-                    .append(field.kind() == Kind.NODE ? "r#" + field.name() + ".canonical_json()" : "json_string(r#" + field.name() + ")").append("),\n");
+                    .append(fieldJson(field)).append("),\n");
             }
             out.append("                ];\n                format!(\"{{\\\"type\\\":{},\\\"span\\\":[{},{}],\\\"fields\\\":{{{}}}}}\", json_string(")
                 .append(quote(mapping.name())).append("), span.start, span.end, fields.join(\",\"))\n            },\n");
@@ -93,6 +93,10 @@ public final class RustBackend {
             case Sequence sequence -> "Expr::Sequence(vec![" + expressions(sequence.elements()) + "])";
             case Choice choice -> "Expr::Choice(vec![" + expressions(choice.alternatives()) + "])";
             case Capture capture -> "Expr::Capture(" + quote(capture.name()) + ", Box::new(" + expression(capture.expression()) + "))";
+            case OptionalExpr optional -> expression(optional.child()) + ".optional()";
+            case Repeat repeat -> expression(repeat.child()) + ".repeat(" + repeat.min() + ", "
+                + (repeat.max() == null ? "None" : "Some(" + repeat.max() + ")") + ")";
+            case Separated separated -> expression(separated.child()) + ".separated_by(" + expression(separated.separator()) + ")";
         };
     }
 
@@ -102,48 +106,50 @@ public final class RustBackend {
 
     private String mapper(GrammarIR ir) {
         StringBuilder out = new StringBuilder(HEADER);
-        out.append("use super::ast::Ast;\nuse unlaxer_runtime::{Tree, Capture};\n\n");
+        out.append("use super::ast::Ast;\nuse unlaxer_runtime::Tree;\n\n");
         out.append("""
             pub fn map(tree: &Tree) -> Result<Ast, String> {
-                map_node(tree, tree.root)?.ok_or_else(|| "no mapped root".to_owned())
+                required(map_node(tree, tree.root)?, "root")
             }
 
-            fn capture<'a>(tree: &'a Tree, id: usize, name: &str) -> Result<&'a Capture, String> {
-                let mut matches = tree.nodes[id].captures.iter().filter(|c| c.name == name);
-                let result = matches.next().ok_or_else(|| format!("missing capture {name}"))?;
-                if matches.next().is_some() { return Err(format!("duplicate capture {name}")); }
-                Ok(result)
+            fn required<T>(mut values: Vec<T>, name: &str) -> Result<T, String> {
+                if values.len() != 1 { return Err(format!("expected one value for {name}, got {}", values.len())); }
+                Ok(values.remove(0))
             }
 
-            fn one_node(tree: &Tree, ids: &[usize]) -> Result<Option<Ast>, String> {
-                let mut found = None;
-                for &id in ids {
-                    if let Some(node) = map_node(tree, id)? {
-                        if found.is_some() { return Err("multiple mapped children".to_owned()); }
-                        found = Some(node);
-                    }
-                }
+            fn map_nodes(tree: &Tree, ids: &[usize]) -> Result<Vec<Ast>, String> {
+                let mut found = Vec::new();
+                for &id in ids { found.extend(map_node(tree, id)?); }
                 Ok(found)
             }
+            """);
+        if (ir.rules().stream().filter(r -> r.mapping() != null).flatMap(r -> r.mapping().fields().stream())
+            .anyMatch(f -> f.cardinality() == Cardinality.OPTIONAL)) out.append("""
 
-            fn map_node(tree: &Tree, id: usize) -> Result<Option<Ast>, String> {
+            fn optional<T>(mut values: Vec<T>, name: &str) -> Result<Option<T>, String> {
+                if values.len() > 1 { return Err(format!("expected at most one value for {name}, got {}", values.len())); }
+                Ok(values.pop())
+            }
+            """);
+        out.append("""
+
+            fn map_node(tree: &Tree, id: usize) -> Result<Vec<Ast>, String> {
                 let node = &tree.nodes[id];
                 match node.rule {
             """);
         for (int i = 0; i < ir.rules().size(); i++) if (ir.rules().get(i).mapping() != null) {
             var mapping = ir.rules().get(i).mapping();
-            out.append("        ").append(i).append(" => Ok(Some(Ast::r#").append(mapping.name()).append(" {\n            span: node.span,\n");
+            out.append("        ").append(i).append(" => Ok(vec![Ast::r#").append(mapping.name()).append(" {\n            span: node.span,\n");
             for (Field field : mapping.fields()) {
-                String captured = "capture(tree, id, " + quote(field.name()) + ")?";
-                out.append("            r#").append(field.name()).append(": ");
-                if (field.kind() == Kind.NODE) out.append("Box::new(one_node(tree, &").append(captured)
-                    .append(".nodes)?.ok_or_else(|| \"capture has no AST node\".to_owned())?)");
-                else out.append("unlaxer_runtime::strip_capture(tree.text(").append(captured).append(".span)).to_owned()");
-                out.append(",\n");
+                out.append("            r#").append(field.name()).append(": {\n                let mut values = Vec::new();\n")
+                    .append("                for capture in node.captures.iter().filter(|c| c.name == ").append(quote(field.name())).append(") {\n");
+                if (field.kind() == Kind.NODE) out.append("                    values.extend(map_nodes(tree, &capture.nodes)?);\n");
+                else out.append("                    values.push(unlaxer_runtime::strip_capture(tree.text(capture.span)).to_owned());\n");
+                out.append("                }\n                ").append(mappedValue(field)).append("\n            },\n");
             }
-            out.append("        })),\n");
+            out.append("        }]),\n");
         }
-        out.append("        _ => one_node(tree, &node.children),\n    }\n}\n");
+        out.append("        _ => map_nodes(tree, &node.children),\n    }\n}\n");
         return out.toString();
     }
 
@@ -154,13 +160,14 @@ public final class RustBackend {
             var mapping = rule.mapping();
             out.append("    fn ").append(RustGrammarLowering.methodName(mapping.name())).append("(&mut self");
             for (Field field : mapping.fields()) out.append(", r#").append(field.name()).append(": ")
-                .append(field.kind() == Kind.NODE ? "&Ast" : "&str");
+                .append(fieldType(field, true));
             out.append(", span: Span) -> Self::Output;\n");
         }
         out.append("}\n\n#[allow(non_snake_case)]\npub fn evaluate<S: Semantics>(node: &Ast, semantics: &mut S) -> S::Output {\n    match node {\n");
         for (Rule rule : ir.rules()) if (rule.mapping() != null) {
             var mapping = rule.mapping();
-            var args = new ArrayList<>(mapping.fields().stream().map(f -> "r#" + f.name()).toList());
+            var args = new ArrayList<>(mapping.fields().stream().map(f -> "r#" + f.name()
+                + (f.cardinality() == Cardinality.OPTIONAL ? ".as_deref()" : "")).toList());
             args.add("*span");
             out.append("        ").append(pattern(mapping, "Ast")).append(" => semantics.")
                 .append(RustGrammarLowering.methodName(mapping.name())).append("(").append(String.join(", ", args)).append("),\n");
@@ -171,6 +178,33 @@ public final class RustBackend {
     private static String pattern(Mapping mapping, String type) {
         String fields = mapping.fields().stream().map(f -> ", r#" + f.name()).collect(Collectors.joining());
         return type + "::r#" + mapping.name() + " { span" + fields + " }";
+    }
+
+    private static String fieldType(Field field, boolean borrowed) {
+        return switch (field.cardinality()) {
+            case ONE -> field.kind() == Kind.NODE ? (borrowed ? "&Ast" : "Box<Ast>") : (borrowed ? "&str" : "String");
+            case OPTIONAL -> "Option<" + (field.kind() == Kind.NODE ? (borrowed ? "&Ast" : "Box<Ast>") : (borrowed ? "&str" : "String")) + ">";
+            case MANY -> (borrowed ? "&[" : "Vec<") + (field.kind() == Kind.NODE ? "Ast" : "String") + (borrowed ? "]" : ">");
+        };
+    }
+
+    private static String mappedValue(Field field) {
+        return switch (field.cardinality()) {
+            case ONE -> field.kind() == Kind.NODE ? "Box::new(required(values, " + quote(field.name()) + ")?)"
+                : "required(values, " + quote(field.name()) + ")?";
+            case OPTIONAL -> "optional(values, " + quote(field.name()) + ")?" + (field.kind() == Kind.NODE ? ".map(Box::new)" : "");
+            case MANY -> "values";
+        };
+    }
+
+    private static String fieldJson(Field field) {
+        String name = "r#" + field.name();
+        String value = field.kind() == Kind.NODE ? "value.canonical_json()" : "json_string(value)";
+        return switch (field.cardinality()) {
+            case ONE -> field.kind() == Kind.NODE ? name + ".canonical_json()" : "json_string(" + name + ")";
+            case OPTIONAL -> name + ".as_ref().map_or_else(|| \"null\".to_owned(), |value| " + value + ")";
+            case MANY -> "format!(\"[{}]\", " + name + ".iter().map(|value| " + value + ").collect::<Vec<_>>().join(\",\"))";
+        };
     }
 
     static String quote(String value) {

@@ -40,6 +40,24 @@ import org.unlaxer.dsl.bootstrap.UBNFMapper;
 
 public class UBNFMapperTest {
 
+    @Test
+    public void nestedQuantifiersKeepTheirOwnStructureAndSuffixes() {
+        var grammar = UBNFMapper.parse("grammar G { A ::= { [ 'x' ] }; B ::= [ ('y'+) ]; C ::= { 'z'+ }; }").grammars().get(0);
+        AtomicElement first = ((ChoiceBody) grammar.rules().get(0).body()).alternatives().get(0).elements().get(0).element();
+        assertTrue(first instanceof RepeatElement);
+        AtomicElement inner = ((ChoiceBody) ((RepeatElement) first).body()).alternatives().get(0).elements().get(0).element();
+        assertTrue(inner instanceof OptionalElement);
+        AtomicElement second = ((ChoiceBody) grammar.rules().get(1).body()).alternatives().get(0).elements().get(0).element();
+        assertTrue(second instanceof OptionalElement);
+        AtomicElement grouped = ((ChoiceBody) ((OptionalElement) second).body()).alternatives().get(0).elements().get(0).element();
+        assertTrue(grouped instanceof GroupElement);
+        AtomicElement suffix = ((ChoiceBody) ((GroupElement) grouped).body()).alternatives().get(0).elements().get(0).element();
+        assertTrue(suffix instanceof OneOrMoreElement);
+        AtomicElement third = ((ChoiceBody) grammar.rules().get(2).body()).alternatives().get(0).elements().get(0).element();
+        assertTrue(third instanceof RepeatElement);
+        assertTrue(((ChoiceBody) ((RepeatElement) third).body()).alternatives().get(0).elements().get(0).element() instanceof OneOrMoreElement);
+    }
+
     // =========================================================================
     // GrammarDecl — 名前・設定・トークン
     // =========================================================================
