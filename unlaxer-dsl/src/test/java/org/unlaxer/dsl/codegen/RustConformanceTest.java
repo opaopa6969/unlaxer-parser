@@ -47,11 +47,6 @@ public class RustConformanceTest {
         new SemanticCardinalityConformance(temporary.getRoot().toPath(), repo).verify(true, true);
     }
 
-    @Test public void semanticCardinalityKnownPureNodeAliasDifferenceRemainsExplicit() throws Exception {
-        assumeTrue("enable with -DrustConformance=true (requires rustc/cargo)", Boolean.getBoolean("rustConformance"));
-        new SemanticCardinalityConformance(temporary.getRoot().toPath(), repo).verifyKnownDivergences();
-    }
-
     @Test public void lexicalTokensPreserveRawTextAndCodePointSpans() throws Exception {
         tokenCorpus("lexical");
     }

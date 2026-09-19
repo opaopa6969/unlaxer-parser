@@ -1,6 +1,6 @@
 # Semantic cardinality conformance (#160)
 
-`Grammar.ubnf.txt` と `corpus.json` から各文法を構築する。capture の syntactic wrapper
+`Grammar.ubnf.txt` と `corpus.json` / `pure-alias.json` から各文法を構築する。capture の syntactic wrapper
 だけではなく、参照先 helper 内部の semantic 値の個数を One / Optional / Many とする。
 Node と mixed Text/Node の pair、group、alias、optional、repeat、bounded repeat、
 separated、optional-of-many、および反復 item 内の named/inline delimiter を検証する。
@@ -27,9 +27,12 @@ Rust は生成 evaluator の引数型を実コンパイルして `&Ast` / `&AstV
 Rust helperMany 内の `(a)` が `a` へ縮むため、対応する検査が失敗する。
 これらを例外扱い・skip せず、修正後の共通成功条件として扱う。
 
-純粋な Node One alias は別の API 移行課題 #163 として `known-divergences.json` に保持する。
-`Document ::= Helper @values; Helper ::= Leaf` は Java の既存 lexical API が String、
-Rust は Node。専用の `semanticCardinalityKnownPureNodeAliasDifferenceRemainsExplicit`
-が双方の値と型の相違を assert し、`semantic-cardinality-known-divergence-both.tsv` へ
-記録する。この4入力は共通成功件数へ含めない。共通 One control は direct `Leaf` を使う。
-差を解消するときは専用テストの失敗を確認し、互換 API 移行と同時に共通 corpus へ移す。
+純粋な Node alias の旧差分は #163 で `pure-alias.json` の共通成功条件へ昇格した。
+直接参照、多段 helper、group、delimiter、単一/複数 mapping target、Optional/Many を含む。
+alias 経由の Java field は `Object` / `Optional<Object>` / `List<Object>` であり、
+実際の値は AST record。Rust field は `Ast` 系で、evaluator 引数型を実コンパイルする。
+両言語の型名一致や、Java Object field の静的な AST 限定保証は主張しない。
+値を暗黙に String 化しないこと、全 field/node span、非 BMP の code-point 位置、
+同値 record の別 occurrence、失敗時を含む両 parser cursor を共通検査する。
+純 Node fixture の `texts: []` は余計な Text 値を生まない独立 oracle であり、
+既存 mixed fixture は引き続き Text の独立 span も検査する。

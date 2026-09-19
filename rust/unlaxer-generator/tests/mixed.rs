@@ -286,3 +286,74 @@ fn main(){for source in ["()","(a)","(x)"] {
 }}
 "#);
 }
+
+#[test]
+fn pure_node_aliases_keep_typed_cardinality_and_owned_occurrence_spans() {
+    let directory = Directory::new();
+    let library = library(&directory.0);
+    for (index, helper) in [
+        "Alias ::= Leaf;",
+        "Alias ::= Inner; Inner ::= Deep; Deep ::= Leaf;",
+        "Alias ::= ((Leaf));",
+        "Alias ::= '😀' '(' Leaf ')';",
+        "Alias ::= Leaf | Other;",
+        "Alias ::= Inner; Inner ::= Deep; Deep ::= Leaf | Other;",
+        "Alias ::= ((Leaf | Other));",
+        "Alias ::= '😀' '(' (Leaf | Other) ')';",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let grammar = format!("grammar G {{ @root @mapping(Bundle,params=[head,maybe,items]) Document ::= Alias @head ':' [ Alias @maybe ] ':' {{ Alias @items }}; {helper} @mapping(Leaf,params=[text]) Leaf ::= ('x' | 'y') @text; @mapping(Other,params=[text]) Other ::= ('z' | '🚀') @text; }}");
+        let source = if index % 4 == 3 {
+            if index < 4 {
+                "😀(x):😀(y):😀(x)😀(x)"
+            } else {
+                "😀(x):😀(🚀):😀(z)😀(x)"
+            }
+        } else if index < 4 {
+            "x:y:xx"
+        } else {
+            "x:🚀:zx"
+        };
+        let empty = if index % 4 == 3 { "😀(x)::" } else { "x::" };
+        let probe = r#"
+mod generated;
+use generated::{ast::Ast,evaluator::{Semantics,evaluate}};
+use unlaxer_runtime::Span;
+struct Eval;
+impl Semantics for Eval {
+    type Output=Vec<(String,Span)>;
+    fn eval_leaf(&mut self,text:&str,span:Span)->Self::Output{vec![(text.into(),span)]}
+    fn eval_other(&mut self,text:&str,span:Span)->Self::Output{vec![(text.into(),span)]}
+    fn eval_bundle(&mut self,head:&Ast,maybe:Option<&Ast>,items:&[Ast],_:Span)->Self::Output{
+        std::iter::once(head).chain(maybe).chain(items.iter()).flat_map(|node|evaluate(node,self)).collect()
+    }
+}
+fn main(){
+    for source in ["SOURCE","EMPTY"] {
+        let expected:Vec<_>=source.chars().enumerate().filter(|(_,c)|matches!(c,'x'|'y'|'z'|'🚀'))
+            .map(|(start,c)|(c.to_string(),Span{start,end:start+1})).collect();
+        let mut input=source.to_owned();
+        let mut context=unlaxer_runtime::ParseContext::new(&input);
+        let matched=generated::parser::parse_context(&mut context).unwrap();
+        let tree=context.tree(matched.nodes[0]).unwrap();
+        assert_eq!(context.position(),source.chars().count());
+        assert_eq!(context.matched_position(),source.chars().count());
+        let ast=generated::mapper::map(&tree).unwrap();
+        drop(tree);drop(context);input.clear();drop(input);
+        assert_eq!(evaluate(&ast,&mut Eval),expected);
+        let Ast::Bundle{maybe,items,..}=&ast else{panic!("bundle")};
+        assert_eq!(maybe.is_none(),source=="EMPTY");
+        assert_eq!(items.len(),if source=="EMPTY"{0}else{2});
+    }
+}
+"#.replace("SOURCE",source).replace("EMPTY",empty);
+        generate_and_run(
+            &directory.0.join(format!("pure-alias-{index}")),
+            &library,
+            &grammar,
+            &probe,
+        );
+    }
+}

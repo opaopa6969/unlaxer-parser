@@ -80,6 +80,13 @@ public class RustNativeGeneratorTest {
         for (String ruleName : List.of("_Root", "self")) {
             grammars.add("grammar G { @whitespace: none @root @mapping(Item,params=[value]) " + ruleName + " ::= 'x' @value; }");
         }
+        String aliasTemplate = Files.readString(Path.of("src/test/resources/semantic-cardinality/Grammar.ubnf.txt"));
+        for (var entry : JsonParser.parseString(Files.readString(Path.of("src/test/resources/semantic-cardinality/pure-alias.json"))).getAsJsonArray()) {
+            var fixture = entry.getAsJsonObject();
+            grammars.add(aliasTemplate.replace("ROOT_BODY", fixture.has("root") ? fixture.get("root").getAsString() : "Helper @values")
+                .replace("HELPER_BODY", fixture.get("body").getAsString())
+                .replace("EXTRA_RULES", fixture.has("extra") ? fixture.get("extra").getAsString() : ""));
+        }
         var report = new ArrayList<>(List.of("grammar_index\tstatus\tfiles_identical"));
         int index = 0;
         for (String source : grammars) {

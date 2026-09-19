@@ -24,7 +24,7 @@
 | Identifier・Single/DoubleQuoted・EndOfSource token binding | UBNF生成・runtime実装 | 22文法78入力の受理/両cursor比較と受理48 AST/spanのfixture。ASCII identifier、生escape、single quoteだけ除去するJava mapper契約。tinyexpression文字列評価は別途検証 |
 | CASE_INSENSITIVE・REGEX・任意外部token | 未対応 | Unicode/regex方言を確定。任意Java parserクラスとtinyexpression固有bindingはRust実装または明示adapterを要求 |
 | imports・複数grammar・namespace・global/rule trivia・interleave | 一部のみ | 現在は単一grammarとglobal javaStyle/none。依存解決・循環・文法別ID・局所設定を検証 |
-| mapping・capture・source-preserving AST | scalar/optional/list/groupと混在Text/Node値を生成。Rustはspan付きAstValue、JavaはObject系。shared mappingの型joinは宣言順非依存。単一capture内の複数semantic子とhelper内部optional/repeatのcardinality・全値収集を両言語で実装（#160）。Java位置binding #116・zero-field生成 #129・複合text capture #132・混在値 #156を修正 | 入れ子container型、再帰的unmapped rule、純粋なmapped alias/sumのbackend間契約、typeof/commonField/enum、全Java capture規則との互換性 |
+| mapping・capture・source-preserving AST | scalar/optional/list/groupと混在Text/Node値を生成。Rustはspan付きAstValue、JavaはObject系。shared mappingの型joinは宣言順非依存。単一capture内の複数semantic子とhelper内部optional/repeatのcardinality・全値収集を両言語で実装（#160）。純mapped aliasもNodeを保持し、直接/多段/group/delimiter・複数targetの値と位置を両backendで比較（#163）。Java位置binding #116・zero-field生成 #129・複合text capture #132・混在値 #156を修正 | 入れ子container型、再帰的unmapped rule、typeof/commonField/enum、全Java capture規則との互換性 |
 | evaluator dispatch・網羅性 | 限定範囲で生成済み | 新nodeのE0004/E0046検証を拡張。eval annotation、型境界、短絡評価を追加。Java sum/dotted evaluatorの不具合 #130 は修正済み |
 | leftAssoc/rightAssoc/precedence | canonical leftAssocとrightAssoc、precedence metadata、schemaを統合したshared mapping、混在factorを生成 | 左辺＋op/right列と右再帰、文法階層による優先順位を検証。非canonical右結合形、Javaの特殊null/literal leafとRust AstValueの構造互換は未完了。Java raw CST反復欠落 #138・右結合 #139 は独立修正 |
 | backref・MatchedToken相当 | context-wide replayのみ | UBNF annotation、名前の寿命・入れ子・伝播、コピー言語のpositive/negative test |
@@ -44,9 +44,12 @@
 
 Javaの継承階層を一対一に移植するのではなく、文法と観測可能な振る舞いを対象とする。JVM任意オブジェクト・reflection・bytecodeのnative直接実行はできないため、Rust側のhost interfaceと移植コードの境界を明記する。差を消して比較を通したことにせず、意図的な差は独立したfixtureにする。
 
-純mapped aliasの型移行は#163で継続する。先行する#165はJavaのpreferred選択Tokenと
-source snapshotを原子的に取得する追加APIで、Rustでは既存のowned AST/spanの
-後続・並行mapping耐性を検証する。Javaのpreferred型候補探索自体のRust移植は未対応。
+純mapped aliasの型移行（#163）は[API変更と利用側の移行文書](../docs/pure-mapped-alias-migration.md)を参照。
+Javaでは従来のStringからObject系のNode保持へ変わるため、文字列依存の利用者は更新が必要。
+先行する#165はJavaのpreferred選択Tokenとsource snapshotを原子的に取得する追加APIで、
+Rustでは既存のowned AST/spanの後続・並行mapping耐性を検証する。
+tinyexpressionはowned source resolverで従来のslice字句処理を維持する。
+Javaのpreferred型候補探索自体のRust移植は未対応。
 
 parser生成は当面`Expr`combinator定義を生成し、共通runtimeで実行する。直接parser関数を出力する高速化backendは、その意味論との同値性を測定できてから検討する。Rustでビルドされた実行ファイルであることは、入力式を機械語にコンパイルしていることを意味しない。
 

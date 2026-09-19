@@ -829,8 +829,8 @@ class MapperRuleEmitter {
         Optional<String> optional = MapperTypeResolver.unwrapOptionalType(type);
         String element = list.or(() -> optional).orElse(type);
         if (list.isPresent()) {
-            w.line(type + " " + param + " = new ArrayList<>();");
-            w.line("for (Object value : " + values + ") " + param + ".add((" + element + ") value);");
+            w.line(type + " " + param + " = " + values + ".stream().map(" + element
+                + ".class::cast).collect(java.util.stream.Collectors.toCollection(ArrayList::new));");
         } else {
             String condition = optional.isPresent() ? "> 1" : "!= 1";
             w.line("if (" + values + ".size() " + condition + ") throw new IllegalArgumentException(\"Unexpected semantic cardinality for "

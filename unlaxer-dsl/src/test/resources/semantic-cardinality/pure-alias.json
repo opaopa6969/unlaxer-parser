@@ -1,0 +1,63 @@
+[
+ {"name":"pure-node-one-alias","kind":"node","cardinality":"one","javaType":"java.lang.Object","body":"Leaf","cases":[
+   {"input":"x","value":"L:x","texts":[],"nodes":[[0,1,"x"]]},
+   {"input":"y","value":"L:y","texts":[],"nodes":[[0,1,"y"]]},
+   {"input":""},{"input":"xy"},{"input":"z"},{"input":"x!"}
+ ]},
+ {"name":"pure-node-multihop-alias","kind":"node","cardinality":"one","javaType":"java.lang.Object","body":"Alias","extra":"Alias ::= Inner; Inner ::= Leaf;","cases":[
+   {"input":"x","value":"L:x","texts":[],"nodes":[[0,1,"x"]]},
+   {"input":"y","value":"L:y","texts":[]},
+   {"input":" x /*😀*/ ","value":"L:x","texts":[]},
+   {"input":""},{"input":"yx"},{"input":"!x"}
+ ]},
+ {"name":"pure-node-group-alias","kind":"node","cardinality":"one","javaType":"java.lang.Object","body":"((Leaf))","cases":[
+   {"input":"x","value":"L:x","texts":[],"nodes":[[0,1,"x"]]},
+   {"input":"y","value":"L:y","texts":[]},{"input":""},{"input":"xy"},{"input":"(x)"}
+ ]},
+ {"name":"pure-node-delimiter-alias","kind":"node","cardinality":"one","javaType":"java.lang.Object","body":"'😀' '(' Alias ')'","extra":"Alias ::= Leaf;","cases":[
+   {"input":"😀(x)","value":"L:x","texts":[],"nodes":[[2,3,"x"]]},
+   {"input":"😀(y)","value":"L:y","texts":[],"nodes":[[2,3,"y"]]},
+   {"input":"😀( /*c*/ x )","value":"L:x","texts":[]},
+   {"input":"😀()"},{"input":"😀(xy)"},{"input":"😀(x"},{"input":"😀(x)!"},{"input":"!😀(x)"}
+ ]},
+ {"name":"pure-node-direct-multi","kind":"node","cardinality":"one","javaType":"java.lang.Object","root":"(Leaf | Other) @values","body":"Leaf","other":true,"extra":"@mapping(Other,params=[text]) Other ::= ('z' | '🚀') @text;","cases":[
+   {"input":"x","value":"L:x","texts":[],"nodes":[[0,1,"x"]]},
+   {"input":"z","value":"O:z","texts":[],"nodes":[[0,1,"z"]]},
+   {"input":"🚀","value":"O:🚀","texts":[],"nodes":[[0,1,"🚀"]]},
+   {"input":""},{"input":"xz"},{"input":"🚀!"}
+ ]},
+ {"name":"pure-node-multi-alias","kind":"node","cardinality":"one","javaType":"java.lang.Object","body":"Leaf | Other","other":true,"extra":"@mapping(Other,params=[text]) Other ::= ('z' | '🚀') @text;","cases":[
+   {"input":"x","value":"L:x","texts":[]},{"input":"y","value":"L:y","texts":[]},
+   {"input":"z","value":"O:z","texts":[]},{"input":"🚀","value":"O:🚀","texts":[],"nodes":[[0,1,"🚀"]]},
+   {"input":""},{"input":"xz"},{"input":"!"}
+ ]},
+ {"name":"pure-node-multi-multihop-group-alias","kind":"node","cardinality":"one","javaType":"java.lang.Object","body":"Alias","other":true,"extra":"Alias ::= (Inner); Inner ::= (Leaf | Other); @mapping(Other,params=[text]) Other ::= ('z' | '🚀') @text;","cases":[
+   {"input":"x","value":"L:x","texts":[]},{"input":"z","value":"O:z","texts":[]},
+   {"input":"🚀","value":"O:🚀","texts":[],"nodes":[[0,1,"🚀"]]},
+   {"input":"/*😀*/ z","value":"O:z","texts":[]},
+   {"input":""},{"input":"zz"},{"input":"🚀x"}
+ ]},
+ {"name":"pure-node-multi-delimiter-alias","kind":"node","cardinality":"one","javaType":"java.lang.Object","body":"'😀' '(' Alias ')'","other":true,"extra":"Alias ::= Leaf | Other; @mapping(Other,params=[text]) Other ::= ('z' | '🚀') @text;","cases":[
+   {"input":"😀(x)","value":"L:x","texts":[],"nodes":[[2,3,"x"]]},
+   {"input":"😀(z)","value":"O:z","texts":[],"nodes":[[2,3,"z"]]},
+   {"input":"😀(🚀)","value":"O:🚀","texts":[],"nodes":[[2,3,"🚀"]]},
+   {"input":"😀( /*c*/ 🚀 )","value":"O:🚀","texts":[]},
+   {"input":"😀()"},{"input":"😀(xz)"},{"input":"😀(🚀"},{"input":"😀(🚀)!"}
+ ]},
+ {"name":"pure-node-alias-optional","kind":"node","cardinality":"optional","javaType":"java.util.Optional<java.lang.Object>","body":"'(' [Alias] ')'","extra":"Alias ::= Leaf;","cases":[
+   {"input":"()","value":"","texts":[],"nodes":[]},
+   {"input":"(x)","value":"L:x","texts":[],"nodes":[[1,2,"x"]]},
+   {"input":"(y)","value":"L:y","texts":[]},{"input":"(xy)"},{"input":"(x"}
+ ]},
+ {"name":"pure-node-alias-many","kind":"node","cardinality":"many","javaType":"java.util.List<java.lang.Object>","body":"{ Outer }","extra":"Outer ::= '(' Alias ')'; Alias ::= Leaf;","cases":[
+   {"input":"","value":"","texts":[],"nodes":[]},
+   {"input":"(x)","value":"L:x","texts":[],"nodes":[[1,2,"x"]]},
+   {"input":"(x)(x)","value":"L:x,L:x","texts":[],"nodes":[[1,2,"x"],[4,5,"x"]]},
+   {"input":"(x)(y)","value":"L:x,L:y","texts":[]},{"input":"(x)("},{"input":"(z)"}
+ ]},
+ {"name":"pure-node-multi-alias-many","kind":"node","cardinality":"many","javaType":"java.util.List<java.lang.Object>","body":"{ Outer }","other":true,"extra":"Outer ::= '(' Alias ')'; Alias ::= Leaf | Other; @mapping(Other,params=[text]) Other ::= ('z' | '🚀') @text;","cases":[
+   {"input":"","value":"","texts":[]},
+   {"input":"(x)(🚀)(x)","value":"L:x,O:🚀,L:x","texts":[],"nodes":[[1,2,"x"],[4,5,"🚀"],[7,8,"x"]]},
+   {"input":"(z)(x)","value":"O:z,L:x","texts":[]},{"input":"(x)("},{"input":"(a)"}
+ ]}
+]
