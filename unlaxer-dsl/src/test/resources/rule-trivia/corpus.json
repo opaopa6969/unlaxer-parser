@@ -100,7 +100,7 @@
   },
   {
     "name": "root-single-literal-choice",
-    "grammar": "grammar LiteralChoice { @package: org.example.ruletrivia @whitespace: javaStyle @root @mapping(Root, params=[value]) Root ::= 'a' @value | 'b' @value; }",
+    "grammar": "grammar LiteralChoice { @package: org.example.ruletrivia @whitespace: javaStyle @root @mapping(Root, params=[value]) @interleave(profile=javaStyle) Root ::= 'a' @value | 'b' @value; }",
     "cases": [
       {"id":"first-alternative", "input":"a", "prefix":[true,1,1], "accepted":true,
        "ast":{"type":"Root","span":[0,1],"fields":{"value":"a"}}},
@@ -112,7 +112,7 @@
   },
   {
     "name": "nested-constructs-and-rollback",
-    "grammar": "grammar Constructs { @package: org.example.ruletrivia @whitespace: javaStyle @root @mapping(Root, params=[choice,maybe,repeated,separated,alias]) Root ::= '(' ('a' 'x' | 'a' 'y') @choice [ ('c' 'z') @maybe ] { 'd' @repeated } Items @separated Alias @alias ')'; Items ::= 'e' % ','; Alias ::= Child; @mapping(Child, params=[value]) Child ::= 'f' @value; }",
+    "grammar": "grammar Constructs { @package: org.example.ruletrivia @whitespace: javaStyle @root @mapping(Root, params=[choice,maybe,repeated,separated,alias]) @interleave(profile=javaStyle) Root ::= '(' ('a' 'x' | 'a' 'y') @choice [ ('c' 'z') @maybe ] { 'd' @repeated } Items @separated Alias @alias ')'; Items ::= 'e' % ','; Alias ::= Child; @mapping(Child, params=[value]) Child ::= 'f' @value; }",
     "cases": [
       {"id":"choice-and-optional-rollback", "input":"(ay dd e, e f)", "prefix":[true,14,14], "accepted":true,
        "ast":{"type":"Root","span":[0,14],"fields":{"choice":"ay","maybe":null,"repeated":["d","d"],"separated":"e, e","alias":{"type":"Child","span":[12,13],"fields":{"value":"f"}}}}},

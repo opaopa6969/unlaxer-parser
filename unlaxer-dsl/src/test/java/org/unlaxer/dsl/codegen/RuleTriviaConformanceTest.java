@@ -70,6 +70,7 @@ public class RuleTriviaConformanceTest {
             String name = fixture.get("name").getAsString();
             String source = fixture.get("grammar").getAsString();
             GrammarDecl grammar = UBNFMapper.parse(source).grammars().get(0);
+            GrammarValidator.validateOrThrow(grammar);
             List<RustBackend.GeneratedFile> javaFrontend = new RustBackend().generate(grammar);
             assertEquals(name + " Java frontend Rust file count", 5, javaFrontend.size());
 

@@ -55,6 +55,7 @@ scope が AST の node/field を増やすことはない。
 `RuleTriviaConformanceTest` は生成した Java parser/AST/mapper と生成 Rust を実行し、
 受理・全入力判定・consumed/matched cursor・AST 全 field/node span を独立期待値で
 照合する。Java frontend と native Rust frontend の全5生成ファイルも byte 比較する。
+共通 corpus は15文法・33入力で、各文法を Java 検証器にも通す。
 native 生成は PATH が空でも実行し、Java を起動しない。
 
 ```sh
@@ -67,3 +68,7 @@ test で skip されたことを、この適合性検証の成功には数えな
 
 任意 trivia parser の登録、global comment 設定、scope metadata、evaluator、
 full tinyexpression-rs、rustcodeblock、LSP/DAP は別の未完了項目として追跡する。
+
+実 tinyexpression `854c1f4` の P4 文法を native generator へ渡すと、この変更で
+`Formula` の `@interleave` を通過し、次の未対応 `@scopeTree(mode=lexical)` を
+exit 3 で明示拒否する。P4 全体の生成成功や full-spec 完了を意味しない。
