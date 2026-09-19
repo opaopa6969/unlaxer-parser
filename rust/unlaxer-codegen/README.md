@@ -28,6 +28,16 @@ generated metadata enum includes `Right` only when a right-associative operator
 is present, preserving existing left-only output byte-for-byte. This is not a
 claim of full Java parser or tinyexpression parity.
 
+Mixed text/node fields use `Kind::Value`: owned `AstValue`, `Option<AstValue>`,
+or `Vec<AstValue>` and corresponding borrowed semantic parameters. Generated
+`AstValue::Text` owns the captured text and its original source span;
+`AstValue::Node` owns a boxed AST. `canonical_json()` projects text to a JSON
+string and nodes to AST objects, while `span()` preserves positions for both.
+Frontends must explicitly wrap text alternatives in `Expression::TextValue`.
+The mapper does not infer a text value when the capture contains no value nodes.
+These additions are emitted only for mixed fields; existing nonmixed output
+remains unchanged.
+
 `generate` rejects malformed mapping/field identifiers, invalid indices, conflicting mapping
 schemas or semantic method names, reserved/duplicate fields, missing/extra capture
 names, invalid token parameters, and invalid repetition bounds. The frontend must

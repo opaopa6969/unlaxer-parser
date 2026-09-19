@@ -1,0 +1,61 @@
+use generated::{ast::{Ast, AstValue}, evaluator::{evaluate, Semantics}};
+use unlaxer_runtime::Span;
+
+struct Eval;
+fn value(value: &AstValue, evaluator: &mut Eval) -> String {
+    match value {
+        AstValue::Text { text, .. } => text.clone(),
+        AstValue::Node(node) => evaluate(node, evaluator).join(""),
+    }
+}
+impl Semantics for Eval {
+    type Output = Vec<String>;
+    fn eval_number(&mut self, text: &str, _: Span) -> Vec<String> { vec![text.to_owned()] }
+    fn eval_container(&mut self, head: &AstValue, maybe: Option<&AstValue>, items: &[AstValue], _: Span) -> Vec<String> {
+        let mut output = vec![value(head, self)];
+        if let Some(maybe) = maybe { output.push(value(maybe, self)); }
+        output.extend(items.iter().map(|item| value(item, self)));
+        output
+    }
+}
+fn main() {
+    for (input, expected) in [
+        ("alpha:2:beta 3 gamma 4", vec!["alpha","2","beta","3","gamma","4"]),
+        ("1::'quoted' 2", vec!["1","quoted","2"]),
+        ("😀:' hi ':'a' 😀 3", vec!["😀"," hi ","a","😀","3"]),
+        ("a:b:", vec!["a","b"]),
+    ] {
+        let tree = generated::parser::parse_tree(input).unwrap();
+        let ast = generated::mapper::map(&tree).unwrap();
+        drop(tree);
+        assert_eq!(evaluate(&ast, &mut Eval),expected);
+        let Ast::Container {head,maybe,items,span} = &ast else {panic!("container required")};
+        assert_eq!(span.start,0);
+        assert_eq!(span.end,input.chars().count());
+        for value in std::iter::once(head).chain(maybe.iter()).chain(items.iter()) {
+            let span=value.span();
+            assert!(span.start<=span.end && span.end<=input.chars().count());
+            if let AstValue::Text{text,..}=value {
+                let source:String=input.chars().skip(span.start).take(span.end-span.start).collect();
+                assert_eq!(unlaxer_runtime::java_capture_text(&source),text);
+                assert_eq!(value.canonical_json(),unlaxer_runtime::json_string(text));
+                if text=="😀" {assert_eq!(span.end-span.start,1);}
+                if text==" hi " {assert_eq!(span.end-span.start,6);}
+            }
+        }
+        assert!(ast.canonical_json().contains("\"head\":"));
+        if input.starts_with("alpha") {
+            assert!(ast.canonical_json().contains("\"head\":\"alpha\""));
+            assert!(matches!(head,AstValue::Text{..}));
+            assert!(matches!(maybe,Some(AstValue::Node(_))));
+            assert!(matches!(&items[0],AstValue::Text{..}));
+            assert!(matches!(&items[1],AstValue::Node(_)));
+            assert!(matches!(&items[2],AstValue::Text{..}));
+            assert!(matches!(&items[3],AstValue::Node(_)));
+        }
+    }
+    // A malformed low-level IR text alternative deliberately lacks TextValue.
+    // The mapper must report an absent required value, never silently invent text.
+    let tree=generated::parser::parse_tree("!::").unwrap();
+    assert!(generated::mapper::map(&tree).unwrap_err().contains("expected one value for head, got 0"));
+}

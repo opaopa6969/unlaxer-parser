@@ -156,6 +156,46 @@ pub fn fixture(name: &str) -> GrammarIr {
                 right,
             ]
         }
+        "mixed" => vec![
+            rule(
+                "Root",
+                Sequence(vec![
+                    cap("head", Reference(1)),
+                    Literal(":".into()),
+                    OptionalExpr(Box::new(cap("maybe", Reference(1)))),
+                    Literal(":".into()),
+                    Repeat {
+                        child: Box::new(cap("items", Reference(1))),
+                        min: 0,
+                        max: None,
+                    },
+                ]),
+                Some((
+                    "Container",
+                    vec![
+                        field("head", Value, One),
+                        field("maybe", Value, Optional),
+                        field("items", Value, Many),
+                    ],
+                )),
+            ),
+            rule(
+                "Mixed",
+                Choice(vec![
+                    TextValue(Box::new(IdentifierToken)),
+                    TextValue(Box::new(QuotedToken('\''))),
+                    TextValue(Box::new(Literal("😀".into()))),
+                    Reference(2),
+                    Literal("!".into()),
+                ]),
+                None,
+            ),
+            rule(
+                "Number",
+                Sequence(vec![cap("value", NumberToken)]),
+                Some(("Number", vec![field("value", Text, One)])),
+            ),
+        ],
         _ => panic!("unknown fixture {name}"),
     };
     GrammarIr {

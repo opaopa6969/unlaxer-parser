@@ -58,11 +58,13 @@ fn generated_modules_compile_evaluate_and_require_semantics() {
         "{}",
         String::from_utf8_lossy(&result.stderr)
     );
-    for fixture in ["evolution", "fields", "shared", "names", "right"] {
+    for fixture in ["evolution", "fields", "shared", "names", "right", "mixed"] {
         let output = temp.0.join(fixture);
         fs::create_dir(&output).unwrap();
         let mut ir = support::fixture(if fixture == "names" {
             "evolution"
+        } else if fixture == "mixed" {
+            include_str!("support/mixed_probe.rs.txt")
         } else if fixture == "right" {
             "shared"
         } else {
@@ -196,6 +198,9 @@ fn invalid_ir_is_rejected_before_emission() {
     cases.push(g);
     let mut g = base.clone();
     g.rules[3].body = Expression::Literal(String::new());
+    cases.push(g);
+    let mut g = base.clone();
+    g.rules[3].body = Expression::TextValue(Box::new(Expression::Reference(999)));
     cases.push(g);
     let mut g = base.clone();
     g.rules[3].body = Expression::CharRangeToken { min: 'z', max: 'a' };

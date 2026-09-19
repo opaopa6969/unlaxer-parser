@@ -56,9 +56,20 @@ fn mappings(ir: &GrammarIr) -> Vec<&Mapping> {
     result
 }
 
+fn has_values(ir: &GrammarIr) -> bool {
+    mappings(ir)
+        .iter()
+        .flat_map(|m| &m.fields)
+        .any(|f| f.kind == Kind::Value)
+}
+
 fn ast(ir: &GrammarIr) -> String {
     let mut out = String::from(HEADER);
-    out.push_str("use unlaxer_runtime::{Span, json_string};\n\n#[allow(non_snake_case, non_camel_case_types)]\n#[derive(Debug, Clone, PartialEq)]\npub enum Ast {\n");
+    out.push_str("use unlaxer_runtime::{Span, json_string};\n\n");
+    if has_values(ir) {
+        out.push_str("#[derive(Debug, Clone, PartialEq)]\npub enum AstValue {\n    Text { text: String, span: Span },\n    Node(Box<Ast>),\n}\n\nimpl AstValue {\n    pub fn span(&self) -> Span {\n        match self {\n            Self::Text { span, .. } => *span,\n            Self::Node(node) => node.span(),\n        }\n    }\n\n    pub fn canonical_json(&self) -> String {\n        match self {\n            Self::Text { text, .. } => json_string(text),\n            Self::Node(node) => node.canonical_json(),\n        }\n    }\n}\n\n");
+    }
+    out.push_str("#[allow(non_snake_case, non_camel_case_types)]\n#[derive(Debug, Clone, PartialEq)]\npub enum Ast {\n");
     for mapping in mappings(ir) {
         write!(out, "    r#{} {{ span: Span", mapping.name).unwrap();
         for field in &mapping.fields {
@@ -166,6 +177,7 @@ fn expression(expr: &Expression) -> String {
         Reference(id) => format!("Expr::Rule({id})"),
         Sequence(items) => format!("Expr::Sequence(vec![{}])", expressions(items)),
         Delimited(child) => format!("Expr::Sequence(vec![{}])", expression(child)),
+        TextValue(child) => format!("{}.text_value()", expression(child)),
         Choice(items) => format!("Expr::Choice(vec![{}])", expressions(items)),
         Capture {
             name,
@@ -195,7 +207,22 @@ fn expressions(items: &[Expression]) -> String {
 
 fn mapper(ir: &GrammarIr) -> String {
     let mut out = String::from(HEADER);
+    if has_values(ir) {
+        out.push_str("use super::ast::AstValue;\n");
+    }
     out.push_str("use super::ast::Ast;\nuse unlaxer_runtime::Tree;\n\npub fn map(tree: &Tree) -> Result<Ast, String> {\n    required(map_node(tree, tree.root)?, \"root\")\n}\n\nfn required<T>(mut values: Vec<T>, name: &str) -> Result<T, String> {\n    if values.len() != 1 { return Err(format!(\"expected one value for {name}, got {}\", values.len())); }\n    Ok(values.remove(0))\n}\n\nfn map_nodes(tree: &Tree, ids: &[usize]) -> Result<Vec<Ast>, String> {\n    let mut found = Vec::new();\n    for &id in ids { found.extend(map_node(tree, id)?); }\n    Ok(found)\n}\n");
+    if has_values(ir) {
+        out.push_str("\nfn map_values(tree: &Tree, ids: &[usize]) -> Result<Vec<AstValue>, String> {\n    let mut found = Vec::new();\n    for &id in ids {\n        let node = &tree.nodes[id];\n        match node.rule {\n            unlaxer_runtime::TEXT_VALUE_RULE => found.push(AstValue::Text {\n                text: unlaxer_runtime::java_capture_text(tree.text(node.span)).to_owned(),\n                span: node.span,\n            }),\n");
+        let ids: Vec<_> = ir
+            .rules
+            .iter()
+            .enumerate()
+            .filter(|(_, r)| r.mapping.is_some())
+            .map(|(id, _)| id.to_string())
+            .collect();
+        writeln!(out, "            {} => found.extend(map_node(tree, id)?.into_iter().map(|node| AstValue::Node(Box::new(node)))),", ids.join(" | ")).unwrap();
+        out.push_str("            _ => found.extend(map_values(tree, &node.children)?),\n        }\n    }\n    Ok(found)\n}\n");
+    }
     if mappings(ir)
         .iter()
         .flat_map(|m| &m.fields)
@@ -214,7 +241,11 @@ fn mapper(ir: &GrammarIr) -> String {
             .unwrap();
             for field in &mapping.fields {
                 writeln!(out, "            r#{}: {{\n                let mut values = Vec::new();\n                for capture in node.captures.iter().filter(|c| c.name == {}) {{", field.name, quote(&field.name)).unwrap();
-                out.push_str(if field.kind == Kind::Node { "                    values.extend(map_nodes(tree, &capture.nodes)?);\n" } else { "                    values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).to_owned());\n" });
+                out.push_str(match field.kind {
+                    Kind::Node => "                    values.extend(map_nodes(tree, &capture.nodes)?);\n",
+                    Kind::Value => "                    values.extend(map_values(tree, &capture.nodes)?);\n",
+                    Kind::Text => "                    values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).to_owned());\n",
+                });
                 writeln!(
                     out,
                     "                }}\n                {}\n            }},",
@@ -231,6 +262,9 @@ fn mapper(ir: &GrammarIr) -> String {
 
 fn evaluator(ir: &GrammarIr) -> String {
     let mut out = String::from(HEADER);
+    if has_values(ir) {
+        out.push_str("use super::ast::AstValue;\n");
+    }
     out.push_str("use super::ast::Ast;\nuse unlaxer_runtime::Span;\n\n#[allow(non_snake_case)]\npub trait Semantics {\n    type Output;\n");
     for mapping in mappings(ir) {
         write!(out, "    fn {}(&mut self", method_name(&mapping.name)).unwrap();
@@ -249,7 +283,11 @@ fn evaluator(ir: &GrammarIr) -> String {
                     "r#{}{}",
                     f.name,
                     if f.cardinality == Cardinality::Optional {
-                        ".as_deref()"
+                        if f.kind == Kind::Value {
+                            ".as_ref()"
+                        } else {
+                            ".as_deref()"
+                        }
                     } else {
                         ""
                     }
@@ -285,15 +323,17 @@ fn field_type(field: &Field, borrowed: bool) -> String {
         (Kind::Node, false) => "Box<Ast>",
         (Kind::Text, true) => "&str",
         (Kind::Text, false) => "String",
+        (Kind::Value, true) => "&AstValue",
+        (Kind::Value, false) => "AstValue",
     };
     match field.cardinality {
         Cardinality::One => one.into(),
         Cardinality::Optional => format!("Option<{one}>"),
         Cardinality::Many => {
-            let element = if field.kind == Kind::Node {
-                "Ast"
-            } else {
-                "String"
+            let element = match field.kind {
+                Kind::Node => "Ast",
+                Kind::Text => "String",
+                Kind::Value => "AstValue",
             };
             if borrowed {
                 format!("&[{element}]")
@@ -325,13 +365,13 @@ fn mapped_value(field: &Field) -> String {
 
 fn field_json(field: &Field) -> String {
     let name = format!("r#{}", field.name);
-    let value = if field.kind == Kind::Node {
+    let value = if field.kind != Kind::Text {
         "value.canonical_json()"
     } else {
         "json_string(value)"
     };
     match field.cardinality {
-        Cardinality::One if field.kind == Kind::Node => format!("{name}.canonical_json()"),
+        Cardinality::One if field.kind != Kind::Text => format!("{name}.canonical_json()"),
         Cardinality::One => format!("json_string({name})"),
         Cardinality::Optional => format!("{name}.as_ref().map_or_else(|| \"null\".to_owned(), |value| {value})"),
         Cardinality::Many => format!("format!(\"[{{}}]\", {name}.iter().map(|value| {value}).collect::<Vec<_>>().join(\",\"))"),
