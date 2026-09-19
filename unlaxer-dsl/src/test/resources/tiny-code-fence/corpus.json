@@ -1,0 +1,163 @@
+[
+  {
+    "name": "start-direct",
+    "params": ["value"],
+    "body": "START @value END",
+    "cases": [
+      {"id":"lf", "input":"```java:a.b.Co\n", "prefix":[true,15,15], "accepted":true, "span":[0,15], "fields":{"value":"```java:a.b.Co"}},
+      {"id":"crlf", "input":"```java:a.B\r\n", "prefix":[true,13,13], "accepted":true, "span":[0,13], "fields":{"value":"```java:a.B"}},
+      {"id":"cr", "input":"```java:a.B\r", "prefix":[true,12,12], "accepted":true, "span":[0,12], "fields":{"value":"```java:a.B"}},
+      {"id":"eof", "input":"```java:a.B", "prefix":[true,11,11], "accepted":true, "span":[0,11], "fields":{"value":"```java:a.B"}},
+      {"id":"ascii-identifiers", "input":"```j2_:_a.B2_C\n", "prefix":[true,15,15], "accepted":true, "span":[0,15], "fields":{"value":"```j2_:_a.B2_C"}},
+      {"id":"empty-input", "input":"", "prefix":[false,0,0], "accepted":false},
+      {"id":"empty-scheme", "input":"```:a.B\n", "prefix":[false,0,0], "accepted":false},
+      {"id":"unicode-scheme", "input":"```λ:a.B\n", "prefix":[false,0,0], "accepted":false},
+      {"id":"digit-start-scheme", "input":"```9java:a.B\n", "prefix":[false,0,0], "accepted":false},
+      {"id":"dollar-scheme", "input":"```$java:a.B\n", "prefix":[false,0,0], "accepted":false},
+      {"id":"empty-class", "input":"```java:\n", "prefix":[false,0,0], "accepted":false},
+      {"id":"unicode-class", "input":"```java:a.型\n", "prefix":[false,0,0], "accepted":false},
+      {"id":"digit-start-class", "input":"```java:9a.B\n", "prefix":[false,0,0], "accepted":false},
+      {"id":"dollar-class", "input":"```java:a.$B\n", "prefix":[false,0,0], "accepted":false},
+      {"id":"empty-dotted-segment", "input":"```java:a..B\n", "prefix":[false,0,0], "accepted":false},
+      {"id":"dangling-dot", "input":"```java:a.B.\n", "prefix":[false,0,0], "accepted":false},
+      {"id":"four-backticks", "input":"````java:a.B\n", "prefix":[false,0,0], "accepted":false},
+      {"id":"two-backticks", "input":"``java:a.B\n", "prefix":[false,0,0], "accepted":false},
+      {"id":"internal-space-before-colon", "input":"```java :a.B\n", "prefix":[false,0,0], "accepted":false},
+      {"id":"internal-space-after-colon", "input":"```java: a.B\n", "prefix":[false,0,0], "accepted":false},
+      {"id":"internal-comment", "input":"```java:/*not-trivia*/a.B\n", "prefix":[false,0,0], "accepted":false}
+    ]
+  },
+  {
+    "name": "end-direct",
+    "params": ["value"],
+    "body": "CLOSE @value END",
+    "cases": [
+      {"id":"eof", "input":"```", "prefix":[true,3,3], "accepted":true, "span":[0,3], "fields":{"value":"```"}},
+      {"id":"lf", "input":"```\n", "prefix":[true,4,4], "accepted":true, "span":[0,4], "fields":{"value":"```"}},
+      {"id":"crlf", "input":"```\r\n", "prefix":[true,5,5], "accepted":true, "span":[0,5], "fields":{"value":"```"}},
+      {"id":"cr", "input":"```\r", "prefix":[true,4,4], "accepted":true, "span":[0,4], "fields":{"value":"```"}},
+      {"id":"empty", "input":"", "prefix":[false,0,0], "accepted":false},
+      {"id":"four-backticks", "input":"````", "prefix":[false,0,0], "accepted":false},
+      {"id":"two-backticks", "input":"``", "prefix":[false,0,0], "accepted":false},
+      {"id":"trailing-text", "input":"```x", "prefix":[false,0,0], "accepted":false},
+      {"id":"leading-space", "input":" ```\n", "prefix":[false,0,0], "accepted":false}
+    ]
+  },
+  {
+    "name": "prefix-vs-full-input-start",
+    "params": ["value"],
+    "body": "START @value",
+    "cases": [
+      {"id":"full", "input":"```java:a.B\n", "prefix":[true,12,12], "accepted":true, "span":[0,12], "fields":{"value":"```java:a.B"}},
+      {"id":"valid-prefix", "input":"```java:a.B\ntail", "prefix":[true,12,12], "accepted":false},
+      {"id":"malformed", "input":"```java:a.B.\n", "prefix":[false,0,0], "accepted":false}
+    ]
+  },
+  {
+    "name": "prefix-vs-full-input-end",
+    "params": ["value"],
+    "body": "CLOSE @value",
+    "cases": [
+      {"id":"full", "input":"```\n", "prefix":[true,4,4], "accepted":true, "span":[0,4], "fields":{"value":"```"}},
+      {"id":"valid-prefix", "input":"```\ntail", "prefix":[true,4,4], "accepted":false},
+      {"id":"malformed", "input":"```x", "prefix":[false,0,0], "accepted":false}
+    ]
+  },
+  {
+    "name": "start-source-offset-after-crlf",
+    "params": ["value"],
+    "extra": "@mapping(Header, params=[text]) HeaderRule ::= START @text;",
+    "body": "CHAR CHAR CHAR HeaderRule @value END",
+    "cases": [
+      {"id":"after-crlf", "input":"x\r\n```java:a.B", "prefix":[true,14,14], "accepted":true, "span":[0,14], "fields":{"value":{"type":"Header", "span":[3,14], "fields":{"text":"```java:a.B"}}}},
+      {"id":"after-lf", "input":"xx\n```java:a.B", "prefix":[true,14,14], "accepted":true, "span":[0,14], "fields":{"value":{"type":"Header", "span":[3,14], "fields":{"text":"```java:a.B"}}}},
+      {"id":"midline", "input":"xxx```java:a.B", "prefix":[false,0,0], "accepted":false}
+    ]
+  },
+  {
+    "name": "end-source-offset",
+    "params": ["value"],
+    "body": "CHAR CHAR CHAR CLOSE @value END",
+    "cases": [
+      {"id":"after-crlf", "input":"x\r\n```\n", "prefix":[true,7,7], "accepted":true, "span":[0,7], "fields":{"value":"```"}},
+      {"id":"after-lf", "input":"xx\n```", "prefix":[true,6,6], "accepted":true, "span":[0,6], "fields":{"value":"```"}},
+      {"id":"midline", "input":"xxx```", "prefix":[false,0,0], "accepted":false}
+    ]
+  },
+  {
+    "name": "java-style-outer-only",
+    "whitespace": true,
+    "params": ["value"],
+    "body": "START @value END",
+    "cases": [
+      {"id":"leading-comment-ending-at-sol", "input":"/*lead*/\n```java:a.B\n//tail", "prefix":[true,27,27], "accepted":true, "span":[0,27], "fields":{"value":"```java:a.B"}},
+      {"id":"leading-space-breaks-sol", "input":" ```java:a.B\n", "prefix":[false,0,0], "accepted":false},
+      {"id":"internal-space-not-skipped", "input":"```java :a.B\n", "prefix":[false,0,0], "accepted":false},
+      {"id":"internal-comment-not-skipped", "input":"```java:/*x*/a.B\n", "prefix":[false,0,0], "accepted":false}
+    ]
+  },
+  {
+    "name": "p4-zero-field-java-style",
+    "whitespace": true,
+    "params": [],
+    "body": "START BODY CLOSE END",
+    "cases": [
+      {"id":"closed", "input":"```java:a.B\nbody\n```\n", "prefix":[true,21,21], "accepted":true, "span":[0,21], "fields":{}},
+      {"id":"leading-body-trivia", "input":"```java:a.B\n  /* lead */\nbody\n```\n", "prefix":[true,34,34], "accepted":true, "span":[0,34], "fields":{}},
+      {"id":"triple-inside-skipped-comment", "input":"```java:a.B\n/* ``` */\n```\n", "prefix":[true,26,26], "accepted":true, "span":[0,26], "fields":{}},
+      {"id":"missing-close", "input":"```java:a.B\n/* body */", "prefix":[false,0,0], "accepted":false},
+      {"id":"inline-triple-not-trivia", "input":"```java:a.B\nx ``` y\n```\n", "prefix":[false,0,0], "accepted":false}
+    ]
+  },
+  {
+    "name": "transparent-aliases",
+    "params": ["start", "body", "end"],
+    "extra": "StartAlias ::= START; EndAlias ::= CLOSE;",
+    "body": "StartAlias @start BODY @body EndAlias @end END",
+    "cases": [
+      {"id":"empty-body", "input":"```java:a.B\n```", "prefix":[true,15,15], "accepted":true, "span":[0,15], "fields":{"start":"```java:a.B", "body":"", "end":"```"}},
+      {"id":"text-body", "input":"```java:a.B\nhello\n```\n", "prefix":[true,22,22], "accepted":true, "span":[0,22], "fields":{"start":"```java:a.B", "body":"hello", "end":"```"}}
+    ]
+  },
+  {
+    "name": "optional-start",
+    "params": ["value"],
+    "body": "[ START @value ] '!' END",
+    "cases": [
+      {"id":"absent", "input":"!", "prefix":[true,1,1], "accepted":true, "span":[0,1], "fields":{"value":null}},
+      {"id":"present", "input":"```java:a.B\n!", "prefix":[true,13,13], "accepted":true, "span":[0,13], "fields":{"value":"```java:a.B"}},
+      {"id":"malformed", "input":"```java:a.B.!", "prefix":[false,0,0], "accepted":false}
+    ]
+  },
+  {
+    "name": "repeat-start",
+    "params": ["value"],
+    "body": "{ START @value } END",
+    "cases": [
+      {"id":"empty", "input":"", "prefix":[true,0,0], "accepted":true, "span":[0,0], "fields":{"value":[]}},
+      {"id":"two", "input":"```java:a.B\n```js:x.Y", "prefix":[true,21,21], "accepted":true, "span":[0,21], "fields":{"value":["```java:a.B", "```js:x.Y"]}},
+      {"id":"valid-then-midline", "input":"```java:a.B\nx```js:x.Y", "prefix":[false,0,0], "accepted":false}
+    ]
+  },
+  {
+    "name": "combined-fence",
+    "params": ["start", "body", "end"],
+    "body": "START @start BODY @body CLOSE @end END",
+    "cases": [
+      {"id":"empty-body", "input":"```java:a.B\n```", "prefix":[true,15,15], "accepted":true, "span":[0,15], "fields":{"start":"```java:a.B", "body":"", "end":"```"}},
+      {"id":"lf-body", "input":"```java:a.B\nhello\n```\n", "prefix":[true,22,22], "accepted":true, "span":[0,22], "fields":{"start":"```java:a.B", "body":"hello", "end":"```"}},
+      {"id":"unicode-internal-nul-body", "input":"```java:a.B\n😀\u0000x\n```", "prefix":[true,19,19], "accepted":true, "span":[0,19], "fields":{"start":"```java:a.B", "body":"😀\u0000x", "end":"```"}},
+      {"id":"trailing-nul-before-eol-preserved", "input":"```java:a.B\ntail\u0000\n```", "prefix":[true,21,21], "accepted":true, "span":[0,21], "fields":{"start":"```java:a.B", "body":"tail\u0000", "end":"```"}},
+      {"id":"double-backticks-in-body", "input":"```java:a.B\na``b\n```", "prefix":[true,20,20], "accepted":true, "span":[0,20], "fields":{"start":"```java:a.B", "body":"a``b", "end":"```"}},
+      {"id":"code-looking-body-is-text", "input":"```java:a.B\nSystem.exit(99);\n```", "prefix":[true,32,32], "accepted":true, "span":[0,32], "fields":{"start":"```java:a.B", "body":"System.exit(99);", "end":"```"}},
+      {"id":"body-edge-whitespace-trimmed", "input":"```java:a.B\n  body  \n```", "prefix":[true,24,24], "accepted":true, "span":[0,24], "fields":{"start":"```java:a.B", "body":"body", "end":"```"}},
+      {"id":"crlf-lines", "input":"```java:a.B\r\nbody\r\n```\r\n", "prefix":[true,24,24], "accepted":true, "span":[0,24], "fields":{"start":"```java:a.B", "body":"body", "end":"```"}},
+      {"id":"cr-lines", "input":"```java:a.B\rbody\r```\r", "prefix":[true,21,21], "accepted":true, "span":[0,21], "fields":{"start":"```java:a.B", "body":"body", "end":"```"}},
+      {"id":"missing-close", "input":"```java:a.B\nbody", "prefix":[false,0,0], "accepted":false},
+      {"id":"inline-triple-backticks", "input":"```java:a.B\nbefore ``` inline\n```\n", "prefix":[false,0,0], "accepted":false},
+      {"id":"close-not-at-sol", "input":"```java:a.B\nbody```", "prefix":[false,0,0], "accepted":false},
+      {"id":"close-with-info", "input":"```java:a.B\nbody\n```java\n", "prefix":[false,0,0], "accepted":false},
+      {"id":"opening-at-eof", "input":"```java:a.B", "prefix":[false,0,0], "accepted":false}
+    ]
+  }
+]
