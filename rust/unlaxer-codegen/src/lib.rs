@@ -150,6 +150,31 @@ fn parser(ir: &GrammarIr) -> String {
         }
         out.push_str("];\n");
     }
+    let catalogs: Vec<_> = ir
+        .rules
+        .iter()
+        .filter_map(|rule| rule.catalog.as_ref().map(|catalog| (rule, catalog)))
+        .collect();
+    if !catalogs.is_empty() {
+        out.push_str("\n/// Catalog targets retained for future context-aware tooling.\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct CatalogSpec {\n    pub rule: &'static str,\n    pub context: &'static str,\n    pub captures: &'static [&'static str],\n}\npub const CATALOGS: &[CatalogSpec] = &[\n");
+        for (rule, catalog) in catalogs {
+            let captures = catalog
+                .captures
+                .iter()
+                .map(|name| quote(name))
+                .collect::<Vec<_>>()
+                .join(", ");
+            writeln!(
+                out,
+                "    CatalogSpec {{ rule: {}, context: {}, captures: &[{}] }},",
+                quote(&rule.name),
+                quote(&catalog.context),
+                captures
+            )
+            .unwrap();
+        }
+        out.push_str("];\n");
+    }
     out
 }
 

@@ -135,6 +135,27 @@ public final class RustBackend {
                     }).append(" },\n"));
             out.append("];\n");
         }
+        if (ir.rules().stream().anyMatch(r -> r.catalog() != null)) {
+            out.append("""
+
+                /// Catalog targets retained for future context-aware tooling.
+                #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+                pub struct CatalogSpec {
+                    pub rule: &'static str,
+                    pub context: &'static str,
+                    pub captures: &'static [&'static str],
+                }
+                pub const CATALOGS: &[CatalogSpec] = &[
+                """);
+            ir.rules().stream().filter(rule -> rule.catalog() != null).forEach(rule -> {
+                String captures = rule.catalog().captures().stream().map(RustBackend::quote)
+                    .collect(java.util.stream.Collectors.joining(", "));
+                out.append("    CatalogSpec { rule: ").append(quote(rule.name()))
+                    .append(", context: ").append(quote(rule.catalog().context()))
+                    .append(", captures: &[").append(captures).append("] },\n");
+            });
+            out.append("];\n");
+        }
         return out.toString();
     }
 

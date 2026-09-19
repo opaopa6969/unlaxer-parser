@@ -22,6 +22,7 @@ fn rule(name: &str, body: Expression, mapping: Option<(&str, Vec<Field>)>) -> Ru
             fields,
         }),
         operator: None,
+        catalog: None,
     }
 }
 

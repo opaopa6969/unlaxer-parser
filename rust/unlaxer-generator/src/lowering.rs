@@ -27,6 +27,7 @@ pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
         bodies: Vec::new(),
         mappings: Vec::new(),
         operators: Vec::new(),
+        catalogs: Vec::new(),
         nullable: HashSet::new(),
         analysis_depth: Cell::new(0),
     }
@@ -40,6 +41,7 @@ struct Lowering<'a> {
     bodies: Vec<Expression>,
     mappings: Vec<Option<(String, Vec<String>)>>,
     operators: Vec<Option<Operator>>,
+    catalogs: Vec<Option<String>>,
     nullable: HashSet<usize>,
     analysis_depth: Cell<usize>,
 }
@@ -109,6 +111,7 @@ impl Lowering<'_> {
             let mut precedence = None;
             let mut local_whitespace = None;
             let mut interleave = false;
+            let mut catalog = None;
             let mut effects = RuleEffects::default();
             for annotation in &rule.annotations {
                 match &annotation.kind {
@@ -198,6 +201,11 @@ impl Lowering<'_> {
                             return Err(format!("duplicate @backref on {}", rule.name));
                         }
                     }
+                    AnnotationKind::Catalog { context } => {
+                        if catalog.replace(context.clone()).is_some() {
+                            return Err(format!("duplicate @catalog on {}", rule.name));
+                        }
+                    }
                     other => {
                         return Err(format!("unsupported annotation {other:?} on {}", rule.name))
                     }
@@ -216,6 +224,7 @@ impl Lowering<'_> {
                 associativity: associativity.expect("validated annotation pair"),
                 precedence,
             }));
+            self.catalogs.push(catalog);
             self.mappings.push(mapping);
         }
         let root = root.ok_or("exactly one @root is required")?;
@@ -292,7 +301,10 @@ impl Lowering<'_> {
                 };
                 Some(mapping)
             } else {
-                if !captures.is_empty() && *effects == RuleEffects::default() {
+                if !captures.is_empty()
+                    && *effects == RuleEffects::default()
+                    && self.catalogs[i].is_none()
+                {
                     return Err(format!(
                         "captures without @mapping on {}",
                         self.grammar.rules[i].name
@@ -300,6 +312,20 @@ impl Lowering<'_> {
                 }
                 None
             };
+            let catalog = self.catalogs[i].as_ref().map(|context| {
+                let mut names: Vec<_> = captures.keys().cloned().collect();
+                names.sort();
+                Catalog {
+                    context: context.clone(),
+                    captures: names,
+                }
+            });
+            if self.catalogs[i].is_some() && captures.is_empty() {
+                return Err(format!(
+                    "@catalog requires at least one capture on {}",
+                    self.grammar.rules[i].name
+                ));
+            }
             if let Some(operator) = self.operators[i] {
                 match operator.associativity {
                     Associativity::Left => self.check_assoc(i, mapping.as_ref())?,
@@ -329,6 +355,7 @@ impl Lowering<'_> {
                 body: expression.clone(),
                 mapping,
                 operator: self.operators[i],
+                catalog,
             });
         }
         // A shared variant has one public type contract, independent of declaration order.

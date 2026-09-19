@@ -34,7 +34,7 @@
 | PropagationStopper・consume/invert・virtual token・metadata | 未対応 | 有限状態の全合成検査、8元モデルとの対応、実parserとの統合試験 |
 | lexical scope store・宣言/参照/semantic diagnostics | Java rollback修正とRust公開ParseContextへのtransactional store接続（#174）、owned Treeへのsnapshot | scope depth/lookup/shadowing/イベント履歴/失敗時復元を共通operation corpusで比較。AST/IDEへのmetadata搬送は未完了 |
 | scopeTree/declares/スコープ参照 | 両frontendから生成、Java capture-site選択も修正（#176）。mode/description metadata保持、CP位置、nested/repeated captureとrollbackを比較 | 両modeは解析時stack。評価時dynamic環境やclosure、LSP/DAP利用は未対応 |
-| catalog/doc/skip/simple等 | Rust生成annotation未対応 | 各annotationのJava実動作を確認し、生成metadataと利用先を検証 |
+| catalog/doc/skip/simple等 | `@catalog` は両frontendから静的 `CatalogSpec` を生成（#180）。parser/AST/evaluatorには作用しない。doc/skip/simpleは未対応 | catalog resolver・context別LSP利用とprotocol test、残るannotationのJava実動作を検証 |
 | recovery・incremental cache | 未対応 | 編集差分と全再解析の一致、位置・診断・利用者状態の無効化、回復後の評価境界 |
 | LSP/DAP | 未対応 | UTF-16変換、diagnostics/completion、breakpoint/step/変数表示を実protocolで検証 |
 | tinyexpression-rs | 未対応 | 値・null/欠損・変数・演算子・関数・外部呼出し・日時/数値仕様を棚卸しし、同一入力で値/失敗分類を比較 |
@@ -65,6 +65,8 @@ transactional scope store（#174）の[rollback契約とruntime API](../docs/tra
 同名nested/並列captureのAST型・全出現収集の修正（#177）は
 [cardinality契約とJava API移行](../docs/nested-capture-migration.md)を参照。
 共存するcaptureはlist、排他的choiceはscalar、欠損枝はoptionalとして両言語で比較する。
+`@catalog`（#180）の[静的metadata契約と既存Java LSPの限界](../docs/catalog-metadata.md)も参照。
+Rustのcontext-aware completion/hoverはまだ未実装であり、metadata生成とLSP対応を区別する。
 
 parser生成は当面`Expr`combinator定義を生成し、共通runtimeで実行する。直接parser関数を出力する高速化backendは、その意味論との同値性を測定できてから検討する。Rustでビルドされた実行ファイルであることは、入力式を機械語にコンパイルしていることを意味しない。
 

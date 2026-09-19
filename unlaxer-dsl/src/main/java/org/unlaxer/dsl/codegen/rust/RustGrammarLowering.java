@@ -17,6 +17,7 @@ public final class RustGrammarLowering {
     private final List<Expression> bodies = new ArrayList<>();
     private final List<MappingAnnotation> mappings = new ArrayList<>();
     private final List<Operator> operators = new ArrayList<>();
+    private final List<String> catalogs = new ArrayList<>();
     private final Set<Integer> nullableRules = new HashSet<>();
     private record Shape(Kind kind, Cardinality cardinality) {}
 
@@ -58,6 +59,7 @@ public final class RustGrammarLowering {
             Integer precedence = null;
             Boolean localWhitespace = null;
             boolean interleave = false;
+            String catalog = null;
             ScopeMode scopeMode = null;
             Declaration declares = null;
             String backref = null;
@@ -106,6 +108,9 @@ public final class RustGrammarLowering {
                     if (!hasScope) throw unsupported("@backref without @scopeTree");
                     if (backref != null) throw unsupported("duplicate @backref on " + rule.name());
                     backref = value.name();
+                } else if (annotation instanceof CatalogAnnotation value) {
+                    if (catalog != null) throw unsupported("duplicate @catalog on " + rule.name());
+                    catalog = value.context();
                 } else throw unsupported("annotation " + annotation + " on " + rule.name());
             }
             ruleEffects.add(scopeMode == null && declares == null && backref == null ? null
@@ -116,6 +121,7 @@ public final class RustGrammarLowering {
             operators.add(leftAssoc || rightAssoc || precedence != null
                 ? new Operator(leftAssoc ? Associativity.LEFT : rightAssoc ? Associativity.RIGHT : Associativity.NONE, precedence == null ? -1 : precedence)
                 : null);
+            catalogs.add(catalog);
         }
         if (root == -1) throw unsupported("exactly one @root is required");
         for (var rule : grammar.rules()) bodies.add(body(rule.body()));
@@ -143,9 +149,14 @@ public final class RustGrammarLowering {
                 }
             }
             var annotation = mappings.get(i);
+            Catalog catalog = null;
+            if (catalogs.get(i) != null) {
+                if (captures.isEmpty()) throw unsupported("@catalog requires at least one capture on " + grammar.rules().get(i).name());
+                catalog = new Catalog(catalogs.get(i), captures.keySet().stream().sorted().toList());
+            }
             Mapping mapping = null;
             if (annotation == null) {
-                if (!captures.isEmpty() && effects == null) throw unsupported("captures without @mapping on " + grammar.rules().get(i).name());
+                if (!captures.isEmpty() && effects == null && catalog == null) throw unsupported("captures without @mapping on " + grammar.rules().get(i).name());
             } else {
                 if (new HashSet<>(annotation.paramNames()).size() != annotation.paramNames().size()
                     || !captures.keySet().equals(new HashSet<>(annotation.paramNames()))) {
@@ -166,7 +177,7 @@ public final class RustGrammarLowering {
                 lowerRightAssoc(i, mapping);
             }
             if (mapping != null) variants.merge(mapping.name(), mapping, this::mergeMappings);
-            rules.add(new Rule(grammar.rules().get(i).name(), bodies.get(i), mapping, operators.get(i)));
+            rules.add(new Rule(grammar.rules().get(i).name(), bodies.get(i), mapping, operators.get(i), catalog));
         }
         List<Rule> rewritten = new ArrayList<>();
         boolean hasValues = variants.values().stream().flatMap(mapping -> mapping.fields().stream())
@@ -185,7 +196,7 @@ public final class RustGrammarLowering {
             // Every rule resolves against the grammar default, never against its caller.
             if (hasLocalTrivia) expression = new TriviaScope(expression, ruleWhitespace.get(i));
             if (ruleEffects.get(i) != null) expression = new RuleEffects(expression, ruleEffects.get(i));
-            rewritten.add(new Rule(rule.name(), expression, mapping, rule.operator()));
+            rewritten.add(new Rule(rule.name(), expression, mapping, rule.operator(), rule.catalog()));
         }
         return new GrammarIR(rewritten, root, whitespace);
     }
