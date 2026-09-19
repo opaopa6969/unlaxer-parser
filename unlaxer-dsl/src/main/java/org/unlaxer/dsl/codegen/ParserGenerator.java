@@ -48,6 +48,7 @@ public class ParserGenerator implements CodeGenerator {
         final Map<String, String> tokenRegexMap;        // token name -> regex pattern (Regex)
         final Set<String> ruleNames;
         final Map<String, List<String>> helpers = new LinkedHashMap<>(); // rule -> helper codes
+        final Map<String, CaptureBindingPlan> captureBindings = new LinkedHashMap<>();
         final Map<String, Boolean> useDelimitedChainByRule = new LinkedHashMap<>();
         boolean hasDelimitedChain = false;
         final Map<String, int[]> helperCounters = new LinkedHashMap<>(); // rule -> [repeat,opt,group,sep]
@@ -60,6 +61,7 @@ public class ParserGenerator implements CodeGenerator {
         GenContext(GrammarDecl grammar) {
             this.grammar = grammar;
             this.grammarName = grammar.name();
+            grammar.rules().forEach(rule -> captureBindings.put(rule.name(), new CaptureBindingPlan(rule)));
             this.tokenParserMap = new LinkedHashMap<>();
             this.tokenUntilMap = new LinkedHashMap<>();
             this.tokenNegationMap = new LinkedHashMap<>();
@@ -177,6 +179,27 @@ public class ParserGenerator implements CodeGenerator {
         sb.append(ParserMetadataEmitter.generatePrecedenceConstants(grammar));
         sb.append(ParserMetadataEmitter.generateOperatorMetadata(grammar));
         sb.append(ParserMetadataEmitter.generateAdvancedAnnotationMetadata(grammar));
+        sb.append("""
+                // Capture metadata belongs to grammar sites, not shared rule-parser instances.
+                public interface __CaptureBinding {
+                    java.util.List<String> captureBindings();
+                }
+                public static final class __CaptureSite extends LazyChain implements __CaptureBinding {
+                    private static final long serialVersionUID = 1L;
+                    private final java.util.List<String> bindings;
+                    private final Parser child;
+                    public __CaptureSite(Parser child, String... bindings) {
+                        this.child = child;
+                        this.bindings = java.util.List.of(bindings);
+                    }
+                    @Override public java.util.List<String> captureBindings() { return bindings; }
+                    @Override public Parsers getLazyParsers() { return new Parsers(child); }
+                    @Override public java.util.Optional<RecursiveMode> getNotAstNodeSpecifier() {
+                        return java.util.Optional.empty();
+                    }
+                }
+
+            """);
 
         // チェーンクラス
         sb.append(generatePlainChainClass(ctx));

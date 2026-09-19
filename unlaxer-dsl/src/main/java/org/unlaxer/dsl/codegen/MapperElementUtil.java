@@ -245,6 +245,9 @@ class MapperElementUtil {
             case GroupElement groupElement -> findCapturedElement(groupElement.body(), captureName);
             case OptionalElement optionalElement -> findCapturedElement(optionalElement.body(), captureName);
             case RepeatElement repeatElement -> findCapturedElement(repeatElement.body(), captureName);
+            case UBNFAST.OneOrMoreElement one -> findCapturedElementInAtomic(one.body(), captureName);
+            case UBNFAST.BoundedRepeatElement bounded -> findCapturedElementInAtomic(bounded.body(), captureName);
+            case UBNFAST.SeparatedElement separated -> findCapturedElementInAtomic(separated.element(), captureName);
             default -> Optional.empty();
         };
     }
@@ -272,6 +275,9 @@ class MapperElementUtil {
             case GroupElement groupElement -> findCapturedElements(groupElement.body(), captureName);
             case OptionalElement optionalElement -> findCapturedElements(optionalElement.body(), captureName);
             case RepeatElement repeatElement -> findCapturedElements(repeatElement.body(), captureName);
+            case UBNFAST.OneOrMoreElement one -> findCapturedElementsInAtomic(one.body(), captureName);
+            case UBNFAST.BoundedRepeatElement bounded -> findCapturedElementsInAtomic(bounded.body(), captureName);
+            case UBNFAST.SeparatedElement separated -> findCapturedElementsInAtomic(separated.element(), captureName);
             default -> List.of();
         };
     }
@@ -446,6 +452,9 @@ class MapperElementUtil {
             case GroupElement groupElement -> firstAtomicElement(groupElement.body());
             case OptionalElement optionalElement -> firstAtomicElement(optionalElement.body());
             case RepeatElement repeatElement -> firstAtomicElement(repeatElement.body());
+            case UBNFAST.OneOrMoreElement one -> normalizeCapturedElement(one.body());
+            case UBNFAST.BoundedRepeatElement bounded -> normalizeCapturedElement(bounded.body());
+            case UBNFAST.SeparatedElement separated -> normalizeCapturedElement(separated.element());
             default -> Optional.of(element);
         };
     }

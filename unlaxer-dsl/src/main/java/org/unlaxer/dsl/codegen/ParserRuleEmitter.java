@@ -76,6 +76,7 @@ class ParserRuleEmitter {
         record OneOrMoreOf(ElementModel inner) implements ElementModel {}
         record OptionalOf(ElementModel inner) implements ElementModel {}
         record BoundedRepeatOf(ElementModel inner, String min, String max) implements ElementModel {}
+        record Captured(ElementModel inner, List<String> bindings) implements ElementModel {}
     }
 
     // =========================================================================
@@ -121,7 +122,9 @@ class ParserRuleEmitter {
                 }
             }
             case OptionalElement opt -> {
-                if (!isSingleAtomicElement(opt.body())) {
+                if (!isSingleAtomicElement(opt.body())
+                        || !(getSingleAtomicElementFrom(opt.body()) instanceof RuleRefElement
+                            || getSingleAtomicElementFrom(opt.body()) instanceof TerminalElement)) {
                     int n = ctx.nextOpt(ruleName);
                     String helperName = ruleName + "Opt" + n + "Parser";
                     int[] counterState = ctx.snapshotCounters(ruleName);
@@ -197,9 +200,15 @@ class ParserRuleEmitter {
         String baseClass = isChoice ? "LazyChoice" : getChainClassName(ctx, ruleName);
         IndentedWriter w = new IndentedWriter(1);
 
-        w.line("public static class " + helperName + " extends " + baseClass + " {");
+        List<String> bindings = ctx.captureBindings.get(ruleName).bindings(body);
+        w.line("public static class " + helperName + " extends " + baseClass
+            + (bindings.isEmpty() ? "" : " implements __CaptureBinding") + " {");
         w.indent();
         w.line("private static final long serialVersionUID = 1L;");
+        if (!bindings.isEmpty()) {
+            w.line("@Override public java.util.List<String> captureBindings() { return java.util.List.of("
+                + bindingArguments(bindings) + "); }");
+        }
         w.line("@Override");
         w.line("public Parsers getLazyParsers() {");
         w.indent();
@@ -958,7 +967,7 @@ class ParserRuleEmitter {
     // =========================================================================
 
     static ElementModel resolveElement(ParserGenerator.GenContext ctx, String ruleName, AtomicElement element) {
-        return switch (element) {
+        ElementModel model = switch (element) {
             case TerminalElement t -> new ElementModel.WordMatch(t.value());
 
             case RuleRefElement r -> resolveRuleRefModel(ctx, r.name());
@@ -966,11 +975,7 @@ class ParserRuleEmitter {
             case RepeatElement rep -> {
                 if (isSingleRuleRef(rep.body())) {
                     AtomicElement single = getSingleAtomicElementFrom(rep.body());
-                    if (single instanceof RuleRefElement ref && isInlineToken(ctx, ref.name())) {
-                        yield new ElementModel.ZeroOrMoreOf(resolveRuleRefModel(ctx, ref.name()));
-                    }
-                    String parserClass = getSingleRuleRefClass(ctx, rep.body());
-                    yield new ElementModel.ZeroOrMoreOf(new ElementModel.ClassRef(parserClass));
+                    yield new ElementModel.ZeroOrMoreOf(resolveElement(ctx, ruleName, single));
                 } else {
                     int n = ctx.nextRepeat(ruleName);
                     String helperName = ruleName + "Repeat" + n + "Parser";
@@ -981,13 +986,8 @@ class ParserRuleEmitter {
             case OptionalElement opt -> {
                 if (isSingleAtomicElement(opt.body())) {
                     AtomicElement inner = getSingleAtomicElementFrom(opt.body());
-                    if (inner instanceof RuleRefElement ref) {
-                        if (isInlineToken(ctx, ref.name())) {
-                            yield new ElementModel.OptionalOf(resolveRuleRefModel(ctx, ref.name()));
-                        }
-                        yield new ElementModel.OptionalOf(new ElementModel.ClassRef(resolveParserClass(ctx, ref.name())));
-                    } else if (inner instanceof TerminalElement t) {
-                        yield new ElementModel.OptionalOf(new ElementModel.WordMatch(t.value()));
+                    if (inner instanceof RuleRefElement || inner instanceof TerminalElement) {
+                        yield new ElementModel.OptionalOf(resolveElement(ctx, ruleName, inner));
                     } else {
                         int n = ctx.nextOpt(ruleName);
                         String helperName = ruleName + "Opt" + n + "Parser";
@@ -1003,11 +1003,7 @@ class ParserRuleEmitter {
             case OneOrMoreElement one -> {
                 if (isSingleRuleRef(one.body())) {
                     AtomicElement single = getSingleAtomicElementFrom(one.body());
-                    if (single instanceof RuleRefElement ref && isInlineToken(ctx, ref.name())) {
-                        yield new ElementModel.OneOrMoreOf(resolveRuleRefModel(ctx, ref.name()));
-                    }
-                    String parserClass = getSingleRuleRefClass(ctx, one.body());
-                    yield new ElementModel.OneOrMoreOf(new ElementModel.ClassRef(parserClass));
+                    yield new ElementModel.OneOrMoreOf(resolveElement(ctx, ruleName, single));
                 } else {
                     int n = ctx.nextRepeat(ruleName);
                     String helperName = ruleName + "OneOrMore" + n + "Parser";
@@ -1022,16 +1018,8 @@ class ParserRuleEmitter {
                     : String.valueOf(bounded.max());
                 if (isSingleRuleRef(bounded.body())) {
                     AtomicElement single = getSingleAtomicElementFrom(bounded.body());
-                    if (single instanceof RuleRefElement ref && isInlineToken(ctx, ref.name())) {
-                        // inline tokens don't have a .class reference — wrap in helper
-                        int n = ctx.nextRepeat(ruleName);
-                        String helperName = ruleName + "Bounded" + n + "Parser";
-                        yield new ElementModel.BoundedRepeatOf(
-                            new ElementModel.ClassRef(helperName + ".class"), minStr, maxStr);
-                    }
-                    String parserClass = getSingleRuleRefClass(ctx, bounded.body());
                     yield new ElementModel.BoundedRepeatOf(
-                        new ElementModel.ClassRef(parserClass), minStr, maxStr);
+                        resolveElement(ctx, ruleName, single), minStr, maxStr);
                 } else {
                     int n = ctx.nextRepeat(ruleName);
                     String helperName = ruleName + "Bounded" + n + "Parser";
@@ -1054,6 +1042,13 @@ class ParserRuleEmitter {
 
             case ErrorElement err -> new ElementModel.ErrorExpected(err.message());
         };
+        List<String> bindings = ctx.captureBindings.get(ruleName).bindings(element);
+        return bindings.isEmpty() ? model : new ElementModel.Captured(model, bindings);
+    }
+
+    private static String bindingArguments(List<String> bindings) {
+        return bindings.stream().map(binding -> "\"" + ParserCodegenUtil.escapeString(binding) + "\"")
+            .collect(Collectors.joining(", "));
     }
 
     // =========================================================================
@@ -1126,6 +1121,8 @@ class ParserRuleEmitter {
                 "new Optional(" + renderInner(m.inner()) + ")";
             case ElementModel.BoundedRepeatOf m ->
                 "new Repeat(" + renderInner(m.inner()) + ", " + m.min() + ", " + m.max() + ")";
+            case ElementModel.Captured m ->
+                "new __CaptureSite(" + renderElement(m.inner()) + ", " + bindingArguments(m.bindings()) + ")";
         };
     }
 
