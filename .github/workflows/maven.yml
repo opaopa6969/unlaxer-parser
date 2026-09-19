@@ -42,6 +42,7 @@ jobs:
           unlaxer-dsl/target/rust-primitives.tsv
           unlaxer-dsl/target/rust-lexical.tsv
           unlaxer-dsl/target/rust-ubnf-frontend.tsv
+          unlaxer-dsl/target/rust-associative.tsv
         if-no-files-found: error
     - name: Build and smoke-test the native subset example
       run: |

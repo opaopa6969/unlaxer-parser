@@ -188,7 +188,7 @@ public class SnapshotRightAssocParsers {
                         return new Parsers(
                             new __CaptureSite(Parser.get(AtomParser.class), "Expr:0"),
                             new __CaptureSite(new WordParser("^"), "Expr:1"),
-                            Parser.get(ExprParser.class)
+                            new __CaptureSite(Parser.get(ExprParser.class), "Expr:2")
                         );
                     }
                 },

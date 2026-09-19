@@ -7,6 +7,7 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import org.unlaxer.dsl.bootstrap.UBNFMapper;
+import org.unlaxer.dsl.codegen.GrammarValidator;
 import org.unlaxer.dsl.codegen.rust.RustBackend;
 
 /** Experimental subcommand; the existing Java flag-based CLI stays unchanged. */
@@ -44,6 +45,11 @@ final class RustGenerateCommand {
         try {
             var file = UBNFMapper.parse(Files.readString(Path.of(options.get("--grammar"))));
             if (file.grammars().size() != 1) throw new IllegalArgumentException("Rust subset requires exactly one grammar");
+            // Java class-resolution warnings do not define Rust token support: lowering
+            // enforces an explicit Rust allowlist. Common grammar errors remain fatal.
+            var errors = GrammarValidator.validate(file.grammars().get(0)).stream()
+                .filter(issue -> "ERROR".equals(issue.severity())).map(GrammarValidator.ValidationIssue::format).toList();
+            if (!errors.isEmpty()) throw new IllegalArgumentException("Grammar validation failed:\n - " + String.join("\n - ", errors));
             var generated = new RustBackend().generate(file.grammars().get(0));
             Path output = Path.of(options.get("--output"));
             if (Files.isSymbolicLink(output)) throw new IOException("output directory must not be a symbolic link");
