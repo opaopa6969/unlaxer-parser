@@ -145,6 +145,26 @@ public class SharedAssociativeSchemaRuntimeTest {
         }
     }
 
+    @Test public void singleLeftAssociativeStringFoldKeepsItsSourceTextApi() throws Exception {
+        try (var loader = compile("""
+            @root @mapping(Concat,params=[left,op,right]) @leftAssoc @precedence(level=10)
+            Expr ::= Base @left { '+' @op Base @right };
+            Base ::= Function | OtherFunction | Text | Parenthesized;
+            Text ::= 'a';
+            Parenthesized ::= '(' Expr ')';
+            @mapping(Call,params=[value]) Function ::= 'f' ('a') @value;
+            @mapping(OtherCall,params=[value]) OtherFunction ::= 'g' ('a') @value;
+            """)) {
+            Object root = parse(loader, "a+fa");
+            assertEquals(Object.class, root.getClass().getMethod("left").getReturnType());
+            assertEquals("java.util.List<java.lang.Object>",
+                root.getClass().getMethod("right").getGenericReturnType().getTypeName());
+            assertEquals("a", field(root, "left"));
+            assertEquals("Call", list(root, "right").get(0).getClass().getSimpleName());
+            assertEquals("a", field(list(root, "right").get(0), "value"));
+        }
+    }
+
     @Test public void sharedScalarAndDirectMappedFamiliesUseEachRulesActualOperandMapper() throws Exception {
         for (String operand : List.of("Atom", "NumericLiteral", "NUMBER")) {
             boolean mapped = operand.equals("NumericLiteral");

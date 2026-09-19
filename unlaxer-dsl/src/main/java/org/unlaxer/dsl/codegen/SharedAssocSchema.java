@@ -28,7 +28,10 @@ record SharedAssocSchema(String leftType, String rightType, boolean spine, boole
         grammar.rules().forEach(candidate -> rules.put(candidate.name(), candidate));
         Map<String, TokenDecl> tokens = new LinkedHashMap<>();
         grammar.tokens().forEach(token -> tokens.put(token.name(), token));
-        if (family.size() < 2 && !transparentRecursiveOperands(rule, mapping.className(), rules, tokens)) {
+        // Single left-associative source-string folds intentionally retain their text API.
+        // A right-recursive rule already has a mapped right operand and needs the shared contract.
+        if (family.size() < 2 && (!MapperElementUtil.isRightAssocRule(rule, mapping)
+                || !transparentRecursiveOperands(rule, mapping.className(), rules, tokens))) {
             return Optional.empty();
         }
         Set<String> mappedOperands = new LinkedHashSet<>();
