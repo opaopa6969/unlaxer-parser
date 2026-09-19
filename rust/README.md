@@ -4,6 +4,8 @@ Java版を置き換える移植ではなく、既存のJava UBNF frontendからR
 
 最終的なparserバイナリ・`tinyexpression-rs`・`rustcodeblock`への[段階的な設計方針](ROADMAP.md)を参照。tinyexpression本体とRustコードブロック実行はまだ未実装。
 
+full-specの進捗は[対応表と受け入れ条件](FULL-SPEC.md)で追跡する。runtimeの機能とUBNFから生成できる機能を区別する。
+
 ## すぐ動かす
 
 生成済みのexampleにはJVMも外部crateも不要。repoルートで実行する。Rust 1.85以上、Cargoを使用する。
@@ -69,7 +71,38 @@ runtimeは規則IDで参照する文法を実行し、入力とCST node arenaを
 
 imports、外部token parser、繰り返し・optional、group全体のcapture、`@typeof`、`@eval`等の他のannotation、左再帰、混合text/node choiceなどは明示的に拒否する。mapping名・field名はASCII識別子に制限し、Rustのraw identifierで出力する。`self`/`Self`/`super`/`crate`、fieldの`span`/`semantics`、重複mapping名・生成method名は拒否する。rootはAST nodeへ解決される必要がある。
 
-RustのLSP/DAP、回復・incremental cache、PropagationStopper、MatchedTokenParser、string/variable/function-call構文、proc macro、Rust製UBNF frontendは未実装。性能最適化・Java比の速度優位も未評価。文法構造はparseごとに構築し、runtimeのrule呼出深さには256の上限がある。大規模・敵対的入力の資源量保証はない。
+RustのLSP/DAP、回復・incremental cache、PropagationStopper、Java MatchedTokenParserとの完全互換、string/variable/function-call構文、proc macro、Rust製UBNF frontendは未実装。性能最適化・Java比の速度優位も未評価。文法構造はparseごとに構築し、runtimeのrule呼出深さには256の上限がある。大規模・敵対的入力の資源量保証はない。
+
+### 公開ParseContextと手書きcombinator
+
+生成された`GeneratedParser`と手書きparserは同じ`Parser` traitを実装する。
+
+```rust
+use unlaxer_runtime::{ParseContext, ParseResult, Parser};
+
+struct MyParser;
+impl Parser for MyParser {
+    fn parse(&self, context: &mut ParseContext<'_>) -> ParseResult {
+        // contextの入力・位置・capture・利用者状態を読んで解析する。
+        context.parse(&unlaxer_runtime::Expr::literal("hello"))
+    }
+}
+let mut context = ParseContext::new("hello");
+context.set_state("mode", String::from("example"));
+let matched = context.parse(&MyParser)?;
+```
+
+呼出側は`context.parse(&parser)`を使う。これにより`Err`時にはカーソル・追加CST node・capture履歴・利用者状態を戻す。独自実装の`parser.parse(&mut context)`を直接呼ぶ場合、この外側のtransactionは付かない。最遠失敗の位置・候補はrollback後も保持する。先読みは成功時も状態を戻し、否定先読みの内部失敗候補は外へ漏らさない。
+
+`source`/`remaining`/`position`/`advance`/`text`で入力を扱い、`set_state`/`state::<T>`/`state_mut::<T>`で`Any + Clone`の値を共有する。位置・移動量はコードポイント単位。利用者状態の`Clone`は変更可能な内容を独立コピーする必要がある。`Rc<RefCell<_>>`等の共有内部状態、ファイル操作等の副作用、panic unwindはrollback対象ではない。panicを捕捉した後はcontextを再利用しない。
+
+`Expr`には`then`/`or`/`optional`/`repeat`/`zero_or_more`/`one_or_more`/`separated_by`/`capture`/`ahead`/`not_ahead`を用意する。`separated_by`は1個以上。無限反復の子が入力を消費せず成功した場合はエラーとする。`Custom(fn)`でcontextを取る関数を組み込める。`Any`/`CharRange`/`Except`は1コードポイント、`Until`は終端の直前まで（終端がなければ失敗）、`Eof`/`Empty`/`Error`も利用できる。これらの追加機能は**runtime APIのみ**で、UBNF loweringにはまだ接続していない。
+
+`captured(name)`と`Backreference(name)`はcontext全体の同名captureの最新成功分を使用する。`capture_spans`は成功履歴を返す。字句スコープやJavaのcapture伝播規則を再現したものではない。
+
+生成器は`rules()`・`parse_context(&mut ParseContext)`も出力する。context入口は現在位置からの**prefix解析**であり、全入力検証は従来の`parse_tree[_detailed]`、または後続の`Expr::Eof`を使う。文法とtrivia設定は呼出中だけ切り替わり、入力と利用者状態は共通。`matched.root_node()`から`context.tree(root)`で所有されたsnapshotを取り、その文法のmapperへ渡す。異なる文法のrule IDはローカルなので、複数文法のnodeを一つのmapperに混ぜない。node IDはcontext内だけで有効で、rollbackされた結果は再利用しない。
+
+公開APIの使用例とrollback契約は[`context_combinators.rs`](unlaxer-runtime/tests/context_combinators.rs)、生成parserとの混在とAST評価は[`context.rs`](examples/evolution/tests/context.rs)で検証する。現在はtransactionごとに利用者状態・capture履歴をコピーする単純実装で、性能評価・最適化は未実施。
 
 ## 再現実験と結果
 

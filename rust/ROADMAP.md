@@ -51,4 +51,4 @@ Rust側の候補構文は` ```rust:module_name `で開始するfenceとするが
 
 ## 次に着手する単位
 
-診断とnative exampleの基盤の次は、文字列・boolean・変数のうち一つを選び、型付きASTと評価結果を比較できる小さなfixtureを追加する。先にtinyexpression全体やrustcodeblockを受理だけする実装を作らず、構文・意味処理・位置・失敗の契約を一機能ずつ揃える。
+full-specへ向けた順序と対応状況は[FULL-SPEC.md](FULL-SPEC.md)で追跡する。まず公開ParseContextと手書き/生成parser共通combinatorを基盤にし、optional・repeatとOption/Vec AST、token/annotationへ拡げる。先にtinyexpression全体やrustcodeblockを受理だけする実装を作らず、構文・意味処理・位置・失敗の契約を一機能ずつ揃える。

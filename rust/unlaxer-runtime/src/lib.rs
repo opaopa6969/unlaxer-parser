@@ -1,5 +1,8 @@
 //! Experimental UBNF structural subset. No JVM, unsafe code, or external dependencies.
+use std::any::Any;
 use std::collections::BTreeSet;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 /// Half-open Unicode scalar (code-point) offsets, not UTF-8 bytes or UTF-16 units.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -16,6 +19,78 @@ pub enum Expr {
     Sequence(Vec<Expr>),
     Choice(Vec<Expr>),
     Capture(&'static str, Box<Expr>),
+    Optional(Box<Expr>),
+    Repeat {
+        child: Box<Expr>,
+        min: usize,
+        max: Option<usize>,
+    },
+    Lookahead {
+        child: Box<Expr>,
+        positive: bool,
+    },
+    Any,
+    Eof,
+    Empty,
+    CharRange(char, char),
+    Except(&'static str),
+    Until(&'static str),
+    Error(&'static str),
+    Custom(fn(&mut ParseContext<'_>) -> ParseResult),
+    Backreference(&'static str),
+}
+
+/// Reusable combinators. These build the same rule expressions used by generated parsers.
+impl Expr {
+    pub fn literal(text: &'static str) -> Self {
+        Self::Literal(text)
+    }
+    pub fn sequence(elements: impl IntoIterator<Item = Self>) -> Self {
+        Self::Sequence(elements.into_iter().collect())
+    }
+    pub fn choice(alternatives: impl IntoIterator<Item = Self>) -> Self {
+        Self::Choice(alternatives.into_iter().collect())
+    }
+    pub fn then(self, next: Self) -> Self {
+        Self::sequence([self, next])
+    }
+    pub fn or(self, alternative: Self) -> Self {
+        Self::choice([self, alternative])
+    }
+    pub fn optional(self) -> Self {
+        Self::Optional(Box::new(self))
+    }
+    pub fn repeat(self, min: usize, max: Option<usize>) -> Self {
+        Self::Repeat {
+            child: Box::new(self),
+            min,
+            max,
+        }
+    }
+    pub fn zero_or_more(self) -> Self {
+        self.repeat(0, None)
+    }
+    pub fn one_or_more(self) -> Self {
+        self.repeat(1, None)
+    }
+    pub fn capture(self, name: &'static str) -> Self {
+        Self::Capture(name, Box::new(self))
+    }
+    pub fn ahead(self) -> Self {
+        Self::Lookahead {
+            child: Box::new(self),
+            positive: true,
+        }
+    }
+    pub fn not_ahead(self) -> Self {
+        Self::Lookahead {
+            child: Box::new(self),
+            positive: false,
+        }
+    }
+    pub fn separated_by(self, separator: Self) -> Self {
+        Self::sequence([self.clone(), separator.then(self).zero_or_more()])
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -131,15 +206,85 @@ struct Fragment {
     captures: Vec<Capture>,
 }
 
-struct Parser<'a> {
+/// Shared entry point for handwritten and generated parsers. Use context.parse(parser)
+/// when calling a custom implementation so failed calls roll back transactional state.
+pub trait Parser {
+    fn parse(&self, context: &mut ParseContext<'_>) -> ParseResult;
+}
+
+pub type ParseResult = Result<ParseMatch, ParseError>;
+
+#[derive(Debug, Clone)]
+pub struct ParseMatch {
+    pub span: Span,
+    pub nodes: Vec<usize>,
+    pub captures: Vec<Capture>,
+}
+
+impl ParseMatch {
+    pub fn empty(span: Span) -> Self {
+        Self {
+            span,
+            nodes: vec![],
+            captures: vec![],
+        }
+    }
+    pub fn root_node(&self) -> Option<usize> {
+        if self.nodes.len() == 1 {
+            Some(self.nodes[0])
+        } else {
+            None
+        }
+    }
+}
+
+impl Parser for Expr {
+    fn parse(&self, context: &mut ParseContext<'_>) -> ParseResult {
+        context.parse_expression(self)
+    }
+}
+
+trait StateValue {
+    fn copy_value(&self) -> Box<dyn StateValue>;
+    fn as_any(&self) -> &dyn Any;
+    fn as_any_mut(&mut self) -> &mut dyn Any;
+}
+impl<T: Any + Clone> StateValue for T {
+    fn copy_value(&self) -> Box<dyn StateValue> {
+        Box::new(self.clone())
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+}
+
+struct Checkpoint {
+    position: usize,
+    nodes: usize,
+    captures: HashMap<String, Vec<Span>>,
+    state: HashMap<String, Box<dyn StateValue>>,
+}
+
+/// Per-parse state, shared by generated rules and custom parsers. Transactions restore
+/// cursors, CST nodes, captures and cloneable user values, but retain failure diagnostics.
+/// Clone must isolate mutable values: external effects and shared interior state are not rolled back.
+/// Rollback applies to Result::Err, not to panic unwinding. Discard the context after a panic.
+/// Capture names are context-wide, and backreferences use the most recent successful capture.
+pub struct ParseContext<'a> {
     input: &'a str,
-    rules: &'a [Rule],
+    rules: Arc<[Rule]>,
     whitespace: bool,
     position: usize,
     nodes: Vec<Node>,
     farthest: usize,
     expected: BTreeSet<String>,
     byte_offsets: Vec<usize>,
+    captures: HashMap<String, Vec<Span>>,
+    state: HashMap<String, Box<dyn StateValue>>,
+    call_depth: usize,
 }
 
 /// Ordered choice with rollback and full-input acceptance. Rule nesting is bounded at 256.
@@ -160,20 +305,9 @@ pub fn parse_detailed(
     whitespace: bool,
     input: &str,
 ) -> Result<Tree, ParseDiagnostic> {
-    let mut parser = Parser {
-        input,
-        rules,
-        whitespace,
-        position: 0,
-        nodes: Vec::new(),
-        farthest: 0,
-        expected: BTreeSet::new(),
-        byte_offsets: input
-            .char_indices()
-            .map(|(i, _)| i)
-            .chain(std::iter::once(input.len()))
-            .collect(),
-    };
+    let mut parser = ParseContext::new(input);
+    parser.rules = Arc::from(rules);
+    parser.whitespace = whitespace;
     let mut trailing_offset = None;
     if let Some(root) = parser.rule(root, 0) {
         if parser.position == input.len() {
@@ -207,7 +341,180 @@ pub fn parse_detailed(
     })
 }
 
-impl Parser<'_> {
+impl<'a> ParseContext<'a> {
+    pub fn new(input: &'a str) -> Self {
+        Self {
+            input,
+            rules: Arc::from([]),
+            whitespace: false,
+            position: 0,
+            nodes: vec![],
+            farthest: 0,
+            expected: BTreeSet::new(),
+            byte_offsets: input
+                .char_indices()
+                .map(|(i, _)| i)
+                .chain(std::iter::once(input.len()))
+                .collect(),
+            captures: HashMap::new(),
+            state: HashMap::new(),
+            call_depth: 0,
+        }
+    }
+
+    pub fn source(&self) -> &'a str {
+        self.input
+    }
+    pub fn remaining(&self) -> &'a str {
+        &self.input[self.position..]
+    }
+    pub fn position(&self) -> usize {
+        self.code_point(self.position)
+    }
+    pub fn node(&self, id: usize) -> Option<&Node> {
+        self.nodes.get(id)
+    }
+    pub fn tree(&self, root: usize) -> Option<Tree> {
+        self.nodes.get(root)?;
+        Some(Tree {
+            source: self.input.to_owned(),
+            nodes: self.nodes.clone(),
+            root,
+            byte_offsets: self.byte_offsets.clone(),
+        })
+    }
+    pub fn text(&self, span: Span) -> Option<&'a str> {
+        if span.start > span.end {
+            return None;
+        }
+        self.input
+            .get(*self.byte_offsets.get(span.start)?..*self.byte_offsets.get(span.end)?)
+    }
+    pub fn advance(&mut self, code_points: usize) -> bool {
+        let Some(end) = self
+            .position()
+            .checked_add(code_points)
+            .and_then(|end| self.byte_offsets.get(end))
+        else {
+            return false;
+        };
+        self.position = *end;
+        true
+    }
+    pub fn captured(&self, name: &str) -> Option<&'a str> {
+        self.text(*self.captures.get(name)?.last()?)
+    }
+    pub fn capture_spans(&self, name: &str) -> &[Span] {
+        self.captures.get(name).map(Vec::as_slice).unwrap_or(&[])
+    }
+    pub fn set_state<T: Any + Clone>(&mut self, name: impl Into<String>, value: T) {
+        self.state.insert(name.into(), Box::new(value));
+    }
+    pub fn state<T: Any>(&self, name: &str) -> Option<&T> {
+        self.state.get(name)?.as_ref().as_any().downcast_ref()
+    }
+    pub fn state_mut<T: Any>(&mut self, name: &str) -> Option<&mut T> {
+        self.state
+            .get_mut(name)?
+            .as_mut()
+            .as_any_mut()
+            .downcast_mut()
+    }
+    pub fn remove_state(&mut self, name: &str) {
+        self.state.remove(name);
+    }
+    pub fn error(&mut self, expected: &str) -> ParseError {
+        self.fail(expected);
+        self.failure()
+    }
+    pub fn failure(&self) -> ParseError {
+        ParseError {
+            offset: self.code_point(self.farthest),
+            expected: self.expected.iter().cloned().collect(),
+        }
+    }
+
+    pub fn parse<P: Parser + ?Sized>(&mut self, parser: &P) -> ParseResult {
+        if self.call_depth >= 256 {
+            return Err(self.error("parser calls below 256"));
+        }
+        self.call_depth += 1;
+        let result = self.transaction(|context| parser.parse(context));
+        self.call_depth -= 1;
+        result
+    }
+
+    pub fn transaction<T>(
+        &mut self,
+        operation: impl FnOnce(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<T, ParseError> {
+        let checkpoint = self.checkpoint();
+        let result = operation(self);
+        if let Err(error) = &result {
+            if let Some(&byte) = self.byte_offsets.get(error.offset) {
+                if byte > self.farthest {
+                    self.farthest = byte;
+                    self.expected.clear();
+                }
+                if byte == self.farthest {
+                    self.expected.extend(error.expected.iter().cloned());
+                }
+            }
+            self.restore(checkpoint);
+        }
+        result
+    }
+
+    /// Temporarily installs grammar rules/trivia policy; user state and input are shared.
+    /// This accepts a prefix. Use an EOF parser or parse_detailed for full-input acceptance.
+    /// Node rule IDs are local to this grammar; map each returned root with its own mapper.
+    pub fn parse_grammar(
+        &mut self,
+        rules: Vec<Rule>,
+        root: usize,
+        whitespace: bool,
+    ) -> ParseResult {
+        let previous_rules = std::mem::replace(&mut self.rules, Arc::from(rules));
+        let previous_whitespace = std::mem::replace(&mut self.whitespace, whitespace);
+        let result = self.parse_expression(&Expr::Rule(root));
+        self.rules = previous_rules;
+        self.whitespace = previous_whitespace;
+        result
+    }
+
+    fn parse_expression(&mut self, expression: &Expr) -> ParseResult {
+        let start = self.position();
+        match self.expression(expression, self.call_depth) {
+            Some(fragment) => Ok(ParseMatch {
+                span: Span {
+                    start,
+                    end: self.position(),
+                },
+                nodes: fragment.nodes,
+                captures: fragment.captures,
+            }),
+            None => Err(self.failure()),
+        }
+    }
+
+    fn checkpoint(&self) -> Checkpoint {
+        Checkpoint {
+            position: self.position,
+            nodes: self.nodes.len(),
+            captures: self.captures.clone(),
+            state: self
+                .state
+                .iter()
+                .map(|(key, value)| (key.clone(), value.as_ref().copy_value()))
+                .collect(),
+        }
+    }
+    fn restore(&mut self, checkpoint: Checkpoint) {
+        self.position = checkpoint.position;
+        self.nodes.truncate(checkpoint.nodes);
+        self.captures = checkpoint.captures;
+        self.state = checkpoint.state;
+    }
     fn code_point(&self, byte: usize) -> usize {
         self.byte_offsets
             .binary_search(&byte)
@@ -236,7 +543,8 @@ impl Parser<'_> {
             self.fail("rule nesting below 256");
             return None;
         }
-        let Some(rule) = self.rules.get(id) else {
+        let rules = Arc::clone(&self.rules);
+        let Some(rule) = rules.get(id) else {
             self.fail("valid rule reference");
             return None;
         };
@@ -262,7 +570,132 @@ impl Parser<'_> {
     }
 
     fn expression(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
+        let checkpoint = self.checkpoint();
+        let result = self.expression_inner(expression, depth);
+        if result.is_none() {
+            self.restore(checkpoint);
+        }
+        result
+    }
+
+    fn expression_inner(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
         match expression {
+            Expr::Custom(parser) => {
+                self.transaction(|context| parser(context))
+                    .ok()
+                    .map(|matched| Fragment {
+                        nodes: matched.nodes,
+                        captures: matched.captures,
+                    })
+            }
+            Expr::Backreference(name) => {
+                let text = self.captured(name);
+                if let Some(text) = text.filter(|text| self.remaining().starts_with(text)) {
+                    self.position += text.len();
+                    Some(Fragment::default())
+                } else {
+                    self.fail(name);
+                    None
+                }
+            }
+            Expr::Empty => Some(Fragment::default()),
+            Expr::Eof => {
+                if self.position == self.input.len() {
+                    Some(Fragment::default())
+                } else {
+                    self.fail("end of input");
+                    None
+                }
+            }
+            Expr::Error(message) => {
+                self.fail(message);
+                None
+            }
+            Expr::Any | Expr::CharRange(_, _) | Expr::Except(_) => {
+                let next = self.input[self.position..].chars().next();
+                let accepted = next.is_some_and(|c| match expression {
+                    Expr::CharRange(min, max) => *min <= c && c <= *max,
+                    Expr::Except(excluded) => !excluded.contains(c),
+                    _ => true,
+                });
+                if accepted {
+                    self.position += next.expect("accepted character").len_utf8();
+                    Some(Fragment::default())
+                } else {
+                    self.fail("character");
+                    None
+                }
+            }
+            Expr::Until(terminator) => {
+                if let Some(length) = self.input[self.position..].find(terminator) {
+                    self.position += length;
+                    Some(Fragment::default())
+                } else {
+                    self.fail(terminator);
+                    None
+                }
+            }
+            Expr::Optional(child) => {
+                let start = self.position;
+                let count = self.nodes.len();
+                match self.expression(child, depth) {
+                    Some(fragment) => Some(fragment),
+                    None => {
+                        self.position = start;
+                        self.nodes.truncate(count);
+                        Some(Fragment::default())
+                    }
+                }
+            }
+            Expr::Repeat { child, min, max } => {
+                if max.is_some_and(|max| max < *min) {
+                    self.fail("valid repetition bounds");
+                    return None;
+                }
+                let mut result = Fragment::default();
+                let mut iterations = 0;
+                while max.is_none_or(|max| iterations < max) {
+                    let start = self.position;
+                    let count = self.nodes.len();
+                    match self.expression(child, depth) {
+                        Some(mut fragment) => {
+                            if self.position == start && max.is_none() {
+                                self.nodes.truncate(count);
+                                self.fail("progress in unbounded repetition");
+                                return None;
+                            }
+                            iterations += 1;
+                            result.nodes.append(&mut fragment.nodes);
+                            result.captures.append(&mut fragment.captures);
+                        }
+                        None => {
+                            self.position = start;
+                            self.nodes.truncate(count);
+                            break;
+                        }
+                    }
+                }
+                (iterations >= *min).then_some(result)
+            }
+            Expr::Lookahead { child, positive } => {
+                let checkpoint = self.checkpoint();
+                let farthest = self.farthest;
+                let expected = self.expected.clone();
+                let matched = self.expression(child, depth).is_some();
+                self.restore(checkpoint);
+                if !*positive || matched {
+                    self.farthest = farthest;
+                    self.expected = expected;
+                }
+                if matched == *positive {
+                    Some(Fragment::default())
+                } else {
+                    if !*positive {
+                        self.fail("negative lookahead");
+                    }
+                    None
+                }
+            }
             Expr::Literal(literal) => {
                 if self.input[self.position..].starts_with(literal) {
                     self.position += literal.len();
@@ -303,6 +736,11 @@ impl Parser<'_> {
             Expr::Capture(name, expression) => {
                 let start = self.position;
                 let mut fragment = self.expression(expression, depth)?;
+                let span = self.span(start);
+                self.captures
+                    .entry((*name).to_owned())
+                    .or_default()
+                    .push(span);
                 fragment.captures.push(Capture {
                     name,
                     span: self.span(start),
