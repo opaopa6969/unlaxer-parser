@@ -1,0 +1,82 @@
+[
+  {
+    "name": "nested-text-completion",
+    "grammar": "grammar NestedText { @package: org.example.nestedcaptures @root @scopeTree(mode=lexical) @declares(symbol=value) @mapping(Root, params=[value]) Root ::= ('a' @value 'b') @value; }",
+    "captureNames": ["value"],
+    "cases": [
+      {"id":"inner-before-outer", "input":"ab",
+       "ast":{"type":"Root","span":[0,2],"fields":{"value":["a","ab"]}},
+       "captures":[{"name":"value","span":[0,1],"text":"a"},{"name":"value","span":[0,2],"text":"ab"}],
+       "declarations":[{"name":"a","sourceOffset":0},{"name":"ab","sourceOffset":0}]}
+    ]
+  },
+  {
+    "name": "choice-optional-coexist",
+    "grammar": "grammar Shapes { @package: org.example.nestedcaptures @root @mapping(Root, params=[choice,maybe,pair]) Root ::= Choice @choice Maybe @maybe Pair @pair; @mapping(Choice, params=[pick]) Choice ::= 'x' @pick | 'y' @pick; @mapping(Maybe, params=[value,missing]) Maybe ::= '[' [ ('o' @value 'O') @value ] [ 'q' @missing ] ']'; @mapping(Pair, params=[item]) Pair ::= 'a' @item 'b' @item; }",
+    "captureNames": ["pick", "value", "missing", "item"],
+    "cases": [
+      {"id":"exclusive-scalar-and-optional-absent", "input":"x[]ab",
+       "ast":{"type":"Root","span":[0,5],"fields":{"choice":{"type":"Choice","span":[0,1],"fields":{"pick":"x"}},"maybe":{"type":"Maybe","span":[1,3],"fields":{"value":[],"missing":null}},"pair":{"type":"Pair","span":[3,5],"fields":{"item":["a","b"]}}}},
+       "captures":[{"name":"pick","span":[0,1],"text":"x"},{"name":"item","span":[3,4],"text":"a"},{"name":"item","span":[4,5],"text":"b"}]},
+      {"id":"second-choice-and-optional-present", "input":"y[oOq]ab",
+       "ast":{"type":"Root","span":[0,8],"fields":{"choice":{"type":"Choice","span":[0,1],"fields":{"pick":"y"}},"maybe":{"type":"Maybe","span":[1,6],"fields":{"value":["o","oO"],"missing":"q"}},"pair":{"type":"Pair","span":[6,8],"fields":{"item":["a","b"]}}}},
+       "captures":[{"name":"pick","span":[0,1],"text":"y"},{"name":"value","span":[2,3],"text":"o"},{"name":"value","span":[2,4],"text":"oO"},{"name":"missing","span":[4,5],"text":"q"},{"name":"item","span":[6,7],"text":"a"},{"name":"item","span":[7,8],"text":"b"}]}
+    ]
+  },
+  {
+    "name": "quantifier-items-not-containers",
+    "grammar": "grammar Quantifiers { @package: org.example.nestedcaptures @root @mapping(Root, params=[repeat,plus,bounded,separated]) Root ::= Repeat @repeat '|' Plus @plus '|' Bounded @bounded '|' Separated @separated; @mapping(Repeat, params=[value]) Repeat ::= { ('r' @value 'R') } @value; @mapping(Plus, params=[value]) Plus ::= ('p' @value 'P')+ @value; @mapping(Bounded, params=[value]) Bounded ::= ('b' @value 'B'){1,2} @value; @mapping(Separated, params=[value]) Separated ::= ('s' @value 'S') % ',' @value; }",
+    "captureNames": ["value"],
+    "cases": [
+      {"id":"every-item-has-inner-then-outer-values", "input":"rRrR|pPpP|bBbB|sS,sS",
+       "ast":{"type":"Root","span":[0,20],"fields":{"repeat":{"type":"Repeat","span":[0,4],"fields":{"value":["r","rR","r","rR"]}},"plus":{"type":"Plus","span":[5,9],"fields":{"value":["p","pP","p","pP"]}},"bounded":{"type":"Bounded","span":[10,14],"fields":{"value":["b","bB","b","bB"]}},"separated":{"type":"Separated","span":[15,20],"fields":{"value":["s","sS","s","sS"]}}}},
+       "captures":[{"name":"value","span":[0,1],"text":"r"},{"name":"value","span":[0,2],"text":"rR"},{"name":"value","span":[2,3],"text":"r"},{"name":"value","span":[2,4],"text":"rR"},{"name":"value","span":[5,6],"text":"p"},{"name":"value","span":[5,7],"text":"pP"},{"name":"value","span":[7,8],"text":"p"},{"name":"value","span":[7,9],"text":"pP"},{"name":"value","span":[10,11],"text":"b"},{"name":"value","span":[10,12],"text":"bB"},{"name":"value","span":[12,13],"text":"b"},{"name":"value","span":[12,14],"text":"bB"},{"name":"value","span":[15,16],"text":"s"},{"name":"value","span":[15,17],"text":"sS"},{"name":"value","span":[18,19],"text":"s"},{"name":"value","span":[18,20],"text":"sS"}]}
+    ]
+  },
+  {
+    "name": "same-wrapper-and-parser-class",
+    "grammar": "grammar BindingSites { @package: org.example.nestedcaptures token ID = org.unlaxer.parser.clang.IdentifierParser @root @mapping(Root, params=[left,right,value]) Root ::= ID @left ':' ID @right ':' (('😀') @value) @value; }",
+    "captureNames": ["left", "right", "value"],
+    "cases": [
+      {"id":"bindings-keep-site-and-code-point-spans", "input":"one:two:😀",
+       "ast":{"type":"Root","span":[0,9],"fields":{"left":"one","right":"two","value":["😀","😀"]}},
+       "captures":[{"name":"left","span":[0,3],"text":"one"},{"name":"right","span":[4,7],"text":"two"},{"name":"value","span":[8,9],"text":"😀"},{"name":"value","span":[8,9],"text":"😀"}]}
+    ]
+  },
+  {
+    "name": "text-node-and-mixed-values",
+    "grammar": "grammar MixedKinds { @package: org.example.nestedcaptures @root @mapping(Root, params=[text,node,mixed,value]) Root ::= 'a' @text Leaf @node ('b' | Leaf) @mixed (Leaf @value | 'b' @value) @value; @mapping(Leaf, params=[text]) Leaf ::= ('x' | 'y') @text; }",
+    "captureNames": ["text", "node", "mixed", "value"],
+    "valueSpanField": "mixed",
+    "cases": [
+      {"id":"mixed-text-branch", "input":"axbb",
+       "ast":{"type":"Root","span":[0,4],"fields":{"text":"a","node":{"type":"Leaf","span":[1,2],"fields":{"text":"x"}},"mixed":"b","value":["b","b"]}},
+       "valueSpans":[[2,3]],
+       "captures":[{"name":"text","span":[1,2],"text":"x"},{"name":"text","span":[0,1],"text":"a"},{"name":"node","span":[1,2],"text":"x"},{"name":"mixed","span":[2,3],"text":"b"},{"name":"value","span":[3,4],"text":"b"},{"name":"value","span":[3,4],"text":"b"}]},
+      {"id":"mixed-node-branch", "input":"axyy",
+       "ast":{"type":"Root","span":[0,4],"fields":{"text":"a","node":{"type":"Leaf","span":[1,2],"fields":{"text":"x"}},"mixed":{"type":"Leaf","span":[2,3],"fields":{"text":"y"}},"value":[{"type":"Leaf","span":[3,4],"fields":{"text":"y"}},{"type":"Leaf","span":[3,4],"fields":{"text":"y"}}]}},
+       "valueSpans":[[2,3]],
+       "captures":[{"name":"text","span":[1,2],"text":"x"},{"name":"text","span":[2,3],"text":"y"},{"name":"text","span":[3,4],"text":"y"},{"name":"text","span":[0,1],"text":"a"},{"name":"node","span":[1,2],"text":"x"},{"name":"mixed","span":[2,3],"text":"y"},{"name":"value","span":[3,4],"text":"y"},{"name":"value","span":[3,4],"text":"y"}]}
+    ]
+  },
+  {
+    "name": "recursive-child-boundary",
+    "grammar": "grammar RecursiveBoundary { @package: org.example.nestedcaptures token ID = org.unlaxer.parser.clang.IdentifierParser @root @mapping(Root, params=[parent]) Root ::= Parent @parent; @mapping(Parent, params=[name,child]) Parent ::= [ ID @name ':' ] Child @child; @mapping(Child, params=[name,next]) Child ::= ID @name [ '/' Child @next ]; }",
+    "captureNames": ["name", "child", "next"],
+    "cases": [
+      {"id":"absent-parent-does-not-borrow-recursive-name", "input":"child/grand",
+       "ast":{"type":"Root","span":[0,11],"fields":{"parent":{"type":"Parent","span":[0,11],"fields":{"name":null,"child":{"type":"Child","span":[0,11],"fields":{"name":"child","next":{"type":"Child","span":[6,11],"fields":{"name":"grand","next":null}}}}}}}},
+       "captures":[{"name":"name","span":[6,11],"text":"grand"},{"name":"name","span":[0,5],"text":"child"},{"name":"next","span":[6,11],"text":"grand"},{"name":"child","span":[0,11],"text":"child/grand"}]}
+    ]
+  },
+  {
+    "name": "shared-mapping-nested-and-sequential",
+    "grammar": "grammar SharedMapping { @package: org.example.nestedcaptures @root @mapping(Root, params=[items]) Root ::= { (A | B) @items }; @mapping(Item, params=[value]) A ::= 'a' @value 'b' @value; @mapping(Item, params=[value]) B ::= ('c' @value 'd') @value; }",
+    "captureNames": ["value", "items"],
+    "cases": [
+      {"id":"shared-list-schema-retains-each-rule-order", "input":"abcd",
+       "ast":{"type":"Root","span":[0,4],"fields":{"items":[{"type":"Item","span":[0,2],"fields":{"value":["a","b"]}},{"type":"Item","span":[2,4],"fields":{"value":["c","cd"]}}]}},
+       "captures":[{"name":"value","span":[0,1],"text":"a"},{"name":"value","span":[1,2],"text":"b"},{"name":"value","span":[2,3],"text":"c"},{"name":"value","span":[2,4],"text":"cd"},{"name":"items","span":[0,2],"text":"ab"},{"name":"items","span":[2,4],"text":"cd"}]}
+    ]
+  }
+]
