@@ -118,7 +118,7 @@ let matched = context.parse(&MyParser)?;
 
 ```sh
 mvn -B -pl unlaxer-common,unlaxer-dsl -am test \
-  -Dtest=RustBackendTest,RustConformanceTest -DrustConformance=true \
+  -Dtest=RustBackendTest,RustConformanceTest,NumericCaptureRuntimeTest -DrustConformance=true \
   -Dsurefire.failIfNoSpecifiedTests=false
 cargo fmt --all --manifest-path rust/Cargo.toml --check
 cargo clippy --locked --manifest-path rust/Cargo.toml --workspace --all-targets -- -D warnings
@@ -145,7 +145,9 @@ v6と同じ[`evolution/{0,1,2,3}`](../unlaxer-dsl/src/test/resources/evolution/)
 
 Java mapperにはcapture選択の既存不具合がある。例えば`:::`で欠損tailを`":"`、空flagsを`[":", ":"]`へ変換し、`:2;::`でrepeat側のItemをoptional headへ誤配置する。plus/bounded/separatedのlistが空になる場合もある。受理20件すべてでJava ASTは期待ASTと異なり、生のJava結果も`javaKnown` fixtureで固定して[issue #116](https://github.com/opaopa6969/unlaxer-parser/issues/116)へ分離した。比較を通すためRustへこの不具合をコピーしない。双方の結果は`target/rust-cardinality.tsv`とCI artifactに保存する。
 
-数値は既存evolutionと同じ`Digits ::= NUMBER`のtext用rule経由でcaptureする。Javaの`NumberParser`直接captureは`int value = null`を生成する別の問題があり、数値型の契約も含め[issue #115](https://github.com/opaopa6969/unlaxer-parser/issues/115)で追跡する。
+数値は既存evolutionと同じ`Digits ::= NUMBER`のtext用rule経由でcaptureする。[issue #115](https://github.com/opaopa6969/unlaxer-parser/issues/115)のJava直接captureの不正なprimitive初期化とgeneric型は修正した。scalarの既存`int` APIを維持し、optional/listは`Integer`へboxingする。Java mapperは`Integer.parseInt`により小数・指数・overflowを明示的に拒否し、Rust mapperは字句を`String`として保持する。この型・変換契約はまだ同値ではない。
+
+別の[数値境界corpus](../unlaxer-dsl/src/test/resources/numeric-capture/conformance.json)は13入力を両backendで実生成・コンパイル・実行する。Javaは符号付き整数・範囲境界・先頭ゼロの6入力を`int`へ変換し、小数/指数/overflowの7入力で`NumberFormatException`、Rustは13入力すべての字句を保持する。`NumericCaptureRuntimeTest`はoptional/repeatのcapture内外、短い名前/FQN、DigitParser、欠損必須captureの明示エラーも検査する。構文成功をAST変換成功と取り違えない。
 
 追加13ケースはRustの実生成・コンパイル・実行で、量指定子内capture、欠ける選択肢、同名captureの複数出現、透明なoptional/list rule、group capture、0回/厳密回数を検証する。2ケースでは古いSemantics引数型をコンパイルして`E0053`を確認する。これらはJUnit内のケース数で独立テストメソッド数ではない。UBNF frontendの入れ子量指定子が脱落する不具合も修正し、外側のrepeat/optional/groupと内側のsuffixを区別する回帰テストを追加した。
 

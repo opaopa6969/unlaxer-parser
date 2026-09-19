@@ -286,6 +286,18 @@ class MapperElementUtil {
                 }
                 if (tokenDeclByName.containsKey(ruleRefElement.name())) {
                     TokenDecl tokenDecl = tokenDeclByName.get(ruleRefElement.name());
+                    if (tokenDecl instanceof TokenDecl.Simple simple) {
+                        String parserClass = simple.parserClass();
+                        String simpleName = parserClass.substring(parserClass.lastIndexOf('.') + 1);
+                        if ("NumberParser".equals(simpleName) || "DigitParser".equals(simpleName)) {
+                            if (parserClass.contains(".")) {
+                                yield Optional.of(parsersClass + "." + ParserCodegenUtil.toParserClassName(ruleRefElement.name()) + ".class");
+                            }
+                            String prefix = "NumberParser".equals(simpleName)
+                                ? "org.unlaxer.parser.elementary." : "org.unlaxer.parser.posix.";
+                            yield Optional.of(prefix + simpleName + ".class");
+                        }
+                    }
                     if (isIdentifierToken(tokenDecl)) {
                         // Mirror ParserRuleEmitter.resolveParserClass exactly so the mapper
                         // references the SAME class the parser put in the tree (findDescendants
@@ -355,8 +367,10 @@ class MapperElementUtil {
         Map<String, String> mappedClassByRuleName,
         Map<String, TokenDecl> tokenDeclByName,
         Map<String, RuleDecl> ruleByName) {
-        if ("int".equals(targetType) || "long".equals(targetType)) {
-            String parseMethod = "int".equals(targetType) ? "Integer.parseInt" : "Long.parseLong";
+        if ("Integer".equals(MapperTypeResolver.boxedType(targetType))
+            || "Long".equals(MapperTypeResolver.boxedType(targetType))) {
+            String parseMethod = "Integer".equals(MapperTypeResolver.boxedType(targetType))
+                ? "Integer.parseInt" : "Long.parseLong";
             return parseMethod + "(firstTokenText(" + tokenVar + "))";
         }
         // enum 型: ASTClass.EnumName 形式 → fromText 生成
