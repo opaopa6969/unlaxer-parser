@@ -19,3 +19,8 @@ bare choice の繰返しは text branch の後で delimiter を自動消費し�
 独立に再現する。baseline `0b32f14` では First 先の生成 Java はコンパイル・実行できるが、
 Second 先は record の Leaf field と mapper の Object 引数が不一致で javac が失敗する。
 この probe はその失敗を表示する診断用であり、成功した conformance 件数には数えない。
+
+修正後は `shared-corpus.json` と `shared-probe.rs.txt` を
+`sharedMixedMappingsAreExecutableInBothDeclarationOrders` へ通し、11入力×両宣言順を
+通常の成功条件として検証する。Java 単体の生成 javac/runtime は常時、Rust 比較は
+ほかの conformance 同様 `-DrustConformance=true` で実行する。

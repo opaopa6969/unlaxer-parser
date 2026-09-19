@@ -3,7 +3,7 @@ grammar Shared {
   @root Entry ::= First | Second;
   @mapping(Value, params=[value]) First ::= 'f' Factor @value;
   @mapping(Value, params=[value]) Second ::= 's' LeafRule @value;
-  Factor ::= 'a' | LeafRule | OtherRule;
+  Factor ::= 'a' | '😀' | LeafRule | OtherRule;
   @mapping(Leaf, params=[value]) LeafRule ::= 'x' @value;
   @mapping(OtherLeaf, params=[value]) OtherRule ::= 'y' @value;
 }
