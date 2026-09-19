@@ -390,6 +390,8 @@ public class ASTGenerator implements CodeGenerator {
      * ルール内の指定フィールド名に対応する Java 型を推論する。
      */
     String inferType(GrammarDecl grammar, RuleDecl rule, String fieldName) {
+        Optional<SharedAssocSchema> shared = SharedAssocSchema.resolve(grammar, rule);
+        if (shared.isPresent()) return shared.get().fieldType(fieldName);
         List<CaptureResult> captures = findCapturedElements(rule.body(), fieldName);
         if (captures.isEmpty()) {
             return "Object";
@@ -398,7 +400,7 @@ public class ASTGenerator implements CodeGenerator {
         // unlaxer-parser #43: widen heterogeneous left/right-assoc operands to the base
         // AST interface so the fold can hold any factor's mapped node (e.g. AbsExpr),
         // not just the assoc's own class. Only number-style folds (operand nominally the
-        // assoc class itself) are widened — mirrors MapperRuleEmitter#shouldWidenAssocOperands,
+        // assoc class itself) are widened — mirrors MapperRuleEmitter#requiresAssocOperandHelper,
         // so source-string-leaf folds keep their String operands.
         if (("left".equals(fieldName) || "right".equals(fieldName))
             && isWidenedAssocOperand(grammar, rule, innerType)) {
