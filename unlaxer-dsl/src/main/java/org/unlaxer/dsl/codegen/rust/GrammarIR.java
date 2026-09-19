@@ -13,7 +13,15 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     public enum Kind { TEXT, NODE }
     public enum Cardinality { ONE, OPTIONAL, MANY }
     public sealed interface Expression permits Literal, NumberToken, Reference, Sequence, Choice, Capture,
-        OptionalExpr, Repeat, Separated {}
+        OptionalExpr, Repeat, Separated, AnyToken, EofToken, EmptyToken, CharRangeToken,
+        ExceptToken, UntilToken, LookaheadToken {}
+    public record AnyToken() implements Expression {}
+    public record EofToken() implements Expression {}
+    public record EmptyToken() implements Expression {}
+    public record CharRangeToken(char min, char max) implements Expression {}
+    public record ExceptToken(String excluded) implements Expression {}
+    public record UntilToken(String terminator) implements Expression {}
+    public record LookaheadToken(String pattern, boolean positive) implements Expression {}
     public record OptionalExpr(Expression child) implements Expression {}
     /** A null maximum denotes unbounded repetition. */
     public record Repeat(Expression child, int min, Integer max) implements Expression {}

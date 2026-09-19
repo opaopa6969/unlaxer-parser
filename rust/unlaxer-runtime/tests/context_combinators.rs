@@ -169,6 +169,134 @@ fn lookahead_restores_successful_state_and_negative_failure_is_suppressed() {
     assert_eq!(context.failure().expected, vec!["negative lookahead"]);
 }
 
+fn java_ahead(pattern: &'static str) -> Expr {
+    Expr::JavaLookahead {
+        pattern,
+        positive: true,
+    }
+}
+
+#[test]
+fn ubnf_predicates_advance_only_the_match_cursor_and_rollback_both() {
+    let mut context = ParseContext::new("😀ab");
+    context.parse(&java_ahead("😀")).unwrap();
+    assert_eq!((context.position(), context.matched_position()), (0, 1));
+    context.parse(&java_ahead("a")).unwrap();
+    assert_eq!((context.position(), context.matched_position()), (0, 2));
+    let failed = java_ahead("b")
+        .capture("peek")
+        .then(Expr::Error("rollback"));
+    assert!(context.parse(&failed).is_err());
+    assert_eq!((context.position(), context.matched_position()), (0, 2));
+    assert!(context.captured("peek").is_none());
+    // A PEG predicate probes the consumed cursor and restores the separate match cursor.
+    context.parse(&Expr::Any.ahead()).unwrap();
+    assert_eq!((context.position(), context.matched_position()), (0, 2));
+    context.parse(&Expr::Any).unwrap();
+    assert_eq!((context.position(), context.matched_position()), (1, 1));
+    context.parse(&Expr::JavaEmpty).unwrap();
+    assert_eq!((context.position(), context.matched_position()), (1, 2));
+    context.parse(&java_ahead("b")).unwrap();
+    assert_eq!((context.position(), context.matched_position()), (1, 3));
+    assert!(context.parse(&java_ahead("a")).is_err());
+    assert_eq!(context.failure().offset, 3);
+    assert_eq!((context.position(), context.matched_position()), (1, 3));
+    assert!(context
+        .parse(&Expr::Custom(|context| {
+            context.set_state("temporary", true);
+            assert!(context.advance(2));
+            Err(context.error("custom rollback"))
+        }))
+        .is_err());
+    assert!(context.state::<bool>("temporary").is_none());
+    assert_eq!((context.position(), context.matched_position()), (1, 3));
+    assert!(context.advance(1));
+    assert_eq!((context.position(), context.matched_position()), (2, 2));
+}
+
+#[test]
+fn ubnf_occurrences_distinguish_direct_atoms_and_transactional_children() {
+    for (child, accepted) in [
+        (Expr::literal("x"), false),
+        (Expr::sequence([Expr::literal("x")]), true),
+        (Expr::literal("x").capture("absent"), true),
+    ] {
+        let mut context = ParseContext::new("ab");
+        let parser = java_ahead("a")
+            .then(child.optional_java())
+            .then(java_ahead("b"))
+            .then(Expr::literal("ab"));
+        assert_eq!(context.parse(&parser).is_ok(), accepted);
+        assert!(context.captured("absent").is_none());
+        let expected = if accepted { (2, 2) } else { (0, 0) };
+        assert_eq!((context.position(), context.matched_position()), expected);
+    }
+    assert!(ParseContext::new("ab")
+        .parse(
+            &java_ahead("a")
+                .then(Expr::literal("x").optional())
+                .then(java_ahead("b"))
+        )
+        .is_ok());
+    assert!(ParseContext::new("ab")
+        .parse(&Expr::JavaEmpty.repeat(2, Some(2)))
+        .is_ok());
+    for (min, max, accepted) in [(2, 2, false), (1, 2, true), (0, 0, false)] {
+        let mut context = ParseContext::new("ab");
+        assert_eq!(
+            context
+                .parse(&Expr::JavaEmpty.repeat_java(min, Some(max)))
+                .is_ok(),
+            accepted
+        );
+        assert_eq!(context.position(), 0);
+        assert_eq!(context.matched_position(), usize::from(accepted));
+    }
+    let mut context = ParseContext::new("ab");
+    context.parse(&java_ahead("a")).unwrap();
+    context
+        .parse(&Expr::literal("x").repeat_java(0, Some(2)))
+        .unwrap();
+    assert_eq!((context.position(), context.matched_position()), (0, 0));
+}
+
+#[test]
+fn ubnf_until_and_empty_patterns_preserve_java_contract_without_changing_peg() {
+    for (input, terminator, consumed, matched) in [
+        ("abc", "#", 3, 3),
+        ("", "#", 0, 0),
+        ("#tail", "#", 0, 1),
+        ("😀*/tail", "*/", 1, 3),
+        ("😀abc", "", 4, 4),
+        ("", "", 0, 0),
+    ] {
+        let mut context = ParseContext::new(input);
+        context.parse(&Expr::JavaUntil(terminator)).unwrap();
+        assert_eq!(
+            (context.position(), context.matched_position()),
+            (consumed, matched),
+            "{input}"
+        );
+    }
+    for input in ["", "abc"] {
+        let mut context = ParseContext::new(input);
+        assert!(context.parse(&java_ahead("")).is_err());
+        context
+            .parse(&Expr::JavaLookahead {
+                pattern: "",
+                positive: false,
+            })
+            .unwrap();
+        assert_eq!((context.position(), context.matched_position()), (0, 0));
+        context.parse(&Expr::literal("").ahead()).unwrap();
+    }
+    assert!(ParseContext::new("abc").parse(&Expr::Until("#")).is_err());
+    let mut context = ParseContext::new("a#");
+    context.parse(&java_ahead("a")).unwrap();
+    context.parse(&Expr::JavaUntil("#")).unwrap();
+    assert_eq!((context.position(), context.matched_position()), (0, 2));
+}
+
 #[test]
 fn optional_and_repetition_are_atomic_and_cardinality_is_enforced() {
     for (text, accepted) in [

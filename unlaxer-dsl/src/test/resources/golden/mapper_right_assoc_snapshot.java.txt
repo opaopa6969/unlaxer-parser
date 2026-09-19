@@ -137,7 +137,7 @@ public class SnapshotRightAssocMapper {
         if (consumed != source.length()) {
             throw new IllegalArgumentException("Parse failed at offset " + consumed + ": " + source);
         }
-        Token rootToken = parsed.getRootToken(true);
+        Token rootToken = parsed.getRootToken(false);
         Token mappingRoot = rootToken;
         if (mappingRoot.parser.getClass() != SnapshotRightAssocParsers.ExprParser.class) {
             mappingRoot = findFirstDescendant(mappingRoot, SnapshotRightAssocParsers.ExprParser.class);

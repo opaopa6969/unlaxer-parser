@@ -55,6 +55,17 @@ public class CaptureBindingRuntimeTest {
         return value.getClass().getMethod(field).invoke(value);
     }
 
+    @Test public void successfulZeroWidthCapturesAreNotRemovedByReduction() throws Exception {
+        for (String token : List.of("EMPTY", "EOF", "UNTIL('#')", "LOOKAHEAD('x')", "NEGATIVE_LOOKAHEAD('!')")) {
+            String suffix = token.startsWith("LOOKAHEAD") ? " 'x'" : token.startsWith("UNTIL") ? " '#'" : "";
+            String input = suffix.isEmpty() ? "" : suffix.contains("#") ? "#" : "x";
+            try (var loader = compile("token T = " + token + "\n @root @mapping(Value, params=[value]) Root ::= T @value" + suffix + ";")) {
+                // Reusing the parser must not change its child definitions during mapping.
+                for (int i = 0; i < 3; i++) assertEquals(token, "", field(parse(loader, input), "value"));
+            }
+        }
+    }
+
     @Test public void missingOptionalCannotStealRepeatedValuesOrDelimiters() throws Exception {
         try (var loader = compile("""
             @root @mapping(Container, params=[head, values, tail, flags])

@@ -1,0 +1,68 @@
+[
+  {"token":"ANY", "body":"T @value END", "cases":[
+    {"input":"a","value":"a"}, {"input":"😀","value":"😀"}, {"input":"あ","value":"あ"}, {"input":""}, {"input":"ab"}]},
+  {"token":"CHAR_RANGE('a','z')", "body":"T @value END", "cases":[
+    {"input":"a","value":"a"}, {"input":"z","value":"z"}, {"input":"A"}, {"input":"😀"}, {"input":""}]},
+  {"token":"CHAR_RANGE('あ','お')", "body":"T @value END", "cases":[
+    {"input":"う","value":"う"}, {"input":"か"}]},
+  {"token":"NEGATION('x😀')", "body":"T @value END", "cases":[
+    {"input":"a","value":"a"}, {"input":"あ","value":"あ"}, {"input":"🚀","value":"🚀"}, {"input":"x"}, {"input":"😀"}, {"input":""}]},
+  {"token":"EMPTY", "body":"T @value END", "cases":[{"input":"","value":""}, {"input":"x"}]},
+  {"token":"EOF", "body":"'x' T @value", "cases":[{"input":"x","value":""}, {"input":""}, {"input":"xx"}]},
+  {"token":"LOOKAHEAD('ab')", "body":"T 'ab' @value END", "cases":[
+    {"input":"ab","value":"ab"}, {"input":"ac"}, {"input":"a"}, {"input":""}]},
+  {"token":"NEGATIVE_LOOKAHEAD('x')", "body":"T 'a' @value END", "cases":[
+    {"input":"a","value":"a"}, {"input":"x"}, {"input":""}]},
+  {"token":"LOOKAHEAD('😀')", "body":"T '😀' @value END", "cases":[
+    {"input":"😀","value":"😀"}, {"input":"😃"}]},
+  {"token":"UNTIL('#')", "body":"T @value '#' END", "cases":[
+    {"input":"abc#","value":"abc"}, {"input":"😀#","value":"😀"}, {"input":"#","value":""},
+    {"input":"abc"}, {"input":""}, {"input":"a#b#"}]},
+  {"token":"UNTIL('*/')", "body":"'/*' T @value '*/' END", "cases":[
+    {"input":"/*a*b*/","value":"a*b"}, {"input":"/**/","value":""}, {"input":"/*abc"}]},
+  {"token":"ANY", "body":"T @value END", "whitespace":true, "cases":[
+    {"input":"  a  ","value":"a"}, {"input":" /*c*/😀 ","value":"😀"}, {"input":" "}]},
+  {"token":"UNTIL('#')", "body":"T @value", "cases":[
+    {"input":"abc","value":"abc","prefix":[true,3,3]}, {"input":"","value":"","prefix":[true,0,0]},
+    {"input":"😀#tail","prefix":[true,1,2]}]},
+  {"token":"UNTIL('')", "body":"T @value", "cases":[
+    {"input":"abc","value":"abc","prefix":[true,3,3]}, {"input":"","value":"","prefix":[true,0,0]}]},
+  {"token":"LOOKAHEAD('')", "body":"T 'a' @value", "cases":[{"input":"a"}, {"input":""}]},
+  {"token":"NEGATIVE_LOOKAHEAD('')", "body":"T 'a' @value", "cases":[{"input":"a","value":"a"}, {"input":""}]},
+  {"token":"LOOKAHEAD('a')", "extra":"token U = LOOKAHEAD('b')", "body":"(T) (U) 'ab' @value", "cases":[
+    {"input":"ab","value":"ab","prefix":[true,2,2]}, {"input":"aa","prefix":[false,0,0]}]},
+  {"token":"LOOKAHEAD('a')", "extra":"token U = LOOKAHEAD('b')", "body":"(T) (U) END @value", "cases":[
+    {"input":"ab","prefix":[false,0,0]}, {"input":"aa","prefix":[false,0,0]}, {"input":""}]},
+  {"token":"EMPTY", "extra":"token U = LOOKAHEAD('a')", "body":"(T) (U) 'ab' @value", "cases":[{"input":"ab"}]},
+  {"token":"EMPTY", "extra":"token U = LOOKAHEAD('b')", "body":"(T) (U) 'ab' @value", "cases":[{"input":"ab","value":"ab"}]},
+  {"token":"LOOKAHEAD('a')", "body":"[ T ] 'a' @value", "cases":[{"input":"a","value":"a"}, {"input":""}]},
+  {"token":"LOOKAHEAD('a')", "body":"T @value", "cases":[{"input":"ab","prefix":[true,0,1]}, {"input":""}]},
+  {"token":"LOOKAHEAD('a')", "body":"T @value 'a'", "cases":[{"input":"a","value":""}]},
+  {"token":"EMPTY", "extra":"Part ::= T;", "body":"Part @value", "cases":[{"input":"","value":""}, {"input":"ab","prefix":[true,0,1]}]},
+  {"token":"UNTIL('#')", "extra":"Part ::= T;", "body":"Part @value '#'", "cases":[
+    {"input":"abc#","value":"abc"}, {"input":"#","value":""}, {"input":"abc"}]},
+  {"token":"ANY", "body":"{ T } @value END", "cases":[{"input":"","value":[]}, {"input":"a😀","value":["a","😀"]}]},
+  {"token":"EMPTY", "body":"[ T ] @value", "cases":[{"input":"","value":""}, {"input":"x"}]},
+  {"token":"LOOKAHEAD('a')", "body":"(T 'x' | 'a') @value", "cases":[{"input":"a","value":"a"}, {"input":"x"}]},
+  {"token":"LOOKAHEAD('a')", "body":"(T 'x')? 'a' @value", "cases":[{"input":"a","value":"a"}, {"input":"x"}]},
+  {"token":"LOOKAHEAD('a')", "extra":"token U = LOOKAHEAD('b')", "body":"(T) (U) 'ab' @value", "whitespace":true, "cases":[
+    {"input":"ab","value":"ab"}, {"input":"aa"}, {"input":" /*c*/ab","value":"ab"}]},
+  {"token":"LOOKAHEAD('a')", "body":"T @value", "whitespace":true, "cases":[
+    {"input":"ab","prefix":[true,0,1]}, {"input":" a","prefix":[true,1,2]}, {"input":""}]},
+  {"token":"LOOKAHEAD('a')", "body":"T 'ab' @value", "whitespace":true, "cases":[
+    {"input":"ab","value":"ab"}, {"input":" /*c*/ab ","value":"ab"}]},
+  {"token":"EMPTY", "body":"T{2,2} 'ab' @value", "cases":[{"input":"ab","prefix":[false,0,0]}]},
+  {"token":"EMPTY", "body":"T{1,2} 'ab' @value", "cases":[{"input":"ab","value":"ab"}]},
+  {"token":"LOOKAHEAD('a')", "body":"T{2,2} 'aa' @value", "cases":[{"input":"aa"}]},
+  {"token":"EMPTY", "body":"T{0,0} 'ab' @value", "cases":[{"input":"ab"}]},
+  {"token":"ANY", "body":"T{0,0} 'ab' @value", "cases":[{"input":"ab"}]},
+  {"token":"LOOKAHEAD('a')", "extra":"token U = LOOKAHEAD('b')", "body":"(T) [ 'x' ] (U) 'ab' @value", "cases":[{"input":"ab"}]},
+  {"token":"LOOKAHEAD('a')", "extra":"token U = LOOKAHEAD('b') token X = CHAR_RANGE('x','x')", "body":"(T) [ X ] (U) 'ab' @value", "cases":[{"input":"ab"}]},
+  {"token":"NEGATION('')", "body":"T @value", "cases":[{"input":"😀","value":"😀"}, {"input":""}]},
+  {"token":"EMPTY", "body":"T{1,2} @value", "cases":[{"input":"","value":[""]}]},
+  {"token":"EMPTY", "body":"T % ',' @value", "cases":[
+    {"input":"","value":[""]}, {"input":",","value":["",""]}, {"input":",,","value":["","",""]}]},
+  {"token":"EMPTY", "extra":"@mapping(Item, params=[text]) Part ::= T @text;", "body":"'a' Part @value 'b'", "cases":[
+    {"input":"ab","value":{"type":"Item","span":[1,1],"fields":{"text":""}}}]},
+  {"token":"LOOKAHEAD('a')", "extra":"token U = LOOKAHEAD('b')", "body":"(T) [ ('x') ] (U) 'ab' @value", "cases":[{"input":"ab","value":"ab"}]}
+]
