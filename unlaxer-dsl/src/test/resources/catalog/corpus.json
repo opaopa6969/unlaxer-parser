@@ -1,0 +1,12 @@
+[
+  {
+    "name":"deduplicated-sorted-captures",
+    "grammar":"grammar CatalogNames { @root @catalog(context='variable') @mapping(Root, params=[zeta,alpha]) Root ::= 'z' @zeta 'Z' @zeta ':' 'a' @alpha; }",
+    "catalogs":[{"rule":"Root","context":"variable","captures":["alpha","zeta"]}]
+  },
+  {
+    "name":"rule-order-locality-quantifiers-and-escaped-context",
+    "grammar":"grammar CatalogRules { @root @catalog(context=' root ') @mapping(Root, params=[value]) Root ::= Helper @value; @catalog(context='提示😀\\n\\t\\r\\\\\\\'\"') Helper ::= ('h' @zeta) [ 'o' @alpha ] { 'r' @repeat } ('p' @plus)+ ('b' @bounded){1,2} ('s' @separated) % ',' Child; @catalog(context='child') @mapping(Child, params=[inner]) Child ::= 'c' @inner; }",
+    "catalogs":[{"rule":"Root","context":" root ","captures":["value"]},{"rule":"Helper","context":"提示😀\n\t\r\\'\"","captures":["alpha","bounded","plus","repeat","separated","zeta"]},{"rule":"Child","context":"child","captures":["inner"]}]
+  }
+]
