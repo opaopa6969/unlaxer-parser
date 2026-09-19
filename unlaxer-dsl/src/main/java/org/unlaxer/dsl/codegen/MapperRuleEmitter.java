@@ -699,7 +699,8 @@ class MapperRuleEmitter {
         // Collect @typeof constraints: ownCaptureName -> referencedCaptureName
         Map<String, String> typeofConstraints = MapperElementUtil.collectTypeofConstraints(rule.body());
         for (String param : mapping.paramNames()) {
-            String type = MapperTypeResolver.inferType(grammar, rule, param);
+            String type = SharedPlainSchema.fieldType(grammar, rule, param)
+                .orElseGet(() -> MapperTypeResolver.inferType(grammar, rule, param));
             List<AtomicElement> capturedElements = MapperElementUtil.findCapturedElements(rule.body(), param);
             if (capturedElements.isEmpty()) {
                 w.line(type + " " + param

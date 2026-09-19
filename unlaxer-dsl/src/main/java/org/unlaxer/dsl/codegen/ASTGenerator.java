@@ -392,6 +392,8 @@ public class ASTGenerator implements CodeGenerator {
     String inferType(GrammarDecl grammar, RuleDecl rule, String fieldName) {
         Optional<SharedAssocSchema> shared = SharedAssocSchema.resolve(grammar, rule);
         if (shared.isPresent()) return shared.get().fieldType(fieldName);
+        Optional<String> plain = SharedPlainSchema.fieldType(grammar, rule, fieldName);
+        if (plain.isPresent()) return plain.get();
         List<CaptureResult> captures = findCapturedElements(rule.body(), fieldName);
         if (captures.isEmpty()) {
             return "Object";

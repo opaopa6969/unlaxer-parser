@@ -109,4 +109,47 @@ public class MixedValueRuntimeTest {
         }
     }
 
+    @Test public void sharedMixedSchemasAreIndependentOfRepresentativeRule() throws Exception {
+        for (String container : List.of("%s", "[%s]", "{%s}")) {
+            String text = "@mapping(Box, params=[value]) First ::= 'f' " + container.formatted("'a'") + " @value;";
+            String node = "@mapping(Box, params=[value]) Second ::= 's' " + container.formatted("Leaf") + " @value;";
+            for (String family : List.of(text + node, node + text)) {
+                try (var loader = compile("@root Root ::= First | Second;" + family + "@mapping(Leaf) Leaf ::= 'x';")) {
+                    Object a = field(parse(loader, "fa"), "value");
+                    Object x = field(parse(loader, "sx"), "value");
+                    if (container.startsWith("[")) {
+                        assertEquals(Optional.empty(), field(parse(loader, "f"), "value"));
+                        assertEquals(Optional.empty(), field(parse(loader, "s"), "value"));
+                        a = ((Optional<?>) a).orElseThrow();
+                        x = ((Optional<?>) x).orElseThrow();
+                    } else if (container.startsWith("{")) {
+                        assertEquals(List.of(), field(parse(loader, "f"), "value"));
+                        assertEquals(List.of(), field(parse(loader, "s"), "value"));
+                        assertEquals(2, ((List<?>) field(parse(loader, "sxx"), "value")).size());
+                        a = ((List<?>) a).get(0);
+                        x = ((List<?>) x).get(0);
+                    }
+                    assertEquals("a", a);
+                    assertLeaf(x);
+                }
+            }
+        }
+    }
+
+    @Test public void incompatibleSharedParametersAndCardinalityAreRejectedExplicitly() {
+        String source = """
+            grammar Shared {
+              @root Root ::= First | Second;
+              @mapping(Box, params=[value]) First ::= 'a' @value;
+              @mapping(Box, params=[value]) Second ::= ['b'] @value;
+            }
+            """;
+        var grammar = UBNFMapper.parse(source).grammars().get(0);
+        assertTrue(assertThrows(IllegalArgumentException.class, () -> new ASTGenerator().generate(grammar))
+            .getMessage().contains("capture cardinality"));
+        var names = UBNFMapper.parse(source.replace("params=[value]) Second ::= ['b'] @value",
+            "params=[other]) Second ::= 'b' @other")).grammars().get(0);
+        assertTrue(assertThrows(IllegalArgumentException.class, () -> new ASTGenerator().generate(names))
+            .getMessage().contains("parameter names/order"));
+    }
 }
