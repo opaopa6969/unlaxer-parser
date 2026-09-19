@@ -1,0 +1,1 @@
+grammar Names { Root ::= a.b.Value; }
