@@ -158,7 +158,8 @@ public final class RustBackend {
             case Delimited delimited -> "Expr::Sequence(vec![" + expression(delimited.child()) + "])";
             case Choice choice -> "Expr::Choice(vec![" + expressions(choice.alternatives()) + "])";
             case Capture capture -> "Expr::Capture(" + quote(capture.name()) + ", Box::new(" + expression(capture.expression()) + "))";
-            case TextValue text -> "Expr::TextValue(Box::new(" + expression(text.child()) + "))";
+            case TextValue text -> expression(text.child()) + ".text_value()";
+            case ValueBoundary boundary -> expression(boundary.child()) + ".value_boundary()";
             case OptionalExpr optional -> expression(optional.child()) + ".optional_java()";
             case Repeat repeat -> expression(repeat.child()) + ".repeat_java(" + repeat.min() + ", "
                 + (repeat.max() == null ? "None" : "Some(" + repeat.max() + ")") + ")";
@@ -202,6 +203,17 @@ public final class RustBackend {
                                 text: unlaxer_runtime::java_capture_text(tree.text(node.span)).to_owned(),
                                 span: node.span,
                             }),
+                            unlaxer_runtime::VALUE_BOUNDARY_RULE => {
+                                let values = map_values(tree, &node.children)?;
+                                if !values.is_empty() && values.iter().all(|value| matches!(value, AstValue::Text { .. })) {
+                                    found.push(AstValue::Text {
+                                        text: unlaxer_runtime::java_capture_text(tree.text(node.span)).to_owned(),
+                                        span: node.span,
+                                    });
+                                } else {
+                                    found.extend(values);
+                                }
+                            },
                 """);
             List<String> ids = new ArrayList<>();
             for (int i = 0; i < ir.rules().size(); i++) if (ir.rules().get(i).mapping() != null) ids.add(Integer.toString(i));

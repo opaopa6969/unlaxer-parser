@@ -7,6 +7,7 @@
 - unlaxer-parser基準: `72de487020cd6321660dc7114f31ae008c629416`。構文・annotationの列挙元は`unlaxer-dsl/src/main/java/org/unlaxer/dsl/bootstrap/UBNFAST.java`、仕様案は`unlaxer-dsl/specs/`。文書と実装が異なる場合はテストで差を確認し、意図を記録する。
 - tinyexpression基準: `6c8196b7879abe58d6b739d3e63a16e853745ced`。実言語仕様の棚卸し・バックエンド間の差の確定は未完了。
 - 「生成済み」は現在の限定UBNFから生成・コンパイル・実行できる範囲。「runtimeのみ」は手書きAPIで使えるがUBNF経路は未対応。「未対応」は今後の作業で、対応済みとして数えない。
+- 共通機能はJava/Rust双方で実装・検証する。片側だけの完了は共通機能の完了とせず、言語固有の表現差・制約を対応表とissueに残す。
 - 共通corpusは既存`evolution/conformance.json`の37入力×4段階、診断境界は`evolution/diagnostics.json`の8入力。full-spec用corpusは各行の拡張とともに追加する。現在の有限corpusは全言語の互換性証明ではない。
 
 ## 対応表
@@ -23,9 +24,9 @@
 | Identifier・Single/DoubleQuoted・EndOfSource token binding | UBNF生成・runtime実装 | 22文法78入力の受理/両cursor比較と受理48 AST/spanのfixture。ASCII identifier、生escape、single quoteだけ除去するJava mapper契約。tinyexpression文字列評価は別途検証 |
 | CASE_INSENSITIVE・REGEX・任意外部token | 未対応 | Unicode/regex方言を確定。任意Java parserクラスとtinyexpression固有bindingはRust実装または明示adapterを要求 |
 | imports・複数grammar・namespace・global/rule trivia・interleave | 一部のみ | 現在は単一grammarとglobal javaStyle/none。依存解決・循環・文法別ID・局所設定を検証 |
-| mapping・capture・source-preserving AST | scalar/optional/list/group生成済み。Java位置binding #116・zero-field生成 #129・複合text capture #132を修正 | 入れ子container型、再帰的unmapped rule、mapped alias/sumのbackend間契約、異種choice、typeof/commonField/enum、全Java capture規則との互換性 |
+| mapping・capture・source-preserving AST | scalar/optional/list/groupと混在Text/Node値を生成。Rustはspan付きAstValue、JavaはObject系。shared mappingの型joinは宣言順非依存。Java位置binding #116・zero-field生成 #129・複合text capture #132・混在値 #156を修正 | 単一capture内の複数semantic子はJava scalar/Rust Vecの差が残る（#160）。入れ子container型、再帰的unmapped rule、mapped alias/sumのbackend間契約、typeof/commonField/enum、全Java capture規則との互換性 |
 | evaluator dispatch・網羅性 | 限定範囲で生成済み | 新nodeのE0004/E0046検証を拡張。eval annotation、型境界、短絡評価を追加。Java sum/dotted evaluatorの不具合 #130 は修正済み |
-| leftAssoc/rightAssoc/precedence | canonical leftAssocとrightAssoc、precedence metadata、同一schemaのshared mappingを生成 | 左辺＋op/right列と右再帰、文法階層による優先順位を検証。非canonical右結合形、異種text/node factorとJavaの特殊leafは未対応。Java raw CST反復欠落 #138・右結合 #139 は独立修正 |
+| leftAssoc/rightAssoc/precedence | canonical leftAssocとrightAssoc、precedence metadata、schemaを統合したshared mapping、混在factorを生成 | 左辺＋op/right列と右再帰、文法階層による優先順位を検証。非canonical右結合形、Javaの特殊null/literal leafとRust AstValueの構造互換は未完了。Java raw CST反復欠落 #138・右結合 #139 は独立修正 |
 | backref・MatchedToken相当 | context-wide replayのみ | UBNF annotation、名前の寿命・入れ子・伝播、コピー言語のpositive/negative test |
 | PropagationStopper・consume/invert・virtual token・metadata | 未対応 | 有限状態の全合成検査、8元モデルとの対応、実parserとの統合試験 |
 | scopeTree/declares/catalog/doc/skip/simple等 | 未対応 | 各annotationのJava実動作を確認し、生成metadataと利用先を検証 |
@@ -34,7 +35,7 @@
 | tinyexpression-rs | 未対応 | 値・null/欠損・変数・演算子・関数・外部呼出し・日時/数値仕様を棚卸しし、同一入力で値/失敗分類を比較 |
 | rustcodeblock | 未対応 | 既定無効・明示許可付きAOT、元の位置へのcompiler診断、通常parse/LSPの非実行保証。Javaソースの自動翻訳はしない |
 | ネイティブ配布 | 縮小文法CLIのみ | tinyexpression CLI、対象OS別artifact、stdin/file/終了コード・制限のsmoke |
-| Rust製UBNF frontend・native generator | syntax frontend全18annotation/11token/9element種、対応範囲のlowering/CLI/5module emitterを実装 | Java/native86文法430file一致、空PATHの生成/check、手書き/symlink保護。全backend機能の生成完了とは区別。frontend既知差と構造分析上限を文書化 |
+| Rust製UBNF frontend・native generator | syntax frontend全18annotation/11token/9element種、対応範囲のlowering/CLI/5module emitterを実装 | Java/nativeの既存・混在値文法で全5file一致、空PATHの生成/check、手書き/symlink保護。全backend機能の生成完了とは区別。frontend既知差と構造分析上限を文書化 |
 | 入力DSLの機械語生成 | 未対応・設計未確定 | generatorや評価器のnativeバイナリ化と区別し、必要な意味論・成果物を別ADRで確定 |
 
 ## 完了の扱いと順序
@@ -44,3 +45,9 @@
 Javaの継承階層を一対一に移植するのではなく、文法と観測可能な振る舞いを対象とする。JVM任意オブジェクト・reflection・bytecodeのnative直接実行はできないため、Rust側のhost interfaceと移植コードの境界を明記する。差を消して比較を通したことにせず、意図的な差は独立したfixtureにする。
 
 parser生成は当面`Expr`combinator定義を生成し、共通runtimeで実行する。直接parser関数を出力する高速化backendは、その意味論との同値性を測定できてから検討する。Rustでビルドされた実行ファイルであることは、入力式を機械語にコンパイルしていることを意味しない。
+
+移植に伴う追加提案は、両言語を対象とする受け入れ条件付きで追跡する。未実装の計画であり、上記の対応済み件数には含めない。
+
+- [#157](https://github.com/opaopa6969/unlaxer-parser/issues/157): portability検査と機械可読な診断レポート。
+- [#158](https://github.com/opaopa6969/unlaxer-parser/issues/158): target-neutralなtoken adapter契約。
+- [#159](https://github.com/opaopa6969/unlaxer-parser/issues/159): 文法進化に伴う生成API影響レポート。

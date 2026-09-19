@@ -144,7 +144,7 @@ public class RustBackendTest {
         assertTrue(files.get(1).content().contains("r#one: AstValue, r#maybe: Option<AstValue>, r#many: Vec<AstValue>"));
         assertTrue(files.get(4).content().contains("r#one: &AstValue, r#maybe: Option<&AstValue>, r#many: &[AstValue]"));
         assertTrue(files.get(4).content().contains("r#maybe.as_ref()"));
-        assertTrue(files.get(2).content().contains("Expr::TextValue(Box::new(Expr::Literal(\"literal\")))"));
+        assertTrue(files.get(2).content().contains("Expr::Literal(\"literal\").text_value()"));
         assertTrue(files.get(3).content().contains("unlaxer_runtime::TEXT_VALUE_RULE => found.push(AstValue::Text"));
         assertTrue(files.get(3).content().contains("0 | 2 => found.extend(map_node"));
         assertTrue(files.get(3).content().contains("values.extend(map_values(tree, &capture.nodes)?);"));
@@ -162,7 +162,7 @@ public class RustBackendTest {
             ir.rules().stream().filter(rule -> rule.mapping() != null && rule.mapping().name().equals("Box"))
                 .forEach(rule -> assertEquals(GrammarIR.Kind.VALUE, rule.mapping().fields().get(0).kind()));
             var files = new RustBackend().generate(grammar);
-            assertTrue(files.get(2).content().contains("Expr::Capture(\"value\", Box::new(Expr::TextValue(Box::new(Expr::Literal(\"a\")))))"));
+            assertTrue(files.get(2).content().contains("Expr::Capture(\"value\", Box::new(Expr::Literal(\"a\").text_value()))"));
             assertEquals(1, files.get(1).content().split("r#Box \\{ span: Span", -1).length - 1);
         }
     }
@@ -178,7 +178,7 @@ public class RustBackendTest {
         var grammar = UBNFMapper.parse(source).grammars().get(0);
         var field = RustGrammarLowering.lower(grammar).rules().get(0).mapping().fields().get(0);
         assertEquals(new GrammarIR.Field("value", GrammarIR.Kind.VALUE, GrammarIR.Cardinality.MANY), field);
-        assertTrue(new RustBackend().generate(grammar).get(2).content().contains("Expr::TextValue(Box::new(Expr::Literal(\"a\")))"));
+        assertTrue(new RustBackend().generate(grammar).get(2).content().contains("Expr::Literal(\"a\").text_value()"));
         reject(source.replace("(Value Leaf) @value", "Leaf % Value @value"), "mapped separator");
     }
 
@@ -223,7 +223,7 @@ public class RustBackendTest {
             }
             """;
         String parser = new RustBackend().generate(UBNFMapper.parse(source).grammars().get(0)).get(2).content();
-        assertTrue(parser.contains("Expr::TextValue(Box::new(Expr::Literal(\"z\")))"));
+        assertTrue(parser.contains("Expr::Literal(\"z\").text_value()"));
         String power = parser.lines().filter(line -> line.contains("Rule { name: \"Expr\"")).findFirst().orElseThrow();
         assertTrue(power.contains("Expr::Choice"));
         assertFalse(power.contains("TextValue"));

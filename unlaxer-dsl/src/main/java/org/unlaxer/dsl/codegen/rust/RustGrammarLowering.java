@@ -160,9 +160,12 @@ public final class RustGrammarLowering {
             case Capture capture -> {
                 Expression child = retainTextValues(capture.expression(), mapping);
                 if (mapping != null && mapping.fields().stream().anyMatch(field ->
-                        field.name().equals(capture.name()) && field.kind() == Kind.VALUE)
-                    && shape(capture.expression(), new HashSet<>()).kind() == Kind.TEXT) {
-                    child = new TextValue(child);
+                        field.name().equals(capture.name()) && field.kind() == Kind.VALUE)) {
+                    Shape shape = shape(capture.expression(), new HashSet<>());
+                    if (shape.kind() == Kind.TEXT) child = new TextValue(child);
+                    else if (shape.kind() == Kind.VALUE && shape.cardinality() != Cardinality.MANY) {
+                        child = new ValueBoundary(child);
+                    }
                 }
                 yield new Capture(capture.name(), child);
             }

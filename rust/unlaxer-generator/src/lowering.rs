@@ -181,7 +181,6 @@ impl Lowering<'_> {
             return Err("root must resolve to exactly one AST node".into());
         }
         let mut rules = Vec::new();
-        let mut variants = HashMap::new();
         for (i, expression) in self.bodies.iter().enumerate() {
             let captures = self.captures(expression)?;
             let mapping = if let Some((name, params)) = &self.mappings[i] {
@@ -209,11 +208,6 @@ impl Lowering<'_> {
                     name: name.clone(),
                     fields,
                 };
-                if let Some(previous) = variants.insert(name, mapping.clone()) {
-                    if previous != mapping {
-                        return Err(format!("incompatible shared mapping schema {name}"));
-                    }
-                }
                 Some(mapping)
             } else {
                 if !captures.is_empty() {
@@ -224,12 +218,11 @@ impl Lowering<'_> {
                 }
                 None
             };
-            let mut lowered_body = expression.clone();
             if let Some(operator) = self.operators[i] {
                 match operator.associativity {
                     Associativity::Left => self.check_assoc(i, mapping.as_ref())?,
                     Associativity::Right => {
-                        lowered_body = self.lower_right_assoc(i, mapping.as_ref())?
+                        self.lower_right_assoc(i, mapping.as_ref())?;
                     }
                     Associativity::None => unreachable!("validated annotation pair"),
                 }
@@ -251,10 +244,52 @@ impl Lowering<'_> {
             }
             rules.push(Rule {
                 name: self.grammar.rules[i].name.clone(),
-                body: lowered_body,
+                body: expression.clone(),
                 mapping,
                 operator: self.operators[i],
             });
+        }
+        // A shared variant has one public type contract, independent of declaration order.
+        let mut variants: HashMap<String, Mapping> = HashMap::new();
+        for mapping in rules.iter().filter_map(|rule| rule.mapping.as_ref()) {
+            if let Some(previous) = variants.get_mut(&mapping.name) {
+                if previous.fields.len() != mapping.fields.len()
+                    || previous
+                        .fields
+                        .iter()
+                        .zip(&mapping.fields)
+                        .any(|(a, b)| a.name != b.name || a.cardinality != b.cardinality)
+                {
+                    return Err(format!(
+                        "incompatible shared mapping schema {}",
+                        mapping.name
+                    ));
+                }
+                for (field, other) in previous.fields.iter_mut().zip(&mapping.fields) {
+                    field.kind = join_kind(field.kind, other.kind);
+                }
+            } else {
+                variants.insert(mapping.name.clone(), mapping.clone());
+            }
+        }
+        let needs_values = variants
+            .values()
+            .flat_map(|m| &m.fields)
+            .any(|f| f.kind == Kind::Value);
+        for rule in &mut rules {
+            if let Some(mapping) = &rule.mapping {
+                rule.mapping = Some(variants[&mapping.name].clone());
+            }
+            if needs_values {
+                rule.body = self.project_text_values(&rule.body, rule.mapping.as_ref())?;
+            }
+            if rule
+                .operator
+                .is_some_and(|op| op.associativity == Associativity::Right)
+            {
+                // Shape validation happened before projection. Only the outer structure changes.
+                rule.body = right_associative_body(&rule.body);
+            }
         }
         Ok(GrammarIr {
             rules,
@@ -452,6 +487,9 @@ impl Lowering<'_> {
             }
         }
         if let Expression::Separated { child, separator } = expression {
+            if self.shape(separator, &mut HashSet::new())?.kind != Kind::Text {
+                return Err("mapped separator".into());
+            }
             if self.is_nullable(child) && self.is_nullable(separator) {
                 return Err("nullable unbounded separation".into());
             }
@@ -554,7 +592,7 @@ impl Lowering<'_> {
                 Ok(wrap_node(self.shape(child, visiting)?, Cardinality::Many))
             }
             Expression::Separated { child, separator } => {
-                if self.shape(separator, visiting)?.kind == Kind::Node {
+                if self.shape(separator, visiting)?.kind != Kind::Text {
                     return Err("mapped separator".into());
                 }
                 Ok(wrap_node(self.shape(child, visiting)?, Cardinality::Many))
@@ -563,7 +601,7 @@ impl Lowering<'_> {
                 let mut nodes = Vec::new();
                 for element in elements {
                     let shape = self.shape(element, visiting)?;
-                    if shape.kind == Kind::Node {
+                    if shape.kind != Kind::Text {
                         nodes.push(shape);
                     }
                 }
@@ -571,7 +609,11 @@ impl Lowering<'_> {
                     0 => text_shape(),
                     1 => nodes[0],
                     _ => Shape {
-                        kind: Kind::Node,
+                        kind: nodes
+                            .iter()
+                            .map(|s| s.kind)
+                            .reduce(join_kind)
+                            .expect("nonempty nodes"),
                         cardinality: Cardinality::Many,
                     },
                 })
@@ -585,6 +627,87 @@ impl Lowering<'_> {
             }
             _ => Ok(text_shape()),
         }
+    }
+
+    /// Preserve each lexical alternative as a CST node before a value mapper visits it.
+    /// The original bodies remain untouched for shape analysis (including recursive references).
+    fn project_text_values(
+        &self,
+        expression: &Expression,
+        mapping: Option<&Mapping>,
+    ) -> Result<Expression> {
+        let _depth = self.enter_analysis()?;
+        Ok(match expression {
+            Expression::Choice(alternatives) => {
+                let mixed = self.shape(expression, &mut HashSet::new())?.kind == Kind::Value;
+                Expression::Choice(
+                    alternatives
+                        .iter()
+                        .map(|alternative| {
+                            let projected = self.project_text_values(alternative, mapping)?;
+                            Ok(
+                                if mixed
+                                    && self.shape(alternative, &mut HashSet::new())?.kind
+                                        == Kind::Text
+                                {
+                                    Expression::TextValue(Box::new(projected))
+                                } else {
+                                    projected
+                                },
+                            )
+                        })
+                        .collect::<Result<_>>()?,
+                )
+            }
+            Expression::Capture {
+                name,
+                expression: child,
+            } => {
+                let projected = self.project_text_values(child, mapping)?;
+                let is_value = mapping.is_some_and(|m| {
+                    m.fields
+                        .iter()
+                        .any(|f| f.name == *name && f.kind == Kind::Value)
+                });
+                let shape = self.shape(child, &mut HashSet::new())?;
+                let projected = if is_value && shape.kind == Kind::Text {
+                    Expression::TextValue(Box::new(projected))
+                } else if is_value
+                    && shape.kind == Kind::Value
+                    && shape.cardinality != Cardinality::Many
+                {
+                    Expression::ValueBoundary(Box::new(projected))
+                } else {
+                    projected
+                };
+                Expression::Capture {
+                    name: name.clone(),
+                    expression: Box::new(projected),
+                }
+            }
+            Expression::Sequence(elements) => Expression::Sequence(
+                elements
+                    .iter()
+                    .map(|element| self.project_text_values(element, mapping))
+                    .collect::<Result<_>>()?,
+            ),
+            Expression::OptionalExpr(child) => {
+                Expression::OptionalExpr(Box::new(self.project_text_values(child, mapping)?))
+            }
+            Expression::Repeat { child, min, max } => Expression::Repeat {
+                child: Box::new(self.project_text_values(child, mapping)?),
+                min: *min,
+                max: *max,
+            },
+            Expression::Separated { child, separator } => Expression::Separated {
+                child: Box::new(self.project_text_values(child, mapping)?),
+                separator: Box::new(self.project_text_values(separator, mapping)?),
+            },
+            Expression::Delimited(child) => {
+                Expression::Delimited(Box::new(self.project_text_values(child, mapping)?))
+            }
+            _ => expression.clone(),
+        })
     }
 
     fn captures(&self, expression: &Expression) -> Result<HashMap<String, Shape>> {
@@ -961,6 +1084,30 @@ fn references(expression: &Expression, result: &mut HashSet<usize>) {
     }
 }
 
+fn right_associative_body(body: &Expression) -> Expression {
+    let Expression::Sequence(elements) = body else {
+        unreachable!("validated right-associative sequence");
+    };
+    let Expression::Repeat { child, .. } = &elements[1] else {
+        unreachable!("validated right-associative repeat");
+    };
+    let Expression::Sequence(tail) = child.as_ref() else {
+        unreachable!("validated right-associative tail");
+    };
+    Expression::Choice(vec![
+        Expression::Sequence(vec![elements[0].clone(), tail[0].clone(), tail[1].clone()]),
+        elements[0].clone(),
+    ])
+}
+
+fn join_kind(left: Kind, right: Kind) -> Kind {
+    if left == right {
+        left
+    } else {
+        Kind::Value
+    }
+}
+
 fn text_shape() -> Shape {
     Shape {
         kind: Kind::Text,
@@ -987,11 +1134,8 @@ fn wrap(shape: Shape, cardinality: Cardinality) -> Shape {
     }
 }
 fn merge(left: Shape, right: Shape, sequence: bool) -> Result<Shape> {
-    if left.kind != right.kind {
-        return Err("mixed text/node choice or capture".into());
-    }
     Ok(Shape {
-        kind: left.kind,
+        kind: join_kind(left.kind, right.kind),
         cardinality: if sequence
             || left.cardinality == Cardinality::Many
             || right.cardinality == Cardinality::Many
