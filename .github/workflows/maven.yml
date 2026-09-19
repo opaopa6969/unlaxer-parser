@@ -202,17 +202,24 @@ jobs:
         rustup toolchain install 1.85.0 --profile minimal
         rustup default 1.85.0
 
-    - name: Compare real tinyexpression StringLiteralParser with both Rust generators
+    - name: Compare real tinyexpression external tokens with both Rust generators
       working-directory: unlaxer-parser
       run: |
-        mvn -B -pl unlaxer-dsl test -Dtest=TinyStringTokenConformanceTest -DrustConformance=true \
+        mvn -B -pl unlaxer-dsl test -Dtest=TinyStringTokenConformanceTest,TinyCodeFenceConformanceTest -DrustConformance=true \
           -Dtinyexpression.classes="$GITHUB_WORKSPACE/tinyexpression/target/classes"
         test -s unlaxer-dsl/target/rust-tiny-string.tsv
+        test -s unlaxer-dsl/target/rust-tiny-code-fence.tsv
 
     - uses: actions/upload-artifact@v4
       with:
         name: tiny-string-token-conformance
         path: unlaxer-parser/unlaxer-dsl/target/rust-tiny-string.tsv
+        if-no-files-found: error
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: tiny-code-fence-conformance
+        path: unlaxer-parser/unlaxer-dsl/target/rust-tiny-code-fence.tsv
         if-no-files-found: error
 
     # 3.0.3 リグレッションを実際に検出したのはこの LSP smoke

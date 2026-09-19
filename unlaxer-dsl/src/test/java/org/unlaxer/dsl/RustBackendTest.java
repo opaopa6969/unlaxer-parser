@@ -90,7 +90,8 @@ public class RustBackendTest {
             }
         }
         for (String parser : new String[]{"other.IdentifierParser", "StringLiteralParser",
-                "other.StringLiteralParser", "QuotedParser"}) {
+                "other.StringLiteralParser", "CodeStartParser", "other.CodeStartParser",
+                "CodeEndParser", "other.CodeEndParser", "QuotedParser"}) {
             reject(SIMPLE.replace("grammar Example {", "grammar Example { token T = " + parser + "\n"), "external token");
         }
     }
@@ -104,6 +105,26 @@ public class RustBackendTest {
             new GrammarIR.Sequence(List.of(new GrammarIR.Capture("value", new GrammarIR.Choice(List.of(
                 new GrammarIR.QuotedToken('"'), new GrammarIR.QuotedToken('\'')))))),
             body);
+    }
+
+    @Test public void tinyExpressionCodeFencesUseExactAtomicBindings() {
+        String source = SIMPLE
+            .replace("grammar Example {", """
+                grammar Example {
+                token START = org.unlaxer.tinyexpression.parser.javalang.CodeStartParser
+                token END = org.unlaxer.tinyexpression.parser.javalang.CodeEndParser
+                """)
+            .replace("'hello' @value", "(START | END) @value");
+        var grammar = UBNFMapper.parse(source).grammars().get(0);
+        var body = RustGrammarLowering.lower(grammar).rules().get(0).body();
+        assertEquals(
+            new GrammarIR.Sequence(List.of(new GrammarIR.Capture("value", new GrammarIR.Choice(List.of(
+                new GrammarIR.CodeStartToken(), new GrammarIR.CodeEndToken()))))),
+            body);
+        String parser = new RustBackend().generate(grammar).stream()
+            .filter(file -> file.relativePath().equals("parser.rs"))
+            .findFirst().orElseThrow().content();
+        assertTrue(parser, parser.contains("Expr::Choice(vec![Expr::CodeStart, Expr::CodeEnd])"));
     }
 
     @Test public void cardinalityReachesAstAndSemantics() {

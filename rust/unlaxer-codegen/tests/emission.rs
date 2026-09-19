@@ -261,6 +261,8 @@ fn expression_variants_escape_unicode_and_control_characters() {
                 min: 1,
                 max: Some(2),
             },
+            CodeStartToken,
+            CodeEndToken,
         ]),
     });
     let files = generate(&grammar).unwrap();
@@ -276,6 +278,8 @@ fn expression_variants_escape_unicode_and_control_characters() {
         "positive: false",
         ".separated_by(",
         ".repeat_java(1, Some(2))",
+        "Expr::CodeStart",
+        "Expr::CodeEnd",
     ] {
         assert!(parser.contains(expected), "{expected}");
     }

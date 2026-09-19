@@ -1021,6 +1021,10 @@ fn token_expression(token: &TokenKind) -> Result<Expression> {
                 Expression::QuotedToken('"'),
                 Expression::QuotedToken('\''),
             ]),
+            "org.unlaxer.tinyexpression.parser.javalang.CodeStartParser" => {
+                Expression::CodeStartToken
+            }
+            "org.unlaxer.tinyexpression.parser.javalang.CodeEndParser" => Expression::CodeEndToken,
             "EndOfSourceParser" | "org.unlaxer.parser.elementary.EndOfSourceParser" => {
                 Expression::EofToken
             }

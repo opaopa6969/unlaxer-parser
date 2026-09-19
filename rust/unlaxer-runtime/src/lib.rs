@@ -25,6 +25,10 @@ pub enum Expr {
     Number,
     /// Java clang IdentifierParser: ASCII letter/underscore, then ASCII alphanumeric/underscore.
     Identifier,
+    /// tinyexpression CodeStartParser: an atomic line-oriented opening code fence.
+    CodeStart,
+    /// tinyexpression CodeEndParser: an atomic line-oriented closing code fence.
+    CodeEnd,
     /// Java single/double-quoted text: backslash followed by any scalar, no escape decoding.
     Quoted(char),
     Rule(usize),
@@ -83,6 +87,14 @@ impl Expr {
     }
     pub fn choice(alternatives: impl IntoIterator<Item = Self>) -> Self {
         Self::Choice(alternatives.into_iter().collect())
+    }
+    /// Match tinyexpression's opening code fence without applying grammar trivia between parts.
+    pub fn code_start() -> Self {
+        Self::CodeStart
+    }
+    /// Match tinyexpression's closing code fence without applying grammar trivia between parts.
+    pub fn code_end() -> Self {
+        Self::CodeEnd
     }
     pub fn then(self, next: Self) -> Self {
         Self::sequence([self, next])
@@ -867,6 +879,20 @@ impl<'a> ParseContext<'a> {
                 self.matched_position = self.position;
                 Some(Fragment::default())
             }
+            Expr::CodeStart => {
+                if self.code_start() {
+                    Some(Fragment::default())
+                } else {
+                    None
+                }
+            }
+            Expr::CodeEnd => {
+                if self.code_end() {
+                    Some(Fragment::default())
+                } else {
+                    None
+                }
+            }
             Expr::Quoted(quote) => {
                 if !matches!(quote, '\'' | '"') {
                     self.fail("single or double quote delimiter");
@@ -958,6 +984,90 @@ impl<'a> ParseContext<'a> {
                 })
             }
         }
+    }
+
+    fn code_start(&mut self) -> bool {
+        if !self.at_start_of_line() {
+            self.fail("start of line");
+            return false;
+        }
+        if !self.consume_code_fence() || !self.consume_ascii_identifier("scheme") {
+            return false;
+        }
+        if !self.remaining().starts_with(':') {
+            self.fail(":");
+            return false;
+        }
+        self.position += 1;
+        if !self.consume_ascii_identifier("Java class name") {
+            return false;
+        }
+        while self.remaining().starts_with('.') {
+            self.position += 1;
+            if !self.consume_ascii_identifier("Java class name segment") {
+                return false;
+            }
+        }
+        self.consume_end_of_line("opening code fence")
+    }
+
+    fn code_end(&mut self) -> bool {
+        if !self.at_start_of_line() {
+            self.fail("start of line");
+            return false;
+        }
+        self.consume_code_fence() && self.consume_end_of_line("closing code fence")
+    }
+
+    fn at_start_of_line(&self) -> bool {
+        self.position == 0
+            || self
+                .input
+                .as_bytes()
+                .get(self.position - 1)
+                .is_some_and(|byte| matches!(byte, b'\r' | b'\n'))
+    }
+
+    fn consume_code_fence(&mut self) -> bool {
+        if self.remaining().starts_with("```") {
+            self.position += 3;
+            true
+        } else {
+            self.fail("```");
+            false
+        }
+    }
+
+    fn consume_ascii_identifier(&mut self, expected: &str) -> bool {
+        let bytes = self.input.as_bytes();
+        if !bytes
+            .get(self.position)
+            .is_some_and(|byte| byte.is_ascii_alphabetic() || *byte == b'_')
+        {
+            self.fail(expected);
+            return false;
+        }
+        self.position += 1;
+        while bytes
+            .get(self.position)
+            .is_some_and(|byte| byte.is_ascii_alphanumeric() || *byte == b'_')
+        {
+            self.position += 1;
+        }
+        true
+    }
+
+    fn consume_end_of_line(&mut self, expected: &str) -> bool {
+        if self.remaining().starts_with("\r\n") {
+            self.position += 2;
+        } else if self.remaining().starts_with(['\r', '\n']) {
+            self.position += 1;
+        } else if !self.remaining().is_empty() {
+            self.fail(expected);
+            return false;
+        }
+        self.matched_position = self.position;
+        true
     }
 
     fn skip(&mut self) {
