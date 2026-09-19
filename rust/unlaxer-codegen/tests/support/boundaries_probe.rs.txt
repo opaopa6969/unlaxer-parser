@@ -1,0 +1,47 @@
+use generated::{ast::{Ast,AstValue},evaluator::{Semantics,evaluate}};
+use unlaxer_runtime::Span;
+struct Eval;
+fn value(value:&AstValue,e:&mut Eval)->String {match value {AstValue::Text{text,..}=>text.clone(),AstValue::Node(node)=>evaluate(node,e).join("")}}
+impl Semantics for Eval {
+    type Output=Vec<String>;
+    fn eval_number(&mut self,text:&str,_:Span)->Vec<String>{vec![text.into()]}
+    fn eval_container(&mut self,head:&AstValue,maybe:Option<&AstValue>,items:&[AstValue],tail:&[AstValue],_:Span)->Vec<String>{
+        std::iter::once(head).chain(maybe).chain(items).chain(tail).map(|v|value(v,self)).collect()
+    }
+}
+fn main(){
+    for (source,expected) in [
+        ("(alpha):(2):(beta)(3):<x>",vec!["(alpha)","2","(beta)","3","x"]),
+        ("(1)::(😀):<😀>",vec!["1","(😀)","😀"]),
+        ("(1):(a)::<>" ,vec!["1","(a)"]),
+        ("(1)::(a):<a2b>",vec!["1","(a)","a2b"]),
+    ]{
+        let tree=generated::parser::parse_tree(source).unwrap();
+        let ast=generated::mapper::map(&tree).unwrap();drop(tree);
+        assert_eq!(evaluate(&ast,&mut Eval),expected);
+        let Ast::Container{head,maybe,items,tail,..}=&ast else{panic!("container")};
+        for v in std::iter::once(head).chain(maybe.iter()).chain(items).chain(tail){
+            if let AstValue::Text{text,span}=v{
+                let slice:String=source.chars().skip(span.start).take(span.end-span.start).collect();
+                assert_eq!(slice,*text);
+            }
+        }
+        if source.starts_with("(alpha)"){
+            assert_eq!(head.span(),Span{start:0,end:7});
+            assert!(matches!(maybe,Some(AstValue::Node(_))));
+            assert_eq!(tail.len(),1);
+            assert_eq!(tail[0].canonical_json(),"\"x\"");
+            assert_eq!(tail[0].span().end-tail[0].span().start,1);
+        }
+        if source=="(1)::(😀):<😀>"{
+            assert!(maybe.is_none());
+            assert_eq!(items[0].canonical_json(),"\"(😀)\"");
+            assert_eq!(items[0].span().end-items[0].span().start,3);
+            assert_eq!(tail[0].canonical_json(),"\"😀\"");
+            assert_eq!(tail[0].span().end-tail[0].span().start,1);
+        }
+    }
+    // A boundary with zero projected values remains absent: no text is invented.
+    let tree=generated::parser::parse_tree("(!):: :<>").unwrap();
+    assert!(generated::mapper::map(&tree).unwrap_err().contains("expected one value for head, got 0"));
+}

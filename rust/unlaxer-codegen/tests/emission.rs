@@ -58,7 +58,15 @@ fn generated_modules_compile_evaluate_and_require_semantics() {
         "{}",
         String::from_utf8_lossy(&result.stderr)
     );
-    for fixture in ["evolution", "fields", "shared", "names", "right", "mixed"] {
+    for fixture in [
+        "evolution",
+        "fields",
+        "shared",
+        "names",
+        "right",
+        "mixed",
+        "boundaries",
+    ] {
         let output = temp.0.join(fixture);
         fs::create_dir(&output).unwrap();
         let mut ir = support::fixture(if fixture == "names" {
@@ -97,6 +105,8 @@ fn main() { let tree=generated::parser::parse_tree("if(1, 3*3, neg(2))").unwrap(
             r#"fn main() {let tree=generated::parser::parse_tree("name 'hi' \"x\" 1 2 3").unwrap(); let ast=generated::mapper::map(&tree).unwrap(); drop(tree); let json=ast.canonical_json(); assert!(json.contains("hi")); assert!(json.contains("children"));}"#
         } else if fixture == "mixed" {
             include_str!("support/mixed_probe.rs.txt")
+        } else if fixture == "boundaries" {
+            include_str!("support/boundaries_probe.rs.txt")
         } else if fixture == "right" {
             r#"fn main() {use generated::parser::{Associativity,OPERATORS}; for source in ["a","b"] {let tree=generated::parser::parse_tree(source).unwrap(); let ast=generated::mapper::map(&tree).unwrap(); assert!(ast.canonical_json().contains(source));} assert_eq!(OPERATORS[0].rule,"Right"); assert_eq!(OPERATORS[0].associativity,Associativity::Right); assert_eq!(OPERATORS[1].associativity,Associativity::Left);}"#
         } else {
@@ -201,6 +211,9 @@ fn invalid_ir_is_rejected_before_emission() {
     cases.push(g);
     let mut g = base.clone();
     g.rules[3].body = Expression::TextValue(Box::new(Expression::Reference(999)));
+    cases.push(g);
+    let mut g = base.clone();
+    g.rules[3].body = Expression::ValueBoundary(Box::new(Expression::Reference(999)));
     cases.push(g);
     let mut g = base.clone();
     g.rules[3].body = Expression::CharRangeToken { min: 'z', max: 'a' };

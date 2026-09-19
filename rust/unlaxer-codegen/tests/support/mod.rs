@@ -196,6 +196,50 @@ pub fn fixture(name: &str) -> GrammarIr {
                 Some(("Number", vec![field("value", Text, One)])),
             ),
         ],
+        "boundaries" => {
+            let mut grammar = fixture("mixed");
+            grammar.rules[0]
+                .mapping
+                .as_mut()
+                .unwrap()
+                .fields
+                .push(field("tail", Value, Many));
+            grammar.rules[0].body = Sequence(vec![
+                cap("head", ValueBoundary(Box::new(Reference(3)))),
+                Literal(":".into()),
+                cap(
+                    "maybe",
+                    ValueBoundary(Box::new(OptionalExpr(Box::new(Reference(3))))),
+                ),
+                Literal(":".into()),
+                Repeat {
+                    child: Box::new(cap("items", ValueBoundary(Box::new(Reference(3))))),
+                    min: 0,
+                    max: None,
+                },
+                Literal(":".into()),
+                cap("tail", Reference(4)),
+            ]);
+            grammar.rules.push(rule(
+                "Outer",
+                Sequence(vec![Literal("(".into()), Reference(1), Literal(")".into())]),
+                None,
+            ));
+            grammar.rules.push(rule(
+                "List",
+                Sequence(vec![
+                    Literal("<".into()),
+                    Repeat {
+                        child: Box::new(Reference(1)),
+                        min: 0,
+                        max: None,
+                    },
+                    Literal(">".into()),
+                ]),
+                None,
+            ));
+            grammar.rules
+        }
         _ => panic!("unknown fixture {name}"),
     };
     GrammarIr {

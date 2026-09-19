@@ -15,6 +15,10 @@ pub struct Span {
 /// The node retains its original children; mappers should project its span as text.
 pub const TEXT_VALUE_RULE: usize = usize::MAX;
 
+/// Reserved CST rule ID for a scalar mixed-value capture boundary.
+/// A mapper may collapse a nonempty all-text projection to this complete source span.
+pub const VALUE_BOUNDARY_RULE: usize = usize::MAX - 1;
+
 #[derive(Debug, Clone)]
 pub enum Expr {
     Literal(&'static str),
@@ -29,6 +33,8 @@ pub enum Expr {
     Capture(&'static str, Box<Expr>),
     /// Wrap successful child nodes in a text-projection boundary without changing parsing.
     TextValue(Box<Expr>),
+    /// Preserve a scalar mixed-value capture span without deciding text versus node.
+    ValueBoundary(Box<Expr>),
     Optional(Box<Expr>),
     /// Java Occurs retains a failed direct consuming atom's match-cursor reset.
     JavaOptional(Box<Expr>),
@@ -118,6 +124,10 @@ impl Expr {
     pub fn text_value(self) -> Self {
         Self::TextValue(Box::new(self))
     }
+    /// Preserve a mixed scalar/optional capture boundary; parsing remains transparent.
+    pub fn value_boundary(self) -> Self {
+        Self::ValueBoundary(Box::new(self))
+    }
     pub fn ahead(self) -> Self {
         Self::Lookahead {
             child: Box::new(self),
@@ -150,7 +160,7 @@ pub struct Capture {
 
 #[derive(Debug, Clone)]
 pub struct Node {
-    /// Grammar-local rule index, or the reserved [`TEXT_VALUE_RULE`] projection marker.
+    /// Grammar-local rule index, [`TEXT_VALUE_RULE`], or [`VALUE_BOUNDARY_RULE`].
     pub rule: usize,
     pub span: Span,
     pub children: Vec<usize>,
@@ -928,12 +938,16 @@ impl<'a> ParseContext<'a> {
                 });
                 Some(fragment)
             }
-            Expr::TextValue(expression) => {
+            Expr::TextValue(child) | Expr::ValueBoundary(child) => {
                 let start = self.position;
-                let fragment = self.expression(expression, depth)?;
+                let fragment = self.expression(child, depth)?;
                 let node_id = self.nodes.len();
                 self.nodes.push(Node {
-                    rule: TEXT_VALUE_RULE,
+                    rule: if matches!(expression, Expr::TextValue(_)) {
+                        TEXT_VALUE_RULE
+                    } else {
+                        VALUE_BOUNDARY_RULE
+                    },
                     span: self.span(start),
                     children: fragment.nodes,
                     captures: vec![],
@@ -980,7 +994,7 @@ impl<'a> ParseContext<'a> {
     // does not wrap that attempt in a child transaction, whereas chain/rule/capture
     // children roll themselves back. Keep this effect confined to UBNF occurrences.
     fn java_failed_atom(&mut self, child: &Expr) {
-        if let Expr::TextValue(child) = child {
+        if let Expr::TextValue(child) | Expr::ValueBoundary(child) = child {
             self.java_failed_atom(child);
             return;
         }

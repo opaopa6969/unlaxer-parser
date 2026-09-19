@@ -111,7 +111,7 @@ fn expression(
                 expression(child, count, captures)?;
             }
         }
-        OptionalExpr(child) | Delimited(child) | TextValue(child) => {
+        OptionalExpr(child) | Delimited(child) | TextValue(child) | ValueBoundary(child) => {
             expression(child, count, captures)?
         }
         Repeat { child, min, max } => {

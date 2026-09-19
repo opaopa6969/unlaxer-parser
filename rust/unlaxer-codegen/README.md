@@ -35,6 +35,11 @@ or `Vec<AstValue>` and corresponding borrowed semantic parameters. Generated
 string and nodes to AST objects, while `span()` preserves positions for both.
 Frontends must explicitly wrap text alternatives in `Expression::TextValue`.
 The mapper does not infer a text value when the capture contains no value nodes.
+Scalar/optional mixed captures may additionally use `Expression::ValueBoundary`
+to retain surrounding delimiters: a nonempty all-text projection becomes the
+complete boundary text/span, while node-containing and empty projections remain
+unchanged. Frontends must not put this boundary around a many-valued helper;
+otherwise a one-element list could acquire its container punctuation.
 These additions are emitted only for mixed fields; existing nonmixed output
 remains unchanged.
 

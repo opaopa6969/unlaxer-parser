@@ -95,4 +95,6 @@ pub enum Expression {
     Delimited(Box<Expression>),
     /// Preserve a text alternative as a synthetic CST value with its own span.
     TextValue(Box<Expression>),
+    /// Scalar/optional capture boundary: retain its full span if all values are text.
+    ValueBoundary(Box<Expression>),
 }

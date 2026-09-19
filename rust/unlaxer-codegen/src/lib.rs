@@ -178,6 +178,7 @@ fn expression(expr: &Expression) -> String {
         Sequence(items) => format!("Expr::Sequence(vec![{}])", expressions(items)),
         Delimited(child) => format!("Expr::Sequence(vec![{}])", expression(child)),
         TextValue(child) => format!("{}.text_value()", expression(child)),
+        ValueBoundary(child) => format!("{}.value_boundary()", expression(child)),
         Choice(items) => format!("Expr::Choice(vec![{}])", expressions(items)),
         Capture {
             name,
@@ -213,6 +214,7 @@ fn mapper(ir: &GrammarIr) -> String {
     out.push_str("use super::ast::Ast;\nuse unlaxer_runtime::Tree;\n\npub fn map(tree: &Tree) -> Result<Ast, String> {\n    required(map_node(tree, tree.root)?, \"root\")\n}\n\nfn required<T>(mut values: Vec<T>, name: &str) -> Result<T, String> {\n    if values.len() != 1 { return Err(format!(\"expected one value for {name}, got {}\", values.len())); }\n    Ok(values.remove(0))\n}\n\nfn map_nodes(tree: &Tree, ids: &[usize]) -> Result<Vec<Ast>, String> {\n    let mut found = Vec::new();\n    for &id in ids { found.extend(map_node(tree, id)?); }\n    Ok(found)\n}\n");
     if has_values(ir) {
         out.push_str("\nfn map_values(tree: &Tree, ids: &[usize]) -> Result<Vec<AstValue>, String> {\n    let mut found = Vec::new();\n    for &id in ids {\n        let node = &tree.nodes[id];\n        match node.rule {\n            unlaxer_runtime::TEXT_VALUE_RULE => found.push(AstValue::Text {\n                text: unlaxer_runtime::java_capture_text(tree.text(node.span)).to_owned(),\n                span: node.span,\n            }),\n");
+        out.push_str("            unlaxer_runtime::VALUE_BOUNDARY_RULE => {\n                let values = map_values(tree, &node.children)?;\n                if !values.is_empty() && values.iter().all(|value| matches!(value, AstValue::Text { .. })) {\n                    found.push(AstValue::Text {\n                        text: unlaxer_runtime::java_capture_text(tree.text(node.span)).to_owned(),\n                        span: node.span,\n                    });\n                } else {\n                    found.extend(values);\n                }\n            },\n");
         let ids: Vec<_> = ir
             .rules
             .iter()

@@ -1,4 +1,6 @@
-use unlaxer_runtime::{parse, Expr, ParseContext, ParseResult, Rule, Span, TEXT_VALUE_RULE};
+use unlaxer_runtime::{
+    parse, Expr, ParseContext, ParseResult, Rule, Span, TEXT_VALUE_RULE, VALUE_BOUNDARY_RULE,
+};
 
 #[test]
 fn repeated_mixed_values_keep_order_original_nodes_and_both_capture_layers() {
@@ -174,13 +176,14 @@ fn wrapping_preserves_optional_repeat_and_lookahead_cursor_contracts() {
     ] {
         for repeat in [false, true] {
             let mut observed = vec![];
-            for wrapped in [false, true] {
+            for wrapped in 0..4 {
                 let mut context = ParseContext::new("ab");
                 context.parse(&Expr::JavaEmpty).unwrap();
-                let child = if wrapped {
-                    child.clone().text_value().text_value()
-                } else {
-                    child.clone()
+                let child = match wrapped {
+                    0 => child.clone(),
+                    1 => child.clone().text_value().text_value(),
+                    2 => child.clone().value_boundary().value_boundary(),
+                    _ => child.clone().text_value().value_boundary().text_value(),
                 };
                 let parser = if repeat {
                     child.repeat_java(0, Some(2))
@@ -196,7 +199,9 @@ fn wrapping_preserves_optional_repeat_and_lookahead_cursor_contracts() {
                     context.failure(),
                 ));
             }
-            assert_eq!(observed[0], observed[1]);
+            for wrapped in &observed[1..] {
+                assert_eq!(&observed[0], wrapped);
+            }
         }
     }
     let mut context = ParseContext::new("😀");
@@ -216,4 +221,64 @@ fn wrapping_preserves_optional_repeat_and_lookahead_cursor_contracts() {
         .unwrap();
     assert_eq!(repeated.nodes.len(), 2);
     assert_eq!(context.position(), 0);
+}
+
+#[test]
+fn value_boundary_keeps_outer_span_inner_nodes_and_captures() {
+    let rules = [Rule {
+        name: "root",
+        expression: Expr::sequence([
+            Expr::literal("("),
+            Expr::literal("😀").capture("inner").text_value(),
+            Expr::literal(")"),
+        ])
+        .value_boundary()
+        .capture("outer"),
+    }];
+    let tree = parse(&rules, 0, false, "(😀)").unwrap();
+    let root = &tree.nodes[tree.root];
+    let boundary = &tree.nodes[root.children[0]];
+    assert_eq!(boundary.rule, VALUE_BOUNDARY_RULE);
+    assert_eq!(boundary.span, Span { start: 0, end: 3 });
+    assert!(boundary.captures.is_empty());
+    let text = &tree.nodes[boundary.children[0]];
+    assert_eq!(text.rule, TEXT_VALUE_RULE);
+    assert_eq!(text.span, Span { start: 1, end: 2 });
+    assert_eq!(
+        root.captures
+            .iter()
+            .map(|capture| capture.name)
+            .collect::<Vec<_>>(),
+        ["inner", "outer"]
+    );
+    assert_eq!(root.captures[1].nodes, root.children);
+    let mut context = ParseContext::new("");
+    let empty = context.parse(&Expr::Empty.value_boundary()).unwrap();
+    let node = context.node(empty.root_node().unwrap()).unwrap();
+    assert_eq!(node.rule, VALUE_BOUNDARY_RULE);
+    assert_eq!(node.span, Span { start: 0, end: 0 });
+    assert!(node.children.is_empty());
+}
+
+#[test]
+fn failed_value_boundary_restores_projection_captures_and_custom_state() {
+    let failed = Expr::Custom(nested)
+        .text_value()
+        .value_boundary()
+        .capture("outer")
+        .then(Expr::literal("!"));
+    let mut context = ParseContext::new("😀?");
+    assert!(context.parse(&failed).is_err());
+    assert_eq!((context.position(), context.matched_position()), (0, 0));
+    assert!(context.node(0).is_none());
+    assert!(context.captured("inner").is_none());
+    assert!(context.captured("outer").is_none());
+    assert!(context.state::<usize>("custom").is_none());
+    assert_eq!(context.failure().offset, 1);
+    context
+        .parse(&Expr::Custom(nested).value_boundary().ahead())
+        .unwrap();
+    assert_eq!((context.position(), context.matched_position()), (0, 0));
+    assert!(context.node(0).is_none());
+    assert!(context.state::<usize>("custom").is_none());
 }
