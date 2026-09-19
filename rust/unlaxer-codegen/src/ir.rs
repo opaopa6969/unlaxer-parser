@@ -24,6 +24,7 @@ pub struct Operator {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Associativity {
     Left,
+    Right,
     None,
 }
 
