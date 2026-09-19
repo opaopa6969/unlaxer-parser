@@ -1017,6 +1017,10 @@ fn token_expression(token: &TokenKind) -> Result<Expression> {
             "DoubleQuotedParser" | "org.unlaxer.parser.elementary.DoubleQuotedParser" => {
                 Expression::QuotedToken('"')
             }
+            "org.unlaxer.tinyexpression.parser.StringLiteralParser" => Expression::Choice(vec![
+                Expression::QuotedToken('"'),
+                Expression::QuotedToken('\''),
+            ]),
             "EndOfSourceParser" | "org.unlaxer.parser.elementary.EndOfSourceParser" => {
                 Expression::EofToken
             }

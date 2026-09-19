@@ -365,6 +365,8 @@ public final class RustGrammarLowering {
                 case "IdentifierParser", "org.unlaxer.parser.clang.IdentifierParser" -> new IdentifierToken();
                 case "SingleQuotedParser", "org.unlaxer.parser.elementary.SingleQuotedParser" -> new QuotedToken('\'');
                 case "DoubleQuotedParser", "org.unlaxer.parser.elementary.DoubleQuotedParser" -> new QuotedToken('"');
+                case "org.unlaxer.tinyexpression.parser.StringLiteralParser" ->
+                    new Choice(List.of(new QuotedToken('"'), new QuotedToken('\'')));
                 case "EndOfSourceParser", "org.unlaxer.parser.elementary.EndOfSourceParser" -> new EofToken();
                 default -> throw unsupported("external token " + simple.parserClass());
             };

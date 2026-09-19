@@ -89,9 +89,21 @@ public class RustBackendTest {
                 reject(source.replace("T @value", "T Root @value"), "left recursion");
             }
         }
-        for (String parser : new String[]{"other.IdentifierParser", "StringLiteralParser", "QuotedParser"}) {
+        for (String parser : new String[]{"other.IdentifierParser", "StringLiteralParser",
+                "other.StringLiteralParser", "QuotedParser"}) {
             reject(SIMPLE.replace("grammar Example {", "grammar Example { token T = " + parser + "\n"), "external token");
         }
+    }
+
+    @Test public void tinyExpressionStringLiteralUsesDoubleThenSingleQuotedChoice() {
+        String source = SIMPLE
+            .replace("grammar Example {", "grammar Example { token STRING = org.unlaxer.tinyexpression.parser.StringLiteralParser\n")
+            .replace("'hello' @value", "STRING @value");
+        var body = RustGrammarLowering.lower(UBNFMapper.parse(source).grammars().get(0)).rules().get(0).body();
+        assertEquals(
+            new GrammarIR.Sequence(List.of(new GrammarIR.Capture("value", new GrammarIR.Choice(List.of(
+                new GrammarIR.QuotedToken('"'), new GrammarIR.QuotedToken('\'')))))),
+            body);
     }
 
     @Test public void cardinalityReachesAstAndSemantics() {
