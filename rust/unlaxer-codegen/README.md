@@ -28,6 +28,13 @@ generated metadata enum includes `Right` only when a right-associative operator
 is present, preserving existing left-only output byte-for-byte. This is not a
 claim of full Java parser or tinyexpression parity.
 
+Generated parsers initialize their immutable `SharedGrammar` once with
+`OnceLock`; `parse_tree*` and `parse_context` reuse that graph through the
+runtime's `Arc<[Rule]>` APIs. Mutable cursors, nodes, captures, diagnostics,
+scope and user state remain parse-local. The legacy `rules() -> Vec<Rule>`
+signature remains as an explicit cloned snapshot for source compatibility;
+normal parsing uses `grammar()` and does not call it.
+
 Mixed text/node fields use `Kind::Value`: owned `AstValue`, `Option<AstValue>`,
 or `Vec<AstValue>` and corresponding borrowed semantic parameters. Generated
 `AstValue::Text` owns the captured text and its original source span;

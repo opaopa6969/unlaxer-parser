@@ -111,19 +111,19 @@ fn ast(ir: &GrammarIr) -> String {
 
 fn parser(ir: &GrammarIr) -> String {
     let mut out = String::from(HEADER);
-    out.push_str("use unlaxer_runtime::{Expr, Rule, Tree, ParseError, ParseDiagnostic, ParseContext, ParseResult, Parser};\n\npub struct GeneratedParser;\n\nimpl Parser for GeneratedParser {\n    fn parse(&self, context: &mut ParseContext<'_>) -> ParseResult {\n        parse_context(context)\n    }\n}\n\npub fn parse_tree(source: &str) -> Result<Tree, ParseError> {\n    parse_tree_detailed(source).map_err(|diagnostic| diagnostic.farthest)\n}\n\npub fn rules() -> Vec<Rule> {\n    vec![\n");
+    out.push_str("use std::sync::OnceLock;\n#[cfg(test)]\nuse std::sync::atomic::{AtomicUsize, Ordering};\nuse unlaxer_runtime::{Expr, Rule, SharedGrammar, Tree, ParseError, ParseDiagnostic, ParseContext, ParseResult, Parser};\n\n#[cfg(test)]\nstatic GRAMMAR_INITIALIZATIONS: AtomicUsize = AtomicUsize::new(0);\n\npub struct GeneratedParser;\n\nimpl Parser for GeneratedParser {\n    fn parse(&self, context: &mut ParseContext<'_>) -> ParseResult {\n        parse_context(context)\n    }\n}\n\npub fn parse_tree(source: &str) -> Result<Tree, ParseError> {\n    parse_tree_detailed(source).map_err(|diagnostic| diagnostic.farthest)\n}\n\n/// Compatibility snapshot of the generated rules. Parsing uses `grammar()` and does not clone them.\npub fn rules() -> Vec<Rule> {\n    grammar().iter().cloned().collect()\n}\n\n/// Immutable grammar graph, initialized once and shared by every parse.\npub fn grammar() -> &'static SharedGrammar {\n    static GRAMMAR: OnceLock<SharedGrammar> = OnceLock::new();\n    GRAMMAR.get_or_init(|| {\n        #[cfg(test)]\n        GRAMMAR_INITIALIZATIONS.fetch_add(1, Ordering::Relaxed);\n        vec![\n");
     for rule in &ir.rules {
         writeln!(
             out,
-            "        Rule {{ name: {}, expression: {} }},",
+            "            Rule {{ name: {}, expression: {} }},",
             quote(&rule.name),
             expression(&rule.body)
         )
         .unwrap();
     }
-    out.push_str("    ]\n}\n\npub fn parse_context(context: &mut ParseContext<'_>) -> ParseResult {\n    context.parse_grammar(rules(), ");
+    out.push_str("        ].into()\n    })\n}\n\n/// Test-only evidence for the process-wide `OnceLock` construction contract.\n#[cfg(test)]\n#[doc(hidden)]\npub fn grammar_initialization_count() -> usize {\n    GRAMMAR_INITIALIZATIONS.load(Ordering::Relaxed)\n}\n\npub fn parse_context(context: &mut ParseContext<'_>) -> ParseResult {\n    context.parse_shared_grammar(grammar(), ");
     write!(out, "{}, {})\n}}\n", ir.root, ir.java_whitespace).unwrap();
-    out.push_str("\npub fn parse_tree_detailed(source: &str) -> Result<Tree, ParseDiagnostic> {\n    unlaxer_runtime::parse_detailed(&rules(), ");
+    out.push_str("\npub fn parse_tree_detailed(source: &str) -> Result<Tree, ParseDiagnostic> {\n    unlaxer_runtime::parse_detailed_shared(grammar(), ");
     write!(out, "{}, {}, source)\n}}\n", ir.root, ir.java_whitespace).unwrap();
     let mut operators: Vec<_> = ir
         .rules
