@@ -17,6 +17,8 @@
 量指定子へのcaptureは従来どおり各要素を対象とする。反復全体の文字列をさらに1件追加するものではない。
 group、optional、repeat、plus、bounded、separatedの内部を辿るが、別の名前付きルールの内部captureは
 呼出し元のcaptureへ混ぜない。scopeイベントも独立に同じ完了順を保持する。
+Javaのplain text captureも出現ごとのString identityに位置を登録するため、
+同じ文字列や空文字列が複数回現れても`sourceSpanOf`で位置を区別できる。
 
 ## Java生成APIへの影響
 
