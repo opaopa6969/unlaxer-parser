@@ -1,0 +1,142 @@
+[
+  {
+    "name": "global-omitted",
+    "grammar": "grammar GlobalOmitted { @package: org.example.ruletrivia @root @mapping(Root, params=[value]) Root ::= 'a' @value 'b'; }",
+    "cases": [
+      {"id":"compact", "input":"ab", "prefix":[true,2,2], "accepted":true,
+       "ast":{"type":"Root","span":[0,2],"fields":{"value":"a"}}},
+      {"id":"space-is-significant", "input":"a b", "prefix":[false,0,0], "accepted":false},
+      {"id":"valid-prefix", "input":"ab!", "prefix":[true,2,2], "accepted":false}
+    ]
+  },
+  {
+    "name": "global-none",
+    "grammar": "grammar GlobalNone { @package: org.example.ruletrivia @whitespace: none @root @mapping(Root, params=[value]) Root ::= 'a' @value 'b'; }",
+    "cases": [
+      {"id":"compact", "input":"ab", "prefix":[true,2,2], "accepted":true,
+       "ast":{"type":"Root","span":[0,2],"fields":{"value":"a"}}},
+      {"id":"does-not-enable-space", "input":"a b", "prefix":[false,0,0], "accepted":false},
+      {"id":"does-not-enable-comments", "input":"a/*x*/b", "prefix":[false,0,0], "accepted":false}
+    ]
+  },
+  {
+    "name": "global-java-style-case-folded",
+    "grammar": "grammar GlobalJava { @package: org.example.ruletrivia @whitespace: JaVaStYle @root @mapping(Root, params=[value]) Root ::= '😀' @value 'b'; }",
+    "cases": [
+      {"id":"whitespace-comments-crlf-non-bmp", "input":" \r\n/*😀*/ 😀 //line\r\n b\t", "prefix":[true,22,22], "accepted":true,
+       "ast":{"type":"Root","span":[0,22],"fields":{"value":"😀"}}},
+      {"id":"unterminated-comment", "input":"😀 /* open b", "prefix":[false,0,0], "accepted":false}
+    ]
+  },
+  {
+    "name": "rule-whitespace-default",
+    "grammar": "grammar RuleDefault { @package: org.example.ruletrivia @root @mapping(Root, params=[value]) @whitespace Root ::= 'a' @value 'b'; }",
+    "cases": [
+      {"id":"default-is-java-style", "input":" /*lead*/ a\r\n b //tail😀", "prefix":[true,23,23], "accepted":true,
+       "ast":{"type":"Root","span":[0,23],"fields":{"value":"a"}}},
+      {"id":"wrong-literal", "input":" a c ", "prefix":[false,0,0], "accepted":false}
+    ]
+  },
+  {
+    "name": "rule-whitespace-java-style-case-folded",
+    "grammar": "grammar RuleJava { @package: org.example.ruletrivia @root @mapping(Root, params=[value]) @whitespace(JaVaStYle) Root ::= 'a' @value 'b'; }",
+    "cases": [
+      {"id":"explicit-java-style", "input":" a\tb ", "prefix":[true,5,5], "accepted":true,
+       "ast":{"type":"Root","span":[0,5],"fields":{"value":"a"}}}
+    ]
+  },
+  {
+    "name": "interleave-java-style",
+    "grammar": "grammar InterleaveJava { @package: org.example.ruletrivia @root @mapping(Root, params=[value]) @interleave(profile=javaStyle) Root ::= 'a' @value 'b'; }",
+    "cases": [
+      {"id":"block-comment", "input":"a /*j*/ b", "prefix":[true,9,9], "accepted":true,
+       "ast":{"type":"Root","span":[0,9],"fields":{"value":"a"}}}
+    ]
+  },
+  {
+    "name": "interleave-comments-and-spaces",
+    "grammar": "grammar InterleaveComments { @package: org.example.ruletrivia @root @mapping(Root, params=[value]) @interleave(profile=commentsAndSpaces) Root ::= 'a' @value 'b'; }",
+    "cases": [
+      {"id":"line-comment-crlf", "input":"a //x\r\n b", "prefix":[true,9,9], "accepted":true,
+       "ast":{"type":"Root","span":[0,9],"fields":{"value":"a"}}}
+    ]
+  },
+  {
+    "name": "explicit-none-before-interleave",
+    "grammar": "grammar NoneBefore { @package: org.example.ruletrivia @whitespace: javaStyle @root @mapping(Root, params=[value]) @whitespace(none) @interleave(profile=javaStyle) Root ::= 'a' @value 'b'; }",
+    "cases": [
+      {"id":"compact", "input":"ab", "prefix":[true,2,2], "accepted":true,
+       "ast":{"type":"Root","span":[0,2],"fields":{"value":"a"}}},
+      {"id":"explicit-none-wins", "input":"a b", "prefix":[false,0,0], "accepted":false}
+    ]
+  },
+  {
+    "name": "explicit-none-after-interleave",
+    "grammar": "grammar NoneAfter { @package: org.example.ruletrivia @whitespace: javaStyle @root @mapping(Root, params=[value]) @interleave(profile=commentsAndSpaces) @whitespace(NoNe) Root ::= 'a' @value 'b'; }",
+    "cases": [
+      {"id":"compact", "input":"ab", "prefix":[true,2,2], "accepted":true,
+       "ast":{"type":"Root","span":[0,2],"fields":{"value":"a"}}},
+      {"id":"order-does-not-matter", "input":"a/*x*/b", "prefix":[false,0,0], "accepted":false}
+    ]
+  },
+  {
+    "name": "enabled-parent-plain-default-child",
+    "grammar": "grammar ParentEnabled { @package: org.example.ruletrivia @root @mapping(Root, params=[child]) @whitespace Root ::= '(' Child @child ')'; @mapping(Child, params=[left,right]) Child ::= 'a' @left 'b' @right; }",
+    "cases": [
+      {"id":"parent-consumes-outer-trivia", "input":" (ab) ", "prefix":[true,6,6], "accepted":true,
+       "ast":{"type":"Root","span":[0,6],"fields":{"child":{"type":"Child","span":[2,4],"fields":{"left":"a","right":"b"}}}}},
+      {"id":"child-default-inherits-grammar-not-caller", "input":"(a b)", "prefix":[false,0,0], "accepted":false}
+    ]
+  },
+  {
+    "name": "plain-parent-enabled-default-child",
+    "grammar": "grammar ChildEnabled { @package: org.example.ruletrivia @whitespace: javaStyle @root @mapping(Root, params=[child]) @whitespace(none) Root ::= '(' Child @child ')'; @mapping(Child, params=[left,right]) Child ::= 'a' @left 'b' @right; }",
+    "cases": [
+      {"id":"child-inherits-grammar", "input":"( a /*😀*/ b )", "prefix":[true,13,13], "accepted":true,
+       "ast":{"type":"Root","span":[0,13],"fields":{"child":{"type":"Child","span":[1,12],"fields":{"left":"a","right":"b"}}}}},
+      {"id":"parent-does-not-consume-leading-space", "input":" ( a b )", "prefix":[false,0,0], "accepted":false},
+      {"id":"parent-does-not-consume-trailing-space", "input":"( a b ) ", "prefix":[true,7,7], "accepted":false}
+    ]
+  },
+  {
+    "name": "root-single-literal-choice",
+    "grammar": "grammar LiteralChoice { @package: org.example.ruletrivia @whitespace: javaStyle @root @mapping(Root, params=[value]) Root ::= 'a' @value | 'b' @value; }",
+    "cases": [
+      {"id":"first-alternative", "input":"a", "prefix":[true,1,1], "accepted":true,
+       "ast":{"type":"Root","span":[0,1],"fields":{"value":"a"}}},
+      {"id":"second-alternative", "input":"b", "prefix":[true,1,1], "accepted":true,
+       "ast":{"type":"Root","span":[0,1],"fields":{"value":"b"}}},
+      {"id":"single-element-alternative-has-no-chain-trivia", "input":" b ", "prefix":[false,0,0], "accepted":false},
+      {"id":"trailing-trivia-is-not-consumed", "input":"a ", "prefix":[true,1,1], "accepted":false}
+    ]
+  },
+  {
+    "name": "nested-constructs-and-rollback",
+    "grammar": "grammar Constructs { @package: org.example.ruletrivia @whitespace: javaStyle @root @mapping(Root, params=[choice,maybe,repeated,separated,alias]) Root ::= '(' ('a' 'x' | 'a' 'y') @choice [ ('c' 'z') @maybe ] { 'd' @repeated } Items @separated Alias @alias ')'; Items ::= 'e' % ','; Alias ::= Child; @mapping(Child, params=[value]) Child ::= 'f' @value; }",
+    "cases": [
+      {"id":"choice-and-optional-rollback", "input":"(ay dd e, e f)", "prefix":[true,14,14], "accepted":true,
+       "ast":{"type":"Root","span":[0,14],"fields":{"choice":"ay","maybe":null,"repeated":["d","d"],"separated":"e, e","alias":{"type":"Child","span":[12,13],"fields":{"value":"f"}}}}},
+      {"id":"optional-present", "input":"(ax cz d e f)", "prefix":[true,13,13], "accepted":true,
+       "ast":{"type":"Root","span":[0,13],"fields":{"choice":"ax","maybe":"cz","repeated":["d"],"separated":"e","alias":{"type":"Child","span":[11,12],"fields":{"value":"f"}}}}},
+      {"id":"separated-tail-rolls-back", "input":"(ay d e, f)", "prefix":[false,0,0], "accepted":false}
+    ]
+  },
+  {
+    "name": "left-associative-local-whitespace",
+    "grammar": "grammar LeftScoped { @package: org.example.ruletrivia @root @mapping(Binary, params=[left,op,right]) @leftAssoc @precedence(level=10) @whitespace Expr ::= Atom @left { '+' @op Atom @right }; Atom ::= 'x'; }",
+    "cases": [
+      {"id":"local-policy-survives-left-rewrite", "input":" x + x + x ", "prefix":[true,11,11], "accepted":true,
+       "ast":{"type":"Binary","span":[0,11],"fields":{"left":"x","op":["+","+"],"right":["x","x"]}}},
+      {"id":"wrong-operator", "input":" x * x ", "prefix":[true,3,3], "accepted":false}
+    ]
+  },
+  {
+    "name": "right-associative-local-interleave",
+    "grammar": "grammar RightScoped { @package: org.example.ruletrivia @root @mapping(Power, params=[left,op,right]) @rightAssoc @precedence(level=20) @interleave(profile=commentsAndSpaces) Expr ::= 'x' @left { '^' @op Expr @right }; }",
+    "cases": [
+      {"id":"local-policy-survives-right-rewrite", "input":" x /*r*/ ^ x ", "prefix":[true,13,13], "accepted":true,
+       "ast":{"type":"Power","span":[0,13],"fields":{"left":"x","op":["^"],"right":[{"type":"Power","span":[11,12],"fields":{"left":"x","op":[],"right":[]}}]}}},
+      {"id":"missing-right", "input":"x^", "prefix":[true,1,1], "accepted":false}
+    ]
+  }
+]
