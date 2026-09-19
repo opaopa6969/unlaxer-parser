@@ -112,21 +112,87 @@ public final class RustGrammarLowering {
                     fields.add(new Field(name, captures.get(name).kind(), captures.get(name).cardinality()));
                 }
                 mapping = new Mapping(annotation.className(), fields);
-                Mapping previous = variants.putIfAbsent(mapping.name(), mapping);
-                if (previous != null && !previous.equals(mapping)) {
-                    throw unsupported("incompatible shared mapping schema " + mapping.name());
-                }
             }
             if (operators.get(i) != null && operators.get(i).associativity() == Associativity.LEFT) {
                 checkLeftAssoc(i, mapping);
             }
-            Expression loweredBody = bodies.get(i);
             if (operators.get(i) != null && operators.get(i).associativity() == Associativity.RIGHT) {
-                loweredBody = lowerRightAssoc(i, mapping);
+                lowerRightAssoc(i, mapping);
             }
-            rules.add(new Rule(grammar.rules().get(i).name(), loweredBody, mapping, operators.get(i)));
+            if (mapping != null) variants.merge(mapping.name(), mapping, this::mergeMappings);
+            rules.add(new Rule(grammar.rules().get(i).name(), bodies.get(i), mapping, operators.get(i)));
         }
-        return new GrammarIR(rules, root, whitespace);
+        List<Rule> rewritten = new ArrayList<>();
+        boolean hasValues = variants.values().stream().flatMap(mapping -> mapping.fields().stream())
+            .anyMatch(field -> field.kind() == Kind.VALUE);
+        for (Rule rule : rules) {
+            Mapping mapping = rule.mapping() == null ? null : variants.get(rule.mapping().name());
+            Expression expression = hasValues ? retainTextValues(rule.body(), mapping) : rule.body();
+            // Rewrite only after source-level shapes have been analyzed: this synthetic choice
+            // is not a heterogeneous source choice and must not introduce text sentinels.
+            if (rule.operator() != null && rule.operator().associativity() == Associativity.RIGHT) {
+                expression = rightAssocBody(expression);
+            }
+            rewritten.add(new Rule(rule.name(), expression, mapping, rule.operator()));
+        }
+        return new GrammarIR(rewritten, root, whitespace);
+    }
+
+    private Mapping mergeMappings(Mapping left, Mapping right) {
+        if (left.fields().size() != right.fields().size()) {
+            throw unsupported("incompatible shared mapping schema " + left.name());
+        }
+        List<Field> fields = new ArrayList<>();
+        for (int i = 0; i < left.fields().size(); i++) {
+            Field a = left.fields().get(i);
+            Field b = right.fields().get(i);
+            if (!a.name().equals(b.name()) || a.cardinality() != b.cardinality()) {
+                throw unsupported("incompatible shared mapping schema " + left.name());
+            }
+            fields.add(new Field(a.name(), joinKind(a.kind(), b.kind()), a.cardinality()));
+        }
+        return new Mapping(left.name(), fields);
+    }
+
+    private Expression retainTextValues(Expression expression, Mapping mapping) {
+        return switch (expression) {
+            case TextValue ignored -> expression;
+            case Capture capture -> {
+                Expression child = retainTextValues(capture.expression(), mapping);
+                if (mapping != null && mapping.fields().stream().anyMatch(field ->
+                        field.name().equals(capture.name()) && field.kind() == Kind.VALUE)) {
+                    Shape shape = shape(capture.expression(), new HashSet<>());
+                    if (shape.kind() == Kind.TEXT) child = new TextValue(child);
+                    else if (shape.kind() == Kind.VALUE && shape.cardinality() != Cardinality.MANY) {
+                        child = new ValueBoundary(child);
+                    }
+                }
+                yield new Capture(capture.name(), child);
+            }
+            case Choice choice -> {
+                boolean mixed = shape(choice, new HashSet<>()).kind() == Kind.VALUE;
+                yield new Choice(choice.alternatives().stream().map(alternative -> {
+                    Expression child = retainTextValues(alternative, mapping);
+                    return mixed && shape(alternative, new HashSet<>()).kind() == Kind.TEXT
+                        ? new TextValue(child) : child;
+                }).toList());
+            }
+            case Sequence sequence -> new Sequence(sequence.elements().stream()
+                .map(child -> retainTextValues(child, mapping)).toList());
+            case Delimited delimited -> new Delimited(retainTextValues(delimited.child(), mapping));
+            case OptionalExpr optional -> new OptionalExpr(retainTextValues(optional.child(), mapping));
+            case Repeat repeat -> new Repeat(retainTextValues(repeat.child(), mapping), repeat.min(), repeat.max());
+            case Separated separated -> new Separated(retainTextValues(separated.child(), mapping),
+                retainTextValues(separated.separator(), mapping));
+            default -> expression;
+        };
+    }
+
+    private Expression rightAssocBody(Expression expression) {
+        Sequence sequence = (Sequence) expression;
+        Expression left = sequence.elements().get(0);
+        Sequence tail = (Sequence) ((Repeat) sequence.elements().get(1)).child();
+        return new Choice(List.of(new Sequence(List.of(left, tail.elements().get(0), tail.elements().get(1))), left));
     }
 
     private void checkLeftAssoc(int rule, Mapping mapping) {
@@ -321,6 +387,7 @@ public final class RustGrammarLowering {
             }
             case Separated separated -> {
                 if (nullable(separated.child()) && nullable(separated.separator())) throw unsupported("nullable unbounded separation");
+                if (shape(separated.separator(), new HashSet<>()).kind() != Kind.TEXT) throw unsupported("mapped separator");
                 checkRepetition(separated.child()); checkRepetition(separated.separator());
             }
             case OptionalExpr optional -> checkRepetition(optional.child());
@@ -386,13 +453,14 @@ public final class RustGrammarLowering {
             case OptionalExpr optional -> wrapNode(shape(optional.child(), visiting), Cardinality.OPTIONAL);
             case Repeat repeat -> wrapNode(shape(repeat.child(), visiting), Cardinality.MANY);
             case Separated separated -> {
-                if (shape(separated.separator(), visiting).kind() == Kind.NODE) throw unsupported("mapped separator");
+                if (shape(separated.separator(), visiting).kind() != Kind.TEXT) throw unsupported("mapped separator");
                 yield wrapNode(shape(separated.child(), visiting), Cardinality.MANY);
             }
             case Sequence sequence -> {
-                var nodes = sequence.elements().stream().map(e -> shape(e, visiting)).filter(s -> s.kind() == Kind.NODE).toList();
-                yield nodes.isEmpty() ? new Shape(Kind.TEXT, Cardinality.ONE)
-                    : nodes.size() == 1 ? nodes.get(0) : new Shape(Kind.NODE, Cardinality.MANY);
+                var nodes = sequence.elements().stream().map(e -> shape(e, visiting)).filter(s -> s.kind() != Kind.TEXT).toList();
+                Shape result = nodes.isEmpty() ? new Shape(Kind.TEXT, Cardinality.ONE) : nodes.get(0);
+                for (int i = 1; i < nodes.size(); i++) result = merge(result, nodes.get(i), true);
+                yield result;
             }
             case Choice choice -> {
                 var shapes = choice.alternatives().stream().map(e -> shape(e, visiting)).toList();
@@ -414,10 +482,13 @@ public final class RustGrammarLowering {
     }
 
     private Shape merge(Shape left, Shape right, boolean sequence) {
-        if (left.kind() != right.kind()) throw unsupported("mixed text/node choice or capture");
-        return new Shape(left.kind(), sequence || left.cardinality() == Cardinality.MANY || right.cardinality() == Cardinality.MANY
+        return new Shape(joinKind(left.kind(), right.kind()), sequence || left.cardinality() == Cardinality.MANY || right.cardinality() == Cardinality.MANY
             ? Cardinality.MANY : left.cardinality() == Cardinality.OPTIONAL || right.cardinality() == Cardinality.OPTIONAL
             ? Cardinality.OPTIONAL : Cardinality.ONE);
+    }
+
+    private Kind joinKind(Kind left, Kind right) {
+        return left == right ? left : Kind.VALUE;
     }
 
     private Map<String, Shape> wrappedCaptures(Expression child, Cardinality cardinality) {

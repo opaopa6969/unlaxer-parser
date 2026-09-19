@@ -49,6 +49,27 @@ public class RustNativeGeneratorTest {
         grammars.add(power.replace("Atom ::= NUMBER;", "@mapping(Number,params=[value]) Atom ::= ['😀'] (NUMBER) @value;"));
         grammars.add(power.replace("Atom ::= NUMBER;", "@mapping(Number,params=[value]) Atom ::= (NUMBER) @value;")
             .replace("Expr ::= Atom @left", "Expr ::= Base @left").replace("  @root", "  Base ::= Atom | '(' Expr ')';\n  @root"));
+        String mixed = Files.readString(Path.of("src/test/resources/mixed-values/Mixed.ubnf"));
+        grammars.add(mixed);
+        grammars.add(mixed.replace(" | OtherRule", "").replace("  @mapping(OtherLeaf, params=[value]) OtherRule ::= 'y' @value;", ""));
+        grammars.add(mixed.replace("{ Factor @items }", "{ Factor } @items"));
+        grammars.add(mixed.replace("{ Factor @items }", "Items @items").replace("  Factor ::=", "  Items ::= { Factor };\n  Factor ::="));
+        grammars.add(mixed.replace("{ Factor @items }", "{ ('a' | LeafRule) @items }"));
+        grammars.add(mixed.replace("Document ::= Factor @head ':' [ Factor @maybe ] ':' { Factor @items };",
+            "Document ::= Outer @head ':' [ Outer @maybe ] ':' { Outer @items }; Outer ::= '(' Factor ')';"));
+        for (boolean reversed : List.of(false, true)) {
+            String text = "@mapping(Shared,params=[value]) Text ::= 'a' @value; ";
+            String node = "@mapping(Shared,params=[value]) Node ::= Leaf @value; ";
+            grammars.add("grammar Shared { @root Entry ::= Text | Node; "
+                + (reversed ? node + text : text + node)
+                + "@mapping(Leaf,params=[value]) Leaf ::= 'x' @value; }");
+        }
+        for (String assoc : List.of("leftAssoc", "rightAssoc")) {
+            grammars.add("grammar MixedAssoc { @whitespace: javaStyle @root @" + assoc
+                + " @precedence(level=10) @mapping(Binary,params=[left,op,right]) "
+                + "Expr ::= Factor @left { '+' @op " + (assoc.equals("leftAssoc") ? "Factor" : "Expr") + " @right }; "
+                + "Factor ::= 'a' | Leaf; @mapping(Leaf,params=[value]) Leaf ::= 'x' @value; }");
+        }
         for (String ruleName : List.of("_Root", "self")) {
             grammars.add("grammar G { @whitespace: none @root @mapping(Item,params=[value]) " + ruleName + " ::= 'x' @value; }");
         }

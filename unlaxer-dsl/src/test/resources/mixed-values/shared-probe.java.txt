@@ -1,0 +1,29 @@
+import java.nio.file.*;
+import java.util.*;
+import org.unlaxer.dsl.codegen.*;
+import org.unlaxer.dsl.bootstrap.*;
+class SharedMixedProbe {
+  public static void main(String[] args) throws Exception {
+    String source = Files.readString(Path.of(args[0]));
+    String first = "  @mapping(Value, params=[value]) First ::= 'f' Factor @value;";
+    String second = "  @mapping(Value, params=[value]) Second ::= 's' LeafRule @value;";
+    for (String text : List.of(source, source.replace(first + "\n" + second, second + "\n" + first))) {
+      var test = new RustConformanceTest();
+      test.temporary.create();
+      var grammar = UBNFMapper.parse(text).grammars().getFirst();
+      var compile = RustConformanceTest.class.getDeclaredMethod("compileJava", UBNFAST.GrammarDecl.class, List.class);
+      compile.setAccessible(true);
+      try (var loader = (java.net.URLClassLoader) compile.invoke(test, grammar, List.of())) {
+        var mapper = loader.loadClass("org.example.mixed.SharedMapper");
+        System.out.println("value type=" + loader.loadClass("org.example.mixed.SharedAST$Value").getMethod("value").getReturnType());
+        for (String input : List.of("fa", "fx", "sx")) {
+          try {
+            Object ast = mapper.getMethod("parse", String.class).invoke(null, input);
+            System.out.println(input + " -> " + ast);
+          } catch (ReflectiveOperationException error) { System.out.println(input + " -> " + error.getCause()); }
+        }
+      } catch (ReflectiveOperationException error) { System.out.println("compile -> " + error.getCause()); }
+      finally { test.temporary.delete(); }
+    }
+  }
+}

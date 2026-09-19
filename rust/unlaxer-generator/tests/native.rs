@@ -425,7 +425,7 @@ fn nullable_cardinality_shared_mapping_and_operator_boundaries_are_explicit() {
         (false, "token E=EMPTY @root @mapping(V,params=[values]) Root ::= E % E @values;"),
         (false, "@root @mapping(V) Root ::= [ 'x' ] Root;"),
         (false, "@root @mapping(V) Root ::= Prefix Root | 'x'; Prefix ::= [ 'a' ];"),
-        (false, "@root @mapping(V,params=[value]) Root ::= ('a' | Node) @value; @mapping(N) Node ::= 'n';"),
+        (true, "@root @mapping(V,params=[value]) Root ::= ('a' | Node) @value; @mapping(N) Node ::= 'n';"),
         (false, "@root @mapping(V,params=[value]) Root ::= ([ 'a' ]) @value;"),
         (false, "@root Root ::= A | B; @mapping(V,params=[value]) A ::= 'a' @value; @mapping(V,params=[value]) B ::= ['b'] @value;"),
         (false, "@root Root ::= A | B; @mapping(FooBar) A ::= 'a'; @mapping(Foo_bar) B ::= 'b';"),

@@ -1,0 +1,13 @@
+[
+  {"input":"fa","value":"T:a","texts":[[1,2,"a"]]},
+  {"input":"fx","value":"L:x","texts":[]},
+  {"input":"fy","value":"O:y","texts":[]},
+  {"input":"sx","value":"L:x","texts":[]},
+  {"input":"f😀","value":"T:😀","texts":[[1,2,"😀"]]},
+  {"input":"f"},
+  {"input":"s"},
+  {"input":"sa"},
+  {"input":"sy"},
+  {"input":"fx!"},
+  {"input":""}
+]

@@ -1,0 +1,10 @@
+grammar Mixed {
+  @package: org.example.mixed
+  @whitespace: javaStyle
+  token STRING = SingleQuotedParser
+  @root @mapping(Root, params=[head, maybe, items])
+  Document ::= Factor @head ':' [ Factor @maybe ] ':' { Factor @items };
+  Factor ::= 'a' | '😀' | STRING | LeafRule | OtherRule;
+  @mapping(Leaf, params=[value]) LeafRule ::= 'x' @value;
+  @mapping(OtherLeaf, params=[value]) OtherRule ::= 'y' @value;
+}

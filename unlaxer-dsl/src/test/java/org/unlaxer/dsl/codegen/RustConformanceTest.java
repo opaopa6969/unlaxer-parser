@@ -37,6 +37,213 @@ public class RustConformanceTest {
         tokenCorpus("lexical");
     }
 
+    @Test public void mixedValueFixturesPreserveJavaObjectFieldsAndValues() throws Exception {
+        javaMixedCorpus("Mixed.ubnf", "corpus.json");
+    }
+
+    @Test public void delimitedMixedFixturesPreserveJavaWholeCaptureText() throws Exception {
+        javaMixedCorpus("Delimited.ubnf", "delimited-corpus.json");
+    }
+
+    private void javaMixedCorpus(String grammarFile, String corpusFile) throws Exception {
+        Path fixtures = repo.resolve("unlaxer-dsl/src/test/resources/mixed-values");
+        String source = Files.readString(fixtures.resolve(grammarFile));
+        var corpus = JsonParser.parseString(Files.readString(fixtures.resolve(corpusFile))).getAsJsonArray();
+        for (String mode : List.of("two", "one")) {
+        var grammar = UBNFMapper.parse(mode.equals("one") ? source.replace(" | OtherRule", "") : source).grammars().get(0);
+        try (var loader = compileJava(grammar, List.of())) {
+            var mapper = loader.loadClass("org.example.mixed.MixedMapper");
+            var root = loader.loadClass("org.example.mixed.MixedAST$Root");
+            assertEquals(Object.class, root.getMethod("head").getReturnType());
+            assertEquals("java.util.Optional<java.lang.Object>", root.getMethod("maybe").getGenericReturnType().getTypeName());
+            assertEquals("java.util.List<java.lang.Object>", root.getMethod("items").getGenericReturnType().getTypeName());
+            for (var entry : corpus) {
+                var row = entry.getAsJsonObject();
+                String input = row.get("input").getAsString();
+                var diagnostic = (Optional<?>) mapper.getMethod("diagnose", String.class).invoke(null, input);
+                boolean accepted = mixedAccepted(row, mode);
+                assertEquals(mode + " " + row, accepted, diagnostic.isEmpty());
+                if (accepted) {
+                    Object mapped = mapper.getMethod("parseWithSourceMap", String.class).invoke(null, input);
+                    JsonObject ast = canonical(mapped.getClass().getMethod("ast").invoke(mapped), mapped);
+                    assertEquals(row.toString(), row.get("value").getAsString(), mixedValueOracle(ast));
+                    for (var item : row.getAsJsonArray("texts")) {
+                        var text = item.getAsJsonArray();
+                        String raw = input.substring(input.offsetByCodePoints(0, text.get(0).getAsInt()),
+                            input.offsetByCodePoints(0, text.get(1).getAsInt())).strip();
+                        if (raw.length() >= 2 && raw.startsWith("'") && raw.endsWith("'")) raw = raw.substring(1, raw.length() - 1);
+                        assertEquals(row + " independent text span fixture", text.get(2).getAsString(), raw);
+                    }
+                }
+            }
+        }
+        }
+    }
+
+    @Test public void mixedTextAndNodesPreserveCardinalityValuesCursorsAndSpans() throws Exception {
+        rustMixedCorpus("Mixed.ubnf", "corpus.json", "rust-mixed-values.tsv");
+    }
+
+    @Test public void delimitedMixedValuesPreserveCaptureTextAndNodeBoundaries() throws Exception {
+        rustMixedCorpus("Delimited.ubnf", "delimited-corpus.json", "rust-delimited-mixed-values.tsv");
+    }
+
+    private void rustMixedCorpus(String grammarFile, String corpusFile, String reportFile) throws Exception {
+        assumeTrue("enable with -DrustConformance=true (requires rustc)", Boolean.getBoolean("rustConformance"));
+        Path library = temporary.getRoot().toPath().resolve("libunlaxer_runtime.rlib");
+        success(run(List.of("rustc", "--edition=2021", "--crate-type=rlib", "--crate-name=unlaxer_runtime",
+            repo.resolve("rust/unlaxer-runtime/src/lib.rs").toString(), "-o", library.toString()), ""));
+        Path fixtures = repo.resolve("unlaxer-dsl/src/test/resources/mixed-values");
+        String source = Files.readString(fixtures.resolve(grammarFile));
+        var corpus = JsonParser.parseString(Files.readString(fixtures.resolve(corpusFile))).getAsJsonArray();
+        var report = new ArrayList<>(List.of("mode\tinput_json\tjava_prefix\tjava_ast\trust"));
+        for (String mode : List.of("two", "one")) {
+        var grammar = UBNFMapper.parse(mode.equals("one") ? source.replace(" | OtherRule", "") : source).grammars().get(0);
+        Path dir = temporary.newFolder().toPath();
+        Path generated = Files.createDirectory(dir.resolve("generated"));
+        for (var file : new RustBackend().generate(grammar)) Files.writeString(generated.resolve(file.relativePath()), file.content());
+        Files.writeString(dir.resolve("main.rs"), Files.readString(fixtures.resolve("probe.rs.txt")));
+        success(rustCompile(dir, library));
+        var actual = run(List.of(dir.resolve("probe").toString()), String.join("\n", corpus.asList().stream()
+            .map(row -> java.util.HexFormat.of().formatHex(row.getAsJsonObject().get("input").getAsString()
+                .getBytes(StandardCharsets.UTF_8))).toList()) + "\n");
+        success(actual);
+        var lines = actual.output().lines().toList();
+        assertEquals(corpus.size(), lines.size());
+        try (var loader = compileJava(grammar, List.of())) {
+            var mapper = loader.loadClass("org.example.mixed.MixedMapper");
+            var parser = (org.unlaxer.parser.Parser) loader.loadClass("org.example.mixed.MixedParsers")
+                .getMethod("getRootParser").invoke(null);
+            for (int i = 0; i < corpus.size(); i++) {
+                var row = corpus.get(i).getAsJsonObject();
+                String input = row.get("input").getAsString();
+                var result = JsonParser.parseString(lines.get(i)).getAsJsonObject();
+                var prefix = new JsonArray();
+                try (var context = new org.unlaxer.context.ParseContext(org.unlaxer.StringSource.createRootSource(input))) {
+                    prefix.add(parser.parse(context).isSucceeded());
+                    prefix.add(context.getConsumedPosition().value());
+                    prefix.add(context.getMatchedPosition().value());
+                }
+                assertEquals(row + " prefix cursors", prefix, result.get("prefix"));
+                var diagnostic = (Optional<?>) mapper.getMethod("diagnose", String.class).invoke(null, input);
+                boolean accepted = mixedAccepted(row, mode);
+                assertEquals(mode + " " + row + " Java acceptance", accepted, diagnostic.isEmpty());
+                assertEquals(mode + " " + row + " Rust acceptance", accepted, !result.get("ast").isJsonNull());
+                JsonElement java = JsonNull.INSTANCE;
+                if (accepted) {
+                    Object mapped = mapper.getMethod("parseWithSourceMap", String.class).invoke(null, input);
+                    java = canonical(mapped.getClass().getMethod("ast").invoke(mapped), mapped);
+                    assertEquals(row + " all fields/node spans", java, result.get("ast"));
+                    assertEquals(row + " independent Java value", row.get("value").getAsString(), mixedValueOracle(java));
+                    assertEquals(row + " Rust semantics after CST/input drop", row.get("value"), result.get("value"));
+                    assertEquals(row + " independent text code-point spans", row.get("texts"), result.get("texts"));
+                }
+                report.add(mode + "\t" + row.get("input") + "\t" + prefix + "\t" + java + "\t" + result);
+            }
+        }
+        Files.writeString(dir.resolve("main.rs"), """
+            mod generated;
+            struct Stale;
+            impl generated::evaluator::Semantics for Stale { type Output = (); }
+            fn main() {}
+            """);
+        var stale = rustCompile(dir, library);
+        assertNotEquals(stale.output(), 0, stale.code());
+        assertTrue(stale.output(), stale.output().contains("E0046"));
+        assertTrue(stale.output(), stale.output().contains("eval_root"));
+        }
+        Files.write(Path.of("target").resolve(reportFile), report, StandardCharsets.UTF_8);
+    }
+
+    private boolean mixedAccepted(JsonObject row, String mode) {
+        return row.has("value") && (!row.has("modes") || row.getAsJsonArray("modes").contains(new JsonPrimitive(mode)));
+    }
+
+    @Test public void sharedMixedMappingsAreExecutableInBothDeclarationOrders() throws Exception {
+        Path fixtures = repo.resolve("unlaxer-dsl/src/test/resources/mixed-values");
+        String source = Files.readString(fixtures.resolve("Shared.ubnf"));
+        String first = "  @mapping(Value, params=[value]) First ::= 'f' Factor @value;";
+        String second = "  @mapping(Value, params=[value]) Second ::= 's' LeafRule @value;";
+        var corpus = JsonParser.parseString(Files.readString(fixtures.resolve("shared-corpus.json"))).getAsJsonArray();
+        Path library = null;
+        if (Boolean.getBoolean("rustConformance")) {
+            library = temporary.getRoot().toPath().resolve("libunlaxer_runtime.rlib");
+            success(run(List.of("rustc", "--edition=2021", "--crate-type=rlib", "--crate-name=unlaxer_runtime",
+                repo.resolve("rust/unlaxer-runtime/src/lib.rs").toString(), "-o", library.toString()), ""));
+        }
+        var report = new ArrayList<>(List.of("reversed\tinput_json\tjava_prefix\tjava_ast\trust"));
+        for (boolean reversed : List.of(false, true)) {
+            var grammar = UBNFMapper.parse(reversed ? source.replace(first + "\n" + second, second + "\n" + first) : source)
+                .grammars().get(0);
+            List<String> lines = List.of();
+            if (library != null) {
+                Path dir = temporary.newFolder().toPath();
+                Path generated = Files.createDirectory(dir.resolve("generated"));
+                for (var file : new RustBackend().generate(grammar)) Files.writeString(generated.resolve(file.relativePath()), file.content());
+                Files.writeString(dir.resolve("main.rs"), Files.readString(fixtures.resolve("shared-probe.rs.txt")));
+                success(rustCompile(dir, library));
+                var actual = run(List.of(dir.resolve("probe").toString()), String.join("\n", corpus.asList().stream()
+                    .map(row -> java.util.HexFormat.of().formatHex(row.getAsJsonObject().get("input").getAsString()
+                        .getBytes(StandardCharsets.UTF_8))).toList()) + "\n");
+                success(actual);
+                lines = actual.output().lines().toList();
+                assertEquals(corpus.size(), lines.size());
+            }
+            try (var loader = compileJava(grammar, List.of())) {
+                var mapper = loader.loadClass("org.example.mixed.SharedMapper");
+                assertEquals(Object.class, loader.loadClass("org.example.mixed.SharedAST$Value").getMethod("value").getReturnType());
+                var parser = (org.unlaxer.parser.Parser) loader.loadClass("org.example.mixed.SharedParsers")
+                    .getMethod("getRootParser").invoke(null);
+                for (int i = 0; i < corpus.size(); i++) {
+                    var row = corpus.get(i).getAsJsonObject();
+                    String input = row.get("input").getAsString();
+                    var prefix = new JsonArray();
+                    try (var context = new org.unlaxer.context.ParseContext(org.unlaxer.StringSource.createRootSource(input))) {
+                        prefix.add(parser.parse(context).isSucceeded());
+                        prefix.add(context.getConsumedPosition().value());
+                        prefix.add(context.getMatchedPosition().value());
+                    }
+                    var diagnostic = (Optional<?>) mapper.getMethod("diagnose", String.class).invoke(null, input);
+                    assertEquals(reversed + " " + row, row.has("value"), diagnostic.isEmpty());
+                    JsonElement java = JsonNull.INSTANCE;
+                    if (row.has("value")) {
+                        Object mapped = mapper.getMethod("parseWithSourceMap", String.class).invoke(null, input);
+                        java = canonical(mapped.getClass().getMethod("ast").invoke(mapped), mapped);
+                        assertEquals(row.toString(), row.get("value").getAsString(), mixedValueOracle(java));
+                    }
+                    JsonElement rust = JsonNull.INSTANCE;
+                    if (library != null) {
+                        var result = JsonParser.parseString(lines.get(i)).getAsJsonObject();
+                        rust = result;
+                        assertEquals(row + " shared prefix", prefix, result.get("prefix"));
+                        assertEquals(row + " shared AST/all spans", java, result.get("ast"));
+                        if (row.has("value")) {
+                            assertEquals(row.toString(), row.get("value"), result.get("value"));
+                            assertEquals(row + " shared text span oracle", row.get("texts"), result.get("texts"));
+                        }
+                    }
+                    report.add(reversed + "\t" + row.get("input") + "\t" + prefix + "\t" + java + "\t" + rust);
+                }
+            }
+        }
+        Files.write(Path.of("target/rust-shared-mixed-values.tsv"), report, StandardCharsets.UTF_8);
+    }
+
+    private String mixedValueOracle(JsonElement value) {
+        if (value.isJsonNull()) return "-";
+        if (value.isJsonPrimitive()) return "T:" + value.getAsString();
+        var ast = value.getAsJsonObject();
+        var fields = ast.getAsJsonObject("fields");
+        return switch (ast.get("type").getAsString()) {
+            case "Leaf" -> "L:" + fields.get("value").getAsString();
+            case "OtherLeaf" -> "O:" + fields.get("value").getAsString();
+            case "Value" -> mixedValueOracle(fields.get("value"));
+            case "Root" -> mixedValueOracle(fields.get("head")) + "|" + mixedValueOracle(fields.get("maybe"))
+                + "|" + String.join(",", fields.getAsJsonArray("items").asList().stream().map(this::mixedValueOracle).toList());
+            default -> throw new AssertionError("Unexpected mixed value: " + value);
+        };
+    }
+
     @Test public void rightAssociativeRecursionPreservesValuesCursorsAndAllSpans() throws Exception {
         assumeTrue("enable with -DrustConformance=true (requires rustc)", Boolean.getBoolean("rustConformance"));
         Path library = temporary.getRoot().toPath().resolve("libunlaxer_runtime.rlib");

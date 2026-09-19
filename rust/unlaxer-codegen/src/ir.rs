@@ -45,6 +45,7 @@ pub struct Field {
 pub enum Kind {
     Text,
     Node,
+    Value,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -92,4 +93,8 @@ pub enum Expression {
     },
     /// Synthetic trivia boundary outside a capture; not a source-level group.
     Delimited(Box<Expression>),
+    /// Preserve a text alternative as a synthetic CST value with its own span.
+    TextValue(Box<Expression>),
+    /// Scalar/optional capture boundary: retain its full span if all values are text.
+    ValueBoundary(Box<Expression>),
 }

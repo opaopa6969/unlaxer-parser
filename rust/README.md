@@ -89,13 +89,13 @@ runtimeは規則IDで参照する文法を実行し、入力とCST node arenaを
 - `NumberParser`またはその完全修飾名へのtoken binding。符号・小数・指数を含む。
 - `IdentifierParser`、`SingleQuotedParser`、`DoubleQuotedParser`、`EndOfSourceParser`の短名または既定packageの完全修飾名。字句とmapperの契約は下記参照。
 - `ANY`・`EOF`・`EMPTY`・`CHAR_RANGE`・`NEGATION`・`UNTIL`・`LOOKAHEAD`・`NEGATIVE_LOOKAHEAD`。詳細は下記のprimitive互換契約を参照。
-- `@mapping`とterminal/rule/group/quantifierへのcapture。全capture名の集合とparamsが一致し、同名captureのtext/node型が整合すること。欠ける選択肢はoptional、繰り返しや同名の複数出現はlistとして推論する。
-- 同じfield名・順序・text/node型・cardinalityを持つ複数ruleのshared mapping。AST variantとSemantics methodは一つに統合し、ruleごとのcaptureとspanは保持する。
+- `@mapping`とterminal/rule/group/quantifierへのcapture。全capture名の集合とparamsが一致すること。欠ける選択肢はoptional、繰り返しや同名の複数出現はlistとして推論する。text/node混在値は下記の`AstValue`で保持する。
+- 同じfield名・順序・cardinalityを持つ複数ruleのshared mapping。text/node種別が異なるfieldは宣言順に依存せず`AstValue`へ統合する。AST variantとSemantics methodは一つに統合し、ruleごとのcaptureとspanは保持する。
 - `@leftAssoc`の`Left @left { Op @op Right @right }`形と`params=[left, op, right]`、`@precedence(level=N)`。詳細は下記参照。
 - `@rightAssoc`の`Base @left { Op @op Self @right }`形（`Self`は宣言rule自身への直接参照）。同じparamsとprecedenceを用い、右辺を再帰的に生成する。
 - `@whitespace: javaStyle`（ASCII空白、行/ブロックコメント）または`none`。未指定は`none`。`@package`はRustでは使用しない。
 
-imports、外部token parser、`@typeof`、`@eval`等の他のannotation、左再帰、混合text/node choiceなどは明示的に拒否する。mapping名・field名はASCII識別子に制限し、Rustのraw identifierで出力する。`self`/`Self`/`super`/`crate`、fieldの`span`/`semantics`、shared mappingのschema不一致・異なるmappingからの生成method名衝突は拒否する。rootはちょうど1つのAST nodeへ解決される必要がある。optionalの先にある参照も左再帰検査に含め、空一致の可能性がある無限反復は生成前に拒否する。
+imports、外部token parser、`@typeof`、`@eval`等の他のannotation、左再帰などは明示的に拒否する。mapping名・field名はASCII識別子に制限し、Rustのraw identifierで出力する。`self`/`Self`/`super`/`crate`、fieldの`span`/`semantics`、shared mappingのschema不一致・異なるmappingからの生成method名衝突は拒否する。rootはちょうど1つのAST nodeへ解決される必要がある。optionalの先にある参照も左再帰検査に含め、空一致の可能性がある無限反復は生成前に拒否する。
 
 ### 演算子の列と優先順位
 
@@ -107,7 +107,7 @@ imports、外部token parser、`@typeof`、`@eval`等の他のannotation、左�
 
 低水準の`RustBackend.generate`を直接呼ぶ場合は、Java各generatorと同様、共通validatorの呼出しは利用者側の責任である。この直接APIでは結合性だけのlevelは`-1`、precedenceだけの結合性は`None`として記録する。比較テストのmetadata逆転モードはvalidatorを意図的に迂回した性質検査で、数値自体が構文を組み替えないことを確認する。逆転した文法がCLIで受理されるという意味ではない。
 
-[`associative/Operators.ubnf`](../unlaxer-dsl/src/test/resources/associative/Operators.ubnf)とcorpusは共有Binary variant・明示的な数値leaf・括弧・非可換演算・コメント中のUnicodeを検証する。これはtinyexpression全体ではなく、数値意味論もtinyexpressionのf32仕様ではない。実tinyexpressionのunmapped text/node混在factorとJavaの特殊なnull/literal leaf表現は別途対応する。
+[`associative/Operators.ubnf`](../unlaxer-dsl/src/test/resources/associative/Operators.ubnf)とcorpusは共有Binary variant・明示的な数値leaf・括弧・非可換演算・コメント中のUnicodeを検証する。これはtinyexpression全体ではなく、数値意味論もtinyexpressionのf32仕様ではない。text/node混在factorは生成可能だが、Java associative mapperの特殊な`Binary(null, [literal], [])`表現とRustの`AstValue::Text`は同一構造ではない。この特殊leafを含むtinyexpression全体の互換性は未完了である。
 
 24入力×metadata 2設定の48ケースで受理・両cursorをJavaと比較し、受理28ケースの全AST field/spanを照合する。Rustの評価値は別途corpusの期待値と比較し、共有variantのSemantics未実装は実`rustc`の`E0046`で検出する。結果は`target/rust-associative.tsv`とCI artifactへ保存する。これにより見つかったJavaの未縮約CST上のassoc反復欠落は[issue #138](https://github.com/opaopa6969/unlaxer-parser/issues/138)で修正した。
 
@@ -118,6 +118,20 @@ imports、外部token parser、`@typeof`、`@eval`等の他のannotation、左�
 | 1個 | `String` / `Box<Ast>` | `&str` / `&Ast` |
 | 0/1個 | `Option<String>` / `Option<Box<Ast>>` | `Option<&str>` / `Option<&Ast>` |
 | 複数 | `Vec<String>` / `Vec<Ast>` | `&[String]` / `&[Ast]` |
+
+### textとAST nodeの混在値
+
+`Factor ::= 'a' | Leaf`のような選択肢は、文字列を失わず`AstValue::Text { text: String, span: Span }`または`AstValue::Node(Box<Ast>)`として保持する。scalar・optional・listはそれぞれ`AstValue`・`Option<AstValue>`・`Vec<AstValue>`、Semantics引数は`&AstValue`・`Option<&AstValue>`・`&[AstValue]`になる。Java側では同じ混在fieldを`Object`・`Optional<Object>`・`List<Object>`として生成し、mapped nodeを文字列化しない。混在しない既存Rust文法の出力は変更しない。
+
+lowererはtext選択肢の境界を明示的な`Expr::TextValue`として生成する。runtimeは元の子node/captureを残して`TEXT_VALUE_RULE`（`usize::MAX`）のCST nodeで包み、mapperがその境界を読んで順序を保つ。scalar/optionalの混在captureには`Expr::ValueBoundary` / `VALUE_BOUNDARY_RULE`（`usize::MAX - 1`）も用い、textなら捕捉全体の括弧・triviaを保持し、nodeなら内側ASTを保持する。空の子からtextを捏造しない。いずれのmarkerも通常ruleの配列indexではない。`ParseContext`の共有状態・transaction・両cursorの契約は変更しない。
+
+[`mixed-values`](../unlaxer-dsl/src/test/resources/mixed-values/)ではJava/Rustの受理・消費/照合cursor・AST field/node span、独立した評価期待値を比較する。Rustのtext spanは別に原文のUnicodeコードポイント位置で検証する。`AstValue::canonical_json()`はJavaのStringとの比較用にtextをJSON文字列へ投影するため、そのJSONにはtext spanを含めない。Rust AST自体はspanを所有し、CST/contextを破棄しても使える。結果は`target/rust-mixed-values.tsv`・`rust-delimited-mixed-values.tsv`・`rust-shared-mixed-values.tsv`に保存する。
+
+Rustはgroup/repeat/unmapped helper内の複数semantic値も順序付きで収集するが、Javaとの一致を検証した範囲は各capture要素が1つのText/Nodeを持つscalar・optional・反復listである。`Pair ::= Leaf Leaf; Root ::= Pair @values;`のような**単一capture内の並列semantic値**では、Javaはscalar Objectとして最後のnodeのみを選び、RustはVecとして全値を保持する。これは互換性を達成した機能と数えず、[#160](https://github.com/opaopa6969/unlaxer-parser/issues/160)で型/cardinalityの統一を追跡する。
+
+同じく`Outer ::= '(' [Factor] ')'; Root ::= Outer @value;`でhelper内部のoptionalをcaptureすると、入力`()`はJavaのObjectでは文字列`"()"`、Rustの`Option<AstValue>`では`None`になる。外側の`[Outer @value]`で不在を表す検証済みの形とは異なる。このhelper越しのcardinality推論差も#160の未完了範囲に含める。
+
+choiceを介さず単一mapped ruleを参照するJavaのaliasは既存の`String` APIを維持する。たとえばtinyexpressionの`SliceStartIndex ::= NumberExpression`はsource textを添字変換に使う。Rustはこの形もNodeとして扱うため、mixed choice対応をもって純粋なmapped aliasの型まで互換になったとは主張しない。
 
 `[ Item ] @head`はoptionalの中へcaptureを置き、`{ Item } @items`、`Item+ @items`、`Item{1,2} @items`、`Item % ',' @items`は各要素をcaptureする。区切り文字はitemsに入れない。量指定子の内側に置いた`{ Item @items }`も扱う。同名captureの履歴は平坦な列で、順序を保つ。透明なunmapped ruleが複数のmapped nodeを包む場合も、mapperはそのnode列を収集する。
 
