@@ -1,5 +1,5 @@
 [
- {"name":"node-one","kind":"node","cardinality":"one","body":"Leaf","cases":[
+ {"name":"node-one","kind":"node","cardinality":"one","root":"Leaf @values","body":"Leaf","cases":[
    {"input":"x","value":"L:x","texts":[]},{"input":"y","value":"L:y","texts":[]},{"input":""},{"input":"xy"}]},
  {"name":"mixed-one","kind":"value","cardinality":"one","body":"'(' Factor ')'","cases":[
    {"input":"(a)","value":"T:(a)","texts":[[0,3,"(a)"]]},{"input":"(x)","value":"L:x","texts":[]},

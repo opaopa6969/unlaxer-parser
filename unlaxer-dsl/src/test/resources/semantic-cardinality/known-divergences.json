@@ -1,0 +1,7 @@
+[
+ {"name":"pure-node-one-alias","kind":"node","cardinality":"one","body":"Leaf","cases":[
+   {"input":"x","value":"L:x","javaValue":"T:x","texts":[]},
+   {"input":"y","value":"L:y","javaValue":"T:y","texts":[]},
+   {"input":""},{"input":"xy"}
+ ]}
+]

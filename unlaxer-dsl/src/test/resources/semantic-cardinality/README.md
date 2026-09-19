@@ -26,3 +26,10 @@ Rust は生成 evaluator の引数型を実コンパイルして `&Ast` / `&AstV
 基準 `5a673e1` では Java node-pair の field が List でなく Object となり、
 Rust helperMany 内の `(a)` が `a` へ縮むため、対応する検査が失敗する。
 これらを例外扱い・skip せず、修正後の共通成功条件として扱う。
+
+純粋な Node One alias は別の API 移行課題 #163 として `known-divergences.json` に保持する。
+`Document ::= Helper @values; Helper ::= Leaf` は Java の既存 lexical API が String、
+Rust は Node。専用の `semanticCardinalityKnownPureNodeAliasDifferenceRemainsExplicit`
+が双方の値と型の相違を assert し、`semantic-cardinality-known-divergence-both.tsv` へ
+記録する。この4入力は共通成功件数へ含めない。共通 One control は direct `Leaf` を使う。
+差を解消するときは専用テストの失敗を確認し、互換 API 移行と同時に共通 corpus へ移す。

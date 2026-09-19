@@ -31,6 +31,14 @@ final class SemanticCardinalityConformance {
     }
 
     void verify(boolean java, boolean rust) throws Exception {
+        verify(java, rust, false);
+    }
+
+    void verifyKnownDivergences() throws Exception {
+        verify(true, true, true);
+    }
+
+    private void verify(boolean java, boolean rust, boolean knownDivergence) throws Exception {
         Path library = root.resolve("libunlaxer_runtime.rlib");
         Path nativeBinary = root.resolve("native/debug/unlaxer");
         if (rust) {
@@ -40,11 +48,13 @@ final class SemanticCardinalityConformance {
                 "-p", "unlaxer-generator", "--target-dir", root.resolve("native").toString()), ""));
         }
         String template = Files.readString(fixtures.resolve("Grammar.ubnf.txt"));
-        var corpus = JsonParser.parseString(Files.readString(fixtures.resolve("corpus.json"))).getAsJsonArray();
+        var corpus = JsonParser.parseString(Files.readString(fixtures.resolve(knownDivergence ? "known-divergences.json" : "corpus.json"))).getAsJsonArray();
         var report = new ArrayList<>(List.of("grammar\tinput\tjava\trust"));
+        var failures = new ArrayList<String>();
         for (var entry : corpus) {
             var fixture = entry.getAsJsonObject();
             String name = fixture.get("name").getAsString();
+            try {
             String source = template.replace("ROOT_BODY", fixture.has("root") ? fixture.get("root").getAsString() : "Helper @values")
                 .replace("HELPER_BODY", fixture.get("body").getAsString())
                 .replace("EXTRA_RULES", fixture.has("extra") ? fixture.get("extra").getAsString() : "");
@@ -82,6 +92,7 @@ final class SemanticCardinalityConformance {
                     var mapper = loader.loadClass("org.example.semantic.SemanticMapper");
                     var parser = (org.unlaxer.parser.Parser) loader.loadClass("org.example.semantic.SemanticParsers").getMethod("getRootParser").invoke(null);
                     var type = loader.loadClass("org.example.semantic.SemanticAST$Box").getMethod("values").getReturnType();
+                    if (knownDivergence) assertEquals(name + " known legacy Java lexical API", String.class, type);
                     switch (fixture.get("cardinality").getAsString()) {
                         case "optional" -> assertEquals(name + " Optional field", Optional.class, type);
                         case "many" -> assertEquals(name + " Many field", List.class, type);
@@ -112,22 +123,30 @@ final class SemanticCardinalityConformance {
                             var actual = results.get(i);
                             actualRust = actual;
                             assertEquals(name + " " + row + " both cursors", result.get("prefix"), actual.get("prefix"));
-                            assertEquals(name + " " + row + " all fields/node spans", result.get("ast"), actual.get("ast"));
+                            if (knownDivergence && row.has("value")) {
+                                assertNotEquals(name + " explicit known alias API difference", result.get("ast"), actual.get("ast"));
+                            } else {
+                                assertEquals(name + " " + row + " all fields/node spans", result.get("ast"), actual.get("ast"));
+                            }
                         }
                         report.add(name + "\t" + row.get("input") + "\t" + result + "\t" + actualRust);
                     }
                 }
             }
+            } catch (AssertionError | Exception error) {
+                failures.add(name + ": " + error);
+            }
         }
         String mode = java && rust ? "both" : java ? "java" : "rust";
-        Files.write(Path.of("target/semantic-cardinality-" + mode + ".tsv"), report, StandardCharsets.UTF_8);
+        Files.write(Path.of("target/semantic-cardinality-" + (knownDivergence ? "known-divergence-" : "") + mode + ".tsv"), report, StandardCharsets.UTF_8);
+        assertTrue(String.join("\n", failures), failures.isEmpty());
     }
 
     private void verifyResult(JsonObject fixture, JsonObject row, JsonObject result, boolean rust) {
         String context = fixture.get("name") + " " + row;
         assertEquals(context + " acceptance", row.has("value"), !result.get("ast").isJsonNull());
         if (!row.has("value")) return;
-        assertEquals(context + " independent value/order", row.get("value"), result.get("value"));
+        assertEquals(context + " independent value/order", !rust && row.has("javaValue") ? row.get("javaValue") : row.get("value"), result.get("value"));
         String input = row.get("input").getAsString();
         var ast = result.getAsJsonObject("ast");
         assertEquals("Box", ast.get("type").getAsString());
