@@ -277,33 +277,38 @@ fn mapper(ir: &GrammarIr) -> String {
     {
         out.push_str("\nfn optional<T>(mut values: Vec<T>, name: &str) -> Result<Option<T>, String> {\n    if values.len() > 1 { return Err(format!(\"expected at most one value for {name}, got {}\", values.len())); }\n    Ok(values.pop())\n}\n");
     }
-    out.push_str("\nfn map_node(tree: &Tree, id: usize) -> Result<Vec<Ast>, String> {\n    let node = &tree.nodes[id];\n    match node.rule {\n");
+    out.push_str("\nfn map_node(tree: &Tree, id: usize) -> Result<Vec<Ast>, String> {\n    match tree.nodes[id].rule {\n");
+    for (index, rule) in ir.rules.iter().enumerate() {
+        if rule.mapping.is_some() {
+            writeln!(out, "        {index} => map_rule_{index}(tree, id),").unwrap();
+        }
+    }
+    out.push_str("        _ => map_nodes(tree, &tree.nodes[id].children),\n    }\n}\n");
     for (index, rule) in ir.rules.iter().enumerate() {
         if let Some(mapping) = &rule.mapping {
             writeln!(
                 out,
-                "        {index} => Ok(vec![Ast::r#{} {{\n            span: node.span,",
+                "\n#[inline(never)]\nfn map_rule_{index}(tree: &Tree, id: usize) -> Result<Vec<Ast>, String> {{\n    let node = &tree.nodes[id];\n    Ok(vec![Ast::r#{} {{\n        span: node.span,",
                 mapping.name
             )
             .unwrap();
             for field in &mapping.fields {
-                writeln!(out, "            r#{}: {{\n                let mut values = Vec::new();\n                for capture in node.captures.iter().filter(|c| c.name == {}) {{", field.name, quote(&field.name)).unwrap();
+                writeln!(out, "        r#{}: {{\n            let mut values = Vec::new();\n            for capture in node.captures.iter().filter(|c| c.name == {}) {{", field.name, quote(&field.name)).unwrap();
                 out.push_str(match field.kind {
-                    Kind::Node => "                    values.extend(map_nodes(tree, &capture.nodes)?);\n",
-                    Kind::Value => "                    values.extend(map_values(tree, &capture.nodes)?);\n",
-                    Kind::Text => "                    values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).to_owned());\n",
+                    Kind::Node => "                values.extend(map_nodes(tree, &capture.nodes)?);\n",
+                    Kind::Value => "                values.extend(map_values(tree, &capture.nodes)?);\n",
+                    Kind::Text => "                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).to_owned());\n",
                 });
                 writeln!(
                     out,
-                    "                }}\n                {}\n            }},",
+                    "            }}\n            {}\n        }},",
                     mapped_value(field)
                 )
                 .unwrap();
             }
-            out.push_str("        }]),\n");
+            out.push_str("    }])\n}\n");
         }
     }
-    out.push_str("        _ => map_nodes(tree, &node.children),\n    }\n}\n");
     out
 }
 

@@ -287,23 +287,28 @@ public final class RustBackend {
         out.append("""
 
             fn map_node(tree: &Tree, id: usize) -> Result<Vec<Ast>, String> {
-                let node = &tree.nodes[id];
-                match node.rule {
+                match tree.nodes[id].rule {
             """);
         for (int i = 0; i < ir.rules().size(); i++) if (ir.rules().get(i).mapping() != null) {
-            var mapping = ir.rules().get(i).mapping();
-            out.append("        ").append(i).append(" => Ok(vec![Ast::r#").append(mapping.name()).append(" {\n            span: node.span,\n");
-            for (Field field : mapping.fields()) {
-                out.append("            r#").append(field.name()).append(": {\n                let mut values = Vec::new();\n")
-                    .append("                for capture in node.captures.iter().filter(|c| c.name == ").append(quote(field.name())).append(") {\n");
-                if (field.kind() == Kind.NODE) out.append("                    values.extend(map_nodes(tree, &capture.nodes)?);\n");
-                else if (field.kind() == Kind.VALUE) out.append("                    values.extend(map_values(tree, &capture.nodes)?);\n");
-                else out.append("                    values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).to_owned());\n");
-                out.append("                }\n                ").append(mappedValue(field)).append("\n            },\n");
-            }
-            out.append("        }]),\n");
+            out.append("        ").append(i).append(" => map_rule_").append(i).append("(tree, id),\n");
         }
-        out.append("        _ => map_nodes(tree, &node.children),\n    }\n}\n");
+        out.append("        _ => map_nodes(tree, &tree.nodes[id].children),\n    }\n}\n");
+        for (int i = 0; i < ir.rules().size(); i++) if (ir.rules().get(i).mapping() != null) {
+            var mapping = ir.rules().get(i).mapping();
+            out.append("\n#[inline(never)]\nfn map_rule_").append(i)
+                .append("(tree: &Tree, id: usize) -> Result<Vec<Ast>, String> {\n")
+                .append("    let node = &tree.nodes[id];\n")
+                .append("    Ok(vec![Ast::r#").append(mapping.name()).append(" {\n        span: node.span,\n");
+            for (Field field : mapping.fields()) {
+                out.append("        r#").append(field.name()).append(": {\n            let mut values = Vec::new();\n")
+                    .append("            for capture in node.captures.iter().filter(|c| c.name == ").append(quote(field.name())).append(") {\n");
+                if (field.kind() == Kind.NODE) out.append("                values.extend(map_nodes(tree, &capture.nodes)?);\n");
+                else if (field.kind() == Kind.VALUE) out.append("                values.extend(map_values(tree, &capture.nodes)?);\n");
+                else out.append("                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).to_owned());\n");
+                out.append("            }\n            ").append(mappedValue(field)).append("\n        },\n");
+            }
+            out.append("    }])\n}\n");
+        }
         return out.toString();
     }
 

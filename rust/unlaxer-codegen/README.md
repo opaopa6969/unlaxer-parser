@@ -20,7 +20,9 @@ fn modules(ir: &GrammarIr) -> Result<(), unlaxer_codegen::GenerateError> {
 The IR includes all currently supported Java RustBackend expression variants,
 owned text/node fields with one/optional/many cardinality, shared mapping schemas,
 and descriptive operator precedence. Identical mapping schemas emit one AST
-variant and semantic method, while each grammar rule has its own mapper case.
+variant and semantic method. The mapper uses a small rule-ID dispatcher and one
+non-inlined function per mapped rule, so debug-build stack frames stay bounded
+as grammars gain mappings.
 Precedence numbers do not reorder parsing; the rule graph determines precedence.
 The IR represents left/right/unspecified associativity as descriptive metadata;
 frontends must lower the desired associativity into the expression graph. The

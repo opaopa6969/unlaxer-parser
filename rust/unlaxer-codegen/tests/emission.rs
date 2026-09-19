@@ -36,6 +36,97 @@ fn evolution_matches_all_five_java_generated_files() {
 }
 
 #[test]
+fn generated_mapper_dispatches_to_out_of_line_rule_mappers() {
+    let grammar = support::fixture("evolution");
+    let mapper = generate(&grammar)
+        .unwrap()
+        .into_iter()
+        .find(|file| file.relative_path == "mapper.rs")
+        .unwrap()
+        .content;
+    let dispatch = mapper
+        .split("fn map_node(tree: &Tree, id: usize) -> Result<Vec<Ast>, String> {")
+        .nth(1)
+        .unwrap()
+        .split("\n#[inline(never)]")
+        .next()
+        .unwrap();
+    assert!(!dispatch.contains("Ast::r#"));
+    for (index, _rule) in grammar
+        .rules
+        .iter()
+        .enumerate()
+        .filter(|(_, rule)| rule.mapping.is_some())
+    {
+        assert!(dispatch.contains(&format!("{index} => map_rule_{index}(tree, id),")));
+        assert!(mapper.contains(&format!(
+            "#[inline(never)]\nfn map_rule_{index}(tree: &Tree, id: usize) -> Result<Vec<Ast>, String>"
+        )));
+    }
+}
+
+#[test]
+fn wide_generated_mapper_runs_on_two_mib_thread_stack_in_debug_build() {
+    let temp = Temp::new();
+    let runtime = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../unlaxer-runtime/src/lib.rs");
+    let runtime_lib = temp.0.join("libunlaxer_runtime.rlib");
+    let result = Command::new("rustc")
+        .args([
+            "--edition=2021",
+            "--crate-name",
+            "unlaxer_runtime",
+            "--crate-type",
+            "rlib",
+        ])
+        .arg(runtime)
+        .arg("-o")
+        .arg(&runtime_lib)
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    let generated = temp.0.join("generated");
+    fs::create_dir(&generated).unwrap();
+    for file in generate(&support::wide_deep_mapper_fixture(140, 24)).unwrap() {
+        fs::write(generated.join(file.relative_path), file.content).unwrap();
+    }
+    let source = temp.0.join("small_stack.rs");
+    let input = format!("{}z", "x".repeat(23));
+    fs::write(
+        &source,
+        format!(
+            "#[path={:?}] mod generated;\nfn main() {{ std::thread::Builder::new().stack_size(2 * 1024 * 1024).spawn(|| {{ let tree = generated::parser::parse_tree({input:?}).unwrap(); let ast = generated::mapper::map(&tree).unwrap(); assert_eq!(ast.span().start, 0); }}).unwrap().join().unwrap(); }}",
+            generated.join("mod.rs")
+        ),
+    )
+    .unwrap();
+    let binary = temp.0.join("small-stack-probe");
+    let result = Command::new("rustc")
+        .args(["--edition=2021", "--extern"])
+        .arg(format!("unlaxer_runtime={}", runtime_lib.display()))
+        .arg(&source)
+        .arg("-o")
+        .arg(&binary)
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let result = Command::new(binary).output().unwrap();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+}
+
+#[test]
 fn generated_parser_reuses_one_grammar_and_keeps_the_rules_snapshot_api() {
     let parser = generate(&support::fixture("evolution"))
         .unwrap()
