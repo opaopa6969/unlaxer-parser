@@ -5,7 +5,7 @@ grammar Annotations {
   @backref(name=value) @scopeTree(mode=lexical)
   @declares(symbol=left, description=right) @catalog(context='variables')
   @leftAssoc @precedence(level=10) @doc('文法😀')
-  @recovery(sync=';, }') @commonField(left, right) @custom
+  @recovery(sync=';, }') @commonField(left,right) @custom
   Root ::= 'a' @left 'b' @right;
   @whitespace @rightAssoc @recovery(auto) @skip Other ::= 'x';
   @recovery(skip) @enum Mode ::= 'auto' | 'skip';

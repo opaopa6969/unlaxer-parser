@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
  */
 public class ParserGenerator implements CodeGenerator {
 
-    record RightAssocShape(AtomicElement base, AtomicElement op) {}
+    record RightAssocShape(AtomicElement base, AtomicElement op, AtomicElement right) {}
 
     // =========================================================================
     // 内部型

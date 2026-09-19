@@ -4,4 +4,7 @@ grammar Boundaries {
   @root Root ::= T Item T // comment
     Item;
   Item ::= 'token' | 'grammar' | 'root' | '';
+  // ERROR is special only for the complete ERROR('message') form.
+  NamedError ::= ERROR (Item) ERROR ('a' 'b');
+  ERROR ::= 'e';
 }

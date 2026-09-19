@@ -29,7 +29,7 @@ jobs:
     - name: Cross-language fixtures, compile failures, and generated-file drift
       run: >
         mvn -B -pl unlaxer-common,unlaxer-dsl -am test
-        -Dtest=RustBackendTest,RustConformanceTest,NumericCaptureRuntimeTest -DrustConformance=true
+        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,NumericCaptureRuntimeTest -DrustConformance=true
         -Dsurefire.failIfNoSpecifiedTests=false
     - uses: actions/upload-artifact@v4
       with:
@@ -41,6 +41,7 @@ jobs:
           unlaxer-dsl/target/rust-cardinality.tsv
           unlaxer-dsl/target/rust-primitives.tsv
           unlaxer-dsl/target/rust-lexical.tsv
+          unlaxer-dsl/target/rust-ubnf-frontend.tsv
           unlaxer-dsl/target/rust-associative.tsv
         if-no-files-found: error
     - name: Build and smoke-test the native subset example
