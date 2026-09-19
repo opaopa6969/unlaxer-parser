@@ -4,6 +4,9 @@ use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+mod scope;
+pub use scope::{ReferenceInfo, ScopeStore, Severity, SymbolDiagnostic, SymbolInfo};
+
 /// Half-open Unicode scalar (code-point) offsets, not UTF-8 bytes or UTF-16 units.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Span {
@@ -354,6 +357,7 @@ struct Checkpoint {
     nodes: usize,
     captures: HashMap<String, Vec<Span>>,
     state: HashMap<String, Box<dyn StateValue>>,
+    scopes: ScopeStore,
 }
 
 /// Per-parse state, shared by generated rules and custom parsers. Transactions restore
@@ -361,6 +365,7 @@ struct Checkpoint {
 /// Clone must isolate mutable values: external effects and shared interior state are not rolled back.
 /// Rollback applies to Result::Err, not to panic unwinding. Discard the context after a panic.
 /// Capture names are context-wide, and backreferences use the most recent successful capture.
+/// Lexical symbols and semantic diagnostics use a separate, owned transactional ScopeStore.
 pub struct ParseContext<'a> {
     input: &'a str,
     rules: Arc<[Rule]>,
@@ -373,6 +378,7 @@ pub struct ParseContext<'a> {
     byte_offsets: Vec<usize>,
     captures: HashMap<String, Vec<Span>>,
     state: HashMap<String, Box<dyn StateValue>>,
+    scopes: ScopeStore,
     call_depth: usize,
 }
 
@@ -448,6 +454,7 @@ impl<'a> ParseContext<'a> {
                 .collect(),
             captures: HashMap::new(),
             state: HashMap::new(),
+            scopes: ScopeStore::default(),
             call_depth: 0,
         }
     }
@@ -518,6 +525,30 @@ impl<'a> ParseContext<'a> {
     }
     pub fn remove_state(&mut self, name: &str) {
         self.state.remove(name);
+    }
+
+    pub fn scopes(&self) -> &ScopeStore {
+        &self.scopes
+    }
+
+    /// Changes participate in all parser checkpoints, independently of named user state.
+    pub fn scopes_mut(&mut self) -> &mut ScopeStore {
+        &mut self.scopes
+    }
+
+    /// Runs in a lexical child scope. On success, names leave scope but source events remain.
+    /// On error, cursors and all transactional values return to their state before entry.
+    /// As with transaction(), a panicking operation requires discarding the context.
+    pub fn with_scope<T>(
+        &mut self,
+        operation: impl FnOnce(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<T, ParseError> {
+        self.transaction(|context| {
+            context.scopes.enter();
+            let result = operation(context);
+            context.scopes.leave();
+            result
+        })
     }
     pub fn error(&mut self, expected: &str) -> ParseError {
         self.fail(expected);
@@ -612,6 +643,7 @@ impl<'a> ParseContext<'a> {
             matched_position: self.matched_position,
             nodes: self.nodes.len(),
             captures: self.captures.clone(),
+            scopes: self.scopes.clone(),
             state: self
                 .state
                 .iter()
@@ -625,6 +657,7 @@ impl<'a> ParseContext<'a> {
         self.nodes.truncate(checkpoint.nodes);
         self.captures = checkpoint.captures;
         self.state = checkpoint.state;
+        self.scopes = checkpoint.scopes;
     }
     fn code_point(&self, byte: usize) -> usize {
         self.byte_offsets
