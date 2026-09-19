@@ -142,6 +142,11 @@ token NOT_QUOTE = NEGATION('"')     // ダブルクォート以外の1文字
 token NOT_SPACE = NEGATION(' \t\n') // スペース・タブ・改行以外の1文字
 ```
 
+除外集合は Unicode codepoint 単位で判定し、成功時に1 codepointを消費する。
+例えば `NEGATION('x😀')` は `x` と `😀` を拒否し、`🚀` は受理する。
+空の除外集合は任意の1 codepointを受理するが、入力末尾では失敗する。
+生成 Java parser は `isMatch(int)` と既存の `isMatch(char)` を両方提供する。
+
 > **ユースケース**: ダブルクォート文字列の中身を文字単位で読むとき。
 > `"hello"` の中の `h`, `e`, `l`, `l`, `o` は「`"` 以外の文字」です。
 
@@ -153,6 +158,11 @@ token UPPER  = CHAR_RANGE('A','Z')   // A〜Z の1文字
 token DIGIT  = CHAR_RANGE('0','9')   // 0〜9 の1文字
 token HEX    = CHAR_RANGE('0','9')   // ※複数の範囲は NEGATION などと組み合わせる
 ```
+
+現在の境界型は Java `char`。各境界はエスケープ展開後に1個の非surrogate BMP文字で、
+`min <= max` でなければならない。空文字・複数文字・surrogate・補助文字（例 `😀`）・
+逆順の範囲は `IllegalArgumentException` で明示的に拒否し、先頭文字へ切り捨てない。
+境界は両端を含む。補助文字の範囲指定は、この `char` API とは別の将来対応である。
 
 > **ユースケース**: 特定の文字クラスを細かく定義したいとき。
 > `IdentifierParser` は「英字・数字・アンダースコア」を読みますが、
