@@ -537,6 +537,15 @@ Understanding the internal architecture is essential for creating custom parser 
 
 #### 1. Source and Source Hierarchy
 
+Zero-width tokens collected during parsing retain an empty sub-source at the
+current cursor's Unicode code-point offset (for example, an empty rule after
+`a😀` has span `[2,2]`, not `[0,0]`). This also applies to absent optionals and
+EOF; a consumed parent containing only lookahead remains anchored at its
+non-consuming position. Empty child sources retain their original coordinates
+when collected into a parent. Virtual tokens, explicitly positioned sources and
+custom `Token` subclasses are not rewritten. Custom collectors producing such
+subclasses remain responsible for supplying their own source coordinates.
+
 `Source` is the foundation of Unlaxer's position tracking system. It represents input text with precise Unicode handling and supports hierarchical relationships.
 
 **Source Types**
