@@ -88,7 +88,7 @@ impl Lowering<'_> {
                 return Err(format!("duplicate rule/token {}", rule.name));
             }
             let mut mapping = None;
-            let mut left = false;
+            let mut associativity = None;
             let mut precedence = None;
             for annotation in &rule.annotations {
                 match &annotation.kind {
@@ -112,11 +112,18 @@ impl Lowering<'_> {
                         }
                         mapping = Some((class_name.clone(), params.clone()));
                     }
-                    AnnotationKind::LeftAssoc => {
-                        if left {
-                            return Err(format!("duplicate @leftAssoc on {}", rule.name));
+                    AnnotationKind::LeftAssoc | AnnotationKind::RightAssoc => {
+                        let value = if matches!(annotation.kind, AnnotationKind::LeftAssoc) {
+                            Associativity::Left
+                        } else {
+                            Associativity::Right
+                        };
+                        if associativity.replace(value).is_some() {
+                            return Err(format!(
+                                "duplicate/conflicting associativity on {}",
+                                rule.name
+                            ));
                         }
-                        left = true;
                     }
                     AnnotationKind::Precedence { level } => {
                         if precedence.replace(*level).is_some() {
@@ -131,14 +138,14 @@ impl Lowering<'_> {
                     }
                 }
             }
-            if left != precedence.is_some() {
+            if associativity.is_some() != precedence.is_some() {
                 return Err(format!(
-                    "@leftAssoc and @precedence must occur together on {}",
+                    "associativity and @precedence must occur together on {}",
                     rule.name
                 ));
             }
             self.operators.push(precedence.map(|precedence| Operator {
-                associativity: Associativity::Left,
+                associativity: associativity.expect("validated annotation pair"),
                 precedence,
             }));
             self.mappings.push(mapping);
@@ -217,8 +224,15 @@ impl Lowering<'_> {
                 }
                 None
             };
+            let mut lowered_body = expression.clone();
             if let Some(operator) = self.operators[i] {
-                self.check_assoc(i, mapping.as_ref())?;
+                match operator.associativity {
+                    Associativity::Left => self.check_assoc(i, mapping.as_ref())?,
+                    Associativity::Right => {
+                        lowered_body = self.lower_right_assoc(i, mapping.as_ref())?
+                    }
+                    Associativity::None => unreachable!("validated annotation pair"),
+                }
                 let mut refs = HashSet::new();
                 references(expression, &mut refs);
                 for reference in refs {
@@ -237,7 +251,7 @@ impl Lowering<'_> {
             }
             rules.push(Rule {
                 name: self.grammar.rules[i].name.clone(),
-                body: expression.clone(),
+                body: lowered_body,
                 mapping,
                 operator: self.operators[i],
             });
@@ -641,6 +655,88 @@ impl Lowering<'_> {
             .into_iter()
             .map(|(name, shape)| (name, wrap(shape, cardinality)))
             .collect())
+    }
+
+    /// Keep the original vector schema; every CST node has zero or one recursive tail.
+    fn lower_right_assoc(&self, rule: usize, mapping: Option<&Mapping>) -> Result<Expression> {
+        let error = || {
+            format!("@rightAssoc requires left {{ op Self }} with scalar base and params=[left, op, right] on {}", self.grammar.rules[rule].name)
+        };
+        // Normalization erases the difference between { tail } and (tail){0,}.
+        // Java's right-associative parser rewrite accepts only the former syntax.
+        let [declared] = self.grammar.rules[rule].body.alternatives.as_slice() else {
+            return Err(error());
+        };
+        if declared.elements.len() != 2
+            || !matches!(declared.elements[1].element.kind, ElementKind::Repeat(_))
+        {
+            return Err(error());
+        }
+        let Some(mapping) = mapping else {
+            return Err(error());
+        };
+        if mapping
+            .fields
+            .iter()
+            .map(|f| f.name.as_str())
+            .collect::<Vec<_>>()
+            != ["left", "op", "right"]
+        {
+            return Err(error());
+        }
+        let Expression::Sequence(elements) = &self.bodies[rule] else {
+            return Err(error());
+        };
+        let [left @ Expression::Capture {
+            name: left_name,
+            expression: base,
+        }, Expression::Repeat {
+            child,
+            min: 0,
+            max: None,
+        }] = elements.as_slice()
+        else {
+            return Err(error());
+        };
+        let Expression::Sequence(tail) = child.as_ref() else {
+            return Err(error());
+        };
+        let [op @ Expression::Capture {
+            name: op_name,
+            expression: operator,
+        }, right @ Expression::Capture {
+            name: right_name,
+            expression: recursive,
+        }] = tail.as_slice()
+        else {
+            return Err(error());
+        };
+        if left_name != "left"
+            || op_name != "op"
+            || right_name != "right"
+            || recursive.as_ref() != &Expression::Reference(rule)
+            || !self.captures(base)?.is_empty()
+            || !self.captures(operator)?.is_empty()
+            || mapping.fields[0].cardinality != Cardinality::One
+            || mapping.fields[1]
+                != (Field {
+                    name: "op".into(),
+                    kind: Kind::Text,
+                    cardinality: Cardinality::Many,
+                })
+            || mapping.fields[2]
+                != (Field {
+                    name: "right".into(),
+                    kind: Kind::Node,
+                    cardinality: Cardinality::Many,
+                })
+        {
+            return Err(error());
+        }
+        Ok(Expression::Choice(vec![
+            Expression::Sequence(vec![left.clone(), op.clone(), right.clone()]),
+            left.clone(),
+        ]))
     }
 
     fn check_assoc(&self, rule: usize, mapping: Option<&Mapping>) -> Result<()> {

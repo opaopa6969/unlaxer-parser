@@ -22,8 +22,11 @@ owned text/node fields with one/optional/many cardinality, shared mapping schema
 and descriptive operator precedence. Identical mapping schemas emit one AST
 variant and semantic method, while each grammar rule has its own mapper case.
 Precedence numbers do not reorder parsing; the rule graph determines precedence.
-Right associativity remains unsupported by the current IR, as in the Java Rust
-backend. This is not a claim of full Java parser or tinyexpression parity.
+The IR represents left/right/unspecified associativity as descriptive metadata;
+frontends must lower the desired associativity into the expression graph. The
+generated metadata enum includes `Right` only when a right-associative operator
+is present, preserving existing left-only output byte-for-byte. This is not a
+claim of full Java parser or tinyexpression parity.
 
 `generate` rejects malformed mapping/field identifiers, invalid indices, conflicting mapping
 schemas or semantic method names, reserved/duplicate fields, missing/extra capture

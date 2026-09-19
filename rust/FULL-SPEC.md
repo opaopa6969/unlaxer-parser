@@ -25,7 +25,7 @@
 | imports・複数grammar・namespace・global/rule trivia・interleave | 一部のみ | 現在は単一grammarとglobal javaStyle/none。依存解決・循環・文法別ID・局所設定を検証 |
 | mapping・capture・source-preserving AST | scalar/optional/list/group生成済み。Java位置binding #116・zero-field生成 #129・複合text capture #132を修正 | 入れ子container型、再帰的unmapped rule、mapped alias/sumのbackend間契約、異種choice、typeof/commonField/enum、全Java capture規則との互換性 |
 | evaluator dispatch・網羅性 | 限定範囲で生成済み | 新nodeのE0004/E0046検証を拡張。eval annotation、型境界、短絡評価を追加。Java sum/dotted evaluatorの不具合 #130 は修正済み |
-| leftAssoc/rightAssoc/precedence | canonical leftAssocとprecedence metadata、同一schemaのshared mappingを生成 | 左辺＋op/right列、文法階層による優先順位を検証。rightAssoc、異種text/node factorとJavaの特殊leafは未対応。Java raw CST反復欠落 #138・右結合 #139 は独立修正 |
+| leftAssoc/rightAssoc/precedence | canonical leftAssocとrightAssoc、precedence metadata、同一schemaのshared mappingを生成 | 左辺＋op/right列と右再帰、文法階層による優先順位を検証。非canonical右結合形、異種text/node factorとJavaの特殊leafは未対応。Java raw CST反復欠落 #138・右結合 #139 は独立修正 |
 | backref・MatchedToken相当 | context-wide replayのみ | UBNF annotation、名前の寿命・入れ子・伝播、コピー言語のpositive/negative test |
 | PropagationStopper・consume/invert・virtual token・metadata | 未対応 | 有限状態の全合成検査、8元モデルとの対応、実parserとの統合試験 |
 | scopeTree/declares/catalog/doc/skip/simple等 | 未対応 | 各annotationのJava実動作を確認し、生成metadataと利用先を検証 |
@@ -34,7 +34,7 @@
 | tinyexpression-rs | 未対応 | 値・null/欠損・変数・演算子・関数・外部呼出し・日時/数値仕様を棚卸しし、同一入力で値/失敗分類を比較 |
 | rustcodeblock | 未対応 | 既定無効・明示許可付きAOT、元の位置へのcompiler診断、通常parse/LSPの非実行保証。Javaソースの自動翻訳はしない |
 | ネイティブ配布 | 縮小文法CLIのみ | tinyexpression CLI、対象OS別artifact、stdin/file/終了コード・制限のsmoke |
-| Rust製UBNF frontend・native generator | syntax frontend全18annotation/11token/9element種、対応範囲のlowering/CLI/5module emitterを実装 | Java/native82文法410file一致、空PATHの生成/check、手書き/symlink保護。全backend機能の生成完了とは区別。frontend既知差と構造分析上限を文書化 |
+| Rust製UBNF frontend・native generator | syntax frontend全18annotation/11token/9element種、対応範囲のlowering/CLI/5module emitterを実装 | Java/native86文法430file一致、空PATHの生成/check、手書き/symlink保護。全backend機能の生成完了とは区別。frontend既知差と構造分析上限を文書化 |
 | 入力DSLの機械語生成 | 未対応・設計未確定 | generatorや評価器のnativeバイナリ化と区別し、必要な意味論・成果物を別ADRで確定 |
 
 ## 完了の扱いと順序

@@ -89,7 +89,7 @@ public final class RustBackend {
 
                 /// Descriptive metadata; parsing precedence follows the grammar's rule graph.
                 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-                pub enum Associativity { Left, None }
+                pub enum Associativity { %s }
                 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
                 pub struct OperatorSpec {
                     pub rule: &'static str,
@@ -97,12 +97,17 @@ public final class RustBackend {
                     pub associativity: Associativity,
                 }
                 pub const OPERATORS: &[OperatorSpec] = &[
-                """);
+                """.formatted(ir.rules().stream().anyMatch(r -> r.operator() != null
+                    && r.operator().associativity() == Associativity.RIGHT) ? "Left, Right, None" : "Left, None"));
             ir.rules().stream().filter(r -> r.operator() != null)
                 .sorted(java.util.Comparator.comparingInt((Rule r) -> r.operator().precedence()).thenComparing(Rule::name))
                 .forEach(rule -> out.append("    OperatorSpec { rule: ").append(quote(rule.name()))
                     .append(", precedence: ").append(rule.operator().precedence()).append(", associativity: Associativity::")
-                    .append(rule.operator().associativity() == Associativity.LEFT ? "Left" : "None").append(" },\n"));
+                    .append(switch (rule.operator().associativity()) {
+                        case LEFT -> "Left";
+                        case RIGHT -> "Right";
+                        case NONE -> "None";
+                    }).append(" },\n"));
             out.append("];\n");
         }
         return out.toString();

@@ -1,0 +1,9 @@
+grammar Power {
+  @package: org.example.power
+  @whitespace: javaStyle
+  token NUMBER = NumberParser
+  @root @mapping(Power, params=[left, op, right])
+  @rightAssoc @precedence(level=30)
+  Expr ::= Atom @left { '^' @op Expr @right };
+  Atom ::= NUMBER;
+}

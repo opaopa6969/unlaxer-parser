@@ -133,6 +133,150 @@ fn native_generated_operator_modules_compile_and_execute() {
 }
 
 #[test]
+fn native_right_associative_generation_evaluates_recursive_owned_nodes() {
+    let directory = Directory::new();
+    let library = directory.0.join("libunlaxer_runtime.rlib");
+    success(
+        Command::new("rustc")
+            .args([
+                "--edition=2021",
+                "--crate-type=rlib",
+                "--crate-name=unlaxer_runtime",
+            ])
+            .arg(repo().join("unlaxer-runtime/src/lib.rs"))
+            .arg("-o")
+            .arg(&library)
+            .output()
+            .unwrap(),
+    );
+    for mapped in [false, true] {
+        let path = directory.0.join(if mapped { "mapped" } else { "text" });
+        fs::create_dir(&path).unwrap();
+        let grammar = path.join("Power.ubnf");
+        let atom = if mapped {
+            "@mapping(Number,params=[value]) Atom ::= (NUMBER) @value;"
+        } else {
+            "Atom ::= NUMBER;"
+        };
+        fs::write(&grammar, format!("grammar Power {{ @whitespace: javaStyle token NUMBER = org.unlaxer.parser.elementary.NumberParser\n @root @rightAssoc @precedence(level=10) @mapping(Power,params=[left,op,right]) Expr ::= Atom @left {{ '^' @op Expr @right }}; {atom} }}")).unwrap();
+        success(invoke(&grammar, &path.join("generated"), false));
+        success(invoke(&grammar, &path.join("generated"), true));
+        let left = if mapped { "&Ast" } else { "&str" };
+        let value = if mapped {
+            "evaluate(left, self)"
+        } else {
+            // The source-preserving Atom capture includes its trailing comment trivia.
+            "left.split('/').next().unwrap().trim().parse::<f64>().unwrap()"
+        };
+        let number = if mapped {
+            "fn eval_number(&mut self, value: &str, _: Span) -> f64 { value.split('/').next().unwrap().trim().parse().unwrap() }"
+        } else {
+            ""
+        };
+        fs::write(path.join("main.rs"), format!(r#"
+mod generated;
+use generated::ast::Ast;
+use generated::evaluator::{{Semantics, evaluate}};
+use unlaxer_runtime::Span;
+struct Calculator;
+impl Semantics for Calculator {{
+    type Output = f64;
+    {number}
+    fn eval_power(&mut self, left: {left}, op: &[String], right: &[Ast], _: Span) -> f64 {{
+        assert_eq!(op.len(), right.len()); assert!(op.len() <= 1);
+        let base = {value};
+        if right.is_empty() {{ base }} else {{ assert_eq!(op[0], "^"); base.powf(evaluate(&right[0], self)) }}
+    }}
+}}
+fn main() {{
+    assert_eq!(generated::parser::OPERATORS[0].associativity, generated::parser::Associativity::Right);
+    for (source, expected) in [("2^3^2",512.0), ("2^3",8.0), ("2",2.0), (" 2 ^ 3 ^ 2 ",512.0), ("2/*😀*/^3^2",512.0)] {{
+        let tree = generated::parser::parse_tree(source).unwrap();
+        let node = generated::mapper::map(&tree).unwrap(); drop(tree);
+        assert_eq!(evaluate(&node, &mut Calculator), expected);
+        assert_eq!(node.span().start, 0);
+        assert_eq!(node.span().end, source.chars().count());
+    }}
+    for source in ["", "2^", "^2", "2^^3", "2^3x", "2^3^"] {{ assert!(generated::parser::parse_tree(source).is_err(), "{{source}}"); }}
+}}
+"#)).unwrap();
+        success(
+            Command::new("rustc")
+                .arg("--edition=2021")
+                .arg(path.join("main.rs"))
+                .arg("--extern")
+                .arg(format!("unlaxer_runtime={}", library.display()))
+                .arg("-o")
+                .arg(path.join("probe"))
+                .output()
+                .unwrap(),
+        );
+        success(Command::new(path.join("probe")).output().unwrap());
+    }
+}
+
+#[test]
+fn right_associative_invalid_shapes_are_rejected_before_output() {
+    let directory = Directory::new();
+    let source = "grammar Power { @root @rightAssoc @precedence(level=10) @mapping(Power,params=[left,op,right]) Expr ::= 'x' @left { '^' @op Expr @right }; }";
+    let invalid = [
+        (
+            source.replace("@rightAssoc", "@rightAssoc @rightAssoc"),
+            "conflicting associativity",
+        ),
+        (
+            source.replace("@rightAssoc", "@leftAssoc @rightAssoc"),
+            "conflicting associativity",
+        ),
+        (
+            source.replace("@precedence(level=10)", ""),
+            "occur together",
+        ),
+        (
+            source.replace("Expr @right", "'x' @right"),
+            "@rightAssoc requires",
+        ),
+        (
+            source.replace("Expr @right", "(Expr) @right"),
+            "@rightAssoc requires",
+        ),
+        (
+            source.replace("{ '^' @op Expr @right }", "('^' @op Expr @right){0,}"),
+            "@rightAssoc requires",
+        ),
+        (
+            source.replace("'x' @left", "['x'] @left"),
+            "@rightAssoc requires",
+        ),
+        (
+            source.replace("'^' @op", "('^' @op) @op"),
+            "@rightAssoc requires",
+        ),
+        (
+            source.replace("params=[left,op,right]", "params=[right,op,left]"),
+            "@rightAssoc requires",
+        ),
+        (
+            source
+                .replace("'x' @left", "['x'] @left")
+                .replace("'^' @op", "['^'] @op"),
+            "nullable unbounded",
+        ),
+        (source.replace("'x' @left", "Expr @left"), "left recursion"),
+    ];
+    for (index, (text, reason)) in invalid.into_iter().enumerate() {
+        let grammar = directory.0.join(format!("invalid-{index}.ubnf"));
+        let output = directory.0.join(format!("output-{index}"));
+        fs::write(&grammar, text).unwrap();
+        let result = invoke(&grammar, &output, false);
+        assert_eq!(result.status.code(), Some(3));
+        let diagnostic = String::from_utf8_lossy(&result.stderr);
+        assert!(diagnostic.contains(reason), "{index}: {diagnostic}");
+        assert!(!output.exists());
+    }
+}
+
+#[test]
 fn lowerer_rejects_unsupported_or_inconsistent_grammars_without_artifacts() {
     let simple = "grammar G { @root @mapping(Value, params=[value]) Root ::= 'x' @value; }";
     let invalid = [
@@ -155,7 +299,7 @@ fn lowerer_rejects_unsupported_or_inconsistent_grammars_without_artifacts() {
         (simple.replace("'x' @value", "'' @value"), "empty literal"),
         (
             simple.replace("@root", "@root @rightAssoc"),
-            "unsupported annotation",
+            "occur together",
         ),
         (
             simple.replace("@root", "@root @precedence(level=1)"),

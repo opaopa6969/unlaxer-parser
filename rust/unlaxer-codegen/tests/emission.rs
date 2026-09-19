@@ -58,17 +58,23 @@ fn generated_modules_compile_evaluate_and_require_semantics() {
         "{}",
         String::from_utf8_lossy(&result.stderr)
     );
-    for fixture in ["evolution", "fields", "shared", "names"] {
+    for fixture in ["evolution", "fields", "shared", "names", "right"] {
         let output = temp.0.join(fixture);
         fs::create_dir(&output).unwrap();
         let mut ir = support::fixture(if fixture == "names" {
             "evolution"
+        } else if fixture == "right" {
+            "shared"
         } else {
             fixture
         });
         if fixture == "names" {
             ir.rules[0].name = "_Root".into();
             ir.rules[3].name = "self".into();
+        }
+        if fixture == "right" {
+            ir.rules[1].operator.as_mut().unwrap().associativity = Associativity::Left;
+            ir.rules[2].operator.as_mut().unwrap().associativity = Associativity::Right;
         }
         for file in generate(&ir).unwrap() {
             fs::write(output.join(file.relative_path), file.content).unwrap();
@@ -89,6 +95,8 @@ fn main() { let tree=generated::parser::parse_tree("if(1, 3*3, neg(2))").unwrap(
 "#
         } else if fixture == "fields" {
             r#"fn main() {let tree=generated::parser::parse_tree("name 'hi' \"x\" 1 2 3").unwrap(); let ast=generated::mapper::map(&tree).unwrap(); drop(tree); let json=ast.canonical_json(); assert!(json.contains("hi")); assert!(json.contains("children"));}"#
+        } else if fixture == "right" {
+            r#"fn main() {use generated::parser::{Associativity,OPERATORS}; for source in ["a","b"] {let tree=generated::parser::parse_tree(source).unwrap(); let ast=generated::mapper::map(&tree).unwrap(); assert!(ast.canonical_json().contains(source));} assert_eq!(OPERATORS[0].rule,"Right"); assert_eq!(OPERATORS[0].associativity,Associativity::Right); assert_eq!(OPERATORS[1].associativity,Associativity::Left);}"#
         } else {
             r#"fn main() {for source in ["a","b"] {let tree=generated::parser::parse_tree(source).unwrap(); let ast=generated::mapper::map(&tree).unwrap(); assert!(ast.canonical_json().contains(source));} assert_eq!(generated::parser::OPERATORS[0].rule,"Right");}"#
         };
@@ -127,6 +135,29 @@ fn main() { let tree=generated::parser::parse_tree("if(1, 3*3, neg(2))").unwrap(
         assert!(!result.status.success());
         assert!(String::from_utf8_lossy(&result.stderr).contains("E0046"));
     }
+}
+
+#[test]
+fn right_metadata_does_not_change_existing_non_right_output() {
+    let mut ir = support::fixture("shared");
+    ir.rules[1].operator.as_mut().unwrap().associativity = Associativity::Left;
+    let original = generate(&ir).unwrap();
+    assert!(original[2]
+        .content
+        .contains("pub enum Associativity { Left, None }"));
+    assert!(!original[2].content.contains("Associativity::Right"));
+    ir.rules[2].operator.as_mut().unwrap().associativity = Associativity::Right;
+    let right = generate(&ir).unwrap();
+    for index in [0, 1, 3, 4] {
+        assert_eq!(original[index], right[index]);
+    }
+    assert_eq!(
+        original[2].content,
+        right[2]
+            .content
+            .replace("{ Left, Right, None }", "{ Left, None }")
+            .replace("Associativity::Right", "Associativity::None")
+    );
 }
 
 #[test]

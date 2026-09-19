@@ -120,11 +120,22 @@ fn parser(ir: &GrammarIr) -> String {
         .filter_map(|r| r.operator.map(|op| (r, op)))
         .collect();
     if !operators.is_empty() {
-        out.push_str("\n/// Descriptive metadata; parsing precedence follows the grammar's rule graph.\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum Associativity { Left, None }\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct OperatorSpec {\n    pub rule: &'static str,\n    pub precedence: i32,\n    pub associativity: Associativity,\n}\npub const OPERATORS: &[OperatorSpec] = &[\n");
+        out.push_str("\n/// Descriptive metadata; parsing precedence follows the grammar's rule graph.\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum Associativity { ");
+        out.push_str(
+            if operators
+                .iter()
+                .any(|(_, op)| op.associativity == Associativity::Right)
+            {
+                "Left, Right, None"
+            } else {
+                "Left, None"
+            },
+        );
+        out.push_str(" }\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct OperatorSpec {\n    pub rule: &'static str,\n    pub precedence: i32,\n    pub associativity: Associativity,\n}\npub const OPERATORS: &[OperatorSpec] = &[\n");
         operators
             .sort_by(|(a, x), (b, y)| x.precedence.cmp(&y.precedence).then(a.name.cmp(&b.name)));
         for (rule, op) in operators {
-            writeln!(out, "    OperatorSpec {{ rule: {}, precedence: {}, associativity: Associativity::{} }},", quote(&rule.name), op.precedence, match op.associativity { Associativity::Left => "Left", Associativity::None => "None" }).unwrap();
+            writeln!(out, "    OperatorSpec {{ rule: {}, precedence: {}, associativity: Associativity::{} }},", quote(&rule.name), op.precedence, match op.associativity { Associativity::Left => "Left", Associativity::Right => "Right", Associativity::None => "None" }).unwrap();
         }
         out.push_str("];\n");
     }

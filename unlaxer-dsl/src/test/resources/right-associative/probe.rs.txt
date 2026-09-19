@@ -1,0 +1,50 @@
+mod generated;
+use generated::{ast::Ast, evaluator::{evaluate, Semantics}};
+use unlaxer_runtime::{Span, json_string};
+use std::io::{self, BufRead};
+
+fn number(value: &str) -> f64 {
+    value.split('/').next().unwrap().trim().parse().unwrap()
+}
+
+struct Calculator;
+impl Semantics for Calculator {
+    type Output = f64;
+    // NUMBER_SEMANTICS
+    fn eval_power(&mut self, left: LEFT_TYPE, op: &[String], right: &[Ast], _: Span) -> f64 {
+        assert_eq!(op.len(), right.len());
+        assert!(op.len() <= 1, "right recursion must not flatten the chain");
+        let value = LEFT_VALUE;
+        match right.first() {
+            None => value,
+            Some(rhs) => {
+                assert_eq!(op[0], "^");
+                value.powf(evaluate(rhs, self))
+            }
+        }
+    }
+}
+
+fn main() {
+    assert_eq!(generated::parser::OPERATORS.len(), 1);
+    assert_eq!(generated::parser::OPERATORS[0].rule, "Expr");
+    assert_eq!(generated::parser::OPERATORS[0].associativity, generated::parser::Associativity::Right);
+    for line in io::stdin().lock().lines() {
+        let encoded = line.unwrap();
+        let bytes = (0..encoded.len()).step_by(2)
+            .map(|i| u8::from_str_radix(&encoded[i..i+2], 16).unwrap()).collect();
+        let input = String::from_utf8(bytes).unwrap();
+        let mut context = unlaxer_runtime::ParseContext::new(&input);
+        let ok = generated::parser::parse_context(&mut context).is_ok();
+        print!(r#"{{"prefix":[{},{},{}],"ast":"#, ok, context.position(), context.matched_position());
+        match generated::parser::parse_tree(&input) {
+            Ok(tree) => {
+                let ast = generated::mapper::map(&tree).unwrap();
+                drop(tree);
+                print!(r#"{},"value":{}"#, ast.canonical_json(), evaluate(&ast, &mut Calculator));
+            }
+            Err(error) => print!(r#"null,"error":{}"#, json_string(&format!("{error:?}"))),
+        }
+        println!("}}");
+    }
+}
