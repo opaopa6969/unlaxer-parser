@@ -89,7 +89,7 @@ public final class RustBackend {
             use std::sync::OnceLock;
             #[cfg(test)]
             use std::sync::atomic::{AtomicUsize, Ordering};
-            use unlaxer_runtime::{Expr, Rule, SharedGrammar, Tree, ParseError, ParseDiagnostic, ParseContext, ParseResult, Parser};
+            use unlaxer_runtime::{Expr, Rule, SharedGrammar, Tree, ParseError, ParseDiagnostic, ParseContext, ParseOptions, ParseResult, Parser};
 
             #[cfg(test)]
             static GRAMMAR_INITIALIZATIONS: AtomicUsize = AtomicUsize::new(0);
@@ -103,7 +103,11 @@ public final class RustBackend {
             }
 
             pub fn parse_tree(source: &str) -> Result<Tree, ParseError> {
-                parse_tree_detailed(source).map_err(|diagnostic| diagnostic.farthest)
+                parse_tree_with_options(source, ParseOptions::default())
+            }
+
+            pub fn parse_tree_with_options(source: &str, options: ParseOptions) -> Result<Tree, ParseError> {
+                parse_tree_detailed_with_options(source, options).map_err(|diagnostic| diagnostic.farthest)
             }
 
             /// Compatibility snapshot of the generated rules. Parsing uses `grammar()` and does not clone them.
@@ -123,8 +127,9 @@ public final class RustBackend {
             .append(", expression: ").append(expression(rule.body())).append(" },\n");
         out.append("        ].into()\n    })\n}\n\n/// Test-only evidence for the process-wide `OnceLock` construction contract.\n#[cfg(test)]\n#[doc(hidden)]\npub fn grammar_initialization_count() -> usize {\n    GRAMMAR_INITIALIZATIONS.load(Ordering::Relaxed)\n}\n\npub fn parse_context(context: &mut ParseContext<'_>) -> ParseResult {\n    context.parse_shared_grammar(grammar(), ")
             .append(ir.root()).append(", ").append(ir.javaWhitespace()).append(")\n}\n");
-        out.append("\npub fn parse_tree_detailed(source: &str) -> Result<Tree, ParseDiagnostic> {\n    unlaxer_runtime::parse_detailed_shared(grammar(), ")
-            .append(ir.root()).append(", ").append(ir.javaWhitespace()).append(", source)\n}\n");
+        out.append("\npub fn parse_tree_detailed(source: &str) -> Result<Tree, ParseDiagnostic> {\n    parse_tree_detailed_with_options(source, ParseOptions::default())\n}\n")
+            .append("\npub fn parse_tree_detailed_with_options(source: &str, options: ParseOptions) -> Result<Tree, ParseDiagnostic> {\n    unlaxer_runtime::parse_detailed_shared_with_options(grammar(), ")
+            .append(ir.root()).append(", ").append(ir.javaWhitespace()).append(", source, options)\n}\n");
         if (ir.rules().stream().anyMatch(r -> r.operator() != null)) {
             out.append("""
 

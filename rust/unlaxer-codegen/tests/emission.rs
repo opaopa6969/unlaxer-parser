@@ -138,7 +138,10 @@ fn generated_parser_reuses_one_grammar_and_keeps_the_rules_snapshot_api() {
     assert!(parser.contains("pub fn grammar() -> &'static SharedGrammar"));
     assert!(parser.contains("pub fn rules() -> Vec<Rule>"));
     assert!(parser.contains("context.parse_shared_grammar(grammar()"));
-    assert!(parser.contains("parse_detailed_shared(grammar()"));
+    assert!(parser.contains("pub fn parse_tree_with_options(source: &str, options: ParseOptions)"));
+    assert!(parser
+        .contains("pub fn parse_tree_detailed_with_options(source: &str, options: ParseOptions)"));
+    assert!(parser.contains("parse_detailed_shared_with_options(grammar()"));
     assert!(!parser.contains("parse_detailed(&rules()"));
 }
 
@@ -220,7 +223,7 @@ impl Semantics for Eval {
  fn eval_negation(&mut self,value:&Ast,_:Span)->i32 {-evaluate(value,self)}
  fn eval_conditional(&mut self,condition:&Ast,then_expr:&Ast,else_expr:&Ast,_:Span)->i32 {if evaluate(condition,self)!=0 {evaluate(then_expr,self)} else {evaluate(else_expr,self)}}
 }
-fn main() { let _:Vec<unlaxer_runtime::Rule>=generated::parser::rules(); let tree=generated::parser::parse_tree("if(1, 3*3, neg(2))").unwrap(); let ast=generated::mapper::map(&tree).unwrap(); drop(tree); assert_eq!(evaluate(&ast,&mut Eval),9); assert_eq!(ast.span().end,18); assert!(ast.canonical_json().contains("Conditional")); }
+fn main() { let _:Vec<unlaxer_runtime::Rule>=generated::parser::rules(); let options=unlaxer_runtime::ParseOptions::with_memoization(unlaxer_runtime::Memoization::SafeFailures); let tree=generated::parser::parse_tree_with_options("if(1, 3*3, neg(2))",options).unwrap(); let ast=generated::mapper::map(&tree).unwrap(); drop(tree); assert_eq!(evaluate(&ast,&mut Eval),9); assert_eq!(ast.span().end,18); assert!(ast.canonical_json().contains("Conditional")); }
 "#
         } else if fixture == "scope_effects" {
             r#"fn main() { let tree=generated::parser::parse_tree("2+3").unwrap(); assert_eq!(tree.scopes().all_declarations().len(),2); assert_eq!(tree.scopes().all_references().len(),2); assert!(tree.scopes().diagnostics().is_empty()); assert!(tree.scopes().is_declared("2")); let ast=generated::mapper::map(&tree).unwrap(); drop(tree); assert!(ast.canonical_json().contains("Binary")); }"#

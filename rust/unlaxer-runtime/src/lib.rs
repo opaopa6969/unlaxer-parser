@@ -198,6 +198,26 @@ pub struct Rule {
 /// diagnostics, scopes and user state remain owned by each [`ParseContext`].
 pub type SharedGrammar = Arc<[Rule]>;
 
+/// Parse-local memoization policy. The default preserves the historical behavior.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Memoization {
+    #[default]
+    Off,
+    /// Cache failures only for rules that cannot reach context-dependent expressions.
+    SafeFailures,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ParseOptions {
+    pub memoization: Memoization,
+}
+
+impl ParseOptions {
+    pub const fn with_memoization(memoization: Memoization) -> Self {
+        Self { memoization }
+    }
+}
+
 /// Converts an owned rule graph into the representation accepted by the shared
 /// parsing APIs. This allocation is intended to happen once per generated grammar.
 pub fn share_grammar(rules: Vec<Rule>) -> SharedGrammar {
@@ -392,6 +412,35 @@ struct Checkpoint {
     scopes: ScopeStore,
 }
 
+#[derive(Debug, Clone, Default)]
+struct FailureDiagnostic {
+    farthest: Option<usize>,
+    expected: BTreeSet<String>,
+}
+
+impl FailureDiagnostic {
+    fn record(&mut self, position: usize, expected: &str) {
+        if self.farthest.is_none_or(|farthest| position > farthest) {
+            self.farthest = Some(position);
+            self.expected.clear();
+        }
+        if self.farthest == Some(position) {
+            self.expected.insert(expected.to_owned());
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct FailureMemoKey {
+    grammar: usize,
+    session: u64,
+    rule: usize,
+    position: usize,
+    matched_position: usize,
+    whitespace: bool,
+    depth: usize,
+}
+
 /// Per-parse state, shared by generated rules and custom parsers. Transactions restore
 /// cursors, CST nodes, captures and cloneable user values, but retain failure diagnostics.
 /// Clone must isolate mutable values: external effects and shared interior state are not rolled back.
@@ -412,6 +461,13 @@ pub struct ParseContext<'a> {
     state: HashMap<String, Box<dyn StateValue>>,
     scopes: ScopeStore,
     call_depth: usize,
+    options: ParseOptions,
+    grammar_session: u64,
+    next_grammar_session: u64,
+    memo_safe_rules: Vec<bool>,
+    failure_memo: HashMap<FailureMemoKey, FailureDiagnostic>,
+    diagnostic_frames: Vec<FailureDiagnostic>,
+    memoized_failure_hits: usize,
 }
 
 /// Ordered choice with rollback and full-input acceptance. Rule nesting is bounded at 256.
@@ -422,6 +478,17 @@ pub fn parse(
     input: &str,
 ) -> Result<Tree, ParseError> {
     parse_detailed(rules, root, whitespace, input).map_err(|diagnostic| diagnostic.farthest)
+}
+
+pub fn parse_with_options(
+    rules: &[Rule],
+    root: usize,
+    whitespace: bool,
+    input: &str,
+    options: ParseOptions,
+) -> Result<Tree, ParseError> {
+    parse_detailed_with_options(rules, root, whitespace, input, options)
+        .map_err(|diagnostic| diagnostic.farthest)
 }
 
 /// Full-input parsing over an immutable grammar graph shared across calls.
@@ -436,6 +503,17 @@ pub fn parse_shared(
         .map_err(|diagnostic| diagnostic.farthest)
 }
 
+pub fn parse_shared_with_options(
+    grammar: &SharedGrammar,
+    root: usize,
+    whitespace: bool,
+    input: &str,
+    options: ParseOptions,
+) -> Result<Tree, ParseError> {
+    parse_detailed_shared_with_options(grammar, root, whitespace, input, options)
+        .map_err(|diagnostic| diagnostic.farthest)
+}
+
 /// Adds a primary trailing-input diagnostic without discarding speculative farthest failures.
 /// Syntax hints and rule-limit failures remain backend-native, not a language-independent oracle.
 pub fn parse_detailed(
@@ -444,7 +522,17 @@ pub fn parse_detailed(
     whitespace: bool,
     input: &str,
 ) -> Result<Tree, ParseDiagnostic> {
-    parse_detailed_owned(Arc::from(rules), root, whitespace, input)
+    parse_detailed_with_options(rules, root, whitespace, input, ParseOptions::default())
+}
+
+pub fn parse_detailed_with_options(
+    rules: &[Rule],
+    root: usize,
+    whitespace: bool,
+    input: &str,
+    options: ParseOptions,
+) -> Result<Tree, ParseDiagnostic> {
+    parse_detailed_owned(Arc::from(rules), root, whitespace, input, options)
 }
 
 /// Detailed full-input parsing over an immutable grammar graph shared across calls.
@@ -455,7 +543,17 @@ pub fn parse_detailed_shared(
     whitespace: bool,
     input: &str,
 ) -> Result<Tree, ParseDiagnostic> {
-    parse_detailed_owned(Arc::clone(grammar), root, whitespace, input)
+    parse_detailed_shared_with_options(grammar, root, whitespace, input, ParseOptions::default())
+}
+
+pub fn parse_detailed_shared_with_options(
+    grammar: &SharedGrammar,
+    root: usize,
+    whitespace: bool,
+    input: &str,
+    options: ParseOptions,
+) -> Result<Tree, ParseDiagnostic> {
+    parse_detailed_owned(Arc::clone(grammar), root, whitespace, input, options)
 }
 
 fn parse_detailed_owned(
@@ -463,10 +561,14 @@ fn parse_detailed_owned(
     root: usize,
     whitespace: bool,
     input: &str,
+    options: ParseOptions,
 ) -> Result<Tree, ParseDiagnostic> {
-    let mut parser = ParseContext::new(input);
+    let mut parser = ParseContext::with_options(input, options);
     parser.rules = rules;
     parser.whitespace = whitespace;
+    if options.memoization == Memoization::SafeFailures {
+        parser.memo_safe_rules = memo_safe_rules(&parser.rules);
+    }
     let mut trailing_offset = None;
     if let Some(root) = parser.rule(root, 0) {
         if parser.position == input.len() {
@@ -503,6 +605,10 @@ fn parse_detailed_owned(
 
 impl<'a> ParseContext<'a> {
     pub fn new(input: &'a str) -> Self {
+        Self::with_options(input, ParseOptions::default())
+    }
+
+    pub fn with_options(input: &'a str, options: ParseOptions) -> Self {
         Self {
             input,
             rules: Arc::from([]),
@@ -521,7 +627,23 @@ impl<'a> ParseContext<'a> {
             state: HashMap::new(),
             scopes: ScopeStore::default(),
             call_depth: 0,
+            options,
+            grammar_session: 0,
+            next_grammar_session: 1,
+            memo_safe_rules: vec![],
+            failure_memo: HashMap::new(),
+            diagnostic_frames: vec![],
+            memoized_failure_hits: 0,
         }
+    }
+
+    pub fn options(&self) -> ParseOptions {
+        self.options
+    }
+
+    #[cfg(test)]
+    fn memoized_failure_hits(&self) -> usize {
+        self.memoized_failure_hits
     }
 
     pub fn source(&self) -> &'a str {
@@ -684,9 +806,23 @@ impl<'a> ParseContext<'a> {
     ) -> ParseResult {
         let previous_rules = std::mem::replace(&mut self.rules, Arc::clone(grammar));
         let previous_whitespace = std::mem::replace(&mut self.whitespace, whitespace);
+        let safe_rules = if self.options.memoization == Memoization::SafeFailures {
+            memo_safe_rules(grammar)
+        } else {
+            vec![]
+        };
+        let previous_safe_rules = std::mem::replace(&mut self.memo_safe_rules, safe_rules);
+        let previous_failure_memo = std::mem::take(&mut self.failure_memo);
+        let previous_session = self.grammar_session;
+        let active_session = self.next_grammar_session;
+        self.next_grammar_session = self.next_grammar_session.wrapping_add(1);
+        self.grammar_session = active_session;
         let result = self.parse_expression(&Expr::Rule(root));
+        self.failure_memo = previous_failure_memo;
         self.rules = previous_rules;
         self.whitespace = previous_whitespace;
+        self.memo_safe_rules = previous_safe_rules;
+        self.grammar_session = previous_session;
         result
     }
 
@@ -758,6 +894,9 @@ impl<'a> ParseContext<'a> {
     }
 
     fn fail_at(&mut self, position: usize, expected: &str) {
+        for diagnostic in &mut self.diagnostic_frames {
+            diagnostic.record(position, expected);
+        }
         if position > self.farthest {
             self.farthest = position;
             self.expected.clear();
@@ -777,9 +916,32 @@ impl<'a> ParseContext<'a> {
             self.fail("valid rule reference");
             return None;
         };
+        let memo_key = (self.options.memoization == Memoization::SafeFailures
+            && self.memo_safe_rules.get(id).copied().unwrap_or(false))
+        .then_some(FailureMemoKey {
+            grammar: Arc::as_ptr(&rules) as *const () as usize,
+            session: self.grammar_session,
+            rule: id,
+            position: self.position,
+            matched_position: self.matched_position,
+            whitespace: self.whitespace,
+            depth,
+        });
+        if let Some(diagnostic) = memo_key.and_then(|key| self.failure_memo.get(&key).cloned()) {
+            self.memoized_failure_hits += 1;
+            if let Some(position) = diagnostic.farthest {
+                for expected in diagnostic.expected {
+                    self.fail_at(position, &expected);
+                }
+            }
+            return None;
+        }
+        if memo_key.is_some() {
+            self.diagnostic_frames.push(FailureDiagnostic::default());
+        }
         let start = self.position;
         let count = self.nodes.len();
-        match self.expression(&rule.expression, depth + 1) {
+        let result = match self.expression(&rule.expression, depth + 1) {
             Some(fragment) => {
                 let node_id = self.nodes.len();
                 self.nodes.push(Node {
@@ -795,7 +957,17 @@ impl<'a> ParseContext<'a> {
                 self.nodes.truncate(count);
                 None
             }
+        };
+        if let Some(key) = memo_key {
+            let diagnostic = self
+                .diagnostic_frames
+                .pop()
+                .expect("memoized rule installed a diagnostic frame");
+            if result.is_none() {
+                self.failure_memo.insert(key, diagnostic);
+            }
         }
+        result
     }
 
     fn expression(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
@@ -966,11 +1138,13 @@ impl<'a> ParseContext<'a> {
                 let checkpoint = self.checkpoint();
                 let farthest = self.farthest;
                 let expected = self.expected.clone();
+                let diagnostic_frames = self.diagnostic_frames.clone();
                 let matched = self.expression(child, depth).is_some();
                 self.restore(checkpoint);
                 if !*positive || matched {
                     self.farthest = farthest;
                     self.expected = expected;
+                    self.diagnostic_frames = diagnostic_frames;
                 }
                 if matched == *positive {
                     Some(Fragment::default())
@@ -1360,6 +1534,63 @@ impl<'a> ParseContext<'a> {
     }
 }
 
+fn memo_safe_rules(rules: &[Rule]) -> Vec<bool> {
+    let mut references = vec![Vec::new(); rules.len()];
+    let mut safe = rules
+        .iter()
+        .enumerate()
+        .map(|(id, rule)| expression_is_memo_safe(&rule.expression, &mut references[id]))
+        .collect::<Vec<_>>();
+    let mut referenced_by = vec![Vec::new(); rules.len()];
+    for (parent, children) in references.iter().enumerate() {
+        for child in children
+            .iter()
+            .copied()
+            .filter(|child| *child < rules.len())
+        {
+            referenced_by[child].push(parent);
+        }
+    }
+    let mut unsafe_worklist = safe
+        .iter()
+        .enumerate()
+        .filter_map(|(id, safe)| (!safe).then_some(id))
+        .collect::<Vec<_>>();
+    while let Some(unsafe_rule) = unsafe_worklist.pop() {
+        for parent in referenced_by[unsafe_rule].iter().copied() {
+            if safe[parent] {
+                safe[parent] = false;
+                unsafe_worklist.push(parent);
+            }
+        }
+    }
+    safe
+}
+
+fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>) -> bool {
+    match expression {
+        Expr::Custom(_) | Expr::Backreference(_) => false,
+        Expr::Rule(id) => {
+            references.push(*id);
+            true
+        }
+        Expr::Sequence(children) | Expr::Choice(children) => children
+            .iter()
+            .all(|child| expression_is_memo_safe(child, references)),
+        Expr::Capture(_, child)
+        | Expr::TextValue(child)
+        | Expr::ValueBoundary(child)
+        | Expr::Optional(child)
+        | Expr::JavaOptional(child)
+        | Expr::Repeat { child, .. }
+        | Expr::JavaRepeat { child, .. }
+        | Expr::Lookahead { child, .. }
+        | Expr::RuleEffects { child, .. }
+        | Expr::TriviaScope { child, .. } => expression_is_memo_safe(child, references),
+        _ => true,
+    }
+}
+
 /// Shared JSON string escaping for deterministic cross-language AST fixtures.
 pub fn json_string(value: &str) -> String {
     let mut result = String::from("\"");
@@ -1470,5 +1701,136 @@ mod tests {
             expression: Expr::Rule(0),
         }];
         assert!(parse(&rules, 0, false, "").unwrap_err().expected[0].contains("256"));
+    }
+
+    #[test]
+    fn safe_failure_memoization_is_opt_in_and_replays_local_diagnostics() {
+        let grammar = share_grammar(vec![
+            Rule {
+                name: "root",
+                expression: Expr::Sequence(vec![
+                    Expr::Lookahead {
+                        child: Box::new(Expr::Rule(1)),
+                        positive: false,
+                    },
+                    Expr::Rule(1),
+                ]),
+            },
+            Rule {
+                name: "r",
+                expression: Expr::Sequence(vec![Expr::Literal("a"), Expr::Literal("x")]),
+            },
+        ]);
+
+        let mut off = ParseContext::new("az");
+        assert!(off.parse_shared_grammar(&grammar, 0, false).is_err());
+        assert_eq!(off.memoized_failure_hits(), 0);
+
+        let mut on = ParseContext::with_options(
+            "az",
+            ParseOptions::with_memoization(Memoization::SafeFailures),
+        );
+        let error = on.parse_shared_grammar(&grammar, 0, false).unwrap_err();
+        assert_eq!(on.memoized_failure_hits(), 1);
+        assert_eq!(error.offset, 1);
+        assert_eq!(error.expected, vec!["x"]);
+    }
+
+    #[test]
+    fn memoized_rule_does_not_capture_a_sibling_lookahead_diagnostic() {
+        let grammar = share_grammar(vec![
+            Rule {
+                name: "root",
+                expression: Expr::Sequence(vec![
+                    Expr::Lookahead {
+                        child: Box::new(Expr::Choice(vec![
+                            Expr::Sequence(vec![Expr::Literal("az"), Expr::Error("far")]),
+                            Expr::Rule(1),
+                        ])),
+                        positive: false,
+                    },
+                    Expr::Rule(1),
+                ]),
+            },
+            Rule {
+                name: "r",
+                expression: Expr::Sequence(vec![Expr::Literal("a"), Expr::Literal("x")]),
+            },
+        ]);
+
+        let error = parse_detailed_shared_with_options(
+            &grammar,
+            0,
+            false,
+            "az",
+            ParseOptions::with_memoization(Memoization::SafeFailures),
+        )
+        .unwrap_err();
+        assert_eq!(error.farthest.offset, 1);
+        assert_eq!(error.farthest.expected, vec!["x"]);
+    }
+
+    #[test]
+    fn shared_grammar_sessions_evict_failures_and_restore_the_caller_session() {
+        let grammar = share_grammar(vec![Rule {
+            name: "root",
+            expression: Expr::Choice(vec![Expr::Literal("x"), Expr::Literal("x")]),
+        }]);
+        let mut context = ParseContext::with_options(
+            "y",
+            ParseOptions::with_memoization(Memoization::SafeFailures),
+        );
+        context.grammar_session = 41;
+
+        for _ in 0..3 {
+            assert!(context.parse_shared_grammar(&grammar, 0, false).is_err());
+            assert!(context.failure_memo.is_empty());
+            assert_eq!(context.grammar_session, 41);
+        }
+    }
+
+    #[test]
+    fn custom_and_backreference_ancestors_are_not_memoized() {
+        static CUSTOM_CALLS: std::sync::atomic::AtomicUsize =
+            std::sync::atomic::AtomicUsize::new(0);
+        fn custom(context: &mut ParseContext<'_>) -> ParseResult {
+            CUSTOM_CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            context.error("custom");
+            Err(context.failure())
+        }
+        let rules = vec![
+            Rule {
+                name: "custom_parent",
+                expression: Expr::Choice(vec![Expr::Rule(1), Expr::Rule(1)]),
+            },
+            Rule {
+                name: "custom",
+                expression: Expr::Custom(custom),
+            },
+            Rule {
+                name: "backreference_parent",
+                expression: Expr::Rule(3),
+            },
+            Rule {
+                name: "backreference",
+                expression: Expr::Backreference("name"),
+            },
+            Rule {
+                name: "safe",
+                expression: Expr::Literal("safe"),
+            },
+        ];
+        assert_eq!(
+            memo_safe_rules(&rules),
+            vec![false, false, false, false, true]
+        );
+        let mut context = ParseContext::with_options(
+            "",
+            ParseOptions::with_memoization(Memoization::SafeFailures),
+        );
+        let grammar = share_grammar(rules);
+        assert!(context.parse_shared_grammar(&grammar, 0, false).is_err());
+        assert_eq!(CUSTOM_CALLS.load(std::sync::atomic::Ordering::Relaxed), 2);
+        assert_eq!(context.memoized_failure_hits(), 0);
     }
 }
