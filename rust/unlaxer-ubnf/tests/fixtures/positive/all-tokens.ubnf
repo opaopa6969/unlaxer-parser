@@ -1,0 +1,18 @@
+grammar Tokens {
+  @import json from 'json.ubnf'
+  @package: org.example.tokens
+  @comment: { line: '//' blockOpen: '/*' blockClose: '*/' }
+  token N = org.unlaxer.parser.elementary.NumberParser
+  token U = UNTIL('*/')
+  token X = NEGATION('😀\n\t')
+  token L = LOOKAHEAD(':')
+  token NL = NEGATIVE_LOOKAHEAD('//')
+  token A = ANY
+  token E = EOF
+  token Z = EMPTY
+  token R = CHAR_RANGE('a','z')
+  token C = CI('select')
+  token RE = REGEX('\d+\\.\d+')
+  @root Root ::= json.Value N U X L NL A E Z R C RE;
+}
+grammar Second { Rule ::= '😀\n\t\r\'\\\q'; }
