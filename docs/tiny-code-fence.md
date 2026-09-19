@@ -36,8 +36,9 @@ assert_eq!(context.remaining(), "body\n```");
 既存の transaction 境界へ戻し、他の combinator や手書き parser と組み合わせられる。
 
 位置は Unicode codepoint の半開区間であり、AST は CST と独立して所有する。
-mapper は既存の text capture の trim 契約を使うため、AST の文字列値と raw source span
-は区別する。全 CST の構造同値や Java の scheme/codeIdentifier tag の移植完了は
+mapper は既存の text capture 契約（Java `String.strip()` 相当の空白除去と外側の単引用符
+除去）を使うため、AST の文字列値と raw source span は区別する。NUL は strip 対象では
+なく保持する。全 CST の構造同値や Java の scheme/codeIdentifier tag の移植完了は
 主張しない。これらの metadata は full-spec 対応表で引き続き追跡する。
 
 ## 実クラスを使う検証
@@ -45,8 +46,10 @@ mapper は既存の text capture の trim 契約を使うため、AST の文字�
 `TinyCodeFenceConformanceTest` は tinyexpression commit
 `854c1f4a7be07eed8007ce90541a0996ee2c93aa` の実クラスを oracle にする。
 ロードした両 class の CodeSource が指定した `target/classes` であることも検査する。
-共通 corpus の受理/全入力判定、consumed/matched cursor、AST 全フィールドと node span
-を独立期待値と照合する。Java/native Rust の全5生成ファイルを比較し、生成 Rust を
+共通 corpus は12文法・73入力（受理34、拒否39）。受理/全入力判定、consumed/matched
+cursor、AST 全フィールドと node span を独立期待値と照合する。実 P4 と同じ zero-field
+mapping・`javaStyle` の構成と、非ゼロ位置の mapped child node も含む。
+Java/native Rust の全5生成ファイル（計60ファイル）を比較し、生成 Rust を
 実際にコンパイル・実行する。native 生成は空の PATH でも動作し、Java を起動しない。
 
 ```sh
@@ -65,5 +68,15 @@ parse/generate はコードをコンパイル・実行しない。既定無効�
 計画する `rustcodeblock`、診断位置の逆引き、host function API は未対応。
 Java ソースの Rust への自動翻訳も行わない。
 
+実文法の `UNTIL('```')` は最初に現れた triple backtick で止まる。body の行途中に
+先に triple backtick があれば、後続の正しい閉じ行を探し直さず、行頭条件により失敗する。
+閉じ fence が欠ける場合も `CodeEnd` が失敗する。Markdown の汎用 fenced code block
+scanner や、埋め込み言語の文字列/commentを解釈する scanner ではない。
+
 汎用 token ID/schema/登録 API を含む #158、残る annotation/evaluator、
 tinyexpression-rs 全体、LSP/DAP は引き続き未完了である。
+
+この変更時点で固定した P4 文法全体を native generator に渡すと、token 宣言の検証後に
+`unsupported annotation Interleave { profile: "javaStyle" } on Formula` と終了コード3で
+停止する。未対応 annotation を捨てて「生成成功」とはしない。実 tinyexpression の
+バイナリが完成したことを意味しない。
