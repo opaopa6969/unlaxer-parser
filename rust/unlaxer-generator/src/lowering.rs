@@ -89,6 +89,12 @@ impl Lowering<'_> {
             }
         }
         let mut root = None;
+        let has_scope = self.grammar.rules.iter().any(|rule| {
+            rule.annotations
+                .iter()
+                .any(|annotation| matches!(annotation.kind, AnnotationKind::ScopeTree { .. }))
+        });
+        let mut rule_effects = Vec::new();
         let mut rule_whitespace = Vec::new();
         let mut has_local_trivia = false;
         let mut methods = HashMap::new();
@@ -103,6 +109,7 @@ impl Lowering<'_> {
             let mut precedence = None;
             let mut local_whitespace = None;
             let mut interleave = false;
+            let mut effects = RuleEffects::default();
             for annotation in &rule.annotations {
                 match &annotation.kind {
                     AnnotationKind::Root => {
@@ -161,11 +168,42 @@ impl Lowering<'_> {
                         }
                         interleave = true;
                     }
+                    AnnotationKind::ScopeTree { mode } => {
+                        if effects.scope_mode.is_some() {
+                            return Err(format!("duplicate @scopeTree on {}", rule.name));
+                        }
+                        effects.scope_mode = Some(match mode.trim() {
+                            "lexical" => ScopeMode::Lexical,
+                            "dynamic" => ScopeMode::Dynamic,
+                            _ => return Err(format!("unsupported scopeTree mode {mode}")),
+                        });
+                    }
+                    AnnotationKind::Declares {
+                        symbol_capture,
+                        description,
+                    } => {
+                        if effects.declares.is_some() {
+                            return Err(format!("duplicate @declares on {}", rule.name));
+                        }
+                        effects.declares = Some(Declaration {
+                            symbol_capture: symbol_capture.clone(),
+                            description: description.clone(),
+                        });
+                    }
+                    AnnotationKind::Backref { name } => {
+                        if !has_scope {
+                            return Err("@backref without @scopeTree is unsupported".into());
+                        }
+                        if effects.backref.replace(name.clone()).is_some() {
+                            return Err(format!("duplicate @backref on {}", rule.name));
+                        }
+                    }
                     other => {
                         return Err(format!("unsupported annotation {other:?} on {}", rule.name))
                     }
                 }
             }
+            rule_effects.push(effects);
             has_local_trivia |= local_whitespace.is_some() || interleave;
             rule_whitespace.push(local_whitespace.unwrap_or(whitespace || interleave));
             if associativity.is_some() != precedence.is_some() {
@@ -213,6 +251,20 @@ impl Lowering<'_> {
         let mut rules = Vec::new();
         for (i, expression) in self.bodies.iter().enumerate() {
             let captures = self.captures(expression)?;
+            let effects = &rule_effects[i];
+            for target in effects
+                .declares
+                .iter()
+                .map(|decl| &decl.symbol_capture)
+                .chain(effects.backref.iter())
+            {
+                if !captures.contains_key(target) {
+                    return Err(format!(
+                        "missing rule-effect capture {target} on {}",
+                        self.grammar.rules[i].name
+                    ));
+                }
+            }
             let mapping = if let Some((name, params)) = &self.mappings[i] {
                 let names: HashSet<_> = params.iter().collect();
                 if names.len() != params.len() || captures.keys().collect::<HashSet<_>>() != names {
@@ -240,7 +292,7 @@ impl Lowering<'_> {
                 };
                 Some(mapping)
             } else {
-                if !captures.is_empty() {
+                if !captures.is_empty() && *effects == RuleEffects::default() {
                     return Err(format!(
                         "captures without @mapping on {}",
                         self.grammar.rules[i].name
@@ -329,6 +381,12 @@ impl Lowering<'_> {
                 rule.body = Expression::TriviaScope {
                     child: Box::new(rule.body.clone()),
                     java_whitespace: rule_whitespace[i],
+                };
+            }
+            if rule_effects[i] != RuleEffects::default() {
+                rule.body = Expression::RuleEffects {
+                    child: Box::new(rule.body.clone()),
+                    effects: rule_effects[i].clone(),
                 };
             }
         }

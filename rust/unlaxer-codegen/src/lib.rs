@@ -156,6 +156,14 @@ fn parser(ir: &GrammarIr) -> String {
 fn expression(expr: &Expression) -> String {
     use Expression::*;
     match expr {
+        RuleEffects { child, effects } => {
+            let scope = effects.scope_mode.map_or_else(
+                || "None".into(),
+                |mode| format!("Some(unlaxer_runtime::ScopeMode::{mode:?})"),
+            );
+            let declares = effects.declares.as_ref().map_or_else(|| "None".into(), |decl| format!("Some(unlaxer_runtime::Declaration {{ symbol_capture: {}, description: {} }})", quote(&decl.symbol_capture), option_text(decl.description.as_deref())));
+            format!("{}.rule_effects(unlaxer_runtime::RuleEffects {{ scope_mode: {scope}, declares: {declares}, backref: {} }})", expression(child), option_text(effects.backref.as_deref()))
+        }
         Literal(s) => format!("Expr::Literal({})", quote(s)),
         NumberToken => "Expr::Number".into(),
         IdentifierToken => "Expr::Identifier".into(),
@@ -208,6 +216,10 @@ fn expression(expr: &Expression) -> String {
             expression(separator)
         ),
     }
+}
+
+fn option_text(value: Option<&str>) -> String {
+    value.map_or_else(|| "None".into(), |text| format!("Some({})", quote(text)))
 }
 
 fn expressions(items: &[Expression]) -> String {

@@ -3,6 +3,32 @@
 
 use std::collections::BTreeMap;
 
+/// Both modes currently use the same parse-time stack; the distinction is retained metadata.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScopeMode {
+    Lexical,
+    Dynamic,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Declaration {
+    pub symbol_capture: &'static str,
+    /// Preserved annotation metadata, not evaluated as a capture or description at runtime.
+    pub description: Option<&'static str>,
+}
+
+/// Effects on a rule's own named captures; referenced rules' captures are excluded.
+/// A scope encloses the body, then closes before declarations and references are
+/// recorded. Every matching occurrence is processed in capture order. Symbol text
+/// uses Java String.trim (scalars <= U+0020); quotes and escapes remain unchanged.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct RuleEffects {
+    pub scope_mode: Option<ScopeMode>,
+    pub declares: Option<Declaration>,
+    /// Record references and warn for unresolved names; does not reject the parse.
+    pub backref: Option<&'static str>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SymbolInfo {
     pub name: String,

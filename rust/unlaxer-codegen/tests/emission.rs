@@ -66,10 +66,11 @@ fn generated_modules_compile_evaluate_and_require_semantics() {
         "right",
         "mixed",
         "boundaries",
+        "scope_effects",
     ] {
         let output = temp.0.join(fixture);
         fs::create_dir(&output).unwrap();
-        let mut ir = support::fixture(if fixture == "names" {
+        let mut ir = support::fixture(if matches!(fixture, "names" | "scope_effects") {
             "evolution"
         } else if fixture == "right" {
             "shared"
@@ -83,6 +84,19 @@ fn generated_modules_compile_evaluate_and_require_semantics() {
         if fixture == "right" {
             ir.rules[1].operator.as_mut().unwrap().associativity = Associativity::Left;
             ir.rules[2].operator.as_mut().unwrap().associativity = Associativity::Right;
+        }
+        if fixture == "scope_effects" {
+            ir.rules[2].body = Expression::RuleEffects {
+                child: Box::new(ir.rules[2].body.clone()),
+                effects: RuleEffects {
+                    scope_mode: Some(ScopeMode::Dynamic),
+                    declares: Some(Declaration {
+                        symbol_capture: "value".into(),
+                        description: Some("documentation".into()),
+                    }),
+                    backref: Some("value".into()),
+                },
+            };
         }
         for file in generate(&ir).unwrap() {
             fs::write(output.join(file.relative_path), file.content).unwrap();
@@ -101,6 +115,8 @@ impl Semantics for Eval {
 }
 fn main() { let tree=generated::parser::parse_tree("if(1, 3*3, neg(2))").unwrap(); let ast=generated::mapper::map(&tree).unwrap(); drop(tree); assert_eq!(evaluate(&ast,&mut Eval),9); assert_eq!(ast.span().end,18); assert!(ast.canonical_json().contains("Conditional")); }
 "#
+        } else if fixture == "scope_effects" {
+            r#"fn main() { let tree=generated::parser::parse_tree("2+3").unwrap(); assert_eq!(tree.scopes().all_declarations().len(),2); assert_eq!(tree.scopes().all_references().len(),2); assert!(tree.scopes().diagnostics().is_empty()); assert!(tree.scopes().is_declared("2")); let ast=generated::mapper::map(&tree).unwrap(); drop(tree); assert!(ast.canonical_json().contains("Binary")); }"#
         } else if fixture == "fields" {
             r#"fn main() {let tree=generated::parser::parse_tree("name 'hi' \"x\" 1 2 3").unwrap(); let ast=generated::mapper::map(&tree).unwrap(); drop(tree); let json=ast.canonical_json(); assert!(json.contains("hi")); assert!(json.contains("children"));}"#
         } else if fixture == "mixed" {
@@ -214,6 +230,21 @@ fn invalid_ir_is_rejected_before_emission() {
     cases.push(g);
     let mut g = base.clone();
     g.rules[3].body = Expression::ValueBoundary(Box::new(Expression::Reference(999)));
+    cases.push(g);
+    let mut g = base.clone();
+    g.rules[3].body = Expression::RuleEffects {
+        child: Box::new(Expression::Reference(999)),
+        effects: RuleEffects::default(),
+    };
+    cases.push(g);
+    let mut g = base.clone();
+    g.rules[3].body = Expression::RuleEffects {
+        child: Box::new(Expression::NumberToken),
+        effects: RuleEffects {
+            backref: Some("missing".into()),
+            ..RuleEffects::default()
+        },
+    };
     cases.push(g);
     let mut g = base.clone();
     g.rules[3].body = Expression::TriviaScope {

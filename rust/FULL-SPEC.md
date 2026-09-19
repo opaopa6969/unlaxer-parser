@@ -30,10 +30,11 @@
 | mapping・capture・source-preserving AST | scalar/optional/list/groupと混在Text/Node値を生成。Rustはspan付きAstValue、JavaはObject系。shared mappingの型joinは宣言順非依存。単一capture内の複数semantic子とhelper内部optional/repeatのcardinality・全値収集を両言語で実装（#160）。純mapped aliasもNodeを保持し、直接/多段/group/delimiter・複数targetの値と位置を両backendで比較（#163）。Java位置binding #116・zero-field生成 #129・複合text capture #132・混在値 #156を修正 | 入れ子container型、再帰的unmapped rule、typeof/commonField/enum、全Java capture規則との互換性 |
 | evaluator dispatch・網羅性 | 限定範囲で生成済み | 新nodeのE0004/E0046検証を拡張。eval annotation、型境界、短絡評価を追加。Java sum/dotted evaluatorの不具合 #130 は修正済み |
 | leftAssoc/rightAssoc/precedence | canonical leftAssocとrightAssoc、precedence metadata、schemaを統合したshared mapping、混在factorを生成 | 左辺＋op/right列と右再帰、文法階層による優先順位を検証。非canonical右結合形、Javaの特殊null/literal leafとRust AstValueの構造互換は未完了。Java raw CST反復欠落 #138・右結合 #139 は独立修正 |
-| backref・MatchedToken相当 | context-wide replayのみ | UBNF annotation、名前の寿命・入れ子・伝播、コピー言語のpositive/negative test |
+| backref・MatchedToken相当 | context-wide replayとscope付き文法の参照検証を区別して対応 | scopeなしUBNF backref、名前の寿命・入れ子・伝播、コピー言語のpositive/negative test |
 | PropagationStopper・consume/invert・virtual token・metadata | 未対応 | 有限状態の全合成検査、8元モデルとの対応、実parserとの統合試験 |
-| lexical scope store・宣言/参照/semantic diagnostics | Java rollback修正とRust公開ParseContextへのtransactional store接続（#174）。runtimeのみ | scope depth/lookup/shadowing/イベント履歴/失敗時復元を共通operation corpusで比較。Rust生成annotation接続やAST/IDEへのmetadata搬送は未完了 |
-| scopeTree/declares/catalog/doc/skip/simple等 | Rust生成annotation未対応（scope store runtime基盤とは区別） | 各annotationのJava実動作を確認し、生成metadataと利用先を検証 |
+| lexical scope store・宣言/参照/semantic diagnostics | Java rollback修正とRust公開ParseContextへのtransactional store接続（#174）、owned Treeへのsnapshot | scope depth/lookup/shadowing/イベント履歴/失敗時復元を共通operation corpusで比較。AST/IDEへのmetadata搬送は未完了 |
+| scopeTree/declares/スコープ参照 | 両frontendから生成、Java capture-site選択も修正（#176）。mode/description metadata保持、CP位置、nested/repeated captureとrollbackを比較 | 両modeは解析時stack。評価時dynamic環境やclosure、LSP/DAP利用は未対応 |
+| catalog/doc/skip/simple等 | Rust生成annotation未対応 | 各annotationのJava実動作を確認し、生成metadataと利用先を検証 |
 | recovery・incremental cache | 未対応 | 編集差分と全再解析の一致、位置・診断・利用者状態の無効化、回復後の評価境界 |
 | LSP/DAP | 未対応 | UTF-16変換、diagnostics/completion、breakpoint/step/変数表示を実protocolで検証 |
 | tinyexpression-rs | 未対応 | 値・null/欠損・変数・演算子・関数・外部呼出し・日時/数値仕様を棚卸しし、同一入力で値/失敗分類を比較 |
@@ -60,6 +61,9 @@ tinyexpressionのStringLiteral対応（#168）は[実クラスとの比較・字
 CodeStart/CodeEnd対応（#170）の[行境界・字句契約と実行機能との区別](../docs/tiny-code-fence.md)も参照。
 rule-level trivia（#172）の[契約と Java global none の移行](../docs/rule-trivia.md)も参照。
 transactional scope store（#174）の[rollback契約とruntime API](../docs/transactional-scopes.md)も参照。
+生成scope annotation（#176）の[capture・metadata契約とJava移行](../docs/generated-scope-effects.md)も参照。
+同名nested captureをmapped fieldへ投影するとJavaは外側scalar、Rustは内外listとなる既存差があり、
+[#177](https://github.com/opaopa6969/unlaxer-parser/issues/177)で追跡する。scopeイベントの一致とAST全互換は区別する。
 
 parser生成は当面`Expr`combinator定義を生成し、共通runtimeで実行する。直接parser関数を出力する高速化backendは、その意味論との同値性を測定できてから検討する。Rustでビルドされた実行ファイルであることは、入力式を機械語にコンパイルしていることを意味しない。
 

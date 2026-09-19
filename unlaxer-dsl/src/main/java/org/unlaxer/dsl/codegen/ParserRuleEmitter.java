@@ -693,81 +693,14 @@ class ParserRuleEmitter {
                 .filter(a -> a instanceof DeclaresAnnotation)
                 .map(a -> ((DeclaresAnnotation) a).symbolCapture())
                 .findFirst().orElse("");
-            // キャプチャ名に対応する要素のパーサークラスを特定する
-            String captureParserClass = findCaptureParserClass(ctx, rule, symbolCapture);
-            w.line("// @declares(symbol=" + symbolCapture + ")");
-            w.line("if (!tokens.isEmpty()) {");
-            w.indent();
-            w.line("org.unlaxer.Token ruleToken = tokens.get(0);");
-            if (captureParserClass != null) {
-                // Position wrappers are transparent; retain exact-class/direct-child semantics.
-                w.line("org.unlaxer.Token captureToken = __semanticChildren(ruleToken).filter(c -> c.getParser().getClass() == "
-                    + captureParserClass + ").findFirst().orElse(null);");
-                w.line("if (captureToken != null && captureToken.source != null) {");
-                w.indent();
-                w.line("String __symbolName = captureToken.source.sourceAsString().trim();");
-                w.line("if (!__symbolName.isEmpty()) {");
-                w.indent();
-                w.line("int __offset = captureToken.source.offsetFromRoot().value();");
-                w.line("org.unlaxer.dsl.runtime.ScopeStore.declare(ctx, __symbolName, __offset);");
-                w.dedent();
-                w.line("}");
-                w.dedent();
-                w.line("}");
-            } else {
-                // フォールバック: filteredChildren を順に走査してnon-keyword を探す
-                w.line("for (org.unlaxer.Token child : ruleToken.filteredChildren) {");
-                w.indent();
-                w.line("if (child.source == null) continue;");
-                w.line("String __symbolName = child.source.sourceAsString().trim();");
-                w.line("if (!__symbolName.isEmpty()) {");
-                w.indent();
-                w.line("int __offset = child.source.offsetFromRoot().value();");
-                w.line("org.unlaxer.dsl.runtime.ScopeStore.declare(ctx, __symbolName, __offset);");
-                w.line("break;");
-                w.dedent();
-                w.line("}");
-                w.dedent();
-                w.line("}");
-            }
-            w.dedent();
-            w.line("}");
+            w.raw(ParserScopeEmitter.action(ctx, rule, symbolCapture, true));
         }
         if (backrefScopeMode) {
             String backrefCapture = rule.annotations().stream()
                 .filter(a -> a instanceof BackrefAnnotation)
                 .map(a -> ((BackrefAnnotation) a).name())
                 .findFirst().orElse("");
-            String captureParserClass = findCaptureParserClass(ctx, rule, backrefCapture);
-            w.line("// @backref(name=" + backrefCapture + ") \u2014 scope reference mode");
-            w.line("if (!tokens.isEmpty()) {");
-            w.indent();
-            w.line("org.unlaxer.Token ruleToken = tokens.get(0);");
-            if (captureParserClass != null) {
-                w.line("org.unlaxer.Token refToken = __semanticChildren(ruleToken).filter(c -> c.getParser().getClass() == "
-                    + captureParserClass + ").findFirst().orElse(null);");
-                w.line("if (refToken != null && refToken.source != null) {");
-                w.indent();
-                w.line("String __refName = refToken.source.sourceAsString().trim();");
-                w.line("if (!__refName.isEmpty()) {");
-                w.indent();
-                w.line("int __offset = refToken.source.offsetFromRoot().value();");
-                w.line("org.unlaxer.dsl.runtime.ScopeStore.addReference(ctx, __refName, __offset, __refName.length());");
-                w.line("if (!org.unlaxer.dsl.runtime.ScopeStore.isDeclared(ctx, __refName)) {");
-                w.indent();
-                w.line("org.unlaxer.dsl.runtime.ScopeStore.addDiagnostic(ctx,");
-                w.line("    \"未定義のシンボル: '\" + __refName + \"'\",");
-                w.line("    __offset, __refName.length(),");
-                w.line("    org.unlaxer.dsl.runtime.ScopeStore.Severity.WARNING);");
-                w.dedent();
-                w.line("}");
-                w.dedent();
-                w.line("}");
-                w.dedent();
-                w.line("}");
-            }
-            w.dedent();
-            w.line("}");
+            w.raw(ParserScopeEmitter.action(ctx, rule, backrefCapture, false));
         }
         if (backrefBackrefMode) {
             String backrefCapture = rule.annotations().stream()

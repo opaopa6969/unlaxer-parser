@@ -7,6 +7,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.AtomicElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.BackrefAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.CatalogAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ChoiceBody;
+import org.unlaxer.dsl.bootstrap.UBNFAST.DeclaresAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.InterleaveAnnotation;
@@ -95,6 +96,8 @@ public final class GrammarValidator {
         validateBoundedRepeatElements(grammar, errors);
         validateCommonFields(grammar, errors);
         validateEnumRules(grammar, errors);
+        boolean scopeReferences = grammar.rules().stream().anyMatch(rule -> rule.annotations().stream()
+            .anyMatch(annotation -> annotation instanceof ScopeTreeAnnotation));
 
         for (RuleDecl rule : grammar.rules()) {
             MappingAnnotation mapping = null;
@@ -141,6 +144,7 @@ public final class GrammarValidator {
             }
             validatePrecedence(rule, hasLeftAssoc, hasRightAssoc, precedenceAnnotations, errors);
             validateAdvancedAnnotations(rule, interleaveAnnotations, backrefAnnotations, scopeTreeAnnotations, errors);
+            validateScopeCaptures(rule, scopeReferences, errors);
             validateTypeofElements(rule, errors);
             validateCatalogAnnotations(rule, errors);
         }
@@ -765,6 +769,34 @@ public final class GrammarValidator {
         }
     }
 
+    private static void validateScopeCaptures(RuleDecl rule, boolean scopeReferences,
+            List<ValidationIssue> errors) {
+        var declarations = rule.annotations().stream().filter(DeclaresAnnotation.class::isInstance)
+            .map(DeclaresAnnotation.class::cast).toList();
+        if (declarations.size() > 1) {
+            addRuleError(errors, rule.name(), "rule " + rule.name() + " has duplicate @declares annotations",
+                "Keep a single @declares(symbol=...) annotation.", "E-ANNOTATION-DUPLICATE-DECLARES");
+        }
+        Set<String> captures = collectCaptureNames(rule.body());
+        for (Annotation annotation : rule.annotations()) {
+            String target;
+            String code;
+            if (annotation instanceof DeclaresAnnotation declaration) {
+                target = declaration.symbolCapture();
+                code = "E-ANNOTATION-DECLARES-CAPTURE";
+            } else if (scopeReferences && annotation instanceof BackrefAnnotation reference) {
+                target = reference.name();
+                code = "E-ANNOTATION-BACKREF-CAPTURE";
+            } else {
+                continue;
+            }
+            if (!captures.contains(target)) {
+                addRuleError(errors, rule.name(), "rule " + rule.name() + " has no scope capture: " + target,
+                    "Capture the target in this rule's body using @" + target + ".", code);
+            }
+        }
+    }
+
     private static void validatePrecedenceTopology(GrammarDecl grammar, List<ValidationIssue> errors) {
         var ruleMap = grammar.rules().stream()
             .collect(java.util.stream.Collectors.toMap(RuleDecl::name, r -> r, (a, b) -> a));
@@ -1004,6 +1036,12 @@ public final class GrammarValidator {
             case GroupElement group -> collectCaptureNamesFromBody(group.body(), captures);
             case OptionalElement opt -> collectCaptureNamesFromBody(opt.body(), captures);
             case RepeatElement rep -> collectCaptureNamesFromBody(rep.body(), captures);
+            case UBNFAST.OneOrMoreElement rep -> collectCaptureNamesFromAtomic(rep.body(), captures);
+            case UBNFAST.BoundedRepeatElement rep -> collectCaptureNamesFromAtomic(rep.body(), captures);
+            case UBNFAST.SeparatedElement separated -> {
+                collectCaptureNamesFromAtomic(separated.element(), captures);
+                collectCaptureNamesFromAtomic(separated.separator(), captures);
+            }
             default -> {
                 // TerminalElement / RuleRefElement have no nested bodies.
             }

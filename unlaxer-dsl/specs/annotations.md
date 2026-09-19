@@ -264,14 +264,27 @@ Java parser と両 Rust 生成経路で対応。[両言語の契約・global non
 
 ### 実装状況
 
-**メタデータ query API 生成済み**。ただし、生成された API を消費するセマンティック検証フェーズ（シンボルテーブルを参照して名前の一致を検証する）は未実装。
+文法に`@scopeTree`があれば、Java/Rustとも指定captureの各出現をscope storeへ参照として記録し、
+未定義ならwarningを残す（構文解析の失敗にはしない）。対象captureは同じルール本体に必要。
+Javaは生成query API、Rustは`RuleEffects.backref`にも対象名を保持する。
+scopeがない場合のJava同一ルール内テキスト比較は別契約で、Rust生成は明示的に未対応。
 
 ### バックログ
 
-セマンティック分析フェーズの設計・実装が必要:
-- Evaluator または別フェーズでシンボルテーブルを構築
-- `getBackrefName()` で取得した名前が、先行するスコープ内で宣言されていることを検証
-- 検証失敗時のエラー報告（LSP diagnostics への統合）
+Rust LSPへのdiagnostics搬送、scopeなしの後方参照、および評価時環境は未対応。
+
+---
+
+## @declares(symbol=..., description=...)
+
+同じルール内の指定captureから宣言名を取り、scope storeへ記録する。
+反復の全出現と入れ子captureを完了順に扱い、参照先ルール内部のcaptureは混ぜない。
+`@scopeTree`も付いていればleave後に親へ宣言する。`symbol` capture欠損と重複注釈は検証エラー。
+`description`は省略可能なmetadataであり、その名前のcapture存在や値は評価しない。
+
+Javaは`DeclaresSpec` / `getDeclaresSpec(ruleName)` / `getDeclaresSpecs()`、
+Rustは`RuleEffects.declares`にsymbolとdescriptionを保持する。
+原文trim・コードポイント位置・rollbackは[共通契約](../../docs/generated-scope-effects.md)を参照。
 
 ---
 
@@ -308,15 +321,14 @@ Java parser と両 Rust 生成経路で対応。[両言語の契約・global non
 
 ### 実装状況
 
-**メタデータ query API 生成済み（充実）**。`ScopeMode` enum、`ScopeTreeSpec` record、11以上のヘルパーメソッドが生成される。ただし、生成された API を消費するランタイムスコープ管理は未実装。
+Javaはquery APIとtransaction listener、Rustは生成`RuleEffects`によりルール開始/終了時に
+scopeをenter/leaveする。失敗時は親transactionを含めて復元する。
+両modeとも現時点では解析時ネストであり、評価時のdynamic環境やclosureではない。
+Rustのowned `Tree.scopes()`は取得時のscope store snapshotを持つ。
 
 ### バックログ
 
-ランタイムスコープ管理の設計・実装が必要:
-- 生成パーサーのルール開始/終了時にスコープ enter/leave イベントを発火
-- スコープツリーの構築（lexical: 静的ネスト、dynamic: 実行時ネスト）
-- `@backref` と連携したシンボル解決（スコープ内の名前参照検証）
-- LSP での go-to-definition、find-references への統合
+評価時dynamic環境・永続的なscope tree、およびRust LSP/DAPへの統合は未対応。
 
 ---
 
@@ -337,8 +349,8 @@ Java parser と両 Rust 生成経路で対応。[両言語の契約・global non
 
 ## 現在の制限事項
 
-- `@backref`: メタデータ query API は生成されるが、セマンティック検証フェーズ（シンボルテーブル参照による名前一致検証）は未実装
-- `@scopeTree`: メタデータ query API は充実しているが、ランタイムスコープ管理（スコープ enter/leave イベント発火、スコープツリー構築）は未実装
+- `@backref`: scopeなしの同一ルール内テキスト比較はRust生成未対応
+- `@scopeTree`: 両modeは解析時stack。評価時dynamic環境・永続scope treeは未対応
 - `@leftAssoc` はバリデーション対象だが、パーサー生成での直接的な消費は限定的
 
 ## 変更履歴

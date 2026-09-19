@@ -41,6 +41,9 @@ public final class RustGrammarLowering {
             if (tokens.putIfAbsent(token.name(), token(token)) != null) throw unsupported("duplicate token " + token.name());
         }
         int root = -1;
+        boolean hasScope = grammar.rules().stream().flatMap(rule -> rule.annotations().stream())
+            .anyMatch(annotation -> annotation instanceof ScopeTreeAnnotation);
+        List<Effects> ruleEffects = new ArrayList<>();
         List<Boolean> ruleWhitespace = new ArrayList<>();
         boolean hasLocalTrivia = false;
         Map<String, String> methods = new LinkedHashMap<>();
@@ -55,6 +58,9 @@ public final class RustGrammarLowering {
             Integer precedence = null;
             Boolean localWhitespace = null;
             boolean interleave = false;
+            ScopeMode scopeMode = null;
+            Declaration declares = null;
+            String backref = null;
             for (var annotation : rule.annotations()) {
                 if (annotation instanceof RootAnnotation) {
                     if (root != -1) throw unsupported("multiple @root annotations");
@@ -86,8 +92,24 @@ public final class RustGrammarLowering {
                         throw unsupported("interleave profile " + value.profile());
                     }
                     interleave = true;
+                } else if (annotation instanceof ScopeTreeAnnotation value) {
+                    if (scopeMode != null) throw unsupported("duplicate @scopeTree on " + rule.name());
+                    scopeMode = switch (value.mode().trim()) {
+                        case "lexical" -> ScopeMode.LEXICAL;
+                        case "dynamic" -> ScopeMode.DYNAMIC;
+                        default -> throw unsupported("scopeTree mode " + value.mode());
+                    };
+                } else if (annotation instanceof DeclaresAnnotation value) {
+                    if (declares != null) throw unsupported("duplicate @declares on " + rule.name());
+                    declares = new Declaration(value.symbolCapture(), value.description());
+                } else if (annotation instanceof BackrefAnnotation value) {
+                    if (!hasScope) throw unsupported("@backref without @scopeTree");
+                    if (backref != null) throw unsupported("duplicate @backref on " + rule.name());
+                    backref = value.name();
                 } else throw unsupported("annotation " + annotation + " on " + rule.name());
             }
+            ruleEffects.add(scopeMode == null && declares == null && backref == null ? null
+                : new Effects(scopeMode, declares, backref));
             hasLocalTrivia |= localWhitespace != null || interleave;
             ruleWhitespace.add(localWhitespace == null ? whitespace || interleave : localWhitespace);
             mappings.add(mapping);
@@ -111,10 +133,19 @@ public final class RustGrammarLowering {
         Map<String, Mapping> variants = new LinkedHashMap<>();
         for (int i = 0; i < bodies.size(); i++) {
             Map<String, Shape> captures = captures(bodies.get(i));
+            Effects effects = ruleEffects.get(i);
+            if (effects != null) {
+                if (effects.declares() != null && !captures.containsKey(effects.declares().symbolCapture())) {
+                    throw unsupported("missing rule-effect capture " + effects.declares().symbolCapture());
+                }
+                if (effects.backref() != null && !captures.containsKey(effects.backref())) {
+                    throw unsupported("missing rule-effect capture " + effects.backref());
+                }
+            }
             var annotation = mappings.get(i);
             Mapping mapping = null;
             if (annotation == null) {
-                if (!captures.isEmpty()) throw unsupported("captures without @mapping on " + grammar.rules().get(i).name());
+                if (!captures.isEmpty() && effects == null) throw unsupported("captures without @mapping on " + grammar.rules().get(i).name());
             } else {
                 if (new HashSet<>(annotation.paramNames()).size() != annotation.paramNames().size()
                     || !captures.keySet().equals(new HashSet<>(annotation.paramNames()))) {
@@ -153,6 +184,7 @@ public final class RustGrammarLowering {
             }
             // Every rule resolves against the grammar default, never against its caller.
             if (hasLocalTrivia) expression = new TriviaScope(expression, ruleWhitespace.get(i));
+            if (ruleEffects.get(i) != null) expression = new RuleEffects(expression, ruleEffects.get(i));
             rewritten.add(new Rule(rule.name(), expression, mapping, rule.operator()));
         }
         return new GrammarIR(rewritten, root, whitespace);
