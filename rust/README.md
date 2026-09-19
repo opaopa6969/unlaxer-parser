@@ -127,11 +127,13 @@ lowererはtext選択肢の境界を明示的な`Expr::TextValue`として生成�
 
 [`mixed-values`](../unlaxer-dsl/src/test/resources/mixed-values/)ではJava/Rustの受理・消費/照合cursor・AST field/node span、独立した評価期待値を比較する。Rustのtext spanは別に原文のUnicodeコードポイント位置で検証する。`AstValue::canonical_json()`はJavaのStringとの比較用にtextをJSON文字列へ投影するため、そのJSONにはtext spanを含めない。Rust AST自体はspanを所有し、CST/contextを破棄しても使える。結果は`target/rust-mixed-values.tsv`・`rust-delimited-mixed-values.tsv`・`rust-shared-mixed-values.tsv`に保存する。
 
-Rustはgroup/repeat/unmapped helper内の複数semantic値も順序付きで収集するが、Javaとの一致を検証した範囲は各capture要素が1つのText/Nodeを持つscalar・optional・反復listである。`Pair ::= Leaf Leaf; Root ::= Pair @values;`のような**単一capture内の並列semantic値**では、Javaはscalar Objectとして最後のnodeのみを選び、RustはVecとして全値を保持する。これは互換性を達成した機能と数えず、[#160](https://github.com/opaopa6969/unlaxer-parser/issues/160)で型/cardinalityの統一を追跡する。
+`Pair ::= Leaf Leaf; Root ::= Pair @values;`のような**単一capture内の並列semantic値**も、JavaのList・RustのVecとして元の順序ですべて保持する（[#160](https://github.com/opaopa6969/unlaxer-parser/issues/160)）。helper内部のgroup/alias/optional/repeat/separatedを解析して、構文上のcapture回数だけでなくsemantic値の個数を型へ反映する。mapped nodeで収集を止め、そのnode内部を親のfieldへ平坦化しない。区切り文字は値に含めず、各scalar Text itemの括弧とtriviaは保持する。Many helper全体を一つのTextへ結合しない。
 
-同じく`Outer ::= '(' [Factor] ')'; Root ::= Outer @value;`でhelper内部のoptionalをcaptureすると、入力`()`はJavaのObjectでは文字列`"()"`、Rustの`Option<AstValue>`では`None`になる。外側の`[Outer @value]`で不在を表す検証済みの形とは異なる。このhelper越しのcardinality推論差も#160の未完了範囲に含める。
+`Outer ::= '(' [Factor] ')'; Root ::= Outer @value;`でhelper内部のoptionalをcaptureした場合、入力`()`はJavaの`Optional.empty()`・Rustの`None`を表す。値がないことと空文字列の値を区別し、括弧だけからTextを捏造しない。従来Javaが返したscalar Objectや最後のnodeだけへの依存はAPI変更になるため、parser・AST・mapper・evaluatorを一緒に再生成し、利用側のList/Optional処理を更新する。Java生成parserの専用`__CaptureBinding` metadataでtext/item境界を保持し、共有Parser instanceを変更しない。
 
-choiceを介さず単一mapped ruleを参照するJavaのaliasは既存の`String` APIを維持する。たとえばtinyexpressionの`SliceStartIndex ::= NumberExpression`はsource textを添字変換に使う。Rustはこの形もNodeとして扱うため、mixed choice対応をもって純粋なmapped aliasの型まで互換になったとは主張しない。
+[`semantic-cardinality`](../unlaxer-dsl/src/test/resources/semantic-cardinality/)の共通corpusでは、Java単体・Rust単体・両言語比較を独立に実行する。型、値の順序、両cursor、全AST node span、Textの独立spanと評価結果を検証し、同値のleafが連続する場合も別々の位置を保持する。native/Java frontendのRust生成fileも照合する。結果は`target/semantic-cardinality-{java,rust,both}.tsv`に保存する。既存のassoc用型契約と純粋なmapped aliasのString APIはこの一般化では変更しない。
+
+choiceを介さず単一mapped ruleを参照するJavaのaliasは既存の`String` APIを維持する。たとえばtinyexpressionの`SliceStartIndex ::= NumberExpression`はsource textを添字変換に使う。Rustはこの形もNodeとして扱うため、mixed choice対応をもって純粋なmapped aliasの型まで互換になったとは主張しない。利用側を含む型移行は[#163](https://github.com/opaopa6969/unlaxer-parser/issues/163)で追跡し、この不一致を独立fixtureに残す。
 
 `[ Item ] @head`はoptionalの中へcaptureを置き、`{ Item } @items`、`Item+ @items`、`Item{1,2} @items`、`Item % ',' @items`は各要素をcaptureする。区切り文字はitemsに入れない。量指定子の内側に置いた`{ Item @items }`も扱う。同名captureの履歴は平坦な列で、順序を保つ。透明なunmapped ruleが複数のmapped nodeを包む場合も、mapperはそのnode列を収集する。
 

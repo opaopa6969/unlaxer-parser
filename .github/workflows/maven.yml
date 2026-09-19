@@ -47,6 +47,10 @@ jobs:
           unlaxer-dsl/target/rust-mixed-values.tsv
           unlaxer-dsl/target/rust-delimited-mixed-values.tsv
           unlaxer-dsl/target/rust-shared-mixed-values.tsv
+          unlaxer-dsl/target/semantic-cardinality-java.tsv
+          unlaxer-dsl/target/semantic-cardinality-rust.tsv
+          unlaxer-dsl/target/semantic-cardinality-both.tsv
+          unlaxer-dsl/target/semantic-cardinality-known-divergence-both.tsv
           unlaxer-dsl/target/rust-native-generator.tsv
         if-no-files-found: error
     - name: Build and smoke-test the native subset example

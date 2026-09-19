@@ -70,6 +70,13 @@ public class RustNativeGeneratorTest {
                 + "Expr ::= Factor @left { '+' @op " + (assoc.equals("leftAssoc") ? "Factor" : "Expr") + " @right }; "
                 + "Factor ::= 'a' | Leaf; @mapping(Leaf,params=[value]) Leaf ::= 'x' @value; }");
         }
+        for (String body : List.of("Leaf Leaf", "Factor Factor", "{ Factor }", "[ Factor ]",
+                "{ Outer }", "{ '(' Factor ')' }", "Outer % ','", "('(' Factor ')') % ','",
+                "Outer Outer", "[ Outer ] [ Outer ]", "[ '(' Factor ')' ] [ '<' Factor '>' ]", "'(' [ Factor ] ')'")) {
+            grammars.add("grammar Cardinality { @root @mapping(Collection,params=[values]) Document ::= Items @values; "
+                + "Items ::= " + body + "; Outer ::= '(' Factor ')'; Factor ::= 'a' | '😀' | Leaf; "
+                + "@mapping(Leaf,params=[text]) Leaf ::= ('x' | 'y') @text; }");
+        }
         for (String ruleName : List.of("_Root", "self")) {
             grammars.add("grammar G { @whitespace: none @root @mapping(Item,params=[value]) " + ruleName + " ::= 'x' @value; }");
         }
