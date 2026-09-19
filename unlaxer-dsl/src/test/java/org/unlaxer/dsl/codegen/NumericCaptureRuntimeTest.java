@@ -114,14 +114,16 @@ public class NumericCaptureRuntimeTest {
                 try (URLClassLoader loader = compile(parser, body)) {
                     assertEquals(Optional.empty(), value(loader, "n;"));
                     assertEquals(Optional.of(-12), value(loader, "n-12;"));
-                    assertThrows(InvocationTargetException.class, () -> value(loader, "n1.5;"));
+                    assertTrue(assertThrows(InvocationTargetException.class,
+                        () -> value(loader, "n1.5;")).getCause() instanceof NumberFormatException);
                 }
             }
             for (String body : List.of("{ NUMBER @value }", "{ NUMBER } @value")) {
                 try (URLClassLoader loader = compile(parser, body)) {
                     assertEquals(List.of(), value(loader, "n;"));
                     assertEquals(List.of(1, -2, 3), value(loader, "n1-2+3;"));
-                    assertThrows(InvocationTargetException.class, () -> value(loader, "n1+1e2;"));
+                    assertTrue(assertThrows(InvocationTargetException.class,
+                        () -> value(loader, "n1+1e2;")).getCause() instanceof NumberFormatException);
                 }
             }
         }
