@@ -447,6 +447,58 @@ class MapperElementUtil {
         return tokenDecl.parserClass().contains("IdentifierParser");
     }
 
+    /**
+     * Text-only compound captures denote their entire bound grammar site. A first-leaf
+     * lookup would truncate a sequence or miss a different choice branch. Keep mapped
+     * AST/enum dispatch and direct token conversions on their existing typed path.
+     */
+    static boolean usesBoundTextCapture(AtomicElement element, Map<String, RuleDecl> ruleByName,
+            Map<String, TokenDecl> tokenDeclByName) {
+        Object value = captureValueShape(element);
+        RuleBody body = switch (value) {
+            case GroupElement group -> group.body();
+            case RuleBody compound -> compound;
+            default -> null;
+        };
+        if (body == null) return false;
+        var visited = new java.util.HashSet<String>();
+        return collectRuleRefs(body).stream().noneMatch(ref ->
+            reachesMappedOrEnum(ref.name(), ruleByName, tokenDeclByName, visited));
+    }
+
+    // Mirrors CaptureBindingPlan.bindValues: unwrap cardinality, but not a source group.
+    private static Object captureValueShape(AtomicElement element) {
+        return switch (element) {
+            case OptionalElement optional -> captureValueShape(optional.body());
+            case RepeatElement repeat -> captureValueShape(repeat.body());
+            case UBNFAST.OneOrMoreElement repeat -> captureValueShape(repeat.body());
+            case UBNFAST.BoundedRepeatElement repeat -> captureValueShape(repeat.body());
+            case UBNFAST.SeparatedElement separated -> captureValueShape(separated.element());
+            default -> element;
+        };
+    }
+
+    private static Object captureValueShape(RuleBody body) {
+        if (body instanceof ChoiceBody choice && choice.alternatives().size() == 1) {
+            return captureValueShape(choice.alternatives().get(0));
+        }
+        if (body instanceof SequenceBody sequence && sequence.elements().size() == 1) {
+            return captureValueShape(sequence.elements().get(0).element());
+        }
+        return body;
+    }
+
+    private static boolean reachesMappedOrEnum(String name, Map<String, RuleDecl> ruleByName,
+            Map<String, TokenDecl> tokenDeclByName, java.util.Set<String> visited) {
+        if (tokenDeclByName.containsKey(name) || !visited.add(name)) return false;
+        RuleDecl rule = ruleByName.get(name);
+        if (rule == null) return false;
+        if (getMappingAnnotation(rule).isPresent()
+                || rule.annotations().stream().anyMatch(a -> a instanceof UBNFAST.EnumAnnotation)) return true;
+        return collectRuleRefs(rule.body()).stream().anyMatch(ref ->
+            reachesMappedOrEnum(ref.name(), ruleByName, tokenDeclByName, visited));
+    }
+
     static Optional<AtomicElement> normalizeCapturedElement(AtomicElement element) {
         return switch (element) {
             case GroupElement groupElement -> firstAtomicElement(groupElement.body());
