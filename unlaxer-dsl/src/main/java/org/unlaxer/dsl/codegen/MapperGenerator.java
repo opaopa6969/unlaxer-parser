@@ -176,6 +176,22 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("    public static synchronized SourceMappedAst<").append(astClass).append("> mapParsedTokenWithSourceMap(Token token) {\n");
         sb.append("        return new SourceMappedAst<>(mapParsedToken(token).ast());\n");
         sb.append("    }\n\n");
+        sb.append("    /** Selected token and the identity-based source snapshot from the same mapping. */\n");
+        sb.append("    public record SourceMappedSelection(Token token, SourceMappedAst<").append(astClass)
+            .append("> sourceMap) {}\n\n");
+        sb.append("    public static SourceMappedSelection selectParsedTokenWithSourceMap(Token token) {\n");
+        sb.append("        return selectParsedTokenWithSourceMap(token, null);\n");
+        sb.append("    }\n\n");
+        sb.append("    /**\n");
+        sb.append("     * Selects once using mapParsedToken's preferred-type and root-validation contract.\n");
+        sb.append("     * Mapping and snapshot capture share the mapper lock; later parses cannot replace these spans.\n");
+        sb.append("     * The caller may inspect the selected token to enforce whole-source coverage.\n");
+        sb.append("     * Retain the actual parser input separately when extracting text from code-point spans.\n");
+        sb.append("     */\n");
+        sb.append("    public static synchronized SourceMappedSelection selectParsedTokenWithSourceMap(Token token, String preferredAstSimpleName) {\n");
+        sb.append("        MappedAst selected = mapParsedToken(token, preferredAstSimpleName);\n");
+        sb.append("        return new SourceMappedSelection(selected.token(), new SourceMappedAst<>(selected.ast()));\n");
+        sb.append("    }\n\n");
         sb.append("    /** Maps an already parsed token tree without accessing mapper internals. */\n");
         sb.append("    public static MappedAst mapParsedToken(Token rootToken) {\n");
         sb.append("        return mapParsedToken(rootToken, null);\n");

@@ -44,6 +44,10 @@
 
 Javaの継承階層を一対一に移植するのではなく、文法と観測可能な振る舞いを対象とする。JVM任意オブジェクト・reflection・bytecodeのnative直接実行はできないため、Rust側のhost interfaceと移植コードの境界を明記する。差を消して比較を通したことにせず、意図的な差は独立したfixtureにする。
 
+純mapped aliasの型移行は#163で継続する。先行する#165はJavaのpreferred選択Tokenと
+source snapshotを原子的に取得する追加APIで、Rustでは既存のowned AST/spanの
+後続・並行mapping耐性を検証する。Javaのpreferred型候補探索自体のRust移植は未対応。
+
 parser生成は当面`Expr`combinator定義を生成し、共通runtimeで実行する。直接parser関数を出力する高速化backendは、その意味論との同値性を測定できてから検討する。Rustでビルドされた実行ファイルであることは、入力式を機械語にコンパイルしていることを意味しない。
 
 移植に伴う追加提案は、両言語を対象とする受け入れ条件付きで追跡する。未実装の計画であり、上記の対応済み件数には含めない。

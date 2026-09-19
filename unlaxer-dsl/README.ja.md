@@ -767,6 +767,25 @@ substringやLSPのUTF-16位置には明示変換が必要。合成nodeには位�
 mappingとsnapshot作成は生成mapperごとに直列化する。従来の `sourceSpanOf(node)` は最新の
 mapping専用。[設計と再現可能な言語進化実験](../paper/v6/artifact.md)も参照。
 
+preferred型で選んだTokenと、そのmappingのsnapshotを同時に保持する場合:
+
+```java
+var selected = TinyCalcMapper.selectParsedTokenWithSourceMap(rootToken, "BinaryExpr");
+Token selectedToken = selected.token();
+var sourceMap = selected.sourceMap();
+TinyCalcAST ast = sourceMap.ast();
+TinyCalcMapper.parse("999");
+int[] span = sourceMap.sourceSpanOf(ast).orElseThrow();
+```
+
+型指定なしの`selectParsedTokenWithSourceMap(rootToken)`も使える。既存の
+`mapParsedToken`と同じ選択を一度だけ行い、同じlock内でsnapshotを作る。
+全入力を覆うかの判定は返却Tokenを使って利用側が行う。snapshotは元の入力文字列を
+保持しないため、文字列を切り出す利用側は**実際にparserへ渡した入力**も保持する。
+コメント除去などで正規化した場合、正規化前の文字列へspanを適用してはいけない。
+Javaでは`parserSource.offsetByCodePoints(0, offset)`でUTF-16 indexへ変換する。
+既存`MappedAst`・`SourceMappedAst`と各入口の戻り値契約は変更していない。
+
 **生成後の作業（手動実装箇所）：**
 
 `TinyCalcMapper` の `to{ClassName}` メソッドは TODO コメント付きのスケルトンとして生成される。`findDescendants()` を使って実際のフィールド抽出ロジックを実装する。
