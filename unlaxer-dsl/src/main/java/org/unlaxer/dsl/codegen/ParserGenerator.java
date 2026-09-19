@@ -214,6 +214,8 @@ public class ParserGenerator implements CodeGenerator {
 
             """);
 
+        sb.append(ParserScopeEmitter.helpers(grammar));
+
         // チェーンクラス
         sb.append(generatePlainChainClass(ctx));
         if (ctx.hasDelimitedChain) {

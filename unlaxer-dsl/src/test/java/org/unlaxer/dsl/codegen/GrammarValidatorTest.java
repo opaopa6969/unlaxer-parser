@@ -470,6 +470,45 @@ public class GrammarValidatorTest {
         assertEquals("ANNOTATION", issues.get(0).category());
     }
 
+    @Test
+    public void testScopeCapturesMustExistInTheirOwnRule() {
+        var grammar = parseGrammar("""
+            grammar ScopeValidation {
+                @root @scopeTree(mode=lexical) Start ::= Decl Ref;
+                @declares(symbol=missing) Decl ::= Child;
+                @backref(name=missing) Ref ::= Child;
+                Child ::= 'x' @missing;
+            }
+            """);
+        var codes = GrammarValidator.validate(grammar).stream().map(GrammarValidator.ValidationIssue::code).toList();
+        assertEquals(java.util.List.of("E-ANNOTATION-DECLARES-CAPTURE", "E-ANNOTATION-BACKREF-CAPTURE"), codes);
+    }
+
+    @Test
+    public void testDuplicateDeclaresRejectedAndMetadataCapturesAccepted() {
+        var valid = parseGrammar("""
+            grammar ScopeValidation {
+                @root @scopeTree(mode=dynamic) Start ::= Decl Ref;
+                @declares(symbol=name, description=doc) Decl ::= 'n' @noise { ('x' @name) };
+                @backref(name=name) Ref ::= [ 'x' @name ];
+            }
+            """);
+        assertTrue(GrammarValidator.validate(valid).toString(), GrammarValidator.validate(valid).isEmpty());
+        var duplicate = parseGrammar("""
+            grammar ScopeValidation {
+                @root @declares(symbol=name) @declares(symbol=name) Start ::= 'x' @name;
+            }
+            """);
+        assertTrue(GrammarValidator.validate(duplicate).stream()
+            .anyMatch(issue -> issue.code().equals("E-ANNOTATION-DUPLICATE-DECLARES")));
+    }
+
+    @Test
+    public void testScopeAbsentBackrefValidationContractUnchanged() {
+        var grammar = parseGrammar("grammar ScopeValidation { @root @backref(name=old) Start ::= 'x'; }");
+        assertTrue(GrammarValidator.validate(grammar).isEmpty());
+    }
+
     // =========================================================================
     // Levenshtein suggestSimilarName tests
     // =========================================================================
