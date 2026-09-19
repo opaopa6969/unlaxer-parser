@@ -1301,6 +1301,19 @@ class MapperRuleEmitter {
         w.line("}");
         w.blankLine();
 
+        w.line("static int sourceSpanLengthCompat(Token token) {");
+        w.indent();
+        w.line("if (token != null && token.source != null && token.source.codePointLength() != null) {");
+        w.indent();
+        w.line("return Math.max(0, token.source.codePointLength().value());");
+        w.dedent();
+        w.line("}");
+        w.line("String text = tokenTextCompat(token);");
+        w.line("return text == null ? 0 : text.codePointCount(0, text.length());");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
+
         w.line("static int tokenStartOffsetCompat(Token token) {");
         w.indent();
         w.line("if (token == null) {");
@@ -1333,8 +1346,7 @@ class MapperRuleEmitter {
         w.dedent();
         w.line("}");
         w.line("int start = Math.max(0, tokenStartOffsetCompat(token));");
-        w.line("String text = tokenTextCompat(token);");
-        w.line("int length = text == null ? 0 : text.codePointCount(0, text.length());");
+        w.line("int length = sourceSpanLengthCompat(token);");
         w.line("int end = start + length;");
         w.line("NODE_SOURCE_SPANS.put(node, new int[]{start, end});");
         w.line("return node;");

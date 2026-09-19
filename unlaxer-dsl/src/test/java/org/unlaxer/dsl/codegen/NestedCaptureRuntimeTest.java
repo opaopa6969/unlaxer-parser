@@ -71,6 +71,28 @@ public class NestedCaptureRuntimeTest {
         }
     }
 
+    @Test public void sourceSpansUseCodePointOffsetsForNodesAndCapturedStrings() throws Exception {
+        try (var loader = compile("""
+            @root @mapping(Document, params=[prefix,child,suffix])
+            Root ::= 'A' @prefix Child @child '😀' @suffix;
+            @mapping(Part, params=[text])
+            Child ::= ('B' '😀') @text;
+            """)) {
+            Object root = parse(loader, "AB😀😀");
+            Object child = field(root, "child");
+
+            assertEquals("A", field(root, "prefix"));
+            assertEquals("B😀", field(child, "text"));
+            assertEquals("😀", field(root, "suffix"));
+
+            span(loader, root, 0, 4);
+            span(loader, field(root, "prefix"), 0, 1);
+            span(loader, child, 1, 3);
+            span(loader, field(child, "text"), 1, 3);
+            span(loader, field(root, "suffix"), 3, 4);
+        }
+    }
+
     @Test public void coalescedBindingsAreDistinctOccurrencesEvenForEmptyEqualText() throws Exception {
         for (String expression : List.of("('a' @name) @name", "[ 'a' @name ] @name")) {
             try (var loader = compile("@root @mapping(Box, params=[name]) Root ::= " + expression + ";")) {
