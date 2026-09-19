@@ -140,12 +140,10 @@ public class NumericCaptureRuntimeTest {
         }
     }
 
-    @Test public void missingRequiredNumericCaptureDoesNotSilentlyBecomeZero() throws Exception {
+    @Test public void numericCaptureAbsentFromAChoiceBranchIsOptionalRatherThanZero() throws Exception {
         try (URLClassLoader loader = compile("NumberParser", "( NUMBER @value | 'absent' )")) {
-            InvocationTargetException failure = assertThrows(InvocationTargetException.class,
-                () -> value(loader, "nabsent;"));
-            assertTrue(failure.getCause() instanceof IllegalArgumentException);
-            assertEquals("Required numeric capture not found: value", failure.getCause().getMessage());
+            assertEquals(Optional.empty(), value(loader, "nabsent;"));
+            assertEquals(Optional.of(7), value(loader, "n7;"));
         }
     }
 

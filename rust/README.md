@@ -185,6 +185,10 @@ let matched = context.parse(&MyParser)?;
 両modeは解析時stackであり、評価時のdynamic環境を意味しない。
 [生成スコープの契約とJava移行](../docs/generated-scope-effects.md)を参照。
 
+同名captureのAST fieldも完了順に全出現を保持する。共存する内外/並列captureはlist、
+排他的choiceはscalar、欠損する枝はoptionalになる。Java側の型変更と再生成手順は
+[同名captureの移行](../docs/nested-capture-migration.md)を参照。
+
 生成器は`rules()`・`parse_context(&mut ParseContext)`も出力する。context入口は現在位置からの**prefix解析**であり、全入力検証は従来の`parse_tree[_detailed]`、または後続の`Expr::Eof`を使う。文法とtrivia設定は呼出中だけ切り替わり、入力と利用者状態は共通。`matched.root_node()`から`context.tree(root)`で所有されたsnapshotを取り、その文法のmapperへ渡す。異なる文法のrule IDはローカルなので、複数文法のnodeを一つのmapperに混ぜない。node IDはcontext内だけで有効で、rollbackされた結果は再利用しない。
 
 公開APIの使用例とrollback契約は[`context_combinators.rs`](unlaxer-runtime/tests/context_combinators.rs)、scope store は[`scopes.rs`](unlaxer-runtime/tests/scopes.rs)、生成parserとの混在とAST評価は[`context.rs`](examples/evolution/tests/context.rs)で検証する。現在はtransactionごとに利用者状態・capture履歴・scope storeをコピーする単純実装で、性能評価・最適化は未実施。

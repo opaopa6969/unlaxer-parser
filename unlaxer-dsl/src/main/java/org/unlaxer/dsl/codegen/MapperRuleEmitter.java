@@ -761,8 +761,9 @@ class MapperRuleEmitter {
         String siteToken = "captureSite_" + safe;
         String ids = sites.stream().map(site -> "\"" + ParserCodegenUtil.escapeString(site.id()) + "\"")
             .collect(java.util.stream.Collectors.joining(", "));
-        w.line("for (Token " + siteToken + " : findCaptureSites(token, java.util.Set.of(" + ids + "))) {");
+        w.line("for (CaptureOccurrence occurrence : findCaptureOccurrences(token, java.util.Set.of(" + ids + "))) {");
         w.indent();
+        w.line("Token " + siteToken + " = occurrence.token();");
         for (int i = 0; i < sites.size(); i++) {
             CaptureBindingPlan.Site site = sites.get(i);
             boolean boundText = MapperElementUtil.usesBoundTextCapture(site.element(), ruleByName, tokenDeclByName);
@@ -774,7 +775,7 @@ class MapperRuleEmitter {
             String candidateType = MapperTypeResolver.inferTypeFromElement(grammar, normalized);
             if (!MapperTypeResolver.isTypeCompatible(valueType, candidateType) && !"String".equals(valueType)) continue;
             String valueToken = "paramToken_" + safe + "_" + i;
-            w.line("if (hasCaptureBinding(" + siteToken + ", \"" + ParserCodegenUtil.escapeString(site.id()) + "\")) {");
+            w.line("if (occurrence.binding().equals(\"" + ParserCodegenUtil.escapeString(site.id()) + "\")) {");
             w.indent();
             w.line("Token " + valueToken + " = " + (parserClass == null ? siteToken
                 : "findDescendants(" + siteToken + ", " + parserClass + ").stream().findFirst().orElse(null)") + ";");
@@ -783,6 +784,11 @@ class MapperRuleEmitter {
             String expression = boundText ? "stripQuotes(firstTokenText(" + valueToken + "))"
                 : MapperElementUtil.mapExpressionForTargetType(valueType, normalized, valueToken,
                 mappedClassByRuleName, tokenDeclByName, ruleByName);
+            if (boundText || "String".equals(valueType)) {
+                expression = "registerNodeSourceSpan(new String(" + expression + "), " + valueToken + ")";
+            } else if ("Object".equals(valueType)) {
+                expression = "registerTextCaptureSpan(" + expression + ", " + valueToken + ")";
+            }
             w.line(listType.isPresent() ? param + ".add(" + expression + ");"
                 : optionalType.isPresent() ? param + " = Optional.ofNullable(" + expression + ");"
                 : param + " = " + expression + ";");
@@ -807,11 +813,12 @@ class MapperRuleEmitter {
         w.line("List<Object> " + values + " = new ArrayList<>();");
         String ids = sites.stream().map(site -> "\"" + ParserCodegenUtil.escapeString(site.id()) + "\"")
             .collect(java.util.stream.Collectors.joining(", "));
-        w.line("for (Token " + siteToken + " : findCaptureSites(token, java.util.Set.of(" + ids + "))) {");
+        w.line("for (CaptureOccurrence occurrence : findCaptureOccurrences(token, java.util.Set.of(" + ids + "))) {");
         w.indent();
+        w.line("Token " + siteToken + " = occurrence.token();");
         for (CaptureBindingPlan.Site site : sites) {
             var shape = semantics.siteShape(site.element());
-            w.line("if (hasCaptureBinding(" + siteToken + ", \"" + ParserCodegenUtil.escapeString(site.id()) + "\")) {");
+            w.line("if (occurrence.binding().equals(\"" + ParserCodegenUtil.escapeString(site.id()) + "\")) {");
             w.indent();
             if (shape.kind() == SemanticCardinality.Kind.TEXT) {
                 w.line(values + ".add(semanticText(" + siteToken + "));");
@@ -874,6 +881,43 @@ class MapperRuleEmitter {
                 }
 
             """.formatted(String.join(", ", boundaries), SemanticCardinality.TEXT_BINDING, SemanticCardinality.BOUNDARY_BINDING);
+    }
+
+    /** Plain mappings consume each completed grammar binding, including coincident sites. */
+    static String emitCaptureOccurrenceUtilities(String parsersClass, java.util.Set<String> allRuleNames) {
+        String allBoundaries = allRuleNames.stream().map(name -> parsersClass + "." + name + "Parser.class")
+            .collect(java.util.stream.Collectors.joining(", "));
+        return """
+                private static final java.util.Set<Class<?>> CAPTURE_RULE_BOUNDARIES = java.util.Set.of(%s);
+                private record CaptureOccurrence(Token token, String binding) {}
+
+                private static Object registerTextCaptureSpan(Object value, Token token) {
+                    // Mixed fields carry both nodes and text. Only text needs an occurrence identity;
+                    // mapped nodes already retain their own source spans and numeric values are unchanged.
+                    return value instanceof String text
+                        ? registerNodeSourceSpan(new String(text), token) : value;
+                }
+
+                private static List<CaptureOccurrence> findCaptureOccurrences(Token token, java.util.Set<String> bindings) {
+                    List<CaptureOccurrence> result = new ArrayList<>();
+                    collectCaptureOccurrences(token, bindings, result, true);
+                    return result;
+                }
+
+                private static void collectCaptureOccurrences(Token token, java.util.Set<String> bindings,
+                        List<CaptureOccurrence> result, boolean root) {
+                    if (token == null || !root && CAPTURE_RULE_BOUNDARIES.contains(token.parser.getClass())) return;
+                    for (Token child : token.filteredChildren) collectCaptureOccurrences(child, bindings, result, false);
+                    if (token.parser instanceof %s.__CaptureBinding capture) {
+                        // Grammar bindings are registered outer-first; captures complete inner-first.
+                        List<String> ids = capture.captureBindings();
+                        for (int i = ids.size() - 1; i >= 0; i--) {
+                            if (bindings.contains(ids.get(i))) result.add(new CaptureOccurrence(token, ids.get(i)));
+                        }
+                    }
+                }
+
+            """.formatted(allBoundaries, parsersClass);
     }
 
     /**

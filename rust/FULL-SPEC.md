@@ -62,8 +62,9 @@ CodeStart/CodeEnd対応（#170）の[行境界・字句契約と実行機能と�
 rule-level trivia（#172）の[契約と Java global none の移行](../docs/rule-trivia.md)も参照。
 transactional scope store（#174）の[rollback契約とruntime API](../docs/transactional-scopes.md)も参照。
 生成scope annotation（#176）の[capture・metadata契約とJava移行](../docs/generated-scope-effects.md)も参照。
-同名nested captureをmapped fieldへ投影するとJavaは外側scalar、Rustは内外listとなる既存差があり、
-[#177](https://github.com/opaopa6969/unlaxer-parser/issues/177)で追跡する。scopeイベントの一致とAST全互換は区別する。
+同名nested/並列captureのAST型・全出現収集の修正（#177）は
+[cardinality契約とJava API移行](../docs/nested-capture-migration.md)を参照。
+共存するcaptureはlist、排他的choiceはscalar、欠損枝はoptionalとして両言語で比較する。
 
 parser生成は当面`Expr`combinator定義を生成し、共通runtimeで実行する。直接parser関数を出力する高速化backendは、その意味論との同値性を測定できてから検討する。Rustでビルドされた実行ファイルであることは、入力式を機械語にコンパイルしていることを意味しない。
 

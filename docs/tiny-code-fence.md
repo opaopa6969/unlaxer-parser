@@ -44,7 +44,7 @@ mapper は既存の text capture 契約（Java `String.strip()` 相当の空白�
 ## 実クラスを使う検証
 
 `TinyCodeFenceConformanceTest` は tinyexpression commit
-`854c1f4a7be07eed8007ce90541a0996ee2c93aa` の実クラスを oracle にする。
+`2a2db7c4ce38234c2ec8c4ddbf7d51eed08fc4ba` の実クラスを oracle にする。
 ロードした両 class の CodeSource が指定した `target/classes` であることも検査する。
 共通 corpus は12文法・73入力（受理34、拒否39）。受理/全入力判定、consumed/matched
 cursor、AST 全フィールドと node span を独立期待値と照合する。実 P4 と同じ zero-field

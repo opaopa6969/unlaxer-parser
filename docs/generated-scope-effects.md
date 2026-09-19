@@ -29,9 +29,9 @@ Rustは生成`RuleEffects`でmode・declaration・referenceを公開し、
 `ParseContext.scopes()` / `scopes_mut()`で実状態を扱う。
 owned `Tree.scopes()`はtree取得時のsnapshotなので、context破棄・後続解析・rollbackから独立する。
 typed AST内にscope storeを埋め込むことやLSP/DAPへの搬送は未実装。
-また、同名nested captureをmapped fieldにするとJavaは外側scalar、Rustは内外listになる既存差がある。
-これは[#177](https://github.com/opaopa6969/unlaxer-parser/issues/177)で追跡し、
-今回のnested scope比較ではmappingなしの宣言ルールで両イベントを検査する。AST互換済みとはしない。
+同名nested captureのAST投影差は#177で修正し、内側→外側のlistとして保持する。
+[AST型変更と移行](nested-capture-migration.md)を参照。
+scope corpusはmappingなしの宣言ルール、nested capture corpusはmapped fieldも含めて両方を検証する。
 
 Java生成parserは再生成が必要。従来の「同じparser classの最初のtoken」を取る挙動や、
 対象が見つからないと別tokenを採用する挙動は修正される。

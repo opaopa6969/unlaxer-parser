@@ -27,7 +27,7 @@ backslash と次の文字を一組として扱うが、escape のデコードは
 `TinyStringTokenConformanceTest` は、固定した tinyexpression checkout をビルドした
 `target/classes` を明示的に受け取り、実 `StringLiteralParser` と生成 Java parser/AST/mapper
 を使う。同名の代替 test class で比較しない。
-CI の oracle は tinyexpression commit `854c1f4a7be07eed8007ce90541a0996ee2c93aa`。
+CI の oracle は tinyexpression commit `2a2db7c4ce38234c2ec8c4ddbf7d51eed08fc4ba`。
 ロードされたクラスの code source が指定したディレクトリであることも検査する。
 
 ```sh

@@ -14,9 +14,11 @@ final class SemanticCardinality {
     record Shape(Kind kind, Count count) {}
     static final String TEXT_BINDING = "#semantic:text";
     static final String BOUNDARY_BINDING = "#semantic:boundary";
+    private final GrammarDecl grammar;
     private final Map<String, RuleDecl> rules = new LinkedHashMap<>();
 
     SemanticCardinality(GrammarDecl grammar) {
+        this.grammar = grammar;
         grammar.rules().forEach(rule -> rules.put(rule.name(), rule));
     }
 
@@ -52,15 +54,29 @@ final class SemanticCardinality {
     }
 
     String fieldType(RuleDecl rule, String field, String legacyType) {
-        if (associative(rule) || new CaptureBindingPlan(rule).sites(field).stream()
-                .noneMatch(site -> needsCollection(site.element()))) return legacyType;
+        if (associative(rule)) return legacyType;
         Shape shape = captures(rule.body()).get(field);
-        if (shape == null || shape.kind() == Kind.TEXT) return legacyType;
+        if (shape == null) return legacyType;
         String inner = legacyType;
         while (MapperTypeResolver.unwrapListType(inner).isPresent() || MapperTypeResolver.unwrapOptionalType(inner).isPresent()) {
             inner = inner.substring(inner.indexOf('<') + 1, inner.length() - 1);
         }
-        if (inner.equals("String") || inner.startsWith("List<") || inner.startsWith("Optional<")) inner = "Object";
+        var sites = new CaptureBindingPlan(rule).sites(field);
+        if (shape.kind() == Kind.TEXT && sites.size() > 1) {
+            // A group and its child can produce the same text type even when the old
+            // container-level inference merged Object/List<String>/String to Object.
+            Map<String, TokenDecl> tokens = new LinkedHashMap<>();
+            grammar.tokens().forEach(token -> tokens.put(token.name(), token));
+            Set<String> types = new java.util.LinkedHashSet<>();
+            for (var site : sites) {
+                String type = MapperElementUtil.usesBoundTextCapture(site.element(), rules, tokens) ? "String"
+                    : MapperTypeResolver.inferTypeFromElement(grammar,
+                        MapperElementUtil.normalizeCapturedElement(site.element()).orElse(site.element()));
+                types.add(type);
+            }
+            inner = types.size() == 1 ? types.iterator().next() : "Object";
+        }
+        if (shape.kind() != Kind.TEXT && inner.equals("String")) inner = "Object";
         return switch (shape.count()) {
             case ONE -> inner;
             case OPTIONAL -> "Optional<" + MapperTypeResolver.boxedType(inner) + ">";

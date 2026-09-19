@@ -99,6 +99,10 @@ public class MapperGenerator implements CodeGenerator {
 
         // ----- Utilities -----
         sb.append(MapperRuleEmitter.emitUtilities(parsersClass, mappedClassByRuleName.keySet()));
+        if (grammar.rules().stream().anyMatch(rule -> !SemanticCardinality.associative(rule)
+                && MapperElementUtil.getMappingAnnotation(rule).isPresent())) {
+            sb.append(MapperRuleEmitter.emitCaptureOccurrenceUtilities(parsersClass, ruleByName.keySet()));
+        }
         if (new SemanticCardinality(grammar).enabled()) {
             sb.append(MapperRuleEmitter.emitSemanticUtilities(grammar, parsersClass));
         }
