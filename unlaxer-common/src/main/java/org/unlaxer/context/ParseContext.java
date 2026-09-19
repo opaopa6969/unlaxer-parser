@@ -63,6 +63,35 @@ public class ParseContext implements
 	Map<Parser, Map<Name, Object>> scopeTreeMapByParser = new HashMap<>();
 	
 	Map<Name, Object> globalScopeTreeMap = new HashMap<>();
+
+    private final List<TransactionalState> transactionalStates = new ArrayList<>();
+    private final Set<TransactionElement> transactionalFrames =
+        Collections.newSetFromMap(new IdentityHashMap<>());
+
+    /**
+     * Register an owner before its first mutation. Registration lasts for this
+     * context's lifetime; registering the same instance again is harmless.
+     * There is deliberately no unregister operation while snapshots may refer to it.
+     * Late registration captures the current baseline in every open transaction,
+     * so a parent rollback also undoes a committed child's first use of the state.
+     * Owners must obey {@link TransactionalState#checkpoint()}'s no-throw contract.
+     */
+    public void registerTransactionalState(TransactionalState state) {
+        java.util.Objects.requireNonNull(state, "state");
+        if (transactionalStates.stream().anyMatch(existing -> existing == state)) return;
+        transactionalStates.add(state);
+        transactionalFrames.forEach(frame -> frame.checkpointState(state));
+    }
+
+    void checkpointTransactionalState(TransactionElement frame) {
+        transactionalFrames.add(frame);
+        transactionalStates.forEach(frame::checkpointState);
+    }
+
+    void finishTransactionalState(TransactionElement frame, boolean restore) {
+        transactionalFrames.remove(frame);
+        if (restore) frame.restoreState();
+    }
 	
 	Collection<AdditionalCommitAction> actions;
 

@@ -51,6 +51,7 @@ public interface Transaction extends TransactionListenerContainer , ParseContext
 	
 	public default void begin(Parser parser) {
 		getTokenStack().push(getCurrent().createNew());
+		get().checkpointTransactionalState(getCurrent());
 		onBegin(get(), parser);
 	}
 	
@@ -104,6 +105,7 @@ public interface Transaction extends TransactionListenerContainer , ParseContext
     }
 
     TransactionElement current = getTokenStack().pollFirst();
+    try {
     TransactionElement parent = getCurrent();
     parent.setCursor(new ParserCursor(current.getParserCursor(),false));
 
@@ -152,6 +154,9 @@ public interface Transaction extends TransactionListenerContainer , ParseContext
       }
     }
     return committed;
+    } finally {
+      parseContext.finishTransactionalState(current, false);
+    }
   }
     
 	public default void rollback(Parser parser) {
@@ -162,7 +167,11 @@ public interface Transaction extends TransactionListenerContainer , ParseContext
 			getOrderedParsersByNonOrdered().remove(parser);
 		}
 		TransactionElement pollFirst = getTokenStack().pollFirst();
-		onRollback(get(), parser , pollFirst.getTokens());
+		try {
+			onRollback(get(), parser , pollFirst.getTokens());
+		} finally {
+			get().finishTransactionalState(pollFirst, true);
+		}
 	}
 	
 	public default Source getRemain(TokenKind tokenKind) {
