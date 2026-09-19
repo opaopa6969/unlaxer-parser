@@ -69,6 +69,6 @@ test で skip されたことを、この適合性検証の成功には数えな
 任意 trivia parser の登録、global comment 設定、scope metadata、evaluator、
 full tinyexpression-rs、rustcodeblock、LSP/DAP は別の未完了項目として追跡する。
 
-実 tinyexpression `854c1f4` の P4 文法を native generator へ渡すと、この変更で
+実 tinyexpression `2a2db7c` の P4 文法を native generator へ渡すと、この変更で
 `Formula` の `@interleave` を通過し、次の未対応 `@scopeTree(mode=lexical)` を
 exit 3 で明示拒否する。P4 全体の生成成功や full-spec 完了を意味しない。
