@@ -111,6 +111,8 @@ imports、外部token parser、`@typeof`、`@eval`等の他のannotation、左�
 
 24入力×metadata 2設定の48ケースで受理・両cursorをJavaと比較し、受理28ケースの全AST field/spanを照合する。Rustの評価値は別途corpusの期待値と比較し、共有variantのSemantics未実装は実`rustc`の`E0046`で検出する。結果は`target/rust-associative.tsv`とCI artifactへ保存する。これにより見つかったJavaの未縮約CST上のassoc反復欠落は[issue #138](https://github.com/opaopa6969/unlaxer-parser/issues/138)で修正した。
 
+右結合は[`right-associative/Power.ubnf`](../unlaxer-dsl/src/test/resources/right-associative/Power.ubnf)をtext・mapped leaf・非BMP marker・括弧の4形で検証する。28入力×4形の112ケースでJava/Rustの受理・両cursor、受理49ケースの全AST field/spanを比較し、独立した期待値で`2^3^2=512`と`(2^3)^2=64`を区別する。生成Semantics未実装の`E0046`とCST破棄後の評価も検証し、結果は`target/rust-right-associative.tsv`へ保存する。fixtureの数値評価はf64であり、source captureに残るコメントを除く処理はテスト用Semanticsの責任である。Javaの括弧付き右再帰AST/mapper型不一致は[issue #145](https://github.com/opaopa6969/unlaxer-parser/issues/145)で修正した。
+
 | captureの個数 | AST text / node | Semantics引数 text / node |
 |---|---|---|
 | 1個 | `String` / `Box<Ast>` | `&str` / `&Ast` |
