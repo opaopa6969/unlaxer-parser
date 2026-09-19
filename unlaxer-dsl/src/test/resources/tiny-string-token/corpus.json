@@ -1,0 +1,88 @@
+[
+  {
+    "name": "direct-eof",
+    "body": "STRING @value END",
+    "cases": [
+      {"id":"empty-double", "input":"\"\"", "prefix":[true,2,2], "accepted":true, "span":[0,2], "value":"\"\""},
+      {"id":"empty-single", "input":"''", "prefix":[true,2,2], "accepted":true, "span":[0,2], "value":""},
+      {"id":"plain-double", "input":"\"double\"", "prefix":[true,8,8], "accepted":true, "span":[0,8], "value":"\"double\""},
+      {"id":"plain-single", "input":"'single'", "prefix":[true,8,8], "accepted":true, "span":[0,8], "value":"single"},
+      {"id":"non-bmp", "input":"'😀'", "prefix":[true,3,3], "accepted":true, "span":[0,3], "value":"😀"},
+      {"id":"raw-newline", "input":"'a\nb'", "prefix":[true,5,5], "accepted":true, "span":[0,5], "value":"a\nb"},
+      {"id":"raw-crlf", "input":"'a\r\nb'", "prefix":[true,6,6], "accepted":true, "span":[0,6], "value":"a\r\nb"},
+      {"id":"nul", "input":"'\u0000'", "prefix":[true,3,3], "accepted":true, "span":[0,3], "value":"\u0000"},
+      {"id":"escaped-single", "input":"'a\\'b'", "prefix":[true,6,6], "accepted":true, "span":[0,6], "value":"a\\'b"},
+      {"id":"escaped-double", "input":"\"a\\\"b\"", "prefix":[true,6,6], "accepted":true, "span":[0,6], "value":"\"a\\\"b\""},
+      {"id":"unknown-escape", "input":"'\\q'", "prefix":[true,4,4], "accepted":true, "span":[0,4], "value":"\\q"},
+      {"id":"escaped-newline", "input":"'\\\n'", "prefix":[true,4,4], "accepted":true, "span":[0,4], "value":"\\\n"},
+      {"id":"escaped-backslash", "input":"'\\\\'", "prefix":[true,4,4], "accepted":true, "span":[0,4], "value":"\\\\"},
+      {"id":"escaped-non-bmp", "input":"'\\😀'", "prefix":[true,4,4], "accepted":true, "span":[0,4], "value":"\\😀"},
+      {"id":"empty-input", "input":"", "prefix":[false,0,0], "accepted":false},
+      {"id":"bare", "input":"bare", "prefix":[false,0,0], "accepted":false},
+      {"id":"open-only", "input":"'", "prefix":[false,0,0], "accepted":false},
+      {"id":"unclosed", "input":"'abc", "prefix":[false,0,0], "accepted":false},
+      {"id":"trailing-backslash", "input":"'abc\\", "prefix":[false,0,0], "accepted":false},
+      {"id":"wrong-trailing-input", "input":"'a'b", "prefix":[false,0,0], "accepted":false}
+    ]
+  },
+  {
+    "name": "prefix-vs-full-input",
+    "body": "STRING @value",
+    "cases": [
+      {"id":"full", "input":"'ok'", "prefix":[true,4,4], "accepted":true, "span":[0,4], "value":"ok"},
+      {"id":"single-prefix", "input":"'ok'tail", "prefix":[true,4,4], "accepted":false},
+      {"id":"double-prefix", "input":"\"ok\"tail", "prefix":[true,4,4], "accepted":false},
+      {"id":"malformed", "input":"\"ok", "prefix":[false,0,0], "accepted":false}
+    ]
+  },
+  {
+    "name": "comments-and-eof",
+    "whitespace": true,
+    "body": "STRING @value END",
+    "cases": [
+      {"id":"block-and-line", "input":" /*lead*/ 'x' //tail", "prefix":[true,20,20], "accepted":true, "span":[0,20], "value":"x"},
+      {"id":"comment-is-raw-inside", "input":"'/*inside*/'", "prefix":[true,12,12], "accepted":true, "span":[0,12], "value":"/*inside*/"},
+      {"id":"comment-only", "input":"/*only*/", "prefix":[false,0,0], "accepted":false}
+    ]
+  },
+  {
+    "name": "transparent-alias",
+    "extra": "Alias ::= STRING;",
+    "body": "Alias @value END",
+    "cases": [
+      {"id":"single", "input":"'alias'", "prefix":[true,7,7], "accepted":true, "span":[0,7], "value":"alias"},
+      {"id":"double", "input":"\"alias\"", "prefix":[true,7,7], "accepted":true, "span":[0,7], "value":"\"alias\""}
+    ]
+  },
+  {
+    "name": "optional",
+    "body": "[ STRING @value ] '!' END",
+    "cases": [
+      {"id":"absent", "input":"!", "prefix":[true,1,1], "accepted":true, "span":[0,1], "value":null},
+      {"id":"single", "input":"'x'!", "prefix":[true,4,4], "accepted":true, "span":[0,4], "value":"x"},
+      {"id":"double", "input":"\"x\"!", "prefix":[true,4,4], "accepted":true, "span":[0,4], "value":"\"x\""},
+      {"id":"unclosed", "input":"'x!", "prefix":[false,0,0], "accepted":false}
+    ]
+  },
+  {
+    "name": "repeat",
+    "body": "{ STRING @value } END",
+    "cases": [
+      {"id":"empty", "input":"", "prefix":[true,0,0], "accepted":true, "span":[0,0], "value":[]},
+      {"id":"two-kinds", "input":"'a'\"b\"", "prefix":[true,6,6], "accepted":true, "span":[0,6], "value":["a","\"b\""]},
+      {"id":"non-bmp-repeat", "input":"'😀'\"🚀\"", "prefix":[true,6,6], "accepted":true, "span":[0,6], "value":["😀","\"🚀\""]},
+      {"id":"valid-then-unclosed", "input":"'a'\"b", "prefix":[false,0,0], "accepted":false}
+    ]
+  },
+  {
+    "name": "mapped-node",
+    "extra": "@mapping(Item, params=[text]) ItemRule ::= STRING @text;",
+    "body": "ItemRule @value END",
+    "cases": [
+      {"id":"single-node", "input":"'node'", "prefix":[true,6,6], "accepted":true, "span":[0,6],
+       "value":{"type":"Item", "span":[0,6], "fields":{"text":"node"}}},
+      {"id":"double-node", "input":"\"😀\"", "prefix":[true,3,3], "accepted":true, "span":[0,3],
+       "value":{"type":"Item", "span":[0,3], "fields":{"text":"\"😀\""}}}
+    ]
+  }
+]
