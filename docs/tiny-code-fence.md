@@ -68,8 +68,10 @@ parse/generate はコードをコンパイル・実行しない。既定無効�
 計画する `rustcodeblock`、診断位置の逆引き、host function API は未対応。
 Java ソースの Rust への自動翻訳も行わない。
 
-実文法の `UNTIL('```')` は最初に現れた triple backtick で止まる。body の行途中に
-先に triple backtick があれば、後続の正しい閉じ行を探し直さず、行頭条件により失敗する。
+実文法の `UNTIL('```')` は読み始めた位置以降、最初に現れた triple backtick で止まる。
+ただし `javaStyle` の外側 trivia は `UNTIL` の呼び出し前にも作用し、body 先頭の空白や
+コメントを読み飛ばす。そこを通過した後の行途中に triple backtick があれば、後続の
+正しい閉じ行を探し直さず、行頭条件により失敗する。
 閉じ fence が欠ける場合も `CodeEnd` が失敗する。Markdown の汎用 fenced code block
 scanner や、埋め込み言語の文字列/commentを解釈する scanner ではない。
 
