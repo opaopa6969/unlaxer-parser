@@ -211,21 +211,21 @@ public class MapperGeneratorTest {
     }
 
     @Test
-    public void testRightAssocMapperContainsFoldMethod() {
+    public void testRightAssocMapperDoesNotFoldAnAlreadyRecursiveTree() {
         GrammarDecl grammar = parseGrammar(RIGHT_ASSOC_GRAMMAR);
         MapperGenerator gen = new MapperGenerator();
         String source = gen.generate(grammar).source();
-        assertTrue("should contain foldRightAssoc method",
-            source.contains("foldRightAssocPowNode"));
+        assertTrue("the parser already establishes right association",
+            !source.contains("foldRightAssocPowNode"));
     }
 
     @Test
-    public void testRightAssocMapperUsesRightFoldInToMethod() {
+    public void testRightAssocMapperUsesBoundRightOperand() {
         GrammarDecl grammar = parseGrammar(RIGHT_ASSOC_GRAMMAR);
         MapperGenerator gen = new MapperGenerator();
         String source = gen.generate(grammar).source();
-        assertTrue("to method should call right fold",
-            source.contains("foldRightAssocPowNode(left, ops, rights)"));
+        assertTrue("right operand must be bounded to this recursive rule invocation",
+            source.contains("List<Token> rightSites = findCaptureSites(working, java.util.Set.of(\"Expr:2\"))"));
     }
 
     // =========================================================================

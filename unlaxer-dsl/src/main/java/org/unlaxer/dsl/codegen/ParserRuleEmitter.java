@@ -844,6 +844,7 @@ class ParserRuleEmitter {
     ) {
         String baseCode = generateElementCode(ctx, ruleName, shape.base());
         String opCode = generateElementCode(ctx, ruleName, shape.op());
+        String rightCode = generateElementCode(ctx, ruleName, shape.right());
         String chainClass = getChainClassName(ctx, ruleName);
         int level = indent.length() / 4;
         IndentedWriter w = new IndentedWriter(level);
@@ -858,7 +859,7 @@ class ParserRuleEmitter {
         w.indent();
         w.line(baseCode + ",");
         w.line(opCode + ",");
-        w.line("Parser.get(" + className + ".class)");
+        w.line(rightCode);
         w.dedent();
         w.line(");");
         w.dedent();
@@ -1303,7 +1304,7 @@ class ParserRuleEmitter {
             // Canonical right-assoc shape only: Base { Op Self }.
             return null;
         }
-        return new ParserGenerator.RightAssocShape(base, op);
+        return new ParserGenerator.RightAssocShape(base, op, right);
     }
 
     static SequenceBody getSingleSequenceFrom(RuleBody body) {

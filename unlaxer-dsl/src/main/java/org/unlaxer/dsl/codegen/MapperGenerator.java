@@ -97,9 +97,6 @@ public class MapperGenerator implements CodeGenerator {
         sb.append(MapperRuleEmitter.emitMappingMethods(grammar, astClass, parsersClass,
             mappingRules, allMappingRules, mappedClassByRuleName, tokenDeclByName, ruleByName));
 
-        // ----- Fold Helpers -----
-        sb.append(MapperRuleEmitter.emitFoldHelpers(grammar, astClass, mappingRules));
-
         // ----- Utilities -----
         sb.append(MapperRuleEmitter.emitUtilities(parsersClass, mappedClassByRuleName.keySet()));
 

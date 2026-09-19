@@ -265,51 +265,22 @@ public class SnapshotRightAssocMapper {
         if (working == null) {
             throw new IllegalArgumentException("Mapping token not found for rule Expr");
         }
-        Token leftToken = findFirstDescendant(working, SnapshotRightAssocParsers.AtomParser.class);
-        if (leftToken == null) {
-            throw new IllegalArgumentException("Left operand not found for rule Expr");
+        List<Token> leftSites = findCaptureSites(working, java.util.Set.of("Expr:0"));
+        List<Token> opSites = findCaptureSites(working, java.util.Set.of("Expr:1"));
+        List<Token> rightSites = findCaptureSites(working, java.util.Set.of("Expr:2"));
+        if (leftSites.size() != 1 || opSites.size() > 1 || opSites.size() != rightSites.size()) {
+            throw new IllegalArgumentException("Invalid right-associative capture shape for rule Expr");
         }
+        Token leftToken = findFirstDescendant(leftSites.get(0), SnapshotRightAssocParsers.AtomParser.class);
         String left = stripQuotes(firstTokenText(leftToken));
         List<String> ops = new ArrayList<>();
         List<SnapshotRightAssocAST.PowNode> rights = new ArrayList<>();
-        for (Token repeatToken : findAssocRepetitions(working, SnapshotRightAssocParsers.ExprRepeat0Parser.class)) {
-            Token opToken = findFirstDescendant(repeatToken, org.unlaxer.parser.elementary.WordParser.class);
-            String opValue = firstTokenText(opToken == null ? repeatToken : opToken);
-            if (opValue != null && !opValue.isEmpty()) {
-                ops.add(stripQuotes(opValue));
-            }
-            Token rightToken = findFirstDescendant(repeatToken, SnapshotRightAssocParsers.ExprParser.class);
-            if (rightToken != null) {
-                rights.add(toPowNode(rightToken));
-            }
+        if (!opSites.isEmpty()) {
+            ops.add(stripQuotes(firstTokenText(opSites.get(0))));
+            Token rightToken = rightSites.get(0);
+            rights.add(toPowNode(rightToken));
         }
-        return registerNodeSourceSpan(foldRightAssocPowNode(left, ops, rights), working);
-    }
-
-    // =========================================================================
-    // Fold Helpers (Right-Associative)
-    // =========================================================================
-
-    static SnapshotRightAssocAST.PowNode foldRightAssocPowNode(
-            String left,
-            java.util.List<String> ops,
-            java.util.List<SnapshotRightAssocAST.PowNode> rights) {
-        if (ops.isEmpty() || rights.isEmpty()) {
-            return new SnapshotRightAssocAST.PowNode(left, ops, rights);
-        }
-        // Right-associative fold: a op b op c => a op (b op c)
-        SnapshotRightAssocAST.PowNode right = rights.get(rights.size() - 1);
-        String op = ops.get(ops.size() - 1);
-        java.util.List<String> restOps = new java.util.ArrayList<>(ops);
-        java.util.List<SnapshotRightAssocAST.PowNode> restRights = new java.util.ArrayList<>(rights);
-        restOps.remove(restOps.size() - 1);
-        restRights.remove(restRights.size() - 1);
-        if (restRights.size() > 0) {
-            right = foldRightAssocPowNode(right, restOps, restRights);
-        }
-        java.util.List<String> singleOp = java.util.List.of(op);
-        java.util.List<SnapshotRightAssocAST.PowNode> singleRight = java.util.List.of(right);
-        return new SnapshotRightAssocAST.PowNode(left, singleOp, singleRight);
+        return registerNodeSourceSpan(new SnapshotRightAssocAST.PowNode(left, ops, rights), working);
     }
 
     // =========================================================================
