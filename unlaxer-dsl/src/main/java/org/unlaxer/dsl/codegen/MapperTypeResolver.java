@@ -46,10 +46,10 @@ class MapperTypeResolver {
         boolean inOptional = captures.stream().anyMatch(CaptureResult::inOptional);
         boolean inRepeat = captures.stream().anyMatch(CaptureResult::inRepeat);
         if (inRepeat) {
-            return "List<" + innerType + ">";
+            return "List<" + boxedType(innerType) + ">";
         }
         if (inOptional) {
-            return "Optional<" + innerType + ">";
+            return "Optional<" + boxedType(innerType) + ">";
         }
         return innerType;
     }
@@ -103,23 +103,23 @@ class MapperTypeResolver {
             }
             case RepeatElement repeatElement -> {
                 String inner = inferTypeFromBody(grammar, repeatElement.body());
-                yield "List<" + inner + ">";
+                yield "List<" + boxedType(inner) + ">";
             }
             case OneOrMoreElement oneOrMoreElement -> {
                 String inner = inferTypeFromElement(grammar, oneOrMoreElement.body());
-                yield "List<" + inner + ">";
+                yield "List<" + boxedType(inner) + ">";
             }
             case BoundedRepeatElement boundedRepeatElement -> {
                 String inner = inferTypeFromElement(grammar, boundedRepeatElement.body());
-                yield "List<" + inner + ">";
+                yield "List<" + boxedType(inner) + ">";
             }
             case OptionalElement optionalElement -> {
                 String inner = inferTypeFromBody(grammar, optionalElement.body());
-                yield "Optional<" + inner + ">";
+                yield "Optional<" + boxedType(inner) + ">";
             }
             case SeparatedElement sep -> {
                 String inner = inferTypeFromElement(grammar, sep.element());
-                yield "List<" + inner + ">";
+                yield "List<" + boxedType(inner) + ">";
             }
             case GroupElement ignored -> "Object";
             case ErrorElement ignored -> "Object";
@@ -288,6 +288,15 @@ class MapperTypeResolver {
         if ("Object".equals(targetType)) {
             return true;
         }
-        return targetType.equals(candidateType);
+        return boxedType(targetType).equals(boxedType(candidateType));
+    }
+
+    /** Java generics cannot contain primitives; scalar record APIs remain unchanged. */
+    static String boxedType(String type) {
+        return switch (type) {
+            case "int" -> "Integer";
+            case "long" -> "Long";
+            default -> type;
+        };
     }
 }

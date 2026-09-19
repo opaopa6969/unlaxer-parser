@@ -1,0 +1,15 @@
+[
+  {"input":"0", "javaInt":0},
+  {"input":"-17", "javaInt":-17},
+  {"input":"+17", "javaInt":17},
+  {"input":"2147483647", "javaInt":2147483647},
+  {"input":"-2147483648", "javaInt":-2147483648},
+  {"input":"0004", "javaInt":4},
+  {"input":"1.5", "javaInt":null},
+  {"input":"1.", "javaInt":null},
+  {"input":".5", "javaInt":null},
+  {"input":"1e2", "javaInt":null},
+  {"input":"-1e-2", "javaInt":null},
+  {"input":"2147483648", "javaInt":null},
+  {"input":"-2147483649", "javaInt":null}
+]

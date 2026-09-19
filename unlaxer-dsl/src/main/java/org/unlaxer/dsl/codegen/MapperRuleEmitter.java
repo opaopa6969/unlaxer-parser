@@ -757,8 +757,9 @@ class MapperRuleEmitter {
             Map<String, String> mappedClassByRuleName,
             Map<String, TokenDecl> tokenDeclByName, Map<String, RuleDecl> ruleByName) {
 
-        w.line(type + " " + param
-            + " = " + MapperTypeResolver.defaultValueForType(type) + ";");
+        String localType = MapperTypeResolver.boxedType(type);
+        w.line(localType + " " + param
+            + " = " + MapperTypeResolver.defaultValueForType(localType) + ";");
         w.line("boolean assigned_" + MapperElementUtil.safeName(param) + " = false;");
         for (int i = 0; i < capturedElements.size(); i++) {
             AtomicElement element = capturedElements.get(i);
@@ -804,6 +805,14 @@ class MapperRuleEmitter {
             w.line("assigned_" + MapperElementUtil.safeName(param) + " = true;");
             w.dedent();
             w.line("}");
+            w.dedent();
+            w.line("}");
+        }
+        if (!localType.equals(type)) {
+            w.line("if (!assigned_" + MapperElementUtil.safeName(param) + ") {");
+            w.indent();
+            w.line("throw new IllegalArgumentException(\"Required numeric capture not found: "
+                + ParserCodegenUtil.escapeString(param) + "\");");
             w.dedent();
             w.line("}");
         }

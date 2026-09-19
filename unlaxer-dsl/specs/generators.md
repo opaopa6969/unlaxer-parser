@@ -93,6 +93,27 @@ public interface CodeGenerator {
 - 繰り返しキャプチャ（`{ ... @name }` で同じ名前が複数回）は `List<T>` 型
 - 省略可能キャプチャは `Optional<T>` 型
 
+### 数値 token の型境界
+
+`NumberParser` / `DigitParser` を直接 capture する既存の Java API は `int`。
+optional と repeat の要素は primitive を boxing し、`Optional<Integer>` /
+`List<Integer>` を生成する。必須数値 capture が見つからない場合、mapper は
+`IllegalArgumentException` を投げる（`0` で補完しない）。
+
+`NumberParser` の構文上の受理範囲は AST の `int` より広い。mapper の変換は
+`Integer.parseInt` の契約に従い、符号付き十進整数と先頭ゼロは許すが、小数表記・
+指数表記（`1.0` / `1e2` を含む）・32-bit signed integer の範囲外は
+`NumberFormatException` とする。丸め・切捨て・overflow wrap はしない。
+したがって `diagnose()` が空（構文成功）でも、AST mapping が失敗し得る。
+数値全文を保持して利用者が変換したい場合は、非 mapping のルール
+`Digits ::= NUMBER ;` を経由して capture すると `String` 型になる。
+
+Rust backend の direct number capture は現段階で `String` であり、Java の
+`int` と型同値ではない。`numeric-capture/conformance.json` を両 backend の
+実生成・実コンパイルに通し、Java の数値変換結果/失敗と Rust の字句保持を
+別々の oracle で検証する（`NumericCaptureRuntimeTest`、Rust は
+`-DrustConformance=true`）。この差は数値意味論の同等性として扱わない。
+
 ---
 
 ## MapperGenerator

@@ -439,10 +439,10 @@ public class ASTGenerator implements CodeGenerator {
         boolean inOptional = captures.stream().anyMatch(CaptureResult::inOptional);
         boolean inRepeat = captures.stream().anyMatch(CaptureResult::inRepeat);
         if (inRepeat) {
-            return "List<" + innerType + ">";
+            return "List<" + MapperTypeResolver.boxedType(innerType) + ">";
         }
         if (inOptional) {
-            return "Optional<" + innerType + ">";
+            return "Optional<" + MapperTypeResolver.boxedType(innerType) + ">";
         }
         return innerType;
     }
@@ -518,23 +518,23 @@ public class ASTGenerator implements CodeGenerator {
             }
             case RepeatElement rep -> {
                 String inner = inferTypeFromBody(grammar, rep.body());
-                yield "List<" + inner + ">";
+                yield "List<" + MapperTypeResolver.boxedType(inner) + ">";
             }
             case OneOrMoreElement one -> {
                 String inner = inferTypeFromElement(grammar, one.body());
-                yield "List<" + inner + ">";
+                yield "List<" + MapperTypeResolver.boxedType(inner) + ">";
             }
             case BoundedRepeatElement bounded -> {
                 String inner = inferTypeFromElement(grammar, bounded.body());
-                yield "List<" + inner + ">";
+                yield "List<" + MapperTypeResolver.boxedType(inner) + ">";
             }
             case OptionalElement opt -> {
                 String inner = inferTypeFromBody(grammar, opt.body());
-                yield "Optional<" + inner + ">";
+                yield "Optional<" + MapperTypeResolver.boxedType(inner) + ">";
             }
             case SeparatedElement sep -> {
                 String inner = inferTypeFromElement(grammar, sep.element());
-                yield "List<" + inner + ">";
+                yield "List<" + MapperTypeResolver.boxedType(inner) + ">";
             }
             case GroupElement g -> "Object";
             case ErrorElement e -> "Object";
