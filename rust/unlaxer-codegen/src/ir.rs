@@ -61,6 +61,8 @@ pub enum Expression {
     NumberToken,
     IdentifierToken,
     QuotedToken(char),
+    CodeStartToken,
+    CodeEndToken,
     AnyToken,
     EofToken,
     EmptyToken,

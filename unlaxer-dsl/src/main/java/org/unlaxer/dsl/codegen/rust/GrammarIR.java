@@ -20,12 +20,15 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     public enum Cardinality { ONE, OPTIONAL, MANY }
     public sealed interface Expression permits Literal, NumberToken, Reference, Sequence, Choice, Capture,
         OptionalExpr, Repeat, Separated, AnyToken, EofToken, EmptyToken, CharRangeToken,
-        ExceptToken, UntilToken, LookaheadToken, Delimited, IdentifierToken, QuotedToken, TextValue, ValueBoundary {}
+        ExceptToken, UntilToken, LookaheadToken, Delimited, IdentifierToken, QuotedToken,
+        CodeStartToken, CodeEndToken, TextValue, ValueBoundary {}
     /** Retains an otherwise unmapped text branch as a source-positioned semantic value. */
     public record TextValue(Expression child) implements Expression {}
     public record ValueBoundary(Expression child) implements Expression {}
     public record IdentifierToken() implements Expression {}
     public record QuotedToken(char quote) implements Expression {}
+    public record CodeStartToken() implements Expression {}
+    public record CodeEndToken() implements Expression {}
     /** Synthetic trivia boundary, outside the capture site; unlike a source-level group. */
     public record Delimited(Expression child) implements Expression {}
     public record AnyToken() implements Expression {}

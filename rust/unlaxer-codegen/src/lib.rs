@@ -160,6 +160,8 @@ fn expression(expr: &Expression) -> String {
         NumberToken => "Expr::Number".into(),
         IdentifierToken => "Expr::Identifier".into(),
         QuotedToken(q) => format!("Expr::Quoted('\\u{{{:x}}}')", u32::from(*q)),
+        CodeStartToken => "Expr::CodeStart".into(),
+        CodeEndToken => "Expr::CodeEnd".into(),
         AnyToken => "Expr::Any".into(),
         EofToken => "Expr::Eof".into(),
         EmptyToken => "Expr::JavaEmpty".into(),

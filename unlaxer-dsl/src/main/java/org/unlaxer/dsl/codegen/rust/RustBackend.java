@@ -144,6 +144,8 @@ public final class RustBackend {
             case NumberToken ignored -> "Expr::Number";
             case IdentifierToken ignored -> "Expr::Identifier";
             case QuotedToken quoted -> "Expr::Quoted('\\u{" + Integer.toHexString(quoted.quote()) + "}')";
+            case CodeStartToken ignored -> "Expr::CodeStart";
+            case CodeEndToken ignored -> "Expr::CodeEnd";
             case AnyToken ignored -> "Expr::Any";
             case EofToken ignored -> "Expr::Eof";
             case EmptyToken ignored -> "Expr::JavaEmpty";
