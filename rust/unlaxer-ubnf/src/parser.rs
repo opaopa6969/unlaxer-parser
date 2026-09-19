@@ -218,7 +218,9 @@ impl Parser<'_> {
             "ANY" => TokenKind::Any,
             "EOF" => TokenKind::Eof,
             "EMPTY" => TokenKind::Empty,
-            "UNTIL" | "NEGATION" | "LOOKAHEAD" | "NEGATIVE_LOOKAHEAD" | "CI" | "REGEX" => {
+            "UNTIL" | "NEGATION" | "LOOKAHEAD" | "NEGATIVE_LOOKAHEAD" | "CI" | "REGEX"
+                if self.is('(') =>
+            {
                 self.expect('(')?;
                 let arg = self.quoted()?;
                 self.expect(')')?;
@@ -233,7 +235,7 @@ impl Parser<'_> {
                     _ => TokenKind::Regex { pattern: arg },
                 }
             }
-            "CHAR_RANGE" => {
+            "CHAR_RANGE" if self.is('(') => {
                 self.expect('(')?;
                 let a = self.current().span;
                 let min = self.quoted()?;

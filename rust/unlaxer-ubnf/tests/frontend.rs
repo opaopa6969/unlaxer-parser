@@ -110,6 +110,10 @@ fn spans_are_utf8_and_codepoint_ranges_and_diagnostics_use_crlf_lines() {
 
 #[test]
 fn malformed_or_unknown_constructs_and_overflow_are_explicit_errors() {
+    for line in include_str!("fixtures/negative.tsv").lines() {
+        let (name, source) = line.split_once('\t').unwrap_or((line, ""));
+        parse(source).expect_err(name);
+    }
     for source in [
         "",
         "grammar G {}",
@@ -141,6 +145,57 @@ fn malformed_or_unknown_constructs_and_overflow_are_explicit_errors() {
         assert!(e.span.byte_end <= source.len());
         assert!(source.is_char_boundary(e.span.byte_start));
     }
+}
+
+#[test]
+fn bare_constructor_names_remain_available_as_external_parser_classes() {
+    for name in [
+        "UNTIL",
+        "NEGATION",
+        "LOOKAHEAD",
+        "NEGATIVE_LOOKAHEAD",
+        "CI",
+        "REGEX",
+        "CHAR_RANGE",
+    ] {
+        let ast = parse(&format!("grammar G {{ token T={name} R ::= T; }}")).unwrap();
+        assert_eq!(
+            ast.grammars[0].tokens[0].kind,
+            TokenKind::Simple {
+                parser_class: name.to_owned()
+            }
+        );
+    }
+}
+
+#[test]
+fn boundary_trivia_and_annotations_preserve_each_independent_name() {
+    for separator in [" ", "\t", "\n", "\r", "\r\n", "//comment😀\n"] {
+        let ast = parse(&format!("grammar G {{ R ::= T{separator}Root; }}")).unwrap();
+        let elements = &ast.grammars[0].rules[0].body.alternatives[0].elements;
+        assert_eq!(elements.len(), 2);
+        assert_eq!(
+            elements[0].element.kind,
+            ElementKind::RuleRef {
+                namespace: None,
+                name: "T".to_owned()
+            }
+        );
+        assert_eq!(
+            elements[1].element.kind,
+            ElementKind::RuleRef {
+                namespace: None,
+                name: "Root".to_owned()
+            }
+        );
+    }
+    let ast = parse(include_str!("fixtures/known/common-field-space.ubnf")).unwrap();
+    assert_eq!(
+        ast.grammars[0].rules[0].annotations[0].kind,
+        AnnotationKind::CommonField {
+            fields: vec!["left".to_owned(), "right".to_owned()]
+        }
+    );
 }
 
 #[test]

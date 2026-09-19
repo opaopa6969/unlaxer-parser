@@ -1,0 +1,23 @@
+empty-file
+empty-grammar	grammar G {}
+empty-sequence	grammar G { R ::= ; }
+empty-choice	grammar G { R ::= 'a' | ; }
+empty-group	grammar G { R ::= (); }
+unterminated-string	grammar G { R ::= 'unterminated; }
+double-quoted-string	grammar G { R ::= "x"; }
+missing-semicolon	grammar G { R ::= 'x' }
+trailing-input	grammar G { R ::= 'x'; } garbage
+block-comment	grammar G { /* no */ R ::= 'x'; }
+unknown-annotation-args	grammar G { @unknown(x) R ::= 'x'; }
+unknown-token-constructor	grammar G { token T=UNKNOWN('x') R ::= T; }
+empty-params	grammar G { @mapping(X,params=[]) R ::= 'x'; }
+recovery-mode	grammar G { @recovery(magic) R ::= 'x'; }
+precedence-overflow	grammar G { @precedence(level=2147483648) R ::= 'x'; }
+bound-overflow	grammar G { R ::= 'x'{2147483648}; }
+double-quantifier	grammar G { R ::= 'x'+?; }
+empty-range	grammar G { token T=CHAR_RANGE('','a') R ::= T; }
+long-range	grammar G { token T=CHAR_RANGE('ab','z') R ::= T; }
+supplementary-range	grammar G { token T=CHAR_RANGE('😀','😇') R ::= T; }
+reversed-range	grammar G { token T=CHAR_RANGE('z','a') R ::= T; }
+late-token	grammar G { R ::= 'x'; token T=ANY }
+late-import	grammar G { R ::= 'x'; @import a from 'b' }
