@@ -736,11 +736,11 @@ public class UBNFMapper {
             : toAtomicElement(baseAtomicTokens.get(0));
 
         // Postfix quantifier: '+' → OneOrMoreElement, '?' → OptionalElement, '*' → RepeatElement
-        List<Token> postfixTokens = findDescendants(token, UBNFParsers.PostfixQuantifierParser.class);
+        List<Token> postfixTokens = findAtElementLevel(token, UBNFParsers.PostfixQuantifierParser.class);
         // Bounded quantifier: {n} / {n,m} / {n,} → BoundedRepeatElement
-        List<Token> boundedTokens = findDescendants(token, UBNFParsers.BoundedQuantifierParser.class);
+        List<Token> boundedTokens = findAtElementLevel(token, UBNFParsers.BoundedQuantifierParser.class);
         // Separated: % sep → SeparatedElement
-        List<Token> separatedTokens = findDescendants(token, UBNFParsers.SeparatedByParser.class);
+        List<Token> separatedTokens = findAtElementLevel(token, UBNFParsers.SeparatedByParser.class);
         AtomicElement element;
         if (!postfixTokens.isEmpty()) {
             String postfix = postfixTokens.get(0).source.toString().trim();
@@ -834,28 +834,28 @@ public class UBNFMapper {
 
     static AtomicElement toAtomicElement(Token token) {
         // GroupElement
-        List<Token> groupTokens = findDescendants(token, UBNFParsers.GroupElementParser.class);
+        List<Token> groupTokens = findAtElementLevel(token, UBNFParsers.GroupElementParser.class);
         if (false == groupTokens.isEmpty()) {
             List<Token> bodyTokens = findDescendants(groupTokens.get(0), UBNFParsers.ChoiceBodyParser.class);
             RuleBody body = bodyTokens.isEmpty() ? new SequenceBody(List.of()) : toChoiceBody(bodyTokens.get(0));
             return new GroupElement(body);
         }
         // OptionalElement
-        List<Token> optTokens = findDescendants(token, UBNFParsers.OptionalElementParser.class);
+        List<Token> optTokens = findAtElementLevel(token, UBNFParsers.OptionalElementParser.class);
         if (false == optTokens.isEmpty()) {
             List<Token> bodyTokens = findDescendants(optTokens.get(0), UBNFParsers.ChoiceBodyParser.class);
             RuleBody body = bodyTokens.isEmpty() ? new SequenceBody(List.of()) : toChoiceBody(bodyTokens.get(0));
             return new OptionalElement(body);
         }
         // RepeatElement
-        List<Token> repTokens = findDescendants(token, UBNFParsers.RepeatElementParser.class);
+        List<Token> repTokens = findAtElementLevel(token, UBNFParsers.RepeatElementParser.class);
         if (false == repTokens.isEmpty()) {
             List<Token> bodyTokens = findDescendants(repTokens.get(0), UBNFParsers.ChoiceBodyParser.class);
             RuleBody body = bodyTokens.isEmpty() ? new SequenceBody(List.of()) : toChoiceBody(bodyTokens.get(0));
             return new RepeatElement(body);
         }
         // ErrorElement
-        List<Token> errorTokens = findDescendants(token, UBNFParsers.ErrorElementParser.class);
+        List<Token> errorTokens = findAtElementLevel(token, UBNFParsers.ErrorElementParser.class);
         if (false == errorTokens.isEmpty()) {
             List<Token> quotedTokens = findDescendants(
                 errorTokens.get(0),
@@ -867,7 +867,7 @@ public class UBNFMapper {
             return new ErrorElement(message);
         }
         // TerminalElement
-        List<Token> termTokens = findDescendants(token, UBNFParsers.TerminalElementParser.class);
+        List<Token> termTokens = findAtElementLevel(token, UBNFParsers.TerminalElementParser.class);
         if (false == termTokens.isEmpty()) {
             List<Token> quotedTokens = findDescendants(
                 termTokens.get(0),
@@ -879,7 +879,7 @@ public class UBNFMapper {
             return new TerminalElement(value);
         }
         // QuantifiedRef / RuleRefElement: [ namespace '.' ] name
-        List<Token> quantifiedTokens = findDescendants(token, UBNFParsers.QuantifiedRefParser.class);
+        List<Token> quantifiedTokens = findAtElementLevel(token, UBNFParsers.QuantifiedRefParser.class);
         if (false == quantifiedTokens.isEmpty()) {
             List<Token> refTokens = findDescendants(quantifiedTokens.get(0), UBNFParsers.RuleRefElementParser.class);
             if (false == refTokens.isEmpty()) {
@@ -974,6 +974,19 @@ public class UBNFMapper {
                 results.add(child);
             } else {
                 results.addAll(findDescendants(child, parserClass));
+            }
+        }
+        return results;
+    }
+
+    /** Search the current element, never stealing syntax from a nested group/quantifier. */
+    private static List<Token> findAtElementLevel(Token token, Class<? extends Parser> parserClass) {
+        List<Token> results = new ArrayList<>();
+        for (Token child : token.filteredChildren) {
+            if (child.parser.getClass() == parserClass) results.add(child);
+            else if (!isAtomicElementParser(child.parser.getClass())
+                && child.parser.getClass() != UBNFParsers.ErrorElementParser.class) {
+                results.addAll(findAtElementLevel(child, parserClass));
             }
         }
         return results;

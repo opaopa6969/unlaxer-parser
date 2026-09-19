@@ -38,13 +38,27 @@ public class RustBackendTest {
         reject(SIMPLE.replace("@root", "@root\n@root"), "multiple @root");
         reject(SIMPLE.replace("value", "span"), "reserved");
         reject(SIMPLE.replace("value", "semantics"), "reserved");
-        reject(SIMPLE.replace("'hello' @value", "[ 'hello' ] @value"), "OptionalElement");
-        reject(SIMPLE.replace("'hello' @value", "{ 'hello' } @value"), "RepeatElement");
-        reject(SIMPLE.replace("'hello' @value", "('hello' @value | 'bye')"), "different captures");
-        reject(SIMPLE.replace("'hello' @value", "'hello' @value 'bye' @value"), "repeated capture");
+        reject(SIMPLE.replace("'hello' @value", "[ 'x' ] Root @value"), "left recursion");
+        reject(SIMPLE.replace("'hello' @value", "{ [ 'hello' ] } 'x' @value"), "nullable unbounded");
+        reject(SIMPLE.replace("'hello' @value", "[ [ 'hello' ] ] @value"), "nested container capture");
+        reject(SIMPLE.replace("'hello' @value", "{ Maybe } @value").replace("Root ::=", "Maybe ::= [ 'x' ];\nRoot ::="), "nullable unbounded");
         reject(SIMPLE.replace("'hello' @value", "'' @value"), "empty literal");
         reject(SIMPLE.replace("grammar Example {", "grammar Example {\n@whitespace: python"), "whitespace");
         reject(SIMPLE.replace("grammar Example {", "grammar Example {\ntoken TEXT = StringParser"), "only the built-in");
+    }
+
+    @Test public void cardinalityReachesAstAndSemantics() {
+        for (String expression : new String[]{"[ 'hello' ] @value", "[ 'hello' @value ]", "('hello' @value | 'bye')"}) {
+            var files = new RustBackend().generate(UBNFMapper.parse(SIMPLE.replace("'hello' @value", expression)).grammars().get(0));
+            assertTrue(expression, files.get(1).content().contains("r#value: Option<String>"));
+            assertTrue(expression, files.get(4).content().contains("r#value: Option<&str>"));
+        }
+        for (String expression : new String[]{"{ 'hello' } @value", "{ 'hello' @value }", "'hello'+ @value",
+            "'hello'{1,2} @value", "'hello' % ',' @value", "'hello' @value 'bye' @value"}) {
+            var files = new RustBackend().generate(UBNFMapper.parse(SIMPLE.replace("'hello' @value", expression)).grammars().get(0));
+            assertTrue(expression, files.get(1).content().contains("r#value: Vec<String>"));
+            assertTrue(expression, files.get(4).content().contains("r#value: &[String]"));
+        }
     }
 
     private void reject(String source, String reason) {

@@ -1,0 +1,13 @@
+grammar Cardinality {
+  @package: org.example.cardinality
+  @whitespace: javaStyle
+  token NUMBER = NumberParser
+
+  @root
+  @mapping(Container, params=[head, values, tail, flags])
+  Root ::= [ Item ] @head ':' { Item } @values ':' [ '!' ] @tail ':' { 'x' } @flags ;
+
+  @mapping(Item, params=[value])
+  Item ::= Digits @value ';' ;
+  Digits ::= NUMBER ;
+}

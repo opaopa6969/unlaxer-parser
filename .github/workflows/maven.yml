@@ -38,6 +38,7 @@ jobs:
           unlaxer-dsl/target/rust-conformance.tsv
           unlaxer-dsl/target/rust-diagnostics.tsv
           unlaxer-dsl/target/rust-diagnostics-edge.tsv
+          unlaxer-dsl/target/rust-cardinality.tsv
         if-no-files-found: error
     - name: Build and smoke-test the native subset example
       run: |

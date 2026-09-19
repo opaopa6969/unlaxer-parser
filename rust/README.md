@@ -57,19 +57,29 @@ UBNF → 既存Java frontend → RustGrammarLowering → GrammarIR → RustBacke
 
 `codegen.rust.GrammarIR`は規則・連接・順序付き選択・captureを保持する構造IRであり、既存のmetadata用Parser IRとは別物。既存Java生成器はまだこのIRを使わない。全backend共通IRへの全面移行や、言語非依存性の一般的な証明を済ませたものではない。
 
-runtimeは規則IDで参照する文法を実行し、入力とCST node arenaを解析結果が所有する。ASTは`enum`、子は`Box<Ast>`、scalar captureは`String`。各variantは半開区間`Span { start, end }`を持つ。内部カーソルはUTF-8 byte、公開位置はUnicodeコードポイントで、UTF-16/LSP座標とは異なる。mapper後のASTは文字列と位置を所有し、CSTを破棄しても評価できる。静的なソースマップは使わない。
+runtimeは規則IDで参照する文法を実行し、入力とCST node arenaを解析結果が所有する。ASTは`enum`、単一の子は`Box<Ast>`、単一text captureは`String`。optionalは`Option`、複数captureは`Vec`になる（下表）。各variantは半開区間`Span { start, end }`を持つ。内部カーソルはUTF-8 byte、公開位置はUnicodeコードポイントで、UTF-16/LSP座標とは異なる。mapper後のASTは文字列と位置を所有し、CSTを破棄しても評価できる。静的なソースマップは使わない。
 
 `Semantics`の各メソッドは既定実装を持たず、`evaluate`はwildcardなしの`match`。新しいvariantと古いdispatchを組み合わせると`E0004`、新しいtraitと古いimplでは`E0046`になる。ただし再コンパイルされるソース間の構造チェックであり、意味処理の正しさは保証しない。文字列として保持する演算子の追加は型を変えないため、この保護を受けない。
 
 ### 対応するUBNF
 
 - 1ファイル・1文法、ちょうど1つの`@root`。
-- 非空の文字列terminal、rule参照、sequence、ordered choice、group。
+- 非空の文字列terminal、rule参照、sequence、ordered choice、group、optional、0/1回以上のrepeat、bounded repeat、separated list。
 - `NumberParser`またはその完全修飾名へのtoken binding。符号・小数・指数を含む。
-- `@mapping`とterminal/ruleへのscalar capture。各選択肢でcapture名と型が一致し、paramsと一対一で対応すること。
+- `@mapping`とterminal/rule/group/quantifierへのcapture。全capture名の集合とparamsが一致し、同名captureのtext/node型が整合すること。欠ける選択肢はoptional、繰り返しや同名の複数出現はlistとして推論する。
 - `@whitespace: javaStyle`（ASCII空白、行/ブロックコメント）または`none`。未指定は`none`。`@package`はRustでは使用しない。
 
-imports、外部token parser、繰り返し・optional、group全体のcapture、`@typeof`、`@eval`等の他のannotation、左再帰、混合text/node choiceなどは明示的に拒否する。mapping名・field名はASCII識別子に制限し、Rustのraw identifierで出力する。`self`/`Self`/`super`/`crate`、fieldの`span`/`semantics`、重複mapping名・生成method名は拒否する。rootはAST nodeへ解決される必要がある。
+imports、外部token parser、`@typeof`、`@eval`等の他のannotation、左再帰、混合text/node choiceなどは明示的に拒否する。mapping名・field名はASCII識別子に制限し、Rustのraw identifierで出力する。`self`/`Self`/`super`/`crate`、fieldの`span`/`semantics`、重複mapping名・生成method名は拒否する。rootはちょうど1つのAST nodeへ解決される必要がある。optionalの先にある参照も左再帰検査に含め、空一致の可能性がある無限反復は生成前に拒否する。
+
+| captureの個数 | AST text / node | Semantics引数 text / node |
+|---|---|---|
+| 1個 | `String` / `Box<Ast>` | `&str` / `&Ast` |
+| 0/1個 | `Option<String>` / `Option<Box<Ast>>` | `Option<&str>` / `Option<&Ast>` |
+| 複数 | `Vec<String>` / `Vec<Ast>` | `&[String]` / `&[Ast]` |
+
+`[ Item ] @head`はoptionalの中へcaptureを置き、`{ Item } @items`、`Item+ @items`、`Item{1,2} @items`、`Item % ',' @items`は各要素をcaptureする。区切り文字はitemsに入れない。量指定子の内側に置いた`{ Item @items }`も扱う。同名captureの履歴は平坦な列で、順序を保つ。透明なunmapped ruleが複数のmapped nodeを包む場合も、mapperはそのnode列を収集する。
+
+`[[ Item ]] @head`など入れ子container全体のcaptureは、`Option<Option<_>>`を失わないよう現時点では明示拒否する。内側の要素に名前を付けるか、各階層をmapped ruleに分ける。再帰的なunmapped ruleの型推論、入れ子container型、全Java capture規則との互換性は今後の作業。scalarからoptionalに変わると手書きSemanticsも型変更が必要になり、古い引数型は`E0053`で検出される。
 
 RustのLSP/DAP、回復・incremental cache、PropagationStopper、Java MatchedTokenParserとの完全互換、string/variable/function-call構文、proc macro、Rust製UBNF frontendは未実装。性能最適化・Java比の速度優位も未評価。文法構造はparseごとに構築し、runtimeのrule呼出深さには256の上限がある。大規模・敵対的入力の資源量保証はない。
 
@@ -96,7 +106,7 @@ let matched = context.parse(&MyParser)?;
 
 `source`/`remaining`/`position`/`advance`/`text`で入力を扱い、`set_state`/`state::<T>`/`state_mut::<T>`で`Any + Clone`の値を共有する。位置・移動量はコードポイント単位。利用者状態の`Clone`は変更可能な内容を独立コピーする必要がある。`Rc<RefCell<_>>`等の共有内部状態、ファイル操作等の副作用、panic unwindはrollback対象ではない。panicを捕捉した後はcontextを再利用しない。
 
-`Expr`には`then`/`or`/`optional`/`repeat`/`zero_or_more`/`one_or_more`/`separated_by`/`capture`/`ahead`/`not_ahead`を用意する。`separated_by`は1個以上。無限反復の子が入力を消費せず成功した場合はエラーとする。`Custom(fn)`でcontextを取る関数を組み込める。`Any`/`CharRange`/`Except`は1コードポイント、`Until`は終端の直前まで（終端がなければ失敗）、`Eof`/`Empty`/`Error`も利用できる。これらの追加機能は**runtime APIのみ**で、UBNF loweringにはまだ接続していない。
+`Expr`には`then`/`or`/`optional`/`repeat`/`zero_or_more`/`one_or_more`/`separated_by`/`capture`/`ahead`/`not_ahead`を用意する。`separated_by`は1個以上。無限反復の子が入力を消費せず成功した場合はエラーとする。`Custom(fn)`でcontextを取る関数を組み込める。`Any`/`CharRange`/`Except`は1コードポイント、`Until`は終端の直前まで（終端がなければ失敗）、`Eof`/`Empty`/`Error`も利用できる。optional/repeat/separated/captureはUBNF loweringからも利用するが、追加字句token・先読み・Custom・BackreferenceのUBNF接続は未実装。
 
 `captured(name)`と`Backreference(name)`はcontext全体の同名captureの最新成功分を使用する。`capture_spans`は成功履歴を返す。字句スコープやJavaのcapture伝播規則を再現したものではない。
 
@@ -128,6 +138,16 @@ v6と同じ[`evolution/{0,1,2,3}`](../unlaxer-dsl/src/test/resources/evolution/)
 この148ケースは1つのJUnitメソッド内の入力比較であり、148個の独立テストメソッドではない。2026-09-19、Java 21.0.9 / Rust 1.98.1で確認した結果。実行時のTSVは`unlaxer-dsl/target/rust-conformance.tsv`に出る。別途Rustのunit testがrollback・数値・コメント・Unicode診断位置・深さ制限・CST破棄後のASTを検査する。
 
 受理後に失敗する5入力も意図的に残す。4入力はコメントを含む数値captureの数値変換失敗で、1入力は`1e309`の非有限値。現在のJava mapperが数値captureの末尾コメントを除去しない挙動をRust側も再現している。AST fieldはtriviaを含む場合があり、spanも必ずしも字句本体だけではない。
+
+## optional/repeatの追加実験
+
+[`cardinality/`](../unlaxer-dsl/src/test/resources/cardinality/)に共通文法・14入力・期待AST・Rust Semanticsを固定した。zero/plus/bounded/unbounded/separatedの5文法×14入力＝70ケースをJava/Rustで実生成・コンパイル・実行する。受理／拒否は70件で一致し、受理20件のRust AST全field・全node span・評価値は独立した期待fixtureと一致する。これはJava ASTとの全面一致ではない。
+
+Java mapperにはcapture選択の既存不具合がある。例えば`:::`で欠損tailを`":"`、空flagsを`[":", ":"]`へ変換し、`:2;::`でrepeat側のItemをoptional headへ誤配置する。plus/bounded/separatedのlistが空になる場合もある。受理20件すべてでJava ASTは期待ASTと異なり、生のJava結果も`javaKnown` fixtureで固定して[issue #116](https://github.com/opaopa6969/unlaxer-parser/issues/116)へ分離した。比較を通すためRustへこの不具合をコピーしない。双方の結果は`target/rust-cardinality.tsv`とCI artifactに保存する。
+
+数値は既存evolutionと同じ`Digits ::= NUMBER`のtext用rule経由でcaptureする。Javaの`NumberParser`直接captureは`int value = null`を生成する別の問題があり、数値型の契約も含め[issue #115](https://github.com/opaopa6969/unlaxer-parser/issues/115)で追跡する。
+
+追加13ケースはRustの実生成・コンパイル・実行で、量指定子内capture、欠ける選択肢、同名captureの複数出現、透明なoptional/list rule、group capture、0回/厳密回数を検証する。2ケースでは古いSemantics引数型をコンパイルして`E0053`を確認する。これらはJUnit内のケース数で独立テストメソッド数ではない。UBNF frontendの入れ子量指定子が脱落する不具合も修正し、外側のrepeat/optional/groupと内側のsuffixを区別する回帰テストを追加した。
 
 ## 構造化診断の追加実験
 
