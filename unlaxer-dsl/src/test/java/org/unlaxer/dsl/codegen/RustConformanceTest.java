@@ -37,6 +37,127 @@ public class RustConformanceTest {
         tokenCorpus("lexical");
     }
 
+    @Test public void rightAssociativeRecursionPreservesValuesCursorsAndAllSpans() throws Exception {
+        assumeTrue("enable with -DrustConformance=true (requires rustc)", Boolean.getBoolean("rustConformance"));
+        Path library = temporary.getRoot().toPath().resolve("libunlaxer_runtime.rlib");
+        success(run(List.of("rustc", "--edition=2021", "--crate-type=rlib", "--crate-name=unlaxer_runtime",
+            repo.resolve("rust/unlaxer-runtime/src/lib.rs").toString(), "-o", library.toString()), ""));
+        Path fixtures = repo.resolve("unlaxer-dsl/src/test/resources/right-associative");
+        String source = Files.readString(fixtures.resolve("Power.ubnf"));
+        String probeTemplate = Files.readString(fixtures.resolve("probe.rs.txt"));
+        var corpus = JsonParser.parseString(Files.readString(fixtures.resolve("corpus.json"))).getAsJsonArray();
+        var report = new ArrayList<>(List.of("mode\tinput_json\tjava_prefix\tjava_ast\trust"));
+        class SpanVerifier {
+            void verify(JsonObject ast, String input, int parentStart, int parentEnd) {
+                int start = ast.getAsJsonArray("span").get(0).getAsInt();
+                int end = ast.getAsJsonArray("span").get(1).getAsInt();
+                assertTrue(ast.toString(), parentStart <= start && start <= end && end <= parentEnd);
+                var fields = ast.getAsJsonObject("fields");
+                if (ast.get("type").getAsString().equals("Number")) {
+                    String slice = input.substring(input.offsetByCodePoints(0, start), input.offsetByCodePoints(0, end));
+                    assertTrue(ast + " vs " + slice, slice.contains(fields.get("value").getAsString()));
+                } else {
+                    assertEquals("Power", ast.get("type").getAsString());
+                    var left = fields.get("left");
+                    if (left.isJsonObject()) verify(left.getAsJsonObject(), input, start, end);
+                    assertTrue(ast.toString(), fields.getAsJsonArray("op").size() <= 1);
+                    assertEquals(fields.getAsJsonArray("op").size(), fields.getAsJsonArray("right").size());
+                    for (var right : fields.getAsJsonArray("right")) verify(right.getAsJsonObject(), input, start, end);
+                }
+            }
+        }
+        for (String mode : List.of("text", "mapped", "unicode", "grouped")) {
+            String grammarSource = source;
+            if (!mode.equals("text")) {
+                grammarSource = grammarSource.replace("Atom ::= NUMBER;",
+                    "@mapping(Number, params=[value]) Atom ::= "
+                    + (mode.equals("unicode") ? "[ '😀' ] " : "") + "(NUMBER) @value;");
+            }
+            if (mode.equals("grouped")) {
+                grammarSource = grammarSource.replace("Expr ::= Atom @left", "Expr ::= Base @left")
+                    .replace("  @root", "  Base ::= Atom | '(' Expr ')';\n  @root");
+            }
+            var grammar = UBNFMapper.parse(grammarSource).grammars().get(0);
+            Path dir = temporary.newFolder().toPath();
+            Path generated = Files.createDirectory(dir.resolve("generated"));
+            for (var file : new RustBackend().generate(grammar)) Files.writeString(generated.resolve(file.relativePath()), file.content());
+            String probe = probeTemplate.replace("LEFT_TYPE", mode.equals("text") ? "&str" : "&Ast")
+                .replace("LEFT_VALUE", mode.equals("text") ? "number(left)" : "evaluate(left, self)")
+                .replace("// NUMBER_SEMANTICS", mode.equals("text") ? ""
+                    : "fn eval_number(&mut self, value: &str, _: Span) -> f64 { number(value) }");
+            Files.writeString(dir.resolve("main.rs"), probe);
+            success(rustCompile(dir, library));
+            var actual = run(List.of(dir.resolve("probe").toString()), String.join("\n", corpus.asList().stream()
+                .map(row -> java.util.HexFormat.of().formatHex(row.getAsJsonObject().get("input").getAsString()
+                    .getBytes(StandardCharsets.UTF_8))).toList()) + "\n");
+            success(actual);
+            var lines = actual.output().lines().toList();
+            assertEquals(corpus.size(), lines.size());
+            // Independent values distinguish right nesting (512) from a left fold (64).
+            for (int i = 0; i < corpus.size(); i++) {
+                var row = corpus.get(i).getAsJsonObject();
+                String input = row.get("input").getAsString();
+                String context = mode + " " + row;
+                boolean accepted = row.has("value") && (!row.has("modes")
+                    || row.getAsJsonArray("modes").contains(new JsonPrimitive(mode)));
+                var result = JsonParser.parseString(lines.get(i)).getAsJsonObject();
+                assertEquals(context, accepted, !result.get("ast").isJsonNull());
+                if (accepted) {
+                    assertEquals(context, row.get("value").getAsDouble(), result.get("value").getAsDouble(), 0.0);
+                    var ast = result.getAsJsonObject("ast");
+                    assertEquals(0, ast.getAsJsonArray("span").get(0).getAsInt());
+                    assertEquals(input.codePointCount(0, input.length()), ast.getAsJsonArray("span").get(1).getAsInt());
+                    new SpanVerifier().verify(ast, input, 0, input.codePointCount(0, input.length()));
+                    if (input.equals("2^3^2")) {
+                        var second = ast.getAsJsonObject("fields").getAsJsonArray("right").get(0).getAsJsonObject();
+                        var third = second.getAsJsonObject("fields").getAsJsonArray("right").get(0).getAsJsonObject();
+                        assertEquals(0, third.getAsJsonObject("fields").getAsJsonArray("right").size());
+                    }
+                }
+            }
+            try (var loader = compileJava(grammar, List.of())) {
+                var mapper = loader.loadClass("org.example.power.PowerMapper");
+                var parser = (org.unlaxer.parser.Parser) loader.loadClass("org.example.power.PowerParsers")
+                    .getMethod("getRootParser").invoke(null);
+                for (int i = 0; i < corpus.size(); i++) {
+                    var row = corpus.get(i).getAsJsonObject();
+                    String input = row.get("input").getAsString();
+                    String context = mode + " " + row;
+                    var result = JsonParser.parseString(lines.get(i)).getAsJsonObject();
+                    var prefix = new JsonArray();
+                    try (var parseContext = new org.unlaxer.context.ParseContext(org.unlaxer.StringSource.createRootSource(input))) {
+                        prefix.add(parser.parse(parseContext).isSucceeded());
+                        prefix.add(parseContext.getConsumedPosition().value());
+                        prefix.add(parseContext.getMatchedPosition().value());
+                    }
+                    assertEquals(context + " prefix cursors", prefix, result.get("prefix"));
+                    boolean accepted = row.has("value") && (!row.has("modes")
+                        || row.getAsJsonArray("modes").contains(new JsonPrimitive(mode)));
+                    var diagnostic = (Optional<?>) mapper.getMethod("diagnose", String.class).invoke(null, input);
+                    assertEquals(context + " Java acceptance", accepted, diagnostic.isEmpty());
+                    JsonElement java = JsonNull.INSTANCE;
+                    if (accepted) {
+                        Object mapped = mapper.getMethod("parseWithSourceMap", String.class).invoke(null, input);
+                        java = canonical(mapped.getClass().getMethod("ast").invoke(mapped), mapped);
+                        assertEquals(context + " Java/Rust AST and all spans", java, result.get("ast"));
+                    }
+                    report.add(mode + "\t" + row.get("input") + "\t" + prefix + "\t" + java + "\t" + result);
+                }
+            }
+            Files.writeString(dir.resolve("main.rs"), """
+                mod generated;
+                struct Stale;
+                impl generated::evaluator::Semantics for Stale { type Output = (); }
+                fn main() {}
+                """);
+            var stale = rustCompile(dir, library);
+            assertNotEquals(stale.output(), 0, stale.code());
+            assertTrue(stale.output(), stale.output().contains("E0046"));
+            assertTrue(stale.output(), stale.output().contains("eval_power"));
+        }
+        Files.write(Path.of("target/rust-right-associative.tsv"), report, StandardCharsets.UTF_8);
+    }
+
     @Test public void sharedLeftAssociativeVariantsPreserveOperatorsEvaluationAndSpans() throws Exception {
         assumeTrue("enable with -DrustConformance=true (requires rustc)", Boolean.getBoolean("rustConformance"));
         Path library = temporary.getRoot().toPath().resolve("libunlaxer_runtime.rlib");
