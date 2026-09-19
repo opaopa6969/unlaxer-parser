@@ -205,9 +205,9 @@ public class MapperGeneratorTest {
         String source = new MapperGenerator().generate(grammar).source();
 
         assertTrue("true capture should be bound to its grammar site",
-            source.contains("hasCaptureBinding(captureSite_value, \"BooleanFactor:0\")"));
+            source.contains("occurrence.binding().equals(\"BooleanFactor:0\")"));
         assertTrue("false capture should be bound to its distinct grammar site",
-            source.contains("hasCaptureBinding(captureSite_value, \"BooleanFactor:1\")"));
+            source.contains("occurrence.binding().equals(\"BooleanFactor:1\")"));
     }
 
     @Test
