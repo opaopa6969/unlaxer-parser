@@ -176,9 +176,15 @@ let matched = context.parse(&MyParser)?;
 
 `captured(name)`と`Backreference(name)`はcontext全体の同名captureの最新成功分を使用する。`capture_spans`は成功履歴を返す。字句スコープやJavaのcapture伝播規則を再現したものではない。
 
+字句スコープの宣言・参照・semantic diagnostics は別の `scopes()` / `scopes_mut()` で扱う。
+`with_scope` は子スコープを開き、成功後は名前を隠してイベント履歴を保持し、失敗時は
+開始前へ戻す。scope store も parser の rollback 対象で、context ごとに独立する。
+[transactional scope の契約](../docs/transactional-scopes.md)を参照。
+これは runtime API の対応であり、Rust の `@scopeTree` / `@declares` / `@backref` 生成は未対応。
+
 生成器は`rules()`・`parse_context(&mut ParseContext)`も出力する。context入口は現在位置からの**prefix解析**であり、全入力検証は従来の`parse_tree[_detailed]`、または後続の`Expr::Eof`を使う。文法とtrivia設定は呼出中だけ切り替わり、入力と利用者状態は共通。`matched.root_node()`から`context.tree(root)`で所有されたsnapshotを取り、その文法のmapperへ渡す。異なる文法のrule IDはローカルなので、複数文法のnodeを一つのmapperに混ぜない。node IDはcontext内だけで有効で、rollbackされた結果は再利用しない。
 
-公開APIの使用例とrollback契約は[`context_combinators.rs`](unlaxer-runtime/tests/context_combinators.rs)、生成parserとの混在とAST評価は[`context.rs`](examples/evolution/tests/context.rs)で検証する。現在はtransactionごとに利用者状態・capture履歴をコピーする単純実装で、性能評価・最適化は未実施。
+公開APIの使用例とrollback契約は[`context_combinators.rs`](unlaxer-runtime/tests/context_combinators.rs)、scope store は[`scopes.rs`](unlaxer-runtime/tests/scopes.rs)、生成parserとの混在とAST評価は[`context.rs`](examples/evolution/tests/context.rs)で検証する。現在はtransactionごとに利用者状態・capture履歴・scope storeをコピーする単純実装で、性能評価・最適化は未実施。
 
 ### UBNF primitiveの互換契約
 

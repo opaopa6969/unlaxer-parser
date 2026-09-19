@@ -50,6 +50,23 @@ fn positive_and_negative_speculation_leave_no_symbols_or_semantic_diagnostics() 
 }
 
 #[test]
+fn declarations_are_visible_inside_a_lookahead_but_not_after_it() {
+    fn read_b(context: &mut ParseContext<'_>) -> ParseResult {
+        assert!(context.scopes().is_declared("a"));
+        context.parse(&Expr::literal("b"))
+    }
+    let mut context = ParseContext::new("ab");
+    context
+        .parse(&Expr::Custom(record_a).then(Expr::Custom(read_b)).ahead())
+        .unwrap();
+    assert!(!context.scopes().is_declared("a"));
+    assert!(context.scopes().all_declarations().is_empty());
+    assert!(context.scopes().all_references().is_empty());
+    assert!(context.scopes().diagnostics().is_empty());
+    assert_eq!((context.position(), context.matched_position()), (0, 0));
+}
+
+#[test]
 fn nested_commit_is_undone_by_outer_rollback_including_lazy_initialization() {
     for preexisting in [false, true] {
         let mut context = ParseContext::new("a");
