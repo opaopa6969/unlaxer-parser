@@ -1,0 +1,37 @@
+mod generated;
+use generated::{ast::Ast, evaluator::{evaluate, Semantics}};
+VALUE_IMPORT
+use unlaxer_runtime::{Span, json_string};
+use std::io::{self, BufRead};
+struct Values;
+impl Semantics for Values {
+    type Output = Vec<String>;
+    fn eval_leaf(&mut self, text: &str, _: Span) -> Self::Output { vec![format!("L:{text}")] }
+    fn eval_box(&mut self, values: FIELD_TYPE, _: Span) -> Self::Output {
+        VALUE_ITER.flat_map(|value| { EVAL_ITEM }).collect()
+    }
+}
+fn text_spans(ast: &Ast) -> String {
+    let Ast::Box { values, .. } = ast else { panic!("box expected") };
+    TEXT_SPANS
+}
+fn main() {
+    for line in io::stdin().lock().lines() {
+        let encoded = line.unwrap();
+        let bytes = (0..encoded.len()).step_by(2).map(|i| u8::from_str_radix(&encoded[i..i+2],16).unwrap()).collect();
+        let input = String::from_utf8(bytes).unwrap();
+        let mut context = unlaxer_runtime::ParseContext::new(&input);
+        let ok = generated::parser::parse_context(&mut context).is_ok();
+        print!(r#"{{"prefix":[{},{},{}],"ast":"#, ok, context.position(), context.matched_position());
+        match generated::parser::parse_tree(&input) {
+            Ok(tree) => {
+                let ast = generated::mapper::map(&tree).unwrap();
+                drop(tree); drop(context); drop(input);
+                print!(r#"{},"value":{},"texts":{}"#, ast.canonical_json(),
+                    json_string(&evaluate(&ast, &mut Values).join(",")), text_spans(&ast));
+            }
+            Err(_) => print!("null"),
+        }
+        println!("}}");
+    }
+}

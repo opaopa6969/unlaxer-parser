@@ -1,0 +1,9 @@
+grammar Semantic {
+  @package: org.example.semantic
+  @whitespace: javaStyle
+  @root @mapping(Box, params=[values]) Document ::= ROOT_BODY;
+  Helper ::= HELPER_BODY;
+  EXTRA_RULES
+  Factor ::= 'a' | '😀' | Leaf;
+  @mapping(Leaf, params=[text]) Leaf ::= ('x' | 'y') @text;
+}

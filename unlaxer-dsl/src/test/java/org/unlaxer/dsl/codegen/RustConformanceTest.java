@@ -33,6 +33,20 @@ public class RustConformanceTest {
         tokenCorpus("primitives");
     }
 
+    @Test public void semanticCardinalityRustOracle() throws Exception {
+        assumeTrue("enable with -DrustConformance=true (requires rustc/cargo)", Boolean.getBoolean("rustConformance"));
+        new SemanticCardinalityConformance(temporary.getRoot().toPath(), repo).verify(false, true);
+    }
+
+    @Test public void semanticCardinalityJavaOracle() throws Exception {
+        new SemanticCardinalityConformance(temporary.getRoot().toPath(), repo).verify(true, false);
+    }
+
+    @Test public void semanticCardinalityJavaAndRustAgree() throws Exception {
+        assumeTrue("enable with -DrustConformance=true (requires rustc/cargo)", Boolean.getBoolean("rustConformance"));
+        new SemanticCardinalityConformance(temporary.getRoot().toPath(), repo).verify(true, true);
+    }
+
     @Test public void lexicalTokensPreserveRawTextAndCodePointSpans() throws Exception {
         tokenCorpus("lexical");
     }

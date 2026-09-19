@@ -1,0 +1,67 @@
+[
+ {"name":"node-one","kind":"node","cardinality":"one","body":"Leaf","cases":[
+   {"input":"x","value":"L:x","texts":[]},{"input":"y","value":"L:y","texts":[]},{"input":""},{"input":"xy"}]},
+ {"name":"mixed-one","kind":"value","cardinality":"one","body":"'(' Factor ')'","cases":[
+   {"input":"(a)","value":"T:(a)","texts":[[0,3,"(a)"]]},{"input":"(x)","value":"L:x","texts":[]},
+   {"input":"(😀)","value":"T:(😀)","texts":[[0,3,"(😀)"]]},{"input":"()"},{"input":"(ax)"}]},
+ {"name":"node-pair","kind":"node","cardinality":"many","body":"Leaf Leaf","cases":[
+   {"input":"xx","value":"L:x,L:x","texts":[],"nodes":[[0,1,"x"],[1,2,"x"]]},
+   {"input":"xy","value":"L:x,L:y","texts":[]},{"input":"yx","value":"L:y,L:x","texts":[]},
+   {"input":" x /*😀*/ y ","value":"L:x,L:y","texts":[]},{"input":""},{"input":"x"},{"input":"xyx"}]},
+ {"name":"mixed-pair","kind":"value","cardinality":"many","body":"Factor Factor","cases":[
+   {"input":"xx","value":"L:x,L:x","texts":[],"nodes":[[0,1,"x"],[1,2,"x"]]},
+   {"input":"aa","value":"T:a,T:a","texts":[[0,1,"a"],[1,2,"a"]]},
+   {"input":"ax","value":"T:a,L:x","texts":[[0,1,"a"]]},{"input":"xa","value":"L:x,T:a","texts":[[1,2,"a"]]},
+   {"input":"xy","value":"L:x,L:y","texts":[]},{"input":"😀a","value":"T:😀,T:a","texts":[[0,1,"😀"],[1,2,"a"]]},
+   {"input":"a /*c*/ x","value":"T:a,L:x","texts":[[0,1,"a"]]},
+   {"input":""},{"input":"a"},{"input":"axa"}]},
+ {"name":"mixed-group","kind":"value","cardinality":"many","root":"( Factor Factor ) @values","body":"Factor","cases":[
+   {"input":"ax","value":"T:a,L:x","texts":[[0,1,"a"]]},{"input":"xa","value":"L:x,T:a","texts":[[1,2,"a"]]},
+   {"input":"😀a","value":"T:😀,T:a","texts":[[0,1,"😀"],[1,2,"a"]]},{"input":""},{"input":"a"}]},
+ {"name":"mixed-alias","kind":"value","cardinality":"many","body":"Alias","extra":"Alias ::= '(' Pair ')'; Pair ::= Factor Factor;","cases":[
+   {"input":"(aa)","value":"T:a,T:a","texts":[[1,2,"a"],[2,3,"a"]]},
+   {"input":"(xa)","value":"L:x,T:a","texts":[[2,3,"a"]]},{"input":"(😀x)","value":"T:😀,L:x","texts":[[1,2,"😀"]]},
+   {"input":"()"},{"input":"(a)"},{"input":"(ax)!"}]},
+ {"name":"node-optional","kind":"node","cardinality":"optional","body":"'(' [ Leaf ] ')'","cases":[
+   {"input":"()","value":"","texts":[]},{"input":"(x)","value":"L:x","texts":[]},
+   {"input":"(y)","value":"L:y","texts":[]},{"input":"(xy)"},{"input":"(a)"}]},
+ {"name":"mixed-optional","kind":"value","cardinality":"optional","body":"'(' [ Factor ] ')'","cases":[
+   {"input":"()","value":"","texts":[]},{"input":"(a)","value":"T:(a)","texts":[[0,3,"(a)"]]},
+   {"input":"(x)","value":"L:x","texts":[]},{"input":"(😀)","value":"T:(😀)","texts":[[0,3,"(😀)"]]},
+   {"input":"( /*c*/ )","value":"","texts":[]},{"input":"(ax)"},{"input":"(a"}]},
+ {"name":"node-repeat","kind":"node","cardinality":"many","body":"'[' { Leaf } ']'","cases":[
+   {"input":"[]","value":"","texts":[]},{"input":"[x]","value":"L:x","texts":[]},
+   {"input":"[xyx]","value":"L:x,L:y,L:x","texts":[],"nodes":[[1,2,"x"],[2,3,"y"],[3,4,"x"]]},
+   {"input":"[xx]","value":"L:x,L:x","texts":[],"nodes":[[1,2,"x"],[2,3,"x"]]},
+   {"input":"[a]"},{"input":"[x]!"}]},
+ {"name":"mixed-repeat","kind":"value","cardinality":"many","body":"'[' { Factor } ']'","cases":[
+   {"input":"[]","value":"","texts":[]},{"input":"[a]","value":"T:a","texts":[[1,2,"a"]]},
+   {"input":"[x]","value":"L:x","texts":[]},{"input":"[axa]","value":"T:a,L:x,T:a","texts":[[1,2,"a"],[3,4,"a"]]},
+   {"input":"[😀x]","value":"T:😀,L:x","texts":[[1,2,"😀"]]},
+   {"input":"[a x]","value":"T:a,L:x","texts":[[1,2,"a"]]},{"input":"[ax]!"}]},
+ {"name":"mixed-bounded","kind":"value","cardinality":"many","body":"'[' (Factor){1,2} ']'","cases":[
+   {"input":"[a]","value":"T:a","texts":[[1,2,"a"]]},{"input":"[ax]","value":"T:a,L:x","texts":[[1,2,"a"]]},
+   {"input":"[]"},{"input":"[axa]"}]},
+ {"name":"node-separated","kind":"node","cardinality":"many","body":"'[' Leaf % ',' ']'","cases":[
+   {"input":"[x]","value":"L:x","texts":[]},{"input":"[x,y]","value":"L:x,L:y","texts":[]},
+   {"input":"[]"},{"input":"[x,]"},{"input":"[xy]"}]},
+ {"name":"mixed-separated","kind":"value","cardinality":"many","body":"'[' Factor % ',' ']'","cases":[
+   {"input":"[a]","value":"T:a","texts":[[1,2,"a"]]},
+   {"input":"[a,x,😀]","value":"T:a,L:x,T:😀","texts":[[1,2,"a"],[5,6,"😀"]]},
+   {"input":"[x, a]","value":"L:x,T:a","texts":[[4,5,"a"]]},
+   {"input":"[]"},{"input":"[a,]"},{"input":"[ax]"}]},
+ {"name":"optional-many-alias","kind":"value","cardinality":"many","body":"'(' [ Items ] ')'","extra":"Items ::= Factor % ',';","cases":[
+   {"input":"()","value":"","texts":[]},{"input":"(a)","value":"T:a","texts":[[1,2,"a"]]},
+   {"input":"(x,a)","value":"L:x,T:a","texts":[[3,4,"a"]]},{"input":"(a,)"}]},
+ {"name":"mixed-repeat-delimited-alias","kind":"value","cardinality":"many","body":"{ Outer }","extra":"Outer ::= '(' Factor ')';","cases":[
+   {"input":"","value":"","texts":[]},{"input":"(a)","value":"T:(a)","texts":[[0,3,"(a)"]]},
+   {"input":"(x)","value":"L:x","texts":[]},
+   {"input":"(a)(x)(😀)","value":"T:(a),L:x,T:(😀)","texts":[[0,3,"(a)"],[6,9,"(😀)"]]},
+   {"input":"(a) /*c*/ (😀)","value":"T:(a) /*c*/,T:(😀)","texts":[[0,10,"(a) /*c*/"],[10,13,"(😀)"]]},
+   {"input":"(a"},{"input":"(a)(z)"}]},
+ {"name":"mixed-repeat-delimited-inline","kind":"value","cardinality":"many","body":"{ '(' Factor ')' }","cases":[
+   {"input":"","value":"","texts":[]},{"input":"(a)","value":"T:(a)","texts":[[0,3,"(a)"]]},
+   {"input":"(x)","value":"L:x","texts":[]},
+   {"input":"(a)(x)(😀)","value":"T:(a),L:x,T:(😀)","texts":[[0,3,"(a)"],[6,9,"(😀)"]]},
+   {"input":"(a"},{"input":"(a)(z)"}]}
+]
