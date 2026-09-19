@@ -115,10 +115,18 @@ public class MapperGeneratorTest {
             source.contains("public record MappedAst(Token token, TinyCalcAST ast)"));
         assertTrue("should expose mapping for an existing token tree",
             source.contains("public static synchronized MappedAst mapParsedToken(Token rootToken, String preferredAstSimpleName)"));
+        assertTrue("should expose explicit mapping for an alternate parser entry",
+            source.contains("public static synchronized MappedAst mapSubtreeToken(Token subtreeToken, String preferredAstSimpleName)"));
+        assertTrue("should expose an immutable alternate-entry source snapshot",
+            source.contains("public static synchronized SourceMappedSelection selectSubtreeTokenWithSourceMap(Token token, String preferredAstSimpleName)"));
         assertTrue("should reset source spans for every public mapping call",
             source.contains("NODE_SOURCE_SPANS.clear();\n        MAP_MEMO.clear();"));
         assertTrue("should reject null token trees explicitly",
             source.contains("throw new IllegalArgumentException(\"rootToken must not be null\")"));
+        assertTrue("should reject null subtree tokens explicitly",
+            source.contains("throw new IllegalArgumentException(\"subtreeToken must not be null\")"));
+        assertTrue("should reject tokens from a different generated grammar",
+            source.contains("subtreeToken must be produced by a rule parser from this generated grammar"));
         assertTrue("should reject token trees without a mapping explicitly",
             source.contains("throw new IllegalArgumentException(\"No mapped node found in token tree\")"));
     }

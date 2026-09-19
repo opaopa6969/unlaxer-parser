@@ -89,6 +89,10 @@ public class SnapshotRightAssocMapper {
         return new SourceMappedAst<>(mapParsedToken(token).ast());
     }
 
+    public static synchronized SourceMappedAst<SnapshotRightAssocAST> mapSubtreeTokenWithSourceMap(Token token) {
+        return new SourceMappedAst<>(mapSubtreeToken(token).ast());
+    }
+
     /** Selected token and the identity-based source snapshot from the same mapping. */
     public record SourceMappedSelection(Token token, SourceMappedAst<SnapshotRightAssocAST> sourceMap) {}
 
@@ -104,6 +108,20 @@ public class SnapshotRightAssocMapper {
      */
     public static synchronized SourceMappedSelection selectParsedTokenWithSourceMap(Token token, String preferredAstSimpleName) {
         MappedAst selected = mapParsedToken(token, preferredAstSimpleName);
+        return new SourceMappedSelection(selected.token(), new SourceMappedAst<>(selected.ast()));
+    }
+
+    public static SourceMappedSelection selectSubtreeTokenWithSourceMap(Token token) {
+        return selectSubtreeTokenWithSourceMap(token, null);
+    }
+
+    /**
+     * Maps an explicitly selected parser entry without requiring the grammar's @root token.
+     * Mapping and snapshot capture share the mapper lock; later parses cannot replace these spans.
+     * Use this only for a committed token produced by an intentional alternate parser entry.
+     */
+    public static synchronized SourceMappedSelection selectSubtreeTokenWithSourceMap(Token token, String preferredAstSimpleName) {
+        MappedAst selected = mapSubtreeToken(token, preferredAstSimpleName);
         return new SourceMappedSelection(selected.token(), new SourceMappedAst<>(selected.ast()));
     }
 
@@ -125,9 +143,36 @@ public class SnapshotRightAssocMapper {
         if (rootToken.parser.getClass() != SnapshotRightAssocParsers.ExprParser.class) {
             throw new IllegalArgumentException("Mapped root token is missing for Expr; pass the committed parser root from ParseContext.getCurrent().getTokens(), not a root-stripped token");
         }
+        return mapTokenTree(rootToken, preferredAstSimpleName);
+    }
+
+    /** Maps a committed token from an intentional alternate parser entry. */
+    public static MappedAst mapSubtreeToken(Token subtreeToken) {
+        return mapSubtreeToken(subtreeToken, null);
+    }
+
+    /** Maps a committed alternate-entry token, preferring an AST type by simple name. */
+    public static synchronized MappedAst mapSubtreeToken(Token subtreeToken, String preferredAstSimpleName) {
+        if (subtreeToken == null) {
+            throw new IllegalArgumentException("subtreeToken must not be null");
+        }
+        if (!isGeneratedRuleToken(subtreeToken)) {
+            throw new IllegalArgumentException("subtreeToken must be produced by a rule parser from this generated grammar");
+        }
+        return mapTokenTree(subtreeToken, preferredAstSimpleName);
+    }
+
+    private static boolean isGeneratedRuleToken(Token token) {
+        if (token.parser == null) return false;
+        Class<?> parserClass = token.parser.getClass();
+        return parserClass == SnapshotRightAssocParsers.ExprParser.class
+            || parserClass == SnapshotRightAssocParsers.AtomParser.class;
+    }
+
+    private static MappedAst mapTokenTree(Token token, String preferredAstSimpleName) {
         NODE_SOURCE_SPANS.clear();
         MAP_MEMO.clear();
-        Token selectedToken = findBestMappedToken(rootToken, preferredAstSimpleName);
+        Token selectedToken = findBestMappedToken(token, preferredAstSimpleName);
         if (selectedToken == null) {
             throw new IllegalArgumentException("No mapped node found in token tree");
         }
