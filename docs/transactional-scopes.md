@@ -87,6 +87,7 @@ Java の `declaredInCurrentScope` は順序未規定、Rust の対応メソッ�
 
 共通 operation corpus は実 Java ParseContext の transaction と Rust transaction を動かし、
 depth・lookup・宣言/参照/診断・consumed/matched cursor を独立期待値で照合する。
+8 fixtures・9 contexts・17 observations を両言語で比較し、全4 severity も検証する。
 CI は `rust-scope-store.tsv` を必須 artifact とする。
 Rust の choice/optional/repeat/PEG lookahead と nested grammar、Java 生成 parser の
 scope annotation についても、失敗した枝の変更が漏れないことを別途検証する。
