@@ -4,6 +4,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.AtomicElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RuleDecl;
+import org.unlaxer.dsl.bootstrap.UBNFAST.RuleRefElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.TerminalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.TokenDecl;
 
@@ -744,6 +745,11 @@ class MapperRuleEmitter {
             String param, String type, List<CaptureBindingPlan.Site> sites,
             Map<String, String> mappedClassByRuleName,
             Map<String, TokenDecl> tokenDeclByName, Map<String, RuleDecl> ruleByName) {
+        SemanticCardinality semantics = new SemanticCardinality(grammar);
+        if (sites.stream().anyMatch(site -> semantics.needsCollection(site.element()))) {
+            emitSemanticParam(w, param, type, sites, semantics);
+            return;
+        }
         Optional<String> listType = MapperTypeResolver.unwrapListType(type);
         Optional<String> optionalType = MapperTypeResolver.unwrapOptionalType(type);
         String valueType = listType.or(() -> optionalType).orElse(type);
@@ -792,6 +798,82 @@ class MapperRuleEmitter {
             w.line("if (" + param + " == null) throw new IllegalArgumentException(\"Required numeric capture not found: "
                 + ParserCodegenUtil.escapeString(param) + "\");");
         }
+    }
+
+    private static void emitSemanticParam(IndentedWriter w, String param, String type,
+            List<CaptureBindingPlan.Site> sites, SemanticCardinality semantics) {
+        String values = "semantic_" + MapperElementUtil.safeName(param);
+        String siteToken = "semanticSite_" + MapperElementUtil.safeName(param);
+        w.line("List<Object> " + values + " = new ArrayList<>();");
+        String ids = sites.stream().map(site -> "\"" + ParserCodegenUtil.escapeString(site.id()) + "\"")
+            .collect(java.util.stream.Collectors.joining(", "));
+        w.line("for (Token " + siteToken + " : findCaptureSites(token, java.util.Set.of(" + ids + "))) {");
+        w.indent();
+        for (CaptureBindingPlan.Site site : sites) {
+            var shape = semantics.siteShape(site.element());
+            w.line("if (hasCaptureBinding(" + siteToken + ", \"" + ParserCodegenUtil.escapeString(site.id()) + "\")) {");
+            w.indent();
+            if (shape.kind() == SemanticCardinality.Kind.TEXT) {
+                w.line(values + ".add(semanticText(" + siteToken + "));");
+            } else {
+                w.line(values + ".addAll(semanticValues(" + siteToken + ", "
+                    + (shape.kind() == SemanticCardinality.Kind.VALUE && shape.count() != SemanticCardinality.Count.MANY) + "));");
+            }
+            w.line("continue;");
+            w.dedent();
+            w.line("}");
+        }
+        w.dedent();
+        w.line("}");
+        Optional<String> list = MapperTypeResolver.unwrapListType(type);
+        Optional<String> optional = MapperTypeResolver.unwrapOptionalType(type);
+        String element = list.or(() -> optional).orElse(type);
+        if (list.isPresent()) {
+            w.line(type + " " + param + " = new ArrayList<>();");
+            w.line("for (Object value : " + values + ") " + param + ".add((" + element + ") value);");
+        } else {
+            String condition = optional.isPresent() ? "> 1" : "!= 1";
+            w.line("if (" + values + ".size() " + condition + ") throw new IllegalArgumentException(\"Unexpected semantic cardinality for "
+                + ParserCodegenUtil.escapeString(param) + "\");");
+            w.line(type + " " + param + " = " + (optional.isPresent()
+                ? values + ".isEmpty() ? Optional.empty() : Optional.of((" + element + ") " + values + ".get(0))"
+                : "(" + element + ") " + values + ".get(0)") + ";");
+        }
+    }
+
+    static String emitSemanticUtilities(GrammarDecl grammar, String parsersClass) {
+        SemanticCardinality semantics = new SemanticCardinality(grammar);
+        List<String> boundaries = grammar.rules().stream()
+            .filter(rule -> MapperElementUtil.getMappingAnnotation(rule).isEmpty())
+            .filter(rule -> {
+                var shape = semantics.shape(new RuleRefElement(rule.name()));
+                return shape.kind() == SemanticCardinality.Kind.VALUE && shape.count() != SemanticCardinality.Count.MANY;
+            }).map(rule -> parsersClass + "." + rule.name() + "Parser.class").toList();
+        return """
+
+                private static final java.util.Set<Class<?>> SEMANTIC_VALUE_BOUNDARIES = java.util.Set.of(%s);
+
+                private static String semanticText(Token token) {
+                    // Distinct identities retain distinct spans even for equal or empty text values.
+                    return registerNodeSourceSpan(new String(stripQuotes(firstTokenText(token))), token);
+                }
+
+                private static List<Object> semanticValues(Token token, boolean boundary) {
+                    if (token == null) return List.of();
+                    if (hasCaptureBinding(token, "%s")) return List.of(semanticText(token));
+                    Object mapped = mapToken(token);
+                    if (mapped != null) return List.of(mapped);
+                    List<Object> values = new ArrayList<>();
+                    for (Token child : token.filteredChildren) values.addAll(semanticValues(child, false));
+                    if ((boundary || hasCaptureBinding(token, "%s")
+                            || SEMANTIC_VALUE_BOUNDARIES.contains(token.parser.getClass()))
+                            && !values.isEmpty() && values.stream().allMatch(String.class::isInstance)) {
+                        return List.of(semanticText(token));
+                    }
+                    return values;
+                }
+
+            """.formatted(String.join(", ", boundaries), SemanticCardinality.TEXT_BINDING, SemanticCardinality.BOUNDARY_BINDING);
     }
 
     /**

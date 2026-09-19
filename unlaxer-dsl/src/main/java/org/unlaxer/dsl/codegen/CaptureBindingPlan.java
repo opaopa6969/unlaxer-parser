@@ -21,6 +21,65 @@ final class CaptureBindingPlan {
         visit(rule.body());
     }
 
+    CaptureBindingPlan(RuleDecl rule, SemanticCardinality semantics) {
+        this(rule);
+        markSemanticValues(rule.body(), semantics);
+    }
+
+    private void markSemanticValues(RuleBody body, SemanticCardinality semantics) {
+        if (body instanceof ChoiceBody choice) {
+            boolean mixed = semantics.shape(body).kind() == SemanticCardinality.Kind.VALUE;
+            for (SequenceBody alternative : choice.alternatives()) {
+                if (mixed && semantics.shape(alternative).kind() == SemanticCardinality.Kind.TEXT) {
+                    bindUnit(alternative, SemanticCardinality.TEXT_BINDING);
+                }
+                markSemanticValues(alternative, semantics);
+            }
+        } else {
+            ((SequenceBody) body).elements().forEach(item -> markSemanticValues(item.element(), semantics));
+        }
+    }
+
+    private void markSemanticValues(AtomicElement element, SemanticCardinality semantics) {
+        switch (element) {
+            case GroupElement group -> markSemanticValues(group.body(), semantics);
+            case OptionalElement optional -> markSemanticItem(optional.body(), semantics);
+            case RepeatElement repeat -> markSemanticItem(repeat.body(), semantics);
+            case OneOrMoreElement repeat -> markSemanticItem(repeat.body(), semantics);
+            case BoundedRepeatElement repeat -> markSemanticItem(repeat.body(), semantics);
+            case SeparatedElement separated -> {
+                markSemanticItem(separated.element(), semantics);
+                markSemanticValues(separated.separator(), semantics);
+            }
+            default -> { }
+        }
+    }
+
+    private void markSemanticItem(RuleBody body, SemanticCardinality semantics) {
+        var shape = semantics.shape(body);
+        if (shape.kind() == SemanticCardinality.Kind.VALUE && shape.count() != SemanticCardinality.Count.MANY) {
+            bindUnit(body, SemanticCardinality.BOUNDARY_BINDING);
+        }
+        markSemanticValues(body, semantics);
+    }
+
+    private void markSemanticItem(AtomicElement element, SemanticCardinality semantics) {
+        var shape = semantics.shape(element);
+        if (shape.kind() == SemanticCardinality.Kind.VALUE && shape.count() != SemanticCardinality.Count.MANY) {
+            bind(element, SemanticCardinality.BOUNDARY_BINDING);
+        }
+        markSemanticValues(element, semantics);
+    }
+
+    private void bindUnit(RuleBody body, String binding) {
+        if (body instanceof ChoiceBody choice && choice.alternatives().size() == 1
+                && choice.alternatives().get(0).elements().size() == 1) {
+            bind(choice.alternatives().get(0).elements().get(0).element(), binding);
+        } else if (body instanceof SequenceBody sequence && sequence.elements().size() == 1) {
+            bind(sequence.elements().get(0).element(), binding);
+        } else bind(body, binding);
+    }
+
     List<String> bindings(Object element) {
         return bindings.getOrDefault(element, List.of());
     }
@@ -28,6 +87,8 @@ final class CaptureBindingPlan {
     List<Site> sites(String capture) {
         return sites.getOrDefault(capture, List.of());
     }
+
+    List<Site> allSites() { return sites.values().stream().flatMap(List::stream).toList(); }
 
     private void visit(RuleBody body) {
         switch (body) {

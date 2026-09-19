@@ -940,7 +940,8 @@ class ParserRuleEmitter {
         w.line("}");
         w.raw(baseIndent + "}");
 
-        return w.build();
+        List<String> bindings = ctx.captureBindings.get(ruleName).bindings(alt);
+        return bindings.isEmpty() ? w.build() : "new __CaptureSite(" + w.build() + ", " + bindingArguments(bindings) + ")";
     }
 
     /**

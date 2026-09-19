@@ -64,7 +64,10 @@ public class ParserGenerator implements CodeGenerator {
         GenContext(GrammarDecl grammar) {
             this.grammar = grammar;
             this.grammarName = grammar.name();
-            grammar.rules().forEach(rule -> captureBindings.put(rule.name(), new CaptureBindingPlan(rule)));
+            SemanticCardinality semantics = new SemanticCardinality(grammar);
+            boolean semanticCollections = semantics.enabled();
+            grammar.rules().forEach(rule -> captureBindings.put(rule.name(), semanticCollections
+                ? new CaptureBindingPlan(rule, semantics) : new CaptureBindingPlan(rule)));
             this.tokenParserMap = new LinkedHashMap<>();
             this.tokenUntilMap = new LinkedHashMap<>();
             this.tokenNegationMap = new LinkedHashMap<>();
