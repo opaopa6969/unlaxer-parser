@@ -138,6 +138,21 @@ Rust backend の direct number capture は現段階で `String` であり、Java
 - 各 `@mapping` ルールに対応する `mapXxx(Token)` メソッド
 - `@rightAssoc` ルール用の `foldRightAssoc{ClassName}` ヘルパースケルトン
 
+### 左結合の AST と元 CST（#138）
+
+`@leftAssoc` は `left` と出現順の `op` / `right` リストを生成し、二分木へ変換しない。
+同じ AST class を複数の優先順位ルールで共有する場合も、各ルールの反復だけを集める。
+元 CST では反復 helper は `ZeroOrMore` の直下にあるため、その wrapper だけを透過する。
+括弧内などの operand rule には探索を広げず、内側の演算子を外側のリストへ混入させない。
+旧来の縮約済み token を `mapParsedTokenWithSourceMap` へ渡す経路も保持する。
+
+typed leaf は実際の mapped class として保持する。source span は各 mapped rule の
+消費範囲であり、`javaStyle` delimiter が消費した末尾空白・コメントを含むことがある。
+優先順位の構文構造は rule 間の参照で決まり、`@precedence` 数値はその参照関係の検証と
+メタデータ API に使う（数値を書くだけで parser の選択順を並べ替えない）。
+
+右結合の生成 mapper に残る型不一致・反復木の不整合は #139 で別途追跡する。
+
 ### Capture の位置 binding と再生成（#116）
 
 通常の mapping は parser class の全体探索や「同じ class の何番目か」ではなく、
