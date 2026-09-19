@@ -169,6 +169,8 @@ jobs:
       uses: actions/checkout@v4
       with:
         repository: opaopa6969/tinyexpression
+        # Consumer migration for #163; pin the matching compatibility oracle.
+        ref: 70c70cc810537e9fddd2d3e2bd65b2919d936300
         path: tinyexpression
 
     - name: Point tinyexpression at the unlaxer under test
@@ -182,6 +184,14 @@ jobs:
     - name: tinyexpression p4-smoke
       working-directory: tinyexpression
       run: mvn -B -P p4-smoke test -Dgpg.skip=true
+
+    - name: tinyexpression generated Node alias contract
+      working-directory: tinyexpression
+      run: >
+        mvn -B test -Dgpg.skip=true
+        -Dtinyexpression.expected.mapper.snapshot=true
+        -Dtinyexpression.expected.mapper.nodeAlias=true
+        -Dtest=P4SourceMappingTest,P4OwnedSliceSourceTest
 
     - name: Install tinyexpression (for LSP smoke)
       working-directory: tinyexpression
