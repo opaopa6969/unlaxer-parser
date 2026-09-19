@@ -94,6 +94,22 @@ public class MixedValueRuntimeTest {
         }
     }
 
+    @Test public void pureMappedAliasesRetainExistingStringContract() throws Exception {
+        // tinyexpression SliceStartIndex ::= NumberExpression relies on this lexical API.
+        for (String alias : List.of("Leaf", "(Leaf)", "'(' Leaf ')'")) {
+            try (var loader = compile("""
+                @root @mapping(Box, params=[value]) Root ::= Alias @value;
+                Alias ::= %s;
+                @mapping(Leaf, params=[text]) Leaf ::= 'x' @text 'y';
+                """.formatted(alias))) {
+                String input = alias.startsWith("'('") ? "(xy)" : "xy";
+                Object ast = parse(loader, input);
+                assertEquals(alias, String.class, ast.getClass().getMethod("value").getReturnType());
+                assertEquals(input, field(ast, "value"));
+            }
+        }
+    }
+
     @Test public void mixedBoundariesKeepFullTextAndMappedSourceSpans() throws Exception {
         try (var loader = compile("""
             @root @mapping(Box, params=[value]) Root ::= '!' (('a' ':' 'b') | Leaf) @value;

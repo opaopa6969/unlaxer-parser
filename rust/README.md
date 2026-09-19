@@ -131,6 +131,8 @@ Rustはgroup/repeat/unmapped helper内の複数semantic値も順序付きで収�
 
 同じく`Outer ::= '(' [Factor] ')'; Root ::= Outer @value;`でhelper内部のoptionalをcaptureすると、入力`()`はJavaのObjectでは文字列`"()"`、Rustの`Option<AstValue>`では`None`になる。外側の`[Outer @value]`で不在を表す検証済みの形とは異なる。このhelper越しのcardinality推論差も#160の未完了範囲に含める。
 
+choiceを介さず単一mapped ruleを参照するJavaのaliasは既存の`String` APIを維持する。たとえばtinyexpressionの`SliceStartIndex ::= NumberExpression`はsource textを添字変換に使う。Rustはこの形もNodeとして扱うため、mixed choice対応をもって純粋なmapped aliasの型まで互換になったとは主張しない。
+
 `[ Item ] @head`はoptionalの中へcaptureを置き、`{ Item } @items`、`Item+ @items`、`Item{1,2} @items`、`Item % ',' @items`は各要素をcaptureする。区切り文字はitemsに入れない。量指定子の内側に置いた`{ Item @items }`も扱う。同名captureの履歴は平坦な列で、順序を保つ。透明なunmapped ruleが複数のmapped nodeを包む場合も、mapperはそのnode列を収集する。
 
 `[[ Item ]] @head`など入れ子container全体のcaptureは、`Option<Option<_>>`を失わないよう現時点では明示拒否する。内側の要素に名前を付けるか、各階層をmapped ruleに分ける。再帰的なunmapped ruleの型推論、入れ子container型、全Java capture規則との互換性は今後の作業。scalarからoptionalに変わると手書きSemanticsも型変更が必要になり、古い引数型は`E0053`で検出される。

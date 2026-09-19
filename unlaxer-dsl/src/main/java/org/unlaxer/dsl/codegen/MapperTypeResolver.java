@@ -152,8 +152,8 @@ class MapperTypeResolver {
 
     /**
      * 参照先ルールが「透過 mapped choice」かどうか判定する。
-     * 自身に @mapping を持たず、alias/group を含む本体から mapped node に到達する場合 true。
-     * このようなルール参照は単一のスカラー型に収束しないため、型は Object とすべき。
+     * 自身に @mapping を持たず、alias/group を含む本体から mapped node を含む choice に到達する場合 true。
+     * choice を介さない単純な mapped alias の既存 String 契約は変更しない。
      * 例: StringTerm（StringMatchExpression | SliceExpression | VariableRef | ... の透過 choice）。
      *
      * 判定基準は {@link MapperElementUtil#isTransparentMappedChoice} と揃えており、
