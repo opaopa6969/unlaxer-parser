@@ -2,6 +2,9 @@ package org.unlaxer;
 
 import java.io.Serializable;
 import java.util.Optional;
+import java.util.IdentityHashMap;
+import java.util.Map;
+import org.unlaxer.context.TransactionalState;
 
 import org.unlaxer.Cursor.EndExclusiveCursor;
 import org.unlaxer.Source.SourceKind;
@@ -18,6 +21,19 @@ public class TransactionElement implements Serializable{
 	boolean resetMatchedWithConsumed = true;
 	
 	public final TokenList tokens = new TokenList();
+
+    private transient Map<TransactionalState, Runnable> stateCheckpoints;
+
+    /** Internal transaction hook: capture each explicitly registered owner once. */
+    public void checkpointState(TransactionalState state) {
+        if (stateCheckpoints == null) stateCheckpoints = new IdentityHashMap<>();
+        stateCheckpoints.computeIfAbsent(state, key -> key.checkpoint());
+    }
+
+    /** Internal transaction hook, run after rollback listeners have been notified. */
+    public void restoreState() {
+        if (stateCheckpoints != null) stateCheckpoints.values().forEach(Runnable::run);
+    }
 	
 	public TransactionElement(ParserCursor parserCursor) {
 		super();

@@ -30,6 +30,7 @@ public class MatchOnly extends ConstructedSingleChildParser implements MetaFunct
 		parseContext.startParse(this, parseContext, tokenKind, invertMatch);
 
 		parseContext.begin(this);
+		org.unlaxer.TransactionElement stateBoundary = parseContext.getCurrent();
 		
 		Parsed parsed = getChild().parse(parseContext,TokenKind.matchOnly,invertMatch);
 
@@ -38,7 +39,14 @@ public class MatchOnly extends ConstructedSingleChildParser implements MetaFunct
 			parseContext.endParse(this, Parsed.FAILED , parseContext, tokenKind, invertMatch);
 			return Parsed.FAILED;
 		}
-		Parsed committed = new Parsed(parseContext.commit(this ,TokenKind.matchOnly));
+		Parsed committed;
+		try {
+			committed = new Parsed(parseContext.commit(this ,TokenKind.matchOnly));
+		} finally {
+			// Child commits remain visible within this lookahead. Publish only the
+			// existing match cursor/token result, never its semantic side effects.
+			stateBoundary.restoreState();
+		}
 		parseContext.endParse(this, committed , parseContext, tokenKind, invertMatch);
 		return committed;
 	}

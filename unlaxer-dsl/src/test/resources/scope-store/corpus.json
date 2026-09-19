@@ -1,0 +1,290 @@
+[
+  {
+    "name": "global-preexisting-empty-and-redeclare",
+    "source": "",
+    "runs": [{
+      "id": "main",
+      "operations": [
+        {"op":"leave"},
+        {"op":"declare","name":"global","offset":0},
+        {"op":"declare","name":"dup","offset":1},
+        {"op":"declare","name":"dup","offset":2},
+        {"op":"declare","name":"","offset":99},
+        {"op":"addReference","name":"","offset":99,"length":1},
+        {"op":"retainCurrent","slot":"global-before-enter"},
+        {"op":"observe","id":"global","names":["","dup","global","missing"],
+         "expected":{"depth":0,"cursor":[0,0],
+           "resolved":[
+             {"query":"","declared":false,"symbol":null},
+             {"query":"dup","declared":true,"symbol":{"name":"dup","sourceOffset":2}},
+             {"query":"global","declared":true,"symbol":{"name":"global","sourceOffset":0}},
+             {"query":"missing","declared":false,"symbol":null}],
+           "declaredCurrent":[{"name":"dup","sourceOffset":2},{"name":"global","sourceOffset":0}],
+           "allDeclarations":[{"name":"global","sourceOffset":0},{"name":"dup","sourceOffset":1},{"name":"dup","sourceOffset":2}],
+           "references":[],"diagnostics":[],
+           "retained":{"global-before-enter":[{"name":"dup","sourceOffset":2},{"name":"global","sourceOffset":0}]}}},
+        {"op":"enter"},
+        {"op":"declare","name":"inner","offset":3},
+        {"op":"observe","id":"inner","names":["dup","global","inner"],
+         "expected":{"depth":1,"cursor":[0,0],
+           "resolved":[
+             {"query":"dup","declared":true,"symbol":{"name":"dup","sourceOffset":2}},
+             {"query":"global","declared":true,"symbol":{"name":"global","sourceOffset":0}},
+             {"query":"inner","declared":true,"symbol":{"name":"inner","sourceOffset":3}}],
+           "declaredCurrent":[{"name":"inner","sourceOffset":3}],
+           "allDeclarations":[{"name":"global","sourceOffset":0},{"name":"dup","sourceOffset":1},{"name":"dup","sourceOffset":2},{"name":"inner","sourceOffset":3}],
+           "references":[],"diagnostics":[],
+           "retained":{"global-before-enter":[{"name":"dup","sourceOffset":2},{"name":"global","sourceOffset":0}]}}},
+        {"op":"leave"}
+      ]
+    }]
+  },
+  {
+    "name": "shadow-leave-and-owned-snapshot",
+    "source": "",
+    "runs": [{
+      "id": "main",
+      "operations": [
+        {"op":"declare","name":"x","offset":0},
+        {"op":"enter"},
+        {"op":"declare","name":"x","offset":5},
+        {"op":"declare","name":"y","offset":6},
+        {"op":"retainCurrent","slot":"inner"},
+        {"op":"observe","id":"shadowed","names":["x","y"],
+         "expected":{"depth":1,"cursor":[0,0],
+           "resolved":[
+             {"query":"x","declared":true,"symbol":{"name":"x","sourceOffset":5}},
+             {"query":"y","declared":true,"symbol":{"name":"y","sourceOffset":6}}],
+           "declaredCurrent":[{"name":"x","sourceOffset":5},{"name":"y","sourceOffset":6}],
+           "allDeclarations":[{"name":"x","sourceOffset":0},{"name":"x","sourceOffset":5},{"name":"y","sourceOffset":6}],
+           "references":[],"diagnostics":[],
+           "retained":{"inner":[{"name":"x","sourceOffset":5},{"name":"y","sourceOffset":6}]}}},
+        {"op":"leave"},
+        {"op":"declare","name":"z","offset":7},
+        {"op":"observe","id":"after-leave","names":["x","y","z"],
+         "expected":{"depth":0,"cursor":[0,0],
+           "resolved":[
+             {"query":"x","declared":true,"symbol":{"name":"x","sourceOffset":0}},
+             {"query":"y","declared":false,"symbol":null},
+             {"query":"z","declared":true,"symbol":{"name":"z","sourceOffset":7}}],
+           "declaredCurrent":[{"name":"x","sourceOffset":0},{"name":"z","sourceOffset":7}],
+           "allDeclarations":[{"name":"x","sourceOffset":0},{"name":"x","sourceOffset":5},{"name":"y","sourceOffset":6},{"name":"z","sourceOffset":7}],
+           "references":[],"diagnostics":[],
+           "retained":{"inner":[{"name":"x","sourceOffset":5},{"name":"y","sourceOffset":6}]}}}
+      ]
+    }]
+  },
+  {
+    "name": "inner-commit-outer-rollback",
+    "source": "abcdef",
+    "runs": [{
+      "id": "main",
+      "operations": [
+        {"op":"declare","name":"stable","offset":0},
+        {"op":"addReference","name":"stable","offset":0,"length":1},
+        {"op":"addDiagnostic","message":"baseline","offset":0,"length":1,"severity":"INFO"},
+        {"op":"transaction","result":"rollback","operations":[
+          {"op":"advance","points":1},
+          {"op":"enter"},
+          {"op":"declare","name":"outer","offset":1},
+          {"op":"addReference","name":"outer","offset":1,"length":1},
+          {"op":"addDiagnostic","message":"outer warning","offset":1,"length":1,"severity":"WARNING"},
+          {"op":"transaction","result":"commit","operations":[
+            {"op":"advance","points":2},
+            {"op":"enter"},
+            {"op":"declare","name":"stable","offset":3},
+            {"op":"declare","name":"inner","offset":3},
+            {"op":"addReference","name":"inner","offset":3,"length":1},
+            {"op":"addDiagnostic","message":"inner error","offset":3,"length":1,"severity":"ERROR"},
+            {"op":"observe","id":"inside-inner","names":["inner","outer","stable"],
+             "expected":{"depth":2,"cursor":[3,3],
+               "resolved":[
+                 {"query":"inner","declared":true,"symbol":{"name":"inner","sourceOffset":3}},
+                 {"query":"outer","declared":true,"symbol":{"name":"outer","sourceOffset":1}},
+                 {"query":"stable","declared":true,"symbol":{"name":"stable","sourceOffset":3}}],
+               "declaredCurrent":[{"name":"inner","sourceOffset":3},{"name":"stable","sourceOffset":3}],
+               "allDeclarations":[{"name":"stable","sourceOffset":0},{"name":"outer","sourceOffset":1},{"name":"stable","sourceOffset":3},{"name":"inner","sourceOffset":3}],
+               "references":[{"name":"stable","offset":0,"length":1},{"name":"outer","offset":1,"length":1},{"name":"inner","offset":3,"length":1}],
+               "diagnostics":[
+                 {"message":"baseline","offset":0,"length":1,"severity":"INFO"},
+                 {"message":"outer warning","offset":1,"length":1,"severity":"WARNING"},
+                 {"message":"inner error","offset":3,"length":1,"severity":"ERROR"}],
+               "retained":{}}}
+          ]},
+          {"op":"observe","id":"inner-committed-to-parent","names":["inner","outer","stable"],
+           "expected":{"depth":2,"cursor":[3,3],
+             "resolved":[
+               {"query":"inner","declared":true,"symbol":{"name":"inner","sourceOffset":3}},
+               {"query":"outer","declared":true,"symbol":{"name":"outer","sourceOffset":1}},
+               {"query":"stable","declared":true,"symbol":{"name":"stable","sourceOffset":3}}],
+             "declaredCurrent":[{"name":"inner","sourceOffset":3},{"name":"stable","sourceOffset":3}],
+             "allDeclarations":[{"name":"stable","sourceOffset":0},{"name":"outer","sourceOffset":1},{"name":"stable","sourceOffset":3},{"name":"inner","sourceOffset":3}],
+             "references":[{"name":"stable","offset":0,"length":1},{"name":"outer","offset":1,"length":1},{"name":"inner","offset":3,"length":1}],
+             "diagnostics":[
+               {"message":"baseline","offset":0,"length":1,"severity":"INFO"},
+               {"message":"outer warning","offset":1,"length":1,"severity":"WARNING"},
+               {"message":"inner error","offset":3,"length":1,"severity":"ERROR"}],
+             "retained":{}}},
+          {"op":"leave"}
+        ]},
+        {"op":"observe","id":"outer-rolled-back","names":["inner","outer","stable"],
+         "expected":{"depth":0,"cursor":[0,0],
+           "resolved":[
+             {"query":"inner","declared":false,"symbol":null},
+             {"query":"outer","declared":false,"symbol":null},
+             {"query":"stable","declared":true,"symbol":{"name":"stable","sourceOffset":0}}],
+           "declaredCurrent":[{"name":"stable","sourceOffset":0}],
+           "allDeclarations":[{"name":"stable","sourceOffset":0}],
+           "references":[{"name":"stable","offset":0,"length":1}],
+           "diagnostics":[{"message":"baseline","offset":0,"length":1,"severity":"INFO"}],
+           "retained":{}}}
+      ]
+    }]
+  },
+  {
+    "name": "lazy-first-mutation-in-active-parent",
+    "source": "abcd",
+    "runs": [{
+      "id": "main",
+      "operations": [
+        {"op":"transaction","result":"rollback","operations":[
+          {"op":"advance","points":1},
+          {"op":"transaction","result":"commit","operations":[
+            {"op":"advance","points":1},
+            {"op":"declare","name":"late","offset":2},
+            {"op":"addReference","name":"late","offset":2,"length":1},
+            {"op":"addDiagnostic","message":"late diagnostic","offset":2,"length":1,"severity":"HINT"},
+            {"op":"enter"},
+            {"op":"declare","name":"nested","offset":2},
+            {"op":"observe","id":"first-store-inside-inner","names":["late","nested"],
+             "expected":{"depth":1,"cursor":[2,2],
+               "resolved":[
+                 {"query":"late","declared":true,"symbol":{"name":"late","sourceOffset":2}},
+                 {"query":"nested","declared":true,"symbol":{"name":"nested","sourceOffset":2}}],
+               "declaredCurrent":[{"name":"nested","sourceOffset":2}],
+               "allDeclarations":[{"name":"late","sourceOffset":2},{"name":"nested","sourceOffset":2}],
+               "references":[{"name":"late","offset":2,"length":1}],
+               "diagnostics":[{"message":"late diagnostic","offset":2,"length":1,"severity":"HINT"}],
+               "retained":{}}},
+            {"op":"leave"}
+          ]},
+          {"op":"observe","id":"inner-commit-visible","names":["late","nested"],
+           "expected":{"depth":0,"cursor":[2,2],
+             "resolved":[
+               {"query":"late","declared":true,"symbol":{"name":"late","sourceOffset":2}},
+               {"query":"nested","declared":false,"symbol":null}],
+             "declaredCurrent":[{"name":"late","sourceOffset":2}],
+             "allDeclarations":[{"name":"late","sourceOffset":2},{"name":"nested","sourceOffset":2}],
+             "references":[{"name":"late","offset":2,"length":1}],
+             "diagnostics":[{"message":"late diagnostic","offset":2,"length":1,"severity":"HINT"}],
+             "retained":{}}}
+        ]},
+        {"op":"observe","id":"outer-removes-lazily-created-store","names":["late","nested"],
+         "expected":{"depth":0,"cursor":[0,0],
+           "resolved":[
+             {"query":"late","declared":false,"symbol":null},
+             {"query":"nested","declared":false,"symbol":null}],
+           "declaredCurrent":[],"allDeclarations":[],"references":[],"diagnostics":[],"retained":{}}}
+      ]
+    }]
+  },
+  {
+    "name": "commit-retains-all-state",
+    "source": "abcd",
+    "runs": [{
+      "id": "main",
+      "operations": [
+        {"op":"transaction","result":"commit","operations":[
+          {"op":"advance","points":2},
+          {"op":"enter"},
+          {"op":"declare","name":"scoped","offset":1},
+          {"op":"addReference","name":"scoped","offset":1,"length":1},
+          {"op":"addDiagnostic","message":"committed error","offset":1,"length":1,"severity":"ERROR"},
+          {"op":"leave"},
+          {"op":"declare","name":"global","offset":2}
+        ]},
+        {"op":"observe","id":"committed","names":["global","scoped"],
+         "expected":{"depth":0,"cursor":[2,2],
+           "resolved":[
+             {"query":"global","declared":true,"symbol":{"name":"global","sourceOffset":2}},
+             {"query":"scoped","declared":false,"symbol":null}],
+           "declaredCurrent":[{"name":"global","sourceOffset":2}],
+           "allDeclarations":[{"name":"scoped","sourceOffset":1},{"name":"global","sourceOffset":2}],
+           "references":[{"name":"scoped","offset":1,"length":1}],
+           "diagnostics":[{"message":"committed error","offset":1,"length":1,"severity":"ERROR"}],
+           "retained":{}}}
+      ]
+    }]
+  },
+  {
+    "name": "clear-diagnostics-is-transactional",
+    "source": "",
+    "runs": [{
+      "id": "main",
+      "operations": [
+        {"op":"addDiagnostic","message":"original","offset":0,"length":1,"severity":"WARNING"},
+        {"op":"transaction","result":"rollback","operations":[
+          {"op":"clearDiagnostics"},
+          {"op":"addDiagnostic","message":"temporary","offset":1,"length":2,"severity":"ERROR"},
+          {"op":"observe","id":"cleared-inside-rollback","names":[],
+           "expected":{"depth":0,"cursor":[0,0],"resolved":[],"declaredCurrent":[],"allDeclarations":[],"references":[],
+             "diagnostics":[{"message":"temporary","offset":1,"length":2,"severity":"ERROR"}],"retained":{}}}
+        ]},
+        {"op":"observe","id":"rollback-restores-original","names":[],
+         "expected":{"depth":0,"cursor":[0,0],"resolved":[],"declaredCurrent":[],"allDeclarations":[],"references":[],
+           "diagnostics":[{"message":"original","offset":0,"length":1,"severity":"WARNING"}],"retained":{}}},
+        {"op":"transaction","result":"commit","operations":[
+          {"op":"clearDiagnostics"},
+          {"op":"addDiagnostic","message":"committed","offset":2,"length":3,"severity":"HINT"}
+        ]},
+        {"op":"observe","id":"commit-keeps-clear","names":[],
+         "expected":{"depth":0,"cursor":[0,0],"resolved":[],"declaredCurrent":[],"allDeclarations":[],"references":[],
+           "diagnostics":[{"message":"committed","offset":2,"length":3,"severity":"HINT"}],"retained":{}}}
+      ]
+    }]
+  },
+  {
+    "name": "parse-contexts-are-independent",
+    "source": "",
+    "runs": [
+      {"id":"first","operations":[
+        {"op":"declare","name":"only-first","offset":1},
+        {"op":"addReference","name":"only-first","offset":1,"length":1},
+        {"op":"observe","id":"populated","names":["only-first"],
+         "expected":{"depth":0,"cursor":[0,0],
+           "resolved":[{"query":"only-first","declared":true,"symbol":{"name":"only-first","sourceOffset":1}}],
+           "declaredCurrent":[{"name":"only-first","sourceOffset":1}],
+           "allDeclarations":[{"name":"only-first","sourceOffset":1}],
+           "references":[{"name":"only-first","offset":1,"length":1}],"diagnostics":[],"retained":{}}}
+      ]},
+      {"id":"second","operations":[
+        {"op":"observe","id":"fresh","names":["only-first"],
+         "expected":{"depth":0,"cursor":[0,0],
+           "resolved":[{"query":"only-first","declared":false,"symbol":null}],
+           "declaredCurrent":[],"allDeclarations":[],"references":[],"diagnostics":[],"retained":{}}}
+      ]}
+    ]
+  },
+  {
+    "name": "non-bmp-code-point-positions",
+    "source": "a😀bc",
+    "runs": [{
+      "id": "main",
+      "operations": [
+        {"op":"transaction","result":"commit","operations":[
+          {"op":"advance","points":2},
+          {"op":"declare","name":"😀symbol","offset":1},
+          {"op":"addReference","name":"😀symbol","offset":1,"length":1},
+          {"op":"addDiagnostic","message":"😀 diagnostic","offset":1,"length":1,"severity":"INFO"}
+        ]},
+        {"op":"observe","id":"code-points-not-utf16-or-bytes","names":["😀symbol"],
+         "expected":{"depth":0,"cursor":[2,2],
+           "resolved":[{"query":"😀symbol","declared":true,"symbol":{"name":"😀symbol","sourceOffset":1}}],
+           "declaredCurrent":[{"name":"😀symbol","sourceOffset":1}],
+           "allDeclarations":[{"name":"😀symbol","sourceOffset":1}],
+           "references":[{"name":"😀symbol","offset":1,"length":1}],
+           "diagnostics":[{"message":"😀 diagnostic","offset":1,"length":1,"severity":"INFO"}],"retained":{}}}
+      ]
+    }]
+  }
+]

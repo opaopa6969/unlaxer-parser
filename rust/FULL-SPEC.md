@@ -32,7 +32,8 @@
 | leftAssoc/rightAssoc/precedence | canonical leftAssocとrightAssoc、precedence metadata、schemaを統合したshared mapping、混在factorを生成 | 左辺＋op/right列と右再帰、文法階層による優先順位を検証。非canonical右結合形、Javaの特殊null/literal leafとRust AstValueの構造互換は未完了。Java raw CST反復欠落 #138・右結合 #139 は独立修正 |
 | backref・MatchedToken相当 | context-wide replayのみ | UBNF annotation、名前の寿命・入れ子・伝播、コピー言語のpositive/negative test |
 | PropagationStopper・consume/invert・virtual token・metadata | 未対応 | 有限状態の全合成検査、8元モデルとの対応、実parserとの統合試験 |
-| scopeTree/declares/catalog/doc/skip/simple等 | 未対応 | 各annotationのJava実動作を確認し、生成metadataと利用先を検証 |
+| lexical scope store・宣言/参照/semantic diagnostics | Java rollback修正とRust公開ParseContextへのtransactional store接続（#174）。runtimeのみ | scope depth/lookup/shadowing/イベント履歴/失敗時復元を共通operation corpusで比較。Rust生成annotation接続やAST/IDEへのmetadata搬送は未完了 |
+| scopeTree/declares/catalog/doc/skip/simple等 | Rust生成annotation未対応（scope store runtime基盤とは区別） | 各annotationのJava実動作を確認し、生成metadataと利用先を検証 |
 | recovery・incremental cache | 未対応 | 編集差分と全再解析の一致、位置・診断・利用者状態の無効化、回復後の評価境界 |
 | LSP/DAP | 未対応 | UTF-16変換、diagnostics/completion、breakpoint/step/変数表示を実protocolで検証 |
 | tinyexpression-rs | 未対応 | 値・null/欠損・変数・演算子・関数・外部呼出し・日時/数値仕様を棚卸しし、同一入力で値/失敗分類を比較 |
@@ -58,6 +59,7 @@ tinyexpressionのStringLiteral対応（#168）は[実クラスとの比較・字
 これは既存FQN bindingの移行であり、汎用token adapter契約 #158 の完了ではない。
 CodeStart/CodeEnd対応（#170）の[行境界・字句契約と実行機能との区別](../docs/tiny-code-fence.md)も参照。
 rule-level trivia（#172）の[契約と Java global none の移行](../docs/rule-trivia.md)も参照。
+transactional scope store（#174）の[rollback契約とruntime API](../docs/transactional-scopes.md)も参照。
 
 parser生成は当面`Expr`combinator定義を生成し、共通runtimeで実行する。直接parser関数を出力する高速化backendは、その意味論との同値性を測定できてから検討する。Rustでビルドされた実行ファイルであることは、入力式を機械語にコンパイルしていることを意味しない。
 

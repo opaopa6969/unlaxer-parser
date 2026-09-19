@@ -31,6 +31,10 @@ import org.unlaxer.dsl.bootstrap.UBNFMapper;
 import org.unlaxer.dsl.runtime.ScopeStore;
 import org.unlaxer.dsl.runtime.ScopeStore.Severity;
 import org.unlaxer.parser.Parser;
+import org.unlaxer.TokenKind;
+import org.unlaxer.parser.combinator.Chain;
+import org.unlaxer.parser.combinator.Choice;
+import org.unlaxer.parser.elementary.WordParser;
 
 /**
  * End-to-end regression coverage for generated scope annotation listeners.
@@ -93,6 +97,39 @@ public class ScopeAnnotationsEndToEndTest {
             ScopeAnnotationsEndToEndTest.class.getClassLoader());
         generatedParsersClass = loader.loadClass(
             "org.unlaxer.dsl.generated.scopee2e.ScopeE2EParsers");
+    }
+
+    @Test
+    public void generatedAnnotationsAreDiscardedWhenAnEnclosingAlternativeFails() throws Exception {
+        String input = "let known; known missing";
+        Parser failed = new Chain(rootParser(), new WordParser("!"));
+        try (ParseContext ctx = new ParseContext(StringSource.createRootSource(input))) {
+            assertTrue(new Choice(failed, new WordParser(input)).parse(ctx).isSucceeded());
+            assertTrue(ctx.allConsumed());
+            assertEquals(0, ScopeStore.currentScopeDepth(ctx));
+            assertTrue(ScopeStore.getAllDeclarations(ctx).isEmpty());
+            assertTrue(ScopeStore.getAllReferences(ctx).isEmpty());
+            assertTrue(ScopeStore.getDiagnostics(ctx).isEmpty());
+        }
+    }
+
+    @Test
+    public void generatedCommittedScopesRemainReversibleByTheirParent() throws Exception {
+        Parser root = rootParser();
+        try (ParseContext ctx = new ParseContext(StringSource.createRootSource("let known; known missing"))) {
+            ctx.begin(root);
+            ctx.begin(root);
+            assertTrue(root.parse(ctx).isSucceeded());
+            ctx.commit(root, TokenKind.consumed);
+            assertEquals(1, ScopeStore.getAllDeclarations(ctx).size());
+            assertEquals(2, ScopeStore.getAllReferences(ctx).size());
+            assertEquals(1, ScopeStore.getDiagnostics(ctx).size());
+            ctx.rollback(root);
+            assertEquals(0, ScopeStore.currentScopeDepth(ctx));
+            assertTrue(ScopeStore.getAllDeclarations(ctx).isEmpty());
+            assertTrue(ScopeStore.getAllReferences(ctx).isEmpty());
+            assertTrue(ScopeStore.getDiagnostics(ctx).isEmpty());
+        }
     }
 
     @Test

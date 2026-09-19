@@ -12,7 +12,7 @@ import java.util.Optional;
 import org.unlaxer.Name;
 import org.unlaxer.TokenList;
 import org.unlaxer.context.ParseContext;
-import org.unlaxer.listener.OutputLevel;
+import org.unlaxer.context.TransactionalState;
 import org.unlaxer.listener.TransactionListener;
 import org.unlaxer.parser.Parser;
 
@@ -23,9 +23,11 @@ import org.unlaxer.parser.Parser;
  * <p>レキシカルスコープのネスト管理と、スコープ内のシンボル宣言・参照解決を担う。
  * {@link ParseContext#getGlobalScopeTreeMap()} を介してパースコンテキストに紐付けられる。
  *
- * <p>スコープスタックは {@code ParseContext} のスナップショット機構と連携する。
- * {@code enter()} / {@code leave()} / {@code declare()} の変更は
- * パーサーのロールバック時に自動的に巻き戻される。
+ * <p>{@link ParseContext#registerTransactionalState(TransactionalState)} で所有状態を登録する。
+ * スコープの push/pop、宣言、参照、診断の変更はパーサーのロールバック時に
+ * 自動的に巻き戻される。初回利用がトランザクション内でも親の rollback に対応する。
+ * {@code MatchOnly} / {@code Not} の先読み境界では、成功時にも状態を復元する。
+ * 任意の {@code globalScopeTreeMap} の値をコピーする仕組みではない。
  *
  * <h2>生成パーサーからの利用（@scopeTree 付きルール）</h2>
  * <pre>
@@ -86,8 +88,7 @@ public final class ScopeStore {
         // 登録すると二重通知になるので何もしない。
     }
 
-    /** globalScopeTreeMap のキー（スコープスタック） */
-    private static final Name SCOPE_STACK_KEY = Name.of(ScopeStore.class, "scopeStack");
+    private static final Name STATE_KEY = Name.of(ScopeStore.class, "transactionalState");
 
     // =========================================================================
     // スコープ管理
@@ -181,8 +182,6 @@ public final class ScopeStore {
     // セマンティック diagnostics
     // =========================================================================
 
-    private static final Name DIAGNOSTICS_KEY = Name.of(ScopeStore.class, "diagnostics");
-
     /**
      * セマンティック診断情報（未定義シンボルなど）を追加する。
      * パース後に {@link #getDiagnostics(ParseContext)} で取得できる。
@@ -200,6 +199,7 @@ public final class ScopeStore {
     /**
      * パース中に蓄積された diagnostics を返す。
      * LSP diagnostics プロバイダや evaluator から呼ぶ。
+     * 変更不可のライブビューであり、後続の変更・ロールバックも反映する。
      */
     public static List<SymbolDiagnostic> getDiagnostics(ParseContext ctx) {
         return Collections.unmodifiableList(getDiagnosticsInternal(ctx));
@@ -210,38 +210,31 @@ public final class ScopeStore {
         getDiagnosticsInternal(ctx).clear();
     }
 
-    @SuppressWarnings("unchecked")
     private static List<SymbolDiagnostic> getDiagnosticsInternal(ParseContext ctx) {
-        return (List<SymbolDiagnostic>) ctx.getGlobalScopeTreeMap()
-            .computeIfAbsent(DIAGNOSTICS_KEY, k -> new ArrayList<>());
+        return state(ctx).diagnostics;
     }
 
     // =========================================================================
     // 宣言一覧（go-to-definition 用フラットリスト）
     // =========================================================================
 
-    private static final Name ALL_DECLARATIONS_KEY = Name.of(ScopeStore.class, "allDeclarations");
-
     /**
      * パース中に {@link #declare} で登録されたすべての宣言をフラットリストで返す。
      * スコープが閉じた後でも参照可能。
      * LSP の go-to-definition で使用する。
+     * 変更不可のライブビューであり、後続の変更・ロールバックも反映する。
      */
     public static List<SymbolInfo> getAllDeclarations(ParseContext ctx) {
         return Collections.unmodifiableList(getAllDeclarationsInternal(ctx));
     }
 
-    @SuppressWarnings("unchecked")
     private static List<SymbolInfo> getAllDeclarationsInternal(ParseContext ctx) {
-        return (List<SymbolInfo>) ctx.getGlobalScopeTreeMap()
-            .computeIfAbsent(ALL_DECLARATIONS_KEY, k -> new ArrayList<>());
+        return state(ctx).declarations;
     }
 
     // =========================================================================
     // 参照一覧（find-references 用フラットリスト）
     // =========================================================================
-
-    private static final Name ALL_REFERENCES_KEY = Name.of(ScopeStore.class, "allReferences");
 
     /**
      * @backref ルールが参照したシンボルを記録する（生成パーサーの onCommit から呼ぶ）。
@@ -259,36 +252,66 @@ public final class ScopeStore {
     /**
      * パース中に記録されたすべての参照をフラットリストで返す。
      * LSP の find-references で使用する。
+     * 変更不可のライブビューであり、後続の変更・ロールバックも反映する。
      */
     public static List<ReferenceInfo> getAllReferences(ParseContext ctx) {
         return Collections.unmodifiableList(getAllReferencesInternal(ctx));
     }
 
-    @SuppressWarnings("unchecked")
     private static List<ReferenceInfo> getAllReferencesInternal(ParseContext ctx) {
-        return (List<ReferenceInfo>) ctx.getGlobalScopeTreeMap()
-            .computeIfAbsent(ALL_REFERENCES_KEY, k -> new ArrayList<>());
+        return state(ctx).references;
     }
 
     // =========================================================================
     // 内部
     // =========================================================================
 
-    @SuppressWarnings("unchecked")
     private static Deque<Map<String, SymbolInfo>> getStack(ParseContext ctx) {
-        // globalScopeTreeMap は ParseContext.Snapshot によりロールバック時に復元される。
-        // Deque 自体の参照はスナップショット時に浅いコピーされるが、
-        // enter/leave は新しい HashMap を push/pop するだけなのでスナップショット整合性を保てる。
-        return (Deque<Map<String, SymbolInfo>>) ctx.getGlobalScopeTreeMap()
-            .computeIfAbsent(SCOPE_STACK_KEY, k -> new ArrayDeque<>());
+        return state(ctx).stack;
     }
 
-    private static final Name GLOBAL_SCOPE_KEY = Name.of(ScopeStore.class, "globalScope");
-
-    @SuppressWarnings("unchecked")
     private static Map<String, SymbolInfo> getGlobalScope(ParseContext ctx) {
-        return (Map<String, SymbolInfo>) ctx.getGlobalScopeTreeMap()
-            .computeIfAbsent(GLOBAL_SCOPE_KEY, k -> new HashMap<>());
+        return state(ctx).global;
+    }
+
+    private static State state(ParseContext ctx) {
+        return (State) ctx.getGlobalScopeTreeMap().computeIfAbsent(STATE_KEY, key -> {
+            State state = new State();
+            // Register the empty baseline before the first mutation, including all
+            // open parent transactions when first used from a nested parser.
+            ctx.registerTransactionalState(state);
+            return state;
+        });
+    }
+
+    private static final class State implements TransactionalState {
+        final Deque<Map<String, SymbolInfo>> stack = new ArrayDeque<>();
+        final Map<String, SymbolInfo> global = new HashMap<>();
+        final List<SymbolInfo> declarations = new ArrayList<>();
+        final List<ReferenceInfo> references = new ArrayList<>();
+        final List<SymbolDiagnostic> diagnostics = new ArrayList<>();
+
+        @Override public Runnable checkpoint() {
+            List<Map<String, SymbolInfo>> savedStack = stack.stream()
+                .<Map<String, SymbolInfo>>map(HashMap::new).toList();
+            Map<String, SymbolInfo> savedGlobal = new HashMap<>(global);
+            List<SymbolInfo> savedDeclarations = List.copyOf(declarations);
+            List<ReferenceInfo> savedReferences = List.copyOf(references);
+            List<SymbolDiagnostic> savedDiagnostics = List.copyOf(diagnostics);
+            return () -> {
+                stack.clear();
+                savedStack.forEach(scope -> stack.addLast(new HashMap<>(scope)));
+                global.clear();
+                global.putAll(savedGlobal);
+                // Retain list identity so existing unmodifiable live views observe rollback.
+                declarations.clear();
+                declarations.addAll(savedDeclarations);
+                references.clear();
+                references.addAll(savedReferences);
+                diagnostics.clear();
+                diagnostics.addAll(savedDiagnostics);
+            };
+        }
     }
 
     // =========================================================================

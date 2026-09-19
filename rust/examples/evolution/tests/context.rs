@@ -2,7 +2,7 @@ use unlaxer_evolution_example::{
     generated::{evaluator::evaluate, mapper, parser},
     semantics::Calculator,
 };
-use unlaxer_runtime::{Expr, ParseContext, Span};
+use unlaxer_runtime::{Expr, ParseContext, ParseResult, Severity, Span};
 
 #[test]
 fn generated_parser_shares_context_with_handwritten_parsers() {
@@ -44,4 +44,43 @@ fn generated_parser_rolls_back_inside_a_failed_custom_branch() {
         evaluate(&mapper::map(&tree).unwrap(), &mut Calculator),
         Ok(5.0)
     );
+}
+
+#[test]
+fn generated_parser_and_custom_semantic_events_share_a_transaction() {
+    fn record_expression(context: &mut ParseContext<'_>) -> ParseResult {
+        assert!(context.scopes().is_declared("host"));
+        let matched = context.parse(&parser::GeneratedParser)?;
+        context
+            .scopes_mut()
+            .declare("expression", matched.span.start);
+        context.scopes_mut().add_reference(
+            "host",
+            matched.span.start,
+            matched.span.end - matched.span.start,
+        );
+        context
+            .scopes_mut()
+            .add_diagnostic("parsed", matched.span.start, 0, Severity::Info);
+        Ok(matched)
+    }
+    let mut context = ParseContext::new("2+3");
+    context.scopes_mut().declare("host", 0);
+    let before = context.scopes().clone();
+    let branch = Expr::Custom(record_expression).then(Expr::literal("!"));
+    assert!(context.parse(&branch).is_err());
+    assert_eq!(context.scopes(), &before);
+    assert_eq!((context.position(), context.matched_position()), (0, 0));
+    assert!(context.node(0).is_none());
+
+    let matched = context.parse(&Expr::Custom(record_expression)).unwrap();
+    let tree = context.tree(matched.root_node().unwrap()).unwrap();
+    let events = context.scopes().clone();
+    drop(context);
+    let ast = mapper::map(&tree).unwrap();
+    drop(tree);
+    assert_eq!(evaluate(&ast, &mut Calculator), Ok(5.0));
+    assert_eq!(events.all_declarations().len(), 2);
+    assert_eq!(events.all_references()[0].length, 3);
+    assert_eq!(events.diagnostics()[0].message, "parsed");
 }
