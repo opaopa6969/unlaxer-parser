@@ -73,6 +73,24 @@ public class RustBackendTest {
         }
     }
 
+    @Test public void lexicalBindingsUseAnExplicitAllowlistAndEofStaysNullable() {
+        for (String parser : new String[]{"IdentifierParser", "org.unlaxer.parser.clang.IdentifierParser",
+                "SingleQuotedParser", "org.unlaxer.parser.elementary.SingleQuotedParser",
+                "DoubleQuotedParser", "org.unlaxer.parser.elementary.DoubleQuotedParser",
+                "EndOfSourceParser", "org.unlaxer.parser.elementary.EndOfSourceParser"}) {
+            String source = SIMPLE.replace("grammar Example {", "grammar Example { token T = " + parser + "\n")
+                .replace("'hello' @value", "T @value");
+            assertEquals(5, new RustBackend().generate(UBNFMapper.parse(source).grammars().get(0)).size());
+            if (parser.endsWith("EndOfSourceParser")) {
+                reject(source.replace("T @value", "{ T } 'x' @value"), "nullable unbounded");
+                reject(source.replace("T @value", "T Root @value"), "left recursion");
+            }
+        }
+        for (String parser : new String[]{"other.IdentifierParser", "StringLiteralParser", "QuotedParser"}) {
+            reject(SIMPLE.replace("grammar Example {", "grammar Example { token T = " + parser + "\n"), "external token");
+        }
+    }
+
     @Test public void cardinalityReachesAstAndSemantics() {
         for (String expression : new String[]{"[ 'hello' ] @value", "[ 'hello' @value ]", "('hello' @value | 'bye')"}) {
             var files = new RustBackend().generate(UBNFMapper.parse(SIMPLE.replace("'hello' @value", expression)).grammars().get(0));

@@ -1,0 +1,62 @@
+[
+  {"token":"IdentifierParser", "body":"T @value", "cases":[
+    {"input":"a", "value":"a", "prefix":[true,1,1]},
+    {"input":"_A09z", "value":"_A09z"}, {"input":"if", "value":"if"},
+    {"input":"", "prefix":[false,0,0]}, {"input":"1a"}, {"input":"$x"},
+    {"input":"é"}, {"input":"あ"}, {"input":"😀"},
+    {"input":"aé", "prefix":[true,1,1]}, {"input":"a b", "prefix":[true,1,1]}]},
+  {"token":"org.unlaxer.parser.clang.IdentifierParser", "body":"T @value", "whitespace":true, "cases":[
+    {"input":" /*intro*/ hello_2 /*end*/ ", "value":"hello_2"}, {"input":"a/*c*/b", "prefix":[true,6,6]}]},
+  {"token":"IdentifierParser", "body":"(T | 'none')+ @value", "whitespace":true, "cases":[
+    {"input":"a b _c9", "value":["a","b","_c9"]}, {"input":"a /*c*/b", "value":["a","b"]}]},
+  {"token":"IdentifierParser", "body":"[ T @value ] '!'", "cases":[
+    {"input":"!", "value":null}, {"input":"a!", "value":"a"}, {"input":"1!"}]},
+  {"token":"SingleQuotedParser", "body":"T @value", "cases":[
+    {"input":"''", "value":""}, {"input":"'abc'", "value":"abc"},
+    {"input":"'😀あ'", "value":"😀あ", "prefix":[true,4,4]},
+    {"input":"'a\nb'", "value":"a\nb"}, {"input":"'a\r\nb'", "value":"a\r\nb"},
+    {"input":"'\u0000'", "value":"\u0000"},
+    {"input":"'\\q'", "value":"\\q"}, {"input":"'\\n'", "value":"\\n"},
+    {"input":"'\\u0041'", "value":"\\u0041"}, {"input":"'\\😀'", "value":"\\😀"},
+    {"input":"'a\\'b'", "value":"a\\'b"}, {"input":"'\\\\'", "value":"\\\\"},
+    {"input":"'\\\n'", "value":"\\\n"}, {"input":"'\"'", "value":"\""},
+    {"input":""}, {"input":"'"}, {"input":"'abc"}, {"input":"'abc\\"},
+    {"input":"'abc\\'"}, {"input":"\"abc\""}, {"input":"'a'b", "prefix":[true,3,3]}]},
+  {"token":"DoubleQuotedParser", "body":"T @value", "cases":[
+    {"input":"\"\"", "value":"\"\""}, {"input":"\"😀\"", "value":"\"😀\"", "prefix":[true,3,3]},
+    {"input":"\"a\\\"b\"", "value":"\"a\\\"b\""}, {"input":"\"\\q\"", "value":"\"\\q\""},
+    {"input":"\"\\😀\"", "value":"\"\\😀\""}, {"input":"\"a\nb\"", "value":"\"a\nb\""},
+    {"input":"'a'"}, {"input":"\""}, {"input":"\"abc\\\""}]},
+  {"token":"org.unlaxer.parser.elementary.SingleQuotedParser", "body":"T @value", "whitespace":true, "cases":[
+    {"input":" /*c*/ 'a /*inside*/' /*tail*/ ", "value":"a /*inside*/"}]},
+  {"token":"org.unlaxer.parser.elementary.DoubleQuotedParser", "body":"T @value", "whitespace":true, "cases":[
+    {"input":" \" a \" //tail", "value":"\" a \""}]},
+  {"token":"SingleQuotedParser", "body":"(T | 'none')+ @value", "whitespace":true, "cases":[
+    {"input":"'a' /*c*/ 'b'", "value":["a","b"]}, {"input":"none 'b'", "value":["none","b"]}, {"input":"'a' 'b"}]},
+  {"token":"DoubleQuotedParser", "body":"[ T @value ] '!'", "cases":[
+    {"input":"!", "value":null}, {"input":"\"a\"!", "value":"\"a\""}, {"input":"\"a!"}]},
+  {"token":"SingleQuotedParser", "extra":"token D = DoubleQuotedParser", "body":"(T | D) @value", "cases":[
+    {"input":"'a'", "value":"a"}, {"input":"\"b\"", "value":"\"b\""}, {"input":"'a\""}]},
+  {"token":"EndOfSourceParser", "body":"T @value", "cases":[
+    {"input":"", "value":"", "prefix":[true,0,0]}, {"input":"a", "prefix":[false,0,0]}]},
+  {"token":"org.unlaxer.parser.elementary.EndOfSourceParser", "body":"'a' T @value", "cases":[
+    {"input":"a", "value":""}, {"input":"ab"}]},
+  {"token":"IdentifierParser", "extra":"token L = LOOKAHEAD('a') token N = LOOKAHEAD('b')", "body":"L [ T ] N 'ab' @value", "cases":[
+    {"input":"ab", "prefix":[false,0,0]}]},
+  {"token":"SingleQuotedParser", "extra":"token L = LOOKAHEAD('a') token N = LOOKAHEAD('b')", "body":"L [ T ] N 'ab' @value", "cases":[
+    {"input":"ab", "value":"ab", "prefix":[true,2,2]}]},
+  {"token":"IdentifierParser", "body":"T+ @value", "whitespace":true, "cases":[
+    {"input":"a", "value":["a"]}, {"input":"a b", "prefix":[true,2,2]}]},
+  {"token":"SingleQuotedParser", "body":"T+ @value", "whitespace":true, "cases":[
+    {"input":"'a''b'", "value":["a","b"]}, {"input":"'a' 'b'", "prefix":[true,4,4]}]},
+  {"token":"SingleQuotedParser", "extra":"@mapping(Item, params=[text]) Part ::= T @text;", "body":"'😀' Part @value", "cases":[
+    {"input":"😀'a'", "value":{"type":"Item", "span":[1,4], "fields":{"text":"a"}}}]},
+  {"token":"SingleQuotedParser", "body":"T @value", "cases":[
+    {"input":"' '", "value":" "}, {"input":"'\\\\\\'x'", "value":"\\\\\\'x"}]},
+  {"token":"IdentifierParser", "body":"(T ':' T) @value", "cases":[
+    {"input":"a:b", "value":"a:b"}, {"input":"a:", "prefix":[false,0,0]}]},
+  {"token":"IdentifierParser", "body":"(T | '!') @value", "cases":[
+    {"input":"a", "value":"a"}, {"input":"!", "value":"!"}, {"input":""}]},
+  {"token":"IdentifierParser", "extra":"@mapping(Item) Part ::= T;", "body":"'[' Part @value ']'", "cases":[
+    {"input":"[alpha]", "value":{"type":"Item", "span":[1,6], "fields":{}}}]}
+]

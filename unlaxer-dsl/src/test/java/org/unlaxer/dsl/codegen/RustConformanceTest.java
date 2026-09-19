@@ -30,11 +30,19 @@ public class RustConformanceTest {
     private final Path repo = Path.of("..").toAbsolutePath().normalize();
 
     @Test public void primitiveTokensPreserveCapturesAndCodePointSpans() throws Exception {
+        tokenCorpus("primitives");
+    }
+
+    @Test public void lexicalTokensPreserveRawTextAndCodePointSpans() throws Exception {
+        tokenCorpus("lexical");
+    }
+
+    private void tokenCorpus(String corpusName) throws Exception {
         assumeTrue("enable with -DrustConformance=true (requires rustc)", Boolean.getBoolean("rustConformance"));
         Path library = temporary.getRoot().toPath().resolve("libunlaxer_runtime.rlib");
         success(run(List.of("rustc", "--edition=2021", "--crate-type=rlib", "--crate-name=unlaxer_runtime",
             repo.resolve("rust/unlaxer-runtime/src/lib.rs").toString(), "-o", library.toString()), ""));
-        var corpus = JsonParser.parseString(Files.readString(repo.resolve("unlaxer-dsl/src/test/resources/primitives/corpus.json"))).getAsJsonArray();
+        var corpus = JsonParser.parseString(Files.readString(repo.resolve("unlaxer-dsl/src/test/resources/" + corpusName + "/corpus.json"))).getAsJsonArray();
         var report = new ArrayList<>(List.of("token\tbody\tinput_json\tjava_prefix\tjava_ast\trust"));
         for (var entry : corpus) {
             var fixture = entry.getAsJsonObject();
@@ -53,7 +61,11 @@ public class RustConformanceTest {
                 use std::io::{self, BufRead};
                 fn main() {
                     for line in io::stdin().lock().lines() {
-                        let input = line.unwrap();
+                        // Hex framing transports embedded newlines/NUL without changing the input.
+                        let encoded = line.unwrap();
+                        let bytes = (0..encoded.len()).step_by(2)
+                            .map(|i| u8::from_str_radix(&encoded[i..i+2], 16).unwrap()).collect();
+                        let input = String::from_utf8(bytes).unwrap();
                         let mut context = unlaxer_runtime::ParseContext::new(&input);
                         let prefix_ok = generated::parser::parse_context(&mut context).is_ok();
                         print!(r#"{{"prefix":[{},{},{}],"ast":"#, prefix_ok, context.position(), context.matched_position());
@@ -72,7 +84,8 @@ public class RustConformanceTest {
             success(rustCompile(dir, library));
             var cases = fixture.getAsJsonArray("cases");
             var actual = run(List.of(dir.resolve("probe").toString()), String.join("\n", cases.asList().stream()
-                .map(row -> row.getAsJsonObject().get("input").getAsString()).toList()) + "\n");
+                .map(row -> java.util.HexFormat.of().formatHex(row.getAsJsonObject().get("input").getAsString()
+                    .getBytes(StandardCharsets.UTF_8))).toList()) + "\n");
             success(actual);
             var lines = actual.output().lines().toList();
             assertEquals(declaration, cases.size(), lines.size());
@@ -114,7 +127,7 @@ public class RustConformanceTest {
                 }
             }
         }
-        Files.write(Path.of("target/rust-primitives.tsv"), report, StandardCharsets.UTF_8);
+        Files.write(Path.of("target/rust-" + corpusName + ".tsv"), report, StandardCharsets.UTF_8);
     }
 
     @Test public void capturePlacementAndTransparentCollectionsAreExecutable() throws Exception {

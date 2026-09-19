@@ -13,17 +13,18 @@
 
 | 機能群 | 現状 | 追加の受け入れ条件 |
 |---|---|---|
-| Java UBNF frontend → Rust generator | 限定範囲で生成済み | 全構文・annotationのpositive/negative fixture、未対応の明示拒否、再生成一致 |
+| Java UBNF frontend → Rust generator | 限定範囲で生成済み。隣接参照の識別子境界 #131 修正 | 全構文・annotationのpositive/negative fixture、未対応の明示拒否、再生成一致 |
 | 公開ParseContext・custom parser | runtimeと生成入口を実装 | 共有入力・Unicode位置・typed状態・CST/captureのrollback、先読み、生成parser混在を継続検証 |
 | literal・参照・sequence・ordered choice・group | 生成済み | optional経由の再帰等も検証し、非消費ループを拒否 |
 | optional・0/1回以上・bounded repeat・separated | UBNF生成・Option/Vec AST・mapper・Semantics実装 | 70ケースの受理一致、20成功ケースのJava/Rust AST全field・全span一致、Rust評価値oracle。外側captureの入れ子container型は両backendとも未完了 |
 | ANY/EOF/EMPTY/CHAR_RANGE/NEGATION/UNTIL/LOOKAHEAD/NEGATIVE_LOOKAHEAD | UBNF生成とJava互換Expr・両cursorを実装 | 48文法・109入力でprefix受理/両cursorと全入力受理が一致、受理56入力のAST/spanも独立fixtureに一致。汎用consume/invert伝播と全CST同値は未完了 |
 | error | runtimeのみ | UBNF接続・診断位置/候補と回復境界の比較 |
 | Number token | 限定生成済み | 不完全指数の診断差を記録済み。数値型・overflow・triviaを実言語仕様に合わせる |
-| Identifier・引用文字列・CASE_INSENSITIVE・REGEX・外部token | 未対応 | Unicode/escape/regex方言を確定。任意Java parserクラスはRust実装または明示adapterを要求 |
+| Identifier・Single/DoubleQuoted・EndOfSource token binding | UBNF生成・runtime実装 | 22文法78入力の受理/両cursor比較と受理48 AST/spanのfixture。ASCII identifier、生escape、single quoteだけ除去するJava mapper契約。tinyexpression文字列評価は別途検証 |
+| CASE_INSENSITIVE・REGEX・任意外部token | 未対応 | Unicode/regex方言を確定。任意Java parserクラスとtinyexpression固有bindingはRust実装または明示adapterを要求 |
 | imports・複数grammar・namespace・global/rule trivia・interleave | 一部のみ | 現在は単一grammarとglobal javaStyle/none。依存解決・循環・文法別ID・局所設定を検証 |
-| mapping・capture・source-preserving AST | scalar/optional/list/group生成済み。Java位置binding不具合#116修正 | 入れ子container型、再帰的unmapped rule、異種choice、params無しtoken alias、typeof/commonField/enum、全Java capture規則との互換性 |
-| evaluator dispatch・網羅性 | 生成済み | 新nodeのE0004/E0046検証を拡張。eval annotation、型境界、短絡評価を追加 |
+| mapping・capture・source-preserving AST | scalar/optional/list/group生成済み。Java位置binding #116・zero-field生成 #129・複合text capture #132を修正 | 入れ子container型、再帰的unmapped rule、mapped alias/sumのbackend間契約、異種choice、typeof/commonField/enum、全Java capture規則との互換性 |
+| evaluator dispatch・網羅性 | 限定範囲で生成済み | 新nodeのE0004/E0046検証を拡張。eval annotation、型境界、短絡評価を追加。Java sum/dotted evaluatorの既知不具合 #130 は別修正 |
 | leftAssoc/rightAssoc/precedence | 未対応 | ASTの結合方向・演算順・位置・不正文法をJavaと比較 |
 | backref・MatchedToken相当 | context-wide replayのみ | UBNF annotation、名前の寿命・入れ子・伝播、コピー言語のpositive/negative test |
 | PropagationStopper・consume/invert・virtual token・metadata | 未対応 | 有限状態の全合成検査、8元モデルとの対応、実parserとの統合試験 |

@@ -89,6 +89,8 @@ public final class RustBackend {
         return switch (expression) {
             case Literal literal -> "Expr::Literal(" + quote(literal.text()) + ")";
             case NumberToken ignored -> "Expr::Number";
+            case IdentifierToken ignored -> "Expr::Identifier";
+            case QuotedToken quoted -> "Expr::Quoted('\\u{" + Integer.toHexString(quoted.quote()) + "}')";
             case AnyToken ignored -> "Expr::Any";
             case EofToken ignored -> "Expr::Eof";
             case EmptyToken ignored -> "Expr::JavaEmpty";
@@ -154,7 +156,7 @@ public final class RustBackend {
                 out.append("            r#").append(field.name()).append(": {\n                let mut values = Vec::new();\n")
                     .append("                for capture in node.captures.iter().filter(|c| c.name == ").append(quote(field.name())).append(") {\n");
                 if (field.kind() == Kind.NODE) out.append("                    values.extend(map_nodes(tree, &capture.nodes)?);\n");
-                else out.append("                    values.push(unlaxer_runtime::strip_capture(tree.text(capture.span)).to_owned());\n");
+                else out.append("                    values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).to_owned());\n");
                 out.append("                }\n                ").append(mappedValue(field)).append("\n            },\n");
             }
             out.append("        }]),\n");
