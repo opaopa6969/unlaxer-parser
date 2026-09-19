@@ -97,10 +97,15 @@ public class SnapshotMapper {
     /**
      * Maps an already parsed token tree, preferring an AST type by simple name.
      * The returned token is the token selected for the returned AST.
+     * A mapped grammar root must be present as the input token itself.
+     * Use the committed parser root, not a choice's root-stripped Parsed token.
      */
     public static synchronized MappedAst mapParsedToken(Token rootToken, String preferredAstSimpleName) {
         if (rootToken == null) {
             throw new IllegalArgumentException("rootToken must not be null");
+        }
+        if (rootToken.parser.getClass() != SnapshotParsers.ExprParser.class) {
+            throw new IllegalArgumentException("Mapped root token is missing for Expr; pass the committed parser root from ParseContext.getCurrent().getTokens(), not a root-stripped token");
         }
         NODE_SOURCE_SPANS.clear();
         MAP_MEMO.clear();
