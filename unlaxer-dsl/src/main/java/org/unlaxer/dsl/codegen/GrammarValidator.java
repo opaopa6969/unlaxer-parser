@@ -1036,8 +1036,8 @@ public final class GrammarValidator {
             case GroupElement group -> collectCaptureNamesFromBody(group.body(), captures);
             case OptionalElement opt -> collectCaptureNamesFromBody(opt.body(), captures);
             case RepeatElement rep -> collectCaptureNamesFromBody(rep.body(), captures);
-            case UBNFAST.OneOrMoreElement rep -> collectCaptureNamesFromBody(rep.body(), captures);
-            case UBNFAST.BoundedRepeatElement rep -> collectCaptureNamesFromBody(rep.body(), captures);
+            case UBNFAST.OneOrMoreElement rep -> collectCaptureNamesFromAtomic(rep.body(), captures);
+            case UBNFAST.BoundedRepeatElement rep -> collectCaptureNamesFromAtomic(rep.body(), captures);
             case UBNFAST.SeparatedElement separated -> {
                 collectCaptureNamesFromAtomic(separated.element(), captures);
                 collectCaptureNamesFromAtomic(separated.separator(), captures);
