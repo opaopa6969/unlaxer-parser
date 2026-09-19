@@ -1,0 +1,220 @@
+[
+  {
+    "name": "capture-site-identity",
+    "grammar": "grammar CaptureSiteIdentity { @package: org.example.scopeannotations @whitespace: javaStyle token ID = org.unlaxer.parser.clang.IdentifierParser @root @scopeTree(mode=lexical) @mapping(Root, params=[decl,ref]) Root ::= Decl @decl Ref @ref; @declares(symbol=name, description=declarationDoc) @mapping(Decl, params=[noise,name]) Decl ::= ID @noise ':' ID @name ';'; @backref(name=name) @mapping(Ref, params=[noise,name]) Ref ::= ID @noise '->' ID @name; }",
+    "queries": ["known", "missing", "noise", "other"],
+    "metadata": [
+      {"rule":"Root","scope":"lexical","declares":null,"backref":null},
+      {"rule":"Decl","scope":null,"declares":{"symbol":"name","description":"declarationDoc"},"backref":null},
+      {"rule":"Ref","scope":null,"declares":null,"backref":"name"}
+    ],
+    "cases": [
+      {
+        "id": "target-site-not-first-parser-class",
+        "input": "noise:known;other->known",
+        "prefix": [true,24,24],
+        "accepted": true,
+        "ast": {"type":"Root","span":[0,24],"fields":{"decl":{"type":"Decl","span":[0,12],"fields":{"noise":"noise","name":"known"}},"ref":{"type":"Ref","span":[12,24],"fields":{"noise":"other","name":"known"}}}},
+        "scope": {"depth":0,"resolved":[{"query":"known","symbol":null},{"query":"missing","symbol":null},{"query":"noise","symbol":null},{"query":"other","symbol":null}],"declarations":[{"name":"known","sourceOffset":6}],"references":[{"name":"known","offset":19,"length":5}],"diagnostics":[]}
+      },
+      {
+        "id": "undefined-target-warning",
+        "input": "noise:known;other->missing",
+        "prefix": [true,26,26],
+        "accepted": true,
+        "ast": {"type":"Root","span":[0,26],"fields":{"decl":{"type":"Decl","span":[0,12],"fields":{"noise":"noise","name":"known"}},"ref":{"type":"Ref","span":[12,26],"fields":{"noise":"other","name":"missing"}}}},
+        "scope": {"depth":0,"resolved":[{"query":"known","symbol":null},{"query":"missing","symbol":null},{"query":"noise","symbol":null},{"query":"other","symbol":null}],"declarations":[{"name":"known","sourceOffset":6}],"references":[{"name":"missing","offset":19,"length":7}],"diagnostics":[{"message":"未定義のシンボル: 'missing'","offset":19,"length":7,"severity":"WARNING"}]}
+      }
+    ]
+  },
+  {
+    "name": "nested-lexical-dynamic",
+    "grammar": "grammar NestedModes { @package: org.example.scopeannotations token ID = org.unlaxer.parser.clang.IdentifierParser @root @scopeTree(mode=lexical) @mapping(Root, params=[block]) Root ::= Block @block; @scopeTree(mode=dynamic) @mapping(Block, params=[outer,inner,after]) Block ::= '{' Decl @outer Inner @inner Ref @after '}'; @scopeTree(mode=lexical) @mapping(Inner, params=[decl,ref]) Inner ::= '[' Decl @decl Ref @ref ']'; @declares(symbol=name) @mapping(Decl, params=[name]) Decl ::= ID @name ';'; @backref(name=name) @mapping(Ref, params=[name]) Ref ::= ID @name ';'; }",
+    "queries": ["x"],
+    "metadata": [
+      {"rule":"Root","scope":"lexical","declares":null,"backref":null},
+      {"rule":"Block","scope":"dynamic","declares":null,"backref":null},
+      {"rule":"Inner","scope":"lexical","declares":null,"backref":null},
+      {"rule":"Decl","scope":null,"declares":{"symbol":"name","description":null},"backref":null},
+      {"rule":"Ref","scope":null,"declares":null,"backref":"name"}
+    ],
+    "cases": [
+      {
+        "id": "shadow-then-resolve-outer-after-leave",
+        "input": "{x;[x;x;]x;}",
+        "prefix": [true,12,12],
+        "accepted": true,
+        "ast": {"type":"Root","span":[0,12],"fields":{"block":{"type":"Block","span":[0,12],"fields":{"outer":{"type":"Decl","span":[1,3],"fields":{"name":"x"}},"inner":{"type":"Inner","span":[3,9],"fields":{"decl":{"type":"Decl","span":[4,6],"fields":{"name":"x"}},"ref":{"type":"Ref","span":[6,8],"fields":{"name":"x"}}}},"after":{"type":"Ref","span":[9,11],"fields":{"name":"x"}}}}}},
+        "scope": {"depth":0,"resolved":[{"query":"x","symbol":null}],"declarations":[{"name":"x","sourceOffset":1},{"name":"x","sourceOffset":4}],"references":[{"name":"x","offset":6,"length":1},{"name":"x","offset":9,"length":1}],"diagnostics":[]}
+      }
+    ]
+  },
+  {
+    "name": "scope-and-declares-parent-registration",
+    "grammar": "grammar ParentRegistration { @package: org.example.scopeannotations token ID = org.unlaxer.parser.clang.IdentifierParser @root @mapping(Root, params=[decl,ref]) Root ::= ScopedDecl @decl Ref @ref; @scopeTree(mode=dynamic) @declares(symbol=name, description=ownedByParent) @mapping(ScopedDecl, params=[name]) ScopedDecl ::= '[' ID @name ']'; @backref(name=name) @mapping(Ref, params=[name]) Ref ::= ID @name; }",
+    "queries": ["kept", "lost"],
+    "metadata": [
+      {"rule":"ScopedDecl","scope":"dynamic","declares":{"symbol":"name","description":"ownedByParent"},"backref":null},
+      {"rule":"Ref","scope":null,"declares":null,"backref":"name"}
+    ],
+    "cases": [
+      {
+        "id": "declaration-is-visible-after-own-scope-leaves",
+        "input": "[kept]kept",
+        "prefix": [true,10,10],
+        "accepted": true,
+        "parentRollback": true,
+        "ast": {"type":"Root","span":[0,10],"fields":{"decl":{"type":"ScopedDecl","span":[0,6],"fields":{"name":"kept"}},"ref":{"type":"Ref","span":[6,10],"fields":{"name":"kept"}}}},
+        "scope": {"depth":0,"resolved":[{"query":"kept","symbol":{"name":"kept","sourceOffset":1}},{"query":"lost","symbol":null}],"declarations":[{"name":"kept","sourceOffset":1}],"references":[{"name":"kept","offset":6,"length":4}],"diagnostics":[]}
+      },
+      {
+        "id": "failed-parent-rule-rolls-back-child-commit",
+        "input": "[lost]",
+        "prefix": [false,0,0],
+        "accepted": false,
+        "scope": {"depth":0,"resolved":[{"query":"kept","symbol":null},{"query":"lost","symbol":null}],"declarations":[],"references":[],"diagnostics":[]}
+      },
+      {
+        "id": "valid-prefix-with-trailing-input",
+        "input": "[kept]kept!",
+        "prefix": [true,10,10],
+        "accepted": false,
+        "scope": {"depth":0,"resolved":[{"query":"kept","symbol":{"name":"kept","sourceOffset":1}},{"query":"lost","symbol":null}],"declarations":[{"name":"kept","sourceOffset":1}],"references":[{"name":"kept","offset":6,"length":4}],"diagnostics":[]}
+      }
+    ]
+  },
+  {
+    "name": "failed-choice-rollback",
+    "grammar": "grammar FailedChoice { @package: org.example.scopeannotations token ID = org.unlaxer.parser.clang.IdentifierParser @root @mapping(Root, params=[value]) Root ::= (Attempt '!' | Good) @value; @scopeTree(mode=lexical) Attempt ::= Decl; @declares(symbol=name) Decl ::= ID @name; Good ::= ID; }",
+    "queries": ["ghost"],
+    "metadata": [
+      {"rule":"Attempt","scope":"lexical","declares":null,"backref":null},
+      {"rule":"Decl","scope":null,"declares":{"symbol":"name","description":null},"backref":null}
+    ],
+    "cases": [
+      {
+        "id": "failed-first-alternative-erases-effects",
+        "input": "ghost",
+        "prefix": [true,5,5],
+        "accepted": true,
+        "ast": {"type":"Root","span":[0,5],"fields":{"value":"ghost"}},
+        "scope": {"depth":0,"resolved":[{"query":"ghost","symbol":null}],"declarations":[],"references":[],"diagnostics":[]}
+      },
+      {
+        "id": "committed-first-alternative",
+        "input": "ghost!",
+        "prefix": [true,6,6],
+        "accepted": true,
+        "parentRollback": true,
+        "ast": {"type":"Root","span":[0,6],"fields":{"value":"ghost!"}},
+        "scope": {"depth":0,"resolved":[{"query":"ghost","symbol":null}],"declarations":[{"name":"ghost","sourceOffset":0}],"references":[],"diagnostics":[]}
+      }
+    ]
+  },
+  {
+    "name": "repeated-capture-occurrences",
+    "grammar": "grammar RepeatedCaptures { @package: org.example.scopeannotations token ID = org.unlaxer.parser.clang.IdentifierParser @root @scopeTree(mode=lexical) @mapping(Root, params=[declarations,references]) Root ::= Names @declarations ';' Refs @references; @declares(symbol=name) @mapping(Names, params=[name]) Names ::= ID @name { ',' ID @name }; @backref(name=name) @mapping(Refs, params=[name]) Refs ::= ID @name { ',' ID @name }; }",
+    "queries": ["a", "b", "missing"],
+    "metadata": [
+      {"rule":"Root","scope":"lexical","declares":null,"backref":null},
+      {"rule":"Names","scope":null,"declares":{"symbol":"name","description":null},"backref":null},
+      {"rule":"Refs","scope":null,"declares":null,"backref":"name"}
+    ],
+    "cases": [
+      {
+        "id": "all-repeat-captures-produce-effects",
+        "input": "a,b;a,b,missing",
+        "prefix": [true,15,15],
+        "accepted": true,
+        "ast": {"type":"Root","span":[0,15],"fields":{"declarations":{"type":"Names","span":[0,3],"fields":{"name":["a","b"]}},"references":{"type":"Refs","span":[4,15],"fields":{"name":["a","b","missing"]}}}},
+        "scope": {"depth":0,"resolved":[{"query":"a","symbol":null},{"query":"b","symbol":null},{"query":"missing","symbol":null}],"declarations":[{"name":"a","sourceOffset":0},{"name":"b","sourceOffset":2}],"references":[{"name":"a","offset":4,"length":1},{"name":"b","offset":6,"length":1},{"name":"missing","offset":8,"length":7}],"diagnostics":[{"message":"未定義のシンボル: 'missing'","offset":8,"length":7,"severity":"WARNING"}]}
+      }
+    ]
+  },
+  {
+    "name": "optional-recursive-boundary",
+    "grammar": "grammar RecursiveBoundary { @package: org.example.scopeannotations token ID = org.unlaxer.parser.clang.IdentifierParser @root @scopeTree(mode=lexical) @mapping(Root, params=[parent]) Root ::= Parent @parent; @declares(symbol=name) @mapping(Parent, params=[name,child]) Parent ::= [ ID @name ':' ] Child @child; @mapping(Child, params=[name,next]) Child ::= ID @name [ '/' Child @next ]; }",
+    "queries": ["parent", "child", "grand"],
+    "metadata": [
+      {"rule":"Root","scope":"lexical","declares":null,"backref":null},
+      {"rule":"Parent","scope":null,"declares":{"symbol":"name","description":null},"backref":null}
+    ],
+    "cases": [
+      {
+        "id": "optional-target-absent-does-not-use-child-capture",
+        "input": "child/grand",
+        "prefix": [true,11,11],
+        "accepted": true,
+        "ast": {"type":"Root","span":[0,11],"fields":{"parent":{"type":"Parent","span":[0,11],"fields":{"name":null,"child":{"type":"Child","span":[0,11],"fields":{"name":"child","next":{"type":"Child","span":[6,11],"fields":{"name":"grand","next":null}}}}}}}},
+        "scope": {"depth":0,"resolved":[{"query":"parent","symbol":null},{"query":"child","symbol":null},{"query":"grand","symbol":null}],"declarations":[],"references":[],"diagnostics":[]}
+      },
+      {
+        "id": "parent-target-does-not-cross-recursive-child",
+        "input": "parent:child/grand",
+        "prefix": [true,18,18],
+        "accepted": true,
+        "ast": {"type":"Root","span":[0,18],"fields":{"parent":{"type":"Parent","span":[0,18],"fields":{"name":"parent","child":{"type":"Child","span":[7,18],"fields":{"name":"child","next":{"type":"Child","span":[13,18],"fields":{"name":"grand","next":null}}}}}}}},
+        "scope": {"depth":0,"resolved":[{"query":"parent","symbol":null},{"query":"child","symbol":null},{"query":"grand","symbol":null}],"declarations":[{"name":"parent","sourceOffset":0}],"references":[],"diagnostics":[]}
+      }
+    ]
+  },
+  {
+    "name": "quantified-capture-occurrences",
+    "grammar": "grammar QuantifiedCaptures { @package: org.example.scopeannotations @root @scopeTree(mode=lexical) @mapping(Root, params=[plus,bounded,separated]) Root ::= Plus @plus '|' Bounded @bounded '|' Separated @separated; @declares(symbol=name) @mapping(Plus, params=[name]) Plus ::= ('a' @name)+; @declares(symbol=name) @mapping(Bounded, params=[name]) Bounded ::= ('b' @name){1,2}; @declares(symbol=name) @mapping(Separated, params=[name]) Separated ::= ('c' @name) % ','; }",
+    "queries": ["a", "b", "c"],
+    "metadata": [
+      {"rule":"Root","scope":"lexical","declares":null,"backref":null},
+      {"rule":"Plus","scope":null,"declares":{"symbol":"name","description":null},"backref":null},
+      {"rule":"Bounded","scope":null,"declares":{"symbol":"name","description":null},"backref":null},
+      {"rule":"Separated","scope":null,"declares":{"symbol":"name","description":null},"backref":null}
+    ],
+    "cases": [
+      {
+        "id": "plus-bounded-and-separated-inner-captures",
+        "input": "aa|bb|c,c",
+        "prefix": [true,9,9],
+        "accepted": true,
+        "ast": {"type":"Root","span":[0,9],"fields":{"plus":{"type":"Plus","span":[0,2],"fields":{"name":["a","a"]}},"bounded":{"type":"Bounded","span":[3,5],"fields":{"name":["b","b"]}},"separated":{"type":"Separated","span":[6,9],"fields":{"name":["c","c"]}}}},
+        "scope": {"depth":0,"resolved":[{"query":"a","symbol":null},{"query":"b","symbol":null},{"query":"c","symbol":null}],"declarations":[{"name":"a","sourceOffset":0},{"name":"a","sourceOffset":1},{"name":"b","sourceOffset":3},{"name":"b","sourceOffset":4},{"name":"c","sourceOffset":6},{"name":"c","sourceOffset":8}],"references":[],"diagnostics":[]}
+      }
+    ]
+  },
+  {
+    "name": "nested-same-name-captures",
+    "grammar": "grammar NestedSameCapture { @package: org.example.scopeannotations @root @scopeTree(mode=lexical) @mapping(Root, params=[value]) Root ::= Decl @value; @declares(symbol=name) Decl ::= ('a' @name 'b') @name; }",
+    "queries": ["a", "ab"],
+    "metadata": [
+      {"rule":"Root","scope":"lexical","declares":null,"backref":null},
+      {"rule":"Decl","scope":null,"declares":{"symbol":"name","description":null},"backref":null}
+    ],
+    "cases": [
+      {
+        "id": "inner-then-outer-capture-occurrences",
+        "input": "ab",
+        "prefix": [true,2,2],
+        "accepted": true,
+        "ast": {"type":"Root","span":[0,2],"fields":{"value":"ab"}},
+        "scope": {"depth":0,"resolved":[{"query":"a","symbol":null},{"query":"ab","symbol":null}],"declarations":[{"name":"a","sourceOffset":0},{"name":"ab","sourceOffset":0}],"references":[],"diagnostics":[]}
+      }
+    ]
+  },
+  {
+    "name": "trimmed-group-non-bmp",
+    "grammar": "grammar TrimmedGroup { @package: org.example.scopeannotations @root @mapping(Root, params=[decl,ref]) Root ::= ScopedDecl @decl Ref @ref; @scopeTree(mode=dynamic) @declares(symbol=name, description=emojiName) @mapping(ScopedDecl, params=[name]) ScopedDecl ::= '>' ('  ' '😀x' '  ') @name '<'; @backref(name=name) @mapping(Ref, params=[name]) Ref ::= '?' (' ' '😀x' ' ') @name; }",
+    "queries": ["😀x"],
+    "metadata": [
+      {"rule":"ScopedDecl","scope":"dynamic","declares":{"symbol":"name","description":"emojiName"},"backref":null},
+      {"rule":"Ref","scope":null,"declares":null,"backref":"name"}
+    ],
+    "cases": [
+      {
+        "id": "ascii-trim-adjusts-code-point-offset-and-length",
+        "input": ">  😀x  <? 😀x ",
+        "prefix": [true,13,13],
+        "accepted": true,
+        "ast": {"type":"Root","span":[0,13],"fields":{"decl":{"type":"ScopedDecl","span":[0,8],"fields":{"name":"😀x"}},"ref":{"type":"Ref","span":[8,13],"fields":{"name":"😀x"}}}},
+        "scope": {"depth":0,"resolved":[{"query":"😀x","symbol":{"name":"😀x","sourceOffset":3}}],"declarations":[{"name":"😀x","sourceOffset":3}],"references":[{"name":"😀x","offset":10,"length":2}],"diagnostics":[]}
+      }
+    ]
+  }
+]
