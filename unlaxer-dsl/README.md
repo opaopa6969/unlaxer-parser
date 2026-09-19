@@ -744,6 +744,25 @@ positions). Synthetic nodes may have no span. Mapping and snapshot creation are
 serialized per generated mapper. Legacy `sourceSpanOf(node)` only covers the latest
 mapping. See the [design and reproducible evolution experiment](../paper/v6/artifact.md).
 
+To keep a preferred selection and its snapshot from the same mapping operation:
+
+```java
+var selected = TinyCalcMapper.selectParsedTokenWithSourceMap(rootToken, "BinaryExpr");
+Token selectedToken = selected.token();
+var sourceMap = selected.sourceMap();
+TinyCalcAST ast = sourceMap.ast();
+TinyCalcMapper.parse("999");
+int[] span = sourceMap.sourceSpanOf(ast).orElseThrow();
+```
+
+The one-argument overload uses the default selection. Both reuse `mapParsedToken`
+once and snapshot under the same lock; callers still check whole-source coverage
+on the returned token. Keep the **actual parser input** separately if extracting
+text: snapshots retain positions, not the input. Do not apply normalized-input
+offsets to the original, unnormalized text. Convert code-point offsets with
+`parserSource.offsetByCodePoints(0, offset)` before Java substring. Existing
+`MappedAst`, `SourceMappedAst`, and entry-point return contracts are unchanged.
+
 **Post-generation work (manual implementation):**
 
 `to{ClassName}` methods in `TinyCalcMapper` are generated as TODO skeletons. Implement actual field extraction logic using `findDescendants()`.
