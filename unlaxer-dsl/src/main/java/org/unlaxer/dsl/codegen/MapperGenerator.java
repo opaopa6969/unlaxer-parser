@@ -180,6 +180,7 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("    public static synchronized SourceMappedAst<").append(astClass).append("> mapParsedTokenWithSourceMap(Token token) {\n");
         sb.append("        return new SourceMappedAst<>(mapParsedToken(token).ast());\n");
         sb.append("    }\n\n");
+        sb.append("    /** Maps an alternate parser entry and retains its identity-based source snapshot. */\n");
         sb.append("    public static synchronized SourceMappedAst<").append(astClass).append("> mapSubtreeTokenWithSourceMap(Token token) {\n");
         sb.append("        return new SourceMappedAst<>(mapSubtreeToken(token).ast());\n");
         sb.append("    }\n\n");
@@ -206,6 +207,8 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("     * Maps an explicitly selected parser entry without requiring the grammar's @root token.\n");
         sb.append("     * Mapping and snapshot capture share the mapper lock; later parses cannot replace these spans.\n");
         sb.append("     * Use this only for a committed token produced by an intentional alternate parser entry.\n");
+        sb.append("     * The token must belong to this generated grammar and contain a mapped node.\n");
+        sb.append("     * The caller must verify full-input consumption before calling this method.\n");
         sb.append("     */\n");
         sb.append("    public static synchronized SourceMappedSelection selectSubtreeTokenWithSourceMap(Token token, String preferredAstSimpleName) {\n");
         sb.append("        MappedAst selected = mapSubtreeToken(token, preferredAstSimpleName);\n");

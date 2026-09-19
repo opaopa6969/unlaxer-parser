@@ -201,6 +201,21 @@ zero-width captureを保つには元CSTを使用する。縮約で削除済み�
 復元できるとは限らない。root identityの検査は生/縮約済みtoken共通であり、
 この検査のために縮約を再有効化することはない。
 
+#### 明示的なalternate parser entry（#188）
+
+`@root` とは別のruleを意図的なentry pointとしてfull parseした場合だけ、
+`mapSubtreeToken` / `mapSubtreeTokenWithSourceMap` または
+`selectSubtreeTokenWithSourceMap` を使用する。これらは既存root APIの検査を緩めず、
+渡されたtokenのparser classが同じ生成文法で宣言されたruleのclassと一致することを
+検証する。別文法のtoken、null、mapped nodeを含まないtokenは
+`IllegalArgumentException` で拒否する。
+
+呼び出し側はparse成功とfull-input consumptionを確認し、contextを閉じる前に
+alternate parser自身がcommitしたtokenを確保する。preferred AST型は候補選択の優先指定で
+あり、構文全体を消費したことの証明にはならない。`selectSubtreeTokenWithSourceMap` は
+選択tokenとimmutableなidentity-based source snapshotを同じmapper lock内で確定するため、
+後続・並行mapping後もspanを保持する。
+
 ### 共有する結合 AST の型契約（#145）
 
 複数の結合 rule が同じ mapping class を使う場合、全 rule から共通の operand 型を
