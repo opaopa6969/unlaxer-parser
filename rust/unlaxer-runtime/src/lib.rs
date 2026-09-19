@@ -538,6 +538,7 @@ impl<'a> ParseContext<'a> {
 
     /// Runs in a lexical child scope. On success, names leave scope but source events remain.
     /// On error, cursors and all transactional values return to their state before entry.
+    /// Manual enter/leave calls inside the operation must be balanced.
     /// As with transaction(), a panicking operation requires discarding the context.
     pub fn with_scope<T>(
         &mut self,

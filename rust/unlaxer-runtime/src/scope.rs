@@ -33,7 +33,7 @@ pub struct SymbolDiagnostic {
     pub severity: Severity,
 }
 
-/// Lexical scope stack plus a global scope and flat, source-ordered event lists.
+/// Lexical scope stack plus a global scope and flat, insertion-ordered event lists.
 /// Same-scope redeclaration replaces lookup, but retains both declaration events.
 /// Leaving a scope hides its names without discarding its events. Empty names are ignored.
 /// Positions/lengths are supplied by the caller, not inferred from UTF-8 string lengths.
