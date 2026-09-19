@@ -1,6 +1,6 @@
 # 実験的Rust生成バックエンド
 
-Java版を置き換える移植ではなく、既存のJava UBNF frontendからRustのparser・AST・mapper・evaluator dispatchを生成する最小構成。UBNFの解釈と検証を共有しやすいため、独立リリース前のruntimeと生成器は同一repoに置く。crateは`publish = false`で、crates.ioへ公開しない。
+Java版を維持しつつ、UBNFからRustのparser・AST・mapper・evaluator dispatchを生成する構成。Java frontend経路に加え、RustだけでUBNF読込・構造検証・5module生成を行うnative generatorも利用できる。独立リリース前のruntimeと生成器は同一repoに置く。crateは`publish = false`で、crates.ioへ公開しない。
 
 最終的なparserバイナリ・`tinyexpression-rs`・`rustcodeblock`への[段階的な設計方針](ROADMAP.md)を参照。tinyexpression本体とRustコードブロック実行はまだ未実装。
 
@@ -29,7 +29,28 @@ printf '%s\n' 'if(0,neg(2*3),4+5)' | rust/target/release/unlaxer-evolution-examp
 
 ## 再生成
 
-Java 21、Maven 3.9系も必要。Java版の既存CLIは変更せず、`generate`サブコマンドを追加した。
+### Rustだけで生成する
+
+Rust 1.85以上とCargoだけでgeneratorをビルドできる。UBNF読込・意味検証・コード生成の通常経路でJava/Mavenを起動しない。
+
+```sh
+cargo build --release --locked --manifest-path rust/Cargo.toml -p unlaxer-generator
+rust/target/release/unlaxer generate --target rust \
+  --grammar unlaxer-dsl/src/test/resources/evolution/3/Evolution.ubnf \
+  --output rust/examples/evolution/src/generated --check
+```
+
+`--check`を外すと生成する。`--target rust`は省略可。generatorの実行先にはJVM/Cargo/rustc不要（生成物をコンパイルする環境にはRustが必要）。CIの`unlaxer-generator-linux-x86_64` artifactにreleaseバイナリを添付する。Linux x86_64 runner用であり、完全static/全OS対応という意味ではない。
+
+構成は`unlaxer-ubnf`（[全構文のsyntax ASTと既知差](unlaxer-ubnf/README.md)）、`unlaxer-generator`（対応範囲のlowering/検証とCLI）、`unlaxer-codegen`（[normalized IRから5module出力](unlaxer-codegen/README.md)）、`unlaxer-runtime`。文法が読めることと全backend機能を生成できることは別であり、下記の未対応機能はnativeでも明示拒否する。
+
+82文法・410生成ファイルのJava/native byte一致を`RustNativeGeneratorTest`で検査し、生成と`--check`は空のPATHで実行する。Javaは比較用oracleで、native生成経路の依存ではない。構文解析は128、構造shape分析は256の再帰深度上限を持ち、超過は診断になる。Javaのprefix解析等との差はfrontend READMEへ明示する。
+
+終了コードは0=成功、2=引数不正、3=構文/意味/未対応機能、4=I/O・drift・上書き保護。全artifactを事前検査し、手書きファイルやsymlink（出力先・祖先・各file）を上書きしない。各fileは一時ファイルから置換するが、ディレクトリ全体のtransactionや敵対的な同時ファイル差し替えへのsandboxではない。排他的に管理できる出力先を使う。
+
+### Java frontendを使う既存経路
+
+こちらの経路にはJava 21、Maven 3.9系が必要。Java版の既存CLIは変更せず、`generate`サブコマンドを追加した。
 
 ```sh
 mvn -B -pl unlaxer-common,unlaxer-dsl -am install -DskipTests -Dgpg.skip=true

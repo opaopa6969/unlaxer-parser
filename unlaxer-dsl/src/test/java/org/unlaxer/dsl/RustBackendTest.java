@@ -198,6 +198,14 @@ public class RustBackendTest {
         assertEquals(2, run("generate", "--target", "java"));
     }
 
+    @Test public void explicitRustWhitespaceNoneRemainsAcceptedByTheCli() throws Exception {
+        Path grammar = temporary.newFile().toPath();
+        Files.writeString(grammar, SIMPLE.replace("grammar Example {", "grammar Example { @whitespace: none"));
+        Path output = temporary.getRoot().toPath().resolve("none-generated");
+        assertEquals(0, run("generate", "--target", "rust", "--grammar", grammar.toString(), "--output", output.toString()));
+        assertTrue(Files.readString(output.resolve("parser.rs")).contains("0, false, source"));
+    }
+
     private int run(String... args) {
         var bytes = new ByteArrayOutputStream();
         try (var stream = new PrintStream(bytes, true, StandardCharsets.UTF_8)) {

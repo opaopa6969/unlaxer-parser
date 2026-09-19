@@ -29,7 +29,7 @@ jobs:
     - name: Cross-language fixtures, compile failures, and generated-file drift
       run: >
         mvn -B -pl unlaxer-common,unlaxer-dsl -am test
-        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,NumericCaptureRuntimeTest -DrustConformance=true
+        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest -DrustConformance=true
         -Dsurefire.failIfNoSpecifiedTests=false
     - uses: actions/upload-artifact@v4
       with:
@@ -43,12 +43,23 @@ jobs:
           unlaxer-dsl/target/rust-lexical.tsv
           unlaxer-dsl/target/rust-ubnf-frontend.tsv
           unlaxer-dsl/target/rust-associative.tsv
+          unlaxer-dsl/target/rust-native-generator.tsv
         if-no-files-found: error
     - name: Build and smoke-test the native subset example
       run: |
         cargo build --release --locked --manifest-path rust/Cargo.toml -p unlaxer-evolution-example
         printf '%s\n' 'if(0,neg(2*3),4+5)' | rust/target/release/unlaxer-evolution-example | python3 -c 'import json,sys; r=json.load(sys.stdin); assert r["ok"] and r["value"] == 9'
         tar -czf rust/target/unlaxer-evolution-linux-x86_64.tar.gz -C rust/target/release unlaxer-evolution-example
+    - name: Build and smoke-test the JVM-free generator
+      run: |
+        cargo build --release --locked --manifest-path rust/Cargo.toml -p unlaxer-generator
+        PATH='' JAVA_HOME=/nonexistent-java rust/target/release/unlaxer generate --grammar unlaxer-dsl/src/test/resources/evolution/3/Evolution.ubnf --output rust/examples/evolution/src/generated --check
+        tar -czf rust/target/unlaxer-generator-linux-x86_64.tar.gz -C rust/target/release unlaxer
+    - uses: actions/upload-artifact@v4
+      with:
+        name: unlaxer-generator-linux-x86_64
+        path: rust/target/unlaxer-generator-linux-x86_64.tar.gz
+        if-no-files-found: error
     - uses: actions/upload-artifact@v4
       with:
         name: unlaxer-evolution-linux-x86_64
