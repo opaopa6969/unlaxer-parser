@@ -71,14 +71,14 @@ public class MapperFunctionFactorReproTest {
     }
 
     @Test
-    public void homogeneousFactorIsUnchanged() {
+    public void homogeneousFactorKeepsNarrowTypeAndDispatchesShallowestNode() {
         GrammarDecl grammar = UBNFMapper.parse(HOMOGENEOUS).grammars().get(0);
         String ast = new ASTGenerator().generate(grammar).source();
         String mapper = new MapperGenerator().generate(grammar).source();
-        // No widening, no helper — behaviour identical to before the fix.
+        // #145: keep the public type, but dispatch before traversing nested parentheses.
         assertFalse("homogeneous operands must not widen",
             ast.contains("PlainAST left,"));
-        assertFalse("no operand helper for homogeneous grammars",
-            mapper.contains("mapAssocOperandToBinaryExpr"));
+        assertTrue("homogeneous dispatch helper must retain its narrow result type",
+            mapper.contains("static PlainAST.BinaryExpr mapAssocOperandToBinaryExpr(Token token)"));
     }
 }

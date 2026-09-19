@@ -166,8 +166,6 @@ source span を持つ。同じ mapping class の追加 rule でも自身の結�
 旧 package-private `foldRightAssoc{ClassName}` は生成しなくなったため、Parser と Mapper を
 一緒に再生成する。`parse` / `parseWithSourceMap` は root transaction の token を使用する。
 
-共有 mapping の異種 operand 型が代表 rule の宣言順により矛盾するケースは #145 で追跡する。
-
 ### 汎用 token mapping の root 境界（#146）
 
 `mapParsedToken` / `mapParsedTokenWithSourceMap` は再parseもCST縮約も行わない。
@@ -202,6 +200,26 @@ mapped rootの代わりに任意の子孫tokenや外部wrapperを渡して自動
 zero-width captureを保つには元CSTを使用する。縮約で削除済みのcapture情報を汎用APIが
 復元できるとは限らない。root identityの検査は生/縮約済みtoken共通であり、
 この検査のために縮約を再有効化することはない。
+
+### 共有する結合 AST の型契約（#145）
+
+複数の結合 rule が同じ mapping class を使う場合、全 rule から共通の operand 型を
+求め、AST と Mapper で同じ constructor 契約を使う。rule の宣言順は型・評価結果に
+影響しない。追加 rule の operand は、その rule 自身の capture と変換方法で取り出す。
+
+共通の `String` / 数値型、直接参照する同じ mapped leaf 型、同じ結合 class だけから
+なる再帰の狭い record 型は維持する。透明な choice を経由して結合 class と別の
+mapped leaf が到達可能な場合、両 operand を共通の `{GrammarName}AST` へ広げる。
+この場合は単独の右結合 rule でも同じ契約を使い、括弧内の式と typed leaf を保持する。
+`right` はその型の `List` となる。AST / Parser / Mapper はまとめて再生成する。
+単独の左結合 rule の source-string fold（例: tinyexpression の文字列連結）は、
+透明な rule から mapped function が到達可能でも従来の text / `Object` operand 型を維持する。
+
+互換でない scalar 型を共有する場合や、共有する結合 rule が canonical な
+`params=[left, op, right]` と反復 text operator の形を満たさない場合は、生成時に
+`Incompatible shared associative mapping` エラーで拒否する。mapped operand を
+暗黙に `String` へ変換して整合させることはしない。回帰テストは両宣言順で生成 Java を
+コンパイル・実行し、型、左右の結合、括弧、typed leaf、source span を検証する。
 
 ### Capture の位置 binding と再生成（#116）
 
