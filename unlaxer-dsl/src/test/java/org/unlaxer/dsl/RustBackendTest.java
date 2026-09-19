@@ -44,7 +44,33 @@ public class RustBackendTest {
         reject(SIMPLE.replace("'hello' @value", "{ Maybe } @value").replace("Root ::=", "Maybe ::= [ 'x' ];\nRoot ::="), "nullable unbounded");
         reject(SIMPLE.replace("'hello' @value", "'' @value"), "empty literal");
         reject(SIMPLE.replace("grammar Example {", "grammar Example {\n@whitespace: python"), "whitespace");
-        reject(SIMPLE.replace("grammar Example {", "grammar Example {\ntoken TEXT = StringParser"), "only the built-in");
+        reject(SIMPLE.replace("grammar Example {", "grammar Example {\ntoken TEXT = StringParser"), "external token");
+    }
+
+    @Test public void zeroWidthTokensCannotCreateUnboundedLoopsOrLeftRecursion() {
+        for (String declaration : new String[]{"EMPTY", "EOF", "LOOKAHEAD('x')", "NEGATIVE_LOOKAHEAD('x')", "UNTIL('#')"}) {
+            String source = SIMPLE.replace("grammar Example {", "grammar Example { token T = " + declaration + "\n");
+            reject(source.replace("'hello' @value", "{ T } 'hello' @value"), "nullable unbounded");
+            reject(source.replace("'hello' @value", "(T | 'x')+ @value"), "nullable unbounded");
+            reject(source.replace("'hello' @value", "T @value Root @value"), "left recursion");
+        }
+        reject(SIMPLE.replace("grammar Example {", "grammar Example { token T = REGEX('x')\n"), "token T");
+        reject(SIMPLE.replace("'hello' @value", "Root{0} @value"), "left recursion");
+        reject(SIMPLE.replace("'hello' @value", "(Root | 'x'){0} @value"), "left recursion");
+    }
+
+    @Test public void invalidUnicodeTextIsRejectedBeforeRustEmission() {
+        var grammar = UBNFMapper.parse(SIMPLE).grammars().get(0);
+        String invalid = String.valueOf((char) 0xd800);
+        for (var token : java.util.List.of(
+            new org.unlaxer.dsl.bootstrap.UBNFAST.TokenDecl.Until("T", invalid),
+            new org.unlaxer.dsl.bootstrap.UBNFAST.TokenDecl.Negation("T", invalid),
+            new org.unlaxer.dsl.bootstrap.UBNFAST.TokenDecl.Lookahead("T", invalid))) {
+            var modified = new org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl(
+                grammar.name(), grammar.settings(), java.util.List.of(token), grammar.rules());
+            var error = assertThrows(IllegalArgumentException.class, () -> new RustBackend().generate(modified));
+            assertTrue(error.toString(), error.getMessage().contains("unpaired surrogate"));
+        }
     }
 
     @Test public void cardinalityReachesAstAndSemantics() {

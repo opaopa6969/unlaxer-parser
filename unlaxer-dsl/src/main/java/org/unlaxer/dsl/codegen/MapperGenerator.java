@@ -221,7 +221,9 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("        if (consumed != source.length()) {\n");
         sb.append("            throw new IllegalArgumentException(\"Parse failed at offset \" + consumed + \": \" + source);\n");
         sb.append("        }\n");
-        sb.append("        Token rootToken = parsed.getRootToken(true);\n");
+        // Capture-site metadata includes successful zero-width matches. The generic reducer
+        // drops empty children and mutates the CST, so typed mapping must use the original tree.
+        sb.append("        Token rootToken = parsed.getRootToken(false);\n");
 
         if (rootRule.isPresent() && MapperElementUtil.getMappingAnnotation(rootRule.get()).isPresent()) {
             RuleDecl rr = rootRule.get();

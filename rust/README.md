@@ -66,6 +66,7 @@ runtimeは規則IDで参照する文法を実行し、入力とCST node arenaを
 - 1ファイル・1文法、ちょうど1つの`@root`。
 - 非空の文字列terminal、rule参照、sequence、ordered choice、group、optional、0/1回以上のrepeat、bounded repeat、separated list。
 - `NumberParser`またはその完全修飾名へのtoken binding。符号・小数・指数を含む。
+- `ANY`・`EOF`・`EMPTY`・`CHAR_RANGE`・`NEGATION`・`UNTIL`・`LOOKAHEAD`・`NEGATIVE_LOOKAHEAD`。詳細は下記のprimitive互換契約を参照。
 - `@mapping`とterminal/rule/group/quantifierへのcapture。全capture名の集合とparamsが一致し、同名captureのtext/node型が整合すること。欠ける選択肢はoptional、繰り返しや同名の複数出現はlistとして推論する。
 - `@whitespace: javaStyle`（ASCII空白、行/ブロックコメント）または`none`。未指定は`none`。`@package`はRustでは使用しない。
 
@@ -102,17 +103,39 @@ context.set_state("mode", String::from("example"));
 let matched = context.parse(&MyParser)?;
 ```
 
-呼出側は`context.parse(&parser)`を使う。これにより`Err`時にはカーソル・追加CST node・capture履歴・利用者状態を戻す。独自実装の`parser.parse(&mut context)`を直接呼ぶ場合、この外側のtransactionは付かない。最遠失敗の位置・候補はrollback後も保持する。先読みは成功時も状態を戻し、否定先読みの内部失敗候補は外へ漏らさない。
+呼出側は`context.parse(&parser)`を使う。これにより`Err`時には消費・マッチ両カーソル・追加CST node・capture履歴・利用者状態を戻す。独自実装の`parser.parse(&mut context)`を直接呼ぶ場合、この外側のtransactionは付かない。最遠失敗の位置・候補はrollback後も保持する。PEG型の`ahead`は成功時も状態を戻し、`not_ahead`の内部失敗候補は外へ漏らさない。UBNFの先読みは異なる契約を持つ（下記）。
 
 `source`/`remaining`/`position`/`advance`/`text`で入力を扱い、`set_state`/`state::<T>`/`state_mut::<T>`で`Any + Clone`の値を共有する。位置・移動量はコードポイント単位。利用者状態の`Clone`は変更可能な内容を独立コピーする必要がある。`Rc<RefCell<_>>`等の共有内部状態、ファイル操作等の副作用、panic unwindはrollback対象ではない。panicを捕捉した後はcontextを再利用しない。
 
-`Expr`には`then`/`or`/`optional`/`repeat`/`zero_or_more`/`one_or_more`/`separated_by`/`capture`/`ahead`/`not_ahead`を用意する。`separated_by`は1個以上。無限反復の子が入力を消費せず成功した場合はエラーとする。`Custom(fn)`でcontextを取る関数を組み込める。`Any`/`CharRange`/`Except`は1コードポイント、`Until`は終端の直前まで（終端がなければ失敗）、`Eof`/`Empty`/`Error`も利用できる。optional/repeat/separated/captureはUBNF loweringからも利用するが、追加字句token・先読み・Custom・BackreferenceのUBNF接続は未実装。
+`Expr`には`then`/`or`/`optional`/`repeat`/`zero_or_more`/`one_or_more`/`separated_by`/`capture`/`ahead`/`not_ahead`を用意する。`separated_by`は1個以上。genericな無限反復の子が入力を消費せず成功した場合はエラーとする。`Custom(fn)`でcontextを取る関数を組み込める。`Any`/`CharRange`/`Except`は1コードポイント、`Until`は終端の直前まで（終端がなければ失敗）、`Eof`/`Empty`/`Error`も利用できる。UBNFではJava互換用の`JavaOptional`/`JavaRepeat`等も生成する。Custom・BackreferenceのUBNF接続は未実装。
 
 `captured(name)`と`Backreference(name)`はcontext全体の同名captureの最新成功分を使用する。`capture_spans`は成功履歴を返す。字句スコープやJavaのcapture伝播規則を再現したものではない。
 
 生成器は`rules()`・`parse_context(&mut ParseContext)`も出力する。context入口は現在位置からの**prefix解析**であり、全入力検証は従来の`parse_tree[_detailed]`、または後続の`Expr::Eof`を使う。文法とtrivia設定は呼出中だけ切り替わり、入力と利用者状態は共通。`matched.root_node()`から`context.tree(root)`で所有されたsnapshotを取り、その文法のmapperへ渡す。異なる文法のrule IDはローカルなので、複数文法のnodeを一つのmapperに混ぜない。node IDはcontext内だけで有効で、rollbackされた結果は再利用しない。
 
 公開APIの使用例とrollback契約は[`context_combinators.rs`](unlaxer-runtime/tests/context_combinators.rs)、生成parserとの混在とAST評価は[`context.rs`](examples/evolution/tests/context.rs)で検証する。現在はtransactionごとに利用者状態・capture履歴をコピーする単純実装で、性能評価・最適化は未実施。
+
+### UBNF primitiveの互換契約
+
+Javaの`ParseContext`は消費位置とマッチ専用位置を分ける。Rustも`position()`と`matched_position()`で両方を公開し、失敗transactionは両方を復元する。UBNF互換動作を通常のPEG combinatorから分離するため、次の生成先を用意した。
+
+| UBNF | Rust生成先 | 動作 |
+|---|---|---|
+| `ANY` / `CHAR_RANGE` / `NEGATION` | `Any` / `CharRange` / `Except` | 1コードポイントを消費し、マッチ位置を消費位置へ同期 |
+| `EOF` | `Eof` | 消費位置が末尾のとき成功 |
+| `EMPTY` | `JavaEmpty` | 常に成功。マッチ位置に文字があれば1コードポイント進めるが消費しない |
+| `LOOKAHEAD` / `NEGATIVE_LOOKAHEAD` | `JavaLookahead` | マッチ位置から検査。肯定成功ではマッチ位置だけ進む。空patternは肯定失敗・否定成功 |
+| `UNTIL` | `JavaUntil` | 終端は非消費だがマッチ位置を進める。終端欠損または空終端なら末尾まで消費して成功 |
+
+例えば`LOOKAHEAD('a')`の後に`LOOKAHEAD('b')`を置くと、`ab`を消費せず順にマッチする。`Expr::literal("a").ahead()`を2回行うPEGの検査とは異なる。既存の`ahead`/`not_ahead`/`Until`/`Empty`の契約は変更していない。UBNFのマッチ専用tokenをcaptureした文字列は**消費した部分**なので空文字であり、先読みしたpattern本体ではない。
+
+UBNFのoptional/repeatは`optional_java`/`repeat_java`を生成する。Java `Occurs`と同じく、有限repeatも消費が進まない成功を1回数えた時点で停止する。上限0でも子を1回試し、成功すれば個数超過で失敗するJavaの挙動も保持する。直接の消費atomが失敗した場合、optionalやrepeat内ではマッチ位置だけが消費位置へ戻る。一方、rule/sequence/captureで包んだ子はtransactionで元の位置へ戻る。これらをgenericな`optional`/`repeat`に混入させない。空消費が可能な無限repeatは引き続きUBNF生成前に拒否する。
+
+`CHAR_RANGE`境界は現在のUBNF ASTの`char`型に合わせて単一の非surrogate BMP文字に限定し、空・複数文字・補助文字・逆順は明示拒否する。`ANY`/`NEGATION`と文字列patternは補助文字もコードポイントとして扱う。Rustへ渡す文字列の不正な単独surrogateは生成前に拒否する。
+
+[`primitives/corpus.json`](../unlaxer-dsl/src/test/resources/primitives/corpus.json)の48文法から両backendを実生成・コンパイルして、109入力のprefix受理/消費位置/マッチ位置と全入力受理を比較する。受理56入力ではAST field/spanも独立fixtureと一致する。空・終端欠損・Unicode・javaStyle trivia・直接/間接capture・量指定子・rollbackを含み、結果は`target/rust-primitives.tsv`とCI artifactへ保存する。選択肢とliteralの反復でもJavaのhelper chain相当の空白処理境界を保持する。IRの`Delimited`は補助境界をcaptureの外へ置き、元の文法のgroupとは区別する。`(T | 'z')+`と`((T | 'z'))+`でコメントのcapture範囲が異なることもJavaと照合する。これは現token群の有限corpusであり、汎用MatchOnly/Not/PropagationStopper・virtual token・全CST形状の完全互換を意味しない。診断候補の文言もbackend固有のままである。
+
+Java生成Mapperも、空のcapture-siteを除去する汎用reducerを通さず元のCSTを読むようにした。成功した零幅captureは欠損ではなく空文字になる。`mapParsedTokenWithSourceMap`へ渡す側も零幅captureを保持する必要がある場合は`parsed.getRootToken(false)`を使う。呼出前にreducerで失った情報は復元できない。
 
 ## 再現実験と結果
 

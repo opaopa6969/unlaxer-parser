@@ -29,6 +29,94 @@ public class RustConformanceTest {
     private static final String PACKAGE = "org.example.evolution.";
     private final Path repo = Path.of("..").toAbsolutePath().normalize();
 
+    @Test public void primitiveTokensPreserveCapturesAndCodePointSpans() throws Exception {
+        assumeTrue("enable with -DrustConformance=true (requires rustc)", Boolean.getBoolean("rustConformance"));
+        Path library = temporary.getRoot().toPath().resolve("libunlaxer_runtime.rlib");
+        success(run(List.of("rustc", "--edition=2021", "--crate-type=rlib", "--crate-name=unlaxer_runtime",
+            repo.resolve("rust/unlaxer-runtime/src/lib.rs").toString(), "-o", library.toString()), ""));
+        var corpus = JsonParser.parseString(Files.readString(repo.resolve("unlaxer-dsl/src/test/resources/primitives/corpus.json"))).getAsJsonArray();
+        var report = new ArrayList<>(List.of("token\tbody\tinput_json\tjava_prefix\tjava_ast\trust"));
+        for (var entry : corpus) {
+            var fixture = entry.getAsJsonObject();
+            String declaration = fixture.get("token").getAsString();
+            String whitespace = fixture.has("whitespace") ? "@whitespace: javaStyle" : "";
+            var grammar = UBNFMapper.parse("grammar Primitive { @package: org.example.primitive " + whitespace
+                + " token T = " + declaration + "\n token END = EOF\n "
+                + (fixture.has("extra") ? fixture.get("extra").getAsString() : "")
+                + "\n @root @mapping(Value, params=[value]) Root ::= "
+                + fixture.get("body").getAsString() + "; }").grammars().get(0);
+            Path dir = temporary.newFolder().toPath();
+            Path generated = Files.createDirectory(dir.resolve("generated"));
+            for (var file : new RustBackend().generate(grammar)) Files.writeString(generated.resolve(file.relativePath()), file.content());
+            Files.writeString(dir.resolve("main.rs"), """
+                mod generated;
+                use std::io::{self, BufRead};
+                fn main() {
+                    for line in io::stdin().lock().lines() {
+                        let input = line.unwrap();
+                        let mut context = unlaxer_runtime::ParseContext::new(&input);
+                        let prefix_ok = generated::parser::parse_context(&mut context).is_ok();
+                        print!(r#"{{"prefix":[{},{},{}],"ast":"#, prefix_ok, context.position(), context.matched_position());
+                        match generated::parser::parse_tree_detailed(&input) {
+                            Ok(tree) => {
+                                let ast = generated::mapper::map(&tree).unwrap();
+                                drop(tree);
+                                print!("{}", ast.canonical_json());
+                            }
+                            Err(_) => print!("null"),
+                        }
+                        println!("}}");
+                    }
+                }
+                """);
+            success(rustCompile(dir, library));
+            var cases = fixture.getAsJsonArray("cases");
+            var actual = run(List.of(dir.resolve("probe").toString()), String.join("\n", cases.asList().stream()
+                .map(row -> row.getAsJsonObject().get("input").getAsString()).toList()) + "\n");
+            success(actual);
+            var lines = actual.output().lines().toList();
+            assertEquals(declaration, cases.size(), lines.size());
+            try (var loader = compileJava(grammar, List.of())) {
+                var mapper = loader.loadClass("org.example.primitive.PrimitiveMapper");
+                var parser = (org.unlaxer.parser.Parser) loader.loadClass("org.example.primitive.PrimitiveParsers")
+                    .getMethod("getRootParser").invoke(null);
+                for (int i = 0; i < cases.size(); i++) {
+                    var row = cases.get(i).getAsJsonObject();
+                    String input = row.get("input").getAsString();
+                    String context = declaration + " / " + fixture.get("body") + " / " + row;
+                    var result = JsonParser.parseString(lines.get(i)).getAsJsonObject();
+                    var rust = result.get("ast");
+                    var prefix = new JsonArray();
+                    try (var parseContext = new org.unlaxer.context.ParseContext(org.unlaxer.StringSource.createRootSource(input))) {
+                        boolean prefixOk = parser.parse(parseContext).isSucceeded();
+                        prefix.add(prefixOk);
+                        prefix.add(parseContext.getConsumedPosition().value());
+                        prefix.add(parseContext.getMatchedPosition().value());
+                        assertEquals(context + " prefix cursors", prefix, result.get("prefix"));
+                        if (row.has("prefix")) assertEquals(context + " prefix oracle", row.get("prefix"), prefix);
+                    }
+                    boolean accepted = row.has("value");
+                    assertEquals(context + " Rust acceptance", accepted, !rust.isJsonNull());
+                    var diagnostic = (Optional<?>) mapper.getMethod("diagnose", String.class).invoke(null, input);
+                    assertEquals(context + " Java acceptance", accepted, diagnostic.isEmpty());
+                    JsonElement java = JsonNull.INSTANCE;
+                    if (accepted) {
+                        Object mapped = mapper.getMethod("parseWithSourceMap", String.class).invoke(null, input);
+                        java = canonical(mapped.getClass().getMethod("ast").invoke(mapped), mapped);
+                        var expected = new JsonObject(); expected.addProperty("type", "Value");
+                        var span = new JsonArray(); span.add(0); span.add(input.codePointCount(0, input.length()));
+                        expected.add("span", span);
+                        var fields = new JsonObject(); fields.add("value", row.get("value")); expected.add("fields", fields);
+                        assertEquals(context + " Rust oracle", expected, rust);
+                        assertEquals(context + " Java oracle", expected, java);
+                    }
+                    report.add(declaration + "\t" + fixture.get("body") + "\t" + row.get("input") + "\t" + prefix + "\t" + java + "\t" + result);
+                }
+            }
+        }
+        Files.write(Path.of("target/rust-primitives.tsv"), report, StandardCharsets.UTF_8);
+    }
+
     @Test public void capturePlacementAndTransparentCollectionsAreExecutable() throws Exception {
         assumeTrue("enable with -DrustConformance=true (requires rustc)", Boolean.getBoolean("rustConformance"));
         Path library = temporary.getRoot().toPath().resolve("libunlaxer_runtime.rlib");

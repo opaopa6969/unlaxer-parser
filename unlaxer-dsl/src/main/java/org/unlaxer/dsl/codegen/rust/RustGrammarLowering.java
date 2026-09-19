@@ -13,7 +13,7 @@ import org.unlaxer.dsl.codegen.rust.GrammarIR.*;
 public final class RustGrammarLowering {
     private final GrammarDecl grammar;
     private final Map<String, Integer> ruleIds = new LinkedHashMap<>();
-    private final Set<String> numbers = new HashSet<>();
+    private final Map<String, Expression> tokens = new LinkedHashMap<>();
     private final List<Expression> bodies = new ArrayList<>();
     private final List<MappingAnnotation> mappings = new ArrayList<>();
     private final Set<Integer> nullableRules = new HashSet<>();
@@ -38,18 +38,14 @@ public final class RustGrammarLowering {
             } else if (!setting.key().equals("package")) throw unsupported("setting " + setting.key());
         }
         for (var token : grammar.tokens()) {
-            if (!(token instanceof TokenDecl.Simple simple)
-                || !Set.of("NumberParser", "org.unlaxer.parser.elementary.NumberParser").contains(simple.parserClass())) {
-                throw unsupported("token " + token.name() + " (only the built-in NumberParser is bound)");
-            }
-            if (!numbers.add(token.name())) throw unsupported("duplicate token " + token.name());
+            if (tokens.putIfAbsent(token.name(), token(token)) != null) throw unsupported("duplicate token " + token.name());
         }
         int root = -1;
         Set<String> variants = new HashSet<>();
         Set<String> methods = new HashSet<>();
         for (int i = 0; i < grammar.rules().size(); i++) {
             var rule = grammar.rules().get(i);
-            if (ruleIds.putIfAbsent(rule.name(), i) != null || numbers.contains(rule.name())) {
+            if (ruleIds.putIfAbsent(rule.name(), i) != null || tokens.containsKey(rule.name())) {
                 throw unsupported("duplicate rule/token " + rule.name());
             }
             MappingAnnotation mapping = null;
@@ -125,11 +121,11 @@ public final class RustGrammarLowering {
         return switch (element) {
             case TerminalElement terminal -> {
                 if (terminal.value().isEmpty()) throw unsupported("empty literal");
-                yield new Literal(terminal.value());
+                yield new Literal(scalarText(terminal.value()));
             }
             case RuleRefElement reference -> {
                 if (reference.namespace().isPresent()) throw unsupported("qualified rule reference");
-                if (numbers.contains(reference.name())) yield new NumberToken();
+                if (tokens.containsKey(reference.name())) yield tokens.get(reference.name());
                 Integer id = ruleIds.get(reference.name());
                 if (id == null) throw unsupported("unknown reference " + reference.name());
                 yield new Reference(id);
@@ -154,14 +150,20 @@ public final class RustGrammarLowering {
         if (lowered instanceof Sequence sequence && sequence.elements().size() == 1) {
             Expression child = sequence.elements().get(0);
             Expression bare = child instanceof Capture capture ? capture.expression() : child;
-            if (bare instanceof Reference || bare instanceof NumberToken || (!onlyReference && bare instanceof Literal)) return child;
+            RuleBody sourceBody = body instanceof ChoiceBody choice && choice.alternatives().size() == 1
+                ? choice.alternatives().get(0) : body;
+            if (sourceBody instanceof SequenceBody source && source.elements().size() == 1
+                && source.elements().get(0).element() instanceof RuleRefElement) return child;
+            if (!onlyReference && bare instanceof Literal) return child;
         }
         return lowered;
     }
 
     private Expression repeatedAtom(AtomicElement atom) {
         Expression child = atomic(atom);
-        return atom instanceof RuleRefElement || child instanceof Sequence || child instanceof Choice
+        // Java wraps repeated choices/literals in a DelimitedChain outside their capture site.
+        if (child instanceof Choice || child instanceof Literal) return new Delimited(child);
+        return atom instanceof RuleRefElement || child instanceof Sequence
             ? child : new Sequence(List.of(child));
     }
 
@@ -175,6 +177,7 @@ public final class RustGrammarLowering {
             }
         }
         return switch (expression) {
+            case Delimited delimited -> new Delimited(capture(name, delimited.child()));
             case OptionalExpr optional -> new OptionalExpr(capture(name, optional.child()));
             case Repeat repeat -> new Repeat(capture(name, repeat.child()), repeat.min(), repeat.max());
             case Separated separated -> new Separated(capture(name, separated.child()), separated.separator());
@@ -184,8 +187,13 @@ public final class RustGrammarLowering {
 
     private boolean nullable(Expression expression) {
         return switch (expression) {
+            case EmptyToken ignored -> true;
+            case EofToken ignored -> true;
+            case LookaheadToken ignored -> true;
+            case UntilToken ignored -> true;
             case Reference reference -> nullableRules.contains(reference.rule());
             case Capture capture -> nullable(capture.expression());
+            case Delimited delimited -> nullable(delimited.child());
             case Sequence sequence -> sequence.elements().stream().allMatch(this::nullable);
             case Choice choice -> choice.alternatives().stream().anyMatch(this::nullable);
             case OptionalExpr ignored -> true;
@@ -193,6 +201,38 @@ public final class RustGrammarLowering {
             case Separated separated -> nullable(separated.child());
             default -> false;
         };
+    }
+
+    private Expression token(TokenDecl token) {
+        return switch (token) {
+            case TokenDecl.Simple simple -> {
+                if (!Set.of("NumberParser", "org.unlaxer.parser.elementary.NumberParser").contains(simple.parserClass())) {
+                    throw unsupported("external token " + simple.parserClass());
+                }
+                yield new NumberToken();
+            }
+            case TokenDecl.Any ignored -> new AnyToken();
+            case TokenDecl.Eof ignored -> new EofToken();
+            case TokenDecl.Empty ignored -> new EmptyToken();
+            case TokenDecl.CharRange range -> {
+                if (range.min() > range.max() || Character.isSurrogate(range.min()) || Character.isSurrogate(range.max())) {
+                    throw unsupported("invalid character range " + range.name());
+                }
+                yield new CharRangeToken(range.min(), range.max());
+            }
+            case TokenDecl.Negation negation -> new ExceptToken(scalarText(negation.excludedChars()));
+            case TokenDecl.Until until -> new UntilToken(scalarText(until.terminator()));
+            case TokenDecl.Lookahead lookahead -> new LookaheadToken(scalarText(lookahead.pattern()), true);
+            case TokenDecl.NegativeLookahead lookahead -> new LookaheadToken(scalarText(lookahead.pattern()), false);
+            default -> throw unsupported("token " + token.name() + " (" + token.getClass().getSimpleName() + ")");
+        };
+    }
+
+    private String scalarText(String text) {
+        if (text.codePoints().anyMatch(c -> c >= Character.MIN_SURROGATE && c <= Character.MAX_SURROGATE)) {
+            throw unsupported("unpaired surrogate in token/literal text");
+        }
+        return text;
     }
 
     private void checkRepetition(Expression expression) {
@@ -207,6 +247,7 @@ public final class RustGrammarLowering {
             }
             case OptionalExpr optional -> checkRepetition(optional.child());
             case Capture capture -> checkRepetition(capture.expression());
+            case Delimited delimited -> checkRepetition(delimited.child());
             case Sequence sequence -> sequence.elements().forEach(this::checkRepetition);
             case Choice choice -> choice.alternatives().forEach(this::checkRepetition);
             default -> { }
@@ -225,8 +266,9 @@ public final class RustGrammarLowering {
         return switch (expression) {
             case Reference reference -> Set.of(reference.rule());
             case Capture capture -> leadingRules(capture.expression());
+            case Delimited delimited -> leadingRules(delimited.child());
             case OptionalExpr optional -> leadingRules(optional.child());
-            case Repeat repeat -> repeat.max() != null && repeat.max() == 0 ? Set.of() : leadingRules(repeat.child());
+            case Repeat repeat -> leadingRules(repeat.child());
             case Separated separated -> {
                 Set<Integer> result = new HashSet<>(leadingRules(separated.child()));
                 if (nullable(separated.child())) result.addAll(leadingRules(separated.separator()));
@@ -262,6 +304,7 @@ public final class RustGrammarLowering {
         return switch (expression) {
             case Reference reference -> shape(reference.rule(), visiting);
             case Capture capture -> shape(capture.expression(), visiting);
+            case Delimited delimited -> shape(delimited.child(), visiting);
             case OptionalExpr optional -> wrapNode(shape(optional.child(), visiting), Cardinality.OPTIONAL);
             case Repeat repeat -> wrapNode(shape(repeat.child(), visiting), Cardinality.MANY);
             case Separated separated -> {
@@ -313,6 +356,7 @@ public final class RustGrammarLowering {
                 yield result;
             }
             case OptionalExpr optional -> wrappedCaptures(optional.child(), Cardinality.OPTIONAL);
+            case Delimited delimited -> captures(delimited.child());
             case Repeat repeat -> wrappedCaptures(repeat.child(), Cardinality.MANY);
             case Separated separated -> {
                 if (!captures(separated.separator()).isEmpty()) throw unsupported("captures in separator");

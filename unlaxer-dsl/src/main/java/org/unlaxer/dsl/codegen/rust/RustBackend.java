@@ -89,12 +89,22 @@ public final class RustBackend {
         return switch (expression) {
             case Literal literal -> "Expr::Literal(" + quote(literal.text()) + ")";
             case NumberToken ignored -> "Expr::Number";
+            case AnyToken ignored -> "Expr::Any";
+            case EofToken ignored -> "Expr::Eof";
+            case EmptyToken ignored -> "Expr::JavaEmpty";
+            case CharRangeToken range -> "Expr::CharRange('\\u{" + Integer.toHexString(range.min())
+                + "}', '\\u{" + Integer.toHexString(range.max()) + "}')";
+            case ExceptToken except -> "Expr::Except(" + quote(except.excluded()) + ")";
+            case UntilToken until -> "Expr::JavaUntil(" + quote(until.terminator()) + ")";
+            case LookaheadToken lookahead -> "Expr::JavaLookahead { pattern: " + quote(lookahead.pattern())
+                + ", positive: " + lookahead.positive() + " }";
             case Reference reference -> "Expr::Rule(" + reference.rule() + ")";
             case Sequence sequence -> "Expr::Sequence(vec![" + expressions(sequence.elements()) + "])";
+            case Delimited delimited -> "Expr::Sequence(vec![" + expression(delimited.child()) + "])";
             case Choice choice -> "Expr::Choice(vec![" + expressions(choice.alternatives()) + "])";
             case Capture capture -> "Expr::Capture(" + quote(capture.name()) + ", Box::new(" + expression(capture.expression()) + "))";
-            case OptionalExpr optional -> expression(optional.child()) + ".optional()";
-            case Repeat repeat -> expression(repeat.child()) + ".repeat(" + repeat.min() + ", "
+            case OptionalExpr optional -> expression(optional.child()) + ".optional_java()";
+            case Repeat repeat -> expression(repeat.child()) + ".repeat_java(" + repeat.min() + ", "
                 + (repeat.max() == null ? "None" : "Some(" + repeat.max() + ")") + ")";
             case Separated separated -> expression(separated.child()) + ".separated_by(" + expression(separated.separator()) + ")";
         };

@@ -20,7 +20,15 @@ pub enum Expr {
     Choice(Vec<Expr>),
     Capture(&'static str, Box<Expr>),
     Optional(Box<Expr>),
+    /// Java Occurs retains a failed direct consuming atom's match-cursor reset.
+    JavaOptional(Box<Expr>),
     Repeat {
+        child: Box<Expr>,
+        min: usize,
+        max: Option<usize>,
+    },
+    /// Java Occurs counts a successful zero-consumption child once, then stops.
+    JavaRepeat {
         child: Box<Expr>,
         min: usize,
         max: Option<usize>,
@@ -35,6 +43,15 @@ pub enum Expr {
     CharRange(char, char),
     Except(&'static str),
     Until(&'static str),
+    /// UBNF/Java predicates use a separate, advancing match-only cursor.
+    JavaLookahead {
+        pattern: &'static str,
+        positive: bool,
+    },
+    /// Java EMPTY optionally matches one scalar without consuming it.
+    JavaEmpty,
+    /// Java UNTIL succeeds at EOF even if its non-consuming terminator is absent.
+    JavaUntil(&'static str),
     Error(&'static str),
     Custom(fn(&mut ParseContext<'_>) -> ParseResult),
     Backreference(&'static str),
@@ -60,6 +77,9 @@ impl Expr {
     pub fn optional(self) -> Self {
         Self::Optional(Box::new(self))
     }
+    pub fn optional_java(self) -> Self {
+        Self::JavaOptional(Box::new(self))
+    }
     pub fn repeat(self, min: usize, max: Option<usize>) -> Self {
         Self::Repeat {
             child: Box::new(self),
@@ -69,6 +89,13 @@ impl Expr {
     }
     pub fn zero_or_more(self) -> Self {
         self.repeat(0, None)
+    }
+    pub fn repeat_java(self, min: usize, max: Option<usize>) -> Self {
+        Self::JavaRepeat {
+            child: Box::new(self),
+            min,
+            max,
+        }
     }
     pub fn one_or_more(self) -> Self {
         self.repeat(1, None)
@@ -263,6 +290,7 @@ impl<T: Any + Clone> StateValue for T {
 
 struct Checkpoint {
     position: usize,
+    matched_position: usize,
     nodes: usize,
     captures: HashMap<String, Vec<Span>>,
     state: HashMap<String, Box<dyn StateValue>>,
@@ -278,6 +306,7 @@ pub struct ParseContext<'a> {
     rules: Arc<[Rule]>,
     whitespace: bool,
     position: usize,
+    matched_position: usize,
     nodes: Vec<Node>,
     farthest: usize,
     expected: BTreeSet<String>,
@@ -348,6 +377,7 @@ impl<'a> ParseContext<'a> {
             rules: Arc::from([]),
             whitespace: false,
             position: 0,
+            matched_position: 0,
             nodes: vec![],
             farthest: 0,
             expected: BTreeSet::new(),
@@ -370,6 +400,11 @@ impl<'a> ParseContext<'a> {
     }
     pub fn position(&self) -> usize {
         self.code_point(self.position)
+    }
+    /// Unicode code-point position of the UBNF match-only cursor. Consuming a
+    /// character resets this cursor to the consumed position; PEG `ahead` restores it.
+    pub fn matched_position(&self) -> usize {
+        self.code_point(self.matched_position)
     }
     pub fn node(&self, id: usize) -> Option<&Node> {
         self.nodes.get(id)
@@ -399,6 +434,7 @@ impl<'a> ParseContext<'a> {
             return false;
         };
         self.position = *end;
+        self.matched_position = self.position;
         true
     }
     pub fn captured(&self, name: &str) -> Option<&'a str> {
@@ -500,6 +536,7 @@ impl<'a> ParseContext<'a> {
     fn checkpoint(&self) -> Checkpoint {
         Checkpoint {
             position: self.position,
+            matched_position: self.matched_position,
             nodes: self.nodes.len(),
             captures: self.captures.clone(),
             state: self
@@ -511,6 +548,7 @@ impl<'a> ParseContext<'a> {
     }
     fn restore(&mut self, checkpoint: Checkpoint) {
         self.position = checkpoint.position;
+        self.matched_position = checkpoint.matched_position;
         self.nodes.truncate(checkpoint.nodes);
         self.captures = checkpoint.captures;
         self.state = checkpoint.state;
@@ -529,11 +567,15 @@ impl<'a> ParseContext<'a> {
     }
 
     fn fail(&mut self, expected: &str) {
-        if self.position > self.farthest {
-            self.farthest = self.position;
+        self.fail_at(self.position, expected);
+    }
+
+    fn fail_at(&mut self, position: usize, expected: &str) {
+        if position > self.farthest {
+            self.farthest = position;
             self.expected.clear();
         }
-        if self.position == self.farthest {
+        if position == self.farthest {
             self.expected.insert(expected.to_owned());
         }
     }
@@ -592,6 +634,7 @@ impl<'a> ParseContext<'a> {
                 let text = self.captured(name);
                 if let Some(text) = text.filter(|text| self.remaining().starts_with(text)) {
                     self.position += text.len();
+                    self.matched_position = self.position;
                     Some(Fragment::default())
                 } else {
                     self.fail(name);
@@ -599,6 +642,49 @@ impl<'a> ParseContext<'a> {
                 }
             }
             Expr::Empty => Some(Fragment::default()),
+            Expr::JavaEmpty => {
+                if let Some(next) = self.input[self.matched_position..].chars().next() {
+                    self.matched_position += next.len_utf8();
+                }
+                Some(Fragment::default())
+            }
+            Expr::JavaLookahead { pattern, positive } => {
+                // Java WordParser rejects a zero-length word; this differs from Literal("").
+                let matched =
+                    !pattern.is_empty() && self.input[self.matched_position..].starts_with(pattern);
+                if matched == *positive {
+                    if *positive {
+                        self.matched_position += pattern.len();
+                    }
+                    Some(Fragment::default())
+                } else {
+                    self.fail_at(
+                        self.matched_position,
+                        if *positive {
+                            pattern
+                        } else {
+                            "negative lookahead"
+                        },
+                    );
+                    None
+                }
+            }
+            Expr::JavaUntil(terminator) => {
+                loop {
+                    if !terminator.is_empty()
+                        && self.input[self.matched_position..].starts_with(terminator)
+                    {
+                        self.matched_position += terminator.len();
+                        break;
+                    }
+                    let Some(next) = self.input[self.position..].chars().next() else {
+                        break;
+                    };
+                    self.position += next.len_utf8();
+                    self.matched_position = self.position;
+                }
+                Some(Fragment::default())
+            }
             Expr::Eof => {
                 if self.position == self.input.len() {
                     Some(Fragment::default())
@@ -620,6 +706,7 @@ impl<'a> ParseContext<'a> {
                 });
                 if accepted {
                     self.position += next.expect("accepted character").len_utf8();
+                    self.matched_position = self.position;
                     Some(Fragment::default())
                 } else {
                     self.fail("character");
@@ -629,13 +716,14 @@ impl<'a> ParseContext<'a> {
             Expr::Until(terminator) => {
                 if let Some(length) = self.input[self.position..].find(terminator) {
                     self.position += length;
+                    self.matched_position = self.position;
                     Some(Fragment::default())
                 } else {
                     self.fail(terminator);
                     None
                 }
             }
-            Expr::Optional(child) => {
+            Expr::Optional(child) | Expr::JavaOptional(child) => {
                 let start = self.position;
                 let count = self.nodes.len();
                 match self.expression(child, depth) {
@@ -643,23 +731,27 @@ impl<'a> ParseContext<'a> {
                     None => {
                         self.position = start;
                         self.nodes.truncate(count);
+                        if matches!(expression, Expr::JavaOptional(_)) {
+                            self.java_failed_atom(child);
+                        }
                         Some(Fragment::default())
                     }
                 }
             }
-            Expr::Repeat { child, min, max } => {
+            Expr::Repeat { child, min, max } | Expr::JavaRepeat { child, min, max } => {
+                let java = matches!(expression, Expr::JavaRepeat { .. });
                 if max.is_some_and(|max| max < *min) {
                     self.fail("valid repetition bounds");
                     return None;
                 }
                 let mut result = Fragment::default();
                 let mut iterations = 0;
-                while max.is_none_or(|max| iterations < max) {
+                while (java && iterations == 0) || max.is_none_or(|max| iterations < max) {
                     let start = self.position;
                     let count = self.nodes.len();
                     match self.expression(child, depth) {
                         Some(mut fragment) => {
-                            if self.position == start && max.is_none() {
+                            if self.position == start && max.is_none() && !java {
                                 self.nodes.truncate(count);
                                 self.fail("progress in unbounded repetition");
                                 return None;
@@ -667,15 +759,21 @@ impl<'a> ParseContext<'a> {
                             iterations += 1;
                             result.nodes.append(&mut fragment.nodes);
                             result.captures.append(&mut fragment.captures);
+                            if java && self.position == start {
+                                break;
+                            }
                         }
                         None => {
                             self.position = start;
                             self.nodes.truncate(count);
+                            if java {
+                                self.java_failed_atom(child);
+                            }
                             break;
                         }
                     }
                 }
-                (iterations >= *min).then_some(result)
+                (iterations >= *min && max.is_none_or(|max| iterations <= max)).then_some(result)
             }
             Expr::Lookahead { child, positive } => {
                 let checkpoint = self.checkpoint();
@@ -699,13 +797,20 @@ impl<'a> ParseContext<'a> {
             Expr::Literal(literal) => {
                 if self.input[self.position..].starts_with(literal) {
                     self.position += literal.len();
+                    self.matched_position = self.position;
                     Some(Fragment::default())
                 } else {
                     self.fail(literal);
                     None
                 }
             }
-            Expr::Number => self.number().then(Fragment::default),
+            Expr::Number => {
+                let accepted = self.number();
+                if accepted {
+                    self.matched_position = self.position;
+                }
+                accepted.then(Fragment::default)
+            }
             Expr::Rule(rule) => self.rule(*rule, depth).map(|id| Fragment {
                 nodes: vec![id],
                 captures: vec![],
@@ -777,6 +882,19 @@ impl<'a> ParseContext<'a> {
             if self.position == start {
                 break;
             }
+            self.matched_position = self.position;
+        }
+    }
+
+    // Java AbstractTokenParser calls consume(0) on a failed consuming atom. Occurs
+    // does not wrap that attempt in a child transaction, whereas chain/rule/capture
+    // children roll themselves back. Keep this effect confined to UBNF occurrences.
+    fn java_failed_atom(&mut self, child: &Expr) {
+        if matches!(
+            child,
+            Expr::Literal(_) | Expr::Any | Expr::CharRange(_, _) | Expr::Except(_)
+        ) {
+            self.matched_position = self.position;
         }
     }
 
