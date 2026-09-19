@@ -178,4 +178,21 @@ public class NestedCaptureRuntimeTest {
         assertThrows(IllegalArgumentException.class, () -> new ASTGenerator().generate(grammar));
         assertThrows(IllegalArgumentException.class, () -> new MapperGenerator().generate(grammar));
     }
+
+    @Test public void mixedSemanticCollectionsKeepEveryOccurrenceInCompletionOrder() throws Exception {
+        try (var loader = compile("""
+            @root @mapping(Box, params=[values]) Root ::= (Mixed @values Mixed) @values;
+            Mixed ::= '😀' | Leaf;
+            @mapping(Leaf, params=[text]) Leaf ::= 'x' @text;
+            """)) {
+            List<?> values = (List<?>) field(parse(loader, "😀x"), "values");
+            assertEquals(3, values.size());
+            assertEquals("😀", values.get(0));
+            assertEquals("😀", values.get(1));
+            assertEquals("x", field(values.get(2), "text"));
+            span(loader, values.get(0), 0, 1);
+            span(loader, values.get(1), 0, 1);
+            span(loader, values.get(2), 1, 2);
+        }
+    }
 }

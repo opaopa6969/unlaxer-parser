@@ -881,11 +881,40 @@ class MapperRuleEmitter {
             """.formatted(String.join(", ", boundaries), SemanticCardinality.TEXT_BINDING, SemanticCardinality.BOUNDARY_BINDING);
     }
 
+    /** Plain mappings consume each completed grammar binding, including coincident sites. */
+    static String emitCaptureOccurrenceUtilities(String parsersClass, java.util.Set<String> allRuleNames) {
+        String allBoundaries = allRuleNames.stream().map(name -> parsersClass + "." + name + "Parser.class")
+            .collect(java.util.stream.Collectors.joining(", "));
+        return """
+                private static final java.util.Set<Class<?>> CAPTURE_RULE_BOUNDARIES = java.util.Set.of(%s);
+                private record CaptureOccurrence(Token token, String binding) {}
+
+                private static List<CaptureOccurrence> findCaptureOccurrences(Token token, java.util.Set<String> bindings) {
+                    List<CaptureOccurrence> result = new ArrayList<>();
+                    collectCaptureOccurrences(token, bindings, result, true);
+                    return result;
+                }
+
+                private static void collectCaptureOccurrences(Token token, java.util.Set<String> bindings,
+                        List<CaptureOccurrence> result, boolean root) {
+                    if (token == null || !root && CAPTURE_RULE_BOUNDARIES.contains(token.parser.getClass())) return;
+                    for (Token child : token.filteredChildren) collectCaptureOccurrences(child, bindings, result, false);
+                    if (token.parser instanceof %s.__CaptureBinding capture) {
+                        // Grammar bindings are registered outer-first; captures complete inner-first.
+                        List<String> ids = capture.captureBindings();
+                        for (int i = ids.size() - 1; i >= 0; i--) {
+                            if (bindings.contains(ids.get(i))) result.add(new CaptureOccurrence(token, ids.get(i)));
+                        }
+                    }
+                }
+
+            """.formatted(allBoundaries, parsersClass);
+    }
+
     /**
      * ユーティリティメソッド群（findDescendants, firstTokenText 等）を生成する。
      */
-    static String emitUtilities(String parsersClass, java.util.Set<String> mappedRuleNames,
-            java.util.Set<String> allRuleNames) {
+    static String emitUtilities(String parsersClass, java.util.Set<String> mappedRuleNames) {
         IndentedWriter w = new IndentedWriter(1);
         w.line("// =========================================================================");
         w.line("// Utilities");
@@ -912,33 +941,6 @@ class MapperRuleEmitter {
             w.line(");");
         }
         w.blankLine();
-
-        String allBoundaries = allRuleNames.stream().map(name -> parsersClass + "." + name + "Parser.class")
-            .collect(java.util.stream.Collectors.joining(", "));
-        w.raw("""
-                private static final java.util.Set<Class<?>> CAPTURE_RULE_BOUNDARIES = java.util.Set.of(%s);
-                private record CaptureOccurrence(Token token, String binding) {}
-
-                private static List<CaptureOccurrence> findCaptureOccurrences(Token token, java.util.Set<String> bindings) {
-                    List<CaptureOccurrence> result = new ArrayList<>();
-                    collectCaptureOccurrences(token, bindings, result, true);
-                    return result;
-                }
-
-                private static void collectCaptureOccurrences(Token token, java.util.Set<String> bindings,
-                        List<CaptureOccurrence> result, boolean root) {
-                    if (token == null || !root && CAPTURE_RULE_BOUNDARIES.contains(token.parser.getClass())) return;
-                    for (Token child : token.filteredChildren) collectCaptureOccurrences(child, bindings, result, false);
-                    if (token.parser instanceof %s.__CaptureBinding capture) {
-                        // Grammar bindings are registered outer-first; captures complete inner-first.
-                        List<String> ids = capture.captureBindings();
-                        for (int i = ids.size() - 1; i >= 0; i--) {
-                            if (bindings.contains(ids.get(i))) result.add(new CaptureOccurrence(token, ids.get(i)));
-                        }
-                    }
-                }
-
-            """.formatted(allBoundaries, parsersClass));
 
         w.raw("""
                 private static boolean hasCaptureBinding(Token token, String binding) {
