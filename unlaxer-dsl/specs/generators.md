@@ -212,6 +212,8 @@ zero-width captureを保つには元CSTを使用する。縮約で削除済み�
 mapped leaf が到達可能な場合、両 operand を共通の `{GrammarName}AST` へ広げる。
 この場合は単独の右結合 rule でも同じ契約を使い、括弧内の式と typed leaf を保持する。
 `right` はその型の `List` となる。AST / Parser / Mapper はまとめて再生成する。
+単独の左結合 rule の source-string fold（例: tinyexpression の文字列連結）は、
+透明な rule から mapped function が到達可能でも従来の text / `Object` operand 型を維持する。
 
 互換でない scalar 型を共有する場合や、共有する結合 rule が canonical な
 `params=[left, op, right]` と反復 text operator の形を満たさない場合は、生成時に
