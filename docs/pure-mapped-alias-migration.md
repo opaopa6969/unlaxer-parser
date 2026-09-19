@@ -24,8 +24,9 @@ Java の `Object` 型だけで利用者の任意代入まで防止できると�
 
 ## 利用側の移行
 
-生成された accessor を `String` 変数へ代入するコード、文字列の直接メソッド呼び出し、
-古い record constructor 呼び出しは再生成時に更新する必要がある。
+生成された accessor を `String` 変数へ代入するコードや、文字列の直接メソッド呼び出しは
+再生成時に更新する必要がある。Object field の constructor は String も受け付けるが、
+それで手書き構築した AST と、生成 mapper の Node 値の契約は区別する。
 数値の意味を使う処理はノードを評価し、字句表現が必要な処理は保持した source と
 所有する source-map snapshot を使う。`Node.toString()` は元ソースではない。
 

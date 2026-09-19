@@ -44,7 +44,7 @@ rust/target/release/unlaxer generate --target rust \
 
 構成は`unlaxer-ubnf`（[全構文のsyntax ASTと既知差](unlaxer-ubnf/README.md)）、`unlaxer-generator`（対応範囲のlowering/検証とCLI）、`unlaxer-codegen`（[normalized IRから5module出力](unlaxer-codegen/README.md)）、`unlaxer-runtime`。文法が読めることと全backend機能を生成できることは別であり、下記の未対応機能はnativeでも明示拒否する。
 
-86文法・430生成ファイルのJava/native byte一致を`RustNativeGeneratorTest`で検査し、生成と`--check`は空のPATHで実行する。Javaは比較用oracleで、native生成経路の依存ではない。構文解析は128、構造shape分析は256の再帰深度上限を持ち、超過は診断になる。Javaのprefix解析等との差はfrontend READMEへ明示する。
+119文法・595生成ファイルのJava/native byte一致を`RustNativeGeneratorTest`で検査し、生成と`--check`は空のPATHで実行する。Javaは比較用oracleで、native生成経路の依存ではない。構文解析は128、構造shape分析は256の再帰深度上限を持ち、超過は診断になる。Javaのprefix解析等との差はfrontend READMEへ明示する。
 
 終了コードは0=成功、2=引数不正、3=構文/意味/未対応機能、4=I/O・drift・上書き保護。全artifactを事前検査し、手書きファイルやsymlink（出力先・祖先・各file）を上書きしない。各fileは一時ファイルから置換するが、ディレクトリ全体のtransactionや敵対的な同時ファイル差し替えへのsandboxではない。排他的に管理できる出力先を使う。
 
