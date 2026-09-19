@@ -111,9 +111,11 @@ fn expression(
                 expression(child, count, captures)?;
             }
         }
-        OptionalExpr(child) | Delimited(child) | TextValue(child) | ValueBoundary(child) => {
-            expression(child, count, captures)?
-        }
+        OptionalExpr(child)
+        | Delimited(child)
+        | TextValue(child)
+        | ValueBoundary(child)
+        | TriviaScope { child, .. } => expression(child, count, captures)?,
         Repeat { child, min, max } => {
             if *min > i32::MAX as usize
                 || max.is_some_and(|max| max < *min || max > i32::MAX as usize)

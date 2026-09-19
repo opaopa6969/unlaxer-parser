@@ -93,6 +93,9 @@ grammar MiniLang {
 空白（スペース、タブ、改行）の扱いを指定します。
 `javaStyle` を指定すると、`//` コメントも含めて自動でスキップされます：
 
+`@whitespace: none` は自動空白処理を無効にします。rule の `@whitespace(...)` による
+上書きや `@interleave` との優先順位は[両言語の trivia 契約](../../docs/rule-trivia.md)を参照。
+
 ```ubnf
 grammar MiniLang {
   @package: org.example.minilang

@@ -180,6 +180,7 @@ RuleName ::= body ;
 ```
 // グローバル設定
 @whitespace: javaStyle
+@whitespace: none
 
 // ルールレベル
 @whitespace
@@ -190,13 +191,17 @@ RuleName ::= body ;
 ### セマンティクス
 
 - グローバル `@whitespace` は生成パーサーのデリミタ挿入を制御する
+- グローバル `none` は自動空白処理なし（未指定時と同じ）、`javaStyle` は有効化
 - ルールレベル `@whitespace` はグローバル設定をオーバーライドする
   - `@whitespace(none)` — 自動デリミタを無効化
   - `@whitespace` または `@whitespace(javaStyle)` — 自動デリミタを有効化
+- 同じルールの `@interleave` より明示 `@whitespace` が優先される
+- 子ルールの既定値は呼出し元ではなく grammar の設定。親連接の外側 delimiter は別途作用する
+- global/rule の whitespace 重複指定は拒否する
 
 ### 実装状況
 
-完全実装済み。
+Java parser と両 Rust 生成経路で対応。[両言語の契約・global none の移行](../../docs/rule-trivia.md)を参照。
 
 ---
 
@@ -224,13 +229,14 @@ RuleName ::= body ;
 パーサージェネレータは以下を生成する:
 - `getInterleaveProfile(ruleName)` — ルールのインターリーブプロファイルを返す
 
-さらに `@interleave(profile=commentsAndSpaces)` は `createContext()` でパーサー生成に直接影響する:
+さらに両 profile とも `createContext()` でパーサー生成に直接影響する:
 - 該当ルールに対して `DelimitedChain`（空白/コメント自動挿入）が選択される
-- `CPPComment` パーサーがデリミタクラスに追加される
+- 空白・`CPPComment`・block comment がデリミタクラスに追加される
+- 明示 `@whitespace(none)` があれば、そのルールでは無効化される
 
 ### 実装状況
 
-**パーサー生成に反映済み**。`profile=commentsAndSpaces` の場合、生成パーサーが WhiteSpaceDelimitedChain を使用し、要素間にコメント/空白を自動許容する。メタデータ query API も生成される。
+**パーサー生成に反映済み**。Java と両 Rust 生成経路で、連接の要素間にコメント/空白を自動許容する。Java にはメタデータ query API も生成されるが、この Rust 対応は parser 挙動の移植であり Java metadata API の同値を主張しない。
 
 ---
 

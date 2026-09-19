@@ -94,6 +94,18 @@
 | `E-ASSOC-WITHOUT-PRECEDENCE` | `@leftAssoc` / `@rightAssoc` が `@precedence` なしで使用されている |
 | `E-RIGHTASSOC-NON-CANONICAL` | `@rightAssoc` ルールが非正規形（`Base { Op Self }` でない） |
 
+### WHITESPACE エラー
+
+| コード | 条件 |
+|--------|------|
+| `E-WHITESPACE-GLOBAL-STYLE` | global style が `javaStyle` / `none` 以外、または block 設定 |
+| `E-WHITESPACE-GLOBAL-DUPLICATE` | global `@whitespace` が複数ある |
+| `E-WHITESPACE-RULE-STYLE` | rule style が `javaStyle` / `none` 以外 |
+| `E-WHITESPACE-RULE-DUPLICATE` | 同一 rule に `@whitespace` が複数ある |
+
+style の比較は trim 後、大文字小文字を区別しない。rule の引数省略は `javaStyle`。
+`@interleave` との併記は重複ではなく、明示した rule whitespace が優先される。
+
 ### PRECEDENCE エラー
 
 | コード | 条件 |

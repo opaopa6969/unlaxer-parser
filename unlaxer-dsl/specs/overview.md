@@ -88,7 +88,7 @@ Java ソースファイル群
 ## 現在の制限事項
 
 - セルフホスティングは未完了（Bootstrap パーサーがハンドコード）
-- `@interleave`, `@backref`, `@scopeTree` はメタデータとして受理されるが、パーサー動作には未反映
+- `@interleave` はパーサーの delimiter 選択に反映する。注釈ごとの Java 実装状況は [annotations.md](annotations.md)、Rust の対応範囲は [FULL-SPEC.md](../../rust/FULL-SPEC.md) を参照
 
 ## 変更履歴
 

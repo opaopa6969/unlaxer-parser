@@ -21,7 +21,9 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     public sealed interface Expression permits Literal, NumberToken, Reference, Sequence, Choice, Capture,
         OptionalExpr, Repeat, Separated, AnyToken, EofToken, EmptyToken, CharRangeToken,
         ExceptToken, UntilToken, LookaheadToken, Delimited, IdentifierToken, QuotedToken,
-        CodeStartToken, CodeEndToken, TextValue, ValueBoundary {}
+        CodeStartToken, CodeEndToken, TextValue, ValueBoundary, TriviaScope {}
+    /** Rule-local trivia policy, transparent to captures and semantic values. */
+    public record TriviaScope(Expression child, boolean javaWhitespace) implements Expression {}
     /** Retains an otherwise unmapped text branch as a source-positioned semantic value. */
     public record TextValue(Expression child) implements Expression {}
     public record ValueBoundary(Expression child) implements Expression {}

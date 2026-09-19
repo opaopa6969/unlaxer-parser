@@ -34,14 +34,15 @@ public final class RustGrammarLowering {
             if (!settings.add(setting.key())) throw unsupported("duplicate setting " + setting.key());
             if (!(setting.value() instanceof StringSettingValue value)) throw unsupported("block setting " + setting.key());
             if (setting.key().equals("whitespace")) {
-                if (!Set.of("javaStyle", "none").contains(value.value())) throw unsupported("whitespace " + value.value());
-                whitespace = value.value().equals("javaStyle");
+                whitespace = whitespaceStyle(value.value());
             } else if (!setting.key().equals("package")) throw unsupported("setting " + setting.key());
         }
         for (var token : grammar.tokens()) {
             if (tokens.putIfAbsent(token.name(), token(token)) != null) throw unsupported("duplicate token " + token.name());
         }
         int root = -1;
+        List<Boolean> ruleWhitespace = new ArrayList<>();
+        boolean hasLocalTrivia = false;
         Map<String, String> methods = new LinkedHashMap<>();
         for (int i = 0; i < grammar.rules().size(); i++) {
             var rule = grammar.rules().get(i);
@@ -52,6 +53,8 @@ public final class RustGrammarLowering {
             boolean leftAssoc = false;
             boolean rightAssoc = false;
             Integer precedence = null;
+            Boolean localWhitespace = null;
+            boolean interleave = false;
             for (var annotation : rule.annotations()) {
                 if (annotation instanceof RootAnnotation) {
                     if (root != -1) throw unsupported("multiple @root annotations");
@@ -73,8 +76,20 @@ public final class RustGrammarLowering {
                 } else if (annotation instanceof PrecedenceAnnotation value) {
                     if (precedence != null) throw unsupported("duplicate @precedence on " + rule.name());
                     precedence = value.level();
+                } else if (annotation instanceof WhitespaceAnnotation value) {
+                    if (localWhitespace != null) throw unsupported("duplicate @whitespace on " + rule.name());
+                    localWhitespace = whitespaceStyle(value.style().orElse("javaStyle"));
+                } else if (annotation instanceof InterleaveAnnotation value) {
+                    if (interleave) throw unsupported("duplicate @interleave on " + rule.name());
+                    String profile = value.profile().trim();
+                    if (!profile.equals("javaStyle") && !profile.equals("commentsAndSpaces")) {
+                        throw unsupported("interleave profile " + value.profile());
+                    }
+                    interleave = true;
                 } else throw unsupported("annotation " + annotation + " on " + rule.name());
             }
+            hasLocalTrivia |= localWhitespace != null || interleave;
+            ruleWhitespace.add(localWhitespace == null ? whitespace || interleave : localWhitespace);
             mappings.add(mapping);
             operators.add(leftAssoc || rightAssoc || precedence != null
                 ? new Operator(leftAssoc ? Associativity.LEFT : rightAssoc ? Associativity.RIGHT : Associativity.NONE, precedence == null ? -1 : precedence)
@@ -125,7 +140,8 @@ public final class RustGrammarLowering {
         List<Rule> rewritten = new ArrayList<>();
         boolean hasValues = variants.values().stream().flatMap(mapping -> mapping.fields().stream())
             .anyMatch(field -> field.kind() == Kind.VALUE);
-        for (Rule rule : rules) {
+        for (int i = 0; i < rules.size(); i++) {
+            Rule rule = rules.get(i);
             Mapping mapping = rule.mapping() == null ? null : variants.get(rule.mapping().name());
             Expression expression = hasValues
                 ? mapping == null ? retainHelperValue(rule.body()) : retainTextValues(rule.body(), mapping)
@@ -135,9 +151,18 @@ public final class RustGrammarLowering {
             if (rule.operator() != null && rule.operator().associativity() == Associativity.RIGHT) {
                 expression = rightAssocBody(expression);
             }
+            // Every rule resolves against the grammar default, never against its caller.
+            if (hasLocalTrivia) expression = new TriviaScope(expression, ruleWhitespace.get(i));
             rewritten.add(new Rule(rule.name(), expression, mapping, rule.operator()));
         }
         return new GrammarIR(rewritten, root, whitespace);
+    }
+
+    private static boolean whitespaceStyle(String style) {
+        String normalized = style.trim();
+        if (normalized.equalsIgnoreCase("javaStyle")) return true;
+        if (normalized.equalsIgnoreCase("none")) return false;
+        throw unsupported("whitespace " + style);
     }
 
     private Mapping mergeMappings(Mapping left, Mapping right) {

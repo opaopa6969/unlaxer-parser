@@ -99,4 +99,9 @@ pub enum Expression {
     TextValue(Box<Expression>),
     /// Scalar/optional capture boundary: retain its full span if all values are text.
     ValueBoundary(Box<Expression>),
+    /// Rule-local trivia policy, transparent to captures and semantic values.
+    TriviaScope {
+        child: Box<Expression>,
+        java_whitespace: bool,
+    },
 }

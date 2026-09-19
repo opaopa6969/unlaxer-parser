@@ -39,6 +39,11 @@ pub enum Expr {
     TextValue(Box<Expr>),
     /// Preserve a scalar mixed-value capture span without deciding text versus node.
     ValueBoundary(Box<Expr>),
+    /// Apply a local trivia policy to sequence boundaries, restoring the caller afterwards.
+    TriviaScope {
+        child: Box<Expr>,
+        whitespace: bool,
+    },
     Optional(Box<Expr>),
     /// Java Occurs retains a failed direct consuming atom's match-cursor reset.
     JavaOptional(Box<Expr>),
@@ -139,6 +144,12 @@ impl Expr {
     /// Preserve a mixed scalar/optional capture boundary; parsing remains transparent.
     pub fn value_boundary(self) -> Self {
         Self::ValueBoundary(Box::new(self))
+    }
+    pub fn trivia_scope(self, whitespace: bool) -> Self {
+        Self::TriviaScope {
+            child: Box::new(self),
+            whitespace,
+        }
     }
     pub fn ahead(self) -> Self {
         Self::Lookahead {
@@ -567,6 +578,19 @@ impl<'a> ParseContext<'a> {
         result
     }
 
+    /// Temporarily changes sequence trivia handling, on both success and failure.
+    /// Atomic parsers still consume only their own token syntax.
+    pub fn with_trivia<T>(
+        &mut self,
+        whitespace: bool,
+        operation: impl FnOnce(&mut Self) -> T,
+    ) -> T {
+        let previous = std::mem::replace(&mut self.whitespace, whitespace);
+        let result = operation(self);
+        self.whitespace = previous;
+        result
+    }
+
     fn parse_expression(&mut self, expression: &Expr) -> ParseResult {
         let start = self.position();
         match self.expression(expression, self.call_depth) {
@@ -964,6 +988,9 @@ impl<'a> ParseContext<'a> {
                 });
                 Some(fragment)
             }
+            Expr::TriviaScope { child, whitespace } => {
+                self.with_trivia(*whitespace, |context| context.expression(child, depth))
+            }
             Expr::TextValue(child) | Expr::ValueBoundary(child) => {
                 let start = self.position;
                 let fragment = self.expression(child, depth)?;
@@ -1104,7 +1131,10 @@ impl<'a> ParseContext<'a> {
     // does not wrap that attempt in a child transaction, whereas chain/rule/capture
     // children roll themselves back. Keep this effect confined to UBNF occurrences.
     fn java_failed_atom(&mut self, child: &Expr) {
-        if let Expr::TextValue(child) | Expr::ValueBoundary(child) = child {
+        if let Expr::TextValue(child)
+        | Expr::ValueBoundary(child)
+        | Expr::TriviaScope { child, .. } = child
+        {
             self.java_failed_atom(child);
             return;
         }

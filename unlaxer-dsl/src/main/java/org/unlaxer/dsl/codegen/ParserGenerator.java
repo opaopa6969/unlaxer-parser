@@ -3,6 +3,7 @@ package org.unlaxer.dsl.codegen;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AtomicElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.BlockSettingValue;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
+import org.unlaxer.dsl.bootstrap.UBNFAST.StringSettingValue;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RootAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RuleBody;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RuleDecl;
@@ -257,7 +258,8 @@ public class ParserGenerator implements CodeGenerator {
         GenContext ctx = new GenContext(grammar);
 
         boolean hasGlobalWhitespace = grammar.settings().stream()
-            .anyMatch(s -> "whitespace".equals(s.key()));
+            .anyMatch(s -> "whitespace".equals(s.key()) && s.value() instanceof StringSettingValue value
+                && "javaStyle".equalsIgnoreCase(value.value().trim()));
 
         boolean hasGlobalComment = grammar.settings().stream()
             .anyMatch(s -> "comment".equals(s.key()) && s.value() instanceof BlockSettingValue bv
