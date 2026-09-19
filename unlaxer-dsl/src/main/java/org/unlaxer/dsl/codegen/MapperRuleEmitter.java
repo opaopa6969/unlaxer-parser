@@ -583,8 +583,7 @@ class MapperRuleEmitter {
             Map<String, String> mappedClassByRuleName,
             Map<String, TokenDecl> tokenDeclByName, Map<String, RuleDecl> ruleByName) {
 
-        String ruleParserClass = parsersClass + "." + rule.name() + "Parser.class";
-        Map<String, Integer> scalarCaptureIndexByParserClass = new LinkedHashMap<>();
+        CaptureBindingPlan bindings = new CaptureBindingPlan(rule);
         // Collect @typeof constraints: ownCaptureName -> referencedCaptureName
         Map<String, String> typeofConstraints = MapperElementUtil.collectTypeofConstraints(rule.body());
         for (String param : mapping.paramNames()) {
@@ -596,24 +595,7 @@ class MapperRuleEmitter {
                 continue;
             }
 
-            Optional<String> listElementType = MapperTypeResolver.unwrapListType(type);
-            if (listElementType.isPresent()) {
-                emitListParam(w, parsersClass, ruleParserClass, grammar, param, type,
-                    listElementType.get(), capturedElements, scalarCaptureIndexByParserClass,
-                    mappedClassByRuleName, tokenDeclByName, ruleByName);
-                continue;
-            }
-
-            Optional<String> optionalElementType = MapperTypeResolver.unwrapOptionalType(type);
-            if (optionalElementType.isPresent()) {
-                emitOptionalParam(w, parsersClass, ruleParserClass, grammar, param, type,
-                    optionalElementType.get(), capturedElements, scalarCaptureIndexByParserClass,
-                    mappedClassByRuleName, tokenDeclByName, ruleByName);
-                continue;
-            }
-
-            emitScalarParam(w, parsersClass, ruleParserClass, grammar, param, type,
-                capturedElements, scalarCaptureIndexByParserClass,
+            emitBoundParam(w, parsersClass, grammar, param, type, bindings.sites(param),
                 mappedClassByRuleName, tokenDeclByName, ruleByName);
         }
         // Emit @typeof runtime assertions
@@ -645,176 +627,53 @@ class MapperRuleEmitter {
         w.line("return registerNodeSourceSpan(mapped, token);");
     }
 
-    private static void emitListParam(IndentedWriter w, String parsersClass, String ruleParserClass,
-            GrammarDecl grammar, String param, String type, String elementType,
-            List<AtomicElement> capturedElements,
-            Map<String, Integer> scalarCaptureIndexByParserClass,
+    private static void emitBoundParam(IndentedWriter w, String parsersClass, GrammarDecl grammar,
+            String param, String type, List<CaptureBindingPlan.Site> sites,
             Map<String, String> mappedClassByRuleName,
             Map<String, TokenDecl> tokenDeclByName, Map<String, RuleDecl> ruleByName) {
-
-        w.line("List<" + elementType + "> " + param
-            + " = new ArrayList<>();");
-        // A capture name can appear more than once for the same parser class — typically a
-        // variadic `X @c { ',' X @c }` (one direct element + one in the repeat). Emit a
-        // single findDescendants loop per parser class (deduplicated), and skip the leading
-        // descendants already claimed by scalar captures of that same class (e.g. the
-        // `@value`/`@first` operand): otherwise the variadic list would re-collect the value
-        // and duplicate every element — which made `'z'.in('a','b')` always true and
-        // `min(3,5,1)` carry its first arg twice. (unlaxer-parser #43 case 3)
-        java.util.Set<String> emittedParserClasses = new java.util.LinkedHashSet<>();
-        for (int i = 0; i < capturedElements.size(); i++) {
-            AtomicElement element = capturedElements.get(i);
-            AtomicElement normalized = MapperElementUtil.normalizeCapturedElement(element).orElse(element);
-            String parserClass = MapperElementUtil.parserClassLiteral(normalized, parsersClass, tokenDeclByName, ruleByName)
-                .orElse(ruleParserClass);
-            if (!emittedParserClasses.add(parserClass)) {
-                continue;
-            }
-            String tokenVarName = "paramToken_" + MapperElementUtil.safeName(param) + "_" + i;
-            String candidateType = MapperTypeResolver.inferTypeFromElement(grammar, normalized);
-            if (!MapperTypeResolver.isTypeCompatible(elementType, candidateType) && !"String".equals(elementType)) {
-                continue;
-            }
-            String mapExpression = MapperElementUtil.mapExpressionForTargetType(
-                elementType,
-                normalized,
-                tokenVarName,
-                mappedClassByRuleName,
-                tokenDeclByName,
-                ruleByName);
-            int skip = scalarCaptureIndexByParserClass.getOrDefault(parserClass, 0);
-            if (skip > 0) {
-                String idxVar = "idx_" + MapperElementUtil.safeName(param) + "_" + i;
-                w.line("int " + idxVar + " = 0;");
-                w.line("for (Token " + tokenVarName
-                    + " : findDescendants(token, " + parserClass + ")) {");
-                w.indent();
-                w.line("if (" + idxVar + "++ < " + skip + ") { continue; }");
-                w.line(param + ".add(" + mapExpression + ");");
-                w.dedent();
-                w.line("}");
-            } else {
-                w.line("for (Token " + tokenVarName
-                    + " : findDescendants(token, " + parserClass + ")) {");
-                w.indent();
-                w.line(param + ".add(" + mapExpression + ");");
-                w.dedent();
-                w.line("}");
-            }
-        }
-    }
-
-    private static void emitOptionalParam(IndentedWriter w, String parsersClass, String ruleParserClass,
-            GrammarDecl grammar, String param, String type, String elementType,
-            List<AtomicElement> capturedElements,
-            Map<String, Integer> scalarCaptureIndexByParserClass,
-            Map<String, String> mappedClassByRuleName,
-            Map<String, TokenDecl> tokenDeclByName, Map<String, RuleDecl> ruleByName) {
-
-        w.line("Optional<" + elementType + "> " + param
-            + " = Optional.empty();");
-        w.line("boolean found_" + MapperElementUtil.safeName(param) + " = false;");
-        for (int i = 0; i < capturedElements.size(); i++) {
-            AtomicElement element = capturedElements.get(i);
-            AtomicElement normalized = MapperElementUtil.normalizeCapturedElement(element).orElse(element);
-            String parserClass = MapperElementUtil.parserClassLiteral(normalized, parsersClass, tokenDeclByName, ruleByName)
-                .orElse(ruleParserClass);
-            int parserOccurrenceIndex =
-                scalarCaptureIndexByParserClass.getOrDefault(parserClass, 0);
-            scalarCaptureIndexByParserClass.put(parserClass, parserOccurrenceIndex + 1);
-            String tokenVarName = "paramToken_" + MapperElementUtil.safeName(param) + "_" + i;
-            String candidateType = MapperTypeResolver.inferTypeFromElement(grammar, normalized);
-            if (!MapperTypeResolver.isTypeCompatible(elementType, candidateType) && !"String".equals(elementType)) {
-                continue;
-            }
-            String mapExpression = MapperElementUtil.mapExpressionForTargetType(
-                elementType,
-                normalized,
-                tokenVarName,
-                mappedClassByRuleName,
-                tokenDeclByName,
-                ruleByName);
-            w.line("if (!found_" + MapperElementUtil.safeName(param) + ") {");
-            w.indent();
-            w.line("Token " + tokenVarName
-                + " = findCapturedToken(token, " + parserClass + ", "
-                + parserOccurrenceIndex + ");");
-            w.line("if (" + tokenVarName + " != null) {");
-            w.indent();
-            w.line(param + " = Optional.ofNullable(" + mapExpression + ");");
-            w.line("found_" + MapperElementUtil.safeName(param) + " = true;");
-            w.dedent();
-            w.line("}");
-            w.dedent();
-            w.line("}");
-        }
-    }
-
-    private static void emitScalarParam(IndentedWriter w, String parsersClass, String ruleParserClass,
-            GrammarDecl grammar, String param, String type,
-            List<AtomicElement> capturedElements,
-            Map<String, Integer> scalarCaptureIndexByParserClass,
-            Map<String, String> mappedClassByRuleName,
-            Map<String, TokenDecl> tokenDeclByName, Map<String, RuleDecl> ruleByName) {
-
+        Optional<String> listType = MapperTypeResolver.unwrapListType(type);
+        Optional<String> optionalType = MapperTypeResolver.unwrapOptionalType(type);
+        String valueType = listType.or(() -> optionalType).orElse(type);
         String localType = MapperTypeResolver.boxedType(type);
-        w.line(localType + " " + param
-            + " = " + MapperTypeResolver.defaultValueForType(localType) + ";");
-        w.line("boolean assigned_" + MapperElementUtil.safeName(param) + " = false;");
-        for (int i = 0; i < capturedElements.size(); i++) {
-            AtomicElement element = capturedElements.get(i);
-            AtomicElement normalized = MapperElementUtil.normalizeCapturedElement(element).orElse(element);
+        String initial = listType.isPresent() ? "new ArrayList<>()"
+            : optionalType.isPresent() ? "Optional.empty()" : "null";
+        w.line(localType + " " + param + " = " + initial + ";");
+        String safe = MapperElementUtil.safeName(param);
+        String siteToken = "captureSite_" + safe;
+        String ids = sites.stream().map(site -> "\"" + ParserCodegenUtil.escapeString(site.id()) + "\"")
+            .collect(java.util.stream.Collectors.joining(", "));
+        w.line("for (Token " + siteToken + " : findCaptureSites(token, java.util.Set.of(" + ids + "))) {");
+        w.indent();
+        for (int i = 0; i < sites.size(); i++) {
+            CaptureBindingPlan.Site site = sites.get(i);
+            AtomicElement normalized = MapperElementUtil.normalizeCapturedElement(site.element()).orElse(site.element());
             String parserClass = MapperElementUtil.parserClassLiteral(normalized, parsersClass, tokenDeclByName, ruleByName)
-                .orElse(ruleParserClass);
-            String tokenVarName = "paramToken_" + MapperElementUtil.safeName(param) + "_" + i;
+                .orElse(null);
             String candidateType = MapperTypeResolver.inferTypeFromElement(grammar, normalized);
-            if (!MapperTypeResolver.isTypeCompatible(type, candidateType) && !"String".equals(type)) {
-                continue;
-            }
-            String mapExpression = MapperElementUtil.mapExpressionForTargetType(
-                type,
-                normalized,
-                tokenVarName,
-                mappedClassByRuleName,
-                tokenDeclByName,
-                ruleByName);
-            boolean isWordParserTerminal = normalized instanceof TerminalElement
-                && parserClass.endsWith("WordParser.class");
-            w.line("if (!assigned_" + MapperElementUtil.safeName(param) + ") {");
+            if (!MapperTypeResolver.isTypeCompatible(valueType, candidateType) && !"String".equals(valueType)) continue;
+            String valueToken = "paramToken_" + safe + "_" + i;
+            w.line("if (hasCaptureBinding(" + siteToken + ", \"" + ParserCodegenUtil.escapeString(site.id()) + "\")) {");
             w.indent();
-            if (isWordParserTerminal) {
-                String literalText = ((TerminalElement) normalized).value();
-                String occurrenceKey = parserClass + "\n" + literalText;
-                int occurrenceIndex = scalarCaptureIndexByParserClass.getOrDefault(occurrenceKey, 0);
-                scalarCaptureIndexByParserClass.put(occurrenceKey, occurrenceIndex + 1);
-                w.line("Token " + tokenVarName
-                    + " = findCapturedTokenWithText(token, " + parserClass + ", \""
-                    + ParserCodegenUtil.escapeString(literalText) + "\", "
-                    + occurrenceIndex + ");");
-            } else {
-                int parserOccurrenceIndex =
-                    scalarCaptureIndexByParserClass.getOrDefault(parserClass, 0);
-                scalarCaptureIndexByParserClass.put(parserClass, parserOccurrenceIndex + 1);
-                w.line("Token " + tokenVarName
-                    + " = findCapturedToken(token, " + parserClass + ", "
-                    + parserOccurrenceIndex + ");");
-            }
-            w.line("if (" + tokenVarName + " != null) {");
+            w.line("Token " + valueToken + " = " + (parserClass == null ? siteToken
+                : "findDescendants(" + siteToken + ", " + parserClass + ").stream().findFirst().orElse(null)") + ";");
+            w.line("if (" + valueToken + " != null) {");
             w.indent();
-            w.line(param + " = " + mapExpression + ";");
-            w.line("assigned_" + MapperElementUtil.safeName(param) + " = true;");
+            String expression = MapperElementUtil.mapExpressionForTargetType(valueType, normalized, valueToken,
+                mappedClassByRuleName, tokenDeclByName, ruleByName);
+            w.line(listType.isPresent() ? param + ".add(" + expression + ");"
+                : optionalType.isPresent() ? param + " = Optional.ofNullable(" + expression + ");"
+                : param + " = " + expression + ";");
+            w.line(listType.isPresent() ? "continue;" : "break;");
             w.dedent();
             w.line("}");
             w.dedent();
             w.line("}");
         }
-        if (!localType.equals(type)) {
-            w.line("if (!assigned_" + MapperElementUtil.safeName(param) + ") {");
-            w.indent();
-            w.line("throw new IllegalArgumentException(\"Required numeric capture not found: "
+        w.dedent();
+        w.line("}");
+        if ("int".equals(type) || "long".equals(type)) {
+            w.line("if (" + param + " == null) throw new IllegalArgumentException(\"Required numeric capture not found: "
                 + ParserCodegenUtil.escapeString(param) + "\");");
-            w.dedent();
-            w.line("}");
         }
     }
 
@@ -911,6 +770,34 @@ class MapperRuleEmitter {
             w.line(");");
         }
         w.blankLine();
+
+        w.raw("""
+                private static boolean hasCaptureBinding(Token token, String binding) {
+                    return token.parser instanceof %s.__CaptureBinding capture
+                        && capture.captureBindings().contains(binding);
+                }
+
+                private static List<Token> findCaptureSites(Token token, java.util.Set<String> bindings) {
+                    List<Token> result = new ArrayList<>();
+                    collectCaptureSites(token, bindings, result, true);
+                    return result;
+                }
+
+                private static void collectCaptureSites(Token token, java.util.Set<String> bindings,
+                        List<Token> result, boolean root) {
+                    if (token == null) return;
+                    if (token.parser instanceof %s.__CaptureBinding capture
+                            && capture.captureBindings().stream().anyMatch(bindings::contains)) {
+                        result.add(token);
+                        return;
+                    }
+                    if (!root && CAPTURE_BOUNDARY_PARSERS.contains(token.parser.getClass())) return;
+                    for (Token child : token.filteredChildren) {
+                        collectCaptureSites(child, bindings, result, false);
+                    }
+                }
+
+            """.formatted(parsersClass, parsersClass));
 
         // Like findDescendants, but stops at capture-boundary tokens (separate mapped nodes),
         // so a capture absent at this level does not leak into a nested sub-expression of the

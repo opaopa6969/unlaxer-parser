@@ -130,6 +130,31 @@ Rust backend の direct number capture は現段階で `String` であり、Java
 - 各 `@mapping` ルールに対応する `mapXxx(Token)` メソッド
 - `@rightAssoc` ルール用の `foldRightAssoc{ClassName}` ヘルパースケルトン
 
+### Capture の位置 binding と再生成（#116）
+
+通常の mapping は parser class の全体探索や「同じ class の何番目か」ではなく、
+文法中の capture 位置に付けた binding を使う。省略された optional は空のままで、
+repeat の要素や構造上の literal を別 field へ流用しない。量指定子の外側に付けた
+capture は各値へ binding し、separated の separator は含めない。同名 capture の
+複数箇所は入力中の出現順に取り出し、別の mapped rule の内部へは探索しない。
+
+ParserGenerator は位置専用の `__CaptureSite` と `__CaptureBinding` を生成する。
+`Parser.get` の共有 parser に capture metadata を書き込むことはない。CST には
+capture wrapper が増えるため、手書きの木の走査は追加ノードを考慮する必要がある。
+生成 scope/backref listener は新 wrapper だけを透過し、既存の rule 境界は維持する。
+`parseWithSourceMap` の AST/span API は変えない。
+
+**Parser と Mapper は同じ generator revision で一緒に再生成する。** 新 Mapper と
+旧 Parser の混在は `__CaptureBinding` が存在せずコンパイルできない。旧生成物の
+ペアはそのまま利用できるが、この修正は再生成しない限り反映されない。
+golden fixture と実 Java コンパイル/実行、および Rust との共有 cardinality corpus
+でこの契約を検査する。
+
+入れ子量指定子の内側の capture（`[ { Item @values } ]`）は扱うが、
+外側 capture が作る入れ子 container 型（`[ { Item } ] @values` の
+`Optional<List<Item>>` など）の mapper 再構築は未完了。型が生成できることと
+その構造へ正しく mapping できることを同一視しない。
+
 ---
 
 ## EvaluatorGenerator

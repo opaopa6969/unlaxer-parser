@@ -141,9 +141,11 @@ v6と同じ[`evolution/{0,1,2,3}`](../unlaxer-dsl/src/test/resources/evolution/)
 
 ## optional/repeatの追加実験
 
-[`cardinality/`](../unlaxer-dsl/src/test/resources/cardinality/)に共通文法・14入力・期待AST・Rust Semanticsを固定した。zero/plus/bounded/unbounded/separatedの5文法×14入力＝70ケースをJava/Rustで実生成・コンパイル・実行する。受理／拒否は70件で一致し、受理20件のRust AST全field・全node span・評価値は独立した期待fixtureと一致する。これはJava ASTとの全面一致ではない。
+[`cardinality/`](../unlaxer-dsl/src/test/resources/cardinality/)に共通文法・14入力・期待AST・Rust Semanticsを固定した。zero/plus/bounded/unbounded/separatedの5文法×14入力＝70ケースをJava/Rustで実生成・コンパイル・実行する。受理／拒否は70件で一致し、受理20件では両backendのAST全field・全node spanが独立した期待fixtureと一致する。Rustの評価値も独立oracleで検査する。この限定corpusの一致であり、全Java文法への互換性を主張するものではない。
 
-Java mapperにはcapture選択の既存不具合がある。例えば`:::`で欠損tailを`":"`、空flagsを`[":", ":"]`へ変換し、`:2;::`でrepeat側のItemをoptional headへ誤配置する。plus/bounded/separatedのlistが空になる場合もある。受理20件すべてでJava ASTは期待ASTと異なり、生のJava結果も`javaKnown` fixtureで固定して[issue #116](https://github.com/opaopa6969/unlaxer-parser/issues/116)へ分離した。比較を通すためRustへこの不具合をコピーしない。双方の結果は`target/rust-cardinality.tsv`とCI artifactに保存する。
+差分実験で見つかったJava mapperのcapture選択不具合[issue #116](https://github.com/opaopa6969/unlaxer-parser/issues/116)は、生成parserの文法位置bindingで修正した。欠損optionalがrepeat側のItemを奪うことや、literalの代わりに区切りを拾うことを防ぎ、plus/bounded/separatedも各値の出現順に対応する。旧`javaKnown`不具合snapshotを除き、正しい期待ASTとの一致とJava/Rust相互一致を検査する。双方の結果は`target/rust-cardinality.tsv`とCI artifactに保存する。
+
+Javaではparserとmapperを同じgenerator revisionで**一緒に再生成**する必要がある。新mapperは新parserの`__CaptureBinding` metadataを必要とし、旧parserとの混在は非互換（コンパイルエラー）になる。旧parser＋旧mapperの組はそのまま利用できるが、旧capture不具合も残る。追加wrapperは専用instanceであり`Parser.get`の共有instanceは変更しない。scope/backref listenerではwrapperだけを透過して従来のrule境界を維持する。入れ子量指定子の内側に置いたcaptureは検証済みだが、`[ { Item } ] @values`のような外側captureの`Optional<List<_>>`再構築はJava/Rust双方の未完了項目で、今回の位置binding修正とは別である。
 
 数値は既存evolutionと同じ`Digits ::= NUMBER`のtext用rule経由でcaptureする。[issue #115](https://github.com/opaopa6969/unlaxer-parser/issues/115)のJava直接captureの不正なprimitive初期化とgeneric型は修正した。scalarの既存`int` APIを維持し、optional/listは`Integer`へboxingする。Java mapperは`Integer.parseInt`により小数・指数・overflowを明示的に拒否し、Rust mapperは字句を`String`として保持する。この型・変換契約はまだ同値ではない。
 

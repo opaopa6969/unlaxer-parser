@@ -98,6 +98,29 @@ public class SnapshotRightAssocParsers {
             .flatMap(spec -> getOperatorParser(spec.ruleName()));
     }
 
+    // Capture metadata belongs to grammar sites, not shared rule-parser instances.
+    public interface __CaptureBinding {
+        java.util.List<String> captureBindings();
+    }
+    public static final class __CaptureSite extends LazyChain implements __CaptureBinding {
+        private static final long serialVersionUID = 1L;
+        private final java.util.List<String> bindings;
+        private final Parser child;
+        public __CaptureSite(Parser child, String... bindings) {
+            this.child = child;
+            this.bindings = java.util.List.of(bindings);
+        }
+        @Override public java.util.List<String> captureBindings() { return bindings; }
+        @Override public Parsers getLazyParsers() { return new Parsers(child); }
+        @Override public java.util.Optional<RecursiveMode> getNotAstNodeSpecifier() {
+            return java.util.Optional.empty();
+        }
+    }
+    private static java.util.stream.Stream<org.unlaxer.Token> __semanticChildren(org.unlaxer.Token token) {
+        return token.filteredChildren.stream().flatMap(child -> child.parser instanceof __CaptureSite
+            ? __semanticChildren(child) : java.util.stream.Stream.of(child));
+    }
+
     // --- Base Chain (No Auto Delimiter) ---
     public static abstract class SnapshotRightAssocPlainLazyChain extends LazyChain {
         private static final long serialVersionUID = 1L;
@@ -147,8 +170,8 @@ public class SnapshotRightAssocParsers {
         @Override
         public Parsers getLazyParsers() {
             return new Parsers(
-                new WordParser("^"),
-                Parser.get(ExprParser.class)
+                new __CaptureSite(new WordParser("^"), "Expr:1"),
+                new __CaptureSite(Parser.get(ExprParser.class), "Expr:2")
             );
         }
     }
@@ -163,13 +186,13 @@ public class SnapshotRightAssocParsers {
                     @Override
                     public Parsers getLazyParsers() {
                         return new Parsers(
-                            Parser.get(AtomParser.class),
-                            new WordParser("^"),
+                            new __CaptureSite(Parser.get(AtomParser.class), "Expr:0"),
+                            new __CaptureSite(new WordParser("^"), "Expr:1"),
                             Parser.get(ExprParser.class)
                         );
                     }
                 },
-                Parser.get(AtomParser.class)
+                new __CaptureSite(Parser.get(AtomParser.class), "Expr:0")
             );
         }
         @Override

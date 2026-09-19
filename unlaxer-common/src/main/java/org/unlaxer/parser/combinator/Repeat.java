@@ -15,6 +15,13 @@ public class Repeat extends ChildOccursWithTerminator {
 		this.minInclusive = minInclusive;
 		this.maxInclusive = maxInclusive;
 	}
+
+    /** Instance form for position-specific combinators without mutating cached parsers. */
+    public Repeat(Parser inner, int minInclusive, int maxInclusive) {
+        super(() -> inner);
+        this.minInclusive = minInclusive;
+        this.maxInclusive = maxInclusive;
+    }
 	
 //	public Repeat(Name name , Parser inner , int minInclusive , int maxInclusive) {
 //		super(name , inner);
