@@ -5,7 +5,10 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 mod scope;
-pub use scope::{ReferenceInfo, ScopeStore, Severity, SymbolDiagnostic, SymbolInfo};
+pub use scope::{
+    Declaration, ReferenceInfo, RuleEffects, ScopeMode, ScopeStore, Severity, SymbolDiagnostic,
+    SymbolInfo,
+};
 
 /// Half-open Unicode scalar (code-point) offsets, not UTF-8 bytes or UTF-16 units.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -42,6 +45,11 @@ pub enum Expr {
     TextValue(Box<Expr>),
     /// Preserve a scalar mixed-value capture span without deciding text versus node.
     ValueBoundary(Box<Expr>),
+    /// Apply rule-local symbol effects to this child's captures after a successful parse.
+    RuleEffects {
+        child: Box<Expr>,
+        effects: RuleEffects,
+    },
     /// Apply a local trivia policy to sequence boundaries, restoring the caller afterwards.
     TriviaScope {
         child: Box<Expr>,
@@ -154,6 +162,12 @@ impl Expr {
             whitespace,
         }
     }
+    pub fn rule_effects(self, effects: RuleEffects) -> Self {
+        Self::RuleEffects {
+            child: Box::new(self),
+            effects,
+        }
+    }
     pub fn ahead(self) -> Self {
         Self::Lookahead {
             child: Box::new(self),
@@ -200,9 +214,14 @@ pub struct Tree {
     pub nodes: Vec<Node>,
     pub root: usize,
     byte_offsets: Vec<usize>,
+    scopes: ScopeStore,
 }
 
 impl Tree {
+    /// Owned semantic metadata as of tree creation, independent of subsequent context changes.
+    pub fn scopes(&self) -> &ScopeStore {
+        &self.scopes
+    }
     pub fn text(&self, span: Span) -> &str {
         &self.source[self.byte_offsets[span.start]..self.byte_offsets[span.end]]
     }
@@ -411,6 +430,7 @@ pub fn parse_detailed(
                 nodes: parser.nodes,
                 root,
                 byte_offsets: parser.byte_offsets,
+                scopes: parser.scopes,
             });
         }
         trailing_offset = Some(parser.code_point(parser.position));
@@ -483,6 +503,7 @@ impl<'a> ParseContext<'a> {
             nodes: self.nodes.clone(),
             root,
             byte_offsets: self.byte_offsets.clone(),
+            scopes: self.scopes.clone(),
         })
     }
     pub fn text(&self, span: Span) -> Option<&'a str> {
@@ -1022,6 +1043,43 @@ impl<'a> ParseContext<'a> {
                 });
                 Some(fragment)
             }
+            Expr::RuleEffects { child, effects } => {
+                if effects.scope_mode.is_some() {
+                    self.scopes.enter();
+                }
+                let fragment = self.expression(child, depth)?;
+                if effects.scope_mode.is_some() {
+                    self.scopes.leave();
+                }
+                if let Some(declaration) = &effects.declares {
+                    for capture in fragment
+                        .captures
+                        .iter()
+                        .filter(|c| c.name == declaration.symbol_capture)
+                    {
+                        if let Some((name, offset)) = self.symbol_capture(capture.span) {
+                            self.scopes.declare(name, offset);
+                        }
+                    }
+                }
+                if let Some(target) = effects.backref {
+                    for capture in fragment.captures.iter().filter(|c| c.name == target) {
+                        if let Some((name, offset)) = self.symbol_capture(capture.span) {
+                            let length = name.chars().count();
+                            self.scopes.add_reference(name, offset, length);
+                            if !self.scopes.is_declared(name) {
+                                self.scopes.add_diagnostic(
+                                    &format!("未定義のシンボル: '{name}'"),
+                                    offset,
+                                    length,
+                                    Severity::Warning,
+                                );
+                            }
+                        }
+                    }
+                }
+                Some(fragment)
+            }
             Expr::TriviaScope { child, whitespace } => {
                 self.with_trivia(*whitespace, |context| context.expression(child, depth))
             }
@@ -1045,6 +1103,13 @@ impl<'a> ParseContext<'a> {
                 })
             }
         }
+    }
+
+    fn symbol_capture(&self, span: Span) -> Option<(&'a str, usize)> {
+        let raw = self.text(span)?;
+        let leading = raw.chars().take_while(|c| *c <= '\u{20}').count();
+        let name = raw.trim_matches(|c| c <= '\u{20}');
+        (!name.is_empty()).then_some((name, span.start + leading))
     }
 
     fn code_start(&mut self) -> bool {

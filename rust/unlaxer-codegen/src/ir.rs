@@ -55,8 +55,31 @@ pub enum Cardinality {
     Many,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScopeMode {
+    Lexical,
+    Dynamic,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Declaration {
+    pub symbol_capture: String,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct RuleEffects {
+    pub scope_mode: Option<ScopeMode>,
+    pub declares: Option<Declaration>,
+    pub backref: Option<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression {
+    RuleEffects {
+        child: Box<Expression>,
+        effects: RuleEffects,
+    },
     Literal(String),
     NumberToken,
     IdentifierToken,

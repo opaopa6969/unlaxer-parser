@@ -85,6 +85,21 @@ fn expression(
 ) -> Result<(), GenerateError> {
     use Expression::*;
     match expr {
+        RuleEffects { child, effects } => {
+            let mut local = BTreeSet::new();
+            expression(child, count, &mut local)?;
+            for target in effects
+                .declares
+                .iter()
+                .map(|decl| &decl.symbol_capture)
+                .chain(effects.backref.iter())
+            {
+                if !local.contains(target) {
+                    return Err(fail(format!("missing rule-effect capture: {target}")));
+                }
+            }
+            captures.extend(local);
+        }
         Reference(id) if *id >= count => {
             return Err(fail(format!("rule reference out of range: {id}")))
         }
@@ -99,7 +114,16 @@ fn expression(
             name,
             expression: child,
         } => {
-            identifier(name)?;
+            // Captures are emitted as string labels, not Rust field names. Mapping
+            // fields are validated separately and retain the stricter identifier rules.
+            let mut chars = name.chars();
+            if !chars
+                .next()
+                .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+                || !chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+            {
+                return Err(fail(format!("unsupported capture name: {name}")));
+            }
             captures.insert(name.clone());
             expression(child, count, captures)?;
         }

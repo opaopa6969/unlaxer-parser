@@ -140,6 +140,7 @@ public final class RustBackend {
 
     private String expression(Expression expression) {
         return switch (expression) {
+            case RuleEffects scope -> expression(scope.child()) + ".rule_effects(" + effects(scope.effects()) + ")";
             case Literal literal -> "Expr::Literal(" + quote(literal.text()) + ")";
             case NumberToken ignored -> "Expr::Number";
             case IdentifierToken ignored -> "Expr::Identifier";
@@ -168,6 +169,20 @@ public final class RustBackend {
                 + (repeat.max() == null ? "None" : "Some(" + repeat.max() + ")") + ")";
             case Separated separated -> expression(separated.child()) + ".separated_by(" + expression(separated.separator()) + ")";
         };
+    }
+
+    private String effects(Effects effects) {
+        String scope = effects.scopeMode() == null ? "None" : "Some(unlaxer_runtime::ScopeMode::"
+            + (effects.scopeMode() == ScopeMode.LEXICAL ? "Lexical" : "Dynamic") + ")";
+        Declaration decl = effects.declares();
+        String declares = decl == null ? "None" : "Some(unlaxer_runtime::Declaration { symbol_capture: "
+            + quote(decl.symbolCapture()) + ", description: " + optionText(decl.description()) + " })";
+        return "unlaxer_runtime::RuleEffects { scope_mode: " + scope + ", declares: " + declares
+            + ", backref: " + optionText(effects.backref()) + " }";
+    }
+
+    private String optionText(String value) {
+        return value == null ? "None" : "Some(" + quote(value) + ")";
     }
 
     private String expressions(List<Expression> expressions) {

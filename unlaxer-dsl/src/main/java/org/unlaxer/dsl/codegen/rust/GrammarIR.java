@@ -18,10 +18,14 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     public record Field(String name, Kind kind, Cardinality cardinality) {}
     public enum Kind { TEXT, NODE, VALUE }
     public enum Cardinality { ONE, OPTIONAL, MANY }
+    public enum ScopeMode { LEXICAL, DYNAMIC }
+    public record Declaration(String symbolCapture, String description) {}
+    public record Effects(ScopeMode scopeMode, Declaration declares, String backref) {}
+    public record RuleEffects(Expression child, Effects effects) implements Expression {}
     public sealed interface Expression permits Literal, NumberToken, Reference, Sequence, Choice, Capture,
         OptionalExpr, Repeat, Separated, AnyToken, EofToken, EmptyToken, CharRangeToken,
         ExceptToken, UntilToken, LookaheadToken, Delimited, IdentifierToken, QuotedToken,
-        CodeStartToken, CodeEndToken, TextValue, ValueBoundary, TriviaScope {}
+        CodeStartToken, CodeEndToken, TextValue, ValueBoundary, TriviaScope, RuleEffects {}
     /** Rule-local trivia policy, transparent to captures and semantic values. */
     public record TriviaScope(Expression child, boolean javaWhitespace) implements Expression {}
     /** Retains an otherwise unmapped text branch as a source-positioned semantic value. */
