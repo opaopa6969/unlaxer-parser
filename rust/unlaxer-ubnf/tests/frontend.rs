@@ -199,6 +199,19 @@ fn boundary_trivia_and_annotations_preserve_each_independent_name() {
 }
 
 #[test]
+fn error_named_reference_before_group_is_not_forced_into_an_error_hint() {
+    let ast = parse("grammar G { R ::= ERROR (Item) ERROR ('a' 'b') ERROR('message'); }").unwrap();
+    let elements = &ast.grammars[0].rules[0].body.alternatives[0].elements;
+    assert_eq!(elements.len(), 5);
+    assert!(matches!(&elements[0].element.kind,ElementKind::RuleRef{name,..} if name=="ERROR"));
+    assert!(matches!(&elements[2].element.kind,ElementKind::RuleRef{name,..} if name=="ERROR"));
+    assert_eq!(
+        elements[4].element.kind,
+        ElementKind::Error("message".to_owned())
+    );
+}
+
+#[test]
 fn nesting_limit_is_a_diagnostic_not_a_stack_overflow() {
     let source = format!(
         "grammar G {{ R ::= {}'x'{}; }}",

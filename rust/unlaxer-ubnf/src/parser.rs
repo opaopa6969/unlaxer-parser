@@ -643,6 +643,14 @@ impl Parser<'_> {
                 .tokens
                 .get(self.pos + 1)
                 .is_some_and(|t| t.kind == Kind::Symbol('('))
+            && self
+                .tokens
+                .get(self.pos + 2)
+                .is_some_and(|t| matches!(t.kind, Kind::Quoted(_)))
+            && self
+                .tokens
+                .get(self.pos + 3)
+                .is_some_and(|t| t.kind == Kind::Symbol(')'))
         {
             self.pos += 1;
             self.expect('(')?;
