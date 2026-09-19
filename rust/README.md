@@ -88,6 +88,7 @@ runtimeは規則IDで参照する文法を実行し、入力とCST node arenaを
 - 非空の文字列terminal、rule参照、sequence、ordered choice、group、optional、0/1回以上のrepeat、bounded repeat、separated list。
 - `NumberParser`またはその完全修飾名へのtoken binding。符号・小数・指数を含む。
 - `IdentifierParser`、`SingleQuotedParser`、`DoubleQuotedParser`、`EndOfSourceParser`の短名または既定packageの完全修飾名。字句とmapperの契約は下記参照。
+- `org.unlaxer.tinyexpression.parser.StringLiteralParser`の完全修飾名。DoubleQuoted→SingleQuotedの順で認識し、短名や別packageは拒否する。[実tinyexpressionクラスとの共通テストと字句契約](../docs/tiny-string-token.md)を参照。文字列の評価・escapeデコードは含まない。
 - `ANY`・`EOF`・`EMPTY`・`CHAR_RANGE`・`NEGATION`・`UNTIL`・`LOOKAHEAD`・`NEGATIVE_LOOKAHEAD`。詳細は下記のprimitive互換契約を参照。
 - `@mapping`とterminal/rule/group/quantifierへのcapture。全capture名の集合とparamsが一致すること。欠ける選択肢はoptional、繰り返しや同名の複数出現はlistとして推論する。text/node混在値は下記の`AstValue`で保持する。
 - 同じfield名・順序・cardinalityを持つ複数ruleのshared mapping。text/node種別が異なるfieldは宣言順に依存せず`AstValue`へ統合する。AST variantとSemantics methodは一つに統合し、ruleごとのcaptureとspanは保持する。
@@ -95,7 +96,7 @@ runtimeは規則IDで参照する文法を実行し、入力とCST node arenaを
 - `@rightAssoc`の`Base @left { Op @op Self @right }`形（`Self`は宣言rule自身への直接参照）。同じparamsとprecedenceを用い、右辺を再帰的に生成する。
 - `@whitespace: javaStyle`（ASCII空白、行/ブロックコメント）または`none`。未指定は`none`。`@package`はRustでは使用しない。
 
-imports、外部token parser、`@typeof`、`@eval`等の他のannotation、左再帰などは明示的に拒否する。mapping名・field名はASCII識別子に制限し、Rustのraw identifierで出力する。`self`/`Self`/`super`/`crate`、fieldの`span`/`semantics`、shared mappingのschema不一致・異なるmappingからの生成method名衝突は拒否する。rootはちょうど1つのAST nodeへ解決される必要がある。optionalの先にある参照も左再帰検査に含め、空一致の可能性がある無限反復は生成前に拒否する。
+imports、上記以外の外部token parser、`@typeof`、`@eval`等の他のannotation、左再帰などは明示的に拒否する。mapping名・field名はASCII識別子に制限し、Rustのraw identifierで出力する。`self`/`Self`/`super`/`crate`、fieldの`span`/`semantics`、shared mappingのschema不一致・異なるmappingからの生成method名衝突は拒否する。rootはちょうど1つのAST nodeへ解決される必要がある。optionalの先にある参照も左再帰検査に含め、空一致の可能性がある無限反復は生成前に拒否する。
 
 ### 演算子の列と優先順位
 
