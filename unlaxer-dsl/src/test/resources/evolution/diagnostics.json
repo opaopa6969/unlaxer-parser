@@ -1,0 +1,10 @@
+[
+  {"input":"neg(/*😀*/)", "kind":"syntax", "javaOffset":9, "rustOffset":9},
+  {"input":"neg(/*😀*/2", "kind":"syntax", "javaOffset":10, "rustOffset":10},
+  {"input":"1/*😀*/x", "kind":"trailing_input", "javaOffset":6, "rustOffset":6},
+  {"input":"1+", "kind":"trailing_input", "javaOffset":1, "rustOffset":1},
+  {"input":"if(1,2,)", "kind":"syntax", "javaOffset":7, "rustOffset":7},
+  {"input":"neg(-)", "kind":"syntax", "javaOffset":5, "rustOffset":5},
+  {"input":"neg(.)", "kind":"syntax", "javaOffset":5, "rustOffset":5},
+  {"input":"neg(1e+)", "kind":"syntax", "javaOffset":7, "rustOffset":5}
+]

@@ -28,6 +28,37 @@ public class SnapshotRightAssocMapper {
     // Entry Point
     // =========================================================================
 
+    /** Parser diagnostics only: offsets are Unicode code points, not UTF-16 indices. */
+    public record ParseDiagnostic(String kind, int offset, List<String> expected,
+            int farthestOffset, List<String> farthestExpected) {
+        public ParseDiagnostic {
+            expected = List.copyOf(expected);
+            farthestExpected = List.copyOf(farthestExpected);
+        }
+    }
+
+    /**
+     * Validates full-input parsing without mapping or clearing retained source maps.
+     * Empty means parser acceptance, not successful AST mapping or evaluation.
+     * Native syntax hints are backend-specific; trailing input always expects end of input.
+     */
+    public static synchronized Optional<ParseDiagnostic> diagnose(String source) {
+        Parser rootParser = SnapshotRightAssocParsers.getRootParser();
+        try (ParseContext context = new ParseContext(createRootSourceCompat(source))) {
+            Parsed parsed = rootParser.parse(context);
+            int consumed = consumedLengthCompat(parsed.getConsumed());
+            if (parsed.isSucceeded() && consumed == source.length()) return Optional.empty();
+            var nativeFailure = context.getParseFailureDiagnostics();
+            List<String> hints = nativeFailure.getExpectedTokens().stream().sorted().toList();
+            int farthest = nativeFailure.getFarthestOffset();
+            if (parsed.isSucceeded()) {
+                int offset = source.codePointCount(0, consumed);
+                return Optional.of(new ParseDiagnostic("trailing_input", offset, List.of("end of input"), farthest, hints));
+            }
+            return Optional.of(new ParseDiagnostic("syntax", farthest, hints, farthest, hints));
+        }
+    }
+
     /** Selected parse-tree token and its generated AST mapping. */
     public record MappedAst(Token token, SnapshotRightAssocAST ast) {}
 
