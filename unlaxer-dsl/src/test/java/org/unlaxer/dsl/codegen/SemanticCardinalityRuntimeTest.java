@@ -146,4 +146,13 @@ public class SemanticCardinalityRuntimeTest {
             }
         }
     }
+
+    @Test public void multiTokenTextAlternativeIsOneValueNotThreeTokens() throws Exception {
+        try (var loader = compile("Helper", "Helper ::= Pair | '(' 'a' ')'; Pair ::= Leaf Leaf;")) {
+            assertTexts(values(loader, "xy"), "x", "y");
+            List<?> literal = (List<?>) values(loader, "(a)");
+            assertTexts(literal, "(a)");
+            assertSpan(loader, literal.get(0), 0, 3);
+        }
+    }
 }
