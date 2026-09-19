@@ -152,8 +152,7 @@ class MapperTypeResolver {
 
     /**
      * 参照先ルールが「透過 mapped choice」かどうか判定する。
-     * すなわち、自身に @mapping を持たず、本体が choice で、その単一 RuleRef 選択肢が
-     * ≥2 の異なる AST クラス（@mapping）にマップする場合 true。
+     * 自身に @mapping を持たず、alias/group を含む本体から mapped node に到達する場合 true。
      * このようなルール参照は単一のスカラー型に収束しないため、型は Object とすべき。
      * 例: StringTerm（StringMatchExpression | SliceExpression | VariableRef | ... の透過 choice）。
      *
@@ -161,37 +160,9 @@ class MapperTypeResolver {
      * 型推論（フィールド型）と mapper 生成式（mapTransparentValue）が一致するようにしている。
      */
     static boolean isTransparentMappedChoice(GrammarDecl grammar, String ruleName) {
-        Optional<RuleDecl> ruleOpt = grammar.rules().stream()
-            .filter(r -> r.name().equals(ruleName))
-            .findFirst();
-        if (ruleOpt.isEmpty()) {
-            return false;
-        }
-        RuleDecl rule = ruleOpt.get();
-        // 自身に @mapping があるなら透過ではない（その AST クラスに解決される）
-        boolean hasMapping = rule.annotations().stream().anyMatch(a -> a instanceof MappingAnnotation);
-        if (hasMapping) {
-            return false;
-        }
-        if (!(rule.body() instanceof ChoiceBody choice)) {
-            return false;
-        }
-        Set<String> mappedClasses = new LinkedHashSet<>();
-        for (SequenceBody alt : choice.alternatives()) {
-            if (alt.elements().size() != 1) {
-                continue;
-            }
-            if (alt.elements().get(0).element() instanceof RuleRefElement ref) {
-                grammar.rules().stream()
-                    .filter(r -> r.name().equals(ref.name()))
-                    .flatMap(r -> r.annotations().stream())
-                    .filter(a -> a instanceof MappingAnnotation)
-                    .map(a -> ((MappingAnnotation) a).className())
-                    .findFirst()
-                    .ifPresent(mappedClasses::add);
-            }
-        }
-        return mappedClasses.size() >= 2;
+        Map<String, RuleDecl> rules = new java.util.LinkedHashMap<>();
+        grammar.rules().forEach(rule -> rules.put(rule.name(), rule));
+        return MapperElementUtil.isTransparentMappedChoice(rules.get(ruleName), rules);
     }
 
     /** TypeofElement を参照するキャプチャ名から実際の AtomicElement に解決する */

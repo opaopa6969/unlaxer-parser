@@ -759,8 +759,10 @@ class MapperRuleEmitter {
         for (int i = 0; i < sites.size(); i++) {
             CaptureBindingPlan.Site site = sites.get(i);
             boolean boundText = MapperElementUtil.usesBoundTextCapture(site.element(), ruleByName, tokenDeclByName);
-            AtomicElement normalized = MapperElementUtil.normalizeCapturedElement(site.element()).orElse(site.element());
-            String parserClass = boundText ? null : MapperElementUtil.parserClassLiteral(normalized, parsersClass, tokenDeclByName, ruleByName)
+            boolean boundValue = "Object".equals(valueType) && MapperElementUtil.containsMappedValue(site.element(), ruleByName);
+            AtomicElement normalized = boundValue ? site.element()
+                : MapperElementUtil.normalizeCapturedElement(site.element()).orElse(site.element());
+            String parserClass = boundText || boundValue ? null : MapperElementUtil.parserClassLiteral(normalized, parsersClass, tokenDeclByName, ruleByName)
                 .orElse(null);
             String candidateType = MapperTypeResolver.inferTypeFromElement(grammar, normalized);
             if (!MapperTypeResolver.isTypeCompatible(valueType, candidateType) && !"String".equals(valueType)) continue;

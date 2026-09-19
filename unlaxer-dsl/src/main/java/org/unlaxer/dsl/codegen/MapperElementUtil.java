@@ -397,8 +397,7 @@ class MapperElementUtil {
         // flattened to firstTokenText, silently dropping the real node it wraps. Resolve the
         // matched alternative's node instead. Object-typed, so a node or the text fallback
         // both fit the field. (unlaxer-parser #43 family / tinyexpression #32)
-        if ("Object".equals(targetType) && element instanceof RuleRefElement transparentRef
-            && isTransparentMappedChoice(ruleByName.get(transparentRef.name()), mappedClassByRuleName)) {
+        if ("Object".equals(targetType) && containsMappedValue(element, ruleByName)) {
             return "mapTransparentValue(" + tokenVar + ")";
         }
         if (!"String".equals(targetType)) {
@@ -415,29 +414,36 @@ class MapperElementUtil {
 
     /**
      * True if {@code rule} is a "transparent choice" used as a heterogeneous {@code Object}
-     * capture: it has no {@code @mapping} of its own and its body is a choice whose
-     * single-RuleRef alternatives map to two or more distinct AST classes. Such a capture's
+     * capture: it has no {@code @mapping} of its own and can reach a mapped value through
+     * choices, groups or aliases (including one mapped branch mixed with text). Such a capture's
      * field is inferred as {@code Object}, so the matched alternative's node must be resolved
      * at runtime rather than dropped to {@code firstTokenText}. (unlaxer-parser #43 family)
      */
-    static boolean isTransparentMappedChoice(RuleDecl rule, Map<String, String> mappedClassByRuleName) {
+    static boolean isTransparentMappedChoice(RuleDecl rule, Map<String, RuleDecl> ruleByName) {
         if (rule == null || getMappingAnnotation(rule).isPresent()) {
             return false;
         }
-        if (!(rule.body() instanceof ChoiceBody choice)) {
-            return false;
+        return containsMappedValue(new GroupElement(rule.body()), ruleByName);
+    }
+
+    /** Shared type/mapper predicate; stop at mapped boundaries and guard recursive aliases. */
+    static boolean containsMappedValue(AtomicElement element, Map<String, RuleDecl> ruleByName) {
+        return containsMappedValue(element, ruleByName, new java.util.HashSet<>());
+    }
+
+    private static boolean containsMappedValue(AtomicElement element, Map<String, RuleDecl> ruleByName,
+            java.util.Set<String> visited) {
+        if (element instanceof RuleRefElement ref) {
+            if (!visited.add(ref.name())) return false;
+            RuleDecl rule = ruleByName.get(ref.name());
+            return rule != null && (getMappingAnnotation(rule).isPresent()
+                || containsMappedValue(new GroupElement(rule.body()), ruleByName, visited));
         }
-        java.util.Set<String> mappedClasses = new java.util.LinkedHashSet<>();
-        for (SequenceBody alternative : choice.alternatives()) {
-            if (alternative.elements().size() != 1) {
-                continue;
-            }
-            AtomicElement element = alternative.elements().get(0).element();
-            if (element instanceof RuleRefElement ref && mappedClassByRuleName.containsKey(ref.name())) {
-                mappedClasses.add(mappedClassByRuleName.get(ref.name()));
-            }
-        }
-        return mappedClasses.size() >= 2;
+        Object value = captureValueShape(element);
+        if (value instanceof RuleRefElement ref) return containsMappedValue(ref, ruleByName, visited);
+        RuleBody body = value instanceof GroupElement group ? group.body()
+            : value instanceof RuleBody compound ? compound : null;
+        return body != null && collectRuleRefs(body).stream().anyMatch(ref -> containsMappedValue(ref, ruleByName, visited));
     }
 
     static boolean isIdentifierToken(TokenDecl tokenDecl) {
