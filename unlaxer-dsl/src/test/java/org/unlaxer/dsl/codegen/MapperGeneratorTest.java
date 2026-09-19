@@ -200,16 +200,14 @@ public class MapperGeneratorTest {
     }
 
     @Test
-    public void testLiteralCaptureMatchesWordParserByText() {
+    public void testLiteralCaptureMatchesGrammarSite() {
         GrammarDecl grammar = parseGrammar(LITERAL_CAPTURE_GRAMMAR);
         String source = new MapperGenerator().generate(grammar).source();
 
-        assertTrue("true capture should be bound by literal text",
-            source.contains("findCapturedTokenWithText(token, "
-                + "org.unlaxer.parser.elementary.WordParser.class, \"true\", 0)"));
-        assertTrue("false capture should be bound by literal text",
-            source.contains("findCapturedTokenWithText(token, "
-                + "org.unlaxer.parser.elementary.WordParser.class, \"false\", 0)"));
+        assertTrue("true capture should be bound to its grammar site",
+            source.contains("hasCaptureBinding(captureSite_value, \"BooleanFactor:0\")"));
+        assertTrue("false capture should be bound to its distinct grammar site",
+            source.contains("hasCaptureBinding(captureSite_value, \"BooleanFactor:1\")"));
     }
 
     @Test

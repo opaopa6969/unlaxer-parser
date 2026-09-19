@@ -198,6 +198,10 @@ public class ParserGenerator implements CodeGenerator {
                         return java.util.Optional.empty();
                     }
                 }
+                private static java.util.stream.Stream<org.unlaxer.Token> __semanticChildren(org.unlaxer.Token token) {
+                    return token.filteredChildren.stream().flatMap(child -> child.parser instanceof __CaptureSite
+                        ? __semanticChildren(child) : java.util.stream.Stream.of(child));
+                }
 
             """);
 
