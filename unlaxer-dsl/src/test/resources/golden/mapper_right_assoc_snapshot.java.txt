@@ -125,8 +125,18 @@ public class SnapshotRightAssocMapper {
         Parser rootParser = SnapshotRightAssocParsers.getRootParser();
         ParseContext context = new ParseContext(createRootSourceCompat(source));
         Parsed parsed;
+        Token rootToken = null;
         try {
             parsed = rootParser.parse(context);
+            if (parsed.isSucceeded()) {
+                rootToken = parsed.getRootToken(false);
+                for (Token committed : context.getCurrent().getTokens()) {
+                    if (committed.parser == rootParser) {
+                        rootToken = committed;
+                        break;
+                    }
+                }
+            }
         } finally {
             context.close();
         }
@@ -137,7 +147,6 @@ public class SnapshotRightAssocMapper {
         if (consumed != source.length()) {
             throw new IllegalArgumentException("Parse failed at offset " + consumed + ": " + source);
         }
-        Token rootToken = parsed.getRootToken(false);
         Token mappingRoot = rootToken;
         if (mappingRoot.parser.getClass() != SnapshotRightAssocParsers.ExprParser.class) {
             mappingRoot = findFirstDescendant(mappingRoot, SnapshotRightAssocParsers.ExprParser.class);
