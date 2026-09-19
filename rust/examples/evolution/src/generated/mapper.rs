@@ -18,76 +18,99 @@ fn map_nodes(tree: &Tree, ids: &[usize]) -> Result<Vec<Ast>, String> {
 }
 
 fn map_node(tree: &Tree, id: usize) -> Result<Vec<Ast>, String> {
-    let node = &tree.nodes[id];
-    match node.rule {
-        1 => Ok(vec![Ast::r#Binary {
-            span: node.span,
-            r#left: {
-                let mut values = Vec::new();
-                for capture in node.captures.iter().filter(|c| c.name == "left") {
-                    values.extend(map_nodes(tree, &capture.nodes)?);
-                }
-                Box::new(required(values, "left")?)
-            },
-            r#op: {
-                let mut values = Vec::new();
-                for capture in node.captures.iter().filter(|c| c.name == "op") {
-                    values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).to_owned());
-                }
-                required(values, "op")?
-            },
-            r#right: {
-                let mut values = Vec::new();
-                for capture in node.captures.iter().filter(|c| c.name == "right") {
-                    values.extend(map_nodes(tree, &capture.nodes)?);
-                }
-                Box::new(required(values, "right")?)
-            },
-        }]),
-        2 => Ok(vec![Ast::r#Number {
-            span: node.span,
-            r#value: {
-                let mut values = Vec::new();
-                for capture in node.captures.iter().filter(|c| c.name == "value") {
-                    values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).to_owned());
-                }
-                required(values, "value")?
-            },
-        }]),
-        4 => Ok(vec![Ast::r#Negation {
-            span: node.span,
-            r#value: {
-                let mut values = Vec::new();
-                for capture in node.captures.iter().filter(|c| c.name == "value") {
-                    values.extend(map_nodes(tree, &capture.nodes)?);
-                }
-                Box::new(required(values, "value")?)
-            },
-        }]),
-        5 => Ok(vec![Ast::r#Conditional {
-            span: node.span,
-            r#condition: {
-                let mut values = Vec::new();
-                for capture in node.captures.iter().filter(|c| c.name == "condition") {
-                    values.extend(map_nodes(tree, &capture.nodes)?);
-                }
-                Box::new(required(values, "condition")?)
-            },
-            r#thenExpr: {
-                let mut values = Vec::new();
-                for capture in node.captures.iter().filter(|c| c.name == "thenExpr") {
-                    values.extend(map_nodes(tree, &capture.nodes)?);
-                }
-                Box::new(required(values, "thenExpr")?)
-            },
-            r#elseExpr: {
-                let mut values = Vec::new();
-                for capture in node.captures.iter().filter(|c| c.name == "elseExpr") {
-                    values.extend(map_nodes(tree, &capture.nodes)?);
-                }
-                Box::new(required(values, "elseExpr")?)
-            },
-        }]),
-        _ => map_nodes(tree, &node.children),
+    match tree.nodes[id].rule {
+        1 => map_rule_1(tree, id),
+        2 => map_rule_2(tree, id),
+        4 => map_rule_4(tree, id),
+        5 => map_rule_5(tree, id),
+        _ => map_nodes(tree, &tree.nodes[id].children),
     }
+}
+
+#[inline(never)]
+fn map_rule_1(tree: &Tree, id: usize) -> Result<Vec<Ast>, String> {
+    let node = &tree.nodes[id];
+    Ok(vec![Ast::r#Binary {
+        span: node.span,
+        r#left: {
+            let mut values = Vec::new();
+            for capture in node.captures.iter().filter(|c| c.name == "left") {
+                values.extend(map_nodes(tree, &capture.nodes)?);
+            }
+            Box::new(required(values, "left")?)
+        },
+        r#op: {
+            let mut values = Vec::new();
+            for capture in node.captures.iter().filter(|c| c.name == "op") {
+                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).to_owned());
+            }
+            required(values, "op")?
+        },
+        r#right: {
+            let mut values = Vec::new();
+            for capture in node.captures.iter().filter(|c| c.name == "right") {
+                values.extend(map_nodes(tree, &capture.nodes)?);
+            }
+            Box::new(required(values, "right")?)
+        },
+    }])
+}
+
+#[inline(never)]
+fn map_rule_2(tree: &Tree, id: usize) -> Result<Vec<Ast>, String> {
+    let node = &tree.nodes[id];
+    Ok(vec![Ast::r#Number {
+        span: node.span,
+        r#value: {
+            let mut values = Vec::new();
+            for capture in node.captures.iter().filter(|c| c.name == "value") {
+                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).to_owned());
+            }
+            required(values, "value")?
+        },
+    }])
+}
+
+#[inline(never)]
+fn map_rule_4(tree: &Tree, id: usize) -> Result<Vec<Ast>, String> {
+    let node = &tree.nodes[id];
+    Ok(vec![Ast::r#Negation {
+        span: node.span,
+        r#value: {
+            let mut values = Vec::new();
+            for capture in node.captures.iter().filter(|c| c.name == "value") {
+                values.extend(map_nodes(tree, &capture.nodes)?);
+            }
+            Box::new(required(values, "value")?)
+        },
+    }])
+}
+
+#[inline(never)]
+fn map_rule_5(tree: &Tree, id: usize) -> Result<Vec<Ast>, String> {
+    let node = &tree.nodes[id];
+    Ok(vec![Ast::r#Conditional {
+        span: node.span,
+        r#condition: {
+            let mut values = Vec::new();
+            for capture in node.captures.iter().filter(|c| c.name == "condition") {
+                values.extend(map_nodes(tree, &capture.nodes)?);
+            }
+            Box::new(required(values, "condition")?)
+        },
+        r#thenExpr: {
+            let mut values = Vec::new();
+            for capture in node.captures.iter().filter(|c| c.name == "thenExpr") {
+                values.extend(map_nodes(tree, &capture.nodes)?);
+            }
+            Box::new(required(values, "thenExpr")?)
+        },
+        r#elseExpr: {
+            let mut values = Vec::new();
+            for capture in node.captures.iter().filter(|c| c.name == "elseExpr") {
+                values.extend(map_nodes(tree, &capture.nodes)?);
+            }
+            Box::new(required(values, "elseExpr")?)
+        },
+    }])
 }

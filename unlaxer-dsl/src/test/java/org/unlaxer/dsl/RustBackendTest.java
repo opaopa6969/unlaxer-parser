@@ -46,6 +46,26 @@ public class RustBackendTest {
         assertFalse(parser.contains("parse_detailed(&rules()"));
     }
 
+    @Test public void generatedMapperDispatchesToBoundedRuleFunctions() {
+        String source = """
+            grammar SplitMapper {
+              @root @mapping(Root, params=[left, right]) Root ::= Left @left Right @right;
+              @mapping(Leaf, params=[value]) Left ::= 'left' @value;
+              @mapping(Leaf, params=[value]) Right ::= 'right' @value;
+            }
+            """;
+        String mapper = new RustBackend().generate(UBNFMapper.parse(source).grammars().get(0))
+            .stream().filter(file -> file.relativePath().endsWith("mapper.rs"))
+            .findFirst().orElseThrow().content();
+        assertTrue(mapper.contains("0 => map_rule_0(tree, id)"));
+        assertTrue(mapper.contains("1 => map_rule_1(tree, id)"));
+        assertTrue(mapper.contains("2 => map_rule_2(tree, id)"));
+        assertEquals(3, mapper.split("#\\[inline\\(never\\)\\]", -1).length - 1);
+        String dispatcher = mapper.substring(
+            mapper.indexOf("fn map_node"), mapper.indexOf("#[inline(never)]"));
+        assertFalse(dispatcher.contains("Ast::"));
+    }
+
     @Test public void unsupportedFeaturesAreRejectedBeforeEmission() {
         reject(SIMPLE.replace("'hello' @value", "Missing @value"), "unknown reference");
         reject(SIMPLE.replace("'hello' @value", "Root @value"), "left recursion");
@@ -163,8 +183,10 @@ public class RustBackendTest {
         var files = new RustBackend().generate(UBNFMapper.parse(source).grammars().get(0));
         assertEquals(1, files.get(1).content().split("r#Value \\{ span: Span", -1).length - 1);
         assertEquals(1, files.get(4).content().split("fn eval_value", -1).length - 1);
-        assertTrue(files.get(3).content().contains("1 => Ok(vec![Ast::r#Value"));
-        assertTrue(files.get(3).content().contains("2 => Ok(vec![Ast::r#Value"));
+        assertTrue(files.get(3).content().contains("1 => map_rule_1(tree, id)"));
+        assertTrue(files.get(3).content().contains("2 => map_rule_2(tree, id)"));
+        assertTrue(files.get(3).content().contains("fn map_rule_1(tree: &Tree, id: usize)"));
+        assertTrue(files.get(3).content().contains("fn map_rule_2(tree: &Tree, id: usize)"));
         reject(source.replace("'b' @value", "[ 'b' ] @value"), "incompatible shared mapping schema");
         reject(source.replace("Second ::= 'b' @value", "Second ::= 'b' @other")
             .replace("@mapping(Value, params=[value]) Second", "@mapping(Value, params=[other]) Second"), "incompatible shared mapping schema");

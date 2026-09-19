@@ -78,7 +78,7 @@ UBNF → 既存Java frontend → RustGrammarLowering → GrammarIR → RustBacke
 
 `codegen.rust.GrammarIR`は規則・連接・順序付き選択・captureを保持する構造IRであり、既存のmetadata用Parser IRとは別物。既存Java生成器はまだこのIRを使わない。全backend共通IRへの全面移行や、言語非依存性の一般的な証明を済ませたものではない。
 
-runtimeは規則IDで参照する文法を実行し、入力とCST node arenaを解析結果が所有する。生成rule graphは`OnceLock<SharedGrammar>`でprocess内に一度だけ構築し、parseごとには`Arc`だけを共有する。cursor・capture・scope・user state・diagnostic・CST nodeは`ParseContext`ごとに独立する。互換用`rules() -> Vec<Rule>`はsnapshotを返し、通常のparse入口はcloneしない。公開契約と小規模A/B結果は[共有grammar graph](../docs/rust-shared-grammar.md)を参照。ASTは`enum`、単一の子は`Box<Ast>`、単一text captureは`String`。optionalは`Option`、複数captureは`Vec`になる（下表）。各variantは半開区間`Span { start, end }`を持つ。内部カーソルはUTF-8 byte、公開位置はUnicodeコードポイントで、UTF-16/LSP座標とは異なる。mapper後のASTは文字列と位置を所有し、CSTを破棄しても評価できる。静的なソースマップは使わない。
+runtimeは規則IDで参照する文法を実行し、入力とCST node arenaを解析結果が所有する。生成rule graphは`OnceLock<SharedGrammar>`でprocess内に一度だけ構築し、parseごとには`Arc`だけを共有する。cursor・capture・scope・user state・diagnostic・CST nodeは`ParseContext`ごとに独立する。互換用`rules() -> Vec<Rule>`はsnapshotを返し、通常のparse入口はcloneしない。公開契約と小規模A/B結果は[共有grammar graph](../docs/rust-shared-grammar.md)を参照。ASTは`enum`、単一の子は`Box<Ast>`、単一text captureは`String`。optionalは`Option`、複数captureは`Vec`になる（下表）。各variantは半開区間`Span { start, end }`を持つ。内部カーソルはUTF-8 byte、公開位置はUnicodeコードポイントで、UTF-16/LSP座標とは異なる。mapper後のASTは文字列と位置を所有し、CSTを破棄しても評価できる。静的なソースマップは使わない。生成mapperは小さなrule ID dispatchから`#[inline(never)]`のrule別関数を呼び、大規模文法でもdebug/test buildの関数frameをmapping総数に比例させない。
 
 `Semantics`の各メソッドは既定実装を持たず、`evaluate`はwildcardなしの`match`。新しいvariantと古いdispatchを組み合わせると`E0004`、新しいtraitと古いimplでは`E0046`になる。ただし再コンパイルされるソース間の構造チェックであり、意味処理の正しさは保証しない。文字列として保持する演算子の追加は型を変えないため、この保護を受けない。
 

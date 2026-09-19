@@ -249,3 +249,35 @@ pub fn fixture(name: &str) -> GrammarIr {
         java_whitespace: true,
     }
 }
+
+#[allow(dead_code)] // This shared module is also compiled by examples that do not use stress fixtures.
+pub fn wide_deep_mapper_fixture(rule_count: usize, depth: usize) -> GrammarIr {
+    assert!(rule_count > depth && depth > 1);
+    let mut rules = Vec::with_capacity(rule_count);
+    for index in 0..rule_count {
+        let (body, fields) = if index + 1 < depth {
+            (
+                Expression::Sequence(vec![
+                    Expression::Literal("x".into()),
+                    cap("child", Expression::Reference(index + 1)),
+                ]),
+                vec![field("child", Kind::Node, Cardinality::One)],
+            )
+        } else {
+            (
+                Expression::Sequence(vec![cap("value", Expression::Literal("z".into()))]),
+                vec![field("value", Kind::Text, Cardinality::One)],
+            )
+        };
+        rules.push(rule(
+            &format!("Rule{index}"),
+            body,
+            Some((&format!("Node{index}"), fields)),
+        ));
+    }
+    GrammarIr {
+        rules,
+        root: 0,
+        java_whitespace: true,
+    }
+}
