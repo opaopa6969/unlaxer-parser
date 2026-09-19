@@ -16,12 +16,12 @@
 | Java UBNF frontend → Rust generator | 限定範囲で生成済み | 全構文・annotationのpositive/negative fixture、未対応の明示拒否、再生成一致 |
 | 公開ParseContext・custom parser | runtimeと生成入口を実装 | 共有入力・Unicode位置・typed状態・CST/captureのrollback、先読み、生成parser混在を継続検証 |
 | literal・参照・sequence・ordered choice・group | 生成済み | optional経由の再帰等も検証し、非消費ループを拒否 |
-| optional・0/1回以上・bounded repeat・separated | UBNF生成・Option/Vec AST・mapper・Semantics実装 | 70ケースの受理一致、Rust AST/位置/値の独立oracle。Java capture不具合#116は未修正、入れ子container型は未対応 |
+| optional・0/1回以上・bounded repeat・separated | UBNF生成・Option/Vec AST・mapper・Semantics実装 | 70ケースの受理一致、20成功ケースのJava/Rust AST全field・全span一致、Rust評価値oracle。外側captureの入れ子container型は両backendとも未完了 |
 | ANY/EOF/EMPTY/CHAR_RANGE/NEGATION/UNTIL/LOOKAHEAD/NEGATIVE_LOOKAHEAD・error | runtimeのみ | UBNF接続とJava比較。Untilの終端欠損・空終端等は未比較で同値としない |
 | Number token | 限定生成済み | 不完全指数の診断差を記録済み。数値型・overflow・triviaを実言語仕様に合わせる |
 | Identifier・引用文字列・CASE_INSENSITIVE・REGEX・外部token | 未対応 | Unicode/escape/regex方言を確定。任意Java parserクラスはRust実装または明示adapterを要求 |
 | imports・複数grammar・namespace・global/rule trivia・interleave | 一部のみ | 現在は単一grammarとglobal javaStyle/none。依存解決・循環・文法別ID・局所設定を検証 |
-| mapping・capture・source-preserving AST | scalar/optional/list/group生成済み | Javaとのcapture意味論差#116、入れ子container型、再帰的unmapped rule、異種choice、typeof/commonField/enum |
+| mapping・capture・source-preserving AST | scalar/optional/list/group生成済み。Java位置binding不具合#116修正 | 入れ子container型、再帰的unmapped rule、異種choice、typeof/commonField/enum、全Java capture規則との互換性 |
 | evaluator dispatch・網羅性 | 生成済み | 新nodeのE0004/E0046検証を拡張。eval annotation、型境界、短絡評価を追加 |
 | leftAssoc/rightAssoc/precedence | 未対応 | ASTの結合方向・演算順・位置・不正文法をJavaと比較 |
 | backref・MatchedToken相当 | context-wide replayのみ | UBNF annotation、名前の寿命・入れ子・伝播、コピー言語のpositive/negative test |
@@ -36,7 +36,7 @@
 
 ## 完了の扱いと順序
 
-公開context/combinator、optional/repeatとtyped ASTを基盤として、次はtoken/annotationとcapture互換性を拡げる。追加実験で見つけたJava numeric capture #115の生成コードは修正し、int変換とRustの字句保持の差を共有corpusで固定した。capture選択 #116と数値意味論のbackend間統一は引き続き未完了事項とする。次に実tinyexpressionの仕様corpusと評価器、信頼されたrustcodeblock、IDE/debuggerを進める。各行を小さなPRに分け、テスト・CI・merge・子issue closeまで行う。全体issueは未対応行を残したままcloseしない。
+公開context/combinator、optional/repeatとtyped ASTを基盤として、次はtoken/annotationとcapture互換性を拡げる。追加実験で見つけたJava numeric capture #115とcapture選択 #116の生成コードは修正した。int変換とRustの字句保持の差は共有corpusで固定し、数値意味論のbackend間統一と外側captureの入れ子container型は未完了事項とする。次に実tinyexpressionの仕様corpusと評価器、信頼されたrustcodeblock、IDE/debuggerを進める。各行を小さなPRに分け、テスト・CI・merge・子issue closeまで行う。全体issueは未対応行を残したままcloseしない。
 
 Javaの継承階層を一対一に移植するのではなく、文法と観測可能な振る舞いを対象とする。JVM任意オブジェクト・reflection・bytecodeのnative直接実行はできないため、Rust側のhost interfaceと移植コードの境界を明記する。差を消して比較を通したことにせず、意図的な差は独立したfixtureにする。
 

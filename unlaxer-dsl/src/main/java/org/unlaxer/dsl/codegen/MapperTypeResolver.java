@@ -251,6 +251,12 @@ class MapperTypeResolver {
                 findCapturedTypesInBody(optionalElement.body(), captureName, true, inRepeat);
             case RepeatElement repeatElement ->
                 findCapturedTypesInBody(repeatElement.body(), captureName, inOptional, true);
+            case OneOrMoreElement one ->
+                findCapturedTypesInAtomic(one.body(), captureName, inOptional, true);
+            case BoundedRepeatElement bounded ->
+                findCapturedTypesInAtomic(bounded.body(), captureName, inOptional, true);
+            case UBNFAST.SeparatedElement separated ->
+                findCapturedTypesInAtomic(separated.element(), captureName, inOptional, true);
             case GroupElement groupElement ->
                 findCapturedTypesInBody(groupElement.body(), captureName, inOptional, inRepeat);
             default -> List.of();

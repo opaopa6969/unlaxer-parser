@@ -662,13 +662,6 @@ class ParserRuleEmitter {
     /**
      * @scopeTree / @declares アノテーション付きルールの TransactionListener メソッドを生成する。
      */
-    /** "Foo.class" 形式の文字列から ".class" を外したクラス名を返す。 */
-    private static String stripClassSuffix(String parserClassLiteral) {
-        return parserClassLiteral.endsWith(".class")
-            ? parserClassLiteral.substring(0, parserClassLiteral.length() - ".class".length())
-            : parserClassLiteral;
-    }
-
     static String generateTransactionListenerMethods(
         ParserGenerator.GenContext ctx, RuleDecl rule,
         boolean hasScopeTree, boolean hasDeclares, boolean backrefScopeMode, boolean backrefBackrefMode) {
@@ -712,11 +705,9 @@ class ParserRuleEmitter {
             w.indent();
             w.line("org.unlaxer.Token ruleToken = tokens.get(0);");
             if (captureParserClass != null) {
-                // 対応するパーサークラスが特定できた → Optional 版で直接取得
-                // (getChildWithParser は不在時に throw するため、commit 途中の
-                //  部分的なトークン構造でも安全な Optional 版を使う)
-                w.line("org.unlaxer.Token captureToken = __semanticChildren(ruleToken).filter(c -> c.getParser() instanceof "
-                    + stripClassSuffix(captureParserClass) + ").findFirst().orElse(null);");
+                // Position wrappers are transparent; retain exact-class/direct-child semantics.
+                w.line("org.unlaxer.Token captureToken = __semanticChildren(ruleToken).filter(c -> c.getParser().getClass() == "
+                    + captureParserClass + ").findFirst().orElse(null);");
                 w.line("if (captureToken != null && captureToken.source != null) {");
                 w.indent();
                 w.line("String __symbolName = captureToken.source.sourceAsString().trim();");
@@ -758,8 +749,8 @@ class ParserRuleEmitter {
             w.indent();
             w.line("org.unlaxer.Token ruleToken = tokens.get(0);");
             if (captureParserClass != null) {
-                w.line("org.unlaxer.Token refToken = __semanticChildren(ruleToken).filter(c -> c.getParser() instanceof "
-                    + stripClassSuffix(captureParserClass) + ").findFirst().orElse(null);");
+                w.line("org.unlaxer.Token refToken = __semanticChildren(ruleToken).filter(c -> c.getParser().getClass() == "
+                    + captureParserClass + ").findFirst().orElse(null);");
                 w.line("if (refToken != null && refToken.source != null) {");
                 w.indent();
                 w.line("String __refName = refToken.source.sourceAsString().trim();");

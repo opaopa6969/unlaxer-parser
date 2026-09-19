@@ -612,6 +612,12 @@ public class ASTGenerator implements CodeGenerator {
                 findCapturedElementsInBody(opt.body(), captureName, true, inRepeat);
             case RepeatElement rep ->
                 findCapturedElementsInBody(rep.body(), captureName, inOptional, true);
+            case OneOrMoreElement one ->
+                findCapturedElementsInAtomic(one.body(), captureName, inOptional, true);
+            case BoundedRepeatElement bounded ->
+                findCapturedElementsInAtomic(bounded.body(), captureName, inOptional, true);
+            case UBNFAST.SeparatedElement separated ->
+                findCapturedElementsInAtomic(separated.element(), captureName, inOptional, true);
             case GroupElement g ->
                 findCapturedElementsInBody(g.body(), captureName, inOptional, inRepeat);
             default -> List.of();

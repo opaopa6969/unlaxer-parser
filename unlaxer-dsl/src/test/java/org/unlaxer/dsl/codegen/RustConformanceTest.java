@@ -132,10 +132,9 @@ public class RustConformanceTest {
                     if (accepted) {
                         Object mapped = mapper.getMethod("parseWithSourceMap", String.class).invoke(null, input);
                         java = canonical(mapped.getClass().getMethod("ast").invoke(mapped), mapped);
-                        assertEquals(context + " Rust oracle", cardinalityAst(row.getAsJsonObject("expected"), input, false), rust.get("ast"));
-                        // Known Java capture-selection bugs, tracked separately; never copy them into Rust.
-                        assertEquals(context + " Java known difference", cardinalityAst(row.getAsJsonObject("javaKnown"), input, !mode.equals("zero")), java);
-                        assertNotEquals(context + " Java capture bug must remain explicit", java, rust.get("ast"));
+                        assertEquals(context + " Rust oracle", cardinalityAst(row.getAsJsonObject("expected"), input), rust.get("ast"));
+                        assertEquals(context + " Java oracle", cardinalityAst(row.getAsJsonObject("expected"), input), java);
+                        assertEquals(context + " Java/Rust AST and spans", java, rust.get("ast"));
                         assertEquals(context, row.get("value").getAsDouble(), rust.get("value").getAsDouble(), 0.0);
                     }
                     report.add(mode + "\t" + row.get("input") + "\t" + java + "\t" + rust);
@@ -145,11 +144,11 @@ public class RustConformanceTest {
         Files.write(Path.of("target/rust-cardinality.tsv"), report, StandardCharsets.UTF_8);
     }
 
-    private JsonObject cardinalityAst(JsonObject expected, String input, boolean emptyJavaList) {
+    private JsonObject cardinalityAst(JsonObject expected, String input) {
         var fields = new JsonObject();
         fields.add("head", cardinalityItem(expected.get("head")));
         var items = new JsonArray();
-        if (!emptyJavaList) for (var item : expected.getAsJsonArray("items")) items.add(cardinalityItem(item));
+        for (var item : expected.getAsJsonArray("items")) items.add(cardinalityItem(item));
         fields.add("values", items);
         fields.add("tail", expected.get("tail"));
         var flags = new JsonArray();

@@ -311,6 +311,31 @@ public class SnapshotRightAssocMapper {
         SnapshotRightAssocParsers.ExprParser.class
     );
 
+    private static boolean hasCaptureBinding(Token token, String binding) {
+        return token.parser instanceof SnapshotRightAssocParsers.__CaptureBinding capture
+            && capture.captureBindings().contains(binding);
+    }
+
+    private static List<Token> findCaptureSites(Token token, java.util.Set<String> bindings) {
+        List<Token> result = new ArrayList<>();
+        collectCaptureSites(token, bindings, result, true);
+        return result;
+    }
+
+    private static void collectCaptureSites(Token token, java.util.Set<String> bindings,
+            List<Token> result, boolean root) {
+        if (token == null) return;
+        if (token.parser instanceof SnapshotRightAssocParsers.__CaptureBinding capture
+                && capture.captureBindings().stream().anyMatch(bindings::contains)) {
+            result.add(token);
+            return;
+        }
+        if (!root && CAPTURE_BOUNDARY_PARSERS.contains(token.parser.getClass())) return;
+        for (Token child : token.filteredChildren) {
+            collectCaptureSites(child, bindings, result, false);
+        }
+    }
+
     static List<Token> findDescendantsBounded(Token token, Class<? extends Parser> parserClass) {
         List<Token> results = new ArrayList<>();
         if (token == null) {

@@ -81,9 +81,10 @@ public class CaptureBindingRuntimeTest {
     }
 
     @Test public void allListQuantifiersExcludeSameParserClassSeparators() throws Exception {
-        for (String expression : List.of("Item+", "Item{1,2}", "Item{1,}", "Item % ','")) {
+        for (String expression : List.of("Item+ @values", "Item{1,2} @values", "Item{1,} @values", "Item % ',' @values",
+                "(Item @values)+", "(Item @values){1,2}", "(Item @values){1,}", "(Item @values) % ','")) {
             try (var loader = compile("""
-                @root @mapping(Container, params=[values]) Root ::= %s @values ;
+                @root @mapping(Container, params=[values]) Root ::= %s ;
                 @mapping(Item, params=[value]) Item ::= Digits @value ';' ;
                 Digits ::= NUMBER ;
                 """.formatted(expression))) {
@@ -139,6 +140,40 @@ public class CaptureBindingRuntimeTest {
             Capture ::= 'x' ;
             """)) {
             assertEquals("x", field(parse(loader, "x"), "value"));
+        }
+    }
+
+    @Test public void tokenCapturesWithoutAClassLookupStillUseTheirBoundSource() throws Exception {
+        record Case(String token, String body, String input, String expected) {}
+        for (var example : List.of(
+                new Case("SingleQuotedParser", "':' VALUE @value ':'", ":'abc':", "abc"),
+                new Case("REGEX('[a-z]+')", "':' VALUE @value ':'", ":abc:", "abc"),
+                new Case("CHAR_RANGE('a','z')", "':' VALUE @value ':'", ":a:", "a"),
+                new Case("ANY", "':' VALUE @value ':'", ":a:", "a"),
+                new Case("UNTIL('!')", "':' VALUE @value '!'", ":abc!", "abc"))) {
+            try (var loader = compile("token VALUE = " + example.token() + "\n"
+                    + "@root @mapping(Container, params=[value]) Root ::= " + example.body() + " ;")) {
+                assertEquals(example.toString(), example.expected(), field(parse(loader, example.input()), "value"));
+            }
+        }
+    }
+
+    @Test public void captureWrappersPreserveBackreferenceListenerDiagnostics() throws Exception {
+        try (var loader = compile("""
+            token NAME = IdentifierParser
+            @root @backref(name=tag) @mapping(Node, params=[tag])
+            Root ::= '<' NAME @tag '>' '</' NAME @tag '>' ;
+            """)) {
+            var parser = (org.unlaxer.parser.Parser) loader.loadClass("org.example.bound.BoundParsers")
+                .getMethod("getRootParser").invoke(null);
+            for (String input : List.of("<a></a>", "<a></b>")) {
+                try (var context = new org.unlaxer.context.ParseContext(org.unlaxer.StringSource.createRootSource(input))) {
+                    assertTrue(parser.parse(context).isSucceeded());
+                    assertTrue(context.allConsumed());
+                    var diagnostics = org.unlaxer.dsl.runtime.ScopeStore.getDiagnostics(context);
+                    assertEquals(input, input.contains("b") ? 1 : 0, diagnostics.size());
+                }
+            }
         }
     }
 }
