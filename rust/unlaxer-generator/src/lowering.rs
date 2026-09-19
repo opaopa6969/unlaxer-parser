@@ -5,6 +5,14 @@ use unlaxer_codegen::ir::*;
 use unlaxer_ubnf::ast::{self, AnnotationKind, ElementKind, SettingValue, TokenKind};
 
 type Result<T> = std::result::Result<T, String>;
+
+fn whitespace_style(style: &str) -> Result<bool> {
+    match style.trim() {
+        value if value.eq_ignore_ascii_case("javaStyle") => Ok(true),
+        value if value.eq_ignore_ascii_case("none") => Ok(false),
+        _ => Err(format!("unsupported whitespace {style}")),
+    }
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Shape {
     kind: Kind,
@@ -66,8 +74,9 @@ impl Lowering<'_> {
                 return Err(format!("unsupported block setting {}", setting.key));
             };
             match setting.key.as_str() {
-                "whitespace" if value == "javaStyle" || value == "none" => {
-                    whitespace = value == "javaStyle"
+                "whitespace" => {
+                    whitespace = whitespace_style(value)
+                        .map_err(|_| format!("unsupported setting whitespace: {value}"))?
                 }
                 "package" => {}
                 _ => return Err(format!("unsupported setting {}: {value}", setting.key)),
@@ -80,6 +89,8 @@ impl Lowering<'_> {
             }
         }
         let mut root = None;
+        let mut rule_whitespace = Vec::new();
+        let mut has_local_trivia = false;
         let mut methods = HashMap::new();
         for (i, rule) in self.grammar.rules.iter().enumerate() {
             if self.ids.insert(rule.name.clone(), i).is_some()
@@ -90,6 +101,8 @@ impl Lowering<'_> {
             let mut mapping = None;
             let mut associativity = None;
             let mut precedence = None;
+            let mut local_whitespace = None;
+            let mut interleave = false;
             for annotation in &rule.annotations {
                 match &annotation.kind {
                     AnnotationKind::Root => {
@@ -133,11 +146,28 @@ impl Lowering<'_> {
                             return Err("precedence must be non-negative".into());
                         }
                     }
+                    AnnotationKind::Whitespace { style } => {
+                        let enabled = whitespace_style(style.as_deref().unwrap_or("javaStyle"))?;
+                        if local_whitespace.replace(enabled).is_some() {
+                            return Err(format!("duplicate @whitespace on {}", rule.name));
+                        }
+                    }
+                    AnnotationKind::Interleave { profile } => {
+                        if interleave {
+                            return Err(format!("duplicate @interleave on {}", rule.name));
+                        }
+                        if !matches!(profile.trim(), "javaStyle" | "commentsAndSpaces") {
+                            return Err(format!("unsupported interleave profile {profile}"));
+                        }
+                        interleave = true;
+                    }
                     other => {
                         return Err(format!("unsupported annotation {other:?} on {}", rule.name))
                     }
                 }
             }
+            has_local_trivia |= local_whitespace.is_some() || interleave;
+            rule_whitespace.push(local_whitespace.unwrap_or(whitespace || interleave));
             if associativity.is_some() != precedence.is_some() {
                 return Err(format!(
                     "associativity and @precedence must occur together on {}",
@@ -276,7 +306,7 @@ impl Lowering<'_> {
             .values()
             .flat_map(|m| &m.fields)
             .any(|f| f.kind == Kind::Value);
-        for rule in &mut rules {
+        for (i, rule) in rules.iter_mut().enumerate() {
             if let Some(mapping) = &rule.mapping {
                 rule.mapping = Some(variants[&mapping.name].clone());
             }
@@ -293,6 +323,13 @@ impl Lowering<'_> {
             {
                 // Shape validation happened before projection. Only the outer structure changes.
                 rule.body = right_associative_body(&rule.body);
+            }
+            // Resolve unannotated callees against the grammar, not a caller's local mode.
+            if has_local_trivia {
+                rule.body = Expression::TriviaScope {
+                    child: Box::new(rule.body.clone()),
+                    java_whitespace: rule_whitespace[i],
+                };
             }
         }
         Ok(GrammarIr {

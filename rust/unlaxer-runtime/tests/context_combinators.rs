@@ -1,6 +1,64 @@
 use unlaxer_runtime::{Expr, ParseContext, ParseMatch, ParseResult, Parser, Rule, Span};
 
 #[test]
+fn trivia_scope_restores_parent_boundaries_after_success_and_failed_choice() {
+    let strict = Expr::literal("a")
+        .then(Expr::literal("b"))
+        .trivia_scope(false);
+    let fallback = Expr::literal("a").then(Expr::literal("c"));
+    let parser = strict
+        .or(fallback)
+        .then(Expr::literal("!"))
+        .trivia_scope(true);
+    for input in [" ab /* outer */ ! ", " a /* inner */ c /* outer */ ! "] {
+        let mut context = ParseContext::new(input);
+        context.parse(&parser).unwrap();
+        assert_eq!(context.remaining(), "");
+    }
+    assert!(ParseContext::new("a b!").parse(&parser).is_err());
+    let mut context = ParseContext::new("a c");
+    assert!(context.parse(&parser).is_err());
+    assert!(context
+        .parse(&Expr::literal("a").then(Expr::literal("c")))
+        .is_err());
+    context
+        .with_trivia(true, |ctx| {
+            ctx.parse(&Expr::literal("a").then(Expr::literal("c")))
+        })
+        .unwrap();
+}
+
+#[test]
+fn nested_grammar_restores_scoped_policy_on_success_and_failure() {
+    fn nested(context: &mut ParseContext<'_>) -> ParseResult {
+        context.parse_grammar(
+            vec![Rule {
+                name: "nested",
+                expression: Expr::literal("x")
+                    .then(Expr::literal("y"))
+                    .trivia_scope(true),
+            }],
+            0,
+            false,
+        )
+    }
+    let outer = Expr::Custom(nested)
+        .or(Expr::literal("x").then(Expr::literal("z")))
+        .then(Expr::literal("!"));
+    let mut context = ParseContext::new("x /* nested */ y!");
+    context.parse(&outer).unwrap();
+    // A failed nested parse must leave the caller strict, including the alternative.
+    assert!(ParseContext::new("x z!").parse(&outer).is_err());
+    ParseContext::new("xz!").parse(&outer).unwrap();
+    // Enabling trivia never splits an atomic quoted token.
+    let mut quoted = ParseContext::new("'a /* literal */ b'");
+    quoted
+        .parse(&Expr::Quoted('\'').capture("raw").trivia_scope(true))
+        .unwrap();
+    assert_eq!(quoted.captured("raw"), Some("'a /* literal */ b'"));
+}
+
+#[test]
 fn lexical_tokens_preserve_raw_unicode_text_and_transactional_cursors() {
     for input in ["'😀'", "'a\nb'", "'\\q'", "'\\😀'", "'\\\n'", "'\0'"] {
         let mut context = ParseContext::new(input);
@@ -267,7 +325,12 @@ fn ubnf_predicates_advance_only_the_match_cursor_and_rollback_both() {
 fn ubnf_occurrences_distinguish_direct_atoms_and_transactional_children() {
     for (child, accepted) in [
         (Expr::literal("x"), false),
+        (Expr::literal("x").trivia_scope(true), false),
         (Expr::sequence([Expr::literal("x")]), true),
+        (
+            Expr::sequence([Expr::literal("x")]).trivia_scope(false),
+            true,
+        ),
         (Expr::literal("x").capture("absent"), true),
     ] {
         let mut context = ParseContext::new("ab");

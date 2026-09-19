@@ -102,6 +102,7 @@ public final class GrammarValidator {
             boolean hasRightAssoc = false;
             List<PrecedenceAnnotation> precedenceAnnotations = new ArrayList<>();
             List<InterleaveAnnotation> interleaveAnnotations = new ArrayList<>();
+            int whitespaceAnnotations = 0;
             List<BackrefAnnotation> backrefAnnotations = new ArrayList<>();
             List<ScopeTreeAnnotation> scopeTreeAnnotations = new ArrayList<>();
 
@@ -121,8 +122,15 @@ public final class GrammarValidator {
                 } else if (annotation instanceof ScopeTreeAnnotation s) {
                     scopeTreeAnnotations.add(s);
                 } else if (annotation instanceof WhitespaceAnnotation w) {
+                    whitespaceAnnotations++;
                     validateRuleWhitespace(rule, w, errors);
                 }
+            }
+            if (whitespaceAnnotations > 1) {
+                addRuleError(errors, rule.name(),
+                    "rule " + rule.name() + " has duplicate @whitespace annotations",
+                    "Keep a single @whitespace annotation.",
+                    "E-WHITESPACE-RULE-DUPLICATE");
             }
 
             if (mapping != null) {
@@ -456,17 +464,25 @@ public final class GrammarValidator {
     }
 
     private static void validateGlobalWhitespace(GrammarDecl grammar, List<ValidationIssue> errors) {
+        if (grammar.settings().stream().filter(s -> "whitespace".equals(s.key())).count() > 1) {
+            addError(errors, "duplicate global @whitespace settings",
+                "Keep a single global @whitespace setting.", "E-WHITESPACE-GLOBAL-DUPLICATE");
+        }
         grammar.settings().stream()
             .filter(s -> "whitespace".equals(s.key()))
             .forEach(s -> {
                 if (s.value() instanceof StringSettingValue sv) {
                     String style = sv.value().trim();
-                    if (!style.equalsIgnoreCase("javaStyle")) {
+                    if (!style.equalsIgnoreCase("javaStyle") && !style.equalsIgnoreCase("none")) {
                         addError(errors,
-                            "global @whitespace style must be javaStyle: " + style,
-                            "Use '@whitespace: javaStyle'.",
+                            "global @whitespace style must be javaStyle or none: " + style,
+                            "Use '@whitespace: javaStyle' or '@whitespace: none'.",
                             "E-WHITESPACE-GLOBAL-STYLE");
                     }
+                } else {
+                    addError(errors, "global @whitespace requires a style name",
+                        "Use '@whitespace: javaStyle' or '@whitespace: none'.",
+                        "E-WHITESPACE-GLOBAL-STYLE");
                 }
             });
     }

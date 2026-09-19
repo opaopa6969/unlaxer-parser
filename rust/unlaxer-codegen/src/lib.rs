@@ -181,6 +181,12 @@ fn expression(expr: &Expression) -> String {
         Delimited(child) => format!("Expr::Sequence(vec![{}])", expression(child)),
         TextValue(child) => format!("{}.text_value()", expression(child)),
         ValueBoundary(child) => format!("{}.value_boundary()", expression(child)),
+        TriviaScope {
+            child,
+            java_whitespace,
+        } => {
+            format!("{}.trivia_scope({java_whitespace})", expression(child))
+        }
         Choice(items) => format!("Expr::Choice(vec![{}])", expressions(items)),
         Capture {
             name,

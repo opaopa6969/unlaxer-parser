@@ -216,6 +216,12 @@ fn invalid_ir_is_rejected_before_emission() {
     g.rules[3].body = Expression::ValueBoundary(Box::new(Expression::Reference(999)));
     cases.push(g);
     let mut g = base.clone();
+    g.rules[3].body = Expression::TriviaScope {
+        child: Box::new(Expression::Reference(999)),
+        java_whitespace: true,
+    };
+    cases.push(g);
+    let mut g = base.clone();
     g.rules[3].body = Expression::CharRangeToken { min: 'z', max: 'a' };
     cases.push(g);
     let mut g = base.clone();

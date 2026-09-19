@@ -162,6 +162,7 @@ public final class RustBackend {
             case Capture capture -> "Expr::Capture(" + quote(capture.name()) + ", Box::new(" + expression(capture.expression()) + "))";
             case TextValue text -> expression(text.child()) + ".text_value()";
             case ValueBoundary boundary -> expression(boundary.child()) + ".value_boundary()";
+            case TriviaScope scope -> expression(scope.child()) + ".trivia_scope(" + scope.javaWhitespace() + ")";
             case OptionalExpr optional -> expression(optional.child()) + ".optional_java()";
             case Repeat repeat -> expression(repeat.child()) + ".repeat_java(" + repeat.min() + ", "
                 + (repeat.max() == null ? "None" : "Some(" + repeat.max() + ")") + ")";
