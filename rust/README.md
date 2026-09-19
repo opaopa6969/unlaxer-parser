@@ -131,9 +131,9 @@ lowererはtext選択肢の境界を明示的な`Expr::TextValue`として生成�
 
 `Outer ::= '(' [Factor] ')'; Root ::= Outer @value;`でhelper内部のoptionalをcaptureした場合、入力`()`はJavaの`Optional.empty()`・Rustの`None`を表す。値がないことと空文字列の値を区別し、括弧だけからTextを捏造しない。従来Javaが返したscalar Objectや最後のnodeだけへの依存はAPI変更になるため、parser・AST・mapper・evaluatorを一緒に再生成し、利用側のList/Optional処理を更新する。Java生成parserの専用`__CaptureBinding` metadataでtext/item境界を保持し、共有Parser instanceを変更しない。
 
-[`semantic-cardinality`](../unlaxer-dsl/src/test/resources/semantic-cardinality/)の共通corpusでは、Java単体・Rust単体・両言語比較を独立に実行する。型、値の順序、両cursor、全AST node span、Textの独立spanと評価結果を検証し、同値のleafが連続する場合も別々の位置を保持する。native/Java frontendのRust生成fileも照合する。結果は`target/semantic-cardinality-{java,rust,both}.tsv`に保存する。既存のassoc用型契約と純粋なmapped aliasのString APIはこの一般化では変更しない。
+[`semantic-cardinality`](../unlaxer-dsl/src/test/resources/semantic-cardinality/)の共通corpusでは、Java単体・Rust単体・両言語比較を独立に実行する。型、値の順序、両cursor、全AST node span、Textの独立spanと評価結果を検証し、同値のleafが連続する場合も別々の位置を保持する。native/Java frontendのRust生成fileも照合する。結果は`target/semantic-cardinality-{java,rust,both}.tsv`に保存する。既存のassoc用型契約はこの一般化では変更しない。
 
-choiceを介さず単一mapped ruleを参照するJavaのaliasは既存の`String` APIを維持する。たとえばtinyexpressionの`SliceStartIndex ::= NumberExpression`はsource textを添字変換に使う。Rustはこの形もNodeとして扱うため、mixed choice対応をもって純粋なmapped aliasの型まで互換になったとは主張しない。利用側を含む型移行は[#163](https://github.com/opaopa6969/unlaxer-parser/issues/163)で追跡し、この不一致を独立fixtureに残す。
+純粋なmapped aliasもJava/Rustの双方でNodeを保持する（[#163](https://github.com/opaopa6969/unlaxer-parser/issues/163)）。Javaの旧`String` APIからの変更であり、transparent fieldは`Object`系となる。Rustの`Box<Ast>`と型名を揃えたものではなく、Node/Textの種別・cardinality・値・位置の契約を共通corpusで照合する。tinyexpressionの`SliceStartIndex ::= NumberExpression`のように字句文字列が必要な利用者は、Nodeを評価・文字列化せず所有source mapから取り出す。[移行手順と保証範囲](../docs/pure-mapped-alias-migration.md)を参照。
 
 この移行に先立ちJavaには、preferred型で選んだTokenとimmutableな位置snapshotを
 一度のmappingから返す`selectParsedTokenWithSourceMap`を追加した（[#165](https://github.com/opaopa6969/unlaxer-parser/issues/165)）。
@@ -145,7 +145,7 @@ Rustの生成ASTはもともとspanを所有するため、別parseや別thread�
 
 `[[ Item ]] @head`など入れ子container全体のcaptureは、`Option<Option<_>>`を失わないよう現時点では明示拒否する。内側の要素に名前を付けるか、各階層をmapped ruleに分ける。再帰的なunmapped ruleの型推論、入れ子container型、全Java capture規則との互換性は今後の作業。scalarからoptionalに変わると手書きSemanticsも型変更が必要になり、古い引数型は`E0053`で検出される。
 
-RustのLSP/DAP、回復・incremental cache、PropagationStopper、Java MatchedTokenParserとの完全互換、tinyexpressionのstring/variable/function-call意味論、proc macro、Rust製UBNF frontendは未実装。性能最適化・Java比の速度優位も未評価。文法構造はparseごとに構築し、runtimeのrule呼出深さには256の上限がある。大規模・敵対的入力の資源量保証はない。
+RustのLSP/DAP、回復・incremental cache、PropagationStopper、Java MatchedTokenParserとの完全互換、tinyexpressionのstring/variable/function-call意味論、proc macroは未実装。Rust製UBNF frontendの構文対応とbackend生成対応は上記のとおり区別する。性能最適化・Java比の速度優位も未評価。文法構造はparseごとに構築し、runtimeのrule呼出深さには256の上限がある。大規模・敵対的入力の資源量保証はない。
 
 ### 公開ParseContextと手書きcombinator
 
