@@ -38,9 +38,17 @@ public class RustConformanceTest {
     }
 
     @Test public void mixedValueFixturesPreserveJavaObjectFieldsAndValues() throws Exception {
+        javaMixedCorpus("Mixed.ubnf", "corpus.json");
+    }
+
+    @Test public void delimitedMixedFixturesPreserveJavaWholeCaptureText() throws Exception {
+        javaMixedCorpus("Delimited.ubnf", "delimited-corpus.json");
+    }
+
+    private void javaMixedCorpus(String grammarFile, String corpusFile) throws Exception {
         Path fixtures = repo.resolve("unlaxer-dsl/src/test/resources/mixed-values");
-        String source = Files.readString(fixtures.resolve("Mixed.ubnf"));
-        var corpus = JsonParser.parseString(Files.readString(fixtures.resolve("corpus.json"))).getAsJsonArray();
+        String source = Files.readString(fixtures.resolve(grammarFile));
+        var corpus = JsonParser.parseString(Files.readString(fixtures.resolve(corpusFile))).getAsJsonArray();
         for (String mode : List.of("two", "one")) {
         var grammar = UBNFMapper.parse(mode.equals("one") ? source.replace(" | OtherRule", "") : source).grammars().get(0);
         try (var loader = compileJava(grammar, List.of())) {
@@ -73,13 +81,21 @@ public class RustConformanceTest {
     }
 
     @Test public void mixedTextAndNodesPreserveCardinalityValuesCursorsAndSpans() throws Exception {
+        rustMixedCorpus("Mixed.ubnf", "corpus.json", "rust-mixed-values.tsv");
+    }
+
+    @Test public void delimitedMixedValuesPreserveCaptureTextAndNodeBoundaries() throws Exception {
+        rustMixedCorpus("Delimited.ubnf", "delimited-corpus.json", "rust-delimited-mixed-values.tsv");
+    }
+
+    private void rustMixedCorpus(String grammarFile, String corpusFile, String reportFile) throws Exception {
         assumeTrue("enable with -DrustConformance=true (requires rustc)", Boolean.getBoolean("rustConformance"));
         Path library = temporary.getRoot().toPath().resolve("libunlaxer_runtime.rlib");
         success(run(List.of("rustc", "--edition=2021", "--crate-type=rlib", "--crate-name=unlaxer_runtime",
             repo.resolve("rust/unlaxer-runtime/src/lib.rs").toString(), "-o", library.toString()), ""));
         Path fixtures = repo.resolve("unlaxer-dsl/src/test/resources/mixed-values");
-        String source = Files.readString(fixtures.resolve("Mixed.ubnf"));
-        var corpus = JsonParser.parseString(Files.readString(fixtures.resolve("corpus.json"))).getAsJsonArray();
+        String source = Files.readString(fixtures.resolve(grammarFile));
+        var corpus = JsonParser.parseString(Files.readString(fixtures.resolve(corpusFile))).getAsJsonArray();
         var report = new ArrayList<>(List.of("mode\tinput_json\tjava_prefix\tjava_ast\trust"));
         for (String mode : List.of("two", "one")) {
         var grammar = UBNFMapper.parse(mode.equals("one") ? source.replace(" | OtherRule", "") : source).grammars().get(0);
@@ -136,7 +152,7 @@ public class RustConformanceTest {
         assertTrue(stale.output(), stale.output().contains("E0046"));
         assertTrue(stale.output(), stale.output().contains("eval_root"));
         }
-        Files.write(Path.of("target/rust-mixed-values.tsv"), report, StandardCharsets.UTF_8);
+        Files.write(Path.of("target").resolve(reportFile), report, StandardCharsets.UTF_8);
     }
 
     private boolean mixedAccepted(JsonObject row, String mode) {
