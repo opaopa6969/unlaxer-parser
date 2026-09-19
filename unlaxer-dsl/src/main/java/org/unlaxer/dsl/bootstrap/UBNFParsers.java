@@ -307,8 +307,11 @@ public class UBNFParsers {
 
     /**
      * IDENTIFIER: AlphabetUnderScore { AlphabetNumericUnderScore }
+     * Lexical characters must be contiguous. Grammar-level UBNFLazyChain inserts
+     * trivia between children, which would merge a single-letter name and the
+     * following reference (T Root -> one identifier). Enclosing rules own trivia.
      */
-    public static class IdentifierParser extends UBNFLazyChain {
+    public static class IdentifierParser extends LazyChain {
         private static final long serialVersionUID = 1L;
 
         @Override

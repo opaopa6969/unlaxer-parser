@@ -175,4 +175,40 @@ public class SelfHostingRoundTripTest {
         assertEquals("Stage 1 and Stage 2 generated source must be identical (fixpoint)",
             stage1.source(), stage2.source());
     }
+
+    @Test
+    public void testGeneratedFrontendKeepsAdjacentReferenceBoundaries() throws Exception {
+        Parser root = (Parser) generatedParsersClass.getMethod("getRootParser").invoke(null);
+        for (String separator : List.of(" ", "\t", "\n", "\r", "\r\n", "// boundary\n")) {
+            String source = "grammar Boundary { token T=EOF @root Root ::= T" + separator + "Root @value; }";
+            try (var context = new ParseContext(StringSource.createRootSource(source))) {
+                Parsed parsed = root.parse(context);
+                assertTrue(parsed.isSucceeded());
+                assertTrue(context.allConsumed());
+                var names = new java.util.ArrayList<String>();
+                collectReferenceTexts(parsed.getRootToken(false), names);
+                assertEquals("generated frontend boundary " + separator, List.of("T", "Root"), names);
+            }
+        }
+    }
+
+    private static void collectReferenceTexts(org.unlaxer.Token token, List<String> names) {
+        if (token.parser.getClass().getSimpleName().equals("QuantifiedRefParser")) {
+            // The enclosing source-preserving CST may include trailing comments;
+            // lexical identifier children, not the whole source slice, define the name.
+            var identifiers = new java.util.ArrayList<String>();
+            collectIdentifierTexts(token, identifiers);
+            names.add(String.join(".", identifiers));
+            return;
+        }
+        for (org.unlaxer.Token child : token.getOriginalChildren()) collectReferenceTexts(child, names);
+    }
+
+    private static void collectIdentifierTexts(org.unlaxer.Token token, List<String> names) {
+        if (token.parser instanceof org.unlaxer.parser.clang.IdentifierParser) {
+            names.add(token.source.sourceAsString());
+            return;
+        }
+        for (org.unlaxer.Token child : token.getOriginalChildren()) collectIdentifierTexts(child, names);
+    }
 }
