@@ -47,7 +47,16 @@ final class RustGenerateCommand {
             if (file.grammars().size() != 1) throw new IllegalArgumentException("Rust subset requires exactly one grammar");
             // Java class-resolution warnings do not define Rust token support: lowering
             // enforces an explicit Rust allowlist. Common grammar errors remain fatal.
-            var errors = GrammarValidator.validate(file.grammars().get(0)).stream()
+            var grammar = file.grammars().get(0);
+            // Explicit "none" is part of the Rust backend contract, whereas Java's
+            // common validator only accepts named trivia implementations. Validate it
+            // as absent here; lowering still checks the original settings/duplicates.
+            var validationGrammar = new org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl(
+                grammar.name(), grammar.imports(), grammar.settings().stream().filter(setting ->
+                    !(setting.key().equals("whitespace")
+                        && setting.value() instanceof org.unlaxer.dsl.bootstrap.UBNFAST.StringSettingValue value
+                        && value.value().equals("none"))).toList(), grammar.tokens(), grammar.rules());
+            var errors = GrammarValidator.validate(validationGrammar).stream()
                 .filter(issue -> "ERROR".equals(issue.severity())).map(GrammarValidator.ValidationIssue::format).toList();
             if (!errors.isEmpty()) throw new IllegalArgumentException("Grammar validation failed:\n - " + String.join("\n - ", errors));
             var generated = new RustBackend().generate(file.grammars().get(0));

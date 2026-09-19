@@ -34,7 +34,8 @@
 | tinyexpression-rs | 未対応 | 値・null/欠損・変数・演算子・関数・外部呼出し・日時/数値仕様を棚卸しし、同一入力で値/失敗分類を比較 |
 | rustcodeblock | 未対応 | 既定無効・明示許可付きAOT、元の位置へのcompiler診断、通常parse/LSPの非実行保証。Javaソースの自動翻訳はしない |
 | ネイティブ配布 | 縮小文法CLIのみ | tinyexpression CLI、対象OS別artifact、stdin/file/終了コード・制限のsmoke |
-| Rust製UBNF frontend・入力DSLの機械語生成 | 未対応・設計未確定 | 前者はgenerator自体のJVM不要化。後者は評価器バイナリと区別し、必要な意味論・成果物を別ADRで確定 |
+| Rust製UBNF frontend・native generator | syntax frontend全18annotation/11token/9element種、対応範囲のlowering/CLI/5module emitterを実装 | Java/native82文法410file一致、空PATHの生成/check、手書き/symlink保護。全backend機能の生成完了とは区別。frontend既知差と構造分析上限を文書化 |
+| 入力DSLの機械語生成 | 未対応・設計未確定 | generatorや評価器のnativeバイナリ化と区別し、必要な意味論・成果物を別ADRで確定 |
 
 ## 完了の扱いと順序
 
