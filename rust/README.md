@@ -89,6 +89,7 @@ runtimeは規則IDで参照する文法を実行し、入力とCST node arenaを
 - `NumberParser`またはその完全修飾名へのtoken binding。符号・小数・指数を含む。
 - `IdentifierParser`、`SingleQuotedParser`、`DoubleQuotedParser`、`EndOfSourceParser`の短名または既定packageの完全修飾名。字句とmapperの契約は下記参照。
 - `org.unlaxer.tinyexpression.parser.StringLiteralParser`の完全修飾名。DoubleQuoted→SingleQuotedの順で認識し、短名や別packageは拒否する。[実tinyexpressionクラスとの共通テストと字句契約](../docs/tiny-string-token.md)を参照。文字列の評価・escapeデコードは含まない。
+- `org.unlaxer.tinyexpression.parser.javalang.CodeStartParser` / `CodeEndParser`の完全修飾名。内部triviaなしの原子的なcode fenceとして行頭・行末条件を保持する。[実クラスとの比較・字句契約](../docs/tiny-code-fence.md)を参照。javacodeblock/rustcodeblockの実行機能ではない。
 - `ANY`・`EOF`・`EMPTY`・`CHAR_RANGE`・`NEGATION`・`UNTIL`・`LOOKAHEAD`・`NEGATIVE_LOOKAHEAD`。詳細は下記のprimitive互換契約を参照。
 - `@mapping`とterminal/rule/group/quantifierへのcapture。全capture名の集合とparamsが一致すること。欠ける選択肢はoptional、繰り返しや同名の複数出現はlistとして推論する。text/node混在値は下記の`AstValue`で保持する。
 - 同じfield名・順序・cardinalityを持つ複数ruleのshared mapping。text/node種別が異なるfieldは宣言順に依存せず`AstValue`へ統合する。AST variantとSemantics methodは一つに統合し、ruleごとのcaptureとspanは保持する。

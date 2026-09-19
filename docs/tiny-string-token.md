@@ -50,5 +50,6 @@ Java frontend と native Rust frontend の生成物も全5ファイル（計35�
 
 これは既存 binding の明示的な移行対応であり、target-neutral token ID/schema、登録 API、
 未登録・重複 adapter の診断を含む #158 全体の完了ではない。
-`CodeStartParser` / `CodeEndParser`、UBNF annotation、tinyexpression の評価機能、
+`CodeStartParser` / `CodeEndParser` の字句認識は [#170 の別契約](tiny-code-fence.md)で扱う。
+UBNF annotation、tinyexpression の評価機能、
 `rustcodeblock`、LSP/DAP は引き続き対応表で追跡する。
