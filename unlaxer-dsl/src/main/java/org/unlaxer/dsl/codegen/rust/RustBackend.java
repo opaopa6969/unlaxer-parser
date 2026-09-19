@@ -59,19 +59,29 @@ public final class RustBackend {
     private String parser(GrammarIR ir) {
         StringBuilder out = new StringBuilder(HEADER);
         out.append("""
-            use unlaxer_runtime::{Expr, Rule, Tree, ParseError, ParseDiagnostic};
+            use unlaxer_runtime::{Expr, Rule, Tree, ParseError, ParseDiagnostic, ParseContext, ParseResult, Parser};
+
+            pub struct GeneratedParser;
+
+            impl Parser for GeneratedParser {
+                fn parse(&self, context: &mut ParseContext<'_>) -> ParseResult {
+                    parse_context(context)
+                }
+            }
 
             pub fn parse_tree(source: &str) -> Result<Tree, ParseError> {
                 parse_tree_detailed(source).map_err(|diagnostic| diagnostic.farthest)
             }
 
-            pub fn parse_tree_detailed(source: &str) -> Result<Tree, ParseDiagnostic> {
-                let rules = vec![
+            pub fn rules() -> Vec<Rule> {
+                vec![
             """);
         for (Rule rule : ir.rules()) out.append("        Rule { name: ").append(quote(rule.name()))
             .append(", expression: ").append(expression(rule.body())).append(" },\n");
-        out.append("    ];\n    unlaxer_runtime::parse_detailed(&rules, ").append(ir.root()).append(", ")
-            .append(ir.javaWhitespace()).append(", source)\n}\n");
+        out.append("    ]\n}\n\npub fn parse_context(context: &mut ParseContext<'_>) -> ParseResult {\n    context.parse_grammar(rules(), ")
+            .append(ir.root()).append(", ").append(ir.javaWhitespace()).append(")\n}\n");
+        out.append("\npub fn parse_tree_detailed(source: &str) -> Result<Tree, ParseDiagnostic> {\n    unlaxer_runtime::parse_detailed(&rules(), ")
+            .append(ir.root()).append(", ").append(ir.javaWhitespace()).append(", source)\n}\n");
         return out.toString();
     }
 
