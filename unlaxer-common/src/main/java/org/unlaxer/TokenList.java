@@ -257,6 +257,16 @@ public class TokenList implements List<Token>{
     
     Optional<Token> firstPrintableToken = tokens.firstPrintableToken();
     if(tokens.isEmpty() || firstPrintableToken.isEmpty()) {
+      if (sourceKind == SourceKind.subSource) {
+        // A zero-width real child can still carry an exact source coordinate.
+        // Do not replace it with an unrelated detached empty source.
+        for (Token token : tokens) {
+          if (token.tokenKind.isReal() && token.source != null
+              && token.source.sourceKind() == SourceKind.subSource) {
+            return token.source;
+          }
+        }
+      }
       return StringSource.createDetachedSource("");
     }
     

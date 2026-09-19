@@ -166,6 +166,28 @@ public class Token implements Serializable{
 	public Source getSource() {
 		return source;
 	}
+
+    /**
+     * Anchors a newly collected, real, detached empty token without losing its CST
+     * children or side metadata. Existing coordinates, virtual tokens and custom
+     * subclasses are untouched. The children move to the returned replacement;
+     * this is intended for collection before the token is attached to its parent.
+     */
+    public Token anchorCollectedEmptySource(Source anchor) {
+        if (anchor == null || !anchor.isEmpty() || anchor.sourceKind().isDetached()) {
+            throw new IllegalArgumentException("anchor must be an empty source with root coordinates");
+        }
+        if (getClass() != Token.class || parent.isPresent() || !tokenKind.isReal()
+                || source == null || !source.isEmpty() || !source.sourceKind().isDetached()) {
+            return this;
+        }
+        Token copy = new Token(tokenKind, anchor, parser, originalChildren);
+        copy.filteredChildren.clear();
+        copy.filteredChildren.addAll(filteredChildren);
+        copy.extraObjectByName.putAll(extraObjectByName);
+        copy.relatedTokenByName.putAll(relatedTokenByName);
+        return copy;
+    }
 	
 	@Deprecated
 	public Optional<String> getToken() {

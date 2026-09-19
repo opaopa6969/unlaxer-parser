@@ -118,6 +118,12 @@ public interface Transaction extends TransactionListenerContainer , ParseContext
       Token collected = ((CollectingParser) parser).collect(
           current.tokens, tokenKind , tokenKind.passFilter);
 
+      if (tokenKind.isReal() && collected.source != null && collected.source.isEmpty()
+          && collected.source.sourceKind().isDetached()) {
+        Source anchor = getSource().peek(current.getCursor(tokenKind).position(), new CodePointLength(0));
+        collected = collected.anchorCollectedEmptySource(anchor);
+      }
+
       parent.tokens.add(collected);
       onCommit(parseContext, parser, TokenList.of(collected));
       committed = new Committed(collected, current.tokens);
