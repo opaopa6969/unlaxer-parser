@@ -4,7 +4,7 @@ use unlaxer_evolution_example::{generated, semantics::Calculator};
 fn main() {
     for line in io::stdin().lock().lines() {
         let input = line.expect("read input");
-        match generated::parser::parse_tree(&input) {
+        match generated::parser::parse_tree_detailed(&input) {
             Ok(tree) => match generated::mapper::map(&tree) {
                 Ok(ast) => {
                     let value = generated::evaluator::evaluate(&ast, &mut Calculator);
@@ -22,14 +22,16 @@ fn main() {
                 Err(error) => panic!("generated mapper invariant: {error}"),
             },
             Err(error) => println!(
-                "{{\"ok\":false,\"offset\":{},\"expected\":[{}]}}",
-                error.offset,
+                "{{\"ok\":false,\"offset\":{},\"expected\":[{}],\"diagnostic\":{}}}",
+                error.farthest.offset,
                 error
+                    .farthest
                     .expected
                     .iter()
                     .map(|s| unlaxer_runtime::json_string(s))
                     .collect::<Vec<_>>()
-                    .join(",")
+                    .join(","),
+                error.canonical_json()
             ),
         }
     }

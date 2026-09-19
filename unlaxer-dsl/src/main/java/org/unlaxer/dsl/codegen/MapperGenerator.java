@@ -118,6 +118,41 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("    // =========================================================================\n");
         sb.append("    // Entry Point\n");
         sb.append("    // =========================================================================\n\n");
+        sb.append("""
+                /** Parser diagnostics only: offsets are Unicode code points, not UTF-16 indices. */
+                public record ParseDiagnostic(String kind, int offset, List<String> expected,
+                        int farthestOffset, List<String> farthestExpected) {
+                    public ParseDiagnostic {
+                        expected = List.copyOf(expected);
+                        farthestExpected = List.copyOf(farthestExpected);
+                    }
+                }
+
+                /**
+                 * Validates full-input parsing without mapping or clearing retained source maps.
+                 * Empty means parser acceptance, not successful AST mapping or evaluation.
+                 * Native syntax hints are backend-specific; trailing input always expects end of input.
+                 */
+                public static synchronized Optional<ParseDiagnostic> diagnose(String source) {
+            """);
+        sb.append("        Parser rootParser = ").append(parsersClass).append(".getRootParser();\n");
+        sb.append("""
+                    try (ParseContext context = new ParseContext(createRootSourceCompat(source))) {
+                        Parsed parsed = rootParser.parse(context);
+                        int consumed = consumedLengthCompat(parsed.getConsumed());
+                        if (parsed.isSucceeded() && consumed == source.length()) return Optional.empty();
+                        var nativeFailure = context.getParseFailureDiagnostics();
+                        List<String> hints = nativeFailure.getExpectedTokens().stream().sorted().toList();
+                        int farthest = nativeFailure.getFarthestOffset();
+                        if (parsed.isSucceeded()) {
+                            int offset = source.codePointCount(0, consumed);
+                            return Optional.of(new ParseDiagnostic("trailing_input", offset, List.of("end of input"), farthest, hints));
+                        }
+                        return Optional.of(new ParseDiagnostic("syntax", farthest, hints, farthest, hints));
+                    }
+                }
+
+            """);
         sb.append("    /** Selected parse-tree token and its generated AST mapping. */\n");
         sb.append("    public record MappedAst(Token token, ").append(astClass).append(" ast) {}\n\n");
         sb.append("    /** Immutable identity-based source map; offsets are code points, end exclusive. */\n");

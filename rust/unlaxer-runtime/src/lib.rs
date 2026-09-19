@@ -72,6 +72,48 @@ impl std::fmt::Display for ParseError {
 }
 impl std::error::Error for ParseError {}
 
+/// Full-input validation with a stable category and backend-native farthest-failure hints.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParseDiagnostic {
+    pub kind: &'static str,
+    pub offset: usize,
+    pub expected: Vec<String>,
+    pub farthest: ParseError,
+}
+
+impl ParseDiagnostic {
+    pub fn canonical_json(&self) -> String {
+        let expected = self
+            .expected
+            .iter()
+            .map(|s| json_string(s))
+            .collect::<Vec<_>>()
+            .join(",");
+        let farthest = self
+            .farthest
+            .expected
+            .iter()
+            .map(|s| json_string(s))
+            .collect::<Vec<_>>()
+            .join(",");
+        format!("{{\"kind\":{},\"offset\":{},\"expected\":[{}],\"farthestOffset\":{},\"farthestExpected\":[{}]}}",
+            json_string(self.kind), self.offset, expected, self.farthest.offset, farthest)
+    }
+}
+
+impl std::fmt::Display for ParseDiagnostic {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} at code point {}: expected {}",
+            self.kind,
+            self.offset,
+            self.expected.join(", ")
+        )
+    }
+}
+impl std::error::Error for ParseDiagnostic {}
+
 /// Matches Java String.strip / Character.isWhitespace (not Rust's broader trim set).
 pub fn strip_capture(text: &str) -> &str {
     text.trim_matches(|c| {
@@ -107,6 +149,17 @@ pub fn parse(
     whitespace: bool,
     input: &str,
 ) -> Result<Tree, ParseError> {
+    parse_detailed(rules, root, whitespace, input).map_err(|diagnostic| diagnostic.farthest)
+}
+
+/// Adds a primary trailing-input diagnostic without discarding speculative farthest failures.
+/// Syntax hints and rule-limit failures remain backend-native, not a language-independent oracle.
+pub fn parse_detailed(
+    rules: &[Rule],
+    root: usize,
+    whitespace: bool,
+    input: &str,
+) -> Result<Tree, ParseDiagnostic> {
     let mut parser = Parser {
         input,
         rules,
@@ -121,6 +174,7 @@ pub fn parse(
             .chain(std::iter::once(input.len()))
             .collect(),
     };
+    let mut trailing_offset = None;
     if let Some(root) = parser.rule(root, 0) {
         if parser.position == input.len() {
             return Ok(Tree {
@@ -130,11 +184,26 @@ pub fn parse(
                 byte_offsets: parser.byte_offsets,
             });
         }
+        trailing_offset = Some(parser.code_point(parser.position));
         parser.fail("end of input");
     }
-    Err(ParseError {
+    let farthest = ParseError {
         offset: parser.code_point(parser.farthest),
         expected: parser.expected.into_iter().collect(),
+    };
+    Err(ParseDiagnostic {
+        kind: if trailing_offset.is_some() {
+            "trailing_input"
+        } else {
+            "syntax"
+        },
+        offset: trailing_offset.unwrap_or(farthest.offset),
+        expected: if trailing_offset.is_some() {
+            vec!["end of input".to_owned()]
+        } else {
+            farthest.expected.clone()
+        },
+        farthest,
     })
 }
 
@@ -358,6 +427,40 @@ mod tests {
             let text = format!("{c}value{c}");
             assert_eq!(strip_capture(&text), text);
         }
+    }
+
+    #[test]
+    fn detailed_errors_separate_trailing_input_from_farthest_failure() {
+        let rules = vec![Rule {
+            name: "root",
+            expression: Expr::Choice(vec![
+                Expr::Sequence(vec![
+                    Expr::Literal("😀"),
+                    Expr::Literal("!"),
+                    Expr::Literal("?"),
+                ]),
+                Expr::Literal("😀"),
+            ]),
+        }];
+        let diagnostic = parse_detailed(&rules, 0, false, "😀!x").unwrap_err();
+        assert_eq!(diagnostic.kind, "trailing_input");
+        assert_eq!(diagnostic.offset, 1);
+        assert_eq!(diagnostic.expected, vec!["end of input"]);
+        assert_eq!(diagnostic.farthest.offset, 2);
+        assert_eq!(diagnostic.farthest.expected, vec!["?"]);
+        assert_eq!(
+            parse(&rules, 0, false, "😀!x").unwrap_err(),
+            diagnostic.farthest
+        );
+        assert_eq!(
+            diagnostic.canonical_json(),
+            r#"{"kind":"trailing_input","offset":1,"expected":["end of input"],"farthestOffset":2,"farthestExpected":["?"]}"#
+        );
+        let syntax = parse_detailed(&rules, 0, false, "x").unwrap_err();
+        assert_eq!(syntax.kind, "syntax");
+        assert_eq!(syntax.offset, 0);
+        assert_eq!(syntax.expected, vec!["😀"]);
+        assert!(parse_detailed(&rules, 0, false, "😀!?").is_ok());
     }
 
     #[test]

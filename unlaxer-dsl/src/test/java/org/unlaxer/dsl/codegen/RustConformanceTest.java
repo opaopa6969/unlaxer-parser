@@ -29,6 +29,54 @@ public class RustConformanceTest {
     private static final String PACKAGE = "org.example.evolution.";
     private final Path repo = Path.of("..").toAbsolutePath().normalize();
 
+    @Test public void diagnosticEdgeCasesIncludeAnExplicitBackendDifference() throws Exception {
+        assumeTrue("enable with -DrustConformance=true (requires rustc)", Boolean.getBoolean("rustConformance"));
+        Path library = temporary.getRoot().toPath().resolve("libunlaxer_runtime.rlib");
+        success(run(List.of("rustc", "--edition=2021", "--crate-type=rlib", "--crate-name=unlaxer_runtime",
+            repo.resolve("rust/unlaxer-runtime/src/lib.rs").toString(), "-o", library.toString()), ""));
+        var grammar = UBNFMapper.parse(fixture("3/Evolution.ubnf")).grammars().get(0);
+        Path dir = temporary.newFolder().toPath();
+        Path generated = Files.createDirectory(dir.resolve("generated"));
+        for (var file : new RustBackend().generate(grammar)) Files.writeString(generated.resolve(file.relativePath()), file.content());
+        Files.writeString(dir.resolve("main.rs"), """
+            mod generated;
+            use std::io::{self, BufRead};
+            fn main() {
+                for line in io::stdin().lock().lines() {
+                    let error = generated::parser::parse_tree_detailed(&line.unwrap()).unwrap_err();
+                    println!("{}", error.canonical_json());
+                }
+            }
+            """);
+        success(rustCompile(dir, library));
+        var corpus = JsonParser.parseString(fixture("diagnostics.json")).getAsJsonArray();
+        var actual = run(List.of(dir.resolve("probe").toString()), String.join("\n", corpus.asList().stream()
+            .map(row -> row.getAsJsonObject().get("input").getAsString()).toList()) + "\n");
+        success(actual);
+        var lines = actual.output().lines().toList();
+        assertEquals(corpus.size(), lines.size());
+        var report = new ArrayList<>(List.of("input_json\tjava_diagnostic\trust_diagnostic"));
+        try (var loader = compileJava(grammar, 3)) {
+            for (int i = 0; i < corpus.size(); i++) {
+                var row = corpus.get(i).getAsJsonObject();
+                String input = row.get("input").getAsString();
+                var java = javaDiagnostic(loader, input);
+                var rust = JsonParser.parseString(lines.get(i)).getAsJsonObject();
+                report.add(row.get("input") + "\t" + java + "\t" + rust);
+                assertEquals(input, row.get("kind"), java.get("kind"));
+                assertEquals(input, row.get("kind"), rust.get("kind"));
+                assertEquals(input + " Java", row.get("javaOffset"), java.get("offset"));
+                assertEquals(input + " Rust", row.get("rustOffset"), rust.get("offset"));
+                assertFalse(input, java.getAsJsonArray("expected").isEmpty());
+                assertFalse(input, rust.getAsJsonArray("expected").isEmpty());
+                if (row.get("kind").getAsString().equals("trailing_input")) {
+                    assertEquals(input, java.get("expected"), rust.get("expected"));
+                }
+            }
+        }
+        Files.write(Path.of("target/rust-diagnostics-edge.tsv"), report, StandardCharsets.UTF_8);
+    }
+
     @Test public void sameGrammarPreservesAstSpansResultsAndEvolutionObligations() throws Exception {
         assumeTrue("enable with -DrustConformance=true (requires rustc)", Boolean.getBoolean("rustConformance"));
         Path library = temporary.getRoot().toPath().resolve("libunlaxer_runtime.rlib");
@@ -36,6 +84,7 @@ public class RustConformanceTest {
             repo.resolve("rust/unlaxer-runtime/src/lib.rs").toString(), "-o", library.toString()), ""));
         var corpus = JsonParser.parseString(fixture("conformance.json")).getAsJsonArray();
         List<String> report = new ArrayList<>(List.of("stage\tcases\taccepted\tevaluated\tstale_dispatch\tmissing_semantics"));
+        List<String> diagnosticReport = new ArrayList<>(List.of("stage\tinput_json\tjava_diagnostic\trust_diagnostic"));
         String previousDispatch = null;
         for (int stage = 0; stage < 4; stage++) {
             var grammar = UBNFMapper.parse(fixture(stage + "/Evolution.ubnf")).grammars().get(0);
@@ -94,6 +143,14 @@ public class RustConformanceTest {
                         int offset = rust.get("offset").getAsInt();
                         assertTrue(context, offset >= 0 && offset <= source.codePointCount(0, source.length()));
                         assertFalse(context, rust.getAsJsonArray("expected").isEmpty());
+                        var javaDiagnostic = expected.getAsJsonObject("diagnostic");
+                        var rustDiagnostic = rust.getAsJsonObject("diagnostic");
+                        diagnosticReport.add(stage + "\t" + corpus.get(i) + "\t" + javaDiagnostic + "\t" + rustDiagnostic);
+                        assertEquals(context, javaDiagnostic.get("kind"), rustDiagnostic.get("kind"));
+                        assertEquals(context, javaDiagnostic.get("offset"), rustDiagnostic.get("offset"));
+                        if (javaDiagnostic.get("kind").getAsString().equals("trailing_input")) {
+                            assertEquals(context, javaDiagnostic.get("expected"), rustDiagnostic.get("expected"));
+                        }
                     }
                 }
             }
@@ -102,6 +159,7 @@ public class RustConformanceTest {
             previousDispatch = dispatch;
         }
         Files.write(Path.of("target/rust-conformance.tsv"), report, StandardCharsets.UTF_8);
+        Files.write(Path.of("target/rust-diagnostics.tsv"), diagnosticReport, StandardCharsets.UTF_8);
         report.forEach(System.out::println);
         // Committed standalone example must exactly match the generator, without requiring Java to run.
         var finalGrammar = UBNFMapper.parse(fixture("3/Evolution.ubnf")).grammars().get(0);
@@ -144,9 +202,12 @@ public class RustConformanceTest {
         catch (InvocationTargetException error) {
             if (!(error.getCause() instanceof IllegalArgumentException)) throw error;
             result.addProperty("ok", false);
+            result.add("diagnostic", javaDiagnostic(loader, source));
             return result;
         }
         Object ast = mapped.getClass().getMethod("ast").invoke(mapped);
+        assertTrue(((Optional<?>) loader.loadClass(PACKAGE + "EvolutionMapper")
+            .getMethod("diagnose", String.class).invoke(null, source)).isEmpty());
         result.addProperty("ok", true);
         result.add("ast", canonical(ast, mapped));
         Object calculator = loader.loadClass(PACKAGE + "Calculator").getConstructor().newInstance();
@@ -159,6 +220,16 @@ public class RustConformanceTest {
             result.addProperty("evaluationError", true);
         }
         return result;
+    }
+
+    private JsonObject javaDiagnostic(ClassLoader loader, String source) throws Exception {
+        Object diagnostic = ((Optional<?>) loader.loadClass(PACKAGE + "EvolutionMapper")
+            .getMethod("diagnose", String.class).invoke(null, source)).orElseThrow();
+        var json = new JsonObject();
+        for (var component : diagnostic.getClass().getRecordComponents()) {
+            json.add(component.getName(), new Gson().toJsonTree(component.getAccessor().invoke(diagnostic)));
+        }
+        return json;
     }
 
     private JsonObject canonical(Object ast, Object mapped) throws Exception {
