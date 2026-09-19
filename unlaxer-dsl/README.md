@@ -765,6 +765,26 @@ static TinyCalcAST.BinaryExpr toBinaryExpr(Token token) {
 
 Generates `TinyCalcEvaluator.java`. It is an abstract class with type parameter `<T>`, where you implement evaluation logic by overriding methods for each AST node type.
 
+The exhaustive switch dispatches only to concrete AST records, not intermediate
+mapped sum/alias interfaces. Manual semantics are required only for these concrete
+variants; `@skip` rules and enum values do not add AST evaluation methods. Existing
+simple names stay unchanged (`Item` → `evalItem`); dotted names use the mapper's
+dot-removal convention (`Node.Item` → `evalNodeItem`). If a flat name has the same
+spelling, the methods are legal overloads with distinct AST parameter types.
+
+Explicitly mapped sum parents retain non-abstract compatibility methods such as
+`evalNode(Node node)`, forwarding to concrete dispatch. Existing handwritten
+overrides still compile, but ordinary `eval` never calls a broad parent override
+instead of a leaf callback. Automatic (non-`manual`) `@eval` belongs on concrete
+variants; applying it to a sum fails generation explicitly. Numeric literal and
+passthrough values are boxed before crossing the generic result-type boundary.
+
+Regenerate AST and evaluator together after grammar changes. A stale evaluator's
+switch remains non-exhaustive when a variant is added (there is no default case),
+and regenerating it introduces a new abstract semantic method unless the variant
+has an automatic `@eval`. Thus unchanged handwritten semantics cannot silently
+omit a newly added manual variant.
+
 **Structure of generated `TinyCalcEvaluator.java`:**
 
 ```java

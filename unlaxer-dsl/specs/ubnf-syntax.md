@@ -528,6 +528,15 @@ Java のデータクラスが自動生成されます。
 共有する場合も、Java の直接の `extends` / `implements` 関係を生成します。
 `@mapping(Node.Item)` は `Node` 内の具象 record を生成します。
 
+Java evaluator は中間の和型ではなく、具象 record に対して網羅的に dispatch
+します。単純名の `evalItem` は維持し、`Node.Item` のメソッド名は `evalNodeItem`
+です。明示的に mapping した親和型のメソッドは、互換用の非 abstract 転送メソッド
+として残りますが、通常の評価で葉の callback を隠しません。
+自動の `@eval`（`strategy='manual'` 以外）は具象 variant に付けてください。
+和型に指定すると、意味処理を黙って無視せず生成時にエラーになります。
+手書きの意味処理が必要な variant を追加して再生成した場合、その callback を
+実装しない限り evaluator の具象サブクラスはコンパイルできません。
+
 ### `@leftAssoc` / `@rightAssoc` — 演算子の結合性
 
 同じ優先度の演算子が並んだとき、左から結合するか右から結合するかを指定します：

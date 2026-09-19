@@ -2,14 +2,12 @@ package org.unlaxer.dsl.codegen;
 
 import org.unlaxer.dsl.bootstrap.UBNFAST.EvalAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
-import org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RuleDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.StringSettingValue;
 
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * GrammarDecl から XxxEvaluator.java を生成する。
@@ -30,10 +28,16 @@ public class EvaluatorGenerator implements CodeGenerator {
         String astClass = grammarName + "AST";
         String evalClass = grammarName + "Evaluator";
 
-        // @mapping ルールからユニークなクラス名→RuleDecl を収集（順序保持）
-        Map<String, RuleDecl> mappedRules = new LinkedHashMap<>();
-        for (RuleDecl rule : grammar.rules()) {
-            getMappingAnnotation(rule).ifPresent(m -> mappedRules.putIfAbsent(m.className(), rule));
+        // A semantic method is required for each emitted concrete record, not for
+        // intermediate sum interfaces. Keep declaration order and flat API names.
+        Map<String, RuleDecl> mappedRules = MappingShape.astMappings(grammar);
+        Set<String> sumTypes = MappingShape.sumTypeNames(grammar);
+        for (var entry : mappedRules.entrySet()) {
+            if (sumTypes.contains(entry.getKey()) && getEvalAnnotation(entry.getValue())
+                    .filter(eval -> !"manual".equals(eval.strategy())).isPresent()) {
+                throw new IllegalArgumentException("Automatic @eval requires a concrete mapping, not sum "
+                    + entry.getKey() + "; annotate its variants instead");
+            }
         }
 
         // 具象メソッドが1つでもあるかチェック（追加 abstract ヘルパーの生成判定用）
@@ -70,7 +74,8 @@ public class EvaluatorGenerator implements CodeGenerator {
             sb.append("    private T evalInternal(").append(astClass).append(" node) {\n");
             sb.append("        return switch (node) {\n");
             for (String name : mappedRules.keySet()) {
-                String methodName = "eval" + name;
+                if (sumTypes.contains(name)) continue;
+                String methodName = "eval" + MapperElementUtil.methodNameFor(name);
                 sb.append("            case ").append(astClass).append(".").append(name)
                   .append(" n -> ").append(methodName).append("(n);\n");
             }
@@ -82,7 +87,17 @@ public class EvaluatorGenerator implements CodeGenerator {
             for (Map.Entry<String, RuleDecl> entry : mappedRules.entrySet()) {
                 String name = entry.getKey();
                 RuleDecl rule = entry.getValue();
-                String methodName = "eval" + name;
+                String methodName = "eval" + MapperElementUtil.methodNameFor(name);
+                if (sumTypes.contains(name)) {
+                    // Existing handwritten @Override methods remain source-compatible,
+                    // but normal dispatch never invokes a broad parent callback.
+                    methodsSb.append("    /** Compatibility adapter; dispatch uses concrete variants. */\n");
+                    methodsSb.append("    protected T ").append(methodName).append("(")
+                        .append(astClass).append(".").append(name).append(" node) {\n");
+                    methodsSb.append("        return evalInternal(node);\n");
+                    methodsSb.append("    }\n");
+                    continue;
+                }
                 Optional<EvalAnnotation> evalOpt = getEvalAnnotation(rule);
 
                 if (evalOpt.isPresent() && !"manual".equals(evalOpt.get().strategy())) {
@@ -228,8 +243,9 @@ public class EvaluatorGenerator implements CodeGenerator {
         sb.append("    @SuppressWarnings(\"unchecked\")\n");
         sb.append("    protected T ").append(methodName).append("(")
           .append(astClass).append(".").append(name).append(" node) {\n");
-        sb.append("        if (node.value() instanceof ").append(p4AstClass).append(" ast) return eval(ast);\n");
-        sb.append("        return (T) node.value();\n");
+        sb.append("        Object value = node.value();\n");
+        sb.append("        if (value instanceof ").append(p4AstClass).append(" ast) return eval(ast);\n");
+        sb.append("        return (T) value;\n");
         sb.append("    }\n");
     }
 
@@ -238,7 +254,7 @@ public class EvaluatorGenerator implements CodeGenerator {
         sb.append("    @SuppressWarnings(\"unchecked\")\n");
         sb.append("    protected T ").append(methodName).append("(")
           .append(astClass).append(".").append(name).append(" node) {\n");
-        sb.append("        return (T) node.value();\n");
+        sb.append("        return (T) (Object) node.value();\n");
         sb.append("    }\n");
     }
 
@@ -250,13 +266,6 @@ public class EvaluatorGenerator implements CodeGenerator {
         return rule.annotations().stream()
             .filter(a -> a instanceof EvalAnnotation)
             .map(a -> (EvalAnnotation) a)
-            .findFirst();
-    }
-
-    private Optional<MappingAnnotation> getMappingAnnotation(RuleDecl rule) {
-        return rule.annotations().stream()
-            .filter(a -> a instanceof MappingAnnotation)
-            .map(a -> (MappingAnnotation) a)
             .findFirst();
     }
 
