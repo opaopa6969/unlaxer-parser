@@ -48,14 +48,15 @@
     "grammar": "grammar MixedKinds { @package: org.example.nestedcaptures @root @mapping(Root, params=[text,node,mixed,value]) Root ::= 'a' @text Leaf @node ('b' | Leaf) @mixed (Leaf @value | 'b' @value) @value; @mapping(Leaf, params=[text]) Leaf ::= ('x' | 'y') @text; }",
     "captureNames": ["text", "node", "mixed", "value"],
     "valueSpanField": "mixed",
+    "valueSpanListField": "value",
     "cases": [
       {"id":"mixed-text-branch", "input":"axbb",
        "ast":{"type":"Root","span":[0,4],"fields":{"text":"a","node":{"type":"Leaf","span":[1,2],"fields":{"text":"x"}},"mixed":"b","value":["b","b"]}},
-       "valueSpans":[[2,3]],
+       "valueSpans":[[2,3],[3,4],[3,4]],
        "captures":[{"name":"text","span":[1,2],"text":"x"},{"name":"text","span":[0,1],"text":"a"},{"name":"node","span":[1,2],"text":"x"},{"name":"mixed","span":[2,3],"text":"b"},{"name":"value","span":[3,4],"text":"b"},{"name":"value","span":[3,4],"text":"b"}]},
       {"id":"mixed-node-branch", "input":"axyy",
        "ast":{"type":"Root","span":[0,4],"fields":{"text":"a","node":{"type":"Leaf","span":[1,2],"fields":{"text":"x"}},"mixed":{"type":"Leaf","span":[2,3],"fields":{"text":"y"}},"value":[{"type":"Leaf","span":[3,4],"fields":{"text":"y"}},{"type":"Leaf","span":[3,4],"fields":{"text":"y"}}]}},
-       "valueSpans":[[2,3]],
+       "valueSpans":[[2,3],[3,4],[3,4]],
        "captures":[{"name":"text","span":[1,2],"text":"x"},{"name":"text","span":[2,3],"text":"y"},{"name":"text","span":[3,4],"text":"y"},{"name":"text","span":[0,1],"text":"a"},{"name":"node","span":[1,2],"text":"x"},{"name":"mixed","span":[2,3],"text":"y"},{"name":"value","span":[3,4],"text":"y"},{"name":"value","span":[3,4],"text":"y"}]}
     ]
   },

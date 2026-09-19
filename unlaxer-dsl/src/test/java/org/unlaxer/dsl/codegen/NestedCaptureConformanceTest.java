@@ -149,6 +149,9 @@ public class NestedCaptureConformanceTest {
     private JsonArray declarations(Parser parser, String input) throws Exception {
         try (var context = new ParseContext(StringSource.createRootSource(input))) {
             assertTrue(parser.parse(context).isSucceeded());
+            int end = input.codePointCount(0, input.length());
+            assertEquals(end, context.getConsumedPosition().value());
+            assertEquals(end, context.getMatchedPosition().value());
             var result = new JsonArray();
             for (SymbolInfo value : ScopeStore.getAllDeclarations(context)) {
                 var item = new JsonObject();
@@ -223,14 +226,17 @@ public class NestedCaptureConformanceTest {
         String valueSpans = fixture.has("valueSpanField") ? """
             fn value_spans(ast: &generated::ast::Ast) -> String {
                 match ast {
-                    generated::ast::Ast::r#Root { r#__FIELD__, .. } => {
-                        let span = r#__FIELD__.span();
-                        format!("[[{},{}]]", span.start, span.end)
+                    generated::ast::Ast::r#Root { r#__FIELD__, r#__LIST__, .. } => {
+                        let mut spans = vec![r#__FIELD__.span()];
+                        spans.extend(r#__LIST__.iter().map(|value| value.span()));
+                        format!("[{}]", spans.iter().map(|span| format!("[{},{}]", span.start, span.end))
+                            .collect::<Vec<_>>().join(","))
                     }
                     _ => "[]".to_owned(),
                 }
             }
-            """.replace("__FIELD__", fixture.get("valueSpanField").getAsString()) : """
+            """.replace("__FIELD__", fixture.get("valueSpanField").getAsString())
+                .replace("__LIST__", fixture.get("valueSpanListField").getAsString()) : """
             fn value_spans(_: &generated::ast::Ast) -> String { "[]".to_owned() }
             """;
         return """
@@ -260,6 +266,10 @@ public class NestedCaptureConformanceTest {
                     let bytes = (0..encoded.len()).step_by(2)
                         .map(|i| u8::from_str_radix(&encoded[i..i + 2], 16).unwrap()).collect();
                     let input = String::from_utf8(bytes).unwrap();
+                    let mut context = unlaxer_runtime::ParseContext::new(&input);
+                    generated::parser::parse_context(&mut context).unwrap();
+                    assert_eq!(context.position(), input.chars().count());
+                    assert_eq!(context.matched_position(), input.chars().count());
                     let tree = generated::parser::parse_tree_detailed(&input).unwrap();
                     let capture_json = captures(&tree, &names);
                     let declaration_json = declarations(&tree);
