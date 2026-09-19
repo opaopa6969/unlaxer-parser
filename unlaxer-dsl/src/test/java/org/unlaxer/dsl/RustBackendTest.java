@@ -35,6 +35,17 @@ public class RustBackendTest {
         assertFalse(files.get(4).content().contains("_ =>"));
     }
 
+    @Test public void generatedParserSharesOneGrammarWithoutBreakingRulesSnapshotApi() {
+        var grammar = UBNFMapper.parse(SIMPLE).grammars().get(0);
+        String parser = new RustBackend().generate(grammar).get(2).content();
+        assertTrue(parser.contains("static GRAMMAR: OnceLock<SharedGrammar>"));
+        assertTrue(parser.contains("pub fn grammar() -> &'static SharedGrammar"));
+        assertTrue(parser.contains("pub fn rules() -> Vec<Rule>"));
+        assertTrue(parser.contains("context.parse_shared_grammar(grammar()"));
+        assertTrue(parser.contains("parse_detailed_shared(grammar()"));
+        assertFalse(parser.contains("parse_detailed(&rules()"));
+    }
+
     @Test public void unsupportedFeaturesAreRejectedBeforeEmission() {
         reject(SIMPLE.replace("'hello' @value", "Missing @value"), "unknown reference");
         reject(SIMPLE.replace("'hello' @value", "Root @value"), "left recursion");

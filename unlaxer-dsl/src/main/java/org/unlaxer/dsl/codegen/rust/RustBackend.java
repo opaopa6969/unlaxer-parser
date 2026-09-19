@@ -86,7 +86,13 @@ public final class RustBackend {
     private String parser(GrammarIR ir) {
         StringBuilder out = new StringBuilder(HEADER);
         out.append("""
-            use unlaxer_runtime::{Expr, Rule, Tree, ParseError, ParseDiagnostic, ParseContext, ParseResult, Parser};
+            use std::sync::OnceLock;
+            #[cfg(test)]
+            use std::sync::atomic::{AtomicUsize, Ordering};
+            use unlaxer_runtime::{Expr, Rule, SharedGrammar, Tree, ParseError, ParseDiagnostic, ParseContext, ParseResult, Parser};
+
+            #[cfg(test)]
+            static GRAMMAR_INITIALIZATIONS: AtomicUsize = AtomicUsize::new(0);
 
             pub struct GeneratedParser;
 
@@ -100,14 +106,24 @@ public final class RustBackend {
                 parse_tree_detailed(source).map_err(|diagnostic| diagnostic.farthest)
             }
 
+            /// Compatibility snapshot of the generated rules. Parsing uses `grammar()` and does not clone them.
             pub fn rules() -> Vec<Rule> {
-                vec![
+                grammar().iter().cloned().collect()
+            }
+
+            /// Immutable grammar graph, initialized once and shared by every parse.
+            pub fn grammar() -> &'static SharedGrammar {
+                static GRAMMAR: OnceLock<SharedGrammar> = OnceLock::new();
+                GRAMMAR.get_or_init(|| {
+                    #[cfg(test)]
+                    GRAMMAR_INITIALIZATIONS.fetch_add(1, Ordering::Relaxed);
+                    vec![
             """);
-        for (Rule rule : ir.rules()) out.append("        Rule { name: ").append(quote(rule.name()))
+        for (Rule rule : ir.rules()) out.append("            Rule { name: ").append(quote(rule.name()))
             .append(", expression: ").append(expression(rule.body())).append(" },\n");
-        out.append("    ]\n}\n\npub fn parse_context(context: &mut ParseContext<'_>) -> ParseResult {\n    context.parse_grammar(rules(), ")
+        out.append("        ].into()\n    })\n}\n\n/// Test-only evidence for the process-wide `OnceLock` construction contract.\n#[cfg(test)]\n#[doc(hidden)]\npub fn grammar_initialization_count() -> usize {\n    GRAMMAR_INITIALIZATIONS.load(Ordering::Relaxed)\n}\n\npub fn parse_context(context: &mut ParseContext<'_>) -> ParseResult {\n    context.parse_shared_grammar(grammar(), ")
             .append(ir.root()).append(", ").append(ir.javaWhitespace()).append(")\n}\n");
-        out.append("\npub fn parse_tree_detailed(source: &str) -> Result<Tree, ParseDiagnostic> {\n    unlaxer_runtime::parse_detailed(&rules(), ")
+        out.append("\npub fn parse_tree_detailed(source: &str) -> Result<Tree, ParseDiagnostic> {\n    unlaxer_runtime::parse_detailed_shared(grammar(), ")
             .append(ir.root()).append(", ").append(ir.javaWhitespace()).append(", source)\n}\n");
         if (ir.rules().stream().anyMatch(r -> r.operator() != null)) {
             out.append("""

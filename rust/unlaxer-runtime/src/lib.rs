@@ -191,6 +191,19 @@ pub struct Rule {
     pub expression: Expr,
 }
 
+/// Immutable grammar graph shared across parses.
+///
+/// Generated parsers keep one of these in a `OnceLock`. Cloning this value only
+/// increments the `Arc` reference count; parser cursors, captures, CST nodes,
+/// diagnostics, scopes and user state remain owned by each [`ParseContext`].
+pub type SharedGrammar = Arc<[Rule]>;
+
+/// Converts an owned rule graph into the representation accepted by the shared
+/// parsing APIs. This allocation is intended to happen once per generated grammar.
+pub fn share_grammar(rules: Vec<Rule>) -> SharedGrammar {
+    Arc::from(rules)
+}
+
 #[derive(Debug, Clone)]
 pub struct Capture {
     pub name: &'static str,
@@ -411,6 +424,18 @@ pub fn parse(
     parse_detailed(rules, root, whitespace, input).map_err(|diagnostic| diagnostic.farthest)
 }
 
+/// Full-input parsing over an immutable grammar graph shared across calls.
+/// Unlike [`parse`], this does not clone every rule and expression for each parse.
+pub fn parse_shared(
+    grammar: &SharedGrammar,
+    root: usize,
+    whitespace: bool,
+    input: &str,
+) -> Result<Tree, ParseError> {
+    parse_detailed_shared(grammar, root, whitespace, input)
+        .map_err(|diagnostic| diagnostic.farthest)
+}
+
 /// Adds a primary trailing-input diagnostic without discarding speculative farthest failures.
 /// Syntax hints and rule-limit failures remain backend-native, not a language-independent oracle.
 pub fn parse_detailed(
@@ -419,8 +444,28 @@ pub fn parse_detailed(
     whitespace: bool,
     input: &str,
 ) -> Result<Tree, ParseDiagnostic> {
+    parse_detailed_owned(Arc::from(rules), root, whitespace, input)
+}
+
+/// Detailed full-input parsing over an immutable grammar graph shared across calls.
+/// All mutable parsing data is initialized afresh for this invocation.
+pub fn parse_detailed_shared(
+    grammar: &SharedGrammar,
+    root: usize,
+    whitespace: bool,
+    input: &str,
+) -> Result<Tree, ParseDiagnostic> {
+    parse_detailed_owned(Arc::clone(grammar), root, whitespace, input)
+}
+
+fn parse_detailed_owned(
+    rules: SharedGrammar,
+    root: usize,
+    whitespace: bool,
+    input: &str,
+) -> Result<Tree, ParseDiagnostic> {
     let mut parser = ParseContext::new(input);
-    parser.rules = Arc::from(rules);
+    parser.rules = rules;
     parser.whitespace = whitespace;
     let mut trailing_offset = None;
     if let Some(root) = parser.rule(root, 0) {
@@ -623,7 +668,21 @@ impl<'a> ParseContext<'a> {
         root: usize,
         whitespace: bool,
     ) -> ParseResult {
-        let previous_rules = std::mem::replace(&mut self.rules, Arc::from(rules));
+        let grammar = share_grammar(rules);
+        self.parse_shared_grammar(&grammar, root, whitespace)
+    }
+
+    /// Temporarily installs an immutable shared grammar while retaining this
+    /// context's parse-local cursor, captures, nodes, scopes and user state.
+    /// The previous grammar and trivia policy are restored on both success and
+    /// ordinary parse failure.
+    pub fn parse_shared_grammar(
+        &mut self,
+        grammar: &SharedGrammar,
+        root: usize,
+        whitespace: bool,
+    ) -> ParseResult {
+        let previous_rules = std::mem::replace(&mut self.rules, Arc::clone(grammar));
         let previous_whitespace = std::mem::replace(&mut self.whitespace, whitespace);
         let result = self.parse_expression(&Expr::Rule(root));
         self.rules = previous_rules;
