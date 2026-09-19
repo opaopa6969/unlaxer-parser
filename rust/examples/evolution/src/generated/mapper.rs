@@ -32,7 +32,7 @@ fn map_node(tree: &Tree, id: usize) -> Result<Vec<Ast>, String> {
             r#op: {
                 let mut values = Vec::new();
                 for capture in node.captures.iter().filter(|c| c.name == "op") {
-                    values.push(unlaxer_runtime::strip_capture(tree.text(capture.span)).to_owned());
+                    values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).to_owned());
                 }
                 required(values, "op")?
             },
@@ -49,7 +49,7 @@ fn map_node(tree: &Tree, id: usize) -> Result<Vec<Ast>, String> {
             r#value: {
                 let mut values = Vec::new();
                 for capture in node.captures.iter().filter(|c| c.name == "value") {
-                    values.push(unlaxer_runtime::strip_capture(tree.text(capture.span)).to_owned());
+                    values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).to_owned());
                 }
                 required(values, "value")?
             },

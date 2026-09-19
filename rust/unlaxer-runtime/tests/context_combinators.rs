@@ -1,5 +1,54 @@
 use unlaxer_runtime::{Expr, ParseContext, ParseMatch, ParseResult, Parser, Rule, Span};
 
+#[test]
+fn lexical_tokens_preserve_raw_unicode_text_and_transactional_cursors() {
+    for input in ["'😀'", "'a\nb'", "'\\q'", "'\\😀'", "'\\\n'", "'\0'"] {
+        let mut context = ParseContext::new(input);
+        context.parse(&Expr::Quoted('\'').capture("raw")).unwrap();
+        assert_eq!(context.captured("raw"), Some(input));
+        assert_eq!(context.position(), input.chars().count());
+        assert_eq!(context.matched_position(), context.position());
+    }
+    for parser in [
+        Expr::Identifier,
+        Expr::Quoted('\''),
+        Expr::Quoted('"'),
+        Expr::Eof,
+    ] {
+        let mut context = ParseContext::new("1x");
+        context.parse(&Expr::JavaEmpty).unwrap();
+        context.set_state("count", 7u32);
+        assert!(context.parse(&parser.capture("failed")).is_err());
+        assert_eq!((context.position(), context.matched_position()), (0, 1));
+        assert_eq!(context.captured("failed"), None);
+        assert_eq!(context.state::<u32>("count"), Some(&7));
+    }
+    for input in ["'", "'abc", "'abc\\", "'abc\\'"] {
+        let mut context = ParseContext::new(input);
+        assert!(context.parse(&Expr::Quoted('\'')).is_err());
+        assert_eq!((context.position(), context.matched_position()), (0, 0));
+        assert_eq!(context.error("quoted").offset, input.chars().count());
+    }
+    let mut context = ParseContext::new("_A0あ");
+    context.parse(&Expr::Identifier.capture("id")).unwrap();
+    assert_eq!(context.captured("id"), Some("_A0"));
+    assert_eq!(context.remaining(), "あ");
+    assert!(ParseContext::new("`a`").parse(&Expr::Quoted('`')).is_err());
+}
+
+#[test]
+fn java_mapper_quote_policy_is_separate_from_raw_capture_text() {
+    use unlaxer_runtime::{java_capture_text, strip_capture};
+    assert_eq!(strip_capture(" 'a' "), "'a'");
+    assert_eq!(java_capture_text(" 'a' "), "a");
+    assert_eq!(java_capture_text("' a '"), " a ");
+    assert_eq!(java_capture_text("'\\n'"), "\\n");
+    assert_eq!(java_capture_text("\"\\n\""), "\"\\n\"");
+    assert_eq!(java_capture_text("''"), "");
+    assert_eq!(java_capture_text("'"), "'");
+    assert_eq!(java_capture_text("\u{a0}'a'\u{a0}"), "\u{a0}'a'\u{a0}");
+}
+
 struct Identifier;
 impl Parser for Identifier {
     fn parse(&self, context: &mut ParseContext<'_>) -> ParseResult {

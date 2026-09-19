@@ -205,12 +205,14 @@ public final class RustGrammarLowering {
 
     private Expression token(TokenDecl token) {
         return switch (token) {
-            case TokenDecl.Simple simple -> {
-                if (!Set.of("NumberParser", "org.unlaxer.parser.elementary.NumberParser").contains(simple.parserClass())) {
-                    throw unsupported("external token " + simple.parserClass());
-                }
-                yield new NumberToken();
-            }
+            case TokenDecl.Simple simple -> switch (simple.parserClass()) {
+                case "NumberParser", "org.unlaxer.parser.elementary.NumberParser" -> new NumberToken();
+                case "IdentifierParser", "org.unlaxer.parser.clang.IdentifierParser" -> new IdentifierToken();
+                case "SingleQuotedParser", "org.unlaxer.parser.elementary.SingleQuotedParser" -> new QuotedToken('\'');
+                case "DoubleQuotedParser", "org.unlaxer.parser.elementary.DoubleQuotedParser" -> new QuotedToken('"');
+                case "EndOfSourceParser", "org.unlaxer.parser.elementary.EndOfSourceParser" -> new EofToken();
+                default -> throw unsupported("external token " + simple.parserClass());
+            };
             case TokenDecl.Any ignored -> new AnyToken();
             case TokenDecl.Eof ignored -> new EofToken();
             case TokenDecl.Empty ignored -> new EmptyToken();

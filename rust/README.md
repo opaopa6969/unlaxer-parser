@@ -66,6 +66,7 @@ runtimeは規則IDで参照する文法を実行し、入力とCST node arenaを
 - 1ファイル・1文法、ちょうど1つの`@root`。
 - 非空の文字列terminal、rule参照、sequence、ordered choice、group、optional、0/1回以上のrepeat、bounded repeat、separated list。
 - `NumberParser`またはその完全修飾名へのtoken binding。符号・小数・指数を含む。
+- `IdentifierParser`、`SingleQuotedParser`、`DoubleQuotedParser`、`EndOfSourceParser`の短名または既定packageの完全修飾名。字句とmapperの契約は下記参照。
 - `ANY`・`EOF`・`EMPTY`・`CHAR_RANGE`・`NEGATION`・`UNTIL`・`LOOKAHEAD`・`NEGATIVE_LOOKAHEAD`。詳細は下記のprimitive互換契約を参照。
 - `@mapping`とterminal/rule/group/quantifierへのcapture。全capture名の集合とparamsが一致し、同名captureのtext/node型が整合すること。欠ける選択肢はoptional、繰り返しや同名の複数出現はlistとして推論する。
 - `@whitespace: javaStyle`（ASCII空白、行/ブロックコメント）または`none`。未指定は`none`。`@package`はRustでは使用しない。
@@ -82,7 +83,7 @@ imports、外部token parser、`@typeof`、`@eval`等の他のannotation、左�
 
 `[[ Item ]] @head`など入れ子container全体のcaptureは、`Option<Option<_>>`を失わないよう現時点では明示拒否する。内側の要素に名前を付けるか、各階層をmapped ruleに分ける。再帰的なunmapped ruleの型推論、入れ子container型、全Java capture規則との互換性は今後の作業。scalarからoptionalに変わると手書きSemanticsも型変更が必要になり、古い引数型は`E0053`で検出される。
 
-RustのLSP/DAP、回復・incremental cache、PropagationStopper、Java MatchedTokenParserとの完全互換、string/variable/function-call構文、proc macro、Rust製UBNF frontendは未実装。性能最適化・Java比の速度優位も未評価。文法構造はparseごとに構築し、runtimeのrule呼出深さには256の上限がある。大規模・敵対的入力の資源量保証はない。
+RustのLSP/DAP、回復・incremental cache、PropagationStopper、Java MatchedTokenParserとの完全互換、tinyexpressionのstring/variable/function-call意味論、proc macro、Rust製UBNF frontendは未実装。性能最適化・Java比の速度優位も未評価。文法構造はparseごとに構築し、runtimeのrule呼出深さには256の上限がある。大規模・敵対的入力の資源量保証はない。
 
 ### 公開ParseContextと手書きcombinator
 
@@ -136,6 +137,23 @@ UBNFのoptional/repeatは`optional_java`/`repeat_java`を生成する。Java `Oc
 [`primitives/corpus.json`](../unlaxer-dsl/src/test/resources/primitives/corpus.json)の48文法から両backendを実生成・コンパイルして、109入力のprefix受理/消費位置/マッチ位置と全入力受理を比較する。受理56入力ではAST field/spanも独立fixtureと一致する。空・終端欠損・Unicode・javaStyle trivia・直接/間接capture・量指定子・rollbackを含み、結果は`target/rust-primitives.tsv`とCI artifactへ保存する。選択肢とliteralの反復でもJavaのhelper chain相当の空白処理境界を保持する。IRの`Delimited`は補助境界をcaptureの外へ置き、元の文法のgroupとは区別する。`(T | 'z')+`と`((T | 'z'))+`でコメントのcapture範囲が異なることもJavaと照合する。これは現token群の有限corpusであり、汎用MatchOnly/Not/PropagationStopper・virtual token・全CST形状の完全互換を意味しない。診断候補の文言もbackend固有のままである。
 
 Java生成Mapperも、空のcapture-siteを除去する汎用reducerを通さず元のCSTを読むようにした。成功した零幅captureは欠損ではなく空文字になる。`mapParsedTokenWithSourceMap`へ渡す側も零幅captureを保持する必要がある場合は`parsed.getRootToken(false)`を使う。呼出前にreducerで失った情報は復元できない。
+
+### Identifier・引用文字列の互換契約
+
+| Java token binding | Rust Expr | 字句契約 |
+|---|---|---|
+| `IdentifierParser` / `org.unlaxer.parser.clang.IdentifierParser` | `Identifier` | ASCIIの`[A-Za-z_][A-Za-z0-9_]*`。キーワード除外なし |
+| `SingleQuotedParser` / `org.unlaxer.parser.elementary.SingleQuotedParser` | `Quoted('\'')` | 単引用符で囲む。backslashと次の任意1コードポイントを優先して読む |
+| `DoubleQuotedParser` / `org.unlaxer.parser.elementary.DoubleQuotedParser` | `Quoted('"')` | 二重引用符で囲む。それ以外は単引用符版と同じ規則 |
+| `EndOfSourceParser` / `org.unlaxer.parser.elementary.EndOfSourceParser` | `Eof` | 消費位置が末尾なら成功する零幅token |
+
+引用文字列は生改行・NUL・補助文字を受理し、`\q`や`\u0041`も字句として受理する。JSONやJavaのescape whitelistではなく、escapeのデコードもしない。runtimeの`Quoted`は単引用符と二重引用符に限定し、その他のdelimiterは明示エラー。`Identifier`/`Quoted`失敗時は開始時の両cursorを復元し、成功時は消費末尾へ両方を同期する。EOFのaliasもnullable検査対象。
+
+**生captureとASTのtext fieldは別契約**。CST・`context.captured`は引用符とbackslashをそのまま保持する。Java生成mapperとの互換用`java_capture_text`は`String.strip`相当の後に外側の単引用符だけを除く。二重引用符とescapeは保持し、単引用符の内側の空白は再trimしない。既存の`strip_capture`（空白だけ除去）は変更しない。AST node spanは変換前のソース範囲を保持する。新しいmapperはこのruntime APIが必要なので、runtime更新と再生成を合わせて行う。
+
+[`lexical/corpus.json`](../unlaxer-dsl/src/test/resources/lexical/corpus.json)は22文法・78入力をJava/Rustで実生成・コンパイルし、prefix受理/両cursorと全入力受理を比較する。受理48入力のAST field/spanも独立fixtureと照合する。プローブへの入力はUTF-8をhexでframe化し、生改行とNULを無改変で運ぶ。結果は`target/rust-lexical.tsv`とCI artifactへ保存する。direct token repeatにはJavaの空白処理境界が付かない場合があるため、`T+`と`(T | 'none')+`を区別して検査する。Identifierのgroup captureと非Identifier側のchoice、zero-field nodeも含み、先頭の識別子だけを拾うJava mapper不具合[欠陥#132](https://github.com/opaopa6969/unlaxer-parser/issues/132)とzero-field生成[欠陥#129](https://github.com/opaopa6969/unlaxer-parser/issues/129)の再発を防ぐ。
+
+tinyexpression基準revisionの`StringLiteralParser`はDoubleQuoted/SingleQuotedのchoiceなので、その字句部分はこれらを組み合わせて記述できる。ただし、tinyexpression固有クラス名へのbinding、評価層のquote正規化、legacy Java出力でのjavacによるescape解釈は別の未完了事項。任意の外部parserをクラス名の末尾だけで近似せず、上表以外は明示拒否する。
 
 ## 再現実験と結果
 

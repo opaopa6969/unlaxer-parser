@@ -15,6 +15,10 @@ pub struct Span {
 pub enum Expr {
     Literal(&'static str),
     Number,
+    /// Java clang IdentifierParser: ASCII letter/underscore, then ASCII alphanumeric/underscore.
+    Identifier,
+    /// Java single/double-quoted text: backslash followed by any scalar, no escape decoding.
+    Quoted(char),
     Rule(usize),
     Sequence(Vec<Expr>),
     Choice(Vec<Expr>),
@@ -225,6 +229,17 @@ pub fn strip_capture(text: &str) -> &str {
             '\u{205f}' | '\u{3000}'
         )
     })
+}
+
+/// Java generated mapper's String.strip followed by single-quote removal.
+/// Double quotes and backslash escapes stay literal; CST/capture text stays untouched.
+pub fn java_capture_text(text: &str) -> &str {
+    let text = strip_capture(text);
+    if text.len() >= 2 && text.starts_with('\'') && text.ends_with('\'') {
+        &text[1..text.len() - 1]
+    } else {
+        text
+    }
 }
 
 #[derive(Default)]
@@ -810,6 +825,54 @@ impl<'a> ParseContext<'a> {
                     self.matched_position = self.position;
                 }
                 accepted.then(Fragment::default)
+            }
+            Expr::Identifier => {
+                let bytes = self.input.as_bytes();
+                if !bytes
+                    .get(self.position)
+                    .is_some_and(|c| c.is_ascii_alphabetic() || *c == b'_')
+                {
+                    self.fail("identifier");
+                    return None;
+                }
+                self.position += 1;
+                while bytes
+                    .get(self.position)
+                    .is_some_and(|c| c.is_ascii_alphanumeric() || *c == b'_')
+                {
+                    self.position += 1;
+                }
+                self.matched_position = self.position;
+                Some(Fragment::default())
+            }
+            Expr::Quoted(quote) => {
+                if !matches!(quote, '\'' | '"') {
+                    self.fail("single or double quote delimiter");
+                    return None;
+                }
+                if !self.remaining().starts_with(*quote) {
+                    self.fail("opening quote");
+                    return None;
+                }
+                self.position += quote.len_utf8();
+                loop {
+                    let Some(next) = self.remaining().chars().next() else {
+                        self.fail("closing quote");
+                        return None;
+                    };
+                    self.position += next.len_utf8();
+                    if next == *quote {
+                        self.matched_position = self.position;
+                        return Some(Fragment::default());
+                    }
+                    if next == '\\' {
+                        let Some(escaped) = self.remaining().chars().next() else {
+                            self.fail("closing quote");
+                            return None;
+                        };
+                        self.position += escaped.len_utf8();
+                    }
+                }
             }
             Expr::Rule(rule) => self.rule(*rule, depth).map(|id| Fragment {
                 nodes: vec![id],
