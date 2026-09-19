@@ -35,6 +35,9 @@ public class CodegenMain {
     }
 
     static int run(String[] args, PrintStream out, PrintStream err) {
+        if (args.length > 0 && "generate".equals(args[0])) {
+            return RustGenerateCommand.run(args, out, err);
+        }
         // Subcommand dispatch: `unlaxer init <name> [...]` is handled
         // by InitRunner. Existing flag-based invocations are unaffected.
         if (args.length > 0 && "init".equals(args[0])) {
@@ -263,6 +266,7 @@ public class CodegenMain {
                 + " [--report-version 1]"
                 + " [--report-schema-check]"
                 + " [--warnings-as-json]"
+                + "\nExperimental Rust: CodegenMain generate --target rust --grammar <file.ubnf> --output <module-directory> [--check]"
         );
     }
 

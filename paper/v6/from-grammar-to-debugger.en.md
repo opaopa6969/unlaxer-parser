@@ -71,6 +71,14 @@ Four new JUnit methods implement the artifact: one for algebra, two for the copy
 
 Source-map checks cover every evaluation-visited node in the fixture, retained lookup after another parse, distinct equal-valued nodes, defensive array copies, a span containing a non-BMP character, and mapping an existing Token. They establish integration for this fixture, not semantic correctness or span coverage for every grammar shape.
 
+### Additional experiment: a bounded Rust backend
+
+An experimental Rust backend now lowers the same four UBNF fixtures through a small structural IR and generates a parser module, an enum AST with owned spans, a mapper, and exhaustive dispatch over a required-method semantics trait. The Java generators are unchanged and do not yet consume this IR. A std-only Rust runtime interprets generated rule structures; handwritten semantics remain separate. Rust LSP/DAP generation and a full Java runtime port are not implemented.
+
+The [additional artifact](../../rust/README.md) compares 37 shared inputs at each of the four stages (148 input-stage cases). Acceptance, successful AST fields and code-point spans, evaluation success/failure, and finite values agree. The accepted counts are 17, 18, 22, and 25; finite evaluation succeeds for 12, 13, 17, and 20. Each stage retains four accepted inputs whose numeric captures include comments and fail numeric conversion, plus one non-finite result; agreement does not imply these behaviors are desirable. Actual Rust compilation rejects stale dispatch with `E0004` and missing semantics with `E0046` for both new node types. The string-operator negative control still compiles and fails at evaluation.
+
+This is evidence that the structural maintenance checks can be expressed using both Java sealed types and Rust enums/traits for this fixture. It is not a proof of target-language independence or whole-runtime equivalence. Rust diagnostics are tested independently, not equated with Java error positions; the runtime also imposes a rule-depth limit. Performance and general grammar coverage remain unevaluated.
+
 ## 4. Related work
 
 Xtext supplies infrastructure for parsing, linking, compilation or interpretation, and editor support, including LSP. Xbase supports Java integration, code generation, and debugging. These systems should not be described as lacking semantic or IDE facilities. [Xtext/Xbase documentation](https://eclipse.dev/Xtext/), [Xtext LSP documentation](https://eclipse.dev/Xtext/documentation/340_lsp_support.html).
