@@ -10,6 +10,8 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 import java.io.File;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -63,7 +65,7 @@ public class NestedCaptureConformanceTest {
         JsonArray corpus = JsonParser.parseString(Files.readString(repo.resolve(
             "unlaxer-dsl/src/test/resources/nested-captures/corpus.json"))).getAsJsonArray();
         var report = new ArrayList<>(List.of(
-            "fixture\tcase\tinput_json\texpected_ast\tjava_ast\texpected_captures\trust_captures\texpected_declarations\tjava_declarations\trust"));
+            "fixture\tcase\tinput_json\texpected_ast\tjava_ast\texpected_captures\trust_captures\texpected_declarations\tjava_declarations\trust\tjava_field_types\trust_field_type_constraints\texpected_value_spans\tjava_value_spans\tjava_retained_value_spans"));
         int fixtureIndex = 0;
         for (JsonElement fixtureElement : corpus) {
             JsonObject fixture = fixtureElement.getAsJsonObject();
@@ -104,6 +106,7 @@ public class NestedCaptureConformanceTest {
             assertEquals(name + " Rust result count", cases.size(), rustLines.size());
 
             try (URLClassLoader loader = compileJava(grammar)) {
+                JsonObject javaFieldTypes = assertJavaFieldTypes(name, fixture.getAsJsonObject("javaFieldTypes"), grammar, loader);
                 Class<?> parsers = loader.loadClass(PACKAGE + "." + grammar.name() + "Parsers");
                 Parser parser = (Parser) parsers.getMethod("getRootParser").invoke(null);
                 Class<?> mapper = loader.loadClass(PACKAGE + "." + grammar.name() + "Mapper");
@@ -127,6 +130,17 @@ public class NestedCaptureConformanceTest {
                     Object ast = mapped.getClass().getMethod("ast").invoke(mapped);
                     JsonObject javaAst = canonical(ast, mapped);
                     assertEquals(context + " Java AST contract", row.get("ast"), javaAst);
+                    JsonArray javaValueSpans = javaValueSpans(fixture, ast, mapped);
+                    assertEquals(context + " Java mixed-value source-map spans", expectedValueSpans, javaValueSpans);
+                    if (fixture.has("valueSpanField")) {
+                        // A later parse clears the mapper's live identity map, not this owned snapshot.
+                        String nextInput = cases.get((i + 1) % cases.size()).getAsJsonObject()
+                            .get("input").getAsString();
+                        mapper.getMethod("parse", String.class).invoke(null, nextInput);
+                    }
+                    JsonArray retainedValueSpans = javaValueSpans(fixture, ast, mapped);
+                    assertEquals(context + " Java retained mixed-value spans after another parse",
+                        expectedValueSpans, retainedValueSpans);
 
                     JsonArray expectedDeclarations = row.has("declarations")
                         ? row.getAsJsonArray("declarations") : new JsonArray();
@@ -137,7 +151,9 @@ public class NestedCaptureConformanceTest {
                     report.add(name + "\t" + row.get("id").getAsString() + "\t" + row.get("input")
                         + "\t" + row.get("ast") + "\t" + javaAst + "\t" + row.get("captures")
                         + "\t" + rust.get("captures") + "\t" + expectedDeclarations + "\t"
-                        + javaDeclarations + "\t" + rust);
+                        + javaDeclarations + "\t" + rust + "\t" + javaFieldTypes + "\t"
+                        + fixture.get("rustFieldTypes") + "\t" + expectedValueSpans + "\t"
+                        + javaValueSpans + "\t" + retainedValueSpans);
                 }
             }
         }
@@ -161,6 +177,49 @@ public class NestedCaptureConformanceTest {
             }
             return result;
         }
+    }
+
+    private JsonObject assertJavaFieldTypes(String context, JsonObject expected, GrammarDecl grammar,
+            URLClassLoader loader) throws Exception {
+        var types = new JsonObject();
+        for (var record : expected.entrySet()) {
+            Class<?> type = loader.loadClass(PACKAGE + "." + grammar.name() + "AST$" + record.getKey());
+            var actual = new JsonObject();
+            for (var component : type.getRecordComponents()) {
+                actual.addProperty(component.getName(), javaTypeName(component.getGenericType()));
+            }
+            assertEquals(context + " Java declared field types: " + record.getKey(), record.getValue(), actual);
+            types.add(record.getKey(), actual);
+        }
+        return types;
+    }
+
+    private String javaTypeName(Type type) {
+        if (type instanceof Class<?> concrete) return concrete.getSimpleName();
+        if (type instanceof ParameterizedType parameterized) {
+            return javaTypeName(parameterized.getRawType()) + "<"
+                + java.util.Arrays.stream(parameterized.getActualTypeArguments()).map(this::javaTypeName)
+                    .collect(java.util.stream.Collectors.joining(",")) + ">";
+        }
+        throw new AssertionError("Unexpected generated field type: " + type);
+    }
+
+    private JsonArray javaValueSpans(JsonObject fixture, Object ast, Object mapped) throws Exception {
+        var result = new JsonArray();
+        if (!fixture.has("valueSpanField")) return result;
+        var values = new ArrayList<>();
+        values.add(ast.getClass().getMethod(fixture.get("valueSpanField").getAsString()).invoke(ast));
+        values.addAll((List<?>) ast.getClass().getMethod(fixture.get("valueSpanListField").getAsString()).invoke(ast));
+        for (Object value : values) {
+            int[] span = (int[]) ((Optional<?>) mapped.getClass().getMethod("sourceSpanOf", Object.class)
+                .invoke(mapped, value)).orElseThrow(() -> new AssertionError(
+                    fixture.get("name").getAsString() + " missing Java source span for mixed value: " + value));
+            var position = new JsonArray();
+            position.add(span[0]);
+            position.add(span[1]);
+            result.add(position);
+        }
+        return result;
     }
 
     private URLClassLoader compileJava(GrammarDecl grammar) throws Exception {
@@ -239,6 +298,21 @@ public class NestedCaptureConformanceTest {
                 .replace("__LIST__", fixture.get("valueSpanListField").getAsString()) : """
             fn value_spans(_: &generated::ast::Ast) -> String { "[]".to_owned() }
             """;
+        var fieldTypes = new StringBuilder("fn assert_field_types(ast: &generated::ast::Ast) {\n"
+            + "use generated::ast::*;\nmatch ast {\n");
+        for (var variant : fixture.getAsJsonObject("rustFieldTypes").entrySet()) {
+            JsonObject fields = variant.getValue().getAsJsonObject();
+            String bindings = fields.keySet().stream().map(name -> "r#" + name)
+                .collect(java.util.stream.Collectors.joining(", "));
+            fieldTypes.append("Ast::r#").append(variant.getKey()).append(" { ").append(bindings)
+                .append(", .. } => {\n");
+            for (var field : fields.entrySet()) {
+                fieldTypes.append("let _: &").append(field.getValue().getAsString()).append(" = r#")
+                    .append(field.getKey()).append(";\n");
+            }
+            fieldTypes.append("}\n");
+        }
+        fieldTypes.append("}\n}\n");
         return """
             mod generated;
             use std::io::{self, BufRead};
@@ -259,6 +333,7 @@ public class NestedCaptureConformanceTest {
                 format!("[{}]", values)
             }
             __VALUE_SPANS__
+            __FIELD_TYPES__
             fn main() {
                 let names = [__NAMES__];
                 for line in io::stdin().lock().lines() {
@@ -275,12 +350,14 @@ public class NestedCaptureConformanceTest {
                     let declaration_json = declarations(&tree);
                     let ast = generated::mapper::map(&tree).unwrap();
                     drop(tree);
+                    assert_field_types(&ast);
                     println!(concat!(r#"{{\"ast\":{},\"captures\":{},"#,
                         r#"\"valueSpans\":{},\"declarations\":{}}}"#),
                         ast.canonical_json(), capture_json, value_spans(&ast), declaration_json);
                 }
             }
-            """.replace("__NAMES__", names).replace("__VALUE_SPANS__", valueSpans);
+            """.replace("__NAMES__", names).replace("__VALUE_SPANS__", valueSpans)
+                .replace("__FIELD_TYPES__", fieldTypes);
     }
 
     private String rustString(String value) {

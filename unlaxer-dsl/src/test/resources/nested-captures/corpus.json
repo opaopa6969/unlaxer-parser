@@ -1,6 +1,8 @@
 [
   {
     "name": "nested-text-completion",
+    "javaFieldTypes": {"Root":{"value":"List<String>"}},
+    "rustFieldTypes": {"Root":{"value":"Vec<String>"}},
     "grammar": "grammar NestedText { @package: org.example.nestedcaptures @root @scopeTree(mode=lexical) @declares(symbol=value) @mapping(Root, params=[value]) Root ::= ('a' @value 'b') @value; }",
     "captureNames": ["value"],
     "cases": [
@@ -12,6 +14,8 @@
   },
   {
     "name": "choice-optional-coexist",
+    "javaFieldTypes": {"Root":{"choice":"Choice","maybe":"Maybe","pair":"Pair"},"Choice":{"pick":"String"},"Maybe":{"value":"List<String>","missing":"Optional<String>"},"Pair":{"item":"List<String>"}},
+    "rustFieldTypes": {"Root":{"choice":"Box<Ast>","maybe":"Box<Ast>","pair":"Box<Ast>"},"Choice":{"pick":"String"},"Maybe":{"value":"Vec<String>","missing":"Option<String>"},"Pair":{"item":"Vec<String>"}},
     "grammar": "grammar Shapes { @package: org.example.nestedcaptures @root @mapping(Root, params=[choice,maybe,pair]) Root ::= Choice @choice Maybe @maybe Pair @pair; @mapping(Choice, params=[pick]) Choice ::= 'x' @pick | 'y' @pick; @mapping(Maybe, params=[value,missing]) Maybe ::= '[' [ ('o' @value 'O') @value ] [ 'q' @missing ] ']'; @mapping(Pair, params=[item]) Pair ::= 'a' @item 'b' @item; }",
     "captureNames": ["pick", "value", "missing", "item"],
     "cases": [
@@ -25,6 +29,8 @@
   },
   {
     "name": "quantifier-items-not-containers",
+    "javaFieldTypes": {"Root":{"repeat":"Repeat","plus":"Plus","bounded":"Bounded","separated":"Separated"},"Repeat":{"value":"List<String>"},"Plus":{"value":"List<String>"},"Bounded":{"value":"List<String>"},"Separated":{"value":"List<String>"}},
+    "rustFieldTypes": {"Root":{"repeat":"Box<Ast>","plus":"Box<Ast>","bounded":"Box<Ast>","separated":"Box<Ast>"},"Repeat":{"value":"Vec<String>"},"Plus":{"value":"Vec<String>"},"Bounded":{"value":"Vec<String>"},"Separated":{"value":"Vec<String>"}},
     "grammar": "grammar Quantifiers { @package: org.example.nestedcaptures @root @mapping(Root, params=[repeat,plus,bounded,separated]) Root ::= Repeat @repeat '|' Plus @plus '|' Bounded @bounded '|' Separated @separated; @mapping(Repeat, params=[value]) Repeat ::= { ('r' @value 'R') } @value; @mapping(Plus, params=[value]) Plus ::= ('p' @value 'P')+ @value; @mapping(Bounded, params=[value]) Bounded ::= ('b' @value 'B'){1,2} @value; @mapping(Separated, params=[value]) Separated ::= ('s' @value 'S') % ',' @value; }",
     "captureNames": ["value"],
     "cases": [
@@ -35,6 +41,8 @@
   },
   {
     "name": "same-wrapper-and-parser-class",
+    "javaFieldTypes": {"Root":{"left":"String","right":"String","value":"List<String>"}},
+    "rustFieldTypes": {"Root":{"left":"String","right":"String","value":"Vec<String>"}},
     "grammar": "grammar BindingSites { @package: org.example.nestedcaptures token ID = org.unlaxer.parser.clang.IdentifierParser @root @mapping(Root, params=[left,right,value]) Root ::= ID @left ':' ID @right ':' (('😀') @value) @value; }",
     "captureNames": ["left", "right", "value"],
     "cases": [
@@ -45,6 +53,8 @@
   },
   {
     "name": "text-node-and-mixed-values",
+    "javaFieldTypes": {"Root":{"text":"String","node":"Leaf","mixed":"Object","value":"List<Object>"},"Leaf":{"text":"Object"}},
+    "rustFieldTypes": {"Root":{"text":"String","node":"Box<Ast>","mixed":"AstValue","value":"Vec<AstValue>"},"Leaf":{"text":"String"}},
     "grammar": "grammar MixedKinds { @package: org.example.nestedcaptures @root @mapping(Root, params=[text,node,mixed,value]) Root ::= 'a' @text Leaf @node ('b' | Leaf) @mixed (Leaf @value | 'b' @value) @value; @mapping(Leaf, params=[text]) Leaf ::= ('x' | 'y') @text; }",
     "captureNames": ["text", "node", "mixed", "value"],
     "valueSpanField": "mixed",
@@ -62,6 +72,8 @@
   },
   {
     "name": "recursive-child-boundary",
+    "javaFieldTypes": {"Root":{"parent":"Parent"},"Parent":{"name":"Optional<String>","child":"Child"},"Child":{"name":"String","next":"Optional<Child>"}},
+    "rustFieldTypes": {"Root":{"parent":"Box<Ast>"},"Parent":{"name":"Option<String>","child":"Box<Ast>"},"Child":{"name":"String","next":"Option<Box<Ast>>"}},
     "grammar": "grammar RecursiveBoundary { @package: org.example.nestedcaptures token ID = org.unlaxer.parser.clang.IdentifierParser @root @mapping(Root, params=[parent]) Root ::= Parent @parent; @mapping(Parent, params=[name,child]) Parent ::= [ ID @name ':' ] Child @child; @mapping(Child, params=[name,next]) Child ::= ID @name [ '/' Child @next ]; }",
     "captureNames": ["name", "child", "next"],
     "cases": [
@@ -72,12 +84,26 @@
   },
   {
     "name": "shared-mapping-nested-and-sequential",
+    "javaFieldTypes": {"Root":{"items":"List<Object>"},"Item":{"value":"List<String>"}},
+    "rustFieldTypes": {"Root":{"items":"Vec<Ast>"},"Item":{"value":"Vec<String>"}},
     "grammar": "grammar SharedMapping { @package: org.example.nestedcaptures @root @mapping(Root, params=[items]) Root ::= { (A | B) @items }; @mapping(Item, params=[value]) A ::= 'a' @value 'b' @value; @mapping(Item, params=[value]) B ::= ('c' @value 'd') @value; }",
     "captureNames": ["value", "items"],
     "cases": [
       {"id":"shared-list-schema-retains-each-rule-order", "input":"abcd",
        "ast":{"type":"Root","span":[0,4],"fields":{"items":[{"type":"Item","span":[0,2],"fields":{"value":["a","b"]}},{"type":"Item","span":[2,4],"fields":{"value":["c","cd"]}}]}},
        "captures":[{"name":"value","span":[0,1],"text":"a"},{"name":"value","span":[1,2],"text":"b"},{"name":"value","span":[2,3],"text":"c"},{"name":"value","span":[2,4],"text":"cd"},{"name":"items","span":[0,2],"text":"ab"},{"name":"items","span":[2,4],"text":"cd"}]}
+    ]
+  },
+  {
+    "name": "typed-node-list-and-shared-mixed-schema",
+    "javaFieldTypes": {"Root":{"nodes":"List<Leaf>","items":"List<Object>"},"Leaf":{"text":"String"},"Item":{"value":"List<Object>"}},
+    "rustFieldTypes": {"Root":{"nodes":"Vec<Ast>","items":"Vec<Ast>"},"Leaf":{"text":"String"},"Item":{"value":"Vec<AstValue>"}},
+    "grammar": "grammar TypedShared { @package: org.example.nestedcaptures @root @mapping(Root, params=[nodes,items]) Root ::= Leaf @nodes Leaf @nodes ':' { (Text | Nodes) @items }; @mapping(Leaf, params=[text]) Leaf ::= 'x' @text; @mapping(Item, params=[value]) Text ::= ('a' @value 'b') @value; @mapping(Item, params=[value]) Nodes ::= Leaf @value ',' Leaf @value; }",
+    "captureNames": ["value"],
+    "cases": [
+      {"id":"node-container-and-shared-text-node-join", "input":"xx:abx,x",
+       "ast":{"type":"Root","span":[0,8],"fields":{"nodes":[{"type":"Leaf","span":[0,1],"fields":{"text":"x"}},{"type":"Leaf","span":[1,2],"fields":{"text":"x"}}],"items":[{"type":"Item","span":[3,5],"fields":{"value":["a","ab"]}},{"type":"Item","span":[5,8],"fields":{"value":[{"type":"Leaf","span":[5,6],"fields":{"text":"x"}},{"type":"Leaf","span":[7,8],"fields":{"text":"x"}}]}}]}},
+       "captures":[{"name":"value","span":[3,4],"text":"a"},{"name":"value","span":[3,5],"text":"ab"},{"name":"value","span":[5,6],"text":"x"},{"name":"value","span":[7,8],"text":"x"}]}
     ]
   }
 ]

@@ -786,6 +786,8 @@ class MapperRuleEmitter {
                 mappedClassByRuleName, tokenDeclByName, ruleByName);
             if (boundText || "String".equals(valueType)) {
                 expression = "registerNodeSourceSpan(new String(" + expression + "), " + valueToken + ")";
+            } else if ("Object".equals(valueType)) {
+                expression = "registerTextCaptureSpan(" + expression + ", " + valueToken + ")";
             }
             w.line(listType.isPresent() ? param + ".add(" + expression + ");"
                 : optionalType.isPresent() ? param + " = Optional.ofNullable(" + expression + ");"
@@ -888,6 +890,13 @@ class MapperRuleEmitter {
         return """
                 private static final java.util.Set<Class<?>> CAPTURE_RULE_BOUNDARIES = java.util.Set.of(%s);
                 private record CaptureOccurrence(Token token, String binding) {}
+
+                private static Object registerTextCaptureSpan(Object value, Token token) {
+                    // Mixed fields carry both nodes and text. Only text needs an occurrence identity;
+                    // mapped nodes already retain their own source spans and numeric values are unchanged.
+                    return value instanceof String text
+                        ? registerNodeSourceSpan(new String(text), token) : value;
+                }
 
                 private static List<CaptureOccurrence> findCaptureOccurrences(Token token, java.util.Set<String> bindings) {
                     List<CaptureOccurrence> result = new ArrayList<>();
