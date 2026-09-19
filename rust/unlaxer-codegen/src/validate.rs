@@ -24,7 +24,12 @@ pub(super) fn validate(ir: &GrammarIr) -> Result<(), GenerateError> {
     let mut mappings = BTreeMap::new();
     let mut methods = BTreeMap::new();
     for rule in &ir.rules {
-        identifier(&rule.name)?;
+        // Rule names are diagnostic labels, not emitted Rust identifiers.
+        // References use numeric indices, so frontend identifiers such as
+        // `_Root` and Rust keywords must remain valid here.
+        if rule.name.is_empty() {
+            return Err(fail("empty rule name"));
+        }
         if !names.insert(&rule.name) {
             return Err(fail(format!("duplicate rule: {}", rule.name)));
         }

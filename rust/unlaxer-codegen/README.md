@@ -25,16 +25,19 @@ Precedence numbers do not reorder parsing; the rule graph determines precedence.
 Right associativity remains unsupported by the current IR, as in the Java Rust
 backend. This is not a claim of full Java parser or tinyexpression parity.
 
-`generate` rejects malformed identifiers, invalid indices, conflicting mapping
+`generate` rejects malformed mapping/field identifiers, invalid indices, conflicting mapping
 schemas or semantic method names, reserved/duplicate fields, missing/extra capture
 names, invalid token parameters, and invalid repetition bounds. The frontend must
 add semantic validation: capture **types/cardinality**, root shape, nullability,
-and left recursion. The low-level IR is not a security boundary.
+and left recursion. Rule names are nonempty diagnostic labels referenced by index,
+not Rust identifiers: names such as `_Root` and `self` are supported.
+The low-level IR is not a security boundary.
 
 Tests compare all five files against Java-generated Evolution snapshots. A Maven
 test independently parses UBNF with the Java frontend and compares native output
 byte-for-byte for Evolution, all six field shapes, and shared mappings/precedence.
-Rust tests compile all three emitted modules, execute parsing/mapping/evaluation,
+Rust tests compile three fixture modules plus a renamed-rule variant (`_Root` and
+`self`), execute parsing/mapping/evaluation,
 drop the source tree before AST use, and require `E0046` for missing semantics.
 Additional tests cover malformed IR and control/Unicode string escaping.
 

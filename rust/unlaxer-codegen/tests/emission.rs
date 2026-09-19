@@ -58,13 +58,22 @@ fn generated_modules_compile_evaluate_and_require_semantics() {
         "{}",
         String::from_utf8_lossy(&result.stderr)
     );
-    for fixture in ["evolution", "fields", "shared"] {
+    for fixture in ["evolution", "fields", "shared", "names"] {
         let output = temp.0.join(fixture);
         fs::create_dir(&output).unwrap();
-        for file in generate(&support::fixture(fixture)).unwrap() {
+        let mut ir = support::fixture(if fixture == "names" {
+            "evolution"
+        } else {
+            fixture
+        });
+        if fixture == "names" {
+            ir.rules[0].name = "_Root".into();
+            ir.rules[3].name = "self".into();
+        }
+        for file in generate(&ir).unwrap() {
             fs::write(output.join(file.relative_path), file.content).unwrap();
         }
-        let probe = if fixture == "evolution" {
+        let probe = if matches!(fixture, "evolution" | "names") {
             r#"
 use generated::{ast::Ast,evaluator::{Semantics,evaluate}};
 use unlaxer_runtime::Span;
@@ -132,6 +141,9 @@ fn invalid_ir_is_rejected_before_emission() {
     cases.push(g);
     let mut g = base.clone();
     g.rules[0].name = g.rules[1].name.clone();
+    cases.push(g);
+    let mut g = base.clone();
+    g.rules[0].name.clear();
     cases.push(g);
     let mut g = base.clone();
     g.rules[1].mapping.as_mut().unwrap().name = "Self".into();
