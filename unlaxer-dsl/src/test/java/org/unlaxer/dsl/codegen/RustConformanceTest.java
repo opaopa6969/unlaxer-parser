@@ -37,6 +37,114 @@ public class RustConformanceTest {
         tokenCorpus("lexical");
     }
 
+    @Test public void sharedLeftAssociativeVariantsPreserveOperatorsEvaluationAndSpans() throws Exception {
+        assumeTrue("enable with -DrustConformance=true (requires rustc)", Boolean.getBoolean("rustConformance"));
+        Path library = temporary.getRoot().toPath().resolve("libunlaxer_runtime.rlib");
+        success(run(List.of("rustc", "--edition=2021", "--crate-type=rlib", "--crate-name=unlaxer_runtime",
+            repo.resolve("rust/unlaxer-runtime/src/lib.rs").toString(), "-o", library.toString()), ""));
+        Path fixtures = repo.resolve("unlaxer-dsl/src/test/resources/associative");
+        String source = Files.readString(fixtures.resolve("Operators.ubnf"));
+        var corpus = JsonParser.parseString(Files.readString(fixtures.resolve("corpus.json"))).getAsJsonArray();
+        var report = new ArrayList<>(List.of("metadata_mode\tinput_json\tjava_ast\trust"));
+        for (boolean reversedMetadata : List.of(false, true)) {
+            // Metadata does not turn this layered grammar into a Pratt parser.
+            String grammarSource = reversedMetadata ? source.replace("level=10", "level=30") : source;
+            var grammar = UBNFMapper.parse(grammarSource).grammars().get(0);
+            Path dir = temporary.newFolder().toPath();
+            Path generated = Files.createDirectory(dir.resolve("generated"));
+            for (var file : new RustBackend().generate(grammar)) Files.writeString(generated.resolve(file.relativePath()), file.content());
+            String probe = Files.readString(fixtures.resolve("probe.rs.txt"));
+            String metadataAssertions = reversedMetadata
+                ? "assert_eq!(generated::parser::OPERATORS[0].rule, \"Term\"); assert_eq!(generated::parser::OPERATORS[1].precedence, 30);"
+                : "assert_eq!(generated::parser::OPERATORS[0].rule, \"Expression\"); assert_eq!(generated::parser::OPERATORS[1].precedence, 20);";
+            Files.writeString(dir.resolve("main.rs"), probe.replace("fn main() {", "fn main() {\n" + metadataAssertions));
+            success(rustCompile(dir, library));
+            var actual = run(List.of(dir.resolve("probe").toString()), String.join("\n", corpus.asList().stream()
+                .map(row -> java.util.HexFormat.of().formatHex(row.getAsJsonObject().get("input").getAsString()
+                    .getBytes(StandardCharsets.UTF_8))).toList()) + "\n");
+            success(actual);
+            var lines = actual.output().lines().toList();
+            assertEquals(corpus.size(), lines.size());
+            // Check the Rust oracle before compiling Java: an existing Java bug must not hide it.
+            for (int i = 0; i < corpus.size(); i++) {
+                var row = corpus.get(i).getAsJsonObject();
+                var result = JsonParser.parseString(lines.get(i)).getAsJsonObject();
+                boolean accepted = row.has("value");
+                assertEquals(row.toString(), accepted, !result.get("ast").isJsonNull());
+                if (accepted) {
+                    assertEquals(row.toString(), row.get("value").getAsDouble(), result.get("value").getAsDouble(), 0.0);
+                    var ast = result.getAsJsonObject("ast");
+                    String input = row.get("input").getAsString();
+                    assertEquals(0, ast.getAsJsonArray("span").get(0).getAsInt());
+                    assertEquals(input.codePointCount(0, input.length()), ast.getAsJsonArray("span").get(1).getAsInt());
+                    assertOperatorTree(ast, input, 0, input.codePointCount(0, input.length()));
+                    if (input.equals("10-3-2")) {
+                        var fields = ast.getAsJsonObject("fields");
+                        assertEquals(JsonParser.parseString("[\"-\",\"-\"]"), fields.get("op"));
+                        assertEquals(2, fields.getAsJsonArray("right").size());
+                    }
+                }
+            }
+            try (var loader = compileJava(grammar, List.of())) {
+                var mapper = loader.loadClass("org.example.operators.OperatorsMapper");
+                var parser = (org.unlaxer.parser.Parser) loader.loadClass("org.example.operators.OperatorsParsers")
+                    .getMethod("getRootParser").invoke(null);
+                for (int i = 0; i < corpus.size(); i++) {
+                    var row = corpus.get(i).getAsJsonObject();
+                    String input = row.get("input").getAsString();
+                    var result = JsonParser.parseString(lines.get(i)).getAsJsonObject();
+                    var prefix = new JsonArray();
+                    try (var context = new org.unlaxer.context.ParseContext(org.unlaxer.StringSource.createRootSource(input))) {
+                        prefix.add(parser.parse(context).isSucceeded());
+                        prefix.add(context.getConsumedPosition().value());
+                        prefix.add(context.getMatchedPosition().value());
+                    }
+                    assertEquals(row + " prefix", prefix, result.get("prefix"));
+                    boolean accepted = row.has("value");
+                    var diagnostic = (Optional<?>) mapper.getMethod("diagnose", String.class).invoke(null, input);
+                    assertEquals(row + " Java acceptance", accepted, diagnostic.isEmpty());
+                    JsonElement java = JsonNull.INSTANCE;
+                    if (accepted) {
+                        Object mapped = mapper.getMethod("parseWithSourceMap", String.class).invoke(null, input);
+                        java = canonical(mapped.getClass().getMethod("ast").invoke(mapped), mapped);
+                        assertEquals(row + " Java/Rust AST and all spans", java, result.get("ast"));
+                    }
+                    report.add(reversedMetadata + "\t" + row.get("input") + "\t" + java + "\t" + result);
+                }
+            }
+            Files.writeString(dir.resolve("main.rs"), """
+                mod generated;
+                struct Stale;
+                impl generated::evaluator::Semantics for Stale {
+                    type Output = ();
+                    fn eval_number(&mut self, _: &str, _: unlaxer_runtime::Span) {}
+                }
+                fn main() {}
+                """);
+            var stale = rustCompile(dir, library);
+            assertNotEquals(stale.output(), 0, stale.code());
+            assertTrue(stale.output(), stale.output().contains("E0046"));
+            assertTrue(stale.output(), stale.output().contains("eval_binary"));
+        }
+        Files.write(Path.of("target/rust-associative.tsv"), report, StandardCharsets.UTF_8);
+    }
+
+    private void assertOperatorTree(JsonObject ast, String source, int parentStart, int parentEnd) {
+        int start = ast.getAsJsonArray("span").get(0).getAsInt();
+        int end = ast.getAsJsonArray("span").get(1).getAsInt();
+        assertTrue(ast.toString(), parentStart <= start && start <= end && end <= parentEnd);
+        var fields = ast.getAsJsonObject("fields");
+        if (ast.get("type").getAsString().equals("Number")) {
+            String slice = source.substring(source.offsetByCodePoints(0, start), source.offsetByCodePoints(0, end));
+            assertTrue(ast + " vs " + slice, slice.contains(fields.get("value").getAsString()));
+        } else {
+            assertEquals("Binary", ast.get("type").getAsString());
+            assertOperatorTree(fields.getAsJsonObject("left"), source, start, end);
+            assertEquals(fields.getAsJsonArray("op").size(), fields.getAsJsonArray("right").size());
+            for (var right : fields.getAsJsonArray("right")) assertOperatorTree(right.getAsJsonObject(), source, start, end);
+        }
+    }
+
     private void tokenCorpus(String corpusName) throws Exception {
         assumeTrue("enable with -DrustConformance=true (requires rustc)", Boolean.getBoolean("rustConformance"));
         Path library = temporary.getRoot().toPath().resolve("libunlaxer_runtime.rlib");

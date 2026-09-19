@@ -24,8 +24,8 @@
 | CASE_INSENSITIVE・REGEX・任意外部token | 未対応 | Unicode/regex方言を確定。任意Java parserクラスとtinyexpression固有bindingはRust実装または明示adapterを要求 |
 | imports・複数grammar・namespace・global/rule trivia・interleave | 一部のみ | 現在は単一grammarとglobal javaStyle/none。依存解決・循環・文法別ID・局所設定を検証 |
 | mapping・capture・source-preserving AST | scalar/optional/list/group生成済み。Java位置binding #116・zero-field生成 #129・複合text capture #132を修正 | 入れ子container型、再帰的unmapped rule、mapped alias/sumのbackend間契約、異種choice、typeof/commonField/enum、全Java capture規則との互換性 |
-| evaluator dispatch・網羅性 | 限定範囲で生成済み | 新nodeのE0004/E0046検証を拡張。eval annotation、型境界、短絡評価を追加。Java sum/dotted evaluatorの既知不具合 #130 は別修正 |
-| leftAssoc/rightAssoc/precedence | 未対応 | ASTの結合方向・演算順・位置・不正文法をJavaと比較 |
+| evaluator dispatch・網羅性 | 限定範囲で生成済み | 新nodeのE0004/E0046検証を拡張。eval annotation、型境界、短絡評価を追加。Java sum/dotted evaluatorの不具合 #130 は修正済み |
+| leftAssoc/rightAssoc/precedence | canonical leftAssocとprecedence metadata、同一schemaのshared mappingを生成 | 左辺＋op/right列、文法階層による優先順位を検証。rightAssoc、異種text/node factorとJavaの特殊leafは未対応。Java raw CST反復欠落 #138・右結合 #139 は独立修正 |
 | backref・MatchedToken相当 | context-wide replayのみ | UBNF annotation、名前の寿命・入れ子・伝播、コピー言語のpositive/negative test |
 | PropagationStopper・consume/invert・virtual token・metadata | 未対応 | 有限状態の全合成検査、8元モデルとの対応、実parserとの統合試験 |
 | scopeTree/declares/catalog/doc/skip/simple等 | 未対応 | 各annotationのJava実動作を確認し、生成metadataと利用先を検証 |

@@ -1,0 +1,50 @@
+mod generated;
+use generated::{ast::Ast, evaluator::{evaluate, Semantics}};
+use unlaxer_runtime::{Span, json_string};
+use std::io::{self, BufRead};
+
+struct Calculator;
+impl Semantics for Calculator {
+    type Output = f64;
+    fn eval_number(&mut self, value: &str, _: Span) -> f64 {
+        // This grammar intentionally captures a source group, including trailing trivia.
+        value.split('/').next().unwrap().trim().parse().unwrap()
+    }
+    fn eval_binary(&mut self, left: &Ast, op: &[String], right: &[Ast], _: Span) -> f64 {
+        assert_eq!(op.len(), right.len());
+        let mut value = evaluate(left, self);
+        for (operator, operand) in op.iter().zip(right) {
+            let rhs = evaluate(operand, self);
+            value = match operator.as_str() {
+                "+" => value + rhs, "-" => value - rhs,
+                "*" => value * rhs, "/" => value / rhs,
+                _ => panic!("unexpected operator"),
+            };
+        }
+        value
+    }
+}
+
+fn main() {
+    for spec in generated::parser::OPERATORS {
+        assert_eq!(spec.associativity, generated::parser::Associativity::Left);
+    }
+    for line in io::stdin().lock().lines() {
+        let encoded = line.unwrap();
+        let bytes = (0..encoded.len()).step_by(2)
+            .map(|i| u8::from_str_radix(&encoded[i..i+2], 16).unwrap()).collect();
+        let input = String::from_utf8(bytes).unwrap();
+        let mut context = unlaxer_runtime::ParseContext::new(&input);
+        let ok = generated::parser::parse_context(&mut context).is_ok();
+        print!(r#"{{"prefix":[{},{},{}],"ast":"#, ok, context.position(), context.matched_position());
+        match generated::parser::parse_tree(&input) {
+            Ok(tree) => {
+                let ast = generated::mapper::map(&tree).unwrap();
+                drop(tree);
+                print!(r#"{},"value":{}"#, ast.canonical_json(), evaluate(&ast, &mut Calculator));
+            }
+            Err(error) => print!(r#"null,"error":{}"#, json_string(&format!("{error:?}"))),
+        }
+        println!("}}");
+    }
+}

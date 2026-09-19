@@ -16,6 +16,7 @@ public final class RustGrammarLowering {
     private final Map<String, Expression> tokens = new LinkedHashMap<>();
     private final List<Expression> bodies = new ArrayList<>();
     private final List<MappingAnnotation> mappings = new ArrayList<>();
+    private final List<Operator> operators = new ArrayList<>();
     private final Set<Integer> nullableRules = new HashSet<>();
     private record Shape(Kind kind, Cardinality cardinality) {}
 
@@ -41,14 +42,15 @@ public final class RustGrammarLowering {
             if (tokens.putIfAbsent(token.name(), token(token)) != null) throw unsupported("duplicate token " + token.name());
         }
         int root = -1;
-        Set<String> variants = new HashSet<>();
-        Set<String> methods = new HashSet<>();
+        Map<String, String> methods = new LinkedHashMap<>();
         for (int i = 0; i < grammar.rules().size(); i++) {
             var rule = grammar.rules().get(i);
             if (ruleIds.putIfAbsent(rule.name(), i) != null || tokens.containsKey(rule.name())) {
                 throw unsupported("duplicate rule/token " + rule.name());
             }
             MappingAnnotation mapping = null;
+            boolean leftAssoc = false;
+            Integer precedence = null;
             for (var annotation : rule.annotations()) {
                 if (annotation instanceof RootAnnotation) {
                     if (root != -1) throw unsupported("multiple @root annotations");
@@ -56,13 +58,23 @@ public final class RustGrammarLowering {
                 } else if (annotation instanceof MappingAnnotation value) {
                     if (mapping != null) throw unsupported("multiple @mapping on " + rule.name());
                     identifier(value.className());
-                    if (!variants.add(value.className()) || !methods.add(methodName(value.className()))) {
-                        throw unsupported("duplicate mapping/method " + value.className());
+                    String previous = methods.putIfAbsent(methodName(value.className()), value.className());
+                    if (previous != null && !previous.equals(value.className())) {
+                        throw unsupported("mapping method collision " + previous + " / " + value.className());
                     }
                     mapping = value;
+                } else if (annotation instanceof LeftAssocAnnotation) {
+                    if (leftAssoc) throw unsupported("duplicate @leftAssoc on " + rule.name());
+                    leftAssoc = true;
+                } else if (annotation instanceof PrecedenceAnnotation value) {
+                    if (precedence != null) throw unsupported("duplicate @precedence on " + rule.name());
+                    precedence = value.level();
                 } else throw unsupported("annotation " + annotation + " on " + rule.name());
             }
             mappings.add(mapping);
+            operators.add(leftAssoc || precedence != null
+                ? new Operator(leftAssoc ? Associativity.LEFT : Associativity.NONE, precedence == null ? -1 : precedence)
+                : null);
         }
         if (root == -1) throw unsupported("exactly one @root is required");
         for (var rule : grammar.rules()) bodies.add(body(rule.body()));
@@ -77,6 +89,7 @@ public final class RustGrammarLowering {
             throw unsupported("root must resolve to exactly one AST node");
         }
         List<Rule> rules = new ArrayList<>();
+        Map<String, Mapping> variants = new LinkedHashMap<>();
         for (int i = 0; i < bodies.size(); i++) {
             Map<String, Shape> captures = captures(bodies.get(i));
             var annotation = mappings.get(i);
@@ -95,10 +108,37 @@ public final class RustGrammarLowering {
                     fields.add(new Field(name, captures.get(name).kind(), captures.get(name).cardinality()));
                 }
                 mapping = new Mapping(annotation.className(), fields);
+                Mapping previous = variants.putIfAbsent(mapping.name(), mapping);
+                if (previous != null && !previous.equals(mapping)) {
+                    throw unsupported("incompatible shared mapping schema " + mapping.name());
+                }
             }
-            rules.add(new Rule(grammar.rules().get(i).name(), bodies.get(i), mapping));
+            if (operators.get(i) != null && operators.get(i).associativity() == Associativity.LEFT) {
+                checkLeftAssoc(i, mapping);
+            }
+            rules.add(new Rule(grammar.rules().get(i).name(), bodies.get(i), mapping, operators.get(i)));
         }
         return new GrammarIR(rules, root, whitespace);
+    }
+
+    private void checkLeftAssoc(int rule, Mapping mapping) {
+        if (mapping == null || !mapping.fields().stream().map(Field::name).toList().equals(List.of("left", "op", "right"))
+            || !(bodies.get(rule) instanceof Sequence sequence) || sequence.elements().size() != 2
+            || !(sequence.elements().get(0) instanceof Capture left) || !left.name().equals("left")
+            || !(sequence.elements().get(1) instanceof Repeat repeat) || repeat.min() != 0 || repeat.max() != null
+            || !(repeat.child() instanceof Sequence tail) || tail.elements().size() != 2
+            || !(tail.elements().get(0) instanceof Capture op) || !op.name().equals("op")
+            || !(tail.elements().get(1) instanceof Capture right) || !right.name().equals("right")
+            || !captures(left.expression()).isEmpty() || !captures(op.expression()).isEmpty()
+            || !captures(right.expression()).isEmpty()
+            || mapping.fields().get(0).cardinality() != Cardinality.ONE
+            || !mapping.fields().get(1).equals(new Field("op", Kind.TEXT, Cardinality.MANY))
+            || mapping.fields().get(2).cardinality() != Cardinality.MANY
+            || mapping.fields().get(0).kind() != mapping.fields().get(2).kind()
+            || shape(right.expression(), new HashSet<>()).cardinality() != Cardinality.ONE) {
+            throw unsupported("@leftAssoc requires left { op right } with scalar operands and params=[left, op, right] on "
+                + grammar.rules().get(rule).name());
+        }
     }
 
     private Expression body(RuleBody body) {
