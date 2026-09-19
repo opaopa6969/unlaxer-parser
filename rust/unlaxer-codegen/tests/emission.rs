@@ -275,6 +275,7 @@ fn expression_variants_escape_unicode_and_control_characters() {
         name: "Tokens".into(),
         mapping: None,
         operator: None,
+        catalog: None,
         body: Sequence(vec![
             Literal("\"\\\n\r\t\0\u{7f}😀".into()),
             AnyToken,

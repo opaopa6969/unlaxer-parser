@@ -79,6 +79,12 @@ public class RustCatalogConformanceTest {
         }
     }
 
+    @Test public void duplicateCatalogMetadataIsRejectedInsteadOfChoosingOneContext() {
+        var grammar = UBNFMapper.parse(duplicateCatalog()).grammars().get(0);
+        var error = assertThrows(IllegalArgumentException.class, () -> RustGrammarLowering.lower(grammar));
+        assertTrue(error.getMessage(), error.getMessage().contains("duplicate @catalog"));
+    }
+
     private List<String> invalidCatalogs() {
         return List.of(
             "grammar Empty { @root @catalog(context='variable') @mapping(Root) Root ::= 'x'; }",
@@ -150,13 +156,26 @@ public class RustCatalogConformanceTest {
             Path directory = temporary.newFolder().toPath();
             Path source = directory.resolve("Invalid.ubnf");
             Files.writeString(source, invalid);
-            Result rejected = generate(nativeGenerator, source, directory.resolve("generated"));
+            Path generated = directory.resolve("generated");
+            Result rejected = generate(nativeGenerator, source, generated);
             assertEquals(rejected.output(), 3, rejected.code());
             assertTrue(rejected.output(), rejected.output().toLowerCase(java.util.Locale.ROOT).contains("catalog"));
             assertTrue(rejected.output(), rejected.output().contains("capture"));
+            assertFalse("rejected catalog must not leave partial output", Files.exists(generated));
         }
+        Path duplicateDirectory = temporary.newFolder().toPath();
+        Path duplicateSource = duplicateDirectory.resolve("Duplicate.ubnf");
+        Files.writeString(duplicateSource, duplicateCatalog());
+        Result duplicate = generate(nativeGenerator, duplicateSource, duplicateDirectory.resolve("generated"));
+        assertEquals(duplicate.output(), 3, duplicate.code());
+        assertTrue(duplicate.output(), duplicate.output().contains("duplicate @catalog"));
+        assertFalse("duplicate catalog must not leave partial output", Files.exists(duplicateDirectory.resolve("generated")));
         Files.createDirectories(Path.of("target"));
         Files.write(Path.of("target/rust-catalog-metadata.tsv"), report, StandardCharsets.UTF_8);
+    }
+
+    private String duplicateCatalog() {
+        return "grammar Duplicate { @root @catalog(context='variable') @catalog(context='function') @mapping(Root, params=[name]) Root ::= 'x' @name; }";
     }
 
     @Test public void realTinyGrammarAdvancesPastCatalogToTheSameGenerationFrontier() throws Exception {

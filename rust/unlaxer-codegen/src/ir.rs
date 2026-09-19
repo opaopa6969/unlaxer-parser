@@ -12,6 +12,14 @@ pub struct Rule {
     pub body: Expression,
     pub mapping: Option<Mapping>,
     pub operator: Option<Operator>,
+    pub catalog: Option<Catalog>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Catalog {
+    pub context: String,
+    /// Stable lexical target names; frontends normalize this list by name.
+    pub captures: Vec<String>,
 }
 
 /// Descriptive only: the rule graph determines parsing precedence.
