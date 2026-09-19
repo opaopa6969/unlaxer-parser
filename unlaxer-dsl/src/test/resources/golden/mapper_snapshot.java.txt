@@ -557,6 +557,14 @@ public class SnapshotMapper {
         return text == null ? 0 : text.length();
     }
 
+    static int sourceSpanLengthCompat(Token token) {
+        if (token != null && token.source != null && token.source.codePointLength() != null) {
+            return Math.max(0, token.source.codePointLength().value());
+        }
+        String text = tokenTextCompat(token);
+        return text == null ? 0 : text.codePointCount(0, text.length());
+    }
+
     static int tokenStartOffsetCompat(Token token) {
         if (token == null) {
             return 0;
@@ -577,8 +585,7 @@ public class SnapshotMapper {
             return node;
         }
         int start = Math.max(0, tokenStartOffsetCompat(token));
-        String text = tokenTextCompat(token);
-        int length = text == null ? 0 : text.codePointCount(0, text.length());
+        int length = sourceSpanLengthCompat(token);
         int end = start + length;
         NODE_SOURCE_SPANS.put(node, new int[]{start, end});
         return node;
