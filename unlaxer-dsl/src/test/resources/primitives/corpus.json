@@ -64,5 +64,13 @@
     {"input":"","value":[""]}, {"input":",","value":["",""]}, {"input":",,","value":["","",""]}]},
   {"token":"EMPTY", "extra":"@mapping(Item, params=[text]) Part ::= T @text;", "body":"'a' Part @value 'b'", "cases":[
     {"input":"ab","value":{"type":"Item","span":[1,1],"fields":{"text":""}}}]},
-  {"token":"LOOKAHEAD('a')", "extra":"token U = LOOKAHEAD('b')", "body":"(T) [ ('x') ] (U) 'ab' @value", "cases":[{"input":"ab","value":"ab"}]}
+  {"token":"LOOKAHEAD('a')", "extra":"token U = LOOKAHEAD('b')", "body":"(T) [ ('x') ] (U) 'ab' @value", "cases":[{"input":"ab","value":"ab"}]},
+  {"token":"ANY", "body":"(T | 'z')+ @value", "whitespace":true, "cases":[
+    {"input":"a b","value":["a","b"]}, {"input":"a /*c*/b","value":["a","b"]}, {"input":""}]},
+  {"token":"ANY", "body":"(T | 'z'){1,2} @value", "whitespace":true, "cases":[
+    {"input":"a b","value":["a","b"]}, {"input":"a /*c*/b","value":["a","b"]}, {"input":"a b c"}]},
+  {"token":"ANY", "body":"((T | 'z'))+ @value", "whitespace":true, "cases":[
+    {"input":"a /*c*/b","value":["a /*c*/","b"]}]},
+  {"token":"ANY", "body":"'a'+ @value", "whitespace":true, "cases":[
+    {"input":"a /*c*/a","value":["a","a"]}]}
 ]

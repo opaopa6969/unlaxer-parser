@@ -161,7 +161,9 @@ public final class RustGrammarLowering {
 
     private Expression repeatedAtom(AtomicElement atom) {
         Expression child = atomic(atom);
-        return atom instanceof RuleRefElement || child instanceof Sequence || child instanceof Choice
+        // Java wraps repeated choices/literals in a DelimitedChain outside their capture site.
+        if (child instanceof Choice || child instanceof Literal) return new Delimited(child);
+        return atom instanceof RuleRefElement || child instanceof Sequence
             ? child : new Sequence(List.of(child));
     }
 
@@ -175,6 +177,7 @@ public final class RustGrammarLowering {
             }
         }
         return switch (expression) {
+            case Delimited delimited -> new Delimited(capture(name, delimited.child()));
             case OptionalExpr optional -> new OptionalExpr(capture(name, optional.child()));
             case Repeat repeat -> new Repeat(capture(name, repeat.child()), repeat.min(), repeat.max());
             case Separated separated -> new Separated(capture(name, separated.child()), separated.separator());
@@ -190,6 +193,7 @@ public final class RustGrammarLowering {
             case UntilToken ignored -> true;
             case Reference reference -> nullableRules.contains(reference.rule());
             case Capture capture -> nullable(capture.expression());
+            case Delimited delimited -> nullable(delimited.child());
             case Sequence sequence -> sequence.elements().stream().allMatch(this::nullable);
             case Choice choice -> choice.alternatives().stream().anyMatch(this::nullable);
             case OptionalExpr ignored -> true;
@@ -243,6 +247,7 @@ public final class RustGrammarLowering {
             }
             case OptionalExpr optional -> checkRepetition(optional.child());
             case Capture capture -> checkRepetition(capture.expression());
+            case Delimited delimited -> checkRepetition(delimited.child());
             case Sequence sequence -> sequence.elements().forEach(this::checkRepetition);
             case Choice choice -> choice.alternatives().forEach(this::checkRepetition);
             default -> { }
@@ -261,6 +266,7 @@ public final class RustGrammarLowering {
         return switch (expression) {
             case Reference reference -> Set.of(reference.rule());
             case Capture capture -> leadingRules(capture.expression());
+            case Delimited delimited -> leadingRules(delimited.child());
             case OptionalExpr optional -> leadingRules(optional.child());
             case Repeat repeat -> leadingRules(repeat.child());
             case Separated separated -> {
@@ -298,6 +304,7 @@ public final class RustGrammarLowering {
         return switch (expression) {
             case Reference reference -> shape(reference.rule(), visiting);
             case Capture capture -> shape(capture.expression(), visiting);
+            case Delimited delimited -> shape(delimited.child(), visiting);
             case OptionalExpr optional -> wrapNode(shape(optional.child(), visiting), Cardinality.OPTIONAL);
             case Repeat repeat -> wrapNode(shape(repeat.child(), visiting), Cardinality.MANY);
             case Separated separated -> {
@@ -349,6 +356,7 @@ public final class RustGrammarLowering {
                 yield result;
             }
             case OptionalExpr optional -> wrappedCaptures(optional.child(), Cardinality.OPTIONAL);
+            case Delimited delimited -> captures(delimited.child());
             case Repeat repeat -> wrappedCaptures(repeat.child(), Cardinality.MANY);
             case Separated separated -> {
                 if (!captures(separated.separator()).isEmpty()) throw unsupported("captures in separator");

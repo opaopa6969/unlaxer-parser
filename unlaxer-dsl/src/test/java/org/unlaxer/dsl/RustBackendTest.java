@@ -51,10 +51,12 @@ public class RustBackendTest {
         for (String declaration : new String[]{"EMPTY", "EOF", "LOOKAHEAD('x')", "NEGATIVE_LOOKAHEAD('x')", "UNTIL('#')"}) {
             String source = SIMPLE.replace("grammar Example {", "grammar Example { token T = " + declaration + "\n");
             reject(source.replace("'hello' @value", "{ T } 'hello' @value"), "nullable unbounded");
+            reject(source.replace("'hello' @value", "(T | 'x')+ @value"), "nullable unbounded");
             reject(source.replace("'hello' @value", "T @value Root @value"), "left recursion");
         }
         reject(SIMPLE.replace("grammar Example {", "grammar Example { token T = REGEX('x')\n"), "token T");
         reject(SIMPLE.replace("'hello' @value", "Root{0} @value"), "left recursion");
+        reject(SIMPLE.replace("'hello' @value", "(Root | 'x'){0} @value"), "left recursion");
     }
 
     @Test public void invalidUnicodeTextIsRejectedBeforeRustEmission() {

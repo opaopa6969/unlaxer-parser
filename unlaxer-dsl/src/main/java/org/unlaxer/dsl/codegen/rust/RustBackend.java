@@ -100,6 +100,7 @@ public final class RustBackend {
                 + ", positive: " + lookahead.positive() + " }";
             case Reference reference -> "Expr::Rule(" + reference.rule() + ")";
             case Sequence sequence -> "Expr::Sequence(vec![" + expressions(sequence.elements()) + "])";
+            case Delimited delimited -> "Expr::Sequence(vec![" + expression(delimited.child()) + "])";
             case Choice choice -> "Expr::Choice(vec![" + expressions(choice.alternatives()) + "])";
             case Capture capture -> "Expr::Capture(" + quote(capture.name()) + ", Box::new(" + expression(capture.expression()) + "))";
             case OptionalExpr optional -> expression(optional.child()) + ".optional_java()";

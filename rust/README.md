@@ -133,7 +133,7 @@ UBNFのoptional/repeatは`optional_java`/`repeat_java`を生成する。Java `Oc
 
 `CHAR_RANGE`境界は現在のUBNF ASTの`char`型に合わせて単一の非surrogate BMP文字に限定し、空・複数文字・補助文字・逆順は明示拒否する。`ANY`/`NEGATION`と文字列patternは補助文字もコードポイントとして扱う。Rustへ渡す文字列の不正な単独surrogateは生成前に拒否する。
 
-[`primitives/corpus.json`](../unlaxer-dsl/src/test/resources/primitives/corpus.json)の44文法から両backendを実生成・コンパイルして、101入力のprefix受理/消費位置/マッチ位置と全入力受理を比較する。受理50入力ではAST field/spanも独立fixtureと一致する。空・終端欠損・Unicode・javaStyle trivia・直接/間接capture・量指定子・rollbackを含み、結果は`target/rust-primitives.tsv`とCI artifactへ保存する。これは現token群の有限corpusであり、汎用MatchOnly/Not/PropagationStopper・virtual token・全CST形状の完全互換を意味しない。診断候補の文言もbackend固有のままである。
+[`primitives/corpus.json`](../unlaxer-dsl/src/test/resources/primitives/corpus.json)の48文法から両backendを実生成・コンパイルして、109入力のprefix受理/消費位置/マッチ位置と全入力受理を比較する。受理56入力ではAST field/spanも独立fixtureと一致する。空・終端欠損・Unicode・javaStyle trivia・直接/間接capture・量指定子・rollbackを含み、結果は`target/rust-primitives.tsv`とCI artifactへ保存する。選択肢とliteralの反復でもJavaのhelper chain相当の空白処理境界を保持する。IRの`Delimited`は補助境界をcaptureの外へ置き、元の文法のgroupとは区別する。`(T | 'z')+`と`((T | 'z'))+`でコメントのcapture範囲が異なることもJavaと照合する。これは現token群の有限corpusであり、汎用MatchOnly/Not/PropagationStopper・virtual token・全CST形状の完全互換を意味しない。診断候補の文言もbackend固有のままである。
 
 Java生成Mapperも、空のcapture-siteを除去する汎用reducerを通さず元のCSTを読むようにした。成功した零幅captureは欠損ではなく空文字になる。`mapParsedTokenWithSourceMap`へ渡す側も零幅captureを保持する必要がある場合は`parsed.getRootToken(false)`を使う。呼出前にreducerで失った情報は復元できない。
 
