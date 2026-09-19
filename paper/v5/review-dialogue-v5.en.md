@@ -1,5 +1,7 @@
 # Review Dialogue Final Round: ["From Grammar to IDE"](./from-grammar-to-ide.en.md) v5 Review Process
 
+> This is simulated peer review for design improvement, not actual conference review. R1's endorsement of the seven-element submonoid is incorrect; see the [v6 errata](../v6/errata.md) and independent exhaustive composition test. The dialogue is retained as a development record.
+
 **[日本語版](./review-dialogue-v5.ja.md)**
 
 ## Cast of Characters

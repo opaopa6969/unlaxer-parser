@@ -114,7 +114,7 @@ public class MapperGeneratorTest {
         assertTrue("should expose selected token together with its AST",
             source.contains("public record MappedAst(Token token, TinyCalcAST ast)"));
         assertTrue("should expose mapping for an existing token tree",
-            source.contains("public static MappedAst mapParsedToken(Token rootToken, String preferredAstSimpleName)"));
+            source.contains("public static synchronized MappedAst mapParsedToken(Token rootToken, String preferredAstSimpleName)"));
         assertTrue("should reset source spans for every public mapping call",
             source.contains("NODE_SOURCE_SPANS.clear();\n        MAP_MEMO.clear();"));
         assertTrue("should reject null token trees explicitly",

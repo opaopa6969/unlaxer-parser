@@ -1,0 +1,20 @@
+package org.example.evolution;
+
+public class Calculator extends EvolutionEvaluator<Double> {
+    protected Double evalNumber(EvolutionAST.Number node) {
+        return Double.parseDouble(node.value());
+    }
+    protected Double evalBinary(EvolutionAST.Binary node) {
+        return switch (node.op()) {
+            case "+" -> eval(node.left()) + eval(node.right());
+            case "*" -> eval(node.left()) * eval(node.right());
+            default -> throw new IllegalArgumentException(node.op());
+        };
+    }
+    protected Double evalNegation(EvolutionAST.Negation node) {
+        return -eval((EvolutionAST) node.value());
+    }
+    protected Double evalConditional(EvolutionAST.Conditional node) {
+        return eval(node.condition()) != 0 ? eval((EvolutionAST) node.thenExpr()) : eval((EvolutionAST) node.elseExpr());
+    }
+}

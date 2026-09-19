@@ -1,0 +1,12 @@
+grammar Evolution {
+  @package: org.example.evolution
+  @whitespace: javaStyle
+  token NUMBER = NumberParser
+  @root
+  Expression ::= Binary | Literal ;
+  @mapping(Binary, params=[left, op, right])
+  Binary ::= Literal @left '+' @op Literal @right ;
+  @mapping(Number, params=[value])
+  Literal ::= Digits @value ;
+  Digits ::= NUMBER ;
+}

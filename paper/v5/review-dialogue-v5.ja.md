@@ -1,5 +1,7 @@
 # 査読会話劇 最終ラウンド: ["From Grammar to IDE"](./from-grammar-to-ide.ja.md) v5 査読プロセス
 
+> これは設計改善を目的とした模擬査読であり、実際の学会査読ではありません。以下のR1の「7元部分モノイドは正確」という評価は誤りです。[v6の訂正表](../v6/errata.md) と独立した全合成検証を参照してください。会話は開発記録として保存しています。
+
 **[English version](./review-dialogue-v5.en.md)**
 
 ## 登場人物
