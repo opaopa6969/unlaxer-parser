@@ -127,7 +127,9 @@ public final class RustGrammarLowering {
             .anyMatch(field -> field.kind() == Kind.VALUE);
         for (Rule rule : rules) {
             Mapping mapping = rule.mapping() == null ? null : variants.get(rule.mapping().name());
-            Expression expression = hasValues ? retainTextValues(rule.body(), mapping) : rule.body();
+            Expression expression = hasValues
+                ? mapping == null ? retainHelperValue(rule.body()) : retainTextValues(rule.body(), mapping)
+                : rule.body();
             // Rewrite only after source-level shapes have been analyzed: this synthetic choice
             // is not a heterogeneous source choice and must not introduce text sentinels.
             if (rule.operator() != null && rule.operator().associativity() == Associativity.RIGHT) {
@@ -152,6 +154,14 @@ public final class RustGrammarLowering {
             fields.add(new Field(a.name(), joinKind(a.kind(), b.kind()), a.cardinality()));
         }
         return new Mapping(left.name(), fields);
+    }
+
+    /** Keep scalar helper/item delimiters, without collapsing a many-valued helper. */
+    private Expression retainHelperValue(Expression expression) {
+        Expression projected = retainTextValues(expression, null);
+        Shape shape = shape(expression, new HashSet<>());
+        return shape.kind() == Kind.VALUE && shape.cardinality() != Cardinality.MANY
+            ? new ValueBoundary(projected) : projected;
     }
 
     private Expression retainTextValues(Expression expression, Mapping mapping) {
@@ -180,9 +190,12 @@ public final class RustGrammarLowering {
             case Sequence sequence -> new Sequence(sequence.elements().stream()
                 .map(child -> retainTextValues(child, mapping)).toList());
             case Delimited delimited -> new Delimited(retainTextValues(delimited.child(), mapping));
-            case OptionalExpr optional -> new OptionalExpr(retainTextValues(optional.child(), mapping));
-            case Repeat repeat -> new Repeat(retainTextValues(repeat.child(), mapping), repeat.min(), repeat.max());
-            case Separated separated -> new Separated(retainTextValues(separated.child(), mapping),
+            case OptionalExpr optional -> new OptionalExpr(mapping == null
+                ? retainHelperValue(optional.child()) : retainTextValues(optional.child(), mapping));
+            case Repeat repeat -> new Repeat(mapping == null
+                ? retainHelperValue(repeat.child()) : retainTextValues(repeat.child(), mapping), repeat.min(), repeat.max());
+            case Separated separated -> new Separated(mapping == null
+                ? retainHelperValue(separated.child()) : retainTextValues(separated.child(), mapping),
                 retainTextValues(separated.separator(), mapping));
             default -> expression;
         };
