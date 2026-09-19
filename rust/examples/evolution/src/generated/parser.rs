@@ -2,7 +2,7 @@
 use std::sync::OnceLock;
 #[cfg(test)]
 use std::sync::atomic::{AtomicUsize, Ordering};
-use unlaxer_runtime::{Expr, Rule, SharedGrammar, Tree, ParseError, ParseDiagnostic, ParseContext, ParseResult, Parser};
+use unlaxer_runtime::{Expr, Rule, SharedGrammar, Tree, ParseError, ParseDiagnostic, ParseContext, ParseOptions, ParseResult, Parser};
 
 #[cfg(test)]
 static GRAMMAR_INITIALIZATIONS: AtomicUsize = AtomicUsize::new(0);
@@ -16,7 +16,11 @@ impl Parser for GeneratedParser {
 }
 
 pub fn parse_tree(source: &str) -> Result<Tree, ParseError> {
-    parse_tree_detailed(source).map_err(|diagnostic| diagnostic.farthest)
+    parse_tree_with_options(source, ParseOptions::default())
+}
+
+pub fn parse_tree_with_options(source: &str, options: ParseOptions) -> Result<Tree, ParseError> {
+    parse_tree_detailed_with_options(source, options).map_err(|diagnostic| diagnostic.farthest)
 }
 
 /// Compatibility snapshot of the generated rules. Parsing uses `grammar()` and does not clone them.
@@ -53,5 +57,9 @@ pub fn parse_context(context: &mut ParseContext<'_>) -> ParseResult {
 }
 
 pub fn parse_tree_detailed(source: &str) -> Result<Tree, ParseDiagnostic> {
-    unlaxer_runtime::parse_detailed_shared(grammar(), 0, true, source)
+    parse_tree_detailed_with_options(source, ParseOptions::default())
+}
+
+pub fn parse_tree_detailed_with_options(source: &str, options: ParseOptions) -> Result<Tree, ParseDiagnostic> {
+    unlaxer_runtime::parse_detailed_shared_with_options(grammar(), 0, true, source, options)
 }

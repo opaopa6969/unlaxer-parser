@@ -42,7 +42,9 @@ public class RustBackendTest {
         assertTrue(parser.contains("pub fn grammar() -> &'static SharedGrammar"));
         assertTrue(parser.contains("pub fn rules() -> Vec<Rule>"));
         assertTrue(parser.contains("context.parse_shared_grammar(grammar()"));
-        assertTrue(parser.contains("parse_detailed_shared(grammar()"));
+        assertTrue(parser.contains("pub fn parse_tree_with_options(source: &str, options: ParseOptions)"));
+        assertTrue(parser.contains("pub fn parse_tree_detailed_with_options(source: &str, options: ParseOptions)"));
+        assertTrue(parser.contains("parse_detailed_shared_with_options(grammar()"));
         assertFalse(parser.contains("parse_detailed(&rules()"));
     }
 
