@@ -1,5 +1,7 @@
 [English](./README.md) | [日本語](./README-ja.md)
 
+実験的機能: [Rust生成バックエンド](rust/README.md)。parser・typed AST・mapper・evaluatorの限定サブセット対応で、Java版の全面移植ではありません。
+
 ---
 
 ```

@@ -28,6 +28,8 @@
 
 ## Table of Contents
 
+Experimental: [Rust code-generation backend](rust/README.md) (parser, typed AST, mapper, evaluator; not a full Java port).
+
 - [The Problem](#the-problem)
 - [The Solution](#the-solution)
 - [Quick Example](#quick-example)

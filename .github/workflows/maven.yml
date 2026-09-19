@@ -7,6 +7,36 @@ on:
     branches: [ "master" ]
 
 jobs:
+  rust:
+    name: Rust backend and Java conformance
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: maven
+    - name: Set up Rust (minimum supported version)
+      run: |
+        rustup toolchain install 1.85.0 --profile minimal --component rustfmt --component clippy
+        rustup default 1.85.0
+    - name: Rust standalone checks
+      run: |
+        cargo fmt --all --manifest-path rust/Cargo.toml --check
+        cargo test --locked --manifest-path rust/Cargo.toml
+        cargo clippy --locked --manifest-path rust/Cargo.toml --workspace --all-targets -- -D warnings
+    - name: Cross-language fixtures, compile failures, and generated-file drift
+      run: >
+        mvn -B -pl unlaxer-common,unlaxer-dsl -am test
+        -Dtest=RustBackendTest,RustConformanceTest -DrustConformance=true
+        -Dsurefire.failIfNoSpecifiedTests=false
+    - uses: actions/upload-artifact@v4
+      with:
+        name: rust-conformance
+        path: unlaxer-dsl/target/rust-conformance.tsv
+        if-no-files-found: error
+
   build:
     runs-on: ubuntu-latest
 

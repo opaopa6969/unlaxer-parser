@@ -73,6 +73,14 @@ evaluatorの`DebugStrategy.onEnter/onExit`と`StepCounterStrategy`は実際の�
 
 ソースマップについては、全評価訪問nodeの位置、次の解析後の参照、同値で別identityのnode、取得配列の変更、非BMP文字を含む範囲、既存Tokenからのmappingを検証する。これにより本fixture内の連携を確認できるが、一般的なプログラム意味論の正しさや全node形状の位置精度は証明しない。
 
+### 追加実験: 限定的なRustバックエンド
+
+同じ4段階のUBNFから、小さな構造IRを介してRustのparser module、位置を所有するenum AST、mapper、必須メソッドを持つsemantics traitと網羅的dispatchを生成する実験的バックエンドを追加した。既存Java生成器は変更せず、このIRへの移行も行っていない。Rust runtimeは標準ライブラリのみで生成された規則構造を実行し、意味処理は別の手書きimplとする。RustのLSP/DAP生成やJava runtime全体の移植は含まない。
+
+[追加artifact](../../rust/README.md)では各段階で共通37入力、計148入力・段階の組を比較し、受理結果、成功時のAST field・コードポイントspan、評価成功/失敗、有限評価値の一致を確認した。受理数は順に17・18・22・25、有限値評価成功は12・13・17・20。各段階に残る5件は、コメントを含む数値captureの変換失敗4件と非有限値1件であり、一致は望ましい挙動であることを意味しない。二つの新node型について、実際のRustコンパイルで旧dispatchの`E0004`と旧semantics実装の`E0046`を確認した。文字列演算子追加の負の対照はコンパイル成功・評価失敗となる。
+
+この結果は、同じfixtureの構造的な保守チェックをJavaのsealed型とRustのenum/traitで表現できることを示す。言語非依存性やruntime全体の等価性の証明ではない。Rust診断は独立に検査し、Javaとのエラー位置一致は検証していない。またrule深さ上限がある。性能・一般的な文法網羅性は未評価である。
+
 ## 4. 関連研究
 
 Xtextはparser、linker、compiler/interpreter、編集支援を扱うlanguage engineering frameworkで、LSPの実装支援も提供する。XbaseはJavaとの統合・生成・デバッグを支える。本稿はこれらを「IDEや意味論を作れない」比較対象として扱わない。[Xtext/Xbase](https://eclipse.dev/Xtext/)、[Xtext LSP](https://eclipse.dev/Xtext/documentation/340_lsp_support.html)。

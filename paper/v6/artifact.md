@@ -6,6 +6,8 @@
 
 保存した実行例とテスト件数は[実行記録](results.md)を参照。
 
+追加実験: [Rust生成バックエンドとJava/Rust適合性検証](../../rust/README.md)。同じ4段階の文法からRustのparser・AST・mapper・evaluatorを生成し、共通37入力とcompiler failureを比較する。本文のJava LSP/DAP実験とは区別し、RustのLSP/DAP対応や全面移植を主張しない。
+
 リポジトリルートから次を実行する。
 
 ```sh
