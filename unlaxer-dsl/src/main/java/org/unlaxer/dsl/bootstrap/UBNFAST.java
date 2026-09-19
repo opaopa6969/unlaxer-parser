@@ -123,7 +123,18 @@ public sealed interface UBNFAST permits
         record Empty(String name) implements TokenDecl {}
 
         /** token NAME = CHAR_RANGE('a','z') — matches a single char in [min,max] range */
-        record CharRange(String name, char min, char max) implements TokenDecl {}
+        record CharRange(String name, char min, char max) implements TokenDecl {
+            public CharRange {
+                if (Character.isSurrogate(min) || Character.isSurrogate(max)) {
+                    throw new IllegalArgumentException("CHAR_RANGE token " + name
+                        + " requires non-surrogate BMP boundaries");
+                }
+                if (min > max) {
+                    throw new IllegalArgumentException("CHAR_RANGE token " + name
+                        + " requires minimum <= maximum");
+                }
+            }
+        }
 
         /** token NAME = CI('keyword') — case-insensitive literal match */
         record CaseInsensitive(String name, String word) implements TokenDecl {}

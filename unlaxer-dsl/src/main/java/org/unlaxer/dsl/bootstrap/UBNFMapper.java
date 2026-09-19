@@ -346,8 +346,11 @@ public class UBNFMapper {
                 charRangeTokens.get(0),
                 org.unlaxer.parser.elementary.SingleQuotedParser.class
             );
-            char min = quoted.size() > 0 ? stripQuotes(quoted.get(0).source.toString().trim()).charAt(0) : 0;
-            char max = quoted.size() > 1 ? stripQuotes(quoted.get(1).source.toString().trim()).charAt(0) : min;
+            if (quoted.size() != 2) {
+                throw new IllegalArgumentException("CHAR_RANGE token " + name + " requires two boundaries");
+            }
+            char min = charRangeBoundary(name, "minimum", stripQuotes(quoted.get(0).source.toString().trim()));
+            char max = charRangeBoundary(name, "maximum", stripQuotes(quoted.get(1).source.toString().trim()));
             return new TokenDecl.CharRange(name, min, max);
         }
 
@@ -993,8 +996,17 @@ public class UBNFMapper {
     }
 
     /**
-     * トークン内の最初の SingleQuotedParser 子孫からクォートを除去して値を返す。
+     * CHAR_RANGE の境界を、切り捨てずに現行の BMP char 型へ変換する。
      */
+    private static char charRangeBoundary(String name, String side, String value) {
+        if (value.length() != 1 || Character.isSurrogate(value.charAt(0))) {
+            throw new IllegalArgumentException("CHAR_RANGE token " + name + " " + side
+                + " must be one non-surrogate BMP character");
+        }
+        return value.charAt(0);
+    }
+
+    /** トークン内の最初の SingleQuotedParser 子孫からクォートを除去して値を返す。 */
     private static String extractQuotedValue(Token token) {
         List<Token> quotedTokens = findDescendants(
             token, org.unlaxer.parser.elementary.SingleQuotedParser.class);

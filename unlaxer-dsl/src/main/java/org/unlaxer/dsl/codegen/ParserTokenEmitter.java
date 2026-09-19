@@ -106,9 +106,11 @@ class ParserTokenEmitter {
             sb.append("        private static final String EXCLUDED = \"")
               .append(ParserCodegenUtil.escapeString(excluded)).append("\";\n");
             sb.append("        @Override\n");
-            sb.append("        public boolean isMatch(char target) {\n");
+            sb.append("        public boolean isMatch(int target) {\n");
             sb.append("            return EXCLUDED.indexOf(target) < 0;\n");
             sb.append("        }\n");
+            sb.append("        @Override\n");
+            sb.append("        public boolean isMatch(char target) { return isMatch((int) target); }\n");
             sb.append("    }\n\n");
         }
         return sb.toString();
