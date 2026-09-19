@@ -50,6 +50,7 @@ public final class RustGrammarLowering {
             }
             MappingAnnotation mapping = null;
             boolean leftAssoc = false;
+            boolean rightAssoc = false;
             Integer precedence = null;
             for (var annotation : rule.annotations()) {
                 if (annotation instanceof RootAnnotation) {
@@ -64,16 +65,19 @@ public final class RustGrammarLowering {
                     }
                     mapping = value;
                 } else if (annotation instanceof LeftAssocAnnotation) {
-                    if (leftAssoc) throw unsupported("duplicate @leftAssoc on " + rule.name());
+                    if (leftAssoc || rightAssoc) throw unsupported("duplicate/conflicting associativity on " + rule.name());
                     leftAssoc = true;
+                } else if (annotation instanceof RightAssocAnnotation) {
+                    if (leftAssoc || rightAssoc) throw unsupported("duplicate/conflicting associativity on " + rule.name());
+                    rightAssoc = true;
                 } else if (annotation instanceof PrecedenceAnnotation value) {
                     if (precedence != null) throw unsupported("duplicate @precedence on " + rule.name());
                     precedence = value.level();
                 } else throw unsupported("annotation " + annotation + " on " + rule.name());
             }
             mappings.add(mapping);
-            operators.add(leftAssoc || precedence != null
-                ? new Operator(leftAssoc ? Associativity.LEFT : Associativity.NONE, precedence == null ? -1 : precedence)
+            operators.add(leftAssoc || rightAssoc || precedence != null
+                ? new Operator(leftAssoc ? Associativity.LEFT : rightAssoc ? Associativity.RIGHT : Associativity.NONE, precedence == null ? -1 : precedence)
                 : null);
         }
         if (root == -1) throw unsupported("exactly one @root is required");
@@ -116,7 +120,11 @@ public final class RustGrammarLowering {
             if (operators.get(i) != null && operators.get(i).associativity() == Associativity.LEFT) {
                 checkLeftAssoc(i, mapping);
             }
-            rules.add(new Rule(grammar.rules().get(i).name(), bodies.get(i), mapping, operators.get(i)));
+            Expression loweredBody = bodies.get(i);
+            if (operators.get(i) != null && operators.get(i).associativity() == Associativity.RIGHT) {
+                loweredBody = lowerRightAssoc(i, mapping);
+            }
+            rules.add(new Rule(grammar.rules().get(i).name(), loweredBody, mapping, operators.get(i)));
         }
         return new GrammarIR(rules, root, whitespace);
     }
@@ -139,6 +147,34 @@ public final class RustGrammarLowering {
             throw unsupported("@leftAssoc requires left { op right } with scalar operands and params=[left, op, right] on "
                 + grammar.rules().get(rule).name());
         }
+    }
+
+    /** Preserve the declared vector fields, but parse at most one recursive right operand. */
+    private Expression lowerRightAssoc(int rule, Mapping mapping) {
+        // Preserve the syntax boundary used by Java's canonical parser rewrite.
+        SequenceBody declared = switch (grammar.rules().get(rule).body()) {
+            case SequenceBody sequence -> sequence;
+            case ChoiceBody choice when choice.alternatives().size() == 1 -> choice.alternatives().get(0);
+            default -> null;
+        };
+        if (declared == null || declared.elements().size() != 2
+            || !(declared.elements().get(1).element() instanceof RepeatElement)
+            || mapping == null || !mapping.fields().stream().map(Field::name).toList().equals(List.of("left", "op", "right"))
+            || !(bodies.get(rule) instanceof Sequence sequence) || sequence.elements().size() != 2
+            || !(sequence.elements().get(0) instanceof Capture left) || !left.name().equals("left")
+            || !(sequence.elements().get(1) instanceof Repeat repeat) || repeat.min() != 0 || repeat.max() != null
+            || !(repeat.child() instanceof Sequence tail) || tail.elements().size() != 2
+            || !(tail.elements().get(0) instanceof Capture op) || !op.name().equals("op")
+            || !(tail.elements().get(1) instanceof Capture right) || !right.name().equals("right")
+            || !(right.expression() instanceof Reference self) || self.rule() != rule
+            || !captures(left.expression()).isEmpty() || !captures(op.expression()).isEmpty()
+            || mapping.fields().get(0).cardinality() != Cardinality.ONE
+            || !mapping.fields().get(1).equals(new Field("op", Kind.TEXT, Cardinality.MANY))
+            || !mapping.fields().get(2).equals(new Field("right", Kind.NODE, Cardinality.MANY))) {
+            throw unsupported("@rightAssoc requires left { op Self } with scalar base and params=[left, op, right] on "
+                + grammar.rules().get(rule).name());
+        }
+        return new Choice(List.of(new Sequence(List.of(left, op, right)), left));
     }
 
     private Expression body(RuleBody body) {

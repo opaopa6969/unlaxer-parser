@@ -43,6 +43,7 @@ jobs:
           unlaxer-dsl/target/rust-lexical.tsv
           unlaxer-dsl/target/rust-ubnf-frontend.tsv
           unlaxer-dsl/target/rust-associative.tsv
+          unlaxer-dsl/target/rust-right-associative.tsv
           unlaxer-dsl/target/rust-native-generator.tsv
         if-no-files-found: error
     - name: Build and smoke-test the native subset example

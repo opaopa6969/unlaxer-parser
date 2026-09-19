@@ -44,7 +44,7 @@ rust/target/release/unlaxer generate --target rust \
 
 構成は`unlaxer-ubnf`（[全構文のsyntax ASTと既知差](unlaxer-ubnf/README.md)）、`unlaxer-generator`（対応範囲のlowering/検証とCLI）、`unlaxer-codegen`（[normalized IRから5module出力](unlaxer-codegen/README.md)）、`unlaxer-runtime`。文法が読めることと全backend機能を生成できることは別であり、下記の未対応機能はnativeでも明示拒否する。
 
-82文法・410生成ファイルのJava/native byte一致を`RustNativeGeneratorTest`で検査し、生成と`--check`は空のPATHで実行する。Javaは比較用oracleで、native生成経路の依存ではない。構文解析は128、構造shape分析は256の再帰深度上限を持ち、超過は診断になる。Javaのprefix解析等との差はfrontend READMEへ明示する。
+86文法・430生成ファイルのJava/native byte一致を`RustNativeGeneratorTest`で検査し、生成と`--check`は空のPATHで実行する。Javaは比較用oracleで、native生成経路の依存ではない。構文解析は128、構造shape分析は256の再帰深度上限を持ち、超過は診断になる。Javaのprefix解析等との差はfrontend READMEへ明示する。
 
 終了コードは0=成功、2=引数不正、3=構文/意味/未対応機能、4=I/O・drift・上書き保護。全artifactを事前検査し、手書きファイルやsymlink（出力先・祖先・各file）を上書きしない。各fileは一時ファイルから置換するが、ディレクトリ全体のtransactionや敵対的な同時ファイル差し替えへのsandboxではない。排他的に管理できる出力先を使う。
 
@@ -92,19 +92,22 @@ runtimeは規則IDで参照する文法を実行し、入力とCST node arenaを
 - `@mapping`とterminal/rule/group/quantifierへのcapture。全capture名の集合とparamsが一致し、同名captureのtext/node型が整合すること。欠ける選択肢はoptional、繰り返しや同名の複数出現はlistとして推論する。
 - 同じfield名・順序・text/node型・cardinalityを持つ複数ruleのshared mapping。AST variantとSemantics methodは一つに統合し、ruleごとのcaptureとspanは保持する。
 - `@leftAssoc`の`Left @left { Op @op Right @right }`形と`params=[left, op, right]`、`@precedence(level=N)`。詳細は下記参照。
+- `@rightAssoc`の`Base @left { Op @op Self @right }`形（`Self`は宣言rule自身への直接参照）。同じparamsとprecedenceを用い、右辺を再帰的に生成する。
 - `@whitespace: javaStyle`（ASCII空白、行/ブロックコメント）または`none`。未指定は`none`。`@package`はRustでは使用しない。
 
-imports、外部token parser、`@typeof`、`@eval`、`@rightAssoc`等の他のannotation、左再帰、混合text/node choiceなどは明示的に拒否する。mapping名・field名はASCII識別子に制限し、Rustのraw identifierで出力する。`self`/`Self`/`super`/`crate`、fieldの`span`/`semantics`、shared mappingのschema不一致・異なるmappingからの生成method名衝突は拒否する。rootはちょうど1つのAST nodeへ解決される必要がある。optionalの先にある参照も左再帰検査に含め、空一致の可能性がある無限反復は生成前に拒否する。
+imports、外部token parser、`@typeof`、`@eval`等の他のannotation、左再帰、混合text/node choiceなどは明示的に拒否する。mapping名・field名はASCII識別子に制限し、Rustのraw identifierで出力する。`self`/`Self`/`super`/`crate`、fieldの`span`/`semantics`、shared mappingのschema不一致・異なるmappingからの生成method名衝突は拒否する。rootはちょうど1つのAST nodeへ解決される必要がある。optionalの先にある参照も左再帰検査に含め、空一致の可能性がある無限反復は生成前に拒否する。
 
 ### 演算子の列と優先順位
 
 `@leftAssoc`はJavaと同様、単一leftと`Vec`のop/rightを生成する。自動の二分木化や評価ではなく、手書きSemanticsが左からfoldする契約である。左右のoperandは同じtext/node種別で各出現が単一値、opはtextでなければならない。同名variantを使う加減算・乗除算の規則でも、enumとtraitの重複定義は生じない。
 
-`parser::OPERATORS`はrule名、`i32`のprecedence、`Associativity::{Left,None}`を保持する生成metadataで、level→rule名の順に並ぶ。構文の優先順位はruleの参照階層で定義する。CLIの共通`GrammarValidator`はassoc/precedenceの併記・非負level・operand側が高優先であることを要求し、不整合な文法を生成前に拒否する。共通検証のERRORを拒否し、Javaクラス解決のWARNINGはRust token対応の根拠にしない。token対応はRust側の明示allowlistで検証する。
+`@rightAssoc`はcanonical形を`Base Op Self | Base`へ変換する。leftは単一text/node、op/rightは従来の`Vec`型を維持するが各ノードに0または1件だけ格納し、右側を再帰的なASTにする。`2^3^2`は`2^(3^2)`となり、評価器はこの構造をそのまま評価する。別ruleへの右参照・groupで包んだSelf・optionalなbase・入れ子captureなど非canonical形は明示拒否する。leftとrightの型を同一に強制せず、textのbaseとnodeの右辺も保持する。
+
+`parser::OPERATORS`はrule名、`i32`のprecedence、`Associativity::{Left,Right,None}`を保持する生成metadataで、level→rule名の順に並ぶ。Rightは使用する文法だけに出力し、既存文法の生成物は変えない。構文の優先順位はruleの参照階層で定義する。CLIはassoc/precedenceの併記・非負level・operand側が高優先であることを要求し、不整合な文法を生成前に拒否する。Java CLIは共通検証のERRORを拒否し、Javaクラス解決のWARNINGはRust token対応の根拠にしない。token対応は両経路ともRust側の明示allowlistで検証する。
 
 低水準の`RustBackend.generate`を直接呼ぶ場合は、Java各generatorと同様、共通validatorの呼出しは利用者側の責任である。この直接APIでは結合性だけのlevelは`-1`、precedenceだけの結合性は`None`として記録する。比較テストのmetadata逆転モードはvalidatorを意図的に迂回した性質検査で、数値自体が構文を組み替えないことを確認する。逆転した文法がCLIで受理されるという意味ではない。
 
-[`associative/Operators.ubnf`](../unlaxer-dsl/src/test/resources/associative/Operators.ubnf)とcorpusは共有Binary variant・明示的な数値leaf・括弧・非可換演算・コメント中のUnicodeを検証する。これはtinyexpression全体ではなく、数値意味論もtinyexpressionのf32仕様ではない。実tinyexpressionのunmapped text/node混在factorとJavaの特殊なnull/literal leaf表現、右結合は別途対応する。
+[`associative/Operators.ubnf`](../unlaxer-dsl/src/test/resources/associative/Operators.ubnf)とcorpusは共有Binary variant・明示的な数値leaf・括弧・非可換演算・コメント中のUnicodeを検証する。これはtinyexpression全体ではなく、数値意味論もtinyexpressionのf32仕様ではない。実tinyexpressionのunmapped text/node混在factorとJavaの特殊なnull/literal leaf表現は別途対応する。
 
 24入力×metadata 2設定の48ケースで受理・両cursorをJavaと比較し、受理28ケースの全AST field/spanを照合する。Rustの評価値は別途corpusの期待値と比較し、共有variantのSemantics未実装は実`rustc`の`E0046`で検出する。結果は`target/rust-associative.tsv`とCI artifactへ保存する。これにより見つかったJavaの未縮約CST上のassoc反復欠落は[issue #138](https://github.com/opaopa6969/unlaxer-parser/issues/138)で修正した。
 

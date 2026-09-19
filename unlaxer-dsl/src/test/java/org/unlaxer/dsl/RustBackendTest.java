@@ -6,6 +6,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -141,9 +142,9 @@ public class RustBackendTest {
         assertTrue(defaults.get(2).content().contains("precedence: -1, associativity: Associativity::Left"));
         var precedenceOnly = new RustBackend().generate(UBNFMapper.parse(source.replace("@leftAssoc", "")).grammars().get(0));
         assertTrue(precedenceOnly.get(2).content().contains("precedence: 10, associativity: Associativity::None"));
-        reject(source.replace("@leftAssoc", "@leftAssoc @leftAssoc"), "duplicate @leftAssoc");
+        reject(source.replace("@leftAssoc", "@leftAssoc @leftAssoc"), "duplicate/conflicting associativity");
         reject(source.replace("@precedence(level=10)", "@precedence(level=10) @precedence(level=20)"), "duplicate @precedence");
-        reject(source.replace("@leftAssoc", "@rightAssoc"), "annotation RightAssoc");
+        reject(source.replace("@leftAssoc", "@rightAssoc"), "@rightAssoc requires");
         reject(source.replace("{ '+' @op 'x' @right }", "'+' @op 'x' @right"), "@leftAssoc requires");
         reject(source.replace("'x' @left", "[ 'x' ] @left"), "@leftAssoc requires");
         reject(source.replace("'+' @op 'x' @right", "'x' @right '+' @op"), "@leftAssoc requires");
@@ -152,6 +153,31 @@ public class RustBackendTest {
         reject(source.replace("'x' @left", "('x' @op) @left"), "@leftAssoc requires");
         reject(source.replace("'x' @left", "('x' @right) @left"), "@leftAssoc requires");
         reject(source.replace("'+' @op", "('+' @op) @op"), "@leftAssoc requires");
+    }
+
+    @Test public void rightAssocRewritesOnlyCanonicalRecursionAndPreservesVectorSchema() {
+        String source = """
+            grammar Power {
+              @root @rightAssoc @precedence(level=10) @mapping(Power,params=[left, op, right])
+              Expr ::= 'x' @left { '^' @op Expr @right };
+            }
+            """;
+        var grammar = UBNFMapper.parse(source).grammars().get(0);
+        var files = new RustBackend().generate(grammar);
+        var plain = new RustBackend().generate(UBNFMapper.parse(source.replace("@rightAssoc @precedence(level=10)", "")).grammars().get(0));
+        for (int index : List.of(1, 3, 4)) assertEquals(plain.get(index), files.get(index));
+        assertTrue(files.get(2).content().contains("Associativity { Left, Right, None }"));
+        assertTrue(files.get(2).content().contains("associativity: Associativity::Right"));
+        assertTrue(files.get(2).content().contains("Expr::Choice"));
+        assertFalse(files.get(2).content().contains("Expr::Repeat"));
+        reject(source.replace("@rightAssoc", "@leftAssoc @rightAssoc"), "duplicate/conflicting associativity");
+        reject(source.replace("@rightAssoc", "@rightAssoc @rightAssoc"), "duplicate/conflicting associativity");
+        reject(source.replace("Expr @right", "'x' @right"), "@rightAssoc requires");
+        reject(source.replace("Expr @right", "(Expr) @right"), "@rightAssoc requires");
+        reject(source.replace("{ '^' @op Expr @right }", "('^' @op Expr @right){0,}"), "@rightAssoc requires");
+        reject(source.replace("'x' @left", "['x'] @left"), "@rightAssoc requires");
+        reject(source.replace("'^' @op", "('^' @op) @op"), "@rightAssoc requires");
+        reject(source.replace("params=[left, op, right]", "params=[right, op, left]"), "@rightAssoc requires");
     }
 
     private void reject(String source, String reason) {
@@ -176,6 +202,23 @@ public class RustBackendTest {
         Path output = temporary.getRoot().toPath().resolve("operators-generated");
         assertEquals(0, run("generate", "--target", "rust", "--grammar", grammar.toString(), "--output", output.toString()));
         assertTrue(Files.isRegularFile(output.resolve("ast.rs")));
+    }
+
+    @Test public void cliAcceptsRightAssocAndRejectsConflictingMetadataBeforeOutput() throws Exception {
+        String source = Files.readString(Path.of("src/test/resources/right-associative/Power.ubnf"));
+        Path grammar = temporary.newFile().toPath();
+        Files.writeString(grammar, source);
+        Path output = temporary.getRoot().toPath().resolve("power-generated");
+        assertEquals(0, run("generate", "--target", "rust", "--grammar", grammar.toString(), "--output", output.toString()));
+        assertTrue(Files.readString(output.resolve("parser.rs")).contains("Associativity::Right"));
+        for (String invalid : List.of(source.replace("@rightAssoc", "@rightAssoc @leftAssoc"),
+                source.replace("@precedence(level=30)", ""), source.replace("level=30", "level=-1"),
+                source.replace("Expr @right", "Atom @right"))) {
+            Path rejected = temporary.getRoot().toPath().resolve("rejected");
+            Files.writeString(grammar, invalid);
+            assertEquals(3, run("generate", "--target", "rust", "--grammar", grammar.toString(), "--output", rejected.toString()));
+            assertFalse(Files.exists(rejected));
+        }
     }
 
     @Test public void cliChecksDriftAndProtectsHandwrittenFiles() throws Exception {
