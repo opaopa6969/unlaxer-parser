@@ -413,10 +413,9 @@ class MapperElementUtil {
     }
 
     /**
-     * True if {@code rule} is a "transparent choice" used as a heterogeneous {@code Object}
-     * capture: it has no {@code @mapping} of its own and can reach a choice containing mapped
-     * values through groups or aliases (including one mapped branch mixed with text). A plain
-     * alias to one mapped rule retains its legacy String API. Such a mixed capture's
+     * True if {@code rule} is a transparent mapped alias/choice used as an {@code Object}
+     * capture: it has no {@code @mapping} of its own and can reach mapped
+     * values through groups or aliases (including a single mapped target or mixed text). Such a capture's
      * field is inferred as {@code Object}, so the matched alternative's node must be resolved
      * at runtime rather than dropped to {@code firstTokenText}. (unlaxer-parser #43 family)
      */
@@ -424,28 +423,7 @@ class MapperElementUtil {
         if (rule == null || getMappingAnnotation(rule).isPresent()) {
             return false;
         }
-        return containsMappedChoice(new GroupElement(rule.body()), ruleByName, new java.util.HashSet<>());
-    }
-
-    private static boolean containsMappedChoice(AtomicElement element, Map<String, RuleDecl> ruleByName,
-            java.util.Set<String> visited) {
-        if (element instanceof RuleRefElement ref) {
-            if (!visited.add(ref.name())) return false;
-            RuleDecl rule = ruleByName.get(ref.name());
-            return rule != null && getMappingAnnotation(rule).isEmpty()
-                && containsMappedChoice(new GroupElement(rule.body()), ruleByName, visited);
-        }
-        Object value = captureValueShape(element);
-        if (value instanceof RuleRefElement ref) return containsMappedChoice(ref, ruleByName, visited);
-        RuleBody body = value instanceof GroupElement group ? group.body()
-            : value instanceof RuleBody compound ? compound : null;
-        if (body instanceof ChoiceBody choice) {
-            if (choice.alternatives().size() > 1 && containsMappedValue(new GroupElement(body), ruleByName)) return true;
-            return choice.alternatives().stream().flatMap(sequence -> sequence.elements().stream())
-                .anyMatch(child -> containsMappedChoice(child.element(), ruleByName, visited));
-        }
-        return body instanceof SequenceBody sequence && sequence.elements().stream()
-            .anyMatch(child -> containsMappedChoice(child.element(), ruleByName, visited));
+        return containsMappedValue(new GroupElement(rule.body()), ruleByName);
     }
 
     /** Mapper value predicate; stop at mapped boundaries and guard recursive aliases. */

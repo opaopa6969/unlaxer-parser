@@ -94,8 +94,8 @@ public class MixedValueRuntimeTest {
         }
     }
 
-    @Test public void pureMappedAliasesRetainExistingStringContract() throws Exception {
-        // tinyexpression SliceStartIndex ::= NumberExpression relies on this lexical API.
+    @Test public void pureMappedAliasesPreserveNodesAfterConsumerMigration() throws Exception {
+        // #163: tinyexpression's lexical consumer now uses an owned source snapshot for nodes.
         for (String alias : List.of("Leaf", "(Leaf)", "'(' Leaf ')'")) {
             try (var loader = compile("""
                 @root @mapping(Box, params=[value]) Root ::= Alias @value;
@@ -104,8 +104,9 @@ public class MixedValueRuntimeTest {
                 """.formatted(alias))) {
                 String input = alias.startsWith("'('") ? "(xy)" : "xy";
                 Object ast = parse(loader, input);
-                assertEquals(alias, String.class, ast.getClass().getMethod("value").getReturnType());
-                assertEquals(input, field(ast, "value"));
+                assertEquals(alias, Object.class, ast.getClass().getMethod("value").getReturnType());
+                assertLeaf(field(ast, "value"));
+                assertEquals("x", field(field(ast, "value"), "text"));
             }
         }
     }

@@ -99,7 +99,7 @@ class MapperTypeResolver {
                 if (tokenType != null) {
                     yield tokenType;
                 }
-                // 透過 mapped choice（異種選択肢）は単一スカラーに収束しない → Object
+                // 透過 mapped alias/choice は Object 経由で実ノードを保持する。
                 if (isTransparentMappedChoice(grammar, ruleRefElement.name())) {
                     yield "Object";
                 }
@@ -156,8 +156,8 @@ class MapperTypeResolver {
 
     /**
      * 参照先ルールが「透過 mapped choice」かどうか判定する。
-     * 自身に @mapping を持たず、alias/group を含む本体から mapped node を含む choice に到達する場合 true。
-     * choice を介さない単純な mapped alias の既存 String 契約は変更しない。
+     * 自身に @mapping を持たず、alias/group を含む本体から mapped node に到達する場合 true。
+     * 単一 target の純 alias も Node を保持し、暗黙に String へ変換しない。
      * 例: StringTerm（StringMatchExpression | SliceExpression | VariableRef | ... の透過 choice）。
      *
      * 判定基準は {@link MapperElementUtil#isTransparentMappedChoice} と揃えており、
