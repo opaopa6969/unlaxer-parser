@@ -89,9 +89,7 @@ fn expression(
         CharRangeToken { min, max } if min > max || u32::from(*max) > 0xffff => {
             return Err(fail("character range must be ordered BMP scalars"))
         }
-        UntilToken(s) | ExceptToken(s) if s.is_empty() => {
-            return Err(fail("empty until/except token"))
-        }
+        Literal(s) if s.is_empty() => return Err(fail("empty literal")),
         Capture {
             name,
             expression: child,
