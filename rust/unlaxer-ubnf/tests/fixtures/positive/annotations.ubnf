@@ -1,0 +1,13 @@
+grammar Annotations {
+  @root @mapping(Node.Item, params=[left, right])
+  @eval(kind='binary', strategy='manual', operation='+', result='number')
+  @whitespace(javaStyle) @interleave(profile=comments)
+  @backref(name=value) @scopeTree(mode=lexical)
+  @declares(symbol=left, description=right) @catalog(context='variables')
+  @leftAssoc @precedence(level=10) @doc('文法😀')
+  @recovery(sync=';, }') @commonField(left, right) @custom
+  Root ::= 'a' @left 'b' @right;
+  @whitespace @rightAssoc @recovery(auto) @skip Other ::= 'x';
+  @recovery(skip) @enum Mode ::= 'auto' | 'skip';
+  @declares(symbol=name) @eval(kind='literal') Name ::= 'name' @name;
+}

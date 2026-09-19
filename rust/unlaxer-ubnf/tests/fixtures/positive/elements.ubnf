@@ -1,0 +1,8 @@
+grammar Elements {
+  @root @mapping(All, params=[a,b,c,d,e,f,g,h,i,j,k,l])
+  Root ::= ('a' | 'b') @a [ 'c' ] @b { 'd' } @c
+    Item+ @d Item? @e Item* @f Item{2} @g Item{1,3} @h
+    Item{2,} @i Item % ',' @j @typeof(a) Item @k
+    ERROR('expected item') @l;
+  Item ::= 'x';
+}

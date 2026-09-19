@@ -12,3 +12,7 @@ dependencies = [
 [[package]]
 name = "unlaxer-runtime"
 version = "0.1.0"
+
+[[package]]
+name = "unlaxer-ubnf"
+version = "0.1.0"

@@ -1,0 +1,1 @@
+grammar EvalDefault { @eval(kind='variable_ref', strip_prefix='$') Root ::= 'x'; }

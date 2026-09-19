@@ -1,0 +1,7 @@
+// Adjacent references remain distinct, including single-letter names.
+grammar Boundaries {
+  token T = ANY
+  @root Root ::= T Item T // comment
+    Item;
+  Item ::= 'token' | 'grammar' | 'root' | '';
+}
