@@ -152,6 +152,9 @@ fn invalid_ir_is_rejected_before_emission() {
     g.rules[3].body = Expression::QuotedToken('x');
     cases.push(g);
     let mut g = base.clone();
+    g.rules[3].body = Expression::Literal(String::new());
+    cases.push(g);
+    let mut g = base.clone();
     g.rules[3].body = Expression::CharRangeToken { min: 'z', max: 'a' };
     cases.push(g);
     let mut g = base.clone();
@@ -181,7 +184,9 @@ fn expression_variants_escape_unicode_and_control_characters() {
             EmptyToken,
             CharRangeToken { min: 'a', max: 'z' },
             ExceptToken("!".into()),
+            ExceptToken(String::new()),
             UntilToken("#".into()),
+            UntilToken(String::new()),
             LookaheadToken {
                 pattern: "x".into(),
                 positive: false,
