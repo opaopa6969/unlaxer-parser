@@ -727,3 +727,27 @@ allocation は精密に -13% 減っており、採用した。timing 効果は f
 同じ情報でも「オブジェクトの列」と「配列 2 本」では allocation 数が frame 数倍違う。読まれるまで展開を遅らせると、
 捨てられる snapshot のコストは配列 2 本分になる。allocation の主役は削るたびに入れ替わるので、1 施策ごとに
 allocation-by-site を取り直して次を決める。
+
+## ケース14: transaction frame pool（再評価、不採用）
+
+### 仮説
+
+ケース13の後の JFR allocation-by-site で、transaction frame の cursor（`EndExclusiveCursorImpl` ← `ParserCursor` ←
+`TransactionElement.createNew`）が weight 27% と最大に見えた。ケース4では 1.4% で不採用にした frame 再利用を、
+popped frame を ParseContext ごとの pool で再利用する形で再評価した（branch `perf/transaction-frame-pool-208`）。
+
+### 観測
+
+master `1da37ce` を baseline にした Java public facade の 3-run 中央値は complex +1.1%、comparison-heavy +3.6%（ノイズ内、改善なし）。
+精密な `gc.alloc.rate.norm` の前後差は complex -5.5%、comparison-heavy -7.3% で、JFR の 27% とは大きく違った。
+Java 672 + 987 tests と TinyExpression p4-smoke は成功。
+
+### 判断
+
+不採用。frame 生成は JIT の escape analysis と TLAB で十分安く、pool の分岐・reset コストと相殺した。
+ケース4の判断（frame allocation は小さい）は正しく、JFR の比率が 2 度目の過大評価だった。
+
+### 教材としての要点
+
+allocation-by-site の比率は「候補の発見」に使い、採否は必ず精密な `gc.alloc.rate.norm` の前後差と timing の A/B で決める。
+同じ罠に 2 回かかったので、以後は候補 issue を立てる前に前後差を取る。
