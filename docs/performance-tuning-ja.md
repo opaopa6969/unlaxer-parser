@@ -646,3 +646,42 @@ Stream API は「1 回」なら安いが、per-token の構築経路では pipel
 主役になる。allocation-by-site で `IntPipeline$Head` のような Stream 内部クラスが上位に来たら、呼び出し元の
 ループ化を疑う。静的初期化の循環（interface の定数が実装クラスを構築する）は unit test の初期化順で隠れることがあり、
 別モジュールの test で初めて現れる。
+
+## ケース13: 診断 stack snapshot をプリミティブ配列で保持する
+
+### 仮説
+
+ケース12の後の Java allocation（約 130 MB/op）の 44% が `ParseStackElement` だった。frontier が進むたびに
+`snapshotStackElements()` が open frame ごとに不変オブジェクトを生成し、その snapshot の大半は次の前進で捨てられる。
+ケース5で「比較して捨てる snapshot」は無くしたが、「採用したのに読まれない snapshot」が残っていた。
+
+### 実装
+
+snapshot を `StackSnapshot`（`Parser[]` と frame ごと 3 つの offset を持つ `int[]`、root first）にし、memo の rebase は
+配列の連結、`ParseStackElement` への展開は `getParseFailureDiagnostics()` が呼ばれたときだけ行う。depth は index、
+offset は snapshot 時点の値をコピーするので、報告される stack は従来と同一である。Rust はケース7で snapshot 自体を
+持たない設計にしているため変更なし。
+
+### 観測
+
+allocation（public facade 1 parse、baseline はケース9適用後）: complex.tiny 151 MB → 131 MB、comparison-heavy.tiny 78 MB → 71 MB。
+適用後の最大項目は transaction frame の cursor（`EndExclusiveCursorImpl` ← `ParserCursor` ← `TransactionElement.createNew`、27%）で、
+ケース4で 1.4% だった frame allocation が他の削減の結果として相対的に最大になった（unlaxer-parser#208 の再評価対象）。
+
+public facade の 3-run 中央値（Java、ms/op、同一ホスト・直列、baseline はケース12適用後）:
+
+| Runtime | Fixture | Baseline runs | Baseline median | Candidate runs | Candidate median | 変化 |
+|---|---|---:|---:|---:|---:|---:|
+| Java | complex | 63.133 / 61.312 / 62.163 | **62.163** | 62.168 / 61.212 / 60.303 | **61.212** | **-1.53%** |
+| Java | comparison-heavy | 32.486 / 34.520 / 33.923 | **33.923** | 31.832 / 31.203 / 30.015 | **31.203** | **-8.02%** |
+
+comparison-heavy は baseline（32.5〜34.5 ms）と candidate（30.0〜31.8 ms）の run が分離し -8%、complex は -1.5% でノイズ内。
+allocation は精密に -13% 減っており、採用した。timing 効果は fixture により 0〜8% と見積もる。測定条件と raw data は
+[TinyExpression の実験レポート](https://github.com/opaopa6969/tinyexpression/blob/master/benchmarks/results/2026-09-21-lazy-stack-snapshot-experiment.md)
+に保存している。
+
+### 教材としての要点
+
+同じ情報でも「オブジェクトの列」と「配列 2 本」では allocation 数が frame 数倍違う。読まれるまで展開を遅らせると、
+捨てられる snapshot のコストは配列 2 本分になる。allocation の主役は削るたびに入れ替わるので、1 施策ごとに
+allocation-by-site を取り直して次を決める。
