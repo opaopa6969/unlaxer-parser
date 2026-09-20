@@ -16,6 +16,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.LongestChoiceAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OptionalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.PrecedenceAnnotation;
+import org.unlaxer.dsl.bootstrap.UBNFAST.PredictiveChoiceAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RepeatElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RightAssocAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RootAnnotation;
@@ -109,6 +110,7 @@ public final class GrammarValidator {
             boolean hasLeftAssoc = false;
             boolean hasRightAssoc = false;
             int longestChoiceAnnotations = 0;
+            int predictiveChoiceAnnotations = 0;
             List<PrecedenceAnnotation> precedenceAnnotations = new ArrayList<>();
             List<InterleaveAnnotation> interleaveAnnotations = new ArrayList<>();
             int whitespaceAnnotations = 0;
@@ -124,6 +126,8 @@ public final class GrammarValidator {
                     hasRightAssoc = true;
                 } else if (annotation instanceof LongestChoiceAnnotation) {
                     longestChoiceAnnotations++;
+                } else if (annotation instanceof PredictiveChoiceAnnotation) {
+                    predictiveChoiceAnnotations++;
                 } else if (annotation instanceof PrecedenceAnnotation p) {
                     precedenceAnnotations.add(p);
                 } else if (annotation instanceof InterleaveAnnotation i) {
@@ -151,6 +155,8 @@ public final class GrammarValidator {
                 validateAssoc(rule, mapping, hasLeftAssoc, hasRightAssoc, errors);
             }
             validateLongestChoice(rule, hasLeftAssoc, hasRightAssoc, longestChoiceAnnotations, errors);
+            validatePredictiveChoice(rule, hasLeftAssoc, hasRightAssoc, longestChoiceAnnotations,
+                predictiveChoiceAnnotations, errors);
             validatePrecedence(rule, hasLeftAssoc, hasRightAssoc, precedenceAnnotations, errors);
             validateAdvancedAnnotations(rule, interleaveAnnotations, backrefAnnotations, scopeTreeAnnotations, errors);
             validateScopeCaptures(rule, scopeReferences, errors);
@@ -189,6 +195,41 @@ public final class GrammarValidator {
                 "rule " + rule.name() + " combines @longestChoice with associativity rewriting",
                 "Move longest matching to a separate dispatch rule.",
                 "E-LONGEST-CHOICE-ASSOC");
+        }
+    }
+
+    private static void validatePredictiveChoice(
+        RuleDecl rule,
+        boolean hasLeftAssoc,
+        boolean hasRightAssoc,
+        int longestChoiceCount,
+        int count,
+        List<ValidationIssue> errors
+    ) {
+        if (count == 0) return;
+        if (count > 1) {
+            addRuleError(errors, rule.name(),
+                "rule " + rule.name() + " has duplicate @predictiveChoice annotations",
+                "Keep a single @predictiveChoice annotation.",
+                "E-PREDICTIVE-CHOICE-DUPLICATE");
+        }
+        if (!(rule.body() instanceof ChoiceBody choice) || choice.alternatives().size() < 2) {
+            addRuleError(errors, rule.name(),
+                "rule " + rule.name() + " uses @predictiveChoice without multiple alternatives",
+                "Use @predictiveChoice only on a rule with at least two '|' alternatives.",
+                "E-PREDICTIVE-CHOICE-SHAPE");
+        }
+        if (hasLeftAssoc || hasRightAssoc) {
+            addRuleError(errors, rule.name(),
+                "rule " + rule.name() + " combines @predictiveChoice with associativity rewriting",
+                "Move predictive dispatch to a separate rule.",
+                "E-PREDICTIVE-CHOICE-ASSOC");
+        }
+        if (longestChoiceCount > 0) {
+            addRuleError(errors, rule.name(),
+                "rule " + rule.name() + " combines @predictiveChoice with @longestChoice",
+                "Choose ordered predictive dispatch or longest-match dispatch.",
+                "E-PREDICTIVE-CHOICE-CONFLICT");
         }
     }
 

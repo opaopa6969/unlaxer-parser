@@ -320,6 +320,7 @@ impl Parser<'_> {
             "leftAssoc" => AnnotationKind::LeftAssoc,
             "rightAssoc" => AnnotationKind::RightAssoc,
             "longestChoice" => AnnotationKind::LongestChoice,
+            "predictiveChoice" => AnnotationKind::PredictiveChoice,
             "skip" => AnnotationKind::Skip,
             "enum" => AnnotationKind::Enum,
             "mapping" => {

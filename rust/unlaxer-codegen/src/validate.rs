@@ -135,6 +135,17 @@ fn expression(
                 expression(child, count, captures)?;
             }
         }
+        PredictiveChoice {
+            alternatives,
+            predictors,
+        } => {
+            if alternatives.is_empty() || alternatives.len() != predictors.len() {
+                return Err(fail("predictive choice alternatives/predictors mismatch"));
+            }
+            for child in alternatives {
+                expression(child, count, captures)?;
+            }
+        }
         OptionalExpr(child)
         | Delimited(child)
         | TextValue(child)

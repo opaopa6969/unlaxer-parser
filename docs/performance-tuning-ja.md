@@ -80,3 +80,62 @@ disambiguation 機能として残し、性能改善には token/先頭文字に�
 
 測定値と raw result は tinyexpression の root retry 置換後に、この文書と benchmark artifactへ
 追記する。
+
+## ケース2: FIRST prefix による予測的 ordered choice
+
+### 目的と意味論
+
+`@predictiveChoice` は通常の ordered `Choice` の前に、生成時に計算した保守的な FIRST prefix
+フィルタを置く。これは「成功する候補を決める」最適化ではない。現在位置の入力と一致し得ないと
+証明できた候補だけを除外し、残った候補は宣言順のまま、従来と同じ transaction 内で試す。
+
+```ubnf
+@predictiveChoice
+RootExpression ::= 'number:' Number | 'string:' String | Fallback ;
+```
+
+初期実装が生成する predictor は literal prefix、組み込みの number / identifier / quoted token、
+それらの有限和と `Any` である。rule 参照は再帰的に FIRST を求めるが、nullable prefix、再帰 cycle、
+custom token/parser、lookahead、または解析できない要素に達した時点で `Any` とする。`Any` は候補を
+除外しない。このため最適化機会を捨てる場合はあっても、文法の受理範囲を狭めてはいけない。
+
+予測された候補がすべて失敗した場合は、全候補を元の順序で再試行する。これは生成器の FIRST
+解析が将来拡張されたときにも false negative を parse failure にしない安全弁であり、失敗時の
+診断を通常の `Choice` と同じに保つ。従って cost model は次のようになる。
+
+- 一意な literal prefix の成功経路: 不可能な transaction を省略できる
+- prefix が重なる、または `Any` を含む経路: 通常の ordered `Choice` とほぼ同じ
+- 予測候補がすべて失敗する経路: 安全な全候補 retry の分だけ通常より高コストになり得る
+
+先頭の trivia を呼出側がまだ消費していない場合も、判定不能として全候補へ戻す。従って
+`@interleave` や whitespace policy の受理動作は変えない。高速化を確認するときは成功入力だけで
+なく、invalid input の診断 kind・位置・expected token も比較する。
+
+### 適用判断
+
+候補の多くが異なる固定 prefix を持ち、通常入力が成功経路へ偏る dispatch rule に向く。
+数値式と比較式のように同じ prefix を共有する候補、nullable が多い rule、深い再帰の内部へ
+無差別に付けても効果は小さい。`@longestChoice` は最長一致という意味論を選ぶ機能、
+`@predictiveChoice` は ordered choice の意味論を保つ最適化であり、相互の代替ではない。
+
+### 検証項目
+
+- disjoint literal、overlapping literal、`Any` を含む選択
+- nullable prefix、rule 参照、再帰 cycle、interleave
+- 全候補失敗時の診断と memoization `OFF` / `SAFE_FAILURES`
+- CST、source span、capture、scope、user state、選択 metadata
+- Java と Rust の生成 IR・runtime semantics の一致
+- 実アプリケーションでの候補削減数と、変更前後それぞれ3回以上の benchmark
+
+### TinyExpression P4での測定結果
+
+`Expression` の6候補へ適用した3-run中央値では、Java parse-onlyは2.25%短縮したが
+parse+mapは10.27%増加し、Rust parse-onlyは1.75%増加、parse+mapは5.19%短縮した。
+36件のroot fixtureに対するalternate-root fallbackも、適用前後とも10件で変わらなかった。
+候補間でFIRST集合が広く重なるため、総合的な改善とは判定せずTinyExpressionへの注釈は
+取り下げた。raw result、測定条件、生成式の膨張修正は
+[TinyExpressionの実験レポート](https://github.com/opaopa6969/tinyexpression/blob/master/benchmarks/results/2026-09-20-predictive-choice-experiment.md)
+に保存している。
+
+この負の結果から、注釈の存在自体を既定の高速化と解釈してはいけない。prefixが分離した
+dispatch ruleで候補削減が期待できる場合だけ有効化し、文法ごとに実測して採否を決める。

@@ -73,6 +73,8 @@ There are approximately **50 combinator classes** in `org.unlaxer.parser.combina
 | `LazyChain` | Lazy-initialized chain (for recursive grammars) |
 | `Choice` | Ordered alternation: try A, if fails try B |
 | `LazyChoice` | Lazy-initialized choice |
+| `PredictiveChoice` / `LazyPredictiveChoice` | Ordered choice that conservatively skips impossible FIRST prefixes |
+| `LongestChoice` / `LazyLongestChoice` | Choice that selects the alternative consuming the most input |
 | `ZeroOrMore` | Kleene star: `{A}` in UBNF, `A*` in regex notation |
 | `LazyZeroOrMore` | Lazy-initialized zero-or-more |
 | `OneOrMore` | One or more: `A+` |

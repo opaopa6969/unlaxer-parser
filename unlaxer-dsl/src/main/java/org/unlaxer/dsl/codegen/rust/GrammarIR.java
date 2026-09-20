@@ -25,7 +25,7 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     public record Declaration(String symbolCapture, String description) {}
     public record Effects(ScopeMode scopeMode, Declaration declares, String backref) {}
     public record RuleEffects(Expression child, Effects effects) implements Expression {}
-    public sealed interface Expression permits Literal, NumberToken, Reference, Sequence, Choice, LongestChoice, Capture,
+    public sealed interface Expression permits Literal, NumberToken, Reference, Sequence, Choice, LongestChoice, PredictiveChoice, Capture,
         OptionalExpr, Repeat, Separated, AnyToken, EofToken, EmptyToken, CharRangeToken,
         ExceptToken, UntilToken, LookaheadToken, Delimited, IdentifierToken, QuotedToken,
         CodeStartToken, CodeEndToken, TextValue, ValueBoundary, TriviaScope, RuleEffects {}
@@ -62,6 +62,25 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     }
     public record LongestChoice(List<Expression> alternatives) implements Expression {
         public LongestChoice { alternatives = List.copyOf(alternatives); }
+    }
+    public sealed interface Predictor permits AnyPredictor, LiteralPredictor, NumberPredictor,
+        IdentifierPredictor, QuotedPredictor, AnyOfPredictor {}
+    public record AnyPredictor() implements Predictor {}
+    public record LiteralPredictor(String text) implements Predictor {}
+    public record NumberPredictor() implements Predictor {}
+    public record IdentifierPredictor() implements Predictor {}
+    public record QuotedPredictor(char quote) implements Predictor {}
+    public record AnyOfPredictor(List<Predictor> alternatives) implements Predictor {
+        public AnyOfPredictor { alternatives = List.copyOf(alternatives); }
+    }
+    public record PredictiveChoice(List<Expression> alternatives, List<Predictor> predictors) implements Expression {
+        public PredictiveChoice {
+            alternatives = List.copyOf(alternatives);
+            predictors = List.copyOf(predictors);
+            if (alternatives.size() != predictors.size()) {
+                throw new IllegalArgumentException("predictive alternatives/predictors mismatch");
+            }
+        }
     }
     public record Capture(String name, Expression expression) implements Expression {}
 }

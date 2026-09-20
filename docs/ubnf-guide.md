@@ -241,6 +241,23 @@ The annotation requires at least two alternatives and cannot be combined with `@
 `@rightAssoc`. Custom parsers and listeners below this rule must not perform non-transactional
 external side effects. See [the tuning note](performance-tuning-ja.md) for the rollback and cost model.
 
+### `@predictiveChoice`
+
+Preserves ordinary declaration-ordered choice while skipping alternatives whose leading literal
+cannot match the current input. Alternatives with an unknown FIRST prefix always remain candidates,
+and the ordinary full choice is retried if every predicted candidate fails. Acceptance and failure
+diagnostics therefore remain compatible with ordinary `Choice`.
+
+```ubnf
+@predictiveChoice
+RootExpression ::= 'number:' Number | 'string:' String | DynamicExpression ;
+```
+
+The annotation requires at least two alternatives and cannot be combined with `@leftAssoc`,
+`@rightAssoc`, or `@longestChoice`. It is most useful on dispatch rules with distinct fixed prefixes;
+nullable, recursive, and custom-parser prefixes conservatively remain unfiltered. See the
+[tuning note](performance-tuning-ja.md) for the safety contract and cost model.
+
 ### `@whitespace: style`
 
 Inserts implicit whitespace skipping between rule elements. Supported styles:
@@ -467,6 +484,7 @@ The imported rules are available under the alias namespace.
 | `@mapping` | annotation | Stable |
 | `@leftAssoc` / `@rightAssoc` | annotation | Stable |
 | `@longestChoice` | annotation | Stable (v3.0.15+) |
+| `@predictiveChoice` | annotation | Development |
 | `@whitespace` | global setting | Stable |
 | `@comment` | global setting | Stable |
 | `@enum` | annotation | Stable (v3.0+) |

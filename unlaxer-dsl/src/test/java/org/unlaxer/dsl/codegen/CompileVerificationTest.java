@@ -149,7 +149,7 @@ public class CompileVerificationTest {
      * 複数のソースを一度に渡してコンパイルする。
      * --enable-preview を明示して unlaxer-common（preview ビルド）を参照できるようにする。
      */
-    private void assertCompiles(CodeGenerator.GeneratedSource... sources) {
+    static void assertCompiles(CodeGenerator.GeneratedSource... sources) {
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
         StandardJavaFileManager fileManager = compiler.getStandardFileManager(null, null, null);
 

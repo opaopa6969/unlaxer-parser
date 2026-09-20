@@ -11,6 +11,7 @@ import org.unlaxer.dsl.codegen.rust.GrammarIR.*;
 
 /** Validates the entire input before emitting anything; unsupported syntax never silently degrades. */
 public final class RustGrammarLowering {
+    private static final int MAX_PREDICTOR_ATOMS = 64;
     private final GrammarDecl grammar;
     private final Map<String, Integer> ruleIds = new LinkedHashMap<>();
     private final Map<String, Expression> tokens = new LinkedHashMap<>();
@@ -19,6 +20,7 @@ public final class RustGrammarLowering {
     private final List<Operator> operators = new ArrayList<>();
     private final List<String> catalogs = new ArrayList<>();
     private final List<Boolean> longestChoices = new ArrayList<>();
+    private final List<Boolean> predictiveChoices = new ArrayList<>();
     private final Set<Integer> nullableRules = new HashSet<>();
     private record Shape(Kind kind, Cardinality cardinality) {}
 
@@ -77,6 +79,7 @@ public final class RustGrammarLowering {
             boolean leftAssoc = false;
             boolean rightAssoc = false;
             boolean longestChoice = false;
+            boolean predictiveChoice = false;
             Integer precedence = null;
             Boolean localWhitespace = null;
             boolean interleave = false;
@@ -105,6 +108,9 @@ public final class RustGrammarLowering {
                 } else if (annotation instanceof LongestChoiceAnnotation) {
                     if (longestChoice) throw unsupported("duplicate @longestChoice on " + rule.name());
                     longestChoice = true;
+                } else if (annotation instanceof PredictiveChoiceAnnotation) {
+                    if (predictiveChoice) throw unsupported("duplicate @predictiveChoice on " + rule.name());
+                    predictiveChoice = true;
                 } else if (annotation instanceof PrecedenceAnnotation value) {
                     if (precedence != null) throw unsupported("duplicate @precedence on " + rule.name());
                     precedence = value.level();
@@ -146,7 +152,15 @@ public final class RustGrammarLowering {
             if (longestChoice && (leftAssoc || rightAssoc)) {
                 throw unsupported("@longestChoice conflicts with associativity on " + rule.name());
             }
+            if (predictiveChoice && (!(rule.body() instanceof ChoiceBody choice)
+                || choice.alternatives().size() < 2)) {
+                throw unsupported("@predictiveChoice requires multiple alternatives on " + rule.name());
+            }
+            if (predictiveChoice && (leftAssoc || rightAssoc || longestChoice)) {
+                throw unsupported("@predictiveChoice conflicts with associativity/@longestChoice on " + rule.name());
+            }
             longestChoices.add(longestChoice);
+            predictiveChoices.add(predictiveChoice);
             hasLocalTrivia |= localWhitespace != null || interleave;
             ruleWhitespace.add(localWhitespace == null ? whitespace || interleave : localWhitespace);
             mappings.add(mapping);
@@ -212,6 +226,11 @@ public final class RustGrammarLowering {
             Expression ruleBody = bodies.get(i);
             if (longestChoices.get(i)) {
                 ruleBody = new LongestChoice(((Choice) ruleBody).alternatives());
+            } else if (predictiveChoices.get(i)) {
+                List<Expression> alternatives = ((Choice) ruleBody).alternatives();
+                Map<Integer, Predictor> predictorCache = new LinkedHashMap<>();
+                ruleBody = new PredictiveChoice(alternatives, alternatives.stream()
+                    .map(alternative -> firstPredictor(alternative, new HashSet<>(), predictorCache)).toList());
             }
             rules.add(new Rule(grammar.rules().get(i).name(), ruleBody, mapping, operators.get(i), catalog));
         }
@@ -298,6 +317,14 @@ public final class RustGrammarLowering {
                     return mixed && shape(alternative, new HashSet<>()).kind() == Kind.TEXT
                         ? new TextValue(child) : child;
                 }).toList());
+            }
+            case PredictiveChoice choice -> {
+                boolean mixed = shape(new Choice(choice.alternatives()), new HashSet<>()).kind() == Kind.VALUE;
+                yield new PredictiveChoice(choice.alternatives().stream().map(alternative -> {
+                    Expression child = retainTextValues(alternative, mapping);
+                    return mixed && shape(alternative, new HashSet<>()).kind() == Kind.TEXT
+                        ? new TextValue(child) : child;
+                }).toList(), choice.predictors());
             }
             case Sequence sequence -> new Sequence(sequence.elements().stream()
                 .map(child -> retainTextValues(child, mapping)).toList());
@@ -452,6 +479,68 @@ public final class RustGrammarLowering {
         };
     }
 
+    private Predictor firstPredictor(
+        Expression expression, Set<Integer> visiting, Map<Integer, Predictor> cache
+    ) {
+        if (nullable(expression)) return new AnyPredictor();
+        return switch (expression) {
+            case Literal literal when !literal.text().isEmpty() -> new LiteralPredictor(literal.text());
+            case NumberToken ignored -> new NumberPredictor();
+            case IdentifierToken ignored -> new IdentifierPredictor();
+            case QuotedToken quoted -> new QuotedPredictor(quoted.quote());
+            case Reference reference -> {
+                if (nullableRules.contains(reference.rule()) || !visiting.add(reference.rule())) {
+                    yield new AnyPredictor();
+                }
+                Predictor result = cache.get(reference.rule());
+                if (result == null) {
+                    result = firstPredictor(bodies.get(reference.rule()), visiting, cache);
+                    cache.put(reference.rule(), result);
+                }
+                visiting.remove(reference.rule());
+                yield result;
+            }
+            case Sequence sequence -> sequence.elements().isEmpty() || nullable(sequence.elements().get(0))
+                ? new AnyPredictor() : firstPredictor(sequence.elements().get(0), visiting, cache);
+            case Choice choice -> combinePredictors(choice.alternatives(), visiting, cache);
+            case LongestChoice choice -> combinePredictors(choice.alternatives(), visiting, cache);
+            case Capture capture -> firstPredictor(capture.expression(), visiting, cache);
+            case Delimited delimited -> firstPredictor(delimited.child(), visiting, cache);
+            case TextValue text -> firstPredictor(text.child(), visiting, cache);
+            case ValueBoundary boundary -> firstPredictor(boundary.child(), visiting, cache);
+            case RuleEffects effects -> firstPredictor(effects.child(), visiting, cache);
+            case Repeat repeat when repeat.min() > 0 -> firstPredictor(repeat.child(), visiting, cache);
+            case Separated separated -> firstPredictor(separated.child(), visiting, cache);
+            default -> new AnyPredictor();
+        };
+    }
+
+    private Predictor combinePredictors(
+        List<Expression> alternatives, Set<Integer> visiting, Map<Integer, Predictor> cache
+    ) {
+        List<Predictor> predictors = new ArrayList<>();
+        for (Expression alternative : alternatives) {
+            Predictor predictor = firstPredictor(alternative, new HashSet<>(visiting), cache);
+            if (!appendPredictorAtoms(predictors, predictor)) return new AnyPredictor();
+        }
+        return predictors.size() == 1 ? predictors.get(0) : new AnyOfPredictor(predictors);
+    }
+
+    private boolean appendPredictorAtoms(List<Predictor> predictors, Predictor predictor) {
+        if (predictor instanceof AnyPredictor) return false;
+        if (predictor instanceof AnyOfPredictor anyOf) {
+            for (Predictor nested : anyOf.alternatives()) {
+                if (!appendPredictorAtoms(predictors, nested)) return false;
+            }
+            return true;
+        }
+        if (!predictors.contains(predictor)) {
+            if (predictors.size() == MAX_PREDICTOR_ATOMS) return false;
+            predictors.add(predictor);
+        }
+        return true;
+    }
+
     private boolean nullable(Expression expression) {
         return switch (expression) {
             case EmptyToken ignored -> true;
@@ -463,6 +552,7 @@ public final class RustGrammarLowering {
             case Delimited delimited -> nullable(delimited.child());
             case Sequence sequence -> sequence.elements().stream().allMatch(this::nullable);
             case Choice choice -> choice.alternatives().stream().anyMatch(this::nullable);
+            case PredictiveChoice choice -> choice.alternatives().stream().anyMatch(this::nullable);
             case OptionalExpr ignored -> true;
             case Repeat repeat -> repeat.min() == 0 || nullable(repeat.child());
             case Separated separated -> nullable(separated.child());
@@ -562,6 +652,12 @@ public final class RustGrammarLowering {
                 choice.alternatives().forEach(e -> result.addAll(leadingRules(e)));
                 yield result;
             }
+            case PredictiveChoice choice -> {
+                if (choice.alternatives().isEmpty()) throw unsupported("empty choice");
+                Set<Integer> result = new HashSet<>();
+                choice.alternatives().forEach(e -> result.addAll(leadingRules(e)));
+                yield result;
+            }
             default -> Set.of();
         };
     }
@@ -592,6 +688,12 @@ public final class RustGrammarLowering {
                 yield result;
             }
             case Choice choice -> {
+                var shapes = choice.alternatives().stream().map(e -> shape(e, visiting)).toList();
+                Shape result = shapes.get(0);
+                for (Shape alternative : shapes) result = merge(result, alternative, false);
+                yield result;
+            }
+            case PredictiveChoice choice -> {
                 var shapes = choice.alternatives().stream().map(e -> shape(e, visiting)).toList();
                 Shape result = shapes.get(0);
                 for (Shape alternative : shapes) result = merge(result, alternative, false);
@@ -648,6 +750,14 @@ public final class RustGrammarLowering {
                 yield result;
             }
             case Choice choice -> {
+                var alternatives = choice.alternatives().stream().map(this::captures).toList();
+                Map<String, Shape> result = new LinkedHashMap<>();
+                alternatives.forEach(fields -> fields.forEach((name, shape) -> result.merge(name, shape, (a, b) -> merge(a, b, false))));
+                result.replaceAll((name, shape) -> alternatives.stream().anyMatch(fields -> !fields.containsKey(name))
+                    ? wrap(shape, Cardinality.OPTIONAL) : shape);
+                yield result;
+            }
+            case PredictiveChoice choice -> {
                 var alternatives = choice.alternatives().stream().map(this::captures).toList();
                 Map<String, Shape> result = new LinkedHashMap<>();
                 alternatives.forEach(fields -> fields.forEach((name, shape) -> result.merge(name, shape, (a, b) -> merge(a, b, false))));

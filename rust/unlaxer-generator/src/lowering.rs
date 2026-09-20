@@ -5,6 +5,7 @@ use unlaxer_codegen::ir::*;
 use unlaxer_ubnf::ast::{self, AnnotationKind, ElementKind, SettingValue, TokenKind};
 
 type Result<T> = std::result::Result<T, String>;
+const MAX_PREDICTOR_ATOMS: usize = 64;
 
 fn whitespace_style(style: &str) -> Result<bool> {
     match style.trim() {
@@ -29,6 +30,7 @@ pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
         operators: Vec::new(),
         catalogs: Vec::new(),
         longest_choices: Vec::new(),
+        predictive_choices: Vec::new(),
         nullable: HashSet::new(),
         analysis_depth: Cell::new(0),
     }
@@ -44,6 +46,7 @@ struct Lowering<'a> {
     operators: Vec<Option<Operator>>,
     catalogs: Vec<Option<String>>,
     longest_choices: Vec<bool>,
+    predictive_choices: Vec<bool>,
     nullable: HashSet<usize>,
     analysis_depth: Cell<usize>,
 }
@@ -130,6 +133,7 @@ impl Lowering<'_> {
             let mut mapping = None;
             let mut associativity = None;
             let mut longest_choice = false;
+            let mut predictive_choice = false;
             let mut precedence = None;
             let mut local_whitespace = None;
             let mut interleave = false;
@@ -175,6 +179,12 @@ impl Lowering<'_> {
                             return Err(format!("duplicate @longestChoice on {}", rule.name));
                         }
                         longest_choice = true;
+                    }
+                    AnnotationKind::PredictiveChoice => {
+                        if predictive_choice {
+                            return Err(format!("duplicate @predictiveChoice on {}", rule.name));
+                        }
+                        predictive_choice = true;
                     }
                     AnnotationKind::Precedence { level } => {
                         if precedence.replace(*level).is_some() {
@@ -252,7 +262,20 @@ impl Lowering<'_> {
                     rule.name
                 ));
             }
+            if predictive_choice && rule.body.alternatives.len() < 2 {
+                return Err(format!(
+                    "@predictiveChoice requires multiple alternatives on {}",
+                    rule.name
+                ));
+            }
+            if predictive_choice && (associativity.is_some() || longest_choice) {
+                return Err(format!(
+                    "@predictiveChoice conflicts with associativity/@longestChoice on {}",
+                    rule.name
+                ));
+            }
             self.longest_choices.push(longest_choice);
+            self.predictive_choices.push(predictive_choice);
             has_local_trivia |= local_whitespace.is_some() || interleave;
             rule_whitespace.push(local_whitespace.unwrap_or(whitespace || interleave));
             if associativity.is_some() != precedence.is_some() {
@@ -396,6 +419,24 @@ impl Lowering<'_> {
                     unreachable!("validated longest choice shape")
                 };
                 Expression::LongestChoice(alternatives.clone())
+            } else if self.predictive_choices[i] {
+                let Expression::Choice(alternatives) = expression else {
+                    unreachable!("validated predictive choice shape")
+                };
+                let mut predictor_cache = HashMap::new();
+                Expression::PredictiveChoice {
+                    predictors: alternatives
+                        .iter()
+                        .map(|alternative| {
+                            self.first_predictor(
+                                alternative,
+                                &mut HashSet::new(),
+                                &mut predictor_cache,
+                            )
+                        })
+                        .collect(),
+                    alternatives: alternatives.clone(),
+                }
             } else {
                 expression.clone()
             };
@@ -800,6 +841,13 @@ impl Lowering<'_> {
                 }
                 Ok(result)
             }
+            Expression::PredictiveChoice { alternatives, .. } => {
+                let mut result = self.shape(&alternatives[0], visiting)?;
+                for element in &alternatives[1..] {
+                    result = merge(result, self.shape(element, visiting)?, false)?;
+                }
+                Ok(result)
+            }
             _ => Ok(text_shape()),
         }
     }
@@ -817,6 +865,74 @@ impl Lowering<'_> {
                 projected
             },
         )
+    }
+
+    /// Compute a conservative FIRST predicate. Any nullable, recursive, or
+    /// otherwise uncertain path disables pruning for that alternative.
+    fn first_predictor(
+        &self,
+        expression: &Expression,
+        visiting: &mut HashSet<usize>,
+        cache: &mut HashMap<usize, Predictor>,
+    ) -> Predictor {
+        if self.is_nullable(expression) {
+            return Predictor::Any;
+        }
+        match expression {
+            Expression::Literal(value) if !value.is_empty() => Predictor::Literal(value.clone()),
+            Expression::NumberToken => Predictor::Number,
+            Expression::IdentifierToken => Predictor::Identifier,
+            Expression::QuotedToken(quote) => Predictor::Quoted(*quote),
+            Expression::Reference(rule) => {
+                if self.nullable.contains(rule) || !visiting.insert(*rule) {
+                    return Predictor::Any;
+                }
+                if let Some(cached) = cache.get(rule) {
+                    visiting.remove(rule);
+                    return cached.clone();
+                }
+                let result = self.first_predictor(&self.bodies[*rule], visiting, cache);
+                visiting.remove(rule);
+                cache.insert(*rule, result.clone());
+                result
+            }
+            Expression::Sequence(elements) => {
+                let Some(first) = elements.first() else {
+                    return Predictor::Any;
+                };
+                if self.is_nullable(first) {
+                    Predictor::Any
+                } else {
+                    self.first_predictor(first, visiting, cache)
+                }
+            }
+            Expression::Choice(alternatives) | Expression::LongestChoice(alternatives) => {
+                let mut values = Vec::new();
+                for alternative in alternatives {
+                    let predictor = self.first_predictor(alternative, visiting, cache);
+                    if !append_predictor_atoms(&mut values, predictor) {
+                        return Predictor::Any;
+                    }
+                }
+                match values.len() {
+                    0 => Predictor::Any,
+                    1 => values.pop().expect("one predictor"),
+                    _ => Predictor::OneOf(values),
+                }
+            }
+            Expression::Capture { expression, .. }
+            | Expression::TextValue(expression)
+            | Expression::ValueBoundary(expression)
+            | Expression::Delimited(expression)
+            | Expression::RuleEffects {
+                child: expression, ..
+            } => self.first_predictor(expression, visiting, cache),
+            Expression::Repeat { child, min, .. } if *min > 0 => {
+                self.first_predictor(child, visiting, cache)
+            }
+            Expression::Separated { child, .. } => self.first_predictor(child, visiting, cache),
+            _ => Predictor::Any,
+        }
     }
 
     /// Preserve each lexical alternative as a CST node before a value mapper visits it.
@@ -870,6 +986,32 @@ impl Lowering<'_> {
                         })
                         .collect::<Result<_>>()?,
                 )
+            }
+            Expression::PredictiveChoice {
+                alternatives,
+                predictors,
+            } => {
+                let ordinary = Expression::Choice(alternatives.clone());
+                let mixed = self.shape(&ordinary, &mut HashSet::new())?.kind == Kind::Value;
+                Expression::PredictiveChoice {
+                    alternatives: alternatives
+                        .iter()
+                        .map(|alternative| {
+                            let projected = self.project_text_values(alternative, mapping)?;
+                            Ok(
+                                if mixed
+                                    && self.shape(alternative, &mut HashSet::new())?.kind
+                                        == Kind::Text
+                                {
+                                    Expression::TextValue(Box::new(projected))
+                                } else {
+                                    projected
+                                },
+                            )
+                        })
+                        .collect::<Result<_>>()?,
+                    predictors: predictors.clone(),
+                }
             }
             Expression::Capture {
                 name,
@@ -1149,6 +1291,24 @@ impl Lowering<'_> {
             return Err(error());
         }
         Ok(())
+    }
+}
+
+fn append_predictor_atoms(values: &mut Vec<Predictor>, predictor: Predictor) -> bool {
+    match predictor {
+        Predictor::Any => false,
+        Predictor::OneOf(nested) => nested
+            .into_iter()
+            .all(|predictor| append_predictor_atoms(values, predictor)),
+        atom => {
+            if !values.contains(&atom) {
+                if values.len() == MAX_PREDICTOR_ATOMS {
+                    return false;
+                }
+                values.push(atom);
+            }
+            true
+        }
     }
 }
 

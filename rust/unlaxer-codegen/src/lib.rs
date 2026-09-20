@@ -227,6 +227,18 @@ fn expression(expr: &Expression) -> String {
         }
         Choice(items) => format!("Expr::Choice(vec![{}])", expressions(items)),
         LongestChoice(items) => format!("Expr::LongestChoice(vec![{}])", expressions(items)),
+        PredictiveChoice {
+            alternatives,
+            predictors,
+        } => format!(
+            "Expr::PredictiveChoice {{ alternatives: vec![{}], predictors: vec![{}] }}",
+            expressions(alternatives),
+            predictors
+                .iter()
+                .map(predictor)
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
         Capture {
             name,
             expression: child,
@@ -245,6 +257,25 @@ fn expression(expr: &Expression) -> String {
             "{}.separated_by({})",
             expression(child),
             expression(separator)
+        ),
+    }
+}
+
+fn predictor(value: &ir::Predictor) -> String {
+    match value {
+        ir::Predictor::Any => "unlaxer_runtime::Predictor::Any".into(),
+        ir::Predictor::Literal(value) => {
+            format!("unlaxer_runtime::Predictor::Literal({})", quote(value))
+        }
+        ir::Predictor::Number => "unlaxer_runtime::Predictor::Number".into(),
+        ir::Predictor::Identifier => "unlaxer_runtime::Predictor::Identifier".into(),
+        ir::Predictor::Quoted(value) => format!(
+            "unlaxer_runtime::Predictor::Quoted('\\u{{{:x}}}')",
+            u32::from(*value)
+        ),
+        ir::Predictor::OneOf(values) => format!(
+            "unlaxer_runtime::Predictor::OneOf(vec![{}])",
+            values.iter().map(predictor).collect::<Vec<_>>().join(", ")
         ),
     }
 }
