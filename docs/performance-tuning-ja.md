@@ -567,3 +567,41 @@ comparison-heavy -6.23% だった。run 間の幅（baseline 75.5〜83.2 ms）�
 allocation 基準で「差が無い」と判断した候補でも、CPU 基準では別の結果になりうる。Stream pipeline は
 1 回あたりの allocation は小さいが、per-commit / per-token の hot path では lambda 呼び出しと spliterator の
 オーバーヘッドが積み上がる。採否の指標を切り替えるときは、その理由（どの profile がどう変わったか）を issue に残す。
+
+## ケース10: direct-rule-call execution tier（不採用）
+
+### 仮説
+
+生成 parser も汎用 combinator graph（Java）/ `Expr` interpreter（Rust）を通るため、rule ごとに専用関数を生成すれば
+dispatch のコストを減らせる、というのが unlaxer-parser#210 の仮説だった。ケース9までの profile で Rust の残余
+（dispatch・再帰）は 47%、その self-time の 40% が `Expr::Rule` / `rule()` だった。
+
+### 実装（Rust、opt-in、参照用 branch `perf/direct-rule-tier-210`）
+
+- runtime: `ExecutionTier::{Combinator, Direct}`（既定 Combinator）、`DirectRuleTable`、opaque `DirectFragment`、
+  `parse_shared_grammar_with_direct`。rule wrapper は depth・memo・diagnostic frame・CST node を既存 `rule()` と同順序で
+  行い、body だけを生成関数へ委譲する
+- codegen: native と Java `RustBackend` が同一出力（byte parity）。rule 1 つ = 関数 1 つ、入れ子式はインライン展開、
+  512 式で分割。未対応要素（`RuleEffects`、longest/predictive choice、separated、lookahead token、custom）は rule 単位で
+  interpreter へ fallback し、生成物冒頭に `directRules` / `fallbackRules[{rule, element, reason}]` を出力
+- test: combinator と direct の観測等価（結果・cursor・`expected`・CST・capture・checkpoint metrics、memo OFF / SafeFailures、
+  fallback 往復）
+
+### 観測
+
+TinyExpression public facade（Criterion、tier ごとに 3 run の中央値）: complex 5.116 → 4.972 ms（-2.8%）、
+comparison-heavy 1.297 → 1.297 ms（±0）。生成 `parser.rs` は 44 KB → 209 KB（関数 9 → 134）、cold release build は
+3.5 s → 7.8 s。第 1 段（sub-expression ごとに関数を切り出す形）は complex で +11% 悪化、生成物 356 KB だった。
+
+### 判断
+
+不採用。memo 25%、checkpoint 12%、CST 8% は direct 化でも不変で、削れるのは enum dispatch と間接参照だけだった。
+生成量と build 時間のコストに対して timing 効果は run 間ノイズ相当。Java 側は JIT が virtual dispatch を最適化するため、
+Rust の結果から期待効果が小さいと判断して着手しなかった。実装と等価性 test は branch に残し、profile が変わった場合に
+再評価する。
+
+### 教材としての要点
+
+「dispatch を消せば速くなる」は、dispatch の下にある仕事（memo・checkpoint・CST 構築）が小さいときだけ成り立つ。
+着手前に self-time の内訳を見て、direct 化で**消える部分**だけの上限を見積もる。生成コードを増やす施策は、
+i-cache と compile 時間という別のコストを同時に測る。
