@@ -83,11 +83,22 @@ public final class PackratMemoTable {
     if (diagnostic != null) parseContext.discardMemoDiagnosticFrame(diagnostic);
   }
 
-  static boolean isExactSafeClass(Parser parser) {
-    for (Class<?> declared : parser.getClass().getInterfaces()) {
-      if (declared == SafeFailureMemoizable.class) return true;
+  /*
+   * Class.getInterfaces() copies its array on every call and this check runs three times per
+   * memoizable rule invocation, so the exact-class answer is cached per Class.
+   */
+  private static final ClassValue<Boolean> EXACT_SAFE_CLASS = new ClassValue<>() {
+    @Override
+    protected Boolean computeValue(Class<?> type) {
+      for (Class<?> declared : type.getInterfaces()) {
+        if (declared == SafeFailureMemoizable.class) return Boolean.TRUE;
+      }
+      return Boolean.FALSE;
     }
-    return false;
+  };
+
+  static boolean isExactSafeClass(Parser parser) {
+    return EXACT_SAFE_CLASS.get(parser.getClass());
   }
 
   public static PositionKey positionKeyOf(

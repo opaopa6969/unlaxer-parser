@@ -605,6 +605,44 @@ Rust の結果から期待効果が小さいと判断して着手しなかった
 「dispatch を消せば速くなる」は、dispatch の下にある仕事（memo・checkpoint・CST 構築）が小さいときだけ成り立つ。
 着手前に self-time の内訳を見て、direct 化で**消える部分**だけの上限を見積もる。生成コードを増やす施策は、
 i-cache と compile 時間という別のコストを同時に測る。
+## ケース11: safe-failure memo の probe コスト
+
+### 仮説
+
+ケース7の後の Rust CPU attribution で、memo の lookup / insert / frame / replay が 24.9%（complex.tiny）、22.0%
+（comparison-heavy.tiny）と最大の runtime カテゴリになり、ケース10の direct tier でも「direct 化しても残るコスト」として
+現れた。内訳を一時 timer で分けると、7 フィールドの `FailureMemoKey` を SipHash で hash する時間と insert が主だった。
+Java 側は `PackratMemoTable.isExactSafeClass` が `Class.getInterfaces()`（呼び出しごとに配列を複製）を memo 化 rule
+1 回につき最大 3 回呼び、`isMemoizationSessionSafe` と `checkpointTransactionalState` が probe ごとに Stream pipeline を
+作っていた。
+
+### 実装
+
+- Rust: key を `rule` / `position` / `matched_position` / `depth*2+whitespace` の 4 ワードに縮小した。`grammar` と
+  `session` は `parse_shared_grammar` が memo table を `std::mem::take` で差し替えて復元するため、key に無くても
+  entry が混ざらない。hasher は外部 crate なしの軽量 mixer を `HashMap` に指定。`depth`（再帰上限で同位置でも結果が
+  変わる）と `whitespace`（`TriviaScope` で変わる）は残した。残る各次元が entry を区別する test を追加
+- Java: exact-class 判定を `ClassValue` で class ごとに cache し、Stream をループ化
+
+### 観測
+
+Rust の memo カテゴリ（一時 timer、1 parse）: complex 4.32 → 3.83 ms（-11%）、comparison-heavy 1.41 → 1.05 ms（-25%）。
+hash が 852 → 479 µs、insert が 929 → 751 µs。memo hit 数は before/after で一致（complex 6,440、comparison-heavy 496）。
+Java allocation: complex 151 → 133 MB/op、comparison-heavy 78 → 68 MB/op（`getInterfaces()` の配列複製が消えた分）。
+
+public facade の 3-run 中央値（ms/op、同一ホスト・直列・他負荷なし、baseline はケース9適用後）:
+
+| Runtime | Fixture | Baseline runs | Baseline median | Candidate runs | Candidate median | 変化 |
+|---|---|---:|---:|---:|---:|---:|
+| Java | complex | 74.840 / 71.466 / 72.681 | **72.681** | 74.318 / 78.513 / 68.789 | **74.318** | **+2.25%** |
+| Java | comparison-heavy | 38.942 / 39.006 / 39.853 | **39.006** | 36.788 / 36.313 / 35.468 | **36.313** | **-6.90%** |
+| Rust | complex | 5.157 / 5.702 / 5.886 | **5.702** | 4.250 / 4.537 / 4.368 | **4.368** | **-23.40%** |
+| Rust | comparison-heavy | 1.332 / 1.351 / 1.480 | **1.351** | 1.056 / 1.074 / 1.027 | **1.056** | **-21.85%** |
+
+Rust は両 fixture で 20% 以上短縮した。Java は comparison-heavy で -6.9%、complex は +2.3%（candidate の run 幅 68.8〜78.5 ms
+に対してノイズ内）で、timing は中立と見る。Java 側の変更は allocation -12% と reflection の配列複製除去が主で、
+採用したのは Rust の効果と Java の allocation 削減による。測定条件と raw data は
+[TinyExpression の実験レポート](https://github.com/opaopa6969/tinyexpression/blob/master/benchmarks/results/2026-09-21-memo-lookup-cost-experiment.md)
 
 ## ケース12: StringSource の構築コスト
 
@@ -642,6 +680,10 @@ public facade の 3-run 中央値（Java、ms/op、同一ホスト・直列、ba
 
 ### 教材としての要点
 
+hash key に「実質的に定数」のフィールドを入れると、hash コストは払うのに識別には寄与しない。境界（ここでは
+grammar / session ごとの table 差し替え）が既に分離を保証しているなら key から外せる。ただし外す前に「同じ位置で
+結果が変わり得る次元」（depth、whitespace）を列挙して test に固定する。Java の `getInterfaces()` のように、
+呼び出しごとに配列を複製する reflection API は hot path では cache する。
 Stream API は「1 回」なら安いが、per-token の構築経路では pipeline オブジェクトと spliterator が allocation の
 主役になる。allocation-by-site で `IntPipeline$Head` のような Stream 内部クラスが上位に来たら、呼び出し元の
 ループ化を疑う。静的初期化の循環（interface の定数が実装クラスを構築する）は unit test の初期化順で隠れることがあり、
