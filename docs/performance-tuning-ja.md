@@ -472,3 +472,60 @@ Rust complex 27.2 → 5.6 ms/op。測定条件と raw data は
 「毎回同じ答えに展開する」処理は、展開の入力（ここでは出所）だけを記録して展開を後ろへ送ると、記録側は
 入力サイズに比例した定数コストになる。等価性は「展開が決定的であること」「展開順が記録順と一致すること」
 「重複排除が順序と可換であること」の 3 点で示せ、いずれも既存の診断 test で確認できる。
+
+## ケース8: Java の memo diagnostic frame を innermost だけ更新し pop 時に merge する
+
+### 仮説
+
+ケース7の後も Java CPU の約 40%（complex.tiny）は `registerFailureCandidate` に残っていた。frontier に届く失敗、
+progress、trial、memo replay のたびに **全 open memo frame** を更新しており、コストが memo 化 rule のネスト深さに比例する。
+Rust ではケース7で「innermost frame と top-level だけを更新し、frame の pop 時に親へ max-merge する」形にして
+complex で -53% だった。Java も同じ形にできるはずである。
+
+### 実装
+
+- 失敗・progress・trial・memo replay は global（`getParseFailureDiagnostics()` が途中で呼ばれうるので遅延しない）と
+  `memoDiagnosticFrames.peekFirst()` だけを更新する
+- `discardMemoDiagnosticFrame` が popped frame を親へ merge する: farthest / maxReached は max、同点なら深い stack、
+  出所集合は `ExpectedSources.addAll`、trials は append
+- frame の stack を absolute snapshot（失敗時点の `snapshotStackElements()` を共有）で保持し、rule-local な suffix は
+  memo 保存後の replay 時に `stackBaseDepth` からの subList で得る。子の stack をそのまま親へ渡せる
+- relevance の事前判定は global と innermost の farthest だけを見る（outer の farthest は常に inner 以上）
+
+等価性: frame 内容は max-union で結合的・可換。子 frame 内の事象は親から見て連続区間なので、pop 時 merge でも
+挿入順は「全 frame へ即時記録」と一致する。成功 pop と失敗 pop を含む 3 層ネストの test で、outer frame の内容と
+memo hit の replay 結果が初回の診断と一致することを固定した。Rust はケース7で同設計済みのため変更なし。
+
+### 観測
+
+allocation（public facade 1 parse）: Java complex.tiny 181 MB → 165 MB、comparison-heavy.tiny 92 MB → 86 MB。
+
+CPU 分布（JFR ExecutionSample、depth 8、baseline はケース7適用後）:
+
+| Fixture | 診断 | commit の token 収集・listener | transaction bookkeeping | dispatch 等 |
+|---|---:|---:|---:|---:|
+| complex（before） | 56.6% | 20.5% | 9.0% | 13.9% |
+| complex（after） | 35.3% | 29.4% | 9.8% | 25.5% |
+| comparison-heavy（before） | 28.6% | 23.8% | 9.5% | 38.1% |
+| comparison-heavy（after） | 21.2% | 25.0% | 7.7% | 46.2% |
+
+診断は最大項目ではなくなり、commit 時の token 収集（`CollectingParser.collect` と `TokenList.toSource` の Stream、
+`TokenList.isEmpty`）と parser dispatch が並ぶ。#218 は allocation 基準で不採用だったが、CPU 基準では再評価の対象になる。
+
+public facade の 3-run 中央値（Java、ms/op、同一ホスト・直列・他負荷なし、baseline はケース7適用後。Rust runtime は変更なし）:
+
+| Runtime | Fixture | Baseline runs | Baseline median | Candidate runs | Candidate median | 変化 |
+|---|---|---:|---:|---:|---:|---:|
+| Java | complex | 102.182 / 103.553 / 99.720 | **102.182** | 73.519 / 74.945 / 78.742 | **74.945** | **-26.66%** |
+| Java | comparison-heavy | 47.588 / 46.877 / 48.770 | **47.588** | 40.684 / 39.708 / 39.473 | **39.708** | **-16.56%** |
+
+採用した。#207 時点からの累積は Java complex 321 → 75 ms/op（-77%）、comparison-heavy 135 → 40 ms/op（-71%）。
+測定条件と raw data は
+[TinyExpression の実験レポート](https://github.com/opaopa6969/tinyexpression/blob/master/benchmarks/results/2026-09-21-innermost-frame-merge-experiment.md)
+に保存している。
+
+### 教材としての要点
+
+「全部の frame に即時記録する」のは実装が素直だが、記録先の数がネスト深さに比例する。結合的・可換な merge で
+表せる情報なら、innermost にだけ記録して境界（pop）で親へ畳み込めば、正しさは merge の代数で示せる。
+Java/Rust で同じ設計を採ると、片側で書いた等価性の議論と test をもう片側にそのまま流用できる。
