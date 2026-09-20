@@ -557,10 +557,29 @@ impl FailureDiagnostic {
             return;
         }
         if self.farthest == Some(position) {
-            for expected in other.expected_values() {
-                let mut shared = None;
-                self.record(position, expected, Some(expected), &mut shared);
+            if other.expected_values().is_empty() {
+                return;
             }
+            if self.expected.as_ref().is_some_and(|expected| {
+                other
+                    .expected
+                    .as_ref()
+                    .is_some_and(|other| Rc::ptr_eq(expected, other))
+            }) {
+                return;
+            }
+            append_missing_expected(
+                Rc::make_mut(self.expected.get_or_insert_with(Default::default)),
+                other.expected_values(),
+            );
+        }
+    }
+}
+
+fn append_missing_expected(target: &mut Vec<Rc<str>>, source: &[Rc<str>]) {
+    for expected in source {
+        if !contains_expected(target, expected, Some(expected)) {
+            target.push(Rc::clone(expected));
         }
     }
 }
@@ -1235,6 +1254,27 @@ impl<'a> ParseContext<'a> {
         }
     }
 
+    fn replay_failure(&mut self, diagnostic: &FailureDiagnostic) {
+        let Some(position) = diagnostic.farthest else {
+            return;
+        };
+        if let Some(frame) = self.diagnostic_frames.last_mut() {
+            frame.merge(diagnostic);
+        }
+        match position.cmp(&self.farthest) {
+            std::cmp::Ordering::Greater => {
+                self.farthest = position;
+                self.expected.clear();
+                self.expected
+                    .extend(diagnostic.expected_values().iter().cloned());
+            }
+            std::cmp::Ordering::Equal => {
+                append_missing_expected(&mut self.expected, diagnostic.expected_values());
+            }
+            std::cmp::Ordering::Less => {}
+        }
+    }
+
     fn rule(&mut self, id: usize, depth: usize) -> Option<usize> {
         if depth >= 256 {
             self.fail("rule nesting below 256");
@@ -1259,11 +1299,7 @@ impl<'a> ParseContext<'a> {
         if let Some(key) = memo_key {
             if let Some(diagnostic) = self.failure_memo.get(&key).cloned() {
                 self.memoized_failure_hits += 1;
-                if let Some(position) = diagnostic.farthest {
-                    for expected in diagnostic.expected_values() {
-                        self.fail_at_shared(position, expected, Some(expected));
-                    }
-                }
+                self.replay_failure(&diagnostic);
                 return None;
             }
         }
@@ -2300,6 +2336,140 @@ mod tests {
         assert_eq!(on.memoized_failure_hits(), 1);
         assert_eq!(error.offset, 1);
         assert_eq!(error.expected, vec!["x"]);
+    }
+
+    fn failure_diagnostic(position: usize, expected: &[&str]) -> FailureDiagnostic {
+        let mut diagnostic = FailureDiagnostic::default();
+        for expected in expected {
+            let mut shared = None;
+            diagnostic.record(position, expected, None, &mut shared);
+        }
+        diagnostic
+    }
+
+    fn expected_values(diagnostic: &FailureDiagnostic) -> Vec<&str> {
+        diagnostic
+            .expected_values()
+            .iter()
+            .map(|expected| expected.as_ref())
+            .collect()
+    }
+
+    fn replay_memoized_failure(
+        global: FailureDiagnostic,
+        frame: FailureDiagnostic,
+        memoized: FailureDiagnostic,
+    ) -> ParseContext<'static> {
+        let rules = share_grammar(vec![Rule {
+            name: "memoized",
+            expression: Expr::Literal("unused"),
+        }]);
+        let mut context = ParseContext::with_options(
+            "",
+            ParseOptions::with_memoization(Memoization::SafeFailures),
+        );
+        context.rules = rules;
+        context.memo_safe_rules = vec![true];
+        context.farthest = global.farthest.unwrap_or(0);
+        context.expected = global.expected_values().to_vec();
+        context.diagnostic_frames.push(frame);
+        context
+            .failure_memo
+            .insert(FailureMemoKey::new(0, 0, 0, false, 0), memoized);
+
+        assert!(context.rule(0, 0).is_none());
+        assert_eq!(context.memoized_failure_hits(), 1);
+        context
+    }
+
+    #[test]
+    fn memo_hit_bulk_replay_preserves_expected_order() {
+        let context = replay_memoized_failure(
+            failure_diagnostic(0, &[]),
+            FailureDiagnostic::default(),
+            failure_diagnostic(0, &["z", "a", "m"]),
+        );
+
+        assert_eq!(
+            context
+                .expected
+                .iter()
+                .map(|expected| expected.as_ref())
+                .collect::<Vec<_>>(),
+            vec!["z", "a", "m"]
+        );
+        assert_eq!(
+            expected_values(context.diagnostic_frames.last().unwrap()),
+            vec!["z", "a", "m"]
+        );
+    }
+
+    #[test]
+    fn memo_hit_bulk_replay_replaces_diagnostic_when_farthest_advances() {
+        let context = replay_memoized_failure(
+            failure_diagnostic(1, &["old-global"]),
+            failure_diagnostic(1, &["old-frame"]),
+            failure_diagnostic(2, &["new-b", "new-a"]),
+        );
+
+        assert_eq!(context.farthest, 2);
+        assert_eq!(
+            context
+                .expected
+                .iter()
+                .map(|expected| expected.as_ref())
+                .collect::<Vec<_>>(),
+            vec!["new-b", "new-a"]
+        );
+        let frame = context.diagnostic_frames.last().unwrap();
+        assert_eq!(frame.farthest, Some(2));
+        assert_eq!(expected_values(frame), vec!["new-b", "new-a"]);
+    }
+
+    #[test]
+    fn memo_hit_bulk_replay_merges_at_same_farthest() {
+        let context = replay_memoized_failure(
+            failure_diagnostic(2, &["global", "shared"]),
+            failure_diagnostic(2, &["frame", "shared"]),
+            failure_diagnostic(2, &["shared", "memo-b", "memo-a"]),
+        );
+
+        assert_eq!(context.farthest, 2);
+        assert_eq!(
+            context
+                .expected
+                .iter()
+                .map(|expected| expected.as_ref())
+                .collect::<Vec<_>>(),
+            vec!["global", "shared", "memo-b", "memo-a"]
+        );
+        assert_eq!(
+            expected_values(context.diagnostic_frames.last().unwrap()),
+            vec!["frame", "shared", "memo-b", "memo-a"]
+        );
+    }
+
+    #[test]
+    fn memo_hit_bulk_replay_ignores_diagnostic_behind_farthest() {
+        let context = replay_memoized_failure(
+            failure_diagnostic(3, &["global"]),
+            failure_diagnostic(3, &["frame"]),
+            failure_diagnostic(2, &["memo"]),
+        );
+
+        assert_eq!(context.farthest, 3);
+        assert_eq!(
+            context
+                .expected
+                .iter()
+                .map(|expected| expected.as_ref())
+                .collect::<Vec<_>>(),
+            vec!["global"]
+        );
+        assert_eq!(
+            expected_values(context.diagnostic_frames.last().unwrap()),
+            vec!["frame"]
+        );
     }
 
     #[test]
