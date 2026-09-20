@@ -358,7 +358,16 @@ public class ParseContext implements
     return Collections.unmodifiableList(trialHistory);
   }
 
-  /** Rule-local diagnostics and direct transaction lifecycle replayed on a safe failure hit. */
+  /**
+   * Rule-local diagnostics and direct transaction lifecycle replayed on a safe failure hit.
+   *
+   * <p>Only the innermost open frame is updated while parsing; when a frame is popped it is
+   * merged into its parent (see {@link #discardMemoDiagnosticFrame}). The stack snapshots are
+   * therefore kept absolute (root frame first) and the rule-local suffix is taken from
+   * {@link #stackBaseDepth} when the frame is memoized or replayed. Because the merge is a
+   * max-union whose order matches the contiguous interval a child occupies in its parent, the
+   * result equals recording every event into every open frame.
+   */
   public static final class FailureDiagnostic {
     int stackBaseDepth;
     int transactionBaseDepth;
@@ -515,6 +524,33 @@ public class ParseContext implements
     if (memoDiagnosticFrames.pollFirst() != frame) {
       throw new IllegalStateException("memo diagnostic frame nesting is illegal");
     }
+    FailureDiagnostic parent = memoDiagnosticFrames.peekFirst();
+    if (parent != null) mergeFrame(parent, frame);
+  }
+
+  /** Folds a popped child frame into its parent: max offsets, deeper stack on ties, sources, trials. */
+  private static void mergeFrame(FailureDiagnostic parent, FailureDiagnostic child) {
+    parent.farthestConsumedOffset = Math.max(parent.farthestConsumedOffset, child.farthestConsumedOffset);
+    parent.farthestMatchedOffset = Math.max(parent.farthestMatchedOffset, child.farthestMatchedOffset);
+    if (child.maxReachedOffset > parent.maxReachedOffset
+        || child.maxReachedOffset == parent.maxReachedOffset
+            && child.maxReachedStackElements.size() > parent.maxReachedStackElements.size()) {
+      parent.maxReachedOffset = child.maxReachedOffset;
+      parent.maxReachedStackElements = child.maxReachedStackElements;
+    }
+    if (child.farthestFailureOffset > parent.farthestFailureOffset) {
+      parent.farthestFailureOffset = child.farthestFailureOffset;
+      parent.farthestFailureStackElements = child.farthestFailureStackElements;
+      parent.expected.clear();
+      parent.expected.addAll(child.expected);
+    } else if (child.farthestFailureOffset >= 0
+        && child.farthestFailureOffset == parent.farthestFailureOffset) {
+      if (child.farthestFailureStackElements.size() > parent.farthestFailureStackElements.size()) {
+        parent.farthestFailureStackElements = child.farthestFailureStackElements;
+      }
+      parent.expected.addAll(child.expected);
+    }
+    parent.trials.addAll(child.trials);
   }
 
   /**
@@ -525,8 +561,8 @@ public class ParseContext implements
    */
   void replayFailureDiagnostic(FailureDiagnostic diagnostic) {
     int depth = parseFrames.size();
-    int rebasedMaxSize = rebasedStackSize(diagnostic.maxReachedStackElements, depth);
-    int rebasedFarthestSize = rebasedStackSize(diagnostic.farthestFailureStackElements, depth);
+    int rebasedMaxSize = rebasedStackSize(diagnostic, diagnostic.maxReachedStackElements, depth);
+    int rebasedFarthestSize = rebasedStackSize(diagnostic, diagnostic.farthestFailureStackElements, depth);
     List<ParseFailureDiagnostics.ParseStackElement> rebasedMax = null;
     List<ParseFailureDiagnostics.ParseStackElement> rebasedFarthest = null;
 
@@ -536,59 +572,59 @@ public class ParseContext implements
         || diagnostic.maxReachedOffset == maxReachedOffset
             && rebasedMaxSize > maxReachedStackElements.size()) {
       maxReachedOffset = diagnostic.maxReachedOffset;
-      if (rebasedMax == null) rebasedMax = rebaseMemoStack(diagnostic.maxReachedStackElements);
+      if (rebasedMax == null) rebasedMax = rebaseMemoStack(diagnostic, diagnostic.maxReachedStackElements);
       maxReachedStackElements = rebasedMax;
     }
     if (diagnostic.farthestFailureOffset > farthestFailureOffset) {
       farthestFailureOffset = diagnostic.farthestFailureOffset;
-      if (rebasedFarthest == null) rebasedFarthest = rebaseMemoStack(diagnostic.farthestFailureStackElements);
+      if (rebasedFarthest == null) rebasedFarthest = rebaseMemoStack(diagnostic, diagnostic.farthestFailureStackElements);
       farthestFailureStackElements = rebasedFarthest;
       expectedAtFarthestFailure.clear();
     }
     if (diagnostic.farthestFailureOffset == farthestFailureOffset) {
       if (rebasedFarthestSize > farthestFailureStackElements.size()) {
-        if (rebasedFarthest == null) rebasedFarthest = rebaseMemoStack(diagnostic.farthestFailureStackElements);
+        if (rebasedFarthest == null) rebasedFarthest = rebaseMemoStack(diagnostic, diagnostic.farthestFailureStackElements);
         farthestFailureStackElements = rebasedFarthest;
       }
       expectedAtFarthestFailure.addAll(diagnostic.expected);
     }
     if (recordingTrials) trialHistory.addAll(diagnostic.trials);
 
-    if (memoDiagnosticFrames.isEmpty()) return;
-    for (FailureDiagnostic active : memoDiagnosticFrames) {
-      active.farthestConsumedOffset = Math.max(active.farthestConsumedOffset, diagnostic.farthestConsumedOffset);
-      active.farthestMatchedOffset = Math.max(active.farthestMatchedOffset, diagnostic.farthestMatchedOffset);
-      if (diagnostic.maxReachedOffset > active.maxReachedOffset
-          || diagnostic.maxReachedOffset == active.maxReachedOffset
-              && localSize(active, rebasedMaxSize) > active.maxReachedStackElements.size()) {
-        active.maxReachedOffset = diagnostic.maxReachedOffset;
-        if (rebasedMax == null) rebasedMax = rebaseMemoStack(diagnostic.maxReachedStackElements);
-        active.maxReachedStackElements = localStackSnapshot(active, rebasedMax);
-      }
-      if (diagnostic.farthestFailureOffset > active.farthestFailureOffset) {
-        active.farthestFailureOffset = diagnostic.farthestFailureOffset;
-        if (rebasedFarthest == null) rebasedFarthest = rebaseMemoStack(diagnostic.farthestFailureStackElements);
-        active.farthestFailureStackElements = localStackSnapshot(active, rebasedFarthest);
-        active.expected.clear();
-      }
-      if (diagnostic.farthestFailureOffset == active.farthestFailureOffset) {
-        if (localSize(active, rebasedFarthestSize) > active.farthestFailureStackElements.size()) {
-          if (rebasedFarthest == null) rebasedFarthest = rebaseMemoStack(diagnostic.farthestFailureStackElements);
-          active.farthestFailureStackElements = localStackSnapshot(active, rebasedFarthest);
-        }
-        active.expected.addAll(diagnostic.expected);
-      }
-      active.trials.addAll(diagnostic.trials);
+    FailureDiagnostic active = memoDiagnosticFrames.peekFirst();
+    if (active == null) return;
+    active.farthestConsumedOffset = Math.max(active.farthestConsumedOffset, diagnostic.farthestConsumedOffset);
+    active.farthestMatchedOffset = Math.max(active.farthestMatchedOffset, diagnostic.farthestMatchedOffset);
+    if (diagnostic.maxReachedOffset > active.maxReachedOffset
+        || diagnostic.maxReachedOffset == active.maxReachedOffset
+            && rebasedMaxSize > active.maxReachedStackElements.size()) {
+      active.maxReachedOffset = diagnostic.maxReachedOffset;
+      if (rebasedMax == null) rebasedMax = rebaseMemoStack(diagnostic, diagnostic.maxReachedStackElements);
+      active.maxReachedStackElements = rebasedMax;
     }
+    if (diagnostic.farthestFailureOffset > active.farthestFailureOffset) {
+      active.farthestFailureOffset = diagnostic.farthestFailureOffset;
+      if (rebasedFarthest == null) rebasedFarthest = rebaseMemoStack(diagnostic, diagnostic.farthestFailureStackElements);
+      active.farthestFailureStackElements = rebasedFarthest;
+      active.expected.clear();
+    }
+    if (diagnostic.farthestFailureOffset == active.farthestFailureOffset) {
+      if (rebasedFarthestSize > active.farthestFailureStackElements.size()) {
+        if (rebasedFarthest == null) rebasedFarthest = rebaseMemoStack(diagnostic, diagnostic.farthestFailureStackElements);
+        active.farthestFailureStackElements = rebasedFarthest;
+      }
+      active.expected.addAll(diagnostic.expected);
+    }
+    active.trials.addAll(diagnostic.trials);
   }
 
-  /** Size {@link #rebaseMemoStack} would produce for {@code localSuffix} at {@code depth} open frames. */
+  /** Size {@link #rebaseMemoStack} would produce for a memoized absolute stack at {@code depth} open frames. */
   private static int rebasedStackSize(
-      List<ParseFailureDiagnostics.ParseStackElement> localSuffix, int depth) {
-    return localSuffix.isEmpty() ? 0 : depth + localSuffix.size();
+      FailureDiagnostic memoized, List<ParseFailureDiagnostics.ParseStackElement> absolute, int depth) {
+    int suffix = localSize(memoized, absolute.size());
+    return suffix == 0 ? 0 : depth + suffix;
   }
 
-  /** Size {@link #localStackSnapshot} would produce from an absolute stack of {@code absoluteSize}. */
+  /** Number of elements above the frame's base in an absolute stack of {@code absoluteSize}. */
   private static int localSize(FailureDiagnostic diagnostic, int absoluteSize) {
     return absoluteSize - Math.min(diagnostic.stackBaseDepth, absoluteSize);
   }
@@ -638,8 +674,13 @@ public class ParseContext implements
     }
   }
 
+  /**
+   * Places a memoized frame's rule-local stack suffix on top of the current parse stack, as if
+   * the memoized rule had just failed here.
+   */
   private List<ParseFailureDiagnostics.ParseStackElement> rebaseMemoStack(
-      List<ParseFailureDiagnostics.ParseStackElement> localSuffix) {
+      FailureDiagnostic memoized, List<ParseFailureDiagnostics.ParseStackElement> absolute) {
+    List<ParseFailureDiagnostics.ParseStackElement> localSuffix = localStackSuffix(memoized, absolute);
     if (localSuffix.isEmpty()) return Collections.emptyList();
     List<ParseFailureDiagnostics.ParseStackElement> result = snapshotStackElements();
     for (ParseFailureDiagnostics.ParseStackElement element : localSuffix) {
@@ -650,11 +691,12 @@ public class ParseContext implements
     return result;
   }
 
-  private static List<ParseFailureDiagnostics.ParseStackElement> localStackSnapshot(
+  /** The part of an absolute stack that belongs to the frame's own rule (a view, not a copy). */
+  private static List<ParseFailureDiagnostics.ParseStackElement> localStackSuffix(
       FailureDiagnostic diagnostic,
       List<ParseFailureDiagnostics.ParseStackElement> absoluteSnapshot) {
     int base = Math.min(diagnostic.stackBaseDepth, absoluteSnapshot.size());
-    return new ArrayList<>(absoluteSnapshot.subList(base, absoluteSnapshot.size()));
+    return absoluteSnapshot.subList(base, absoluteSnapshot.size());
   }
 
   /**
@@ -831,7 +873,8 @@ public class ParseContext implements
             succeeded,
             consumed);
         trialHistory.add(trial);
-        for (FailureDiagnostic diagnostic : memoDiagnosticFrames) diagnostic.trials.add(trial);
+        FailureDiagnostic innermost = memoDiagnosticFrames.peekFirst();
+        if (innermost != null) innermost.trials.add(trial);
       }
       parseFrames.pollFirst();
       if (frame.parser instanceof TerminalSymbol) terminalFrames.pollFirst();
@@ -958,21 +1001,20 @@ public class ParseContext implements
       snapshot = snapshotStackElements();
       maxReachedStackElements = snapshot;
     }
-    if (memoDiagnosticFrames.isEmpty()) {
+    FailureDiagnostic diagnostic = memoDiagnosticFrames.peekFirst();
+    if (diagnostic == null) {
       return;
     }
-    for (FailureDiagnostic diagnostic : memoDiagnosticFrames) {
-      diagnostic.farthestConsumedOffset = Math.max(diagnostic.farthestConsumedOffset, consumed);
-      diagnostic.farthestMatchedOffset = Math.max(diagnostic.farthestMatchedOffset, matched);
-      if (reached > diagnostic.maxReachedOffset) {
-        if (snapshot == null) snapshot = snapshotStackElements();
-        diagnostic.maxReachedOffset = reached;
-        diagnostic.maxReachedStackElements = localStackSnapshot(diagnostic, snapshot);
-      } else if (reached == diagnostic.maxReachedOffset
-          && localStackDepth(diagnostic, depth) > diagnostic.maxReachedStackElements.size()) {
-        if (snapshot == null) snapshot = snapshotStackElements();
-        diagnostic.maxReachedStackElements = localStackSnapshot(diagnostic, snapshot);
-      }
+    diagnostic.farthestConsumedOffset = Math.max(diagnostic.farthestConsumedOffset, consumed);
+    diagnostic.farthestMatchedOffset = Math.max(diagnostic.farthestMatchedOffset, matched);
+    if (reached > diagnostic.maxReachedOffset) {
+      if (snapshot == null) snapshot = snapshotStackElements();
+      diagnostic.maxReachedOffset = reached;
+      diagnostic.maxReachedStackElements = snapshot;
+    } else if (reached == diagnostic.maxReachedOffset
+        && depth > diagnostic.maxReachedStackElements.size()) {
+      if (snapshot == null) snapshot = snapshotStackElements();
+      diagnostic.maxReachedStackElements = snapshot;
     }
   }
 
@@ -983,17 +1025,10 @@ public class ParseContext implements
    */
   void registerFailureCandidate(ParseFrame frame) {
     int candidateOffset = frame.maxOffset();
-    boolean relevant = candidateOffset >= farthestFailureOffset;
-    if (false == relevant) {
-      for (FailureDiagnostic diagnostic : memoDiagnosticFrames) {
-        if (candidateOffset >= diagnostic.farthestFailureOffset) {
-          relevant = true;
-          break;
-        }
-      }
-      if (false == relevant) {
-        return;
-      }
+    FailureDiagnostic diagnostic = memoDiagnosticFrames.peekFirst();
+    if (candidateOffset < farthestFailureOffset
+        && (diagnostic == null || candidateOffset < diagnostic.farthestFailureOffset)) {
+      return;
     }
     Parser terminalParser = deepestTerminalParser();
     int depth = parseFrames.size();
@@ -1011,23 +1046,21 @@ public class ParseContext implements
         farthestFailureStackElements = snapshot;
       }
     }
-    if (memoDiagnosticFrames.isEmpty()) {
+    if (diagnostic == null) {
       return;
     }
-    for (FailureDiagnostic diagnostic : memoDiagnosticFrames) {
-      if (candidateOffset > diagnostic.farthestFailureOffset) {
+    if (candidateOffset > diagnostic.farthestFailureOffset) {
+      if (snapshot == null) snapshot = snapshotStackElements();
+      diagnostic.farthestFailureOffset = candidateOffset;
+      diagnostic.farthestFailureStackElements = snapshot;
+      diagnostic.expected.clear();
+    }
+    if (candidateOffset == diagnostic.farthestFailureOffset) {
+      if (depth > diagnostic.farthestFailureStackElements.size()) {
         if (snapshot == null) snapshot = snapshotStackElements();
-        diagnostic.farthestFailureOffset = candidateOffset;
-        diagnostic.farthestFailureStackElements = localStackSnapshot(diagnostic, snapshot);
-        diagnostic.expected.clear();
+        diagnostic.farthestFailureStackElements = snapshot;
       }
-      if (candidateOffset == diagnostic.farthestFailureOffset) {
-        if (localStackDepth(diagnostic, depth) > diagnostic.farthestFailureStackElements.size()) {
-          if (snapshot == null) snapshot = snapshotStackElements();
-          diagnostic.farthestFailureStackElements = localStackSnapshot(diagnostic, snapshot);
-        }
-        recordSources(diagnostic.expected, frame.parser, terminalParser);
-      }
+      recordSources(diagnostic.expected, frame.parser, terminalParser);
     }
   }
 
@@ -1035,11 +1068,6 @@ public class ParseContext implements
   private static void recordSources(ExpectedSources sources, Parser failed, Parser terminalParser) {
     sources.addFailed(failed);
     if (terminalParser != null) sources.addTerminal(terminalParser);
-  }
-
-  /** Size of the memo-frame-local view of a parse stack with {@code depth} open frames. */
-  private static int localStackDepth(FailureDiagnostic diagnostic, int depth) {
-    return depth - Math.min(diagnostic.stackBaseDepth, depth);
   }
 
   List<ParseFailureDiagnostics.ExpectedHintCandidate> expectedHintCandidatesFor(Parser parser) {
