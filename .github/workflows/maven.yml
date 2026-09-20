@@ -185,7 +185,7 @@ jobs:
       with:
         repository: opaopa6969/tinyexpression
         # Consumer migration and real token oracle; update deliberately with their contracts.
-        ref: 2a2db7c4ce38234c2ec8c4ddbf7d51eed08fc4ba
+        ref: 6e5cfd91619b71a53e8f391469653d270208ca2e
         path: tinyexpression
 
     - name: Point tinyexpression at the unlaxer under test
