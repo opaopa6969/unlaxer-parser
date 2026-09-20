@@ -4,16 +4,8 @@ import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
 
-import org.unlaxer.CodePointLength;
-import org.unlaxer.Parsed;
-import org.unlaxer.Token;
 import org.unlaxer.TokenKind;
-import org.unlaxer.TokenList;
-import org.unlaxer.TransactionElement;
-import org.unlaxer.context.Transaction.AdditionalCommitAction;
-import org.unlaxer.listener.TransactionListener;
 import org.unlaxer.parser.Parser;
-import org.unlaxer.parser.Parsers;
 
 /**
  * Opt-in packrat memoization table (issue #40).
@@ -22,16 +14,11 @@ import org.unlaxer.parser.Parsers;
  * invertMatch). Caches the outcome of parsing a rule at a position so that the exponential
  * re-parsing of the same sub-tree under backtracking ambiguity collapses to a single attempt.
  *
- * <p>Two flavours, both gated by the caller:
+ * <p>One deliberately narrow flavour, gated by immutable parse options:
  * <ul>
- *   <li><b>failure memo</b> — "rule R failed at position X". Always safe: a failed parse is
- *       rolled back (net-zero scope effect), and for the grammars this targets a rule's
- *       success/failure at a position is a pure function of the source. Returned immediately
- *       on a hit, skipping the whole sub-tree.</li>
- *   <li><b>success memo</b> — the rule's tokens plus end positions, used to replay a success
- *       without re-deriving the sub-tree. Only safe when the sub-tree mutates no persistent
- *       parse state (scope tree / declarations); {@link #isSuccessMemoizable(Parser)} enforces
- *       this by excluding any sub-tree that contains a {@link TransactionListener}.</li>
+ *   <li><b>safe failure memo</b> — only exact generated classes carrying
+ *       {@link SafeFailureMemoizable} may cache a failure. The generated marker reflects a
+ *       transitive, fail-closed grammar analysis. Successes are never cached.</li>
  * </ul>
  *
  * <p>The table lives on a single {@link ParseContext} (one parse session) and is dropped when
@@ -43,131 +30,62 @@ public final class PackratMemoTable {
   /** Position component of the memo key (parser identity is the outer map key). */
   public record PositionKey(int consumed, int matched, TokenKind tokenKind, boolean invertMatch) {}
 
-  /** A memoized outcome. {@link #FAILED} marks a known failure; success carries replay data. */
+  /** A known failure together with the rule-local diagnostics produced by the original call. */
   public static final class Entry {
+    private final ParseContext.FailureDiagnostic diagnostic;
 
-    public static final Entry FAILED = new Entry(true, null, 0, 0, null);
-
-    private final boolean failed;
-    private final TokenList tokens;
-    private final int endConsumed;
-    private final int endMatched;
-    private final Parser chosenChild;
-
-    private Entry(boolean failed, TokenList tokens, int endConsumed, int endMatched, Parser chosenChild) {
-      this.failed = failed;
-      this.tokens = tokens;
-      this.endConsumed = endConsumed;
-      this.endMatched = endMatched;
-      this.chosenChild = chosenChild;
-    }
-
-    /**
-     * @param chosenChild for a choice rule, the alternative that matched (needed to replay
-     *     {@code ChoiceCommitAction}); null for chains and plain rules.
-     */
-    public static Entry success(TokenList tokens, int endConsumed, int endMatched, Parser chosenChild) {
-      return new Entry(false, tokens, endConsumed, endMatched, chosenChild);
-    }
-
-    public boolean isFailed() {
-      return failed;
-    }
-
-    public TokenList tokens() {
-      return tokens;
-    }
-
-    public int endConsumed() {
-      return endConsumed;
-    }
-
-    public int endMatched() {
-      return endMatched;
-    }
-
-    public Parser chosenChild() {
-      return chosenChild;
-    }
+    private Entry(ParseContext.FailureDiagnostic diagnostic) { this.diagnostic = diagnostic; }
   }
 
   /**
    * The memoized outcome for {@code parser} at the current position, or null to proceed with a
-   * normal parse (no entry, or memoization disabled). A non-null result is either a known failure
-   * ({@link Entry#isFailed()}) or a success to replay via {@link #replaySuccess}.
+   * normal parse (no entry, memoization disabled, or an exact class without the generated marker).
+   * A non-null result is a known failure whose diagnostic contribution has already been replayed.
    */
   public static Entry lookup(
       ParseContext parseContext, Parser parser, TokenKind tokenKind, boolean invertMatch) {
-    if (false == parseContext.isMemoizeEnabled()) {
+    if (false == parseContext.isMemoizationSessionSafe()) {
       return null;
     }
-    return parseContext.getPackratMemoTable()
+    if (false == isExactSafeClass(parser)) return null;
+    Entry entry = parseContext.getPackratMemoTable()
         .get(parser, positionKeyOf(parseContext, tokenKind, invertMatch));
+    if (entry != null) {
+      parseContext.replayFailureDiagnostic(entry.diagnostic);
+      parseContext.getPackratMemoTable().failureHits++;
+    }
+    return entry;
   }
 
-  /**
-   * Record that {@code parser} succeeded at {@code startKey} consuming up to (endConsumed,
-   * endMatched), capturing a snapshot of its tokens for replay. Only stored for success-memoizable
-   * parsers (see {@link #isSuccessMemoizable}); no-op otherwise or when memoization is disabled.
-   * {@code rawTokens} is the rule's transaction-element token list captured BEFORE commit.
-   */
-  public static void memoizeSuccess(ParseContext parseContext, Parser parser, PositionKey startKey,
-      TokenList rawTokens, int endConsumed, int endMatched, Parser chosenChild) {
-    if (false == parseContext.isMemoizeEnabled()) {
-      return;
-    }
-    PackratMemoTable table = parseContext.getPackratMemoTable();
-    if (false == table.isSuccessMemoizable(parser)) {
-      return;
-    }
-    TokenList snapshot = new TokenList();
-    snapshot.addAll(rawTokens);
-    table.put(parser, startKey, Entry.success(snapshot, endConsumed, endMatched, chosenChild));
-  }
-
-  /**
-   * Replay a memoized success without re-deriving the sub-tree: open a transaction for the rule,
-   * splice in DEEP COPIES of the cached tokens (their mutable parent pointers must not be shared —
-   * see {@link Token#deepCopy()}), advance the cursor to the cached end, then commit so the normal
-   * merge/collect/cursor-propagation and any commit actions run exactly as on a fresh parse.
-   */
-  public static Parsed replaySuccess(ParseContext parseContext, Parser parser, TokenKind tokenKind,
-      boolean invertMatch, Entry entry, AdditionalCommitAction... commitActions) {
-    parseContext.startParse(parser, parseContext, tokenKind, invertMatch);
-    parseContext.begin(parser);
-    TransactionElement current = parseContext.getCurrent();
-    for (Token token : entry.tokens()) {
-      current.getTokens().add(token.deepCopy());
-    }
-    int consumeDelta = entry.endConsumed() - current.getPosition(TokenKind.consumed).value();
-    if (consumeDelta > 0) {
-      parseContext.consume(new CodePointLength(consumeDelta));
-    }
-    int matchDelta = entry.endMatched() - current.getPosition(TokenKind.matchOnly).value();
-    if (matchDelta > 0) {
-      parseContext.matchOnly(new CodePointLength(matchDelta));
-    }
-    Parsed committed = new Parsed(parseContext.commit(parser, tokenKind, commitActions));
-    parseContext.endParse(parser, committed, parseContext, tokenKind, invertMatch);
-    return committed;
-  }
-
-  /**
-   * Record that {@code parser} failed at the current position. A {@link TransactionListener}'s
-   * outcome can depend on mutable scope state, so its failure is never memoized; every other
-   * rule's failure at a fixed position is a pure function of the source. No-op when memoization
-   * is disabled.
-   */
+  /** Records a generated, statically proven safe failure and its diagnostic contribution. */
   public static void memoizeFailure(
-      ParseContext parseContext, Parser parser, TokenKind tokenKind, boolean invertMatch) {
-    if (false == parseContext.isMemoizeEnabled()) {
-      return;
+      ParseContext parseContext, Parser parser, TokenKind tokenKind, boolean invertMatch,
+      ParseContext.FailureDiagnostic diagnostic) {
+    if (diagnostic == null) return;
+    parseContext.discardMemoDiagnosticFrame(diagnostic);
+    if (false == parseContext.isMemoizationSessionSafe() || false == isExactSafeClass(parser)) return;
+    parseContext.getPackratMemoTable().put(
+        parser, positionKeyOf(parseContext, tokenKind, invertMatch), new Entry(diagnostic));
+  }
+
+  /** Starts a local diagnostic frame only for an eligible exact safe rule. */
+  public static ParseContext.FailureDiagnostic beginFailure(
+      ParseContext parseContext, Parser parser) {
+    if (false == parseContext.isMemoizationSessionSafe() || false == isExactSafeClass(parser)) return null;
+    return parseContext.beginMemoDiagnosticFrame();
+  }
+
+  /** Discards the local diagnostic frame after a successful rule evaluation. */
+  public static void memoizeSuccess(
+      ParseContext parseContext, ParseContext.FailureDiagnostic diagnostic) {
+    if (diagnostic != null) parseContext.discardMemoDiagnosticFrame(diagnostic);
+  }
+
+  static boolean isExactSafeClass(Parser parser) {
+    for (Class<?> declared : parser.getClass().getInterfaces()) {
+      if (declared == SafeFailureMemoizable.class) return true;
     }
-    if (parser instanceof TransactionListener) {
-      return;
-    }
-    parseContext.getPackratMemoTable()
-        .put(parser, positionKeyOf(parseContext, tokenKind, invertMatch), Entry.FAILED);
+    return false;
   }
 
   public static PositionKey positionKeyOf(
@@ -180,7 +98,7 @@ public final class PackratMemoTable {
 
   private final Map<Parser, Map<PositionKey, Entry>> entryByPositionByParser = new IdentityHashMap<>();
 
-  private final Map<Parser, Boolean> successMemoizableByParser = new IdentityHashMap<>();
+  private int failureHits;
 
   public Entry get(Parser parser, PositionKey positionKey) {
     Map<PositionKey, Entry> entryByPosition = entryByPositionByParser.get(parser);
@@ -196,41 +114,5 @@ public final class PackratMemoTable {
         .put(positionKey, entry);
   }
 
-  /**
-   * True when serving {@code parser} from a success memo (skipping its sub-tree) would not drop
-   * any persistent parse-state mutation. A sub-tree containing a {@link TransactionListener}
-   * (scope tree / declarations / back-reference resolution is emitted as such a listener) is
-   * conservatively treated as not success-memoizable. Computed once per parser and cached;
-   * cycle-safe for recursive grammars.
-   */
-  public boolean isSuccessMemoizable(Parser parser) {
-    Boolean cached = successMemoizableByParser.get(parser);
-    if (cached != null) {
-      return cached;
-    }
-    // Pre-seed with true to break cycles: a back-edge to this parser must not, by itself,
-    // make it unsafe — only a TransactionListener anywhere in the sub-tree does.
-    successMemoizableByParser.put(parser, Boolean.TRUE);
-    boolean memoizable = subTreeHasNoTransactionListener(parser, new IdentityHashMap<>());
-    successMemoizableByParser.put(parser, memoizable);
-    return memoizable;
-  }
-
-  private boolean subTreeHasNoTransactionListener(Parser parser, Map<Parser, Boolean> visited) {
-    if (parser == null || visited.put(parser, Boolean.TRUE) != null) {
-      return true;
-    }
-    if (parser instanceof TransactionListener) {
-      return false;
-    }
-    Parsers children = parser.getChildren();
-    if (children != null) {
-      for (Parser child : children) {
-        if (false == subTreeHasNoTransactionListener(child, visited)) {
-          return false;
-        }
-      }
-    }
-    return true;
-  }
+  public int failureHits() { return failureHits; }
 }

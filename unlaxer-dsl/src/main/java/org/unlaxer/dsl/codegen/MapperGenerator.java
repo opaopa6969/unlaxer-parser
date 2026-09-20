@@ -61,6 +61,7 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("import org.unlaxer.StringSource;\n");
         sb.append("import org.unlaxer.Token;\n");
         sb.append("import org.unlaxer.context.ParseContext;\n");
+        sb.append("import org.unlaxer.context.ParseOptions;\n");
         sb.append("import org.unlaxer.parser.Parser;\n\n");
 
         sb.append(CodeGenerator.generatedAnnotation("org.unlaxer.dsl.codegen.MapperGenerator"));
@@ -139,9 +140,12 @@ public class MapperGenerator implements CodeGenerator {
                  */
                 public static synchronized Optional<ParseDiagnostic> diagnose(String source) {
             """);
+        sb.append("        return diagnose(source, ParseOptions.DEFAULT);\n");
+        sb.append("    }\n\n");
+        sb.append("    public static synchronized Optional<ParseDiagnostic> diagnose(String source, ParseOptions options) {\n");
         sb.append("        Parser rootParser = ").append(parsersClass).append(".getRootParser();\n");
         sb.append("""
-                    try (ParseContext context = new ParseContext(createRootSourceCompat(source))) {
+                    try (ParseContext context = ParseContext.withOptions(createRootSourceCompat(source), options)) {
                         Parsed parsed = rootParser.parse(context);
                         int consumed = consumedLengthCompat(parsed.getConsumed());
                         if (parsed.isSucceeded() && consumed == source.length()) return Optional.empty();
@@ -279,13 +283,19 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("        return new MappedAst(selectedToken, mapped);\n");
         sb.append("    }\n\n");
         sb.append("    public static ").append(rootClassName).append(" parse(String source) {\n");
-        sb.append("        return parse(source, null);\n");
+        sb.append("        return parse(source, (String) null, ParseOptions.DEFAULT);\n");
+        sb.append("    }\n\n");
+        sb.append("    public static ").append(rootClassName).append(" parseWithOptions(String source, ParseOptions options) {\n");
+        sb.append("        return parse(source, null, options);\n");
         sb.append("    }\n\n");
         sb.append("    public static synchronized ").append(rootClassName).append(" parse(String source, String preferredAstSimpleName) {\n");
+        sb.append("        return parse(source, preferredAstSimpleName, ParseOptions.DEFAULT);\n");
+        sb.append("    }\n\n");
+        sb.append("    public static synchronized ").append(rootClassName).append(" parse(String source, String preferredAstSimpleName, ParseOptions options) {\n");
         sb.append("        NODE_SOURCE_SPANS.clear();\n");
         sb.append("        MAP_MEMO.clear();\n");
         sb.append("        Parser rootParser = ").append(parsersClass).append(".getRootParser();\n");
-        sb.append("        ParseContext context = new ParseContext(createRootSourceCompat(source));\n");
+        sb.append("        ParseContext context = ParseContext.withOptions(createRootSourceCompat(source), options);\n");
         sb.append("        Parsed parsed;\n");
         sb.append("        Token rootToken = null;\n");
         sb.append("        try {\n");

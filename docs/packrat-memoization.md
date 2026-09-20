@@ -1,97 +1,77 @@
-# Packrat メモ化 (#40) — 設計と「効果の濃淡」
+# Java の安全な failure memoization
 
-opt-in の packrat メモ化を `unlaxer-common` に追加した（issue #40）。本書は **なぜ効くのか／なぜ成功メモ化の効果はこの種の文法では薄いのか** を記録する。
+Java 生成 parser は、曖昧な選択肢が同じ `(rule, position)` を再試行する際の指数的な
+バックトラックを抑えるため、parse session 単位の failure memoization を提供する。
+既定値は従来どおり `OFF` であり、明示的に有効化した session だけが対象になる。
 
-## 1. 問題: 曖昧括弧式の指数バックトラック
+```java
+ParseOptions options = ParseOptions.withMemoization(Memoization.SAFE_FAILURES);
+try (ParseContext context = ParseContext.withOptions(source, options)) {
+    Parsed parsed = GeneratedParsers.getRootParser().parse(context);
+}
 
-PEG は順序付き選択 + バックトラックで動く。曖昧な括弧式文法では、ある `(` の位置で複数の選択肢が **同じ内側部分木をフルパースしてから** 失敗する。tinyexpression P4 の実例（opaopa6969/tinyexpression#19）:
-
-1. `NumberFactor → TernaryExpression` … `(` の後 `BooleanExpression` をフルパース → `?` が無くて失敗
-2. `NumberFactor → '(' NumberExpression ')'` … 内側を再びフルパース → 型不一致で失敗
-3. `BooleanFactor → '(' BooleanExpression ')'` … ここで成功
-
-同一部分木を毎レベルで複数回パースし、ネストごとに乗算 → **約 3^深さ**。実運用の不正検知式（400〜900字、深いネスト）で **53分以上 CPU 張り付き**。
-
-```mermaid
-graph TD
-  E0["Expr @ pos0"] --> A0["alt A: Inner '!'"]
-  E0 --> B0["alt B: Inner '?'"]
-  A0 --> I0a["Inner @ pos1 (パース)"]
-  B0 --> I0b["Inner @ pos1 (再パース!)"]
-  I0a --> E1a["Expr @ pos1 ..."]
-  I0b --> E1b["Expr @ pos1 (再び!) ..."]
-  E1a --> dotsa["... 2^深さ"]
-  E1b --> dotsb["... 2^深さ"]
-  classDef dup fill:#fdd,stroke:#c00;
-  class I0b,E1b,dotsb dup;
+// 生成 Mapper も同じ option を受け取る。
+Ast.Root root = GeneratedMapper.parseWithOptions(text, options);
 ```
 
-赤＝重複再計算。各レベルで同じ `(rule, position)` が何度も評価される。
+## 契約
 
-## 2. 解法: `(parser, position)` メモ化
+- `ParseOptions` は immutable。`ParseOptions.DEFAULT` と既存 Mapper overload は `OFF`。
+- `SAFE_FAILURES` は失敗だけを保存する。成功 token、cursor、commit action は保存・再生しない。
+- キーは parser identity、consumed/matched position、`TokenKind`、invert flag。
+- failure hit は最初の rule call が生成した診断を再生するため、OFF/ON で farthest offset と
+  expected hints が変わらない。
+- cache は 1 個の `ParseContext` に閉じ、session をまたいで共有しない。
+- parser graph（rule instance、その children、parse 結果へ影響する設定）は session 中 immutable
+  であることを前提とする。graph を変更する可能性がある callback/state facility は下記の
+  fail-closed 条件に従う。
 
-`AbstractParser.parse` / `ChainInterface.parse` / `ChoiceInterface.parse`（生成ルールは `LazyChain`/`LazyChoice` なのでこの3点でルール実行を網羅）で、`(parser同一性, consumed, matched, tokenKind, invertMatch)` をキーに結果をキャッシュする。
+診断 cache は global snapshot ではなく、対象 rule の開始時にだけ作る local accumulator を
+保存する。cursor、failure、expected hint の更新は入れ子になった全 accumulator に伝播し、
+成功時は破棄、失敗時だけ保存する。hit 時は global 診断と外側の active accumulator の双方へ
+merge するため、先行 sibling の farther failure を誤って cache しない。成功した negative
+lookahead 内の診断も speculation 境界で破棄される。stack は rule 開始深度以降の suffix だけを
+保存し、hit 時の現在 stack へ rebase するので、以前の呼出元を診断へ復活させない。`OFF` と
+unsafe rule には frame overhead がない。
 
-- **opt-in / default-off**: `parseContext.enableMemoize()` または `new ParseContext(src, ParseContext.memoize())`。既定では無効＝既存挙動・性能に影響ゼロ。
-- メモは 1 つの `ParseContext`（1 パースセッション）に属し、`close()` で破棄。
+次の session 状態では、既存 entry を含め lookup/store を停止し、通常の parser lifecycle を
+必ず実行する。状態が後から追加・切替された場合も同じである。
 
-### 2a. 失敗メモ化 — **効果大**
+- `ParserListener` または `TransactionListener` が 1 個以上登録されている
+- persistent commit action が 1 個以上登録されている
+- `TransactionalState` が 1 個以上登録されている
+- trial recording が有効である
 
-ルールがある位置で **既に失敗** したなら、再試行しても成功し得ない（PEG は位置で決定的）。よって即 `FAILED` で短絡し、部分木の再導出をスキップする。
+これにより callback、action、state checkpoint、trial record が cache hit によって欠落しない。
+これらの要因を一度でも追加または有効化した session は、その後 remove/clear/stop されても
+memoization を再開しない。unsafe 中の parser/state 変化より前の stale entry が復活するのを防ぐ。
 
-- 失敗パースは roll back 済み（onBegin→onRollback で scope 効果は差し引きゼロ）。よって `TransactionListener`（scope/宣言/back-reference）**以外** のルールの「ある位置での失敗」はソースの純関数 → 安全にメモ化可。
-- **指数の主因は失敗の再パース**（選択肢 2 つが内側をフルパースして失敗する部分）。これを潰すと 3^深さ → ほぼ線形に崩壊する。
+## 安全規則の生成時解析
 
-実測（同形の再現文法 `Expr ::= A|B; A ::= Inner '!'; B ::= Inner '?'; Inner ::= '(' Expr ')' | 'x'`、末尾終端子なしの失敗入力）:
+生成器は grammar の rule dependency graph を推移的に解析する。状態依存の leaf だけでなく、
+そこへ到達可能な全 ancestor を対象外にする。以下は fail-closed で unsafe となる。
 
-| depth | OFF | ON |
-|------:|----:|---:|
-| 8  | 127 ms | 21 ms |
-| 12 | 506 ms | 3 ms |
-| 14 | 986 ms | 1 ms |
-| 16 | 3 986 ms | 0 ms |
-| 18 | 11 481 ms | 0 ms |
+- `@scopeTree`、`@declares`、`@backref`
+- custom/unknown token parser（`token X = SomeParser`）
+- import namespace 経由など、生成器が純粋性を証明できない参照
 
-OFF は +2 深さごとに約 2 倍（指数）。ON は平坦（線形）。depth 40 の失敗入力（OFF なら 2^40 で実行不能）が ON では数 ms。
+capture、scope、back-reference、rollback、user state、`MatchedTokenParser` のように結果が
+現在の context に依存し得る処理は、明示的に安全と証明されない限り cache されない。
 
-### 2b. 成功メモ化 — **この種の文法では効果が薄い**
+安全と証明された生成 class は `SafeFailureMemoizable` を直接 implements する。runtime は
+`instanceof` ではなく exact class の直接 interface を検査するため、生成 class の subclass が
+parse 動作を override しても安全性を暗黙に継承しない。
 
-ルールがある位置で **成功** したなら、その部分木のトークンを再利用すれば再導出を避けられる。実装はしてある（キャッシュしたトークンを `Token.deepCopy()` で複製 → cursor を進める → `commit` で通常通りマージ/collect）。トークン木の同一性はテストで検証済み。
+## 互換 API
 
-**だが、対象（tinyexpression のような変数を含む式）文法では追加利得が小さい。理由:**
+`ParseContext.enableMemoize()` と `ParseContext.memoize()` は deprecated。互換性のため残るが、
+新しい `SAFE_FAILURES` と同じ安全規則限定の failure-only 動作へ固定される。旧 API でも
+unknown/custom/state-dependent parser や成功結果が cache されることはない。
 
-1. **失敗メモ化が既に指数を崩している。** 指数爆発のコストは「失敗部分木の再パース」が支配項。成功する 1 本の経路は本質的に線形回数しか通らないので、成功メモ化が省けるのは「線形分の重複」に留まる。
+## 性能上の位置づけ
 
-2. **scope 安全性のため、成功メモ化は `TransactionListener` を部分木に含むルールを除外する。** キャッシュヒットで部分木をスキップすると、その中の scope/宣言/back-reference の副作用（`onBegin`/`onCommit`）が再発火しない（失敗と違い、成功は副作用が残るべきなので差し引きゼロにならない）。
-   - tinyexpression 文法では **`VariableRef` が `@backref`**（参照解決リスナ）として生成される。式（`if`/boolean/比較/算術）はほぼ必ず `$変数` を含む → その部分木はリスナを含む → **成功メモ化の対象から外れる**。
-   - すなわち、まさに指数爆発する式ルール群が、成功メモ化では（安全側に倒して）対象外になる。
+failure memoization は、複数の選択肢が同じ内側部分木を最後まで調べて失敗する文法で特に
+有効になる。メモリ量は概ね「安全 rule 数 × 試行 position 数」。success memoization の安全な
+再設計と下流生成物のベンチマークは別課題とする。
 
-```mermaid
-graph LR
-  R["式ルール (BooleanExpression / IfExpression ...)"] --> V["VariableRef (@backref = TransactionListener)"]
-  R -. "部分木にリスナを含む" .-> X["成功メモ化: 除外 (安全側)"]
-  R --> F["失敗メモ化: 適用 (差し引きゼロで安全) → 指数崩壊"]
-  classDef ok fill:#dfd,stroke:#0a0; classDef no fill:#fdd,stroke:#c00;
-  class F ok; class X no;
-```
-
-3. **`Token.parent` が可変**。キャッシュしたトークンをそのまま別の親に差し込むと共有インスタンスが再 parent 付けされ元の木を壊す → 各 replay で `deepCopy()` が必要（コストとリスクの追加）。
-
-**結論:** 失敗メモ化が #40 の実害（指数ハング）を解消する主役。成功メモ化は正しく実装・検証してあるが、変数参照を含む式文法では除外され、追加効果は限定的。**成功メモ化が効くのは、リスナ（scope/宣言/back-ref）を一切含まない純粋な部分木**（例: 変数を含まない定数算術の深いネスト）に限られる。
-
-## 3. 安全性まとめ
-
-| ケース | メモ化 | 安全性の根拠 |
-|---|---|---|
-| 失敗（非リスナ ルール） | する | roll back 済みで scope 差し引きゼロ。位置決定的 |
-| 失敗（`TransactionListener`） | しない | 結果が可変 scope 状態に依存しうる |
-| 成功（リスナ無し部分木） | する | 副作用無し。`deepCopy` で木の独立性を保証。トークン木同一性をテストで検証 |
-| 成功（リスナ含む部分木） | しない | スキップすると scope/宣言/back-ref 副作用が欠落 |
-
-## 4. 残・補助
-
-- **end-to-end**: 実 tinyexpression #19 の5式での計測は、downstream で memoize を eval 経路に配線 + Central 公開後。
-- **補助最適化（独立）**: `StringSource.peek` が毎回 `new StringSource` + codepoint 配列コピー（#19 プロファイル最頻フレーム）。メモ化とは別に削減余地。
-- メモリ上限: 現状は 1 セッションの `HashMap`（`#rules × #positions`）。長大入力で問題化すれば LRH/サイズ上限を追加。
-
-関連: issue #40, #38（指数バックトラック perf）, opaopa6969/tinyexpression#19。
+関連: #40, #184, #192, #194

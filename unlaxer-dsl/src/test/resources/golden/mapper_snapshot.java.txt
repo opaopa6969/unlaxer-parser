@@ -8,6 +8,7 @@ import org.unlaxer.Parsed;
 import org.unlaxer.StringSource;
 import org.unlaxer.Token;
 import org.unlaxer.context.ParseContext;
+import org.unlaxer.context.ParseOptions;
 import org.unlaxer.parser.Parser;
 
 @javax.annotation.processing.Generated("org.unlaxer.dsl.codegen.MapperGenerator")
@@ -43,8 +44,12 @@ public class SnapshotMapper {
      * Native syntax hints are backend-specific; trailing input always expects end of input.
      */
     public static synchronized Optional<ParseDiagnostic> diagnose(String source) {
+        return diagnose(source, ParseOptions.DEFAULT);
+    }
+
+    public static synchronized Optional<ParseDiagnostic> diagnose(String source, ParseOptions options) {
         Parser rootParser = SnapshotParsers.getRootParser();
-        try (ParseContext context = new ParseContext(createRootSourceCompat(source))) {
+        try (ParseContext context = ParseContext.withOptions(createRootSourceCompat(source), options)) {
             Parsed parsed = rootParser.parse(context);
             int consumed = consumedLengthCompat(parsed.getConsumed());
             if (parsed.isSucceeded() && consumed == source.length()) return Optional.empty();
@@ -188,14 +193,22 @@ public class SnapshotMapper {
     }
 
     public static SnapshotAST.ExprNode parse(String source) {
-        return parse(source, null);
+        return parse(source, (String) null, ParseOptions.DEFAULT);
+    }
+
+    public static SnapshotAST.ExprNode parseWithOptions(String source, ParseOptions options) {
+        return parse(source, null, options);
     }
 
     public static synchronized SnapshotAST.ExprNode parse(String source, String preferredAstSimpleName) {
+        return parse(source, preferredAstSimpleName, ParseOptions.DEFAULT);
+    }
+
+    public static synchronized SnapshotAST.ExprNode parse(String source, String preferredAstSimpleName, ParseOptions options) {
         NODE_SOURCE_SPANS.clear();
         MAP_MEMO.clear();
         Parser rootParser = SnapshotParsers.getRootParser();
-        ParseContext context = new ParseContext(createRootSourceCompat(source));
+        ParseContext context = ParseContext.withOptions(createRootSourceCompat(source), options);
         Parsed parsed;
         Token rootToken = null;
         try {

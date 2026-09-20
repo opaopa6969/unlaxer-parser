@@ -100,6 +100,28 @@ public class CompileVerificationTest {
         assertCompiles(astResult, parserResult, mapperResult);
     }
 
+    @Test
+    public void legacyNullPreferredTypeCallRemainsSourceCompatible() {
+        GrammarDecl grammar = parseGrammar(TINYCALC_GRAMMAR);
+        CodeGenerator.GeneratedSource astResult = new ASTGenerator().generate(grammar);
+        CodeGenerator.GeneratedSource parserResult = new ParserGenerator().generate(grammar);
+        CodeGenerator.GeneratedSource mapperResult = new MapperGenerator().generate(grammar);
+        CodeGenerator.GeneratedSource caller = new CodeGenerator.GeneratedSource(
+            "org.unlaxer.tinycalc.generated", "LegacyNullCaller", """
+                package org.unlaxer.tinycalc.generated;
+                final class LegacyNullCaller {
+                    Object parse(String source) {
+                        return TinyCalcMapper.parse(source, null);
+                    }
+                    Object parseWithOptions(String source) {
+                        return TinyCalcMapper.parseWithOptions(source,
+                            org.unlaxer.context.ParseOptions.DEFAULT);
+                    }
+                }
+                """);
+        assertCompiles(astResult, parserResult, mapperResult, caller);
+    }
+
     // =========================================================================
     // 全ジェネレーター統合コンパイル検証
     // =========================================================================

@@ -8,6 +8,9 @@ import org.junit.Test;
 import org.unlaxer.Parsed;
 import org.unlaxer.StringSource;
 import org.unlaxer.context.ParseContext;
+import org.unlaxer.context.ParseOptions;
+import org.unlaxer.context.Memoization;
+import org.unlaxer.context.SafeFailureMemoizable;
 import org.unlaxer.parser.combinator.LazyChain;
 import org.unlaxer.parser.combinator.LazyChoice;
 import org.unlaxer.parser.elementary.WordParser;
@@ -35,35 +38,35 @@ import org.unlaxer.parser.elementary.WordParser;
  */
 public class PackratMemoizationTest {
 
-	public static class Expr extends LazyChoice {
+	public static class Expr extends LazyChoice implements SafeFailureMemoizable {
 		private static final long serialVersionUID = 1L;
 		@Override public Parsers getLazyParsers() {
 			return new Parsers(Parser.get(A.class), Parser.get(B.class));
 		}
 	}
 
-	public static class A extends LazyChain {
+	public static class A extends LazyChain implements SafeFailureMemoizable {
 		private static final long serialVersionUID = 1L;
 		@Override public Parsers getLazyParsers() {
 			return new Parsers(Parser.get(Inner.class), new WordParser("!"));
 		}
 	}
 
-	public static class B extends LazyChain {
+	public static class B extends LazyChain implements SafeFailureMemoizable {
 		private static final long serialVersionUID = 1L;
 		@Override public Parsers getLazyParsers() {
 			return new Parsers(Parser.get(Inner.class), new WordParser("?"));
 		}
 	}
 
-	public static class Inner extends LazyChoice {
+	public static class Inner extends LazyChoice implements SafeFailureMemoizable {
 		private static final long serialVersionUID = 1L;
 		@Override public Parsers getLazyParsers() {
 			return new Parsers(Parser.get(Paren.class), new WordParser("x"));
 		}
 	}
 
-	public static class Paren extends LazyChain {
+	public static class Paren extends LazyChain implements SafeFailureMemoizable {
 		private static final long serialVersionUID = 1L;
 		@Override public Parsers getLazyParsers() {
 			return new Parsers(new WordParser("("), Parser.get(Expr.class), new WordParser(")"));
@@ -85,7 +88,8 @@ public class PackratMemoizationTest {
 	private Parsed parse(String source, boolean memoize) {
 		Parser parser = Parser.get(Expr.class);
 		ParseContext parseContext = memoize
-			? new ParseContext(StringSource.createRootSource(source), ParseContext.memoize())
+			? ParseContext.withOptions(StringSource.createRootSource(source),
+				ParseOptions.withMemoization(Memoization.SAFE_FAILURES))
 			: new ParseContext(StringSource.createRootSource(source));
 		try (parseContext) {
 			return parser.parse(parseContext);
@@ -130,12 +134,10 @@ public class PackratMemoizationTest {
 	}
 
 	/**
-	 * Success memoization must replay a structurally identical token tree (deep-copied, freshly
-	 * parented) — not just the same success/failure verdict. Compares the full parsed tree with
-	 * memoization on vs off for inputs whose sub-trees are revisited under backtracking.
+	 * Failure-only memoization must preserve the structurally identical successful token tree.
 	 */
 	@Test
-	public void successMemoizationPreservesTokenTree() {
+	public void failureOnlyMemoizationPreservesTokenTree() {
 		String[] sources = { "x!", "(x!)!", "((x!)!)!", "(((x!)!)!)!" };
 		for (String source : sources) {
 			Parsed off = parse(source, false);
