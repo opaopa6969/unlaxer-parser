@@ -1341,6 +1341,11 @@ impl<'a> ParseContext<'a> {
     }
 
     fn expression(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
+        if expression.fails_without_side_effects() {
+            // Nothing to restore on failure and nothing to commit on success, so the
+            // checkpoint (Rc clones, scope journal mark, metrics) would be pure overhead.
+            return self.expression_inner(expression, depth);
+        }
         let checkpoint = self.checkpoint();
         let result = self.expression_inner(expression, depth);
         if result.is_none() {
@@ -2060,6 +2065,33 @@ fn memo_safe_rules(rules: &[Rule]) -> Vec<bool> {
         }
     }
     safe
+}
+
+impl Expr {
+    /// Atoms whose failure path leaves every piece of transactional state (position, matched
+    /// position, nodes, captures, user state, scopes) exactly as it was, so
+    /// `ParseContext::expression` can run them without a checkpoint. `Quoted`, `CodeStart` and
+    /// `CodeEnd` advance the position before they can fail and stay wrapped; `Custom` opens its
+    /// own transaction; everything compound delegates to children that may need restoring.
+    fn fails_without_side_effects(&self) -> bool {
+        matches!(
+            self,
+            Expr::Literal(_)
+                | Expr::Number
+                | Expr::Identifier
+                | Expr::Backreference(_)
+                | Expr::Empty
+                | Expr::JavaEmpty
+                | Expr::Eof
+                | Expr::Error(_)
+                | Expr::Any
+                | Expr::CharRange(_, _)
+                | Expr::Except(_)
+                | Expr::Until(_)
+                | Expr::JavaUntil(_)
+                | Expr::JavaLookahead { .. }
+        )
+    }
 }
 
 fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>) -> bool {
