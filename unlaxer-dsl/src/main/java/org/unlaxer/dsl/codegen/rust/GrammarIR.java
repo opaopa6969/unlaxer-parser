@@ -25,7 +25,7 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     public record Declaration(String symbolCapture, String description) {}
     public record Effects(ScopeMode scopeMode, Declaration declares, String backref) {}
     public record RuleEffects(Expression child, Effects effects) implements Expression {}
-    public sealed interface Expression permits Literal, NumberToken, Reference, Sequence, Choice, Capture,
+    public sealed interface Expression permits Literal, NumberToken, Reference, Sequence, Choice, LongestChoice, Capture,
         OptionalExpr, Repeat, Separated, AnyToken, EofToken, EmptyToken, CharRangeToken,
         ExceptToken, UntilToken, LookaheadToken, Delimited, IdentifierToken, QuotedToken,
         CodeStartToken, CodeEndToken, TextValue, ValueBoundary, TriviaScope, RuleEffects {}
@@ -59,6 +59,9 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     }
     public record Choice(List<Expression> alternatives) implements Expression {
         public Choice { alternatives = List.copyOf(alternatives); }
+    }
+    public record LongestChoice(List<Expression> alternatives) implements Expression {
+        public LongestChoice { alternatives = List.copyOf(alternatives); }
     }
     public record Capture(String name, Expression expression) implements Expression {}
 }

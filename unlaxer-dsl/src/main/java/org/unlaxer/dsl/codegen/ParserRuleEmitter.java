@@ -10,6 +10,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.DocAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ErrorElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.InterleaveAnnotation;
+import org.unlaxer.dsl.bootstrap.UBNFAST.LongestChoiceAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OneOrMoreElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OptionalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RepeatElement;
@@ -626,7 +627,9 @@ class ParserRuleEmitter {
             interfaces.add("org.unlaxer.context.SafeFailureMemoizable");
         }
         String implSuffix = interfaces.isEmpty() ? "" : " implements " + String.join(", ", interfaces);
-        String baseClass = isChoice ? "LazyChoice" : getChainClassName(ctx, ruleName);
+        boolean longestChoice = rule.annotations().stream().anyMatch(a -> a instanceof LongestChoiceAnnotation);
+        String baseClass = longestChoice ? "LazyLongestChoice"
+            : isChoice ? "LazyChoice" : getChainClassName(ctx, ruleName);
         w.line("public static class " + className + " extends " + baseClass + implSuffix + " {");
         w.indent();
         w.line("private static final long serialVersionUID = 1L;");

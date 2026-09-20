@@ -64,6 +64,18 @@ public class ParseContext implements
 	
 	//FIXME change store to ScopeTree
 	public Map<NonOrdered, Parsers> orderedParsersByNonOrdered = new HashMap<>();
+
+	/** Records choice metadata in the current transaction so an enclosing rollback removes it. */
+	public void choose(ChoiceInterface choice, Parser parser) {
+		getCurrent().recordChosenParser(choice, chosenParserByChoice.get(choice));
+		chosenParserByChoice.put(choice, parser);
+	}
+
+	/** Records interleave ordering in the current transaction so an enclosing rollback removes it. */
+	public void order(NonOrdered nonOrdered, Parsers parsers) {
+		getCurrent().recordOrderedParsers(nonOrdered, orderedParsersByNonOrdered.get(nonOrdered));
+		orderedParsersByNonOrdered.put(nonOrdered, parsers);
+	}
 	
 	Map<Parser, Map<Name, Object>> scopeTreeMapByParser = new HashMap<>();
 	

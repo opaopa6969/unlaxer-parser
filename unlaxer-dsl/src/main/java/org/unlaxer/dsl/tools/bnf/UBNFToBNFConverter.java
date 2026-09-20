@@ -245,6 +245,8 @@ public final class UBNFToBNFConverter {
             builder.append("@leftAssoc");
         } else if (annotation instanceof UBNFAST.RightAssocAnnotation) {
             builder.append("@rightAssoc");
+        } else if (annotation instanceof UBNFAST.LongestChoiceAnnotation) {
+            builder.append("@longestChoice");
         } else if (annotation instanceof UBNFAST.PrecedenceAnnotation precedenceAnnotation) {
             builder.append("@precedence(level=");
             builder.append(precedenceAnnotation.level());

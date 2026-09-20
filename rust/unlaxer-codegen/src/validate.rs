@@ -127,7 +127,7 @@ fn expression(
             captures.insert(name.clone());
             expression(child, count, captures)?;
         }
-        Sequence(children) | Choice(children) => {
+        Sequence(children) | Choice(children) | LongestChoice(children) => {
             if children.is_empty() {
                 return Err(fail("empty sequence/choice"));
             }

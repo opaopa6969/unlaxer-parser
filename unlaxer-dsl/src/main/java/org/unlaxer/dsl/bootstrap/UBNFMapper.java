@@ -29,6 +29,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.InterleaveAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.KeyValuePair;
 import org.unlaxer.dsl.bootstrap.UBNFAST.LeftAssocAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation;
+import org.unlaxer.dsl.bootstrap.UBNFAST.LongestChoiceAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.BoundedRepeatElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ErrorElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OneOrMoreElement;
@@ -461,6 +462,8 @@ public class UBNFMapper {
                 result.add(new LeftAssocAnnotation());
             } else if (child.parser.getClass() == UBNFParsers.RightAssocAnnotationParser.class) {
                 result.add(new RightAssocAnnotation());
+            } else if (child.parser.getClass() == UBNFParsers.LongestChoiceAnnotationParser.class) {
+                result.add(new LongestChoiceAnnotation());
             } else if (child.parser.getClass() == UBNFParsers.PrecedenceAnnotationParser.class) {
                 result.add(toPrecedenceAnnotation(child));
             } else if (child.parser.getClass() == UBNFParsers.DocAnnotationParser.class) {

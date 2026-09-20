@@ -133,6 +133,7 @@ pub enum AnnotationKind {
     },
     LeftAssoc,
     RightAssoc,
+    LongestChoice,
     Precedence {
         level: i32,
     },

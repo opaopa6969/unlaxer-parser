@@ -202,6 +202,7 @@ public final class RustBackend {
             case Sequence sequence -> "Expr::Sequence(vec![" + expressions(sequence.elements()) + "])";
             case Delimited delimited -> "Expr::Sequence(vec![" + expression(delimited.child()) + "])";
             case Choice choice -> "Expr::Choice(vec![" + expressions(choice.alternatives()) + "])";
+            case LongestChoice choice -> "Expr::LongestChoice(vec![" + expressions(choice.alternatives()) + "])";
             case Capture capture -> "Expr::Capture(" + quote(capture.name()) + ", Box::new(" + expression(capture.expression()) + "))";
             case TextValue text -> expression(text.child()) + ".text_value()";
             case ValueBoundary boundary -> expression(boundary.child()) + ".value_boundary()";

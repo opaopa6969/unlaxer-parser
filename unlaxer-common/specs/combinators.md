@@ -121,6 +121,39 @@ return FAILED
 
 `Choice` のデフォルトコンストラクタは `ASTNodeKind.ChoicedOperator` タグを設定する。
 
+## LongestChoice / LazyLongestChoice
+
+**クラス**: `org.unlaxer.parser.combinator.LongestChoice` / `LazyLongestChoice`
+**インタフェース**: `LongestChoiceInterface`
+
+### セマンティクス
+
+すべての代替を同じ開始状態から試し、active `TokenKind` のカーソルを最も遠くまで
+進めた成功候補を採用する。同じ長さなら宣言順で先の候補を採用する。
+通常の `Choice` は first-success のままであり、暗黙に longest-match へ変化しない。
+
+Java runtime は各候補を trial transaction で評価してロールバックした後、勝者だけを
+再実行して commit する。Rust runtime は cursor、CST node、capture、登録 state、scope の
+勝者 snapshot を復元するため、各候補を1回だけ評価する。この実装差は観測可能な外部
+副作用を許可するものではない。
+
+### 状態と副作用の契約
+
+- cursor、token/CST、capture、scope、登録済み user state、choice/interleave 選択情報は
+  losing trial 後に開始状態へ戻る（MUST）。
+- Java の custom parser が変更する状態は `TransactionalState` として登録する（MUST）。
+- Rust の user state は `Clone` 可能な context state API を使う（MUST）。
+- parser/listener/action が context 外へ行う I/O や mutable global state の変更は
+  rollback できない。`@longestChoice` 配下では副作用を避けるか、冪等にする（MUST）。
+- Java では勝者も trial と commit の2回呼ばれる。呼出回数そのものに意味を持たせない。
+
+### 性能上の位置づけ
+
+`LongestChoice` は候補を絞り込む最適化ではない。候補をすべて評価するため、通常の
+`Choice` より高価である。短い prefix を成功として返す複数の top-level parser を
+frontend が順次再実行している場合など、重複した外側制御を一つの transaction 境界へ
+集約する用途に限定する。再帰的に頻出する expression rule へ無条件に付与しない。
+
 ---
 
 ## ZeroOrMore / LazyZeroOrMore

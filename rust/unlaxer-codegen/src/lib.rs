@@ -226,6 +226,7 @@ fn expression(expr: &Expression) -> String {
             format!("{}.trivia_scope({java_whitespace})", expression(child))
         }
         Choice(items) => format!("Expr::Choice(vec![{}])", expressions(items)),
+        LongestChoice(items) => format!("Expr::LongestChoice(vec![{}])", expressions(items)),
         Capture {
             name,
             expression: child,

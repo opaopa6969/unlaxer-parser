@@ -172,6 +172,7 @@ public sealed interface UBNFAST permits
         UBNFAST.CatalogAnnotation,
         UBNFAST.LeftAssocAnnotation,
         UBNFAST.RightAssocAnnotation,
+        UBNFAST.LongestChoiceAnnotation,
         UBNFAST.PrecedenceAnnotation,
         UBNFAST.DocAnnotation,
         UBNFAST.RecoveryAnnotation,
@@ -228,6 +229,9 @@ public sealed interface UBNFAST permits
 
     /** @rightAssoc */
     record RightAssocAnnotation() implements Annotation {}
+
+    /** @longestChoice — choose the successful alternative consuming the most input. */
+    record LongestChoiceAnnotation() implements Annotation {}
 
     /** @precedence(level=10) */
     record PrecedenceAnnotation(int level) implements Annotation {}

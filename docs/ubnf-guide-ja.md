@@ -226,6 +226,21 @@ Addition ::= Term @left { AddOp @op Term @right } ;
 Exponent ::= Factor @base '^' Factor @exp ;
 ```
 
+### `@longestChoice`
+
+トップレベルの全代替を試し、最も多く入力を消費した成功候補を選びます。同じ長さなら宣言順を
+維持します。最長一致が必要な場所だけに指定してください。通常の選択は PEG 型の first-success
+のままで、より低コストです。
+
+```ubnf
+@longestChoice
+RootExpression ::= NumberExpression | BooleanExpression | StringExpression ;
+```
+
+2つ以上の代替が必要で、`@leftAssoc` / `@rightAssoc` とは併用できません。このルール配下の
+custom parser と listener は、transaction 管理外の外部副作用を起こしてはいけません。
+rollback とコストモデルは[チューニング実践ノート](performance-tuning-ja.md)を参照してください。
+
 ### `@whitespace: style`
 
 ルール要素間に暗黙の空白スキップを挿入します。サポートされているスタイル：
@@ -448,6 +463,7 @@ grammar ExtendedCalc {
 | `@root` | アノテーション | 安定 |
 | `@mapping` | アノテーション | 安定 |
 | `@leftAssoc` / `@rightAssoc` | アノテーション | 安定 |
+| `@longestChoice` | アノテーション | 安定 (v3.0.15+) |
 | `@whitespace` | グローバル設定 | 安定 |
 | `@comment` | グローバル設定 | 安定 |
 | `@enum` | アノテーション | 安定 (v3.0+) |
