@@ -120,7 +120,7 @@ public class MapperGeneratorTest {
         assertTrue("should expose an immutable alternate-entry source snapshot",
             source.contains("public static synchronized SourceMappedSelection selectSubtreeTokenWithSourceMap(Token token, String preferredAstSimpleName)"));
         assertTrue("should reset source spans for every public mapping call",
-            source.contains("NODE_SOURCE_SPANS.clear();\n        MAP_MEMO.clear();"));
+            source.contains("resetMappingMemos();"));
         assertTrue("should reject null token trees explicitly",
             source.contains("throw new IllegalArgumentException(\"rootToken must not be null\")"));
         assertTrue("should reject null subtree tokens explicitly",
