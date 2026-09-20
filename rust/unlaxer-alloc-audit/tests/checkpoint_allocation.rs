@@ -4,16 +4,15 @@
 //! the number of checkpoint layers wrapped around identical work; the allocation counts
 //! must be equal, otherwise every extra layer would add allocations per iteration.
 //!
-//! The allocator statistics are process-wide, so this binary opts out of the threaded
-//! libtest harness (`harness = false`) and runs the scenarios one after another.
+//! The allocation counters are process-wide, so this binary opts out of the threaded
+//! libtest harness (`harness = false`) and runs the scenarios one after another. The
+//! workspace has no external crates, and the counting allocator lives in this crate.
 
-use stats_alloc::{Region, StatsAlloc, INSTRUMENTED_SYSTEM};
-use std::alloc::System;
-
+use unlaxer_alloc_audit::{allocations, CountingAllocator};
 use unlaxer_runtime::{Expr, ParseContext};
 
 #[global_allocator]
-static GLOBAL: &StatsAlloc<System> = &INSTRUMENTED_SYSTEM;
+static GLOBAL: CountingAllocator = CountingAllocator;
 
 const ITERATIONS: usize = 512;
 const EXTRA_LAYERS: usize = 8;
@@ -49,11 +48,11 @@ fn allocations_during(input: &str, parser: &Expr, nonempty_payload: bool) -> usi
         context.set_state("seed", 1u32);
         context.scopes_mut().declare("seed", 0);
     }
-    let region = Region::new(GLOBAL);
+    let before = allocations();
     context.parse(parser).unwrap();
-    let change = region.change();
+    let after = allocations();
     assert_eq!(context.remaining(), "");
-    change.allocations + change.reallocations
+    after.allocations - before.allocations
 }
 
 fn check_layers_are_allocation_free(

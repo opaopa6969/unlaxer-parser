@@ -213,8 +213,10 @@ allocation を減らせるはずだ、というのが unlaxer-parser#208 の仮�
   `checkpointTransactionalState`、`finishTransactionalState` 配下の allocation と定義した。
 - Rust: `Checkpoint` は cursor と CST 長の scalar、および `Option<Rc<_>>` の payload handle だけを
   持つ stack value である。これを test で固定するため、同じ入力・同じ仕事に対して checkpoint 層だけを
-  1 層と 9 層で比較し、allocation 数が一致することを `rust/unlaxer-runtime/tests/checkpoint_allocation.rs`
-  で検証した（`stats_alloc` による process-wide 計数、`harness = false` で直列実行）。
+  1 層と 9 層で比較し、allocation 数が一致することを
+  `rust/unlaxer-alloc-audit/tests/checkpoint_allocation.rs` で検証した。workspace は外部 crate を
+  持たず `unsafe_code = "forbid"` なので、counting allocator はこの監査専用 member crate に閉じ込め、
+  計数が process-wide であるため `harness = false` で直列実行する。
 
 ### 観測
 
