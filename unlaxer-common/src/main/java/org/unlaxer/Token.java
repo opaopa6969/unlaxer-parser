@@ -95,17 +95,18 @@ public class Token implements Serializable{
 		this.parser = parser;
 		this.originalChildren = children;
 		parent= Optional.empty();
-		children.stream().forEach(child->{
-			child.parent = Optional.of(this);
+		// Runs on every commit: set parents and filter AST children with indexed loops instead
+		// of two Stream pipelines and an intermediate list.
+		int size = children.size();
+		TokenList astChildren = new TokenList(size);
+		Optional<Token> self = Optional.of(this);
+		for (int i = 0; i < size; i++) {
+			Token child = children.get(i);
+			child.parent = self;
 //			child.parser.setParent(parser);
-		});
-		this.filteredChildren =
-		    TokenList.of(
-		        children.stream()
-		        .filter(AST_NODES)
-		        .collect(Collectors.toList())
-		    );
-		    
+			if (AST_NODES.test(child)) astChildren.add(child);
+		}
+		this.filteredChildren = astChildren;
 	}
 	
 	/**
