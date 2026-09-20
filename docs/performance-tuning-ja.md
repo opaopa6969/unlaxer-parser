@@ -191,3 +191,70 @@ rollback境界を維持しつつ、状態が実際に変わるまで所有コス
 counterでtransaction数と実mutation数の差を確認し、次にnested commit/rollback、late
 registration、listener、否定lookaheadを回帰testへ固定してから速度を測る。この順序なら、
 速くなった代わりに意味論が弱くなる事故を避けられる。
+
+## ケース4: transaction frame 再利用の allocation 監査（不採用）
+
+### 仮説
+
+ケース3で payload の deep copy を遅延しても、TinyExpression complex 1 parse で Java は 41,917
+transaction、Rust は 53,985 checkpoint を開く。frame オブジェクトの生成、stack 操作、
+commit/rollback の bookkeeping が残るなら、ParseContext-local の frame pool や配列 stack で
+allocation を減らせるはずだ、というのが unlaxer-parser#208 の仮説だった。
+
+#214 の規約どおり、実装の前に allocation profile で「frame が実際にどれだけ割り当てているか」を
+確認した。
+
+### 監査方法
+
+- Java: TinyExpression `P4ParserBenchmark.publicFacade` を JMH `-prof gc`（`gc.alloc.rate.norm`）と
+  `-prof jfr` で計測し、`jdk.ObjectAllocationSample` の allocation pressure を object class と
+  呼び出し元 3 frame で集計した。frame 関連は `TransactionElement`、`ParserCursor`、
+  `EndExclusiveCursorImpl`、`TokenList`、および `Transaction.begin/commit/rollback`、
+  `checkpointTransactionalState`、`finishTransactionalState` 配下の allocation と定義した。
+- Rust: `Checkpoint` は cursor と CST 長の scalar、および `Option<Rc<_>>` の payload handle だけを
+  持つ stack value である。これを test で固定するため、同じ入力・同じ仕事に対して checkpoint 層だけを
+  1 層と 9 層で比較し、allocation 数が一致することを
+  `rust/unlaxer-alloc-audit/tests/checkpoint_allocation.rs` で検証した。workspace は外部 crate を
+  持たず `unsafe_code = "forbid"` なので、counting allocator はこの監査専用 member crate に閉じ込め、
+  計数が process-wide であるため `harness = false` で直列実行する。
+
+### 観測
+
+Java（baseline `5770ed3`、public facade 1 parse）:
+
+| Fixture | allocation / op | frame 関連の割合 | 支配的な allocation site |
+|---|---:|---:|---|
+| complex.tiny | 約 1,176 MB | 1.42% | `ArrayDeque.iterator()` ← `trackCursorProgress` 48.8%、`snapshotStackElements` 12.9%、`localStackSnapshot` 系の `ArrayList` copy 22.3% |
+| comparison-heavy.tiny | 約 432 MB | 3.00% | `localStackSnapshot` 40.6%、`snapshotStackElements` 16.7%、`ArrayList.<init>` / `copyOfRange` 21.0% |
+
+frame オブジェクトそのものは両 fixture とも allocation pressure の 3% 未満で、pool や配列 stack で
+削れる上限がそこにある。一方、`trackCursorProgress` は `startParse` / `endParse` / `consume` ごとに
+`memoDiagnosticFrames` の iterator を生成し、frontier に達するたびに parse stack 全体を
+`ParseStackElement` のリストへ snapshot している。これは失敗診断の bookkeeping であり、
+transaction frame とは別の仮説になる。
+
+Rust（baseline `74527e5`）:
+
+- 8 層 × 512 反復 = 4,096 個の追加 checkpoint を、空 payload / 非空 payload（capture・typed state・
+  scope 宣言あり）× commit / rollback の 4 シナリオで比較し、追加 allocation は 0 だった。
+- TinyExpression complex.tiny の 1 parse は 789,084 allocation（17.7 MB）、comparison-heavy.tiny は
+  82,094 allocation（4.0 MB）を行うが、上記から checkpoint 自体には帰属しない。`FailureDiagnostic::record`
+  の `expected.to_owned()` や `Fragment` 生成が次の attribution 候補である。
+
+### 適用判断
+
+Java の frame pool / 配列 stack は不採用とした。削減上限が allocation の 1.4〜3.0% で、
+ケース3の run 間ノイズ（±3〜5%）の中に埋もれる。counter・profile を残し、production コードは
+変更していない。Rust は既に frame allocation がゼロであることを test で固定し、pool は導入しない。
+
+代わりに、監査で見つかった診断 bookkeeping の allocation（Java 75% 前後）を unlaxer-parser#215 として
+切り出し、#214 の次候補に提案した。測定条件と raw data は
+[TinyExpression の監査レポート](https://github.com/opaopa6969/tinyexpression/blob/master/benchmarks/results/2026-09-20-frame-reuse-audit.md)
+に保存している。
+
+### 教材としての要点
+
+「transaction が多いから frame を再利用すれば速くなる」は自然な仮説だが、JVM の若い世代の
+allocation は安価で、数が多いことと bytes が多いことは別である。profile を先に取ると、
+本当に bytes を消費しているのは frame ではなく、frame ごとに繰り返される付随処理（ここでは診断の
+stack snapshot）だと分かる。負の結果でも profile と test を残せば、次の施策が同じ計測から始められる。

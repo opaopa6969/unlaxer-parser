@@ -1,0 +1,22 @@
+[package]
+name = "unlaxer-alloc-audit"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+description = "Allocation evidence tests for unlaxer-runtime; keeps the workspace free of external crates"
+
+[dependencies]
+unlaxer-runtime = { path = "../unlaxer-runtime" }
+
+# The workspace forbids unsafe code. Counting heap allocations needs one `unsafe impl
+# GlobalAlloc`, so this crate alone downgrades the lint to deny and allows it on that impl.
+[lints.rust]
+unsafe_code = "deny"
+
+# Allocation counts are process-wide, so the test runs its scenarios sequentially without
+# the multi-threaded libtest harness.
+[[test]]
+name = "checkpoint_allocation"
+harness = false
