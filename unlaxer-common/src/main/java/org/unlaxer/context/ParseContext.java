@@ -204,8 +204,8 @@ public class ParseContext implements
   int farthestMatchedOffset = 0;
   int maxReachedOffset = 0;
   int farthestFailureOffset = -1;
-  List<ParseFailureDiagnostics.ParseStackElement> maxReachedStackElements = Collections.emptyList();
-  List<ParseFailureDiagnostics.ParseStackElement> farthestFailureStackElements = Collections.emptyList();
+  StackSnapshot maxReachedStackElements = StackSnapshot.EMPTY;
+  StackSnapshot farthestFailureStackElements = StackSnapshot.EMPTY;
   /*
    * Where expected hints come from at the farthest failure, in first-seen order. Hints are
    * expanded from these sources only when diagnostics are requested; see ExpectedSources.
@@ -383,8 +383,8 @@ public class ParseContext implements
     int farthestMatchedOffset;
     int maxReachedOffset;
     int farthestFailureOffset = -1;
-    List<ParseFailureDiagnostics.ParseStackElement> maxReachedStackElements = Collections.emptyList();
-    List<ParseFailureDiagnostics.ParseStackElement> farthestFailureStackElements = Collections.emptyList();
+    StackSnapshot maxReachedStackElements = StackSnapshot.EMPTY;
+    StackSnapshot farthestFailureStackElements = StackSnapshot.EMPTY;
     final ExpectedSources expected = new ExpectedSources();
     final List<ParseFailureDiagnostics.TrialRecord> trials = new ArrayList<>();
     final List<MemoTransactionEvent> transactionEvents = new ArrayList<>();
@@ -571,8 +571,8 @@ public class ParseContext implements
     int depth = parseFrames.size();
     int rebasedMaxSize = rebasedStackSize(diagnostic, diagnostic.maxReachedStackElements, depth);
     int rebasedFarthestSize = rebasedStackSize(diagnostic, diagnostic.farthestFailureStackElements, depth);
-    List<ParseFailureDiagnostics.ParseStackElement> rebasedMax = null;
-    List<ParseFailureDiagnostics.ParseStackElement> rebasedFarthest = null;
+    StackSnapshot rebasedMax = null;
+    StackSnapshot rebasedFarthest = null;
 
     farthestConsumedOffset = Math.max(farthestConsumedOffset, diagnostic.farthestConsumedOffset);
     farthestMatchedOffset = Math.max(farthestMatchedOffset, diagnostic.farthestMatchedOffset);
@@ -626,8 +626,7 @@ public class ParseContext implements
   }
 
   /** Size {@link #rebaseMemoStack} would produce for a memoized absolute stack at {@code depth} open frames. */
-  private static int rebasedStackSize(
-      FailureDiagnostic memoized, List<ParseFailureDiagnostics.ParseStackElement> absolute, int depth) {
+  private static int rebasedStackSize(FailureDiagnostic memoized, StackSnapshot absolute, int depth) {
     int suffix = localSize(memoized, absolute.size());
     return suffix == 0 ? 0 : depth + suffix;
   }
@@ -686,25 +685,10 @@ public class ParseContext implements
    * Places a memoized frame's rule-local stack suffix on top of the current parse stack, as if
    * the memoized rule had just failed here.
    */
-  private List<ParseFailureDiagnostics.ParseStackElement> rebaseMemoStack(
-      FailureDiagnostic memoized, List<ParseFailureDiagnostics.ParseStackElement> absolute) {
-    List<ParseFailureDiagnostics.ParseStackElement> localSuffix = localStackSuffix(memoized, absolute);
-    if (localSuffix.isEmpty()) return Collections.emptyList();
-    List<ParseFailureDiagnostics.ParseStackElement> result = snapshotStackElements();
-    for (ParseFailureDiagnostics.ParseStackElement element : localSuffix) {
-      result.add(new ParseFailureDiagnostics.ParseStackElement(
-          element.getParserClassName(), result.size(), element.getStartOffset(),
-          element.getMaxConsumedOffset(), element.getMaxMatchedOffset()));
-    }
-    return result;
-  }
-
-  /** The part of an absolute stack that belongs to the frame's own rule (a view, not a copy). */
-  private static List<ParseFailureDiagnostics.ParseStackElement> localStackSuffix(
-      FailureDiagnostic diagnostic,
-      List<ParseFailureDiagnostics.ParseStackElement> absoluteSnapshot) {
-    int base = Math.min(diagnostic.stackBaseDepth, absoluteSnapshot.size());
-    return absoluteSnapshot.subList(base, absoluteSnapshot.size());
+  private StackSnapshot rebaseMemoStack(FailureDiagnostic memoized, StackSnapshot absolute) {
+    int base = Math.min(memoized.stackBaseDepth, absolute.size());
+    if (base == absolute.size()) return StackSnapshot.EMPTY;
+    return snapshotStackElements().concat(absolute, base);
   }
 
   /**
@@ -895,8 +879,9 @@ public class ParseContext implements
     CodePointIndex codePointIndex = new CodePointIndex(effectiveOffset);
     int line = source.lineNumberFrom(codePointIndex).value();
     int column = source.codePointIndexInLineFrom(codePointIndex).value();
-    List<ParseFailureDiagnostics.ParseStackElement> stack =
-        farthestFailureStackElements.isEmpty() ? maxReachedStackElements : farthestFailureStackElements;
+    List<ParseFailureDiagnostics.ParseStackElement> maxReached = maxReachedStackElements.materialize();
+    List<ParseFailureDiagnostics.ParseStackElement> farthestFailure = farthestFailureStackElements.materialize();
+    List<ParseFailureDiagnostics.ParseStackElement> stack = farthestFailure.isEmpty() ? maxReached : farthestFailure;
 
     List<String> expectedParsers = new ArrayList<>();
     List<ParseFailureDiagnostics.ExpectedHintCandidate> expectedHints = new ArrayList<>();
@@ -1000,7 +985,7 @@ public class ParseContext implements
     }
     int reached = Math.max(consumed, matched);
     int depth = parseFrames.size();
-    List<ParseFailureDiagnostics.ParseStackElement> snapshot = null;
+    StackSnapshot snapshot = null;
     if (reached > maxReachedOffset) {
       maxReachedOffset = reached;
       snapshot = snapshotStackElements();
@@ -1040,7 +1025,7 @@ public class ParseContext implements
     }
     Parser terminalParser = deepestTerminalParser();
     int depth = parseFrames.size();
-    List<ParseFailureDiagnostics.ParseStackElement> snapshot = null;
+    StackSnapshot snapshot = null;
     if (candidateOffset > farthestFailureOffset) {
       farthestFailureOffset = candidateOffset;
       expectedAtFarthestFailure.clear();
@@ -1214,21 +1199,71 @@ public class ParseContext implements
     hints.add(hint);
   }
 
-  List<ParseFailureDiagnostics.ParseStackElement> snapshotStackElements() {
-    List<ParseFailureDiagnostics.ParseStackElement> elements =
-        new ArrayList<ParseFailureDiagnostics.ParseStackElement>(parseFrames.size());
-    int depth = 0;
+  /**
+   * Copies the open parse frames (root first) into a compact snapshot. Snapshots are taken every
+   * time the frontier advances and most are superseded before anyone reads them, so they hold
+   * primitive arrays and are expanded into ParseStackElements only on demand.
+   */
+  StackSnapshot snapshotStackElements() {
+    int size = parseFrames.size();
+    if (size == 0) return StackSnapshot.EMPTY;
+    Parser[] parsers = new Parser[size];
+    int[] offsets = new int[size * 3];
+    int index = 0;
     // parseFrames pushes to the front, so the descending iterator yields the root frame first.
-    for (Iterator<ParseFrame> frames = parseFrames.descendingIterator(); frames.hasNext();) {
+    for (Iterator<ParseFrame> frames = parseFrames.descendingIterator(); frames.hasNext(); index++) {
       ParseFrame frame = frames.next();
-      elements.add(new ParseFailureDiagnostics.ParseStackElement(
-          frame.parser.getClass().getSimpleName(),
-          depth++,
-          frame.startOffset,
-          frame.maxConsumedOffset,
-          frame.maxMatchedOffset));
+      parsers[index] = frame.parser;
+      offsets[index * 3] = frame.startOffset;
+      offsets[index * 3 + 1] = frame.maxConsumedOffset;
+      offsets[index * 3 + 2] = frame.maxMatchedOffset;
     }
-    return elements;
+    return new StackSnapshot(parsers, offsets);
+  }
+
+  /** Immutable parse-stack snapshot: one parser reference plus three offsets per frame, root first. */
+  static final class StackSnapshot {
+    static final StackSnapshot EMPTY = new StackSnapshot(new Parser[0], new int[0]);
+
+    private final Parser[] parsers;
+    private final int[] offsets;
+
+    StackSnapshot(Parser[] parsers, int[] offsets) {
+      this.parsers = parsers;
+      this.offsets = offsets;
+    }
+
+    int size() {
+      return parsers.length;
+    }
+
+    boolean isEmpty() {
+      return parsers.length == 0;
+    }
+
+    /** This snapshot followed by {@code suffix}'s frames from {@code base} on (a memo rebase). */
+    StackSnapshot concat(StackSnapshot suffix, int base) {
+      int extra = suffix.parsers.length - base;
+      Parser[] mergedParsers = java.util.Arrays.copyOf(parsers, parsers.length + extra);
+      System.arraycopy(suffix.parsers, base, mergedParsers, parsers.length, extra);
+      int[] mergedOffsets = java.util.Arrays.copyOf(offsets, offsets.length + extra * 3);
+      System.arraycopy(suffix.offsets, base * 3, mergedOffsets, offsets.length, extra * 3);
+      return new StackSnapshot(mergedParsers, mergedOffsets);
+    }
+
+    /** Expands to the public element list; depth is the position from the root. */
+    List<ParseFailureDiagnostics.ParseStackElement> materialize() {
+      List<ParseFailureDiagnostics.ParseStackElement> elements = new ArrayList<>(parsers.length);
+      for (int i = 0; i < parsers.length; i++) {
+        elements.add(new ParseFailureDiagnostics.ParseStackElement(
+            parsers[i].getClass().getSimpleName(),
+            i,
+            offsets[i * 3],
+            offsets[i * 3 + 1],
+            offsets[i * 3 + 2]));
+      }
+      return elements;
+    }
   }
 
   static class ParseFrame {
