@@ -9,6 +9,7 @@ import org.unlaxer.StringSource;
 import org.unlaxer.parser.Parsers;
 import org.unlaxer.parser.combinator.DoConsumePropagationStopper;
 import org.unlaxer.parser.combinator.LazyChain;
+import org.unlaxer.parser.combinator.LazyChoice;
 import org.unlaxer.parser.combinator.Not;
 import org.unlaxer.parser.elementary.WordParser;
 
@@ -25,6 +26,37 @@ public class MemoDiagnosticFrameTest {
         private static final long serialVersionUID = 1L;
         @Override public Parsers getLazyParsers() {
             return new Parsers(new WordParser("a"), new WordParser("x"));
+        }
+    }
+
+    /** Fails at offset 1 expecting "q"; popped with a failure inside MiddleSucceeds. */
+    static final class InnerFailsAtOne extends LazyChain implements SafeFailureMemoizable {
+        private static final long serialVersionUID = 1L;
+        @Override public Parsers getLazyParsers() {
+            return new Parsers(new WordParser("a"), new WordParser("q"));
+        }
+    }
+
+    /** Succeeds on its second alternative, so its frame is popped by a success. */
+    static final class MiddleSucceeds extends LazyChoice implements SafeFailureMemoizable {
+        private static final long serialVersionUID = 1L;
+        @Override public Parsers getLazyParsers() {
+            return new Parsers(new InnerFailsAtOne(), new WordParser("a"));
+        }
+    }
+
+    /** Fails at offset 2 expecting "m"; popped with a failure. */
+    static final class DeepFailsAtTwo extends LazyChain implements SafeFailureMemoizable {
+        private static final long serialVersionUID = 1L;
+        @Override public Parsers getLazyParsers() {
+            return new Parsers(new WordParser("b"), new WordParser("m"));
+        }
+    }
+
+    static final class OuterNested extends LazyChain implements SafeFailureMemoizable {
+        private static final long serialVersionUID = 1L;
+        @Override public Parsers getLazyParsers() {
+            return new Parsers(new MiddleSucceeds(), new DeepFailsAtTwo());
         }
     }
 
@@ -54,6 +86,38 @@ public class MemoDiagnosticFrameTest {
                 local.farthestFailureOffset);
             assertTrue(context.expectedParsersOf(local).stream().anyMatch(expected -> expected.contains("x")));
             assertTrue(context.expectedParsersOf(local).stream().noneMatch("z"::equals));
+        }
+    }
+
+    @Test
+    public void nestedFramesMergeIntoTheOuterFrameOnSuccessAndFailurePops() {
+        String expectedM = new WordParser("m").expectedDisplayTexts().get(0);
+        String expectedQ = new WordParser("q").expectedDisplayTexts().get(0);
+        OuterNested outer = new OuterNested();
+        try (ParseContext context = context()) {
+            ParseContext.FailureDiagnostic frame = context.beginMemoDiagnosticFrame();
+            assertTrue(outer.parse(context).isFailed());
+            context.discardMemoDiagnosticFrame(frame);
+
+            // The inner failure at 1 was superseded by the deeper failure at 2 inside the same frame,
+            // whether the intermediate frames were popped by success (middle) or failure (deep).
+            assertEquals(2, frame.farthestFailureOffset);
+            assertEquals(2, frame.maxReachedOffset);
+            java.util.List<String> expected = context.expectedParsersOf(frame);
+            assertTrue(expected.toString(), expected.contains(expectedM));
+            assertTrue(expected.toString(), !expected.contains(expectedQ));
+
+            ParseFailureDiagnostics first = context.getParseFailureDiagnostics();
+            assertEquals(2, first.getFarthestOffset());
+            assertTrue(first.getExpectedParsers().contains(expectedM));
+
+            // A memo hit replays the stored frame and must reproduce the same diagnostics.
+            assertTrue(outer.parse(context).isFailed());
+            assertEquals(1, context.getPackratMemoTable().failureHits());
+            ParseFailureDiagnostics replayed = context.getParseFailureDiagnostics();
+            assertEquals(first.getExpectedParsers(), replayed.getExpectedParsers());
+            assertEquals(first.getFarthestOffset(), replayed.getFarthestOffset());
+            assertEquals(first.getMaxReachedStackElements().size(), replayed.getMaxReachedStackElements().size());
         }
     }
 
