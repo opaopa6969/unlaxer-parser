@@ -265,4 +265,39 @@ public class ParseFailureDiagnosticsTest {
                 .collect(Collectors.toList());
         }
     }
+
+    @Test
+    public void sameOffsetHints_keepFirstSeenOrderAndDropDuplicatesAcrossAlternatives() {
+        // Six alternatives fail at offset 2 after "ab". Alternatives 1 and 4 expect the same "x"
+        // literal, so the reported hints must list x, y, z, w once each in first-seen order, and
+        // the same candidates must be reported when the shared literal appears first.
+        WordParser ab = new WordParser("ab");
+        Choice grammar = new Choice(
+            new Chain(new WordParser("ab"), new WordParser("x")),
+            new Chain(new WordParser("ab"), new WordParser("y")),
+            new Chain(new WordParser("ab"), new Chain(new WordParser("z"))),
+            new Chain(new WordParser("ab"), new WordParser("x")),
+            new Chain(new WordParser("ab"), new WordParser("w")),
+            new Chain(new WordParser("ab"), new WordParser("y")));
+        StringSource source = StringSource.createRootSource("abq");
+        try (ParseContext ctx = new ParseContext(source, CreateMetaTokenSpecifier.createMetaOn)) {
+            assertTrue("parse should fail", grammar.parse(ctx).isFailed());
+            ParseFailureDiagnostics diagnostics = ctx.getParseFailureDiagnostics();
+            assertEquals("failure offset", 2, diagnostics.getFarthestOffset());
+            List<String> hints = diagnostics.getExpectedParsers();
+            // Display hints wrap the literal (for example in quotes), so keep only the letter.
+            List<String> literalHints = hints.stream()
+                .map(hint -> hint.replaceAll("[^xyzw]", ""))
+                .filter(letter -> letter.length() == 1)
+                .collect(Collectors.toList());
+            assertEquals("hints were " + hints, List.of("x", "y", "z", "w"), literalHints);
+            assertEquals("hint list must not repeat entries", hints.size(), hints.stream().distinct().count());
+            List<ParseFailureDiagnostics.ExpectedHintCandidate> candidates = diagnostics.getExpectedHintCandidates();
+            long distinctPairs = candidates.stream()
+                .map(candidate -> candidate.getDisplayHint() + "|" + candidate.getParserQualifiedClassName())
+                .distinct().count();
+            assertEquals("candidates must not repeat (hint, parser) pairs", candidates.size(), distinctPairs);
+        }
+        assertNotNull(ab);
+    }
 }
