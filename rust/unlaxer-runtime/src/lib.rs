@@ -488,7 +488,10 @@ pub struct CheckpointMetrics {
     pub rolled_back: u64,
     pub nonempty_payload_snapshots: u64,
     pub empty_payload_checkpoints: u64,
+    /// Deep copies caused by COW payload mutation.
     pub copy_on_write_deep_copies: u64,
+    /// Scope undo records created since metrics were enabled, including rolled-back records.
+    pub scope_journal_entries: u64,
 }
 
 struct Checkpoint {
@@ -498,7 +501,7 @@ struct Checkpoint {
     metrics_counted: bool,
     captures: Option<Rc<HashMap<String, Vec<Span>>>>,
     state: Option<Rc<StateMap>>,
-    scopes: Option<Rc<ScopeStore>>,
+    scopes_journal_mark: usize,
 }
 
 struct ChoiceWinner {
@@ -508,7 +511,7 @@ struct ChoiceWinner {
     nodes: Vec<Node>,
     captures: Rc<HashMap<String, Vec<Span>>>,
     state: Rc<StateMap>,
-    scopes: Rc<ScopeStore>,
+    scopes: ScopeStore,
     fragment: Fragment,
 }
 
@@ -675,7 +678,7 @@ pub struct ParseContext<'a> {
     byte_offsets: Vec<usize>,
     captures: Rc<HashMap<String, Vec<Span>>>,
     state: Rc<StateMap>,
-    scopes: Rc<ScopeStore>,
+    scopes: ScopeStore,
     call_depth: usize,
     options: ParseOptions,
     grammar_session: u64,
@@ -685,6 +688,7 @@ pub struct ParseContext<'a> {
     diagnostic_frames: Vec<FailureDiagnostic>,
     memoized_failure_hits: usize,
     checkpoint_metrics: Option<CheckpointMetrics>,
+    checkpoint_metrics_scope_journal_base: u64,
 }
 
 /// Ordered choice with rollback and full-input acceptance. Rule nesting is bounded at 256.
@@ -794,8 +798,7 @@ fn parse_detailed_owned(
                 nodes: parser.nodes,
                 root,
                 byte_offsets: parser.byte_offsets,
-                scopes: Rc::try_unwrap(parser.scopes)
-                    .unwrap_or_else(|scopes| scopes.as_ref().clone()),
+                scopes: parser.scopes,
             });
         }
         trailing_offset = Some(parser.code_point(parser.position));
@@ -843,7 +846,7 @@ impl<'a> ParseContext<'a> {
                 .collect(),
             captures: Rc::new(HashMap::new()),
             state: Rc::new(StateMap::default()),
-            scopes: Rc::new(ScopeStore::default()),
+            scopes: ScopeStore::default(),
             call_depth: 0,
             options,
             grammar_session: 0,
@@ -853,6 +856,7 @@ impl<'a> ParseContext<'a> {
             diagnostic_frames: vec![],
             memoized_failure_hits: 0,
             checkpoint_metrics: None,
+            checkpoint_metrics_scope_journal_base: 0,
         }
     }
 
@@ -863,12 +867,20 @@ impl<'a> ParseContext<'a> {
     /// Enables parse-local checkpoint counters, initially reset to zero.
     pub fn enable_checkpoint_metrics(&mut self) {
         self.checkpoint_metrics = Some(CheckpointMetrics::default());
+        self.checkpoint_metrics_scope_journal_base = self.scopes.journal_entries_created();
     }
 
     /// Returns a stable snapshot without disabling collection. Before enabling,
     /// every counter is zero.
     pub fn snapshot_checkpoint_metrics(&self) -> CheckpointMetrics {
-        self.checkpoint_metrics.unwrap_or_default()
+        let mut metrics = self.checkpoint_metrics.unwrap_or_default();
+        if self.checkpoint_metrics.is_some() {
+            metrics.scope_journal_entries = self
+                .scopes
+                .journal_entries_created()
+                .saturating_sub(self.checkpoint_metrics_scope_journal_base);
+        }
+        metrics
     }
 
     #[cfg(test)]
@@ -900,7 +912,7 @@ impl<'a> ParseContext<'a> {
             nodes: self.nodes.clone(),
             root,
             byte_offsets: self.byte_offsets.clone(),
-            scopes: self.scopes.as_ref().clone(),
+            scopes: self.scopes.clone(),
         })
     }
     pub fn text(&self, span: Span) -> Option<&'a str> {
@@ -1102,11 +1114,12 @@ impl<'a> ParseContext<'a> {
     fn checkpoint(&mut self) -> Checkpoint {
         let captures = (!self.captures.is_empty()).then(|| Rc::clone(&self.captures));
         let state = (!self.state.0.is_empty()).then(|| Rc::clone(&self.state));
-        let scopes = (!self.scopes.is_empty()).then(|| Rc::clone(&self.scopes));
+        let scopes_nonempty = !self.scopes.is_empty();
+        let scopes_journal_mark = self.scopes.checkpoint();
         let metrics_counted = self.checkpoint_metrics.is_some();
         if let Some(metrics) = &mut self.checkpoint_metrics {
             metrics.opened += 1;
-            if captures.is_some() || state.is_some() || scopes.is_some() {
+            if captures.is_some() || state.is_some() || scopes_nonempty {
                 metrics.nonempty_payload_snapshots += 1;
             } else {
                 metrics.empty_payload_checkpoints += 1;
@@ -1118,12 +1131,13 @@ impl<'a> ParseContext<'a> {
             nodes: self.nodes.len(),
             metrics_counted,
             captures,
-            scopes,
+            scopes_journal_mark,
             state,
         }
     }
 
     fn commit_checkpoint(&mut self, checkpoint: Checkpoint) {
+        self.scopes.commit_checkpoint();
         if checkpoint.metrics_counted {
             if let Some(metrics) = &mut self.checkpoint_metrics {
                 metrics.committed += 1;
@@ -1158,15 +1172,8 @@ impl<'a> ParseContext<'a> {
                 self.state = Rc::new(StateMap::default());
             }
         }
-        if let Some(scopes) = checkpoint.scopes {
-            self.scopes = scopes;
-        } else if !self.scopes.is_empty() {
-            if let Some(scopes) = Rc::get_mut(&mut self.scopes) {
-                *scopes = ScopeStore::default();
-            } else {
-                self.scopes = Rc::new(ScopeStore::default());
-            }
-        }
+        self.scopes
+            .rollback_checkpoint(checkpoint.scopes_journal_mark);
     }
 
     fn record_cow_copy(&mut self) {
@@ -1190,10 +1197,7 @@ impl<'a> ParseContext<'a> {
     }
 
     fn scopes_mut_store(&mut self) -> &mut ScopeStore {
-        if Rc::strong_count(&self.scopes) > 1 {
-            self.record_cow_copy();
-        }
-        Rc::make_mut(&mut self.scopes)
+        &mut self.scopes
     }
     fn code_point(&self, byte: usize) -> usize {
         self.byte_offsets
@@ -1774,20 +1778,27 @@ impl<'a> ParseContext<'a> {
                         nodes: self.nodes[node_start..].to_vec(),
                         captures: Rc::clone(&self.captures),
                         state: Rc::clone(&self.state),
-                        scopes: Rc::clone(&self.scopes),
+                        scopes: {
+                            let mut scopes = self.scopes.clone();
+                            scopes.commit_checkpoint();
+                            scopes
+                        },
                         fragment,
                     });
                 }
             }
             self.restore(checkpoint);
         }
-        winner.map(|winner| {
+        winner.map(|mut winner| {
             debug_assert_eq!(self.nodes.len(), winner.node_start);
             self.position = winner.position;
             self.matched_position = winner.matched_position;
             self.nodes.extend(winner.nodes);
             self.captures = winner.captures;
             self.state = winner.state;
+            winner
+                .scopes
+                .retain_journal_entry_count(self.scopes.journal_entries_created());
             self.scopes = winner.scopes;
             winner.fragment
         })

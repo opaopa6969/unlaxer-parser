@@ -98,6 +98,57 @@ fn nested_commit_is_undone_by_outer_rollback_including_lazy_initialization() {
 }
 
 #[test]
+fn outer_rollback_after_nested_commit_restores_depth_and_ordered_scope_payloads() {
+    let mut context = ParseContext::new("");
+    context.scopes_mut().declare("root", 1);
+    context.scopes_mut().add_reference("root", 1, 4);
+    context
+        .scopes_mut()
+        .add_diagnostic("root diagnostic", 1, 4, Severity::Info);
+    let initial = context.scopes().clone();
+
+    let rejected: Result<(), _> = context.transaction(|outer| {
+        outer.scopes_mut().enter();
+        outer.scopes_mut().declare("outer", 2);
+        outer.transaction(|inner| {
+            inner.scopes_mut().enter();
+            inner.scopes_mut().declare("inner", 3);
+            inner.scopes_mut().add_reference("inner", 3, 5);
+            inner
+                .scopes_mut()
+                .add_diagnostic("inner diagnostic", 3, 5, Severity::Warning);
+            inner.scopes_mut().leave();
+            Ok(())
+        })?;
+        assert_eq!(outer.scopes().current_scope_depth(), 1);
+        assert_eq!(outer.scopes().all_declarations().len(), 3);
+        assert_eq!(outer.scopes().all_references().len(), 2);
+        assert_eq!(outer.scopes().diagnostics().len(), 2);
+        Err(outer.error("rollback everything"))
+    });
+
+    assert!(rejected.is_err());
+    assert_eq!(context.scopes(), &initial);
+    assert_eq!(context.scopes().current_scope_depth(), 0);
+}
+
+#[test]
+fn rollback_of_same_scope_redeclaration_restores_previous_lookup_entry() {
+    let mut context = ParseContext::new("");
+    context.scopes_mut().declare("same", 7);
+
+    let rejected: Result<(), _> = context.transaction(|local| {
+        local.scopes_mut().declare("same", 99);
+        assert_eq!(local.scopes().resolve("same").unwrap().source_offset, 99);
+        Err(local.error("reject redeclaration"))
+    });
+
+    assert!(rejected.is_err());
+    assert_eq!(context.scopes().resolve("same").unwrap().source_offset, 7);
+    assert_eq!(context.scopes().all_declarations().len(), 1);
+}
+
+#[test]
 fn scoped_custom_operation_hides_names_but_retains_successful_events() {
     let mut context = ParseContext::new("a");
     context.scopes_mut().declare("a", 42);
