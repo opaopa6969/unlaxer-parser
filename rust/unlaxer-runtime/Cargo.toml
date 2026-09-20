@@ -8,3 +8,12 @@ publish = false
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+stats_alloc = "0.1"
+
+# Allocation counting is process-wide, so this test runs its scenarios sequentially
+# without the multi-threaded libtest harness.
+[[test]]
+name = "checkpoint_allocation"
+harness = false
