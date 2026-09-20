@@ -55,6 +55,28 @@ memoization を再開しない。unsafe 中の parser/state 変化より前の s
 - custom/unknown token parser（`token X = SomeParser`）
 - import namespace 経由など、生成器が純粋性を証明できない参照
 
+状態を参照せず、失敗時に `ParseContext` への observable な副作用を残さない custom token
+parser は、token alias ごとに明示的に許可できる。同じ設定を複数行書ける。
+
+```ubnf
+@memoSafeToken: IDENTIFIER
+@memoSafeToken: NUMBER
+token IDENTIFIER = example.IdentifierParser
+token NUMBER = example.NumberParser
+```
+
+対象は `TokenDecl.Simple` の alias だけであり、設定の重複、未定義 alias、block 値、built-in
+token 宣言への指定は validator error になる。この宣言は parser 実装の安全性を利用者が保証する
+契約であり、設定した leaf を参照する rule と、安全な依存だけを持つ ancestor が memo 対象になる。
+未指定の custom token は従来どおり fail-closed で unsafe のままである。未知の global setting に
+対する従来の validator 互換性は変更しない。
+
+Rust runtime の built-in `Expr` は runtime が所有する既知の実装なので、既に failure
+memoization の安全対象である。現在の Rust generator は任意の Java custom token class を Rust
+実装へ接続する仕組みを持たないため、`@memoSafeToken` を Rust custom token の許可にはまだ使用
+しない。将来 custom token 接続を追加するときは、同じ alias 単位の設定を安全性の明示契約として
+尊重し、未指定 custom token とその ancestor を fail-closed で除外する。
+
 capture、scope、back-reference、rollback、user state、`MatchedTokenParser` のように結果が
 現在の context に依存し得る処理は、明示的に安全と証明されない限り cache されない。
 

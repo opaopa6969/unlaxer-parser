@@ -68,11 +68,15 @@ impl Lowering<'_> {
         }
         let mut whitespace = false;
         let mut settings = HashSet::new();
+        let mut memo_safe_tokens = HashSet::new();
         for setting in &self.grammar.settings {
-            if !settings.insert(&setting.key) {
+            if setting.key != "memoSafeToken" && !settings.insert(&setting.key) {
                 return Err(format!("duplicate setting {}", setting.key));
             }
             let SettingValue::String(value) = &setting.value else {
+                if setting.key == "memoSafeToken" {
+                    return Err("memoSafeToken requires token alias string".into());
+                }
                 return Err(format!("unsupported block setting {}", setting.key));
             };
             match setting.key.as_str() {
@@ -81,6 +85,21 @@ impl Lowering<'_> {
                         .map_err(|_| format!("unsupported setting whitespace: {value}"))?
                 }
                 "package" => {}
+                "memoSafeToken" => {
+                    let alias = value.trim();
+                    if !memo_safe_tokens.insert(alias) {
+                        return Err(format!("duplicate memoSafeToken alias {alias}"));
+                    }
+                    let Some(token) = self.grammar.tokens.iter().find(|token| token.name == alias)
+                    else {
+                        return Err(format!("memoSafeToken undefined token alias {alias}"));
+                    };
+                    if !matches!(token.kind, TokenKind::Simple { .. }) {
+                        return Err(format!(
+                            "memoSafeToken alias must name a Simple token {alias}"
+                        ));
+                    }
+                }
                 _ => return Err(format!("unsupported setting {}: {value}", setting.key)),
             }
         }

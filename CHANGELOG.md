@@ -13,6 +13,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 ### Added
 - Generated Mappers expose `mapParsedToken(Token[, preferredAstSimpleName])` and return both the selected token and mapped AST. Consumers can map an existing parse tree without reflection into private mapper methods or state.
 - Public parser boundary behavior now has regression coverage for source cursors, repeat bounds, case-insensitive words, and supplementary code points.
+- Java grammar settings can explicitly certify stateless custom token aliases for safe failure memoization with repeatable `@memoSafeToken: ALIAS` declarations; invalid, duplicate, and non-simple aliases are rejected deterministically.
 
 ### Deprecated
 - Correctly spelled public APIs now replace `Source.sourceToStgring()`, `NonTerminallSymbol`, and `HierarcyLevel`. The misspelled symbols remain as source- and behavior-compatible deprecated bridges and will not be removed before 3.2.0.

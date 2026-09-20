@@ -49,6 +49,7 @@ public class ParserGenerator implements CodeGenerator {
         final Map<String, String> tokenCIMap;           // token name -> word (CaseInsensitive)
         final Map<String, String> tokenRegexMap;        // token name -> regex pattern (Regex)
         final Set<String> ruleNames;
+        final Set<String> explicitlySafeMemoTokens;
         final Map<String, List<String>> helpers = new LinkedHashMap<>(); // rule -> helper codes
         final Map<String, CaptureBindingPlan> captureBindings = new LinkedHashMap<>();
         final Map<String, Boolean> useDelimitedChainByRule = new LinkedHashMap<>();
@@ -98,6 +99,12 @@ public class ParserGenerator implements CodeGenerator {
             }
             this.ruleNames = grammar.rules().stream()
                 .map(RuleDecl::name)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+            this.explicitlySafeMemoTokens = grammar.settings().stream()
+                .filter(setting -> "memoSafeToken".equals(setting.key()))
+                .map(setting -> setting.value() instanceof StringSettingValue value
+                    ? value.value().trim() : "")
+                .filter(alias -> !alias.isEmpty())
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         }
 
@@ -314,8 +321,9 @@ public class ParserGenerator implements CodeGenerator {
 
     /**
      * Fail-closed, transitive rule analysis for failure memoization. Simple token classes are
-     * treated as custom/unknown even when their names resemble built-ins. State-bearing
-     * annotations make both the rule and every rule that can reach it unsafe.
+     * treated as custom/unknown even when their names resemble built-ins, unless their token
+     * alias is explicitly listed by {@code @memoSafeToken}. State-bearing annotations make both
+     * the rule and every rule that can reach it unsafe.
      */
     private void analyzeSafeFailureMemoization(GenContext ctx) {
         Map<String, Set<String>> dependencies = new LinkedHashMap<>();
@@ -372,7 +380,8 @@ public class ParserGenerator implements CodeGenerator {
                 }
                 yield ctx.grammar.tokens().stream()
                     .filter(token -> token.name().equals(ref.name()))
-                    .findFirst().map(token -> !(token instanceof TokenDecl.Simple)).orElse(false);
+                    .findFirst().map(token -> !(token instanceof TokenDecl.Simple)
+                        || ctx.explicitlySafeMemoTokens.contains(ref.name())).orElse(false);
             }
             case org.unlaxer.dsl.bootstrap.UBNFAST.TerminalElement ignored -> true;
             case org.unlaxer.dsl.bootstrap.UBNFAST.RepeatElement repeat ->

@@ -54,6 +54,32 @@ public class JavaSafeFailureMemoizationGenerationTest {
     }
 
     @Test
+    public void explicitlySafeSimpleTokenAliasesAreSafeAndPropagateToAncestors() {
+        var grammar = UBNFMapper.parse("""
+            grammar MemoSafety {
+              @package: example.memo
+              @memoSafeToken: SAFE_A
+              @memoSafeToken: SAFE_B
+              token SAFE_A = example.SafeAParser
+              token SAFE_B = example.SafeBParser
+              token UNKNOWN = example.UnknownParser
+              @root Root ::= SafeAncestor | OtherLeaf | UnknownLeaf ;
+              SafeAncestor ::= SafeLeaf ;
+              SafeLeaf ::= SAFE_A SAFE_B ;
+              OtherLeaf ::= 'x' ;
+              UnknownLeaf ::= UNKNOWN ;
+            }
+            """).grammars().get(0);
+
+        String source = new ParserGenerator().generate(grammar).source();
+        assertFalse(declaration(source, "RootParser").contains("SafeFailureMemoizable"));
+        assertTrue(declaration(source, "SafeAncestorParser").contains("SafeFailureMemoizable"));
+        assertTrue(declaration(source, "SafeLeafParser").contains("SafeFailureMemoizable"));
+        assertTrue(declaration(source, "OtherLeafParser").contains("SafeFailureMemoizable"));
+        assertFalse(declaration(source, "UnknownLeafParser").contains("SafeFailureMemoizable"));
+    }
+
+    @Test
     public void mapperOffersOptionsAndLegacyEntryPointsDefaultOff() {
         var grammar = UBNFMapper.parse("""
             grammar MemoMapper {
