@@ -802,3 +802,46 @@ copy-on-write は「変更が無い frame」を安くするが、「変更があ
 mutation journal は逆に「変更の数」に比例する。どちらが有利かは mutation 頻度と状態サイズで決まり、profile で
 deep copy 回数と状態サイズを見てから選ぶ。journal は nested commit / outer rollback、longest choice の勝者採用、
 長寿命 context での履歴破棄という 3 つの境界条件を test に固定してから速度を測る。
+
+## ケース16: parse stack snapshot を persistent な親リンク構造にする
+
+### 仮説
+
+ケース13で snapshot を `Parser[]` + `int[]` にしたが、frontier が前進する・同じ offset でより深くなるたびに open frame 全部を
+配列に写していた。#213 後の再 profile では JFR の site 比率が comparison-heavy.tiny で 47.6% と出たが、ケース14の教訓どおり
+一時カウンタで精密に数えると、complex.tiny で 25,224 回・平均深さ 41.9・約 19.5 MB（総 allocation の 23.5%）、
+comparison-heavy.tiny で 17,269 回・平均深さ 21.7・約 7.1 MB（15.3%）だった。呼び元の大半は memo diagnostic frame 側の
+「同 offset でより深い」（complex 11,396 回）で、`int[]`（frame ごとに 3 int）が `Parser[]` の約 2.8 倍を占めていた。
+連続する snapshot は外側の frame がほとんど共通なので、frame ごとの不変 node を親リンクで繋げば割当は「変化した frame の数」に
+比例するはずだと考えた。
+
+### 実装
+
+- `StackSnapshot` を `{parent, parser, startOffset, maxConsumedOffset, maxMatchedOffset, size}` の不変 node にし、`EMPTY` を
+  size 0 の終端にする。`concat(suffix, base)` は suffix の base 以降の node を再親付け、`materialize()` は chain を root 先頭に展開する
+- `ParseFrame` に下の frame への参照 `below` と cached `snapshot` を持たせ、`updateMax` で値が変わったときだけキャッシュを捨てる。
+  `updateMax` は `startParse` / `endParse` / `trackCursorProgress` のいずれも stack top の frame にしか適用しないので、外側 frame の
+  キャッシュが内側の node から参照されたまま無効になることは無い
+- `snapshotStackElements()` は top frame の `snapshot()` を返すだけになり、再帰は「前回の変更以降 node を作っていない frame の数」で止まる
+
+### 観測
+
+Java allocation（JMH `gc.alloc.rate.norm`、public facade 1 parse）: complex.tiny 82,964,099 → 65,641,335 B（-20.9%）、
+comparison-heavy.tiny 46,361,449 → 39,651,879 B（-14.5%）。精密計測の見積もり（23.5% / 15.3%）とほぼ一致した。
+
+Timing（Java public facade、3-run 中央値、ms/op、baseline = master `11d3239`）:
+
+| Runtime | Fixture | Baseline runs | Baseline median | Candidate runs | Candidate median | 変化 |
+|---|---|---:|---:|---:|---:|---:|
+| Java | complex | 50.725 / 48.978 / 49.919 | **49.919** | 44.610 / 42.016 / 41.936 | **42.016** | **-15.83%** |
+| Java | comparison-heavy | 28.650 / 28.927 / 27.972 | **28.650** | 25.770 / 25.797 / 25.627 | **25.770** | **-10.05%** |
+
+両 fixture で baseline と candidate の run が完全に分離した（complex 49.0〜50.7 ms 対 41.9〜44.6 ms、comparison-heavy 28.0〜28.9 ms 対
+25.6〜25.8 ms）。allocation -21% / -15% に対して timing -16% / -10% と、ケース13（allocation -13% で timing -8%）と同じく
+割当削減がほぼ比例して時間に効いた。採用。
+
+### 教材としての要点
+
+「配列に写す」snapshot は O(深さ) の割当を毎回払う。stack のように変化が top に限られる構造では、不変 node の親リンク
+（persistent stack）にすると共有部分を再利用でき、割当は差分だけになる。このとき「誰が値を変えるか」を洗い出して、キャッシュを
+無効化する箇所が top 以外に無いことを確認してから採用する。JFR の site 比率は 3 度目も過大で、精密カウンタの見積もりは実測と一致した。
