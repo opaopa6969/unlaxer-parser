@@ -515,17 +515,18 @@ struct ChoiceWinner {
 #[derive(Debug, Clone, Default)]
 struct FailureDiagnostic {
     farthest: Option<usize>,
-    expected: BTreeSet<String>,
+    expected: BTreeSet<Rc<str>>,
 }
 
 impl FailureDiagnostic {
-    fn record(&mut self, position: usize, expected: &str) {
+    fn record(&mut self, position: usize, expected: &str, shared: &mut Option<Rc<str>>) {
         if self.farthest.is_none_or(|farthest| position > farthest) {
             self.farthest = Some(position);
             self.expected.clear();
         }
-        if self.farthest == Some(position) {
-            self.expected.insert(expected.to_owned());
+        if self.farthest == Some(position) && !self.expected.contains(expected) {
+            let expected = Rc::clone(shared.get_or_insert_with(|| Rc::from(expected)));
+            self.expected.insert(expected);
         }
     }
 }
@@ -555,7 +556,7 @@ pub struct ParseContext<'a> {
     matched_position: usize,
     nodes: Vec<Node>,
     farthest: usize,
-    expected: BTreeSet<String>,
+    expected: BTreeSet<Rc<str>>,
     byte_offsets: Vec<usize>,
     captures: Rc<HashMap<String, Vec<Span>>>,
     state: Rc<StateMap>,
@@ -687,7 +688,11 @@ fn parse_detailed_owned(
     }
     let farthest = ParseError {
         offset: parser.code_point(parser.farthest),
-        expected: parser.expected.into_iter().collect(),
+        expected: parser
+            .expected
+            .into_iter()
+            .map(|expected| expected.to_string())
+            .collect(),
     };
     Err(ParseDiagnostic {
         kind: if trailing_offset.is_some() {
@@ -869,7 +874,11 @@ impl<'a> ParseContext<'a> {
     pub fn failure(&self) -> ParseError {
         ParseError {
             offset: self.code_point(self.farthest),
-            expected: self.expected.iter().cloned().collect(),
+            expected: self
+                .expected
+                .iter()
+                .map(|expected| expected.to_string())
+                .collect(),
         }
     }
 
@@ -896,7 +905,11 @@ impl<'a> ParseContext<'a> {
                     self.expected.clear();
                 }
                 if byte == self.farthest {
-                    self.expected.extend(error.expected.iter().cloned());
+                    for expected in &error.expected {
+                        if !self.expected.contains(expected.as_str()) {
+                            self.expected.insert(Rc::from(expected.as_str()));
+                        }
+                    }
                 }
             }
             self.restore(checkpoint);
@@ -1093,15 +1106,17 @@ impl<'a> ParseContext<'a> {
     }
 
     fn fail_at(&mut self, position: usize, expected: &str) {
+        let mut shared = None;
         for diagnostic in &mut self.diagnostic_frames {
-            diagnostic.record(position, expected);
+            diagnostic.record(position, expected, &mut shared);
         }
         if position > self.farthest {
             self.farthest = position;
             self.expected.clear();
         }
-        if position == self.farthest {
-            self.expected.insert(expected.to_owned());
+        if position == self.farthest && !self.expected.contains(expected) {
+            let expected = shared.unwrap_or_else(|| Rc::from(expected));
+            self.expected.insert(expected);
         }
     }
 
@@ -1126,14 +1141,17 @@ impl<'a> ParseContext<'a> {
             whitespace: self.whitespace,
             depth,
         });
-        if let Some(diagnostic) = memo_key.and_then(|key| self.failure_memo.get(&key).cloned()) {
-            self.memoized_failure_hits += 1;
-            if let Some(position) = diagnostic.farthest {
-                for expected in diagnostic.expected {
-                    self.fail_at(position, &expected);
+        if let Some(key) = memo_key {
+            if let Some(diagnostic) = self.failure_memo.remove(&key) {
+                self.memoized_failure_hits += 1;
+                if let Some(position) = diagnostic.farthest {
+                    for expected in &diagnostic.expected {
+                        self.fail_at(position, expected);
+                    }
                 }
+                self.failure_memo.insert(key, diagnostic);
+                return None;
             }
-            return None;
         }
         if memo_key.is_some() {
             self.diagnostic_frames.push(FailureDiagnostic::default());
@@ -1985,6 +2003,19 @@ mod tests {
         assert_eq!(syntax.offset, 0);
         assert_eq!(syntax.expected, vec!["😀"]);
         assert!(parse_detailed(&rules, 0, false, "😀!?").is_ok());
+    }
+
+    #[test]
+    fn custom_parser_dynamic_expected_remains_owned() {
+        fn dynamic_failure(context: &mut ParseContext<'_>) -> ParseResult {
+            let expected = format!("dynamic {}", context.remaining());
+            Err(context.error(&expected))
+        }
+
+        let mut context = ParseContext::new("value");
+        let error = context.parse(&Expr::Custom(dynamic_failure)).unwrap_err();
+        assert_eq!(error.offset, 0);
+        assert_eq!(error.expected, vec!["dynamic value"]);
     }
 
     #[test]

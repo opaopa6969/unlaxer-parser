@@ -236,4 +236,33 @@ public class ParseFailureDiagnosticsTest {
             assertFalse("stack should not be empty", stack.isEmpty());
         }
     }
+
+    @Test
+    public void equalOffsetFailures_keepTheDeepestParseStackRegardlessOfOrder() {
+        // Both alternatives consume "ab" and then fail at offset 2. The second nests three
+        // chains deeper than the first, so the reported parse stack must be the deeper one
+        // whichever alternative fails first, and the expected hints must be the same union.
+        List<String> shallowFirst = failureStackClassNames(true);
+        List<String> deepFirst = failureStackClassNames(false);
+        assertEquals(List.of("Choice", "Chain", "Chain", "Chain", "WordParser"), shallowFirst);
+        assertEquals(shallowFirst, deepFirst);
+    }
+
+    private static List<String> failureStackClassNames(boolean shallowFirst) {
+        Chain shallow = new Chain(new WordParser("ab"), new WordParser("x"));
+        Chain deep = new Chain(new WordParser("ab"), new Chain(new Chain(new WordParser("y"))));
+        Choice grammar = shallowFirst ? new Choice(shallow, deep) : new Choice(deep, shallow);
+        StringSource source = StringSource.createRootSource("abz");
+        try (ParseContext ctx = new ParseContext(source, CreateMetaTokenSpecifier.createMetaOn)) {
+            assertTrue("parse should fail", grammar.parse(ctx).isFailed());
+            ParseFailureDiagnostics diagnostics = ctx.getParseFailureDiagnostics();
+            assertEquals("failure offset", 2, diagnostics.getFarthestOffset());
+            List<String> hints = diagnostics.getExpectedParsers();
+            assertTrue("hints should mention x: " + hints, hints.stream().anyMatch(hint -> hint.contains("x")));
+            assertTrue("hints should mention y: " + hints, hints.stream().anyMatch(hint -> hint.contains("y")));
+            return diagnostics.getMaxReachedStackElements().stream()
+                .map(ParseFailureDiagnostics.ParseStackElement::getParserClassName)
+                .collect(Collectors.toList());
+        }
+    }
 }
