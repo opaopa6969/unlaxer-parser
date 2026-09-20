@@ -87,6 +87,7 @@ public class ParseFailureDiagnostics {
     private final String parserQualifiedClassName;
     private final int parserDepth;
     private final boolean terminal;
+    private String dedupeKey;
 
     public ExpectedHintCandidate(
         String displayHint,
@@ -119,6 +120,16 @@ public class ParseFailureDiagnostics {
 
     public boolean isTerminal() {
       return terminal;
+    }
+
+    /** Identity used when de-duplicating hints: display hint plus qualified parser class. */
+    String dedupeKey() {
+      String key = dedupeKey;
+      if (key == null) {
+        key = displayHint + '|' + parserQualifiedClassName;
+        dedupeKey = key;
+      }
+      return key;
     }
   }
 

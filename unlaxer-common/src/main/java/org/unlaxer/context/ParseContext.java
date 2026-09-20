@@ -209,6 +209,19 @@ public class ParseContext implements
   List<String> expectedParsersAtFarthestFailure = new ArrayList<String>();
   List<ParseFailureDiagnostics.ExpectedHintCandidate> expectedHintCandidatesAtFarthestFailure =
       new ArrayList<ParseFailureDiagnostics.ExpectedHintCandidate>();
+  /* Dedupe keys mirror the two ordered lists above so hint merging avoids linear String scans. */
+  private final Set<String> expectedParserKeysAtFarthestFailure = new HashSet<>();
+  private final Set<String> expectedHintKeysAtFarthestFailure = new HashSet<>();
+  /*
+   * Hint candidates depend only on the parser graph and each TerminalSymbol's display texts,
+   * which are fixed for the life of a parse, so they are computed once per parser instance.
+   */
+  private final Map<Parser, List<ParseFailureDiagnostics.ExpectedHintCandidate>> hintCandidatesByParser =
+      new IdentityHashMap<>();
+  private final Map<Parser, java.util.Optional<ParseFailureDiagnostics.ExpectedHintCandidate>> terminalHintByParser =
+      new IdentityHashMap<>();
+  /* Open TerminalSymbol frames, innermost first, so the deepest terminal hint needs no stack scan. */
+  private final Deque<ParseFrame> terminalFrames = new ArrayDeque<>();
 
   // Trial recording for enriched parse failure diagnostics
   private List<ParseFailureDiagnostics.TrialRecord> trialHistory = new ArrayList<>();
@@ -358,8 +371,40 @@ public class ParseContext implements
     List<ParseFailureDiagnostics.ParseStackElement> farthestFailureStackElements = Collections.emptyList();
     final List<String> expectedParsers = new ArrayList<>();
     final List<ParseFailureDiagnostics.ExpectedHintCandidate> expectedHints = new ArrayList<>();
+    private final Set<String> expectedParserKeys = new HashSet<>();
+    private final Set<String> expectedHintKeys = new HashSet<>();
     final List<ParseFailureDiagnostics.TrialRecord> trials = new ArrayList<>();
     final List<MemoTransactionEvent> transactionEvents = new ArrayList<>();
+
+    void clearExpected() {
+      expectedParsers.clear();
+      expectedParserKeys.clear();
+      expectedHints.clear();
+      expectedHintKeys.clear();
+    }
+
+    /** Appends a display name unless an equal one is already listed. */
+    void addExpectedParser(String display) {
+      if (expectedParserKeys.add(display)) expectedParsers.add(display);
+    }
+
+    /** Appends a candidate unless an equal (display hint, parser class) pair is already listed. */
+    void addExpectedHint(ParseFailureDiagnostics.ExpectedHintCandidate hint) {
+      if (expectedHintKeys.add(hint.dedupeKey())) expectedHints.add(hint);
+    }
+
+    void setExpected(
+        List<String> parsers, List<ParseFailureDiagnostics.ExpectedHintCandidate> hints) {
+      clearExpected();
+      for (String display : parsers) {
+        expectedParsers.add(display);
+        expectedParserKeys.add(display);
+      }
+      for (ParseFailureDiagnostics.ExpectedHintCandidate hint : hints) {
+        expectedHints.add(hint);
+        expectedHintKeys.add(hint.dedupeKey());
+      }
+    }
   }
 
   private enum MemoTransactionEvent { BEGIN, COMMIT, ROLLBACK }
@@ -394,8 +439,7 @@ public class ParseContext implements
     result.farthestFailureOffset = farthestFailureOffset;
     result.maxReachedStackElements = maxReachedStackElements;
     result.farthestFailureStackElements = farthestFailureStackElements;
-    result.expectedParsers.addAll(expectedParsersAtFarthestFailure);
-    result.expectedHints.addAll(expectedHintCandidatesAtFarthestFailure);
+    result.setExpected(expectedParsersAtFarthestFailure, expectedHintCandidatesAtFarthestFailure);
     result.trials.addAll(trialHistory);
     return result;
   }
@@ -414,10 +458,7 @@ public class ParseContext implements
     target.farthestFailureOffset = source.farthestFailureOffset;
     target.maxReachedStackElements = source.maxReachedStackElements;
     target.farthestFailureStackElements = source.farthestFailureStackElements;
-    target.expectedParsers.clear();
-    target.expectedParsers.addAll(source.expectedParsers);
-    target.expectedHints.clear();
-    target.expectedHints.addAll(source.expectedHints);
+    target.setExpected(source.expectedParsers, source.expectedHints);
     target.trials.clear();
     target.trials.addAll(source.trials);
   }
@@ -429,10 +470,7 @@ public class ParseContext implements
     farthestFailureOffset = source.farthestFailureOffset;
     maxReachedStackElements = source.maxReachedStackElements;
     farthestFailureStackElements = source.farthestFailureStackElements;
-    expectedParsersAtFarthestFailure.clear();
-    expectedParsersAtFarthestFailure.addAll(source.expectedParsers);
-    expectedHintCandidatesAtFarthestFailure.clear();
-    expectedHintCandidatesAtFarthestFailure.addAll(source.expectedHints);
+    setGlobalExpected(source.expectedParsers, source.expectedHints);
     trialHistory.clear();
     trialHistory.addAll(source.trials);
   }
@@ -451,17 +489,86 @@ public class ParseContext implements
     }
   }
 
+  /**
+   * Merges a memoized rule failure into the global diagnostic and every open memo frame, as if
+   * the rule had just failed here. Rebased stacks have a known size (current depth plus the
+   * memoized local suffix), so they are only built when a merge below keeps them, and the
+   * memoized expected lists are read in place instead of being copied per frame.
+   */
   void replayFailureDiagnostic(FailureDiagnostic diagnostic) {
-    FailureDiagnostic rebased = copyOf(diagnostic);
-    rebased.maxReachedStackElements = rebaseMemoStack(diagnostic.maxReachedStackElements);
-    rebased.farthestFailureStackElements = rebaseMemoStack(diagnostic.farthestFailureStackElements);
-    mergeFailureDiagnosticIntoGlobal(rebased);
-    for (FailureDiagnostic active : memoDiagnosticFrames) {
-      FailureDiagnostic local = copyOf(rebased);
-      local.maxReachedStackElements = localStackSnapshot(active, rebased.maxReachedStackElements);
-      local.farthestFailureStackElements = localStackSnapshot(active, rebased.farthestFailureStackElements);
-      mergeFailureDiagnostic(active, local);
+    int depth = parseFrames.size();
+    int rebasedMaxSize = rebasedStackSize(diagnostic.maxReachedStackElements, depth);
+    int rebasedFarthestSize = rebasedStackSize(diagnostic.farthestFailureStackElements, depth);
+    List<ParseFailureDiagnostics.ParseStackElement> rebasedMax = null;
+    List<ParseFailureDiagnostics.ParseStackElement> rebasedFarthest = null;
+
+    farthestConsumedOffset = Math.max(farthestConsumedOffset, diagnostic.farthestConsumedOffset);
+    farthestMatchedOffset = Math.max(farthestMatchedOffset, diagnostic.farthestMatchedOffset);
+    if (diagnostic.maxReachedOffset > maxReachedOffset
+        || diagnostic.maxReachedOffset == maxReachedOffset
+            && rebasedMaxSize > maxReachedStackElements.size()) {
+      maxReachedOffset = diagnostic.maxReachedOffset;
+      if (rebasedMax == null) rebasedMax = rebaseMemoStack(diagnostic.maxReachedStackElements);
+      maxReachedStackElements = rebasedMax;
     }
+    if (diagnostic.farthestFailureOffset > farthestFailureOffset) {
+      farthestFailureOffset = diagnostic.farthestFailureOffset;
+      if (rebasedFarthest == null) rebasedFarthest = rebaseMemoStack(diagnostic.farthestFailureStackElements);
+      farthestFailureStackElements = rebasedFarthest;
+      clearGlobalExpected();
+    }
+    if (diagnostic.farthestFailureOffset == farthestFailureOffset) {
+      if (rebasedFarthestSize > farthestFailureStackElements.size()) {
+        if (rebasedFarthest == null) rebasedFarthest = rebaseMemoStack(diagnostic.farthestFailureStackElements);
+        farthestFailureStackElements = rebasedFarthest;
+      }
+      for (String expected : diagnostic.expectedParsers) addExpectedHint(expected);
+      for (ParseFailureDiagnostics.ExpectedHintCandidate hint : diagnostic.expectedHints) {
+        addExpectedHintCandidate(hint);
+      }
+    }
+    if (recordingTrials) trialHistory.addAll(diagnostic.trials);
+
+    if (memoDiagnosticFrames.isEmpty()) return;
+    for (FailureDiagnostic active : memoDiagnosticFrames) {
+      active.farthestConsumedOffset = Math.max(active.farthestConsumedOffset, diagnostic.farthestConsumedOffset);
+      active.farthestMatchedOffset = Math.max(active.farthestMatchedOffset, diagnostic.farthestMatchedOffset);
+      if (diagnostic.maxReachedOffset > active.maxReachedOffset
+          || diagnostic.maxReachedOffset == active.maxReachedOffset
+              && localSize(active, rebasedMaxSize) > active.maxReachedStackElements.size()) {
+        active.maxReachedOffset = diagnostic.maxReachedOffset;
+        if (rebasedMax == null) rebasedMax = rebaseMemoStack(diagnostic.maxReachedStackElements);
+        active.maxReachedStackElements = localStackSnapshot(active, rebasedMax);
+      }
+      if (diagnostic.farthestFailureOffset > active.farthestFailureOffset) {
+        active.farthestFailureOffset = diagnostic.farthestFailureOffset;
+        if (rebasedFarthest == null) rebasedFarthest = rebaseMemoStack(diagnostic.farthestFailureStackElements);
+        active.farthestFailureStackElements = localStackSnapshot(active, rebasedFarthest);
+        active.clearExpected();
+      }
+      if (diagnostic.farthestFailureOffset == active.farthestFailureOffset) {
+        if (localSize(active, rebasedFarthestSize) > active.farthestFailureStackElements.size()) {
+          if (rebasedFarthest == null) rebasedFarthest = rebaseMemoStack(diagnostic.farthestFailureStackElements);
+          active.farthestFailureStackElements = localStackSnapshot(active, rebasedFarthest);
+        }
+        for (String expected : diagnostic.expectedParsers) active.addExpectedParser(expected);
+        for (ParseFailureDiagnostics.ExpectedHintCandidate hint : diagnostic.expectedHints) {
+          active.addExpectedHint(hint);
+        }
+      }
+      active.trials.addAll(diagnostic.trials);
+    }
+  }
+
+  /** Size {@link #rebaseMemoStack} would produce for {@code localSuffix} at {@code depth} open frames. */
+  private static int rebasedStackSize(
+      List<ParseFailureDiagnostics.ParseStackElement> localSuffix, int depth) {
+    return localSuffix.isEmpty() ? 0 : depth + localSuffix.size();
+  }
+
+  /** Size {@link #localStackSnapshot} would produce from an absolute stack of {@code absoluteSize}. */
+  private static int localSize(FailureDiagnostic diagnostic, int absoluteSize) {
+    return absoluteSize - Math.min(diagnostic.stackBaseDepth, absoluteSize);
   }
 
   /** Replays only registered-state hooks; token/cursor transactions remain untouched on a hit. */
@@ -528,70 +635,24 @@ public class ParseContext implements
     return new ArrayList<>(absoluteSnapshot.subList(base, absoluteSnapshot.size()));
   }
 
-  private void mergeFailureDiagnosticIntoGlobal(FailureDiagnostic diagnostic) {
-    farthestConsumedOffset = Math.max(farthestConsumedOffset, diagnostic.farthestConsumedOffset);
-    farthestMatchedOffset = Math.max(farthestMatchedOffset, diagnostic.farthestMatchedOffset);
-    if (diagnostic.maxReachedOffset > maxReachedOffset
-        || diagnostic.maxReachedOffset == maxReachedOffset
-            && diagnostic.maxReachedStackElements.size() > maxReachedStackElements.size()) {
-      maxReachedOffset = diagnostic.maxReachedOffset;
-      maxReachedStackElements = diagnostic.maxReachedStackElements;
-    }
-    if (diagnostic.farthestFailureOffset > farthestFailureOffset) {
-      farthestFailureOffset = diagnostic.farthestFailureOffset;
-      farthestFailureStackElements = diagnostic.farthestFailureStackElements;
-      expectedParsersAtFarthestFailure.clear();
-      expectedHintCandidatesAtFarthestFailure.clear();
-    }
-    if (diagnostic.farthestFailureOffset == farthestFailureOffset) {
-      if (diagnostic.farthestFailureStackElements.size() > farthestFailureStackElements.size()) {
-        farthestFailureStackElements = diagnostic.farthestFailureStackElements;
-      }
-      for (String expected : diagnostic.expectedParsers) addExpectedHint(expected);
-      for (ParseFailureDiagnostics.ExpectedHintCandidate hint : diagnostic.expectedHints) {
-        addExpectedHintCandidate(hint);
-      }
-    }
-    if (recordingTrials) trialHistory.addAll(diagnostic.trials);
+  private void clearGlobalExpected() {
+    expectedParsersAtFarthestFailure.clear();
+    expectedParserKeysAtFarthestFailure.clear();
+    expectedHintCandidatesAtFarthestFailure.clear();
+    expectedHintKeysAtFarthestFailure.clear();
   }
 
-  private void mergeFailureDiagnostic(FailureDiagnostic target, FailureDiagnostic source) {
-    target.farthestConsumedOffset = Math.max(target.farthestConsumedOffset, source.farthestConsumedOffset);
-    target.farthestMatchedOffset = Math.max(target.farthestMatchedOffset, source.farthestMatchedOffset);
-    if (source.maxReachedOffset > target.maxReachedOffset
-        || source.maxReachedOffset == target.maxReachedOffset
-            && source.maxReachedStackElements.size() > target.maxReachedStackElements.size()) {
-      target.maxReachedOffset = source.maxReachedOffset;
-      target.maxReachedStackElements = source.maxReachedStackElements;
+  private void setGlobalExpected(
+      List<String> parsers, List<ParseFailureDiagnostics.ExpectedHintCandidate> hints) {
+    clearGlobalExpected();
+    for (String display : parsers) {
+      expectedParsersAtFarthestFailure.add(display);
+      expectedParserKeysAtFarthestFailure.add(display);
     }
-    if (source.farthestFailureOffset > target.farthestFailureOffset) {
-      target.farthestFailureOffset = source.farthestFailureOffset;
-      target.farthestFailureStackElements = source.farthestFailureStackElements;
-      target.expectedParsers.clear();
-      target.expectedHints.clear();
+    for (ParseFailureDiagnostics.ExpectedHintCandidate hint : hints) {
+      expectedHintCandidatesAtFarthestFailure.add(hint);
+      expectedHintKeysAtFarthestFailure.add(hint.dedupeKey());
     }
-    if (source.farthestFailureOffset == target.farthestFailureOffset) {
-      if (source.farthestFailureStackElements.size() > target.farthestFailureStackElements.size()) {
-        target.farthestFailureStackElements = source.farthestFailureStackElements;
-      }
-      for (String expected : source.expectedParsers) {
-        if (!target.expectedParsers.contains(expected)) target.expectedParsers.add(expected);
-      }
-      for (ParseFailureDiagnostics.ExpectedHintCandidate hint : source.expectedHints) {
-        addExpectedHintCandidate(target.expectedHints, hint);
-      }
-    }
-    target.trials.addAll(source.trials);
-  }
-
-  private void addExpectedHintCandidate(
-      List<ParseFailureDiagnostics.ExpectedHintCandidate> target,
-      ParseFailureDiagnostics.ExpectedHintCandidate candidate) {
-    for (ParseFailureDiagnostics.ExpectedHintCandidate current : target) {
-      if (current.getDisplayHint().equals(candidate.getDisplayHint())
-          && current.getParserQualifiedClassName().equals(candidate.getParserQualifiedClassName())) return;
-    }
-    target.add(candidate);
   }
 
   public boolean isRecordingTrials() {
@@ -691,6 +752,7 @@ public class ParseContext implements
         Transaction.super.getConsumedPosition().value(),
         Transaction.super.getMatchedPosition().value());
     parseFrames.push(frame);
+    if (parser instanceof TerminalSymbol) terminalFrames.push(frame);
     trackCursorProgress();
     ParserListenerContainer.super.startParse(parser, parseContext, tokenKind, invertMatch);
   }
@@ -721,6 +783,7 @@ public class ParseContext implements
         for (FailureDiagnostic diagnostic : memoDiagnosticFrames) diagnostic.trials.add(trial);
       }
       parseFrames.pollFirst();
+      if (frame.parser instanceof TerminalSymbol) terminalFrames.pollFirst();
     }
     ParserListenerContainer.super.endParse(parser, parsed, parseContext, tokenKind, invertMatch);
   }
@@ -875,8 +938,7 @@ public class ParseContext implements
     List<ParseFailureDiagnostics.ParseStackElement> snapshot = null;
     if (candidateOffset > farthestFailureOffset) {
       farthestFailureOffset = candidateOffset;
-      expectedParsersAtFarthestFailure.clear();
-      expectedHintCandidatesAtFarthestFailure.clear();
+      clearGlobalExpected();
       for (ParseFailureDiagnostics.ExpectedHintCandidate hint : parserHints) {
         addExpectedHintCandidate(hint);
       }
@@ -901,8 +963,7 @@ public class ParseContext implements
         if (snapshot == null) snapshot = snapshotStackElements();
         diagnostic.farthestFailureOffset = candidateOffset;
         diagnostic.farthestFailureStackElements = localStackSnapshot(diagnostic, snapshot);
-        diagnostic.expectedParsers.clear();
-        diagnostic.expectedHints.clear();
+        diagnostic.clearExpected();
       }
       if (candidateOffset == diagnostic.farthestFailureOffset) {
         if (localStackDepth(diagnostic, depth) > diagnostic.farthestFailureStackElements.size()) {
@@ -910,17 +971,9 @@ public class ParseContext implements
           diagnostic.farthestFailureStackElements = localStackSnapshot(diagnostic, snapshot);
         }
         for (ParseFailureDiagnostics.ExpectedHintCandidate hint : parserHints) {
-          addExpectedHintCandidate(diagnostic.expectedHints, hint);
-          String display = hint.getDisplayHint();
-          if (display != null && !display.isBlank()
-              && !diagnostic.expectedParsers.contains(display)) diagnostic.expectedParsers.add(display);
+          addMemoFrameHint(diagnostic, hint);
         }
-        terminalHint.ifPresent(hint -> {
-          addExpectedHintCandidate(diagnostic.expectedHints, hint);
-          String display = hint.getDisplayHint();
-          if (display != null && !display.isBlank()
-              && !diagnostic.expectedParsers.contains(display)) diagnostic.expectedParsers.add(display);
-        });
+        if (terminalHint.isPresent()) addMemoFrameHint(diagnostic, terminalHint.get());
       }
     }
   }
@@ -928,6 +981,13 @@ public class ParseContext implements
   /** Size of the memo-frame-local view of a parse stack with {@code depth} open frames. */
   private static int localStackDepth(FailureDiagnostic diagnostic, int depth) {
     return depth - Math.min(diagnostic.stackBaseDepth, depth);
+  }
+
+  private static void addMemoFrameHint(
+      FailureDiagnostic diagnostic, ParseFailureDiagnostics.ExpectedHintCandidate hint) {
+    diagnostic.addExpectedHint(hint);
+    String display = hint.getDisplayHint();
+    if (display != null && !display.isBlank()) diagnostic.addExpectedParser(display);
   }
 
   void addExpectedHintCandidate(ParseFailureDiagnostics.ExpectedHintCandidate candidate) {
@@ -938,11 +998,8 @@ public class ParseContext implements
     if (hint == null || hint.isBlank()) {
       return;
     }
-    for (ParseFailureDiagnostics.ExpectedHintCandidate current : expectedHintCandidatesAtFarthestFailure) {
-      if (current.getDisplayHint().equals(candidate.getDisplayHint())
-          && current.getParserQualifiedClassName().equals(candidate.getParserQualifiedClassName())) {
-        return;
-      }
+    if (false == expectedHintKeysAtFarthestFailure.add(candidate.dedupeKey())) {
+      return;
     }
     expectedHintCandidatesAtFarthestFailure.add(candidate);
     addExpectedHint(hint);
@@ -952,12 +1009,16 @@ public class ParseContext implements
     if (hint == null || hint.isBlank()) {
       return;
     }
-    if (false == expectedParsersAtFarthestFailure.contains(hint)) {
+    if (expectedParserKeysAtFarthestFailure.add(hint)) {
       expectedParsersAtFarthestFailure.add(hint);
     }
   }
 
   List<ParseFailureDiagnostics.ExpectedHintCandidate> expectedHintCandidatesFor(Parser parser) {
+    List<ParseFailureDiagnostics.ExpectedHintCandidate> cached = hintCandidatesByParser.get(parser);
+    if (cached != null) {
+      return cached;
+    }
     LinkedHashMap<String, ParseFailureDiagnostics.ExpectedHintCandidate> candidates =
         new LinkedHashMap<String, ParseFailureDiagnostics.ExpectedHintCandidate>();
     collectExpectedCandidatesIterative(parser, candidates, 2);
@@ -968,7 +1029,10 @@ public class ParseContext implements
           0);
       candidates.put(expectedCandidateKey(fallback), fallback);
     }
-    return new ArrayList<ParseFailureDiagnostics.ExpectedHintCandidate>(candidates.values());
+    List<ParseFailureDiagnostics.ExpectedHintCandidate> result = Collections.unmodifiableList(
+        new ArrayList<ParseFailureDiagnostics.ExpectedHintCandidate>(candidates.values()));
+    hintCandidatesByParser.put(parser, result);
+    return result;
   }
 
   void collectExpectedCandidatesIterative(
@@ -1021,17 +1085,33 @@ public class ParseContext implements
   }
 
   java.util.Optional<ParseFailureDiagnostics.ExpectedHintCandidate> deepestTerminalHintCandidate() {
-    for (ParseFrame frame : parseFrames) {
-      Parser parser = frame.parser;
-      if (parser instanceof TerminalSymbol) {
-        for (String expected : ((TerminalSymbol) parser).expectedDisplayTexts()) {
-          if (expected != null && false == expected.isBlank()) {
-            return java.util.Optional.of(newExpectedHintCandidate(parser, expected, 0));
-          }
-        }
+    if (terminalFrames.isEmpty()) {
+      return java.util.Optional.empty();
+    }
+    for (ParseFrame frame : terminalFrames) {
+      java.util.Optional<ParseFailureDiagnostics.ExpectedHintCandidate> hint = terminalHintFor(frame.parser);
+      if (hint.isPresent()) {
+        return hint;
       }
     }
     return java.util.Optional.empty();
+  }
+
+  /** The first non-blank display text of a TerminalSymbol as a depth-0 candidate, computed once. */
+  private java.util.Optional<ParseFailureDiagnostics.ExpectedHintCandidate> terminalHintFor(Parser parser) {
+    java.util.Optional<ParseFailureDiagnostics.ExpectedHintCandidate> cached = terminalHintByParser.get(parser);
+    if (cached != null) {
+      return cached;
+    }
+    java.util.Optional<ParseFailureDiagnostics.ExpectedHintCandidate> result = java.util.Optional.empty();
+    for (String expected : ((TerminalSymbol) parser).expectedDisplayTexts()) {
+      if (expected != null && false == expected.isBlank()) {
+        result = java.util.Optional.of(newExpectedHintCandidate(parser, expected, 0));
+        break;
+      }
+    }
+    terminalHintByParser.put(parser, result);
+    return result;
   }
 
   ParseFailureDiagnostics.ExpectedHintCandidate newExpectedHintCandidate(
@@ -1055,7 +1135,7 @@ public class ParseContext implements
   }
 
   String expectedCandidateKey(ParseFailureDiagnostics.ExpectedHintCandidate candidate) {
-    return candidate.getDisplayHint().concat("|").concat(candidate.getParserQualifiedClassName());
+    return candidate.dedupeKey();
   }
 
   void addIfPresent(LinkedHashSet<String> hints, String hint) {

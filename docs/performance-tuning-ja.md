@@ -333,3 +333,76 @@ Rust は `BTreeSet<String>` 挿入と memo hit の clone が消えた分が効�
 snapshot の要素数が既知の量（open frame 数）と一致するなら、まず量で比較し、必要なときだけ実体を作る。
 Rust 側の `to_owned()` も同じ形で、set が変わらない挿入のために文字列を確保していた。いずれも診断の
 出力契約は変えず、既存の test を「出力が変わっていない」証拠として使う。
+
+## ケース6: 失敗診断の hint 収集を incremental にする
+
+### 仮説
+
+ケース5で診断の allocation を止めた後、TinyExpression public facade の Java CPU を JFR で見ると、
+77%（complex.tiny）〜84%（comparison-heavy.tiny）が失敗診断の hint 収集だった。transaction bookkeeping は
+6% 未満、parser dispatch は 5% 未満で、unlaxer-parser#209（effect summary）と #210（direct-rule-call）の
+上限効果はこの時点では小さい（#209 は着手前 profile を根拠に不採用として記録した）。
+
+hint 収集の内訳は、`addExpectedHintCandidate` が候補リストを線形走査して `String.equals` で重複判定する
+コスト、失敗した parser ごとに深さ 2 の BFS（`expectedHintCandidatesFor`）をやり直すコスト、
+innermost の `TerminalSymbol` を探して parse stack を走査するコスト、memo hit ごとに診断を copy して
+merge するコストだった。これらは「同じ答えを毎回計算し直している」だけで、診断の出力には影響しない。
+
+### 実装
+
+- 順序を保つ `expectedParsers` / `expectedHints` リストの横に key 集合（display hint、`hint|qualifiedClass`）を置き、
+  重複判定を O(1) にした。global と memo frame の両方で、clear / restore / merge も同じ helper を通す
+- `expectedHintCandidatesFor(parser)` は parser ごとに 1 回だけ計算して cache する。parser graph と
+  `TerminalSymbol.expectedDisplayTexts()` は 1 parse の間は不変、という契約を明文化した
+- `startParse` / `endParse` で open な `TerminalSymbol` frame の stack を並行して保守し、`deepestTerminalHintCandidate`
+  はその stack（通常 0〜2 要素）だけを見る。terminal ごとの候補も cache する
+- memo hit の replay は保存済み診断を copy せず、offset と size を先に比較して採用される場合だけ rebased stack を作り、
+  expected リストは参照のまま merge する
+
+Rust には hint の BFS は無いが、一時 timer による CPU attribution（complex.tiny、計測付き 29.9 ms/op）では
+失敗診断 `fail_at` / `failure()` が 43.7%、memo lookup / replay が 45.9%（inclusive、重複計上あり）で、
+Java と同じ「失敗のたびに全 open frame の集合へ記録し、memo hit のたびに remove → replay → insert する」構図だった。
+Rust では frame の expected を `BTreeSet<Rc<str>>` から遅延生成の小さな `Rc<Vec<Rc<str>>>` にし、
+既に先の位置で失敗している frame は即 skip、重複判定は `Rc::ptr_eq` を先に見てから文字列比較、memo hit は
+保存済み診断を O(1) で clone して共有文字列のまま replay する。`ParseError.expected` は生成時に sort + dedup し、
+従来の `BTreeSet` 順（文字列昇順）と byte 単位で一致させた。nested frame・負の lookahead・memo hit を含む
+grammar で `expected` が sort 済み・重複なしになる test を追加した。
+
+### 観測
+
+allocation（public facade 1 parse）: Java complex.tiny 299 MB → 184 MB（-38.5%）、comparison-heavy.tiny 132 MB → 94 MB（-28.5%）。
+
+CPU 分布（JFR ExecutionSample、depth 8 で分類）:
+
+| Fixture | 診断 | commit の token 収集・listener | transaction bookkeeping | dispatch 等 |
+|---|---:|---:|---:|---:|
+| complex（before） | 77.3% | 12.7% | 6.0% | 4.1% |
+| complex（after） | 66.1% | 13.8% | 11.1% | 9.0% |
+| comparison-heavy（before） | 84.4% | 7.7% | 2.7% | 5.3% |
+| comparison-heavy（after） | 66.2% | 13.5% | 6.1% | 14.2% |
+
+after でも診断が最大項目で、self frame の上位は `HashMap.putVal`（frontier に届く失敗ごとに、全 open memo frame の
+集合へ同じ hint を再登録する）と `registerFailureCandidate` 本体になった。「frontier では (parser, terminal) の pair だけを
+記録し、hint への展開は診断が要求されたときに行う」次段を unlaxer-parser#220 として切り出した。
+
+public facade の 3-run 中央値（ms/op、同一ホスト・直列・他負荷なし、baseline はケース5適用後）:
+
+| Runtime | Fixture | Baseline runs | Baseline median | Candidate runs | Candidate median | 変化 |
+|---|---|---:|---:|---:|---:|---:|
+| Java | complex | 175.103 / 177.431 / 185.600 | **177.431** | 123.616 / 122.938 / 117.131 | **122.938** | **-30.71%** |
+| Java | comparison-heavy | 90.602 / 88.884 / 87.172 | **88.884** | 58.933 / 59.413 / 58.704 | **58.933** | **-33.70%** |
+| Rust | complex | 16.856 / 17.069 / 17.347 | **17.069** | 10.943 / 11.518 / 10.725 | **10.943** | **-35.89%** |
+| Rust | comparison-heavy | 2.476 / 2.507 / 2.667 | **2.507** | 1.845 / 1.906 / 2.017 | **1.906** | **-23.98%** |
+
+Java は hint の再計算・線形走査・stack 走査が消えた分、Rust は frame ごとの `BTreeSet` 操作と memo hit の
+map 更新が消えた分が効いた。ケース5と合わせると、#207 時点から Java complex は 321 → 123 ms/op、Rust complex は
+27.2 → 10.9 ms/op になった。採用した。測定条件と raw data は
+[TinyExpression の実験レポート](https://github.com/opaopa6969/tinyexpression/blob/master/benchmarks/results/2026-09-21-diagnostic-hint-cpu-experiment.md)
+に保存している。
+
+### 教材としての要点
+
+allocation を止めても CPU の hotspot は残る。次に見るのは「同じ入力から同じ答えを繰り返し計算している場所」で、
+ここでは parser ごとの hint 候補、stack 走査、線形の重複判定だった。cache と集合化は出力を変えないので、既存の
+診断 test をそのまま等価性の証拠にできる。ただし cache は「何が不変か」の契約を必ず文書化する
+（ここでは parser graph と TerminalSymbol の display text）。

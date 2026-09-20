@@ -1,6 +1,5 @@
 //! Experimental UBNF structural subset. No JVM, unsafe code, or external dependencies.
 use std::any::Any;
-use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -515,20 +514,63 @@ struct ChoiceWinner {
 #[derive(Debug, Clone, Default)]
 struct FailureDiagnostic {
     farthest: Option<usize>,
-    expected: BTreeSet<Rc<str>>,
+    expected: Option<Rc<Vec<Rc<str>>>>,
 }
 
 impl FailureDiagnostic {
-    fn record(&mut self, position: usize, expected: &str, shared: &mut Option<Rc<str>>) {
+    fn record(
+        &mut self,
+        position: usize,
+        expected: &str,
+        replayed: Option<&Rc<str>>,
+        shared: &mut Option<Rc<str>>,
+    ) {
         if self.farthest.is_none_or(|farthest| position > farthest) {
             self.farthest = Some(position);
-            self.expected.clear();
+            if let Some(values) = &mut self.expected {
+                Rc::make_mut(values).clear();
+            }
         }
-        if self.farthest == Some(position) && !self.expected.contains(expected) {
-            let expected = Rc::clone(shared.get_or_insert_with(|| Rc::from(expected)));
-            self.expected.insert(expected);
+        if self.farthest == Some(position)
+            && !contains_expected(self.expected_values(), expected, replayed)
+        {
+            let expected = shared_expected(expected, replayed, shared);
+            Rc::make_mut(self.expected.get_or_insert_with(Default::default)).push(expected);
         }
     }
+
+    fn expected_values(&self) -> &[Rc<str>] {
+        self.expected.as_deref().map_or(&[], Vec::as_slice)
+    }
+}
+
+fn contains_expected(values: &[Rc<str>], expected: &str, shared: Option<&Rc<str>>) -> bool {
+    values.iter().any(|value| {
+        shared.is_some_and(|shared| Rc::ptr_eq(value, shared)) || value.as_ref() == expected
+    })
+}
+
+fn shared_expected(
+    expected: &str,
+    replayed: Option<&Rc<str>>,
+    shared: &mut Option<Rc<str>>,
+) -> Rc<str> {
+    if let Some(shared) = shared {
+        return Rc::clone(shared);
+    }
+    let value = replayed.map_or_else(|| Rc::from(expected), Rc::clone);
+    *shared = Some(Rc::clone(&value));
+    value
+}
+
+fn expected_strings<'a>(expected: impl IntoIterator<Item = &'a Rc<str>>) -> Vec<String> {
+    let mut expected: Vec<_> = expected
+        .into_iter()
+        .map(|expected| expected.to_string())
+        .collect();
+    expected.sort_unstable();
+    expected.dedup();
+    expected
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -556,7 +598,7 @@ pub struct ParseContext<'a> {
     matched_position: usize,
     nodes: Vec<Node>,
     farthest: usize,
-    expected: BTreeSet<Rc<str>>,
+    expected: Vec<Rc<str>>,
     byte_offsets: Vec<usize>,
     captures: Rc<HashMap<String, Vec<Span>>>,
     state: Rc<StateMap>,
@@ -688,11 +730,7 @@ fn parse_detailed_owned(
     }
     let farthest = ParseError {
         offset: parser.code_point(parser.farthest),
-        expected: parser
-            .expected
-            .into_iter()
-            .map(|expected| expected.to_string())
-            .collect(),
+        expected: expected_strings(&parser.expected),
     };
     Err(ParseDiagnostic {
         kind: if trailing_offset.is_some() {
@@ -724,7 +762,7 @@ impl<'a> ParseContext<'a> {
             matched_position: 0,
             nodes: vec![],
             farthest: 0,
-            expected: BTreeSet::new(),
+            expected: vec![],
             byte_offsets: input
                 .char_indices()
                 .map(|(i, _)| i)
@@ -874,11 +912,7 @@ impl<'a> ParseContext<'a> {
     pub fn failure(&self) -> ParseError {
         ParseError {
             offset: self.code_point(self.farthest),
-            expected: self
-                .expected
-                .iter()
-                .map(|expected| expected.to_string())
-                .collect(),
+            expected: expected_strings(&self.expected),
         }
     }
 
@@ -906,8 +940,8 @@ impl<'a> ParseContext<'a> {
                 }
                 if byte == self.farthest {
                     for expected in &error.expected {
-                        if !self.expected.contains(expected.as_str()) {
-                            self.expected.insert(Rc::from(expected.as_str()));
+                        if !contains_expected(&self.expected, expected, None) {
+                            self.expected.push(Rc::from(expected.as_str()));
                         }
                     }
                 }
@@ -1106,17 +1140,27 @@ impl<'a> ParseContext<'a> {
     }
 
     fn fail_at(&mut self, position: usize, expected: &str) {
+        self.fail_at_shared(position, expected, None);
+    }
+
+    fn fail_at_shared(&mut self, position: usize, expected: &str, replayed: Option<&Rc<str>>) {
         let mut shared = None;
         for diagnostic in &mut self.diagnostic_frames {
-            diagnostic.record(position, expected, &mut shared);
+            if diagnostic
+                .farthest
+                .is_some_and(|farthest| position < farthest)
+            {
+                continue;
+            }
+            diagnostic.record(position, expected, replayed, &mut shared);
         }
         if position > self.farthest {
             self.farthest = position;
             self.expected.clear();
         }
-        if position == self.farthest && !self.expected.contains(expected) {
-            let expected = shared.unwrap_or_else(|| Rc::from(expected));
-            self.expected.insert(expected);
+        if position == self.farthest && !contains_expected(&self.expected, expected, replayed) {
+            let expected = shared_expected(expected, replayed, &mut shared);
+            self.expected.push(expected);
         }
     }
 
@@ -1142,14 +1186,13 @@ impl<'a> ParseContext<'a> {
             depth,
         });
         if let Some(key) = memo_key {
-            if let Some(diagnostic) = self.failure_memo.remove(&key) {
+            if let Some(diagnostic) = self.failure_memo.get(&key).cloned() {
                 self.memoized_failure_hits += 1;
                 if let Some(position) = diagnostic.farthest {
-                    for expected in &diagnostic.expected {
-                        self.fail_at(position, expected);
+                    for expected in diagnostic.expected_values() {
+                        self.fail_at_shared(position, expected, Some(expected));
                     }
                 }
-                self.failure_memo.insert(key, diagnostic);
                 return None;
             }
         }
@@ -2176,6 +2219,47 @@ mod tests {
         assert_eq!(on.memoized_failure_hits(), 1);
         assert_eq!(error.offset, 1);
         assert_eq!(error.expected, vec!["x"]);
+    }
+
+    #[test]
+    fn memo_replay_across_nested_frames_keeps_expected_sorted_and_unique() {
+        let grammar = share_grammar(vec![
+            Rule {
+                name: "root",
+                expression: Expr::Sequence(vec![
+                    Expr::Lookahead {
+                        child: Box::new(Expr::Rule(1)),
+                        positive: false,
+                    },
+                    Expr::Rule(1),
+                ]),
+            },
+            Rule {
+                name: "outer",
+                expression: Expr::Choice(vec![
+                    Expr::Rule(2),
+                    Expr::Literal("z"),
+                    Expr::Literal("a"),
+                    Expr::Literal("a"),
+                ]),
+            },
+            Rule {
+                name: "inner",
+                expression: Expr::Choice(vec![Expr::Literal("m"), Expr::Literal("a")]),
+            },
+        ]);
+        let mut context = ParseContext::with_options(
+            "q",
+            ParseOptions::with_memoization(Memoization::SafeFailures),
+        );
+
+        let error = context
+            .parse_shared_grammar(&grammar, 0, false)
+            .unwrap_err();
+
+        assert_eq!(context.memoized_failure_hits(), 1);
+        assert_eq!(error.offset, 0);
+        assert_eq!(error.expected, vec!["a", "m", "z"]);
     }
 
     #[test]
