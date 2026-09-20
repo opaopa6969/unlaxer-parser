@@ -20,3 +20,7 @@ unsafe_code = "deny"
 [[test]]
 name = "checkpoint_allocation"
 harness = false
+
+[[test]]
+name = "diagnostic_allocation"
+harness = false
