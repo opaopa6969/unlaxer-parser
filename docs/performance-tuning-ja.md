@@ -529,3 +529,41 @@ public facade の 3-run 中央値（Java、ms/op、同一ホスト・直列・�
 「全部の frame に即時記録する」のは実装が素直だが、記録先の数がネスト深さに比例する。結合的・可換な merge で
 表せる情報なら、innermost にだけ記録して境界（pop）で親へ畳み込めば、正しさは merge の代数で示せる。
 Java/Rust で同じ設計を採ると、片側で書いた等価性の議論と test をもう片側にそのまま流用できる。
+
+## ケース9: commit 時と parse 後の token 経路から Stream pipeline を外す
+
+### 仮説
+
+ケース8の後、Java CPU の 25〜30% は「commit の token 収集・listener」に分類された。JFR の呼び出し元を深い stack で
+見ると、`CollectingParser.collect`（毎 commit の Stream + 中間 List + コピー）、`Token` のコンストラクタ（子の parent 設定と
+AST 子フィルタで Stream 2 本）、`TokenList.toSource`（防御的コピーと Stream join）、そして parse 後に毎 token を訪れる
+`AbstractTokenReducer.reduce` の Stream だった。#218 は allocation 基準（差 1%）で一度不採用にしたが、
+Stream pipeline の CPU コストは allocation とは別に効くため、CPU 基準で再評価した。
+
+### 実装
+
+4 箇所を事前サイズ付きの `TokenList` と添字ループに置き換えた。Token の内容・順序・kind・parent・source は不変で、
+既存の Token/CST test と TinyExpression の parity / source mapping test をそのまま等価性の証拠にした。
+Rust の commit 経路は `Fragment.nodes.append` で中間物が無く、reduce に相当する段も無いため変更なし。
+
+### 観測
+
+allocation（public facade 1 parse）: complex.tiny 165.0 MB → 151.3 MB（-8.3%）、comparison-heavy.tiny 86.3 MB → 78.3 MB（-9.3%）（JMH `gc.alloc.rate.norm`、精密）。
+
+public facade の 3-run 中央値（Java、ms/op、同一ホスト・直列、baseline はケース8適用後）:
+
+| Runtime | Fixture | Baseline runs | Baseline median | Candidate runs | Candidate median | 変化 |
+|---|---|---:|---:|---:|---:|---:|
+| Java | complex | 77.836 / 76.848 / 75.458 | **76.848** | 71.632 / 71.858 / 77.740 | **71.858** | **-6.49%** |
+| Java | comparison-heavy | 40.461 / 40.613 / 41.461 | **40.613** | 37.474 / 39.221 / 43.641 | **39.221** | **-3.43%** |
+
+同じ candidate の前段（`collect` と `toSource` のみ変更）を別セッションで測った 1 回目の A/B は complex -10.20%、
+comparison-heavy -6.23% だった。run 間の幅（baseline 75.5〜83.2 ms）に対して差は小さいが、2 セッション計 12 run で方向が
+一貫し、allocation は精密に 8〜9% 減っているため採用した。timing の効果は「5% 前後」と見るのが妥当で、
+ケース5〜8のような大きな短縮ではない。
+
+### 教材としての要点
+
+allocation 基準で「差が無い」と判断した候補でも、CPU 基準では別の結果になりうる。Stream pipeline は
+1 回あたりの allocation は小さいが、per-commit / per-token の hot path では lambda 呼び出しと spliterator の
+オーバーヘッドが積み上がる。採否の指標を切り替えるときは、その理由（どの profile がどう変わったか）を issue に残す。

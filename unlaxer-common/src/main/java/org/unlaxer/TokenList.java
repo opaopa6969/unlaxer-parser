@@ -12,7 +12,6 @@ import java.util.function.Consumer;
 import java.util.function.IntFunction;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.unlaxer.Source.SourceKind;
@@ -37,6 +36,12 @@ public class TokenList implements List<Token>{
   public TokenList() {
     super();
     this.tokens = new ArrayList<>();
+  }
+
+  /** Creates an empty list that can hold {@code initialCapacity} tokens without growing. */
+  public TokenList(int initialCapacity) {
+    super();
+    this.tokens = new ArrayList<>(initialCapacity);
   }
   
   public static TokenList of(List<Token> tokens) {
@@ -249,7 +254,8 @@ public class TokenList implements List<Token>{
   }
   
   public Source toSource(SourceKind sourceKind) {
-    return toSource(TokenList.of(tokens) , sourceKind);
+    // toSource(TokenList, SourceKind) only reads the list, so no defensive copy is needed.
+    return toSource(this , sourceKind);
   }
 
   
@@ -270,19 +276,19 @@ public class TokenList implements List<Token>{
       return StringSource.createDetachedSource("");
     }
     
-    String collect = tokens.stream()
-      .map(Token::getSource)
-      .map(Source::toString)
-      .collect(Collectors.joining());
+    StringBuilder collect = new StringBuilder();
+    for (int i = 0, size = tokens.size(); i < size; i++) {
+      collect.append(tokens.get(i).getSource().toString());
+    }
     
     Token token = firstPrintableToken.get();
     
     CodePointOffset offsetFromRoot = token.source.offsetFromRoot();
     
     if(sourceKind == SourceKind.subSource) {
-      return StringSource.createSubSource(collect , token.source.root() , offsetFromRoot);
+      return StringSource.createSubSource(collect.toString() , token.source.root() , offsetFromRoot);
     }else {
-      return StringSource.create(collect, sourceKind );
+      return StringSource.create(collect.toString(), sourceKind );
     }
   }
 }

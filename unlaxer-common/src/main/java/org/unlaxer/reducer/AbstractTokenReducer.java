@@ -62,13 +62,17 @@ public abstract class AbstractTokenReducer implements CommittedReducer {
 		// false);
 		// System.out.println();
 
-		if (token.getAstNodeChildren().isEmpty()) {
+		TokenList children = token.getAstNodeChildren();
+		if (children.isEmpty()) {
 			return reduceWithLeaf(token);
 		}
 		TokenList tokens = new TokenList();
 
-		token.getAstNodeChildren().stream().map(this::reduce)
-			.forEach(tokens::addAll);
+		// Visited once per token after every parse: iterate by index rather than through a
+		// Stream pipeline; reduce(child) rewrites the child's own list, never this one.
+		for (int i = 0, size = children.size(); i < size; i++) {
+			tokens.addAll(reduce(children.get(i)));
+		}
 
 		if (doReduce(token.parser)) {
 			return tokens;
