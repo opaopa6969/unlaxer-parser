@@ -205,6 +205,30 @@ public class SafeFailureMemoizationPolicyTest {
     }
 
     @Test
+    public void transparentTransactionListenerAllowsMemoHitsAndSkipsCachedWorkCallbacks() {
+        CountingWord child = new CountingWord("no");
+        SafeRule parser = new SafeRule(child);
+        int[] begins = {0};
+        try (ParseContext context = safeContext("x")) {
+            context.addMemoizationTransparentTransactionListener(
+                Name.of("memo-transparent-listener"), new TransactionListener() {
+                    @Override public void setLevel(OutputLevel level) {}
+                    @Override public void onOpen(ParseContext c) {}
+                    @Override public void onBegin(ParseContext c, Parser p) { begins[0]++; }
+                    @Override public void onCommit(ParseContext c, Parser p, TokenList tokens) {}
+                    @Override public void onRollback(ParseContext c, Parser p, TokenList tokens) {}
+                    @Override public void onClose(ParseContext c) {}
+                });
+            assertFalse(parser.parse(context).isSucceeded());
+            int firstBegins = begins[0];
+            assertFalse(parser.parse(context).isSucceeded());
+            assertEquals(1, child.calls);
+            assertEquals("memoized work has no listener callbacks", firstBegins, begins[0]);
+            assertEquals(1, context.getPackratMemoTable().failureHits());
+        }
+    }
+
+    @Test
     public void transactionalStateLifecycleIsReplayedOnExistingCacheHit() {
         CountingWord child = new CountingWord("no");
         SafeRule parser = new SafeRule(child);
@@ -251,6 +275,48 @@ public class SafeFailureMemoizationPolicyTest {
             assertEquals(2 * firstCheckpoints, checkpoints[0]);
             assertEquals(2 * firstRestores, restores[0]);
             assertEquals(1, context.getPackratMemoTable().failureHits());
+        }
+    }
+
+    @Test
+    public void stateVersionSeparatesMutationsAndRollbackRestoresPriorCache() {
+        CountingWord child = new CountingWord("no");
+        SafeRule parser = new SafeRule(child);
+        try (ParseContext context = safeContext("x")) {
+            assertFalse(parser.parse(context).isSucceeded()); // version 0
+            context.begin(parser);
+            context.markMemoizationStateChanged();
+            long changedVersion = context.getMemoizationStateVersion();
+            assertFalse(parser.parse(context).isSucceeded()); // distinct version
+            context.rollback(parser);
+            assertEquals(0, context.getMemoizationStateVersion());
+            assertFalse(parser.parse(context).isSucceeded()); // version 0 hit
+            assertEquals(2, child.calls);
+            assertEquals(1, context.getPackratMemoTable().failureHits());
+            assertTrue(changedVersion > 0);
+        }
+    }
+
+    @Test
+    public void rolledBackBranchesNeverReuseStateVersionIdentifiers() {
+        CountingWord child = new CountingWord("no");
+        SafeRule parser = new SafeRule(child);
+        try (ParseContext context = safeContext("x")) {
+            context.begin(parser);
+            context.markMemoizationStateChanged();
+            long firstBranchVersion = context.getMemoizationStateVersion();
+            assertFalse(parser.parse(context).isSucceeded());
+            context.rollback(parser);
+
+            context.begin(parser);
+            context.markMemoizationStateChanged();
+            long secondBranchVersion = context.getMemoizationStateVersion();
+            assertFalse(parser.parse(context).isSucceeded());
+            context.rollback(parser);
+
+            assertTrue(secondBranchVersion > firstBranchVersion);
+            assertEquals("different branch state must not hit the first branch cache", 2, child.calls);
+            assertEquals(0, context.getPackratMemoTable().failureHits());
         }
     }
 }

@@ -44,6 +44,8 @@ public class ParseContext implements
 
 	PackratMemoTable packratMemoTable;
 	private boolean memoizationPermanentlyDisabled;
+	private long memoizationStateVersion;
+	private long nextMemoizationStateVersion;
 
 	public final Source source;
 
@@ -52,6 +54,8 @@ public class ParseContext implements
 	Map<Name, ParserListener> parserListenerByName = new LinkedHashMap<>();
 	
 	Map<Name, TransactionListener> listenerByName = new LinkedHashMap<>();
+	private final Set<TransactionListener> memoizationTransparentTransactionListeners =
+		Collections.newSetFromMap(new IdentityHashMap<>());
 
 	final Deque<TransactionElement> tokenStack = new ArrayDeque<TransactionElement>();
 
@@ -68,6 +72,8 @@ public class ParseContext implements
     private final List<TransactionalState> transactionalStates = new ArrayList<>();
     private final Set<TransactionElement> transactionalFrames =
         Collections.newSetFromMap(new IdentityHashMap<>());
+    private final Map<TransactionElement, Long> memoizationStateVersionByFrame =
+        new IdentityHashMap<>();
 
     /**
      * Register an owner before its first mutation. Registration lasts for this
@@ -87,14 +93,32 @@ public class ParseContext implements
     void checkpointTransactionalState(TransactionElement frame) {
         recordMemoTransactionBegin();
         transactionalFrames.add(frame);
+        memoizationStateVersionByFrame.put(frame, memoizationStateVersion);
         transactionalStates.forEach(frame::checkpointState);
     }
 
     void finishTransactionalState(TransactionElement frame, boolean restore) {
         transactionalFrames.remove(frame);
-        if (restore) frame.restoreState();
+        Long savedMemoizationStateVersion = memoizationStateVersionByFrame.remove(frame);
+        if (savedMemoizationStateVersion == null) {
+            throw new IllegalStateException("transaction state version snapshot is missing");
+        }
+        if (restore) {
+            frame.restoreState();
+            memoizationStateVersion = savedMemoizationStateVersion;
+        }
         recordMemoTransactionFinish(restore
             ? MemoTransactionEvent.ROLLBACK : MemoTransactionEvent.COMMIT);
+    }
+
+    /** Marks a mutation of parser-visible state covered by the safe memoization contract. */
+    public void markMemoizationStateChanged() {
+        nextMemoizationStateVersion = Math.incrementExact(nextMemoizationStateVersion);
+        memoizationStateVersion = nextMemoizationStateVersion;
+    }
+
+    public long getMemoizationStateVersion() {
+        return memoizationStateVersion;
     }
 	
 	Collection<AdditionalCommitAction> actions;
@@ -172,7 +196,8 @@ public class ParseContext implements
 	public boolean isMemoizationSessionSafe() {
 		if (memoizationPermanentlyDisabled || false == isMemoizeEnabled()) return false;
 		if (false == parserListenerByName.isEmpty()
-				|| false == listenerByName.isEmpty()
+				|| listenerByName.values().stream().anyMatch(listener ->
+					false == memoizationTransparentTransactionListeners.contains(listener))
 				|| false == actions.isEmpty()
 				|| recordingTrials) {
 			disableMemoizationPermanently();
@@ -194,6 +219,17 @@ public class ParseContext implements
 	@Override
 	public void addTransactionListener(Name name, TransactionListener listener) {
 		disableMemoizationPermanently();
+		Transaction.super.addTransactionListener(name, listener);
+	}
+
+	/**
+	 * Registers an observational listener whose callbacks may be skipped for memoized parser work.
+	 * The listener must not mutate parser-visible state, diagnostics, tokens, or application state.
+	 */
+	public void addMemoizationTransparentTransactionListener(
+			Name name, TransactionListener listener) {
+		java.util.Objects.requireNonNull(listener, "listener");
+		memoizationTransparentTransactionListeners.add(listener);
 		Transaction.super.addTransactionListener(name, listener);
 	}
 

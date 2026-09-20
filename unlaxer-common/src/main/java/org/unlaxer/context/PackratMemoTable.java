@@ -11,7 +11,7 @@ import org.unlaxer.parser.Parser;
  * Opt-in packrat memoization table (issue #40).
  *
  * <p>Keyed by (parser identity, start consumed position, start matched position, tokenKind,
- * invertMatch). Caches the outcome of parsing a rule at a position so that the exponential
+ * invertMatch, parser-visible state version). Caches the outcome of parsing a rule at a position so that the exponential
  * re-parsing of the same sub-tree under backtracking ambiguity collapses to a single attempt.
  *
  * <p>One deliberately narrow flavour, gated by immutable parse options:
@@ -28,7 +28,8 @@ import org.unlaxer.parser.Parser;
 public final class PackratMemoTable {
 
   /** Position component of the memo key (parser identity is the outer map key). */
-  public record PositionKey(int consumed, int matched, TokenKind tokenKind, boolean invertMatch) {}
+  public record PositionKey(
+      int consumed, int matched, TokenKind tokenKind, boolean invertMatch, long stateVersion) {}
 
   /** A known failure together with the rule-local diagnostics produced by the original call. */
   public static final class Entry {
@@ -94,7 +95,7 @@ public final class PackratMemoTable {
     return new PositionKey(
         parseContext.getConsumedPosition().value(),
         parseContext.getMatchedPosition().value(),
-        tokenKind, invertMatch);
+        tokenKind, invertMatch, parseContext.getMemoizationStateVersion());
   }
 
   private final Map<Parser, Map<PositionKey, Entry>> entryByPositionByParser = new IdentityHashMap<>();

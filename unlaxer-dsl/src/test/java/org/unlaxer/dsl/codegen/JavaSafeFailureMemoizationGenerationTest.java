@@ -10,7 +10,7 @@ import org.unlaxer.dsl.bootstrap.UBNFMapper;
 public class JavaSafeFailureMemoizationGenerationTest {
 
     @Test
-    public void stateAndCustomDependenciesTaintEveryAncestor() {
+    public void versionedScopeAnnotationsAreSafeButCustomDependenciesTaintEveryAncestor() {
         var grammar = UBNFMapper.parse("""
             grammar MemoSafety {
               @package: example.memo
@@ -39,12 +39,12 @@ public class JavaSafeFailureMemoizationGenerationTest {
         assertTrue(declaration(source, "PureRootParser").contains("SafeFailureMemoizable"));
         assertTrue(declaration(source, "PureParser").contains("SafeFailureMemoizable"));
         assertTrue(declaration(source, "CapturePureParser").contains("SafeFailureMemoizable"));
-        assertFalse(declaration(source, "StatefulParser").contains("SafeFailureMemoizable"));
-        assertFalse(declaration(source, "StatefulAncestorParser").contains("SafeFailureMemoizable"));
-        assertFalse(declaration(source, "DeclarationParser").contains("SafeFailureMemoizable"));
-        assertFalse(declaration(source, "DeclarationAncestorParser").contains("SafeFailureMemoizable"));
-        assertFalse(declaration(source, "ReferenceParser").contains("SafeFailureMemoizable"));
-        assertFalse(declaration(source, "ReferenceAncestorParser").contains("SafeFailureMemoizable"));
+        assertTrue(declaration(source, "StatefulParser").contains("SafeFailureMemoizable"));
+        assertTrue(declaration(source, "StatefulAncestorParser").contains("SafeFailureMemoizable"));
+        assertTrue(declaration(source, "DeclarationParser").contains("SafeFailureMemoizable"));
+        assertTrue(declaration(source, "DeclarationAncestorParser").contains("SafeFailureMemoizable"));
+        assertTrue(declaration(source, "ReferenceParser").contains("SafeFailureMemoizable"));
+        assertTrue(declaration(source, "ReferenceAncestorParser").contains("SafeFailureMemoizable"));
         assertFalse(declaration(source, "CustomLeafParser").contains("SafeFailureMemoizable"));
         assertFalse(declaration(source, "CustomAncestorParser").contains("SafeFailureMemoizable"));
         assertFalse(declaration(source, "MatchedLeafParser").contains("SafeFailureMemoizable"));

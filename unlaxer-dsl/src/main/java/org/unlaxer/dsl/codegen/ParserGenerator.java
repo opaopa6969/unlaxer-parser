@@ -322,18 +322,15 @@ public class ParserGenerator implements CodeGenerator {
     /**
      * Fail-closed, transitive rule analysis for failure memoization. Simple token classes are
      * treated as custom/unknown even when their names resemble built-ins, unless their token
-     * alias is explicitly listed by {@code @memoSafeToken}. State-bearing annotations make both
-     * the rule and every rule that can reach it unsafe.
+     * alias is explicitly listed by {@code @memoSafeToken}. Built-in scope annotations use the
+     * versioned {@code ScopeStore} contract and therefore do not taint a rule; unknown/custom
+     * state remains fail-closed through its token dependency.
      */
     private void analyzeSafeFailureMemoization(GenContext ctx) {
         Map<String, Set<String>> dependencies = new LinkedHashMap<>();
         for (RuleDecl rule : ctx.grammar.rules()) {
             Set<String> refs = new LinkedHashSet<>();
-            boolean locallySafe = rule.annotations().stream().noneMatch(annotation ->
-                annotation instanceof org.unlaxer.dsl.bootstrap.UBNFAST.ScopeTreeAnnotation
-                || annotation instanceof org.unlaxer.dsl.bootstrap.UBNFAST.DeclaresAnnotation
-                || annotation instanceof org.unlaxer.dsl.bootstrap.UBNFAST.BackrefAnnotation);
-            locallySafe &= collectMemoDependencies(ctx, rule.body(), refs);
+            boolean locallySafe = collectMemoDependencies(ctx, rule.body(), refs);
             dependencies.put(rule.name(), refs);
             ctx.safeFailureMemoByRule.put(rule.name(), locallySafe);
         }

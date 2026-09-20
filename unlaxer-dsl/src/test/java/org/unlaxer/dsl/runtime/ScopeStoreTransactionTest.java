@@ -34,6 +34,28 @@ public class ScopeStoreTransactionTest {
         }
     }
 
+    @Test public void mutationsAdvanceVersionAndRollbackRestoresTheSnapshot() {
+        try (var ctx = new ParseContext(StringSource.createRootSource(""))) {
+            var parser = new WordParser("x");
+            long initial = ctx.getMemoizationStateVersion();
+            ctx.begin(parser);
+            ScopeStore.enter(ctx);
+            long entered = ctx.getMemoizationStateVersion();
+            ScopeStore.declare(ctx, "local", 1);
+            long declared = ctx.getMemoizationStateVersion();
+            ScopeStore.addReference(ctx, "local", 1, 1);
+            long referenced = ctx.getMemoizationStateVersion();
+            ScopeStore.addDiagnostic(ctx, "diagnostic", 1, 1, Severity.INFO);
+            long diagnosed = ctx.getMemoizationStateVersion();
+            assertTrue(entered > initial);
+            assertTrue(declared > entered);
+            assertTrue(referenced > declared);
+            assertTrue(diagnosed > referenced);
+            ctx.rollback(parser);
+            assertEquals(initial, ctx.getMemoizationStateVersion());
+        }
+    }
+
     @Test public void failedChoiceAndRepeatAttemptsDoNotPublishCommittedChildState() {
         Parser attempt = new Chain(new DeclaringParser(), new WordParser("!"));
         try (var ctx = new ParseContext(StringSource.createRootSource("a?"))) {

@@ -18,7 +18,8 @@ Ast.Root root = GeneratedMapper.parseWithOptions(text, options);
 
 - `ParseOptions` は immutable。`ParseOptions.DEFAULT` と既存 Mapper overload は `OFF`。
 - `SAFE_FAILURES` は失敗だけを保存する。成功 token、cursor、commit action は保存・再生しない。
-- キーは parser identity、consumed/matched position、`TokenKind`、invert flag。
+- キーは parser identity、consumed/matched position、`TokenKind`、invert flag、
+  parser-visible state version。
 - failure hit は最初の rule call が生成した診断を再生するため、OFF/ON で farthest offset と
   expected hints が変わらない。
 - cache は 1 個の `ParseContext` に閉じ、session をまたいで共有しない。
@@ -37,7 +38,7 @@ unsafe rule には frame overhead がない。
 次の session 状態では、既存 entry を含め lookup/store を停止し、通常の parser lifecycle を
 必ず実行する。状態が後から追加・切替された場合も同じである。
 
-- `ParserListener` または `TransactionListener` が 1 個以上登録されている
+- `ParserListener`、または通常の `TransactionListener` が 1 個以上登録されている
 - persistent commit action が 1 個以上登録されている
 - trial recording が有効である
 
@@ -45,22 +46,36 @@ unsafe rule には frame overhead がない。
 これらの要因を一度でも追加または有効化した session は、その後 remove/clear/stop されても
 memoization を再開しない。unsafe 中の parser 変化より前の stale entry が復活するのを防ぐ。
 
+純粋な観測だけを行い、memo hit で省略された処理の callback が呼ばれなくてもよい listener は
+`ParseContext.addMemoizationTransparentTransactionListener(...)` で登録できる。典型例は
+wall-clock deadline の監視で、
+cache hit 自体は監視対象の parser work を行わない。状態、token、diagnostic、application data を変更する
+listener にこの marker を付けてはならない。
+
 `TransactionalState` は例外であり、登録されていても安全規則の failure memoization を継続する。
 entry は対象 safe parser 自身の transaction begin/commit/rollback 列を保存し、hit 時に
 token/cursor を変更せず state の checkpoint/restore hook だけを同じ順序で再生する。子 parser の
 本体と lifecycle は cache hit では実行されない。これは listener callback ではなく、memoized parser
 呼出しの rollback 境界で owner の状態を保つための再生である。したがって `@scopeTree` のように
-context 全体へ state owner を登録する機能があっても、状態非依存と証明された規則を cache できる。
-状態を読み書きする規則とその ancestor は生成時解析で引き続き memo 対象外になる。
+context 全体へ state owner を登録する機能があっても memoization を継続できる。
+
+既知の `ScopeStore` mutation は `ParseContext.markMemoizationStateChanged()` で単調な epoch を払い出す。
+transaction は開始時の current version を保存し、rollback 時に state と version をともに復元する。
+払い出し元の epoch は rollback しないため、別の backtracking branch が異なる state に同じ version を
+再利用することはない。これにより `@scopeTree`、`@declares`、`@backref` の結果を version 付き key で
+区別できる。任意 user state はこの契約の対象ではない。
 
 ## 安全規則の生成時解析
 
-生成器は grammar の rule dependency graph を推移的に解析する。状態依存の leaf だけでなく、
+生成器は grammar の rule dependency graph を推移的に解析する。unsafe leaf だけでなく、
 そこへ到達可能な全 ancestor を対象外にする。以下は fail-closed で unsafe となる。
 
-- `@scopeTree`、`@declares`、`@backref`
 - custom/unknown token parser（`token X = SomeParser`）
 - import namespace 経由など、生成器が純粋性を証明できない参照
+
+`@scopeTree`、`@declares`、`@backref` は生成 runtime が所有する versioned `ScopeStore` だけを使うため
+安全対象になる。成功は cache しないので commit 時の宣言・参照・semantic diagnostic は常に実行され、
+失敗は transaction rollback 後の version で保存される。
 
 状態を参照せず、失敗時に `ParseContext` への observable な副作用を残さない custom token
 parser は、token alias ごとに明示的に許可できる。同じ設定を複数行書ける。
@@ -84,8 +99,9 @@ memoization の安全対象である。現在の Rust generator は任意の Jav
 しない。将来 custom token 接続を追加するときは、同じ alias 単位の設定を安全性の明示契約として
 尊重し、未指定 custom token とその ancestor を fail-closed で除外する。
 
-capture、scope、back-reference、rollback、user state、`MatchedTokenParser` のように結果が
-現在の context に依存し得る処理は、明示的に安全と証明されない限り cache されない。
+capture、rollback、任意 user state、`MatchedTokenParser` のように結果が現在の context に依存し得る
+処理は、明示的に安全と証明されない限り cache されない。scope/back-reference は versioned
+`ScopeStore` を通る生成実装だけが例外である。
 
 安全と証明された生成 class は `SafeFailureMemoizable` を直接 implements する。runtime は
 `instanceof` ではなく exact class の直接 interface を検査するため、生成 class の subclass が
