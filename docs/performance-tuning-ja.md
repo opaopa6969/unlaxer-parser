@@ -885,3 +885,50 @@ memo に「結果」を保存しているのに、hit 時にそれを「もう�
 保存済みデータがすでに正規形（順序・重複なし）であることを test で固定できるなら、replay は集合演算 1 回に潰せる。
 `Rc` の共有で「同じ列をもう一度持つ」コピーも避けられるが、共有した列に後から追記するときの COW（`Rc::make_mut`）が
 allocation 契約を壊さないかは audit crate で確認する。
+
+## ケース18: 失敗時に状態を変えない原子式では checkpoint を開かない（Rust、不採用）
+
+### 仮説
+
+#213 後の領域別 CPU 計測で checkpoint / commit / rollback は complex.tiny 7.0%、comparison-heavy.tiny 3.5%。1 parse あたり
+checkpoint は 53,984 回（complex）/ 15,133 回（comparison-heavy）で、`ParseContext::expression` が全ての `Expr` に対して
+`checkpoint()` → `expression_inner()` → `restore()` / `commit_checkpoint()` を行っていた。`Literal` / `Number` / `Identifier` /
+`Eof` / 文字クラス（`Any` / `CharRange` / `Except`）/ `Until` / `Backreference` / `Error` / `JavaLookahead` など、失敗経路で
+position・matched_position・nodes・captures・state・scopes のどれにも触らない原子式では、checkpoint は「何も戻さない」ための
+固定費（captures / state の `Rc` clone、scope journal の mark、metrics）になっている。
+
+### 実装
+
+- `Expr::fails_without_side_effects()` を追加し、`expression()` の先頭でこれに該当する式は `expression_inner()` を直接呼ぶ
+- 対象外: `Quoted` / `CodeStart` / `CodeEnd`（途中まで position を進めてから失敗し得る）、`Custom`（自前で transaction を開く）、
+  複合式（子が復元を要する）
+- differential test: 各対象式について「失敗後の `ParseError`、position、matched_position、user state、scope 深さ」が
+  同じ式を `Sequence` で包んで checkpoint 経由にした場合と一致することを固定。`Quoted` が wrapper を保っている（position が 0 に戻る）
+  ことも固定。`CheckpointMetrics.opened` は実際に開いた数として意味を保ち、対象式では増えない
+
+### 観測
+
+Timing（Rust public facade、Criterion 3-run 中央値、ms/op、baseline = master `b21a965` の pin、candidate = worktree path patch、2 セッション）:
+
+| Runtime | Fixture | Baseline runs | Baseline median | Candidate runs | Candidate median | 変化 |
+|---|---|---:|---:|---:|---:|---:|
+| Rust（session 1） | complex | 3.869 / 3.847 / 4.077 | **3.869** | 3.845 / 3.744 / 3.740 | **3.744** | -3.23% |
+| Rust（session 1） | comparison-heavy | 1.025 / 1.042 / 0.988 | **1.025** | 1.002 / 0.986 / 1.015 | **1.002** | -2.27% |
+| Rust（session 2） | complex | 3.800 / 3.818 / 3.748 | **3.800** | 3.829 / 3.762 / 3.818 | **3.818** | +0.47% |
+| Rust（session 2） | comparison-heavy | 1.002 / 1.004 / 1.002 | **1.002** | 1.032 / 1.000 / 0.986 | **1.000** | -0.18% |
+
+session 1 の -3.2% / -2.3% は run の範囲が重なっており、session 2 では +0.5% / -0.2% と消えた。改善なし。
+差分は小さく test も揃っているが、「効果が測れない変更は入れない」の規約に従って**不採用**とし、実装は branch
+`perf/elide-atom-checkpoint-239` に残す。
+
+原子式 1 回の checkpoint は、captures / state が空なら `Rc` clone も無く、scope journal の mark は整数 1 つ、metrics は無効時 `None`
+なので、コンパイル後はほぼ構造体の初期化だけになっていた。着手前計測の「checkpoint 領域 7.0%」は `Instant` 区間の固定費（16〜18 ns）が
+数 ns の処理に対して相対的に大きく、控除しきれずに過大に見えていたと考えられる。
+
+### 教材としての要点
+
+「全ての式を transaction で包む」は安全側の既定として正しく、失敗経路を読めば「戻すものが無い」式は列挙できる。だが省いて得られる
+のは checkpoint 1 回の固定費で、それが数 ns まで最適化されていれば 5 万回省いても測れない。`Instant` による領域別計測は、
+区間の処理が計測固定費と同じオーダーのとき（checkpoint のような小さな操作）に比率を過大に見せる。JFR の allocation 比率と同じく、
+小さな操作の比率は「候補の発見」に留め、採否は必ず timing の A/B（できれば 2 セッション）で決める。包んだ場合と包まない場合の
+結果一致を固定した differential test と、包んだままにする式の境界を残した test は、branch に保存して将来の判断材料にする。
