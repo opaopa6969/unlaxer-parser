@@ -43,6 +43,12 @@ pub enum Expr {
     /// Try every alternative from the same transactional state and commit the
     /// one that consumes the most input. Equal-length matches keep declaration order.
     LongestChoice(Vec<Expr>),
+    /// Ordered choice that skips alternatives whose conservative FIRST
+    /// predictor proves they cannot match. `Any` preserves ordinary choice.
+    PredictiveChoice {
+        alternatives: Vec<Expr>,
+        predictors: Vec<Predictor>,
+    },
     Capture(&'static str, Box<Expr>),
     /// Wrap successful child nodes in a text-projection boundary without changing parsing.
     TextValue(Box<Expr>),
@@ -96,6 +102,48 @@ pub enum Expr {
     Backreference(&'static str),
 }
 
+#[derive(Debug, Clone)]
+pub enum Predictor {
+    Any,
+    Literal(&'static str),
+    Number,
+    Identifier,
+    Quoted(char),
+    OneOf(Vec<Predictor>),
+}
+
+impl Predictor {
+    fn matches(&self, raw: &str, after_trivia: &str) -> bool {
+        match self {
+            Self::Any => true,
+            Self::Literal(value) => raw.starts_with(value) || after_trivia.starts_with(value),
+            Self::Number => number_may_start(raw) || number_may_start(after_trivia),
+            Self::Identifier => identifier_may_start(raw) || identifier_may_start(after_trivia),
+            Self::Quoted(quote) => raw.starts_with(*quote) || after_trivia.starts_with(*quote),
+            Self::OneOf(values) => values.iter().any(|value| value.matches(raw, after_trivia)),
+        }
+    }
+}
+
+fn number_may_start(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    let offset = usize::from(
+        bytes
+            .first()
+            .is_some_and(|byte| matches!(byte, b'+' | b'-')),
+    );
+    bytes.get(offset).is_some_and(u8::is_ascii_digit)
+        || (bytes.get(offset) == Some(&b'.')
+            && bytes.get(offset + 1).is_some_and(u8::is_ascii_digit))
+}
+
+fn identifier_may_start(value: &str) -> bool {
+    value
+        .as_bytes()
+        .first()
+        .is_some_and(|byte| byte.is_ascii_alphabetic() || *byte == b'_')
+}
+
 /// Reusable combinators. These build the same rule expressions used by generated parsers.
 impl Expr {
     pub fn literal(text: &'static str) -> Self {
@@ -109,6 +157,13 @@ impl Expr {
     }
     pub fn longest_choice(alternatives: impl IntoIterator<Item = Self>) -> Self {
         Self::LongestChoice(alternatives.into_iter().collect())
+    }
+    pub fn predictive_choice(alternatives: impl IntoIterator<Item = (Predictor, Self)>) -> Self {
+        let (predictors, alternatives) = alternatives.into_iter().unzip();
+        Self::PredictiveChoice {
+            alternatives,
+            predictors,
+        }
     }
     /// Match tinyexpression's opening code fence without applying grammar trivia between parts.
     pub fn code_start() -> Self {
@@ -1266,19 +1321,12 @@ impl<'a> ParseContext<'a> {
                 }
                 Some(result)
             }
-            Expr::Choice(alternatives) => {
-                let start = self.position;
-                let count = self.nodes.len();
-                for alternative in alternatives {
-                    if let Some(fragment) = self.expression(alternative, depth) {
-                        return Some(fragment);
-                    }
-                    self.position = start;
-                    self.nodes.truncate(count);
-                }
-                None
-            }
+            Expr::Choice(alternatives) => self.ordered_choice(alternatives.iter(), depth),
             Expr::LongestChoice(alternatives) => self.longest_choice(alternatives, depth),
+            Expr::PredictiveChoice {
+                alternatives,
+                predictors,
+            } => self.predictive_choice(alternatives, predictors, depth),
             Expr::Capture(name, expression) => {
                 let start = self.position;
                 let mut fragment = self.expression(expression, depth)?;
@@ -1489,6 +1537,89 @@ impl<'a> ParseContext<'a> {
         })
     }
 
+    fn ordered_choice<'b>(
+        &mut self,
+        alternatives: impl IntoIterator<Item = &'b Expr>,
+        depth: usize,
+    ) -> Option<Fragment> {
+        let start = self.position;
+        let count = self.nodes.len();
+        for alternative in alternatives {
+            if let Some(fragment) = self.expression(alternative, depth) {
+                return Some(fragment);
+            }
+            self.position = start;
+            self.nodes.truncate(count);
+        }
+        None
+    }
+
+    fn predictive_choice(
+        &mut self,
+        alternatives: &[Expr],
+        predictors: &[Predictor],
+        depth: usize,
+    ) -> Option<Fragment> {
+        if alternatives.len() != predictors.len() {
+            return self.ordered_choice(alternatives.iter(), depth);
+        }
+        let raw = self.remaining();
+        let after_trivia = self.prediction_after_trivia(raw);
+        let selected = predictors
+            .iter()
+            .filter(|predictor| predictor.matches(raw, after_trivia))
+            .count();
+        if selected == 0 || selected == alternatives.len() {
+            return self.ordered_choice(alternatives.iter(), depth);
+        }
+
+        // A successful predicted path commits exactly like Choice. On failure,
+        // retry the ordinary choice so diagnostics and custom ParseContext state
+        // remain observationally equivalent even if a predictor is conservative.
+        let checkpoint = self.checkpoint();
+        if let Some(fragment) = self.ordered_choice(
+            alternatives
+                .iter()
+                .zip(predictors)
+                .filter_map(|(alternative, predictor)| {
+                    predictor.matches(raw, after_trivia).then_some(alternative)
+                }),
+            depth,
+        ) {
+            return Some(fragment);
+        }
+        self.restore(checkpoint);
+        self.ordered_choice(alternatives.iter(), depth)
+    }
+
+    fn prediction_after_trivia<'b>(&self, raw: &'b str) -> &'b str {
+        if !self.whitespace {
+            return raw;
+        }
+        let mut position = 0;
+        loop {
+            let start = position;
+            while raw
+                .as_bytes()
+                .get(position)
+                .is_some_and(|byte| matches!(byte, b' ' | b'\t' | b'\n' | b'\r' | 11 | 12))
+            {
+                position += 1;
+            }
+            let rest = &raw[position..];
+            if rest.starts_with("//") {
+                position += rest.find(['\r', '\n']).unwrap_or(rest.len());
+            } else if let Some(comment) = rest.strip_prefix("/*") {
+                if let Some(end) = comment.find("*/") {
+                    position += end + 4;
+                }
+            }
+            if position == start {
+                return &raw[position..];
+            }
+        }
+    }
+
     fn skip(&mut self) {
         if !self.whitespace {
             return;
@@ -1639,6 +1770,9 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>) -> bo
                 .iter()
                 .all(|child| expression_is_memo_safe(child, references))
         }
+        Expr::PredictiveChoice { alternatives, .. } => alternatives
+            .iter()
+            .all(|child| expression_is_memo_safe(child, references)),
         Expr::Capture(_, child)
         | Expr::TextValue(child)
         | Expr::ValueBoundary(child)
@@ -1674,6 +1808,15 @@ pub fn json_string(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    static PREDICTIVE_SKIPPED_CALLS: std::sync::atomic::AtomicUsize =
+        std::sync::atomic::AtomicUsize::new(0);
+
+    fn predictive_skipped(context: &mut ParseContext<'_>) -> ParseResult {
+        PREDICTIVE_SKIPPED_CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        context.error("skipped");
+        Err(context.failure())
+    }
 
     #[test]
     fn capture_stripping_preserves_nonbreaking_spaces_like_java() {
@@ -1740,6 +1883,86 @@ mod tests {
         let error = parse(&rules, 0, false, "😀x").unwrap_err();
         assert_eq!(error.offset, 1);
         assert_eq!(error.expected, vec!["!", "?"]);
+    }
+
+    #[test]
+    fn predictive_choice_prunes_only_proven_impossible_alternatives() {
+        PREDICTIVE_SKIPPED_CALLS.store(0, std::sync::atomic::Ordering::Relaxed);
+        let rules = vec![Rule {
+            name: "root",
+            expression: Expr::PredictiveChoice {
+                alternatives: vec![Expr::Custom(predictive_skipped), Expr::Literal("alpha")],
+                predictors: vec![Predictor::Literal("beta"), Predictor::Literal("alpha")],
+            },
+        }];
+        assert!(parse(&rules, 0, false, "alpha").is_ok());
+        assert_eq!(
+            PREDICTIVE_SKIPPED_CALLS.load(std::sync::atomic::Ordering::Relaxed),
+            0
+        );
+    }
+
+    #[test]
+    fn predictive_choice_preserves_order_and_retries_full_choice_after_miss() {
+        let ordered = vec![Rule {
+            name: "root",
+            expression: Expr::PredictiveChoice {
+                alternatives: vec![Expr::Literal("a"), Expr::Literal("ab")],
+                predictors: vec![Predictor::Literal("a"), Predictor::Literal("a")],
+            },
+        }];
+        assert_eq!(parse(&ordered, 0, false, "ab").unwrap_err().offset, 1);
+
+        // Even malformed/manual predictor metadata cannot change acceptance:
+        // the selected branch fails and ordinary Choice is retried.
+        let fallback = vec![Rule {
+            name: "root",
+            expression: Expr::PredictiveChoice {
+                alternatives: vec![
+                    Expr::Sequence(vec![Expr::Literal("a"), Expr::Literal("x")]),
+                    Expr::Literal("ab"),
+                ],
+                predictors: vec![Predictor::Literal("a"), Predictor::Literal("z")],
+            },
+        }];
+        assert!(parse(&fallback, 0, false, "ab").is_ok());
+    }
+
+    #[test]
+    fn predictive_choice_considers_java_trivia_without_consuming_it() {
+        let rules = vec![Rule {
+            name: "root",
+            expression: Expr::PredictiveChoice {
+                alternatives: vec![
+                    Expr::Sequence(vec![Expr::Literal("alpha")]),
+                    Expr::Sequence(vec![Expr::Literal("beta")]),
+                ],
+                predictors: vec![Predictor::Literal("alpha"), Predictor::Literal("beta")],
+            },
+        }];
+        assert!(parse(&rules, 0, true, " /* lead */ beta").is_ok());
+    }
+
+    #[test]
+    fn lexical_predictors_match_only_necessary_ascii_starts() {
+        let unchanged = "";
+        for source in ["0", "+1", "-2", ".5", "-.5", "12."] {
+            assert!(Predictor::Number.matches(source, unchanged), "{source}");
+        }
+        for source in ["", "+", "-.", ".", "x", "١"] {
+            assert!(!Predictor::Number.matches(source, unchanged), "{source}");
+        }
+        for source in ["name", "_name", "Z9"] {
+            assert!(Predictor::Identifier.matches(source, unchanged), "{source}");
+        }
+        for source in ["", "9name", "é"] {
+            assert!(
+                !Predictor::Identifier.matches(source, unchanged),
+                "{source}"
+            );
+        }
+        assert!(Predictor::Quoted('"').matches("\"value\"", unchanged));
+        assert!(!Predictor::Quoted('"').matches("'value'", unchanged));
     }
 
     #[test]

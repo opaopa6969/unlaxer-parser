@@ -11,6 +11,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.ErrorElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.InterleaveAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.LongestChoiceAnnotation;
+import org.unlaxer.dsl.bootstrap.UBNFAST.PredictiveChoiceAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OneOrMoreElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OptionalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RepeatElement;
@@ -28,9 +29,11 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.TerminalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.WhitespaceAnnotation;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -628,11 +631,17 @@ class ParserRuleEmitter {
         }
         String implSuffix = interfaces.isEmpty() ? "" : " implements " + String.join(", ", interfaces);
         boolean longestChoice = rule.annotations().stream().anyMatch(a -> a instanceof LongestChoiceAnnotation);
+        boolean predictiveChoice = rule.annotations().stream().anyMatch(a -> a instanceof PredictiveChoiceAnnotation);
         String baseClass = longestChoice ? "LazyLongestChoice"
+            : predictiveChoice ? "LazyPredictiveChoice"
             : isChoice ? "LazyChoice" : getChainClassName(ctx, ruleName);
         w.line("public static class " + className + " extends " + baseClass + implSuffix + " {");
         w.indent();
         w.line("private static final long serialVersionUID = 1L;");
+        if (predictiveChoice) {
+            w.line("private static final java.util.List<ChoicePredictor> __CHOICE_PREDICTORS = java.util.List.of("
+                + generateChoicePredictors(ctx, rule) + ");");
+        }
         w.line("@Override");
         w.line("public Parsers getLazyParsers() {");
         w.indent();
@@ -645,6 +654,14 @@ class ParserRuleEmitter {
         w.line(");");
         w.dedent();
         w.line("}");
+        if (predictiveChoice) {
+            w.line("@Override");
+            w.line("public java.util.List<ChoicePredictor> getChoicePredictors() {");
+            w.indent();
+            w.line("return __CHOICE_PREDICTORS;");
+            w.dedent();
+            w.line("}");
+        }
         boolean hasSkip = rule.annotations().stream().anyMatch(a -> a instanceof SkipAnnotation);
         if (isChoice || hasSkip) {
             w.line("@Override");
@@ -665,6 +682,132 @@ class ParserRuleEmitter {
         w.blankLine();
 
         return w.build();
+    }
+
+    private static final int MAX_PREDICTOR_ATOMS = 64;
+
+    private record PredictorSpec(boolean any, LinkedHashSet<String> atoms) {
+        private PredictorSpec {
+            atoms = new LinkedHashSet<>(atoms);
+        }
+
+        static PredictorSpec unknown() { return new PredictorSpec(true, new LinkedHashSet<>()); }
+        static PredictorSpec atom(String expression) {
+            return new PredictorSpec(false, new LinkedHashSet<>(List.of(expression)));
+        }
+
+        static PredictorSpec union(List<PredictorSpec> specs) {
+            LinkedHashSet<String> atoms = new LinkedHashSet<>();
+            for (PredictorSpec spec : specs) {
+                if (spec.any) return unknown();
+                atoms.addAll(spec.atoms);
+                if (atoms.size() > MAX_PREDICTOR_ATOMS) return unknown();
+            }
+            return atoms.isEmpty() ? unknown() : new PredictorSpec(false, atoms);
+        }
+
+        String expression() {
+            if (any || atoms.isEmpty()) return "ChoicePredictor.any()";
+            if (atoms.size() == 1) return atoms.iterator().next();
+            return "ChoicePredictor.anyOf(" + String.join(", ", atoms) + ")";
+        }
+    }
+
+    private static String generateChoicePredictors(ParserGenerator.GenContext ctx, RuleDecl rule) {
+        if (!(rule.body() instanceof ChoiceBody choice)) return "ChoicePredictor.any()";
+        Map<String, PredictorSpec> memo = new HashMap<>();
+        return choice.alternatives().stream()
+            .map(sequence -> predictorSpec(ctx, sequence, new HashSet<>(), memo).expression())
+            .collect(Collectors.joining(", "));
+    }
+
+    /**
+     * Computes only FIRST prefixes that are provably necessary. Anything nullable,
+     * recursive, imported, or custom deliberately becomes Any.
+     */
+    private static PredictorSpec predictorSpec(
+        ParserGenerator.GenContext ctx, SequenceBody sequence, Set<String> visiting,
+        Map<String, PredictorSpec> memo
+    ) {
+        if (sequence.elements().isEmpty()) return PredictorSpec.unknown();
+        return predictorSpec(ctx, sequence.elements().get(0).element(), visiting, memo);
+    }
+
+    private static PredictorSpec predictorSpec(
+        ParserGenerator.GenContext ctx, RuleBody body, Set<String> visiting,
+        Map<String, PredictorSpec> memo
+    ) {
+        return switch (body) {
+            case SequenceBody sequence -> predictorSpec(ctx, sequence, visiting, memo);
+            case ChoiceBody choice -> PredictorSpec.union(choice.alternatives().stream()
+                .map(sequence -> predictorSpec(ctx, sequence, new HashSet<>(visiting), memo))
+                .toList());
+        };
+    }
+
+    private static PredictorSpec predictorSpec(
+        ParserGenerator.GenContext ctx, AtomicElement element, Set<String> visiting,
+        Map<String, PredictorSpec> memo
+    ) {
+        return switch (element) {
+            case TerminalElement terminal -> terminal.value().isEmpty()
+                ? PredictorSpec.unknown()
+                : PredictorSpec.atom("ChoicePredictor.literal(\""
+                    + ParserCodegenUtil.escapeString(terminal.value()) + "\")");
+            case GroupElement group -> predictorSpec(ctx, group.body(), visiting, memo);
+            case OneOrMoreElement one -> predictorSpec(ctx, one.body(), visiting, memo);
+            case BoundedRepeatElement bounded -> bounded.min() > 0
+                ? predictorSpec(ctx, bounded.body(), visiting, memo)
+                : PredictorSpec.unknown();
+            case SeparatedElement separated -> predictorSpec(ctx, separated.element(), visiting, memo);
+            case RuleRefElement ref -> predictorForReference(ctx, ref, visiting, memo);
+            default -> PredictorSpec.unknown();
+        };
+    }
+
+    private static PredictorSpec predictorForReference(
+        ParserGenerator.GenContext ctx, RuleRefElement ref, Set<String> visiting,
+        Map<String, PredictorSpec> memo
+    ) {
+        if (ref.namespace().isPresent()) return PredictorSpec.unknown();
+        String name = ref.name();
+        String tokenParser = ctx.tokenParserMap.get(name);
+        if (tokenParser != null) return predictorForTokenParser(tokenParser);
+        if (!ctx.ruleNames.contains(name)) return PredictorSpec.unknown();
+        PredictorSpec cached = memo.get(name);
+        if (cached != null) return cached;
+        if (!visiting.add(name)) return PredictorSpec.unknown();
+        RuleDecl target = ctx.grammar.rules().stream()
+            .filter(rule -> rule.name().equals(name))
+            .findFirst().orElse(null);
+        PredictorSpec result;
+        if (target == null || target.annotations().stream()
+                .anyMatch(annotation -> annotation instanceof RecoveryAnnotation)) {
+            result = PredictorSpec.unknown();
+        } else {
+            result = predictorSpec(ctx, target.body(), visiting, memo);
+        }
+        visiting.remove(name);
+        memo.put(name, result);
+        return result;
+    }
+
+    private static PredictorSpec predictorForTokenParser(String parserClass) {
+        return switch (parserClass) {
+            case "NumberParser", "org.unlaxer.parser.elementary.NumberParser" ->
+                PredictorSpec.atom("ChoicePredictor.number()");
+            case "IdentifierParser", "org.unlaxer.parser.clang.IdentifierParser" ->
+                PredictorSpec.atom("ChoicePredictor.identifier()");
+            case "SingleQuotedParser", "org.unlaxer.parser.elementary.SingleQuotedParser" ->
+                PredictorSpec.atom("ChoicePredictor.quoted('\\'')");
+            case "DoubleQuotedParser", "org.unlaxer.parser.elementary.DoubleQuotedParser" ->
+                PredictorSpec.atom("ChoicePredictor.quoted('\\\"')");
+            case "org.unlaxer.tinyexpression.parser.StringLiteralParser" ->
+                PredictorSpec.union(List.of(
+                    PredictorSpec.atom("ChoicePredictor.quoted('\\\"')"),
+                    PredictorSpec.atom("ChoicePredictor.quoted('\\'')")));
+            default -> PredictorSpec.unknown();
+        };
     }
 
     /**

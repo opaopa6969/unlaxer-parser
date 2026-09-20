@@ -177,16 +177,19 @@ fn generated_modules_compile_evaluate_and_require_semantics() {
         "mixed",
         "boundaries",
         "scope_effects",
+        "predictive",
     ] {
         let output = temp.0.join(fixture);
         fs::create_dir(&output).unwrap();
-        let mut ir = support::fixture(if matches!(fixture, "names" | "scope_effects") {
-            "evolution"
-        } else if fixture == "right" {
-            "shared"
-        } else {
-            fixture
-        });
+        let mut ir = support::fixture(
+            if matches!(fixture, "names" | "scope_effects" | "predictive") {
+                "evolution"
+            } else if fixture == "right" {
+                "shared"
+            } else {
+                fixture
+            },
+        );
         if fixture == "names" {
             ir.rules[0].name = "_Root".into();
             ir.rules[3].name = "self".into();
@@ -208,10 +211,24 @@ fn generated_modules_compile_evaluate_and_require_semantics() {
                 },
             };
         }
+        if fixture == "predictive" {
+            let Expression::Choice(alternatives) = ir.rules[0].body.clone() else {
+                panic!("evolution root must be a choice")
+            };
+            ir.rules[0].body = Expression::PredictiveChoice {
+                predictors: vec![
+                    Predictor::Literal("if".into()),
+                    Predictor::Number,
+                    Predictor::Identifier,
+                    Predictor::Quoted('"'),
+                ],
+                alternatives,
+            };
+        }
         for file in generate(&ir).unwrap() {
             fs::write(output.join(file.relative_path), file.content).unwrap();
         }
-        let probe = if matches!(fixture, "evolution" | "names") {
+        let probe = if matches!(fixture, "evolution" | "names" | "predictive") {
             r#"
 use generated::{ast::Ast,evaluator::{Semantics,evaluate}};
 use unlaxer_runtime::Span;

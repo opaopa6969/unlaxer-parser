@@ -111,6 +111,10 @@ pub enum Expression {
     Sequence(Vec<Expression>),
     Choice(Vec<Expression>),
     LongestChoice(Vec<Expression>),
+    PredictiveChoice {
+        alternatives: Vec<Expression>,
+        predictors: Vec<Predictor>,
+    },
     Capture {
         name: String,
         expression: Box<Expression>,
@@ -136,4 +140,16 @@ pub enum Expression {
         child: Box<Expression>,
         java_whitespace: bool,
     },
+}
+
+/// Conservative FIRST predicate. `Any` deliberately disables pruning for an
+/// alternative; `OneOf` contains only predicates that are all proven possible.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Predictor {
+    Any,
+    Literal(String),
+    Number,
+    Identifier,
+    Quoted(char),
+    OneOf(Vec<Predictor>),
 }

@@ -241,6 +241,21 @@ RootExpression ::= NumberExpression | BooleanExpression | StringExpression ;
 custom parser と listener は、transaction 管理外の外部副作用を起こしてはいけません。
 rollback とコストモデルは[チューニング実践ノート](performance-tuning-ja.md)を参照してください。
 
+### `@predictiveChoice`
+
+通常の宣言順選択を維持したまま、先頭 literal と一致し得ない代替を parse 前に除外します。
+FIRST prefix を安全に求められない代替は常に候補へ残り、予測候補がすべて失敗した場合は通常の
+選択を再実行するため、受理範囲と失敗診断は通常の `Choice` と同じです。
+
+```ubnf
+@predictiveChoice
+RootExpression ::= 'number:' Number | 'string:' String | DynamicExpression ;
+```
+
+2つ以上の代替が必要で、`@leftAssoc` / `@rightAssoc` / `@longestChoice` とは併用できません。
+固定 prefix の異なる dispatch rule で効果が高く、nullable・再帰・custom parser など解析不能な
+prefix は最適化されません。詳細は[チューニング実践ノート](performance-tuning-ja.md)を参照してください。
+
 ### `@whitespace: style`
 
 ルール要素間に暗黙の空白スキップを挿入します。サポートされているスタイル：
@@ -464,6 +479,7 @@ grammar ExtendedCalc {
 | `@mapping` | アノテーション | 安定 |
 | `@leftAssoc` / `@rightAssoc` | アノテーション | 安定 |
 | `@longestChoice` | アノテーション | 安定 (v3.0.15+) |
+| `@predictiveChoice` | アノテーション | 開発版 |
 | `@whitespace` | グローバル設定 | 安定 |
 | `@comment` | グローバル設定 | 安定 |
 | `@enum` | アノテーション | 安定 (v3.0+) |

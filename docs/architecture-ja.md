@@ -73,6 +73,8 @@ flowchart TD
 | `LazyChain` | 遅延初期化チェーン（再帰文法向け） |
 | `Choice` | 順序付き選択肢：A を試し、失敗したら B を試す |
 | `LazyChoice` | 遅延初期化選択肢 |
+| `PredictiveChoice` / `LazyPredictiveChoice` | 保守的な FIRST prefix で不可能な枝だけを省略する順序付き選択肢 |
+| `LongestChoice` / `LazyLongestChoice` | 全候補から入力を最も長く消費する枝を選ぶ選択肢 |
 | `ZeroOrMore` | クリーネスター：UBNF の `{A}`、正規表現記法の `A*` |
 | `LazyZeroOrMore` | 遅延初期化ゼロ以上 |
 | `OneOrMore` | 1回以上：`A+` |

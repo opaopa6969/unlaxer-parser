@@ -203,6 +203,10 @@ public final class RustBackend {
             case Delimited delimited -> "Expr::Sequence(vec![" + expression(delimited.child()) + "])";
             case Choice choice -> "Expr::Choice(vec![" + expressions(choice.alternatives()) + "])";
             case LongestChoice choice -> "Expr::LongestChoice(vec![" + expressions(choice.alternatives()) + "])";
+            case PredictiveChoice choice -> "Expr::PredictiveChoice { alternatives: vec!["
+                + expressions(choice.alternatives()) + "], predictors: vec!["
+                + choice.predictors().stream().map(this::predictor).collect(java.util.stream.Collectors.joining(", "))
+                + "] }";
             case Capture capture -> "Expr::Capture(" + quote(capture.name()) + ", Box::new(" + expression(capture.expression()) + "))";
             case TextValue text -> expression(text.child()) + ".text_value()";
             case ValueBoundary boundary -> expression(boundary.child()) + ".value_boundary()";
@@ -211,6 +215,20 @@ public final class RustBackend {
             case Repeat repeat -> expression(repeat.child()) + ".repeat_java(" + repeat.min() + ", "
                 + (repeat.max() == null ? "None" : "Some(" + repeat.max() + ")") + ")";
             case Separated separated -> expression(separated.child()) + ".separated_by(" + expression(separated.separator()) + ")";
+        };
+    }
+
+    private String predictor(Predictor predictor) {
+        return switch (predictor) {
+            case AnyPredictor ignored -> "unlaxer_runtime::Predictor::Any";
+            case LiteralPredictor literal -> "unlaxer_runtime::Predictor::Literal(" + quote(literal.text()) + ")";
+            case NumberPredictor ignored -> "unlaxer_runtime::Predictor::Number";
+            case IdentifierPredictor ignored -> "unlaxer_runtime::Predictor::Identifier";
+            case QuotedPredictor quoted -> "unlaxer_runtime::Predictor::Quoted('\\u{"
+                + Integer.toHexString(quoted.quote()) + "}')";
+            case AnyOfPredictor anyOf -> "unlaxer_runtime::Predictor::OneOf(vec!["
+                + anyOf.alternatives().stream().map(this::predictor)
+                    .collect(java.util.stream.Collectors.joining(", ")) + "])";
         };
     }
 

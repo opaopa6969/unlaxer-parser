@@ -780,6 +780,7 @@ class LSPServerEmitter {
         kw.add("@leftAssoc");
         kw.add("@rightAssoc");
         kw.add("@longestChoice");
+        kw.add("@predictiveChoice");
         kw.add("@precedence");
         kw.add("@declares");
         kw.add("@catalog");
