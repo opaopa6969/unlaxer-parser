@@ -50,7 +50,7 @@ public interface Transaction extends TransactionListenerContainer , ParseContext
 	}
 	
 	public default void begin(Parser parser) {
-		getTokenStack().push(getCurrent().createNew());
+		getTokenStack().push(get().acquireFrame(getCurrent()));
 		get().checkpointTransactionalState(getCurrent());
 		onBegin(get(), parser);
 	}
@@ -157,6 +157,7 @@ public interface Transaction extends TransactionListenerContainer , ParseContext
     return committed;
     } finally {
       parseContext.finishTransactionalState(current, false);
+      parseContext.releaseFrame(current);
     }
   }
     
@@ -167,6 +168,7 @@ public interface Transaction extends TransactionListenerContainer , ParseContext
 			onRollback(get(), parser , pollFirst.getTokens());
 		} finally {
 			get().finishTransactionalState(pollFirst, true);
+			get().releaseFrame(pollFirst);
 		}
 	}
 	

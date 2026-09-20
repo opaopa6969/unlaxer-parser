@@ -24,7 +24,7 @@ public class TransactionElement implements Serializable{
 	
 	boolean resetMatchedWithConsumed = true;
 	
-	public final TokenList tokens = new TokenList();
+	public TokenList tokens = new TokenList();
 
     private transient Map<TransactionalState, Runnable> stateCheckpoints;
     private transient long savedMemoizationStateVersion;
@@ -126,6 +126,22 @@ public class TransactionElement implements Serializable{
 		this.resetMatchedWithConsumed = resetMatchedWithConsumed;
 	}
 
+
+	/**
+	 * Reinitializes a popped frame as a child of {@code parent}, exactly like {@link #createNew()}
+	 * on {@code parent} would, but reusing this frame's cursor and token objects.
+	 */
+	public void resetAsChildOf(TransactionElement parent, boolean freshTokens) {
+		resetMatchedWithConsumed = parent.resetMatchedWithConsumed;
+		parserCursor.resetFrom(parent.parserCursor, resetMatchedWithConsumed);
+		tokenKind = Optional.empty();
+		if (freshTokens) tokens = new TokenList();
+		else tokens.clear();
+		if (stateCheckpoints != null) stateCheckpoints.clear();
+		hasSavedMemoizationStateVersion = false;
+		previousChosenParsers = null;
+		previousOrderedParsers = null;
+	}
 
 	public TransactionElement createNew() {
 		return new TransactionElement(new ParserCursor(parserCursor,resetMatchedWithConsumed),resetMatchedWithConsumed);

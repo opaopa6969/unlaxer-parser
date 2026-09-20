@@ -59,5 +59,11 @@ public class ParserCursor{
 	void resetMatchedWithConsumed(EndExclusiveCursor consumed, EndExclusiveCursor matched){
 		matched.setPosition(consumed.position());
 	}
+
+	/** Reuses this cursor pair for a new transaction frame: same positions as {@code parent}. */
+	void resetFrom(ParserCursor parent, boolean resetMatched) {
+		consumed.setPosition(parent.consumed.position());
+		matched.setPosition(resetMatched ? parent.consumed.position() : parent.matched.position());
+	}
 	
 }

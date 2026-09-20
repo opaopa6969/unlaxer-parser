@@ -60,6 +60,28 @@ public class ParseContext implements
 
 	final Deque<TransactionElement> tokenStack = new ArrayDeque<TransactionElement>();
 
+	/*
+	 * Popped transaction frames are recycled: a frame, its cursor pair and token list are created
+	 * on every begin and discarded on every commit/rollback, and after the diagnostic and source
+	 * tuning they were the largest remaining allocation. A committed frame's tokens are always
+	 * copied (Committed, parent.tokens.addAll) before the frame is released, so only transaction
+	 * listeners could still hold the list; while any listener is registered the list is not reused.
+	 */
+	private final ArrayDeque<TransactionElement> framePool = new ArrayDeque<>();
+
+	/** A child frame of {@code parent}: recycled when possible, otherwise freshly created. */
+	TransactionElement acquireFrame(TransactionElement parent) {
+		TransactionElement frame = framePool.pollFirst();
+		if (frame == null) return parent.createNew();
+		frame.resetAsChildOf(parent, false == listenerByName.isEmpty());
+		return frame;
+	}
+
+	/** Returns a popped frame to the pool once its state has been restored or committed. */
+	void releaseFrame(TransactionElement frame) {
+		framePool.push(frame);
+	}
+
 	//FIXME change store to ScopeTree
 	public Map<ChoiceInterface, Parser> chosenParserByChoice = new HashMap<>();
 	
