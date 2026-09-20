@@ -178,7 +178,17 @@ jobs:
     - name: Resolve unlaxer version under test
       id: unlaxer
       working-directory: unlaxer-parser
-      run: echo "version=$(mvn -q help:evaluate -Dexpression=revision -DforceStdout)" >> "$GITHUB_OUTPUT"
+      run: |
+        if ! output="$(mvn -q help:evaluate -Dexpression=revision -DforceStdout 2>&1)"; then
+          printf '%s\n' "$output" >&2
+          exit 1
+        fi
+        mapfile -t versions < <(printf '%s\n' "$output" | sed -nE '/^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9._-]+)?$/p')
+        if [ "${#versions[@]}" -ne 1 ]; then
+          printf 'Expected exactly one Maven revision, got %s:\n%s\n' "${#versions[@]}" "$output" >&2
+          exit 1
+        fi
+        printf 'version=%s\n' "${versions[0]}" >> "$GITHUB_OUTPUT"
 
     - name: Checkout tinyexpression
       uses: actions/checkout@v4
