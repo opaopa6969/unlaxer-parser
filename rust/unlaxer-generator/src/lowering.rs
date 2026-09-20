@@ -28,6 +28,7 @@ pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
         mappings: Vec::new(),
         operators: Vec::new(),
         catalogs: Vec::new(),
+        longest_choices: Vec::new(),
         nullable: HashSet::new(),
         analysis_depth: Cell::new(0),
     }
@@ -42,6 +43,7 @@ struct Lowering<'a> {
     mappings: Vec<Option<(String, Vec<String>)>>,
     operators: Vec<Option<Operator>>,
     catalogs: Vec<Option<String>>,
+    longest_choices: Vec<bool>,
     nullable: HashSet<usize>,
     analysis_depth: Cell<usize>,
 }
@@ -127,6 +129,7 @@ impl Lowering<'_> {
             }
             let mut mapping = None;
             let mut associativity = None;
+            let mut longest_choice = false;
             let mut precedence = None;
             let mut local_whitespace = None;
             let mut interleave = false;
@@ -166,6 +169,12 @@ impl Lowering<'_> {
                                 rule.name
                             ));
                         }
+                    }
+                    AnnotationKind::LongestChoice => {
+                        if longest_choice {
+                            return Err(format!("duplicate @longestChoice on {}", rule.name));
+                        }
+                        longest_choice = true;
                     }
                     AnnotationKind::Precedence { level } => {
                         if precedence.replace(*level).is_some() {
@@ -231,6 +240,19 @@ impl Lowering<'_> {
                 }
             }
             rule_effects.push(effects);
+            if longest_choice && rule.body.alternatives.len() < 2 {
+                return Err(format!(
+                    "@longestChoice requires multiple alternatives on {}",
+                    rule.name
+                ));
+            }
+            if longest_choice && associativity.is_some() {
+                return Err(format!(
+                    "@longestChoice conflicts with associativity on {}",
+                    rule.name
+                ));
+            }
+            self.longest_choices.push(longest_choice);
             has_local_trivia |= local_whitespace.is_some() || interleave;
             rule_whitespace.push(local_whitespace.unwrap_or(whitespace || interleave));
             if associativity.is_some() != precedence.is_some() {
@@ -369,9 +391,17 @@ impl Lowering<'_> {
                     }
                 }
             }
+            let body = if self.longest_choices[i] {
+                let Expression::Choice(alternatives) = expression else {
+                    unreachable!("validated longest choice shape")
+                };
+                Expression::LongestChoice(alternatives.clone())
+            } else {
+                expression.clone()
+            };
             rules.push(Rule {
                 name: self.grammar.rules[i].name.clone(),
-                body: expression.clone(),
+                body,
                 mapping,
                 operator: self.operators[i],
                 catalog,
@@ -801,6 +831,28 @@ impl Lowering<'_> {
             Expression::Choice(alternatives) => {
                 let mixed = self.shape(expression, &mut HashSet::new())?.kind == Kind::Value;
                 Expression::Choice(
+                    alternatives
+                        .iter()
+                        .map(|alternative| {
+                            let projected = self.project_text_values(alternative, mapping)?;
+                            Ok(
+                                if mixed
+                                    && self.shape(alternative, &mut HashSet::new())?.kind
+                                        == Kind::Text
+                                {
+                                    Expression::TextValue(Box::new(projected))
+                                } else {
+                                    projected
+                                },
+                            )
+                        })
+                        .collect::<Result<_>>()?,
+                )
+            }
+            Expression::LongestChoice(alternatives) => {
+                let ordinary = Expression::Choice(alternatives.clone());
+                let mixed = self.shape(&ordinary, &mut HashSet::new())?.kind == Kind::Value;
+                Expression::LongestChoice(
                     alternatives
                         .iter()
                         .map(|alternative| {

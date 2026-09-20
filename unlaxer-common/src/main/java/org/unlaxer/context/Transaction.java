@@ -107,6 +107,7 @@ public interface Transaction extends TransactionListenerContainer , ParseContext
     TransactionElement current = getTokenStack().pollFirst();
     try {
     TransactionElement parent = getCurrent();
+	parent.absorbSelectionChanges(current);
     parent.setCursor(new ParserCursor(current.getParserCursor(),false));
 
     boolean outputCollected = doCreateMetaToken() ||
@@ -160,13 +161,8 @@ public interface Transaction extends TransactionListenerContainer , ParseContext
   }
     
 	public default void rollback(Parser parser) {
-		if (parser instanceof ChoiceInterface) {
-			getChosenParserByChoice().remove(parser);
-		}
-		if (parser instanceof NonOrdered) {
-			getOrderedParsersByNonOrdered().remove(parser);
-		}
 		TransactionElement pollFirst = getTokenStack().pollFirst();
+		pollFirst.restoreSelectionChanges(getChosenParserByChoice(), getOrderedParsersByNonOrdered());
 		try {
 			onRollback(get(), parser , pollFirst.getTokens());
 		} finally {

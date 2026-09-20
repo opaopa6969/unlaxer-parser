@@ -110,6 +110,7 @@ pub enum Expression {
     Reference(usize),
     Sequence(Vec<Expression>),
     Choice(Vec<Expression>),
+    LongestChoice(Vec<Expression>),
     Capture {
         name: String,
         expression: Box<Expression>,

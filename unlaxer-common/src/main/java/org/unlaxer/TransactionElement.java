@@ -5,6 +5,10 @@ import java.util.Optional;
 import java.util.IdentityHashMap;
 import java.util.Map;
 import org.unlaxer.context.TransactionalState;
+import org.unlaxer.parser.Parser;
+import org.unlaxer.parser.Parsers;
+import org.unlaxer.parser.combinator.ChoiceInterface;
+import org.unlaxer.parser.combinator.NonOrdered;
 
 import org.unlaxer.Cursor.EndExclusiveCursor;
 import org.unlaxer.Source.SourceKind;
@@ -24,6 +28,13 @@ public class TransactionElement implements Serializable{
 
     private transient Map<TransactionalState, Runnable> stateCheckpoints;
 
+    /*
+     * Choice/interleave metadata is observable parser state too.  Keep a small undo journal
+     * instead of cloning the complete ParseContext maps at every parser transaction.
+     */
+    private transient Map<ChoiceInterface, Parser> previousChosenParsers;
+    private transient Map<NonOrdered, Parsers> previousOrderedParsers;
+
     /** Internal transaction hook: capture each explicitly registered owner once. */
     public void checkpointState(TransactionalState state) {
         if (stateCheckpoints == null) stateCheckpoints = new IdentityHashMap<>();
@@ -33,6 +44,44 @@ public class TransactionElement implements Serializable{
     /** Internal transaction hook, run after rollback listeners have been notified. */
     public void restoreState() {
         if (stateCheckpoints != null) stateCheckpoints.values().forEach(Runnable::run);
+    }
+
+    public void recordChosenParser(ChoiceInterface choice, Parser previous) {
+        if (previousChosenParsers == null) previousChosenParsers = new IdentityHashMap<>();
+        if (!previousChosenParsers.containsKey(choice)) previousChosenParsers.put(choice, previous);
+    }
+
+    public void recordOrderedParsers(NonOrdered nonOrdered, Parsers previous) {
+        if (previousOrderedParsers == null) previousOrderedParsers = new IdentityHashMap<>();
+        if (!previousOrderedParsers.containsKey(nonOrdered)) previousOrderedParsers.put(nonOrdered, previous);
+    }
+
+    /** Propagates the earliest undo value into the enclosing transaction. */
+    public void absorbSelectionChanges(TransactionElement child) {
+        if (child.previousChosenParsers != null) {
+            child.previousChosenParsers.forEach(this::recordChosenParser);
+        }
+        if (child.previousOrderedParsers != null) {
+            child.previousOrderedParsers.forEach(this::recordOrderedParsers);
+        }
+    }
+
+    /** Restores choice/interleave observations made by this transaction and its commits. */
+    public void restoreSelectionChanges(
+            Map<ChoiceInterface, Parser> chosenParsers,
+            Map<NonOrdered, Parsers> orderedParsers) {
+        if (previousChosenParsers != null) {
+            previousChosenParsers.forEach((choice, previous) -> {
+                if (previous == null) chosenParsers.remove(choice);
+                else chosenParsers.put(choice, previous);
+            });
+        }
+        if (previousOrderedParsers != null) {
+            previousOrderedParsers.forEach((nonOrdered, previous) -> {
+                if (previous == null) orderedParsers.remove(nonOrdered);
+                else orderedParsers.put(nonOrdered, previous);
+            });
+        }
     }
 	
 	public TransactionElement(ParserCursor parserCursor) {

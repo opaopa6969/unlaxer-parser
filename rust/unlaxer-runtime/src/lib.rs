@@ -40,6 +40,9 @@ pub enum Expr {
     Rule(usize),
     Sequence(Vec<Expr>),
     Choice(Vec<Expr>),
+    /// Try every alternative from the same transactional state and commit the
+    /// one that consumes the most input. Equal-length matches keep declaration order.
+    LongestChoice(Vec<Expr>),
     Capture(&'static str, Box<Expr>),
     /// Wrap successful child nodes in a text-projection boundary without changing parsing.
     TextValue(Box<Expr>),
@@ -103,6 +106,9 @@ impl Expr {
     }
     pub fn choice(alternatives: impl IntoIterator<Item = Self>) -> Self {
         Self::Choice(alternatives.into_iter().collect())
+    }
+    pub fn longest_choice(alternatives: impl IntoIterator<Item = Self>) -> Self {
+        Self::LongestChoice(alternatives.into_iter().collect())
     }
     /// Match tinyexpression's opening code fence without applying grammar trivia between parts.
     pub fn code_start() -> Self {
@@ -410,6 +416,17 @@ struct Checkpoint {
     captures: HashMap<String, Vec<Span>>,
     state: HashMap<String, Box<dyn StateValue>>,
     scopes: ScopeStore,
+}
+
+struct ChoiceWinner {
+    position: usize,
+    matched_position: usize,
+    node_start: usize,
+    nodes: Vec<Node>,
+    captures: HashMap<String, Vec<Span>>,
+    state: HashMap<String, Box<dyn StateValue>>,
+    scopes: ScopeStore,
+    fragment: Fragment,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -1261,6 +1278,7 @@ impl<'a> ParseContext<'a> {
                 }
                 None
             }
+            Expr::LongestChoice(alternatives) => self.longest_choice(alternatives, depth),
             Expr::Capture(name, expression) => {
                 let start = self.position;
                 let mut fragment = self.expression(expression, depth)?;
@@ -1429,6 +1447,48 @@ impl<'a> ParseContext<'a> {
         true
     }
 
+    fn longest_choice(&mut self, alternatives: &[Expr], depth: usize) -> Option<Fragment> {
+        let start = self.position;
+        let node_start = self.nodes.len();
+        let mut winner: Option<ChoiceWinner> = None;
+        for alternative in alternatives {
+            let checkpoint = self.checkpoint();
+            if let Some(fragment) = self.expression(alternative, depth) {
+                let consumed = self.position - start;
+                let replaces = winner
+                    .as_ref()
+                    .is_none_or(|current| consumed > current.position - start);
+                if replaces {
+                    winner = Some(ChoiceWinner {
+                        position: self.position,
+                        matched_position: self.matched_position,
+                        node_start,
+                        nodes: self.nodes[node_start..].to_vec(),
+                        captures: self.captures.clone(),
+                        state: self
+                            .state
+                            .iter()
+                            .map(|(key, value)| (key.clone(), value.as_ref().copy_value()))
+                            .collect(),
+                        scopes: self.scopes.clone(),
+                        fragment,
+                    });
+                }
+            }
+            self.restore(checkpoint);
+        }
+        winner.map(|winner| {
+            debug_assert_eq!(self.nodes.len(), winner.node_start);
+            self.position = winner.position;
+            self.matched_position = winner.matched_position;
+            self.nodes.extend(winner.nodes);
+            self.captures = winner.captures;
+            self.state = winner.state;
+            self.scopes = winner.scopes;
+            winner.fragment
+        })
+    }
+
     fn skip(&mut self) {
         if !self.whitespace {
             return;
@@ -1574,9 +1634,11 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>) -> bo
             references.push(*id);
             true
         }
-        Expr::Sequence(children) | Expr::Choice(children) => children
-            .iter()
-            .all(|child| expression_is_memo_safe(child, references)),
+        Expr::Sequence(children) | Expr::Choice(children) | Expr::LongestChoice(children) => {
+            children
+                .iter()
+                .all(|child| expression_is_memo_safe(child, references))
+        }
         Expr::Capture(_, child)
         | Expr::TextValue(child)
         | Expr::ValueBoundary(child)

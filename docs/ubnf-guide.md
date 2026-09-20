@@ -226,6 +226,21 @@ Addition ::= Term @left { AddOp @op Term @right } ;
 Exponent ::= Factor @base '^' Factor @exp ;
 ```
 
+### `@longestChoice`
+
+Tries every top-level alternative and selects the successful alternative that consumes the most
+input. Equal-length matches keep declaration order. Use it only where longest-match semantics are
+required; ordinary alternation remains PEG-style first-success and is faster.
+
+```ubnf
+@longestChoice
+RootExpression ::= NumberExpression | BooleanExpression | StringExpression ;
+```
+
+The annotation requires at least two alternatives and cannot be combined with `@leftAssoc` or
+`@rightAssoc`. Custom parsers and listeners below this rule must not perform non-transactional
+external side effects. See [the tuning note](performance-tuning-ja.md) for the rollback and cost model.
+
 ### `@whitespace: style`
 
 Inserts implicit whitespace skipping between rule elements. Supported styles:
@@ -451,6 +466,7 @@ The imported rules are available under the alias namespace.
 | `@root` | annotation | Stable |
 | `@mapping` | annotation | Stable |
 | `@leftAssoc` / `@rightAssoc` | annotation | Stable |
+| `@longestChoice` | annotation | Stable (v3.0.15+) |
 | `@whitespace` | global setting | Stable |
 | `@comment` | global setting | Stable |
 | `@enum` | annotation | Stable (v3.0+) |

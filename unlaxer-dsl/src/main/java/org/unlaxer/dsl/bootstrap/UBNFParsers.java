@@ -44,7 +44,8 @@ import org.unlaxer.util.cache.SupplierBoundCache;
  * TokenDecl     ::= 'token' IDENTIFIER '=' CLASS_NAME
  * RuleDecl      ::= Annotation* IDENTIFIER '::=' RuleBody
  * Annotation    ::= '@root' | '@mapping(...)' | '@whitespace[(...)]'
- *                 | '@leftAssoc' | '@rightAssoc' | '@precedence(level=INTEGER)' | '@' IDENTIFIER
+ *                 | '@leftAssoc' | '@rightAssoc' | '@longestChoice'
+ *                 | '@precedence(level=INTEGER)' | '@' IDENTIFIER
  * RuleBody      ::= ChoiceBody
  * ChoiceBody    ::= SequenceBody { '|' SequenceBody }
  * SequenceBody  ::= AnnotatedElement+
@@ -960,6 +961,16 @@ public class UBNFParsers {
         }
     }
 
+    /** LongestChoiceAnnotation: '@longestChoice' */
+    public static class LongestChoiceAnnotationParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(new WordParser("@longestChoice"));
+        }
+    }
+
     /**
      * PrecedenceAnnotation: '@precedence' '(' 'level' '=' UNSIGNED_INTEGER ')'
      */
@@ -1214,6 +1225,7 @@ public class UBNFParsers {
                 Parser.get(CatalogAnnotationParser.class),
                 Parser.get(LeftAssocAnnotationParser.class),
                 Parser.get(RightAssocAnnotationParser.class),
+                Parser.get(LongestChoiceAnnotationParser.class),
                 Parser.get(PrecedenceAnnotationParser.class),
                 Parser.get(DocAnnotationParser.class),
                 Parser.get(RecoveryAnnotationParser.class),

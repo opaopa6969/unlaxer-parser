@@ -12,6 +12,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.InterleaveAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.LeftAssocAnnotation;
+import org.unlaxer.dsl.bootstrap.UBNFAST.LongestChoiceAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OptionalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.PrecedenceAnnotation;
@@ -107,6 +108,7 @@ public final class GrammarValidator {
             MappingAnnotation mapping = null;
             boolean hasLeftAssoc = false;
             boolean hasRightAssoc = false;
+            int longestChoiceAnnotations = 0;
             List<PrecedenceAnnotation> precedenceAnnotations = new ArrayList<>();
             List<InterleaveAnnotation> interleaveAnnotations = new ArrayList<>();
             int whitespaceAnnotations = 0;
@@ -120,6 +122,8 @@ public final class GrammarValidator {
                     hasLeftAssoc = true;
                 } else if (annotation instanceof RightAssocAnnotation) {
                     hasRightAssoc = true;
+                } else if (annotation instanceof LongestChoiceAnnotation) {
+                    longestChoiceAnnotations++;
                 } else if (annotation instanceof PrecedenceAnnotation p) {
                     precedenceAnnotations.add(p);
                 } else if (annotation instanceof InterleaveAnnotation i) {
@@ -146,6 +150,7 @@ public final class GrammarValidator {
             if (hasLeftAssoc || hasRightAssoc) {
                 validateAssoc(rule, mapping, hasLeftAssoc, hasRightAssoc, errors);
             }
+            validateLongestChoice(rule, hasLeftAssoc, hasRightAssoc, longestChoiceAnnotations, errors);
             validatePrecedence(rule, hasLeftAssoc, hasRightAssoc, precedenceAnnotations, errors);
             validateAdvancedAnnotations(rule, interleaveAnnotations, backrefAnnotations, scopeTreeAnnotations, errors);
             validateScopeCaptures(rule, scopeReferences, errors);
@@ -157,6 +162,34 @@ public final class GrammarValidator {
         validateUndefinedRuleRefs(grammar, errors);
 
         return List.copyOf(errors);
+    }
+
+    private static void validateLongestChoice(
+        RuleDecl rule,
+        boolean hasLeftAssoc,
+        boolean hasRightAssoc,
+        int count,
+        List<ValidationIssue> errors
+    ) {
+        if (count == 0) return;
+        if (count > 1) {
+            addRuleError(errors, rule.name(),
+                "rule " + rule.name() + " has duplicate @longestChoice annotations",
+                "Keep a single @longestChoice annotation.",
+                "E-LONGEST-CHOICE-DUPLICATE");
+        }
+        if (!(rule.body() instanceof ChoiceBody choice) || choice.alternatives().size() < 2) {
+            addRuleError(errors, rule.name(),
+                "rule " + rule.name() + " uses @longestChoice without multiple alternatives",
+                "Use @longestChoice only on a rule with at least two '|' alternatives.",
+                "E-LONGEST-CHOICE-SHAPE");
+        }
+        if (hasLeftAssoc || hasRightAssoc) {
+            addRuleError(errors, rule.name(),
+                "rule " + rule.name() + " combines @longestChoice with associativity rewriting",
+                "Move longest matching to a separate dispatch rule.",
+                "E-LONGEST-CHOICE-ASSOC");
+        }
     }
 
     public static void validateOrThrow(GrammarDecl grammar) {

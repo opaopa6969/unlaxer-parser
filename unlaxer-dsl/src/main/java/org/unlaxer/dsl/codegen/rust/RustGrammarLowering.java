@@ -18,6 +18,7 @@ public final class RustGrammarLowering {
     private final List<MappingAnnotation> mappings = new ArrayList<>();
     private final List<Operator> operators = new ArrayList<>();
     private final List<String> catalogs = new ArrayList<>();
+    private final List<Boolean> longestChoices = new ArrayList<>();
     private final Set<Integer> nullableRules = new HashSet<>();
     private record Shape(Kind kind, Cardinality cardinality) {}
 
@@ -75,6 +76,7 @@ public final class RustGrammarLowering {
             MappingAnnotation mapping = null;
             boolean leftAssoc = false;
             boolean rightAssoc = false;
+            boolean longestChoice = false;
             Integer precedence = null;
             Boolean localWhitespace = null;
             boolean interleave = false;
@@ -100,6 +102,9 @@ public final class RustGrammarLowering {
                 } else if (annotation instanceof RightAssocAnnotation) {
                     if (leftAssoc || rightAssoc) throw unsupported("duplicate/conflicting associativity on " + rule.name());
                     rightAssoc = true;
+                } else if (annotation instanceof LongestChoiceAnnotation) {
+                    if (longestChoice) throw unsupported("duplicate @longestChoice on " + rule.name());
+                    longestChoice = true;
                 } else if (annotation instanceof PrecedenceAnnotation value) {
                     if (precedence != null) throw unsupported("duplicate @precedence on " + rule.name());
                     precedence = value.level();
@@ -134,6 +139,14 @@ public final class RustGrammarLowering {
             }
             ruleEffects.add(scopeMode == null && declares == null && backref == null ? null
                 : new Effects(scopeMode, declares, backref));
+            if (longestChoice && (!(rule.body() instanceof ChoiceBody choice)
+                || choice.alternatives().size() < 2)) {
+                throw unsupported("@longestChoice requires multiple alternatives on " + rule.name());
+            }
+            if (longestChoice && (leftAssoc || rightAssoc)) {
+                throw unsupported("@longestChoice conflicts with associativity on " + rule.name());
+            }
+            longestChoices.add(longestChoice);
             hasLocalTrivia |= localWhitespace != null || interleave;
             ruleWhitespace.add(localWhitespace == null ? whitespace || interleave : localWhitespace);
             mappings.add(mapping);
@@ -196,7 +209,11 @@ public final class RustGrammarLowering {
                 lowerRightAssoc(i, mapping);
             }
             if (mapping != null) variants.merge(mapping.name(), mapping, this::mergeMappings);
-            rules.add(new Rule(grammar.rules().get(i).name(), bodies.get(i), mapping, operators.get(i), catalog));
+            Expression ruleBody = bodies.get(i);
+            if (longestChoices.get(i)) {
+                ruleBody = new LongestChoice(((Choice) ruleBody).alternatives());
+            }
+            rules.add(new Rule(grammar.rules().get(i).name(), ruleBody, mapping, operators.get(i), catalog));
         }
         List<Rule> rewritten = new ArrayList<>();
         boolean hasValues = variants.values().stream().flatMap(mapping -> mapping.fields().stream())
@@ -269,6 +286,14 @@ public final class RustGrammarLowering {
             case Choice choice -> {
                 boolean mixed = shape(choice, new HashSet<>()).kind() == Kind.VALUE;
                 yield new Choice(choice.alternatives().stream().map(alternative -> {
+                    Expression child = retainTextValues(alternative, mapping);
+                    return mixed && shape(alternative, new HashSet<>()).kind() == Kind.TEXT
+                        ? new TextValue(child) : child;
+                }).toList());
+            }
+            case LongestChoice choice -> {
+                boolean mixed = shape(new Choice(choice.alternatives()), new HashSet<>()).kind() == Kind.VALUE;
+                yield new LongestChoice(choice.alternatives().stream().map(alternative -> {
                     Expression child = retainTextValues(alternative, mapping);
                     return mixed && shape(alternative, new HashSet<>()).kind() == Kind.TEXT
                         ? new TextValue(child) : child;

@@ -319,6 +319,7 @@ impl Parser<'_> {
             "root" => AnnotationKind::Root,
             "leftAssoc" => AnnotationKind::LeftAssoc,
             "rightAssoc" => AnnotationKind::RightAssoc,
+            "longestChoice" => AnnotationKind::LongestChoice,
             "skip" => AnnotationKind::Skip,
             "enum" => AnnotationKind::Enum,
             "mapping" => {

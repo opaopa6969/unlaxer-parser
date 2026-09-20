@@ -10,6 +10,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.BackrefAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.InterleaveAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.LeftAssocAnnotation;
+import org.unlaxer.dsl.bootstrap.UBNFAST.LongestChoiceAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.PrecedenceAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RightAssocAnnotation;
@@ -129,6 +130,8 @@ public final class GrammarToParserIrExporter {
         } else if (annotation instanceof RightAssocAnnotation) {
             name = "right-assoc";
             payload.put("assoc", "right");
+        } else if (annotation instanceof LongestChoiceAnnotation) {
+            name = "longest-choice";
         } else if (annotation instanceof PrecedenceAnnotation precedence) {
             name = "precedence";
             payload.put("level", precedence.level());

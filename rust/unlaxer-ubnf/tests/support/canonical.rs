@@ -140,6 +140,7 @@ fn annotation(a: &Annotation) -> String {
         AnnotationKind::Catalog { context } => ("CatalogAnnotation", vec![quote(context)]),
         AnnotationKind::LeftAssoc => ("LeftAssocAnnotation", vec![]),
         AnnotationKind::RightAssoc => ("RightAssocAnnotation", vec![]),
+        AnnotationKind::LongestChoice => ("LongestChoiceAnnotation", vec![]),
         AnnotationKind::Precedence { level } => ("PrecedenceAnnotation", vec![level.to_string()]),
         AnnotationKind::Doc { text } => ("DocAnnotation", vec![quote(text)]),
         AnnotationKind::Recovery { mode, sync_tokens } => (

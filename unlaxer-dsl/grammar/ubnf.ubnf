@@ -146,6 +146,7 @@ grammar UBNF {
     | CatalogAnnotation
     | LeftAssocAnnotation
     | RightAssocAnnotation
+    | LongestChoiceAnnotation
     | PrecedenceAnnotation
     | DocAnnotation
     | RecoveryAnnotation
@@ -190,6 +191,9 @@ grammar UBNF {
 
   @mapping(RightAssocAnnotation)
   RightAssocAnnotation ::= '@rightAssoc' ;
+
+  @mapping(LongestChoiceAnnotation)
+  LongestChoiceAnnotation ::= '@longestChoice' ;
 
   @mapping(PrecedenceAnnotation, params=[level])
   PrecedenceAnnotation ::= '@precedence' '(' 'level' '=' UNSIGNED_INTEGER @level ')' ;
