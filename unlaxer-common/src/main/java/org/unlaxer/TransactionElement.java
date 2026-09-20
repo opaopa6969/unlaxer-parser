@@ -27,6 +27,8 @@ public class TransactionElement implements Serializable{
 	public final TokenList tokens = new TokenList();
 
     private transient Map<TransactionalState, Runnable> stateCheckpoints;
+    private transient long savedMemoizationStateVersion;
+    private transient boolean hasSavedMemoizationStateVersion;
 
     /*
      * Choice/interleave metadata is observable parser state too.  Keep a small undo journal
@@ -37,8 +39,35 @@ public class TransactionElement implements Serializable{
 
     /** Internal transaction hook: capture each explicitly registered owner once. */
     public void checkpointState(TransactionalState state) {
+        checkpointStateIfAbsent(state);
+    }
+
+    /** Internal transaction hook that reports whether it captured a new snapshot. */
+    public boolean checkpointStateIfAbsent(TransactionalState state) {
         if (stateCheckpoints == null) stateCheckpoints = new IdentityHashMap<>();
-        stateCheckpoints.computeIfAbsent(state, key -> key.checkpoint());
+        if (stateCheckpoints.containsKey(state)) return false;
+        stateCheckpoints.put(state, state.checkpoint());
+        return true;
+    }
+
+    public boolean hasStateCheckpoints() {
+        return stateCheckpoints != null && false == stateCheckpoints.isEmpty();
+    }
+
+    public void saveMemoizationStateVersion(long version) {
+        if (hasSavedMemoizationStateVersion) {
+            throw new IllegalStateException("transaction state version snapshot already exists");
+        }
+        savedMemoizationStateVersion = version;
+        hasSavedMemoizationStateVersion = true;
+    }
+
+    public long takeMemoizationStateVersion() {
+        if (false == hasSavedMemoizationStateVersion) {
+            throw new IllegalStateException("transaction state version snapshot is missing");
+        }
+        hasSavedMemoizationStateVersion = false;
+        return savedMemoizationStateVersion;
     }
 
     /** Internal transaction hook, run after rollback listeners have been notified. */

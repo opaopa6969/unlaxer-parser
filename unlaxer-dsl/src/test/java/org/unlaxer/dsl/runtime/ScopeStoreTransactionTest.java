@@ -8,6 +8,7 @@ import org.unlaxer.TokenKind;
 import org.unlaxer.TokenList;
 import org.unlaxer.Parsed;
 import org.unlaxer.context.ParseContext;
+import org.unlaxer.context.TransactionMetrics;
 import org.unlaxer.listener.OutputLevel;
 import org.unlaxer.listener.TransactionListener;
 import org.unlaxer.parser.Parser;
@@ -31,6 +32,36 @@ public class ScopeStoreTransactionTest {
             ScopeStore.declare(ctx, "decl" + offset, offset);
             ScopeStore.addReference(ctx, "ref", offset, 1);
             ScopeStore.addDiagnostic(ctx, "warning", offset, 1, Severity.WARNING);
+        }
+    }
+
+    @Test public void unusedScopeStoreDoesNotCreateTransactionSnapshots() {
+        try (var ctx = new ParseContext(StringSource.createRootSource(""))) {
+            var parser = new WordParser("x");
+            ScopeStore.getAllDeclarations(ctx); // initialize the mutation-aware owner
+            ctx.enableTransactionMetrics();
+            ctx.begin(parser);
+            ctx.commit(parser, TokenKind.consumed);
+
+            assertEquals(new TransactionMetrics(1, 1, 0, 0, 1, 0),
+                ctx.snapshotTransactionMetrics());
+        }
+    }
+
+    @Test public void scopeStoreSnapshotsOncePerFrameBeforeItsFirstMutation() {
+        try (var ctx = new ParseContext(StringSource.createRootSource(""))) {
+            var parser = new WordParser("x");
+            ScopeStore.getAllDeclarations(ctx);
+            ctx.enableTransactionMetrics();
+            ctx.begin(parser);
+            ScopeStore.enter(ctx);
+            ScopeStore.declare(ctx, "name", 1);
+            ScopeStore.addReference(ctx, "name", 1, 1);
+            ScopeStore.addDiagnostic(ctx, "message", 1, 1, Severity.INFO);
+            ctx.commit(parser, TokenKind.consumed);
+
+            assertEquals(new TransactionMetrics(1, 1, 0, 1, 0, 1),
+                ctx.snapshotTransactionMetrics());
         }
     }
 

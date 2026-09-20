@@ -75,6 +75,14 @@ pub struct ScopeStore {
 }
 
 impl ScopeStore {
+    pub(crate) fn is_empty(&self) -> bool {
+        self.stack.is_empty()
+            && self.global.is_empty()
+            && self.declarations.is_empty()
+            && self.references.is_empty()
+            && self.diagnostics.is_empty()
+    }
+
     pub fn enter(&mut self) {
         self.stack.push(BTreeMap::new());
     }

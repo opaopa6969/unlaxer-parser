@@ -139,3 +139,55 @@ parse+mapは10.27%増加し、Rust parse-onlyは1.75%増加、parse+mapは5.19%�
 
 この負の結果から、注釈の存在自体を既定の高速化と解釈してはいけない。prefixが分離した
 dispatch ruleで候補削減が期待できる場合だけ有効化し、文法ごとに実測して採否を決める。
+
+## ケース3: transaction payload の copy-on-write
+
+### 仮説
+
+`ParseContext` の transaction は cursor やtree長だけでなく、capture、scope、user stateなども
+rollbackする。ところが多くの speculative branch は、それらのpayloadを変更せずにcommitまたは
+rollbackする。transaction開始時に毎回deep copyすると、「戻すものがない失敗」まで高価になる。
+
+そこでtransaction自体は削らず、payload snapshotだけを最初のmutationまで遅延した。
+
+- Java: 既存の第三者製 `TransactionalState` は互換性のためeagerのままにし、
+  `MutationAwareTransactionalState` を実装する組み込みstateだけがmutation直前に各open frameへ
+  snapshotを設置する。memoization versionはMapではなくframe内のprimitive fieldへ保存する。
+- Rust: capture、user state、scopeを `Rc` でcheckpointと共有し、最初のmutationで
+  `Rc::make_mut` によりdeep copyする。空payloadは `Option::None` として保持する。
+
+両runtimeはopt-in counterを持つ。`opened`、`committed`、`rolled_back`、
+`nonempty_payload_snapshots`、`empty_payload_checkpoints`、`copy_on_write_deep_copies` の6項目を
+同じ意味カテゴリで観測する。ただし内部表現が異なるため、Javaのpayload snapshotは登録された
+`TransactionalState`、Rustはcapture/state/scopeの共有snapshotを数える。従って絶対値を言語間で
+比較せず、各runtime内で「checkpoint数に対して実copyが何回必要だったか」を読む。
+
+### TinyExpressionでの観測
+
+production public facadeと同じFormula→Boolean→String→Objectのretry順、safe failure memoizationで
+一度ずつ計測した。
+
+| Runtime / fixture | Opened | Commit | Rollback | Nonempty snapshot | Empty checkpoint | Deep copy |
+|---|---:|---:|---:|---:|---:|---:|
+| Java / complex | 41,917 | 7,967 | 33,950 | 1,341 | 40,576 | 1,341 |
+| Java / comparison-heavy | 24,830 | 4,082 | 20,748 | 11 | 24,819 | 11 |
+| Rust / complex | 53,985 | 13,238 | 40,747 | 53,983 | 2 | 1,621 |
+| Rust / comparison-heavy | 15,135 | 1,492 | 13,643 | 14,593 | 542 | 132 |
+
+Javaでは95%以上のtransactionが組み込みstate snapshotを必要とせず、Rustではsnapshot handleを
+持つcheckpointが多い一方、実deep copyはcomplexで約3.0%、comparison-heavyで約0.9%だった。
+この差はcopy-on-writeの対象がhot pathに存在することを示す。
+
+3-run中央値のpublic facade A/Bでは、Javaがcomplex 1.30%、comparison-heavy 3.71%短縮、Rustが
+complex 66.06%、comparison-heavy 54.20%短縮した。受理結果、AST/source span、診断、nested
+transactionの状態同値testも維持したため採用した。測定条件とraw dataは
+[TinyExpressionの実験レポート](https://github.com/opaopa6969/tinyexpression/blob/master/benchmarks/results/2026-09-20-checkpoint-cow-experiment.md)
+に保存している。
+
+### 教材としての要点
+
+copy-on-writeは「状態をなくしてpureにする」最適化ではない。`ParseContext` の状態fulな能力と
+rollback境界を維持しつつ、状態が実際に変わるまで所有コストを払わない設計である。最初に
+counterでtransaction数と実mutation数の差を確認し、次にnested commit/rollback、late
+registration、listener、否定lookaheadを回帰testへ固定してから速度を測る。この順序なら、
+速くなった代わりに意味論が弱くなる事故を避けられる。
