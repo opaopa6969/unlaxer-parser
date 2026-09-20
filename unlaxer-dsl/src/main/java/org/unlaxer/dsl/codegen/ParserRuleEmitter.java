@@ -196,8 +196,13 @@ class ParserRuleEmitter {
         IndentedWriter w = new IndentedWriter(1);
 
         List<String> bindings = ctx.captureBindings.get(ruleName).bindings(body);
+        String helperInterfaces = bindings.isEmpty() ? "" : "__CaptureBinding";
+        if (Boolean.TRUE.equals(ctx.safeFailureMemoByRule.get(ruleName))) {
+            helperInterfaces += (helperInterfaces.isEmpty() ? "" : ", ")
+                + "org.unlaxer.context.SafeFailureMemoizable";
+        }
         w.line("public static class " + helperName + " extends " + baseClass
-            + (bindings.isEmpty() ? "" : " implements __CaptureBinding") + " {");
+            + (helperInterfaces.isEmpty() ? "" : " implements " + helperInterfaces) + " {");
         w.indent();
         w.line("private static final long serialVersionUID = 1L;");
         if (!bindings.isEmpty()) {
@@ -233,7 +238,9 @@ class ParserRuleEmitter {
         String chainClass = getChainClassName(ctx, ruleName);
 
         IndentedWriter bw = new IndentedWriter(1);
-        bw.line("public static class " + sep.bodyName() + " extends " + chainClass + " {");
+        String memoMarker = Boolean.TRUE.equals(ctx.safeFailureMemoByRule.get(ruleName))
+            ? " implements org.unlaxer.context.SafeFailureMemoizable" : "";
+        bw.line("public static class " + sep.bodyName() + " extends " + chainClass + memoMarker + " {");
         bw.indent();
         bw.line("private static final long serialVersionUID = 1L;");
         bw.line("@Override");
@@ -253,7 +260,7 @@ class ParserRuleEmitter {
         ctx.addHelper(ruleName, bw.build());
 
         IndentedWriter ow = new IndentedWriter(1);
-        ow.line("public static class " + sep.outerName() + " extends " + chainClass + " {");
+        ow.line("public static class " + sep.outerName() + " extends " + chainClass + memoMarker + " {");
         ow.indent();
         ow.line("private static final long serialVersionUID = 1L;");
         ow.line("@Override");
@@ -613,9 +620,12 @@ class ParserRuleEmitter {
         boolean backrefScopeMode    = hasBackrefDecl && grammarHasScopeTree;
         boolean backrefBackrefMode  = hasBackrefDecl && !grammarHasScopeTree;
         boolean needsTransactionListener = hasScopeTreeDecl || hasDeclaresDecl || backrefScopeMode || backrefBackrefMode;
-        String implSuffix = needsTransactionListener
-            ? " implements org.unlaxer.listener.TransactionListener"
-            : "";
+        java.util.List<String> interfaces = new java.util.ArrayList<>();
+        if (needsTransactionListener) interfaces.add("org.unlaxer.listener.TransactionListener");
+        if (Boolean.TRUE.equals(ctx.safeFailureMemoByRule.get(ruleName))) {
+            interfaces.add("org.unlaxer.context.SafeFailureMemoizable");
+        }
+        String implSuffix = interfaces.isEmpty() ? "" : " implements " + String.join(", ", interfaces);
         String baseClass = isChoice ? "LazyChoice" : getChainClassName(ctx, ruleName);
         w.line("public static class " + className + " extends " + baseClass + implSuffix + " {");
         w.indent();

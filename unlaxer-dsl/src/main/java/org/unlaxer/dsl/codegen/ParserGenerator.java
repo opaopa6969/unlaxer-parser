@@ -49,9 +49,11 @@ public class ParserGenerator implements CodeGenerator {
         final Map<String, String> tokenCIMap;           // token name -> word (CaseInsensitive)
         final Map<String, String> tokenRegexMap;        // token name -> regex pattern (Regex)
         final Set<String> ruleNames;
+        final Set<String> explicitlySafeMemoTokens;
         final Map<String, List<String>> helpers = new LinkedHashMap<>(); // rule -> helper codes
         final Map<String, CaptureBindingPlan> captureBindings = new LinkedHashMap<>();
         final Map<String, Boolean> useDelimitedChainByRule = new LinkedHashMap<>();
+        final Map<String, Boolean> safeFailureMemoByRule = new LinkedHashMap<>();
         boolean hasDelimitedChain = false;
         final Map<String, int[]> helperCounters = new LinkedHashMap<>(); // rule -> [repeat,opt,group,sep]
         // A helper belongs to a grammar site, not to an emission traversal or structurally equal element.
@@ -97,6 +99,12 @@ public class ParserGenerator implements CodeGenerator {
             }
             this.ruleNames = grammar.rules().stream()
                 .map(RuleDecl::name)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+            this.explicitlySafeMemoTokens = grammar.settings().stream()
+                .filter(setting -> "memoSafeToken".equals(setting.key()))
+                .map(setting -> setting.value() instanceof StringSettingValue value
+                    ? value.value().trim() : "")
+                .filter(alias -> !alias.isEmpty())
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         }
 
@@ -259,6 +267,8 @@ public class ParserGenerator implements CodeGenerator {
     private GenContext createContext(GrammarDecl grammar) {
         GenContext ctx = new GenContext(grammar);
 
+        analyzeSafeFailureMemoization(ctx);
+
         boolean hasGlobalWhitespace = grammar.settings().stream()
             .anyMatch(s -> "whitespace".equals(s.key()) && s.value() instanceof StringSettingValue value
                 && "javaStyle".equalsIgnoreCase(value.value().trim()));
@@ -307,6 +317,85 @@ public class ParserGenerator implements CodeGenerator {
         }
 
         return ctx;
+    }
+
+    /**
+     * Fail-closed, transitive rule analysis for failure memoization. Simple token classes are
+     * treated as custom/unknown even when their names resemble built-ins, unless their token
+     * alias is explicitly listed by {@code @memoSafeToken}. Built-in scope annotations use the
+     * versioned {@code ScopeStore} contract and therefore do not taint a rule; unknown/custom
+     * state remains fail-closed through its token dependency.
+     */
+    private void analyzeSafeFailureMemoization(GenContext ctx) {
+        Map<String, Set<String>> dependencies = new LinkedHashMap<>();
+        for (RuleDecl rule : ctx.grammar.rules()) {
+            Set<String> refs = new LinkedHashSet<>();
+            boolean locallySafe = collectMemoDependencies(ctx, rule.body(), refs);
+            dependencies.put(rule.name(), refs);
+            ctx.safeFailureMemoByRule.put(rule.name(), locallySafe);
+        }
+        boolean changed;
+        do {
+            changed = false;
+            for (RuleDecl rule : ctx.grammar.rules()) {
+                if (!ctx.safeFailureMemoByRule.get(rule.name())) continue;
+                boolean safe = dependencies.get(rule.name()).stream()
+                    .allMatch(ref -> Boolean.TRUE.equals(ctx.safeFailureMemoByRule.get(ref)));
+                if (!safe) {
+                    ctx.safeFailureMemoByRule.put(rule.name(), false);
+                    changed = true;
+                }
+            }
+        } while (changed);
+    }
+
+    private boolean collectMemoDependencies(GenContext ctx, RuleBody body, Set<String> refs) {
+        return switch (body) {
+            case org.unlaxer.dsl.bootstrap.UBNFAST.ChoiceBody choice -> choice.alternatives().stream()
+                .allMatch(sequence -> collectMemoDependencies(ctx, sequence, refs));
+            case org.unlaxer.dsl.bootstrap.UBNFAST.SequenceBody sequence ->
+                collectMemoDependencies(ctx, sequence, refs);
+        };
+    }
+
+    private boolean collectMemoDependencies(GenContext ctx,
+            org.unlaxer.dsl.bootstrap.UBNFAST.SequenceBody sequence, Set<String> refs) {
+        boolean safe = true;
+        for (var annotated : sequence.elements()) {
+            safe &= collectMemoDependencies(ctx, annotated.element(), refs);
+        }
+        return safe;
+    }
+
+    private boolean collectMemoDependencies(GenContext ctx, AtomicElement element, Set<String> refs) {
+        return switch (element) {
+            case org.unlaxer.dsl.bootstrap.UBNFAST.RuleRefElement ref -> {
+                if (ref.namespace().isPresent()) yield false;
+                if (ctx.ruleNames.contains(ref.name())) {
+                    refs.add(ref.name());
+                    yield true;
+                }
+                yield ctx.grammar.tokens().stream()
+                    .filter(token -> token.name().equals(ref.name()))
+                    .findFirst().map(token -> !(token instanceof TokenDecl.Simple)
+                        || ctx.explicitlySafeMemoTokens.contains(ref.name())).orElse(false);
+            }
+            case org.unlaxer.dsl.bootstrap.UBNFAST.TerminalElement ignored -> true;
+            case org.unlaxer.dsl.bootstrap.UBNFAST.RepeatElement repeat ->
+                collectMemoDependencies(ctx, repeat.body(), refs);
+            case org.unlaxer.dsl.bootstrap.UBNFAST.OptionalElement optional ->
+                collectMemoDependencies(ctx, optional.body(), refs);
+            case org.unlaxer.dsl.bootstrap.UBNFAST.OneOrMoreElement one ->
+                collectMemoDependencies(ctx, one.body(), refs);
+            case org.unlaxer.dsl.bootstrap.UBNFAST.BoundedRepeatElement bounded ->
+                collectMemoDependencies(ctx, bounded.body(), refs);
+            case org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement group ->
+                collectMemoDependencies(ctx, group.body(), refs);
+            case org.unlaxer.dsl.bootstrap.UBNFAST.SeparatedElement separated ->
+                collectMemoDependencies(ctx, separated.element(), refs)
+                    && collectMemoDependencies(ctx, separated.separator(), refs);
+            case org.unlaxer.dsl.bootstrap.UBNFAST.ErrorElement ignored -> true;
+        };
     }
 
     // =========================================================================

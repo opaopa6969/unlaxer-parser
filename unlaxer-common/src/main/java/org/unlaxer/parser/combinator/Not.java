@@ -25,6 +25,7 @@ public class Not extends ConstructedSingleChildParser {
 
 		parseContext.begin(this);
 		org.unlaxer.TransactionElement stateBoundary = parseContext.getCurrent();
+		ParseContext.DiagnosticSpeculation diagnosticBoundary = parseContext.beginDiagnosticSpeculation();
 
 		Parsed parsed = getChild().parse(parseContext, TokenKind.matchOnly, invertMatch);
 
@@ -36,6 +37,7 @@ public class Not extends ConstructedSingleChildParser {
 		}
 
 		// child failed → Not succeeds; commit (no tokens consumed)
+		parseContext.discardDiagnosticSpeculation(diagnosticBoundary);
 		Parsed committed;
 		try {
 			committed = new Parsed(parseContext.commit(this, TokenKind.matchOnly));

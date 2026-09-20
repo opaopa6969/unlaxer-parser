@@ -13,6 +13,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 ### Added
 - Generated Mappers expose `mapParsedToken(Token[, preferredAstSimpleName])` and return both the selected token and mapped AST. Consumers can map an existing parse tree without reflection into private mapper methods or state.
 - Public parser boundary behavior now has regression coverage for source cursors, repeat bounds, case-insensitive words, and supplementary code points.
+- Java grammar settings can explicitly certify stateless custom token aliases for safe failure memoization with repeatable `@memoSafeToken: ALIAS` declarations; invalid, duplicate, and non-simple aliases are rejected deterministically.
 
 ### Deprecated
 - Correctly spelled public APIs now replace `Source.sourceToStgring()`, `NonTerminallSymbol`, and `HierarcyLevel`. The misspelled symbols remain as source- and behavior-compatible deprecated bridges and will not be removed before 3.2.0.
@@ -56,6 +57,11 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 - **Application runtime hook for generated DAP adapters**: generated adapters expose `runtimeVariables(source, runtimeMode, launchArguments)`. UBNF continues to generate protocol, source mapping, breakpoints, and structural stepping; language-specific evaluation and typed variables can be supplied without coupling `unlaxer-dsl` to an application runtime.
 
 ### Changed
+- Java generated parsers now expose immutable, default-off `ParseOptions` with
+  `Memoization.SAFE_FAILURES`. Generated dependency analysis marks only exact classes proven free
+  of scope, declaration, back-reference, custom-parser, and other state-dependent behavior;
+  failures replay rule-local diagnostics, successes are never cached, and the deprecated
+  `enableMemoize()` / `memoize()` adapters obey the same fail-closed policy (#194).
 - DAP launch uses standard `program` with `formulaSource` retained as a compatibility alias, and separates execution `runtimeMode` from structural `steppingMode`.
 - AST stepping fails explicitly when AST mapping is unavailable instead of silently switching to token stepping.
 - `StringSource.peek` no longer double-allocates: it returned `new StringSource(this, subSource(...), offset)`, wrapping an already-equivalent `subSource` in a second `StringSource` (a redundant String + int[] copy on every peek — a hot path in deeply nested grammars). Now returns the single `subSource` directly. Byte-for-byte equivalent; full `unlaxer-common` suite green (108 files). NOTE: this halves peek allocation but does **not** by itself bring the deeply nested-`if` formula (tinyexpression #19 example 5) under a second — that case is GC/allocation-bound and needs dedicated profiling (its cost is not `(rule,position)` re-derivation, which memoization already removes).

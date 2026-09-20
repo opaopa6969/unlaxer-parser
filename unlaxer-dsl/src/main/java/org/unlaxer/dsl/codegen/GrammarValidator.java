@@ -69,6 +69,9 @@ public final class GrammarValidator {
             if (code.startsWith("E-WHITESPACE-")) {
                 return "WHITESPACE";
             }
+            if (code.startsWith("E-MEMO-")) {
+                return "MEMOIZATION";
+            }
             if (code.startsWith("E-PRECEDENCE-")) {
                 return "PRECEDENCE";
             }
@@ -90,6 +93,7 @@ public final class GrammarValidator {
         List<ValidationIssue> errors = new ArrayList<>();
 
         validateGlobalWhitespace(grammar, errors);
+        validateMemoSafeTokens(grammar, errors);
         validateRootPresence(grammar, errors);
         validateTokens(grammar, errors);
         validateRuleTokenParserNameCollisions(grammar, errors);
@@ -487,6 +491,45 @@ public final class GrammarValidator {
                     addError(errors, "global @whitespace requires a style name",
                         "Use '@whitespace: javaStyle' or '@whitespace: none'.",
                         "E-WHITESPACE-GLOBAL-STYLE");
+                }
+            });
+    }
+
+    private static void validateMemoSafeTokens(GrammarDecl grammar, List<ValidationIssue> errors) {
+        Map<String, TokenDecl> tokens = new LinkedHashMap<>();
+        for (TokenDecl token : grammar.tokens()) {
+            tokens.putIfAbsent(token.name(), token);
+        }
+        Set<String> seen = new LinkedHashSet<>();
+        grammar.settings().stream()
+            .filter(setting -> "memoSafeToken".equals(setting.key()))
+            .forEach(setting -> {
+                if (!(setting.value() instanceof StringSettingValue value)) {
+                    addError(errors,
+                        "global @memoSafeToken requires a token alias string",
+                        "Use one setting per alias, for example '@memoSafeToken: IDENTIFIER'.",
+                        "E-MEMO-SAFE-TOKEN-VALUE");
+                    return;
+                }
+                String alias = value.value().trim();
+                if (!seen.add(alias)) {
+                    addError(errors,
+                        "duplicate global @memoSafeToken alias: " + alias,
+                        "Keep a single @memoSafeToken setting for alias " + alias + ".",
+                        "E-MEMO-SAFE-TOKEN-DUPLICATE");
+                    return;
+                }
+                TokenDecl token = tokens.get(alias);
+                if (token == null) {
+                    addError(errors,
+                        "global @memoSafeToken references undefined token alias: " + alias,
+                        "Declare token " + alias + " or remove this @memoSafeToken setting.",
+                        "E-MEMO-SAFE-TOKEN-UNDEFINED");
+                } else if (!(token instanceof TokenDecl.Simple)) {
+                    addError(errors,
+                        "global @memoSafeToken alias must name a Simple token: " + alias,
+                        "Remove the setting; built-in token declarations are already proven safe.",
+                        "E-MEMO-SAFE-TOKEN-KIND");
                 }
             });
     }

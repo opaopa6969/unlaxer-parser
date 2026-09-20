@@ -952,6 +952,66 @@ public class GrammarValidatorTest {
             .anyMatch(issue -> "E-RULE-TOKEN-NAME-COLLISION".equals(issue.code())));
     }
 
+    @Test
+    public void testMemoSafeTokenAllowsMultipleDistinctSimpleAliases() {
+        GrammarDecl grammar = parseGrammar("""
+            grammar G {
+              @package: org.example
+              @memoSafeToken: A
+              @memoSafeToken: B
+              token A = org.example.AParser
+              token B = org.example.BParser
+              @root Start ::= A B ;
+            }
+            """);
+
+        assertFalse(GrammarValidator.validate(grammar).stream()
+            .anyMatch(issue -> issue.code().startsWith("E-MEMO-")));
+    }
+
+    @Test
+    public void testMemoSafeTokenValidationIsDeterministic() {
+        GrammarDecl grammar = parseGrammar("""
+            grammar G {
+              @package: org.example
+              @memoSafeToken: MISSING
+              @memoSafeToken: SAFE
+              @memoSafeToken: SAFE
+              @memoSafeToken: BUILTIN
+              @memoSafeToken: { alias: 'SAFE' }
+              token SAFE = org.example.SafeParser
+              token BUILTIN = REGEX('[a-z]+')
+              @root Start ::= SAFE ;
+            }
+            """);
+
+        List<GrammarValidator.ValidationIssue> issues = GrammarValidator.validate(grammar).stream()
+            .filter(issue -> issue.code().startsWith("E-MEMO-"))
+            .toList();
+        assertEquals(List.of(
+            "E-MEMO-SAFE-TOKEN-UNDEFINED",
+            "E-MEMO-SAFE-TOKEN-DUPLICATE",
+            "E-MEMO-SAFE-TOKEN-KIND",
+            "E-MEMO-SAFE-TOKEN-VALUE"
+        ), issues.stream().map(GrammarValidator.ValidationIssue::code).toList());
+        assertTrue(issues.stream().allMatch(issue -> "ERROR".equals(issue.severity())));
+        assertTrue(issues.stream().allMatch(issue -> "MEMOIZATION".equals(issue.category())));
+    }
+
+    @Test
+    public void testUnknownGlobalSettingCompatibilityIsUnchanged() {
+        GrammarDecl grammar = parseGrammar("""
+            grammar G {
+              @package: org.example
+              @futureSetting: value
+              @root Start ::= 'x' ;
+            }
+            """);
+
+        assertFalse(GrammarValidator.validate(grammar).stream()
+            .anyMatch(issue -> issue.message().contains("futureSetting")));
+    }
+
     private GrammarDecl parseGrammar(String source) {
         return UBNFMapper.parse(source).grammars().get(0);
     }

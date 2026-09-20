@@ -31,11 +31,30 @@ public final class RustGrammarLowering {
         if (!grammar.imports().isEmpty()) throw unsupported("imports");
         boolean whitespace = false;
         Set<String> settings = new HashSet<>();
+        Set<String> memoSafeTokens = new HashSet<>();
         for (var setting : grammar.settings()) {
-            if (!settings.add(setting.key())) throw unsupported("duplicate setting " + setting.key());
-            if (!(setting.value() instanceof StringSettingValue value)) throw unsupported("block setting " + setting.key());
+            if (!setting.key().equals("memoSafeToken") && !settings.add(setting.key())) {
+                throw unsupported("duplicate setting " + setting.key());
+            }
+            if (!(setting.value() instanceof StringSettingValue value)) {
+                if (setting.key().equals("memoSafeToken")) {
+                    throw unsupported("memoSafeToken requires token alias string");
+                }
+                throw unsupported("block setting " + setting.key());
+            }
             if (setting.key().equals("whitespace")) {
                 whitespace = whitespaceStyle(value.value());
+            } else if (setting.key().equals("memoSafeToken")) {
+                String alias = value.value().trim();
+                if (!memoSafeTokens.add(alias)) {
+                    throw unsupported("duplicate memoSafeToken alias " + alias);
+                }
+                TokenDecl token = grammar.tokens().stream()
+                    .filter(candidate -> candidate.name().equals(alias))
+                    .findFirst().orElseThrow(() -> unsupported("memoSafeToken undefined token alias " + alias));
+                if (!(token instanceof TokenDecl.Simple)) {
+                    throw unsupported("memoSafeToken alias must name a Simple token " + alias);
+                }
             } else if (!setting.key().equals("package")) throw unsupported("setting " + setting.key());
         }
         for (var token : grammar.tokens()) {

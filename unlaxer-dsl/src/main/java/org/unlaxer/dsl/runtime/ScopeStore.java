@@ -99,6 +99,7 @@ public final class ScopeStore {
      */
     public static void enter(ParseContext ctx) {
         getStack(ctx).push(new HashMap<>());
+        ctx.markMemoizationStateChanged();
     }
 
     /**
@@ -108,6 +109,7 @@ public final class ScopeStore {
         Deque<Map<String, SymbolInfo>> stack = getStack(ctx);
         if (!stack.isEmpty()) {
             stack.pop();
+            ctx.markMemoizationStateChanged();
         }
     }
 
@@ -137,6 +139,7 @@ public final class ScopeStore {
         SymbolInfo info = new SymbolInfo(name, sourceOffset);
         scope.put(name, info);
         getAllDeclarationsInternal(ctx).add(info);
+        ctx.markMemoizationStateChanged();
     }
 
     /**
@@ -194,6 +197,7 @@ public final class ScopeStore {
      */
     public static void addDiagnostic(ParseContext ctx, String message, int offset, int length, Severity severity) {
         getDiagnosticsInternal(ctx).add(new SymbolDiagnostic(message, offset, length, severity));
+        ctx.markMemoizationStateChanged();
     }
 
     /**
@@ -207,7 +211,11 @@ public final class ScopeStore {
 
     /** diagnostics リストをクリアする（再パース前など）。 */
     public static void clearDiagnostics(ParseContext ctx) {
-        getDiagnosticsInternal(ctx).clear();
+        List<SymbolDiagnostic> diagnostics = getDiagnosticsInternal(ctx);
+        if (!diagnostics.isEmpty()) {
+            diagnostics.clear();
+            ctx.markMemoizationStateChanged();
+        }
     }
 
     private static List<SymbolDiagnostic> getDiagnosticsInternal(ParseContext ctx) {
@@ -247,6 +255,7 @@ public final class ScopeStore {
     public static void addReference(ParseContext ctx, String name, int offset, int length) {
         if (name == null || name.isEmpty()) return;
         getAllReferencesInternal(ctx).add(new ReferenceInfo(name, offset, length));
+        ctx.markMemoizationStateChanged();
     }
 
     /**
@@ -280,6 +289,7 @@ public final class ScopeStore {
             // Register the empty baseline before the first mutation, including all
             // open parent transactions when first used from a nested parser.
             ctx.registerTransactionalState(state);
+            ctx.markMemoizationStateChanged();
             return state;
         });
     }

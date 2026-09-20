@@ -40,9 +40,12 @@ public class ParseContext implements
 	GlobalScopeTree , ParserContextScopeTree{
 
   // Opt-in packrat memoization (issue #40). Off by default — default parsing is unaffected.
-	boolean doMemoize;
+	private ParseOptions options = ParseOptions.DEFAULT;
 
 	PackratMemoTable packratMemoTable;
+	private boolean memoizationPermanentlyDisabled;
+	private long memoizationStateVersion;
+	private long nextMemoizationStateVersion;
 
 	public final Source source;
 
@@ -51,6 +54,8 @@ public class ParseContext implements
 	Map<Name, ParserListener> parserListenerByName = new LinkedHashMap<>();
 	
 	Map<Name, TransactionListener> listenerByName = new LinkedHashMap<>();
+	private final Set<TransactionListener> memoizationTransparentTransactionListeners =
+		Collections.newSetFromMap(new IdentityHashMap<>());
 
 	final Deque<TransactionElement> tokenStack = new ArrayDeque<TransactionElement>();
 
@@ -67,6 +72,8 @@ public class ParseContext implements
     private final List<TransactionalState> transactionalStates = new ArrayList<>();
     private final Set<TransactionElement> transactionalFrames =
         Collections.newSetFromMap(new IdentityHashMap<>());
+    private final Map<TransactionElement, Long> memoizationStateVersionByFrame =
+        new IdentityHashMap<>();
 
     /**
      * Register an owner before its first mutation. Registration lasts for this
@@ -84,13 +91,34 @@ public class ParseContext implements
     }
 
     void checkpointTransactionalState(TransactionElement frame) {
+        recordMemoTransactionBegin();
         transactionalFrames.add(frame);
+        memoizationStateVersionByFrame.put(frame, memoizationStateVersion);
         transactionalStates.forEach(frame::checkpointState);
     }
 
     void finishTransactionalState(TransactionElement frame, boolean restore) {
         transactionalFrames.remove(frame);
-        if (restore) frame.restoreState();
+        Long savedMemoizationStateVersion = memoizationStateVersionByFrame.remove(frame);
+        if (savedMemoizationStateVersion == null) {
+            throw new IllegalStateException("transaction state version snapshot is missing");
+        }
+        if (restore) {
+            frame.restoreState();
+            memoizationStateVersion = savedMemoizationStateVersion;
+        }
+        recordMemoTransactionFinish(restore
+            ? MemoTransactionEvent.ROLLBACK : MemoTransactionEvent.COMMIT);
+    }
+
+    /** Marks a mutation of parser-visible state covered by the safe memoization contract. */
+    public void markMemoizationStateChanged() {
+        nextMemoizationStateVersion = Math.incrementExact(nextMemoizationStateVersion);
+        memoizationStateVersion = nextMemoizationStateVersion;
+    }
+
+    public long getMemoizationStateVersion() {
+        return memoizationStateVersion;
     }
 	
 	Collection<AdditionalCommitAction> actions;
@@ -109,12 +137,24 @@ public class ParseContext implements
   // Trial recording for enriched parse failure diagnostics
   private List<ParseFailureDiagnostics.TrialRecord> trialHistory = new ArrayList<>();
   private boolean recordingTrials = false;
-	
+
+  // Present only while an exact generated safe rule is being evaluated with memoization enabled.
+  private final Deque<FailureDiagnostic> memoDiagnosticFrames = new ArrayDeque<>();
+
 	public ParseContext(Source source, ParseContextEffector... parseContextEffectors) {
+		this(source, ParseOptions.DEFAULT, parseContextEffectors);
+	}
+
+	private ParseContext(Source source, ParseOptions options,
+			ParseContextEffector... parseContextEffectors) {
 	  parseContextByThread.set(this);
 	  if(source.sourceKind() != SourceKind.root) {
 	    throw new IllegalArgumentException();
 	  }
+		this.options = java.util.Objects.requireNonNull(options, "options");
+		if (options.memoization() == Memoization.SAFE_FAILURES) {
+			this.packratMemoTable = new PackratMemoTable();
+		}
 		this.source = source;
 		actions = new ArrayList<>();
 		tokenStack.add(new TransactionElement(new ParserCursor(source.positionResolver())));
@@ -124,6 +164,12 @@ public class ParseContext implements
 		}
 		onOpen(this);
 	}
+
+	/** Creates a parse session with options installed before listener {@code onOpen} callbacks. */
+	public static ParseContext withOptions(Source source, ParseOptions options,
+			ParseContextEffector... effectors) {
+		return new ParseContext(source, options, effectors);
+	}
 	
 	@Override
 	public Deque<TransactionElement> getTokenStack(){
@@ -131,26 +177,70 @@ public class ParseContext implements
 	}
 
 	/**
-	 * Enable opt-in packrat memoization (issue #40) for this parse session. Use either
-	 * {@code parseContext.enableMemoize()} or {@code new ParseContext(source, ParseContext.memoize())}.
-	 * Off by default, so default parsing is unaffected.
+	 * Compatibility adapter for safe failure memoization. Prefer
+	 * {@code ParseContext.withOptions(source, ParseOptions.withMemoization(Memoization.SAFE_FAILURES))}.
 	 */
+	@Deprecated
 	public void enableMemoize() {
-		this.doMemoize = true;
+		this.options = ParseOptions.withMemoization(Memoization.SAFE_FAILURES);
 		if (this.packratMemoTable == null) {
 			this.packratMemoTable = new PackratMemoTable();
 		}
 	}
 
 	public boolean isMemoizeEnabled() {
-		return doMemoize;
+		return options.memoization() == Memoization.SAFE_FAILURES;
 	}
+
+	/** Memo hits must not skip callbacks, persistent actions, or trial recording. */
+	public boolean isMemoizationSessionSafe() {
+		if (memoizationPermanentlyDisabled || false == isMemoizeEnabled()) return false;
+		if (false == parserListenerByName.isEmpty()
+				|| listenerByName.values().stream().anyMatch(listener ->
+					false == memoizationTransparentTransactionListeners.contains(listener))
+				|| false == actions.isEmpty()
+				|| recordingTrials) {
+			disableMemoizationPermanently();
+			return false;
+		}
+		return true;
+	}
+
+	private void disableMemoizationPermanently() {
+		memoizationPermanentlyDisabled = true;
+	}
+
+	@Override
+	public void addParserListener(Name name, ParserListener parserListener) {
+		disableMemoizationPermanently();
+		ParserListenerContainer.super.addParserListener(name, parserListener);
+	}
+
+	@Override
+	public void addTransactionListener(Name name, TransactionListener listener) {
+		disableMemoizationPermanently();
+		Transaction.super.addTransactionListener(name, listener);
+	}
+
+	/**
+	 * Registers an observational listener whose callbacks may be skipped for memoized parser work.
+	 * The listener must not mutate parser-visible state, diagnostics, tokens, or application state.
+	 */
+	public void addMemoizationTransparentTransactionListener(
+			Name name, TransactionListener listener) {
+		java.util.Objects.requireNonNull(listener, "listener");
+		memoizationTransparentTransactionListeners.add(listener);
+		Transaction.super.addTransactionListener(name, listener);
+	}
+
+	public ParseOptions getOptions() { return options; }
 
 	public PackratMemoTable getPackratMemoTable() {
 		return packratMemoTable;
 	}
 
-	/** A {@link ParseContextEffector} that turns on packrat memoization at construction time. */
+	/** Deprecated compatibility effector; it enables only generated safe failures. */
+	@Deprecated
 	public static ParseContextEffector memoize() {
 		return ParseContext::enableMemoize;
 	}
@@ -167,6 +257,7 @@ public class ParseContext implements
   // --- Trial recording API ---
 
   public void startTrialRecording() {
+    disableMemoizationPermanently();
     recordingTrials = true;
     trialHistory.clear();
   }
@@ -177,6 +268,252 @@ public class ParseContext implements
 
   public List<ParseFailureDiagnostics.TrialRecord> getTrialHistory() {
     return Collections.unmodifiableList(trialHistory);
+  }
+
+  /** Rule-local diagnostics and direct transaction lifecycle replayed on a safe failure hit. */
+  public static final class FailureDiagnostic {
+    int stackBaseDepth;
+    int transactionBaseDepth;
+    int farthestConsumedOffset;
+    int farthestMatchedOffset;
+    int maxReachedOffset;
+    int farthestFailureOffset = -1;
+    List<ParseFailureDiagnostics.ParseStackElement> maxReachedStackElements = Collections.emptyList();
+    List<ParseFailureDiagnostics.ParseStackElement> farthestFailureStackElements = Collections.emptyList();
+    final List<String> expectedParsers = new ArrayList<>();
+    final List<ParseFailureDiagnostics.ExpectedHintCandidate> expectedHints = new ArrayList<>();
+    final List<ParseFailureDiagnostics.TrialRecord> trials = new ArrayList<>();
+    final List<MemoTransactionEvent> transactionEvents = new ArrayList<>();
+  }
+
+  private enum MemoTransactionEvent { BEGIN, COMMIT, ROLLBACK }
+
+  /** Snapshot used only to discard diagnostics from successful negative lookahead speculation. */
+  public static final class DiagnosticSpeculation {
+    private final FailureDiagnostic global;
+    private final Map<FailureDiagnostic, FailureDiagnostic> active = new IdentityHashMap<>();
+
+    private DiagnosticSpeculation(ParseContext context) {
+      global = context.globalFailureDiagnostic();
+      for (FailureDiagnostic frame : context.memoDiagnosticFrames) active.put(frame, copyOf(frame));
+    }
+  }
+
+  public DiagnosticSpeculation beginDiagnosticSpeculation() {
+    return new DiagnosticSpeculation(this);
+  }
+
+  public void discardDiagnosticSpeculation(DiagnosticSpeculation speculation) {
+    restoreGlobalFailureDiagnostic(speculation.global);
+    for (Map.Entry<FailureDiagnostic, FailureDiagnostic> entry : speculation.active.entrySet()) {
+      restoreFailureDiagnostic(entry.getKey(), entry.getValue());
+    }
+  }
+
+  private FailureDiagnostic globalFailureDiagnostic() {
+    FailureDiagnostic result = new FailureDiagnostic();
+    result.farthestConsumedOffset = farthestConsumedOffset;
+    result.farthestMatchedOffset = farthestMatchedOffset;
+    result.maxReachedOffset = maxReachedOffset;
+    result.farthestFailureOffset = farthestFailureOffset;
+    result.maxReachedStackElements = maxReachedStackElements;
+    result.farthestFailureStackElements = farthestFailureStackElements;
+    result.expectedParsers.addAll(expectedParsersAtFarthestFailure);
+    result.expectedHints.addAll(expectedHintCandidatesAtFarthestFailure);
+    result.trials.addAll(trialHistory);
+    return result;
+  }
+
+  private static FailureDiagnostic copyOf(FailureDiagnostic source) {
+    FailureDiagnostic result = new FailureDiagnostic();
+    restoreFailureDiagnostic(result, source);
+    return result;
+  }
+
+  private static void restoreFailureDiagnostic(FailureDiagnostic target, FailureDiagnostic source) {
+    target.stackBaseDepth = source.stackBaseDepth;
+    target.farthestConsumedOffset = source.farthestConsumedOffset;
+    target.farthestMatchedOffset = source.farthestMatchedOffset;
+    target.maxReachedOffset = source.maxReachedOffset;
+    target.farthestFailureOffset = source.farthestFailureOffset;
+    target.maxReachedStackElements = source.maxReachedStackElements;
+    target.farthestFailureStackElements = source.farthestFailureStackElements;
+    target.expectedParsers.clear();
+    target.expectedParsers.addAll(source.expectedParsers);
+    target.expectedHints.clear();
+    target.expectedHints.addAll(source.expectedHints);
+    target.trials.clear();
+    target.trials.addAll(source.trials);
+  }
+
+  private void restoreGlobalFailureDiagnostic(FailureDiagnostic source) {
+    farthestConsumedOffset = source.farthestConsumedOffset;
+    farthestMatchedOffset = source.farthestMatchedOffset;
+    maxReachedOffset = source.maxReachedOffset;
+    farthestFailureOffset = source.farthestFailureOffset;
+    maxReachedStackElements = source.maxReachedStackElements;
+    farthestFailureStackElements = source.farthestFailureStackElements;
+    expectedParsersAtFarthestFailure.clear();
+    expectedParsersAtFarthestFailure.addAll(source.expectedParsers);
+    expectedHintCandidatesAtFarthestFailure.clear();
+    expectedHintCandidatesAtFarthestFailure.addAll(source.expectedHints);
+    trialHistory.clear();
+    trialHistory.addAll(source.trials);
+  }
+
+  FailureDiagnostic beginMemoDiagnosticFrame() {
+    FailureDiagnostic frame = new FailureDiagnostic();
+    frame.stackBaseDepth = parseFrames.size();
+    frame.transactionBaseDepth = tokenStack.size();
+    memoDiagnosticFrames.push(frame);
+    return frame;
+  }
+
+  void discardMemoDiagnosticFrame(FailureDiagnostic frame) {
+    if (memoDiagnosticFrames.pollFirst() != frame) {
+      throw new IllegalStateException("memo diagnostic frame nesting is illegal");
+    }
+  }
+
+  void replayFailureDiagnostic(FailureDiagnostic diagnostic) {
+    FailureDiagnostic rebased = copyOf(diagnostic);
+    rebased.maxReachedStackElements = rebaseMemoStack(diagnostic.maxReachedStackElements);
+    rebased.farthestFailureStackElements = rebaseMemoStack(diagnostic.farthestFailureStackElements);
+    mergeFailureDiagnosticIntoGlobal(rebased);
+    for (FailureDiagnostic active : memoDiagnosticFrames) {
+      FailureDiagnostic local = copyOf(rebased);
+      local.maxReachedStackElements = localStackSnapshot(active, rebased.maxReachedStackElements);
+      local.farthestFailureStackElements = localStackSnapshot(active, rebased.farthestFailureStackElements);
+      mergeFailureDiagnostic(active, local);
+    }
+  }
+
+  /** Replays only registered-state hooks; token/cursor transactions remain untouched on a hit. */
+  void replayMemoTransactionEvents(FailureDiagnostic diagnostic) {
+    Deque<List<Runnable>> restoresByTransaction = new ArrayDeque<>();
+    for (MemoTransactionEvent event : diagnostic.transactionEvents) {
+      switch (event) {
+        case BEGIN -> {
+          List<Runnable> restores = new ArrayList<>(transactionalStates.size());
+          for (TransactionalState state : transactionalStates) restores.add(state.checkpoint());
+          restoresByTransaction.push(restores);
+        }
+        case COMMIT -> {
+          if (restoresByTransaction.pollFirst() == null) {
+            throw new IllegalStateException("memo transaction trace is unbalanced");
+          }
+        }
+        case ROLLBACK -> {
+          List<Runnable> restores = restoresByTransaction.pollFirst();
+          if (restores == null) throw new IllegalStateException("memo transaction trace is unbalanced");
+          restores.forEach(Runnable::run);
+        }
+      }
+    }
+    if (false == restoresByTransaction.isEmpty()) {
+      throw new IllegalStateException("memo transaction trace is unbalanced");
+    }
+  }
+
+  private void recordMemoTransactionBegin() {
+    for (FailureDiagnostic diagnostic : memoDiagnosticFrames) {
+      if (tokenStack.size() == diagnostic.transactionBaseDepth + 1) {
+        diagnostic.transactionEvents.add(MemoTransactionEvent.BEGIN);
+      }
+    }
+  }
+
+  private void recordMemoTransactionFinish(MemoTransactionEvent event) {
+    for (FailureDiagnostic diagnostic : memoDiagnosticFrames) {
+      if (tokenStack.size() == diagnostic.transactionBaseDepth) {
+        diagnostic.transactionEvents.add(event);
+      }
+    }
+  }
+
+  private List<ParseFailureDiagnostics.ParseStackElement> rebaseMemoStack(
+      List<ParseFailureDiagnostics.ParseStackElement> localSuffix) {
+    if (localSuffix.isEmpty()) return Collections.emptyList();
+    List<ParseFailureDiagnostics.ParseStackElement> result = snapshotStackElements();
+    for (ParseFailureDiagnostics.ParseStackElement element : localSuffix) {
+      result.add(new ParseFailureDiagnostics.ParseStackElement(
+          element.getParserClassName(), result.size(), element.getStartOffset(),
+          element.getMaxConsumedOffset(), element.getMaxMatchedOffset()));
+    }
+    return result;
+  }
+
+  private static List<ParseFailureDiagnostics.ParseStackElement> localStackSnapshot(
+      FailureDiagnostic diagnostic,
+      List<ParseFailureDiagnostics.ParseStackElement> absoluteSnapshot) {
+    int base = Math.min(diagnostic.stackBaseDepth, absoluteSnapshot.size());
+    return new ArrayList<>(absoluteSnapshot.subList(base, absoluteSnapshot.size()));
+  }
+
+  private void mergeFailureDiagnosticIntoGlobal(FailureDiagnostic diagnostic) {
+    farthestConsumedOffset = Math.max(farthestConsumedOffset, diagnostic.farthestConsumedOffset);
+    farthestMatchedOffset = Math.max(farthestMatchedOffset, diagnostic.farthestMatchedOffset);
+    if (diagnostic.maxReachedOffset > maxReachedOffset
+        || diagnostic.maxReachedOffset == maxReachedOffset
+            && diagnostic.maxReachedStackElements.size() > maxReachedStackElements.size()) {
+      maxReachedOffset = diagnostic.maxReachedOffset;
+      maxReachedStackElements = diagnostic.maxReachedStackElements;
+    }
+    if (diagnostic.farthestFailureOffset > farthestFailureOffset) {
+      farthestFailureOffset = diagnostic.farthestFailureOffset;
+      farthestFailureStackElements = diagnostic.farthestFailureStackElements;
+      expectedParsersAtFarthestFailure.clear();
+      expectedHintCandidatesAtFarthestFailure.clear();
+    }
+    if (diagnostic.farthestFailureOffset == farthestFailureOffset) {
+      if (diagnostic.farthestFailureStackElements.size() > farthestFailureStackElements.size()) {
+        farthestFailureStackElements = diagnostic.farthestFailureStackElements;
+      }
+      for (String expected : diagnostic.expectedParsers) addExpectedHint(expected);
+      for (ParseFailureDiagnostics.ExpectedHintCandidate hint : diagnostic.expectedHints) {
+        addExpectedHintCandidate(hint);
+      }
+    }
+    if (recordingTrials) trialHistory.addAll(diagnostic.trials);
+  }
+
+  private void mergeFailureDiagnostic(FailureDiagnostic target, FailureDiagnostic source) {
+    target.farthestConsumedOffset = Math.max(target.farthestConsumedOffset, source.farthestConsumedOffset);
+    target.farthestMatchedOffset = Math.max(target.farthestMatchedOffset, source.farthestMatchedOffset);
+    if (source.maxReachedOffset > target.maxReachedOffset
+        || source.maxReachedOffset == target.maxReachedOffset
+            && source.maxReachedStackElements.size() > target.maxReachedStackElements.size()) {
+      target.maxReachedOffset = source.maxReachedOffset;
+      target.maxReachedStackElements = source.maxReachedStackElements;
+    }
+    if (source.farthestFailureOffset > target.farthestFailureOffset) {
+      target.farthestFailureOffset = source.farthestFailureOffset;
+      target.farthestFailureStackElements = source.farthestFailureStackElements;
+      target.expectedParsers.clear();
+      target.expectedHints.clear();
+    }
+    if (source.farthestFailureOffset == target.farthestFailureOffset) {
+      if (source.farthestFailureStackElements.size() > target.farthestFailureStackElements.size()) {
+        target.farthestFailureStackElements = source.farthestFailureStackElements;
+      }
+      for (String expected : source.expectedParsers) {
+        if (!target.expectedParsers.contains(expected)) target.expectedParsers.add(expected);
+      }
+      for (ParseFailureDiagnostics.ExpectedHintCandidate hint : source.expectedHints) {
+        addExpectedHintCandidate(target.expectedHints, hint);
+      }
+    }
+    target.trials.addAll(source.trials);
+  }
+
+  private void addExpectedHintCandidate(
+      List<ParseFailureDiagnostics.ExpectedHintCandidate> target,
+      ParseFailureDiagnostics.ExpectedHintCandidate candidate) {
+    for (ParseFailureDiagnostics.ExpectedHintCandidate current : target) {
+      if (current.getDisplayHint().equals(candidate.getDisplayHint())
+          && current.getParserQualifiedClassName().equals(candidate.getParserQualifiedClassName())) return;
+    }
+    target.add(candidate);
   }
 
   public boolean isRecordingTrials() {
@@ -235,6 +572,7 @@ public class ParseContext implements
 
   @Override
   public void addActions(List<AdditionalCommitAction> additionalCommitActions) {
+    if (false == additionalCommitActions.isEmpty()) disableMemoizationPermanently();
     actions.addAll(additionalCommitActions);
   }
   
@@ -295,12 +633,14 @@ public class ParseContext implements
         int endPos = Transaction.super.getConsumedPosition().value();
         boolean succeeded = parsed != null && parsed.isSucceeded();
         int consumed = endPos - frame.startOffset;
-        trialHistory.add(new ParseFailureDiagnostics.TrialRecord(
+        ParseFailureDiagnostics.TrialRecord trial = new ParseFailureDiagnostics.TrialRecord(
             parser.getClass().getSimpleName(),
             frame.startOffset,
             endPos,
             succeeded,
-            consumed));
+            consumed);
+        trialHistory.add(trial);
+        for (FailureDiagnostic diagnostic : memoDiagnosticFrames) diagnostic.trials.add(trial);
       }
       parseFrames.pollFirst();
     }
@@ -407,12 +747,29 @@ public class ParseContext implements
         maxReachedStackElements = snapshot;
       }
     }
+    List<ParseFailureDiagnostics.ParseStackElement> snapshot = null;
+    for (FailureDiagnostic diagnostic : memoDiagnosticFrames) {
+      diagnostic.farthestConsumedOffset = Math.max(diagnostic.farthestConsumedOffset, consumed);
+      diagnostic.farthestMatchedOffset = Math.max(diagnostic.farthestMatchedOffset, matched);
+      if (reached > diagnostic.maxReachedOffset) {
+        if (snapshot == null) snapshot = snapshotStackElements();
+        diagnostic.maxReachedOffset = reached;
+        diagnostic.maxReachedStackElements = localStackSnapshot(diagnostic, snapshot);
+      } else if (reached == diagnostic.maxReachedOffset) {
+        if (snapshot == null) snapshot = snapshotStackElements();
+        List<ParseFailureDiagnostics.ParseStackElement> local = localStackSnapshot(diagnostic, snapshot);
+        if (local.size() > diagnostic.maxReachedStackElements.size()) {
+          diagnostic.maxReachedStackElements = local;
+        }
+      }
+    }
   }
 
   void registerFailureCandidate(ParseFrame frame) {
     int candidateOffset = frame.maxOffset();
     List<ParseFailureDiagnostics.ExpectedHintCandidate> parserHints = expectedHintCandidatesFor(frame.parser);
     java.util.Optional<ParseFailureDiagnostics.ExpectedHintCandidate> terminalHint = deepestTerminalHintCandidate();
+    List<ParseFailureDiagnostics.ParseStackElement> snapshot = snapshotStackElements();
     if (candidateOffset > farthestFailureOffset) {
       farthestFailureOffset = candidateOffset;
       expectedParsersAtFarthestFailure.clear();
@@ -421,17 +778,41 @@ public class ParseContext implements
         addExpectedHintCandidate(hint);
       }
       terminalHint.ifPresent(this::addExpectedHintCandidate);
-      farthestFailureStackElements = snapshotStackElements();
-      return;
-    }
-    if (candidateOffset == farthestFailureOffset) {
+      farthestFailureStackElements = snapshot;
+    } else if (candidateOffset == farthestFailureOffset) {
       for (ParseFailureDiagnostics.ExpectedHintCandidate hint : parserHints) {
         addExpectedHintCandidate(hint);
       }
       terminalHint.ifPresent(this::addExpectedHintCandidate);
-      List<ParseFailureDiagnostics.ParseStackElement> snapshot = snapshotStackElements();
       if (snapshot.size() > farthestFailureStackElements.size()) {
         farthestFailureStackElements = snapshot;
+      }
+    }
+    for (FailureDiagnostic diagnostic : memoDiagnosticFrames) {
+      List<ParseFailureDiagnostics.ParseStackElement> localSnapshot =
+          localStackSnapshot(diagnostic, snapshot);
+      if (candidateOffset > diagnostic.farthestFailureOffset) {
+        diagnostic.farthestFailureOffset = candidateOffset;
+        diagnostic.farthestFailureStackElements = localSnapshot;
+        diagnostic.expectedParsers.clear();
+        diagnostic.expectedHints.clear();
+      }
+      if (candidateOffset == diagnostic.farthestFailureOffset) {
+        if (localSnapshot.size() > diagnostic.farthestFailureStackElements.size()) {
+          diagnostic.farthestFailureStackElements = localSnapshot;
+        }
+        for (ParseFailureDiagnostics.ExpectedHintCandidate hint : parserHints) {
+          addExpectedHintCandidate(diagnostic.expectedHints, hint);
+          String display = hint.getDisplayHint();
+          if (display != null && !display.isBlank()
+              && !diagnostic.expectedParsers.contains(display)) diagnostic.expectedParsers.add(display);
+        }
+        terminalHint.ifPresent(hint -> {
+          addExpectedHintCandidate(diagnostic.expectedHints, hint);
+          String display = hint.getDisplayHint();
+          if (display != null && !display.isBlank()
+              && !diagnostic.expectedParsers.contains(display)) diagnostic.expectedParsers.add(display);
+        });
       }
     }
   }

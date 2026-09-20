@@ -83,6 +83,32 @@ public class RustBackendTest {
         reject(SIMPLE.replace("grammar Example {", "grammar Example {\ntoken TEXT = StringParser"), "external token");
     }
 
+    @Test public void memoSafeTokenIsValidatedAndIsANoopForBuiltInRustExpressions() {
+        String valid = SIMPLE.replace("grammar Example {", """
+            grammar Example {
+            @memoSafeToken: NUMBER
+            @memoSafeToken: IDENTIFIER
+            token NUMBER = org.unlaxer.parser.elementary.NumberParser
+            token IDENTIFIER = org.unlaxer.parser.clang.IdentifierParser
+            """);
+        assertEquals(5, new RustBackend().generate(UBNFMapper.parse(valid).grammars().get(0)).size());
+
+        reject(valid.replace("@memoSafeToken: IDENTIFIER", "@memoSafeToken: NUMBER"),
+            "duplicate memoSafeToken alias NUMBER");
+        reject(valid.replace("@memoSafeToken: IDENTIFIER", "@memoSafeToken: MISSING"),
+            "undefined token alias MISSING");
+        reject(SIMPLE.replace("grammar Example {", """
+            grammar Example {
+            @memoSafeToken: BUILTIN
+            token BUILTIN = REGEX('[a-z]+')
+            """), "must name a Simple token BUILTIN");
+        reject(SIMPLE.replace("grammar Example {", """
+            grammar Example {
+            @memoSafeToken: { alias: 'NUMBER' }
+            token NUMBER = org.unlaxer.parser.elementary.NumberParser
+            """), "requires token alias string");
+    }
+
     @Test public void zeroWidthTokensCannotCreateUnboundedLoopsOrLeftRecursion() {
         for (String declaration : new String[]{"EMPTY", "EOF", "LOOKAHEAD('x')", "NEGATIVE_LOOKAHEAD('x')", "UNTIL('#')"}) {
             String source = SIMPLE.replace("grammar Example {", "grammar Example { token T = " + declaration + "\n");
