@@ -542,6 +542,23 @@ impl FailureDiagnostic {
     fn expected_values(&self) -> &[Rc<str>] {
         self.expected.as_deref().map_or(&[], Vec::as_slice)
     }
+
+    fn merge(&mut self, other: &Self) {
+        let Some(position) = other.farthest else {
+            return;
+        };
+        if self.farthest.is_none_or(|farthest| position > farthest) {
+            self.farthest = Some(position);
+            self.expected.clone_from(&other.expected);
+            return;
+        }
+        if self.farthest == Some(position) {
+            for expected in other.expected_values() {
+                let mut shared = None;
+                self.record(position, expected, Some(expected), &mut shared);
+            }
+        }
+    }
 }
 
 fn contains_expected(values: &[Rc<str>], expected: &str, shared: Option<&Rc<str>>) -> bool {
@@ -1145,13 +1162,7 @@ impl<'a> ParseContext<'a> {
 
     fn fail_at_shared(&mut self, position: usize, expected: &str, replayed: Option<&Rc<str>>) {
         let mut shared = None;
-        for diagnostic in &mut self.diagnostic_frames {
-            if diagnostic
-                .farthest
-                .is_some_and(|farthest| position < farthest)
-            {
-                continue;
-            }
+        if let Some(diagnostic) = self.diagnostic_frames.last_mut() {
             diagnostic.record(position, expected, replayed, &mut shared);
         }
         if position > self.farthest {
@@ -1223,6 +1234,9 @@ impl<'a> ParseContext<'a> {
                 .diagnostic_frames
                 .pop()
                 .expect("memoized rule installed a diagnostic frame");
+            if let Some(parent) = self.diagnostic_frames.last_mut() {
+                parent.merge(&diagnostic);
+            }
             if result.is_none() {
                 self.failure_memo.insert(key, diagnostic);
             }
@@ -2260,6 +2274,68 @@ mod tests {
         assert_eq!(context.memoized_failure_hits(), 1);
         assert_eq!(error.offset, 0);
         assert_eq!(error.expected, vec!["a", "m", "z"]);
+    }
+
+    #[test]
+    fn nested_memo_frames_merge_success_and_failure_diagnostics_into_outer_memo() {
+        let grammar = share_grammar(vec![
+            Rule {
+                name: "outer",
+                expression: Expr::Sequence(vec![Expr::Rule(1), Expr::Rule(3)]),
+            },
+            Rule {
+                name: "successful_middle",
+                expression: Expr::Choice(vec![Expr::Rule(2), Expr::Literal("")]),
+            },
+            Rule {
+                name: "failed_inner",
+                expression: Expr::Choice(vec![Expr::Literal("inner-b"), Expr::Literal("inner-a")]),
+            },
+            Rule {
+                name: "failed_middle",
+                expression: Expr::Rule(4),
+            },
+            Rule {
+                name: "failed_deepest",
+                expression: Expr::Choice(vec![Expr::Literal("tail-b"), Expr::Literal("tail-a")]),
+            },
+        ]);
+        let mut context = ParseContext::with_options(
+            "q",
+            ParseOptions::with_memoization(Memoization::SafeFailures),
+        );
+        context.rules = Arc::clone(&grammar);
+        context.memo_safe_rules = memo_safe_rules(&grammar);
+        context.grammar_session = 17;
+
+        assert!(context.rule(0, 0).is_none());
+
+        let outer = context
+            .failure_memo
+            .iter()
+            .find_map(|(key, diagnostic)| (key.rule == 0).then_some(diagnostic))
+            .expect("outer failure was memoized");
+        assert_eq!(outer.farthest, Some(0));
+        assert_eq!(
+            outer
+                .expected_values()
+                .iter()
+                .map(|expected| expected.as_ref())
+                .collect::<Vec<_>>(),
+            vec!["inner-b", "inner-a", "tail-b", "tail-a"]
+        );
+        assert_eq!(
+            context.failure(),
+            ParseError {
+                offset: 0,
+                expected: vec![
+                    "inner-a".to_owned(),
+                    "inner-b".to_owned(),
+                    "tail-a".to_owned(),
+                    "tail-b".to_owned(),
+                ],
+            }
+        );
     }
 
     #[test]
