@@ -32,7 +32,19 @@ public interface PositionResolver {
   Size lineSize();
   
   public static PositionResolver createPositionResolver(int[] codePoints){
+    // Empty detached/root sources are created for every empty token; the resolver is
+    // immutable after construction, so all of them share one instance.
+    if (codePoints.length == 0) {
+      return EmptyResolverHolder.EMPTY;
+    }
     return new PositionResolverImpl(codePoints);
+  }
+
+  /** Holder so the interface has no static initialization order with its implementation. */
+  final class EmptyResolverHolder {
+    static final PositionResolver EMPTY = new PositionResolverImpl(new int[0]);
+
+    private EmptyResolverHolder() {}
   }
 
 }

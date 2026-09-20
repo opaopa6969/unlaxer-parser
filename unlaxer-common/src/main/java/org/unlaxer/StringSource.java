@@ -74,7 +74,7 @@ public class StringSource implements Source {
 
     this.offsetFromParent = offsetFromParent;
     this.offsetFromRoot = CodePointOffset.ZERO;
-    this.codePoints = source.codePoints().toArray();
+    this.codePoints = codePointsOf(source);
 
     // ✅ subSource 以外は独立 resolver（=positionInRoot は 0起点）
     this.positionResolver = PositionResolver.createPositionResolver(codePoints);
@@ -106,7 +106,7 @@ public class StringSource implements Source {
     this.depth = parent.depth().newWithIncrements();
     this.sourceKind = SourceKind.subSource;
 
-    this.codePoints = source.codePoints().toArray();
+    this.codePoints = codePointsOf(source.toString());
 
     // ✅ subSource は root resolver を使う（root座標共有）
     this.positionResolver = this.root;
@@ -136,7 +136,7 @@ public class StringSource implements Source {
     this.sourceKind = SourceKind.subSource;
 
     this.offsetFromParent = codePointOffset;
-    this.codePoints = source.codePoints().toArray();
+    this.codePoints = codePointsOf(source);
 
     // ✅ subSource は root resolver を使う（root座標共有）
     this.positionResolver = this.root;
@@ -149,6 +149,33 @@ public class StringSource implements Source {
         sourceKind,
         positionResolver
     );
+  }
+
+  /*
+   * Holder class: Source.EMPTY is built while StringSource itself is still being initialized
+   * (initializing StringSource initializes the Source interface, which calls back into this
+   * class), so a plain static field of StringSource would still be null at that point.
+   */
+  private static final class EmptyCodePoints {
+    static final int[] ARRAY = new int[0];
+  }
+
+  /**
+   * Decodes a String into code points without an IntStream pipeline. Sub-sources are created
+   * on every commit, so this runs on the hot path; the result is exact-sized.
+   */
+  static int[] codePointsOf(String source) {
+    int length = source.length();
+    if (length == 0) {
+      return EmptyCodePoints.ARRAY;
+    }
+    int[] codePoints = new int[source.codePointCount(0, length)];
+    for (int i = 0, j = 0; i < length; j++) {
+      int codePoint = source.codePointAt(i);
+      codePoints[j] = codePoint;
+      i += Character.charCount(codePoint);
+    }
+    return codePoints;
   }
 
   public LineNumber lineNumberFrom(CodePointIndex codePointIndex) {
