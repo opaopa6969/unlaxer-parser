@@ -258,3 +258,78 @@ Java の frame pool / 配列 stack は不採用とした。削減上限が alloc
 allocation は安価で、数が多いことと bytes が多いことは別である。profile を先に取ると、
 本当に bytes を消費しているのは frame ではなく、frame ごとに繰り返される付随処理（ここでは診断の
 stack snapshot）だと分かる。負の結果でも profile と test を残せば、次の施策が同じ計測から始められる。
+
+## ケース5: 失敗診断の bookkeeping から「結果に影響しない allocation」を外す
+
+### 仮説
+
+ケース4の監査で、Java の public facade 1 parse あたり約 1,176 MB の allocation のうち 75% 以上が
+transaction frame ではなく失敗診断の進捗追跡だと分かった。`trackCursorProgress` は
+`startParse` / `endParse` / `consume` のたびに parse stack 全体を `ParseStackElement` のリストへ
+snapshot してから「今のほうが深いか」を比べ、`registerFailureCandidate` は失敗した frame ごとに
+hint 候補の収集と snapshot を行ってから「frontier に届くか」を比べていた。比較の結果が「捨てる」なら、
+その snapshot は最初から要らない。
+
+Rust でも同じ構図があった。`FailureDiagnostic::record` は同じ位置に同じ expected を記録するたびに
+`String` を確保して `BTreeSet` へ挿入し（重複なので set は変わらない）、memo hit のたびに保存済み診断を
+`clone` して replay していた。complex.tiny 1 parse の 789,084 allocation のうち 86% が expected 保存、
+5% が memo hit の clone だった。
+
+診断の**出力**（farthest offset、expected hints、parse stack、memo diagnostic の replay、
+`ParseError.expected` の内容と順序）は一切変えず、「比較して捨てるもの」と「既にあるものの再確保」だけを
+やめる、というのが unlaxer-parser#215 の仮説である。
+
+### 実装
+
+- Java: snapshot は open な parse frame と同じ要素数なので、深さ（`parseFrames.size()`、memo frame では
+  base depth を引いた局所深さ）を先に比べ、採用される場合だけ `snapshotStackElements()` を呼ぶ。
+  1 回の snapshot を global と memo frame の局所 view で共有する。どの frontier にも届かない失敗は
+  hint 収集の前に return し、memo diagnostic frame が空なら iterator を作らない。
+  `snapshotStackElements()` は `ArrayDeque` の逆順 iterator で直接構築し、中間 `ArrayList` copy を省く。
+- Rust: expected 集合を `BTreeSet<Rc<str>>` にし、`contains` を先に見て重複時は文字列も node も確保しない。
+  1 回の失敗を複数の memo frame と top-level 集合へ記録するときは `Rc` を共有する。memo hit は
+  `HashMap::remove` → 参照で replay → 再挿入とし、診断全体の clone を除去した。
+  `ParseError.expected: Vec<String>` は据え置き、custom parser が渡す動的文字列も所有し続ける。
+
+### 観測
+
+allocation（TinyExpression public facade 1 parse、baseline `c243638`）:
+
+| Runtime | Fixture | before | after |
+|---|---|---:|---:|
+| Java（JMH `gc.alloc.rate.norm`） | complex.tiny | 1,176 MB | 299 MB（-74.6%） |
+| Java | comparison-heavy.tiny | 432 MB | 132 MB（-69.5%） |
+| Rust（allocation 回数） | complex.tiny | 789,084 | 89,265（-88.7%） |
+| Rust | comparison-heavy.tiny | 82,094 | 13,478（-83.6%） |
+
+Java で残った allocation の最大項目は `CollectingParser.collect` の `TokenList.stream()`（残量の約 43%）で、
+これは commit 時の token 収集という別の仮説になる。Rust で残ったのは Fragment / CST の `Vec` で、#211 の範囲である。
+
+public facade の 3-run 中央値（ms/op、同一ホスト・直列・他負荷なし）:
+
+| Runtime | Fixture | Baseline runs | Baseline median | Candidate runs | Candidate median | 変化 |
+|---|---|---:|---:|---:|---:|---:|
+| Java | complex | 324.001 / 321.120 / 315.319 | **321.120** | 178.221 / 178.669 / 178.662 | **178.662** | **-44.36%** |
+| Java | comparison-heavy | 144.009 / 144.538 / 134.637 | **144.009** | 88.862 / 88.941 / 91.975 | **88.941** | **-38.24%** |
+| Rust | complex | 25.784 / 25.916 / 27.139 | **25.916** | 19.378 / 18.357 / 16.966 | **18.357** | **-29.17%** |
+| Rust | comparison-heavy | 3.786 / 3.500 / 3.469 | **3.500** | 2.611 / 2.844 / 2.565 | **2.611** | **-25.40%** |
+
+Java は allocation を 7 割以上削った分が young GC と allocation 帯域の削減としてほぼそのまま時間に現れ、
+Rust は `BTreeSet<String>` 挿入と memo hit の clone が消えた分が効いた。採用した。測定条件と raw data は
+[TinyExpression の実験レポート](https://github.com/opaopa6969/tinyexpression/blob/master/benchmarks/results/2026-09-21-diagnostic-tracking-alloc-experiment.md)
+に保存している。
+
+### 正確性の固定
+
+- Java: 同一 offset で失敗する 2 つの選択肢を、浅い方 → 深い方、深い方 → 浅い方の両順で parse し、報告される
+  parse stack が常に深い方で hints が同じ和集合になることを test に固定した（`ParseFailureDiagnosticsTest`）。
+  既存の memo diagnostic frame の replay / rebase test、TinyExpression の parity / source mapping test も変更なしで通る。
+- Rust: 同一位置・同一 expected の失敗を 1 回と 1,024 回で比較し allocation 数が一致する test
+  （`unlaxer-alloc-audit/tests/diagnostic_allocation.rs`）と、custom parser の動的 expected が所有され続ける test を追加した。
+
+### 教材としての要点
+
+「比較のために作って、比較の結果捨てる」オブジェクトは、profile で見ると最も大きな allocation 源になりうる。
+snapshot の要素数が既知の量（open frame 数）と一致するなら、まず量で比較し、必要なときだけ実体を作る。
+Rust 側の `to_owned()` も同じ形で、set が変わらない挿入のために文字列を確保していた。いずれも診断の
+出力契約は変えず、既存の test を「出力が変わっていない」証拠として使う。
