@@ -751,3 +751,54 @@ Java 672 + 987 tests と TinyExpression p4-smoke は成功。
 
 allocation-by-site の比率は「候補の発見」に使い、採否は必ず精密な `gc.alloc.rate.norm` の前後差と timing の A/B で決める。
 同じ罠に 2 回かかったので、以後は候補 issue を立てる前に前後差を取る。
+
+## ケース15: scope 状態の rollback を mutation journal にする
+
+### 仮説
+
+ケース3の copy-on-write は「最初の mutation まで snapshot を遅らせる」設計だが、mutation が起きた frame では
+scope state 全体（Java: scope map の stack、global map、宣言・参照・診断の 3 リスト。Rust: `ScopeStore` の deep copy）を
+複製していた。TinyExpression complex.tiny 1 parse で Java 約 1,300 回、Rust 701 回。ケース14の profile で
+`HashMap.putMapEntries` ← `ScopeStore$State.checkpoint` が最大項目に見えたため、#214 Phase 5 の条件が成立したと判断し、
+unlaxer-parser#213 の「1 領域だけ」の規約に従って scope だけを journal 化した。
+
+### 実装
+
+- Java `ScopeStore.State`: 各 mutation（enter / leave / declare / addDiagnostic / clearDiagnostics / addReference）が
+  逆操作を journal に append する。`checkpoint()` は journal 長の mark を持つ Runnable を返し、rollback は mark まで
+  逆順に undo して切り詰める。nested commit は entry を残すので外側の rollback が undo できる。undo は live な
+  map / list を in-place で戻すため、既存の unmodifiable view は従来どおり rollback を観測する
+- Rust: `ParseContext.scopes` を `Rc<ScopeStore>` から直接所有にし、`Checkpoint.scopes` の `Rc` clone を journal mark に置換。
+  entry は `PopScope` / `PushScope` / `Declare{previous}` / `TruncateReferences` / `TruncateDiagnostics` / `RestoreDiagnostics`。
+  journal は最外の checkpoint が終わると破棄する（長寿命 ParseContext で無制限に増えない）。`LongestChoice` は候補ごとに
+  journal 込みで store を clone し、勝者を丸ごと採用する。capture / user state は COW のまま、`scope_journal_entries`
+  counter を追加（既存 metric の意味は不変）
+
+### 観測
+
+Rust counter（complex.tiny 1 parse）: COW deep copy 1,621 → 920（scope 由来 701 → 0）、journal entry 709。他の checkpoint metrics は一致。
+Java allocation（public facade 1 parse）: complex.tiny 89.0 MB → 83.0 MB（-6.8%）、comparison-heavy.tiny は scope が無く ±0。
+
+Timing（public facade、3-run 中央値、ms/op。Java は 2 セッション実施）:
+
+| Runtime | Fixture | Baseline | Candidate | 変化 |
+|---|---|---:|---:|---:|
+| Rust | complex | 4.988 | 4.089 | **-18.0%** |
+| Rust | comparison-heavy | 1.318 | 1.034 | **-21.5%** |
+| Java（session 1） | complex | 51.436 | 50.510 | -1.8% |
+| Java（session 1） | comparison-heavy | 28.370 | 30.790 | +8.5% |
+| Java（session 2） | complex | 51.871 | 50.324 | -3.0% |
+| Java（session 2） | comparison-heavy | 28.815 | 29.177 | +1.3% |
+
+Rust は両 fixture で 18〜22% 短縮。comparison-heavy.tiny は scope を使わないのに速くなっているのは、
+`Rc<ScopeStore>` の clone / drop と `Checkpoint` の payload が checkpoint ごとに消えたためで、journal の効果は
+mutation 頻度だけでなく「checkpoint の固定費」にも及ぶ。Java は complex.tiny で allocation -6.8% に対し timing は
+-2〜-3% と小さく、comparison-heavy.tiny は session 1 の +8.5% が session 2 で +1.3% に収まった（scope に触らない
+fixture で変化する経路が無いため noise と判断）。採用: Rust は timing、Java は allocation と complex.tiny timing を根拠とする。
+
+### 教材としての要点
+
+copy-on-write は「変更が無い frame」を安くするが、「変更がある frame」のコストは snapshot サイズに比例する。
+mutation journal は逆に「変更の数」に比例する。どちらが有利かは mutation 頻度と状態サイズで決まり、profile で
+deep copy 回数と状態サイズを見てから選ぶ。journal は nested commit / outer rollback、longest choice の勝者採用、
+長寿命 context での履歴破棄という 3 つの境界条件を test に固定してから速度を測る。

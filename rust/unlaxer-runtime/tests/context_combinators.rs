@@ -245,6 +245,42 @@ fn checkpoint_metrics_distinguish_empty_payloads_and_cow_copies() {
 }
 
 #[test]
+fn scope_journal_does_not_change_capture_or_state_cow_accounting() {
+    let mut scope_only = ParseContext::new("");
+    scope_only.scopes_mut().declare("seed", 0);
+    scope_only.enable_checkpoint_metrics();
+    scope_only
+        .transaction(|context| {
+            context.scopes_mut().declare("journaled", 1);
+            Ok(())
+        })
+        .unwrap();
+    let scope_metrics = scope_only.snapshot_checkpoint_metrics();
+    assert_eq!(scope_metrics.copy_on_write_deep_copies, 0);
+    assert_eq!(scope_metrics.scope_journal_entries, 1);
+
+    let mut cow_domains = ParseContext::new("ab");
+    cow_domains
+        .parse(&Expr::literal("a").capture("first"))
+        .unwrap();
+    cow_domains.set_state("values", vec![1usize]);
+    cow_domains.enable_checkpoint_metrics();
+    cow_domains
+        .transaction(|context| {
+            context
+                .parse(&Expr::literal("b").capture("second"))
+                .map(|_| ())?;
+            context.state_mut::<Vec<usize>>("values").unwrap().push(2);
+            context.scopes_mut().declare("also journaled", 1);
+            Ok(())
+        })
+        .unwrap();
+    let cow_metrics = cow_domains.snapshot_checkpoint_metrics();
+    assert_eq!(cow_metrics.copy_on_write_deep_copies, 2);
+    assert_eq!(cow_metrics.scope_journal_entries, 1);
+}
+
+#[test]
 fn empty_outer_checkpoint_discards_committed_inner_cow_domains() {
     let mut context = ParseContext::new("a");
     context.enable_checkpoint_metrics();

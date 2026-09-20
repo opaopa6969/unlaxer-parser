@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use unlaxer_runtime::{
     parse, parse_detailed_with_options, Expr, Memoization, ParseContext, ParseOptions, ParseResult,
-    Rule, Span,
+    Rule, Severity, Span,
 };
 
 static SHORT_CALLS: AtomicUsize = AtomicUsize::new(0);
@@ -80,6 +80,46 @@ fn longest_choice_commits_only_the_longest_transactional_state() {
     assert_eq!(context.scopes().all_declarations().len(), 1);
     assert_eq!(SHORT_CALLS.load(Ordering::Relaxed), 1);
     assert_eq!(LONG_CALLS.load(Ordering::Relaxed), 1);
+}
+
+#[test]
+fn longest_choice_discards_every_losing_scope_event_and_keeps_winner_order() {
+    fn scoped_candidate(
+        context: &mut ParseContext<'_>,
+        text: &'static str,
+        marker: &'static str,
+    ) -> ParseResult {
+        let matched = context.parse(&Expr::literal(text))?;
+        let scope = context.scopes_mut();
+        scope.enter();
+        scope.declare(marker, matched.span.start);
+        scope.add_reference(marker, matched.span.start, text.chars().count());
+        scope.add_diagnostic(marker, matched.span.start, 1, Severity::Info);
+        Ok(matched)
+    }
+
+    fn losing(context: &mut ParseContext<'_>) -> ParseResult {
+        scoped_candidate(context, "a", "loser")
+    }
+
+    fn winning(context: &mut ParseContext<'_>) -> ParseResult {
+        scoped_candidate(context, "abc", "winner")
+    }
+
+    let mut context = ParseContext::new("abc");
+    context
+        .parse(&Expr::longest_choice([
+            Expr::Custom(losing),
+            Expr::Custom(winning),
+        ]))
+        .unwrap();
+
+    assert_eq!(context.scopes().current_scope_depth(), 1);
+    assert!(!context.scopes().is_declared("loser"));
+    assert!(context.scopes().is_declared("winner"));
+    assert_eq!(context.scopes().all_declarations()[0].name, "winner");
+    assert_eq!(context.scopes().all_references()[0].name, "winner");
+    assert_eq!(context.scopes().diagnostics()[0].message, "winner");
 }
 
 #[test]

@@ -100,7 +100,9 @@ public final class ScopeStore {
     public static void enter(ParseContext ctx) {
         State state = state(ctx);
         ctx.beforeTransactionalStateMutation(state);
-        state.stack.push(new HashMap<>());
+        Deque<Map<String, SymbolInfo>> stack = state.stack;
+        stack.push(new HashMap<>());
+        state.journal.add(stack::pop);
         ctx.markMemoizationStateChanged();
     }
 
@@ -112,7 +114,8 @@ public final class ScopeStore {
         Deque<Map<String, SymbolInfo>> stack = state.stack;
         if (!stack.isEmpty()) {
             ctx.beforeTransactionalStateMutation(state);
-            stack.pop();
+            Map<String, SymbolInfo> left = stack.pop();
+            state.journal.add(() -> stack.push(left));
             ctx.markMemoizationStateChanged();
         }
     }
@@ -143,8 +146,14 @@ public final class ScopeStore {
         Deque<Map<String, SymbolInfo>> stack = state.stack;
         Map<String, SymbolInfo> scope = stack.isEmpty() ? state.global : stack.peek();
         SymbolInfo info = new SymbolInfo(name, sourceOffset);
-        scope.put(name, info);
-        state.declarations.add(info);
+        SymbolInfo previous = scope.put(name, info);
+        List<SymbolInfo> declarations = state.declarations;
+        declarations.add(info);
+        state.journal.add(() -> {
+            declarations.remove(declarations.size() - 1);
+            if (previous == null) scope.remove(name);
+            else scope.put(name, previous);
+        });
         ctx.markMemoizationStateChanged();
     }
 
@@ -204,7 +213,9 @@ public final class ScopeStore {
     public static void addDiagnostic(ParseContext ctx, String message, int offset, int length, Severity severity) {
         State state = state(ctx);
         ctx.beforeTransactionalStateMutation(state);
-        state.diagnostics.add(new SymbolDiagnostic(message, offset, length, severity));
+        List<SymbolDiagnostic> diagnostics = state.diagnostics;
+        diagnostics.add(new SymbolDiagnostic(message, offset, length, severity));
+        state.journal.add(() -> diagnostics.remove(diagnostics.size() - 1));
         ctx.markMemoizationStateChanged();
     }
 
@@ -223,7 +234,9 @@ public final class ScopeStore {
         List<SymbolDiagnostic> diagnostics = state.diagnostics;
         if (!diagnostics.isEmpty()) {
             ctx.beforeTransactionalStateMutation(state);
+            List<SymbolDiagnostic> cleared = List.copyOf(diagnostics);
             diagnostics.clear();
+            state.journal.add(() -> diagnostics.addAll(cleared));
             ctx.markMemoizationStateChanged();
         }
     }
@@ -266,7 +279,9 @@ public final class ScopeStore {
         if (name == null || name.isEmpty()) return;
         State state = state(ctx);
         ctx.beforeTransactionalStateMutation(state);
-        state.references.add(new ReferenceInfo(name, offset, length));
+        List<ReferenceInfo> references = state.references;
+        references.add(new ReferenceInfo(name, offset, length));
+        state.journal.add(() -> references.remove(references.size() - 1));
         ctx.markMemoizationStateChanged();
     }
 
@@ -313,26 +328,24 @@ public final class ScopeStore {
         final List<ReferenceInfo> references = new ArrayList<>();
         final List<SymbolDiagnostic> diagnostics = new ArrayList<>();
 
+        /*
+         * Mutation journal (unlaxer-parser#213). Every mutation above appends its inverse; a
+         * checkpoint is the journal length, and rolling back undoes entries down to that mark.
+         * Nested commits leave their entries in place so an outer rollback still undoes them.
+         * Undo mutates the live maps and lists in place, so existing unmodifiable views observe
+         * the rollback exactly as the former full snapshots did.
+         */
+        final List<Runnable> journal = new ArrayList<>();
+
         @Override public Runnable checkpoint() {
-            List<Map<String, SymbolInfo>> savedStack = stack.stream()
-                .<Map<String, SymbolInfo>>map(HashMap::new).toList();
-            Map<String, SymbolInfo> savedGlobal = new HashMap<>(global);
-            List<SymbolInfo> savedDeclarations = List.copyOf(declarations);
-            List<ReferenceInfo> savedReferences = List.copyOf(references);
-            List<SymbolDiagnostic> savedDiagnostics = List.copyOf(diagnostics);
-            return () -> {
-                stack.clear();
-                savedStack.forEach(scope -> stack.addLast(new HashMap<>(scope)));
-                global.clear();
-                global.putAll(savedGlobal);
-                // Retain list identity so existing unmodifiable live views observe rollback.
-                declarations.clear();
-                declarations.addAll(savedDeclarations);
-                references.clear();
-                references.addAll(savedReferences);
-                diagnostics.clear();
-                diagnostics.addAll(savedDiagnostics);
-            };
+            int mark = journal.size();
+            return () -> undoTo(mark);
+        }
+
+        private void undoTo(int mark) {
+            for (int index = journal.size() - 1; index >= mark; index--) {
+                journal.remove(index).run();
+            }
         }
     }
 

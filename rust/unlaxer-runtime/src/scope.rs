@@ -65,14 +65,44 @@ pub struct SymbolDiagnostic {
 /// Positions/lengths are supplied by the caller, not inferred from UTF-8 string lengths.
 /// Cloning creates an independent owned snapshot. Use ParseContext::scopes_mut to
 /// participate in automatic parser rollback; a standalone store has no transactions.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone)]
+enum ScopeUndo {
+    PopScope,
+    PushScope(BTreeMap<String, SymbolInfo>),
+    Declare {
+        depth: usize,
+        name: String,
+        previous: Option<SymbolInfo>,
+        declarations_len: usize,
+    },
+    TruncateReferences(usize),
+    TruncateDiagnostics(usize),
+    RestoreDiagnostics(Vec<SymbolDiagnostic>),
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct ScopeStore {
     stack: Vec<BTreeMap<String, SymbolInfo>>,
     global: BTreeMap<String, SymbolInfo>,
     declarations: Vec<SymbolInfo>,
     references: Vec<ReferenceInfo>,
     diagnostics: Vec<SymbolDiagnostic>,
+    journal: Vec<ScopeUndo>,
+    checkpoint_depth: usize,
+    journal_entries_created: u64,
 }
+
+impl PartialEq for ScopeStore {
+    fn eq(&self, other: &Self) -> bool {
+        self.stack == other.stack
+            && self.global == other.global
+            && self.declarations == other.declarations
+            && self.references == other.references
+            && self.diagnostics == other.diagnostics
+    }
+}
+
+impl Eq for ScopeStore {}
 
 impl ScopeStore {
     pub(crate) fn is_empty(&self) -> bool {
@@ -84,12 +114,15 @@ impl ScopeStore {
     }
 
     pub fn enter(&mut self) {
+        self.record(ScopeUndo::PopScope);
         self.stack.push(BTreeMap::new());
     }
 
     /// Leaving at global depth is a no-op, matching Java ScopeStore.
     pub fn leave(&mut self) {
-        self.stack.pop();
+        if let Some(scope) = self.stack.pop() {
+            self.record(ScopeUndo::PushScope(scope));
+        }
     }
 
     pub fn current_scope_depth(&self) -> usize {
@@ -104,10 +137,18 @@ impl ScopeStore {
             name: name.to_owned(),
             source_offset,
         };
-        self.stack
+        let depth = self.stack.len();
+        let previous = self
+            .stack
             .last_mut()
             .unwrap_or(&mut self.global)
             .insert(name.to_owned(), info.clone());
+        self.record(ScopeUndo::Declare {
+            depth,
+            name: name.to_owned(),
+            previous,
+            declarations_len: self.declarations.len(),
+        });
         self.declarations.push(info);
     }
 
@@ -144,6 +185,7 @@ impl ScopeStore {
     /// Records an occurrence only; checking whether it resolves is a separate operation.
     pub fn add_reference(&mut self, name: &str, offset: usize, length: usize) {
         if !name.is_empty() {
+            self.record(ScopeUndo::TruncateReferences(self.references.len()));
             self.references.push(ReferenceInfo {
                 name: name.to_owned(),
                 offset,
@@ -163,6 +205,7 @@ impl ScopeStore {
         length: usize,
         severity: Severity,
     ) {
+        self.record(ScopeUndo::TruncateDiagnostics(self.diagnostics.len()));
         self.diagnostics.push(SymbolDiagnostic {
             message: message.to_owned(),
             offset,
@@ -176,6 +219,81 @@ impl ScopeStore {
     }
 
     pub fn clear_diagnostics(&mut self) {
-        self.diagnostics.clear();
+        if !self.diagnostics.is_empty() {
+            let diagnostics = std::mem::take(&mut self.diagnostics);
+            self.record(ScopeUndo::RestoreDiagnostics(diagnostics));
+        }
+    }
+
+    pub(crate) fn checkpoint(&mut self) -> usize {
+        let mark = self.journal.len();
+        self.checkpoint_depth += 1;
+        mark
+    }
+
+    pub(crate) fn commit_checkpoint(&mut self) {
+        debug_assert!(self.checkpoint_depth > 0);
+        self.checkpoint_depth -= 1;
+        if self.checkpoint_depth == 0 {
+            self.journal.clear();
+        }
+    }
+
+    pub(crate) fn rollback_checkpoint(&mut self, mark: usize) {
+        debug_assert!(self.checkpoint_depth > 0);
+        debug_assert!(mark <= self.journal.len());
+        while self.journal.len() > mark {
+            let undo = self.journal.pop().expect("journal length checked");
+            self.apply_undo(undo);
+        }
+        self.checkpoint_depth -= 1;
+        if self.checkpoint_depth == 0 {
+            self.journal.clear();
+        }
+    }
+
+    pub(crate) fn journal_entries_created(&self) -> u64 {
+        self.journal_entries_created
+    }
+
+    pub(crate) fn retain_journal_entry_count(&mut self, count: u64) {
+        self.journal_entries_created = self.journal_entries_created.max(count);
+    }
+
+    fn record(&mut self, undo: ScopeUndo) {
+        if self.checkpoint_depth > 0 {
+            self.journal.push(undo);
+            self.journal_entries_created += 1;
+        }
+    }
+
+    fn apply_undo(&mut self, undo: ScopeUndo) {
+        match undo {
+            ScopeUndo::PopScope => {
+                self.stack.pop();
+            }
+            ScopeUndo::PushScope(scope) => self.stack.push(scope),
+            ScopeUndo::Declare {
+                depth,
+                name,
+                previous,
+                declarations_len,
+            } => {
+                let scope = if depth == 0 {
+                    &mut self.global
+                } else {
+                    &mut self.stack[depth - 1]
+                };
+                if let Some(previous) = previous {
+                    scope.insert(name, previous);
+                } else {
+                    scope.remove(&name);
+                }
+                self.declarations.truncate(declarations_len);
+            }
+            ScopeUndo::TruncateReferences(len) => self.references.truncate(len),
+            ScopeUndo::TruncateDiagnostics(len) => self.diagnostics.truncate(len),
+            ScopeUndo::RestoreDiagnostics(diagnostics) => self.diagnostics = diagnostics,
+        }
     }
 }
