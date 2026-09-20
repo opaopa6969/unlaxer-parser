@@ -52,8 +52,8 @@ public class MemoDiagnosticFrameTest {
 
             assertEquals("only the rule-local failure belongs to the frame", 1,
                 local.farthestFailureOffset);
-            assertTrue(local.expectedParsers.stream().anyMatch(expected -> expected.contains("x")));
-            assertTrue(local.expectedParsers.stream().noneMatch("z"::equals));
+            assertTrue(context.expectedParsersOf(local).stream().anyMatch(expected -> expected.contains("x")));
+            assertTrue(context.expectedParsersOf(local).stream().noneMatch("z"::equals));
         }
     }
 
@@ -75,7 +75,7 @@ public class MemoDiagnosticFrameTest {
             context.discardMemoDiagnosticFrame(outer);
 
             assertEquals(-1, outer.farthestFailureOffset);
-            assertTrue(outer.expectedParsers.isEmpty());
+            assertTrue(context.expectedParsersOf(outer).isEmpty());
             assertEquals(-1, context.farthestFailureOffset);
         }
     }

@@ -406,3 +406,69 @@ allocation を止めても CPU の hotspot は残る。次に見るのは「同�
 ここでは parser ごとの hint 候補、stack 走査、線形の重複判定だった。cache と集合化は出力を変えないので、既存の
 診断 test をそのまま等価性の証拠にできる。ただし cache は「何が不変か」の契約を必ず文書化する
 （ここでは parser graph と TerminalSymbol の display text）。
+
+## ケース7: 失敗診断の hint を「出所」だけ記録して遅延展開する
+
+### 仮説
+
+ケース6の後も、Java CPU の約 66% は診断だった。self frame の上位は `HashMap.putVal` で、frontier に届く失敗のたびに、
+その parser の全 hint 候補を global と全 open memo frame の key 集合へ再登録し（重複でも hash を計算する）、frontier が
+進むたびに clear → 再登録を繰り返していた。
+
+frontier で本当に必要な情報は「どの parser が、どの innermost `TerminalSymbol` の下で失敗したか」の順序付き集合だけである。
+hint 候補は parser ごとに固定（ケース6の cache）、terminal hint も terminal ごとに固定なので、この集合から候補リストを
+決定的に展開できる。展開順 = 出所の first-seen 順 = 従来の hint の first-seen 順で、重複排除は順序と可換だから、
+「診断が要求されたときに展開する」実装は従来と同じリストを返す。
+
+### 実装
+
+- Java: `ExpectedSources`（parser の identity set × failed/terminal の 2 種、first-seen 順）を global と各
+  `FailureDiagnostic` が持つ。frontier での失敗は `addFailed(parser)` と `addTerminal(terminalParser)` の 2 回の identity
+  set 挿入だけ。memo 化された失敗は出所集合をそのまま保存し、replay は集合の merge。`getParseFailureDiagnostics()` /
+  `computeExpectedTokens()` / 負の lookahead の snapshot で要求されたときだけ、cache 済み候補を出所順に展開して
+  重複排除する。
+- Rust: `fail_at` は innermost の frame と top-level（`ParseContext::failure()` が途中で呼べるので遅延しない）だけを
+  更新し、memo 化 rule の frame は pop 時（成功・失敗とも）に親へ max-merge する。子 frame 内の失敗は親から見て
+  連続区間なので挿入順は従来と一致し、より遠い子の `Rc<Vec<Rc<str>>>` は共有して親の次回書き込みで copy-on-write
+  するため memo 保存内容は変わらない。4 層ネストで成功 pop と失敗 pop を含む test で memo 保存順と
+  `ParseError.expected` を固定した。
+
+### 観測
+
+allocation（public facade 1 parse）: Java complex.tiny 184 MB → 181 MB、comparison-heavy.tiny 94 MB → 92 MB（ほぼ不変。
+ケース6で既に allocation 源は除かれており、ここは CPU の施策）。
+
+CPU 分布（JFR ExecutionSample、depth 8 で分類、baseline はケース6適用後）:
+
+| Fixture | 診断 | commit の token 収集・listener | transaction bookkeeping | dispatch 等 |
+|---|---:|---:|---:|---:|
+| complex（before） | 66.1% | 13.8% | 11.1% | 9.0% |
+| complex（after） | 56.6% | 20.5% | 9.0% | 13.9% |
+| comparison-heavy（before） | 66.2% | 13.5% | 6.1% | 14.2% |
+| comparison-heavy（after） | 28.6% | 23.8% | 9.5% | 38.1% |
+
+after の診断 self frame 上位は `IdentityHashMap.put` と `ExpectedSources.addAll`（memo replay の merge と、
+frontier 失敗ごとの全 open frame への出所登録）で、「innermost frame にだけ記録し、frame の pop 時に親へ merge する」
+（Rust 側でこのケースに採った形）が Java の次段候補になる。
+
+public facade の 3-run 中央値（ms/op、同一ホスト・直列・他負荷なし、baseline はケース6適用後）:
+
+| Runtime | Fixture | Baseline runs | Baseline median | Candidate runs | Candidate median | 変化 |
+|---|---|---:|---:|---:|---:|---:|
+| Java | complex | 118.594 / 124.915 / 119.034 | **119.034** | 96.369 / 97.635 / 108.313 | **97.635** | **-17.98%** |
+| Java | comparison-heavy | 59.471 / 59.703 / 61.601 | **59.703** | 55.029 / 52.264 / 51.858 | **52.264** | **-12.46%** |
+| Rust | complex | 12.004 / 12.073 / 11.135 | **12.004** | 5.782 / 5.616 / 5.118 | **5.616** | **-53.22%** |
+| Rust | comparison-heavy | 1.895 / 1.918 / 1.955 | **1.918** | 1.398 / 1.297 / 1.316 | **1.316** | **-31.37%** |
+
+Rust の効果が大きいのは、failure ごとの frame 走査が消えたことに加え、memo hit の replay が innermost frame 1 つへの
+merge になったためである。Java は memo replay の出所 merge と全 open frame への出所登録が残っており、Rust と同形の
+「innermost だけに記録して pop 時 merge」が次段候補になる。採用した。#207 時点からの累積は Java complex 321 → 98 ms/op、
+Rust complex 27.2 → 5.6 ms/op。測定条件と raw data は
+[TinyExpression の実験レポート](https://github.com/opaopa6969/tinyexpression/blob/master/benchmarks/results/2026-09-21-lazy-hint-materialization-experiment.md)
+に保存している。
+
+### 教材としての要点
+
+「毎回同じ答えに展開する」処理は、展開の入力（ここでは出所）だけを記録して展開を後ろへ送ると、記録側は
+入力サイズに比例した定数コストになる。等価性は「展開が決定的であること」「展開順が記録順と一致すること」
+「重複排除が順序と可換であること」の 3 点で示せ、いずれも既存の診断 test で確認できる。
