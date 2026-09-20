@@ -18,6 +18,18 @@ pub struct GeneratedFile {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GenerateError(pub String);
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ExecutionTier {
+    #[default]
+    Combinator,
+    Direct,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct GenerateOptions {
+    pub execution_tier: ExecutionTier,
+}
+
 impl std::fmt::Display for GenerateError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.0)
@@ -27,6 +39,13 @@ impl std::error::Error for GenerateError {}
 
 /// Validate structural IR and emit five files. No filesystem writes or Java calls.
 pub fn generate(ir: &GrammarIr) -> Result<Vec<GeneratedFile>, GenerateError> {
+    generate_with_options(ir, GenerateOptions::default())
+}
+
+pub fn generate_with_options(
+    ir: &GrammarIr,
+    options: GenerateOptions,
+) -> Result<Vec<GeneratedFile>, GenerateError> {
     validate::validate(ir)?;
     Ok([
         (
@@ -34,7 +53,10 @@ pub fn generate(ir: &GrammarIr) -> Result<Vec<GeneratedFile>, GenerateError> {
             format!("{HEADER}pub mod ast;\npub mod parser;\npub mod mapper;\npub mod evaluator;\n"),
         ),
         ("ast.rs", ast(ir)),
-        ("parser.rs", parser(ir)),
+        (
+            "parser.rs",
+            parser(ir, options.execution_tier == ExecutionTier::Direct),
+        ),
         ("mapper.rs", mapper(ir)),
         ("evaluator.rs", evaluator(ir)),
     ]
@@ -109,8 +131,23 @@ fn ast(ir: &GrammarIr) -> String {
     out
 }
 
-fn parser(ir: &GrammarIr) -> String {
+fn parser(ir: &GrammarIr, direct: bool) -> String {
     let mut out = String::from(HEADER);
+    let direct_emission = direct.then(|| DirectEmission::new(ir));
+    if let Some(emission) = &direct_emission {
+        writeln!(
+            out,
+            "// directRules: [{}]",
+            emission.direct_rules.join(", ")
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "// fallbackRules: [{}]",
+            emission.fallback_rules.join(", ")
+        )
+        .unwrap();
+    }
     out.push_str("use std::sync::OnceLock;\n#[cfg(test)]\nuse std::sync::atomic::{AtomicUsize, Ordering};\nuse unlaxer_runtime::{Expr, Rule, SharedGrammar, Tree, ParseError, ParseDiagnostic, ParseContext, ParseOptions, ParseResult, Parser};\n\n#[cfg(test)]\nstatic GRAMMAR_INITIALIZATIONS: AtomicUsize = AtomicUsize::new(0);\n\npub struct GeneratedParser;\n\nimpl Parser for GeneratedParser {\n    fn parse(&self, context: &mut ParseContext<'_>) -> ParseResult {\n        parse_context(context)\n    }\n}\n\npub fn parse_tree(source: &str) -> Result<Tree, ParseError> {\n    parse_tree_with_options(source, ParseOptions::default())\n}\n\npub fn parse_tree_with_options(source: &str, options: ParseOptions) -> Result<Tree, ParseError> {\n    parse_tree_detailed_with_options(source, options).map_err(|diagnostic| diagnostic.farthest)\n}\n\n/// Compatibility snapshot of the generated rules. Parsing uses `grammar()` and does not clone them.\npub fn rules() -> Vec<Rule> {\n    grammar().iter().cloned().collect()\n}\n\n/// Immutable grammar graph, initialized once and shared by every parse.\npub fn grammar() -> &'static SharedGrammar {\n    static GRAMMAR: OnceLock<SharedGrammar> = OnceLock::new();\n    GRAMMAR.get_or_init(|| {\n        #[cfg(test)]\n        GRAMMAR_INITIALIZATIONS.fetch_add(1, Ordering::Relaxed);\n        vec![\n");
     for rule in &ir.rules {
         writeln!(
@@ -121,9 +158,23 @@ fn parser(ir: &GrammarIr) -> String {
         )
         .unwrap();
     }
-    out.push_str("        ].into()\n    })\n}\n\n/// Test-only evidence for the process-wide `OnceLock` construction contract.\n#[cfg(test)]\n#[doc(hidden)]\npub fn grammar_initialization_count() -> usize {\n    GRAMMAR_INITIALIZATIONS.load(Ordering::Relaxed)\n}\n\npub fn parse_context(context: &mut ParseContext<'_>) -> ParseResult {\n    context.parse_shared_grammar(grammar(), ");
+    out.push_str("        ].into()\n    })\n}\n");
+    if let Some(emission) = &direct_emission {
+        out.push_str(&emission.code);
+    }
+    out.push_str("\n/// Test-only evidence for the process-wide `OnceLock` construction contract.\n#[cfg(test)]\n#[doc(hidden)]\npub fn grammar_initialization_count() -> usize {\n    GRAMMAR_INITIALIZATIONS.load(Ordering::Relaxed)\n}\n\npub fn parse_context(context: &mut ParseContext<'_>) -> ParseResult {\n    context.");
+    out.push_str(if direct {
+        "parse_shared_grammar_with_direct(grammar(), direct_rules(), "
+    } else {
+        "parse_shared_grammar(grammar(), "
+    });
     write!(out, "{}, {})\n}}\n", ir.root, ir.java_whitespace).unwrap();
-    out.push_str("\npub fn parse_tree_detailed(source: &str) -> Result<Tree, ParseDiagnostic> {\n    parse_tree_detailed_with_options(source, ParseOptions::default())\n}\n\npub fn parse_tree_detailed_with_options(source: &str, options: ParseOptions) -> Result<Tree, ParseDiagnostic> {\n    unlaxer_runtime::parse_detailed_shared_with_options(grammar(), ");
+    out.push_str("\npub fn parse_tree_detailed(source: &str) -> Result<Tree, ParseDiagnostic> {\n    parse_tree_detailed_with_options(source, ParseOptions::default())\n}\n\npub fn parse_tree_detailed_with_options(source: &str, options: ParseOptions) -> Result<Tree, ParseDiagnostic> {\n    unlaxer_runtime::");
+    out.push_str(if direct {
+        "parse_detailed_shared_with_direct_options(grammar(), direct_rules(), "
+    } else {
+        "parse_detailed_shared_with_options(grammar(), "
+    });
     write!(
         out,
         "{}, {}, source, options)\n}}\n",
@@ -181,6 +232,258 @@ fn parser(ir: &GrammarIr) -> String {
         out.push_str("];\n");
     }
     out
+}
+
+struct DirectEmission {
+    code: String,
+    direct_rules: Vec<String>,
+    fallback_rules: Vec<String>,
+}
+
+impl DirectEmission {
+    fn new(ir: &GrammarIr) -> Self {
+        let mut code = String::new();
+        let mut direct_rules = Vec::new();
+        let mut fallback_rules = Vec::new();
+        let mut rule_functions = Vec::new();
+        for (rule_id, rule) in ir.rules.iter().enumerate() {
+            let rule_function = format!("direct_rule_{rule_id}");
+            rule_functions.push(rule_function.clone());
+            if let Some((element, reason)) = direct_unsupported(&rule.body) {
+                fallback_rules.push(format!(
+                    "{{\"rule\":{},\"element\":{},\"reason\":{}}}",
+                    quote(&rule.name),
+                    quote(element),
+                    quote(reason)
+                ));
+                writeln!(code, "\nfn {rule_function}(context: &mut ParseContext<'_>, depth: usize) -> Option<unlaxer_runtime::DirectFragment> {{\n    context.direct_fallback(&grammar()[{rule_id}].expression, depth)\n}}").unwrap();
+            } else {
+                direct_rules.push(quote(&rule.name));
+                let mut emitter = DirectBodyEmitter::new(rule_id);
+                let body = emitter.emit_root(&rule.body);
+                code.push_str(&emitter.helpers);
+                writeln!(code, "\nfn {rule_function}(context: &mut ParseContext<'_>, depth: usize) -> Option<unlaxer_runtime::DirectFragment> {{\n    {body}\n}}").unwrap();
+            }
+        }
+        write!(
+            code,
+            "\nstatic DIRECT_RULES: unlaxer_runtime::DirectRuleTable = unlaxer_runtime::DirectRuleTable::new(&[{}]);\n\npub fn direct_rules() -> &'static unlaxer_runtime::DirectRuleTable {{\n    &DIRECT_RULES\n}}\n",
+            rule_functions.join(", ")
+        )
+        .unwrap();
+        Self {
+            code,
+            direct_rules,
+            fallback_rules,
+        }
+    }
+}
+
+fn direct_unsupported(expression: &Expression) -> Option<(&'static str, &'static str)> {
+    use Expression::*;
+    match expression {
+        RuleEffects { .. } => Some(("RuleEffects", "unsupported annotation")),
+        LongestChoice(_) => Some(("LongestChoice", "unsupported choice strategy")),
+        PredictiveChoice { .. } => Some(("PredictiveChoice", "unsupported choice strategy")),
+        Separated { .. } => Some(("Separated", "unsupported separated repetition")),
+        LookaheadToken { .. } => Some(("LookaheadToken", "unsupported lookahead")),
+        Sequence(items) | Choice(items) => items.iter().find_map(direct_unsupported),
+        Delimited(child)
+        | TextValue(child)
+        | ValueBoundary(child)
+        | TriviaScope { child, .. }
+        | OptionalExpr(child)
+        | Repeat { child, .. }
+        | Capture {
+            expression: child, ..
+        } => direct_unsupported(child),
+        Literal(_)
+        | NumberToken
+        | IdentifierToken
+        | QuotedToken(_)
+        | CodeStartToken
+        | CodeEndToken
+        | AnyToken
+        | EofToken
+        | EmptyToken
+        | CharRangeToken { .. }
+        | ExceptToken(_)
+        | UntilToken(_)
+        | Reference(_) => None,
+    }
+}
+
+const MAX_DIRECT_EXPRESSIONS_PER_FUNCTION: usize = 512;
+
+struct DirectBodyEmitter {
+    rule: usize,
+    helper: usize,
+    helpers: String,
+}
+
+impl DirectBodyEmitter {
+    fn new(rule: usize) -> Self {
+        Self {
+            rule,
+            helper: 0,
+            helpers: String::new(),
+        }
+    }
+
+    fn emit_root(&mut self, expression: &Expression) -> String {
+        let mut remaining = MAX_DIRECT_EXPRESSIONS_PER_FUNCTION;
+        self.emit(expression, &mut remaining, false)
+    }
+
+    fn emit(
+        &mut self,
+        expression: &Expression,
+        remaining: &mut usize,
+        allow_extract: bool,
+    ) -> String {
+        if allow_extract && *remaining == 0 {
+            return self.extract(expression);
+        }
+        *remaining = remaining.saturating_sub(1);
+        self.emit_inner(expression, remaining)
+    }
+
+    fn extract(&mut self, expression: &Expression) -> String {
+        let name = format!("direct_rule_{}_part_{}", self.rule, self.helper);
+        self.helper += 1;
+        let mut remaining = MAX_DIRECT_EXPRESSIONS_PER_FUNCTION;
+        let body = self.emit(expression, &mut remaining, false);
+        writeln!(self.helpers, "\nfn {name}(context: &mut ParseContext<'_>, depth: usize) -> Option<unlaxer_runtime::DirectFragment> {{\n    {body}\n}}").unwrap();
+        format!("{name}(context, depth)")
+    }
+
+    fn child(&mut self, expression: &Expression, remaining: &mut usize) -> String {
+        self.emit(expression, remaining, true)
+    }
+
+    fn emit_inner(&mut self, expression: &Expression, remaining: &mut usize) -> String {
+        use Expression::*;
+        match expression {
+            Literal(value) => format!("context.direct_literal({}, depth)", quote(value)),
+            NumberToken => "context.direct_number(depth)".into(),
+            IdentifierToken => "context.direct_identifier(depth)".into(),
+            QuotedToken(value) => format!(
+                "context.direct_quoted('\\u{{{:x}}}', depth)",
+                u32::from(*value)
+            ),
+            CodeStartToken => "context.direct_code_start(depth)".into(),
+            CodeEndToken => "context.direct_code_end(depth)".into(),
+            AnyToken => "context.direct_any(depth)".into(),
+            EofToken => "context.direct_eof(depth)".into(),
+            EmptyToken => "context.direct_java_empty(depth)".into(),
+            CharRangeToken { min, max } => format!(
+                "context.direct_char_range('\\u{{{:x}}}', '\\u{{{:x}}}', depth)",
+                u32::from(*min),
+                u32::from(*max)
+            ),
+            ExceptToken(value) => format!("context.direct_except({}, depth)", quote(value)),
+            UntilToken(value) => format!("context.direct_java_until({}, depth)", quote(value)),
+            Reference(id) => format!("context.direct_rule({id}, depth)"),
+            Sequence(items) => {
+                let mut children = Vec::with_capacity(items.len());
+                for child in items {
+                    children.push(self.child(child, remaining));
+                }
+                direct_sequence_call(&children)
+            }
+            Delimited(child) => {
+                let child = self.child(child, remaining);
+                direct_sequence_call(&[child])
+            }
+            Choice(items) => {
+                let mut children = Vec::with_capacity(items.len());
+                for child in items {
+                    children.push(self.child(child, remaining));
+                }
+                direct_choice_call(&children)
+            }
+            Capture { name, expression } => {
+                let child = self.child(expression, remaining);
+                format!(
+                    "context.direct_capture({}, |context, depth| {child}, depth)",
+                    quote(name)
+                )
+            }
+            OptionalExpr(child) => {
+                let failed_atom = direct_failed_atom(child);
+                let child = self.child(child, remaining);
+                format!("context.direct_optional(|context, depth| {child}, {failed_atom}, depth)")
+            }
+            Repeat { child, min, max } => {
+                let failed_atom = direct_failed_atom(child);
+                let child = self.child(child, remaining);
+                let max = max.map_or_else(|| "None".into(), |max| format!("Some({max})"));
+                format!("context.direct_repeat(|context, depth| {child}, {min}, {max}, {failed_atom}, depth)")
+            }
+            TriviaScope {
+                child,
+                java_whitespace,
+            } => {
+                let child = self.child(child, remaining);
+                format!("context.direct_trivia_scope({java_whitespace}, |context, depth| {child}, depth)")
+            }
+            TextValue(child) | ValueBoundary(child) => {
+                let text = matches!(expression, TextValue(_));
+                let child = self.child(child, remaining);
+                format!("context.direct_value_boundary(|context, depth| {child}, {text}, depth)")
+            }
+            RuleEffects { .. }
+            | LongestChoice(_)
+            | PredictiveChoice { .. }
+            | Separated { .. }
+            | LookaheadToken { .. } => unreachable!("fallback rules are not directly emitted"),
+        }
+    }
+}
+
+fn direct_sequence_call(children: &[String]) -> String {
+    let mut call = String::from(
+        "{\n        let checkpoint = context.direct_checkpoint();\n        context.direct_sequence_step();\n        let result = (|| {\n            let mut result = unlaxer_runtime::DirectFragment::empty();\n",
+    );
+    for child in children {
+        writeln!(
+            call,
+            "            result.append({child}?);\n            context.direct_sequence_step();"
+        )
+        .unwrap();
+    }
+    call.push_str("            Some(result)\n        })();\n        context.direct_finish(checkpoint, result)\n    }");
+    call
+}
+
+fn direct_choice_call(children: &[String]) -> String {
+    let mut call = String::from(
+        "{\n        let checkpoint = context.direct_checkpoint();\n        let result = (|| {\n",
+    );
+    for child in children {
+        writeln!(
+            call,
+            "            if let Some(fragment) = {child} {{ return Some(fragment); }}"
+        )
+        .unwrap();
+    }
+    call.push_str(
+        "            None\n        })();\n        context.direct_finish(checkpoint, result)\n    }",
+    );
+    call
+}
+
+fn direct_failed_atom(expression: &Expression) -> bool {
+    match expression {
+        Expression::Literal(_)
+        | Expression::AnyToken
+        | Expression::CharRangeToken { .. }
+        | Expression::ExceptToken(_) => true,
+        Expression::TextValue(child)
+        | Expression::ValueBoundary(child)
+        | Expression::TriviaScope { child, .. } => direct_failed_atom(child),
+        _ => false,
+    }
 }
 
 fn expression(expr: &Expression) -> String {

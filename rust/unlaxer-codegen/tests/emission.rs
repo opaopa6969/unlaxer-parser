@@ -146,6 +146,54 @@ fn generated_parser_reuses_one_grammar_and_keeps_the_rules_snapshot_api() {
 }
 
 #[test]
+fn direct_generation_is_opt_in_and_reports_fallback_rules() {
+    let mut grammar = support::fixture("evolution");
+    grammar.rules[0].body = Expression::LongestChoice(vec![grammar.rules[0].body.clone()]);
+    let ordinary = generate(&grammar).unwrap();
+    let direct = generate_with_options(
+        &grammar,
+        GenerateOptions {
+            execution_tier: ExecutionTier::Direct,
+        },
+    )
+    .unwrap();
+    for index in [0, 1, 3, 4] {
+        assert_eq!(ordinary[index], direct[index]);
+    }
+    assert!(!ordinary[2].content.contains("directRules"));
+    assert!(direct[2].content.contains("// directRules:"));
+    assert!(direct[2].content.contains("{\"rule\":\"Expression\",\"element\":\"LongestChoice\",\"reason\":\"unsupported choice strategy\"}"));
+    assert!(direct[2].content.contains("fn direct_rule_0"));
+    assert!(!direct[2].content.contains("fn direct_expr_"));
+    assert!(direct[2].content.contains("pub fn direct_rules()"));
+    assert!(direct[2]
+        .content
+        .contains("context.direct_fallback(&grammar()[0].expression, depth)"));
+    assert!(direct[2]
+        .content
+        .contains("parse_shared_grammar_with_direct"));
+}
+
+#[test]
+fn oversized_direct_rule_extracts_only_bounded_helpers() {
+    let mut grammar = support::fixture("evolution");
+    grammar.rules[0].body =
+        Expression::Sequence((0..600).map(|_| Expression::Literal("x".into())).collect());
+    let parser = generate_with_options(
+        &grammar,
+        GenerateOptions {
+            execution_tier: ExecutionTier::Direct,
+        },
+    )
+    .unwrap()
+    .remove(2)
+    .content;
+    assert!(parser.contains("fn direct_rule_0_part_0"));
+    assert!(!parser.contains("fn direct_expr_"));
+    assert_eq!(parser.matches("fn direct_rule_0(").count(), 1);
+}
+
+#[test]
 fn generated_modules_compile_evaluate_and_require_semantics() {
     let temp = Temp::new();
     let runtime = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../unlaxer-runtime/src/lib.rs");
@@ -170,6 +218,7 @@ fn generated_modules_compile_evaluate_and_require_semantics() {
     );
     for fixture in [
         "evolution",
+        "evolution_direct",
         "fields",
         "shared",
         "names",
@@ -182,7 +231,10 @@ fn generated_modules_compile_evaluate_and_require_semantics() {
         let output = temp.0.join(fixture);
         fs::create_dir(&output).unwrap();
         let mut ir = support::fixture(
-            if matches!(fixture, "names" | "scope_effects" | "predictive") {
+            if matches!(
+                fixture,
+                "evolution_direct" | "names" | "scope_effects" | "predictive"
+            ) {
                 "evolution"
             } else if fixture == "right" {
                 "shared"
@@ -225,10 +277,23 @@ fn generated_modules_compile_evaluate_and_require_semantics() {
                 alternatives,
             };
         }
-        for file in generate(&ir).unwrap() {
+        let files = if fixture == "evolution_direct" {
+            generate_with_options(
+                &ir,
+                GenerateOptions {
+                    execution_tier: ExecutionTier::Direct,
+                },
+            )
+        } else {
+            generate(&ir)
+        }
+        .unwrap();
+        for file in files {
             fs::write(output.join(file.relative_path), file.content).unwrap();
         }
-        let probe = if matches!(fixture, "evolution" | "names" | "predictive") {
+        let probe = if fixture == "evolution_direct" {
+            r#"fn main() { let options=unlaxer_runtime::ParseOptions { memoization: unlaxer_runtime::Memoization::SafeFailures, execution_tier: unlaxer_runtime::ExecutionTier::Direct }; let tree=generated::parser::parse_tree_with_options("if(1, 3*3, neg(2))",options).unwrap(); let ast=generated::mapper::map(&tree).unwrap(); assert_eq!(ast.span().end,18); assert!(ast.canonical_json().contains("Conditional")); }"#
+        } else if matches!(fixture, "evolution" | "names" | "predictive") {
             r#"
 use generated::{ast::Ast,evaluator::{Semantics,evaluate}};
 use unlaxer_runtime::Span;

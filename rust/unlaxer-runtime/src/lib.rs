@@ -268,14 +268,34 @@ pub enum Memoization {
     SafeFailures,
 }
 
+/// Selects the generated-rule execution path. The historical expression
+/// interpreter remains the default even when a generated parser ships a direct table.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ExecutionTier {
+    #[default]
+    Combinator,
+    Direct,
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct ParseOptions {
     pub memoization: Memoization,
+    pub execution_tier: ExecutionTier,
 }
 
 impl ParseOptions {
     pub const fn with_memoization(memoization: Memoization) -> Self {
-        Self { memoization }
+        Self {
+            memoization,
+            execution_tier: ExecutionTier::Combinator,
+        }
+    }
+
+    pub const fn with_execution_tier(execution_tier: ExecutionTier) -> Self {
+        Self {
+            memoization: Memoization::Off,
+            execution_tier,
+        }
     }
 }
 
@@ -285,14 +305,14 @@ pub fn share_grammar(rules: Vec<Rule>) -> SharedGrammar {
     Arc::from(rules)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Capture {
     pub name: &'static str,
     pub span: Span,
     pub nodes: Vec<usize>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Node {
     /// Grammar-local rule index, [`TEXT_VALUE_RULE`], or [`VALUE_BOUNDARY_RULE`].
     pub rule: usize,
@@ -404,9 +424,43 @@ pub fn java_capture_text(text: &str) -> &str {
 }
 
 #[derive(Default)]
-struct Fragment {
+pub struct DirectFragment {
     nodes: Vec<usize>,
     captures: Vec<Capture>,
+}
+
+/// Opaque generated-code transaction snapshot.
+pub struct DirectCheckpoint(Checkpoint);
+
+impl DirectFragment {
+    #[inline]
+    pub fn empty() -> Self {
+        Self::default()
+    }
+
+    #[inline]
+    pub fn append(&mut self, mut other: Self) {
+        self.nodes.append(&mut other.nodes);
+        self.captures.append(&mut other.captures);
+    }
+}
+
+type Fragment = DirectFragment;
+
+/// Allocation-free ABI used by generated direct expression functions.
+pub type DirectExpression = for<'a> fn(&mut ParseContext<'a>, usize) -> Option<DirectFragment>;
+pub type DirectRule = DirectExpression;
+
+/// Rule-indexed generated entry points. Tables are static so nested custom parsers can
+/// temporarily replace and then restore them together with their grammar.
+pub struct DirectRuleTable {
+    rules: &'static [DirectRule],
+}
+
+impl DirectRuleTable {
+    pub const fn new(rules: &'static [DirectRule]) -> Self {
+        Self { rules }
+    }
 }
 
 /// Shared entry point for handwritten and generated parsers. Use context.parse(parser)
@@ -417,7 +471,7 @@ pub trait Parser {
 
 pub type ParseResult = Result<ParseMatch, ParseError>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseMatch {
     pub span: Span,
     pub nodes: Vec<usize>,
@@ -629,6 +683,7 @@ pub struct ParseContext<'a> {
     diagnostic_frames: Vec<FailureDiagnostic>,
     memoized_failure_hits: usize,
     checkpoint_metrics: Option<CheckpointMetrics>,
+    direct_rules: Option<&'static DirectRuleTable>,
 }
 
 /// Ordered choice with rollback and full-input acceptance. Rule nesting is bounded at 256.
@@ -717,6 +772,26 @@ pub fn parse_detailed_shared_with_options(
     parse_detailed_owned(Arc::clone(grammar), root, whitespace, input, options)
 }
 
+/// Detailed full-input parsing with generated direct-rule entry points available.
+/// `ParseOptions::execution_tier` still decides whether the table is used.
+pub fn parse_detailed_shared_with_direct_options(
+    grammar: &SharedGrammar,
+    direct_rules: &'static DirectRuleTable,
+    root: usize,
+    whitespace: bool,
+    input: &str,
+    options: ParseOptions,
+) -> Result<Tree, ParseDiagnostic> {
+    parse_detailed_owned_with_direct(
+        Arc::clone(grammar),
+        Some(direct_rules),
+        root,
+        whitespace,
+        input,
+        options,
+    )
+}
+
 fn parse_detailed_owned(
     rules: SharedGrammar,
     root: usize,
@@ -724,8 +799,20 @@ fn parse_detailed_owned(
     input: &str,
     options: ParseOptions,
 ) -> Result<Tree, ParseDiagnostic> {
+    parse_detailed_owned_with_direct(rules, None, root, whitespace, input, options)
+}
+
+fn parse_detailed_owned_with_direct(
+    rules: SharedGrammar,
+    direct_rules: Option<&'static DirectRuleTable>,
+    root: usize,
+    whitespace: bool,
+    input: &str,
+    options: ParseOptions,
+) -> Result<Tree, ParseDiagnostic> {
     let mut parser = ParseContext::with_options(input, options);
     parser.rules = rules;
+    parser.direct_rules = direct_rules;
     parser.whitespace = whitespace;
     if options.memoization == Memoization::SafeFailures {
         parser.memo_safe_rules = memo_safe_rules(&parser.rules);
@@ -797,6 +884,7 @@ impl<'a> ParseContext<'a> {
             diagnostic_frames: vec![],
             memoized_failure_hits: 0,
             checkpoint_metrics: None,
+            direct_rules: None,
         }
     }
 
@@ -993,7 +1081,18 @@ impl<'a> ParseContext<'a> {
         root: usize,
         whitespace: bool,
     ) -> ParseResult {
+        self.parse_shared_grammar_inner(grammar, None, root, whitespace)
+    }
+
+    fn parse_shared_grammar_inner(
+        &mut self,
+        grammar: &SharedGrammar,
+        direct_rules: Option<&'static DirectRuleTable>,
+        root: usize,
+        whitespace: bool,
+    ) -> ParseResult {
         let previous_rules = std::mem::replace(&mut self.rules, Arc::clone(grammar));
+        let previous_direct_rules = std::mem::replace(&mut self.direct_rules, direct_rules);
         let previous_whitespace = std::mem::replace(&mut self.whitespace, whitespace);
         let safe_rules = if self.options.memoization == Memoization::SafeFailures {
             memo_safe_rules(grammar)
@@ -1009,10 +1108,23 @@ impl<'a> ParseContext<'a> {
         let result = self.parse_expression(&Expr::Rule(root));
         self.failure_memo = previous_failure_memo;
         self.rules = previous_rules;
+        self.direct_rules = previous_direct_rules;
         self.whitespace = previous_whitespace;
         self.memo_safe_rules = previous_safe_rules;
         self.grammar_session = previous_session;
         result
+    }
+
+    /// Temporarily installs a shared grammar and its generated direct-rule table.
+    /// The table is consulted only when the context uses [`ExecutionTier::Direct`].
+    pub fn parse_shared_grammar_with_direct(
+        &mut self,
+        grammar: &SharedGrammar,
+        direct_rules: &'static DirectRuleTable,
+        root: usize,
+        whitespace: bool,
+    ) -> ParseResult {
+        self.parse_shared_grammar_inner(grammar, Some(direct_rules), root, whitespace)
     }
 
     /// Temporarily changes sequence trivia handling, on both success and failure.
@@ -1180,15 +1292,17 @@ impl<'a> ParseContext<'a> {
             self.fail("rule nesting below 256");
             return None;
         }
-        let rules = Arc::clone(&self.rules);
-        let Some(rule) = rules.get(id) else {
+        if id >= self.rules.len() {
             self.fail("valid rule reference");
             return None;
-        };
+        }
+        let direct = (self.options.execution_tier == ExecutionTier::Direct)
+            .then(|| self.direct_rules?.rules.get(id).copied())
+            .flatten();
         let memo_key = (self.options.memoization == Memoization::SafeFailures
             && self.memo_safe_rules.get(id).copied().unwrap_or(false))
         .then_some(FailureMemoKey {
-            grammar: Arc::as_ptr(&rules) as *const () as usize,
+            grammar: Arc::as_ptr(&self.rules) as *const () as usize,
             session: self.grammar_session,
             rule: id,
             position: self.position,
@@ -1212,7 +1326,14 @@ impl<'a> ParseContext<'a> {
         }
         let start = self.position;
         let count = self.nodes.len();
-        let result = match self.expression(&rule.expression, depth + 1) {
+        let fragment = match direct {
+            Some(direct) => direct(self, depth + 1),
+            None => {
+                let rules = Arc::clone(&self.rules);
+                self.expression(&rules[id].expression, depth + 1)
+            }
+        };
+        let result = match fragment {
             Some(fragment) => {
                 let node_id = self.nodes.len();
                 self.nodes.push(Node {
@@ -1242,6 +1363,446 @@ impl<'a> ParseContext<'a> {
             }
         }
         result
+    }
+
+    #[inline]
+    fn direct_expression(
+        &mut self,
+        depth: usize,
+        operation: impl FnOnce(&mut Self, usize) -> Option<DirectFragment>,
+    ) -> Option<DirectFragment> {
+        let checkpoint = self.checkpoint();
+        let result = operation(self, depth);
+        if result.is_none() {
+            self.restore(checkpoint);
+        } else {
+            self.commit_checkpoint(checkpoint);
+        }
+        result
+    }
+
+    #[inline]
+    pub fn direct_checkpoint(&mut self) -> DirectCheckpoint {
+        DirectCheckpoint(self.checkpoint())
+    }
+
+    #[inline]
+    pub fn direct_finish(
+        &mut self,
+        checkpoint: DirectCheckpoint,
+        result: Option<DirectFragment>,
+    ) -> Option<DirectFragment> {
+        if result.is_none() {
+            self.restore(checkpoint.0);
+        } else {
+            self.commit_checkpoint(checkpoint.0);
+        }
+        result
+    }
+
+    pub fn direct_fallback(&mut self, expression: &Expr, depth: usize) -> Option<DirectFragment> {
+        self.expression(expression, depth)
+    }
+
+    #[inline]
+    pub fn direct_rule(&mut self, id: usize, depth: usize) -> Option<DirectFragment> {
+        self.direct_expression(depth, |context, depth| {
+            context.rule(id, depth).map(|id| DirectFragment {
+                nodes: vec![id],
+                captures: vec![],
+            })
+        })
+    }
+
+    pub fn direct_sequence(
+        &mut self,
+        elements: &[DirectExpression],
+        depth: usize,
+    ) -> Option<DirectFragment> {
+        self.direct_expression(depth, |context, depth| {
+            let mut result = DirectFragment::default();
+            context.skip();
+            for element in elements {
+                let mut fragment = element(context, depth)?;
+                result.nodes.append(&mut fragment.nodes);
+                result.captures.append(&mut fragment.captures);
+                context.skip();
+            }
+            Some(result)
+        })
+    }
+
+    #[inline]
+    pub fn direct_sequence_body(
+        &mut self,
+        depth: usize,
+        body: impl FnOnce(&mut Self, usize) -> Option<DirectFragment>,
+    ) -> Option<DirectFragment> {
+        self.direct_expression(depth, |context, depth| {
+            context.skip();
+            body(context, depth)
+        })
+    }
+
+    #[inline]
+    pub fn direct_sequence_step(&mut self) {
+        self.skip();
+    }
+
+    pub fn direct_choice(
+        &mut self,
+        alternatives: &[DirectExpression],
+        depth: usize,
+    ) -> Option<DirectFragment> {
+        self.direct_expression(depth, |context, depth| {
+            let start = context.position;
+            let count = context.nodes.len();
+            for alternative in alternatives {
+                if let Some(fragment) = alternative(context, depth) {
+                    return Some(fragment);
+                }
+                context.position = start;
+                context.nodes.truncate(count);
+            }
+            None
+        })
+    }
+
+    #[inline]
+    pub fn direct_choice_body(
+        &mut self,
+        depth: usize,
+        body: impl FnOnce(&mut Self, usize) -> Option<DirectFragment>,
+    ) -> Option<DirectFragment> {
+        self.direct_expression(depth, body)
+    }
+
+    #[inline]
+    pub fn direct_optional(
+        &mut self,
+        child: impl FnOnce(&mut Self, usize) -> Option<DirectFragment>,
+        failed_atom: bool,
+        depth: usize,
+    ) -> Option<DirectFragment> {
+        self.direct_expression(depth, |context, depth| {
+            let start = context.position;
+            let count = context.nodes.len();
+            match child(context, depth) {
+                Some(fragment) => Some(fragment),
+                None => {
+                    context.position = start;
+                    context.nodes.truncate(count);
+                    if failed_atom {
+                        context.matched_position = context.position;
+                    }
+                    Some(DirectFragment::default())
+                }
+            }
+        })
+    }
+
+    #[inline]
+    pub fn direct_repeat(
+        &mut self,
+        mut child: impl FnMut(&mut Self, usize) -> Option<DirectFragment>,
+        min: usize,
+        max: Option<usize>,
+        failed_atom: bool,
+        depth: usize,
+    ) -> Option<DirectFragment> {
+        self.direct_expression(depth, |context, depth| {
+            if max.is_some_and(|max| max < min) {
+                context.fail("valid repetition bounds");
+                return None;
+            }
+            let mut result = DirectFragment::default();
+            let mut iterations = 0;
+            while iterations == 0 || max.is_none_or(|max| iterations < max) {
+                let start = context.position;
+                let count = context.nodes.len();
+                match child(context, depth) {
+                    Some(mut fragment) => {
+                        iterations += 1;
+                        result.nodes.append(&mut fragment.nodes);
+                        result.captures.append(&mut fragment.captures);
+                        if context.position == start {
+                            break;
+                        }
+                    }
+                    None => {
+                        context.position = start;
+                        context.nodes.truncate(count);
+                        if failed_atom {
+                            context.matched_position = context.position;
+                        }
+                        break;
+                    }
+                }
+            }
+            (iterations >= min && max.is_none_or(|max| iterations <= max)).then_some(result)
+        })
+    }
+
+    #[inline]
+    pub fn direct_capture(
+        &mut self,
+        name: &'static str,
+        child: impl FnOnce(&mut Self, usize) -> Option<DirectFragment>,
+        depth: usize,
+    ) -> Option<DirectFragment> {
+        self.direct_expression(depth, |context, depth| {
+            let start = context.position;
+            let mut fragment = child(context, depth)?;
+            let span = context.span(start);
+            context
+                .captures_mut_map()
+                .entry(name.to_owned())
+                .or_default()
+                .push(span);
+            fragment.captures.push(Capture {
+                name,
+                span,
+                nodes: fragment.nodes.clone(),
+            });
+            Some(fragment)
+        })
+    }
+
+    #[inline]
+    pub fn direct_trivia_scope(
+        &mut self,
+        whitespace: bool,
+        child: impl FnOnce(&mut Self, usize) -> Option<DirectFragment>,
+        depth: usize,
+    ) -> Option<DirectFragment> {
+        self.direct_expression(depth, |context, depth| {
+            context.with_trivia(whitespace, |context| child(context, depth))
+        })
+    }
+
+    #[inline]
+    pub fn direct_value_boundary(
+        &mut self,
+        child: impl FnOnce(&mut Self, usize) -> Option<DirectFragment>,
+        text: bool,
+        depth: usize,
+    ) -> Option<DirectFragment> {
+        self.direct_expression(depth, |context, depth| {
+            let start = context.position;
+            let fragment = child(context, depth)?;
+            let node_id = context.nodes.len();
+            context.nodes.push(Node {
+                rule: if text {
+                    TEXT_VALUE_RULE
+                } else {
+                    VALUE_BOUNDARY_RULE
+                },
+                span: context.span(start),
+                children: fragment.nodes,
+                captures: vec![],
+            });
+            Some(DirectFragment {
+                nodes: vec![node_id],
+                captures: fragment.captures,
+            })
+        })
+    }
+
+    #[inline]
+    pub fn direct_literal(
+        &mut self,
+        literal: &'static str,
+        depth: usize,
+    ) -> Option<DirectFragment> {
+        self.direct_expression(depth, |context, _| {
+            if context.input[context.position..].starts_with(literal) {
+                context.position += literal.len();
+                context.matched_position = context.position;
+                Some(DirectFragment::default())
+            } else {
+                context.fail(literal);
+                None
+            }
+        })
+    }
+
+    #[inline]
+    pub fn direct_number(&mut self, depth: usize) -> Option<DirectFragment> {
+        self.direct_expression(depth, |context, _| {
+            let accepted = context.number();
+            if accepted {
+                context.matched_position = context.position;
+            }
+            accepted.then(DirectFragment::default)
+        })
+    }
+
+    #[inline]
+    pub fn direct_identifier(&mut self, depth: usize) -> Option<DirectFragment> {
+        self.direct_expression(depth, |context, _| {
+            let bytes = context.input.as_bytes();
+            if !bytes
+                .get(context.position)
+                .is_some_and(|c| c.is_ascii_alphabetic() || *c == b'_')
+            {
+                context.fail("identifier");
+                return None;
+            }
+            context.position += 1;
+            while bytes
+                .get(context.position)
+                .is_some_and(|c| c.is_ascii_alphanumeric() || *c == b'_')
+            {
+                context.position += 1;
+            }
+            context.matched_position = context.position;
+            Some(DirectFragment::default())
+        })
+    }
+
+    #[inline]
+    pub fn direct_quoted(&mut self, quote: char, depth: usize) -> Option<DirectFragment> {
+        self.direct_expression(depth, |context, _| {
+            if !matches!(quote, '\'' | '"') {
+                context.fail("single or double quote delimiter");
+                return None;
+            }
+            if !context.remaining().starts_with(quote) {
+                context.fail("opening quote");
+                return None;
+            }
+            context.position += quote.len_utf8();
+            loop {
+                let Some(next) = context.remaining().chars().next() else {
+                    context.fail("closing quote");
+                    return None;
+                };
+                context.position += next.len_utf8();
+                if next == quote {
+                    context.matched_position = context.position;
+                    return Some(DirectFragment::default());
+                }
+                if next == '\\' {
+                    let Some(escaped) = context.remaining().chars().next() else {
+                        context.fail("closing quote");
+                        return None;
+                    };
+                    context.position += escaped.len_utf8();
+                }
+            }
+        })
+    }
+
+    #[inline]
+    pub fn direct_code_start(&mut self, depth: usize) -> Option<DirectFragment> {
+        self.direct_expression(depth, |context, _| {
+            context.code_start().then(DirectFragment::default)
+        })
+    }
+
+    #[inline]
+    pub fn direct_code_end(&mut self, depth: usize) -> Option<DirectFragment> {
+        self.direct_expression(depth, |context, _| {
+            context.code_end().then(DirectFragment::default)
+        })
+    }
+
+    #[inline]
+    pub fn direct_any(&mut self, depth: usize) -> Option<DirectFragment> {
+        self.direct_character(None, depth)
+    }
+
+    #[inline]
+    pub fn direct_char_range(
+        &mut self,
+        min: char,
+        max: char,
+        depth: usize,
+    ) -> Option<DirectFragment> {
+        self.direct_character(Some((min, max)), depth)
+    }
+
+    fn direct_character(
+        &mut self,
+        range: Option<(char, char)>,
+        depth: usize,
+    ) -> Option<DirectFragment> {
+        self.direct_expression(depth, |context, _| {
+            let next = context.input[context.position..].chars().next();
+            if next.is_some_and(|c| range.is_none_or(|(min, max)| min <= c && c <= max)) {
+                context.position += next.expect("accepted character").len_utf8();
+                context.matched_position = context.position;
+                Some(DirectFragment::default())
+            } else {
+                context.fail("character");
+                None
+            }
+        })
+    }
+
+    #[inline]
+    pub fn direct_except(
+        &mut self,
+        excluded: &'static str,
+        depth: usize,
+    ) -> Option<DirectFragment> {
+        self.direct_expression(depth, |context, _| {
+            let next = context.input[context.position..].chars().next();
+            if next.is_some_and(|c| !excluded.contains(c)) {
+                context.position += next.expect("accepted character").len_utf8();
+                context.matched_position = context.position;
+                Some(DirectFragment::default())
+            } else {
+                context.fail("character");
+                None
+            }
+        })
+    }
+
+    #[inline]
+    pub fn direct_eof(&mut self, depth: usize) -> Option<DirectFragment> {
+        self.direct_expression(depth, |context, _| {
+            if context.position == context.input.len() {
+                Some(DirectFragment::default())
+            } else {
+                context.fail("end of input");
+                None
+            }
+        })
+    }
+
+    #[inline]
+    pub fn direct_java_empty(&mut self, depth: usize) -> Option<DirectFragment> {
+        self.direct_expression(depth, |context, _| {
+            if let Some(next) = context.input[context.matched_position..].chars().next() {
+                context.matched_position += next.len_utf8();
+            }
+            Some(DirectFragment::default())
+        })
+    }
+
+    #[inline]
+    pub fn direct_java_until(
+        &mut self,
+        terminator: &'static str,
+        depth: usize,
+    ) -> Option<DirectFragment> {
+        self.direct_expression(depth, |context, _| {
+            loop {
+                if !terminator.is_empty()
+                    && context.input[context.matched_position..].starts_with(terminator)
+                {
+                    context.matched_position += terminator.len();
+                    break;
+                }
+                let Some(next) = context.input[context.position..].chars().next() else {
+                    break;
+                };
+                context.position += next.len_utf8();
+                context.matched_position = context.position;
+            }
+            Some(DirectFragment::default())
+        })
     }
 
     fn expression(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
