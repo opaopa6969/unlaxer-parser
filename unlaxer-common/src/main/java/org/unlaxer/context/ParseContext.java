@@ -84,43 +84,106 @@ public class ParseContext implements
     private final List<TransactionalState> transactionalStates = new ArrayList<>();
     private final Set<TransactionElement> transactionalFrames =
         Collections.newSetFromMap(new IdentityHashMap<>());
-    private final Map<TransactionElement, Long> memoizationStateVersionByFrame =
-        new IdentityHashMap<>();
+    private boolean transactionMetricsEnabled;
+    private long transactionsOpened;
+    private long transactionsCommitted;
+    private long transactionsRolledBack;
+    private long nonemptyPayloadSnapshots;
+    private long emptyPayloadCheckpoints;
+    private long copyOnWriteDeepCopies;
 
     /**
      * Register an owner before its first mutation. Registration lasts for this
      * context's lifetime; registering the same instance again is harmless.
      * There is deliberately no unregister operation while snapshots may refer to it.
-     * Late registration captures the current baseline in every open transaction,
-     * so a parent rollback also undoes a committed child's first use of the state.
+     * Late registration of an ordinary owner captures the current baseline in every
+     * open transaction, so a parent rollback also undoes a committed child's first
+     * use of the state. Mutation-aware owners defer that work until
+     * {@link #beforeTransactionalStateMutation(TransactionalState)}.
      * Owners must obey {@link TransactionalState#checkpoint()}'s no-throw contract.
      */
     public void registerTransactionalState(TransactionalState state) {
         java.util.Objects.requireNonNull(state, "state");
         if (transactionalStates.stream().anyMatch(existing -> existing == state)) return;
         transactionalStates.add(state);
-        transactionalFrames.forEach(frame -> frame.checkpointState(state));
+        if (false == state instanceof MutationAwareTransactionalState) {
+            transactionalFrames.forEach(frame -> checkpointState(frame, state));
+        }
+    }
+
+    /**
+     * Installs this owner's rollback snapshot in every open transaction, once per
+     * frame. Mutation-aware owners must call this immediately before each mutation.
+     */
+    public void beforeTransactionalStateMutation(TransactionalState state) {
+        java.util.Objects.requireNonNull(state, "state");
+        if (false == state instanceof MutationAwareTransactionalState) {
+            throw new IllegalArgumentException("state is not mutation-aware");
+        }
+        if (transactionalStates.stream().noneMatch(existing -> existing == state)) {
+            throw new IllegalStateException("transactional state is not registered");
+        }
+        transactionalFrames.forEach(frame -> checkpointState(frame, state));
     }
 
     void checkpointTransactionalState(TransactionElement frame) {
         recordMemoTransactionBegin();
         transactionalFrames.add(frame);
-        memoizationStateVersionByFrame.put(frame, memoizationStateVersion);
-        transactionalStates.forEach(frame::checkpointState);
+        frame.saveMemoizationStateVersion(memoizationStateVersion);
+        transactionalStates.stream()
+            .filter(state -> false == state instanceof MutationAwareTransactionalState)
+            .forEach(state -> checkpointState(frame, state));
+        if (transactionMetricsEnabled) transactionsOpened++;
     }
 
     void finishTransactionalState(TransactionElement frame, boolean restore) {
         transactionalFrames.remove(frame);
-        Long savedMemoizationStateVersion = memoizationStateVersionByFrame.remove(frame);
-        if (savedMemoizationStateVersion == null) {
-            throw new IllegalStateException("transaction state version snapshot is missing");
-        }
+        long savedMemoizationStateVersion = frame.takeMemoizationStateVersion();
         if (restore) {
             frame.restoreState();
             memoizationStateVersion = savedMemoizationStateVersion;
         }
+        if (transactionMetricsEnabled) {
+            if (restore) transactionsRolledBack++;
+            else transactionsCommitted++;
+            if (frame.hasStateCheckpoints()) nonemptyPayloadSnapshots++;
+            else emptyPayloadCheckpoints++;
+        }
         recordMemoTransactionFinish(restore
             ? MemoTransactionEvent.ROLLBACK : MemoTransactionEvent.COMMIT);
+    }
+
+    private void checkpointState(TransactionElement frame, TransactionalState state) {
+        if (frame.checkpointStateIfAbsent(state) && transactionMetricsEnabled) {
+            copyOnWriteDeepCopies++;
+        }
+    }
+
+    /**
+     * Enables and resets low-overhead transaction counters. Call before parsing.
+     * A nonempty/empty payload is counted when a transaction finishes, according
+     * to whether its frame acquired any registered-state rollback snapshot.
+     * Deep copies count actual owner {@link TransactionalState#checkpoint()}
+     * invocations, including eager compatibility owners.
+     */
+    public void enableTransactionMetrics() {
+        if (tokenStack.size() != 1) {
+            throw new IllegalStateException("transaction metrics must be enabled outside a transaction");
+        }
+        transactionMetricsEnabled = true;
+        transactionsOpened = 0;
+        transactionsCommitted = 0;
+        transactionsRolledBack = 0;
+        nonemptyPayloadSnapshots = 0;
+        emptyPayloadCheckpoints = 0;
+        copyOnWriteDeepCopies = 0;
+    }
+
+    /** Returns a stable snapshot without disabling collection. */
+    public TransactionMetrics snapshotTransactionMetrics() {
+        return new TransactionMetrics(transactionsOpened, transactionsCommitted,
+            transactionsRolledBack, nonemptyPayloadSnapshots, emptyPayloadCheckpoints,
+            copyOnWriteDeepCopies);
     }
 
     /** Marks a mutation of parser-visible state covered by the safe memoization contract. */

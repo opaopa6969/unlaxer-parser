@@ -202,6 +202,76 @@ fn custom_trait_failure_rolls_back_and_public_recursive_calls_are_bounded() {
 }
 
 #[test]
+fn checkpoint_metrics_distinguish_empty_payloads_and_cow_copies() {
+    let mut empty = ParseContext::new("a");
+    empty.enable_checkpoint_metrics();
+    empty
+        .transaction(|context| {
+            assert!(context.advance(1));
+            Ok(())
+        })
+        .unwrap();
+    let metrics = empty.snapshot_checkpoint_metrics();
+    assert_eq!(metrics.opened, 1);
+    assert_eq!(metrics.committed, 1);
+    assert_eq!(metrics.rolled_back, 0);
+    assert_eq!(metrics.empty_payload_checkpoints, 1);
+    assert_eq!(metrics.nonempty_payload_snapshots, 0);
+    assert_eq!(metrics.copy_on_write_deep_copies, 0);
+
+    let mut populated = ParseContext::new("");
+    populated.set_state("value", vec![1usize]);
+    populated.enable_checkpoint_metrics();
+    populated
+        .transaction(|context| {
+            assert_eq!(context.state::<Vec<usize>>("value"), Some(&vec![1]));
+            Ok(())
+        })
+        .unwrap();
+    let rejected: Result<(), _> = populated.transaction(|context| {
+        context.state_mut::<Vec<usize>>("value").unwrap().push(2);
+        Err(context.error("reject mutation"))
+    });
+    assert!(rejected.is_err());
+    assert_eq!(populated.state::<Vec<usize>>("value"), Some(&vec![1]));
+    let metrics = populated.snapshot_checkpoint_metrics();
+    assert_eq!(metrics.opened, 2);
+    assert_eq!(metrics.committed, 1);
+    assert_eq!(metrics.rolled_back, 1);
+    assert_eq!(metrics.empty_payload_checkpoints, 0);
+    assert_eq!(metrics.nonempty_payload_snapshots, 2);
+    assert_eq!(metrics.copy_on_write_deep_copies, 1);
+    assert_eq!(metrics.opened, metrics.committed + metrics.rolled_back);
+}
+
+#[test]
+fn empty_outer_checkpoint_discards_committed_inner_cow_domains() {
+    let mut context = ParseContext::new("a");
+    context.enable_checkpoint_metrics();
+    let rejected: Result<(), _> = context.transaction(|outer| {
+        outer.transaction(|inner| {
+            inner.parse(&Expr::literal("a").capture("name"))?;
+            inner.set_state("value", 7usize);
+            inner.scopes_mut().declare("a", 0);
+            Ok(())
+        })?;
+        assert_eq!(outer.captured("name"), Some("a"));
+        assert_eq!(outer.state::<usize>("value"), Some(&7));
+        assert!(outer.scopes().is_declared("a"));
+        Err(outer.error("reject outer"))
+    });
+    assert!(rejected.is_err());
+    assert_eq!((context.position(), context.matched_position()), (0, 0));
+    assert!(context.captured("name").is_none());
+    assert!(context.state::<usize>("value").is_none());
+    assert!(!context.scopes().is_declared("a"));
+    assert!(context.scopes().all_declarations().is_empty());
+    let metrics = context.snapshot_checkpoint_metrics();
+    assert_eq!(metrics.opened, metrics.committed + metrics.rolled_back);
+    assert!(metrics.empty_payload_checkpoints > 0);
+}
+
+#[test]
 fn handwritten_parser_sees_context_and_composes_with_capture_and_replay() {
     let parser = Expr::Custom(identifier)
         .capture("tag")

@@ -12,7 +12,7 @@ import java.util.Optional;
 import org.unlaxer.Name;
 import org.unlaxer.TokenList;
 import org.unlaxer.context.ParseContext;
-import org.unlaxer.context.TransactionalState;
+import org.unlaxer.context.MutationAwareTransactionalState;
 import org.unlaxer.listener.TransactionListener;
 import org.unlaxer.parser.Parser;
 
@@ -98,7 +98,9 @@ public final class ScopeStore {
      * スコープを1段深くする（@scopeTree ルールの onBegin から呼ぶ）。
      */
     public static void enter(ParseContext ctx) {
-        getStack(ctx).push(new HashMap<>());
+        State state = state(ctx);
+        ctx.beforeTransactionalStateMutation(state);
+        state.stack.push(new HashMap<>());
         ctx.markMemoizationStateChanged();
     }
 
@@ -106,8 +108,10 @@ public final class ScopeStore {
      * スコープを1段浅くする（@scopeTree ルールの onCommit / onRollback から呼ぶ）。
      */
     public static void leave(ParseContext ctx) {
-        Deque<Map<String, SymbolInfo>> stack = getStack(ctx);
+        State state = state(ctx);
+        Deque<Map<String, SymbolInfo>> stack = state.stack;
         if (!stack.isEmpty()) {
+            ctx.beforeTransactionalStateMutation(state);
             stack.pop();
             ctx.markMemoizationStateChanged();
         }
@@ -134,11 +138,13 @@ public final class ScopeStore {
      */
     public static void declare(ParseContext ctx, String name, int sourceOffset) {
         if (name == null || name.isEmpty()) return;
-        Deque<Map<String, SymbolInfo>> stack = getStack(ctx);
-        Map<String, SymbolInfo> scope = stack.isEmpty() ? getGlobalScope(ctx) : stack.peek();
+        State state = state(ctx);
+        ctx.beforeTransactionalStateMutation(state);
+        Deque<Map<String, SymbolInfo>> stack = state.stack;
+        Map<String, SymbolInfo> scope = stack.isEmpty() ? state.global : stack.peek();
         SymbolInfo info = new SymbolInfo(name, sourceOffset);
         scope.put(name, info);
-        getAllDeclarationsInternal(ctx).add(info);
+        state.declarations.add(info);
         ctx.markMemoizationStateChanged();
     }
 
@@ -196,7 +202,9 @@ public final class ScopeStore {
      * @param severity {@link Severity}
      */
     public static void addDiagnostic(ParseContext ctx, String message, int offset, int length, Severity severity) {
-        getDiagnosticsInternal(ctx).add(new SymbolDiagnostic(message, offset, length, severity));
+        State state = state(ctx);
+        ctx.beforeTransactionalStateMutation(state);
+        state.diagnostics.add(new SymbolDiagnostic(message, offset, length, severity));
         ctx.markMemoizationStateChanged();
     }
 
@@ -211,8 +219,10 @@ public final class ScopeStore {
 
     /** diagnostics リストをクリアする（再パース前など）。 */
     public static void clearDiagnostics(ParseContext ctx) {
-        List<SymbolDiagnostic> diagnostics = getDiagnosticsInternal(ctx);
+        State state = state(ctx);
+        List<SymbolDiagnostic> diagnostics = state.diagnostics;
         if (!diagnostics.isEmpty()) {
+            ctx.beforeTransactionalStateMutation(state);
             diagnostics.clear();
             ctx.markMemoizationStateChanged();
         }
@@ -254,7 +264,9 @@ public final class ScopeStore {
      */
     public static void addReference(ParseContext ctx, String name, int offset, int length) {
         if (name == null || name.isEmpty()) return;
-        getAllReferencesInternal(ctx).add(new ReferenceInfo(name, offset, length));
+        State state = state(ctx);
+        ctx.beforeTransactionalStateMutation(state);
+        state.references.add(new ReferenceInfo(name, offset, length));
         ctx.markMemoizationStateChanged();
     }
 
@@ -294,7 +306,7 @@ public final class ScopeStore {
         });
     }
 
-    private static final class State implements TransactionalState {
+    private static final class State implements MutationAwareTransactionalState {
         final Deque<Map<String, SymbolInfo>> stack = new ArrayDeque<>();
         final Map<String, SymbolInfo> global = new HashMap<>();
         final List<SymbolInfo> declarations = new ArrayList<>();
