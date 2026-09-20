@@ -845,3 +845,43 @@ Timing（Java public facade、3-run 中央値、ms/op、baseline = master `11d32
 「配列に写す」snapshot は O(深さ) の割当を毎回払う。stack のように変化が top に限られる構造では、不変 node の親リンク
 （persistent stack）にすると共有部分を再利用でき、割当は差分だけになる。このとき「誰が値を変えるか」を洗い出して、キャッシュを
 無効化する箇所が top 以外に無いことを確認してから採用する。JFR の site 比率は 3 度目も過大で、精密カウンタの見積もりは実測と一致した。
+
+## ケース17: memo hit 時の失敗診断を 1 件ずつでなく一括で replay する（Rust）
+
+### 仮説
+
+#213 後の Rust runtime を領域別に計測すると（`Instant` の一時 instrumentation、非計測 wall time を分母）、failure diagnostic の
+record / merge / replay が complex.tiny で 29.4%、comparison-heavy.tiny で 28.6% と最大の直接計測領域だった。1 parse あたり
+complex の diagnostic record 42,358 件のうち 33,873 件（約 80%）が safe-failure memo hit 時の replay で、memoized
+`FailureDiagnostic` の `expected` を 1 件ずつ `fail_at_shared` に戻し、そのたびに farthest の比較と最内 diagnostic frame の
+線形走査をやり直していた。memoized の `expected` は初出順・重複なしで確定しているので、diagnostic 単位でまとめて merge
+できるはずだと考えた。
+
+### 実装
+
+- `FailureDiagnostic::merge` を一括 merge にする: memoized の farthest が先なら `Rc<Vec<Rc<str>>>` を共有して置き換え、同じ offset なら
+  既存順を保って不足分だけ追記（`append_missing_expected`）、手前なら何もしない。同じ `Rc` を指していれば短絡する
+- `ParseContext::replay_failure` を追加し、memo hit 時に global 診断と最内の開いている memo frame をそれぞれ 1 回ずつ更新する。
+  1 件ごとの `fail_at_shared` 呼び出しは無くなった
+- 公開 API は不変。`ParseError.expected` の内容・初出順・重複除去を、farthest が前進する hit / 同位置の hit / 手前の hit / 順序保持の
+  4 test で固定した。`unlaxer-alloc-audit` の診断 allocation 契約（1 failure / 1024 identical failures とも 11 allocations）は維持
+
+### 観測
+
+Timing（Rust public facade、Criterion 3-run 中央値、ms/op、baseline = master `11d3239` の pin、candidate = worktree path patch）:
+
+| Runtime | Fixture | Baseline runs | Baseline median | Candidate runs | Candidate median | 変化 |
+|---|---|---:|---:|---:|---:|---:|
+| Rust | complex | 4.030 / 4.058 / 4.347 | **4.058** | 3.703 / 3.690 / 3.673 | **3.690** | **-9.08%** |
+| Rust | comparison-heavy | 1.092 / 1.031 / 1.031 | **1.031** | 0.956 / 0.998 / 0.968 | **0.968** | **-6.09%** |
+
+両 fixture で run が分離した（complex 4.03〜4.35 ms 対 3.67〜3.70 ms、comparison-heavy 1.03〜1.09 ms 対 0.96〜1.00 ms）。
+memo hit 率が高い complex.tiny（46%）の方が効果が大きい。診断領域 29% のうち replay 分（record の約 80%）を潰して 9% なので、
+残りは record / merge 本体と memo miss 側の記録コスト。採用。
+
+### 教材としての要点
+
+memo に「結果」を保存しているのに、hit 時にそれを「もう一度 1 件ずつ起こし直す」と、保存した分の仕事を毎回やり直すことになる。
+保存済みデータがすでに正規形（順序・重複なし）であることを test で固定できるなら、replay は集合演算 1 回に潰せる。
+`Rc` の共有で「同じ列をもう一度持つ」コピーも避けられるが、共有した列に後から追記するときの COW（`Rc::make_mut`）が
+allocation 契約を壊さないかは audit crate で確認する。
