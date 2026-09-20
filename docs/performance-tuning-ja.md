@@ -605,3 +605,44 @@ Rust の結果から期待効果が小さいと判断して着手しなかった
 「dispatch を消せば速くなる」は、dispatch の下にある仕事（memo・checkpoint・CST 構築）が小さいときだけ成り立つ。
 着手前に self-time の内訳を見て、direct 化で**消える部分**だけの上限を見積もる。生成コードを増やす施策は、
 i-cache と compile 時間という別のコストを同時に測る。
+
+## ケース12: StringSource の構築コスト
+
+### 仮説
+
+ケース9の後の Java allocation（約 151 MB/op）の 26% が `String.codePoints()` の IntStream で、呼び出し元は
+`StringSource` のコンストラクタだった。commit ごとの sub-source 生成と、空 token の detached source 生成のたびに
+IntStream pipeline を作り、空文字列でも `PositionResolverImpl`（code point ごとの HashMap 群）を新規に構築していた。
+CST 表現の compact 化（#211）を考える前に、source 構築そのものの無駄を外せるはずである。
+
+### 実装
+
+- `codePoints()` の IntStream を、`codePointCount` で exact-size の配列を確保して `codePointAt` で埋めるループに置換
+- 空文字列の root/detached source は不変な resolver を 1 つ共有（構築後に変更されないことを確認）
+- 空配列の定数は holder class に置く。`Source.EMPTY` が `StringSource` の静的初期化中に構築されるため、`StringSource`
+  自身の static field ではまだ null になる（unlaxer-dsl の全 test が `ExceptionInInitializerError` で落ちて発見）
+
+Rust は `&str` スライスと `byte_offsets` の binary search で相当処理が allocation-free のため変更なし。
+
+### 観測
+
+allocation（public facade 1 parse）: Java complex.tiny 151 MB → 130 MB（-14%）、comparison-heavy.tiny 78 MB → 64 MB（-17%）。
+残りの最大項目は診断 stack snapshot の `ParseStackElement`（44%、unlaxer-parser#229）。
+
+public facade の 3-run 中央値（Java、ms/op、同一ホスト・直列、baseline はケース9適用後）:
+
+| Runtime | Fixture | Baseline runs | Baseline median | Candidate runs | Candidate median | 変化 |
+|---|---|---:|---:|---:|---:|---:|
+| Java | complex | 68.846 / 68.094 / 69.997 | **68.846** | 58.853 / 63.884 / 62.837 | **62.837** | **-8.73%** |
+| Java | comparison-heavy | 37.020 / 36.335 / 38.193 | **37.020** | 32.667 / 32.526 / 31.444 | **32.526** | **-12.14%** |
+
+採用した。測定条件と raw data は
+[TinyExpression の実験レポート](https://github.com/opaopa6969/tinyexpression/blob/master/benchmarks/results/2026-09-21-string-source-construction-experiment.md)
+に保存している。
+
+### 教材としての要点
+
+Stream API は「1 回」なら安いが、per-token の構築経路では pipeline オブジェクトと spliterator が allocation の
+主役になる。allocation-by-site で `IntPipeline$Head` のような Stream 内部クラスが上位に来たら、呼び出し元の
+ループ化を疑う。静的初期化の循環（interface の定数が実装クラスを構築する）は unit test の初期化順で隠れることがあり、
+別モジュールの test で初めて現れる。
