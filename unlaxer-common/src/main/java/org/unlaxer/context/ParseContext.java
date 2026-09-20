@@ -79,13 +79,13 @@ public class ParseContext implements
      */
     public void registerTransactionalState(TransactionalState state) {
         java.util.Objects.requireNonNull(state, "state");
-        disableMemoizationPermanently();
         if (transactionalStates.stream().anyMatch(existing -> existing == state)) return;
         transactionalStates.add(state);
         transactionalFrames.forEach(frame -> frame.checkpointState(state));
     }
 
     void checkpointTransactionalState(TransactionElement frame) {
+        recordMemoTransactionBegin();
         transactionalFrames.add(frame);
         transactionalStates.forEach(frame::checkpointState);
     }
@@ -93,6 +93,8 @@ public class ParseContext implements
     void finishTransactionalState(TransactionElement frame, boolean restore) {
         transactionalFrames.remove(frame);
         if (restore) frame.restoreState();
+        recordMemoTransactionFinish(restore
+            ? MemoTransactionEvent.ROLLBACK : MemoTransactionEvent.COMMIT);
     }
 	
 	Collection<AdditionalCommitAction> actions;
@@ -172,7 +174,6 @@ public class ParseContext implements
 		if (false == parserListenerByName.isEmpty()
 				|| false == listenerByName.isEmpty()
 				|| false == actions.isEmpty()
-				|| false == transactionalStates.isEmpty()
 				|| recordingTrials) {
 			disableMemoizationPermanently();
 			return false;
@@ -233,9 +234,10 @@ public class ParseContext implements
     return Collections.unmodifiableList(trialHistory);
   }
 
-  /** Rule-local diagnostic accumulator replayed when a safe failure memo is hit. */
+  /** Rule-local diagnostics and direct transaction lifecycle replayed on a safe failure hit. */
   public static final class FailureDiagnostic {
     int stackBaseDepth;
+    int transactionBaseDepth;
     int farthestConsumedOffset;
     int farthestMatchedOffset;
     int maxReachedOffset;
@@ -245,7 +247,10 @@ public class ParseContext implements
     final List<String> expectedParsers = new ArrayList<>();
     final List<ParseFailureDiagnostics.ExpectedHintCandidate> expectedHints = new ArrayList<>();
     final List<ParseFailureDiagnostics.TrialRecord> trials = new ArrayList<>();
+    final List<MemoTransactionEvent> transactionEvents = new ArrayList<>();
   }
+
+  private enum MemoTransactionEvent { BEGIN, COMMIT, ROLLBACK }
 
   /** Snapshot used only to discard diagnostics from successful negative lookahead speculation. */
   public static final class DiagnosticSpeculation {
@@ -323,6 +328,7 @@ public class ParseContext implements
   FailureDiagnostic beginMemoDiagnosticFrame() {
     FailureDiagnostic frame = new FailureDiagnostic();
     frame.stackBaseDepth = parseFrames.size();
+    frame.transactionBaseDepth = tokenStack.size();
     memoDiagnosticFrames.push(frame);
     return frame;
   }
@@ -343,6 +349,49 @@ public class ParseContext implements
       local.maxReachedStackElements = localStackSnapshot(active, rebased.maxReachedStackElements);
       local.farthestFailureStackElements = localStackSnapshot(active, rebased.farthestFailureStackElements);
       mergeFailureDiagnostic(active, local);
+    }
+  }
+
+  /** Replays only registered-state hooks; token/cursor transactions remain untouched on a hit. */
+  void replayMemoTransactionEvents(FailureDiagnostic diagnostic) {
+    Deque<List<Runnable>> restoresByTransaction = new ArrayDeque<>();
+    for (MemoTransactionEvent event : diagnostic.transactionEvents) {
+      switch (event) {
+        case BEGIN -> {
+          List<Runnable> restores = new ArrayList<>(transactionalStates.size());
+          for (TransactionalState state : transactionalStates) restores.add(state.checkpoint());
+          restoresByTransaction.push(restores);
+        }
+        case COMMIT -> {
+          if (restoresByTransaction.pollFirst() == null) {
+            throw new IllegalStateException("memo transaction trace is unbalanced");
+          }
+        }
+        case ROLLBACK -> {
+          List<Runnable> restores = restoresByTransaction.pollFirst();
+          if (restores == null) throw new IllegalStateException("memo transaction trace is unbalanced");
+          restores.forEach(Runnable::run);
+        }
+      }
+    }
+    if (false == restoresByTransaction.isEmpty()) {
+      throw new IllegalStateException("memo transaction trace is unbalanced");
+    }
+  }
+
+  private void recordMemoTransactionBegin() {
+    for (FailureDiagnostic diagnostic : memoDiagnosticFrames) {
+      if (tokenStack.size() == diagnostic.transactionBaseDepth + 1) {
+        diagnostic.transactionEvents.add(MemoTransactionEvent.BEGIN);
+      }
+    }
+  }
+
+  private void recordMemoTransactionFinish(MemoTransactionEvent event) {
+    for (FailureDiagnostic diagnostic : memoDiagnosticFrames) {
+      if (tokenStack.size() == diagnostic.transactionBaseDepth) {
+        diagnostic.transactionEvents.add(event);
+      }
     }
   }
 

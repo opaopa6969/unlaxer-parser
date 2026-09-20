@@ -205,22 +205,52 @@ public class SafeFailureMemoizationPolicyTest {
     }
 
     @Test
-    public void transactionalStatePermanentlyDisablesExistingCache() {
+    public void transactionalStateLifecycleIsReplayedOnExistingCacheHit() {
         CountingWord child = new CountingWord("no");
         SafeRule parser = new SafeRule(child);
         try (ParseContext context = safeContext("x")) {
             assertFalse(parser.parse(context).isSucceeded());
             int[] checkpoints = {0};
+            int[] restores = {0};
             TransactionalState state = () -> {
                 checkpoints[0]++;
-                return () -> {};
+                return () -> restores[0]++;
             };
             context.registerTransactionalState(state);
             assertFalse(parser.parse(context).isSucceeded());
+            int checkpointsPerHit = checkpoints[0];
+            int restoresPerHit = restores[0];
             assertFalse(parser.parse(context).isSucceeded());
-            assertEquals(3, child.calls);
-            assertTrue("normal lifecycle must checkpoint registered state", checkpoints[0] > 0);
-            assertEquals(0, context.getPackratMemoTable().failureHits());
+            assertEquals("safe cached failure must skip the parser body", 1, child.calls);
+            assertEquals("chain rule has one direct transaction", 1, checkpointsPerHit);
+            assertEquals("failed chain rule rolls its direct transaction back", 1, restoresPerHit);
+            assertEquals(2 * checkpointsPerHit, checkpoints[0]);
+            assertEquals(2 * restoresPerHit, restores[0]);
+            assertEquals(2, context.getPackratMemoTable().failureHits());
+        }
+    }
+
+    @Test
+    public void transactionalStatePresentBeforeFirstFailureKeepsMemoizationSafe() {
+        CountingWord child = new CountingWord("no");
+        SafeRule parser = new SafeRule(child);
+        try (ParseContext context = safeContext("x")) {
+            int[] checkpoints = {0};
+            int[] restores = {0};
+            context.registerTransactionalState(() -> {
+                checkpoints[0]++;
+                return () -> restores[0]++;
+            });
+
+            assertFalse(parser.parse(context).isSucceeded());
+            int firstCheckpoints = checkpoints[0];
+            int firstRestores = restores[0];
+            assertFalse(parser.parse(context).isSucceeded());
+
+            assertEquals(1, child.calls);
+            assertEquals(2 * firstCheckpoints, checkpoints[0]);
+            assertEquals(2 * firstRestores, restores[0]);
+            assertEquals(1, context.getPackratMemoTable().failureHits());
         }
     }
 }

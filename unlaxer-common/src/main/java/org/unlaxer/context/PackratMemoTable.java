@@ -51,6 +51,7 @@ public final class PackratMemoTable {
     Entry entry = parseContext.getPackratMemoTable()
         .get(parser, positionKeyOf(parseContext, tokenKind, invertMatch));
     if (entry != null) {
+      parseContext.replayMemoTransactionEvents(entry.diagnostic);
       parseContext.replayFailureDiagnostic(entry.diagnostic);
       parseContext.getPackratMemoTable().failureHits++;
     }

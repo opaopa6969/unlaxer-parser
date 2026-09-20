@@ -39,12 +39,19 @@ unsafe rule には frame overhead がない。
 
 - `ParserListener` または `TransactionListener` が 1 個以上登録されている
 - persistent commit action が 1 個以上登録されている
-- `TransactionalState` が 1 個以上登録されている
 - trial recording が有効である
 
-これにより callback、action、state checkpoint、trial record が cache hit によって欠落しない。
+これにより callback、action、trial record が cache hit によって欠落しない。
 これらの要因を一度でも追加または有効化した session は、その後 remove/clear/stop されても
-memoization を再開しない。unsafe 中の parser/state 変化より前の stale entry が復活するのを防ぐ。
+memoization を再開しない。unsafe 中の parser 変化より前の stale entry が復活するのを防ぐ。
+
+`TransactionalState` は例外であり、登録されていても安全規則の failure memoization を継続する。
+entry は対象 safe parser 自身の transaction begin/commit/rollback 列を保存し、hit 時に
+token/cursor を変更せず state の checkpoint/restore hook だけを同じ順序で再生する。子 parser の
+本体と lifecycle は cache hit では実行されない。これは listener callback ではなく、memoized parser
+呼出しの rollback 境界で owner の状態を保つための再生である。したがって `@scopeTree` のように
+context 全体へ state owner を登録する機能があっても、状態非依存と証明された規則を cache できる。
+状態を読み書きする規則とその ancestor は生成時解析で引き続き memo 対象外になる。
 
 ## 安全規則の生成時解析
 
