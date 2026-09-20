@@ -834,6 +834,7 @@ public class ParseContext implements
   public void startParse(Parser parser, ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
     ParseFrame frame = new ParseFrame(
         parser,
+        parseFrames.peekFirst(),
         Transaction.super.getConsumedPosition().value(),
         Transaction.super.getMatchedPosition().value());
     parseFrames.push(frame);
@@ -1200,80 +1201,97 @@ public class ParseContext implements
   }
 
   /**
-   * Copies the open parse frames (root first) into a compact snapshot. Snapshots are taken every
-   * time the frontier advances and most are superseded before anyone reads them, so they hold
-   * primitive arrays and are expanded into ParseStackElements only on demand.
+   * Snapshot of the open parse frames (root first). Snapshots are taken every time the frontier
+   * advances and most are superseded before anyone reads them, so instead of copying the stack
+   * into arrays each time, a snapshot is a persistent chain of one immutable node per frame. A
+   * frame caches the node built from its current offsets and drops it when {@link
+   * ParseFrame#updateMax} changes them; only the top frame is ever updated, so a cached node's
+   * parent chain is never stale. Taking a snapshot therefore allocates one node per frame that
+   * changed (or was pushed) since the previous snapshot, rather than one array per open frame.
    */
   StackSnapshot snapshotStackElements() {
-    int size = parseFrames.size();
-    if (size == 0) return StackSnapshot.EMPTY;
-    Parser[] parsers = new Parser[size];
-    int[] offsets = new int[size * 3];
-    int index = 0;
-    // parseFrames pushes to the front, so the descending iterator yields the root frame first.
-    for (Iterator<ParseFrame> frames = parseFrames.descendingIterator(); frames.hasNext(); index++) {
-      ParseFrame frame = frames.next();
-      parsers[index] = frame.parser;
-      offsets[index * 3] = frame.startOffset;
-      offsets[index * 3 + 1] = frame.maxConsumedOffset;
-      offsets[index * 3 + 2] = frame.maxMatchedOffset;
-    }
-    return new StackSnapshot(parsers, offsets);
+    ParseFrame top = parseFrames.peekFirst();
+    return top == null ? StackSnapshot.EMPTY : top.snapshot();
   }
 
-  /** Immutable parse-stack snapshot: one parser reference plus three offsets per frame, root first. */
+  /**
+   * Immutable parse-stack snapshot: a node per frame linked to the node of the frame below it,
+   * ending at {@link #EMPTY}. Materializes root first with the same content as the former
+   * array-backed snapshot.
+   */
   static final class StackSnapshot {
-    static final StackSnapshot EMPTY = new StackSnapshot(new Parser[0], new int[0]);
+    static final StackSnapshot EMPTY = new StackSnapshot(null, null, 0, 0, 0);
 
-    private final Parser[] parsers;
-    private final int[] offsets;
+    private final StackSnapshot parent;
+    private final Parser parser;
+    private final int startOffset;
+    private final int maxConsumedOffset;
+    private final int maxMatchedOffset;
+    private final int size;
 
-    StackSnapshot(Parser[] parsers, int[] offsets) {
-      this.parsers = parsers;
-      this.offsets = offsets;
+    StackSnapshot(
+        StackSnapshot parent,
+        Parser parser,
+        int startOffset,
+        int maxConsumedOffset,
+        int maxMatchedOffset) {
+      this.parent = parent;
+      this.parser = parser;
+      this.startOffset = startOffset;
+      this.maxConsumedOffset = maxConsumedOffset;
+      this.maxMatchedOffset = maxMatchedOffset;
+      this.size = parent == null ? 0 : parent.size + 1;
     }
 
     int size() {
-      return parsers.length;
+      return size;
     }
 
     boolean isEmpty() {
-      return parsers.length == 0;
+      return size == 0;
     }
 
     /** This snapshot followed by {@code suffix}'s frames from {@code base} on (a memo rebase). */
     StackSnapshot concat(StackSnapshot suffix, int base) {
-      int extra = suffix.parsers.length - base;
-      Parser[] mergedParsers = java.util.Arrays.copyOf(parsers, parsers.length + extra);
-      System.arraycopy(suffix.parsers, base, mergedParsers, parsers.length, extra);
-      int[] mergedOffsets = java.util.Arrays.copyOf(offsets, offsets.length + extra * 3);
-      System.arraycopy(suffix.offsets, base * 3, mergedOffsets, offsets.length, extra * 3);
-      return new StackSnapshot(mergedParsers, mergedOffsets);
+      if (suffix.size <= base) return this;
+      return concat(suffix.parent, base).push(suffix);
+    }
+
+    private StackSnapshot push(StackSnapshot node) {
+      return new StackSnapshot(
+          this, node.parser, node.startOffset, node.maxConsumedOffset, node.maxMatchedOffset);
     }
 
     /** Expands to the public element list; depth is the position from the root. */
     List<ParseFailureDiagnostics.ParseStackElement> materialize() {
-      List<ParseFailureDiagnostics.ParseStackElement> elements = new ArrayList<>(parsers.length);
-      for (int i = 0; i < parsers.length; i++) {
-        elements.add(new ParseFailureDiagnostics.ParseStackElement(
-            parsers[i].getClass().getSimpleName(),
-            i,
-            offsets[i * 3],
-            offsets[i * 3 + 1],
-            offsets[i * 3 + 2]));
+      ParseFailureDiagnostics.ParseStackElement[] elements =
+          new ParseFailureDiagnostics.ParseStackElement[size];
+      for (StackSnapshot node = this; node.size > 0; node = node.parent) {
+        int depth = node.size - 1;
+        elements[depth] = new ParseFailureDiagnostics.ParseStackElement(
+            node.parser.getClass().getSimpleName(),
+            depth,
+            node.startOffset,
+            node.maxConsumedOffset,
+            node.maxMatchedOffset);
       }
-      return elements;
+      return new ArrayList<>(java.util.Arrays.asList(elements));
     }
   }
 
   static class ParseFrame {
     final Parser parser;
+    /** The frame below this one on the parse stack, or null for the root frame. */
+    final ParseFrame below;
     final int startOffset;
     int maxConsumedOffset;
     int maxMatchedOffset;
+    /** Snapshot node built from the current offsets; null once they change. */
+    private StackSnapshot snapshot;
 
-    ParseFrame(Parser parser, int startConsumedOffset, int startMatchedOffset) {
+    ParseFrame(Parser parser, ParseFrame below, int startConsumedOffset, int startMatchedOffset) {
       this.parser = parser;
+      this.below = below;
       this.startOffset = Math.max(startConsumedOffset, startMatchedOffset);
       this.maxConsumedOffset = startConsumedOffset;
       this.maxMatchedOffset = startMatchedOffset;
@@ -1282,10 +1300,27 @@ public class ParseContext implements
     void updateMax(int consumedOffset, int matchedOffset) {
       if (consumedOffset > maxConsumedOffset) {
         maxConsumedOffset = consumedOffset;
+        snapshot = null;
       }
       if (matchedOffset > maxMatchedOffset) {
         maxMatchedOffset = matchedOffset;
+        snapshot = null;
       }
+    }
+
+    /**
+     * The snapshot of the stack up to and including this frame. Frames below the top are never
+     * updated while a frame sits above them, so their cached nodes stay valid; the recursion is
+     * bounded by the number of frames whose node has not been built since their last change.
+     */
+    StackSnapshot snapshot() {
+      StackSnapshot cached = snapshot;
+      if (cached == null) {
+        StackSnapshot parent = below == null ? StackSnapshot.EMPTY : below.snapshot();
+        cached = new StackSnapshot(parent, parser, startOffset, maxConsumedOffset, maxMatchedOffset);
+        snapshot = cached;
+      }
+      return cached;
     }
 
     int maxOffset() {
