@@ -1,6 +1,7 @@
 //! Experimental UBNF structural subset. No JVM, unsafe code, or external dependencies.
 use std::any::Any;
 use std::collections::HashMap;
+use std::hash::{BuildHasher, Hasher};
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -592,14 +593,69 @@ fn expected_strings<'a>(expected: impl IntoIterator<Item = &'a Rc<str>>) -> Vec<
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct FailureMemoKey {
-    grammar: usize,
-    session: u64,
     rule: usize,
     position: usize,
     matched_position: usize,
-    whitespace: bool,
-    depth: usize,
+    depth_and_whitespace: usize,
 }
+
+impl FailureMemoKey {
+    fn new(
+        rule: usize,
+        position: usize,
+        matched_position: usize,
+        whitespace: bool,
+        depth: usize,
+    ) -> Self {
+        Self {
+            rule,
+            position,
+            matched_position,
+            depth_and_whitespace: depth * 2 + usize::from(whitespace),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct FailureMemoBuildHasher;
+
+impl BuildHasher for FailureMemoBuildHasher {
+    type Hasher = FailureMemoHasher;
+
+    fn build_hasher(&self) -> Self::Hasher {
+        FailureMemoHasher::default()
+    }
+}
+
+#[derive(Debug, Default)]
+struct FailureMemoHasher(u64);
+
+impl FailureMemoHasher {
+    fn mix(&mut self, value: u64) {
+        const HASH_MULTIPLIER: u64 = 0x517c_c1b7_2722_0a95;
+        self.0 = (self.0.rotate_left(5) ^ value).wrapping_mul(HASH_MULTIPLIER);
+    }
+}
+
+impl Hasher for FailureMemoHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        for chunk in bytes.chunks(std::mem::size_of::<u64>()) {
+            let mut word = [0; std::mem::size_of::<u64>()];
+            word[..chunk.len()].copy_from_slice(chunk);
+            self.mix(u64::from_ne_bytes(word));
+        }
+    }
+
+    fn write_usize(&mut self, value: usize) {
+        self.mix(value as u64);
+    }
+}
+
+type FailureMemoMap = HashMap<FailureMemoKey, FailureDiagnostic, FailureMemoBuildHasher>;
 
 /// Per-parse state, shared by generated rules and custom parsers. Transactions restore
 /// cursors, CST nodes, captures and cloneable user values, but retain failure diagnostics.
@@ -625,7 +681,7 @@ pub struct ParseContext<'a> {
     grammar_session: u64,
     next_grammar_session: u64,
     memo_safe_rules: Vec<bool>,
-    failure_memo: HashMap<FailureMemoKey, FailureDiagnostic>,
+    failure_memo: FailureMemoMap,
     diagnostic_frames: Vec<FailureDiagnostic>,
     memoized_failure_hits: usize,
     checkpoint_metrics: Option<CheckpointMetrics>,
@@ -793,7 +849,7 @@ impl<'a> ParseContext<'a> {
             grammar_session: 0,
             next_grammar_session: 1,
             memo_safe_rules: vec![],
-            failure_memo: HashMap::new(),
+            failure_memo: FailureMemoMap::default(),
             diagnostic_frames: vec![],
             memoized_failure_hits: 0,
             checkpoint_metrics: None,
@@ -1187,14 +1243,14 @@ impl<'a> ParseContext<'a> {
         };
         let memo_key = (self.options.memoization == Memoization::SafeFailures
             && self.memo_safe_rules.get(id).copied().unwrap_or(false))
-        .then_some(FailureMemoKey {
-            grammar: Arc::as_ptr(&rules) as *const () as usize,
-            session: self.grammar_session,
-            rule: id,
-            position: self.position,
-            matched_position: self.matched_position,
-            whitespace: self.whitespace,
-            depth,
+        .then(|| {
+            FailureMemoKey::new(
+                id,
+                self.position,
+                self.matched_position,
+                self.whitespace,
+                depth,
+            )
         });
         if let Some(key) = memo_key {
             if let Some(diagnostic) = self.failure_memo.get(&key).cloned() {
@@ -2233,6 +2289,71 @@ mod tests {
         assert_eq!(on.memoized_failure_hits(), 1);
         assert_eq!(error.offset, 1);
         assert_eq!(error.expected, vec!["x"]);
+    }
+
+    #[test]
+    fn safe_failure_memo_key_distinguishes_all_parser_state_dimensions() {
+        let grammar = share_grammar(vec![Rule {
+            name: "r",
+            expression: Expr::Sequence(vec![Expr::Literal("a"), Expr::Literal("x")]),
+        }]);
+        let mut context = ParseContext::with_options(
+            " ay",
+            ParseOptions::with_memoization(Memoization::SafeFailures),
+        );
+        context.rules = Arc::clone(&grammar);
+        context.memo_safe_rules = memo_safe_rules(&grammar);
+        context.grammar_session = 17;
+
+        let cases = [
+            ((0, 0, 0, false), (Some(0), vec!["a".to_owned()])),
+            ((0, 1, 0, false), (Some(0), vec!["a".to_owned()])),
+            ((0, 0, 1, false), (Some(0), vec!["a".to_owned()])),
+            ((0, 0, 0, true), (Some(2), vec!["x".to_owned()])),
+            ((1, 0, 0, false), (Some(2), vec!["x".to_owned()])),
+        ];
+
+        for &(state, ref expected) in &cases {
+            let (position, matched_position, depth, whitespace) = state;
+            context.position = position;
+            context.matched_position = matched_position;
+            context.whitespace = whitespace;
+            context.diagnostic_frames.push(FailureDiagnostic::default());
+            assert!(context.rule(0, depth).is_none());
+            let diagnostic = context
+                .diagnostic_frames
+                .pop()
+                .expect("test installed a diagnostic frame");
+            assert_eq!(
+                (
+                    diagnostic.farthest,
+                    expected_strings(diagnostic.expected_values())
+                ),
+                *expected
+            );
+        }
+        assert_eq!(context.memoized_failure_hits(), 0);
+
+        for &(state, ref expected) in &cases {
+            let (position, matched_position, depth, whitespace) = state;
+            context.position = position;
+            context.matched_position = matched_position;
+            context.whitespace = whitespace;
+            context.diagnostic_frames.push(FailureDiagnostic::default());
+            assert!(context.rule(0, depth).is_none());
+            let diagnostic = context
+                .diagnostic_frames
+                .pop()
+                .expect("test installed a diagnostic frame");
+            assert_eq!(
+                (
+                    diagnostic.farthest,
+                    expected_strings(diagnostic.expected_values())
+                ),
+                *expected
+            );
+        }
+        assert_eq!(context.memoized_failure_hits(), cases.len());
     }
 
     #[test]
