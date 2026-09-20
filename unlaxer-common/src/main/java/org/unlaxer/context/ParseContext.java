@@ -131,9 +131,9 @@ public class ParseContext implements
         recordMemoTransactionBegin();
         transactionalFrames.add(frame);
         frame.saveMemoizationStateVersion(memoizationStateVersion);
-        transactionalStates.stream()
-            .filter(state -> false == state instanceof MutationAwareTransactionalState)
-            .forEach(state -> checkpointState(frame, state));
+        for (TransactionalState state : transactionalStates) {
+            if (false == state instanceof MutationAwareTransactionalState) checkpointState(frame, state);
+        }
         if (transactionMetricsEnabled) transactionsOpened++;
     }
 
@@ -284,14 +284,22 @@ public class ParseContext implements
 	public boolean isMemoizationSessionSafe() {
 		if (memoizationPermanentlyDisabled || false == isMemoizeEnabled()) return false;
 		if (false == parserListenerByName.isEmpty()
-				|| listenerByName.values().stream().anyMatch(listener ->
-					false == memoizationTransparentTransactionListeners.contains(listener))
+				|| hasOpaqueTransactionListener()
 				|| false == actions.isEmpty()
 				|| recordingTrials) {
 			disableMemoizationPermanently();
 			return false;
 		}
 		return true;
+	}
+
+	/** Runs on every memo probe, so this is a plain loop rather than a Stream pipeline. */
+	private boolean hasOpaqueTransactionListener() {
+		if (listenerByName.isEmpty()) return false;
+		for (TransactionListener listener : listenerByName.values()) {
+			if (false == memoizationTransparentTransactionListeners.contains(listener)) return true;
+		}
+		return false;
 	}
 
 	private void disableMemoizationPermanently() {
