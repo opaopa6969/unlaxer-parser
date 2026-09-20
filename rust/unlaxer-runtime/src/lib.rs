@@ -479,6 +479,67 @@ impl Clone for StateMap {
     }
 }
 
+#[derive(Debug, Clone, Default)]
+struct CaptureStore {
+    values: HashMap<String, Vec<Span>>,
+    journal: Vec<&'static str>,
+    checkpoint_depth: usize,
+}
+
+impl CaptureStore {
+    fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
+
+    fn get(&self, name: &str) -> Option<&Vec<Span>> {
+        self.values.get(name)
+    }
+
+    fn push(&mut self, name: &'static str, span: Span) {
+        if self.checkpoint_depth > 0 {
+            self.journal.push(name);
+        }
+        self.values.entry(name.to_owned()).or_default().push(span);
+    }
+
+    fn checkpoint(&mut self) -> usize {
+        let mark = self.journal.len();
+        self.checkpoint_depth += 1;
+        mark
+    }
+
+    fn commit_checkpoint(&mut self) {
+        debug_assert!(self.checkpoint_depth > 0);
+        self.checkpoint_depth -= 1;
+        if self.checkpoint_depth == 0 {
+            self.journal.clear();
+        }
+    }
+
+    fn rollback_checkpoint(&mut self, mark: usize) {
+        debug_assert!(self.checkpoint_depth > 0);
+        debug_assert!(mark <= self.journal.len());
+        while self.journal.len() > mark {
+            let name = self.journal.pop().expect("journal length checked");
+            let remove = {
+                let spans = self
+                    .values
+                    .get_mut(name)
+                    .expect("journaled capture must exist");
+                spans.pop().expect("journaled capture must have a span");
+                spans.is_empty()
+            };
+            if remove {
+                self.values.remove(name);
+            }
+        }
+        self.checkpoint_depth -= 1;
+        if self.checkpoint_depth == 0 {
+            self.journal.clear();
+        }
+    }
+}
+
 /// Opt-in counters for ParseContext checkpoint behavior. Payload counters exclude
 /// cursor and CST-length scalars, which are always copied inline.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -499,7 +560,7 @@ struct Checkpoint {
     matched_position: usize,
     nodes: usize,
     metrics_counted: bool,
-    captures: Option<Rc<HashMap<String, Vec<Span>>>>,
+    captures_journal_mark: usize,
     state: Option<Rc<StateMap>>,
     scopes_journal_mark: usize,
 }
@@ -509,7 +570,7 @@ struct ChoiceWinner {
     matched_position: usize,
     node_start: usize,
     nodes: Vec<Node>,
-    captures: Rc<HashMap<String, Vec<Span>>>,
+    captures: CaptureStore,
     state: Rc<StateMap>,
     scopes: ScopeStore,
     fragment: Fragment,
@@ -695,7 +756,7 @@ pub struct ParseContext<'a> {
     farthest: usize,
     expected: Vec<Rc<str>>,
     byte_offsets: Vec<usize>,
-    captures: Rc<HashMap<String, Vec<Span>>>,
+    captures: CaptureStore,
     state: Rc<StateMap>,
     scopes: ScopeStore,
     call_depth: usize,
@@ -863,7 +924,7 @@ impl<'a> ParseContext<'a> {
                 .map(|(i, _)| i)
                 .chain(std::iter::once(input.len()))
                 .collect(),
-            captures: Rc::new(HashMap::new()),
+            captures: CaptureStore::default(),
             state: Rc::new(StateMap::default()),
             scopes: ScopeStore::default(),
             call_depth: 0,
@@ -1131,14 +1192,15 @@ impl<'a> ParseContext<'a> {
     }
 
     fn checkpoint(&mut self) -> Checkpoint {
-        let captures = (!self.captures.is_empty()).then(|| Rc::clone(&self.captures));
+        let captures_nonempty = !self.captures.is_empty();
+        let captures_journal_mark = self.captures.checkpoint();
         let state = (!self.state.0.is_empty()).then(|| Rc::clone(&self.state));
         let scopes_nonempty = !self.scopes.is_empty();
         let scopes_journal_mark = self.scopes.checkpoint();
         let metrics_counted = self.checkpoint_metrics.is_some();
         if let Some(metrics) = &mut self.checkpoint_metrics {
             metrics.opened += 1;
-            if captures.is_some() || state.is_some() || scopes_nonempty {
+            if captures_nonempty || state.is_some() || scopes_nonempty {
                 metrics.nonempty_payload_snapshots += 1;
             } else {
                 metrics.empty_payload_checkpoints += 1;
@@ -1149,13 +1211,14 @@ impl<'a> ParseContext<'a> {
             matched_position: self.matched_position,
             nodes: self.nodes.len(),
             metrics_counted,
-            captures,
+            captures_journal_mark,
             scopes_journal_mark,
             state,
         }
     }
 
     fn commit_checkpoint(&mut self, checkpoint: Checkpoint) {
+        self.captures.commit_checkpoint();
         self.scopes.commit_checkpoint();
         if checkpoint.metrics_counted {
             if let Some(metrics) = &mut self.checkpoint_metrics {
@@ -1173,15 +1236,8 @@ impl<'a> ParseContext<'a> {
         self.position = checkpoint.position;
         self.matched_position = checkpoint.matched_position;
         self.nodes.truncate(checkpoint.nodes);
-        if let Some(captures) = checkpoint.captures {
-            self.captures = captures;
-        } else if !self.captures.is_empty() {
-            if let Some(captures) = Rc::get_mut(&mut self.captures) {
-                captures.clear();
-            } else {
-                self.captures = Rc::new(HashMap::new());
-            }
-        }
+        self.captures
+            .rollback_checkpoint(checkpoint.captures_journal_mark);
         if let Some(state) = checkpoint.state {
             self.state = state;
         } else if !self.state.0.is_empty() {
@@ -1199,13 +1255,6 @@ impl<'a> ParseContext<'a> {
         if let Some(metrics) = &mut self.checkpoint_metrics {
             metrics.copy_on_write_deep_copies += 1;
         }
-    }
-
-    fn captures_mut_map(&mut self) -> &mut HashMap<String, Vec<Span>> {
-        if Rc::strong_count(&self.captures) > 1 {
-            self.record_cow_copy();
-        }
-        Rc::make_mut(&mut self.captures)
     }
 
     fn state_mut_map(&mut self) -> &mut StateMap {
@@ -1631,10 +1680,7 @@ impl<'a> ParseContext<'a> {
                 let start = self.position;
                 let mut fragment = self.expression(expression, depth)?;
                 let span = self.span(start);
-                self.captures_mut_map()
-                    .entry((*name).to_owned())
-                    .or_default()
-                    .push(span);
+                self.captures.push(name, span);
                 fragment.captures.push(Capture {
                     name,
                     span: self.span(start),
@@ -1812,7 +1858,11 @@ impl<'a> ParseContext<'a> {
                         matched_position: self.matched_position,
                         node_start,
                         nodes: self.nodes[node_start..].to_vec(),
-                        captures: Rc::clone(&self.captures),
+                        captures: {
+                            let mut captures = self.captures.clone();
+                            captures.commit_checkpoint();
+                            captures
+                        },
                         state: Rc::clone(&self.state),
                         scopes: {
                             let mut scopes = self.scopes.clone();

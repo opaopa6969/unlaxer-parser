@@ -245,7 +245,7 @@ fn checkpoint_metrics_distinguish_empty_payloads_and_cow_copies() {
 }
 
 #[test]
-fn scope_journal_does_not_change_capture_or_state_cow_accounting() {
+fn journals_do_not_change_state_cow_accounting() {
     let mut scope_only = ParseContext::new("");
     scope_only.scopes_mut().declare("seed", 0);
     scope_only.enable_checkpoint_metrics();
@@ -258,6 +258,21 @@ fn scope_journal_does_not_change_capture_or_state_cow_accounting() {
     let scope_metrics = scope_only.snapshot_checkpoint_metrics();
     assert_eq!(scope_metrics.copy_on_write_deep_copies, 0);
     assert_eq!(scope_metrics.scope_journal_entries, 1);
+
+    let mut capture_only = ParseContext::new("ab");
+    capture_only
+        .parse(&Expr::literal("a").capture("first"))
+        .unwrap();
+    capture_only.enable_checkpoint_metrics();
+    capture_only
+        .parse(&Expr::literal("b").capture("second"))
+        .unwrap();
+    assert_eq!(
+        capture_only
+            .snapshot_checkpoint_metrics()
+            .copy_on_write_deep_copies,
+        0
+    );
 
     let mut cow_domains = ParseContext::new("ab");
     cow_domains
@@ -276,8 +291,56 @@ fn scope_journal_does_not_change_capture_or_state_cow_accounting() {
         })
         .unwrap();
     let cow_metrics = cow_domains.snapshot_checkpoint_metrics();
-    assert_eq!(cow_metrics.copy_on_write_deep_copies, 2);
+    assert_eq!(cow_metrics.copy_on_write_deep_copies, 1);
     assert_eq!(cow_metrics.scope_journal_entries, 1);
+}
+
+#[test]
+fn capture_added_in_failed_transaction_disappears_after_rollback() {
+    let mut context = ParseContext::new("a");
+    let rejected: Result<(), _> = context.transaction(|context| {
+        context.parse(&Expr::literal("a").capture("rolled_back"))?;
+        assert_eq!(context.captured("rolled_back"), Some("a"));
+        Err(context.error("reject capture"))
+    });
+
+    assert!(rejected.is_err());
+    assert_eq!(context.captured("rolled_back"), None);
+    assert!(context.capture_spans("rolled_back").is_empty());
+}
+
+#[test]
+fn committed_inner_capture_disappears_when_outer_transaction_rolls_back() {
+    let mut context = ParseContext::new("a");
+    let rejected: Result<(), _> = context.transaction(|outer| {
+        outer.transaction(|inner| {
+            inner.parse(&Expr::literal("a").capture("nested"))?;
+            Ok(())
+        })?;
+        assert_eq!(outer.captured("nested"), Some("a"));
+        Err(outer.error("reject outer transaction"))
+    });
+
+    assert!(rejected.is_err());
+    assert_eq!(context.captured("nested"), None);
+    assert!(context.capture_spans("nested").is_empty());
+}
+
+#[test]
+fn repeated_capture_spans_keep_source_order() {
+    let mut context = ParseContext::new("ab");
+    context
+        .parse(&Expr::sequence([
+            Expr::literal("a").capture("part"),
+            Expr::literal("b").capture("part"),
+        ]))
+        .unwrap();
+
+    assert_eq!(
+        context.capture_spans("part"),
+        &[Span { start: 0, end: 1 }, Span { start: 1, end: 2 }]
+    );
+    assert_eq!(context.captured("part"), Some("b"));
 }
 
 #[test]
