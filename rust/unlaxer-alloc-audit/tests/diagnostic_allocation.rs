@@ -31,6 +31,25 @@ fn allocations_for_identical_failures(failures: usize) -> usize {
     after.allocations - before.allocations
 }
 
+fn check_repeated_interned_failures_allocate_nothing() {
+    let mut context = ParseContext::new("actual");
+    // Exercise both the inline first name and the hash table, including a name
+    // originally supplied by an owned string through the public custom-parser API.
+    context.error("first");
+    context.error(&String::from("expected"));
+    for name in ["first", "expected"] {
+        let parser = Expr::literal(name).optional();
+        let before = allocations();
+        for _ in 0..REPEATED_FAILURES {
+            context.parse(&parser).unwrap();
+        }
+        let count = allocations().allocations - before.allocations;
+        assert_eq!(count, 0, "an interned name must not allocate again");
+        println!("interned {name}: {REPEATED_FAILURES} identical failures = {count} allocations");
+    }
+    assert_eq!(context.failure().expected, vec!["expected", "first"]);
+}
+
 fn main() {
     let single = allocations_for_identical_failures(1);
     let repeated = allocations_for_identical_failures(REPEATED_FAILURES);
@@ -46,4 +65,5 @@ fn main() {
         single, repeated,
         "identical failures at one position must not allocate per attempt"
     );
+    check_repeated_interned_failures_allocate_nothing();
 }
