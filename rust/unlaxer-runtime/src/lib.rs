@@ -481,7 +481,7 @@ impl Clone for StateMap {
 
 #[derive(Debug, Clone, Default)]
 struct CaptureStore {
-    values: HashMap<String, Vec<Span>>,
+    values: HashMap<&'static str, Vec<Span>>,
     journal: Vec<&'static str>,
     checkpoint_depth: usize,
 }
@@ -499,7 +499,7 @@ impl CaptureStore {
         if self.checkpoint_depth > 0 {
             self.journal.push(name);
         }
-        self.values.entry(name.to_owned()).or_default().push(span);
+        self.values.entry(name).or_default().push(span);
     }
 
     fn checkpoint(&mut self) -> usize {

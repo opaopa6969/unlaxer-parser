@@ -101,7 +101,26 @@ fn check_layers_open_checkpoints() {
     }
 }
 
+fn check_capture_push_allocations() {
+    let input = "a".repeat(ITERATIONS);
+    let parser = Expr::literal("a").capture("part");
+    let mut context = ParseContext::new(&input);
+    let before = allocations();
+    for _ in 0..ITERATIONS {
+        context.parse(&parser).unwrap();
+    }
+    let count = allocations().allocations - before.allocations;
+    assert_eq!(context.capture_spans("part").len(), ITERATIONS);
+    assert_eq!(context.captured("part"), Some("a"));
+    println!("capture pushes: {ITERATIONS} captures = {count} allocations");
+    assert!(
+        count <= 522,
+        "512 captures with borrowed names must not exceed 522 allocations (owned names used 1034)"
+    );
+}
+
 fn main() {
+    check_capture_push_allocations();
     check_layers_open_checkpoints();
     check_layers_are_allocation_free("empty payload / commit", committing_layers, false);
     check_layers_are_allocation_free("nonempty payload / commit", committing_layers, true);
