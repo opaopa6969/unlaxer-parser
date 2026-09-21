@@ -23,6 +23,12 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 - Correctly spelled public APIs now replace `Source.sourceToStgring()`, `NonTerminallSymbol`, and `HierarcyLevel`. The misspelled symbols remain as source- and behavior-compatible deprecated bridges and will not be removed before 3.2.0.
 
 ### Changed
+- `ScopeStore.addReference` / `addDiagnostic` no longer advance the memoization state version.
+  References and symbol diagnostics are write-only during parsing (read after the parse), so
+  recording them cannot change what a memoized rule produces; advancing the version on every
+  `$var` reference made the rest of the parse miss the memo table. tinyexpression's five-level
+  nested `if` formula parses in about 0.1 s instead of 4-6 s with `Memoization.SAFE_FAILURES`
+  (#269). Declarations and scope depth still advance the version.
 - Maven Central publication now defaults to bundle-only mode and requires the organization-wide monthly release guard to opt into upload. The Central publishing plugin is updated to 0.11.0 so token identifiers are not written to release logs.
 
 ### Fixed
