@@ -1301,3 +1301,64 @@ base fixture で **-9.0% / -19.0%**、x64 で -13% / -32%（倍率 70 → 66、7
 
 「表の 75% が要素 1 個」のような分布はカウンタで数えないと分からない。小さい可変長データは `Vec` + `Rc` の 2 段の割当と破棄が支配的で、
 inline 表現にすると割当・破棄・局所性の三つが同時に良くなる。一方、回数が多くても 1 回が数 ns の操作（`Arc::clone`）は外しても測れない。
+
+## ケース25: 詳細診断を失敗時に作るモード `Diagnostics::DetailedOnFailure`（Rust、opt-in の実験）
+
+### 仮説
+
+[設計問答](parser-execution-design-qa-ja.md)の提案1。PEG の分岐失敗は正常な制御フローで、成功する入力でも `fail_at` は complex x1 で 8,485 回、
+x64 で 522,124 回起きる。ケース24 後の差分計測でも失敗診断の記録を止めると x1 38.7%、x64 44.9% 短縮する。成功時に返さない expected 集合を
+維持する仕事を止め、失敗したときだけ同じ入力を `Detailed` で再解析すれば、成功経路の短縮と失敗時の同一 `ParseError` を両立できるはずだと考えた。
+
+### 実装（opt-in、既定は不変。codex に委譲しレビュー）
+
+- `ParseOptions.diagnostics: Diagnostics { Detailed（既定）, DetailedOnFailure }` と `with_diagnostics()` を追加（additive）
+- `DetailedOnFailure` の初回 parse では `fail_at*` が farthest / expected / diagnostic_frames を更新せず、memo entry は空診断、hit 時 replay は no-op、
+  memo 判定・キー・hit / miss は不変。全入力解析の entry point は失敗時に新しい context で `Detailed` 再解析し、その `ParseError` / `ParseDiagnostic` を返す
+- 低水準 API（`ParseContext` 直接使用）は再解析せず診断が空になる。解析中に診断を読んで受理判定を変える custom parser、再実行できない副作用を持つ
+  parser には不適（README に記載）。Java 側は未実装（Rust 限定実験）
+- test: 成功・切断・末尾追加・括弧不一致の入力で `Detailed` と `DetailedOnFailure` の受理結果・CST・capture・scope・`ParseError` が一致。
+  alloc-audit: 1024 回の同一失敗で allocation 2 → **0**
+
+### 観測
+
+モード比較（同じ候補 runtime、Criterion、warm-up 3 s / measurement 6 s / 50 samples、`parse_tree_detailed_with_options(SafeFailures)`）:
+
+| Fixture | 入力 | Detailed ms | DetailedOnFailure ms | 変化 |
+|---|---|---:|---:|---:|
+| complex | 成功（そのまま） | 2.875 | 1.411 | -50.9% |
+| complex | 失敗（前半で切断） | 4.932 | 8.548 | +73.3% |
+| complex | 失敗（末尾に `@`） | 2.472 | 3.979 | +61.0% |
+| complex-x4 | 成功（そのまま） | 9.842 | 6.218 | -36.8% |
+| complex-x4 | 失敗（前半で切断） | 5.023 | 7.421 | +47.7% |
+| complex-x4 | 失敗（末尾に `@`） | 10.196 | 14.790 | +45.1% |
+| complex-x16 | 成功（そのまま） | 39.266 | 27.253 | -30.6% |
+| complex-x16 | 失敗（前半で切断） | 16.048 | 27.764 | +73.0% |
+| complex-x16 | 失敗（末尾に `@`） | 57.304 | 65.773 | +14.8% |
+| complex-x64 | 成功（そのまま） | 161.297 | 104.725 | -35.1% |
+| complex-x64 | 失敗（前半で切断） | 70.233 | 102.727 | +46.3% |
+| complex-x64 | 失敗（末尾に `@`） | 160.116 | 242.633 | +51.5% |
+
+成功入力で **-48%（x1）〜 -35%（x64）**、失敗入力は 2 回 parse になるため **+46〜+73%**。codex の CPU 時間計測でも成功 complex -35% / -38.5%、
+comparison-heavy（`BooleanExpression` 入口）-28% / -35%、失敗 +52〜+75% で一致。
+
+既定モード（`Detailed`）の退行確認（baseline = master `81a960a`、candidate = 本ケース、public facade 3-run 中央値）:
+
+| Runtime | Fixture | Baseline runs | Baseline median | Candidate runs | Candidate median | 変化 |
+|---|---|---:|---:|---:|---:|---:|
+| Rust | complex | 2.381 / 2.393 / 2.324 | **2.381** | 2.353 / 2.255 / 2.225 | **2.255** | **-5.29%** |
+| Rust | comparison-heavy | 0.658 / 0.662 / 0.638 | **0.658** | 0.634 / 0.636 / 0.637 | **0.636** | **-3.28%** |
+
+退行なし（x64 も complex -8.5%、comparison-heavy -3.2%）。
+
+### 判断
+
+成功が多い用途（式の評価・コンパイル）では大きく速くなり、失敗が多い用途（編集途中の入力を逐次解析する LSP）では遅くなる。
+既定は `Detailed` のまま、利用者が `ParseOptions` で選ぶ opt-in として**採用**。次の段階は提案2（要求する結果と parser の性質から実行方式を選ぶ）と、
+Java 側の同等モード。
+
+### 教材としての要点
+
+「常時収集」と「必要になったら作る」の切り替えは、収集コストが成功経路の 35〜48% を占める場合に効く。代償は失敗時の再解析（約 1.5〜1.75 倍）で、
+用途ごとに損益が逆転する。だから runtime が既定を決めるのではなく、要求する結果（Features）として利用者が選ぶ形にする。
+差分計測で上限（39〜45%）を先に測っていたので、実装後の結果（35〜48%）が妥当かをすぐ判断できた。

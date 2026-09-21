@@ -269,14 +269,39 @@ pub enum Memoization {
     SafeFailures,
 }
 
+/// Syntax-failure recording policy, independent of semantic diagnostics and memoization.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Diagnostics {
+    /// Record speculative failures throughout parsing, including successful parses.
+    #[default]
+    Detailed,
+    /// Skip syntax-failure recording on the first pass. Full-input parsing functions
+    /// retry failures with `Detailed` in a fresh context and return that diagnostic.
+    /// Direct [`ParseContext`] operations do not retry and retain empty diagnostics.
+    ///
+    /// Only use with parsers whose acceptance does not depend on diagnostics and
+    /// which can safely run again: custom callbacks and external effects may run twice.
+    DetailedOnFailure,
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct ParseOptions {
     pub memoization: Memoization,
+    pub diagnostics: Diagnostics,
 }
 
 impl ParseOptions {
     pub const fn with_memoization(memoization: Memoization) -> Self {
-        Self { memoization }
+        Self {
+            memoization,
+            diagnostics: Diagnostics::Detailed,
+        }
+    }
+
+    /// Selects syntax diagnostics without changing the memoization policy.
+    pub const fn with_diagnostics(mut self, diagnostics: Diagnostics) -> Self {
+        self.diagnostics = diagnostics;
+        self
     }
 }
 
@@ -804,6 +829,15 @@ impl FailureMemoBuckets {
 /// Rollback applies to Result::Err, not to panic unwinding. Discard the context after a panic.
 /// Capture names are context-wide, and backreferences use the most recent successful capture.
 /// Lexical symbols and semantic diagnostics use a separate, owned transactional ScopeStore.
+///
+/// With [`Diagnostics::DetailedOnFailure`], all direct context operations (including
+/// `parse`, `parse_grammar`, `parse_shared_grammar`, `transaction` and `with_scope`)
+/// run once, without collecting syntax diagnostics or automatically retrying.
+/// [`Self::failure`] and [`Self::error`] then return offset zero and an empty expected
+/// list; errors supplied by custom parsers are still returned unchanged.
+/// Use the free full-input parsing functions for automatic diagnostic retries.
+/// Checkpoint counters and memoized-failure hit counts describe only this context's
+/// first pass, not any separate diagnostic retry; semantic diagnostics are unaffected.
 pub struct ParseContext<'a> {
     input: &'a str,
     rules: Arc<[Rule]>,
@@ -843,6 +877,8 @@ pub fn parse(
     parse_detailed(rules, root, whitespace, input).map_err(|diagnostic| diagnostic.farthest)
 }
 
+/// Full-input parsing; [`Diagnostics::DetailedOnFailure`] retries failures with
+/// detailed diagnostics in a fresh context using the same input and memoization policy.
 pub fn parse_with_options(
     rules: &[Rule],
     root: usize,
@@ -866,6 +902,7 @@ pub fn parse_shared(
         .map_err(|diagnostic| diagnostic.farthest)
 }
 
+/// Shared-grammar version of [`parse_with_options`], including diagnostic retries.
 pub fn parse_shared_with_options(
     grammar: &SharedGrammar,
     root: usize,
@@ -888,6 +925,9 @@ pub fn parse_detailed(
     parse_detailed_with_options(rules, root, whitespace, input, ParseOptions::default())
 }
 
+/// Full-input parsing with a categorized diagnostic. With
+/// [`Diagnostics::DetailedOnFailure`], failure (including trailing input) triggers
+/// a fresh detailed parse and returns its complete [`ParseDiagnostic`].
 pub fn parse_detailed_with_options(
     rules: &[Rule],
     root: usize,
@@ -909,6 +949,7 @@ pub fn parse_detailed_shared(
     parse_detailed_shared_with_options(grammar, root, whitespace, input, ParseOptions::default())
 }
 
+/// Shared-grammar version of [`parse_detailed_with_options`], including diagnostic retries.
 pub fn parse_detailed_shared_with_options(
     grammar: &SharedGrammar,
     root: usize,
@@ -946,6 +987,18 @@ fn parse_detailed_owned(
         trailing_offset = Some(parser.code_point(parser.position));
         parser.fail("end of input");
     }
+    if options.diagnostics == Diagnostics::DetailedOnFailure {
+        let rules = Arc::clone(&parser.rules);
+        // Release the first pass, including its empty-diagnostic memo entries.
+        drop(parser);
+        return parse_detailed_owned(
+            rules,
+            root,
+            whitespace,
+            input,
+            options.with_diagnostics(Diagnostics::Detailed),
+        );
+    }
     let farthest = ParseError {
         offset: parser.code_point(parser.farthest),
         expected: parser.expected_names.strings(&parser.expected),
@@ -971,6 +1024,8 @@ impl<'a> ParseContext<'a> {
         Self::with_options(input, ParseOptions::default())
     }
 
+    /// Creates a low-level context. [`Diagnostics::DetailedOnFailure`] disables
+    /// syntax diagnostics here and does not automatically retry failed operations.
     pub fn with_options(input: &'a str, options: ParseOptions) -> Self {
         let byte_offsets: Vec<_> = input
             .char_indices()
@@ -1038,6 +1093,7 @@ impl<'a> ParseContext<'a> {
     }
 
     #[cfg(test)]
+    /// Hits in this context's pass only; excludes any separate detailed retry.
     fn memoized_failure_hits(&self) -> usize {
         self.memoized_failure_hits
     }
@@ -1144,10 +1200,14 @@ impl<'a> ParseContext<'a> {
             result
         })
     }
+    /// Records an expected name and returns [`Self::failure`]. With
+    /// [`Diagnostics::DetailedOnFailure`], records nothing and returns an empty diagnostic.
     pub fn error(&mut self, expected: &str) -> ParseError {
         self.fail(expected);
         self.failure()
     }
+    /// Current syntax diagnostic; offset zero and no expected names with
+    /// [`Diagnostics::DetailedOnFailure`]. Does not trigger a detailed retry.
     pub fn failure(&self) -> ParseError {
         ParseError {
             offset: self.code_point(self.farthest),
@@ -1172,7 +1232,11 @@ impl<'a> ParseContext<'a> {
         let checkpoint = self.checkpoint();
         let result = operation(self);
         if let Err(error) = &result {
-            if let Some(&byte) = self.byte_offsets.get(error.offset) {
+            if let Some(&byte) = self
+                .byte_offsets
+                .get(error.offset)
+                .filter(|_| self.options.diagnostics == Diagnostics::Detailed)
+            {
                 if byte > self.farthest {
                     self.farthest = byte;
                     self.expected.clear();
@@ -1369,6 +1433,9 @@ impl<'a> ParseContext<'a> {
     }
 
     fn fail_at(&mut self, position: usize, expected: &str) {
+        if self.options.diagnostics == Diagnostics::DetailedOnFailure {
+            return;
+        }
         // Failures behind both farthest positions cannot contribute a name.
         if position < self.farthest
             && self
@@ -1392,6 +1459,9 @@ impl<'a> ParseContext<'a> {
     }
 
     fn replay_failure(&mut self, diagnostic: &FailureDiagnostic) {
+        if self.options.diagnostics == Diagnostics::DetailedOnFailure {
+            return;
+        }
         let Some(position) = diagnostic.farthest else {
             return;
         };
@@ -1445,7 +1515,8 @@ impl<'a> ParseContext<'a> {
         }
         let rules = Arc::clone(&self.rules);
         let rule = &rules[id];
-        if memo_key.is_some() {
+        let record_diagnostics = self.options.diagnostics == Diagnostics::Detailed;
+        if memo_key.is_some() && record_diagnostics {
             self.diagnostic_frames.push(FailureDiagnostic::default());
         }
         let start = self.position;
@@ -1468,13 +1539,18 @@ impl<'a> ParseContext<'a> {
             }
         };
         if let Some((bucket, key)) = memo_key {
-            let diagnostic = self
-                .diagnostic_frames
-                .pop()
-                .expect("memoized rule installed a diagnostic frame");
-            if let Some(parent) = self.diagnostic_frames.last_mut() {
-                parent.merge(&diagnostic);
-            }
+            let diagnostic = if record_diagnostics {
+                let diagnostic = self
+                    .diagnostic_frames
+                    .pop()
+                    .expect("memoized rule installed a diagnostic frame");
+                if let Some(parent) = self.diagnostic_frames.last_mut() {
+                    parent.merge(&diagnostic);
+                }
+                diagnostic
+            } else {
+                FailureDiagnostic::default()
+            };
             if result.is_none() {
                 self.failure_memo.insert(bucket, key, diagnostic);
             }
@@ -2551,6 +2627,67 @@ mod tests {
                 assert_eq!(context.memoized_failure_hits(), 0);
                 assert!(context.diagnostic_frames.is_empty());
             }
+        }
+    }
+
+    #[test]
+    fn deferred_diagnostics_preserve_memo_keys_hits_and_checkpoint_metrics() {
+        let grammar = share_grammar(vec![
+            Rule {
+                name: "root",
+                expression: Expr::choice([Expr::Rule(1), Expr::Rule(1), Expr::literal("😀ok")]),
+            },
+            Rule {
+                name: "fails",
+                expression: Expr::literal("😀")
+                    .then(Expr::choice([Expr::literal("no"), Expr::literal("never")])),
+            },
+            Rule {
+                name: "unsafe",
+                expression: Expr::Backreference("name"),
+            },
+        ]);
+        for input in ["😀ok", "😀bad"] {
+            let options = ParseOptions::with_memoization(Memoization::SafeFailures);
+            let mut detailed = ParseContext::with_options(input, options);
+            let mut deferred = ParseContext::with_options(
+                input,
+                options.with_diagnostics(Diagnostics::DetailedOnFailure),
+            );
+            for context in [&mut detailed, &mut deferred] {
+                context.rules = Arc::clone(&grammar);
+                context.memo_safe_rules = memo_safe_rules(&grammar);
+                context.enable_checkpoint_metrics();
+                assert_eq!(context.rule(0, 0).is_some(), input == "😀ok");
+                assert_eq!(context.memoized_failure_hits(), 1);
+            }
+            assert_eq!(detailed.memo_safe_rules, deferred.memo_safe_rules);
+            assert_eq!(deferred.memo_safe_rules, [true, true, false]);
+            assert_eq!(
+                detailed.failure_memo.first.len(),
+                deferred.failure_memo.first.len()
+            );
+            for key in detailed.failure_memo.first.keys() {
+                let diagnostic = deferred.failure_memo.first.get(key).unwrap();
+                assert_eq!(diagnostic.farthest, None);
+                assert!(matches!(diagnostic.expected, ExpectedIds::Empty));
+            }
+            assert_eq!(
+                detailed.snapshot_checkpoint_metrics(),
+                deferred.snapshot_checkpoint_metrics()
+            );
+            assert_eq!(deferred.farthest, 0);
+            assert!(deferred.expected.is_empty());
+            assert!(deferred.expected_names.first.is_none());
+            assert!(deferred.diagnostic_frames.is_empty());
+            assert_eq!(deferred.diagnostic_frames.capacity(), 0);
+            // Replaying even a populated diagnostic is inert in the deferred pass.
+            deferred.replay_failure(&FailureDiagnostic {
+                farthest: Some(input.len()),
+                expected: ExpectedIds::Single(123),
+            });
+            assert_eq!(deferred.farthest, 0);
+            assert!(deferred.expected.is_empty());
         }
     }
 
