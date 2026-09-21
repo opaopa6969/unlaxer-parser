@@ -84,22 +84,57 @@ runtimeは規則IDで参照する文法を実行し、入力とCST node arenaを
 
 ### 構文診断のポリシー
 
-Rust runtime の診断ポリシーは既定で `Diagnostics::Detailed`。生成 parser の
-`parse_tree_detailed_with_options` / `parse_tree_with_options`、runtime の全入力解析 API に
-`ParseOptions::with_memoization(Memoization::SafeFailures).with_diagnostics(Diagnostics::DetailedOnFailure)`
-を渡すと、初回は構文上の失敗診断を記録せず、失敗時だけ同じ入力・文法・memoization 設定で
-新しい context を作り、`Detailed` で再解析した診断を返す。成功時の CST・capture・scope・意味診断は保持する。
-失敗が多い編集途中の入力では、再解析の分だけ実行時間が増える。
+Rust runtime の既定は `Diagnostics::Auto`。`ParseOptions::default()` と
+`ParseOptions::with_memoization(...)` はともに Auto を選ぶ。明示した `Detailed` /
+`DetailedOnFailure` は文法の性質によらず固定される。
 
-`ParseContext` を直接使う低水準 API は再解析しない。このモードの `failure()` / `error()` は
-offset 0・空の expected を返し、custom parser が直接返したエラーはそのまま返す。
+| 入口 | 文法の性質 | Auto の解決先 |
+|---|---|---|
+| 生成 parser の `parse_tree[_detailed][_with_options]` / runtime の全入力解析 API | custom がない、または全 custom が下記の条件を宣言 | `DetailedOnFailure` |
+| 同上 | 未宣言 custom、診断を読む custom、再実行できない custom を含む | `Detailed` |
+| `ParseContext::new` / `with_options` を直接使う低水準 API | いずれも | `Detailed` |
+
+全入力解析の準備時に `grammar_allows_deferred_diagnostics(&[Rule])` で全 rule の `Expr` 木を
+一度走査して解決する。参照先は再帰的に辿らず、未使用 rule も判定する。解析中・詳細再解析時には
+走査しない。既存の `SharedGrammar = Arc<[Rule]>` を維持し、判定のキャッシュは持たないため、
+別の全入力解析呼出しでは再び準備時に走査する。codegen の生成 grammar は custom を含まず、生成文字列の変更は不要。
+
+`DetailedOnFailure` は初回の構文上の失敗診断を記録せず、失敗時だけ同じ入力・文法・memoization
+設定で新しい context を作り、`Detailed` で再解析した診断を返す。成功時の CST・capture・scope・
+意味診断は保持する。**失敗が多い編集途中の入力や LSP 等は `Detailed` を明示する**。例えば
+`ParseOptions::with_memoization(Memoization::SafeFailures).with_diagnostics(Diagnostics::Detailed)`。
+Auto による失敗後の再解析は実行時間を増やす。失敗率による動的な切り替えは行わない。
+
+従来の `Expr::Custom(parser)` は保守的に Detailed へ解決する。custom の作者が
+「解析中に構文診断を読まず、fresh context で同じ結果を再現できる」と保証できる場合は、次のように宣言する。
+
+```rust
+use unlaxer_runtime::{Expr, ParseContext, ParseResult};
+fn custom(context: &mut ParseContext<'_>) -> ParseResult {
+    context.parse(&Expr::literal("ok"))
+}
+let expression = Expr::CustomWith {
+    parser: custom,
+    reads_diagnostics: false,
+    replayable: true,
+};
+```
+
+deferred を許可するのは `reads_diagnostics == false && replayable == true` の場合だけ。
+宣言は custom が呼ぶ別の parser・外部作用も含み、診断記録の有無で受理・CST・capture・scope・
+user state を変えず、再実行による外部作用が問題にならないことを作者が保証する。runtime は宣言の真偽を
+検証しない。この宣言は memoization 安全性を意味せず、`CustomWith` とその祖先は従来の Custom と同様に memo 対象外。
+
+低水準 `ParseContext` は再解析しない。Auto は構築時に Detailed へ解決し、`options()` は解決後の値を返すので、
+既定の `failure()` / `error()` は従来どおり詳細診断を返す。低水準で明示的に DetailedOnFailure を使った場合だけ
+これらは offset 0・空の expected を返し、custom parser が直接返したエラーはそのまま返す。
 checkpoint / memo hit のカウンタはその context の解析だけを数え、別 context の再解析分を含めない。
-解析中の診断で受理判定を変える custom parser や、再実行できない callback・外部作用がある場合は
-`Detailed` を使う。`ParseOptions` の構造体リテラルには追加の `diagnostics` フィールドか
-`..ParseOptions::default()` が必要で、既存の constructor と関数シグネチャは維持する。
-Java の同等モードは issue #259 の `ParseOptions.Diagnostics.DETAILED_ON_FAILURE`。
+
+Java の `DETAILED_ON_FAILURE` は issue #259 で実装済み。Auto は issue #261 で同じ解決規則を
+別作業として実装するため、この Rust 変更だけで Java 側も完了したとは扱わない。
 [Java の診断ポリシーと対応表](../docs/java-diagnostics-policy.md)を参照。
 Rust の既存の生成文字列が変わらないことを `RustNativeEmitterTest` で検証する。
+[Auto の facade 前後計測と検証結果](diagnostics-auto-measurement.md)も参照。
 
 ### 対応するUBNF
 
