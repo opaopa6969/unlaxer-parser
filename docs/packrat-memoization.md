@@ -59,7 +59,11 @@ token/cursor を変更せず state の checkpoint/restore hook だけを同じ�
 呼出しの rollback 境界で owner の状態を保つための再生である。したがって `@scopeTree` のように
 context 全体へ state owner を登録する機能があっても memoization を継続できる。
 
-既知の `ScopeStore` mutation は `ParseContext.markMemoizationStateChanged()` で単調な epoch を払い出す。
+parse の結果に影響し得る `ScopeStore` mutation（scope の enter / leave、`declare`、diagnostics の clear）は
+`ParseContext.markMemoizationStateChanged()` で単調な epoch を払い出す。`addReference` と `addDiagnostic` は
+払い出さない: 参照と semantic diagnostic は parse 中には読まれず（LSP や evaluator が parse 後に読む）、記録しても
+memoized rule の結果は変わらないため。以前は `$var` の参照ごとに version が進み、以降の parse が memo table に
+一切 hit しなくなっていた（#269。tinyexpression の 5 段ネスト if 式で 4〜6 秒 → 約 0.1 秒）。
 transaction は開始時の current version を保存し、rollback 時に state と version をともに復元する。
 払い出し元の epoch は rollback しないため、別の backtracking branch が異なる state に同じ version を
 再利用することはない。これにより `@scopeTree`、`@declares`、`@backref` の結果を version 付き key で

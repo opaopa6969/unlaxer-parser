@@ -216,7 +216,8 @@ public final class ScopeStore {
         List<SymbolDiagnostic> diagnostics = state.diagnostics;
         diagnostics.add(new SymbolDiagnostic(message, offset, length, severity));
         state.journal.add(() -> diagnostics.remove(diagnostics.size() - 1));
-        ctx.markMemoizationStateChanged();
+        // Write-only during parsing (read after the parse), so it does not change what any
+        // memoized rule would produce: keep the memoization state version (#269).
     }
 
     /**
@@ -282,7 +283,8 @@ public final class ScopeStore {
         List<ReferenceInfo> references = state.references;
         references.add(new ReferenceInfo(name, offset, length));
         state.journal.add(() -> references.remove(references.size() - 1));
-        ctx.markMemoizationStateChanged();
+        // Write-only during parsing (read after the parse), so it does not change what any
+        // memoized rule would produce: keep the memoization state version (#269).
     }
 
     /**

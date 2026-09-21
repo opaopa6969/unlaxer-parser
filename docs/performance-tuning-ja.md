@@ -1565,3 +1565,54 @@ parseOnlySafe の x64 が動かないのは、その経路の x64 では memo �
 プロファイラは入力が小さいとサンプルが足りず、この種の「薄く広い」コストを見せない。数秒かかる入力（病的な式でよい）で採ると
 すぐ出る。修正は class 単位のキャッシュだけで、意味論に触らない。同じ形（`getClass().getAnnotation` を default メソッドで毎回）は
 `Nullable` にもあったので一緒に直した。
+
+## ケース30: 参照・診断の記録で memo の state version を進めない（Java、#269）
+
+### 仮説
+
+tinyexpression の全テストを unlaxer 開発版で回すと、5 段ネストの if 式（fraud formula #5）の parse が公開版 3.0.15 の 25 ms から 4〜6 秒に
+退行していた（tinyexpression の Java CI は公開版 jar でしか走らないので見えていなかった）。transparent listener で数えると
+begins 427 万、失敗 memo hit 22.9 万、空白 delimitor は 91 位置で 49.9 万回 commit。最初は「#194 で成功 memo が消えたため」と考え、
+安全な成功 memo（ケース31）を codex に実装させたが、式 #5 は 7.75 → 4.74 秒で目標未達。失敗 memo の hit はあるのに再導出が止まらない理由を
+追うと、`ScopeStore.addReference` / `addDiagnostic` が毎回 `markMemoizationStateChanged()` を呼んでいた。memo の key は `stateVersion` を
+含むので、`$var` の参照を 1 つ commit するごとに以降の lookup が全て miss になる（rollback で version は戻るが、次の試行の参照で新しい
+version が払い出される）。参照と semantic diagnostic は parse 中には読まれない（LSP / evaluator が parse 後に読む）ので、記録しても
+memoized rule の結果は変わらない。
+
+### 実装（PR #273）
+
+`addReference` / `addDiagnostic` から version 更新を外す 2 行の変更。scope の enter / leave、`declare`、diagnostics の clear は従来どおり進める。
+`ScopeStoreTransactionTest` の期待値を新契約に更新（参照・診断は version を変えず、rollback で state と version が戻る）。
+
+### 観測
+
+tinyexpression `P4PackratFraudFormulaTest`（cold JVM、isolated repo、unlaxer master `cb128f7` vs 本 PR）: 式 #4 445 → 82 ms、式 #5 **4,680 → 86 ms**。
+unlaxer 開発版でこのテストが通るようになった。
+
+tinyexpression（JMH、同じ tinyexpression コード `c70416e1`、交互 3-run 中央値。「+成功 memo」はケース31 を重ねた値）:
+
+| Bench | Fixture | Baseline runs | median | 本 PR runs | median | 変化 | +成功 memo runs | median | 変化 |
+|---|---|---|---:|---|---:|---:|---|---:|---:|
+| publicFacade | complex | 30.623 / 31.662 / 30.172 | **30.623** | 22.980 / 23.337 / 21.935 | **22.980** | **-24.96%** | 12.193 / 13.008 / 12.320 | **12.320** | **-59.77%** |
+| publicFacade | comparison-heavy | 17.838 / 17.811 / 19.155 | **17.838** | 18.221 / 18.654 / 18.069 | **18.221** | +2.15% | 9.904 / 9.396 / 9.314 | **9.396** | **-47.32%** |
+| parseOnlySafe | complex | 37.072 / 35.511 / 39.809 | **37.072** | 25.991 / 26.920 / 27.486 | **26.920** | **-27.38%** | 15.049 / 14.974 / 17.214 | **15.049** | **-59.41%** |
+
+x64 / 失敗入力（1 fork × 5 iteration）:
+
+| Bench | Fixture | baseline ms | 本 PR ms | 変化 | +成功 memo ms | 変化 |
+|---|---|---:|---:|---:|---:|---:|
+| publicFacade | complex-x64 | 2008.2 | 1426.0 | -29.0% | 958.1 | -52.3% |
+| parseOnlySafe | complex-x64 | 2413.4 | 1825.3 | -24.4% | 973.8 | -59.7% |
+| facadeAny | complex-half（失敗） | 31.5 | 25.9 | -17.6% | 16.1 | -49.0% |
+| facadeAny | complex-tail（失敗） | 82.9 | 51.6 | -37.8% | 28.6 | -65.5% |
+
+comparison-heavy は変数参照が少なく（比較の両辺が literal 中心）、version 更新の影響を受けていなかったのでノイズ内。complex 系は
+`$var` を多く含み、失敗 memo が初めて効くようになって -25%。
+
+### 教材としての要点
+
+memo の key に入れる「状態」は、その状態を**読む**処理があるものだけでよい。書くだけの蓄積（参照リスト、診断）まで version に
+含めると、key が毎回変わって memo 表は「hit する形をしているのに hit しない」表になる。hit 数のカウンタは非ゼロだったので、
+カウンタだけ見ていると気づかない。位置ごとの重複 commit 数（「91 位置で 49.9 万回」）のように**再導出そのもの**を数えて初めて、
+memo が効いていない区間が見えた。仮説（成功 memo の欠落）を実装で確かめてから真因に至ったので、回り道の実装も無駄ではなく、
+ケース31 でそのまま採用できた。
