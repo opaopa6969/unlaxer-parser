@@ -84,8 +84,12 @@ TinyExpression の通常コンパイルには適する可能性がある。入�
 - 失敗する入力（前半で切断、末尾に `@`）: 再解析の分だけ **+46〜+73%**
 - 受理結果・CST・capture・scope・`ParseError`（offset / expected）は `Detailed` と一致。既定は `Detailed` のまま
 
+Java 側も同日に `ParseOptions.Diagnostics.DETAILED_ON_FAILURE` として実装した（unlaxer-parser #259、[ケース26](performance-tuning-ja.md)）。
+parser 単体で -17%（x1）〜 -24.5%（x64）、失敗入力で +59〜+79%。Rust より効果が小さいのは、memo の transaction replay と parse frame の維持が
+診断とは別に残るため。
+
 用途で損益が逆転するので、runtime が既定を変えるのではなく利用者が要求として選ぶ形にした。解析中に診断を読む custom parser と
-再実行できない副作用には不適で、この判定を parser の性質から自動化するのが提案2の役割になる。Java 側は未実装。
+再実行できない副作用には不適で、この判定を parser の性質から自動化するのが提案2の役割になる。
 
 ## 提案2: Features は要求する結果を指定し、安全性は parser の性質から判定する
 
