@@ -1,5 +1,6 @@
 package org.unlaxer.context;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
@@ -109,21 +110,56 @@ public final class PackratMemoTable {
         tokenKind, invertMatch, parseContext.getMemoizationStateVersion());
   }
 
-  private final Map<Parser, Map<PositionKey, Entry>> entryByPositionByParser = new IdentityHashMap<>();
+  /**
+   * One parser's entries, split by consumed-position block. A long input used to grow one
+   * HashMap per parser to hundreds of thousands of entries, so every lookup, insert and rehash
+   * missed the cache and parse time grew faster than the input. Blocks of 256 positions keep
+   * each table small; the key, the entries and the hit semantics are unchanged (#252, the Java
+   * counterpart of the Rust runtime's failure memo buckets in #245).
+   */
+  private static final class PositionBuckets {
+    private static final int BLOCK_SHIFT = 8;
+
+    private final ArrayList<HashMap<PositionKey, Entry>> blocks = new ArrayList<>();
+
+    Entry get(PositionKey positionKey) {
+      int block = positionKey.consumed() >>> BLOCK_SHIFT;
+      if (block >= blocks.size()) {
+        return null;
+      }
+      HashMap<PositionKey, Entry> entries = blocks.get(block);
+      return entries == null ? null : entries.get(positionKey);
+    }
+
+    void put(PositionKey positionKey, Entry entry) {
+      int block = positionKey.consumed() >>> BLOCK_SHIFT;
+      while (blocks.size() <= block) {
+        blocks.add(null);
+      }
+      HashMap<PositionKey, Entry> entries = blocks.get(block);
+      if (entries == null) {
+        entries = new HashMap<>();
+        blocks.set(block, entries);
+      }
+      entries.put(positionKey, entry);
+    }
+  }
+
+  private final Map<Parser, PositionBuckets> entryByPositionByParser = new IdentityHashMap<>();
 
   private int failureHits;
 
   public Entry get(Parser parser, PositionKey positionKey) {
-    Map<PositionKey, Entry> entryByPosition = entryByPositionByParser.get(parser);
-    if (entryByPosition == null) {
+    PositionBuckets buckets = entryByPositionByParser.get(parser);
+    if (buckets == null) {
       return null;
     }
-    return entryByPosition.get(positionKey);
+    return buckets.get(positionKey);
   }
 
   public void put(Parser parser, PositionKey positionKey, Entry entry) {
     entryByPositionByParser
-        .computeIfAbsent(parser, ignored -> new HashMap<>())
+        .computeIfAbsent(parser, ignored -> new PositionBuckets())
         .put(positionKey, entry);
   }
 
