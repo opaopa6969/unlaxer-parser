@@ -1525,3 +1525,43 @@ tinyexpression public facade（JMH、unlaxer master `cb128f7` を両側で使用
 tinyexpression の全テストを unlaxer 開発版で回すと、深いネストの if 式（fraud formula #5）の parse が公開版 3.0.15 の 25 ms から 4〜6 秒に
 退行していることが同時に見つかった（#194 で成功 memo が無くなったため。unlaxer #269）。tinyexpression の Java CI は公開版 jar でしか
 走らないので CI には出ない。
+
+## ケース29: `IntegerValue` のアノテーション反射と `NodeKind.getTag()` の毎回検索をやめる（Java）
+
+### 仮説
+
+ケース28 のあとに tinyexpression の全テストを開発版で回して見つけた深いネスト if 式（#269）を JFR で採ると、CPU の 15.8% が
+`HashMap.getNode ← LinkedHashMap.get ← AnnotationInvocationHandler.invoke ← $Proxy.value ← MinIntegerValue.minIntegerValue`、
+6.2% が `MinLength.minLength`、2.3% が `MaxIntegerValue`、9.3% が `ConcurrentHashMap.get ← FactoryBoundCache.get ← Tag.of ← NodeKind.getTag` だった。
+`IntegerValue`（`CodePointIndex` / `CodePointOffset` / `CodePointLength` / `StringLength` / `Depth`）は cursor 演算のたびに生成され、
+コンストラクタが 4 つの境界値を毎回 `getClass().getAnnotation(...)` で読む。`NodeKind.getTag()` は `Token.AST_NODES`（`filteredChildren`）や
+`TagBasedReducer.doReduce` から token ごとに呼ばれ、毎回 cache map を検索していた。どちらも class（enum 定数）の定数なので 1 回読めばよい。
+これまでの JFR では見えなかったのは、サンプル数が少なかった（数十 ms の parse）ため。5 秒の parse なら 259 サンプルで十分に出る。
+
+### 実装（PR #271）
+
+- `MinIntegerValue` / `MaxIntegerValue` / `MinLength` / `MaxLength` / `Nullable` の default メソッドを `ClassValue` による class 単位の
+  キャッシュにする。mixin interface（`OneOrMoreOfIntegerValue` 等）の override は仮想呼び出しのまま優先される
+- `IntegerValue` のコンストラクタは境界値を 1 回ずつ取り、digit 境界が既定（0 .. `Integer.MAX_VALUE`）なら `Math.log10` を省く。
+  受理される値・例外文言は不変
+- `NodeKind` の定数に `Tag` を保持（`Tag.of(this)` と同一インスタンス）
+
+### 観測
+
+tinyexpression（JMH、同じ tinyexpression コード `c70416e1`、unlaxer master `cb128f7` vs 本 PR、交互 3-run 中央値）:
+
+| Runtime | Bench | Fixture | Baseline runs | Baseline median | Candidate runs | Candidate median | 変化 |
+|---|---|---|---:|---:|---:|---:|---:|
+| Java | publicFacade | complex | 31.489 / 29.915 / 31.376 | **31.376** | 27.025 / 27.585 / 25.328 | **27.025** | **-13.87%** |
+| Java | publicFacade | comparison-heavy | 18.142 / 17.902 / 18.115 | **18.115** | 15.213 / 16.263 / 16.087 | **16.087** | **-11.19%** |
+| Java | parseOnlySafe | complex | 35.084 / 37.185 / 35.278 | **35.278** | 30.551 / 30.409 / 30.036 | **30.409** | **-13.80%** |
+
+x64（1 fork × 5 iteration）: publicFacade 1960.0 → 1723.2 ms（-12.1%）、parseOnlySafe 2372.7 → 2358.1 ms（-0.6%）。
+parseOnlySafe の x64 が動かないのは、その経路の x64 では memo 表と診断の局所性（ケース21〜24）が支配的で、値オブジェクト生成の比率が下がるため。
+
+### 教材としての要点
+
+「値オブジェクトを不変にして安全にする」設計が、実装の細部（アノテーション反射を毎回）で hot path の 1/4 を食っていた。
+プロファイラは入力が小さいとサンプルが足りず、この種の「薄く広い」コストを見せない。数秒かかる入力（病的な式でよい）で採ると
+すぐ出る。修正は class 単位のキャッシュだけで、意味論に触らない。同じ形（`getClass().getAnnotation` を default メソッドで毎回）は
+`Nullable` にもあったので一緒に直した。
