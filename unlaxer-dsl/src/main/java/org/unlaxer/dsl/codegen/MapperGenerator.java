@@ -71,11 +71,38 @@ public class MapperGenerator implements CodeGenerator {
         sb.append(" */\n");
         sb.append("public class ").append(mapperClass).append(" {\n\n");
         sb.append("    private ").append(mapperClass).append("() {}\n\n");
-        sb.append("    private static final java.util.IdentityHashMap<Object, int[]> NODE_SOURCE_SPANS =\n");
-        sb.append("        new java.util.IdentityHashMap<>();\n\n");
+        // Span layers of the current mapping call. SourceMappedAst snapshots freeze the layers they
+        // reference instead of copying every span, so later registrations open a new layer and the
+        // next mapping call starts from an empty layer; a snapshot therefore never changes after
+        // construction. Keys are always freshly created objects, so entries are never overwritten.
+        sb.append("    private static SpanLayer NODE_SOURCE_SPANS = new SpanLayer(null);\n\n");
+        sb.append("    /**\n");
+        sb.append("     * One layer of the current mapping generation's source spans. Taking a SourceMappedAst\n");
+        sb.append("     * snapshot freezes the top layer; later registrations open a new layer on top of it, so a\n");
+        sb.append("     * snapshot's layers are never mutated again and can be read without the mapper lock.\n");
+        sb.append("     * Lookups walk from the newest layer down; keys are fresh objects, so there are no overrides.\n");
+        sb.append("     */\n");
+        sb.append("    private static final class SpanLayer {\n");
+        sb.append("        private final java.util.IdentityHashMap<Object, int[]> spans = new java.util.IdentityHashMap<>();\n");
+        sb.append("        private final SpanLayer parent;\n");
+        sb.append("        private boolean frozen;\n\n");
+        sb.append("        private SpanLayer(SpanLayer parent) {\n");
+        sb.append("            this.parent = parent;\n");
+        sb.append("        }\n\n");
+        sb.append("        int[] get(Object node) {\n");
+        sb.append("            for (SpanLayer layer = this; layer != null; layer = layer.parent) {\n");
+        sb.append("                int[] span = layer.spans.get(node);\n");
+        sb.append("                if (span != null) return span;\n");
+        sb.append("            }\n");
+        sb.append("            return null;\n");
+        sb.append("        }\n");
+        sb.append("    }\n\n");
         // Per-parse memo of token -> mapped AST node; see mapToken. Cleared at the start of parse().
         // (tinyexpression #49)
         sb.append("    private static final java.util.IdentityHashMap<Token, ").append(astClass).append("> MAP_MEMO =\n");
+        sb.append("        new java.util.IdentityHashMap<>();\n\n");
+        // Per-parse memo of token -> best mapped token in its subtree; see findBestMappedToken.
+        sb.append("    private static final java.util.IdentityHashMap<Token, MappingCandidate> BEST_MEMO =\n");
         sb.append("        new java.util.IdentityHashMap<>();\n\n");
 
         String rootClassName = rootRule.flatMap(MapperElementUtil::getMappingAnnotation)
@@ -166,10 +193,13 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("    /** Immutable identity-based source map; offsets are code points, end exclusive. */\n");
         sb.append("    public static final class SourceMappedAst<T extends ").append(astClass).append("> {\n");
         sb.append("        private final T ast;\n");
-        sb.append("        private final java.util.IdentityHashMap<Object, int[]> spans = new java.util.IdentityHashMap<>();\n\n");
+        sb.append("        private final SpanLayer spans;\n\n");
         sb.append("        private SourceMappedAst(T ast) {\n");
         sb.append("            this.ast = ast;\n");
-        sb.append("            NODE_SOURCE_SPANS.forEach((node, span) -> spans.put(node, span.clone()));\n");
+        sb.append("            // Owns the current layers by freezing them: later registrations and later parses\n");
+        sb.append("            // write to new layers, so this snapshot never changes and needs no copy.\n");
+        sb.append("            NODE_SOURCE_SPANS.frozen = true;\n");
+        sb.append("            this.spans = NODE_SOURCE_SPANS;\n");
         sb.append("        }\n\n");
         sb.append("        public T ast() { return ast; }\n\n");
         sb.append("        public Optional<int[]> sourceSpanOf(Object node) {\n");
@@ -269,9 +299,16 @@ public class MapperGenerator implements CodeGenerator {
         }
         sb.append(";\n");
         sb.append("    }\n\n");
-        sb.append("    private static MappedAst mapTokenTree(Token token, String preferredAstSimpleName) {\n");
-        sb.append("        NODE_SOURCE_SPANS.clear();\n");
+        sb.append("    /** Starts a mapping call: a fresh span layer (snapshots keep the old ones) and empty memos. */\n");
+        sb.append("    private static void resetMappingMemos() {\n");
+        sb.append("        NODE_SOURCE_SPANS = new SpanLayer(null);\n");
         sb.append("        MAP_MEMO.clear();\n");
+        sb.append("        BEST_MEMO.clear();\n");
+        sb.append("    }\n\n");
+        sb.append("    private static MappedAst mapTokenTree(Token token, String preferredAstSimpleName) {\n");
+        sb.append("        // Every public mapping call maps afresh: callers may rely on distinct AST instances and on\n");
+        sb.append("        // a snapshot that resolves only the nodes of its own mapping.\n");
+        sb.append("        resetMappingMemos();\n");
         sb.append("        Token selectedToken = findBestMappedToken(token, preferredAstSimpleName);\n");
         sb.append("        if (selectedToken == null) {\n");
         sb.append("            throw new IllegalArgumentException(\"No mapped node found in token tree\");\n");
@@ -292,8 +329,7 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("        return parse(source, preferredAstSimpleName, ParseOptions.DEFAULT);\n");
         sb.append("    }\n\n");
         sb.append("    public static synchronized ").append(rootClassName).append(" parse(String source, String preferredAstSimpleName, ParseOptions options) {\n");
-        sb.append("        NODE_SOURCE_SPANS.clear();\n");
-        sb.append("        MAP_MEMO.clear();\n");
+        sb.append("        resetMappingMemos();\n");
         sb.append("        Parser rootParser = ").append(parsersClass).append(".getRootParser();\n");
         sb.append("        ParseContext context = ParseContext.withOptions(createRootSourceCompat(source), options);\n");
         sb.append("        Parsed parsed;\n");
