@@ -1616,3 +1616,41 @@ memo の key に入れる「状態」は、その状態を**読む**処理があ
 カウンタだけ見ていると気づかない。位置ごとの重複 commit 数（「91 位置で 49.9 万回」）のように**再導出そのもの**を数えて初めて、
 memo が効いていない区間が見えた。仮説（成功 memo の欠落）を実装で確かめてから真因に至ったので、回り道の実装も無駄ではなく、
 ケース31 でそのまま採用できた。
+
+## ケース31: 安全な rule に限定した成功 memoization を戻す（Java、#269 の続き）
+
+### 仮説
+
+ケース30 の真因（version 更新）を直しても、8 択 × 5 段の BranchExpression が同じ内側の `if` を成功として再導出する構造は残る。
+3.0.15 には listener を含まない部分木の成功 memo があり、#194 で「安全な再設計は別課題」として外されていた。#194 の fail-closed 契約
+（生成器が exact class 単位で安全を証明する）を保ったまま、成功も replay できれば、複数の選択肢が同じ部分木を成功させる文法で
+再導出が消えるはず。
+
+### 実装（PR #274。codex に委譲しレビュー）
+
+- 新 marker `SafeSuccessMemoizable extends SafeFailureMemoizable`。生成器は「失敗 memo 安全 かつ 自身が TransactionListener でない
+  （`@scopeTree` / `@declares` / `@backref` なし）かつ 推移閉包に listener rule・custom token・recovery wrapper を含まない」rule と、
+  空白 delimitor（`SpaceParser` / `CPPComment` / `BlockComment` の `ZeroOrMore`）に付ける。helper は自身の body で判定。tinyexpression では 50 class
+- runtime: 成功時に commit 前の token 列を deep copy して保持（終了 consumed / matched、選択した child、内側 Choice の選択、rule-local の
+  `FailureDiagnostic` frame も保持）。hit 時は `begin` → deep copy を splice → cursor を進める → `commit` の通常経路で replay し、
+  診断 frame を外側へ流す。transaction イベントの再実行は行わない（対象 class は transactional state を変えないため。二重に hook が走るのを避ける）
+- 入口は `AbstractParser` / `Chain` / `Choice` / `LongestChoice` / `PredictiveChoice` の 5 つに加え、空白 delimitor が通る `Occurs` にも接続
+- `Memoization` の enum は増やさず、`SAFE_FAILURES` で成功 replay も有効になる（既定 OFF は不変）。Rust は不変
+
+### 観測
+
+ケース30 の表の「+成功 memo」列（unlaxer `cb128f7` → #273 + 本 PR、tinyexpression `c70416e1`、交互 3-run 中央値）:
+publicFacade complex 30.62 → **12.32 ms（-59.8%）**、comparison-heavy 17.84 → **9.40 ms（-47.3%）**、parseOnlySafe complex 37.07 → 15.05 ms（-59.4%）。
+x64 facade 2008 → 958 ms（-52.3%）、失敗入力 -49〜-66%。fraud 式 #5 は 86 → 59 ms、#4 は 82 → 57 ms。
+#273 単体（-25% / +2%）に対して、成功 memo は comparison-heavy にも効く（変数参照の有無に関係なく、literal 中心の部分木が再導出されていた）。
+
+成功 memo だけ（ケース30 の修正なし）では式 #5 は 7.75 → 4.74 秒で目標未達だった。version が進み続ける状態では、成功 entry も
+失敗 entry と同様に hit しない。
+
+### 教材としての要点
+
+「安全性のために外した最適化」を戻すときは、外した理由（listener・状態依存・診断の一致）を個別に条件化して、条件を満たす部分だけに
+限定して戻す。exact class の marker という既存の枝（#194）に乗せたので、runtime の判定は `ClassValue` 1 回で済み、subclass が override
+しても暗黙に安全にならない。効果は真因の修正（ケース30）と重ねて初めて出た。単独で測って捨てていたら、-60% を取り逃していた。
+ケース30 の教訓（hit カウンタではなく再導出を数える）と合わせ、施策の順序を間違えたときに「結果が出ない＝施策が無意味」と
+結論しないための例になる。
