@@ -4,8 +4,16 @@ import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
 
+import org.unlaxer.CodePointLength;
+import org.unlaxer.Parsed;
+import org.unlaxer.Token;
 import org.unlaxer.TokenKind;
+import org.unlaxer.TokenList;
+import org.unlaxer.context.Transaction.AdditionalCommitAction;
+import org.unlaxer.listener.TransactionListener;
 import org.unlaxer.parser.Parser;
+import org.unlaxer.parser.combinator.ChoiceCommitAction;
+import org.unlaxer.parser.combinator.ChoiceInterface;
 
 /**
  * Opt-in packrat memoization table (issue #40).
@@ -18,7 +26,8 @@ import org.unlaxer.parser.Parser;
  * <ul>
  *   <li><b>safe failure memo</b> — only exact generated classes carrying
  *       {@link SafeFailureMemoizable} may cache a failure. The generated marker reflects a
- *       transitive, fail-closed grammar analysis. Successes are never cached.</li>
+ *       transitive, fail-closed grammar analysis. Classes also directly carrying
+ *       {@link SafeSuccessMemoizable} may cache safe successes.</li>
  * </ul>
  *
  * <p>The table lives on a single {@link ParseContext} (one parse session) and is dropped when
@@ -31,17 +40,34 @@ public final class PackratMemoTable {
   public record PositionKey(
       int consumed, int matched, TokenKind tokenKind, boolean invertMatch, long stateVersion) {}
 
-  /** A known failure together with the rule-local diagnostics produced by the original call. */
+  /** A rule outcome, including local diagnostics even when an alternative succeeded. */
   public static final class Entry {
     private final ParseContext.FailureDiagnostic diagnostic;
+    private final TokenList tokens;
+    private final int endConsumed;
+    private final int endMatched;
+    private final Parser chosenChild;
+    private final Map<ChoiceInterface, Parser> choices;
 
-    private Entry(ParseContext.FailureDiagnostic diagnostic) { this.diagnostic = diagnostic; }
+    private Entry(ParseContext.FailureDiagnostic diagnostic) {
+      this(diagnostic, null, 0, 0, null, Map.of());
+    }
+
+    private Entry(ParseContext.FailureDiagnostic diagnostic, TokenList tokens,
+        int endConsumed, int endMatched, Parser chosenChild, Map<ChoiceInterface, Parser> choices) {
+      this.diagnostic = diagnostic;
+      this.tokens = tokens;
+      this.endConsumed = endConsumed;
+      this.endMatched = endMatched;
+      this.chosenChild = chosenChild;
+      this.choices = choices;
+    }
   }
 
   /**
    * The memoized outcome for {@code parser} at the current position, or null to proceed with a
    * normal parse (no entry, memoization disabled, or an exact class without the generated marker).
-   * A non-null result is a known failure whose diagnostic contribution has already been replayed.
+   * A non-null result must be returned through {@link #replay} by every parser entry point.
    */
   public static Entry lookup(
       ParseContext parseContext, Parser parser, TokenKind tokenKind, boolean invertMatch) {
@@ -52,11 +78,80 @@ public final class PackratMemoTable {
     Entry entry = parseContext.getPackratMemoTable()
         .get(parser, positionKeyOf(parseContext, tokenKind, invertMatch));
     if (entry != null) {
-      parseContext.replayMemoTransactionEvents(entry.diagnostic);
+      if (entry.tokens == null) {
+        parseContext.replayMemoTransactionEvents(entry.diagnostic);
+        parseContext.getPackratMemoTable().failureHits++;
+      } else {
+        parseContext.getPackratMemoTable().successHits++;
+      }
       parseContext.replayFailureDiagnostic(entry.diagnostic);
-      parseContext.getPackratMemoTable().failureHits++;
     }
     return entry;
+  }
+
+  /**
+   * Shared replay path for AbstractParser and the chain/choice combinators. Successes need no
+   * stored state-hook replay: their dependency closure cannot mutate transactional state, and
+   * the real begin/commit below checkpoints the owner once and records a balanced transaction
+   * in enclosing memo frames. Replaying the old trace as well would duplicate those hooks.
+   */
+  public static Parsed replay(ParseContext context, Parser parser, TokenKind tokenKind,
+      boolean invertMatch, Entry entry) {
+    if (entry.tokens == null) return Parsed.FAILED;
+    context.startParse(parser, context, tokenKind, invertMatch);
+    context.begin(parser);
+    for (Token token : entry.tokens) context.getCurrent().getTokens().add(token.deepCopy());
+    int consumeDelta = entry.endConsumed - context.getConsumedPosition().value();
+    // Even a zero-width consumed token can reset a previously advanced matched cursor.
+    if (consumeDelta > 0 || context.getMatchedPosition().value() > entry.endMatched) {
+      context.consume(new CodePointLength(consumeDelta));
+    }
+    int matchDelta = entry.endMatched - context.getMatchedPosition().value();
+    if (matchDelta > 0) context.matchOnly(new CodePointLength(matchDelta));
+    entry.choices.forEach(context::choose);
+    Parsed parsed = new Parsed(context.commit(parser, tokenKind, choiceActions(entry.chosenChild)));
+    context.endParse(parser, parsed, context, tokenKind, invertMatch);
+    return parsed;
+  }
+
+  /** Capture the key before evaluation; failure-only rules do not need an extra start key. */
+  public static PositionKey successKey(ParseContext context, Parser parser,
+      TokenKind tokenKind, boolean invertMatch, ParseContext.FailureDiagnostic diagnostic) {
+    return diagnostic != null && isExactSuccessSafeClass(parser)
+        ? positionKeyOf(context, tokenKind, invertMatch) : null;
+  }
+
+  /**
+   * Commit an ordinary success and retain its completed diagnostic frame. Snapshot tokens BEFORE
+   * collection reparents them; copy deeply both here and on replay so later mutations of a
+   * returned tree cannot modify the cache. Choices keep their historical child Parsed on a miss.
+   */
+  public static Parsed commitSuccess(ParseContext context, Parser parser, TokenKind tokenKind,
+      boolean invertMatch, PositionKey startKey, ParseContext.FailureDiagnostic diagnostic,
+      Parser chosenChild, Parsed originalParsed) {
+    Entry entry = null;
+    if (startKey != null && context.isMemoizationSessionSafe()) {
+      TokenList snapshot = new TokenList();
+      for (Token token : context.getCurrent().getTokens()) snapshot.add(token.deepCopy());
+      entry = new Entry(diagnostic, snapshot, context.getConsumedPosition().value(),
+          context.getMatchedPosition().value(), chosenChild,
+          context.getCurrent().snapshotChosenParsers(context.getChosenParserByChoice()));
+    }
+    var committed = context.commit(parser, tokenKind, choiceActions(chosenChild));
+    Parsed parsed = originalParsed == null ? new Parsed(committed) : originalParsed;
+    context.endParse(parser, parsed, context, tokenKind, invertMatch);
+    if (diagnostic != null) context.discardMemoDiagnosticFrame(diagnostic);
+    if (entry != null && context.isMemoizationSessionSafe()) {
+      context.getPackratMemoTable().put(parser, startKey, entry);
+    }
+    return parsed;
+  }
+
+  private static final AdditionalCommitAction[] NO_ACTIONS = new AdditionalCommitAction[0];
+
+  private static AdditionalCommitAction[] choiceActions(Parser chosenChild) {
+    return chosenChild == null ? NO_ACTIONS
+        : new AdditionalCommitAction[] {new ChoiceCommitAction(chosenChild)};
   }
 
   /** Records a generated, statically proven safe failure and its diagnostic contribution. */
@@ -91,11 +186,28 @@ public final class PackratMemoTable {
     @Override
     protected Boolean computeValue(Class<?> type) {
       for (Class<?> declared : type.getInterfaces()) {
-        if (declared == SafeFailureMemoizable.class) return Boolean.TRUE;
+        if (declared == SafeFailureMemoizable.class || declared == SafeSuccessMemoizable.class) {
+          return Boolean.TRUE;
+        }
       }
       return Boolean.FALSE;
     }
   };
+
+  private static final ClassValue<Boolean> EXACT_SUCCESS_SAFE_CLASS = new ClassValue<>() {
+    @Override
+    protected Boolean computeValue(Class<?> type) {
+      if (TransactionListener.class.isAssignableFrom(type)) return Boolean.FALSE;
+      for (Class<?> declared : type.getInterfaces()) {
+        if (declared == SafeSuccessMemoizable.class) return Boolean.TRUE;
+      }
+      return Boolean.FALSE;
+    }
+  };
+
+  static boolean isExactSuccessSafeClass(Parser parser) {
+    return EXACT_SUCCESS_SAFE_CLASS.get(parser.getClass());
+  }
 
   static boolean isExactSafeClass(Parser parser) {
     return EXACT_SAFE_CLASS.get(parser.getClass());
@@ -112,6 +224,7 @@ public final class PackratMemoTable {
   private final Map<Parser, Map<PositionKey, Entry>> entryByPositionByParser = new IdentityHashMap<>();
 
   private int failureHits;
+  private int successHits;
 
   public Entry get(Parser parser, PositionKey positionKey) {
     Map<PositionKey, Entry> entryByPosition = entryByPositionByParser.get(parser);
@@ -128,4 +241,5 @@ public final class PackratMemoTable {
   }
 
   public int failureHits() { return failureHits; }
+  public int successHits() { return successHits; }
 }

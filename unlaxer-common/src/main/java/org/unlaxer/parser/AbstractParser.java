@@ -9,7 +9,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
-import org.unlaxer.Committed;
 import org.unlaxer.Name;
 import org.unlaxer.Parsed;
 import org.unlaxer.Tag;
@@ -71,12 +70,13 @@ public abstract class AbstractParser implements Parser {
 	public Parsed parse(ParseContext parseContext , TokenKind tokenKind ,boolean invertMatch) {
 
 		// Opt-in safe failure memoization. Generated exact-class markers keep state-dependent
-		// parsers out; successes are always re-derived. Off by default.
+		// parsers out; safe successes also replay their token trees. Off by default.
 		PackratMemoTable.Entry memo = PackratMemoTable.lookup(parseContext, this, tokenKind, invertMatch);
 		if (memo != null) {
-			return Parsed.FAILED;
+			return PackratMemoTable.replay(parseContext, this, tokenKind, invertMatch, memo);
 		}
 		var memoDiagnostic = PackratMemoTable.beginFailure(parseContext, this);
+		var memoStart = PackratMemoTable.successKey(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
 
 		parseContext.startParse(this, parseContext, tokenKind, invertMatch);
 
@@ -84,11 +84,8 @@ public abstract class AbstractParser implements Parser {
 		Parsed parsed = getParser().parse(parseContext,tokenKind,invertMatch);
 
 		if(parsed.isSucceeded()){
-			Committed commited = parseContext.commit(this , tokenKind);
-			Parsed succeededParsed = new Parsed(commited);
-			parseContext.endParse(this, succeededParsed , parseContext, tokenKind, invertMatch);
-			PackratMemoTable.memoizeSuccess(parseContext, memoDiagnostic);
-			return succeededParsed;
+			return PackratMemoTable.commitSuccess(parseContext, this, tokenKind, invertMatch,
+				memoStart, memoDiagnostic, null, null);
 		}
 
 		parseContext.rollback(this);

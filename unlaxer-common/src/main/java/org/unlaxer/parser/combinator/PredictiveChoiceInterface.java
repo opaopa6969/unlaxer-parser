@@ -17,8 +17,9 @@ public interface PredictiveChoiceInterface extends ChoiceInterface {
     @Override
     default Parsed parse(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
         PackratMemoTable.Entry memo = PackratMemoTable.lookup(parseContext, this, tokenKind, invertMatch);
-        if (memo != null) return Parsed.FAILED;
+        if (memo != null) return PackratMemoTable.replay(parseContext, this, tokenKind, invertMatch, memo);
         var memoDiagnostic = PackratMemoTable.beginFailure(parseContext, this);
+        var memoStart = PackratMemoTable.successKey(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
 
         parseContext.startParse(this, parseContext, tokenKind, invertMatch);
         List<Parser> children = getChildren();
@@ -41,10 +42,8 @@ public interface PredictiveChoiceInterface extends ChoiceInterface {
             parseContext.begin(this);
             Parsed parsed = parser.parse(parseContext, tokenKind, invertMatch);
             if (parsed.isSucceeded()) {
-                parseContext.commit(this, tokenKind, new ChoiceCommitAction(parser));
-                parseContext.endParse(this, parsed, parseContext, tokenKind, invertMatch);
-                PackratMemoTable.memoizeSuccess(parseContext, memoDiagnostic);
-                return parsed;
+                return PackratMemoTable.commitSuccess(parseContext, this, tokenKind, invertMatch,
+                    memoStart, memoDiagnostic, parser, parsed);
             }
             parseContext.rollback(this);
         }
@@ -55,10 +54,8 @@ public interface PredictiveChoiceInterface extends ChoiceInterface {
                 parseContext.begin(this);
                 Parsed parsed = parser.parse(parseContext, tokenKind, invertMatch);
                 if (parsed.isSucceeded()) {
-                    parseContext.commit(this, tokenKind, new ChoiceCommitAction(parser));
-                    parseContext.endParse(this, parsed, parseContext, tokenKind, invertMatch);
-                    PackratMemoTable.memoizeSuccess(parseContext, memoDiagnostic);
-                    return parsed;
+                    return PackratMemoTable.commitSuccess(parseContext, this, tokenKind, invertMatch,
+                        memoStart, memoDiagnostic, parser, parsed);
                 }
                 parseContext.rollback(this);
             }

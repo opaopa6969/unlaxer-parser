@@ -22,8 +22,9 @@ public interface LongestChoiceInterface extends ChoiceInterface {
     default Parsed parse(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
         PackratMemoTable.Entry memo =
             PackratMemoTable.lookup(parseContext, this, tokenKind, invertMatch);
-        if (memo != null) return Parsed.FAILED;
+        if (memo != null) return PackratMemoTable.replay(parseContext, this, tokenKind, invertMatch, memo);
         var memoDiagnostic = PackratMemoTable.beginFailure(parseContext, this);
+        var memoStart = PackratMemoTable.successKey(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
 
         parseContext.startParse(this, parseContext, tokenKind, invertMatch);
         List<Parser> children = getChildren();
@@ -55,10 +56,8 @@ public interface LongestChoiceInterface extends ChoiceInterface {
         parseContext.begin(this);
         Parsed replayed = winner.parse(parseContext, tokenKind, invertMatch);
         if (replayed.isSucceeded()) {
-            parseContext.commit(this, tokenKind, new ChoiceCommitAction(winner));
-            parseContext.endParse(this, replayed, parseContext, tokenKind, invertMatch);
-            PackratMemoTable.memoizeSuccess(parseContext, memoDiagnostic);
-            return replayed;
+            return PackratMemoTable.commitSuccess(parseContext, this, tokenKind, invertMatch,
+                    memoStart, memoDiagnostic, winner, replayed);
         }
 
         // A custom parser may be non-deterministic.  Do not commit a different candidate than
