@@ -38,6 +38,10 @@ fn main() {
         "diagnostic_allocation: 1 failure = {single} allocations, \
          {REPEATED_FAILURES} identical failures = {repeated} allocations"
     );
+    assert!(
+        single <= 11,
+        "a first-bucket failure must not exceed the unbucketed baseline of 11 allocations"
+    );
     assert_eq!(
         single, repeated,
         "identical failures at one position must not allocate per attempt"

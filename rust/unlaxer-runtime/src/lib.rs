@@ -740,6 +740,39 @@ impl Hasher for FailureMemoHasher {
 
 type FailureMemoMap = HashMap<FailureMemoKey, FailureDiagnostic, FailureMemoBuildHasher>;
 
+const FAILURE_MEMO_BUCKET_SIZE: usize = 256;
+
+/// Keep nearby failures together for lookup and destruction. The first bucket is
+/// inline so inputs shorter than one bucket need no additional allocation.
+#[derive(Default)]
+struct FailureMemoBuckets {
+    first: FailureMemoMap,
+    remaining: Vec<FailureMemoMap>,
+}
+
+impl FailureMemoBuckets {
+    fn get(&self, bucket: usize, key: &FailureMemoKey) -> Option<&FailureDiagnostic> {
+        if bucket == 0 {
+            self.first.get(key)
+        } else {
+            self.remaining.get(bucket - 1)?.get(key)
+        }
+    }
+
+    fn insert(&mut self, bucket: usize, key: FailureMemoKey, diagnostic: FailureDiagnostic) {
+        let map = if bucket == 0 {
+            &mut self.first
+        } else {
+            if self.remaining.len() < bucket {
+                // Empty maps allocate no entry storage, including skipped buckets.
+                self.remaining.resize_with(bucket, FailureMemoMap::default);
+            }
+            &mut self.remaining[bucket - 1]
+        };
+        map.insert(key, diagnostic);
+    }
+}
+
 /// Per-parse state, shared by generated rules and custom parsers. Transactions restore
 /// cursors, CST nodes, captures and cloneable user values, but retain failure diagnostics.
 /// Clone must isolate mutable values: external effects and shared interior state are not rolled back.
@@ -756,6 +789,9 @@ pub struct ParseContext<'a> {
     farthest: usize,
     expected: Vec<Rc<str>>,
     byte_offsets: Vec<usize>,
+    // Empty for ASCII, where byte and scalar offsets are identical. Otherwise
+    // non-boundary bytes contain usize::MAX to retain code_point's rejection.
+    code_point_offsets: Vec<usize>,
     captures: CaptureStore,
     state: Rc<StateMap>,
     scopes: ScopeStore,
@@ -764,7 +800,7 @@ pub struct ParseContext<'a> {
     grammar_session: u64,
     next_grammar_session: u64,
     memo_safe_rules: Vec<bool>,
-    failure_memo: FailureMemoMap,
+    failure_memo: FailureMemoBuckets,
     diagnostic_frames: Vec<FailureDiagnostic>,
     memoized_failure_hits: usize,
     checkpoint_metrics: Option<CheckpointMetrics>,
@@ -910,6 +946,20 @@ impl<'a> ParseContext<'a> {
     }
 
     pub fn with_options(input: &'a str, options: ParseOptions) -> Self {
+        let byte_offsets: Vec<_> = input
+            .char_indices()
+            .map(|(i, _)| i)
+            .chain(std::iter::once(input.len()))
+            .collect();
+        let code_point_offsets = if input.is_ascii() {
+            vec![]
+        } else {
+            let mut offsets = vec![usize::MAX; input.len() + 1];
+            for (code_point, &byte) in byte_offsets.iter().enumerate() {
+                offsets[byte] = code_point;
+            }
+            offsets
+        };
         Self {
             input,
             rules: Arc::from([]),
@@ -919,11 +969,8 @@ impl<'a> ParseContext<'a> {
             nodes: vec![],
             farthest: 0,
             expected: vec![],
-            byte_offsets: input
-                .char_indices()
-                .map(|(i, _)| i)
-                .chain(std::iter::once(input.len()))
-                .collect(),
+            byte_offsets,
+            code_point_offsets,
             captures: CaptureStore::default(),
             state: Rc::new(StateMap::default()),
             scopes: ScopeStore::default(),
@@ -932,7 +979,7 @@ impl<'a> ParseContext<'a> {
             grammar_session: 0,
             next_grammar_session: 1,
             memo_safe_rules: vec![],
-            failure_memo: FailureMemoMap::default(),
+            failure_memo: FailureMemoBuckets::default(),
             diagnostic_frames: vec![],
             memoized_failure_hits: 0,
             checkpoint_metrics: None,
@@ -1268,8 +1315,17 @@ impl<'a> ParseContext<'a> {
         &mut self.scopes
     }
     fn code_point(&self, byte: usize) -> usize {
-        self.byte_offsets
-            .binary_search(&byte)
+        if self.code_point_offsets.is_empty() {
+            assert!(
+                byte <= self.input.len(),
+                "parser maintains UTF-8 boundaries"
+            );
+            return byte;
+        }
+        self.code_point_offsets
+            .get(byte)
+            .copied()
+            .filter(|&offset| offset != usize::MAX)
             .expect("parser maintains UTF-8 boundaries")
     }
 
@@ -1337,16 +1393,20 @@ impl<'a> ParseContext<'a> {
         let memo_key = (self.options.memoization == Memoization::SafeFailures
             && self.memo_safe_rules.get(id).copied().unwrap_or(false))
         .then(|| {
-            FailureMemoKey::new(
-                id,
-                self.position,
-                self.matched_position,
-                self.whitespace,
-                depth,
+            (
+                // Route by scalar position; keep the existing byte-based key intact.
+                self.code_point(self.position) / FAILURE_MEMO_BUCKET_SIZE,
+                FailureMemoKey::new(
+                    id,
+                    self.position,
+                    self.matched_position,
+                    self.whitespace,
+                    depth,
+                ),
             )
         });
-        if let Some(key) = memo_key {
-            if let Some(diagnostic) = self.failure_memo.get(&key).cloned() {
+        if let Some((bucket, key)) = memo_key {
+            if let Some(diagnostic) = self.failure_memo.get(bucket, &key).cloned() {
                 self.memoized_failure_hits += 1;
                 self.replay_failure(&diagnostic);
                 return None;
@@ -1374,7 +1434,7 @@ impl<'a> ParseContext<'a> {
                 None
             }
         };
-        if let Some(key) = memo_key {
+        if let Some((bucket, key)) = memo_key {
             let diagnostic = self
                 .diagnostic_frames
                 .pop()
@@ -1383,7 +1443,7 @@ impl<'a> ParseContext<'a> {
                 parent.merge(&diagnostic);
             }
             if result.is_none() {
-                self.failure_memo.insert(key, diagnostic);
+                self.failure_memo.insert(bucket, key, diagnostic);
             }
         }
         result
@@ -2253,6 +2313,45 @@ mod tests {
     }
 
     #[test]
+    fn unicode_spans_match_binary_search_at_every_boundary() {
+        for input in ["", "ascii", "éあ😀e\u{301}\r\n\0z", "😀"] {
+            let mut context = ParseContext::new(input);
+            let boundaries = context.byte_offsets.clone();
+            for &end in &boundaries {
+                context.position = end;
+                for &start in boundaries.iter().take_while(|&&start| start <= end) {
+                    assert_eq!(
+                        context.span(start),
+                        Span {
+                            start: boundaries.binary_search(&start).unwrap(),
+                            end: boundaries.binary_search(&end).unwrap(),
+                        },
+                        "{input:?}: {start}..{end}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn code_point_rejects_non_boundaries_and_out_of_range_offsets() {
+        for input in ["", "ascii", "éあ😀e\u{301}"] {
+            let context = ParseContext::new(input);
+            for byte in (0..=input.len() + 1).chain(std::iter::once(usize::MAX)) {
+                if context.byte_offsets.binary_search(&byte).is_err() {
+                    assert!(
+                        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                            context.code_point(byte)
+                        }))
+                        .is_err(),
+                        "{input:?}: {byte}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
     fn predictive_choice_prunes_only_proven_impossible_alternatives() {
         PREDICTIVE_SKIPPED_CALLS.store(0, std::sync::atomic::Ordering::Relaxed);
         let rules = vec![Rule {
@@ -2388,6 +2487,99 @@ mod tests {
         assert_eq!(error.expected, vec!["x"]);
     }
 
+    #[test]
+    fn failure_memo_hits_and_misses_across_scalar_bucket_boundaries() {
+        let grammar = share_grammar(vec![Rule {
+            name: "fails_after_one_scalar",
+            expression: Expr::Any.then(Expr::choice([
+                Expr::Literal("z"),
+                Expr::Literal("!"),
+                Expr::Literal("z"),
+            ])),
+        }]);
+        for scalar in ["a", "😀"] {
+            let input = scalar.repeat(260);
+            let mut context = ParseContext::with_options(
+                &input,
+                ParseOptions::with_memoization(Memoization::SafeFailures),
+            );
+            context.rules = Arc::clone(&grammar);
+            context.memo_safe_rules = memo_safe_rules(&grammar);
+            context.enable_checkpoint_metrics();
+            let mut off = ParseContext::new(&input);
+            off.rules = Arc::clone(&grammar);
+            off.enable_checkpoint_metrics();
+
+            for (attempt, position) in [255, 256, 257, 257, 255, 256].into_iter().enumerate() {
+                let byte = context.byte_offsets[position];
+                context.position = byte;
+                context.matched_position = byte;
+                context.farthest = 0;
+                context.expected.clear();
+                context.diagnostic_frames.push(FailureDiagnostic::default());
+                let metrics_before = context.snapshot_checkpoint_metrics();
+                assert!(context.rule(0, 0).is_none());
+                assert_eq!(context.position, byte);
+                assert_eq!(context.matched_position, byte);
+                assert!(context.nodes.is_empty());
+                assert_eq!(context.memoized_failure_hits(), attempt.saturating_sub(2));
+                let diagnostic = context.diagnostic_frames.pop().unwrap();
+                assert_eq!(
+                    diagnostic.farthest,
+                    Some(context.byte_offsets[position + 1])
+                );
+                assert_eq!(expected_values(&diagnostic), vec!["z", "!"]);
+                assert_eq!(
+                    context.failure(),
+                    ParseError {
+                        offset: position + 1,
+                        expected: vec!["!".to_owned(), "z".to_owned()],
+                    }
+                );
+                if attempt < 3 {
+                    off.position = byte;
+                    off.matched_position = byte;
+                    assert!(off.rule(0, 0).is_none());
+                    assert_eq!(context.failure(), off.failure());
+                    assert_eq!(
+                        context.snapshot_checkpoint_metrics(),
+                        off.snapshot_checkpoint_metrics()
+                    );
+                } else {
+                    assert_eq!(context.snapshot_checkpoint_metrics(), metrics_before);
+                }
+            }
+            assert_eq!(context.failure_memo.first.len(), 1);
+            assert_eq!(context.failure_memo.remaining.len(), 1);
+            assert_eq!(context.failure_memo.remaining[0].len(), 2);
+        }
+    }
+
+    #[test]
+    fn failure_memo_allocates_entry_storage_only_for_populated_buckets() {
+        let mut memo = FailureMemoBuckets::default();
+        let key = FailureMemoKey::new(0, 0, 0, false, 0);
+        assert!(memo.get(8, &key).is_none());
+        assert_eq!(memo.first.capacity(), 0);
+        assert_eq!(memo.remaining.capacity(), 0);
+
+        memo.insert(0, key, failure_diagnostic(0, &["first"]));
+        assert_eq!(memo.remaining.capacity(), 0);
+        let distant_key = FailureMemoKey::new(0, 8 * FAILURE_MEMO_BUCKET_SIZE, 0, false, 0);
+        memo.insert(
+            8,
+            distant_key,
+            failure_diagnostic(distant_key.position, &["last"]),
+        );
+        assert!(memo.remaining[..7].iter().all(|map| map.capacity() == 0));
+        assert_eq!(expected_values(memo.get(0, &key).unwrap()), vec!["first"]);
+        assert_eq!(
+            expected_values(memo.get(8, &distant_key).unwrap()),
+            vec!["last"]
+        );
+        assert!(memo.get(7, &distant_key).is_none());
+    }
+
     fn failure_diagnostic(position: usize, expected: &[&str]) -> FailureDiagnostic {
         let mut diagnostic = FailureDiagnostic::default();
         for expected in expected {
@@ -2425,7 +2617,7 @@ mod tests {
         context.diagnostic_frames.push(frame);
         context
             .failure_memo
-            .insert(FailureMemoKey::new(0, 0, 0, false, 0), memoized);
+            .insert(0, FailureMemoKey::new(0, 0, 0, false, 0), memoized);
 
         assert!(context.rule(0, 0).is_none());
         assert_eq!(context.memoized_failure_hits(), 1);
@@ -2664,8 +2856,7 @@ mod tests {
 
         let outer = context
             .failure_memo
-            .iter()
-            .find_map(|(key, diagnostic)| (key.rule == 0).then_some(diagnostic))
+            .get(0, &FailureMemoKey::new(0, 0, 0, false, 0))
             .expect("outer failure was memoized");
         assert_eq!(outer.farthest, Some(0));
         assert_eq!(
@@ -2738,7 +2929,8 @@ mod tests {
 
         for _ in 0..3 {
             assert!(context.parse_shared_grammar(&grammar, 0, false).is_err());
-            assert!(context.failure_memo.is_empty());
+            assert!(context.failure_memo.first.is_empty());
+            assert!(context.failure_memo.remaining.is_empty());
             assert_eq!(context.grammar_session, 41);
         }
     }
