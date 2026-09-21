@@ -24,8 +24,16 @@ public class TagBasedReducer extends AbstractTokenReducer {
 			throw new IllegalArgumentException();
 		}
 		
+		// Tag.of(this) always returns the same cached instance, so the racy publication is benign.
+		private volatile Tag tag;
+
 		public Tag getTag(){
-			return Tag.of(this);
+			Tag cached = tag;
+			if (cached == null) {
+				cached = Tag.of(this);
+				tag = cached;
+			}
+			return cached;
 		}
 		
 		public void addTag(ParserTaggable taggable){
