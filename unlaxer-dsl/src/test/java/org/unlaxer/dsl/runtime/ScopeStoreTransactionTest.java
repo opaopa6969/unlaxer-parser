@@ -80,10 +80,15 @@ public class ScopeStoreTransactionTest {
             long diagnosed = ctx.getMemoizationStateVersion();
             assertTrue(entered > initial);
             assertTrue(declared > entered);
-            assertTrue(referenced > declared);
-            assertTrue(diagnosed > referenced);
+            // References and symbol diagnostics are only read after the parse, so recording them
+            // must not invalidate memoized outcomes (#269: every `$var` reference used to make the
+            // rest of the parse miss the memo table).
+            assertEquals(declared, referenced);
+            assertEquals(declared, diagnosed);
             ctx.rollback(parser);
             assertEquals(initial, ctx.getMemoizationStateVersion());
+            assertTrue(ScopeStore.getAllReferences(ctx).isEmpty());
+            assertTrue(ScopeStore.getDiagnostics(ctx).isEmpty());
         }
     }
 
