@@ -16,18 +16,25 @@ implements Comparable<T> , Serializable , MinIntegerValue , MaxIntegerValue , Nu
   public IntegerValue(int value) {
     super();
     this.value = value;
-    if(minIntegerValue() > value || maxIntegerValue() <value) {
+    int minValue = minIntegerValue();
+    int maxValue = maxIntegerValue();
+    if(minValue > value || maxValue <value) {
       throw new IllegalArgumentException(
-        "value is out of range(" + minIntegerValue() + " - " + maxIntegerValue() + "):" + value);
+        "value is out of range(" + minValue + " - " + maxValue + "):" + value);
     }
     
     // digit-length check skipped for hot IntegerValue subtypes whose bounds are
     // (0, Integer.MAX_VALUE). Subtypes with tighter bounds override skipLengthCheck().
     if (false == skipLengthCheck()) {
-      int numberOfDigits = (int) ((value == 0 ? 0 :Math.log10(value))+1);
-      if(minLength() > numberOfDigits|| maxLength() < numberOfDigits) {
-        throw new IllegalArgumentException(
-          "number of value's digits is out of range(" + minLength() + " - " + maxLength() + "):" + value);
+      int minLength = minLength();
+      int maxLength = maxLength();
+      // With the default bounds no digit count can fail, so Math.log10 is not needed.
+      if (minLength > 0 || maxLength < Integer.MAX_VALUE) {
+        int numberOfDigits = (int) ((value == 0 ? 0 :Math.log10(value))+1);
+        if(minLength > numberOfDigits|| maxLength < numberOfDigits) {
+          throw new IllegalArgumentException(
+            "number of value's digits is out of range(" + minLength + " - " + maxLength + "):" + value);
+        }
       }
     }
   }
