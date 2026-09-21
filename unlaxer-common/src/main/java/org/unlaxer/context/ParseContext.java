@@ -228,6 +228,8 @@ public class ParseContext implements
 
   // Present only while an exact generated safe rule is being evaluated with memoization enabled.
   private final Deque<FailureDiagnostic> memoDiagnosticFrames = new ArrayDeque<>();
+  // Transaction replay is semantic state, so it remains active without syntax diagnostics.
+  private final Deque<FailureDiagnostic> memoTransactionFrames = new ArrayDeque<>();
 
 	public ParseContext(Source source, ParseContextEffector... parseContextEffectors) {
 		this(source, ParseOptions.DEFAULT, parseContextEffectors);
@@ -270,7 +272,7 @@ public class ParseContext implements
 	 */
 	@Deprecated
 	public void enableMemoize() {
-		this.options = ParseOptions.withMemoization(Memoization.SAFE_FAILURES);
+		this.options = options.withMemoizationPolicy(Memoization.SAFE_FAILURES);
 		if (this.packratMemoTable == null) {
 			this.packratMemoTable = new PackratMemoTable();
 		}
@@ -522,13 +524,20 @@ public class ParseContext implements
 
   FailureDiagnostic beginMemoDiagnosticFrame() {
     FailureDiagnostic frame = new FailureDiagnostic();
-    frame.stackBaseDepth = parseFrames.size();
     frame.transactionBaseDepth = tokenStack.size();
-    memoDiagnosticFrames.push(frame);
+    memoTransactionFrames.push(frame);
+    if (options.diagnostics() == ParseOptions.Diagnostics.DETAILED) {
+      frame.stackBaseDepth = parseFrames.size();
+      memoDiagnosticFrames.push(frame);
+    }
     return frame;
   }
 
   void discardMemoDiagnosticFrame(FailureDiagnostic frame) {
+    if (memoTransactionFrames.pollFirst() != frame) {
+      throw new IllegalStateException("memo transaction frame nesting is illegal");
+    }
+    if (options.diagnostics() == ParseOptions.Diagnostics.DETAILED_ON_FAILURE) return;
     if (memoDiagnosticFrames.pollFirst() != frame) {
       throw new IllegalStateException("memo diagnostic frame nesting is illegal");
     }
@@ -568,6 +577,7 @@ public class ParseContext implements
    * memoized expected lists are read in place instead of being copied per frame.
    */
   void replayFailureDiagnostic(FailureDiagnostic diagnostic) {
+    if (options.diagnostics() == ParseOptions.Diagnostics.DETAILED_ON_FAILURE) return;
     int depth = parseFrames.size();
     int rebasedMaxSize = rebasedStackSize(diagnostic, diagnostic.maxReachedStackElements, depth);
     int rebasedFarthestSize = rebasedStackSize(diagnostic, diagnostic.farthestFailureStackElements, depth);
@@ -664,8 +674,8 @@ public class ParseContext implements
   }
 
   private void recordMemoTransactionBegin() {
-    if (memoDiagnosticFrames.isEmpty()) return;
-    for (FailureDiagnostic diagnostic : memoDiagnosticFrames) {
+    if (memoTransactionFrames.isEmpty()) return;
+    for (FailureDiagnostic diagnostic : memoTransactionFrames) {
       if (tokenStack.size() == diagnostic.transactionBaseDepth + 1) {
         diagnostic.transactionEvents.add(MemoTransactionEvent.BEGIN);
       }
@@ -673,8 +683,8 @@ public class ParseContext implements
   }
 
   private void recordMemoTransactionFinish(MemoTransactionEvent event) {
-    if (memoDiagnosticFrames.isEmpty()) return;
-    for (FailureDiagnostic diagnostic : memoDiagnosticFrames) {
+    if (memoTransactionFrames.isEmpty()) return;
+    for (FailureDiagnostic diagnostic : memoTransactionFrames) {
       if (tokenStack.size() == diagnostic.transactionBaseDepth) {
         diagnostic.transactionEvents.add(event);
       }
@@ -875,7 +885,17 @@ public class ParseContext implements
     ParserListenerContainer.super.endParse(parser, parsed, parseContext, tokenKind, invertMatch);
   }
 
+  /**
+   * Returns syntax diagnostics without reparsing. With DETAILED_ON_FAILURE this is empty:
+   * offset zero, empty expected/stack/trial lists, and no failure candidate. Explicit trial
+   * recording remains available separately through getTrialHistory().
+   */
   public ParseFailureDiagnostics getParseFailureDiagnostics() {
+    if (options.diagnostics() == ParseOptions.Diagnostics.DETAILED_ON_FAILURE) {
+      CodePointIndex start = new CodePointIndex(0);
+      return new ParseFailureDiagnostics(0, 0, 0, source.lineNumberFrom(start).value(),
+          source.codePointIndexInLineFrom(start).value(), List.of(), List.of(), List.of(), false);
+    }
     int effectiveOffset = Math.max(0, farthestFailureOffset >= 0 ? farthestFailureOffset : maxReachedOffset);
     CodePointIndex codePointIndex = new CodePointIndex(effectiveOffset);
     int line = source.lineNumberFrom(codePointIndex).value();
@@ -972,6 +992,7 @@ public class ParseContext implements
    * memo diagnostic frames allocates an iterator, so the loop is skipped while none are open.
    */
   void trackCursorProgress() {
+    if (options.diagnostics() == ParseOptions.Diagnostics.DETAILED_ON_FAILURE) return;
     int consumed = Transaction.super.getConsumedPosition().value();
     int matched = Transaction.super.getMatchedPosition().value();
     if (consumed > farthestConsumedOffset) {
@@ -1018,6 +1039,7 @@ public class ParseContext implements
    * farthest failure; a failure behind every frontier changes nothing and allocates nothing.
    */
   void registerFailureCandidate(ParseFrame frame) {
+    if (options.diagnostics() == ParseOptions.Diagnostics.DETAILED_ON_FAILURE) return;
     int candidateOffset = frame.maxOffset();
     FailureDiagnostic diagnostic = memoDiagnosticFrames.peekFirst();
     if (candidateOffset < farthestFailureOffset

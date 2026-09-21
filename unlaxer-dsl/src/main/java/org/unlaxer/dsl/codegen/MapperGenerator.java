@@ -164,6 +164,8 @@ public class MapperGenerator implements CodeGenerator {
                  * Validates full-input parsing without mapping or clearing retained source maps.
                  * Empty means parser acceptance, not successful AST mapping or evaluation.
                  * Native syntax hints are backend-specific; trailing input always expects end of input.
+                 * DETAILED_ON_FAILURE retries failures in a fresh DETAILED context with the same memo policy.
+                 * Custom parsers must not depend on diagnostics and must be safe to run twice.
                  */
                 public static synchronized Optional<ParseDiagnostic> diagnose(String source) {
             """);
@@ -176,15 +178,23 @@ public class MapperGenerator implements CodeGenerator {
                         Parsed parsed = rootParser.parse(context);
                         int consumed = consumedLengthCompat(parsed.getConsumed());
                         if (parsed.isSucceeded() && consumed == source.length()) return Optional.empty();
-                        var nativeFailure = context.getParseFailureDiagnostics();
-                        List<String> hints = nativeFailure.getExpectedTokens().stream().sorted().toList();
-                        int farthest = nativeFailure.getFarthestOffset();
-                        if (parsed.isSucceeded()) {
-                            int offset = source.codePointCount(0, consumed);
-                            return Optional.of(new ParseDiagnostic("trailing_input", offset, List.of("end of input"), farthest, hints));
+                        if (options.diagnostics() == ParseOptions.Diagnostics.DETAILED) {
+                            return Optional.of(failureDiagnostic(source, context, parsed));
                         }
-                        return Optional.of(new ParseDiagnostic("syntax", farthest, hints, farthest, hints));
                     }
+                    // Close the first context before retrying with a fresh memo table and state.
+                    return diagnose(source, options.withDiagnostics(ParseOptions.Diagnostics.DETAILED));
+                }
+
+                private static ParseDiagnostic failureDiagnostic(String source, ParseContext context, Parsed parsed) {
+                    var nativeFailure = context.getParseFailureDiagnostics();
+                    List<String> hints = nativeFailure.getExpectedTokens().stream().sorted().toList();
+                    int farthest = nativeFailure.getFarthestOffset();
+                    if (parsed.isSucceeded()) {
+                        int offset = source.codePointCount(0, consumedLengthCompat(parsed.getConsumed()));
+                        return new ParseDiagnostic("trailing_input", offset, List.of("end of input"), farthest, hints);
+                    }
+                    return new ParseDiagnostic("syntax", farthest, hints, farthest, hints);
                 }
 
             """);
@@ -350,12 +360,16 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("        } finally {\n");
         sb.append("            context.close();\n");
         sb.append("        }\n");
-        sb.append("        if (!parsed.isSucceeded()) {\n");
-        sb.append("            throw new IllegalArgumentException(\"Parse failed: \" + source);\n");
-        sb.append("        }\n");
         sb.append("        int consumed = consumedLengthCompat(parsed.getConsumed());\n");
+        sb.append("        if ((!parsed.isSucceeded() || consumed != source.length())\n");
+        sb.append("                && options.diagnostics() == ParseOptions.Diagnostics.DETAILED_ON_FAILURE) {\n");
+        sb.append("            return parse(source, preferredAstSimpleName, options.withDiagnostics(ParseOptions.Diagnostics.DETAILED));\n");
+        sb.append("        }\n");
+        sb.append("        if (!parsed.isSucceeded()) {\n");
+        sb.append("            throw new IllegalArgumentException(\"Parse failed: \" + source + \"; \" + failureDiagnostic(source, context, parsed));\n");
+        sb.append("        }\n");
         sb.append("        if (consumed != source.length()) {\n");
-        sb.append("            throw new IllegalArgumentException(\"Parse failed at offset \" + consumed + \": \" + source);\n");
+        sb.append("            throw new IllegalArgumentException(\"Parse failed at offset \" + consumed + \": \" + source + \"; \" + failureDiagnostic(source, context, parsed));\n");
         sb.append("        }\n");
         // Capture-site metadata includes successful zero-width matches. The generic reducer
         // drops empty children and mutates the CST, so typed mapping must use the original tree.

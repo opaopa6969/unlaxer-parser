@@ -97,8 +97,9 @@ checkpoint / memo hit のカウンタはその context の解析だけを数え�
 解析中の診断で受理判定を変える custom parser や、再実行できない callback・外部作用がある場合は
 `Detailed` を使う。`ParseOptions` の構造体リテラルには追加の `diagnostics` フィールドか
 `..ParseOptions::default()` が必要で、既存の constructor と関数シグネチャは維持する。
-これは issue #257 の Rust 限定実験であり、Java の同等モードは未実装。Java/Rust 共通機能の完了とは扱わず、
-既存の生成文字列が変わらないことを `RustNativeEmitterTest` で検証する。
+Java の同等モードは issue #259 の `ParseOptions.Diagnostics.DETAILED_ON_FAILURE`。
+[Java の診断ポリシーと対応表](../docs/java-diagnostics-policy.md)を参照。
+Rust の既存の生成文字列が変わらないことを `RustNativeEmitterTest` で検証する。
 
 ### 対応するUBNF
 

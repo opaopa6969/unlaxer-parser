@@ -333,6 +333,8 @@ UBNF 文法ファイル `unlaxer-dsl/grammar/ubnf.ubnf` 自体が UBNF で記述
 
 ## ドキュメント
 
+[Java の構文診断ポリシー（DetailedOnFailure）](docs/java-diagnostics-policy.md)
+
 | ドキュメント | 説明 | 言語 |
 |------------|------|------|
 | [Getting Started](./docs/getting-started-ja.md) | Maven 設定、最初の文法、完全ウォークスルー | [EN](./docs/getting-started.md) / [JA](./docs/getting-started-ja.md) |
