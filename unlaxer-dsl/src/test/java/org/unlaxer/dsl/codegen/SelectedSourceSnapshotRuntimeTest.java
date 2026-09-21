@@ -88,12 +88,179 @@ public class SelectedSourceSnapshotRuntimeTest {
             .invoke(null, token, preferred);
     }
 
+    private Object selectTree(Object tree, String preferred) throws Exception {
+        return tree.getClass().getMethod("select", String.class).invoke(tree, preferred);
+    }
+
     private Optional<?> span(Object snapshot, Object node) throws Exception {
         return (Optional<?>) snapshot.getClass().getMethod("sourceSpanOf", Object.class).invoke(snapshot, node);
     }
 
     private void assertSpan(Object snapshot, Object node, int start, int end) throws Exception {
         assertArrayEquals(new int[]{start, end}, (int[]) span(snapshot, node).orElseThrow());
+    }
+
+    @Test public void mappedTreeSelectionsMatchLegacyForEveryTypeAndDefault() throws Exception {
+        try (var loader = compile(RULES)) {
+            Class<?> mapper = mapper(loader);
+            for (String source : List.of("😀1+1", "2")) {
+                Token root = parseToken(loader, source);
+                for (String entry : List.of("mapParsedTree", "mapSubtreeTree")) {
+                    Object tree = mapper.getMethod(entry, Token.class).invoke(null, root);
+                    for (String preferred : new String[]{"Pair", "Item", "Missing", null, "", " \t"}) {
+                        Object selected = selectTree(tree, preferred);
+                        Object legacy = mapper.getMethod("selectSubtreeTokenWithSourceMap", Token.class, String.class)
+                            .invoke(null, root, preferred);
+                        Object snapshot = field(selected, "sourceMap");
+                        Object oldSnapshot = field(legacy, "sourceMap");
+                        Object ast = field(snapshot, "ast");
+                        Object oldAst = field(oldSnapshot, "ast");
+                        assertSame(field(legacy, "token"), field(selected, "token"));
+                        assertEquals(oldAst, ast);
+                        assertNotSame(oldAst, ast);
+                        assertArrayEquals((int[]) span(oldSnapshot, oldAst).orElseThrow(),
+                            (int[]) span(snapshot, ast).orElseThrow());
+                        assertSpan(snapshot, ast, source.equals("2") ? 0 : "Item".equals(preferred) ? 3 : 0,
+                            source.equals("2") ? 1 : 4);
+                        assertFalse(span(snapshot, oldAst).isPresent());
+                        assertFalse(span(oldSnapshot, ast).isPresent());
+                    }
+                    assertSame(field(selectTree(tree, null), "token"), field(field(tree, "selectDefault"), "token"));
+                }
+            }
+        }
+    }
+
+    @Test public void mappedTreeSharesMemoizedAstAcrossSelectionsOfTheSameToken() throws Exception {
+        try (var loader = compile(RULES)) {
+            Class<?> mapper = mapper(loader);
+            Object tree = mapper.getMethod("mapParsedTree", Token.class).invoke(null, parseToken(loader, "😀1+1"));
+            Object selected = selectTree(tree, "Pair");
+            Object ast = field(field(selected, "sourceMap"), "ast");
+            var memoField = mapper.getDeclaredField("MAP_MEMO");
+            memoField.setAccessible(true);
+            var memo = (java.util.Map<?, ?>) memoField.get(null);
+            assertSame(memo.get(field(selected, "token")), ast);
+            for (String preferred : new String[]{"Pair", "Missing", null, " "}) {
+                Object again = selectTree(tree, preferred);
+                assertSame(field(selected, "token"), field(again, "token"));
+                assertSame(ast, field(field(again, "sourceMap"), "ast"));
+            }
+            Object item = selectTree(tree, "Item");
+            Object itemAst = field(field(item, "sourceMap"), "ast");
+            assertSame(memo.get(field(item, "token")), itemAst);
+            assertSame(itemAst, field(field(selectTree(tree, "Item"), "sourceMap"), "ast"));
+            assertSame(ast, field(field(field(tree, "selectDefault"), "sourceMap"), "ast"));
+        }
+    }
+
+    @Test public void mappedTreeSurvivesEveryLegacyEntryAndAnotherTreeMapping() throws Exception {
+        try (var loader = compile(RULES)) {
+            Class<?> mapper = mapper(loader);
+            Token root = parseToken(loader, "😀1+1");
+            Object tree = mapper.getMethod("mapSubtreeTree", Token.class).invoke(null, root);
+            Object selected = selectTree(tree, "Pair");
+            Object snapshot = field(selected, "sourceMap");
+            Object ast = field(snapshot, "ast");
+            Object left = field(ast, "left");
+            Object right = field(ast, "right");
+            Object itemAst = field(field(selectTree(tree, "Item"), "sourceMap"), "ast");
+            for (String entry : List.of("mapParsedToken", "mapSubtreeToken",
+                    "mapParsedTokenWithSourceMap", "mapSubtreeTokenWithSourceMap",
+                    "selectParsedTokenWithSourceMap", "selectSubtreeTokenWithSourceMap",
+                    "mapParsedTree", "mapSubtreeTree", "parse")) {
+                Object other = entry.equals("parse")
+                    ? mapper.getMethod(entry, String.class).invoke(null, "😀1+1")
+                    : mapper.getMethod(entry, Token.class).invoke(null, root);
+                Object otherAst = entry.equals("parse") ? other
+                    : entry.endsWith("Tree") ? field(field(field(other, "selectDefault"), "sourceMap"), "ast")
+                    : entry.startsWith("select") ? field(field(other, "sourceMap"), "ast") : field(other, "ast");
+                assertEquals(ast, otherAst);
+                assertNotSame(ast, otherAst);
+                assertFalse(span(snapshot, otherAst).isPresent());
+                Object again = selectTree(tree, "Pair");
+                Object againMap = field(again, "sourceMap");
+                assertSame(field(selected, "token"), field(again, "token"));
+                assertSame(ast, field(againMap, "ast"));
+                for (Object retained : List.of(snapshot, againMap)) {
+                    assertSpan(retained, ast, 0, 4);
+                    assertSpan(retained, left, 1, 2);
+                    assertSpan(retained, right, 3, 4);
+                    assertFalse(span(retained, otherAst).isPresent());
+                }
+                Object itemMap = field(selectTree(tree, "Item"), "sourceMap");
+                assertSame(itemAst, field(itemMap, "ast"));
+                assertSpan(itemMap, itemAst, 3, 4);
+            }
+            int[] exposed = (int[]) span(snapshot, right).orElseThrow();
+            exposed[0] = 99;
+            assertSpan(snapshot, right, 3, 4);
+        }
+    }
+
+    @Test public void mappedTreeFoldPreservesDepthAndLaterPreorderTies() throws Exception {
+        try (var loader = compile(RULES)) {
+            Class<?> mapper = mapper(loader);
+            Token root = parseToken(loader, "1");
+            Token first = (Token) field(select(mapper, root, "Item"), "token");
+            Token second = (Token) field(select(mapper, parseToken(loader, "2"), "Item"), "token");
+            // Equal start offsets and depths: later wins. A deeper later token must lose.
+            for (boolean deeper : List.of(false, true)) {
+                Token synthetic = root.newCreatesOf(first, deeper ? root.newCreatesOf(second) : second);
+                Object tree = mapper.getMethod("mapSubtreeTree", Token.class).invoke(null, synthetic);
+                for (String preferred : new String[]{"Item", "Missing", null, " "}) {
+                    Object selected = selectTree(tree, preferred);
+                    assertSame(deeper ? first : second, field(selected, "token"));
+                    assertSame(field(select(mapper, synthetic, preferred), "token"), field(selected, "token"));
+                }
+            }
+        }
+    }
+
+    @Test public void mappedTreePreservesRootAndSubtreeValidationFailures() throws Exception {
+        try (var loader = compile("""
+            @root @mapping(Node) Root ::= A | B;
+            @mapping(First) A ::= 'a';
+            @mapping(Second) B ::= 'b';
+            Empty ::= 'z';
+            """)) {
+            Class<?> mapper = mapper(loader);
+            Token root = parseToken(loader, "a");
+            Object tree = mapper.getMethod("mapParsedTree", Token.class).invoke(null, root);
+            assertSame(root, field(field(tree, "selectDefault"), "token"));
+            Token alternate;
+            try (var context = new ParseContext(StringSource.createRootSource("a"))) {
+                alternate = parser(loader).parse(context).getRootToken(false);
+            }
+            Object subtree = mapper.getMethod("mapSubtreeTree", Token.class).invoke(null, alternate);
+            assertSame(alternate, field(field(subtree, "selectDefault"), "token"));
+            Parser emptyParser = Parser.get(loader.loadClass("org.example.snapshot.SnapshotParsers$EmptyParser")
+                .asSubclass(Parser.class));
+            Token empty;
+            try (var context = new ParseContext(StringSource.createRootSource("z"))) {
+                assertTrue(emptyParser.parse(context).isSucceeded());
+                empty = context.getCurrent().getTokens().stream().filter(t -> t.parser == emptyParser)
+                    .findFirst().orElseThrow();
+            }
+            Token foreign;
+            try (var context = new ParseContext(StringSource.createRootSource("a"))) {
+                foreign = new org.unlaxer.parser.elementary.WordParser("a").parse(context).getRootToken(false);
+            }
+            for (String kind : List.of("Parsed", "Subtree")) {
+                Token[] badTokens = kind.equals("Parsed") ? new Token[]{null, alternate, foreign}
+                    : new Token[]{null, foreign, empty};
+                for (Token bad : badTokens) {
+                    var legacy = assertThrows(InvocationTargetException.class,
+                        () -> mapper.getMethod("map" + kind + "Token", Token.class).invoke(null, bad));
+                    var current = assertThrows(InvocationTargetException.class,
+                        () -> mapper.getMethod("map" + kind + "Tree", Token.class).invoke(null, bad));
+                    assertEquals(legacy.getCause().getClass(), current.getCause().getClass());
+                    assertEquals(legacy.getCause().getMessage(), current.getCause().getMessage());
+                }
+            }
+            Object snapshot = field(selectTree(tree, "First"), "sourceMap");
+            assertSpan(snapshot, field(snapshot, "ast"), 0, 1);
+        }
     }
 
     @Test public void preferredAndDefaultReturnLegacySelectedTokenAndMatchingAstIdentity() throws Exception {

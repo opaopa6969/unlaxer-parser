@@ -114,11 +114,15 @@ public class SnapshotMapper {
         private final SpanLayer spans;
 
         private SourceMappedAst(T ast) {
-            this.ast = ast;
+            this(ast, NODE_SOURCE_SPANS);
             // Owns the current layers by freezing them: later registrations and later parses
             // write to new layers, so this snapshot never changes and needs no copy.
-            NODE_SOURCE_SPANS.frozen = true;
-            this.spans = NODE_SOURCE_SPANS;
+            spans.frozen = true;
+        }
+
+        private SourceMappedAst(T ast, SpanLayer spans) {
+            this.ast = ast;
+            this.spans = spans;
         }
 
         public T ast() { return ast; }
@@ -189,13 +193,23 @@ public class SnapshotMapper {
      * Use the committed parser root, not a choice's root-stripped Parsed token.
      */
     public static synchronized MappedAst mapParsedToken(Token rootToken, String preferredAstSimpleName) {
+        validateParsedRoot(rootToken);
+        return mapTokenTree(rootToken, preferredAstSimpleName);
+    }
+
+    /** Maps once for repeated selection; uses mapParsedToken's committed-root validation. */
+    public static synchronized MappedTree mapParsedTree(Token rootToken) {
+        validateParsedRoot(rootToken);
+        return mapTree(rootToken);
+    }
+
+    private static void validateParsedRoot(Token rootToken) {
         if (rootToken == null) {
             throw new IllegalArgumentException("rootToken must not be null");
         }
         if (rootToken.parser.getClass() != SnapshotParsers.ExprParser.class) {
             throw new IllegalArgumentException("Mapped root token is missing for Expr; pass the committed parser root from ParseContext.getCurrent().getTokens(), not a root-stripped token");
         }
-        return mapTokenTree(rootToken, preferredAstSimpleName);
     }
 
     /** Maps a committed token from an intentional alternate parser entry. */
@@ -205,13 +219,26 @@ public class SnapshotMapper {
 
     /** Maps a committed alternate-entry token, preferring an AST type by simple name. */
     public static synchronized MappedAst mapSubtreeToken(Token subtreeToken, String preferredAstSimpleName) {
+        validateSubtreeToken(subtreeToken);
+        return mapTokenTree(subtreeToken, preferredAstSimpleName);
+    }
+
+    /**
+     * Maps a committed alternate-entry token once for repeated selection.
+     * Uses mapSubtreeToken's generated-rule validation; callers must verify full-input consumption.
+     */
+    public static synchronized MappedTree mapSubtreeTree(Token subtreeToken) {
+        validateSubtreeToken(subtreeToken);
+        return mapTree(subtreeToken);
+    }
+
+    private static void validateSubtreeToken(Token subtreeToken) {
         if (subtreeToken == null) {
             throw new IllegalArgumentException("subtreeToken must not be null");
         }
         if (!isGeneratedRuleToken(subtreeToken)) {
             throw new IllegalArgumentException("subtreeToken must be produced by a rule parser from this generated grammar");
         }
-        return mapTokenTree(subtreeToken, preferredAstSimpleName);
     }
 
     private static boolean isGeneratedRuleToken(Token token) {
@@ -296,6 +323,77 @@ public class SnapshotMapper {
             throw new IllegalArgumentException("Root mapping token not found for Expr");
         }
         return toExprNode(mappingRoot);
+    }
+
+    /**
+     * One token-tree mapping with a frozen identity-based source map.
+     * AST instances are shared within this MappedTree: selecting the same token again
+     * returns the same AST instance, without re-mapping. Separate public mapping calls
+     * still create distinct AST instances. Later mappings cannot change these selections
+     * or their source spans. Retaining this object retains all mapped candidates.
+     */
+    public static final class MappedTree {
+        private final List<MappedTreeCandidate> candidates;
+        private final SpanLayer spans;
+
+        private MappedTree(List<MappedTreeCandidate> candidates, SpanLayer spans) {
+            this.candidates = List.copyOf(candidates);
+            spans.frozen = true;
+            this.spans = spans;
+        }
+
+        /** Selects without a preferred AST type. */
+        public SourceMappedSelection selectDefault() {
+            return select(null);
+        }
+
+        /**
+         * Folds candidates in preorder, using the legacy preferred-type selection:
+         * preferred matches first, then shallower depth, then greater start offset;
+         * ties select the later candidate. Null or blank means all types are preferred.
+         * An absent preferred type falls back to the default selection.
+         */
+        public SourceMappedSelection select(String preferredAstSimpleName) {
+            boolean anyType = preferredAstSimpleName == null || preferredAstSimpleName.isBlank();
+            MappingCandidate best = null;
+            SnapshotAST ast = null;
+            for (MappedTreeCandidate mapped : candidates) {
+                boolean preferred = anyType || mapped.simpleName.equals(preferredAstSimpleName);
+                MappingCandidate candidate = new MappingCandidate(
+                    mapped.token, mapped.depth, mapped.startOffset, preferred);
+                if (betterCandidate(best, candidate) == candidate) {
+                    best = candidate;
+                    ast = mapped.ast;
+                }
+            }
+            return new SourceMappedSelection(best.token, new SourceMappedAst<>(ast, spans));
+        }
+    }
+
+    private record MappedTreeCandidate(Token token, int depth, int startOffset,
+            String simpleName, SnapshotAST ast) {}
+
+    private static MappedTree mapTree(Token token) {
+        resetMappingMemos();
+        List<MappedTreeCandidate> candidates = new ArrayList<>();
+        collectMappedTreeCandidates(token, 0, candidates);
+        if (candidates.isEmpty()) {
+            throw new IllegalArgumentException("No mapped node found in token tree");
+        }
+        return new MappedTree(candidates, NODE_SOURCE_SPANS);
+    }
+
+    private static void collectMappedTreeCandidates(Token token, int depth,
+            List<MappedTreeCandidate> candidates) {
+        if (token == null) return;
+        SnapshotAST mapped = mapToken(token);
+        if (mapped != null) {
+            candidates.add(new MappedTreeCandidate(token, depth, tokenStartOffsetCompat(token),
+                mapped.getClass().getSimpleName(), mapped));
+        }
+        for (Token child : token.filteredChildren) {
+            collectMappedTreeCandidates(child, depth + 1, candidates);
+        }
     }
 
     private static SnapshotAST mapToken(Token token) {
