@@ -1066,3 +1066,63 @@ parser を速くしても、後段の mapper が O(n²) なら大きな入力で
 取り、比率が伸びている関数を探す（x1 で 18% → x64 で 80%）。木の走査結果を親から何度も要求する構造は部分木ごとのメモ化で、
 「snapshot のための全体コピー」は凍結レイヤ（生成後に変化しないことを構造で保証）で、いずれも線形に戻せる。ただし何を再利用できるかは
 契約テストが決める。今回は「呼び出しごとに新しい AST」という契約があったので、memo の再利用ではなくコピーの排除で線形化した。
+
+## ケース21: 失敗 memo を position バケットに分け、code point 変換を O(1) にする（Rust、入力サイズに対する超線形の修正）
+
+### 仮説
+
+ケース19（capture journal）の後も Rust parser 単体は 63 倍入力で 168 倍、facade で 156 倍だった。回数カウンタを n = 1 / 4 / 16 / 64 で
+取ると **全て入力倍率どおり（約 60〜63 倍）**で、`LongestChoice` / `Lookahead` は 0 回、expected の最大リスト長は 38 で一定、
+唯一 `code_point()` の二分探索比較だけが 97.8 倍（O(N log N)）だった。時間を区間に分けると、parse 本体が 85 倍、**parse 終了時の失敗 memo
+表の破棄が 541 倍**（0.345 → 186.7 ms）。x64 では memo 表が 345,583 エントリ・capacity 458,752、保持診断と合わせて約 53 MiB で、
+hash 参照と解放がキャッシュミスの連続になる。アルゴリズムの二乗ではなく、表の大きさに起因する局所性の問題と判断した。
+
+### 実装
+
+- 失敗 memo を position（code point offset）256 単位のバケットに分割（`FailureMemoBuckets`）。先頭バケットはインラインで持ち、小さな入力では
+  割当が増えない。キー項目（rule id、position、matched_position、whitespace、depth）・保持期間・hit 時の replay 順序・metric は不変
+- 非 ASCII 入力では byte → code point の逆引き表を入力構築時に O(N) で作り、`code_point()` / `span()` を O(1) に。ASCII 入力は
+  byte == code point なので表を持たない。既存の `byte_offsets` と境界外の拒否は維持
+- test: バケット境界（255 / 256 / 257）をまたぐ memo hit / miss、バケットの割当が使った範囲だけであること、非 ASCII の `span` が二分探索と
+  全境界で一致すること、境界外の拒否。`unlaxer-alloc-audit` は小入力の allocation を 11 回以下に固定
+
+### 観測
+
+Timing（Rust、Criterion、baseline = master `fcfd7c5`（#241 適用後）、candidate = 本ケース、いずれも worktree の path patch）。base fixture は 3-run 中央値:
+
+| Runtime | Fixture | Baseline runs | Baseline median | Candidate runs | Candidate median | 変化 |
+|---|---|---:|---:|---:|---:|---:|
+| Rust | complex | 3.077 / 2.977 / 3.072 | **3.072** | 2.949 / 3.011 / 2.892 | **2.949** | **-4.01%** |
+| Rust | comparison-heavy | 0.943 / 0.948 / 0.913 | **0.943** | 0.872 / 0.878 / 0.893 | **0.878** | **-6.94%** |
+
+public facade（x1 は run1、x4 以上は 1 run）:
+
+| Fixture | サイズ倍率 | baseline ms（倍率） | candidate ms（倍率） | 変化 |
+|---|---:|---:|---:|---:|
+| complex | 1.0x | 3.077（1.0x） | 2.949（1.0x） | -4.2% |
+| complex-x4 | 3.9x | 15.755（5.1x） | 12.607（4.3x） | -20.0% |
+| complex-x16 | 15.6x | 81.427（26.5x） | 52.414（17.8x） | -35.6% |
+| complex-x64 | 63.0x | 435.675（141.6x） | 222.657（75.5x） | -48.9% |
+| comparison-heavy | 1.0x | 0.943（1.0x） | 0.872（1.0x） | -7.5% |
+| comparison-heavy-x4 | 4.0x | 3.531（3.7x） | 3.351（3.8x） | -5.1% |
+| comparison-heavy-x16 | 16.0x | 18.083（19.2x） | 15.413（17.7x） | -14.8% |
+| comparison-heavy-x64 | 64.0x | 141.636（150.1x） | 77.469（88.8x） | -45.3% |
+
+parse-only-safe（parser 単体、1 run）:
+
+| Fixture | サイズ倍率 | baseline ms（倍率） | candidate ms（倍率） | 変化 |
+|---|---:|---:|---:|---:|
+| complex | 1.0x | 3.056（1.0x） | 2.821（1.0x） | -7.7% |
+| complex-x4 | 3.9x | 13.177（4.3x） | 12.512（4.4x） | -5.1% |
+| complex-x16 | 15.6x | 82.669（27.1x） | 51.782（18.4x） | -37.4% |
+| complex-x64 | 63.0x | 443.931（145.3x） | 218.026（77.3x） | -50.9% |
+
+base fixture で -4.0% / -6.9%、x64 で **-49% / -45%**、parser 単体の倍率は 145 → 77（入力 63 倍）。CST・失敗診断・`CheckpointMetrics` の fingerprint は
+不変で 147 tests が通る。**採用**。残る 1.2〜1.4 倍（75〜89 倍 / 63〜64 倍）は parse 終了時の memo 破棄（分割後も 44 ms、x1 の 151 倍）が主で、
+保持診断を連続 arena に置いてまとめて解放する案が次の候補。非 ASCII 入力では逆引き表の分だけメモリが増える（入力 byte 長 × usize）。
+
+### 教材としての要点
+
+倍率が悪いのに回数カウンタが線形なら、疑うのは「表の大きさ」と「解放」である。hash 表が L2 / L3 を超えると 1 参照が
+キャッシュミスになり、parse 終了時の drop は全エントリを触るので同じ崖を踏む。位置で分割すると同時に触る範囲が入力の一部に収まり、
+局所性が戻る。計測は parse 本体だけでなく drop の区間も測る。JFR や `Instant` の比率と同じく、この種の崖は小さな fixture では見えない。
