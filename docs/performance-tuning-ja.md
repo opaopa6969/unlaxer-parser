@@ -1126,3 +1126,58 @@ base fixture で -4.0% / -6.9%、x64 で **-49% / -45%**、parser 単体の倍�
 倍率が悪いのに回数カウンタが線形なら、疑うのは「表の大きさ」と「解放」である。hash 表が L2 / L3 を超えると 1 参照が
 キャッシュミスになり、parse 終了時の drop は全エントリを触るので同じ崖を踏む。位置で分割すると同時に触る範囲が入力の一部に収まり、
 局所性が戻る。計測は parse 本体だけでなく drop の区間も測る。JFR や `Instant` の比率と同じく、この種の崖は小さな fixture では見えない。
+
+## ケース22: packrat memo を position ブロックに分ける（Java、不採用）
+
+### 仮説
+
+分離計測で Java parser 単体（`parseOnlySafe`）は 63 倍入力で 70.5 倍。complex-x64 の JFR（50 サンプル）では parser CPU の上位が
+`HashMap.resize` 20%、`HashMap.getNode` 8% で、Rust のケース21（失敗 memo 表の巨大化）と同型だと考えた。`PackratMemoTable` は parser
+ごとに 1 つの `HashMap<PositionKey, Entry>` を持つ。
+
+### 実装
+
+parser ごとの表を consumed position 256 単位の `ArrayList<HashMap<PositionKey, Entry>>` に分割（使ったブロックだけ生成）。キー・エントリ・
+hit の意味は不変。Java 672 + 987 tests、TinyExpression p4-smoke 85 は成功。
+
+### 観測
+
+Timing（Java、baseline = master `3c64061`、candidate = branch `perf/memo-position-buckets-252` `522e813`、isolated Maven repo）。base fixture は 3-run 中央値:
+
+| Runtime | Fixture | Baseline runs | Baseline median | Candidate runs | Candidate median | 変化 |
+|---|---|---:|---:|---:|---:|---:|
+| Java | complex | 46.283 / 42.047 / 44.200 | **44.200** | 44.649 / 43.062 / 42.614 | **43.062** | **-2.58%** |
+| Java | comparison-heavy | 26.240 / 27.066 / 25.597 | **26.240** | 25.231 / 27.057 / 26.794 | **26.794** | **+2.11%** |
+
+x1 / x4 / x16 / x64（`parseOnlySafe` と `publicFacade`、1 fork × 5 iteration、各 1 run）:
+
+parseOnlySafe:
+
+| Fixture | サイズ倍率 | baseline ms（倍率） | candidate ms（倍率） | 変化 |
+|---|---:|---:|---:|---:|
+| complex | 1.0x | 36.8（1.0x） | 34.9（1.0x） | -5.0% |
+| complex-x4 | 3.9x | 143.4（3.9x） | 158.4（4.5x） | +10.4% |
+| complex-x16 | 15.6x | 618.2（16.8x） | 599.8（17.2x） | -3.0% |
+| complex-x64 | 63.0x | 2293.5（62.4x） | 2711.4（77.6x） | +18.2% |
+
+publicFacade:
+
+| Fixture | サイズ倍率 | baseline ms（倍率） | candidate ms（倍率） | 変化 |
+|---|---:|---:|---:|---:|
+| complex | 1.0x | 42.1（1.0x） | 42.1（1.0x） | -0.1% |
+| complex-x4 | 3.9x | 192.4（4.6x） | 164.3（3.9x） | -14.6% |
+| complex-x16 | 15.6x | 760.2（18.1x） | 675.0（16.0x） | -11.2% |
+| complex-x64 | 63.0x | 3774.2（89.6x） | 3890.9（92.5x） | +3.1% |
+
+改善なし。base は -2.6% / +2.1% でノイズ内、x64 は parser 単体 +18%、facade +3%、x4 / x16 の facade -11〜-15% と方向が揃わず、
+1 run の JMH のばらつき（x64 で ±10%）の範囲。**不採用**（実装は branch に保存）。
+
+この計測で baseline の parser 単体倍率は 62.4 倍（入力 63 倍）で、分離計測の 70.5 倍は run 間の揺れだったと分かった。つまり Java parser は
+すでにほぼ線形で、JFR の `HashMap.resize` 20% は 50 サンプルの偶然。Java の facade の超線形（86 倍）はケース20 に書いた候補ごとの再 mapping が主。
+
+### 教材としての要点
+
+同じ構造でも、崖の位置は言語と実装で違う。Rust の memo 表は 1 parse で 34 万エントリの 1 表だったが、Java は parser ごとに表が分かれて
+おり（数百表）、1 表あたりは小さく崖に達していなかった。「片方で効いた施策をもう片方に当てる」のは候補発見としては正しいが、採否は
+やはり A/B で決める。50 サンプルの JFR CPU 比率は候補発見にも弱い。倍率の比較は 1 run では ±10% 揺れるので、線形性の判断は
+複数 run の中央値か、JMH の fork / iteration を増やして行う。
