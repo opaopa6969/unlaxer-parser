@@ -1412,3 +1412,61 @@ parser 単体で **-17%（x1）/ -24.5%（x64）**、entry では mapping 分が
 Rust（-35〜-51%）より Java の効果（-17〜-25%）が小さいのは、Java の失敗診断が「記録」だけでなく frame の維持と listener 連携に組み込まれており、
 記録を止めても骨格が残るから。同じ設計案でも runtime の構造で回収できる割合が違うので、実装前の差分計測（上限）と実装後の実測を
 両方記録して、差の理由（ここでは frame 管理）を次の候補にする。
+
+## ケース27: 診断方針 `Auto` を既定にする（設計問答 提案2 の最小案、Java / Rust）
+
+### 仮説
+
+ケース25 / 26 の `DetailedOnFailure` は利用者が選ぶ opt-in で、「その文法・その parser で安全に選べるか」は利用者の責任だった。
+要求する結果と parser の性質から実行方式を選ぶ準備層（提案2）の最初の形として、既定を `Auto` にし、準備時に 1 回だけ
+`DetailedOnFailure` か `Detailed` に解決する。低水準 API の利用者（失敗後に診断を読む既存コード）の観測結果を変えないことが条件。
+
+### 実装（Rust PR #265、Java PR #266。codex に並行で委譲しレビュー）
+
+| 入口 | grammar / parser 木 | 解決先 |
+|---|---|---|
+| 生成 entry point（失敗時に `Detailed` で再解析できる） | 未宣言の custom / 手書き parser を含まない | `DetailedOnFailure` |
+| 同 entry point | 含む | `Detailed` |
+| 低水準 API（`ParseContext` を直接使う、再解析なし） | いずれも | `Detailed` |
+
+- 性質の宣言: Rust `Expr::CustomWith { parser, reads_diagnostics, replayable }`、Java marker interface `DiagnosticsAgnostic`。未宣言は保守的に `Detailed`。
+  生成 parser は marker を実装し、Java の生成 mapper は root の走査結果（`DiagnosticsSafety.isDeferredDiagnosticsSafe`）を文法ごとに `static final` でキャッシュ
+  （generator が「全て library」と断言できるとは限らない。生成文法は custom token に手書き parser を指定できる）
+- 明示で `Detailed` / `DetailedOnFailure` を選べば従来どおり固定。失敗が多い用途は `Detailed` を明示する（README / `docs/java-diagnostics-policy.md`）
+
+### 観測
+
+Rust（Criterion、既定同士: baseline = master `5f70015`（`Detailed`）、candidate = 既定 `Auto`。tinyexpression の生成 grammar は custom を含まないので
+`DetailedOnFailure` に解決）:
+
+| Runtime | Fixture | Baseline runs | Baseline median | Candidate runs | Candidate median | 変化 |
+|---|---|---:|---:|---:|---:|---:|
+| Rust | complex | 2.152 / 2.155 / 2.164 | **2.155** | 1.400 / 1.426 / 1.569 | **1.426** | **-33.83%** |
+| Rust | comparison-heavy | 0.622 / 0.618 / 0.615 | **0.618** | 0.473 / 0.473 / 0.471 | **0.473** | **-23.49%** |
+
+x64: complex 146.9 → 92.6 ms（-36.9%）、comparison-heavy 45.5 → 31.3 ms（-31.3%）。失敗入力は +69〜+72%。
+
+Java（JMH、既定同士、public facade 3-run 中央値）:
+
+| Runtime | Fixture | Baseline runs | Baseline median | Candidate runs | Candidate median | 変化 |
+|---|---|---:|---:|---:|---:|---:|
+| Java | complex | 40.675 / 42.814 / 40.761 | **40.761** | 41.862 / 43.481 / 41.988 | **41.988** | **+3.01%** |
+| Java | comparison-heavy | 26.293 / 25.063 / 26.366 | **26.293** | 25.093 / 24.825 / 26.613 | **25.093** | **-4.56%** |
+
+Java は変化なし（ノイズ内）。tinyexpression の facade は低水準 `new ParseContext(...)` を使い、生成 entry には marker 未宣言の手書き
+`StringLiteralParser` が含まれるため、どちらも `DETAILED` に解決される。生成 entry で既定（Auto）と明示 `DETAILED` を比べても一致:
+
+| Fixture | entryDetailed ms | entryAuto ms（既定） | 差 |
+|---|---:|---:|---:|
+| complex-x64 | 2440.9 | 2342.6 | -4.0% |
+| complex-half | 15.1 | 14.8 | -2.0% |
+
+つまり **Java の tinyexpression は既定変更だけでは速くならない**。marker の付与と facade の経路変更は tinyexpression #168 で行う。
+設計どおり、低水準 API 利用者の観測結果は変わっていない。
+
+### 教材としての要点
+
+「既定を速い方に変える」は、その速さを受け取れる入口と受け取れない入口を分けて初めて安全になる。低水準 API では従来どおり、
+再解析できる入口だけで自動選択する、という規則にしたので、既存コードは何も変わらず、生成 parser の利用者は何もしなくても速くなる。
+一方で、手書き parser が 1 つでも未宣言だと文法全体が `Detailed` に落ちる。性質の宣言は利用者の自己申告なので、宣言の意味
+（解析中に診断を読まない、再実行できる）を文書に固定し、差分テストで両モードの一致を守る。

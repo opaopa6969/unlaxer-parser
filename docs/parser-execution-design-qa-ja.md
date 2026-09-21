@@ -121,6 +121,18 @@ parser.parse(context);
 
 Java/Rust で API の表現は異なってよいが、要求する機能、適用条件、観測可能な結果は揃える。
 
+### 実装（2026-09-21、最小案、unlaxer-parser #261）
+
+決定: `ParseProfile` / `PreparedParser` は選ぶ軸が診断以外にも増えた時点で設計し、いまは既存 `ParseOptions` に `Auto`（Rust `Diagnostics::Auto`、
+Java `Diagnostics.AUTO`）を足して**既定**にした。Auto は準備時に 1 回解決する: 生成 entry point（失敗時に `Detailed` で再解析できる）で
+未宣言の custom / 手書き parser を含まなければ `DetailedOnFailure`、含めば `Detailed`、低水準 API では常に `Detailed`。custom parser は
+Rust `Expr::CustomWith`、Java `DiagnosticsAgnostic` で「解析中に診断を読まない、再実行できる」を宣言し、未宣言は保守的に扱う。
+
+実測（[ケース27](performance-tuning-ja.md)）: Rust の tinyexpression は既定で `DetailedOnFailure` に解決され facade -33.8% / -23.5%。
+Java の tinyexpression は手書き `StringLiteralParser` が未宣言で、facade も低水準 API のため `DETAILED` のまま（tinyexpression #168）。
+低水準 API 利用者の観測結果は変わらないことを test で固定した。要求する機能を診断以外（CST / trace / 補完）へ広げる段階で、
+この解決規則を capability 表に一般化する（#264）。
+
 ## 提案3: 動的に定義した parser を一度だけ実行計画へ変換する
 
 ```text
