@@ -107,6 +107,18 @@ public class MapperGeneratorTest {
     }
 
     @Test
+    public void testGeneratedSourceContainsMappedTreeApi() {
+        GrammarDecl grammar = parseGrammar(TINYCALC_GRAMMAR);
+        String source = new MapperGenerator().generate(grammar).source();
+        assertTrue(source.contains("public static synchronized MappedTree mapParsedTree(Token rootToken)"));
+        assertTrue(source.contains("public static synchronized MappedTree mapSubtreeTree(Token subtreeToken)"));
+        assertTrue(source.contains("public static final class MappedTree"));
+        assertTrue(source.contains("public SourceMappedSelection select(String preferredAstSimpleName)"));
+        assertTrue(source.contains("public SourceMappedSelection selectDefault()"));
+        assertTrue(source.contains("AST instances are shared within this MappedTree"));
+    }
+
+    @Test
     public void testGeneratedSourceContainsPublicParsedTokenMappingApi() {
         GrammarDecl grammar = parseGrammar(TINYCALC_GRAMMAR);
         String source = new MapperGenerator().generate(grammar).source();

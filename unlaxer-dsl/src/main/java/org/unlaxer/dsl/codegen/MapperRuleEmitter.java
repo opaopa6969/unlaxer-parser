@@ -24,6 +24,83 @@ class MapperRuleEmitter {
 
     private MapperRuleEmitter() {}
 
+    /** One mapping generation retained independently of the mutable mapping memos. */
+    static String emitMappedTree(String astClass) {
+        return """
+                /**
+                 * One token-tree mapping with a frozen identity-based source map.
+                 * AST instances are shared within this MappedTree: selecting the same token again
+                 * returns the same AST instance, without re-mapping. Separate public mapping calls
+                 * still create distinct AST instances. Later mappings cannot change these selections
+                 * or their source spans. Retaining this object retains all mapped candidates.
+                 */
+                public static final class MappedTree {
+                    private final List<MappedTreeCandidate> candidates;
+                    private final SpanLayer spans;
+
+                    private MappedTree(List<MappedTreeCandidate> candidates, SpanLayer spans) {
+                        this.candidates = List.copyOf(candidates);
+                        spans.frozen = true;
+                        this.spans = spans;
+                    }
+
+                    /** Selects without a preferred AST type. */
+                    public SourceMappedSelection selectDefault() {
+                        return select(null);
+                    }
+
+                    /**
+                     * Folds candidates in preorder, using the legacy preferred-type selection:
+                     * preferred matches first, then shallower depth, then greater start offset;
+                     * ties select the later candidate. Null or blank means all types are preferred.
+                     * An absent preferred type falls back to the default selection.
+                     */
+                    public SourceMappedSelection select(String preferredAstSimpleName) {
+                        boolean anyType = preferredAstSimpleName == null || preferredAstSimpleName.isBlank();
+                        MappingCandidate best = null;
+                        %1$s ast = null;
+                        for (MappedTreeCandidate mapped : candidates) {
+                            boolean preferred = anyType || mapped.simpleName.equals(preferredAstSimpleName);
+                            MappingCandidate candidate = new MappingCandidate(
+                                mapped.token, mapped.depth, mapped.startOffset, preferred);
+                            if (betterCandidate(best, candidate) == candidate) {
+                                best = candidate;
+                                ast = mapped.ast;
+                            }
+                        }
+                        return new SourceMappedSelection(best.token, new SourceMappedAst<>(ast, spans));
+                    }
+                }
+
+                private record MappedTreeCandidate(Token token, int depth, int startOffset,
+                        String simpleName, %1$s ast) {}
+
+                private static MappedTree mapTree(Token token) {
+                    resetMappingMemos();
+                    List<MappedTreeCandidate> candidates = new ArrayList<>();
+                    collectMappedTreeCandidates(token, 0, candidates);
+                    if (candidates.isEmpty()) {
+                        throw new IllegalArgumentException("No mapped node found in token tree");
+                    }
+                    return new MappedTree(candidates, NODE_SOURCE_SPANS);
+                }
+
+                private static void collectMappedTreeCandidates(Token token, int depth,
+                        List<MappedTreeCandidate> candidates) {
+                    if (token == null) return;
+                    %1$s mapped = mapToken(token);
+                    if (mapped != null) {
+                        candidates.add(new MappedTreeCandidate(token, depth, tokenStartOffsetCompat(token),
+                            mapped.getClass().getSimpleName(), mapped));
+                    }
+                    for (Token child : token.filteredChildren) {
+                        collectMappedTreeCandidates(child, depth + 1, candidates);
+                    }
+                }
+
+            """.formatted(astClass);
+    }
+
     /**
      * mapToken() メソッドを生成する。
      */
