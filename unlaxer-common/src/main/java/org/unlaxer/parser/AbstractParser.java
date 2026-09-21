@@ -38,7 +38,7 @@ public abstract class AbstractParser implements Parser {
 	
 	Map<Name,Parser> parserByName = new HashMap<>();
 	
-	boolean donePrepareChildren = false;
+	volatile boolean donePrepareChildren = false;
 	
 	NodeReduceMarker nodeReduceMarker;
 	
@@ -138,11 +138,22 @@ public abstract class AbstractParser implements Parser {
 		nodeReduceMarker.parent = Optional.of(nodeReduceMarker);
 	}
 
+	/**
+	 * Parsers are shared singletons, so the lazy child preparation must happen exactly once even
+	 * when several threads start parsing at the same time. Without the lock a second thread could
+	 * observe the container while the first one is still filling it and fail with a
+	 * ConcurrentModificationException in the choice/chain iteration (#202); the volatile flag
+	 * publishes the fully prepared list to readers that skip the lock.
+	 */
 	@Override
 	public Parsers getChildren() {
 		if(false == donePrepareChildren){
-			prepareChildren(children);
-			donePrepareChildren = true;
+			synchronized (this) {
+				if(false == donePrepareChildren){
+					prepareChildren(children);
+					donePrepareChildren = true;
+				}
+			}
 		}
 		return children;
 	}

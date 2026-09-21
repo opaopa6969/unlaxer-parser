@@ -7,6 +7,7 @@ import org.unlaxer.TokenList;
 import org.unlaxer.parser.ChildOccurs;
 import org.unlaxer.parser.MetaFunctionParser;
 import org.unlaxer.parser.Parser;
+import java.util.List;
 import org.unlaxer.parser.Parsers;
 import org.unlaxer.parser.PseudoRootParser;
 import org.unlaxer.util.Singletons;
@@ -106,11 +107,29 @@ public abstract class AbstractTokenReducer implements CommittedReducer {
 			parsers.addAll(reduce(childParser));
 		}
 
-		token.parser.getChildren().clear();
-		token.parser.getChildren().addAll(parsers);
+		// Parsers are shared singletons and this flattening is idempotent: after the first parse the
+		// children already hold exactly this list. Skipping the rewrite in that case keeps concurrent
+		// parses, which may be iterating the same children, from failing with a
+		// ConcurrentModificationException (#202).
+		if (false == sameParsers(childParsers, parsers)) {
+			token.parser.getChildren().clear();
+			token.parser.getChildren().addAll(parsers);
+		}
 		tokens.add(token);
 
 		return tokens;
+	}
+
+	private static boolean sameParsers(List<Parser> current, List<Parser> replacement) {
+		if (current.size() != replacement.size()) {
+			return false;
+		}
+		for (int i = 0, size = current.size(); i < size; i++) {
+			if (current.get(i) != replacement.get(i)) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	private Parsers reduce(Parser parser) {
