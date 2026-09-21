@@ -1362,3 +1362,53 @@ Java 側の同等モード。
 「常時収集」と「必要になったら作る」の切り替えは、収集コストが成功経路の 35〜48% を占める場合に効く。代償は失敗時の再解析（約 1.5〜1.75 倍）で、
 用途ごとに損益が逆転する。だから runtime が既定を決めるのではなく、要求する結果（Features）として利用者が選ぶ形にする。
 差分計測で上限（39〜45%）を先に測っていたので、実装後の結果（35〜48%）が妥当かをすぐ判断できた。
+
+## ケース26: Java 版 `Diagnostics.DETAILED_ON_FAILURE`（opt-in の実験、ケース25 の Java 対応）
+
+### 仮説
+
+Java でも診断記録（`trackCursorProgress` / `registerFailureCandidate` / `replayFailureDiagnostic` / `mergeFrame`）を no-op にした計測専用 build で
+`parseOnlySafe` が complex 40.7 → 27.9 ms（-31.6%）、complex-x64 2,800 → 1,998 ms（-28.7%）。Rust と同じ「成功経路では記録せず、失敗時だけ
+`DETAILED` で再解析する」opt-in が Java でも成り立つはずだと考えた。
+
+### 実装（opt-in、既定は不変。codex に委譲しレビュー）
+
+- `ParseOptions.Diagnostics { DETAILED（既定）, DETAILED_ON_FAILURE }`、`diagnostics()`、`withDiagnostics()` を additive に追加
+- `DETAILED_ON_FAILURE` では frontier 追跡、失敗候補の登録（`ExpectedSources` / `StackSnapshot`）、memo diagnostic frame の記録と replay を省く。
+  memo hit 時の **transaction replay（状態復元）は意味論なので維持**し、そのために診断 frame と transaction frame の管理を分けた
+  （`memoTransactionFrames`）。`getParseFailureDiagnostics()` は空の診断を返す（Javadoc に明記）
+- 生成 parser の entry point（`MapperGenerator.emitEntryPoint`）は構文失敗・末尾未消費時に、初回 context を閉じてから新しい `DETAILED` context
+  で再解析し、その診断で `ParseDiagnostic` / 例外文言を作る。golden 2 件を再生成。`docs/java-diagnostics-policy.md` に Java / Rust の対応表と制約
+- test: `DetailedOnFailureTest`（7 件: Token 木・cursor・memo hit 数・listener callback の一致、transaction replay の維持、legacy `memoize()` 経路）、
+  `JavaDetailedOnFailureRuntimeTest`（3 件: 生成 entry point の再解析で診断が `DETAILED` と一致）。Java 679 + 990、p4-smoke 85、`RustNativeEmitterTest`
+
+### 観測
+
+モード比較（同じ候補 runtime、JMH 1 fork × 5 iteration、`SAFE_FAILURES`。parser 単体は `ParseContext` 直呼び、entry は生成 `parse(source, null, options)`
+= parse + mapping）:
+
+| 経路 | Fixture | DETAILED ms | DETAILED_ON_FAILURE ms | 変化 |
+|---|---|---:|---:|---:|
+| parser 単体（成功） | complex | 34.3 | 28.4 | -17.1% |
+| parser 単体（成功） | complex-x64 | 2585.0 | 1951.4 | -24.5% |
+| entry（成功） | complex | 36.5 | 33.8 | -7.4% |
+| entry（失敗: 前半で切断） | complex-half | 16.5 | 26.1 | +58.6% |
+| entry（失敗: 末尾 `@`） | complex-tail | 36.6 | 65.6 | +79.4% |
+
+parser 単体で **-17%（x1）/ -24.5%（x64）**、entry では mapping 分が薄めて -7.4%。失敗入力は 2 回 parse で +59〜+79%。差分計測の上限
+（-31.6% / -28.7%）より小さいのは、`DETAILED_ON_FAILURE` でも memo の transaction frame 管理と `ParseFrame` の push / pop（stack の維持）が残るため。
+
+既定モード（`DETAILED`）の退行確認（baseline = master `516b809`、public facade 3-run 中央値）:
+
+| Runtime | Fixture | Baseline runs | Baseline median | Candidate runs | Candidate median | 変化 |
+|---|---|---:|---:|---:|---:|---:|
+| Java | complex | 42.983 / 42.850 / 42.344 | **42.850** | 40.970 / 41.181 / 45.126 | **41.181** | **-3.90%** |
+| Java | comparison-heavy | 25.625 / 25.556 / 25.876 | **25.625** | 24.842 / 25.460 / 24.946 | **24.946** | **-2.65%** |
+
+退行なし。**採用**（opt-in）。
+
+### 教材としての要点
+
+Rust（-35〜-51%）より Java の効果（-17〜-25%）が小さいのは、Java の失敗診断が「記録」だけでなく frame の維持と listener 連携に組み込まれており、
+記録を止めても骨格が残るから。同じ設計案でも runtime の構造で回収できる割合が違うので、実装前の差分計測（上限）と実装後の実測を
+両方記録して、差の理由（ここでは frame 管理）を次の候補にする。
