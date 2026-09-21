@@ -58,8 +58,8 @@ fn main() {
          {REPEATED_FAILURES} identical failures = {repeated} allocations"
     );
     assert!(
-        single <= 11,
-        "a first-bucket failure must not exceed the unbucketed baseline of 11 allocations"
+        single <= 9,
+        "a first-bucket failure with an inline expected ID must not exceed 9 allocations"
     );
     assert_eq!(
         single, repeated,

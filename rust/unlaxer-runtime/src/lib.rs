@@ -624,26 +624,43 @@ impl ExpectedNames {
 }
 
 #[derive(Debug, Clone, Default)]
+enum ExpectedIds {
+    #[default]
+    Empty,
+    Single(u32),
+    Multiple(Rc<Vec<u32>>),
+}
+
+#[derive(Debug, Clone, Default)]
 struct FailureDiagnostic {
     farthest: Option<usize>,
-    expected: Option<Rc<Vec<u32>>>,
+    expected: ExpectedIds,
 }
 
 impl FailureDiagnostic {
     fn record(&mut self, position: usize, expected: u32) {
         if self.farthest.is_none_or(|farthest| position > farthest) {
             self.farthest = Some(position);
-            if let Some(values) = &mut self.expected {
-                Rc::make_mut(values).clear();
-            }
+            self.expected = ExpectedIds::Single(expected);
+            return;
         }
         if self.farthest == Some(position) && !self.expected_values().contains(&expected) {
-            Rc::make_mut(self.expected.get_or_insert_with(Default::default)).push(expected);
+            match &mut self.expected {
+                ExpectedIds::Empty => self.expected = ExpectedIds::Single(expected),
+                ExpectedIds::Single(first) => {
+                    self.expected = ExpectedIds::Multiple(Rc::new(vec![*first, expected]));
+                }
+                ExpectedIds::Multiple(values) => Rc::make_mut(values).push(expected),
+            }
         }
     }
 
     fn expected_values(&self) -> &[u32] {
-        self.expected.as_deref().map_or(&[], Vec::as_slice)
+        match &self.expected {
+            ExpectedIds::Empty => &[],
+            ExpectedIds::Single(expected) => std::slice::from_ref(expected),
+            ExpectedIds::Multiple(values) => values,
+        }
     }
 
     fn merge(&mut self, other: &Self) {
@@ -656,21 +673,20 @@ impl FailureDiagnostic {
             return;
         }
         if self.farthest == Some(position) {
-            if other.expected_values().is_empty() {
+            if matches!(self.expected, ExpectedIds::Empty) {
+                self.expected.clone_from(&other.expected);
                 return;
             }
-            if self.expected.as_ref().is_some_and(|expected| {
-                other
-                    .expected
-                    .as_ref()
-                    .is_some_and(|other| Rc::ptr_eq(expected, other))
-            }) {
-                return;
+            if let (ExpectedIds::Multiple(expected), ExpectedIds::Multiple(other)) =
+                (&self.expected, &other.expected)
+            {
+                if Rc::ptr_eq(expected, other) {
+                    return;
+                }
             }
-            append_missing_expected(
-                Rc::make_mut(self.expected.get_or_insert_with(Default::default)),
-                other.expected_values(),
-            );
+            for &expected in other.expected_values() {
+                self.record(position, expected);
+            }
         }
     }
 }
@@ -2646,6 +2662,61 @@ mod tests {
         assert!(memo.get(7, &distant_key).is_none());
     }
 
+    #[test]
+    fn failure_diagnostic_promotes_single_id_and_keeps_first_seen_order() {
+        let mut diagnostic = FailureDiagnostic::default();
+        assert!(matches!(diagnostic.expected, ExpectedIds::Empty));
+        diagnostic.record(2, 7);
+        diagnostic.record(2, 7);
+        diagnostic.record(1, 9);
+        assert!(matches!(diagnostic.expected, ExpectedIds::Single(7)));
+        assert_eq!(diagnostic.expected_values(), &[7]);
+
+        diagnostic.record(2, 3);
+        diagnostic.record(2, 7);
+        diagnostic.record(2, 5);
+        assert!(matches!(diagnostic.expected, ExpectedIds::Multiple(_)));
+        assert_eq!(diagnostic.expected_values(), &[7, 3, 5]);
+
+        let shared = diagnostic.clone();
+        diagnostic.record(3, 9);
+        assert_eq!(diagnostic.farthest, Some(3));
+        assert!(matches!(diagnostic.expected, ExpectedIds::Single(9)));
+        assert_eq!(shared.expected_values(), &[7, 3, 5]);
+
+        let mut other = FailureDiagnostic::default();
+        other.record(3, 1);
+        diagnostic.merge(&other);
+        diagnostic.merge(&other);
+        assert_eq!(diagnostic.expected_values(), &[9, 1]);
+    }
+
+    #[test]
+    fn replay_failure_shares_multiple_ids_until_the_frame_changes() {
+        let mut context = ParseContext::new("abc");
+        let diagnostic = failure_diagnostic(&mut context.expected_names, 2, &["z", "a", "z"]);
+        context.diagnostic_frames.push(FailureDiagnostic::default());
+        context.replay_failure(&diagnostic);
+        context.replay_failure(&diagnostic);
+        let frame = context.diagnostic_frames.last().unwrap();
+        let (ExpectedIds::Multiple(frame_ids), ExpectedIds::Multiple(memo_ids)) =
+            (&frame.expected, &diagnostic.expected)
+        else {
+            panic!("multiple expected IDs must retain shared storage");
+        };
+        assert!(Rc::ptr_eq(frame_ids, memo_ids));
+        assert_eq!(frame.expected_values(), &[0, 1]);
+        assert_eq!(context.failure().expected, vec!["a", "z"]);
+
+        context.fail_at(2, "m");
+        assert_eq!(diagnostic.expected_values(), &[0, 1]);
+        assert_eq!(context.failure().expected, vec!["a", "m", "z"]);
+        assert_eq!(
+            context.diagnostic_frames.last().unwrap().expected_values(),
+            &[0, 1, 2]
+        );
+    }
+
     fn failure_diagnostic(
         names: &mut ExpectedNames,
         position: usize,
@@ -2736,10 +2807,12 @@ mod tests {
             .unwrap()
             .clone();
         let frame = context.diagnostic_frames.last().unwrap();
-        assert!(Rc::ptr_eq(
-            frame.expected.as_ref().unwrap(),
-            memoized.expected.as_ref().unwrap(),
-        ));
+        let (ExpectedIds::Multiple(frame_ids), ExpectedIds::Multiple(memo_ids)) =
+            (&frame.expected, &memoized.expected)
+        else {
+            panic!("multiple expected IDs must retain shared storage");
+        };
+        assert!(Rc::ptr_eq(frame_ids, memo_ids));
         assert_eq!(context.expected, vec![0, 1, 2]);
         assert_eq!(frame.expected_values(), &[2, 1, 0]);
         assert_eq!(context.failure().expected, vec!["a", "shared", "z"]);
