@@ -77,7 +77,12 @@ class ParserTokenEmitter {
             }
             sb.append("    // --- Simple token wrapper for ").append(tokenName).append(" ---\n");
             sb.append("    public static class ").append(wrapperName)
-              .append(" extends ").append(parserClass).append(" {\n");
+              .append(" extends ").append(parserClass)
+              // A wrapper must not declare an unknown superclass safe. Marked custom bases
+              // inherit the contract; unmarked custom bases remain conservative.
+              .append(parserClass.startsWith("org.unlaxer.parser.")
+                  ? " implements org.unlaxer.context.DiagnosticsAgnostic" : "")
+              .append(" {\n");
             sb.append("        private static final long serialVersionUID = 1L;\n");
             sb.append("    }\n\n");
         }
@@ -101,7 +106,7 @@ class ParserTokenEmitter {
             }
             sb.append("    // --- NEGATION parser for token ").append(tokenName).append(" ---\n");
             sb.append("    public static class ").append(className)
-              .append(" extends org.unlaxer.parser.elementary.SingleCharacterParser {\n");
+              .append(" extends org.unlaxer.parser.elementary.SingleCharacterParser implements org.unlaxer.context.DiagnosticsAgnostic {\n");
             sb.append("        private static final long serialVersionUID = 1L;\n");
             sb.append("        private static final String EXCLUDED = \"")
               .append(ParserCodegenUtil.escapeString(excluded)).append("\";\n");
@@ -134,7 +139,7 @@ class ParserTokenEmitter {
             }
             sb.append("    // --- CHAR_RANGE parser for token ").append(tokenName).append(" ---\n");
             sb.append("    public static class ").append(className)
-              .append(" extends org.unlaxer.parser.elementary.SingleCharacterParser {\n");
+              .append(" extends org.unlaxer.parser.elementary.SingleCharacterParser implements org.unlaxer.context.DiagnosticsAgnostic {\n");
             sb.append("        private static final long serialVersionUID = 1L;\n");
             sb.append("        @Override\n");
             sb.append("        public boolean isMatch(char target) {\n");
@@ -163,7 +168,7 @@ class ParserTokenEmitter {
             }
             sb.append("    // --- REGEX parser for token ").append(tokenName).append(" ---\n");
             sb.append("    public static class ").append(className)
-              .append(" extends org.unlaxer.dsl.runtime.RegexTokenParser {\n");
+              .append(" extends org.unlaxer.dsl.runtime.RegexTokenParser implements org.unlaxer.context.DiagnosticsAgnostic {\n");
             sb.append("        private static final long serialVersionUID = 1L;\n");
             sb.append("        public ").append(className).append("() {\n");
             sb.append("            super(\"").append(ParserCodegenUtil.escapeString(pattern)).append("\");\n");

@@ -241,7 +241,7 @@ public class ParseContext implements
 	  if(source.sourceKind() != SourceKind.root) {
 	    throw new IllegalArgumentException();
 	  }
-		this.options = java.util.Objects.requireNonNull(options, "options");
+		this.options = java.util.Objects.requireNonNull(options, "options").resolveDiagnostics(false);
 		if (options.memoization() == Memoization.SAFE_FAILURES) {
 			this.packratMemoTable = new PackratMemoTable();
 		}
@@ -255,7 +255,7 @@ public class ParseContext implements
 		onOpen(this);
 	}
 
-	/** Creates a parse session with options installed before listener {@code onOpen} callbacks. */
+	/** Creates a session with AUTO resolved to DETAILED before listener {@code onOpen} callbacks. */
 	public static ParseContext withOptions(Source source, ParseOptions options,
 			ParseContextEffector... effectors) {
 		return new ParseContext(source, options, effectors);
@@ -331,6 +331,7 @@ public class ParseContext implements
 		Transaction.super.addTransactionListener(name, listener);
 	}
 
+	/** Returns the effective options, with AUTO already resolved to DETAILED. */
 	public ParseOptions getOptions() { return options; }
 
 	public PackratMemoTable getPackratMemoTable() {

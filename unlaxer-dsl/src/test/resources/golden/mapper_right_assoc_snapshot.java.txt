@@ -55,6 +55,9 @@ public class SnapshotRightAssocMapper {
     // Entry Point
     // =========================================================================
 
+    private static final boolean DEFERRED_DIAGNOSTICS_SAFE =
+        org.unlaxer.context.DiagnosticsSafety.isDeferredDiagnosticsSafe(SnapshotRightAssocParsers.getRootParser());
+
     /** Parser diagnostics only: offsets are Unicode code points, not UTF-16 indices. */
     public record ParseDiagnostic(String kind, int offset, List<String> expected,
             int farthestOffset, List<String> farthestExpected) {
@@ -68,6 +71,7 @@ public class SnapshotRightAssocMapper {
      * Validates full-input parsing without mapping or clearing retained source maps.
      * Empty means parser acceptance, not successful AST mapping or evaluation.
      * Native syntax hints are backend-specific; trailing input always expects end of input.
+     * AUTO defers diagnostics only when every reachable parser is declared safe.
      * DETAILED_ON_FAILURE retries failures in a fresh DETAILED context with the same memo policy.
      * Custom parsers must not depend on diagnostics and must be safe to run twice.
      */
@@ -76,6 +80,7 @@ public class SnapshotRightAssocMapper {
     }
 
     public static synchronized Optional<ParseDiagnostic> diagnose(String source, ParseOptions options) {
+        options = options.resolveDiagnostics(DEFERRED_DIAGNOSTICS_SAFE);
         Parser rootParser = SnapshotRightAssocParsers.getRootParser();
         try (ParseContext context = ParseContext.withOptions(createRootSourceCompat(source), options)) {
             Parsed parsed = rootParser.parse(context);
@@ -252,6 +257,7 @@ public class SnapshotRightAssocMapper {
 
     public static synchronized SnapshotRightAssocAST.PowNode parse(String source, String preferredAstSimpleName, ParseOptions options) {
         resetMappingMemos();
+        options = options.resolveDiagnostics(DEFERRED_DIAGNOSTICS_SAFE);
         Parser rootParser = SnapshotRightAssocParsers.getRootParser();
         ParseContext context = ParseContext.withOptions(createRootSourceCompat(source), options);
         Parsed parsed;
