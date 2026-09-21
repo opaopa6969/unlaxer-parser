@@ -6,6 +6,7 @@ import org.unlaxer.CodePointIndex;
 import org.unlaxer.Parsed;
 import org.unlaxer.TokenKind;
 import org.unlaxer.context.ParseContext;
+import org.unlaxer.context.PackratMemoTable;
 import org.unlaxer.parser.MetaFunctionParser;
 import org.unlaxer.parser.NonTerminallSymbol;
 import org.unlaxer.parser.Parser;
@@ -17,6 +18,12 @@ public interface Occurs extends MetaFunctionParser , NonTerminallSymbol {
 	@Override
 	public default Parsed parse(ParseContext parseContext,TokenKind tokenKind,boolean invertMatch) {
 	  
+        // Generated whitespace delimitors use Occurs directly, bypassing AbstractParser.
+        var memo = PackratMemoTable.lookup(parseContext, this, tokenKind, invertMatch);
+        if (memo != null) return PackratMemoTable.replay(parseContext, this, tokenKind, invertMatch, memo);
+        var memoDiagnostic = PackratMemoTable.beginFailure(parseContext, this);
+        var memoStart = PackratMemoTable.successKey(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
+
 		parseContext.startParse(this, parseContext, tokenKind, invertMatch);
 		
 		parseContext.begin(this);
@@ -63,13 +70,13 @@ public interface Occurs extends MetaFunctionParser , NonTerminallSymbol {
 		
 		if (matchCount >= min() && matchCount <=max()) {
 			
-			Parsed committed = new Parsed(parseContext.commit(this,tokenKind));
-			parseContext.endParse(this, committed , parseContext, tokenKind, invertMatch);
-			return committed;
+            return PackratMemoTable.commitSuccess(parseContext, this, tokenKind, invertMatch,
+                memoStart, memoDiagnostic, null, null);
 		} else {
 			
 			parseContext.rollback(this);
 			parseContext.endParse(this, Parsed.FAILED , parseContext, tokenKind, invertMatch);
+            PackratMemoTable.memoizeFailure(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
 			return Parsed.FAILED;
 		}
 	}

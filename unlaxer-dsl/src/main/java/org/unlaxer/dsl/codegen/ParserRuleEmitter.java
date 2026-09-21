@@ -202,9 +202,13 @@ class ParserRuleEmitter {
         List<String> bindings = ctx.captureBindings.get(ruleName).bindings(body);
         String helperInterfaces = "org.unlaxer.context.DiagnosticsAgnostic"
             + (bindings.isEmpty() ? "" : ", __CaptureBinding");
-        if (Boolean.TRUE.equals(ctx.safeFailureMemoByRule.get(ruleName))) {
+        boolean successSafe = ParserGenerator.isSafeSuccessBody(ctx, body);
+        if (successSafe || Boolean.TRUE.equals(ctx.safeFailureMemoByRule.get(ruleName))) {
             helperInterfaces += (helperInterfaces.isEmpty() ? "" : ", ")
                 + "org.unlaxer.context.SafeFailureMemoizable";
+        }
+        if (successSafe) {
+            helperInterfaces += ", org.unlaxer.context.SafeSuccessMemoizable";
         }
         w.line("public static class " + helperName + " extends " + baseClass
             + (helperInterfaces.isEmpty() ? "" : " implements " + helperInterfaces) + " {");
@@ -243,8 +247,12 @@ class ParserRuleEmitter {
         String chainClass = getChainClassName(ctx, ruleName);
 
         IndentedWriter bw = new IndentedWriter(1);
-        String memoMarker = Boolean.TRUE.equals(ctx.safeFailureMemoByRule.get(ruleName))
+        boolean successSafe = ParserGenerator.isSafeSuccessElements(ctx, sep.element(), sep.separator());
+        String memoMarker = successSafe || Boolean.TRUE.equals(ctx.safeFailureMemoByRule.get(ruleName))
             ? " implements org.unlaxer.context.SafeFailureMemoizable" : "";
+        if (successSafe) {
+            memoMarker += ", org.unlaxer.context.SafeSuccessMemoizable";
+        }
         bw.line("public static class " + sep.bodyName() + " extends " + chainClass + memoMarker + " {");
         bw.indent();
         bw.line("private static final long serialVersionUID = 1L;");
@@ -624,11 +632,14 @@ class ParserRuleEmitter {
             .anyMatch(r -> r.annotations().stream().anyMatch(a -> a instanceof ScopeTreeAnnotation));
         boolean backrefScopeMode    = hasBackrefDecl && grammarHasScopeTree;
         boolean backrefBackrefMode  = hasBackrefDecl && !grammarHasScopeTree;
-        boolean needsTransactionListener = hasScopeTreeDecl || hasDeclaresDecl || backrefScopeMode || backrefBackrefMode;
+        boolean needsTransactionListener = needsTransactionListener(rule);
         java.util.List<String> interfaces = new java.util.ArrayList<>();
         if (needsTransactionListener) interfaces.add("org.unlaxer.listener.TransactionListener");
         if (Boolean.TRUE.equals(ctx.safeFailureMemoByRule.get(ruleName))) {
             interfaces.add("org.unlaxer.context.SafeFailureMemoizable");
+        }
+        if (Boolean.TRUE.equals(ctx.safeSuccessMemoByRule.get(ruleName))) {
+            interfaces.add("org.unlaxer.context.SafeSuccessMemoizable");
         }
         interfaces.add("org.unlaxer.context.DiagnosticsAgnostic");
         String implSuffix = interfaces.isEmpty() ? "" : " implements " + String.join(", ", interfaces);
@@ -684,6 +695,12 @@ class ParserRuleEmitter {
         w.blankLine();
 
         return w.build();
+    }
+
+    /** Keep the safety analysis and listener emission tied to the same annotation predicate. */
+    static boolean needsTransactionListener(RuleDecl rule) {
+        return rule.annotations().stream().anyMatch(annotation -> annotation instanceof ScopeTreeAnnotation
+            || annotation instanceof DeclaresAnnotation || annotation instanceof BackrefAnnotation);
     }
 
     private static final int MAX_PREDICTOR_ATOMS = 64;

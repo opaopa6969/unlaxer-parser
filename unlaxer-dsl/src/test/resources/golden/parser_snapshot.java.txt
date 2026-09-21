@@ -138,7 +138,7 @@ public class SnapshotParsers {
     }
 
     // --- Whitespace Delimitor ---
-    public static class SnapshotSpaceDelimitor extends LazyZeroOrMore implements org.unlaxer.context.DiagnosticsAgnostic {
+    public static class SnapshotSpaceDelimitor extends LazyZeroOrMore implements org.unlaxer.context.DiagnosticsAgnostic, org.unlaxer.context.SafeSuccessMemoizable {
         private static final long serialVersionUID = 1L;
         @Override
         public Supplier<Parser> getLazyParser() {

@@ -54,6 +54,7 @@ public class ParserGenerator implements CodeGenerator {
         final Map<String, CaptureBindingPlan> captureBindings = new LinkedHashMap<>();
         final Map<String, Boolean> useDelimitedChainByRule = new LinkedHashMap<>();
         final Map<String, Boolean> safeFailureMemoByRule = new LinkedHashMap<>();
+        final Map<String, Boolean> safeSuccessMemoByRule = new LinkedHashMap<>();
         boolean hasDelimitedChain = false;
         final Map<String, int[]> helperCounters = new LinkedHashMap<>(); // rule -> [repeat,opt,group,sep]
         // A helper belongs to a grammar site, not to an emission traversal or structurally equal element.
@@ -333,23 +334,47 @@ public class ParserGenerator implements CodeGenerator {
             boolean locallySafe = collectMemoDependencies(ctx, rule.body(), refs);
             dependencies.put(rule.name(), refs);
             ctx.safeFailureMemoByRule.put(rule.name(), locallySafe);
+            // Capture metadata itself is immutable. Scope capture actions are emitted by the
+            // listener on @declares/@backref, and must never be skipped by a success hit.
+            ctx.safeSuccessMemoByRule.put(rule.name(), locallySafe
+                && !ParserRuleEmitter.needsTransactionListener(rule)
+                // References to this rule select a recovery wrapper with additional effects.
+                && ParserRuleEmitter.findRecoveryAnnotation(rule).isEmpty());
         }
         boolean changed;
         do {
             changed = false;
             for (RuleDecl rule : ctx.grammar.rules()) {
-                if (!ctx.safeFailureMemoByRule.get(rule.name())) continue;
-                boolean safe = dependencies.get(rule.name()).stream()
-                    .allMatch(ref -> Boolean.TRUE.equals(ctx.safeFailureMemoByRule.get(ref)));
-                if (!safe) {
-                    ctx.safeFailureMemoByRule.put(rule.name(), false);
-                    changed = true;
+                for (Map<String, Boolean> safety : List.of(
+                        ctx.safeFailureMemoByRule, ctx.safeSuccessMemoByRule)) {
+                    if (!safety.get(rule.name())) continue;
+                    boolean safe = dependencies.get(rule.name()).stream()
+                        .allMatch(ref -> Boolean.TRUE.equals(safety.get(ref)));
+                    if (!safe) {
+                        safety.put(rule.name(), false);
+                        changed = true;
+                    }
                 }
             }
         } while (changed);
     }
 
-    private boolean collectMemoDependencies(GenContext ctx, RuleBody body, Set<String> refs) {
+    /** Helpers have no listeners of their own; prove their actual body, not their enclosing rule. */
+    static boolean isSafeSuccessBody(GenContext ctx, RuleBody body) {
+        Set<String> refs = new LinkedHashSet<>();
+        return collectMemoDependencies(ctx, body, refs) && refs.stream()
+            .allMatch(ref -> Boolean.TRUE.equals(ctx.safeSuccessMemoByRule.get(ref)));
+    }
+
+    static boolean isSafeSuccessElements(GenContext ctx, AtomicElement... elements) {
+        Set<String> refs = new LinkedHashSet<>();
+        for (AtomicElement element : elements) {
+            if (!collectMemoDependencies(ctx, element, refs)) return false;
+        }
+        return refs.stream().allMatch(ref -> Boolean.TRUE.equals(ctx.safeSuccessMemoByRule.get(ref)));
+    }
+
+    private static boolean collectMemoDependencies(GenContext ctx, RuleBody body, Set<String> refs) {
         return switch (body) {
             case org.unlaxer.dsl.bootstrap.UBNFAST.ChoiceBody choice -> choice.alternatives().stream()
                 .allMatch(sequence -> collectMemoDependencies(ctx, sequence, refs));
@@ -358,7 +383,7 @@ public class ParserGenerator implements CodeGenerator {
         };
     }
 
-    private boolean collectMemoDependencies(GenContext ctx,
+    private static boolean collectMemoDependencies(GenContext ctx,
             org.unlaxer.dsl.bootstrap.UBNFAST.SequenceBody sequence, Set<String> refs) {
         boolean safe = true;
         for (var annotated : sequence.elements()) {
@@ -367,7 +392,7 @@ public class ParserGenerator implements CodeGenerator {
         return safe;
     }
 
-    private boolean collectMemoDependencies(GenContext ctx, AtomicElement element, Set<String> refs) {
+    private static boolean collectMemoDependencies(GenContext ctx, AtomicElement element, Set<String> refs) {
         return switch (element) {
             case org.unlaxer.dsl.bootstrap.UBNFAST.RuleRefElement ref -> {
                 if (ref.namespace().isPresent()) yield false;
@@ -408,7 +433,7 @@ public class ParserGenerator implements CodeGenerator {
         StringBuilder sb = new StringBuilder();
 
         sb.append("    // --- Whitespace Delimitor ---\n");
-        sb.append("    public static class ").append(delimitorName).append(" extends LazyZeroOrMore implements org.unlaxer.context.DiagnosticsAgnostic {\n");
+        sb.append("    public static class ").append(delimitorName).append(" extends LazyZeroOrMore implements org.unlaxer.context.DiagnosticsAgnostic, org.unlaxer.context.SafeSuccessMemoizable {\n");
         sb.append("        private static final long serialVersionUID = 1L;\n");
         sb.append("        @Override\n");
         sb.append("        public Supplier<Parser> getLazyParser() {\n");

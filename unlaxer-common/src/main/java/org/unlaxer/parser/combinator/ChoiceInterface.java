@@ -16,12 +16,13 @@ public interface ChoiceInterface extends Parser{
 	public default Parsed parse(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
 
 		// Opt-in safe failure memoization: a cached failure short-circuits after the original call
-		// exhausted every alternative. Successes are never cached; default parsing is unchanged.
+		// exhausted every alternative. Safe successes replay the chosen token tree.
 		PackratMemoTable.Entry memo = PackratMemoTable.lookup(parseContext, this, tokenKind, invertMatch);
 		if (memo != null) {
-			return Parsed.FAILED;
+			return PackratMemoTable.replay(parseContext, this, tokenKind, invertMatch, memo);
 		}
 		var memoDiagnostic = PackratMemoTable.beginFailure(parseContext, this);
+		var memoStart = PackratMemoTable.successKey(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
 
 		parseContext.startParse(this, parseContext, tokenKind, invertMatch);
 		List<Parser> children = getChildren();
@@ -31,10 +32,8 @@ public interface ChoiceInterface extends Parser{
 			Parsed parsed = parser.parse(parseContext, tokenKind, invertMatch);
 
 			if (parsed.isSucceeded()) {
-				parseContext.commit(this, tokenKind , new ChoiceCommitAction(parser));
-				parseContext.endParse(this, parsed , parseContext, tokenKind, invertMatch);
-				PackratMemoTable.memoizeSuccess(parseContext, memoDiagnostic);
-				return parsed;
+				return PackratMemoTable.commitSuccess(parseContext, this, tokenKind, invertMatch,
+					memoStart, memoDiagnostic, parser, parsed);
 			}
 			parseContext.rollback(this);
 		}

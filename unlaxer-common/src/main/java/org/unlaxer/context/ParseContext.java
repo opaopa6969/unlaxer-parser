@@ -267,7 +267,7 @@ public class ParseContext implements
 	}
 
 	/**
-	 * Compatibility adapter for safe failure memoization. Prefer
+	 * Compatibility adapter for safe failure and success memoization. Prefer
 	 * {@code ParseContext.withOptions(source, ParseOptions.withMemoization(Memoization.SAFE_FAILURES))}.
 	 */
 	@Deprecated
@@ -338,7 +338,7 @@ public class ParseContext implements
 		return packratMemoTable;
 	}
 
-	/** Deprecated compatibility effector; it enables only generated safe failures. */
+	/** Deprecated compatibility effector; it enables generated safe failures and safe successes. */
 	@Deprecated
 	public static ParseContextEffector memoize() {
 		return ParseContext::enableMemoize;
@@ -370,7 +370,7 @@ public class ParseContext implements
   }
 
   /**
-   * Rule-local diagnostics and direct transaction lifecycle replayed on a safe failure hit.
+   * Rule-local diagnostics retained for safe failures and successes; state hooks replay on failures.
    *
    * <p>Only the innermost open frame is updated while parsing; when a frame is popped it is
    * merged into its parent (see {@link #discardMemoDiagnosticFrame}). The stack snapshots are

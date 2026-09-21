@@ -95,6 +95,16 @@ public class TransactionElement implements Serializable{
         }
     }
 
+    /** Snapshot only selections committed inside this transaction, for safe success replay. */
+    public Map<ChoiceInterface, Parser> snapshotChosenParsers(Map<ChoiceInterface, Parser> chosenParsers) {
+        if (previousChosenParsers == null) return Map.of();
+        Map<ChoiceInterface, Parser> snapshot = new IdentityHashMap<>();
+        for (ChoiceInterface choice : previousChosenParsers.keySet()) {
+            snapshot.put(choice, chosenParsers.get(choice));
+        }
+        return snapshot;
+    }
+
     /** Restores choice/interleave observations made by this transaction and its commits. */
     public void restoreSelectionChanges(
             Map<ChoiceInterface, Parser> chosenParsers,

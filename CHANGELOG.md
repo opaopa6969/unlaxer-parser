@@ -8,6 +8,10 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ## [Unreleased]
 
+### Added
+- Java `Memoization.SAFE_FAILURES` also replays safe successes for exact classes directly implementing `SafeSuccessMemoizable`. Entries retain rule-local diagnostics, independent token snapshots, cursors, and choice selections.
+- The Java generator proves success safety transitively, excludes listener/state-dependent rules and uncertified custom tokens, and marks generated whitespace delimitors. Runtime replay also covers their `Occurs` entry point. Memoization remains off by default; Rust behavior and generated Rust sources are unchanged.
+
 ## [3.0.15] - 2026-09-01
 
 ### Added

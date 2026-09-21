@@ -18,12 +18,13 @@ public interface ChainInterface extends Parser{
 		parseContext.getCurrent().setResetMatchedWithConsumed(false);
 
 		// Opt-in safe failure memoization. The cursor flag above remains observable on a hit;
-		// successes are never cached and default parsing remains unchanged.
+		// safe successes replay through the same transaction path as other rules.
 		PackratMemoTable.Entry memo = PackratMemoTable.lookup(parseContext, this, tokenKind, invertMatch);
 		if (memo != null) {
-			return Parsed.FAILED;
+			return PackratMemoTable.replay(parseContext, this, tokenKind, invertMatch, memo);
 		}
 		var memoDiagnostic = PackratMemoTable.beginFailure(parseContext, this);
+		var memoStart = PackratMemoTable.successKey(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
 
 		parseContext.startParse(this, parseContext, tokenKind, invertMatch);
 		parseContext.begin(this);
@@ -43,9 +44,7 @@ public interface ChainInterface extends Parser{
 				return Parsed.FAILED;
 			}
 		}
-		Parsed committed = new Parsed(parseContext.commit(this,tokenKind));
-		parseContext.endParse(this, committed, parseContext, tokenKind, invertMatch);
-		PackratMemoTable.memoizeSuccess(parseContext, memoDiagnostic);
-		return committed;
+		return PackratMemoTable.commitSuccess(parseContext, this, tokenKind, invertMatch,
+            memoStart, memoDiagnostic, null, null);
 	}
 }
