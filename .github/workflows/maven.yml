@@ -195,7 +195,9 @@ jobs:
       with:
         repository: opaopa6969/tinyexpression
         # Consumer migration and real token oracle; update deliberately with their contracts.
-        ref: 6e5cfd91619b71a53e8f391469653d270208ca2e
+        # ee51999 carries tinyexpression #161 (thread-safe lazy children in its forked
+        # AbstractParser, unlaxer-parser #202) and the x4/x16/x64 scaling fixtures.
+        ref: ee519996e5f82d26d12e2bb6269edaf3600794a4
         path: tinyexpression
 
     - name: Point tinyexpression at the unlaxer under test
