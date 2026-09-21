@@ -2,10 +2,15 @@ package org.unlaxer.context;
 
 import java.util.Objects;
 
-/** Immutable options for one parse session. Defaults to detailed diagnostics and no memoization. */
+/** Immutable options for one parse session. Defaults to automatic diagnostics and no memoization. */
 public final class ParseOptions {
   /** Syntax-failure recording policy, independent of memoization and semantic state. */
   public enum Diagnostics {
+    /**
+     * Uses deferred diagnostics at retrying entry points for a declared safe parser tree.
+     * Direct ParseContext operations resolve this to DETAILED because they never retry.
+     */
+    AUTO,
     /** Records speculative failures even when the whole parse succeeds. */
     DETAILED,
     /**
@@ -23,7 +28,7 @@ public final class ParseOptions {
   private final Diagnostics diagnostics;
 
   public ParseOptions(Memoization memoization) {
-    this(memoization, Diagnostics.DETAILED);
+    this(memoization, Diagnostics.AUTO);
   }
 
   private ParseOptions(Memoization memoization, Diagnostics diagnostics) {
@@ -54,6 +59,16 @@ public final class ParseOptions {
   /** Selects syntax diagnostics without changing the memoization policy. */
   public ParseOptions withDiagnostics(Diagnostics policy) {
     return policy == diagnostics ? this : new ParseOptions(memoization, policy);
+  }
+
+  /**
+   * Resolves AUTO once the entry point knows whether it can safely retry in a fresh context.
+   * Pass false for low-level operations without retry. Explicit policies remain unchanged.
+   */
+  public ParseOptions resolveDiagnostics(boolean deferredDiagnosticsSafe) {
+    return diagnostics == Diagnostics.AUTO
+        ? withDiagnostics(deferredDiagnosticsSafe ? Diagnostics.DETAILED_ON_FAILURE : Diagnostics.DETAILED)
+        : this;
   }
 
   @Override

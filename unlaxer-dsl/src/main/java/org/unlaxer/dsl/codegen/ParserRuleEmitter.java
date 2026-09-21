@@ -200,7 +200,8 @@ class ParserRuleEmitter {
         IndentedWriter w = new IndentedWriter(1);
 
         List<String> bindings = ctx.captureBindings.get(ruleName).bindings(body);
-        String helperInterfaces = bindings.isEmpty() ? "" : "__CaptureBinding";
+        String helperInterfaces = "org.unlaxer.context.DiagnosticsAgnostic"
+            + (bindings.isEmpty() ? "" : ", __CaptureBinding");
         if (Boolean.TRUE.equals(ctx.safeFailureMemoByRule.get(ruleName))) {
             helperInterfaces += (helperInterfaces.isEmpty() ? "" : ", ")
                 + "org.unlaxer.context.SafeFailureMemoizable";
@@ -502,7 +503,7 @@ class ParserRuleEmitter {
             String syncArgs = java.util.Arrays.stream(tokens)
                 .map(t -> "\"" + ParserCodegenUtil.escapeString(t) + "\"")
                 .collect(Collectors.joining(", "));
-            w.line("public static class " + wrapperName + " extends org.unlaxer.parser.combinator.SyncPointRecoveryParser {");
+            w.line("public static class " + wrapperName + " extends org.unlaxer.parser.combinator.SyncPointRecoveryParser implements org.unlaxer.context.DiagnosticsAgnostic {");
             w.indent();
             w.line("private static final long serialVersionUID = 1L;");
             w.line("public " + wrapperName + "() {");
@@ -522,7 +523,7 @@ class ParserRuleEmitter {
             String syncArgs = followTokens.stream()
                 .map(t -> "\"" + ParserCodegenUtil.escapeString(t) + "\"")
                 .collect(Collectors.joining(", "));
-            w.line("public static class " + wrapperName + " extends org.unlaxer.parser.combinator.SyncPointRecoveryParser {");
+            w.line("public static class " + wrapperName + " extends org.unlaxer.parser.combinator.SyncPointRecoveryParser implements org.unlaxer.context.DiagnosticsAgnostic {");
             w.indent();
             w.line("private static final long serialVersionUID = 1L;");
             w.line("public " + wrapperName + "() {");
@@ -538,7 +539,7 @@ class ParserRuleEmitter {
             // success with error marker. This ensures the AST always has a node
             // (Hejlsberg principle: always produce an AST).
             List<String> skipFollowTokens = computeFollowTokens(ctx, ruleName);
-            w.line("public static class " + wrapperName + " extends org.unlaxer.parser.combinator.ConstructedSingleChildParser {");
+            w.line("public static class " + wrapperName + " extends org.unlaxer.parser.combinator.ConstructedSingleChildParser implements org.unlaxer.context.DiagnosticsAgnostic {");
             w.indent();
             w.line("private static final long serialVersionUID = 1L;");
             w.line("public " + wrapperName + "() {");
@@ -629,6 +630,7 @@ class ParserRuleEmitter {
         if (Boolean.TRUE.equals(ctx.safeFailureMemoByRule.get(ruleName))) {
             interfaces.add("org.unlaxer.context.SafeFailureMemoizable");
         }
+        interfaces.add("org.unlaxer.context.DiagnosticsAgnostic");
         String implSuffix = interfaces.isEmpty() ? "" : " implements " + String.join(", ", interfaces);
         boolean longestChoice = rule.annotations().stream().anyMatch(a -> a instanceof LongestChoiceAnnotation);
         boolean predictiveChoice = rule.annotations().stream().anyMatch(a -> a instanceof PredictiveChoiceAnnotation);

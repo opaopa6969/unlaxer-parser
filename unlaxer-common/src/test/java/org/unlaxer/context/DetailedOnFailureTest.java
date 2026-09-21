@@ -42,9 +42,9 @@ public class DetailedOnFailureTest {
 
     @Test public void optionsPreserveIndependentPoliciesAndValueSemantics() {
         assertSame(ParseOptions.DEFAULT, ParseOptions.defaults());
-        assertEquals(Diagnostics.DETAILED, new ParseOptions(Memoization.OFF).diagnostics());
+        assertEquals(Diagnostics.AUTO, new ParseOptions(Memoization.OFF).diagnostics());
         for (Memoization memo : Memoization.values()) {
-            var detailed = ParseOptions.withMemoization(memo);
+            var detailed = ParseOptions.withMemoization(memo).withDiagnostics(Diagnostics.DETAILED);
             var deferred = detailed.withDiagnostics(Diagnostics.DETAILED_ON_FAILURE);
             assertEquals(Diagnostics.DETAILED, detailed.diagnostics());
             assertEquals(memo, deferred.memoization());
@@ -170,7 +170,7 @@ public class DetailedOnFailureTest {
             }
             observations.add(events);
         }
-        assertEquals(observations.get(0), observations.get(1));
+        for (var observation : observations) assertEquals(observations.get(0), observation);
     }
 
     @Test public void populatedMemoDiagnosticReplayIsInertInDeferredContext() {

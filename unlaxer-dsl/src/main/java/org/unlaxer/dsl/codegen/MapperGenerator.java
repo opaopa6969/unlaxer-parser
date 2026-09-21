@@ -150,6 +150,9 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("    // =========================================================================\n");
         sb.append("    // Entry Point\n");
         sb.append("    // =========================================================================\n\n");
+        sb.append("    private static final boolean DEFERRED_DIAGNOSTICS_SAFE =\n");
+        sb.append("        org.unlaxer.context.DiagnosticsSafety.isDeferredDiagnosticsSafe(")
+            .append(parsersClass).append(".getRootParser());\n\n");
         sb.append("""
                 /** Parser diagnostics only: offsets are Unicode code points, not UTF-16 indices. */
                 public record ParseDiagnostic(String kind, int offset, List<String> expected,
@@ -164,6 +167,7 @@ public class MapperGenerator implements CodeGenerator {
                  * Validates full-input parsing without mapping or clearing retained source maps.
                  * Empty means parser acceptance, not successful AST mapping or evaluation.
                  * Native syntax hints are backend-specific; trailing input always expects end of input.
+                 * AUTO defers diagnostics only when every reachable parser is declared safe.
                  * DETAILED_ON_FAILURE retries failures in a fresh DETAILED context with the same memo policy.
                  * Custom parsers must not depend on diagnostics and must be safe to run twice.
                  */
@@ -172,6 +176,7 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("        return diagnose(source, ParseOptions.DEFAULT);\n");
         sb.append("    }\n\n");
         sb.append("    public static synchronized Optional<ParseDiagnostic> diagnose(String source, ParseOptions options) {\n");
+        sb.append("        options = options.resolveDiagnostics(DEFERRED_DIAGNOSTICS_SAFE);\n");
         sb.append("        Parser rootParser = ").append(parsersClass).append(".getRootParser();\n");
         sb.append("""
                     try (ParseContext context = ParseContext.withOptions(createRootSourceCompat(source), options)) {
@@ -340,6 +345,7 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("    }\n\n");
         sb.append("    public static synchronized ").append(rootClassName).append(" parse(String source, String preferredAstSimpleName, ParseOptions options) {\n");
         sb.append("        resetMappingMemos();\n");
+        sb.append("        options = options.resolveDiagnostics(DEFERRED_DIAGNOSTICS_SAFE);\n");
         sb.append("        Parser rootParser = ").append(parsersClass).append(".getRootParser();\n");
         sb.append("        ParseContext context = ParseContext.withOptions(createRootSourceCompat(source), options);\n");
         sb.append("        Parsed parsed;\n");

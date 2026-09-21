@@ -201,7 +201,7 @@ public class ParserGenerator implements CodeGenerator {
                 public interface __CaptureBinding {
                     java.util.List<String> captureBindings();
                 }
-                public static final class __CaptureSite extends LazyChain implements __CaptureBinding {
+                public static final class __CaptureSite extends LazyChain implements __CaptureBinding, org.unlaxer.context.DiagnosticsAgnostic {
                     private static final long serialVersionUID = 1L;
                     private final java.util.List<String> bindings;
                     private final Parser child;
@@ -408,7 +408,7 @@ public class ParserGenerator implements CodeGenerator {
         StringBuilder sb = new StringBuilder();
 
         sb.append("    // --- Whitespace Delimitor ---\n");
-        sb.append("    public static class ").append(delimitorName).append(" extends LazyZeroOrMore {\n");
+        sb.append("    public static class ").append(delimitorName).append(" extends LazyZeroOrMore implements org.unlaxer.context.DiagnosticsAgnostic {\n");
         sb.append("        private static final long serialVersionUID = 1L;\n");
         sb.append("        @Override\n");
         sb.append("        public Supplier<Parser> getLazyParser() {\n");
@@ -437,7 +437,7 @@ public class ParserGenerator implements CodeGenerator {
         StringBuilder sb = new StringBuilder();
 
         sb.append("    // --- Base Chain (No Auto Delimiter) ---\n");
-        sb.append("    public static abstract class ").append(chainName).append(" extends LazyChain {\n");
+        sb.append("    public static abstract class ").append(chainName).append(" extends LazyChain implements org.unlaxer.context.DiagnosticsAgnostic {\n");
         sb.append("        private static final long serialVersionUID = 1L;\n");
         sb.append("        @Override\n");
         sb.append("        public void prepareChildren(Parsers c) {\n");
@@ -459,7 +459,7 @@ public class ParserGenerator implements CodeGenerator {
         StringBuilder sb = new StringBuilder();
 
         sb.append("    // --- Base Chain (Auto Delimiter) ---\n");
-        sb.append("    public static abstract class ").append(chainName).append(" extends LazyChain {\n");
+        sb.append("    public static abstract class ").append(chainName).append(" extends LazyChain implements org.unlaxer.context.DiagnosticsAgnostic {\n");
         sb.append("        private static final long serialVersionUID = 1L;\n");
         sb.append("        private static final ").append(delimitorName).append(" SPACE = createSpace();\n");
         sb.append("        private static ").append(delimitorName).append(" createSpace() {\n");

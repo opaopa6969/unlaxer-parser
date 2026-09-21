@@ -105,7 +105,7 @@ public class SnapshotParsers {
     public interface __CaptureBinding {
         java.util.List<String> captureBindings();
     }
-    public static final class __CaptureSite extends LazyChain implements __CaptureBinding {
+    public static final class __CaptureSite extends LazyChain implements __CaptureBinding, org.unlaxer.context.DiagnosticsAgnostic {
         private static final long serialVersionUID = 1L;
         private final java.util.List<String> bindings;
         private final Parser child;
@@ -125,7 +125,7 @@ public class SnapshotParsers {
     }
 
     // --- Base Chain (No Auto Delimiter) ---
-    public static abstract class SnapshotPlainLazyChain extends LazyChain {
+    public static abstract class SnapshotPlainLazyChain extends LazyChain implements org.unlaxer.context.DiagnosticsAgnostic {
         private static final long serialVersionUID = 1L;
         @Override
         public void prepareChildren(Parsers c) {
@@ -138,7 +138,7 @@ public class SnapshotParsers {
     }
 
     // --- Whitespace Delimitor ---
-    public static class SnapshotSpaceDelimitor extends LazyZeroOrMore {
+    public static class SnapshotSpaceDelimitor extends LazyZeroOrMore implements org.unlaxer.context.DiagnosticsAgnostic {
         private static final long serialVersionUID = 1L;
         @Override
         public Supplier<Parser> getLazyParser() {
@@ -149,7 +149,7 @@ public class SnapshotParsers {
     }
 
     // --- Base Chain (Auto Delimiter) ---
-    public static abstract class SnapshotLazyChain extends LazyChain {
+    public static abstract class SnapshotLazyChain extends LazyChain implements org.unlaxer.context.DiagnosticsAgnostic {
         private static final long serialVersionUID = 1L;
         private static final SnapshotSpaceDelimitor SPACE = createSpace();
         private static SnapshotSpaceDelimitor createSpace() {
@@ -168,7 +168,7 @@ public class SnapshotParsers {
         public java.util.Optional<RecursiveMode> getNotAstNodeSpecifier() { return java.util.Optional.empty(); }
     }
 
-    public static class ExprRepeat0Parser extends SnapshotLazyChain {
+    public static class ExprRepeat0Parser extends SnapshotLazyChain implements org.unlaxer.context.DiagnosticsAgnostic {
         private static final long serialVersionUID = 1L;
         @Override
         public Parsers getLazyParsers() {
@@ -179,7 +179,7 @@ public class SnapshotParsers {
         }
     }
 
-    public static class ExprParser extends SnapshotLazyChain {
+    public static class ExprParser extends SnapshotLazyChain implements org.unlaxer.context.DiagnosticsAgnostic {
         private static final long serialVersionUID = 1L;
         @Override
         public Parsers getLazyParsers() {
@@ -190,7 +190,7 @@ public class SnapshotParsers {
         }
     }
 
-    public static class TermRepeat0Parser extends SnapshotLazyChain {
+    public static class TermRepeat0Parser extends SnapshotLazyChain implements org.unlaxer.context.DiagnosticsAgnostic {
         private static final long serialVersionUID = 1L;
         @Override
         public Parsers getLazyParsers() {
@@ -201,7 +201,7 @@ public class SnapshotParsers {
         }
     }
 
-    public static class TermParser extends SnapshotLazyChain {
+    public static class TermParser extends SnapshotLazyChain implements org.unlaxer.context.DiagnosticsAgnostic {
         private static final long serialVersionUID = 1L;
         @Override
         public Parsers getLazyParsers() {
@@ -212,7 +212,7 @@ public class SnapshotParsers {
         }
     }
 
-    public static class FactorParser extends SnapshotLazyChain {
+    public static class FactorParser extends SnapshotLazyChain implements org.unlaxer.context.DiagnosticsAgnostic {
         private static final long serialVersionUID = 1L;
         @Override
         public Parsers getLazyParsers() {
