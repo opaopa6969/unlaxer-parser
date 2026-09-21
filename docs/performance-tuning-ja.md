@@ -936,3 +936,54 @@ session 1 の -3.2% / -2.3% は run の範囲が重なっており、session 2 �
 区間の処理が計測固定費と同じオーダーのとき（checkpoint のような小さな操作）に比率を過大に見せる。JFR の allocation 比率と同じく、
 小さな操作の比率は「候補の発見」に留め、採否は必ず timing の A/B（できれば 2 セッション）で決める。包んだ場合と包まない場合の
 結果一致を固定した differential test と、包んだままにする式の境界を残した test は、branch に保存して将来の判断材料にする。
+
+## ケース19: capture の rollback を mutation journal にする（Rust、入力サイズに対する超線形の修正）
+
+### 仮説
+
+TinyExpression の fixture を 4 / 16 / 64 倍に伸ばして public facade を測ると、Rust は入力 63〜64 倍に対して 172 倍 / 193 倍の
+時間がかかった（x16 → x64 区間で n^1.3〜1.6）。コードを読むと `Expr::Capture` が `captures_mut_map()`（`Rc::make_mut`）で
+capture 全体の `HashMap<String, Vec<Span>>` を deep copy しており、`Sequence` の各要素が checkpoint で captures の `Rc` を掴むため、
+capture 追加のほぼ毎回「それまでの全 capture 数」に比例するコピーが起きていた。ケース15で scope に使った mutation journal を
+capture にも適用すれば、コピーは消えて rollback は「取り消す capture の数」に比例するはずだと考えた。
+
+### 実装
+
+- `CaptureStore { values, journal: Vec<&'static str>, checkpoint_depth }` を直接所有し、`push` は checkpoint 内なら name を journal に積む。
+  `checkpoint()` は journal 長の mark、`rollback_checkpoint(mark)` は mark まで逆順に最後の span を pop（空になれば entry を消す）、
+  `commit_checkpoint()` は最外で journal を破棄
+- `Checkpoint.captures` の `Rc` clone を `captures_journal_mark` に置換。`LongestChoice` はケース15と同じく候補ごとに store を clone し勝者を採用
+- 追加 test: 失敗 transaction 内の capture が rollback で消える、nested commit → outer rollback、同名 capture の順序、LongestChoice の敗者候補の
+  capture が残らない。`copy_on_write_deep_copies` は capture 由来が 0 になる
+
+### 観測
+
+Timing（Rust public facade、Criterion、baseline = master `b21a965` の pin、candidate = worktree path patch）。base fixture は 3-run 中央値:
+
+| Runtime | Fixture | Baseline runs | Baseline median | Candidate runs | Candidate median | 変化 |
+|---|---|---:|---:|---:|---:|---:|
+| Rust | complex | 3.710 / 3.862 / 4.101 | **3.862** | 3.013 / 3.122 / 3.106 | **3.106** | **-19.58%** |
+| Rust | comparison-heavy | 1.005 / 1.010 / 0.994 | **1.005** | 0.932 / 0.883 / 0.881 | **0.883** | **-12.18%** |
+
+x4 / x16 / x64（candidate 1 run、baseline はスケーリング計測の値）:
+
+| Fixture | bytes | サイズ倍率 | baseline ms/op（倍率） | candidate ms/op（倍率） | 変化 |
+|---|---:|---:|---:|---:|---:|
+| complex | 332 | 1.0x | 3.794（1.0x） | 3.013（1.0x） | -20.6% |
+| complex-x4 | 1,293 | 3.9x | 18.829（5.0x） | 14.653（4.9x） | -22.2% |
+| complex-x16 | 5,179 | 15.6x | 110.569（29.1x） | 77.340（25.7x） | -30.1% |
+| complex-x64 | 20,923 | 63.0x | 654.400（172.5x） | 470.704（156.2x） | -28.1% |
+| comparison-heavy | 179 | 1.0x | 0.991（1.0x） | 0.932（1.0x） | -6.0% |
+| comparison-heavy-x4 | 716 | 4.0x | 4.030（4.1x） | 3.720（4.0x） | -7.7% |
+| comparison-heavy-x16 | 2,864 | 16.0x | 21.968（22.2x） | 19.022（20.4x） | -13.4% |
+| comparison-heavy-x64 | 11,456 | 64.0x | 191.505（193.2x） | 150.774（161.8x） | -21.3% |
+
+base fixture で -19.6% / -12.2% と明確に短縮し、x64 では -28% / -21%。**採用**。ただし倍率は complex 172 → 156 倍、comparison-heavy 193 → 162 倍で
+まだ入力倍率（63〜64）より大きく、capture の COW 以外にも超線形の要因が残っている（生成 mapper はノード単位の線形 dispatch なので runtime 側。
+#245 で領域別に n=1/4/16/64 を計測して切り分ける）。
+
+### 教材としての要点
+
+copy-on-write は「checkpoint を取る側」を安くするが、「変更する側」が状態サイズに比例するコピーを毎回払う。変更が入力長に比例して
+増える状態（capture、宣言、token）を COW にすると、parse 全体が O(n²) になる。小さな fixture の A/B では見えないので、
+線形性は「サイズを 4 / 16 / 64 倍にした fixture で倍率を見る」という別の計測で確認する。

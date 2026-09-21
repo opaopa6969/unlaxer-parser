@@ -83,6 +83,23 @@ fn longest_choice_commits_only_the_longest_transactional_state() {
 }
 
 #[test]
+fn longest_choice_discards_captures_from_losing_candidates() {
+    let mut context = ParseContext::new("ab");
+    context
+        .parse(&Expr::longest_choice([
+            Expr::literal("a").capture("candidate"),
+            Expr::literal("ab").capture("candidate"),
+        ]))
+        .unwrap();
+
+    assert_eq!(context.captured("candidate"), Some("ab"));
+    assert_eq!(
+        context.capture_spans("candidate"),
+        &[Span { start: 0, end: 2 }]
+    );
+}
+
+#[test]
 fn longest_choice_discards_every_losing_scope_event_and_keeps_winner_order() {
     fn scoped_candidate(
         context: &mut ParseContext<'_>,
