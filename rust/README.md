@@ -82,6 +82,24 @@ runtimeは規則IDで参照する文法を実行し、入力とCST node arenaを
 
 `Semantics`の各メソッドは既定実装を持たず、`evaluate`はwildcardなしの`match`。新しいvariantと古いdispatchを組み合わせると`E0004`、新しいtraitと古いimplでは`E0046`になる。ただし再コンパイルされるソース間の構造チェックであり、意味処理の正しさは保証しない。文字列として保持する演算子の追加は型を変えないため、この保護を受けない。
 
+### 構文診断のポリシー
+
+Rust runtime の診断ポリシーは既定で `Diagnostics::Detailed`。生成 parser の
+`parse_tree_detailed_with_options` / `parse_tree_with_options`、runtime の全入力解析 API に
+`ParseOptions::with_memoization(Memoization::SafeFailures).with_diagnostics(Diagnostics::DetailedOnFailure)`
+を渡すと、初回は構文上の失敗診断を記録せず、失敗時だけ同じ入力・文法・memoization 設定で
+新しい context を作り、`Detailed` で再解析した診断を返す。成功時の CST・capture・scope・意味診断は保持する。
+失敗が多い編集途中の入力では、再解析の分だけ実行時間が増える。
+
+`ParseContext` を直接使う低水準 API は再解析しない。このモードの `failure()` / `error()` は
+offset 0・空の expected を返し、custom parser が直接返したエラーはそのまま返す。
+checkpoint / memo hit のカウンタはその context の解析だけを数え、別 context の再解析分を含めない。
+解析中の診断で受理判定を変える custom parser や、再実行できない callback・外部作用がある場合は
+`Detailed` を使う。`ParseOptions` の構造体リテラルには追加の `diagnostics` フィールドか
+`..ParseOptions::default()` が必要で、既存の constructor と関数シグネチャは維持する。
+これは issue #257 の Rust 限定実験であり、Java の同等モードは未実装。Java/Rust 共通機能の完了とは扱わず、
+既存の生成文字列が変わらないことを `RustNativeEmitterTest` で検証する。
+
 ### 対応するUBNF
 
 - 1ファイル・1文法、ちょうど1つの`@root`。

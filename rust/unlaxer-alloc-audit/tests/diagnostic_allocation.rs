@@ -3,7 +3,9 @@
 //! the memo frame while keeping process-wide allocation counting single-threaded.
 
 use unlaxer_alloc_audit::{allocations, CountingAllocator};
-use unlaxer_runtime::{share_grammar, Expr, Memoization, ParseContext, ParseOptions, Rule};
+use unlaxer_runtime::{
+    share_grammar, Diagnostics, Expr, Memoization, ParseContext, ParseOptions, Rule,
+};
 
 #[global_allocator]
 static GLOBAL: CountingAllocator = CountingAllocator;
@@ -50,6 +52,54 @@ fn check_repeated_interned_failures_allocate_nothing() {
     assert_eq!(context.failure().expected, vec!["expected", "first"]);
 }
 
+fn check_deferred_success_failures_allocate_nothing() {
+    // A fresh context: unlike the interned-name contract above, no diagnostic
+    // allocation or warmup is permitted, even for the first failed alternative.
+    let parser = Expr::literal("expected").optional();
+    let mut counts = Vec::new();
+    for diagnostics in [Diagnostics::Detailed, Diagnostics::DetailedOnFailure] {
+        let mut context = ParseContext::with_options(
+            "actual",
+            ParseOptions::default().with_diagnostics(diagnostics),
+        );
+        let before = allocations();
+        for _ in 0..REPEATED_FAILURES {
+            context.parse(&parser).unwrap();
+        }
+        let count = allocations().allocations - before.allocations;
+        counts.push(count);
+        println!("{diagnostics:?}: {REPEATED_FAILURES} failures on success = {count} allocations");
+    }
+    assert!(counts[0] > counts[1]);
+    assert_eq!(counts[1], 0);
+}
+
+fn check_deferred_success_skips_memo_diagnostic_allocations() {
+    let grammar = share_grammar(vec![
+        Rule {
+            name: "root",
+            expression: Expr::choice([Expr::Rule(1), Expr::Rule(1), Expr::literal("actual")]),
+        },
+        Rule {
+            name: "failure",
+            expression: Expr::choice([Expr::literal("first"), Expr::literal("second")]),
+        },
+    ]);
+    let mut counts = Vec::new();
+    for diagnostics in [Diagnostics::Detailed, Diagnostics::DetailedOnFailure] {
+        let mut context = ParseContext::with_options(
+            "actual",
+            ParseOptions::with_memoization(Memoization::SafeFailures).with_diagnostics(diagnostics),
+        );
+        let before = allocations();
+        context.parse_shared_grammar(&grammar, 0, false).unwrap();
+        let count = allocations().allocations - before.allocations;
+        counts.push(count);
+        println!("{diagnostics:?}: successful memoized choice = {count} allocations");
+    }
+    assert!(counts[1] < counts[0]);
+}
+
 fn main() {
     let single = allocations_for_identical_failures(1);
     let repeated = allocations_for_identical_failures(REPEATED_FAILURES);
@@ -66,4 +116,6 @@ fn main() {
         "identical failures at one position must not allocate per attempt"
     );
     check_repeated_interned_failures_allocate_nothing();
+    check_deferred_success_failures_allocate_nothing();
+    check_deferred_success_skips_memo_diagnostic_allocations();
 }
