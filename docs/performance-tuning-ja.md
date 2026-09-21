@@ -1470,3 +1470,58 @@ Java は変化なし（ノイズ内）。tinyexpression の facade は低水準 
 再解析できる入口だけで自動選択する、という規則にしたので、既存コードは何も変わらず、生成 parser の利用者は何もしなくても速くなる。
 一方で、手書き parser が 1 つでも未宣言だと文法全体が `Detailed` に落ちる。性質の宣言は利用者の自己申告なので、宣言の意味
 （解析中に診断を読まない、再実行できる）を文書に固定し、差分テストで両モードの一致を守る。
+
+## ケース28: 候補型ごとの再 mapping を root 1 回の mapping に置き換える（Java、生成 mapper #267 + tinyexpression #167）
+
+### 仮説
+
+ケース22 の x64 計測で、Java の public facade（3,424 ms）から parser 単体（2,465 ms）を引いた約 960 ms は、tinyexpression の
+`P4PreferredAstMapper.mapCandidates` が候補型名（約 45 個）ごとに `P4SourceMapping.select` → 生成 mapper の `mapTokenTree` を呼び直す分だった
+（1 回約 34 ms × 20〜30 回）。生成 mapper には「公開 mapping 呼び出しごとに AST は別インスタンス、snapshot は自分の mapping だけを解決する」契約
+（`SelectedSourceSnapshotRuntimeTest`）があり、generator 側で勝手に再利用はできない。契約を壊さずに「1 回 map して何度でも選ぶ」入口を
+別に用意すれば、facade の候補数依存が消えるはず。
+
+### 実装（unlaxer PR #268、tinyexpression PR #171。codex に委譲しレビュー）
+
+- 生成 mapper に `mapParsedTree(Token)` / `mapSubtreeTree(Token)` を追加。返る `MappedTree` は 1 回の mapping で得た preorder の候補列・AST・
+  凍結した `SpanLayer` を保持し、`select(String preferredAstSimpleName)` / `selectDefault()` が `findBestMappedToken` と同じ fold
+  （preferred 優先 → 浅い depth → 大きい start offset → 同点は後勝ち）を再 mapping せずに行う。`MAP_MEMO` により各ノードの mapping は 1 回。
+- 既存入口の契約は不変（呼び出しごとに memo をリセットして別 AST）。AST 共有は「同じ `MappedTree` 内」に限る契約として Javadoc に明記。
+- tinyexpression 側は `P4SourceMapping.mapOnce(...)` で新 API をリフレクション解決し、無ければ候補ごとに既存 `select` を呼ぶ fallback ハンドルを返す
+  （Maven Central 公開版 3.0.15 互換）。候補順序・`coversWholeSource`・返す `ParsedAst`・例外経路は不変。
+
+### 観測
+
+生成 mapper 単体（Java 21、warm-up 20 回後 9 回の中央値、parse 時間は除く）: 型名一致だけなら 1 候補目で決まるので差は無い（0.80〜1.01 倍）が、
+facade と同じ「型名 + 全ソース範囲」条件では complex 6.97 → 0.367 ms（19.0 倍）、complex-x64 1,430 → 33.0 ms（43.3 倍）。
+
+tinyexpression public facade（JMH、unlaxer master `cb128f7` を両側で使用、tinyexpression `4bcd3657` vs `2e2da9a2`、3-run 中央値）:
+
+| Runtime | Fixture | Baseline runs | Baseline median | Candidate runs | Candidate median | 変化 |
+|---|---|---:|---:|---:|---:|---:|
+| Java | complex | 35.346 / 34.873 / 33.777 | **34.873** | 31.066 / 30.393 / 30.130 | **30.393** | **-12.85%** |
+| Java | comparison-heavy | 21.830 / 23.422 / 23.143 | **23.143** | 17.843 / 18.577 / 19.540 | **18.577** | **-19.73%** |
+
+倍率（`publicFacade`、1 fork × 5 iteration。入力は complex 63 倍、comparison-heavy 64 倍）:
+
+| Fixture | baseline ms（倍率） | candidate ms（倍率） | 変化 |
+|---|---:|---:|---:|
+| complex-x4 | 138.6（4.0） | 121.4（4.0） | -12.4% |
+| complex-x16 | 613.8（17.6） | 529.6（17.4） | -13.7% |
+| complex-x64 | 2986.2（85.6） | 2009.7（66.1） | -32.7% |
+| comparison-heavy-x4 | 98.8（4.3） | 77.9（4.2） | -21.2% |
+| comparison-heavy-x16 | 441.7（19.1） | 295.7（15.9） | -33.1% |
+| comparison-heavy-x64 | 2907.6（125.6） | 1166.0（62.8） | -59.9% |
+
+失敗入力（`facadeAny`）は complex-half +1.0%、complex-tail -17.9%。Java facade の超線形（ケース22 で 86 倍）はこれで入力倍率の 1.05 倍に収まった。
+
+### 教材としての要点
+
+「契約があるから再利用できない」は、その契約を守る既存入口を残したまま、再利用を前提にした別の入口を足せば解ける。新入口の契約
+（AST 共有の範囲、凍結した span 層、保持コスト）を Javadoc とテストで固定し、下流は新 API が無い版では従来経路に落ちる二段構えにする。
+効果は候補数に比例する場所（comparison-heavy の x64 で -60%）に集中し、候補 1 つで決まる入力では出ない。倍率の改善（86 → 66 倍）は
+「facade の残りの超線形は parser 側ではなく呼び出し側の回数にあった」ことの確認になる。
+
+tinyexpression の全テストを unlaxer 開発版で回すと、深いネストの if 式（fraud formula #5）の parse が公開版 3.0.15 の 25 ms から 4〜6 秒に
+退行していることが同時に見つかった（#194 で成功 memo が無くなったため。unlaxer #269）。tinyexpression の Java CI は公開版 jar でしか
+走らないので CI には出ない。
