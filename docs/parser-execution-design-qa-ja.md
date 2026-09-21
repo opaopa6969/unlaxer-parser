@@ -75,6 +75,18 @@ TinyExpression の通常コンパイルには適する可能性がある。入�
 最初から詳細診断付きで動かす方がよい可能性もある。
 再解析が必要な場合の memo の診断情報も、最初の簡易解析と混同せず管理する必要がある。
 
+### 実測（2026-09-21、unlaxer-parser #257、Rust 限定の opt-in 実験）
+
+`ParseOptions::with_diagnostics(Diagnostics::DetailedOnFailure)` として実装し、TinyExpression の fixture で計測した
+（[実践ノート ケース25](performance-tuning-ja.md)）。
+
+- 成功する入力: complex.tiny で **-48%**（x1）〜 **-35%**（x64、20.9 KB）。差分計測で見積もった上限（39〜45%）に近い
+- 失敗する入力（前半で切断、末尾に `@`）: 再解析の分だけ **+46〜+73%**
+- 受理結果・CST・capture・scope・`ParseError`（offset / expected）は `Detailed` と一致。既定は `Detailed` のまま
+
+用途で損益が逆転するので、runtime が既定を変えるのではなく利用者が要求として選ぶ形にした。解析中に診断を読む custom parser と
+再実行できない副作用には不適で、この判定を parser の性質から自動化するのが提案2の役割になる。Java 側は未実装。
+
 ## 提案2: Features は要求する結果を指定し、安全性は parser の性質から判定する
 
 将来の API のイメージを次に示す。クラス名・定数名を含め、現在存在する API ではない。
