@@ -1417,11 +1417,10 @@ impl<'a> ParseContext<'a> {
             self.fail("rule nesting below 256");
             return None;
         }
-        let rules = Arc::clone(&self.rules);
-        let Some(rule) = rules.get(id) else {
+        if id >= self.rules.len() {
             self.fail("valid rule reference");
             return None;
-        };
+        }
         let memo_key = (self.options.memoization == Memoization::SafeFailures
             && self.memo_safe_rules.get(id).copied().unwrap_or(false))
         .then(|| {
@@ -1444,6 +1443,8 @@ impl<'a> ParseContext<'a> {
                 return None;
             }
         }
+        let rules = Arc::clone(&self.rules);
+        let rule = &rules[id];
         if memo_key.is_some() {
             self.diagnostic_frames.push(FailureDiagnostic::default());
         }
@@ -2527,6 +2528,30 @@ mod tests {
             expression: Expr::Rule(0),
         }];
         assert!(parse(&rules, 0, false, "").unwrap_err().expected[0].contains("256"));
+    }
+
+    #[test]
+    fn rule_depth_and_invalid_id_diagnostics_keep_their_priority() {
+        let grammar = share_grammar(vec![Rule {
+            name: "root",
+            expression: Expr::Literal("unused"),
+        }]);
+        for memoization in [Memoization::Off, Memoization::SafeFailures] {
+            for (id, depth, expected) in [
+                (usize::MAX, 255, "valid rule reference"),
+                (usize::MAX, 256, "rule nesting below 256"),
+                (0, 256, "rule nesting below 256"),
+            ] {
+                let mut context =
+                    ParseContext::with_options("", ParseOptions::with_memoization(memoization));
+                context.rules = Arc::clone(&grammar);
+                context.memo_safe_rules = memo_safe_rules(&grammar);
+                assert!(context.rule(id, depth).is_none());
+                assert_eq!(context.failure().expected, vec![expected]);
+                assert_eq!(context.memoized_failure_hits(), 0);
+                assert!(context.diagnostic_frames.is_empty());
+            }
+        }
     }
 
     #[test]
