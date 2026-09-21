@@ -310,6 +310,33 @@ fn capture_added_in_failed_transaction_disappears_after_rollback() {
 }
 
 #[test]
+fn existing_capture_is_retrievable_by_dynamic_name_after_rollback() {
+    let mut context = ParseContext::new("ab");
+    let name = String::from("part");
+    context.parse(&Expr::literal("a").capture("part")).unwrap();
+
+    let rejected: Result<(), _> = context.transaction(|outer| {
+        outer.transaction(|inner| {
+            inner.parse(&Expr::literal("b").capture("part"))?;
+            assert_eq!(inner.captured(&name), Some("b"));
+            Ok(())
+        })?;
+        Err(outer.error("reject replacement capture"))
+    });
+
+    assert!(rejected.is_err());
+    assert_eq!(context.position(), 1);
+    assert_eq!(context.captured(&name), Some("a"));
+    assert_eq!(context.capture_spans(&name), &[Span { start: 0, end: 1 }]);
+    context.parse(&Expr::literal("b").capture("part")).unwrap();
+    assert_eq!(context.captured(&name), Some("b"));
+    assert_eq!(
+        context.capture_spans(&name),
+        &[Span { start: 0, end: 1 }, Span { start: 1, end: 2 }]
+    );
+}
+
+#[test]
 fn committed_inner_capture_disappears_when_outer_transaction_rolls_back() {
     let mut context = ParseContext::new("a");
     let rejected: Result<(), _> = context.transaction(|outer| {

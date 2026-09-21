@@ -1237,3 +1237,67 @@ base fixture で **-21.7% / -15.9%**、x64 で -27% / -25%（倍率 79 → 70、
 
 大量に保持する小さな値（ここでは `Rc<str>`）は、参照カウントの増減と解放が「本体の処理」に見えない固定費として積み上がる。
 文字列を整数 id に変えると、比較・複製・破棄のすべてが安くなり、表も小さくなる。名前へ戻すのは結果を返す 1 回だけで済む。
+
+## ケース24: 失敗診断まわりの割当を削る（Rust: 単一 expected の inline 化、capture 名の借用、`Arc::clone` の後送り）
+
+### 仮説
+
+master `ab6a368` の差分計測（機能を no-op にした build との差）で、失敗診断の記録を止めると x1 で 38.7%、x64 で 44.9% 短縮する。
+診断が依然最大のコストで、memo 破棄は x1 → x64 で 146.6 倍（他の回数は 60〜62 倍）と局所性の問題が残る。memo が保持する
+`Rc<Vec<u32>>` は x64 で 283,762 本、**その 75% が要素 1 個**。他に `CaptureStore.push` が毎回 `name.to_owned()`（x64 で 125,945 回）、
+`rule()` が memo lookup 前に `Arc::clone(&rules)`（hit 46%）していた。
+
+### 実装（項目ごとに 1 commit、codex に委譲しレビュー）
+
+1. `FailureDiagnostic.expected` を `ExpectedIds { Empty, Single(u32), Multiple(Rc<Vec<u32>>) }` に。単一要素では `Vec` も `Rc` も作らない。
+   farthest の選択、初出順、重複除去、一括 replay の `Rc` 共有、`ParseError.expected` は不変
+2. `CaptureStore.values` を `HashMap<&'static str, Vec<Span>>` に（capture 名は `&'static str`）。名前での検索・span 順・journal は不変
+3. `rule()` の `Arc::clone(&self.rules)` を memo lookup の後に移す。`depth >= 256` と不正 rule id の診断順序は test で固定
+
+alloc-audit: 診断 allocation 11 → 9、capture 512 回の allocation 1,034 → 522。
+
+### 観測
+
+| 段階（codex 簡易計測、CPU 時間中央値） | x1 | x64 |
+|---|---:|---:|
+| base `ab6a368` | 2.500 ms | 170.0 ms |
+| +1 単一 expected の inline 化 | 2.468（-1.3%） | 149.0（**-12.4%**） |
+| +2 capture 名の `to_owned()` 排除 | 2.500（+1.3%） | 145.0（-2.7%） |
+| +3 memo hit 前の `Arc::clone` 排除 | 2.500（±0） | 149.0（+2.8%、ばらつき内） |
+
+Timing（Rust、Criterion、baseline = master `ab6a368`、candidate = 3 項目、path patch）。base fixture は 3-run 中央値:
+
+| Runtime | Fixture | Baseline runs | Baseline median | Candidate runs | Candidate median | 変化 |
+|---|---|---:|---:|---:|---:|---:|
+| Rust | complex | 2.454 / 2.495 / 2.492 | **2.492** | 2.252 / 2.267 / 2.330 | **2.267** | **-9.02%** |
+| Rust | comparison-heavy | 0.856 / 0.746 / 0.774 | **0.774** | 0.626 / 0.627 / 0.629 | **0.627** | **-19.00%** |
+
+public facade（x1 は run1、x4 以上は 1 run）:
+
+| Fixture | サイズ倍率 | baseline ms（倍率） | candidate ms（倍率） | 変化 |
+|---|---:|---:|---:|---:|
+| complex | 1.0x | 2.454（1.0x） | 2.252（1.0x） | -8.3% |
+| complex-x4 | 3.9x | 9.283（3.8x） | 9.054（4.0x） | -2.5% |
+| complex-x16 | 15.6x | 43.358（17.7x） | 38.426（17.1x） | -11.4% |
+| complex-x64 | 63.0x | 170.736（69.6x） | 148.416（65.9x） | -13.1% |
+| comparison-heavy | 1.0x | 0.856（1.0x） | 0.626（1.0x） | -26.9% |
+| comparison-heavy-x4 | 4.0x | 2.861（3.3x） | 2.341（3.7x） | -18.2% |
+| comparison-heavy-x16 | 16.0x | 11.979（14.0x） | 10.268（16.4x） | -14.3% |
+| comparison-heavy-x64 | 64.0x | 66.312（77.5x） | 45.096（72.0x） | -32.0% |
+
+parse-only-safe（parser 単体、1 run）:
+
+| Fixture | サイズ倍率 | baseline ms（倍率） | candidate ms（倍率） | 変化 |
+|---|---:|---:|---:|---:|
+| complex | 1.0x | 2.457（1.0x） | 2.343（1.0x） | -4.6% |
+| complex-x4 | 3.9x | 9.204（3.7x） | 8.597（3.7x） | -6.6% |
+| complex-x16 | 15.6x | 41.107（16.7x） | 36.149（15.4x） | -12.1% |
+| complex-x64 | 63.0x | 172.424（70.2x） | 150.355（64.2x） | -12.8% |
+
+base fixture で **-9.0% / -19.0%**、x64 で -13% / -32%（倍率 70 → 66、78 → 72）。効果はほぼ項目 1 で、項目 2 は allocation を半減させるが
+時間はばらつき内、項目 3 は時間で判別できない（無害なので残す）。154 tests、fingerprint 一致。**採用**。
+
+### 教材としての要点
+
+「表の 75% が要素 1 個」のような分布はカウンタで数えないと分からない。小さい可変長データは `Vec` + `Rc` の 2 段の割当と破棄が支配的で、
+inline 表現にすると割当・破棄・局所性の三つが同時に良くなる。一方、回数が多くても 1 回が数 ns の操作（`Arc::clone`）は外しても測れない。
