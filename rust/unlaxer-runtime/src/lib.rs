@@ -99,7 +99,19 @@ pub enum Expr {
     /// Java UNTIL succeeds at EOF even if its non-consuming terminator is absent.
     JavaUntil(&'static str),
     Error(&'static str),
+    /// Undeclared custom parser: [`Diagnostics::Auto`] conservatively uses `Detailed`.
     Custom(fn(&mut ParseContext<'_>) -> ParseResult),
+    /// Custom parser with a caller-supplied contract for automatic diagnostics.
+    /// Deferred diagnostics require `reads_diagnostics: false` and `replayable: true`.
+    /// The contract includes nested parsers and external effects: changing diagnostic
+    /// recording must not affect acceptance, CST, captures, scopes or user state, and
+    /// a fresh-context retry must reproduce the result without harmful repeated effects.
+    /// These flags do not declare memoization safety; custom parsers remain memo-unsafe.
+    CustomWith {
+        parser: fn(&mut ParseContext<'_>) -> ParseResult,
+        reads_diagnostics: bool,
+        replayable: bool,
+    },
     Backreference(&'static str),
 }
 
@@ -272,8 +284,12 @@ pub enum Memoization {
 /// Syntax-failure recording policy, independent of semantic diagnostics and memoization.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum Diagnostics {
-    /// Record speculative failures throughout parsing, including successful parses.
+    /// Resolve once when preparing a full-input parse: use `DetailedOnFailure` if
+    /// every custom parser declares diagnostic independence and replayability,
+    /// otherwise `Detailed`. Direct [`ParseContext`] construction uses `Detailed`.
     #[default]
+    Auto,
+    /// Record speculative failures throughout parsing, including successful parses.
     Detailed,
     /// Skip syntax-failure recording on the first pass. Full-input parsing functions
     /// retry failures with `Detailed` in a fresh context and return that diagnostic.
@@ -294,7 +310,7 @@ impl ParseOptions {
     pub const fn with_memoization(memoization: Memoization) -> Self {
         Self {
             memoization,
-            diagnostics: Diagnostics::Detailed,
+            diagnostics: Diagnostics::Auto,
         }
     }
 
@@ -877,7 +893,8 @@ pub fn parse(
     parse_detailed(rules, root, whitespace, input).map_err(|diagnostic| diagnostic.farthest)
 }
 
-/// Full-input parsing; [`Diagnostics::DetailedOnFailure`] retries failures with
+/// Full-input parsing; [`Diagnostics::Auto`] resolves from the grammar at preparation.
+/// [`Diagnostics::DetailedOnFailure`] retries failures with
 /// detailed diagnostics in a fresh context using the same input and memoization policy.
 pub fn parse_with_options(
     rules: &[Rule],
@@ -925,7 +942,8 @@ pub fn parse_detailed(
     parse_detailed_with_options(rules, root, whitespace, input, ParseOptions::default())
 }
 
-/// Full-input parsing with a categorized diagnostic. With
+/// Full-input parsing with a categorized diagnostic. [`Diagnostics::Auto`] resolves
+/// from the grammar once before parsing. With
 /// [`Diagnostics::DetailedOnFailure`], failure (including trailing input) triggers
 /// a fresh detailed parse and returns its complete [`ParseDiagnostic`].
 pub fn parse_detailed_with_options(
@@ -967,6 +985,15 @@ fn parse_detailed_owned(
     input: &str,
     options: ParseOptions,
 ) -> Result<Tree, ParseDiagnostic> {
+    let options = if options.diagnostics == Diagnostics::Auto {
+        options.with_diagnostics(if grammar_allows_deferred_diagnostics(&rules) {
+            Diagnostics::DetailedOnFailure
+        } else {
+            Diagnostics::Detailed
+        })
+    } else {
+        options
+    };
     let mut parser = ParseContext::with_options(input, options);
     parser.rules = rules;
     parser.whitespace = whitespace;
@@ -1024,9 +1051,16 @@ impl<'a> ParseContext<'a> {
         Self::with_options(input, ParseOptions::default())
     }
 
-    /// Creates a low-level context. [`Diagnostics::DetailedOnFailure`] disables
+    /// Creates a low-level context. [`Diagnostics::Auto`] resolves to `Detailed`,
+    /// preserving diagnostics for callers of [`Self::failure`] and [`Self::error`].
+    /// [`Diagnostics::DetailedOnFailure`] disables
     /// syntax diagnostics here and does not automatically retry failed operations.
     pub fn with_options(input: &'a str, options: ParseOptions) -> Self {
+        let options = if options.diagnostics == Diagnostics::Auto {
+            options.with_diagnostics(Diagnostics::Detailed)
+        } else {
+            options
+        };
         let byte_offsets: Vec<_> = input
             .char_indices()
             .map(|(i, _)| i)
@@ -1069,6 +1103,7 @@ impl<'a> ParseContext<'a> {
         }
     }
 
+    /// Returns the resolved options; `diagnostics` is never [`Diagnostics::Auto`].
     pub fn options(&self) -> ParseOptions {
         self.options
     }
@@ -1571,14 +1606,13 @@ impl<'a> ParseContext<'a> {
 
     fn expression_inner(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
         match expression {
-            Expr::Custom(parser) => {
-                self.transaction(|context| parser(context))
-                    .ok()
-                    .map(|matched| Fragment {
-                        nodes: matched.nodes,
-                        captures: matched.captures,
-                    })
-            }
+            Expr::Custom(parser) | Expr::CustomWith { parser, .. } => self
+                .transaction(|context| parser(context))
+                .ok()
+                .map(|matched| Fragment {
+                    nodes: matched.nodes,
+                    captures: matched.captures,
+                }),
             Expr::Backreference(name) => {
                 let text = self.captured(name);
                 if let Some(text) = text.filter(|text| self.remaining().starts_with(text)) {
@@ -2248,6 +2282,63 @@ impl<'a> ParseContext<'a> {
     }
 }
 
+/// Whether every custom parser in the grammar permits deferred diagnostics.
+///
+/// Visits all rule expressions, including unreachable rules and nested combinators,
+/// without following rule references (recursive grammars therefore terminate).
+/// Full-input entry points call this once during preparation when resolving `Auto`,
+/// never during parsing or a detailed retry. No result is cached in [`SharedGrammar`].
+pub fn grammar_allows_deferred_diagnostics(rules: &[Rule]) -> bool {
+    rules
+        .iter()
+        .all(|rule| expression_allows_deferred_diagnostics(&rule.expression))
+}
+
+fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
+    match expression {
+        Expr::Custom(_) => false,
+        Expr::CustomWith {
+            reads_diagnostics,
+            replayable,
+            ..
+        } => !reads_diagnostics && *replayable,
+        Expr::Sequence(children) | Expr::Choice(children) | Expr::LongestChoice(children) => {
+            children.iter().all(expression_allows_deferred_diagnostics)
+        }
+        Expr::PredictiveChoice { alternatives, .. } => alternatives
+            .iter()
+            .all(expression_allows_deferred_diagnostics),
+        Expr::Capture(_, child)
+        | Expr::TextValue(child)
+        | Expr::ValueBoundary(child)
+        | Expr::Optional(child)
+        | Expr::JavaOptional(child)
+        | Expr::Repeat { child, .. }
+        | Expr::JavaRepeat { child, .. }
+        | Expr::Lookahead { child, .. }
+        | Expr::RuleEffects { child, .. }
+        | Expr::TriviaScope { child, .. } => expression_allows_deferred_diagnostics(child),
+        Expr::Literal(_)
+        | Expr::Number
+        | Expr::Identifier
+        | Expr::CodeStart
+        | Expr::CodeEnd
+        | Expr::Quoted(_)
+        | Expr::Rule(_)
+        | Expr::Any
+        | Expr::Eof
+        | Expr::Empty
+        | Expr::CharRange(_, _)
+        | Expr::Except(_)
+        | Expr::Until(_)
+        | Expr::JavaLookahead { .. }
+        | Expr::JavaEmpty
+        | Expr::JavaUntil(_)
+        | Expr::Error(_)
+        | Expr::Backreference(_) => true,
+    }
+}
+
 fn memo_safe_rules(rules: &[Rule]) -> Vec<bool> {
     let mut references = vec![Vec::new(); rules.len()];
     let mut safe = rules
@@ -2283,7 +2374,7 @@ fn memo_safe_rules(rules: &[Rule]) -> Vec<bool> {
 
 fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>) -> bool {
     match expression {
-        Expr::Custom(_) | Expr::Backreference(_) => false,
+        Expr::Custom(_) | Expr::CustomWith { .. } | Expr::Backreference(_) => false,
         Expr::Rule(id) => {
             references.push(*id);
             true

@@ -4,7 +4,8 @@
 
 use unlaxer_alloc_audit::{allocations, CountingAllocator};
 use unlaxer_runtime::{
-    share_grammar, Diagnostics, Expr, Memoization, ParseContext, ParseOptions, Rule,
+    parse_detailed_shared_with_options, parse_detailed_with_options, share_grammar, Diagnostics,
+    Expr, Memoization, ParseContext, ParseOptions, ParseResult, Rule,
 };
 
 #[global_allocator]
@@ -100,6 +101,72 @@ fn check_deferred_success_skips_memo_diagnostic_allocations() {
     assert!(counts[1] < counts[0]);
 }
 
+fn check_auto_entry_allocation_profile_matches_resolved_policy() {
+    fn custom(context: &mut ParseContext<'_>) -> ParseResult {
+        context.parse(&Expr::literal("actual"))
+    }
+    for (name, expression, resolved) in [
+        (
+            "generated",
+            Expr::literal("actual"),
+            Diagnostics::DetailedOnFailure,
+        ),
+        ("undeclared", Expr::Custom(custom), Diagnostics::Detailed),
+        (
+            "declared",
+            Expr::CustomWith {
+                parser: custom,
+                reads_diagnostics: false,
+                replayable: true,
+            },
+            Diagnostics::DetailedOnFailure,
+        ),
+    ] {
+        let grammar = share_grammar(vec![
+            Rule {
+                name: "root",
+                expression: Expr::choice([Expr::Rule(1), Expr::Rule(1), expression]),
+            },
+            Rule {
+                name: "failure",
+                expression: Expr::choice([Expr::literal("first"), Expr::literal("second")]),
+            },
+        ]);
+        for memoization in [Memoization::Off, Memoization::SafeFailures] {
+            for shared in [false, true] {
+                for input in ["actual", "invalid", "actual@"] {
+                    let mut counts = Vec::new();
+                    for diagnostics in [Diagnostics::Auto, resolved, Diagnostics::Detailed] {
+                        let options = ParseOptions::with_memoization(memoization)
+                            .with_diagnostics(diagnostics);
+                        let before = allocations();
+                        let result = if shared {
+                            parse_detailed_shared_with_options(&grammar, 0, false, input, options)
+                        } else {
+                            parse_detailed_with_options(&grammar, 0, false, input, options)
+                        };
+                        let after = allocations();
+                        counts.push((
+                            after.allocations - before.allocations,
+                            after.bytes - before.bytes,
+                        ));
+                        assert_eq!(result.is_ok(), input == "actual");
+                    }
+                    assert_eq!(
+                        counts[0], counts[1],
+                        "{name} {memoization:?} {shared} {input}"
+                    );
+                    if input == "actual" && resolved == Diagnostics::DetailedOnFailure {
+                        assert!(counts[0].0 < counts[2].0);
+                        assert!(counts[0].1 < counts[2].1);
+                    }
+                }
+            }
+        }
+        println!("Auto {name}: allocation calls and bytes match {resolved:?} for success, syntax failure and trailing input, shared/owned, memo off/on");
+    }
+}
+
 fn main() {
     let single = allocations_for_identical_failures(1);
     let repeated = allocations_for_identical_failures(REPEATED_FAILURES);
@@ -118,4 +185,5 @@ fn main() {
     check_repeated_interned_failures_allocate_nothing();
     check_deferred_success_failures_allocate_nothing();
     check_deferred_success_skips_memo_diagnostic_allocations();
+    check_auto_entry_allocation_profile_matches_resolved_policy();
 }
