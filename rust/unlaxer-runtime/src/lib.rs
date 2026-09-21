@@ -576,35 +576,73 @@ struct ChoiceWinner {
     fragment: Fragment,
 }
 
+/// IDs belong to one context and survive rollback and temporary grammar sessions.
+/// Keep the first name inline so a single distinct failure needs no table allocation.
+#[derive(Default)]
+struct ExpectedNames {
+    first: Option<Rc<str>>,
+    remaining: Vec<Rc<str>>,
+    ids: HashMap<Rc<str>, u32>,
+}
+
+impl ExpectedNames {
+    fn intern(&mut self, name: &str) -> u32 {
+        let Some(first) = &self.first else {
+            self.first = Some(Rc::from(name));
+            return 0;
+        };
+        if first.as_ref() == name {
+            return 0;
+        }
+        if let Some(&id) = self.ids.get(name) {
+            return id;
+        }
+        let id = u32::try_from(self.remaining.len() + 1).expect("too many expected names");
+        let name: Rc<str> = Rc::from(name);
+        self.remaining.push(Rc::clone(&name));
+        self.ids.insert(name, id);
+        id
+    }
+
+    fn name(&self, id: u32) -> &str {
+        if id == 0 {
+            self.first.as_deref().expect("expected name was interned")
+        } else {
+            &self.remaining[id as usize - 1]
+        }
+    }
+
+    fn strings(&self, expected: &[u32]) -> Vec<String> {
+        let mut expected: Vec<_> = expected
+            .iter()
+            .map(|&id| self.name(id).to_owned())
+            .collect();
+        expected.sort_unstable();
+        expected.dedup();
+        expected
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 struct FailureDiagnostic {
     farthest: Option<usize>,
-    expected: Option<Rc<Vec<Rc<str>>>>,
+    expected: Option<Rc<Vec<u32>>>,
 }
 
 impl FailureDiagnostic {
-    fn record(
-        &mut self,
-        position: usize,
-        expected: &str,
-        replayed: Option<&Rc<str>>,
-        shared: &mut Option<Rc<str>>,
-    ) {
+    fn record(&mut self, position: usize, expected: u32) {
         if self.farthest.is_none_or(|farthest| position > farthest) {
             self.farthest = Some(position);
             if let Some(values) = &mut self.expected {
                 Rc::make_mut(values).clear();
             }
         }
-        if self.farthest == Some(position)
-            && !contains_expected(self.expected_values(), expected, replayed)
-        {
-            let expected = shared_expected(expected, replayed, shared);
+        if self.farthest == Some(position) && !self.expected_values().contains(&expected) {
             Rc::make_mut(self.expected.get_or_insert_with(Default::default)).push(expected);
         }
     }
 
-    fn expected_values(&self) -> &[Rc<str>] {
+    fn expected_values(&self) -> &[u32] {
         self.expected.as_deref().map_or(&[], Vec::as_slice)
     }
 
@@ -637,41 +675,12 @@ impl FailureDiagnostic {
     }
 }
 
-fn append_missing_expected(target: &mut Vec<Rc<str>>, source: &[Rc<str>]) {
+fn append_missing_expected(target: &mut Vec<u32>, source: &[u32]) {
     for expected in source {
-        if !contains_expected(target, expected, Some(expected)) {
-            target.push(Rc::clone(expected));
+        if !target.contains(expected) {
+            target.push(*expected);
         }
     }
-}
-
-fn contains_expected(values: &[Rc<str>], expected: &str, shared: Option<&Rc<str>>) -> bool {
-    values.iter().any(|value| {
-        shared.is_some_and(|shared| Rc::ptr_eq(value, shared)) || value.as_ref() == expected
-    })
-}
-
-fn shared_expected(
-    expected: &str,
-    replayed: Option<&Rc<str>>,
-    shared: &mut Option<Rc<str>>,
-) -> Rc<str> {
-    if let Some(shared) = shared {
-        return Rc::clone(shared);
-    }
-    let value = replayed.map_or_else(|| Rc::from(expected), Rc::clone);
-    *shared = Some(Rc::clone(&value));
-    value
-}
-
-fn expected_strings<'a>(expected: impl IntoIterator<Item = &'a Rc<str>>) -> Vec<String> {
-    let mut expected: Vec<_> = expected
-        .into_iter()
-        .map(|expected| expected.to_string())
-        .collect();
-    expected.sort_unstable();
-    expected.dedup();
-    expected
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -787,7 +796,8 @@ pub struct ParseContext<'a> {
     matched_position: usize,
     nodes: Vec<Node>,
     farthest: usize,
-    expected: Vec<Rc<str>>,
+    expected: Vec<u32>,
+    expected_names: ExpectedNames,
     byte_offsets: Vec<usize>,
     // Empty for ASCII, where byte and scalar offsets are identical. Otherwise
     // non-boundary bytes contain usize::MAX to retain code_point's rejection.
@@ -922,7 +932,7 @@ fn parse_detailed_owned(
     }
     let farthest = ParseError {
         offset: parser.code_point(parser.farthest),
-        expected: expected_strings(&parser.expected),
+        expected: parser.expected_names.strings(&parser.expected),
     };
     Err(ParseDiagnostic {
         kind: if trailing_offset.is_some() {
@@ -969,6 +979,7 @@ impl<'a> ParseContext<'a> {
             nodes: vec![],
             farthest: 0,
             expected: vec![],
+            expected_names: ExpectedNames::default(),
             byte_offsets,
             code_point_offsets,
             captures: CaptureStore::default(),
@@ -1124,7 +1135,7 @@ impl<'a> ParseContext<'a> {
     pub fn failure(&self) -> ParseError {
         ParseError {
             offset: self.code_point(self.farthest),
-            expected: expected_strings(&self.expected),
+            expected: self.expected_names.strings(&self.expected),
         }
     }
 
@@ -1152,8 +1163,9 @@ impl<'a> ParseContext<'a> {
                 }
                 if byte == self.farthest {
                     for expected in &error.expected {
-                        if !contains_expected(&self.expected, expected, None) {
-                            self.expected.push(Rc::from(expected.as_str()));
+                        let expected = self.expected_names.intern(expected);
+                        if !self.expected.contains(&expected) {
+                            self.expected.push(expected);
                         }
                     }
                 }
@@ -1341,20 +1353,24 @@ impl<'a> ParseContext<'a> {
     }
 
     fn fail_at(&mut self, position: usize, expected: &str) {
-        self.fail_at_shared(position, expected, None);
-    }
-
-    fn fail_at_shared(&mut self, position: usize, expected: &str, replayed: Option<&Rc<str>>) {
-        let mut shared = None;
+        // Failures behind both farthest positions cannot contribute a name.
+        if position < self.farthest
+            && self
+                .diagnostic_frames
+                .last()
+                .is_none_or(|frame| frame.farthest.is_some_and(|farthest| position < farthest))
+        {
+            return;
+        }
+        let expected = self.expected_names.intern(expected);
         if let Some(diagnostic) = self.diagnostic_frames.last_mut() {
-            diagnostic.record(position, expected, replayed, &mut shared);
+            diagnostic.record(position, expected);
         }
         if position > self.farthest {
             self.farthest = position;
             self.expected.clear();
         }
-        if position == self.farthest && !contains_expected(&self.expected, expected, replayed) {
-            let expected = shared_expected(expected, replayed, &mut shared);
+        if position == self.farthest && !self.expected.contains(&expected) {
             self.expected.push(expected);
         }
     }
@@ -1371,7 +1387,7 @@ impl<'a> ParseContext<'a> {
                 self.farthest = position;
                 self.expected.clear();
                 self.expected
-                    .extend(diagnostic.expected_values().iter().cloned());
+                    .extend_from_slice(diagnostic.expected_values());
             }
             std::cmp::Ordering::Equal => {
                 append_missing_expected(&mut self.expected, diagnostic.expected_values());
@@ -2289,6 +2305,49 @@ mod tests {
     }
 
     #[test]
+    fn expected_names_intern_dynamic_and_static_text_once() {
+        let mut names = ExpectedNames::default();
+        let first = names.intern(&String::from("z"));
+        assert_eq!(names.intern("z"), first);
+        let second = names.intern("a");
+        assert_eq!(names.intern(&String::from("a")), second);
+        assert_ne!(first, second);
+        for index in 0..128 {
+            let name = format!("dynamic {index}");
+            let id = names.intern(&name);
+            assert_eq!(names.intern(&name.clone()), id);
+            assert_eq!(names.name(id), name);
+        }
+        assert_eq!(names.intern("z"), first);
+        assert_eq!(names.intern("a"), second);
+        assert_eq!(names.remaining.len(), 129);
+    }
+
+    #[test]
+    fn dynamic_expected_names_preserve_failure_order_after_rollback() {
+        let mut context = ParseContext::new("");
+        context.fail("z");
+        context.fail(&String::from("a"));
+        context.fail("a");
+        let result: Result<(), ParseError> = context.transaction(|_| {
+            Err(ParseError {
+                offset: 0,
+                expected: vec!["m".to_owned(), "z".to_owned(), "m".to_owned()],
+            })
+        });
+        assert!(result.is_err());
+        context.fail("m");
+        assert_eq!(context.expected, vec![0, 1, 2]);
+        assert_eq!(context.expected_names.remaining.len(), 2);
+        assert_eq!(context.position(), 0);
+        assert_eq!(context.failure().expected, vec!["a", "m", "z"]);
+        assert_eq!(
+            context.failure().to_string(),
+            "at code point 0: expected a, m, z"
+        );
+    }
+
+    #[test]
     fn rollback_unicode_and_diagnostic_offsets() {
         let rules = vec![
             Rule {
@@ -2528,7 +2587,10 @@ mod tests {
                     diagnostic.farthest,
                     Some(context.byte_offsets[position + 1])
                 );
-                assert_eq!(expected_values(&diagnostic), vec!["z", "!"]);
+                assert_eq!(
+                    expected_values(&context.expected_names, &diagnostic),
+                    vec!["z", "!"]
+                );
                 assert_eq!(
                     context.failure(),
                     ParseError {
@@ -2563,44 +2625,54 @@ mod tests {
         assert_eq!(memo.first.capacity(), 0);
         assert_eq!(memo.remaining.capacity(), 0);
 
-        memo.insert(0, key, failure_diagnostic(0, &["first"]));
+        let mut names = ExpectedNames::default();
+        memo.insert(0, key, failure_diagnostic(&mut names, 0, &["first"]));
         assert_eq!(memo.remaining.capacity(), 0);
         let distant_key = FailureMemoKey::new(0, 8 * FAILURE_MEMO_BUCKET_SIZE, 0, false, 0);
         memo.insert(
             8,
             distant_key,
-            failure_diagnostic(distant_key.position, &["last"]),
+            failure_diagnostic(&mut names, distant_key.position, &["last"]),
         );
         assert!(memo.remaining[..7].iter().all(|map| map.capacity() == 0));
-        assert_eq!(expected_values(memo.get(0, &key).unwrap()), vec!["first"]);
         assert_eq!(
-            expected_values(memo.get(8, &distant_key).unwrap()),
+            expected_values(&names, memo.get(0, &key).unwrap()),
+            vec!["first"]
+        );
+        assert_eq!(
+            expected_values(&names, memo.get(8, &distant_key).unwrap()),
             vec!["last"]
         );
         assert!(memo.get(7, &distant_key).is_none());
     }
 
-    fn failure_diagnostic(position: usize, expected: &[&str]) -> FailureDiagnostic {
+    fn failure_diagnostic(
+        names: &mut ExpectedNames,
+        position: usize,
+        expected: &[&str],
+    ) -> FailureDiagnostic {
         let mut diagnostic = FailureDiagnostic::default();
         for expected in expected {
-            let mut shared = None;
-            diagnostic.record(position, expected, None, &mut shared);
+            diagnostic.record(position, names.intern(expected));
         }
         diagnostic
     }
 
-    fn expected_values(diagnostic: &FailureDiagnostic) -> Vec<&str> {
+    fn expected_values<'a>(
+        names: &'a ExpectedNames,
+        diagnostic: &FailureDiagnostic,
+    ) -> Vec<&'a str> {
         diagnostic
             .expected_values()
             .iter()
-            .map(|expected| expected.as_ref())
+            .map(|&id| names.name(id))
             .collect()
     }
 
     fn replay_memoized_failure(
-        global: FailureDiagnostic,
-        frame: FailureDiagnostic,
-        memoized: FailureDiagnostic,
+        global: (usize, &[&str]),
+        frame: Option<(usize, &[&str])>,
+        memoized: (usize, &[&str]),
     ) -> ParseContext<'static> {
         let rules = share_grammar(vec![Rule {
             name: "memoized",
@@ -2612,6 +2684,11 @@ mod tests {
         );
         context.rules = rules;
         context.memo_safe_rules = vec![true];
+        let global = failure_diagnostic(&mut context.expected_names, global.0, global.1);
+        let frame = frame.map_or_else(FailureDiagnostic::default, |(position, expected)| {
+            failure_diagnostic(&mut context.expected_names, position, expected)
+        });
+        let memoized = failure_diagnostic(&mut context.expected_names, memoized.0, memoized.1);
         context.farthest = global.farthest.unwrap_or(0);
         context.expected = global.expected_values().to_vec();
         context.diagnostic_frames.push(frame);
@@ -2626,32 +2703,64 @@ mod tests {
 
     #[test]
     fn memo_hit_bulk_replay_preserves_expected_order() {
-        let context = replay_memoized_failure(
-            failure_diagnostic(0, &[]),
-            FailureDiagnostic::default(),
-            failure_diagnostic(0, &["z", "a", "m"]),
-        );
+        let context = replay_memoized_failure((0, &[]), None, (0, &["z", "a", "m"]));
 
         assert_eq!(
             context
                 .expected
                 .iter()
-                .map(|expected| expected.as_ref())
+                .map(|&id| context.expected_names.name(id))
                 .collect::<Vec<_>>(),
             vec!["z", "a", "m"]
         );
         assert_eq!(
-            expected_values(context.diagnostic_frames.last().unwrap()),
+            expected_values(
+                &context.expected_names,
+                context.diagnostic_frames.last().unwrap()
+            ),
             vec!["z", "a", "m"]
         );
+    }
+
+    #[test]
+    fn memo_hit_bulk_replay_shares_interned_ids_and_deduplicates_names() {
+        let dynamic = String::from("a");
+        let mut context = replay_memoized_failure(
+            (0, &["shared", &dynamic]),
+            None,
+            (0, &["z", "a", &dynamic, "shared", "z"]),
+        );
+        let memoized = context
+            .failure_memo
+            .get(0, &FailureMemoKey::new(0, 0, 0, false, 0))
+            .unwrap()
+            .clone();
+        let frame = context.diagnostic_frames.last().unwrap();
+        assert!(Rc::ptr_eq(
+            frame.expected.as_ref().unwrap(),
+            memoized.expected.as_ref().unwrap(),
+        ));
+        assert_eq!(context.expected, vec![0, 1, 2]);
+        assert_eq!(frame.expected_values(), &[2, 1, 0]);
+        assert_eq!(context.failure().expected, vec!["a", "shared", "z"]);
+
+        // Extending the live frame must leave the shared memo entry unchanged.
+        context.fail("m");
+        assert_eq!(memoized.expected_values(), &[2, 1, 0]);
+        assert_eq!(context.expected, vec![0, 1, 2, 3]);
+        assert_eq!(
+            context.diagnostic_frames.last().unwrap().expected_values(),
+            &[2, 1, 0, 3]
+        );
+        assert_eq!(context.failure().expected, vec!["a", "m", "shared", "z"]);
     }
 
     #[test]
     fn memo_hit_bulk_replay_replaces_diagnostic_when_farthest_advances() {
         let context = replay_memoized_failure(
-            failure_diagnostic(1, &["old-global"]),
-            failure_diagnostic(1, &["old-frame"]),
-            failure_diagnostic(2, &["new-b", "new-a"]),
+            (1, &["old-global"]),
+            Some((1, &["old-frame"])),
+            (2, &["new-b", "new-a"]),
         );
 
         assert_eq!(context.farthest, 2);
@@ -2659,21 +2768,24 @@ mod tests {
             context
                 .expected
                 .iter()
-                .map(|expected| expected.as_ref())
+                .map(|&id| context.expected_names.name(id))
                 .collect::<Vec<_>>(),
             vec!["new-b", "new-a"]
         );
         let frame = context.diagnostic_frames.last().unwrap();
         assert_eq!(frame.farthest, Some(2));
-        assert_eq!(expected_values(frame), vec!["new-b", "new-a"]);
+        assert_eq!(
+            expected_values(&context.expected_names, frame),
+            vec!["new-b", "new-a"]
+        );
     }
 
     #[test]
     fn memo_hit_bulk_replay_merges_at_same_farthest() {
         let context = replay_memoized_failure(
-            failure_diagnostic(2, &["global", "shared"]),
-            failure_diagnostic(2, &["frame", "shared"]),
-            failure_diagnostic(2, &["shared", "memo-b", "memo-a"]),
+            (2, &["global", "shared"]),
+            Some((2, &["frame", "shared"])),
+            (2, &["shared", "memo-b", "memo-a"]),
         );
 
         assert_eq!(context.farthest, 2);
@@ -2681,35 +2793,38 @@ mod tests {
             context
                 .expected
                 .iter()
-                .map(|expected| expected.as_ref())
+                .map(|&id| context.expected_names.name(id))
                 .collect::<Vec<_>>(),
             vec!["global", "shared", "memo-b", "memo-a"]
         );
         assert_eq!(
-            expected_values(context.diagnostic_frames.last().unwrap()),
+            expected_values(
+                &context.expected_names,
+                context.diagnostic_frames.last().unwrap()
+            ),
             vec!["frame", "shared", "memo-b", "memo-a"]
         );
     }
 
     #[test]
     fn memo_hit_bulk_replay_ignores_diagnostic_behind_farthest() {
-        let context = replay_memoized_failure(
-            failure_diagnostic(3, &["global"]),
-            failure_diagnostic(3, &["frame"]),
-            failure_diagnostic(2, &["memo"]),
-        );
+        let context =
+            replay_memoized_failure((3, &["global"]), Some((3, &["frame"])), (2, &["memo"]));
 
         assert_eq!(context.farthest, 3);
         assert_eq!(
             context
                 .expected
                 .iter()
-                .map(|expected| expected.as_ref())
+                .map(|&id| context.expected_names.name(id))
                 .collect::<Vec<_>>(),
             vec!["global"]
         );
         assert_eq!(
-            expected_values(context.diagnostic_frames.last().unwrap()),
+            expected_values(
+                &context.expected_names,
+                context.diagnostic_frames.last().unwrap()
+            ),
             vec!["frame"]
         );
     }
@@ -2750,7 +2865,7 @@ mod tests {
             assert_eq!(
                 (
                     diagnostic.farthest,
-                    expected_strings(diagnostic.expected_values())
+                    context.expected_names.strings(diagnostic.expected_values())
                 ),
                 *expected
             );
@@ -2771,7 +2886,7 @@ mod tests {
             assert_eq!(
                 (
                     diagnostic.farthest,
-                    expected_strings(diagnostic.expected_values())
+                    context.expected_names.strings(diagnostic.expected_values())
                 ),
                 *expected
             );
@@ -2863,7 +2978,7 @@ mod tests {
             outer
                 .expected_values()
                 .iter()
-                .map(|expected| expected.as_ref())
+                .map(|&id| context.expected_names.name(id))
                 .collect::<Vec<_>>(),
             vec!["inner-b", "inner-a", "tail-b", "tail-a"]
         );

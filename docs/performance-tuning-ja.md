@@ -1181,3 +1181,59 @@ publicFacade:
 おり（数百表）、1 表あたりは小さく崖に達していなかった。「片方で効いた施策をもう片方に当てる」のは候補発見としては正しいが、採否は
 やはり A/B で決める。50 サンプルの JFR CPU 比率は候補発見にも弱い。倍率の比較は 1 run では ±10% 揺れるので、線形性の判断は
 複数 run の中央値か、JMH の fork / iteration を増やして行う。
+
+## ケース23: expected 名を intern して失敗 memo を `Vec<u32>` にする（Rust、memo 破棄コスト）
+
+### 仮説
+
+ケース21（memo の position バケット化）の後も complex-x64 の parse 224 ms のうち parse 終了時の失敗 memo 破棄が約 44 ms（x1 の 151 倍、入力は
+63 倍）。memo は 345,583 エントリで、保持する `expected` の `Vec<Rc<str>>` は 283,762 本・capacity 合計 1,858,728 要素。破棄は要素ごとに
+`Rc` の参照カウントを減らし、離れたキャッシュラインを順に触る。名前を `ParseContext` ごとの interner で `u32` にすれば、破棄は `Vec` の
+バッファ解放だけになり、エントリも小さくなって局所性が上がるはずだと考えた。
+
+### 実装
+
+- `ExpectedNames`（先頭の名前をインラインに持ち、2 つ目以降を `Vec<Rc<str>>` + `HashMap<Rc<str>, u32>` で管理）を `ParseContext` に追加。
+  `fail` / `fail_at` / `record` は名前を `u32` に intern してから記録する
+- `FailureDiagnostic.expected` を `Option<Rc<Vec<u32>>>`、`ParseContext.expected` を `Vec<u32>` に。ケース17の一括 replay での `Rc` 共有、初出順、
+  重複除去（`contains` が `u32` 比較になる）はそのまま。`ParseError.expected` を作る時点で名前へ戻す（従来どおり sort + dedup）
+- allocation 契約: 登録済みの名前の再記録は allocation 0（audit crate に契約 test を追加）。実装は codex に委譲し、差分レビューと A/B を行った
+
+### 観測
+
+Timing（Rust、Criterion、baseline = master `3c64061`、candidate = 本ケース、path patch）。base fixture は 3-run 中央値:
+
+| Runtime | Fixture | Baseline runs | Baseline median | Candidate runs | Candidate median | 変化 |
+|---|---|---:|---:|---:|---:|---:|
+| Rust | complex | 2.911 / 3.091 / 3.130 | **3.091** | 2.421 / 2.557 / 2.362 | **2.421** | **-21.66%** |
+| Rust | comparison-heavy | 0.876 / 0.890 / 0.966 | **0.890** | 0.736 / 0.749 / 0.761 | **0.749** | **-15.91%** |
+
+public facade（x1 は run1、x4 以上は 1 run）:
+
+| Fixture | サイズ倍率 | baseline ms（倍率） | candidate ms（倍率） | 変化 |
+|---|---:|---:|---:|---:|
+| complex | 1.0x | 2.911（1.0x） | 2.421（1.0x） | -16.8% |
+| complex-x4 | 3.9x | 15.038（5.2x） | 9.370（3.9x） | -37.7% |
+| complex-x16 | 15.6x | 54.521（18.7x） | 44.638（18.4x） | -18.1% |
+| complex-x64 | 63.0x | 229.409（78.8x） | 168.236（69.5x） | -26.7% |
+| comparison-heavy | 1.0x | 0.876（1.0x） | 0.736（1.0x） | -16.0% |
+| comparison-heavy-x4 | 4.0x | 3.564（4.1x） | 2.907（3.9x） | -18.4% |
+| comparison-heavy-x16 | 16.0x | 18.292（20.9x） | 13.322（18.1x） | -27.2% |
+| comparison-heavy-x64 | 64.0x | 82.326（93.9x） | 62.095（84.3x） | -24.6% |
+
+parse-only-safe（parser 単体、1 run）:
+
+| Fixture | サイズ倍率 | baseline ms（倍率） | candidate ms（倍率） | 変化 |
+|---|---:|---:|---:|---:|
+| complex | 1.0x | 3.012（1.0x） | 2.452（1.0x） | -18.6% |
+| complex-x4 | 3.9x | 14.007（4.7x） | 10.117（4.1x） | -27.8% |
+| complex-x16 | 15.6x | 58.395（19.4x） | 42.307（17.3x） | -27.6% |
+| complex-x64 | 63.0x | 244.341（81.1x） | 173.604（70.8x） | -28.9% |
+
+base fixture で **-21.7% / -15.9%**、x64 で -27% / -25%（倍率 79 → 70、94 → 84）、parser 単体 81 → 71 倍。x1 でも大きく効いたのは、
+破棄だけでなく `contains_expected` の文字列比較が `u32` 比較になり、`Rc` の clone / drop が消えたため。150 tests、fingerprint 一致。**採用**。
+
+### 教材としての要点
+
+大量に保持する小さな値（ここでは `Rc<str>`）は、参照カウントの増減と解放が「本体の処理」に見えない固定費として積み上がる。
+文字列を整数 id に変えると、比較・複製・破棄のすべてが安くなり、表も小さくなる。名前へ戻すのは結果を返す 1 回だけで済む。
