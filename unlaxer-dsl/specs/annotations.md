@@ -36,6 +36,10 @@ RuleName ::= body ;
 - 1つの grammar ブロック内で最大1つのルールに付与すべき（SHOULD）
 - パーサージェネレータはルートルールを起点としたパース構造を生成する
 
+SHOULD 違反（同一 grammar 内で2つ以上のルールに `@root` が付与された場合）を
+現在の実装は検出・警告しない。構文としてもバリデーションとしても受理する
+（エントリポイントとして実際にどのルールが使われるかはジェネレータ実装依存）。
+
 ### 実装状況
 
 完全実装済み。
@@ -68,7 +72,7 @@ RuleName ::= body ;
 | エラーコード | 条件 |
 |------------|------|
 | `E-MAPPING-MISSING-CAPTURE` | `params` に記載されたキャプチャ名がルール本体に存在しない |
-| `E-MAPPING-EXTRA-CAPTURE` | ルール本体のキャプチャ名が `params` に含まれていない |
+| `E-MAPPING-UNLISTED-CAPTURE` | ルール本体のキャプチャ名が `params` に含まれていない |
 | `E-MAPPING-DUPLICATE-PARAM` | `params` に重複するパラメータ名がある |
 
 ### 実装状況
@@ -355,5 +359,9 @@ Rustのowned `Tree.scopes()`は取得時のscope store snapshotを持つ。
 
 ## 変更履歴
 
+- 2026-09-24: `@root` の SHOULD 違反（複数ルール付与）時の挙動を明記（現在の実装は検出・
+  警告せず受理する）。`ubnf-syntax.md` の完全版 MiniLang 文法が本ドキュメントの
+  「`@leftAssoc` は `@precedence` を伴う（MUST）」に違反していた矛盾は、MiniLang 側の
+  例を修正して解消した（issue #277）
 - 2026-03-02: `@interleave`/`@backref`/`@scopeTree` の実装状況を実態に合わせて修正。バックログを追記
 - 2026-03-01: 既存 SPEC.md から移動・拡充
