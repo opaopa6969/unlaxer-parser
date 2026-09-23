@@ -12,6 +12,22 @@ fn fixtures(dir: &str) -> impl Iterator<Item = std::path::PathBuf> {
 }
 
 #[test]
+fn empty_grammar_body_is_accepted_and_yields_no_rules() {
+    // Grammar ::= 'grammar' IDENTIFIER '{' { RuleDeclaration } '}' allows zero
+    // RuleDeclaration repetitions, so a grammar with no rules parses to an empty AST.
+    for source in ["grammar G { }", "grammar G {}", "grammar G {\n}"] {
+        let ast = parse(source).unwrap_or_else(|e| panic!("{source:?}: {e}"));
+        assert_eq!(ast.grammars.len(), 1);
+        let g = &ast.grammars[0];
+        assert_eq!(g.name, "G");
+        assert!(g.imports.is_empty());
+        assert!(g.settings.is_empty());
+        assert!(g.tokens.is_empty());
+        assert!(g.rules.is_empty());
+    }
+}
+
+#[test]
 fn all_declared_syntax_and_self_hosting_grammar_parse_without_java() {
     for path in fixtures("positive").chain(fixtures("known")) {
         let source = std::fs::read_to_string(&path).unwrap();
@@ -116,7 +132,6 @@ fn malformed_or_unknown_constructs_and_overflow_are_explicit_errors() {
     }
     for source in [
         "",
-        "grammar G {}",
         "grammar G { R ::= ; }",
         "grammar G { R ::= 'a' | ; }",
         "grammar G { R ::= (); }",

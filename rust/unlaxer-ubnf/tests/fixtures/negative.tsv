@@ -1,5 +1,4 @@
 empty-file
-empty-grammar	grammar G {}
 empty-sequence	grammar G { R ::= ; }
 empty-choice	grammar G { R ::= 'a' | ; }
 empty-group	grammar G { R ::= (); }

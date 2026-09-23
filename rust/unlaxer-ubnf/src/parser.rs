@@ -194,9 +194,6 @@ impl Parser<'_> {
         while !self.is('}') && self.current().kind != Kind::Eof {
             rules.push(self.rule()?);
         }
-        if rules.is_empty() {
-            return Err(self.error("grammar requires at least one rule"));
-        }
         self.expect('}')?;
         Ok(GrammarDecl {
             name,
