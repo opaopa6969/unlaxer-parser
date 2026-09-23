@@ -11,6 +11,11 @@
 - アノテーションのセマンティクス詳細（→ [annotations.md](annotations.md)）
 - CLI のバリデーションモード（→ [cli.md](cli.md)）
 
+本ドキュメントおよび `ubnf-syntax.md` が単に「拒否する」とだけ記述し、構文解析層と
+バリデーション（`GrammarValidator`）層のどちらで拒否するかを明示していない箇所は、
+どちらの層で拒否してもツール全体として規範を満たしたものとみなす。個別の箇所が
+どちらか一方の層で拒否すると明記している場合はそちらを優先する。
+
 ## 関連ドキュメント
 
 - [annotations.md](annotations.md) — 各アノテーションの契約
@@ -83,7 +88,7 @@
 | コード | 条件 |
 |--------|------|
 | `E-MAPPING-MISSING-CAPTURE` | `@mapping` の `params` に記載されたキャプチャ名がルール本体に存在しない |
-| `E-MAPPING-EXTRA-CAPTURE` | ルール本体のキャプチャ名が `@mapping` の `params` に含まれていない |
+| `E-MAPPING-UNLISTED-CAPTURE` | ルール本体のキャプチャ名が `@mapping` の `params` に含まれていない |
 | `E-MAPPING-DUPLICATE-PARAM` | `@mapping` の `params` に重複するパラメータ名がある |
 
 ### ASSOCIATIVITY エラー
@@ -91,8 +96,8 @@
 | コード | 条件 |
 |--------|------|
 | `E-ASSOC-BOTH` | `@leftAssoc` と `@rightAssoc` が同一ルールに使用されている |
-| `E-ASSOC-WITHOUT-PRECEDENCE` | `@leftAssoc` / `@rightAssoc` が `@precedence` なしで使用されている |
-| `E-RIGHTASSOC-NON-CANONICAL` | `@rightAssoc` ルールが非正規形（`Base { Op Self }` でない） |
+| `E-ASSOC-NO-PRECEDENCE` | `@leftAssoc` / `@rightAssoc` が `@precedence` なしで使用されている |
+| `E-RIGHTASSOC-NONCANONICAL` | `@rightAssoc` ルールが非正規形（`Base { Op Self }` でない） |
 
 ### WHITESPACE エラー
 
@@ -110,9 +115,9 @@ style の比較は trim 後、大文字小文字を区別しない。rule の引
 
 | コード | 条件 |
 |--------|------|
-| `E-PRECEDENCE-WITHOUT-ASSOC` | `@precedence` が `@leftAssoc` / `@rightAssoc` なしで使用されている |
+| `E-PRECEDENCE-NO-ASSOC` | `@precedence` が `@leftAssoc` / `@rightAssoc` なしで使用されている |
 | `E-PRECEDENCE-DUPLICATE` | 同一ルールに `@precedence` が複数回宣言されている |
-| `E-PRECEDENCE-MIXED-LEVEL` | 同一優先度レベルで左結合と右結合が混在している |
+| `E-PRECEDENCE-MIXED-ASSOC` | 同一優先度レベルで左結合と右結合が混在している |
 | `E-PRECEDENCE-ORDER` | 演算子ルールの参照先が適切な優先度順序になっていない |
 
 ### ANNOTATION エラー
@@ -124,6 +129,16 @@ style の比較は trim 後、大文字小文字を区別しない。rule の引
 | `E-ANNOTATION-SCOPETREE-MODE` | `@scopeTree` の `mode` が不正な値 |
 | `E-ANNOTATION-DECLARES-CAPTURE` | `@declares(symbol=...)` の対象captureが同じルール本体に存在しない |
 | `E-ANNOTATION-BACKREF-CAPTURE` | scope付き文法で`@backref(name=...)` の対象captureが同じルール本体に存在しない |
+
+### BOUNDED エラー（量指定子 `{n}` / `{n,m}` / `{n,}`）
+
+| コード | 条件 |
+|--------|------|
+| `E-BOUNDED-INVALID` | `{min,max}` の `min > max`（逆順） |
+| `E-BOUNDED-OVERFLOW` | `min` / `max` が 32bit 符号付き整数の範囲外 |
+
+`ubnf-syntax.md` の `Quantifier` production は構文としては `min > max` や範囲外の
+整数値を制約しないが、この2つはバリデーション層で拒否する。
 
 ---
 
@@ -146,3 +161,10 @@ style の比較は trim 後、大文字小文字を区別しない。rule の引
 ## 変更履歴
 
 - 2026-03-01: 初版作成
+- 2026-09-24: エラーコード名を `GrammarValidator` の実装に合わせて訂正
+  （`E-MAPPING-EXTRA-CAPTURE` → `E-MAPPING-UNLISTED-CAPTURE`、
+  `E-ASSOC-WITHOUT-PRECEDENCE` → `E-ASSOC-NO-PRECEDENCE`、
+  `E-RIGHTASSOC-NON-CANONICAL` → `E-RIGHTASSOC-NONCANONICAL`、
+  `E-PRECEDENCE-WITHOUT-ASSOC` → `E-PRECEDENCE-NO-ASSOC`、
+  `E-PRECEDENCE-MIXED-LEVEL` → `E-PRECEDENCE-MIXED-ASSOC`）。検出条件自体は変えず、
+  仕様書の表記のみ実装と一致させた（issue #277）。

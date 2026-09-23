@@ -167,6 +167,9 @@ token HEX    = CHAR_RANGE('0','9')   // ※複数の範囲は NEGATION などと
 逆順の範囲は `IllegalArgumentException` で明示的に拒否し、先頭文字へ切り捨てない。
 境界は両端を含む。補助文字の範囲指定は、この `char` API とは別の将来対応である。
 
+両端を含む判定は生成されたパーサーの実行時契約であり、UBNF を読む処理系
+（構文解析・バリデーション）自体の入出力からは観測できない（`scope: runtime`）。
+
 > **ユースケース**: 特定の文字クラスを細かく定義したいとき。
 > `IdentifierParser` は「英字・数字・アンダースコア」を読みますが、
 > 「小文字のみ」「16進数の文字」などをピンポイントで定義できます。
@@ -285,7 +288,14 @@ UBNF の識別子は連続した文字で構成されます。空白・改行・
 同様に `T @x Root @value` の capture 名も別々に保持されます。
 識別子内部へ空白を挿入して一つの名前を分割することはできません。
 `namespace.Rule` のドットや FQN の区切りは、外側の文法が処理します。
+3段以上の dotted 参照（例 `a.b.Value`）でも同様に外側の文法が処理し、
+UBNF 自体は `a.b.Value` 全体を1個の `IDENTIFIER` として扱う（namespace が
+`a.b` か `a` かは外側の文法の解釈に委ねられ、UBNF の形式文法は分割しない）。
 UBNF ファイル自体のコメント構文は `//` のみで、`/* ... */` は未対応です。
+
+「大文字始まりの識別子」は命名規約であり、形式的な文法定義の `RuleDecl` は
+大文字・小文字を制約しない（MUST ではない）。小文字始まりのルール名
+（例 `r ::= 'x';`）は構文としても検証としても受理する。
 
 ---
 
@@ -309,6 +319,10 @@ IfKeyword  ::= 'if' ;
 | `'\r'` | 復帰 |
 | `'\\'` | バックスラッシュ |
 | `'\''` | シングルクォート |
+
+表にないエスケープ列（例 `'\q'`）はエラーにしない（構文としてもバリデーションとしても
+受理する）。展開結果の具体的な文字（バックスラッシュを保持するか、除去して `q` のみに
+するか）は未定義とし、実装依存とする。
 
 ### ルール参照・トークン参照
 
@@ -459,6 +473,9 @@ ExprList ::= Expr % Comma ;
 > **展開後の構造**: `elem % sep` はコード生成時に2つのヘルパークラスに展開されます:
 > - `RuleSep0BodyParser`: `sep elem`（2つ目以降の要素）
 > - `RuleSep0Parser`: `elem (RuleSep0BodyParser)*`
+
+`elem (sep elem)*` への展開は生成されたパーサーの実行時構造であり、UBNF ファイルを
+読む処理系（構文解析・バリデーション）自体の入出力からは観測できない（`scope: runtime`）。
 
 ---
 
@@ -654,6 +671,17 @@ Statement ::=
 > `WordParser("if")` などのリテラルは自動的に `"'if' expected"` というヒントを生成するので、
 > 大抵の場面では `ERROR` なしでも有用なエラーメッセージが得られます。
 
+ヒントメッセージが実際に診断情報へ現れることは生成されたパーサーの実行時挙動であり、
+UBNF を読む処理系（構文解析・バリデーション）自体の入出力や構文木の比較では観測できない
+（`scope: runtime`）。
+
+`ERROR('message')` の形式（`ErrorElement ::= 'ERROR' '(' STRING ')'`）に一致しない
+`ERROR` の出現（例えば `ERROR(msg)` のように引数が STRING リテラルでない場合）は
+`ErrorElement` にならない。この場合 `ERROR` は予約語ではなく通常の `RuleRefElement`
+（ルール参照）として扱われ、`msg` は参照先ルール `ERROR` 本体内のグループ要素として
+解釈される。`ERROR` という名前のルールが定義されていなければ、他の未定義ルール参照と
+同様にバリデーション層で拒否される（`E-RULE-UNDEFINED`）。
+
 ---
 
 ## MiniLang の完全な文法
@@ -726,16 +754,19 @@ grammar MiniLang {
 
   @doc('比較式。> < == != を扱う。')
   @mapping(BinaryExpr, params=[left, op, right])
+  @precedence(level=10)
   @leftAssoc
   Expression ::= AddExpr @left [ ('>' @op | '<' @op | '==' @op | '!=' @op) AddExpr @right ] ;
 
   @doc('加減算式。')
   @mapping(BinaryExpr, params=[left, op, right])
+  @precedence(level=20)
   @leftAssoc
   AddExpr ::= MulExpr @left { ('+' @op | '-' @op) MulExpr @right } ;
 
   @doc('乗除算式。加減算より優先度が高い。')
   @mapping(BinaryExpr, params=[left, op, right])
+  @precedence(level=30)
   @leftAssoc
   MulExpr ::= UnaryExpr @left { ('*' @op | '/' @op) UnaryExpr @right } ;
 
@@ -912,6 +943,15 @@ RuleRefElement  ::= IDENTIFIER
 ErrorElement    ::= 'ERROR' '(' STRING ')'
 ```
 
+`Quantifier` の `'{' INTEGER ',' [INTEGER] '}'` は形式的な文法としては下限・上限の
+大小関係を制約しない。`CHAR_RANGE` と同様、構文層では広く受理しバリデーション層
+（`GrammarValidator` / ubnfc validate）で制約する: 逆順の反復回数（例 `V{9,2}`、
+下限9・上限2）は `E-BOUNDED-INVALID` で拒否する。
+
+`INTEGER` の表現範囲は Java の 32bit 符号付き整数（`int`）とする。`{2147483648}` の
+ように範囲外の値は構文層では拒否せず、バリデーション層で `E-BOUNDED-OVERFLOW` として
+拒否する（層の扱い一般については [validation.md](validation.md) の「スコープ」節を参照）。
+
 ---
 
 ## 予約語
@@ -924,6 +964,12 @@ ErrorElement    ::= 'ERROR' '(' STRING ')'
 - `CHAR_RANGE`, `CI`, `REGEX`, `ANY`, `EOF`, `EMPTY` — トークンキーワード
 - `ERROR` — エラーヒント要素
 - `params` — `@mapping` アノテーション内
+
+これらは表に挙げた特定の構文的な位置（例: `token` 宣言の直後、`TokenValue` の
+関数名位置、`ErrorElement` の `ERROR(...)` 位置）でのみ特別な意味を持つ。
+それ以外の位置では通常の `IDENTIFIER` として扱われ、ルール名・トークン名として
+再利用できる（例: `token ::= 'x';`、`ERROR ::= 'x'; R ::= ERROR;`、
+`token ANY=EMPTY R ::= ANY;` はいずれも構文・バリデーションの両方で受理する）。
 
 ---
 
@@ -942,3 +988,4 @@ ErrorElement    ::= 'ERROR' '(' STRING ')'
 |------|------|
 | 2026-03-01 | 初版作成 |
 | 2026-03-07 | 全面改訂。T1-4〜T4-8 の新機能を追加。初心者向けガイドと MiniLang サンプルを統合 |
+| 2026-09-24 | 完全版 MiniLang 文法に `@precedence(level=...)` を追加し `annotations.md` の MUST（`@leftAssoc` は `@precedence` を伴う）に適合させた。ルール名の大小・3段 dotted 参照・未知のエスケープ・逆順/超過分の量指定子・`ERROR(msg)` の扱い・予約語の識別子転用・CHAR_RANGE 両端包含と `%` 展開と ERROR ヒントの runtime scope について仕様の決定を明記（issue #277） |
