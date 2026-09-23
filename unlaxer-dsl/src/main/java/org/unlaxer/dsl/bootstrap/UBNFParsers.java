@@ -38,7 +38,7 @@ import org.unlaxer.util.cache.SupplierBoundCache;
  * Grammar (UBNF):
  *
  * UBNFFile      ::= GrammarDecl+
- * GrammarDecl   ::= 'grammar' IDENTIFIER '{' GlobalSetting* TokenDecl* RuleDecl+ '}'
+ * GrammarDecl   ::= 'grammar' IDENTIFIER '{' GlobalSetting* TokenDecl* RuleDecl* '}'
  * GlobalSetting ::= '@' IDENTIFIER ':' SettingValue
  * SettingValue  ::= StringSettingValue | BlockSettingValue
  * TokenDecl     ::= 'token' IDENTIFIER '=' CLASS_NAME
@@ -1549,7 +1549,7 @@ public class UBNFParsers {
     // =========================================================================
 
     /**
-     * GrammarDecl: 'grammar' IDENTIFIER '{' GlobalSetting* TokenDecl* RuleDecl+ '}'
+     * GrammarDecl: 'grammar' IDENTIFIER '{' GlobalSetting* TokenDecl* RuleDecl* '}'
      */
     /**
      * ImportDecl: '@import' IDENTIFIER 'from' STRING
@@ -1580,7 +1580,7 @@ public class UBNFParsers {
                 new ZeroOrMore(Parser.get(ImportDeclParser.class)),
                 new ZeroOrMore(Parser.get(GlobalSettingParser.class)),
                 new ZeroOrMore(Parser.get(TokenDeclParser.class)),
-                new OneOrMore(Parser.get(RuleDeclParser.class)),
+                new ZeroOrMore(Parser.get(RuleDeclParser.class)),
                 Parser.get(RightBraceParser.class)
             );
         }

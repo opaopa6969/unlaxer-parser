@@ -77,10 +77,11 @@ public class UBNFMapper {
 
     /**
      * UBNF ソース文字列をパースして AST に変換する。
+     * 末尾に未消費の入力が残る場合（prefix 成功）も失敗として扱う。
      *
      * @param source UBNF ファイルの文字列
      * @return パース＋変換された UBNFFile AST ノード
-     * @throws IllegalArgumentException パースに失敗した場合
+     * @throws IllegalArgumentException パースに失敗した場合、または入力全体を消費できなかった場合
      */
     public static UBNFFile parse(String source) {
         StringSource stringSource = StringSource.createRootSource(source);
@@ -90,8 +91,40 @@ public class UBNFMapper {
             if (false == parsed.isSucceeded()) {
                 throw new IllegalArgumentException("UBNF パース失敗: " + source.substring(0, Math.min(80, source.length())));
             }
+            int consumed = consumedLength(parsed.getConsumed());
+            if (consumed != source.length()) {
+                throw new IllegalArgumentException("UBNF パース失敗: " + positionOf(source, consumed)
+                    + " に未消費の入力があります: "
+                    + source.substring(consumed, Math.min(consumed + 80, source.length())));
+            }
             return toUBNFFile(parsed.getRootToken());
         }
+    }
+
+    /** 消費済みトークンの文字列長。トークンが空、またはソースを持たない場合は 0。 */
+    private static int consumedLength(org.unlaxer.Token token) {
+        if (token == null || token.source == null) {
+            return 0;
+        }
+        String text = token.source.sourceAsString();
+        return text == null ? 0 : text.length();
+    }
+
+    /** 1 始まりの行・列（UTF-16 インデックス基準）。CRLF/LF どちらも改行として数える。 */
+    private static String positionOf(String source, int offset) {
+        int line = 1;
+        int column = 1;
+        int limit = Math.min(offset, source.length());
+        for (int i = 0; i < limit; i++) {
+            char c = source.charAt(i);
+            if (c == '\n') {
+                line++;
+                column = 1;
+            } else {
+                column++;
+            }
+        }
+        return "line " + line + ", column " + column;
     }
 
     // =========================================================================

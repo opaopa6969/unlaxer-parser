@@ -530,4 +530,46 @@ public class UBNFMapperTest {
             .findFirst().orElseThrow();
         assertEquals("catalog context should be 'variable'", "variable", catalog.context());
     }
+
+    // =========================================================================
+    // #278: Grammar ::= 'grammar' IDENTIFIER '{' { RuleDeclaration } '}' allows
+    // zero rules, and the whole input must be consumed (no prefix acceptance).
+    // =========================================================================
+
+    @Test
+    public void emptyGrammarBodyIsAcceptedAndYieldsNoRules() {
+        for (String input : new String[] {"grammar G { }", "grammar G {}", "grammar G {\n}"}) {
+            GrammarDecl grammar = UBNFMapper.parse(input).grammars().get(0);
+            assertEquals(input, "G", grammar.name());
+            assertTrue(input, grammar.rules().isEmpty());
+            assertTrue(input, grammar.tokens().isEmpty());
+        }
+    }
+
+    @Test
+    public void trailingInputAfterTheClosingBraceIsRejected() {
+        IllegalArgumentException error = org.junit.Assert.assertThrows(IllegalArgumentException.class,
+            () -> UBNFMapper.parse("grammar G { R ::= 'x'; } garbage"));
+        assertTrue(error.getMessage(), error.getMessage().contains("garbage"));
+    }
+
+    @Test
+    public void unterminatedTrailingBlockCommentIsRejected() {
+        IllegalArgumentException error = org.junit.Assert.assertThrows(IllegalArgumentException.class,
+            () -> UBNFMapper.parse("grammar G { R ::= 'x'; } /* dangling"));
+        assertTrue(error.getMessage(), error.getMessage().contains("/*"));
+    }
+
+    @Test
+    public void trailingWhitespaceAndLineCommentsAfterTheClosingBraceStillParse() {
+        for (String input : new String[] {
+            "grammar G { R ::= 'x'; }\n",
+            "grammar G { R ::= 'x'; }  \n\n",
+            "grammar G { R ::= 'x'; } // trailing comment",
+            "grammar G { R ::= 'x'; }\n// trailing comment\n",
+        }) {
+            GrammarDecl grammar = UBNFMapper.parse(input).grammars().get(0);
+            assertEquals(input, 1, grammar.rules().size());
+        }
+    }
 }

@@ -248,6 +248,15 @@ public class UBNFParsersTest {
     }
 
     @Test
+    public void testGrammarDecl_emptyBodyIsAccepted() {
+        // Grammar ::= 'grammar' IDENTIFIER '{' { RuleDeclaration } '}' allows zero rules.
+        for (String input : new String[] {"grammar G { }", "grammar G {}"}) {
+            Parsed parsed = parse(UBNFParsers.getGrammarDeclParser(), input);
+            assertTrue(input, parsed.isSucceeded());
+        }
+    }
+
+    @Test
     public void testGrammarDecl_withSettings() {
         String input = "grammar Mini {\n"
             + "  @package: org.example\n"
