@@ -20,11 +20,11 @@
 [![Maven Central](https://img.shields.io/maven-central/v/org.unlaxer/unlaxer-common)](https://central.sonatype.com/artifact/org.unlaxer/unlaxer-common)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Java 21+](https://img.shields.io/badge/Java-21%2B-orange.svg)]()
-[![Version](https://img.shields.io/badge/version-3.0.15-blue)]()
+[![Version](https://img.shields.io/badge/version-3.1.0-blue)]()
 
 ---
 
-> **最新リリース — 3.0.15**: 生成 Mapper は既存の Token tree を public API で変換でき、利用側から生成内部への reflection が不要になりました。javaStyle block comment と UTF-16 対応 DAP 座標も含みます。全履歴は [CHANGELOG](./CHANGELOG.md) を参照してください。履歴上の注意: **3.0.2 は Maven Central に公開されていません** — 3.0.1 からアップグレードする場合は 3.0.3 以降へ直接進んでください。`unlaxer-common` または `unlaxer-dsl` の `2.x` に依存している場合は、[CHANGELOG](./CHANGELOG.md) と下記の[downstream ドリフト警告](#downstream-ドリフト警告)を参照してください。
+> **最新リリース — 3.1.0**: 後方互換の minor リリース。実行時 FIRST 集合による候補除外で、大きい入力の deferred 診断モードの CPU コストを約半分に削減（6 ラウンドの計測詳細は CHANGELOG 参照）。UBNF bootstrap は Rust frontend と同様に末尾未消費入力を拒否し、空文法を受理するようになりました。自己ホスト文法での 3 段以上の dotted 参照（`a.b.Value`）も正しくパースできます。全履歴は [CHANGELOG](./CHANGELOG.md) を参照してください。履歴上の注意: **3.0.2 は Maven Central に公開されていません** — 3.0.1 からアップグレードする場合は 3.0.3 以降へ直接進んでください。`unlaxer-common` または `unlaxer-dsl` の `2.x` に依存している場合は、[CHANGELOG](./CHANGELOG.md) と下記の[downstream ドリフト警告](#downstream-ドリフト警告)を参照してください。
 
 ---
 
@@ -141,12 +141,12 @@ MulOp ::= '*' | '/' ;
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-common</artifactId>
-        <version>3.0.15</version>
+        <version>3.1.0</version>
     </dependency>
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-dsl</artifactId>
-        <version>3.0.15</version>
+        <version>3.1.0</version>
     </dependency>
 </dependencies>
 ```
