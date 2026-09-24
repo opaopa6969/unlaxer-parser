@@ -1,0 +1,317 @@
+{
+  "family": "ubnf",
+  "section": "形式的な文法定義",
+  "summary": "節「形式的な文法定義」の production から直接導ける受理・拒否。",
+  "cases": [
+    {
+      "id": "file/empty-rejected",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "UBNFFile ::= { '//' LINE_COMMENT } GrammarDecl+"
+      },
+      "input": "",
+      "expectation": {
+        "verdict": "reject"
+      },
+      "note": "`GrammarDecl+` なので grammar ブロックが 0 個のファイルは成立しない。"
+    },
+    {
+      "id": "file/only-comments-rejected",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "UBNFFile ::= { '//' LINE_COMMENT } GrammarDecl+"
+      },
+      "input": "// just a comment\n",
+      "expectation": {
+        "verdict": "reject"
+      }
+    },
+    {
+      "id": "file/two-grammars",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "UBNFFile ::= { '//' LINE_COMMENT } GrammarDecl+"
+      },
+      "input": "grammar A { R ::= 'x'; }\ngrammar B { S ::= 'y'; }\n",
+      "expectation": {
+        "verdict": "accept"
+      },
+      "note": "`GrammarDecl+` は 2 個以上を許す。"
+    },
+    {
+      "id": "file/leading-comment-then-grammar",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "UBNFFile ::= { '//' LINE_COMMENT } GrammarDecl+"
+      },
+      "input": "// header\ngrammar G { R ::= 'x'; }\n",
+      "expectation": {
+        "verdict": "accept"
+      }
+    },
+    {
+      "id": "file/trailing-garbage-rejected",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "UBNFFile ::= { '//' LINE_COMMENT } GrammarDecl+"
+      },
+      "input": "grammar G { R ::= 'x'; } garbage",
+      "expectation": {
+        "verdict": "reject"
+      },
+      "note": "UBNFFile は GrammarDecl の並びで終わる。残余入力は受理できない。"
+    },
+    {
+      "id": "grammar/empty-block",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "GrammarDecl ::= 'grammar' IDENTIFIER '{' { GlobalSetting } { TokenDecl } { RuleDecl } '}'"
+      },
+      "input": "grammar G { }",
+      "expectation": {
+        "verdict": "accept"
+      },
+      "note": "`{ GlobalSetting } { TokenDecl } { RuleDecl }` はすべて 0 回でよい。"
+    },
+    {
+      "id": "grammar/keyword-required",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "GrammarDecl ::= 'grammar' IDENTIFIER '{' { GlobalSetting } { TokenDecl } { RuleDecl } '}'"
+      },
+      "input": "G { R ::= 'x'; }",
+      "expectation": {
+        "verdict": "reject"
+      }
+    },
+    {
+      "id": "grammar/name-required",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "GrammarDecl ::= 'grammar' IDENTIFIER '{' { GlobalSetting } { TokenDecl } { RuleDecl } '}'"
+      },
+      "input": "grammar { R ::= 'x'; }",
+      "expectation": {
+        "verdict": "reject"
+      }
+    },
+    {
+      "id": "grammar/unclosed",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "GrammarDecl ::= 'grammar' IDENTIFIER '{' { GlobalSetting } { TokenDecl } { RuleDecl } '}'"
+      },
+      "input": "grammar G { R ::= 'x';",
+      "expectation": {
+        "verdict": "reject"
+      }
+    },
+    {
+      "id": "order/token-after-rule",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "GrammarDecl ::= 'grammar' IDENTIFIER '{' { GlobalSetting } { TokenDecl } { RuleDecl } '}'"
+      },
+      "input": "grammar G { R ::= T; token T=EMPTY }",
+      "expectation": {
+        "verdict": "reject"
+      },
+      "note": "production は設定・token・rule の順を固定している。"
+    },
+    {
+      "id": "order/setting-after-token",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "GrammarDecl ::= 'grammar' IDENTIFIER '{' { GlobalSetting } { TokenDecl } { RuleDecl } '}'"
+      },
+      "input": "grammar G { token T=EMPTY @package: a.b R ::= T; }",
+      "expectation": {
+        "verdict": "reject"
+      }
+    },
+    {
+      "id": "body/empty-sequence-rejected",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "SequenceBody ::= AnnotatedElement+"
+      },
+      "input": "grammar G { R ::= ; }",
+      "expectation": {
+        "verdict": "reject"
+      },
+      "note": "`AnnotatedElement+` は 1 個以上を要求する。"
+    },
+    {
+      "id": "body/empty-alternative-rejected",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "SequenceBody ::= AnnotatedElement+"
+      },
+      "input": "grammar G { R ::= 'a' | ; }",
+      "expectation": {
+        "verdict": "reject"
+      }
+    },
+    {
+      "id": "body/leading-bar-rejected",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "ChoiceBody ::= SequenceBody { '|' SequenceBody }"
+      },
+      "input": "grammar G { R ::= | 'a'; }",
+      "expectation": {
+        "verdict": "reject"
+      },
+      "note": "`ChoiceBody ::= SequenceBody { '|' SequenceBody }` は先頭に `|` を許さない。"
+    },
+    {
+      "id": "body/empty-group-rejected",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "GroupElement ::= '(' RuleBody ')'"
+      },
+      "input": "grammar G { R ::= (); }",
+      "expectation": {
+        "verdict": "reject"
+      },
+      "note": "GroupElement の中身は RuleBody で、RuleBody は AnnotatedElement+ に還元される。"
+    },
+    {
+      "id": "body/empty-optional-rejected",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "SequenceBody ::= AnnotatedElement+"
+      },
+      "input": "grammar G { R ::= [ ]; }",
+      "expectation": {
+        "verdict": "reject"
+      }
+    },
+    {
+      "id": "body/empty-repeat-rejected",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "SequenceBody ::= AnnotatedElement+"
+      },
+      "input": "grammar G { R ::= { }; }",
+      "expectation": {
+        "verdict": "reject"
+      }
+    },
+    {
+      "id": "body/choice-and-group",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "ChoiceBody ::= SequenceBody { '|' SequenceBody }"
+      },
+      "input": "grammar G { Term ::= 't'; Expression ::= Term { ('+' | '-') Term }; }",
+      "expectation": {
+        "verdict": "accept"
+      }
+    },
+    {
+      "id": "element/typeof-prefix",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "AnnotatedElement ::= ['@typeof' '(' IDENTIFIER ')'] AtomicElement [Quantifier | '%' AtomicElement] ['@' IDENTIFIER]"
+      },
+      "input": "grammar G { Expr ::= 'e'; Op ::= '+'; BinaryExpr ::= @typeof(left) Expr @left Op Expr @right ; }",
+      "expectation": {
+        "verdict": "accept"
+      }
+    },
+    {
+      "id": "error/element",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "ErrorElement ::= 'ERROR' '(' STRING ')'"
+      },
+      "input": "grammar G { R ::= 'a' | ERROR('statement expected'); }",
+      "expectation": {
+        "verdict": "accept"
+      }
+    },
+    {
+      "id": "error/element-needs-string",
+      "scope": "validate",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## ERROR 要素 — エラーメッセージのヒント",
+        "sentence": "`ERROR('message')` の形式（`ErrorElement ::= 'ERROR' '(' STRING ')'`）に一致しない `ERROR` の出現（例えば `ERROR(msg)` のように引数が STRING リテラルでない場合）は `ErrorElement` にならない。この場合 `ERROR` は予約語ではなく通常の `RuleRefElement` （ルール参照）として扱われ、`msg` は参照先ルール `ERROR` 本体内のグループ要素として 解釈される。`ERROR` という名前のルールが定義されていなければ、他の未定義ルール参照と 同様にバリデーション層で拒否される（`E-RULE-UNDEFINED`）。"
+      },
+      "input": "grammar G { R ::= 'a' | ERROR(msg); }",
+      "expectation": {
+        "verdict": "diagnostic",
+        "code": "E-RULE-UNDEFINED"
+      },
+      "note": "unlaxer-parser #279 の決定: `ERROR(msg)` は `ErrorElement` にならず、`ERROR` は通常の `RuleRefElement` として解決される。`ERROR` ルールが未定義なので `E-RULE-UNDEFINED`（ubnfc は `msg` も未定義参照として同時に報告する）。"
+    },
+    {
+      "id": "error/element-needs-argument",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "ErrorElement ::= 'ERROR' '(' STRING ')'"
+      },
+      "input": "grammar G { R ::= 'a' | ERROR(); }",
+      "expectation": {
+        "verdict": "reject"
+      }
+    },
+    {
+      "id": "error/hint-is-last-alternative",
+      "scope": "runtime",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## ERROR 要素 — エラーメッセージのヒント",
+        "sentence": "ヒントメッセージが実際に診断情報へ現れることは生成されたパーサーの実行時挙動であり、 UBNF を読む処理系（構文解析・バリデーション）自体の入出力や構文木の比較では観測できない （`scope: runtime`）。"
+      },
+      "input": "grammar G { R ::= 'a' | ERROR('m'); }",
+      "expectation": {
+        "verdict": "undetermined",
+        "question": "unlaxer-parser #279 で仕様書は「観測できない（scope: runtime）」と明記した。char-range/inclusive-bounds と同じ理由で、この corpus 形式は runtime scope を accept/reject/diagnostic に決められないため undetermined のまま残す。"
+      }
+    }
+  ]
+}

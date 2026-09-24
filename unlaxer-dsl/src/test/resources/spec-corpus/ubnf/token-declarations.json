@@ -1,0 +1,152 @@
+{
+  "family": "ubnf",
+  "section": "トークン宣言（token）",
+  "summary": "token 宣言の形と、特殊トークンキーワードの引数。",
+  "cases": [
+    {
+      "id": "token/class-reference",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "TokenDecl ::= 'token' IDENTIFIER '=' TokenValue"
+      },
+      "input": "grammar G { token NUMBER = NumberParser R ::= NUMBER; }",
+      "expectation": {
+        "verdict": "accept"
+      }
+    },
+    {
+      "id": "token/equals-required",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "TokenDecl ::= 'token' IDENTIFIER '=' TokenValue"
+      },
+      "input": "grammar G { token NUMBER NumberParser R ::= NUMBER; }",
+      "expectation": {
+        "verdict": "reject"
+      }
+    },
+    {
+      "id": "token/unknown-keyword-with-arguments",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "TokenValue ::= CLASS_NAME | UNTIL('terminator')"
+      },
+      "input": "grammar G { token T=UNKNOWN('x') R ::= T; }",
+      "expectation": {
+        "verdict": "reject"
+      },
+      "note": "TokenValue の選択肢に `UNKNOWN('x')` の形は無い。"
+    },
+    {
+      "id": "token/any-eof-empty",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "| ANY | EOF | EMPTY"
+      },
+      "input": "grammar G { token A=ANY token E=EOF token M=EMPTY R ::= A E M; }",
+      "expectation": {
+        "verdict": "accept"
+      }
+    },
+    {
+      "id": "token/until",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "| UNTIL('terminator')"
+      },
+      "input": "grammar G { token T=UNTIL('\\n') R ::= T; }",
+      "expectation": {
+        "verdict": "accept",
+        "canonicalContains": [
+          "[\"Until\",\"T\",\"\\n\"]"
+        ]
+      }
+    },
+    {
+      "id": "token/ci",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "| CI('word')"
+      },
+      "input": "grammar G { token K=CI('select') R ::= K; }",
+      "expectation": {
+        "verdict": "accept",
+        "canonicalContains": [
+          "[\"CaseInsensitive\",\"K\",\"select\"]"
+        ]
+      }
+    },
+    {
+      "id": "token/regex",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "| REGEX('pattern')"
+      },
+      "input": "grammar G { token I=REGEX('[0-9]+') R ::= I; }",
+      "expectation": {
+        "verdict": "accept",
+        "canonicalContains": [
+          "[\"Regex\",\"I\",\"[0-9]+\"]"
+        ]
+      }
+    },
+    {
+      "id": "token/negation-empty-set",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "#### `NEGATION('chars')` — 指定文字以外の1文字",
+        "sentence": "空の除外集合は任意の1 codepointを受理するが、入力末尾では失敗する。"
+      },
+      "input": "grammar G { token N=NEGATION('') R ::= N; }",
+      "expectation": {
+        "verdict": "accept"
+      },
+      "note": "空の除外集合には意味が与えられているので、宣言として正当。"
+    },
+    {
+      "id": "token/negation-codepoint-set",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "#### `NEGATION('chars')` — 指定文字以外の1文字",
+        "sentence": "除外集合は Unicode codepoint 単位で判定し、成功時に1 codepointを消費する。"
+      },
+      "input": "grammar G { token N=NEGATION('x😀') R ::= N; }",
+      "expectation": {
+        "verdict": "accept",
+        "canonicalContains": [
+          "[\"Negation\",\"N\",\"x😀\"]"
+        ]
+      }
+    },
+    {
+      "id": "token/declaration-needs-no-semicolon",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "TokenDecl ::= 'token' IDENTIFIER '=' TokenValue"
+      },
+      "input": "grammar G { token T=ANY; R ::= T; }",
+      "expectation": {
+        "verdict": "reject"
+      },
+      "note": "TokenDecl に `;` は無い。"
+    }
+  ]
+}

@@ -1,0 +1,73 @@
+{
+  "family": "ubnf",
+  "section": "コメント",
+  "summary": "UBNF ファイル自身のコメント構文。",
+  "cases": [
+    {
+      "id": "comment/line-accepted",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## コメント",
+        "sentence": "UBNF ファイル内では `//` で行コメントが書けます："
+      },
+      "input": "grammar G {\n  // hello\n  R ::= 'x';\n}\n",
+      "expectation": {
+        "verdict": "accept"
+      }
+    },
+    {
+      "id": "comment/line-inside-body",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## コメント",
+        "sentence": "UBNF ファイル内では `//` で行コメントが書けます："
+      },
+      "input": "grammar G { R ::= 'x' // trailing\n ; }",
+      "expectation": {
+        "verdict": "accept"
+      }
+    },
+    {
+      "id": "comment/block-rejected",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## ルール宣言",
+        "sentence": "UBNF ファイル自体のコメント構文は `//` のみで、`/* ... */` は未対応です。"
+      },
+      "input": "grammar G { /* no */ R ::= 'x'; }",
+      "expectation": {
+        "verdict": "reject"
+      },
+      "note": "`/* ... */` は未対応と明記されている。"
+    },
+    {
+      "id": "comment/block-in-body-rejected",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## ルール宣言",
+        "sentence": "UBNF ファイル自体のコメント構文は `//` のみで、`/* ... */` は未対応です。"
+      },
+      "input": "grammar G { R ::= /* no */ 'x'; }",
+      "expectation": {
+        "verdict": "reject"
+      }
+    },
+    {
+      "id": "comment/block-unclosed-rejected",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## ルール宣言",
+        "sentence": "UBNF ファイル自体のコメント構文は `//` のみで、`/* ... */` は未対応です。"
+      },
+      "input": "grammar G { R ::= 'x'; } /* dangling",
+      "expectation": {
+        "verdict": "reject"
+      }
+    }
+  ]
+}
