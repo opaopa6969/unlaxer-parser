@@ -44,7 +44,8 @@ public class TransactionElement implements Serializable{
 
     /** Internal transaction hook that reports whether it captured a new snapshot. */
     public boolean checkpointStateIfAbsent(TransactionalState state) {
-        if (stateCheckpoints == null) stateCheckpoints = new IdentityHashMap<>();
+        // A transaction holds a handful of entries at most, and one is opened per parser call.
+        if (stateCheckpoints == null) stateCheckpoints = new IdentityHashMap<>(4);
         if (stateCheckpoints.containsKey(state)) return false;
         stateCheckpoints.put(state, state.checkpoint());
         return true;
@@ -76,12 +77,12 @@ public class TransactionElement implements Serializable{
     }
 
     public void recordChosenParser(ChoiceInterface choice, Parser previous) {
-        if (previousChosenParsers == null) previousChosenParsers = new IdentityHashMap<>();
+        if (previousChosenParsers == null) previousChosenParsers = new IdentityHashMap<>(4);
         if (!previousChosenParsers.containsKey(choice)) previousChosenParsers.put(choice, previous);
     }
 
     public void recordOrderedParsers(NonOrdered nonOrdered, Parsers previous) {
-        if (previousOrderedParsers == null) previousOrderedParsers = new IdentityHashMap<>();
+        if (previousOrderedParsers == null) previousOrderedParsers = new IdentityHashMap<>(4);
         if (!previousOrderedParsers.containsKey(nonOrdered)) previousOrderedParsers.put(nonOrdered, previous);
     }
 
@@ -98,7 +99,7 @@ public class TransactionElement implements Serializable{
     /** Snapshot only selections committed inside this transaction, for safe success replay. */
     public Map<ChoiceInterface, Parser> snapshotChosenParsers(Map<ChoiceInterface, Parser> chosenParsers) {
         if (previousChosenParsers == null) return Map.of();
-        Map<ChoiceInterface, Parser> snapshot = new IdentityHashMap<>();
+        Map<ChoiceInterface, Parser> snapshot = new IdentityHashMap<>(4);
         for (ChoiceInterface choice : previousChosenParsers.keySet()) {
             snapshot.put(choice, chosenParsers.get(choice));
         }

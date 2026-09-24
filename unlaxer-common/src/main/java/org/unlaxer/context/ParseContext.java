@@ -404,8 +404,15 @@ public class ParseContext implements
   static final class ExpectedSources {
     private final List<Parser> parsers = new ArrayList<>();
     private final List<Boolean> terminal = new ArrayList<>();
-    private final Set<Parser> failedSeen = Collections.newSetFromMap(new IdentityHashMap<>());
-    private final Set<Parser> terminalSeen = Collections.newSetFromMap(new IdentityHashMap<>());
+    /*
+     * The de-duplication indexes only matter while sources are being added. A parse opens one
+     * diagnostic frame per memoizable rule invocation and keeps every memoized one alive for the
+     * whole session, so the two identity maps are built on the first add, kept small, and dropped
+     * again by releaseIndexes() once a frame is only going to be read. A later add rebuilds them
+     * from the recorded lists, so releasing them is never observable.
+     */
+    private Set<Parser> failedSeen;
+    private Set<Parser> terminalSeen;
 
     int size() {
       return parsers.size();
@@ -422,13 +429,31 @@ public class ParseContext implements
     void clear() {
       parsers.clear();
       terminal.clear();
-      failedSeen.clear();
-      terminalSeen.clear();
+      releaseIndexes();
+    }
+
+    /** Drops the de-dup indexes of sources that are only going to be read from here on. */
+    void releaseIndexes() {
+      failedSeen = null;
+      terminalSeen = null;
+    }
+
+    private Set<Parser> seen(boolean terminalKind) {
+      Set<Parser> index = terminalKind ? terminalSeen : failedSeen;
+      if (index == null) {
+        index = Collections.newSetFromMap(new IdentityHashMap<>(8));
+        for (int i = 0, n = parsers.size(); i < n; i++) {
+          if (terminal.get(i) == terminalKind) index.add(parsers.get(i));
+        }
+        if (terminalKind) terminalSeen = index;
+        else failedSeen = index;
+      }
+      return index;
     }
 
     /** Records that {@code parser} failed at the frontier; its hint candidates are expanded later. */
     void addFailed(Parser parser) {
-      if (failedSeen.add(parser)) {
+      if (seen(false).add(parser)) {
         parsers.add(parser);
         terminal.add(Boolean.FALSE);
       }
@@ -436,7 +461,7 @@ public class ParseContext implements
 
     /** Records the innermost open TerminalSymbol at a frontier failure. */
     void addTerminal(Parser parser) {
-      if (terminalSeen.add(parser)) {
+      if (seen(true).add(parser)) {
         parsers.add(parser);
         terminal.add(Boolean.TRUE);
       }
@@ -521,6 +546,11 @@ public class ParseContext implements
     expectedAtFarthestFailure.copyFrom(source.expected);
     trialHistory.clear();
     trialHistory.addAll(source.trials);
+  }
+
+  /** A memoized frame is only ever read from here on, so its de-dup indexes can be dropped. */
+  static void sealMemoDiagnostic(FailureDiagnostic diagnostic) {
+    diagnostic.expected.releaseIndexes();
   }
 
   FailureDiagnostic beginMemoDiagnosticFrame() {
