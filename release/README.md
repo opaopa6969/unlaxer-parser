@@ -37,3 +37,30 @@ Central Usage Center remains authoritative if its signed-in value differs.
 
 Direct `mvn deploy` is safe by default: both participating POMs set
 `skipPublishing=true`. Only the guarded release script opts into upload.
+
+## Publishing from GitHub Actions
+
+This machine has no Maven Central credentials, so the actual upload runs in
+GitHub Actions instead of locally. `.github/workflows/release-central.yml`
+(`workflow_dispatch`) mirrors `scripts/release-central.sh`:
+
+- **Required repo secrets** (environment `release`): `MAVEN_CENTRAL_USERNAME`,
+  `MAVEN_CENTRAL_PASSWORD`, `MAVEN_GPG_PRIVATE_KEY`, `MAVEN_GPG_PASSPHRASE`.
+  The `guard` job needs none of them; the `publish` job fails fast with
+  `test -n` if any is missing.
+- **Trigger a dry run** (guard report only, no upload):
+  ```
+  gh workflow run release-central.yml -f version=3.1.0 -f confirm=org.unlaxer/2026-09 -f dry_run=true
+  ```
+- **Trigger a real publish** once the guard has capacity:
+  ```
+  gh workflow run release-central.yml -f version=3.1.0 -f confirm=org.unlaxer/2026-09 -f dry_run=false
+  ```
+  `version` must equal the pom `revision` exactly and `confirm` must equal
+  `org.unlaxer/YYYY-MM` for the current UTC month, same as the local script.
+- The `publish` job skips the deploy when the version is already present on
+  Central (tagging always runs, and is skipped only if the tag itself already
+  exists), and always skips tests during `deploy` (`-DskipTests`) because
+  merges to `master` are already gated by `.github/workflows/maven.yml`.
+- `scripts/release-central.sh` remains the local alternative for anyone who
+  does have Central credentials configured.

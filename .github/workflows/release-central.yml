@@ -1,0 +1,154 @@
+# org.unlaxer:unlaxer-parser を Maven Central へ公開する。
+# このマシンには Central 資格情報がないため、公開は GitHub Actions
+# (environment: release の secrets) 経由で行う。ローカルの代替手段は
+# scripts/release-central.sh (release/README.md 参照)。
+name: Release Central
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: pom の revision と完全一致させる公開バージョン (例 3.1.0)
+        required: true
+        type: string
+      confirm:
+        description: 今月の確認文字列 org.unlaxer/YYYY-MM (release/README.md 参照)
+        required: true
+        type: string
+      dry_run:
+        description: true ならガード確認のみ行い公開しない
+        required: true
+        default: true
+        type: boolean
+
+concurrency:
+  group: release-central-${{ inputs.version }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: Guard (version / confirm / monthly cap)
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.value }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Verify version matches pom revision
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          pom_version=$(mvn -q help:evaluate -Dexpression=revision -DforceStdout)
+          echo "pom revision: $pom_version"
+          if [[ "$INPUT_VERSION" != "$pom_version" ]]; then
+            echo "::error::input version ($INPUT_VERSION) does not match pom revision ($pom_version)" >&2
+            exit 1
+          fi
+          echo "value=$pom_version" >> "$GITHUB_OUTPUT"
+
+      - name: Verify monthly confirmation string
+        env:
+          INPUT_CONFIRM: ${{ inputs.confirm }}
+        run: |
+          expected="org.unlaxer/$(date -u +%Y-%m)"
+          if [[ "$INPUT_CONFIRM" != "$expected" ]]; then
+            echo "::error::confirm must be exactly '$expected' for the current UTC month" >&2
+            exit 1
+          fi
+
+      - name: Read monthly release cap from the queue
+        id: cap
+        run: |
+          limit=$(sed -nE 's/^[[:space:]]*maxPublishOperationsPerCalendarMonth:[[:space:]]*([0-9]+).*/\1/p' release/central-release-queue.yml | head -1)
+          limit=${limit:-1}
+          echo "value=$limit" >> "$GITHUB_OUTPUT"
+
+      - name: Run the release-train guard (read-only report)
+        run: |
+          python3 scripts/central_release_guard.py --month "$(date -u +%Y-%m)" --max-releases "${{ steps.cap.outputs.value }}"
+
+  publish:
+    name: Publish to Central
+    needs: guard
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.guard.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21 (Central deploy)
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+          server-id: central
+          server-username: MAVEN_CENTRAL_USERNAME
+          server-password: MAVEN_CENTRAL_PASSWORD
+          gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+
+      - name: Skip when already published
+        id: check
+        run: |
+          url="https://repo1.maven.org/maven2/org/unlaxer/unlaxer-parser/$VERSION/unlaxer-parser-$VERSION.pom"
+          if curl --fail --silent --head "$url" >/dev/null; then
+            echo "already_published=true" >> "$GITHUB_OUTPUT"
+            echo "org.unlaxer:unlaxer-parser:$VERSION is already on Central; skipping deploy."
+          else
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy reactor to Central
+        if: steps.check.outputs.already_published != 'true'
+        env:
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          MAVEN_GPG_PRIVATE_KEY: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+        run: |
+          test -n "$MAVEN_CENTRAL_USERNAME"
+          test -n "$MAVEN_CENTRAL_PASSWORD"
+          test -n "$MAVEN_GPG_PRIVATE_KEY"
+          test -n "$MAVEN_GPG_PASSPHRASE"
+          # CI (.github/workflows/maven.yml) already gates merges to master with
+          # `mvn clean test`; this deploy step re-runs the build only to produce
+          # and upload artifacts, so tests are explicitly skipped here.
+          mvn -B -pl .,unlaxer-common,unlaxer-dsl clean deploy -DskipPublishing=false -DskipTests
+
+      - name: Tag the release
+        run: |
+          git fetch --quiet --tags origin
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "tag v$VERSION already exists; skipping"
+          else
+            git tag "v$VERSION"
+            git push origin "v$VERSION"
+          fi
+
+      - name: Summary
+        run: |
+          {
+            echo "### org.unlaxer:unlaxer-parser $VERSION"
+            if [[ "${{ steps.check.outputs.already_published }}" == "true" ]]; then
+              echo "Already present on Central; no upload performed."
+            else
+              echo "Deployed. https://repo1.maven.org/maven2/org/unlaxer/unlaxer-parser/$VERSION/"
+              echo "Central UI: https://central.sonatype.com/artifact/org.unlaxer/unlaxer-parser/$VERSION"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
