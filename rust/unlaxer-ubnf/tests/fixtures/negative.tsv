@@ -6,6 +6,7 @@ unterminated-string	grammar G { R ::= 'unterminated; }
 double-quoted-string	grammar G { R ::= "x"; }
 missing-semicolon	grammar G { R ::= 'x' }
 trailing-input	grammar G { R ::= 'x'; } garbage
+trailing-input-no-space	grammar G { R ::= 'x'; }garbage
 block-comment	grammar G { /* no */ R ::= 'x'; }
 unknown-annotation-args	grammar G { @unknown(x) R ::= 'x'; }
 unknown-token-constructor	grammar G { token T=UNKNOWN('x') R ::= T; }
