@@ -1654,3 +1654,142 @@ x64 facade 2008 → 958 ms（-52.3%）、失敗入力 -49〜-66%。fraud 式 #5 
 しても暗黙に安全にならない。効果は真因の修正（ケース30）と重ねて初めて出た。単独で測って捨てていたら、-60% を取り逃していた。
 ケース30 の教訓（hit カウンタではなく再導出を数える）と合わせ、施策の順序を間違えたときに「結果が出ない＝施策が無意味」と
 結論しないための例になる。
+
+## ケース32: 入力長に対する超線形の正体は GC だった（Java、#276。空コンテナの遅延化で割当 -12%）
+
+### 仮説
+
+別 repo `ubnfc` の実装横断比較（`ubnfc/docs/reports/2026-09-23-parser-speed-comparison.md` Family A）で、
+tinyexpression P4 文法の 4 実装のうち **unlaxer コンビネータ（Java）だけが超線形**だった。認識 µs/byte は
+complex 332 B の 41.5 から complex-x64 20,923 B の 77.1（**×1.86**）で、他の 3 実装は ×0.84〜1.17。
+x64 は complex を `+` で 64 回つないだ 1 本の式なので、文法上は線形であるべき。
+ケース21（Rust）と同じく「memo 表の走査」「Token スタックの複製」「診断の集約」のどれかが超線形だと考え、
+[[scaling-check-and-cache-locality]] の手順どおり **まず 1 byte あたりの操作回数を数えた**。
+
+### 計測（回数カウンタ、1 parse、cold、`SAFE_FAILURES` / `Diagnostics` は DETAILED）
+
+`ParseContext` / `PackratMemoTable` / `Token` / `TokenList` / `StringSource` に一時カウンタを入れた
+build（merge していない）で x1 / x4 / x16 / x64 を 1 回ずつ解析した。入力倍率は 1.00 / 3.89 / 15.60 / **63.02**。
+
+| カウンタ | complex | x4 | x16 | x64 | x64/x1 | byte あたり |
+|---|---:|---:|---:|---:|---:|---:|
+| rule 評価（`startParse`） | 14,487 | 56,119 | 222,163 | 888,979 | 61.4 | **0.97** |
+| transaction begin | 13,986 | 53,606 | 211,382 | 842,486 | 60.2 | 0.96 |
+| commit / rollback | 5,946 / 8,040 | 23,002 / 30,604 | 90,874 / 120,508 | 362,362 / 480,124 | 60.9 / 59.7 | 0.97 / 0.95 |
+| memo lookup | 11,810 | 45,417 | 179,493 | 715,797 | 60.6 | 0.96 |
+| memo hit（失敗 / 成功） | 2,044 / 3,172 | 7,828 / 12,304 | 30,964 / 48,832 | 123,508 / 194,944 | 60.4 / 61.5 | 0.96 / 0.98 |
+| memo 表エントリ数（終了時） | 1,695 | 6,474 | 25,590 | 102,054 | 60.2 | 0.96 |
+| memo 診断 frame 生成 | 2,336 | 8,978 | 35,546 | 141,818 | 60.7 | 0.96 |
+| memo transaction frame 走査 | 574,204 | 2,307,220 | 9,216,628 | 36,854,260 | 64.2 | 1.02 |
+| Token 生成 | 14,317 | 55,874 | 221,798 | 888,134 | 62.0 | 0.98 |
+| Token `deepCopy` node | 474 | 1,899 | 7,599 | 30,399 | 64.1 | 1.02 |
+| `StackSnapshot` node | 30,013 | 116,539 | 462,403 | 1,848,499 | 61.6 | 0.98 |
+| expected `addAll` 反復 | 171,196 | 668,023 | 2,655,331 | 10,604,563 | 61.9 | 0.98 |
+| `registerFailureCandidate` | 7,079 | 26,964 | 106,152 | 422,904 | 59.7 | 0.95 |
+| `codePointsOf` 文字数 | 26,120 | 104,963 | 426,016 | 1,737,088 | 66.5 | 1.06 |
+| `TokenList.toSource` 連結文字数 | 15,251 | 65,629 | 269,720 | 1,110,104 | 72.8 | 1.16 |
+| **割当 byte / parse** | 27.5 MB | 106.0 MB | 419.7 MB | 1,679.8 MB | 61.1 | **0.97** |
+
+**どのカウンタも線形**（byte あたり 0.95〜1.16）。割当**量**すら byte あたり一定（約 80 KB/byte）。
+つまり超線形な「回数」は存在しない。
+
+### 真因: GC（`-Xms2g -Xmx2g`、`taskset` で 1 CPU に固定 → Serial GC）
+
+同じ計測に `-Xlog:gc` を足して区間で見ると、正体が出た。
+
+| fixture | young GC 回数 | pause 合計 | プロセス wall | **GC 比率** | 1 回の平均 pause | GC 後の live |
+|---|---:|---:|---:|---:|---:|---:|
+| complex | 297 | 1.91 s | 118.9 s | **1.6%** | 6.4 ms | 5.6 MB |
+| complex-x4 | 289 | 5.95 s | 96.5 s | **6.2%** | 20.6 ms | 14.1 MB |
+| complex-x16 | 136 | 13.78 s | 61.1 s | **22.6%** | 101.3 ms | 349.6 MB |
+| complex-x64 | 457 | 124.0 s | 304.6 s | **40.7%** | 271.2 ms | 908.4 MB |
+
+機構は掛け算である。**1 parse の割当が入力長に比例する**（1.67 GB @ x64、young 世代 約 550 MB）ので
+**1 parse あたりの GC 回数が N に比例**し、同時に **1 parse の live 集合（構築中の CST と packrat memo 表）も N に比例**
+するので **1 回の GC の copy/promote コストも N に比例**する。積で O(N²)。
+
+ヒープだけ変えた対照実験（同じ binary・同じコア、`-Xms16g -Xmx16g`）がこれを裏づける。
+
+| fixture | 2 GB の ms | 16 GB の ms | 16 GB の µs/byte | 16 GB の GC 比率 | **GC を除いた µs/byte** |
+|---|---:|---:|---:|---:|---:|
+| complex | 19.14 | 15.02 | 45.25 | 0.28% | 45.1 |
+| complex-x4 | 58.66 | 55.46 | 42.90 | 0.81% | 42.5 |
+| complex-x16 | 315.74 | 269.82 | 52.10 | 3.06% | 50.5 |
+| complex-x64 | 1,926.14 | 1,350.85 | 64.56 | 16.75% | 53.7 |
+
+x64 はヒープを増やすだけで **-30%**。**GC pause を引くと complex → x64 は ×1.19 で、目標の ×1.2 に収まる。**
+つまりパーサ本体（rule 評価・memo・診断・Token 構築）は入力長に対して線形で、超線形なのは GC だけである。
+
+### 実装（PR #277）: 常に空の入れ物を作るのをやめる
+
+主因が「1 byte あたり 80 KB の割当と、それに比例して伸びる live 集合」なので、
+**必ず確保されるのに大半が空のまま捨てられるコンテナ**を潰した。JFR の割当プロファイル（x64）で上位に出たもののうち、
+意味を変えずに消せるものだけを選んでいる（比率は候補発見にのみ使用、[[jfr-allocation-attribution-caveat]]）。
+
+- `Token.extraObjectByName` / `relatedTokenByName` を**遅延生成**にした。1 commit につき 1 Token（x64 で 888k）作られ、
+  そのたびに `NullSafetyConcurrentHashMap` 2 個と null 番兵 `Object` 4 個を確保していた（割当の約 11%）。
+  しかも木が生きている間ずっと到達可能なので live 集合にも効く。`null` の map は空の map と同じように読める。
+  `put` は元々 null key/value を捨てる実装なので、null 引数では map を作らない。
+  map 自体は concurrent なままなので、生成も `volatile` + double-checked locking で安全に publish する
+  （書き込み経路だけを通る。parse 本体は 1 度も触らない）
+- `ParseContext.ExpectedSources` の重複除去索引（`IdentityHashMap` 2 個、既定で `Object[64]` = 272 B 各）を
+  **初回の add まで遅延**し、memo 表へ格納する時点で `releaseIndexes()` で捨てるようにした。
+  診断 frame は memo 可能 rule 呼び出しごとに作られ（x64 で 141,818 個）、memo された分（90,907 個）は
+  parse が終わるまで生き残る。格納後の frame は読むだけ（`mergeFrame` と `replayFailureDiagnostic` は
+  `parsers` / `terminal` の 2 リストしか見ない）なので索引は不要。あとから add されても
+  リストから索引を作り直すので、捨てることは観測できない
+- `TransactionElement` の `IdentityHashMap`（checkpoint / choice / interleave の undo）を初期容量 4 で作るようにした。
+  既定容量は `Object[64]`、実際の要素は数個
+- `Token` の `Optional.of(this)` は子がある時だけ作る
+
+### 観測
+
+A/B の条件: `legacy-bench.sh root`、`SAFE_FAILURES`、`-Xss512m -Xms2g -Xmx2g`、`taskset -c 24`、
+jar-first classpath、tinyexpression `c70416e1` を isolated maven repo で再ビルド。
+
+base と candidate を **fixture ごとに交互**に実行した（共有機で load average 9〜49 と荒れたため）。
+時間は全 run の中央値と最小値の両方を出す。割当は `ThreadMXBean` の 1 parse あたり byte。
+
+| fixture | run 数 | base 中央値 | cand 中央値 | Δ | base 最小 | cand 最小 | Δ | base 割当 | cand 割当 | **Δ割当** |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| complex | 15 | 19.03 ms | 16.53 ms | -13.1% | 14.38 ms | 14.54 ms | +1.1% | 27.71 MB | 24.06 MB | **-13.2%** |
+| complex-x4 | 6 | 68.66 ms | 58.84 ms | -14.3% | 53.99 ms | 50.75 ms | -6.0% | 106.13 MB | 93.11 MB | **-12.3%** |
+| complex-x16 | 6 | 300.10 ms | 297.11 ms | -1.0% | 280.51 ms | 272.26 ms | -2.9% | 417.72 MB | 369.30 MB | **-11.6%** |
+| complex-x64 | 15 | 2,098.13 ms | 1,669.22 ms | -20.4% | 1,552.84 ms | 1,390.95 ms | -10.4% | 1,679.38 MB | 1,471.91 MB | **-12.4%** |
+
+同じ session の GC ログ（complex と x64、各 3 session 合算）:
+
+| | GC 回数 | pause 合計 | GC 比率 |
+|---|---:|---:|---:|
+| base complex | 461 | 3.25 s | 1.60% |
+| cand complex | 402 | 2.09 s | 1.08% |
+| base complex-x64 | 897 | 300.6 s | 45.99% |
+| cand complex-x64 | 769 | **178.3 s** | **37.22%** |
+
+GC 回数は割当と同じ -14% だが、**pause 合計は -41%** 落ちた。消したのが（毎回作って捨てる分だけでなく）
+**parse 中ずっと生きていた分**＝ Token の side map と memo 表の索引だったので、1 回あたりのコストも下がっている。
+
+µs/byte の倍率（complex → complex-x64）は **中央値 ×1.75 → ×1.60、最小値 ×1.71 → ×1.52**。
+**目標の ×1.2 には届いていない。** 残りは同じ機構（1 byte あたり 70 KB の割当）で、線形化するには
+割当を桁で削る必要がある。#276 は open のままにした。
+
+テスト: `unlaxer-common` 694 / `unlaxer-dsl` 1,004（skip 23）が緑。isolated repo で tinyexpression 全テスト
+**769 件（skip 10）が緑**（base も同じ）。Rust は対象外 — `unlaxer-runtime` には「空でも確保される入れ物」が無く
+（`Vec::new` / `HashMap::new` は確保しない、expected は ケース23 で interned `u32`）、GC も無い。
+同じ比較で tinyexpression-rs は ×0.94 で平坦だった。
+
+### 教材としての要点
+
+- **「回数カウンタが全部線形なら、次に疑うのは表の大きさと解放」**（ケース21 の教訓）を GC のある言語へ引き写すと、
+  **「GC 回数 × live 集合」**になる。どちらも N に比例するので積が O(N²) になる。
+  この項は `-Xlog:gc` の pause 合計と wall の比で 1 行で出る。**時間を区間に分けるのは Rust の drop 区間だけの話ではない。**
+- **ヒープサイズを変えるだけの対照実験は、GC が主因かどうかの一番安い判定法**である。
+  同じ binary・同じコアで 2 GB → 16 GB にして x64 が -30%、GC を引いた µs/byte が ×1.19 になった時点で、
+  「パーサのアルゴリズムは線形、遅いのは GC」が確定した。実装に手を付ける前にこれをやるべきだった。
+- **Java で「空の入れ物」はタダではない。** `new ConcurrentHashMap<>()` は 1 個で数十 byte、
+  `new IdentityHashMap<>()` は中身が 0 個でも `Object[64]`（272 B）を確保する。1 parse で 88 万個作られる Token が
+  空の map を 2 個ずつ持つと、それだけで割当の 11% になり、木が生きている間ずっと live に乗る。
+  Rust の `Vec::new()` / `HashMap::new()` は確保しないので、この種の差は**移植すると消える**。言語差を対応表に書く価値がある。
+- 共有機で load average が 9〜49 に振れる状況では、**時間の中央値だけでは採否を決められない**。
+  A/B を fixture ごとに交互実行し、中央値と最小値の両方、および `ThreadMXBean` の割当（負荷に依らない）を並べる。
+  今回も採否の根拠は割当 -12%（4 サイズで一致）と GC pause -41% で、時間はそれを支持する位置にある。

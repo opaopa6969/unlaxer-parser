@@ -44,8 +44,14 @@ public class Token implements Serializable{
 	//TODO make private and rename astNodeChildren
 	public  final TokenList filteredChildren; // astNodeChildren
 	
-	private Map<Name,Object> extraObjectByName = new NullSafetyConcurrentHashMap<>();
-	private Map<Name,Token> relatedTokenByName = new NullSafetyConcurrentHashMap<>();
+	/*
+	 * Side maps stay empty for almost every token, but a parse allocates one token per committed
+	 * rule (888k of them for a 20 KB input), so the two maps and their null sentinels were 11% of
+	 * a parse's allocation and stayed reachable for as long as the tree. They are created on the
+	 * first write instead; an absent map reads exactly like an empty one.
+	 */
+	private volatile Map<Name,Object> extraObjectByName;
+	private volatile Map<Name,Token> relatedTokenByName;
 
 	public enum ChildrenKind{
 		original,
@@ -99,7 +105,7 @@ public class Token implements Serializable{
 		// of two Stream pipelines and an intermediate list.
 		int size = children.size();
 		TokenList astChildren = new TokenList(size);
-		Optional<Token> self = Optional.of(this);
+		Optional<Token> self = size == 0 ? null : Optional.of(this);
 		for (int i = 0; i < size; i++) {
 			Token child = children.get(i);
 			child.parent = self;
@@ -128,8 +134,7 @@ public class Token implements Serializable{
 			}
 			copy = new Token(tokenKind, source, parser, copiedChildren);
 		}
-		copy.extraObjectByName.putAll(extraObjectByName);
-		copy.relatedTokenByName.putAll(relatedTokenByName);
+		copy.copySideMapsFrom(this);
 		return copy;
 	}
 
@@ -185,8 +190,7 @@ public class Token implements Serializable{
         Token copy = new Token(tokenKind, anchor, parser, originalChildren);
         copy.filteredChildren.clear();
         copy.filteredChildren.addAll(filteredChildren);
-        copy.extraObjectByName.putAll(extraObjectByName);
-        copy.relatedTokenByName.putAll(relatedTokenByName);
+        copy.copySideMapsFrom(this);
         return copy;
     }
 	
@@ -594,30 +598,85 @@ public class Token implements Serializable{
 		return this;
 	}
 	
+	/** Copies whatever side entries {@code source} holds; nothing is allocated when it holds none. */
+	private void copySideMapsFrom(Token source) {
+		Map<Name,Object> extras = source.extraObjectByName;
+		if (extras != null && false == extras.isEmpty()) {
+			extraObjects().putAll(extras);
+		}
+		Map<Name,Token> related = source.relatedTokenByName;
+		if (related != null && false == related.isEmpty()) {
+			relatedTokens().putAll(related);
+		}
+	}
+
+	/* The maps themselves stay concurrent, so their creation is published safely as well. */
+	private Map<Name,Object> extraObjects() {
+		Map<Name,Object> map = extraObjectByName;
+		if (map == null) {
+			synchronized (this) {
+				map = extraObjectByName;
+				if (map == null) {
+					map = new NullSafetyConcurrentHashMap<>();
+					extraObjectByName = map;
+				}
+			}
+		}
+		return map;
+	}
+
+	private Map<Name,Token> relatedTokens() {
+		Map<Name,Token> map = relatedTokenByName;
+		if (map == null) {
+			synchronized (this) {
+				map = relatedTokenByName;
+				if (map == null) {
+					map = new NullSafetyConcurrentHashMap<>();
+					relatedTokenByName = map;
+				}
+			}
+		}
+		return map;
+	}
+
 	@SuppressWarnings("unchecked")
 	public<T> Optional<T> getExtraObject(Name name) {
-		return Optional.ofNullable( (T)extraObjectByName.get(name));
+		Map<Name,Object> map = extraObjectByName;
+		return map == null ? Optional.empty() : Optional.ofNullable( (T)map.get(name));
 	}
 	
 	public void putExtraObject(Name name , Object object) {
-		extraObjectByName.put(name , object);
+		// NullSafetyConcurrentHashMap drops null keys and values, so a null pair stores nothing.
+		if (name == null || object == null) {
+			return;
+		}
+		extraObjects().put(name , object);
 	}
 	
 	public boolean removeExtraObject(Name name) {
-		var preset = extraObjectByName.remove(name);
+		Map<Name,Object> map = extraObjectByName;
+		if (map == null) {
+			return false;
+		}
+		var preset = map.remove(name);
 		return preset != null ; 
 	}
 	
 	public Optional<Token> getRelatedToken(Name name) {
-		return Optional.ofNullable( relatedTokenByName.get(name));
+		Map<Name,Token> map = relatedTokenByName;
+		return map == null ? Optional.empty() : Optional.ofNullable( map.get(name));
 	}
 	
 	public void putRelatedToken(Name name , Token relatedToken) {
-		relatedTokenByName.put(name , relatedToken);
+		if (name == null || relatedToken == null) {
+			return;
+		}
+		relatedTokens().put(name , relatedToken);
 	}
 	
 	public Optional<Token>  removeRelatedToken(Name name) {
-		return Optional.ofNullable(relatedTokenByName.remove(name));
+		Map<Name,Token> map = relatedTokenByName;
+		return map == null ? Optional.empty() : Optional.ofNullable(map.remove(name));
 	}
 	
 	public String getPath() {

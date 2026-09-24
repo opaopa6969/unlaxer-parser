@@ -142,6 +142,7 @@ public final class PackratMemoTable {
     context.endParse(parser, parsed, context, tokenKind, invertMatch);
     if (diagnostic != null) context.discardMemoDiagnosticFrame(diagnostic);
     if (entry != null && context.isMemoizationSessionSafe()) {
+      ParseContext.sealMemoDiagnostic(diagnostic);
       context.getPackratMemoTable().put(parser, startKey, entry);
     }
     return parsed;
@@ -161,6 +162,7 @@ public final class PackratMemoTable {
     if (diagnostic == null) return;
     parseContext.discardMemoDiagnosticFrame(diagnostic);
     if (false == parseContext.isMemoizationSessionSafe() || false == isExactSafeClass(parser)) return;
+    ParseContext.sealMemoDiagnostic(diagnostic);
     parseContext.getPackratMemoTable().put(
         parser, positionKeyOf(parseContext, tokenKind, invertMatch), new Entry(diagnostic));
   }
