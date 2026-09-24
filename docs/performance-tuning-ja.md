@@ -2007,3 +2007,229 @@ memo された診断が parse 終了まで live に乗る（live 集合の約半
   GC 回数は割当に比例して減るが、**1 回のコストを決める live 集合は減っていない**からである。
   積の片方だけを削ると効果は線形にしか効かない。ケース32 の式（GC 回数 × live 集合）は、
   どちらを削っているのかを常に確認するために使う。
+
+## ケース34: `DETAILED_ON_FAILURE` が読まない観測を作らない・持ち続けない（Java、#263）
+
+### 出発点
+
+ケース33（#276 round 2）で、複合実装（Java）の超線形は「GC 回数（∝ 1 parse の割当）× 1 回のコスト（∝ live 集合）」の
+積であり、**残差は全部 collector** だと分かった。既定の `Diagnostics.DETAILED` では live 集合の約半分が診断 payload で、
+`DETAILED_ON_FAILURE`（ケース26）はその記録を行わない。残る問いは #263 のもの、すなわち
+**「診断を記録しないモードでも払い続けている upkeep は何か」**である。#263 はそれを (a) `ParseFrame` の push / pop、
+(b) memo hit の transaction replay のための frame 管理、(c) `trackCursorProgress` 相当の cursor 参照、と見立てていた。
+
+### まず数える（カウンタだけを足した計測専用 build、`complex-x64` を 1 parse）
+
+| 数えたもの | base | 施策後 | 備考 |
+|---|---:|---:|---|
+| `ParseFrame` 生成（= `startParse`） | **888,979** | **0** | 生成した frame を読む経路が 1 つも無い |
+| `terminalFrames` への push | 274,169 | **0** | 読み手は `registerFailureCandidate` だけ（早期 return） |
+| `StackSnapshot` 生成 | **0** | 0 | (c) は既に無い（`DETAILED` では 1,848,499） |
+| memo 診断 frame（`FailureDiagnostic`）生成 | 141,818 | 141,818 | transaction event の記録先として必要 |
+| transaction event の記録呼び出し（begin + finish） | 1,684,972 | 1,684,972 | transaction ごとに 2 回 |
+| ↳ **走査した frame スロット数** | **73,708,520** | **2,375,772** | 1 呼び出しあたり 43.7 → **1.41** |
+| ↳ そのために割り当てた iterator | **1,684,972** | **0** | `ArrayDeque` の走査 1 回につき 1 個 |
+| ↳ 実際に event を足した回数 | 690,802 | 690,802 | 記録内容は不変 |
+| memo 表に載った frame | 102,054 | 102,054 | parse 終了まで live |
+| ↳ それが抱える transaction event | 374,120 | 374,120 | 1 frame あたり 3.67。`ArrayList` → `byte[]` |
+| ↳ **`ExpectedSources` を抱えた frame** | **102,054** | **0** | このモードでは 1 件も入らない（expected 総数 0） |
+| ↳ **`trials` を抱えた frame** | **102,054** | **0** | memo と trial 記録は両立しない（`DETAILED` でも 0） |
+
+`fixture` を変えても比は変わらない（`complex` は各 14,487 / 4,294 / 2,336 / 27,972 / 1,695 …、
+入力 63 倍に対して 60〜62 倍）。
+
+結論は #263 の見立てのうち **(a) と (b) が当たり、(c) は既に無い**。加えて、
+**空のまま memo 表に載り続ける `ExpectedSources` と `trials`** というケース33 と同じ形の無駄が残っていた。
+とくに `trials` は `DETAILED` でも 1 件も使われない（`isMemoizationSessionSafe` が trial 記録中は false を返すので、
+memo frame に trial が入ることは構造上ありえない）。
+
+### 施策1 (a): `DETAILED_ON_FAILURE` では `ParseFrame` を作らない
+
+`ParseFrame` の読み手は `trackCursorProgress` / `registerFailureCandidate` / `replayFailureDiagnostic` /
+`snapshotStackElements` / `deepestTerminalParser` の 5 つで、`DETAILED_ON_FAILURE` ではすべて早期 return するか、
+到達しない。残る唯一の読み手は **明示的な trial 記録**（`startTrialRecording`。このモードでも使える）で、
+そこが frame から取るのは `startOffset` 1 つだけである。
+
+そこで、このモードでは frame の代わりに `int[]` の stack へ開始 offset だけを積む。倍々で伸びるので
+rule 評価あたりの割当は 0 になる。`trials` の内容が `DETAILED` と一致することは
+`DetailedOnFailureTest.trialRecordsAreIdenticalWithoutParseFrames` で固定した
+（同じ入力・同じ parser 木で、parser 名・開始/終了位置・成否・消費数の列が完全一致）。
+`terminalFrames` も同時に空のままになる（読み手が `registerFailureCandidate` だけなので）。
+
+モードの判定は `options.diagnostics()` の enum 比較ではなく、constructor で 1 回だけ決める `final boolean` にした
+（`startParse` / `endParse` / `consume` / `matchOnly` の全てで走るため）。
+
+### 施策2 (b): 開いている memo transaction frame を配列で持ち、深さで打ち切る
+
+`recordMemoTransactionBegin` / `Finish` は transaction の begin と finish のたびに
+`Deque<FailureDiagnostic>` を走査する。`complex-x64` では 842,486 + 842,486 回、しかも**毎回非空**なので
+走査のたびに `ArrayDeque` の iterator が 1 個割り当たり、さらに条件に合わない frame も最後まで見ていた。
+
+frame の `transactionBaseDepth` は「その frame を開いた時点の transaction 深さ」で、frame が開いている間に
+深さがそれを下回ることはない。つまり配列に積むと **深さで整列している**。そこで
+`FailureDiagnostic[]` + 件数に置き換え、内側から外側へ走査して
+`transactionBaseDepth < 記録する深さ` になった時点で打ち切る。iterator は消え、走査長は実質 1〜2 になる。
+
+深さ 24 の入れ子（初期容量 16 を超える）で memo hit の state hook 回数が `DETAILED` と一致することを
+`deeplyNestedMemoFramesReplayAfterTheFrameArrayGrows` で固定した。
+
+### 施策3: memo frame の payload を「使うときに作る」
+
+`FailureDiagnostic` は `ExpectedSources` と `List<TrialRecord>` と `List<MemoTransactionEvent>` を
+**必ず** 3 つとも構築していた。memo 表に載った frame は parse 終了まで live なので、
+`complex-x64` では 102,054 個ぶんが最後まで残る。実際には
+
+- `expected` は `DETAILED_ON_FAILURE` では **1 件も入らない**（カウンタで 0 を確認）
+- `trials` は memo と両立しない（`isMemoizationSessionSafe` が trial 記録中は false を返すので、
+  memo frame に trial が入ることはない）
+- `transactionEvents` だけが実際に使われ、1 frame あたり平均 3.7 件
+
+なので、`expected` と `trials` は最初の書き込みで作る遅延生成にし（読み側は共有の空インスタンスを見る）、
+`transactionEvents` は `ArrayList`（自身のヘッダ + 10 スロットの `Object[]`）をやめて
+容量 4 から倍々に伸びる `byte[]`（enum の ordinal）にした。`MemoTransactionEvent.values()` は
+呼ぶたびに配列を複製するので、replay 用に `static final` で 1 本持つ。
+
+### (a)(b) の上限を no-op build で測る
+
+施策を入れる前に、#263 の (a) と (b) を**丸ごと no-op にした計測専用 build**（transaction replay の意味論は壊れるので
+計測にしか使えない）を base / 実装済み候補と同じ session で交互に走らせた。
+
+| build | `complex` 中央値 / 最小 / 割当 | `complex-x64` 中央値 / 最小 / 割当 |
+|---|---:|---:|
+| base | 8.222 / 7.890 ms / 14.30 MB | 717.997 / 687.246 ms / 870.98 MB |
+| (a)+(b) を no-op（上限） | 6.182 / 5.406 ms / 12.85 MB | 636.621 / 580.008 ms / 789.26 MB |
+| 実装済み候補（施策1+2+3） | **5.715 / 5.653 ms / 13.31 MB** | **513.038 / 501.563 ms / 818.61 MB** |
+
+上限は `complex` -24.8% / `complex-x64` -11.3%。**候補はその上限をほぼ回収している**
+（`complex` -30.5%、`complex-x64` -28.5%。候補が上限より速いのは、no-op build には施策3
+—— memo frame の payload 遅延化 —— が入っていないため。逆に no-op build のほうが割当が小さいのは、
+transaction event を一切記録しないので `byte[]` すら作らないからで、これは意味論として採れない）。
+
+### live 集合（`jcmd GC.class_histogram` を `complex-x64` の parse 中に 8 回）
+
+memo 表のエントリ数が同じ時点どうしを比べる（parse の進行でどちらも単調に増えるので、
+エントリ数を横軸にすると 2 つの build を直接比較できる）。
+
+| 標本 | memo entry | `ArrayList` | `ExpectedSources` | `Object[]` | live（`FillerElement` 除く） |
+|---|---:|---:|---:|---:|---:|
+| base | 45,465 | 350,030 | 45,488 | 167,522 | 71.2 MB |
+| **cand** | 45,212 | **258,037（-26.3%）** | **0** | **121,558（-27.4%）** | **66.2 MB（-7.0%）** |
+| base | 100,501 | 561,197 | 100,524 | 270,196 | 106.6 MB |
+| cand（8 標本の線形あてはめで同じ entry 数へ外挿） | 100,501 | — | 0 | — | **94.7 MB（-11.2%）** |
+
+**memo entry 1 個あたりの限界 live コストは 634 byte → 532 byte（-16%）**
+（8 標本の傾き。base 6.34e-4 MB/entry、cand 5.32e-4 MB/entry）。
+`ExpectedSources` は live 集合から**完全に消えた**（100,524 個 → 0 個）。
+残っているのは CST 本体（`Token` / `StringSource` / `TokenList`）と memo の `Entry` / `PositionKey` /
+`HashMap$Node`、そして成功 memo が抱える token の deep copy で、これらは**意味論として必要なもの**である。
+
+### 施策ごとの A/B（`legacy-bench.sh root-deferred`、`SAFE_FAILURES`、`-Xss512m -Xms2g -Xmx2g`、`taskset -c 24` → Serial GC）
+
+`base` → `+施策1` → `+施策2` → `+施策3` を同じ session で fixture ごとに続けて実行した中央値 / 最小値 / 1 parse の割当。
+
+| build | `complex` 中央値 | 最小 | 割当 | `complex-x64` 中央値 | 最小 | 割当 |
+|---|---:|---:|---:|---:|---:|---:|
+| base | 8.063 ms | 7.527 | 14.30 MB | 665.05 ms | 649.88 | 861.93 MB |
+| +施策1（`ParseFrame` を作らない） | 6.836 ms | 6.585 | 13.67 MB | （外れ値）1158.92 | 690.76 | 826.91 MB |
+| +施策2（frame 配列と打ち切り） | 5.674 ms | 5.549 | 13.72 MB | 592.12 ms | 550.20 | 823.37 MB |
+| +施策3（payload の遅延生成） | **5.464 ms** | **5.352** | **13.36 MB** | **606.02 ms** | **575.41** | **810.67 MB** |
+
+- `complex`: **-32.2%（中央値）/ -28.9%（最小）**、割当 **-6.6%**。
+- `complex-x64`: **-8.9%（中央値）/ -11.5%（最小）**、割当 **-5.9%**。
+- 施策1 の `complex-x64` 行は他エージェントの Rust ビルドが同じホストで走った窓に当たり、
+  5 run 中 3 run が 2 倍近くに振れた（1216 / 1159 / 1175 / 871 / 691 ms）。最小値 690.76 ms を採り、
+  この 1 マスだけ**施策の効果として読まない**。他のマスは同じ session の前後関係で一貫している。
+- **時間の改善の大半は割当ではなく CPU である。** 割当は -6.6% しか減っていないのに `complex` は -32% になった。
+  内訳はカウンタのとおりで、`complex-x64` 1 parse あたり **7,370 万回**あった frame スロットの走査が
+  **238 万回**に、iterator 168 万個が 0 になったことが効いている。
+
+### スケーリング（base → 候補、fixture ごとに交互実行、GC ログ付き）
+
+`root-deferred`（`Diagnostics.DETAILED_ON_FAILURE`）:
+
+| fixture | base 中央値 | cand 中央値 | Δ | base 割当 | cand 割当 | Δ | base GC 比率 | cand GC 比率 | base µs/byte | cand µs/byte |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `complex` | 8.109 ms | **6.294 ms** | **-22.4%** | 14.17 MB | 13.44 MB | -5.2% | 0.65% | 0.79% | 24.42 | 18.96 |
+| `complex-x4` | 32.764 ms | **23.781 ms** | **-27.4%** | 54.20 MB | 50.83 MB | -6.2% | 2.27% | 2.45% | 25.34 | 18.39 |
+| `complex-x16` | 135.199 ms | **107.691 ms** | **-20.3%** | 215.11 MB | 201.96 MB | -6.1% | 9.18% | 9.95% | 26.11 | 20.79 |
+| `complex-x64` | 664.836 ms | **568.791 ms** | **-14.4%** | 863.05 MB | 819.51 MB | -5.0% | 26.67% | 27.90% | 31.78 | 27.18 |
+
+`root`（既定の `Diagnostics.DETAILED`、退行確認）:
+
+| fixture | base 中央値 | cand 中央値 | Δ | base 割当 | cand 割当 | base GC 比率 | cand GC 比率 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `complex` | 10.341 ms | 10.569 ms | +2.2% | 17.50 MB | 17.17 MB | 0.76% | 0.81% |
+| `complex-x4` | 43.918 ms | 40.034 ms | -8.8% | 67.08 MB | 66.37 MB | 2.97% | 3.06% |
+| `complex-x16` | 180.933 ms | 170.266 ms | -5.9% | 264.69 MB | 260.57 MB | 11.74% | 12.53% |
+| `complex-x64` | 1080.802 ms | 1045.492 ms | -3.3% | 1068.62 MB | 1052.18 MB | 34.49% | 36.09% |
+
+既定モードに退行はない（`complex` の +2.2% は最小値では -8.2% に反転するノイズ）。施策2 と
+施策3 の `trials` 遅延化は既定モードでも効くので、`complex-x4` 以降では -3〜-9% 速くなっている。
+
+### #276 の ×1.2 について: **未達**、しかも比は悪化する
+
+| モード | `complex` µs/byte | `complex-x64` µs/byte | **倍率** |
+|---|---:|---:|---:|
+| base `DETAILED` | 31.15 | 51.66 | ×1.658 |
+| cand `DETAILED` | 31.83 | 49.97 | ×1.570 |
+| base `DETAILED_ON_FAILURE` | 24.42 | 31.78 | ×1.301 |
+| **cand `DETAILED_ON_FAILURE`** | **18.96** | **27.18** | **×1.434** |
+
+**すべての絶対値が改善したのに倍率は 1.301 → 1.434 に悪化した。** 理由は分解すると明らかである。
+GC pause を引いた µs/byte は **base ×0.96 / cand ×1.04** で、どちらもパーサ本体は線形。
+比を決めているのは `complex-x64` の GC 比率（26.7% / 27.9%）だけで、
+`complex` はほぼ GC ゼロ（0.65% / 0.79%）。**この施策は CPU を削るので GC がほぼ無い小入力ほど大きく効き、
+GC 律速の大入力では効きが小さい。だから「小入力を速くすると倍率は上がる」。**
+
+倍率 ×1.2 は「入力長に対する µs/byte の平坦さ」の指標なので、**GC が 27% を占める条件では
+GC 回数（∝ 割当）か live 集合を桁で削らない限り満たせない**。今回の施策は割当を -5〜6% しか動かさない
+（時間の改善は主に CPU）。ケース32 / 33 の結論（残差は全部 collector）は変わっていない。
+
+### Java / Rust の対称性
+
+Rust 側（`rust/unlaxer-runtime`）は**変更不要**である。今回の 3 施策に対応する構造をそれぞれ確認した。
+
+- **(a) `ParseFrame` に相当するオブジェクトが無い。** Rust の parser は再帰関数で、parse stack は機械のスタックそのもの。
+  `ParseFrame` / `terminalFrames` / `StackSnapshot` のような per-rule のヒープ構造を持たない。
+- **memo entry の payload。** `failure_memo` の値は `FailureDiagnostic { farthest: Option<usize>, expected: ExpectedIds }`
+  で、`Diagnostics::DetailedOnFailure` のときは `record_diagnostics == false` なので
+  **診断 frame をそもそも push せず**、entry には `FailureDiagnostic::default()`（`farthest: None`、
+  `ExpectedIds::Empty`）が入る。空のコンテナを確保して抱え続ける、という Java 側の無駄が構造的に存在しない
+  （`ExpectedIds` は `Empty` / `Single(u32)` / `Multiple(Rc<Vec<u32>>)` の enum。ケース23）。
+- **(b) transaction event の journal に相当するものが無い。** Rust の memo 安全判定（`expression_is_memo_safe`）は
+  scope / user state に触れる rule を memo 対象から外すので、memo hit で state hook を replay する必要がない。
+  Java は「安全な rule でも直下の transaction は開く」設計なので、この journal が要る。この差は
+  `docs/java-diagnostics-policy.md` の対応表どおりで、今回も解消していない。
+
+つまり「`DETAILED_ON_FAILURE` が読まないものを作らない」という本件の設計は、Rust では最初からそうなっていた。
+Java 側をその形に寄せた変更であり、観測可能な振る舞いの差は生じない。
+
+### 検証
+
+- `unlaxer-common` 696（新規 2 件を含む）/ `unlaxer-dsl` 1,012（skip 23）緑。
+- isolated maven repo で tinyexpression 全テスト **769 件（skip 10）緑**（`c70416e1` を候補 jar で再ビルド）。
+- 失敗診断の同値性: 失敗入力 18 件 × `DETAILED` / `DETAILED_ON_FAILURE` × memo `OFF` / `SAFE_FAILURES` の
+  72 通りで `ParseFailureDiagnostics` の全項目をテキスト化し、base / cand で **byte 一致**。
+- 計測条件: `ubnfc/examples/p4-java/scripts/legacy-bench.sh`、`Memoization.SAFE_FAILURES`、
+  `-Xss512m -Xms2g -Xmx2g`、`taskset -c 24`（1 CPU → Serial GC）、jar-first classpath、
+  tinyexpression `c70416e1` を build ごとの isolated maven repo で再ビルド、fixture ごとに base/cand 交互。
+  ホストは共有で、他エージェントの Rust ビルドが並走する窓があった（該当マスは本文で明示）。
+
+### 教材としての要点
+
+- **「モードを足す」と「モードが払う費用を消す」は別の作業である。** ケース26 で
+  `DETAILED_ON_FAILURE` を入れた時点で記録は止まったが、記録の**器**（`ParseFrame`、memo frame の
+  空コンテナ、frame 走査）はそのまま残っていた。差分計測の上限（-31.6%）に実測（-17.1%）が届かない、
+  という当時の残差の中身がこれである。**モードを足したら、そのモードで「誰も読まないのに作っているもの」を
+  カウンタで数え直す。**
+- **「全部の open frame を走査する」は、整列が言える場所では打ち切れる。** 今回の `transactionBaseDepth` のように、
+  スタック構造から単調性が言えるなら、走査は「合わなくなった時点で終わり」にできる。
+  `Deque` のままでは iterator の割当が残るので、**打ち切りと iterator 除去はセットで**配列に置き換える。
+- **memo 表に入るものは「1 parse ぶんずっと live」である。** だから memo entry が抱える空コンテナは、
+  一時割当ではなく **live 集合**の話になる。ケース33 の教訓（どこを削れば GC が軽くなるかは
+  割当プロファイルではなく live のヒストグラムが答える）と同じで、
+  **「必ず作るが空のことが多い」入れ物は、memo に載る側から先に潰す。**
+- **同値性は差分ダンプで固定する。** 失敗入力 18 件 × `DETAILED`/`DETAILED_ON_FAILURE` × memo `OFF`/`SAFE_FAILURES`
+  の 72 通りについて `ParseFailureDiagnostics` の全項目（offset / line / column / stack / expected / hints /
+  expectedTokens / deepestRule / trials）をテキストへ落とし、変更前後で **byte 一致**を確認した。
+  「テストが緑」より強い証拠が要る変更では、この形の差分ダンプを作る。
