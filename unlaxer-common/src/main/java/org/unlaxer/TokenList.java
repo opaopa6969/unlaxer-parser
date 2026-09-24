@@ -18,16 +18,28 @@ import org.unlaxer.Source.SourceKind;
 
 public class TokenList implements List<Token>{
   
+  /*
+   * Every token owns two of these lists and more than half of them (both lists of every leaf)
+   * stay empty for as long as the tree lives, so an empty TokenList backs onto one shared
+   * immutable list and only allocates an ArrayList when it is first written to. Reads on the
+   * shared list behave exactly like reads on an empty ArrayList. (perf #276)
+   */
+  private static final List<Token> EMPTY_BACKING = List.of();
+
   List<Token> tokens;
 
   public TokenList(List<Token> tokens) {
     super();
-    this.tokens = new ArrayList<>(tokens);
+    this.tokens = tokens.isEmpty() ? EMPTY_BACKING : new ArrayList<>(tokens);
   }
   
   public TokenList(Token... tokens) {
     super();
-    this.tokens = new ArrayList<>();
+    if (tokens.length == 0) {
+      this.tokens = EMPTY_BACKING;
+      return;
+    }
+    this.tokens = new ArrayList<>(tokens.length);
     for (Token token : tokens) {
       this.tokens.add(token);
     }
@@ -35,13 +47,32 @@ public class TokenList implements List<Token>{
   
   public TokenList() {
     super();
-    this.tokens = new ArrayList<>();
+    this.tokens = EMPTY_BACKING;
   }
 
   /** Creates an empty list that can hold {@code initialCapacity} tokens without growing. */
   public TokenList(int initialCapacity) {
     super();
-    this.tokens = new ArrayList<>(initialCapacity);
+    this.tokens = initialCapacity == 0 ? EMPTY_BACKING : new ArrayList<>(initialCapacity);
+  }
+
+  /** Returns the backing list, replacing the shared empty one on the first write. */
+  private List<Token> mutable() {
+    List<Token> backing = tokens;
+    if (backing == EMPTY_BACKING) {
+      backing = new ArrayList<>();
+      tokens = backing;
+    }
+    return backing;
+  }
+
+  private List<Token> mutable(int expectedSize) {
+    List<Token> backing = tokens;
+    if (backing == EMPTY_BACKING) {
+      backing = new ArrayList<>(expectedSize < 1 ? 1 : expectedSize);
+      tokens = backing;
+    }
+    return backing;
   }
   
   public static TokenList of(List<Token> tokens) {
@@ -81,11 +112,11 @@ public class TokenList implements List<Token>{
   }
 
   public boolean add(Token e) {
-    return tokens.add(e);
+    return mutable().add(e);
   }
 
   public boolean remove(Object o) {
-    return tokens.remove(o);
+    return !tokens.isEmpty() && tokens.remove(o);
   }
 
   public boolean containsAll(Collection<?> c) {
@@ -93,15 +124,21 @@ public class TokenList implements List<Token>{
   }
 
   public boolean addAll(Collection<? extends Token> c) {
-    return tokens.addAll(c);
+    return c.isEmpty() ? false : mutable(c.size()).addAll(c);
   }
 
   public boolean addAll(int index, Collection<? extends Token> c) {
-    return tokens.addAll(index, c);
+    if (c.isEmpty()) {
+      if (tokens == EMPTY_BACKING && index != 0) {
+        throw new IndexOutOfBoundsException("Index: " + index + ", Size: 0");
+      }
+      return tokens == EMPTY_BACKING ? false : tokens.addAll(index, c);
+    }
+    return mutable(c.size()).addAll(index, c);
   }
 
   public boolean removeAll(Collection<?> c) {
-    return tokens.removeAll(c);
+    return !tokens.isEmpty() && tokens.removeAll(c);
   }
 
   public <T> T[] toArray(IntFunction<T[]> generator) {
@@ -109,19 +146,19 @@ public class TokenList implements List<Token>{
   }
 
   public boolean retainAll(Collection<?> c) {
-    return tokens.retainAll(c);
+    return !tokens.isEmpty() && tokens.retainAll(c);
   }
 
   public void replaceAll(UnaryOperator<Token> operator) {
-    tokens.replaceAll(operator);
+    if (!tokens.isEmpty()) tokens.replaceAll(operator);
   }
 
   public void sort(Comparator<? super Token> c) {
-    tokens.sort(c);
+    if (!tokens.isEmpty()) tokens.sort(c);
   }
 
   public void clear() {
-    tokens.clear();
+    if (!tokens.isEmpty()) tokens.clear();
   }
 
   public boolean equals(Object o) {
@@ -141,10 +178,13 @@ public class TokenList implements List<Token>{
   }
 
   public boolean removeIf(Predicate<? super Token> filter) {
-    return tokens.removeIf(filter);
+    return !tokens.isEmpty() && tokens.removeIf(filter);
   }
 
   public Token set(int index, Token element) {
+    if (tokens == EMPTY_BACKING) {
+      throw new IndexOutOfBoundsException("Index: " + index + ", Size: 0");
+    }
     return tokens.set(index, element);
   }
   
@@ -153,7 +193,7 @@ public class TokenList implements List<Token>{
   }
 
   public void add(int index, Token element) {
-    tokens.add(index, element);
+    mutable().add(index, element);
   }
   
   public void add(TokenIndex index, Token element) {
@@ -161,6 +201,9 @@ public class TokenList implements List<Token>{
   }
 
   public Token remove(int index) {
+    if (tokens == EMPTY_BACKING) {
+      throw new IndexOutOfBoundsException("Index: " + index + ", Size: 0");
+    }
     return tokens.remove(index);
   }
   
@@ -177,11 +220,11 @@ public class TokenList implements List<Token>{
   }
 
   public ListIterator<Token> listIterator() {
-    return tokens.listIterator();
+    return mutable().listIterator();
   }
 
   public ListIterator<Token> listIterator(int index) {
-    return tokens.listIterator(index);
+    return mutable().listIterator(index);
   }
   
   public ListIterator<Token> listIterator(TokenIndex index) {
@@ -189,7 +232,7 @@ public class TokenList implements List<Token>{
   }
 
   public List<Token> subList(int fromIndex, int toIndex) {
-    return tokens.subList(fromIndex, toIndex);
+    return mutable().subList(fromIndex, toIndex);
   }
   
   public List<Token> subList(TokenIndex fromIndexInclusive , TokenIndex toIndexExclusive) {
@@ -276,12 +319,19 @@ public class TokenList implements List<Token>{
       return StringSource.createDetachedSource("");
     }
     
+    Token token = firstPrintableToken.get();
+    
+    if(sourceKind == SourceKind.subSource) {
+      Source view = contiguousRootSliceOf(tokens, token);
+      if (view != null) {
+        return view;
+      }
+    }
+    
     StringBuilder collect = new StringBuilder();
     for (int i = 0, size = tokens.size(); i < size; i++) {
       collect.append(tokens.get(i).getSource().toString());
     }
-    
-    Token token = firstPrintableToken.get();
     
     CodePointOffset offsetFromRoot = token.source.offsetFromRoot();
     
@@ -290,5 +340,48 @@ public class TokenList implements List<Token>{
     }else {
       return StringSource.create(collect.toString(), sourceKind );
     }
+  }
+
+  /**
+   * Returns the concatenation of {@code tokens} as a view over the root's code points, or
+   * {@code null} when the children are not one contiguous slice of it.
+   *
+   * <p>Concatenating the children's text and decoding it again re-created, on every commit, a
+   * String and an {@code int[]} that the root already holds - a 20 KB input retained 24x its own
+   * size in such copies. The children of a committed rule are consecutive by construction in
+   * practice, but nothing enforces it (trivia handling and rewritten sources can break it), so the
+   * offsets are checked and the copying path is kept for everything else. (perf #276)
+   */
+  private static Source contiguousRootSliceOf(TokenList tokens, Token firstPrintable) {
+    Source rootSource = firstPrintable.source.root();
+    if (!(rootSource instanceof StringSource root) || !root.isRoot()) {
+      return null;
+    }
+    int cursor = -1;
+    int start = -1;
+    for (int i = 0, size = tokens.size(); i < size; i++) {
+      Source source = tokens.get(i).getSource();
+      if (!(source instanceof StringSource stringSource)) {
+        return null;
+      }
+      int length = stringSource.codePointLength().value();
+      if (length == 0) {
+        continue;
+      }
+      if (!stringSource.sharesCodePointArrayWith(root)) {
+        return null;
+      }
+      int offset = stringSource.codePointOffsetInArray();
+      if (cursor == -1) {
+        start = offset;
+      } else if (offset != cursor) {
+        return null;
+      }
+      cursor = offset + length;
+    }
+    if (cursor == -1) {
+      return null;
+    }
+    return StringSource.createSubSourceView(root, start, cursor - start);
   }
 }

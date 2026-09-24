@@ -1,9 +1,7 @@
 package org.unlaxer;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.NavigableMap;
 import java.util.TreeMap;
 import java.util.stream.Stream;
@@ -15,9 +13,16 @@ import org.unlaxer.Source.SourceKind;
 public class PositionResolverImpl implements PositionResolver {
   
   final NavigableMap<CodePointIndex, LineNumber> lineNumberByIndex = new TreeMap<>();
-  final Map<CodePointIndex,StringIndex> stringIndexByCodePointIndex = new HashMap<>();
-  final Map<CodePointIndex,CodePointIndexInLine> codePointIndexInLineByCodePointIndex = new HashMap<>();
-  final Map<StringIndex,CodePointIndex> codePointIndexByStringIndex = new HashMap<>();
+  /*
+   * These three used to be HashMaps with one boxed entry per code point, built eagerly for the
+   * root source and live for the whole parse: a 20 KB input retained 63k HashMap nodes plus 63k
+   * CodePointIndex/StringIndex/CodePointIndexInLine instances (3.4 MB) to hold what is, for
+   * BMP text, the identity mapping. They are int arrays now, with -1 for "no entry"; the boxed
+   * values are built only for the callers that ask. (perf #276)
+   */
+  final int[] stringIndexByCodePointIndex;
+  final int[] codePointIndexInLineByCodePointIndex;
+  final int[] codePointIndexByStringIndex;
   final List<CursorRange> cursorRanges = new ArrayList<>();
   final CursorRange cursorRange;
 //  final RootPositionResolver rootPositionResolver;
@@ -39,6 +44,13 @@ public class PositionResolverImpl implements PositionResolver {
 //      CodePointOffset offsetFromRoot) {
 //    boolean isRoot = rootPositionResolver == null ;
     int codePointCount = codePoints.length;
+    int stringLength = 0;
+    for (int i = 0; i < codePointCount; i++) {
+      stringLength += Character.isBmpCodePoint(codePoints[i]) ? 1 : 2;
+    }
+    stringIndexByCodePointIndex = newIndex(codePointCount + 1);
+    codePointIndexInLineByCodePointIndex = newIndex(codePointCount + 1);
+    codePointIndexByStringIndex = newIndex(stringLength + 2);
 //    this.rootPositionResolver = isRoot ? this : rootPositionResolver;
     
     LineNumber lineNumber = new LineNumber(0);
@@ -46,20 +58,20 @@ public class PositionResolverImpl implements PositionResolver {
     CodePointIndex previousStartIndex;
     lineNumberByIndex.put(startIndex, lineNumber);
     
-    StringIndex stringIndex = new StringIndex(0);
-    CodePointIndex codePointIndex = new CodePointIndex(0);
-    CodePointIndexInLine codePointOffsetInline = new CodePointIndexInLine(0);
+    int stringIndex = 0;
+    int codePointIndex = 0;
+    int codePointOffsetInline = 0;
     
     for (int i = 0; i < codePointCount; i++) {
-      codePointIndex = new CodePointIndex(i);
-      stringIndexByCodePointIndex.put(codePointIndex, stringIndex);
-      codePointIndexByStringIndex.put(stringIndex,codePointIndex);
-      codePointIndexInLineByCodePointIndex.put(codePointIndex, codePointOffsetInline);
+      codePointIndex = i;
+      stringIndexByCodePointIndex[codePointIndex] = stringIndex;
+      codePointIndexByStringIndex[stringIndex] = codePointIndex;
+      codePointIndexInLineByCodePointIndex[codePointIndex] = codePointOffsetInline;
     
       int codePointAt = codePoints[i];
       
       int adding = Character.isBmpCodePoint(codePointAt) ? 1:2;
-      stringIndex = stringIndex.newWithAdd(adding);
+      stringIndex = stringIndex + adding;
       
       if(codePointAt == SymbolMap.lf.codes[0]) {
         
@@ -76,7 +88,7 @@ public class PositionResolverImpl implements PositionResolver {
         );
         lineNumber = lineNumber.newWithIncrements();
         lineNumberByIndex.put(startIndex, lineNumber);
-        codePointOffsetInline = new CodePointIndexInLine(0);
+        codePointOffsetInline = 0;
         continue;
         
       }else if(codePointAt == SymbolMap.cr.codes[0]) {
@@ -97,9 +109,9 @@ public class PositionResolverImpl implements PositionResolver {
           lineNumber = lineNumber.newWithIncrements();
           lineNumberByIndex.put(startIndex, lineNumber);
           
-          stringIndex = stringIndex.newWithAdd(1);
-          stringIndexByCodePointIndex.put(codePointIndex.newWithAdd(1), stringIndex);
-          codePointIndexByStringIndex.put(stringIndex,codePointIndex.newWithAdd(1));
+          stringIndex = stringIndex + 1;
+          stringIndexByCodePointIndex[codePointIndex + 1] = stringIndex;
+          codePointIndexByStringIndex[stringIndex] = codePointIndex + 1;
         }else {
           previousStartIndex = startIndex;
           startIndex = new CodePointIndex(i+1);
@@ -115,10 +127,10 @@ public class PositionResolverImpl implements PositionResolver {
           lineNumber = lineNumber.newWithIncrements();
           lineNumberByIndex.put(startIndex, lineNumber);
         }
-        codePointOffsetInline = new CodePointIndexInLine(0);
+        codePointOffsetInline = 0;
         continue;
       }
-      codePointOffsetInline = codePointOffsetInline.newWithIncrements();
+      codePointOffsetInline = codePointOffsetInline + 1;
     }
 
     StartInclusiveCursor start = new StartInclusiveCursorImpl(SourceKind.root,this);//.addPosition(offsetFromRoot);
@@ -128,11 +140,11 @@ public class PositionResolverImpl implements PositionResolver {
     EndExclusiveCursor end = new EndExclusiveCursorImpl(SourceKind.root,this)
         .setPosition(position);
     cursorRange = new CursorRange(start, end);
-    codePointIndexInLineByCodePointIndex.put(position, new CodePointIndexInLine(0));
+    codePointIndexInLineByCodePointIndex[codePointCount] = 0;
     lineNumberByIndex.put(position, lineNumber);
     if(cursorRanges.size()>0) {
       CursorRange last = cursorRanges.get(cursorRanges.size()-1);
-      if(last.lessThan(codePointIndex) && startIndex.lessThan(position)) {
+      if(last.lessThan(new CodePointIndex(codePointIndex)) && startIndex.lessThan(position)) {
         
         cursorRanges.add(
             CursorRange.of(
@@ -158,6 +170,18 @@ public class PositionResolverImpl implements PositionResolver {
       .map(root::subSource);
   }
 
+  private static int[] newIndex(int size) {
+    int[] index = new int[size];
+    java.util.Arrays.fill(index, ABSENT);
+    return index;
+  }
+
+  private static final int ABSENT = -1;
+
+  private static int at(int[] index, int key) {
+    return key < 0 || key >= index.length ? ABSENT : index[key];
+  }
+
   @Override
   public StringIndex stringIndexInRootFrom(CodePointIndex codePointIndex) {
     
@@ -165,7 +189,8 @@ public class PositionResolverImpl implements PositionResolver {
 //      return stringIndexByCodePointIndex.get(codePointIndexInSubSource);
 //    }
 //    return rootPositionResolver.stringIndexInRootFrom(codePointIndexInSubSource.newWithPlus(offsetFromRoot));
-    return stringIndexByCodePointIndex.get(codePointIndex);
+    int value = at(stringIndexByCodePointIndex, codePointIndex.value());
+    return value == ABSENT ? null : new StringIndex(value);
   }
 
   @Override
@@ -186,22 +211,26 @@ public class PositionResolverImpl implements PositionResolver {
 
   @Override
   public StringIndex subStringIndexFrom(CodePointIndex subCodePointIndex) {
-    return stringIndexByCodePointIndex.get(subCodePointIndex);
+    int value = at(stringIndexByCodePointIndex, subCodePointIndex.value());
+    return value == ABSENT ? null : new StringIndex(value);
   }
 
   @Override
   public CodePointIndex subCodePointIndexFrom(StringIndex subStringIndex) {
-    return codePointIndexByStringIndex.get(subStringIndex);
+    int value = at(codePointIndexByStringIndex, subStringIndex.value());
+    return value == ABSENT ? null : new CodePointIndex(value);
   }
 
   @Override
   public CodePointIndexInLine codePointIndexInLineFrom(CodePointIndex codePointIndex) {
-    return codePointIndexInLineByCodePointIndex.get(codePointIndex);
+    int value = at(codePointIndexInLineByCodePointIndex, codePointIndex.value());
+    return value == ABSENT ? null : new CodePointIndexInLine(value);
   }
 
   @Override
   public CodePointIndex rootCodePointIndexFrom(StringIndex stringIndex) {
-    return codePointIndexByStringIndex.get(stringIndex);
+    int value = at(codePointIndexByStringIndex, stringIndex.value());
+    return value == ABSENT ? null : new CodePointIndex(value);
   }
 
 }

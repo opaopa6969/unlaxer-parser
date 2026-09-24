@@ -13,6 +13,16 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 - The Java generator proves success safety transitively, excludes listener/state-dependent rules and uncertified custom tokens, and marks generated whitespace delimitors. Runtime replay also covers their `Occurs` entry point. Memoization remains off by default; Rust behavior and generated Rust sources are unchanged.
 
 ### Changed
+- The parse tree itself is smaller. A sub-source is now a view over its root's code point array
+  (start/length) with its String materialized on demand instead of a fresh `String` and `int[]`
+  per source; empty child lists share one immutable backing list until first written; a source's
+  depth and both offsets are int fields behind the same accessors; and the root position resolver
+  keeps its three indices in `int[]` instead of `HashMap`s with one boxed entry per code point.
+  On a 20 KB input the tree retained by a parse falls from 34.7 MB / 1,256,693 objects to
+  23.2 MB / 756,303 objects (-33% / -40%). `TokenList.toSource` only takes the view when the
+  children are verifiably one contiguous slice of the root and otherwise concatenates as before,
+  so nothing about the produced tokens changes. Rust behavior is unchanged: `unlaxer-runtime`'s
+  `Tree` already stores nodes as spans over one owned source.
 - The packrat memo table no longer keeps every entry for the whole parse. Entries whose start
   position falls more than `unlaxer.memo.window` code points (default 1024) behind the furthest
   position the cursor reached are dropped, which bounds the memo live set by the grammar's
