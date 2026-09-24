@@ -6,8 +6,8 @@ documentation releases.
 
 ## Policy
 
-- One successful Central publish operation per UTC calendar month across the
-  whole organization.
+- Target one Central publish operation per UTC calendar month across the
+  whole organization; two or three in a month are acceptable when candidates are ready (owner decision, 2026-09-24).
 - Collect changes in GitHub/CI and select at most one reactor from
   `central-release-queue.yml` for the monthly slot.
 - Publish dependency reactors before downstream consumers. A downstream project
