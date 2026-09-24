@@ -31,6 +31,13 @@ public class DetailedOnFailureTest {
         }
     }
 
+    /** One memoizable rule per nesting level, so a parse opens as many memo frames as levels. */
+    static final class Nested extends LazyChain implements SafeFailureMemoizable {
+        final Parser inner;
+        Nested(Parser inner) { this.inner = inner; }
+        @Override public Parsers getLazyParsers() { return new Parsers(inner); }
+    }
+
     static final class Root extends LazyChain implements SafeFailureMemoizable {
         @Override public Parsers getLazyParsers() {
             return new Parsers(new WordParser("["), new Body(), new WordParser("]"));
@@ -211,6 +218,60 @@ public class DetailedOnFailureTest {
             assertTrue(root.parse(context).isFailed());
             assertEquals(1, context.getPackratMemoTable().failureHits());
             assertEmpty(context);
+        }
+    }
+
+    /**
+     * DETAILED_ON_FAILURE keeps no ParseFrame, so the trial records it produces have to be built
+     * from the frame start offsets it does keep. They must be the ones DETAILED reports. (#263)
+     */
+    @Test public void trialRecordsAreIdenticalWithoutParseFrames() {
+        List<String> detailed = trials(Diagnostics.DETAILED);
+        assertFalse(detailed.isEmpty());
+        assertEquals(detailed, trials(Diagnostics.DETAILED_ON_FAILURE));
+    }
+
+    private static List<String> trials(Diagnostics diagnostics) {
+        List<String> records = new ArrayList<>();
+        try (var context = ParseContext.withOptions(StringSource.createRootSource("[ab)"),
+                ParseOptions.DEFAULT.withDiagnostics(diagnostics))) {
+            context.startTrialRecording();
+            assertTrue(new Root().parse(context).isFailed());
+            for (var trial : context.getTrialHistory()) {
+                records.add(trial.getParserName() + "[" + trial.getStartPosition() + ","
+                    + trial.getEndPosition() + "," + trial.isSucceeded() + "," + trial.getConsumed() + "]");
+            }
+        }
+        return records;
+    }
+
+    /** Memo frames deeper than the open-frame array's initial capacity still replay in order. */
+    @Test public void deeplyNestedMemoFramesReplayAfterTheFrameArrayGrows() {
+        assertEquals(replayOfDeepNesting(Diagnostics.DETAILED),
+            replayOfDeepNesting(Diagnostics.DETAILED_ON_FAILURE));
+    }
+
+    /** Hooks a memo hit on a 24-level nest runs, as {@code hits/checkpoints/restores}. */
+    private static String replayOfDeepNesting(Diagnostics diagnostics) {
+        Parser root = new WordParser("x");
+        for (int level = 0; level < 24; level++) root = new Nested(root);
+        try (var context = ParseContext.withOptions(StringSource.createRootSource("y"),
+                ParseOptions.withMemoization(Memoization.SAFE_FAILURES).withDiagnostics(diagnostics))) {
+            int[] checkpoints = {0};
+            int[] restores = {0};
+            context.registerTransactionalState(() -> {
+                checkpoints[0]++;
+                return () -> restores[0]++;
+            });
+            assertTrue(root.parse(context).isFailed());
+            int parsedCheckpoints = checkpoints[0];
+            int parsedRestores = restores[0];
+            assertEquals(24, parsedCheckpoints);
+            assertTrue(root.parse(context).isFailed());
+            assertEquals(1, context.getPackratMemoTable().failureHits());
+            return context.getPackratMemoTable().failureHits()
+                + "/" + (checkpoints[0] - parsedCheckpoints)
+                + "/" + (restores[0] - parsedRestores);
         }
     }
 
