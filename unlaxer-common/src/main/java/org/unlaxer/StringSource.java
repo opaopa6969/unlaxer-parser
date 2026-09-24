@@ -12,13 +12,27 @@ public class StringSource implements Source {
 
   private final Source root;
   private final Source parent; // subSource の時だけ非null
-  private final String sourceString;
+  /*
+   * A sub-source is a view: start/length into a shared code point array (its root's, when the
+   * sub-source is an exact slice of it) with the String materialized only when someone asks.
+   * A 20 KB input used to retain 515,595 code points' worth of per-token copies - 24x the input -
+   * because every commit re-created both the String and the int[]. (perf #276)
+   */
   private final int[] codePoints;
+  private final int codePointOffsetInArray;
+  private final int codePointLength;
+  private String sourceString;
   private final PositionResolver positionResolver;
-  private final Depth depth;
   private final SourceKind sourceKind;
-  private final CodePointOffset offsetFromParent;
-  private final CodePointOffset offsetFromRoot;
+  /*
+   * Depth and both offsets are plain ints: a parse creates a sub-source per peek and per commit,
+   * and boxing these three into Depth/CodePointOffset instances cost three objects per source
+   * that stayed live for as long as the tree. The accessors still return the value objects; only
+   * callers that ask now pay for one. (perf #276)
+   */
+  private final int depthValue;
+  private final int offsetFromParentValue;
+  private final int offsetFromRootValue;
   /*
    * Built on demand: a parse creates over a million sub-sources for a 20 KB input and most of
    * them (peeks that did not match) never need their cursor range, while the ones that do become
@@ -77,11 +91,13 @@ public class StringSource implements Source {
 
     // ✅ root/detached は parent を持たない（subSourceだけが parent を持つ）
     this.parent = null;
-    this.depth = new Depth(0);
+    this.depthValue = 0;
 
-    this.offsetFromParent = offsetFromParent;
-    this.offsetFromRoot = CodePointOffset.ZERO;
+    this.offsetFromParentValue = offsetFromParent.value();
+    this.offsetFromRootValue = 0;
     this.codePoints = codePointsOf(source);
+    this.codePointOffsetInArray = 0;
+    this.codePointLength = this.codePoints.length;
 
     // ✅ subSource 以外は独立 resolver（=positionInRoot は 0起点）
     this.positionResolver = PositionResolver.createPositionResolver(codePoints);
@@ -101,17 +117,19 @@ public class StringSource implements Source {
     }
 
     this.parent = parent;
-    this.offsetFromParent = offsetFromParent;
-    this.depth = parent.depth().newWithIncrements();
+    this.offsetFromParentValue = offsetFromParent.value();
+    this.depthValue = depthOf(parent) + 1;
     this.sourceKind = SourceKind.subSource;
 
-    this.codePoints = codePointsOf(source.toString());
+    this.codePoints = codePointsOf(this.sourceString);
+    this.codePointOffsetInArray = 0;
+    this.codePointLength = this.codePoints.length;
 
     // ✅ subSource は root resolver を使う（root座標共有）
     this.positionResolver = this.root;
 
     // ✅ root座標系の offset を合成する（cursorRange は cursorRange() で遅延生成）
-    this.offsetFromRoot = parent.offsetFromRoot().newWithPlus(offsetFromParent);
+    this.offsetFromRootValue = offsetFromRootOf(parent) + this.offsetFromParentValue;
   }
 
   /**
@@ -125,17 +143,80 @@ public class StringSource implements Source {
     this.parent = parent;
     this.root = parent.root();
 
-    this.depth = parent.depth().newWithIncrements();
+    this.depthValue = depthOf(parent) + 1;
     this.sourceKind = SourceKind.subSource;
 
-    this.offsetFromParent = codePointOffset;
+    this.offsetFromParentValue = codePointOffset.value();
     this.codePoints = codePointsOf(source);
+    this.codePointOffsetInArray = 0;
+    this.codePointLength = this.codePoints.length;
 
     // ✅ subSource は root resolver を使う（root座標共有）
     this.positionResolver = this.root;
 
     // ✅ root座標系の offset を合成する（cursorRange は cursorRange() で遅延生成）
-    this.offsetFromRoot = parent.offsetFromRoot().newWithPlus(offsetFromParent);
+    this.offsetFromRootValue = offsetFromRootOf(parent) + this.offsetFromParentValue;
+  }
+
+  /**
+   * View constructor: shares {@code parent}'s code point array instead of copying the slice out
+   * of it. The resulting source is byte-for-byte the one the copying constructor would build for
+   * {@code parent.subString(offsetFromParent, length)}; only the String is deferred. (perf #276)
+   */
+  private StringSource(StringSource parent, int offsetFromParent, int length) {
+    super();
+    /*
+     * The copying constructor this replaces materialized the slice eagerly, so an out-of-range
+     * request failed here rather than at the first read; keep that.
+     */
+    if (offsetFromParent < 0 || length < 0 || offsetFromParent + length > parent.codePointLength) {
+      throw new IndexOutOfBoundsException(
+          "offset " + offsetFromParent + ", count " + length + ", length " + parent.codePointLength);
+    }
+    this.sourceString = null;
+    this.parent = parent;
+    this.root = parent.root();
+    this.depthValue = parent.depthValue + 1;
+    this.sourceKind = SourceKind.subSource;
+    this.offsetFromParentValue = offsetFromParent;
+    this.codePoints = parent.codePoints;
+    this.codePointOffsetInArray = parent.codePointOffsetInArray + offsetFromParent;
+    this.codePointLength = length;
+    this.positionResolver = this.root;
+    this.offsetFromRootValue = parent.offsetFromRootValue + offsetFromParent;
+  }
+
+  private static int depthOf(Source source) {
+    return source instanceof StringSource stringSource ? stringSource.depthValue : source.depth().value();
+  }
+
+  private static int offsetFromRootOf(Source source) {
+    return source instanceof StringSource stringSource
+        ? stringSource.offsetFromRootValue
+        : source.offsetFromRoot().value();
+  }
+
+  /**
+   * Creates a sub-source that is an exact slice of {@code rootSource}'s code points without
+   * materializing the text. Callers must have established that the slice is what the equivalent
+   * copying factory would produce; {@link TokenList#toSource} checks that its children are
+   * contiguous before using this. (perf #276)
+   */
+  public static StringSource createSubSourceView(Source rootSource, int codePointOffset, int length) {
+    Objects.requireNonNull(rootSource, "rootSource must not be null");
+    if (rootSource instanceof StringSource stringSource && stringSource.isRoot()) {
+      return new StringSource(stringSource, codePointOffset, length);
+    }
+    throw new IllegalArgumentException("createSubSourceView requires a root StringSource");
+  }
+
+  /** Whether this source is a slice of {@code candidateRoot}'s own code point array. (perf #276) */
+  boolean sharesCodePointArrayWith(StringSource candidateRoot) {
+    return codePoints == candidateRoot.codePoints;
+  }
+
+  int codePointOffsetInArray() {
+    return codePointOffsetInArray;
   }
 
   /*
@@ -231,17 +312,25 @@ public class StringSource implements Source {
 
   @Override
   public StringLength stringLength() {
-    return new StringLength(sourceString.length());
+    String materialized = sourceString;
+    if (materialized != null) {
+      return new StringLength(materialized.length());
+    }
+    int chars = 0;
+    for (int i = 0; i < codePointLength; i++) {
+      chars += Character.charCount(codePoints[codePointOffsetInArray + i]);
+    }
+    return new StringLength(chars);
   }
 
   @Override
   public CodePointLength codePointLength() {
-    return new CodePointLength(codePoints.length);
+    return new CodePointLength(codePointLength);
   }
 
   @Override
   public boolean isEmpty() {
-    return sourceString.isEmpty();
+    return codePointLength == 0;
   }
 
   @Override
@@ -260,20 +349,20 @@ public class StringSource implements Source {
 
   @Override
   public int hashCode() {
-    return sourceString.hashCode();
+    return sourceAsString().hashCode();
   }
 
   @Override
   public boolean equals(Object obj) {
     if (obj instanceof Source source) {
-      return sourceString.equals(source.sourceAsString());
+      return sourceAsString().equals(source.sourceAsString());
     }
-    return sourceString.equals(obj);
+    return sourceAsString().equals(obj);
   }
 
   @Override
   public String toString() {
-    return sourceString;
+    return sourceAsString();
   }
 
   @Override
@@ -308,7 +397,7 @@ public class StringSource implements Source {
     // a SECOND StringSource at the same offset, doubling the String + int[] copies on every peek
     // (the dominant allocation in deeply nested grammars — #19/#40). The wrap is redundant: the
     // single subSource is byte-for-byte equivalent. (perf #40 follow-up)
-    if (startIndexInclusive.value() + length.value() > codePoints.length) {
+    if (startIndexInclusive.value() + length.value() > codePointLength) {
       return subSource(startIndexInclusive, new CodePointLength(0));
     }
     return subSource(startIndexInclusive, length);
@@ -316,30 +405,28 @@ public class StringSource implements Source {
 
   @Override
   public Source subSource(CodePointIndex startIndexInclusive, CodePointIndex endIndexExclusive) {
-    return new StringSource(this,
-        subString(startIndexInclusive, endIndexExclusive),
-        new CodePointOffset(startIndexInclusive));
+    return new StringSource(this, startIndexInclusive.value(),
+        endIndexExclusive.value() - startIndexInclusive.value());
   }
 
   @Override
-  public Source subSource(CodePointIndex startIndexInclusive, CodePointLength codePointLength) {
-    return new StringSource(this,
-        subString(startIndexInclusive, codePointLength),
-        new CodePointOffset(startIndexInclusive));
+  public Source subSource(CodePointIndex startIndexInclusive, CodePointLength length) {
+    return new StringSource(this, startIndexInclusive.value(), length.value());
   }
 
   @Override
   public int[] subCodePoints(CodePointIndex startIndexInclusive, CodePointIndex endIndexExclusive) {
-    return Arrays.copyOfRange(codePoints, startIndexInclusive.value(), endIndexExclusive.value());
+    return Arrays.copyOfRange(codePoints, codePointOffsetInArray + startIndexInclusive.value(),
+        codePointOffsetInArray + endIndexExclusive.value());
   }
 
   public String subString(CodePointIndex startIndexInclusive, CodePointIndex endIndexExclusive) {
-    return new String(codePoints, startIndexInclusive.value(),
+    return new String(codePoints, codePointOffsetInArray + startIndexInclusive.value(),
         endIndexExclusive.value() - startIndexInclusive.value());
   }
 
   public String subString(CodePointIndex startIndexInclusive, CodePointLength length) {
-    return new String(codePoints, startIndexInclusive.value(), length.value());
+    return new String(codePoints, codePointOffsetInArray + startIndexInclusive.value(), length.value());
   }
 
   @Override
@@ -349,7 +436,13 @@ public class StringSource implements Source {
 
   @Override
   public String sourceAsString() {
-    return sourceString;
+    String materialized = sourceString;
+    if (materialized == null) {
+      // Derived from final fields only, so losing a race just recomputes the same String.
+      materialized = new String(codePoints, codePointOffsetInArray, codePointLength);
+      sourceString = materialized;
+    }
+    return materialized;
   }
 
   @Override
@@ -369,7 +462,7 @@ public class StringSource implements Source {
 
   @Override
   public Depth depth() {
-    return depth;
+    return new Depth(depthValue);
   }
 
   @Override
@@ -379,12 +472,12 @@ public class StringSource implements Source {
     if (parent == null) {
       return CodePointOffset.ZERO;
     }
-    return offsetFromParent;
+    return offsetFromParentValue == 0 ? CodePointOffset.ZERO : new CodePointOffset(offsetFromParentValue);
   }
 
   @Override
   public CodePointOffset offsetFromRoot() {
-    return offsetFromRoot;
+    return offsetFromRootValue == 0 ? CodePointOffset.ZERO : new CodePointOffset(offsetFromRootValue);
   }
 
   @Override
@@ -429,7 +522,7 @@ public class StringSource implements Source {
     CursorRange built = cursorRange;
     if (built == null) {
       built = CursorRange.fromRootOffset(
-          offsetFromRoot, new CodePointLength(codePoints.length), sourceKind, positionResolver);
+          offsetFromRoot(), new CodePointLength(codePointLength), sourceKind, positionResolver);
       cursorRange = built;
     }
     return built;
@@ -444,6 +537,6 @@ public class StringSource implements Source {
    */
   @Override
   public Range sourceRange() {
-    return new Range(0, codePoints.length);
+    return new Range(0, codePointLength);
   }
 }
