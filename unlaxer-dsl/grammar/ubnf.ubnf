@@ -284,11 +284,13 @@ grammar UBNF {
   @mapping(TerminalElement, params=[value])
   TerminalElement ::= STRING @value ;
 
-  // 識別子参照（名前空間付き namespace.RuleName も対応）
+  // 識別子参照（名前空間付き namespace.RuleName も対応。a.b.Value のような
+  // 3段以上の chained dot も受理する。'.' で終わる (IDENTIFIER '.') の対を
+  // 0回以上繰り返すことで、末尾の bare IDENTIFIER だけが name に残る）
   // @backref: ルール参照 → 定義へのジャンプ (Go-to-Definition)
   // @mapping なし透過: toAtomicElement が直接 RuleRefElement に変換
   @backref(name=name)
-  QuantifiedRef ::= [ IDENTIFIER @namespace '.' ] IDENTIFIER @name ;
+  QuantifiedRef ::= { IDENTIFIER '.' } @namespace IDENTIFIER @name ;
 
   // @typeof(captureName) — 要素レベルの型相関アノテーション
   @mapping(TypeofElement, params=[captureName])
