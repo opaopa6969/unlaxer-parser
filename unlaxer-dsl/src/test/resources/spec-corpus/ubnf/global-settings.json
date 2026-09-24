@@ -1,0 +1,143 @@
+{
+  "family": "ubnf",
+  "section": "グローバル設定",
+  "summary": "`@key: value` の形と値の集合。",
+  "cases": [
+    {
+      "id": "setting/package",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "### `@package`",
+        "sentence": "生成コードの Java パッケージを指定します："
+      },
+      "input": "grammar G { @package: org.example.minilang R ::= 'x'; }",
+      "expectation": {
+        "verdict": "accept"
+      }
+    },
+    {
+      "id": "setting/colon-required",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "GlobalSetting::= '@' IDENTIFIER ':' SettingValue"
+      },
+      "input": "grammar G { @package org.example R ::= 'x'; }",
+      "expectation": {
+        "verdict": "reject"
+      }
+    },
+    {
+      "id": "setting/quoted-scalar-rejected",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "SettingValue ::= DottedIdentifier | '{' { IDENTIFIER ':' STRING } '}'"
+      },
+      "input": "grammar G { @package: 'org.example' R ::= 'x'; }",
+      "expectation": {
+        "verdict": "reject"
+      },
+      "note": "SettingValue は DottedIdentifier かブロックのみ。"
+    },
+    {
+      "id": "setting/block-value",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "SettingValue ::= DottedIdentifier | '{' { IDENTIFIER ':' STRING } '}'"
+      },
+      "input": "grammar G { @comment: { line: '//' } R ::= 'x'; }",
+      "expectation": {
+        "verdict": "accept"
+      }
+    },
+    {
+      "id": "setting/whitespace-javastyle",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "### `@whitespace`",
+        "sentence": "`@whitespace: none` は自動空白処理を無効にします。rule の `@whitespace(...)` による 上書きや `@interleave` との優先順位は[両言語の trivia 契約](../../docs/rule-trivia.md)を参照。"
+      },
+      "input": "grammar G { @whitespace: javaStyle R ::= 'x'; }",
+      "expectation": {
+        "verdict": "accept"
+      }
+    },
+    {
+      "id": "setting/whitespace-none",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "### `@whitespace`",
+        "sentence": "`@whitespace: none` は自動空白処理を無効にします。rule の `@whitespace(...)` による 上書きや `@interleave` との優先順位は[両言語の trivia 契約](../../docs/rule-trivia.md)を参照。"
+      },
+      "input": "grammar G { @whitespace: none R ::= 'x'; }",
+      "expectation": {
+        "verdict": "accept"
+      }
+    },
+    {
+      "id": "setting/whitespace-bad-style",
+      "scope": "validate",
+      "citation": {
+        "file": "unlaxer-dsl/specs/validation.md",
+        "heading": "### WHITESPACE エラー",
+        "sentence": "| `E-WHITESPACE-GLOBAL-STYLE` | global style が `javaStyle` / `none` 以外、または block 設定 |"
+      },
+      "input": "grammar G { @whitespace: bogus R ::= 'x'; }",
+      "expectation": {
+        "verdict": "diagnostic",
+        "code": "E-WHITESPACE-GLOBAL-STYLE"
+      }
+    },
+    {
+      "id": "setting/whitespace-duplicate",
+      "scope": "validate",
+      "citation": {
+        "file": "unlaxer-dsl/specs/validation.md",
+        "heading": "### WHITESPACE エラー",
+        "sentence": "| `E-WHITESPACE-GLOBAL-DUPLICATE` | global `@whitespace` が複数ある |"
+      },
+      "input": "grammar G { @whitespace: none @whitespace: javaStyle R ::= 'x'; }",
+      "expectation": {
+        "verdict": "diagnostic",
+        "code": "E-WHITESPACE-GLOBAL-DUPLICATE"
+      }
+    },
+    {
+      "id": "setting/whitespace-block-value",
+      "scope": "validate",
+      "citation": {
+        "file": "unlaxer-dsl/specs/validation.md",
+        "heading": "### WHITESPACE エラー",
+        "sentence": "| `E-WHITESPACE-GLOBAL-STYLE` | global style が `javaStyle` / `none` 以外、または block 設定 |"
+      },
+      "input": "grammar G { @whitespace: { line: 'x' } R ::= 'x'; }",
+      "expectation": {
+        "verdict": "diagnostic",
+        "code": "E-WHITESPACE-GLOBAL-STYLE"
+      },
+      "note": "global style に block 設定を書くのはエラーと表に書かれている。"
+    },
+    {
+      "id": "setting/unknown-key",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "GlobalSetting::= '@' IDENTIFIER ':' SettingValue"
+      },
+      "input": "grammar G { @nosuchsetting: a.b R ::= 'x'; }",
+      "expectation": {
+        "verdict": "accept"
+      },
+      "note": "GlobalSetting は `'@' IDENTIFIER ':' SettingValue` で、キーの集合を制限していない。"
+    }
+  ]
+}

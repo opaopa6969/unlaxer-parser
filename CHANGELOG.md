@@ -33,6 +33,34 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
   Inputs shorter than the window are untouched. Set `-Dunlaxer.memo.evictBelowFrontier=false` to
   restore the previous table. Rust behavior is unchanged.
 
+### Tests
+- The spec-derived UBNF oracle is now a permanent test on both implementations. 129 cases derived
+  from the normative sentences of `unlaxer-dsl/specs/{ubnf-syntax,annotations,validation}.md`
+  (origin: the sibling `ubnfc` repository; see `spec-corpus/ubnf/SOURCE.md`) are committed under
+  `unlaxer-dsl/src/test/resources/spec-corpus/ubnf/` and driven by `UbnfSpecCorpusTest` (Java
+  bootstrap: 126 cases through `UBNFMapper` and `GrammarValidator`, including canonical-AST
+  expectations) and `rust/unlaxer-ubnf/tests/spec_corpus.rs` (Rust frontend: the 108 parse-scope
+  cases) from the same fixture files. Both tests also verify that every cited heading and sentence
+  still exists verbatim in the spec, so editing the spec breaks this repository's tests rather
+  than the sibling's. One documented deviation is pinned with its observed behaviour
+  (`quantifier/huge-bound`: the Java mapper throws `NumberFormatException` before
+  `E-BOUNDED-OVERFLOW` can be reported).
+- `ParseEqualityGoldenTest` turns the round 3-5 one-off equality dumps into a committed golden
+  file. 35 inputs x {shipped, memo-safe grammar} x {DETAILED, DETAILED_ON_FAILURE} x
+  {memo OFF, SAFE_FAILURES} = 280 combinations dump the whole CST (kinds, parsers, source kinds,
+  offsets, ranges, code point and char lengths, child counts, source strings), the memo and
+  transaction counters, and every `ParseFailureDiagnostics` getter. Regenerate with
+  `-Dunlaxer.golden.regenerate=true`.
+- `ParserScalingSmokeTest` pins the "the parser itself is linear" result of cases 32-36 with
+  load-independent counters: transactions, memo hits and entries, and `getThreadAllocatedBytes`
+  must not grow by more than x1.3 per byte between x1, x4 and x16 concatenations, for both a
+  generated parser (with memoization) and the shipped UBNF bootstrap.
+- Non-BMP coverage for the offset conversions: `LSPNonBmpOffsetTest` drives a generated LSP server
+  and pins that code point offsets become UTF-16 offsets before they reach `Position`, and
+  `UbnfNonBmpOffsetTest` pins the bootstrap's line/column reporting across surrogate pairs. The
+  DAP side was already covered by `DAPNonBmpLineMappingTest` and the Rust side by
+  `rust/unlaxer-ubnf/tests/frontend.rs`.
+
 ## [3.0.15] - 2026-09-01
 
 ### Added
