@@ -51,7 +51,11 @@ done
 repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root"
 month=$(date -u +%Y-%m)
-guard=(python3 scripts/central_release_guard.py --month "$month")
+# Monthly limit comes from the queue file (owner decision 2026-09-24: the
+# "one per month" rule is a guideline; the yml carries the actual cap).
+limit=$(sed -nE 's/^[[:space:]]*maxPublishOperationsPerCalendarMonth:[[:space:]]*([0-9]+).*/\1/p' release/central-release-queue.yml | head -1)
+limit=${limit:-1}
+guard=(python3 scripts/central_release_guard.py --month "$month" --max-releases "$limit")
 
 "${guard[@]}"
 
@@ -103,7 +107,7 @@ if curl -fsI "$published_url" >/dev/null; then
 fi
 
 if ! $emergency; then
-  "${guard[@]}" --max-releases 1
+  "${guard[@]}"
 else
   echo "Emergency override: $reason"
 fi
