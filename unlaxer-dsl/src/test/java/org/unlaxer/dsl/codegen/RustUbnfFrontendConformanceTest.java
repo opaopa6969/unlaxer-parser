@@ -62,6 +62,10 @@ public class RustUbnfFrontendConformanceTest {
         positives.add(repo.resolve("unlaxer-dsl/grammar/ubnf.ubnf"));
         positives.add(repo.resolve("unlaxer-dsl/tinycalc-vscode/grammar/tinycalc.ubnf"));
         positives.add(repo.resolve("unlaxer-dsl/src/test/resources/cardinality/Cardinality.ubnf"));
+        // Issue #284: chained dotted RuleRef (a.b.Value) used to be a known Java mapper
+        // defect (UBNFMapper only kept the first two identifiers). Now fixed, so this
+        // fixture is checked for full AST equality like every other positive case.
+        positives.add(crate.resolve("tests/fixtures/known/namespace.ubnf"));
         for (int i = 0; i < 4; i++) positives.add(repo.resolve("unlaxer-dsl/src/test/resources/evolution/" + i + "/Evolution.ubnf"));
         var report = new ArrayList<>(List.of("case\tclassification\tjava\trust"));
         for (Path path : positives) {
@@ -91,7 +95,7 @@ public class RustUbnfFrontendConformanceTest {
             }
         }
         // These are isolated Java frontend defects, not hidden normalizations in the equality check.
-        for (String name : List.of("eval-default", "namespace", "keyword-boundary", "common-field-space")) {
+        for (String name : List.of("eval-default", "keyword-boundary", "common-field-space")) {
             Path path = crate.resolve("tests/fixtures/known/" + name + ".ubnf");
             JsonObject nativeResult = inspect(binary, path);
             assertTrue(nativeResult.toString(), nativeResult.has("ast"));
@@ -105,11 +109,6 @@ public class RustUbnfFrontendConformanceTest {
             if (name.equals("eval-default")) {
                 var annotation = (UBNFAST.EvalAnnotation) java.grammars().get(0).rules().get(0).annotations().get(0);
                 assertEquals("$", annotation.strategy());
-            } else if (name.equals("namespace")) {
-                var body = (UBNFAST.ChoiceBody) java.grammars().get(0).rules().get(0).body();
-                var reference = (UBNFAST.RuleRefElement) body.alternatives().get(0).elements().get(0).element();
-                assertEquals(Optional.of("a"), reference.namespace());
-                assertEquals("b", reference.name());
             }
             report.add(name + "\tknown-difference\t" + canonical(java) + "\t" + nativeResult);
         }

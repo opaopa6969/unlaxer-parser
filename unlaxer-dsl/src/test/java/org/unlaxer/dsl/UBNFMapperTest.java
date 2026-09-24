@@ -251,6 +251,31 @@ public class UBNFMapperTest {
         assertEquals("Expression", ((RuleRefElement) element).name());
     }
 
+    // Issue #284: QuantifiedRef must accept chained dot references (a.b.Value),
+    // splitting only the LAST segment into name and joining everything before it
+    // (with '.') into namespace, for any number of segments.
+    @Test
+    public void testRuleBody_namespacedRuleRef_twoSegments() {
+        UBNFFile file = UBNFMapper.parse("grammar G {\n  Rule ::= a.B ;\n}");
+        ChoiceBody body = (ChoiceBody) file.grammars().get(0).rules().get(0).body();
+        AtomicElement element = body.alternatives().get(0).elements().get(0).element();
+        assertTrue(element instanceof RuleRefElement);
+        RuleRefElement ref = (RuleRefElement) element;
+        assertEquals(java.util.Optional.of("a"), ref.namespace());
+        assertEquals("B", ref.name());
+    }
+
+    @Test
+    public void testRuleBody_namespacedRuleRef_threeSegments_chainedDot() {
+        UBNFFile file = UBNFMapper.parse("grammar G {\n  Rule ::= a.b.Value ;\n}");
+        ChoiceBody body = (ChoiceBody) file.grammars().get(0).rules().get(0).body();
+        AtomicElement element = body.alternatives().get(0).elements().get(0).element();
+        assertTrue(element instanceof RuleRefElement);
+        RuleRefElement ref = (RuleRefElement) element;
+        assertEquals(java.util.Optional.of("a.b"), ref.namespace());
+        assertEquals("Value", ref.name());
+    }
+
     @Test
     public void testRuleBody_terminalElement() {
         UBNFFile file = UBNFMapper.parse("grammar G {\n  Rule ::= 'grammar' ;\n}");

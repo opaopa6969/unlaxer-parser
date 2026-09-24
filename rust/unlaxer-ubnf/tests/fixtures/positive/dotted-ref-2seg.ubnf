@@ -1,0 +1,1 @@
+grammar DottedRef2 { R ::= a.B; }

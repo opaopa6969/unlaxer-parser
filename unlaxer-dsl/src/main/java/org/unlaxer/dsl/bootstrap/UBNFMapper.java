@@ -920,19 +920,13 @@ public class UBNFMapper {
                 : stripQuotes(quotedTokens.get(0).source.toString().trim());
             return new TerminalElement(value);
         }
-        // QuantifiedRef / RuleRefElement: [ namespace '.' ] name
+        // QuantifiedRef / RuleRefElement: { namespaceSegment '.' } name (chained dot, e.g. a.b.Value)
         List<Token> quantifiedTokens = findAtElementLevel(token, UBNFParsers.QuantifiedRefParser.class);
         if (false == quantifiedTokens.isEmpty()) {
             List<Token> refTokens = findDescendants(quantifiedTokens.get(0), UBNFParsers.RuleRefElementParser.class);
             if (false == refTokens.isEmpty()) {
                 List<Token> identifiers = findDescendants(refTokens.get(0), UBNFParsers.IdentifierParser.class);
-                if (identifiers.size() >= 2) {
-                    String namespace = identifiers.get(0).source.toString().trim();
-                    String name = identifiers.get(1).source.toString().trim();
-                    return new RuleRefElement(Optional.of(namespace), name);
-                }
-                String name = identifiers.isEmpty() ? "" : identifiers.get(0).source.toString().trim();
-                return new RuleRefElement(name);
+                return buildRuleRef(identifiers);
             }
         }
         // AtomicElementParser 直下の IdentifierParser が RuleRef になることもある（フォールバック）
@@ -941,6 +935,26 @@ public class UBNFMapper {
             return new RuleRefElement(identifiers.get(0).source.toString().trim());
         }
         return new RuleRefElement("?");
+    }
+
+    /**
+     * 収集済みの IDENTIFIER トークン列から RuleRefElement を組み立てる。
+     * chained dot（{@code a.b.Value}）に対応するため、最後のトークンを name、
+     * それより前のすべてのトークンを '.' 結合したものを namespace とする
+     * （Issue #284: 段数を1個に決め打ちしていたバグの修正）。
+     */
+    private static RuleRefElement buildRuleRef(List<Token> identifiers) {
+        if (identifiers.size() >= 2) {
+            String name = identifiers.get(identifiers.size() - 1).source.toString().trim();
+            StringBuilder namespace = new StringBuilder();
+            for (int i = 0; i < identifiers.size() - 1; i++) {
+                if (i > 0) namespace.append('.');
+                namespace.append(identifiers.get(i).source.toString().trim());
+            }
+            return new RuleRefElement(Optional.of(namespace.toString()), name);
+        }
+        String name = identifiers.isEmpty() ? "" : identifiers.get(0).source.toString().trim();
+        return new RuleRefElement(name);
     }
 
     /**
@@ -953,19 +967,13 @@ public class UBNFMapper {
      * '%' sep → SeparatedElement
      */
     static AtomicElement toQuantifiedRef(Token token) {
-        // ベース: RuleRefElement (namespace + name)
+        // ベース: RuleRefElement (namespace + name)。namespace は最後のセグメントより前の
+        // すべてのセグメントを '.' 結合したもの（chained dot, 例: a.b.Value → namespace=a.b, name=Value）。
         List<Token> refTokens = findDescendants(token, UBNFParsers.RuleRefElementParser.class);
         RuleRefElement base;
         if (false == refTokens.isEmpty()) {
             List<Token> identifiers = findDescendants(refTokens.get(0), UBNFParsers.IdentifierParser.class);
-            if (identifiers.size() >= 2) {
-                String namespace = identifiers.get(0).source.toString().trim();
-                String name = identifiers.get(1).source.toString().trim();
-                base = new RuleRefElement(Optional.of(namespace), name);
-            } else {
-                String name = identifiers.isEmpty() ? "" : identifiers.get(0).source.toString().trim();
-                base = new RuleRefElement(name);
-            }
+            base = buildRuleRef(identifiers);
         } else {
             base = new RuleRefElement("?");
         }

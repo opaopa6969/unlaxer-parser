@@ -192,6 +192,32 @@ public class SelfHostingRoundTripTest {
         }
     }
 
+    /**
+     * Issue #284: the QuantifiedRef production generated from ubnf.ubnf used to admit
+     * only a single optional dot ({@code [ IDENTIFIER '.' ] IDENTIFIER}), so a generated
+     * frontend rejected chained dotted references (a.b.Value) even though the hand-written
+     * UBNFParsers accepted them. Verify the generated parser now accepts any number of
+     * dotted segments and preserves each identifier boundary.
+     */
+    @Test
+    public void testGeneratedFrontendAcceptsChainedDottedReference() throws Exception {
+        Parser root = (Parser) generatedParsersClass.getMethod("getRootParser").invoke(null);
+        record Case(String source, String joinedIdentifiers) {}
+        for (Case testCase : List.of(
+                new Case("grammar TwoSeg { R ::= a.B; }", "a.B"),
+                new Case("grammar ThreeSeg { R ::= a.b.Value; }", "a.b.Value"),
+                new Case("grammar FourSeg { R ::= a.b.c.Value; }", "a.b.c.Value"))) {
+            try (var context = new ParseContext(StringSource.createRootSource(testCase.source()))) {
+                Parsed parsed = root.parse(context);
+                assertTrue(testCase.source() + " should parse", parsed.isSucceeded());
+                assertTrue(testCase.source() + " should be fully consumed", context.allConsumed());
+                var names = new java.util.ArrayList<String>();
+                collectReferenceTexts(parsed.getRootToken(false), names);
+                assertEquals(testCase.source(), List.of(testCase.joinedIdentifiers()), names);
+            }
+        }
+    }
+
     private static void collectReferenceTexts(org.unlaxer.Token token, List<String> names) {
         if (token.parser.getClass().getSimpleName().equals("QuantifiedRefParser")) {
             // The enclosing source-preserving CST may include trailing comments;
