@@ -119,6 +119,31 @@ public final class FirstSet implements Serializable {
     return nonAscii;
   }
 
+  /**
+   * Structural equality over every field. The fixed point in {@link FirstSets} must compare the
+   * stored start set itself: {@link #mayStartWith(int)} answers {@code true} for everything once a
+   * set is nullable, which would hide a start set that is still growing underneath it (a nullable
+   * repetition still contributes its body's start set to the chain that contains it).
+   */
+  @Override
+  public boolean equals(Object other) {
+    if (this == other) {
+      return true;
+    }
+    if (false == (other instanceof FirstSet)) {
+      return false;
+    }
+    FirstSet that = (FirstSet) other;
+    return asciiLow == that.asciiLow && asciiHigh == that.asciiHigh && nonAscii == that.nonAscii
+        && nullable == that.nullable && unknown == that.unknown;
+  }
+
+  @Override
+  public int hashCode() {
+    return Long.hashCode(asciiLow) * 31 + Long.hashCode(asciiHigh) * 7
+        + (nonAscii ? 1 : 0) + (nullable ? 2 : 0) + (unknown ? 4 : 0);
+  }
+
   @Override
   public String toString() {
     if (unknown) {

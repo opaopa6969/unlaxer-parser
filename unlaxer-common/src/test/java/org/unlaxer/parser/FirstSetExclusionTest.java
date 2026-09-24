@@ -218,6 +218,41 @@ public class FirstSetExclusionTest {
     assertTrue(FirstSet.EPSILON.mayStartWith(-1));
   }
 
+  static final class Annotation extends LazyChoice {
+    private static final long serialVersionUID = 1L;
+
+    @Override
+    public Parsers getLazyParsers() {
+      return new Parsers(new WordParser("@root"), new WordParser("@eval"));
+    }
+  }
+
+  /**
+   * Regression: a nullable repetition is analysed before its body in the first round, so it starts
+   * out as "nullable, no start set". Once nullable, mayStartWith answers true for everything, and a
+   * convergence test built on it stopped the fixed point before '@' reached the chain (UBNF RuleDecl).
+   */
+  @Test
+  public void aNullableRepetitionKeepsGrowingItsStartSetUntilTheFixedPoint() {
+    LazyChain ruleDecl = new LazyChain() {
+      private static final long serialVersionUID = 1L;
+
+      @Override
+      public Parsers getLazyParsers() {
+        return new Parsers(new ZeroOrMore(new Annotation()), new WordParser("name"));
+      }
+    };
+    FirstSet first = FirstSets.of(ruleDecl);
+    assertTrue(first.mayStartWith('@'));
+    assertTrue(first.mayStartWith('n'));
+    assertFalse(first.mayStartWith('x'));
+    for (String input : new String[] {"@rootname", "@eval@rootname", "name", "@name", "x"}) {
+      assertEquals(input,
+          parse(ruleDecl, input, Diagnostics.DETAILED, Memoization.SAFE_FAILURES),
+          parse(ruleDecl, input, Diagnostics.DETAILED_ON_FAILURE, Memoization.SAFE_FAILURES));
+    }
+  }
+
   /** A recursive grammar makes the parser graph cyclic; the analysis has to reach a fixed point. */
   static final class Expression extends LazyChoice implements SafeFailureMemoizable {
     private static final long serialVersionUID = 1L;

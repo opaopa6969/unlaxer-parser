@@ -185,7 +185,7 @@ public final class FirstSets {
         case CHAIN -> chain(nodes);
         case OCCURS -> occurs(nodes);
       };
-      if (computed.equals(value) || sameAnswer(computed, value)) {
+      if (computed.equals(value)) {
         return false;
       }
       value = computed;
@@ -233,25 +233,6 @@ public final class FirstSets {
       }
       return occursNullable || bodyNullable ? result.asNullable() : result;
     }
-  }
-
-  /**
-   * Two sets answer the same questions when they agree on every code point and on nullability, so
-   * the fixed point can stop even though the objects differ.
-   */
-  private static boolean sameAnswer(FirstSet computed, FirstSet current) {
-    if (computed.isUnknown() || current.isUnknown()) {
-      return computed.isUnknown() && current.isUnknown();
-    }
-    if (computed.isNullable() != current.isNullable()) {
-      return false;
-    }
-    for (int codePoint = 0; codePoint < 128; codePoint++) {
-      if (computed.mayStartWith(codePoint) != current.mayStartWith(codePoint)) {
-        return false;
-      }
-    }
-    return computed.mayStartWith(0x10000) == current.mayStartWith(0x10000);
   }
 
   /** The body first, then the terminator: a repetition can also end by matching its terminator. */
