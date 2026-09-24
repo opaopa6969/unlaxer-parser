@@ -2475,3 +2475,291 @@ Java の ×1.4〜1.6 のような超線形は観測されていない）。値�
   transaction の `begin` はその隙間が無い唯一の点だった。
 - **索引ノードを別に作らない。** 位置ごとの連結リストは entry 自身のフィールド 3 本で足りる。
   「evict のために索引を足したら割当が増えた」では本末転倒になる。
+
+---
+
+## ケース36: CST そのものを小さくする — view・共有空リスト・値オブジェクトの非ボックス化・位置索引の配列化（Java、#276 round 5）
+
+### 出発点
+
+ケース32〜35 で機構は確定している。**超線形 = GC 回数（∝ 1 parse の割当）× 1 回のコスト（∝ live 集合）**で、
+GC pause を引いた µs/byte はどの build でも ×0.96〜×1.09、つまり**パーサ本体は線形**。
+round 4 で memo 表の live を入力長から切り離した結果、`complex-x64` の parse 直後に残る live 37.9 MB は
+**ほぼ全部が CST 本体**（`Token` 81,676 / `StringSource` 81,229 / `TokenList` 164,044）になった。
+（round 4 の数は `jcmd GC.class_histogram`、つまり JVM 全体の live である。本ケースの数は「root token から
+到達できるものだけ」なのでわずかに小さい: `Token` 80,892 / `StringSource` 80,893 / `TokenList` 161,784。）
+round 5 は、その CST を数えてから削る。
+
+### まず CST を数える（reflection で「root token から到達できるもの」だけを歩く）
+
+`jcmd GC.class_histogram` は JVM 全体の live を返すので、CST の内訳には使えない。
+root token から参照グラフを歩き（文法 = `org.unlaxer.parser.*` は共有なので境界にする）、
+クラスごとに個数と shallow size（12 byte header、compressed oops）を積む計測を書いた。`complex-x64`（20,923 code point）:
+
+| クラス | 個数 | live | 何のためか |
+|---|---:|---:|---|
+| `StringSource` | 80,893 | 4,530,008 | token 1 個につき 1 個 |
+| `Token` | 80,892 | 4,529,952 | |
+| `java.util.ArrayList` | 161,785 | 3,882,840 | token 1 個につき 2 本（original / filtered） |
+| `[I` | 53,537 | 3,072,568 | **source ごとの code point 配列のコピー** |
+| `TokenList` | 161,784 | 2,588,544 | 上の 2 本の wrapper |
+| `[Ljava.lang.Object;` | 73,675 | 2,206,616 | 空でない ArrayList の裏 |
+| `java.util.HashMap$Node` | 62,771 | 2,008,672 | **root の位置索引**（3 表 × code point 数） |
+| `CodePointOffset` | 124,952 | 1,999,232 | source ごとの offsetFromParent / offsetFromRoot |
+| `java.lang.String` | 81,092 | 1,946,208 | **source ごとの文字列のコピー** |
+| `Range` | 80,892 | 1,941,408 | `Token.tokenRange`（deprecated） |
+| `[B` | 53,805 | 1,681,344 | 上の String の中身 |
+| `java.util.Optional` | 90,459 | 1,447,344 | `Token.tokenString`（deprecated）と `Token.parent` |
+| `Depth` | 80,893 | 1,294,288 | source ごとの深さ |
+| `[Ljava.util.HashMap$Node;` | 4 | 393,344 | 位置索引の表 |
+| `CodePointIndex` / `CodePointIndexInLine` / `StringIndex` | 21,823 / 20,924 / 20,923 | 1,018,720 | 位置索引の key / value |
+| **合計** | **1,256,693** | **34,714,800** | **429 byte / token** |
+
+重複はここで 4 つ見つかる。
+
+1. **すべての sub-source が自分の `String` と `int[]` を持つ。** 木に生き残った 53,537 本の配列が
+   **515,595 code point** を抱えている。入力は 20,923 code point なので **24.6 倍**である。
+   `TokenList.toSource` が commit のたびに子の文字列を `StringBuilder` で連結し、
+   `createSubSource` がそれを decode し直すのが原因。
+2. **葉 token の子リスト 2 本が両方とも空のまま。** 葉 44,056 個 × 2 = **88,112 本の空 `ArrayList`**。
+3. **source ごとに深さと 2 つの offset を box している**（3 オブジェクト / source）。
+4. **root の `PositionResolverImpl` が code point 1 個につき HashMap entry 3 個と box 3 個を作る。**
+   入力長に比例する live が CST とは別に 3.4 MB ある。
+
+### 理論下限との比較
+
+同じ木を「1 本の共有 code point 配列 + N 個の node（開始・終了・種別・parser・親・子リスト）」で持つとどうなるか:
+
+- 共有 `int[]`: 20,923 × 4 + 16 = **83,708 byte**
+- node 80,892 個 × (header 12 + start 4 + end 4 + kind 4 + parser 4 + parent 4 + children 4 → 40) = **3,235,680 byte**
+- 子配列 36,836 個（葉でない node）× (16 + 4 × 平均 3.4) ≈ **1,178,752 byte**
+- 合計 **約 4.50 MB**
+
+実測 34.71 MB は下限の **7.7 倍**だった。`rust/unlaxer-runtime` の `Tree` はまさにこの形
+（`source: String` 1 本 + `nodes: Vec<Node>` の arena、`Node.span: Span { start, end }`、`text(span)` は `&str` の slice）なので、
+下限の見積もりは机上の値ではなく**もう一方の実装が実際に取っている形**である。
+
+### 施策（クラスが重ならないので live の帰属は一意に決まる）
+
+**施策A: sub-source を root の code point 配列への view にする。**
+`StringSource` に `codePointOffsetInArray` / `codePointLength` を持たせ、`subSource` / `peek` は
+親の配列をそのまま共有する。`sourceString` は `sourceAsString()` が初めて呼ばれたときに作る
+（final フィールドだけから導出するので競合しても同じ String を作り直すだけ）。
+`TokenList.toSource` は**子が root の連続 slice かどうかを構造的に確かめてから** view を作り、
+そうでなければ従来の連結経路に落ちる（trivia の扱いや書き換えられた source で連続でなくなり得るため）。
+実測では `complex-x64` の 53,536 本すべてが連続 slice だった。
+`subSource(start, end)` の範囲外は、従来 `new String` が即座に投げていたので、view の生成時に同じ位置で投げる。
+
+**施策B: 空の子リストは 1 つの不変リストを共有する。** `TokenList` の裏を `List.of()` にし、
+最初の書き込みで `ArrayList` に差し替える。読み取り 20 メソッドは不変リストでも同じ結果を返す。
+`set(int,…)` / `remove(int)` / `addAll(int,…)` は空の `ArrayList` なら `IndexOutOfBoundsException` を投げるので
+その振る舞いを明示的に維持し、`listIterator()` / `subList()` は可変 view を返す契約なので先に差し替える。
+
+**施策C: `Depth` / `CodePointOffset` を int フィールドにする。** アクセサは今までどおり値オブジェクトを返すが、
+**聞いた人だけが 1 個払う**。`StringSource` は 56 → 64 byte になるが（施策Aの int 2 本ぶん）、
+source ごとに 3 オブジェクト消える。
+
+**施策D: 位置索引を `int[]` にする。** `PositionResolverImpl` の 3 つの `HashMap` を
+`int[]`（欠損は -1）に置き換える。返り値は必要になったときだけ box する。
+
+### live の内訳（`complex-x64`、施策ごとにクラスが重ならないので差分がそのまま帰属になる）
+
+| 施策 | 消えた / 増えたもの | live 差 |
+|---|---|---:|
+| A: view | `[I` 53,537本 → 1本 (−2,988,856)、`String` 81,092 → 53,735 (−656,568)、`StringSource` +8 byte/個 (+647,144) | **−2,998,280** |
+| B: 空リスト共有 | `ArrayList` 161,785 → 73,673 | **−2,114,704** |
+| C: int フィールド | `CodePointOffset` 124,952 → 0、`Depth` 80,893 → 0 | **−3,293,520** |
+| D: 位置索引の配列化 | `HashMap$Node` 62,771 → 0、`Node[]`、`CodePointIndex`/`InLine`/`StringIndex` → 索引 `int[]` 3 本 (+251,144) | **−3,155,152** |
+| **合計** | | **−11,561,656（−33.3%）** |
+
+| fixture | base live / 個数 | cand live / 個数 | 差 |
+|---|---:|---:|---:|
+| `complex` (326 B) | 627,296 / 22,009 | 445,720 / 13,949 | −28.9% / −36.6% |
+| `complex-x16` (5,179 B) | 8,711,928 / 315,077 | 5,839,040 / 190,383 | −33.0% / −39.6% |
+| `complex-x64` (20,923 B) | 34,714,800 / 1,256,693 | **23,153,144 / 756,303** | **−33.3% / −39.8%** |
+
+`complex-x64` は下限 4.50 MB の 7.7 倍 → **5.1 倍**になった。
+
+### 採らなかったもの: `Token` の deprecated フィールド
+
+round 1 で挙がっていた `Token.tokenString`（`Optional<String>`）と `Token.tokenRange`（`Range`）は
+**public final フィールド**なので、遅延化するには型か可視性を変えるしかない。残っている live のうち
+
+- `Range` 1,941,408 + `[B` 1,681,344 + `String` 1,289,640 + `Optional` の `tokenString` ぶん ≈ **5.6 MB（残り 23.2 MB の 24%）**
+
+がこの 2 つに縛られている。とくに `tokenString` は **view にした source の `String` を毎 token 実体化させる**ので、
+施策Aが `[I` を消せても `[B` / `String` は消せない。これは 3.x の公開 API の削除になるため本 PR には入れない
+（受け入れ条件の「観測可能な振る舞いを変えない」に反する）。**4.x の候補として数値ごと記録する。**
+
+`originalChildren` と `filteredChildren` の内容が一致する token が 36,836 個中 **29,919 個**あり、
+リストを共有すれば更に約 2.1 MB 減る。ただし `filteredChildren` は public で可変
+（`anchorCollectedEmptySource` が `clear()` / `addAll()` する）なので、共有すると一方の変更が他方に見える。
+copy-on-write を被せる案はあるが、**「観測可能な振る舞いを変えない」を保証する費用が利得に見合わない**ので採らない。
+
+### 等価性（受け入れ条件）
+
+`root` parser を 16 fixture × {`DETAILED`, `DETAILED_ON_FAILURE`} × {memo `OFF`, `SAFE_FAILURES`} と
+不正入力 19 件 × 同じ 4 通り、**計 132 通り**走らせ、次を 1 つのテキストに落として base / cand で比較した:
+
+- 受理した fixture の **CST 全体**（token ごとに tokenKind / parser / sourceKind / offsetFromRoot / offsetFromParent /
+  depth / code point 長 / char 長 / `tokenRange` / `tokenString` / `cursorRange().toRange()` / **source の文字列そのもの** /
+  子の数）
+- memo カウンタ（failure hit / success hit / 最大 entry 数 / evict 数 / under-run / dead-on-arrival / 最大 look-back）
+- 失敗時の `ParseFailureDiagnostics` 全 getter（`ExpectedHintCandidate` は `toString()` が無く identity hash しか出ないので、
+  フィールドを展開して比較する）
+
+**109,940 行が byte 一致（md5 `cf4d3ea9…` で一致）。** memo hit 数も 132 通りすべてで一致している。
+
+### スケーリング（`legacy-bench.sh root-deferred`、`SAFE_FAILURES`、`-Xss512m -Xms2g -Xmx2g`、`taskset -c 24` → Serial GC）
+
+ホストは他エージェントと共有で load average 8〜30（x64 のラウンドで 1 run が 466 ms から 2,013 ms まで振れる）。
+そこで **fixture ごとに base / cand を交互に 4 ラウンド（各 3 run）= 各 12 run** 取り、**最小値**を主の指標にする。
+割当（`getThreadAllocatedBytes`）と GC 比率（GC ログの pause 合計 / プロセス wall）は負荷に依らない。
+
+| fixture | base 最小 | cand 最小 | Δ | base 割当 | cand 割当 | Δ割当 | base GC 比率 | cand GC 比率 | base µs/byte | cand µs/byte |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `complex` (326 B) | 6.673 ms | **5.794 ms** | **-13.2%** | 13.46 MB | 11.16 MB | **-17.1%** | 0.77% | 0.61% | 20.53 | 17.83 |
+| `complex-x4` (1,293 B) | 23.667 ms | **21.505 ms** | **-9.1%** | 51.63 MB | 43.25 MB | **-16.2%** | 2.25% | 1.66% | 18.30 | 16.63 |
+| `complex-x16` (5,179 B) | 119.377 ms | **97.077 ms** | **-18.7%** | 201.93 MB | 168.43 MB | **-16.6%** | 7.97% | 5.35% | 23.05 | 18.74 |
+| `complex-x64` (20,923 B) | 550.735 ms | **466.352 ms** | **-15.3%** | 792.94 MB | 659.03 MB | **-16.9%** | 19.84% | **13.96%** | 26.32 | **22.29** |
+
+- **絶対値は全サイズで改善**（最小値 -9〜-19%）、**割当は全サイズで -16〜-17%**、
+  **x64 の GC 比率 19.84% → 13.96%**（GC pause 合計 203.8 s → 136.7 s、-32.9%）。
+- **µs/byte 倍率（`complex` → `complex-x64`）: ×1.282 → ×1.250。受け入れ条件の ×1.2 は未達。**
+- **GC pause を引いた µs/byte 倍率は base ×1.036 / cand ×1.082** — ケース32〜35 と同じく**パーサ本体は線形**。
+  倍率が 1.25 までしか下がらないのは、round 3 と同じ理由である:
+  **施策は割当（-17%）と live（-33%）の両方を削ったので、GC がほとんど無い `complex`（GC 比率 0.61%）でも
+  CPU ぶんだけ速くなる**。分母が小さくなれば比は下がらない。
+### 割当の施策ごとの寄与（`complex-x64`、warmup 20 / 5 parse、cold。割当は負荷に依らない）
+
+live と違って割当はクラスで切り分けられないので、**候補から施策を 1 つずつ戻した build** を作って測った。
+
+| build | 割当 / parse | 完全候補との差 |
+|---|---:|---:|
+| base（施策なし） | 810,462,752 | +151,424,328 |
+| **候補（4 施策）** | **659,038,424** | — |
+| 候補 − A（view をやめる） | 682,561,736 | +23,523,312 |
+| 候補 − B（空リスト共有をやめる） | 721,248,728 | +62,210,304 |
+| 候補 − C（値オブジェクトに戻す） | 724,151,408 | +65,112,984 |
+| 候補 − D（位置索引を HashMap に戻す） | 680,161,064 | +21,122,640 |
+
+限界寄与の和（172.0 MB）が全体差（151.4 MB）より大きいのは、`− C` の build が
+**int フィールドを残したまま値オブジェクトを足した**ため `StringSource` が 64 → 80 byte になり、
+約 16 MB ぶん過大に出るからである（施策Cの真の寄与は約 49 MB）。
+**割当を最も削るのは B と C**、**live を最も削るのは C と D**で、同じ施策でも効く因子が違う。
+### 参考条件（採否の根拠ではない。collector が制約かどうかを切り分けるため）
+
+| 条件 | `complex` 最小 | `complex-x64` 最小 | x64 の GC 比率 | µs/byte 倍率 |
+|---|---:|---:|---:|---:|
+| base、Serial、2 GB（この issue の条件） | 6.673 ms | 550.735 ms | 19.84% | **×1.282** |
+| **候補、Serial、2 GB** | **5.794 ms** | **466.352 ms** | **13.96%** | **×1.250** |
+| base、Serial、**16 GB** | 6.727 ms | 477.570 ms | 4.19% | **×1.106** |
+| **候補、Serial、16 GB** | 6.128 ms | **412.930 ms** | **2.83%** | **×1.050** |
+| base、**ParallelGC**、2 GB | 5.946 ms | 806.275 ms | 14.23% | ×2.113 |
+| 候補、**ParallelGC**、2 GB | 5.496 ms | 854.886 ms | 11.27% | ×2.424 |
+
+- **ヒープを 16 GB にすると候補は ×1.05、base でも ×1.106** で、どちらも受け入れ条件を満たす。
+  x64 の GC 比率が 2.83% まで落ちるからで、**×1.25 の残りは collector そのものである**。
+- **`taskset -c 24`（1 CPU 固定）で ParallelGC を選ぶと逆に遅くなる**（x64 で 806 / 855 ms）。
+  GC スレッドが 1 コアを奪い合うためで、**1 CPU に固定したまま collector だけ替えるのは無意味**。
+  この issue の計測条件（1 CPU 固定 → Serial GC が選ばれる）は「live 集合 × GC 回数」を最大化する条件である。
+### #276 の受け入れ条件（×1.2）について: **未達。そして、この条件のままでは今後も達成できない**
+
+| round | `complex` µs/byte | `complex-x64` µs/byte | 倍率 | x64 の GC 比率 | GC を引いた倍率 |
+|---|---:|---:|---:|---:|---:|
+| round 3 cand | 18.96 | 27.18 | ×1.434 | 27.90% | ×1.04 |
+| round 4 cand | 18.40 | 23.82 | ×1.295 | 20.71% | ×1.036 |
+| **round 5 base（= round 4 cand）** | 20.53 | 26.32 | ×1.282 | 19.84% | ×1.036 |
+| **round 5 cand** | **17.83** | **22.29** | **×1.250** | **13.96%** | ×1.082 |
+
+（round 5 の絶対値が round 4 より大きいのは、同じ 2 GB / Serial / 1 CPU の条件でホストの load average が高かったため。
+倍率と GC 比率は base / cand を交互に取った同一セッションの値なので比較できる。）
+
+5 round で確定したことは次のとおりである。
+
+1. **パーサ本体（rule 評価・memo・診断・Token 構築）は入力長に対して線形である。**
+   GC pause を引いた µs/byte 倍率は round 2 以降どの build でも ×1.03〜×1.09（今回の候補は ×1.082）。
+2. **残る超線形は collector である。** 2 GB 固定ヒープでは「GC 回数（∝ 1 parse の割当）×
+   1 回のコスト（∝ live 集合）」の積が O(N²) を生む。round 2 は第 1 因子を −27%、round 4 は第 2 因子（memo）を −39%、
+   round 5 は第 2 因子（CST）を −33% と第 1 因子を −17% 削った。
+3. **これ以上 live を削るには公開 API を壊すしかない。** 残り 23.15 MB のうち
+   **約 5.6 MB（24%）は `Token.tokenString` / `Token.tokenRange`**（deprecated な public final フィールド）で、
+   残りは `Token` + `StringSource` + 子リスト 2 本という**構文木そのもの**である。理論下限 4.50 MB に対して 5.1 倍まで来た。
+   parse が入力長ぶんの木を作って**返す**以上、live が O(N) なのは API の要求であって実装の無駄ではない。
+4. **施策が両因子を削ると、倍率はかえって下がりにくい。** GC がほぼ無い小入力（`complex` は GC 比率 0.61%）も
+   CPU ぶん速くなるので、分母が一緒に下がる。round 3 で観測したのと同じ現象である。
+
+したがって **「既定 2 GB ヒープ・1 CPU 固定（= Serial GC）で ×1.2」は、パーサの実装ではなく実行条件が決めている**。
+同じ binary が 16 GB では **×1.05**（base ですら ×1.106）である。#276 はここで **decision として close** し、
+残りは「大きい入力のための実行条件」（下の付録）と、**構造的な代替である ubnfc 生成器**へ引き継ぐ。
+
+### Java / Rust の対称性
+
+**`rust/unlaxer-runtime` の CST は、この PR が Java を近づけた形をもともと取っている。**
+
+- `Tree { source: String, nodes: Vec<Node>, root: usize, byte_offsets: Vec<usize>, scopes }`、
+  `Node { rule: usize, span: Span { start, end }, children: Vec<usize>, captures: Vec<Capture> }`。
+  `Tree::text(span)` は所有している 1 本の `String` への `&str` slice なので、
+  **施策Aと施策Cは Rust では設計上すでに成立している**（node は span の 2 つの整数しか持たず、部分文字列を所有しない）。
+- `Vec::new()` は確保しないので、**施策Bに相当する無駄が無い**（葉の `children` は空 `Vec` で 0 byte の heap）。
+- 位置索引は `byte_offsets: Vec<usize>` で、**施策Dと同じ配列表現**である。さらに `code_point_offsets` は
+  ASCII のとき空のまま（Java 側も BMP なら恒等写像だが、今回は素直に `int[]` を 3 本持つ形にした）。
+
+よって round 5 は **Rust 側に対応する変更を必要としない**（機能差ではなく、Java 側が Rust の表現に追いついた回である）。
+入力長に比例して増え続ける `FailureMemoBuckets` は別問題で、#290 に切ってある。
+
+### 検証
+
+- `unlaxer-common` 699 件 / `unlaxer-dsl` 1,012 件（skip 23）緑。
+- isolated maven repo で tinyexpression `c70416e1` を候補 jar で再ビルドし、全テスト **769 件（skip 10）緑**。
+- 132 通りの等価性ダンプが byte 一致（上記）。
+- 計測条件: `ubnfc/examples/p4-java/scripts/legacy-bench.sh`、`Memoization.SAFE_FAILURES`、
+  `-Xss512m -Xms2g -Xmx2g`、`taskset -c 24`（1 CPU → Serial GC）、jar-first classpath、
+  build ごとの isolated maven repo、fixture ごとに base/cand を交互に 4 ラウンド（各 3 run）。
+  ホストは共有で load average 8〜30（x64 のラウンドで 1 run が 466 ms から 2,013 ms まで振れた）。
+
+### 教材としての要点
+
+- **「live を減らす」は「割当を減らす」とは別の作業で、別の数え方が要る。** `jcmd GC.class_histogram` は
+  JVM 全体しか返さないので、**root から参照グラフを歩いてクラスごとに積む 100 行の計測**を先に書いた。
+  そこで初めて「入力 20,923 code point に対して木が 515,595 code point を抱えている」が見えた。
+- **理論下限を先に計算する。** 「node 1 個 = 開始・終了・種別・親・子」で 4.5 MB、実測 34.7 MB、つまり 7.7 倍。
+  この比を出しておくと、施策を 4 つ足して 5.1 倍まで来たところで「次は何が縛っているか」（= deprecated な public フィールド）が
+  数字で言える。
+- **同じ問題を解いた別実装があるなら、それが下限の実在証明になる。** Rust 側の `Tree` は
+  span の arena + 1 本のソースで、Java 側の 4 施策はどれも「Rust ではすでにそうなっている」ことの後追いだった。
+  対称性の節は「両方に入れたか」の確認だけでなく、**設計の目標値をどこから取るか**にも使える。
+- **view にするときに危ないのは「連続でない連結」。** `TokenList.toSource` は子の文字列を連結するので、
+  trivia を挟めば root の連続 slice にならない可能性がある。**連続かどうかを構造的に確かめて、
+  駄目なら従来経路に落ちる**ようにすれば、正しさは文法に依存しなくなる（実測では 100% 連続だった）。
+- **不変な空コンテナの共有は、可変メソッドの数だけ落とし穴がある。** 空の `ArrayList` と `List.of()` は
+  読み取りでは同じでも、`set` / `remove(int)` / `addAll(int,…)` の例外型と `listIterator()` / `subList()` の
+  可変性が違う。**「読み取りは共有、書き込みで差し替え」だけでは足りず、例外の同値まで見る**。
+
+---
+
+## 付録: 大きい入力を Java で parse するときの実行条件（#276 の decision）
+
+ケース32〜36 で確定したとおり、**パーサ本体は入力長に対して線形**で、大きい入力で観測される超線形は
+**固定ヒープの collector**が生む。1 parse は入力長に比例した構文木を作って返すので live 集合は O(入力長) であり、
+これは API の要求である。したがって数 KB を超える入力では、次を実行条件として明示することを勧める。
+
+| 設定 | 何をするか | 効果（`complex-x64` = 20,923 byte、tinyexpression P4 文法） |
+|---|---|---|
+| **ヒープを増やす**（`-Xmx16g` など） | live 集合の数倍〜十数倍を young 世代に取らせる | GC 比率 13.96% → **2.83%**、µs/byte 倍率 ×1.250 → **×1.050**、x64 は 466 → 413 ms |
+| **JVM を 1 CPU に固定しない** | `taskset -c N` / cgroup で 1 CPU にすると JVM は Serial GC を選ぶ | 1 CPU のまま collector だけ替えても逆効果（ParallelGC は x64 で 855 ms）。**コアを与えてから** collector を選ぶ |
+| `ParseOptions.Diagnostics.DETAILED_ON_FAILURE` | 成功経路で失敗診断を作らない・持たない（ケース34） | `complex` 8.1 → 6.3 ms、x64 665 → 569 ms |
+| `Memoization.SAFE_FAILURES` | 安全な rule に限定した失敗/成功 memo（ケース31） | 深い入れ子式で桁違い |
+| `-Dunlaxer.memo.window`（既定 1,024） | memo 表の保持を文法の backtrack 距離で切る（ケース35） | x64 の memo entry 102,054 → 8,424 |
+
+**逆に、既定の 2 GB ヒープ・1 CPU 固定のまま「入力を 64 倍にしても µs/byte が 1.2 倍以内」を要求するのは、
+パーサではなく collector に対する要求になる。** 受け入れ条件を書くときは collector とヒープを条件に含めること。
+
+### 構造的な代替: ubnfc 生成器
+
+同じ文法・同じ入力を [ubnfc](https://github.com/opaopa6969/ubnfc) の Rust backend で走らせると、
+AST 生成まで込みで `complex` 0.54 µs/byte / `complex-x64` 0.78 µs/byte である
+（ubnfc `docs/reports/2026-09-23-p4-rust-diag-two-mode.md`）。Java 側の候補が 17.8 / 22.3 µs/byte なので
+**1 byte あたり約 30 倍安く、GC が無いので「live 集合 × GC 回数」の積も生じない**。
+unlaxer 自身の Rust runtime（tinyexpression-rs）でも同じ比較で µs/byte 倍率は ×0.94〜×1.17 で平坦だった（ケース32 / 35）。
+**Java 実装で下限に近づける作業はここで一区切りとし、桁で速くする必要があるなら生成器側へ行く**、というのが #276 の結論である。
