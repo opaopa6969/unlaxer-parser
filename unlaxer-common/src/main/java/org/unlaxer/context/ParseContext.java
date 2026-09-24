@@ -3,6 +3,7 @@ package org.unlaxer.context;
 import java.io.Closeable;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Collection;
 import java.util.Deque;
@@ -402,81 +403,167 @@ public class ParseContext implements
    * failure instead of one hash insertion per hint per open frame.
    */
   static final class ExpectedSources {
-    private final List<Parser> parsers = new ArrayList<>();
-    private final List<Boolean> terminal = new ArrayList<>();
-    /*
-     * The de-duplication indexes only matter while sources are being added. A parse opens one
-     * diagnostic frame per memoizable rule invocation and keeps every memoized one alive for the
-     * whole session, so the two identity maps are built on the first add, kept small, and dropped
-     * again by releaseIndexes() once a frame is only going to be read. A later add rebuilds them
-     * from the recorded lists, so releasing them is never observable.
+    private static final Parser[] NO_PARSERS = new Parser[0];
+    private static final boolean[] NO_KINDS = new boolean[0];
+    /**
+     * Below this many entries an identity scan of the entry array beats any index: the entries
+     * are contiguous references, so a frame that only ever records a handful of parsers — most
+     * of them — never allocates an index at all.
      */
-    private Set<Parser> failedSeen;
-    private Set<Parser> terminalSeen;
+    private static final int INDEX_THRESHOLD = 16;
+
+    /** Entries in first-seen order, without duplicates of the same (parser, kind) pair. */
+    private Parser[] parsers = NO_PARSERS;
+    private boolean[] terminal = NO_KINDS;
+    private int size;
+    /*
+     * Open-addressed identity index over (parser, kind); a slot holds an entry index plus one,
+     * 0 meaning empty. It replaces the two IdentityHashMap-backed sets this class used to keep:
+     * those were 13% of a parse's allocation at complex-x64 (an IdentityHashMap holds key and
+     * value in adjacent slots and resizes as the frontier's parser set grows), and one open
+     * int[] at load factor 1/2 does the same job. The index only matters while entries are being
+     * added, so releaseIndexes() still drops it when a frame becomes read-only. (perf #276)
+     */
+    private int[] index;
 
     int size() {
-      return parsers.size();
+      return size;
     }
 
-    Parser parserAt(int index) {
-      return parsers.get(index);
+    Parser parserAt(int entryIndex) {
+      return parsers[entryIndex];
     }
 
-    boolean isTerminalAt(int index) {
-      return terminal.get(index);
+    boolean isTerminalAt(int entryIndex) {
+      return terminal[entryIndex];
     }
 
     void clear() {
-      parsers.clear();
-      terminal.clear();
-      releaseIndexes();
+      size = 0;
+      index = null;
     }
 
-    /** Drops the de-dup indexes of sources that are only going to be read from here on. */
+    /** Drops the de-dup index of sources that are only going to be read from here on. */
     void releaseIndexes() {
-      failedSeen = null;
-      terminalSeen = null;
-    }
-
-    private Set<Parser> seen(boolean terminalKind) {
-      Set<Parser> index = terminalKind ? terminalSeen : failedSeen;
-      if (index == null) {
-        index = Collections.newSetFromMap(new IdentityHashMap<>(8));
-        for (int i = 0, n = parsers.size(); i < n; i++) {
-          if (terminal.get(i) == terminalKind) index.add(parsers.get(i));
-        }
-        if (terminalKind) terminalSeen = index;
-        else failedSeen = index;
-      }
-      return index;
+      index = null;
     }
 
     /** Records that {@code parser} failed at the frontier; its hint candidates are expanded later. */
     void addFailed(Parser parser) {
-      if (seen(false).add(parser)) {
-        parsers.add(parser);
-        terminal.add(Boolean.FALSE);
-      }
+      add(parser, false);
     }
 
     /** Records the innermost open TerminalSymbol at a frontier failure. */
     void addTerminal(Parser parser) {
-      if (seen(true).add(parser)) {
-        parsers.add(parser);
-        terminal.add(Boolean.TRUE);
-      }
+      add(parser, true);
     }
 
     void addAll(ExpectedSources other) {
-      for (int i = 0, n = other.parsers.size(); i < n; i++) {
-        if (other.terminal.get(i)) addTerminal(other.parsers.get(i));
-        else addFailed(other.parsers.get(i));
+      int count = other.size;
+      if (count == 0) {
+        return;
+      }
+      if (size == 0) {
+        /*
+         * The dominant merge is into a frame whose own frontier was just cleared because the
+         * child reached further. There is nothing to de-duplicate against and the child is
+         * already duplicate-free, so the entries are copied wholesale and no index is built.
+         */
+        ensureEntryCapacity(count);
+        System.arraycopy(other.parsers, 0, parsers, 0, count);
+        System.arraycopy(other.terminal, 0, terminal, 0, count);
+        size = count;
+        index = null;
+        return;
+      }
+      // One growth and at most one index build for the whole merge instead of one per entry.
+      reserve(size + count);
+      for (int i = 0; i < count; i++) {
+        add(other.parsers[i], other.terminal[i]);
       }
     }
 
     void copyFrom(ExpectedSources other) {
       clear();
       addAll(other);
+    }
+
+    private void add(Parser parser, boolean terminalKind) {
+      if (contains(parser, terminalKind)) {
+        return;
+      }
+      ensureEntryCapacity(size + 1);
+      parsers[size] = parser;
+      terminal[size] = terminalKind;
+      size++;
+      if (index != null) {
+        if ((size + 1) * 2 > index.length) buildIndex();
+        else insert(size);
+      } else if (size >= INDEX_THRESHOLD) {
+        buildIndex();
+      }
+    }
+
+    private boolean contains(Parser parser, boolean terminalKind) {
+      int[] table = index;
+      if (table == null) {
+        for (int i = 0; i < size; i++) {
+          if (parsers[i] == parser && terminal[i] == terminalKind) return true;
+        }
+        return false;
+      }
+      int mask = table.length - 1;
+      for (int slot = slotOf(parser, terminalKind, mask); ; slot = (slot + 1) & mask) {
+        int entry = table[slot];
+        if (entry == 0) return false;
+        if (parsers[entry - 1] == parser && terminal[entry - 1] == terminalKind) return true;
+      }
+    }
+
+    private void ensureEntryCapacity(int needed) {
+      if (needed <= parsers.length) {
+        return;
+      }
+      int capacity = Math.max(4, parsers.length);
+      while (capacity < needed) capacity <<= 1;
+      parsers = Arrays.copyOf(parsers, capacity);
+      terminal = Arrays.copyOf(terminal, capacity);
+    }
+
+    /** Sizes the entry arrays and, if it will be needed, the index for {@code needed} entries. */
+    private void reserve(int needed) {
+      ensureEntryCapacity(needed);
+      if (needed >= INDEX_THRESHOLD && (index == null || (needed + 1) * 2 > index.length)) {
+        buildIndex(needed);
+      }
+    }
+
+    private void buildIndex() {
+      buildIndex(size);
+    }
+
+    private void buildIndex(int expectedSize) {
+      int capacity = 4;
+      while (capacity < (expectedSize + 1) * 2) capacity <<= 1;
+      index = new int[capacity];
+      for (int entry = 1; entry <= size; entry++) {
+        insert(entry);
+      }
+    }
+
+    /** Places an existing entry in the index; the caller guarantees a free slot exists. */
+    private void insert(int entry) {
+      int[] table = index;
+      int mask = table.length - 1;
+      int slot = slotOf(parsers[entry - 1], terminal[entry - 1], mask);
+      while (table[slot] != 0) slot = (slot + 1) & mask;
+      table[slot] = entry;
+    }
+
+    private static int slotOf(Parser parser, boolean terminalKind, int mask) {
+      int hash = System.identityHashCode(parser) * 0x9E3779B9;
+      if (terminalKind) hash ^= 0x7ED55D16;
+      return (hash ^ (hash >>> 16)) & mask;
     }
   }
 

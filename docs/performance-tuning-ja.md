@@ -1793,3 +1793,217 @@ GC 回数は割当と同じ -14% だが、**pause 合計は -41%** 落ちた。�
 - 共有機で load average が 9〜49 に振れる状況では、**時間の中央値だけでは採否を決められない**。
   A/B を fixture ごとに交互実行し、中央値と最小値の両方、および `ThreadMXBean` の割当（負荷に依らない）を並べる。
   今回も採否の根拠は割当 -12%（4 サイズで一致）と GC pause -41% で、時間はそれを支持する位置にある。
+
+
+## ケース33: 「割当 × live 集合」の両方を削る — 位置オブジェクトと診断の索引（Java、#276 round 2。割当 -27%）
+
+### 出発点
+
+ケース32 で、複合実装（Java）の超線形は **GC** だと分かった。1 parse の割当が入力長 N に比例し、
+同時に live 集合（構築中の CST と packrat memo 表）も N に比例するので、
+「GC 回数 × 1 回のコスト」の積が O(N²) になる。PR #281 は「必ず確保されるのに大半が空の入れ物」を潰して
+割当 -12% を得たが、`complex → complex-x64` の µs/byte 倍率は ×1.60 で、受け入れ条件の ×1.2 には届かなかった。
+
+round 2 では**積の 2 因子を両方**攻めた。すなわち、(a) 1 parse の割当量そのもの、(b) parse 中ずっと到達可能な live 集合。
+
+### まず live 集合の中身を数える
+
+`complex-x64` を解析中の JVM に `jcmd <pid> GC.class_histogram` を撃つ（既定で full GC を伴うので **live だけ**が出る）。
+parse の進行に応じて 60〜171 MB の間で動き、終盤が最大になる。最大サンプル（163 MB、`FillerElement` は Serial GC の詰め物）:
+
+| クラス | 個数 | live | 比率 |
+|---|---:|---:|---:|
+| `[Ljdk.internal.vm.FillerElement;` | 28 | 26.51 MB | 16.3% |
+| `[Ljava.lang.Object;` | 340029 | 25.08 MB | 15.4% |
+| `org.unlaxer.context.ParseContext$StackSnapshot` | 516194 | 19.69 MB | 12.1% |
+| `java.util.ArrayList` | 563854 | 12.91 MB | 7.9% |
+| `org.unlaxer.Token` | 142879 | 7.63 MB | 4.7% |
+| `org.unlaxer.StringSource` | 134378 | 7.18 MB | 4.4% |
+| `java.util.HashMap$Node` | 195420 | 5.96 MB | 3.7% |
+| `org.unlaxer.CodePointIndex` | 314241 | 4.79 MB | 2.9% |
+| `[I` | 90458 | 4.76 MB | 2.9% |
+| `org.unlaxer.TokenList` | 292946 | 4.47 MB | 2.7% |
+| `org.unlaxer.EndExclusiveCursorImpl` | 136565 | 4.17 MB | 2.6% |
+| `org.unlaxer.StartInclusiveCursorImpl` | 136519 | 4.17 MB | 2.6% |
+| （以下 `FailureDiagnostic` 67,192 / `String` 145,213 / `Range` 142,880 / `CodePointOffset` 208,168 / `CursorRange` 136,519 / `PackratMemoTable$Entry` 67,180 / `PositionKey` 67,180 / `Optional` 163,252 / `ExpectedSources` 67,193 / `Depth` 134,378） | | 約 36 MB | 22% |
+
+**live 集合のおよそ半分が診断の payload** だった。`StackSnapshot` 516,194 ノード（12.1%）、
+`ArrayList` 563,854 個 + その `Object[]`（合計 23%）、`FailureDiagnostic` 67,192、`ExpectedSources` 67,193。
+これらは memo 表に入った失敗診断（x64 で約 9 万件）が parse 終了まで抱えている。
+`CursorRange` 136,519 + 2 種の cursor 273,084 + `CodePointIndex` 314,241（合計 7.4%）は
+**Token 1 個につき 1 組**で、これは後述のとおり「捨てられる値」だった。
+
+### 次に割当元を数える（JFR、比率は候補発見のみ）
+
+x64 の `ObjectAllocationSample` を型と割当元で集計すると、上位は次のとおり（master #281 時点）。
+
+| 割当元 | 比率 |
+|---|---:|
+| `Object[]` 合計 | **31.2%** |
+| ├ `IdentityHashMap.resize` / `init` ← `ExpectedSources.addFailed` / `addTerminal` | **12.8%** |
+| ├ `ArrayList.grow` ← `ArrayList.add` | 13.2% |
+| └ その他 | 5.2% |
+| `ArrayList`（`TokenList.<init>` ほか） | 10.0% |
+| `EndExclusiveCursorImpl`（`StringSource.<init>` 経由を含む） | 6.0% |
+| `StackSnapshot` | 5.6% |
+| `StringSource` | 5.0% |
+| `TokenList` / `Token` | 9.0% |
+
+[[jfr-allocation-attribution-caveat]] のとおり比率は候補発見にだけ使い、採否は
+`ThreadMXBean` の 1 parse あたり割当 byte と時間の前後差で決めた。
+
+### 施策1: `cursorRange` を遅延化し、Token の range は直接作る
+
+`StringSource` は構築時に必ず `CursorRange`（+ `StartInclusiveCursorImpl` + `EndExclusiveCursorImpl` +
+`CodePointIndex` ×2 + `CodePointOffset`）を作っていた。1 parse で sub-source は x64 で 123 万個作られるが、
+その大半は「一致しなかった peek」で、cursor range を一度も読まれない。
+
+素直に遅延化するだけでは効かない。`Token` のコンストラクタが
+`token.cursorRange().toRange()` を**毎 Token 呼ぶ**ので、結局 88 万個ぶん作られるからである。
+ここで cursor の `position()` は **その source 内の位置**（`position - offsetFromRoot`）であり、
+`StringSource` はどの種類（root / detached / subSource）でも cursor を `offsetFromRoot` に置いて
+cursor 自身の `offsetFromRoot` も同じ値にしている。つまり **`cursorRange().toRange()` は常に `[0, codePointLength)`** である。
+そこで `Source.sourceRange()` を default メソッドとして足し（既定実装は `cursorRange().toRange()` のまま）、
+`StringSource` では `new Range(0, codePoints.length)` を直接返す。`Token` はこちらを使う。
+
+等価性は推論だけで済ませず、`sourceRange()` の中で `cursorRange().toRange()` と突き合わせて
+食い違ったら例外を投げる一時ビルドで確認した。`unlaxer-common` 694 + `unlaxer-dsl` 1,009 の全テストと、
+`complex` / `complex-x64` の実 parse（Token 88 万個）で **不一致 0 件**。
+
+**割当 -13.5%**（complex 23.08 → 20.01 MB、x64 1,403.7 → 1,213.2 MB）。
+
+### 施策2: 期待集合の重複除去を `IdentityHashMap` からオープンアドレス索引へ
+
+`ParseContext.ExpectedSources` は「失敗の先端で期待された parser」を初出順・重複なしで持つ。
+PR #281 で索引を遅延生成＋memo 格納時に破棄するようにしたが、それでも
+**`IdentityHashMap` の table が割当の 12.8%** を占めていた。`IdentityHashMap` は key と value を隣接スロットに置くので
+1 エントリ 2 スロットを使い、既定容量から先端 parser 集合が育つたびに resize する。
+
+`List<Parser>` + `List<Boolean>` + `Set<Parser>` ×2 を、次の 3 つに置き換えた。
+
+- `Parser[] parsers` + `boolean[] terminal`（初出順、容量 4 から倍々）
+- `int[] index`: `(parser, kind)` に対するオープンアドレス索引。スロットには**エントリ番号 + 1** を入れる
+  （0 が空）。負荷率 1/2。**16 エントリ未満の frame は索引を作らない**（連続した参照の線形走査のほうが速い）
+- `addAll` の 2 つの近道: 移し先が空なら（`mergeFrame` で「子のほうが先へ進んだ」分岐が毎回 `clear()` してから
+  呼ぶので、これが支配的）**重複除去なしで `System.arraycopy`**。空でなければ最終サイズを先に確保して、
+  1 回の伸長・1 回の索引構築で済ませる
+
+Rust 版（[[ケース23]]）が `expected: Vec<u32>`（interned id）+ 線形 `contains` で済ませているのと同じ形である。
+
+**割当 さらに -14.1%**（complex 20.01 → 16.70 MB、x64 1,213.2 → 1,014.1 MB）。
+2 つ合わせて **-27%**（4 サイズで一致）。
+
+### 観測（A/B）
+
+条件: `ubnfc/examples/p4-java/scripts/legacy-bench.sh root`（= JMH `parseFreshToken(memoized)` と同じ経路）、
+`Memoization.SAFE_FAILURES` / `Diagnostics` は既定の `DETAILED`、`-Xss512m -Xms2g -Xmx2g`、`taskset -c 24`（1 CPU → Serial GC）、
+jar-first classpath、tinyexpression `c70416e1` を isolated maven repo で再ビルド。
+base（master `b3cbc6c` = #281 込み）と candidate を **fixture ごとに交互**に実行し、中央値と最小値の両方を出す。
+共有機のため load average は 5〜22 で動いた。割当は `ThreadMXBean` の 1 parse あたり byte（負荷に依らない）。
+
+**全セッション（fixture ごとに交互実行、load 5〜22）**
+| fixture | run 数 base/cand | base 中央値 | cand 中央値 | Δ | base 最小 | cand 最小 | Δ | base 割当 | cand 割当 | **Δ割当** |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `complex` | 10/7 | 12.64 ms | 10.81 ms | -14.5% | 12.28 ms | 9.95 ms | -18.9% | 22.96 MB | 16.68 MB | **-27.4%** |
+| `complex-x4` | 10/7 | 55.59 ms | 44.59 ms | -19.8% | 48.44 ms | 42.21 ms | -12.9% | 88.87 MB | 64.55 MB | **-27.4%** |
+| `complex-x16` | 10/7 | 234.21 ms | 202.71 ms | -13.5% | 225.20 ms | 170.26 ms | -24.4% | 351.29 MB | 253.27 MB | **-27.9%** |
+| `complex-x64` | 15/12 | 1394.05 ms | 1091.55 ms | -21.7% | 1276.26 ms | 989.86 ms | -22.4% | 1402.09 MB | 1022.49 MB | **-27.1%** |
+
+| fixture | byte | base µs/byte 中央 | cand µs/byte 中央 | base µs/byte 最小 | cand µs/byte 最小 |
+|---|---:|---:|---:|---:|---:|
+| `complex` | 332 | 38.07 | 32.56 | 36.99 | 29.98 |
+| `complex-x4` | 1293 | 42.99 | 34.48 | 37.47 | 32.65 |
+| `complex-x16` | 5179 | 45.22 | 39.14 | 43.48 | 32.88 |
+| `complex-x64` | 20923 | 66.63 | 52.17 | 61.00 | 47.31 |
+- base: `complex` → `complex-x64` の µs/byte 倍率 中央値 **x1.75** / 最小 **x1.65**
+- cand: `complex` → `complex-x64` の µs/byte 倍率 中央値 **x1.60** / 最小 **x1.58**
+
+**x64 だけの静穏セッション（他の負荷を止め、GC ログ付きで runs=3 を 2 セッション）**
+| fixture | run 数 base/cand | base 中央値 | cand 中央値 | Δ | base 最小 | cand 最小 | Δ | base 割当 | cand 割当 | **Δ割当** |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `complex-x64` | 6/6 | 1311.39 ms | 1059.08 ms | -19.2% | 1276.26 ms | 989.86 ms | -22.4% | 1402.90 MB | 1022.49 MB | **-27.1%** |
+
+| fixture | byte | base µs/byte 中央 | cand µs/byte 中央 | base µs/byte 最小 | cand µs/byte 最小 |
+|---|---:|---:|---:|---:|---:|
+| `complex-x64` | 20923 | 62.68 | 50.62 | 61.00 | 47.31 |
+
+**GC ログ（`-Xlog:gc`、1 セッション・runs=1、プロセス全体の pause 合計 / wall）で分解する。**
+
+| fixture | byte | base µs/byte | base GC 比率 | **base GC を引いた µs/byte** | cand µs/byte | cand GC 比率 | **cand GC を引いた µs/byte** |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `complex` | 332 | 38.07 | 1.05% | **37.67** | 32.56 | 0.90% | **32.27** |
+| `complex-x4` | 1293 | 42.99 | 3.78% | **41.36** | 34.48 | 3.08% | **33.42** |
+| `complex-x16` | 5179 | 45.22 | 14.99% | **38.44** | 39.14 | 11.73% | **34.55** |
+| `complex-x64` | 20923 | 66.63 | 38.38% | **41.06** | 52.17 | 34.39% | **34.23** |
+
+**GC pause を引いた µs/byte の倍率（`complex` → `complex-x64`）は base ×1.09 / cand ×1.06。**
+
+### GC 設定は「対照」であって「修正」ではない
+
+同じ candidate を x64 で JVM 設定だけ変えて測った（採否の根拠にはしない。
+どこまでがパーサの費用で、どこからが collector の挙動かを読者が切り分けられるようにするため）。
+
+| x64 の条件 | 中央値 | µs/byte | GC 回数 | pause 合計 | GC 比率 |
+|---|---:|---:|---:|---:|---:|
+| base、Serial、2 GB（issue の条件） | 1,311.39 ms | 62.68 | 643 | 126.9 s | 39.00% |
+| **cand、Serial、2 GB** | **1,059.08 ms** | **50.62** | 497 | 97.0 s | 34.34% |
+| cand、**ParallelGC**、2 GB | 915.99 ms | 43.78 | 358 | 53.1 s | 31.26% |
+| cand、Serial、**16 GB** | 795.68 ms | 38.03 | 45 | 11.3 s | 6.91% |
+| base、Serial、16 GB | 907.81 ms | 43.39 | 57 | 16.8 s | 9.89% |
+
+`taskset -c 24` で 1 CPU に固定すると JVM は Serial GC を選ぶ。**同じ binary のまま collector を替えるだけで -13.5%、
+ヒープを 2 GB → 16 GB にするだけで -24.9%** 動く。つまり issue の計測条件そのものが
+「live 集合 × GC 回数」を最大化する設定である。実運用の比較では
+`-XX:ActiveProcessorCount` か明示的な GC 指定を条件に書いたほうがよい（ケース32 の 5 番と同じ指摘）。
+
+### 到達点と残り
+
+- **割当は 4 サイズすべてで -27%**（`ThreadMXBean`、負荷に依らない）。GC 回数 -22%、pause 合計 -23%、
+  x64 の GC 比率 39.0% → 34.3%。時間は中央値 -13〜-22%。
+- **受け入れ条件の ×1.2 には届いていない。** `complex` → `complex-x64` の µs/byte 倍率は
+  **×1.75 → ×1.60**（中央値、2 GB / Serial）。
+- ただし**分解すると、パーサ本体は既に線形**である。GC pause を引いた µs/byte の倍率は
+  **base ×1.09 / cand ×1.06**。ヒープを 16 GB にした対照でも候補は **38.03 µs/byte**（`complex` の 32.56 に対して **×1.17**）で、
+  **GC が制約でない条件なら目標を満たす**。
+- 残る ×1.6 は全部 collector である。機構はケース32 のとおり「GC 回数（∝ 割当）× 1 回のコスト（∝ live 集合）」で、
+  今回削ったのは**割当（第 1 因子）だけ**。live 集合は診断 payload が約半分を占めたまま減っていないので、
+  積は線形にしか改善しない。**×1.2 を既定経路で満たすには第 2 因子（live 集合）を削る必要がある** = 診断の 2 モード化（#263）。
+
+### 次の一歩（測った上での順序）
+
+施策後の x64 割当プロファイルで残っている上位は次のとおり。
+
+| 割当元 | 比率 | 備考 |
+|---|---:|---|
+| `ArrayList` + その `Object[]`（`TokenList.<init>` 経由が最大） | 約 20% | Token 1 個につき `originalChildren` / `filteredChildren` の 2 本。葉 token では両方とも空のまま |
+| `int[]` / `Parser[]`（`ExpectedSources` の索引と入れ物） | 約 12% | 先端 parser 集合が大きい frame が残る |
+| `StringSource` + `CodePointOffset` + `Depth` | 約 11% | sub-source を root の view にする案（#276 の 1 番）。ただし `int[] codePoints` の再生成は割当の 1.4% しかなく、見積もりより小さい |
+| `StackSnapshot` | 6.7% | memo 済み診断が抱える分。`rebaseMemoStack` の `concat` が 4.1% |
+| `EndExclusiveCursorImpl` + `ParserCursor` | 10% | `TransactionElement.createNew`（rule 評価ごと） |
+
+**最大の残りは `TokenList` の裏の `ArrayList`** で、葉 token の空リストを遅延化すれば約 6% 減る見込みだが、
+`TokenList` は `List<Token>` を実装した可変クラスで変更メソッドが 15 以上あり、1 つでも取りこぼすと
+実行時に `UnsupportedOperationException` になる。**1 PR 1 施策**の原則に従い、本 PR には入れず記録に留める。
+
+本質的な残りは **診断そのもの**である。`Diagnostics.DETAILED` は成功経路でも失敗診断を作り続けるので、
+memo された診断が parse 終了まで live に乗る（live 集合の約半分）。`DETAILED_ON_FAILURE` は
+`discardMemoDiagnosticFrame` / `replayFailureDiagnostic` を丸ごと早期 return するので、この分がまるごと消える。
+2 モード化は #263 の担当で、本 issue の受け入れ条件（既定経路の µs/byte）を満たす唯一の残り手段でもある。
+
+### 教材としての要点
+
+- **「live 集合が原因かも」と思ったら、まず `jcmd GC.class_histogram` を parse 中に撃つ。** 既定で full GC を伴うので
+  live だけが出る。x64 では 163 MB のうち診断 payload が約半分で、CST 本体（Token + StringSource + TokenList）は 12% しかなかった。
+  **どこを削れば GC が軽くなるかは、割当プロファイルではなく live のヒストグラムが答える。**
+- **「常に同じ値になる派生値」は作らないで済む。** `cursorRange().toRange()` が全ての `StringSource` で
+  `[0, length)` だと分かった時点で、Token ごとの `CursorRange` + cursor 2 個 + index 2 個が不要になった。
+  こういう等価性は**推論で済ませず、両方を計算して突き合わせる一時ビルド**で確かめる（今回は全テスト + 実 parse で不一致 0）。
+- **`IdentityHashMap` を「小さな集合」に使うのは高い。** key と value で 2 スロット、既定容量から resize、
+  `Collections.newSetFromMap` の包みも 1 個。**数十個までの identity 集合なら、オープンアドレスの `int[]` 索引か、
+  そもそも配列の線形走査のほうが速くて小さい。** Rust 版が `Vec<u32>` + `contains` で済ませていたのは正しかった。
+- **「移し先が空なら重複除去は要らない」** — 集合の合流は、片方が空なら `arraycopy` である。
+  合流が支配的な処理では、この 1 分岐が索引構築を丸ごと消す。
+- 割当を -27% にしても **µs/byte の倍率は ×1.75 → ×1.60 にしかならない**。
+  GC 回数は割当に比例して減るが、**1 回のコストを決める live 集合は減っていない**からである。
+  積の片方だけを削ると効果は線形にしか効かない。ケース32 の式（GC 回数 × live 集合）は、
+  どちらを削っているのかを常に確認するために使う。
