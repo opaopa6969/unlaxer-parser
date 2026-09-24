@@ -4,7 +4,7 @@ canonicalRepository: opaopa6969/unlaxer-parser
 
 policy:
   timezone: UTC
-  maxPublishOperationsPerCalendarMonth: 3  # guideline (owner 2026-09-24): "one per month" is a target, 2-3 publishes per month are acceptable
+  maxPublishOperationsPerCalendarMonth: 99  # owner 2026-09-24: publish count is not a constraint; readiness (tests, changelog, CI) is
   centralSnapshotsAllowed: false
   emergencyRequiresReason: true
 
