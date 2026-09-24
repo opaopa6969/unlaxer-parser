@@ -1,0 +1,157 @@
+{
+  "family": "ubnf",
+  "section": "CHAR_RANGE('min','max')",
+  "summary": "CHAR_RANGE の境界に関する規範文（唯一、明示的に拒否条件を列挙している箇所）。",
+  "cases": [
+    {
+      "id": "char-range/valid",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "#### `CHAR_RANGE('min','max')` — 文字の範囲",
+        "sentence": "現在の境界型は Java `char`。各境界はエスケープ展開後に1個の非surrogate BMP文字で、 `min <= max` でなければならない。空文字・複数文字・surrogate・補助文字（例 `😀`）・ 逆順の範囲は `IllegalArgumentException` で明示的に拒否し、先頭文字へ切り捨てない。"
+      },
+      "input": "grammar G { token L=CHAR_RANGE('a','z') R ::= L; }",
+      "expectation": {
+        "verdict": "accept"
+      }
+    },
+    {
+      "id": "char-range/equal-bounds",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "#### `CHAR_RANGE('min','max')` — 文字の範囲",
+        "sentence": "境界は両端を含む。補助文字の範囲指定は、この `char` API とは別の将来対応である。"
+      },
+      "input": "grammar G { token L=CHAR_RANGE('a','a') R ::= L; }",
+      "expectation": {
+        "verdict": "accept"
+      },
+      "note": "両端を含むので min == max は空でない範囲。"
+    },
+    {
+      "id": "char-range/empty-min",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "#### `CHAR_RANGE('min','max')` — 文字の範囲",
+        "sentence": "現在の境界型は Java `char`。各境界はエスケープ展開後に1個の非surrogate BMP文字で、 `min <= max` でなければならない。空文字・複数文字・surrogate・補助文字（例 `😀`）・ 逆順の範囲は `IllegalArgumentException` で明示的に拒否し、先頭文字へ切り捨てない。"
+      },
+      "input": "grammar G { token L=CHAR_RANGE('','a') R ::= L; }",
+      "expectation": {
+        "verdict": "reject"
+      },
+      "note": "空文字は明示的に拒否と書かれている。"
+    },
+    {
+      "id": "char-range/empty-max",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "#### `CHAR_RANGE('min','max')` — 文字の範囲",
+        "sentence": "現在の境界型は Java `char`。各境界はエスケープ展開後に1個の非surrogate BMP文字で、 `min <= max` でなければならない。空文字・複数文字・surrogate・補助文字（例 `😀`）・ 逆順の範囲は `IllegalArgumentException` で明示的に拒否し、先頭文字へ切り捨てない。"
+      },
+      "input": "grammar G { token L=CHAR_RANGE('a','') R ::= L; }",
+      "expectation": {
+        "verdict": "reject"
+      }
+    },
+    {
+      "id": "char-range/multi-char-min",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "#### `CHAR_RANGE('min','max')` — 文字の範囲",
+        "sentence": "現在の境界型は Java `char`。各境界はエスケープ展開後に1個の非surrogate BMP文字で、 `min <= max` でなければならない。空文字・複数文字・surrogate・補助文字（例 `😀`）・ 逆順の範囲は `IllegalArgumentException` で明示的に拒否し、先頭文字へ切り捨てない。"
+      },
+      "input": "grammar G { token L=CHAR_RANGE('ab','z') R ::= L; }",
+      "expectation": {
+        "verdict": "reject"
+      },
+      "note": "「先頭文字へ切り捨てない」と明記されている。"
+    },
+    {
+      "id": "char-range/multi-char-max",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "#### `CHAR_RANGE('min','max')` — 文字の範囲",
+        "sentence": "現在の境界型は Java `char`。各境界はエスケープ展開後に1個の非surrogate BMP文字で、 `min <= max` でなければならない。空文字・複数文字・surrogate・補助文字（例 `😀`）・ 逆順の範囲は `IllegalArgumentException` で明示的に拒否し、先頭文字へ切り捨てない。"
+      },
+      "input": "grammar G { token L=CHAR_RANGE('a','yz') R ::= L; }",
+      "expectation": {
+        "verdict": "reject"
+      }
+    },
+    {
+      "id": "char-range/supplementary",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "#### `CHAR_RANGE('min','max')` — 文字の範囲",
+        "sentence": "現在の境界型は Java `char`。各境界はエスケープ展開後に1個の非surrogate BMP文字で、 `min <= max` でなければならない。空文字・複数文字・surrogate・補助文字（例 `😀`）・ 逆順の範囲は `IllegalArgumentException` で明示的に拒否し、先頭文字へ切り捨てない。"
+      },
+      "input": "grammar G { token L=CHAR_RANGE('😀','😇') R ::= L; }",
+      "expectation": {
+        "verdict": "reject"
+      },
+      "note": "補助文字は明示的に拒否と書かれている。"
+    },
+    {
+      "id": "char-range/reversed",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "#### `CHAR_RANGE('min','max')` — 文字の範囲",
+        "sentence": "現在の境界型は Java `char`。各境界はエスケープ展開後に1個の非surrogate BMP文字で、 `min <= max` でなければならない。空文字・複数文字・surrogate・補助文字（例 `😀`）・ 逆順の範囲は `IllegalArgumentException` で明示的に拒否し、先頭文字へ切り捨てない。"
+      },
+      "input": "grammar G { token L=CHAR_RANGE('z','a') R ::= L; }",
+      "expectation": {
+        "verdict": "reject"
+      }
+    },
+    {
+      "id": "char-range/escaped-bounds",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "#### `CHAR_RANGE('min','max')` — 文字の範囲",
+        "sentence": "現在の境界型は Java `char`。各境界はエスケープ展開後に1個の非surrogate BMP文字で、 `min <= max` でなければならない。空文字・複数文字・surrogate・補助文字（例 `😀`）・ 逆順の範囲は `IllegalArgumentException` で明示的に拒否し、先頭文字へ切り捨てない。"
+      },
+      "input": "grammar G { token L=CHAR_RANGE('\\t','\\n') R ::= L; }",
+      "expectation": {
+        "verdict": "accept"
+      },
+      "note": "エスケープ展開後に 1 文字ずつ、0x09 <= 0x0A なので正当。"
+    },
+    {
+      "id": "char-range/escaped-bounds-reversed",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "#### `CHAR_RANGE('min','max')` — 文字の範囲",
+        "sentence": "現在の境界型は Java `char`。各境界はエスケープ展開後に1個の非surrogate BMP文字で、 `min <= max` でなければならない。空文字・複数文字・surrogate・補助文字（例 `😀`）・ 逆順の範囲は `IllegalArgumentException` で明示的に拒否し、先頭文字へ切り捨てない。"
+      },
+      "input": "grammar G { token L=CHAR_RANGE('\\n','\\t') R ::= L; }",
+      "expectation": {
+        "verdict": "reject"
+      },
+      "note": "展開後は 0x0A > 0x09 で逆順。"
+    },
+    {
+      "id": "char-range/inclusive-bounds",
+      "scope": "runtime",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "#### `CHAR_RANGE('min','max')` — 文字の範囲",
+        "sentence": "両端を含む判定は生成されたパーサーの実行時契約であり、UBNF を読む処理系 （構文解析・バリデーション）自体の入出力からは観測できない（`scope: runtime`）。"
+      },
+      "input": "grammar G { token D=CHAR_RANGE('0','9') @root R ::= D; }",
+      "expectation": {
+        "verdict": "undetermined",
+        "question": "unlaxer-parser #279 で仕様書は「観測できない（scope: runtime）」と明記した。ただしこれは runtime scope の性質そのものであり、この corpus 形式が4実装の構文木・診断の比較でしか判定できない以上、accept/reject/diagnostic のいずれにも決められない。他の runtime scope ケースと同じ扱いとして undetermined のまま残す。"
+      }
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "family": "ubnf",
+  "section": "予約語",
+  "summary": "予約語一覧から導ける問い。",
+  "cases": [
+    {
+      "id": "reserved/rule-named-token",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 予約語",
+        "sentence": "これらは表に挙げた特定の構文的な位置（例: `token` 宣言の直後、`TokenValue` の 関数名位置、`ErrorElement` の `ERROR(...)` 位置）でのみ特別な意味を持つ。 それ以外の位置では通常の `IDENTIFIER` として扱われ、ルール名・トークン名として 再利用できる（例: `token ::= 'x';`、`ERROR ::= 'x'; R ::= ERROR;`、 `token ANY=EMPTY R ::= ANY;` はいずれも構文・バリデーションの両方で受理する）。"
+      },
+      "input": "grammar G { token ::= 'x'; }",
+      "expectation": {
+        "verdict": "accept"
+      },
+      "note": "unlaxer-parser #279 の決定: 予約語は表に挙げた特定の構文位置でのみ特別。それ以外ではルール名・トークン名として再利用できる。"
+    },
+    {
+      "id": "reserved/rule-named-error",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 予約語",
+        "sentence": "これらは表に挙げた特定の構文的な位置（例: `token` 宣言の直後、`TokenValue` の 関数名位置、`ErrorElement` の `ERROR(...)` 位置）でのみ特別な意味を持つ。 それ以外の位置では通常の `IDENTIFIER` として扱われ、ルール名・トークン名として 再利用できる（例: `token ::= 'x';`、`ERROR ::= 'x'; R ::= ERROR;`、 `token ANY=EMPTY R ::= ANY;` はいずれも構文・バリデーションの両方で受理する）。"
+      },
+      "input": "grammar G { ERROR ::= 'x'; R ::= ERROR; }",
+      "expectation": {
+        "verdict": "accept"
+      },
+      "note": "unlaxer-parser #279 の決定: `ERROR('...')` の位置以外での `ERROR` は通常の識別子として扱う。"
+    },
+    {
+      "id": "reserved/token-named-any",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 予約語",
+        "sentence": "これらは表に挙げた特定の構文的な位置（例: `token` 宣言の直後、`TokenValue` の 関数名位置、`ErrorElement` の `ERROR(...)` 位置）でのみ特別な意味を持つ。 それ以外の位置では通常の `IDENTIFIER` として扱われ、ルール名・トークン名として 再利用できる（例: `token ::= 'x';`、`ERROR ::= 'x'; R ::= ERROR;`、 `token ANY=EMPTY R ::= ANY;` はいずれも構文・バリデーションの両方で受理する）。"
+      },
+      "input": "grammar G { token ANY=EMPTY R ::= ANY; }",
+      "expectation": {
+        "verdict": "accept"
+      },
+      "note": "unlaxer-parser #279 の決定: トークンキーワードと同名のトークン名は再利用できる。"
+    }
+  ]
+}

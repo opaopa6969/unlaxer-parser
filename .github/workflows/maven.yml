@@ -26,10 +26,13 @@ jobs:
         cargo fmt --all --manifest-path rust/Cargo.toml --check
         cargo test --locked --manifest-path rust/Cargo.toml
         cargo clippy --locked --manifest-path rust/Cargo.toml --workspace --all-targets -- -D warnings
+    # UbnfSpecCorpusTest は spec-corpus/ubnf/*.json の Java 側の駆動。Rust 側の
+    # rust/unlaxer-ubnf/tests/spec_corpus.rs は同 job の `cargo test` が回すので、
+    # 同じ fixture の Java / Rust 両方が 1 つの job で緑になることを見えるようにする。
     - name: Cross-language fixtures, compile failures, and generated-file drift
       run: >
         mvn -B -pl unlaxer-common,unlaxer-dsl -am test
-        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest -DrustConformance=true
+        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest -DrustConformance=true
         -Dsurefire.failIfNoSpecifiedTests=false
     - name: Require rule trivia conformance evidence
       run: test -s unlaxer-dsl/target/rust-rule-trivia.tsv

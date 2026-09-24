@@ -6,8 +6,8 @@ documentation releases.
 
 ## Policy
 
-- One successful Central publish operation per UTC calendar month across the
-  whole organization.
+- Publish frequency is not a constraint (owner decision 2026-09-24). What gates a
+  publish is readiness: green CI, changelog, version bump, and the release checklist issue.
 - Collect changes in GitHub/CI and select at most one reactor from
   `central-release-queue.yml` for the monthly slot.
 - Publish dependency reactors before downstream consumers. A downstream project

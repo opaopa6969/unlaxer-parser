@@ -1,0 +1,442 @@
+{
+  "family": "ubnf",
+  "section": "アノテーション",
+  "summary": "注釈の引数形と、annotations.md / validation.md の MUST 契約。",
+  "cases": [
+    {
+      "id": "annotation/root",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "Annotation ::= '@root'"
+      },
+      "input": "grammar G { @root Program ::= 'p'; }",
+      "expectation": {
+        "verdict": "accept"
+      }
+    },
+    {
+      "id": "annotation/root-two-rules",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/annotations.md",
+        "heading": "## @root",
+        "sentence": "SHOULD 違反（同一 grammar 内で2つ以上のルールに `@root` が付与された場合）を 現在の実装は検出・警告しない。構文としてもバリデーションとしても受理する （エントリポイントとして実際にどのルールが使われるかはジェネレータ実装依存）。"
+      },
+      "input": "grammar G { @root A ::= 'a'; @root B ::= 'b'; }",
+      "expectation": {
+        "verdict": "accept"
+      },
+      "note": "unlaxer-parser #279 の決定: SHOULD 違反は検出・警告せず受理する。"
+    },
+    {
+      "id": "annotation/mapping-class-only",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "| '@mapping' '(' IDENTIFIER [',' 'params' '=' '[' IDENTIFIER {',' IDENTIFIER} ']'] ')'"
+      },
+      "input": "grammar G { @mapping(Item) Part ::= 'a'; }",
+      "expectation": {
+        "verdict": "accept"
+      }
+    },
+    {
+      "id": "annotation/mapping-params",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "| '@mapping' '(' IDENTIFIER [',' 'params' '=' '[' IDENTIFIER {',' IDENTIFIER} ']'] ')'"
+      },
+      "input": "grammar G { @mapping(VarDecl, params=[name, value]) VarDecl ::= 'let' 'x' @name '=' 'y' @value ; }",
+      "expectation": {
+        "verdict": "accept"
+      }
+    },
+    {
+      "id": "annotation/mapping-empty-params",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "| '@mapping' '(' IDENTIFIER [',' 'params' '=' '[' IDENTIFIER {',' IDENTIFIER} ']'] ')'"
+      },
+      "input": "grammar G { @mapping(Item, params=[]) Part ::= 'a'; }",
+      "expectation": {
+        "verdict": "reject"
+      },
+      "note": "`'[' IDENTIFIER {',' IDENTIFIER} ']'` は 1 個以上を要求する。"
+    },
+    {
+      "id": "annotation/mapping-missing-capture",
+      "scope": "validate",
+      "citation": {
+        "file": "unlaxer-dsl/specs/validation.md",
+        "heading": "### MAPPING エラー",
+        "sentence": "| `E-MAPPING-MISSING-CAPTURE` | `@mapping` の `params` に記載されたキャプチャ名がルール本体に存在しない |"
+      },
+      "input": "grammar G { @mapping(Item, params=[name]) Part ::= 'a'; }",
+      "expectation": {
+        "verdict": "diagnostic",
+        "code": "E-MAPPING-MISSING-CAPTURE"
+      }
+    },
+    {
+      "id": "annotation/mapping-extra-capture",
+      "scope": "validate",
+      "citation": {
+        "file": "unlaxer-dsl/specs/validation.md",
+        "heading": "### MAPPING エラー",
+        "sentence": "| `E-MAPPING-UNLISTED-CAPTURE` | ルール本体のキャプチャ名が `@mapping` の `params` に含まれていない |"
+      },
+      "input": "grammar G { @mapping(Item, params=[name]) Part ::= 'a' @name 'b' @other; }",
+      "expectation": {
+        "verdict": "diagnostic",
+        "code": "E-MAPPING-UNLISTED-CAPTURE"
+      }
+    },
+    {
+      "id": "annotation/mapping-duplicate-param",
+      "scope": "validate",
+      "citation": {
+        "file": "unlaxer-dsl/specs/validation.md",
+        "heading": "### MAPPING エラー",
+        "sentence": "| `E-MAPPING-DUPLICATE-PARAM` | `@mapping` の `params` に重複するパラメータ名がある |"
+      },
+      "input": "grammar G { @mapping(Item, params=[name, name]) Part ::= 'a' @name; }",
+      "expectation": {
+        "verdict": "diagnostic",
+        "code": "E-MAPPING-DUPLICATE-PARAM"
+      }
+    },
+    {
+      "id": "annotation/whitespace-bare",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "| '@whitespace' ['(' IDENTIFIER ')']"
+      },
+      "input": "grammar G { @whitespace R ::= 'x'; }",
+      "expectation": {
+        "verdict": "accept"
+      }
+    },
+    {
+      "id": "annotation/whitespace-none",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "| '@whitespace' ['(' IDENTIFIER ')']"
+      },
+      "input": "grammar G { @whitespace(none) R ::= 'x'; }",
+      "expectation": {
+        "verdict": "accept"
+      }
+    },
+    {
+      "id": "annotation/whitespace-uppercase",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/validation.md",
+        "heading": "### WHITESPACE エラー",
+        "sentence": "style の比較は trim 後、大文字小文字を区別しない。rule の引数省略は `javaStyle`。"
+      },
+      "input": "grammar G { @whitespace(JAVASTYLE) R ::= 'x'; }",
+      "expectation": {
+        "verdict": "accept"
+      },
+      "note": "style の比較は大文字小文字を区別しない、と明記されている。"
+    },
+    {
+      "id": "annotation/whitespace-bad-style",
+      "scope": "validate",
+      "citation": {
+        "file": "unlaxer-dsl/specs/validation.md",
+        "heading": "### WHITESPACE エラー",
+        "sentence": "| `E-WHITESPACE-RULE-STYLE` | rule style が `javaStyle` / `none` 以外 |"
+      },
+      "input": "grammar G { @whitespace(bogus) R ::= 'x'; }",
+      "expectation": {
+        "verdict": "diagnostic",
+        "code": "E-WHITESPACE-RULE-STYLE"
+      }
+    },
+    {
+      "id": "annotation/whitespace-rule-duplicate",
+      "scope": "validate",
+      "citation": {
+        "file": "unlaxer-dsl/specs/validation.md",
+        "heading": "### WHITESPACE エラー",
+        "sentence": "| `E-WHITESPACE-RULE-DUPLICATE` | 同一 rule に `@whitespace` が複数ある |"
+      },
+      "input": "grammar G { @whitespace(none) @whitespace(javaStyle) R ::= 'x'; }",
+      "expectation": {
+        "verdict": "diagnostic",
+        "code": "E-WHITESPACE-RULE-DUPLICATE"
+      }
+    },
+    {
+      "id": "annotation/precedence-level",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "| '@precedence' '(' 'level' '=' INTEGER ')'"
+      },
+      "input": "grammar G { @leftAssoc @precedence(level=10) R ::= 'x'; }",
+      "expectation": {
+        "verdict": "accept"
+      }
+    },
+    {
+      "id": "annotation/precedence-missing-level-keyword",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "| '@precedence' '(' 'level' '=' INTEGER ')'"
+      },
+      "input": "grammar G { @leftAssoc @precedence(10) R ::= 'x'; }",
+      "expectation": {
+        "verdict": "reject"
+      }
+    },
+    {
+      "id": "annotation/precedence-negative",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/annotations.md",
+        "heading": "## @precedence(level=...)",
+        "sentence": "- `level` は0以上の整数（MUST）"
+      },
+      "input": "grammar G { @leftAssoc @precedence(level=-1) R ::= 'x'; }",
+      "expectation": {
+        "verdict": "reject"
+      },
+      "note": "0 以上の整数（MUST）。"
+    },
+    {
+      "id": "annotation/precedence-duplicate",
+      "scope": "validate",
+      "citation": {
+        "file": "unlaxer-dsl/specs/validation.md",
+        "heading": "### PRECEDENCE エラー",
+        "sentence": "| `E-PRECEDENCE-DUPLICATE` | 同一ルールに `@precedence` が複数回宣言されている |"
+      },
+      "input": "grammar G { @leftAssoc @precedence(level=1) @precedence(level=2) R ::= 'x'; }",
+      "expectation": {
+        "verdict": "diagnostic",
+        "code": "E-PRECEDENCE-DUPLICATE"
+      }
+    },
+    {
+      "id": "annotation/precedence-without-assoc",
+      "scope": "validate",
+      "citation": {
+        "file": "unlaxer-dsl/specs/validation.md",
+        "heading": "### PRECEDENCE エラー",
+        "sentence": "| `E-PRECEDENCE-NO-ASSOC` | `@precedence` が `@leftAssoc` / `@rightAssoc` なしで使用されている |"
+      },
+      "input": "grammar G { @precedence(level=1) R ::= 'x'; }",
+      "expectation": {
+        "verdict": "diagnostic",
+        "code": "E-PRECEDENCE-NO-ASSOC"
+      }
+    },
+    {
+      "id": "annotation/assoc-without-precedence",
+      "scope": "validate",
+      "citation": {
+        "file": "unlaxer-dsl/specs/validation.md",
+        "heading": "### ASSOCIATIVITY エラー",
+        "sentence": "| `E-ASSOC-NO-PRECEDENCE` | `@leftAssoc` / `@rightAssoc` が `@precedence` なしで使用されている |"
+      },
+      "input": "grammar G { @leftAssoc R ::= 'x'; }",
+      "expectation": {
+        "verdict": "diagnostic",
+        "code": "E-ASSOC-NO-PRECEDENCE"
+      }
+    },
+    {
+      "id": "annotation/assoc-both",
+      "scope": "validate",
+      "citation": {
+        "file": "unlaxer-dsl/specs/validation.md",
+        "heading": "### ASSOCIATIVITY エラー",
+        "sentence": "| `E-ASSOC-BOTH` | `@leftAssoc` と `@rightAssoc` が同一ルールに使用されている |"
+      },
+      "input": "grammar G { @leftAssoc @rightAssoc @precedence(level=1) R ::= 'x'; }",
+      "expectation": {
+        "verdict": "diagnostic",
+        "code": "E-ASSOC-BOTH"
+      }
+    },
+    {
+      "id": "annotation/interleave-profile",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "| '@interleave' '(' 'profile' '=' IDENTIFIER ')'"
+      },
+      "input": "grammar G { @interleave(profile=javaStyle) R ::= 'x'; }",
+      "expectation": {
+        "verdict": "accept"
+      }
+    },
+    {
+      "id": "annotation/interleave-missing-keyword",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "| '@interleave' '(' 'profile' '=' IDENTIFIER ')'"
+      },
+      "input": "grammar G { @interleave(javaStyle) R ::= 'x'; }",
+      "expectation": {
+        "verdict": "reject"
+      }
+    },
+    {
+      "id": "annotation/interleave-bad-profile",
+      "scope": "validate",
+      "citation": {
+        "file": "unlaxer-dsl/specs/validation.md",
+        "heading": "### ANNOTATION エラー",
+        "sentence": "| `E-ANNOTATION-INTERLEAVE-PROFILE` | `@interleave` の `profile` が不正な値 |"
+      },
+      "input": "grammar G { @interleave(profile=bogus) R ::= 'x'; }",
+      "expectation": {
+        "verdict": "diagnostic",
+        "code": "E-ANNOTATION-INTERLEAVE-PROFILE"
+      }
+    },
+    {
+      "id": "annotation/backref-name",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "| '@backref' '(' 'name' '=' IDENTIFIER ')'"
+      },
+      "input": "grammar G { @backref(name=tagName) R ::= 'x' @tagName; }",
+      "expectation": {
+        "verdict": "accept"
+      }
+    },
+    {
+      "id": "annotation/scopetree-mode",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "| '@scopeTree' '(' 'mode' '=' IDENTIFIER ')'"
+      },
+      "input": "grammar G { @scopeTree(mode=lexical) R ::= 'x'; }",
+      "expectation": {
+        "verdict": "accept"
+      }
+    },
+    {
+      "id": "annotation/scopetree-bad-mode",
+      "scope": "validate",
+      "citation": {
+        "file": "unlaxer-dsl/specs/validation.md",
+        "heading": "### ANNOTATION エラー",
+        "sentence": "| `E-ANNOTATION-SCOPETREE-MODE` | `@scopeTree` の `mode` が不正な値 |"
+      },
+      "input": "grammar G { @scopeTree(mode=bogus) R ::= 'x'; }",
+      "expectation": {
+        "verdict": "diagnostic",
+        "code": "E-ANNOTATION-SCOPETREE-MODE"
+      }
+    },
+    {
+      "id": "annotation/doc-string",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "| '@doc' '(' STRING ')'"
+      },
+      "input": "grammar G { @doc('a rule') R ::= 'x'; }",
+      "expectation": {
+        "verdict": "accept"
+      }
+    },
+    {
+      "id": "annotation/doc-identifier-rejected",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "| '@doc' '(' STRING ')'"
+      },
+      "input": "grammar G { @doc(a rule) R ::= 'x'; }",
+      "expectation": {
+        "verdict": "reject"
+      }
+    },
+    {
+      "id": "annotation/skip",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "| '@skip'"
+      },
+      "input": "grammar G { @skip Comma ::= ','; }",
+      "expectation": {
+        "verdict": "accept"
+      }
+    },
+    {
+      "id": "annotation/simple-catch-all",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "| '@' IDENTIFIER"
+      },
+      "input": "grammar G { @custom R ::= 'x'; }",
+      "expectation": {
+        "verdict": "accept"
+      },
+      "note": "catch-all があるので未知の注釈名は構文としては正当。"
+    },
+    {
+      "id": "annotation/simple-with-arguments-rejected",
+      "scope": "parse",
+      "citation": {
+        "file": "unlaxer-dsl/specs/ubnf-syntax.md",
+        "heading": "## 形式的な文法定義",
+        "sentence": "| '@' IDENTIFIER"
+      },
+      "input": "grammar G { @unknown(x) R ::= 'x'; }",
+      "expectation": {
+        "verdict": "reject"
+      },
+      "note": "catch-all は `'@' IDENTIFIER` だけで引数を取らない。"
+    },
+    {
+      "id": "spec-contradiction/minilang-leftassoc",
+      "scope": "validate",
+      "citation": {
+        "file": "unlaxer-dsl/specs/annotations.md",
+        "heading": "## @leftAssoc",
+        "sentence": "1. `@leftAssoc` を使用するルールは `@precedence` も宣言する（MUST）"
+      },
+      "input": "grammar G { MulExpr ::= 'm'; @mapping(BinaryExpr, params=[left, op, right]) @leftAssoc AddExpr ::= MulExpr @left { ('+' @op | '-' @op) MulExpr @right } ; }",
+      "expectation": {
+        "verdict": "diagnostic",
+        "code": "E-ASSOC-NO-PRECEDENCE"
+      },
+      "note": "unlaxer-parser #279 で解消: ubnf-syntax.md の完全版 MiniLang 文法に `@precedence(level=...)` を追加し、annotations.md の MUST と矛盾しない形にした。この入力のように `@precedence` を伴わない `@leftAssoc` は MUST 違反として E-ASSOC-NO-PRECEDENCE を出す（旧コード名 E-ASSOC-WITHOUT-PRECEDENCE）。"
+    }
+  ]
+}

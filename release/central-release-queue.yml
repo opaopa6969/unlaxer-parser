@@ -4,7 +4,7 @@ canonicalRepository: opaopa6969/unlaxer-parser
 
 policy:
   timezone: UTC
-  maxPublishOperationsPerCalendarMonth: 1
+  maxPublishOperationsPerCalendarMonth: 99  # owner 2026-09-24: publish count is not a constraint; readiness (tests, changelog, CI) is
   centralSnapshotsAllowed: false
   emergencyRequiresReason: true
 
@@ -25,7 +25,18 @@ nextWindow:
   candidates:
     - repository: opaopa6969/unlaxer-parser
       status: collecting
-      requestedVersion: null
+      requestedVersion: "3.1.0"
+      note: >-
+        Backward-compatible minor: spec corrections (#277), bootstrap fixes
+        (#278/#282/#284 — trailing input rejected, empty grammar accepted,
+        chained dotted refs), runtime perf rounds 1-6 (#276/#263/#292,
+        cases 32-37). Deprecated Token field removal deferred to 4.0.
     - repository: opaopa6969/tinyexpression
       status: collecting
-      requestedVersion: null
+      requestedVersion: "2.0.0"
+      note: >-
+        Major: ubnfc-generated P4 parser becomes the DEFAULT engine (vendored,
+        dependency-free; ubnfc issue #62 facade); the combinator path stays as
+        a `legacy` emitter mode in 2.0 and is removed in 3.0. Needs no new
+        unlaxer version; can take the 2026-11 slot after unlaxer 3.1.0, or
+        2026-10 if preferred.
