@@ -97,7 +97,8 @@ public class Token implements Serializable{
 		this.tokenKind = tokenKind;
 		this.source = token;
 		this.tokenString = token == null ? Optional.empty() : token.nonEmptyString();
-		this.tokenRange = token == null ? Range.invalidRange() : token.cursorRange().toRange();
+		// sourceRange() is cursorRange().toRange() without building the CursorRange (perf #276).
+		this.tokenRange = token == null ? Range.invalidRange() : token.sourceRange();
 		this.parser = parser;
 		this.originalChildren = children;
 		parent= Optional.empty();

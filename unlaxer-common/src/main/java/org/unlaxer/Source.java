@@ -62,6 +62,19 @@ public interface Source extends CharSequence, CodePointAccessor, PositionResolve
 
   CursorRange cursorRange();
 
+  /**
+   * This source's own extent as a {@link Range}, equivalent to {@code cursorRange().toRange()}.
+   *
+   * <p>A cursor's {@code position()} is its position in <em>this</em> source, so the range of a
+   * source is always {@code [0, codePointLength)} whatever its kind or its offset from the root.
+   * One token is built per committed rule, and building a {@link CursorRange} to read that pair
+   * back allocates two cursors and their index objects; implementations that know their own
+   * length answer directly and leave {@code cursorRange()} unbuilt. (perf #276)
+   */
+  default Range sourceRange() {
+    return cursorRange().toRange();
+  }
+
   Stream<Source> linesAsSource();
 
   default Source reRoot() {

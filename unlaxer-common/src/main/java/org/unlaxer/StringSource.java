@@ -19,7 +19,14 @@ public class StringSource implements Source {
   private final SourceKind sourceKind;
   private final CodePointOffset offsetFromParent;
   private final CodePointOffset offsetFromRoot;
-  private final CursorRange cursorRange;
+  /*
+   * Built on demand: a parse creates over a million sub-sources for a 20 KB input and most of
+   * them (peeks that did not match) never need their cursor range, while the ones that do become
+   * a token now get their [0, length) extent from sourceRange() without a CursorRange at all.
+   * The range is derived only from final fields, so recomputing it after a race is harmless.
+   * (perf #276)
+   */
+  private CursorRange cursorRange;
 
   public static StringSource create(String source, SourceKind sourceKind) {
     if (sourceKind == SourceKind.subSource) {
@@ -78,14 +85,6 @@ public class StringSource implements Source {
 
     // ✅ subSource 以外は独立 resolver（=positionInRoot は 0起点）
     this.positionResolver = PositionResolver.createPositionResolver(codePoints);
-
-    // root/detached の cursorRange は自分座標（0起点）でOK
-    this.cursorRange = CursorRange.fromRootOffset(
-        CodePointOffset.ZERO,
-        new CodePointLength(codePoints.length),
-        sourceKind,
-        positionResolver
-    );
   }
 
   /**
@@ -111,14 +110,8 @@ public class StringSource implements Source {
     // ✅ subSource は root resolver を使う（root座標共有）
     this.positionResolver = this.root;
 
-    // ✅ root座標系の offset を合成して cursorRange を作る
+    // ✅ root座標系の offset を合成する（cursorRange は cursorRange() で遅延生成）
     this.offsetFromRoot = parent.offsetFromRoot().newWithPlus(offsetFromParent);
-    this.cursorRange = CursorRange.fromRootOffset(
-        this.offsetFromRoot,
-        new CodePointLength(codePoints.length),
-        sourceKind,
-        positionResolver
-    );
   }
 
   /**
@@ -141,14 +134,8 @@ public class StringSource implements Source {
     // ✅ subSource は root resolver を使う（root座標共有）
     this.positionResolver = this.root;
 
-    // ✅ root座標系の offset を合成して cursorRange を作る
+    // ✅ root座標系の offset を合成する（cursorRange は cursorRange() で遅延生成）
     this.offsetFromRoot = parent.offsetFromRoot().newWithPlus(offsetFromParent);
-    this.cursorRange = CursorRange.fromRootOffset(
-        this.offsetFromRoot,
-        new CodePointLength(codePoints.length),
-        sourceKind,
-        positionResolver
-    );
   }
 
   /*
@@ -439,6 +426,24 @@ public class StringSource implements Source {
 
   @Override
   public CursorRange cursorRange() {
-    return cursorRange;
+    CursorRange built = cursorRange;
+    if (built == null) {
+      built = CursorRange.fromRootOffset(
+          offsetFromRoot, new CodePointLength(codePoints.length), sourceKind, positionResolver);
+      cursorRange = built;
+    }
+    return built;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Every kind of {@code StringSource} builds its cursors at {@code offsetFromRoot} with the
+   * same value as the cursors' own {@code offsetFromRoot}, so {@code position()} runs from 0 to
+   * the code point length and the range never has to be materialized.
+   */
+  @Override
+  public Range sourceRange() {
+    return new Range(0, codePoints.length);
   }
 }
