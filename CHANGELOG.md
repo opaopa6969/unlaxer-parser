@@ -8,9 +8,16 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-09-25
+
 ### Added
 - Java `Memoization.SAFE_FAILURES` also replays safe successes for exact classes directly implementing `SafeSuccessMemoizable`. Entries retain rule-local diagnostics, independent token snapshots, cursors, and choice selections.
 - The Java generator proves success safety transitively, excludes listener/state-dependent rules and uncertified custom tokens, and marks generated whitespace delimitors. Runtime replay also covers their `Occurs` entry point. Memoization remains off by default; Rust behavior and generated Rust sources are unchanged.
+- `Source.sourceRange()`: a default method that returns a token's `[start, start+length)` extent directly, without building an intermediate `CursorRange` (#286).
+- `docs/engine-selection-guide-ja.md`: a decision guide between unlaxer Classic (this repository's combinator runtime) and the sibling `ubnfc` UBNF compiler — what each one offers, a decision procedure, and the maintenance policy (Classic performance work stops at round 6 below; ubnfc is where further speed work goes). Linked from the READMEs (#303).
+- `.github/workflows/release-central.yml` (`workflow_dispatch`): publishes `org.unlaxer:unlaxer-parser` to Maven Central from GitHub Actions as an alternative to the local `scripts/release-central.sh` path, with a secrets-free `guard` job that checks the version/confirmation/monthly cap before any credentialed step (#304).
+- AGENTS.md and test Javadoc now document that `RustUbnfFrontendConformanceTest` (and other `-DrustConformance=true` tests) are skipped under a plain `mvn test` and verified only in CI; a skipped run now prints an `[assumption] ...` line naming the property instead of silently passing (#283).
+- `scripts/release-central.sh` now prefers `~/.m2/settings-central.xml` (or a `MAVEN_SETTINGS` override) for Maven Central credentials, since `~/.m2/settings.xml` on the release machine is rewritten by unrelated self-hosted-runner jobs' `actions/setup-java` steps and loses the `central` server entry (#305).
 
 ### Changed
 - The parse tree itself is smaller. A sub-source is now a view over its root's code point array
@@ -32,6 +39,98 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
   observed look-back, so a grammar that backtracks further degrades to the previous behaviour.
   Inputs shorter than the window are untouched. Set `-Dunlaxer.memo.evictBelowFrontier=false` to
   restore the previous table. Rust behavior is unchanged.
+- The UBNF bootstrap (`UBNFMapper`/`UBNFParsers`) now rejects trailing unconsumed input after a
+  grammar file's closing `}` (e.g. `grammar G { R ::= 'x'; } garbage`) with a positioned
+  `IllegalArgumentException` (`line N, column M`), and accepts an empty grammar body
+  (`grammar G { }`), matching both the spec (`unlaxer-dsl/specs/ubnf-syntax.md`) and the Rust
+  `unlaxer-ubnf` frontend, which already behaved this way. Previously the Java bootstrap silently
+  accepted a prefix of the input and rejected empty grammars. Trailing whitespace and trailing
+  `//` comments remain accepted (#278, #280, #283).
+  - The `RustUbnfFrontendConformanceTest` fixture that had encoded the old (incorrect) Java
+    behaviour as a known cross-language difference is fixed to assert the new, spec-conforming
+    rejection, including that Java and Rust report the same line/column (#283).
+- Chained (3+ segment) dotted rule references (`a.b.Value`) in `unlaxer-dsl/grammar/ubnf.ubnf`
+  now parse correctly through the *generated* self-hosting frontend, matching the hand-written
+  `UBNFParsers`/Rust `unlaxer-ubnf` frontends, which already accepted them. The `QuantifiedRef`
+  production changed from a single optional dot to an unbounded `{ IDENTIFIER '.' }` repeat
+  (#284, #285).
+- Deferred-diagnostics mode (`ParseOptions.Diagnostics.DETAILED_ON_FAILURE`) no longer builds or
+  retains the bookkeeping objects that failure recording doesn't read on a mode where recording
+  is already skipped: per-call `ParseFrame` push/pop and memo-transaction-frame management are
+  trimmed to what transaction replay still needs semantically. Counted on `complex-x64`: no
+  change in observable results, measurable reduction in objects created per parse (#263, #287).
+- Deferred-diagnostics mode also now computes each parser's FIRST set (leading code points, as a
+  fixed point over the combinator graph) once and uses it to skip a choice candidate, chain
+  element, or repetition body whose leading code point cannot match — without opening a
+  transaction, creating a `Token`, or touching the memo table for it. This only applies when
+  diagnostics are deferred and no listener/action/trial recording is active; `DETAILED` mode
+  executes exactly the same instructions as before. Disable with
+  `-Dunlaxer.parser.firstSetExclusion.disabled=true` (#292, #302). See **Performance** below.
+- Spec documentation corrections found by the sibling `ubnfc` project's spec-derived oracle
+  corpus: several error-code names documented in `validation.md`/`annotations.md`
+  (`E-MAPPING-EXTRA-CAPTURE`, `E-ASSOC-WITHOUT-PRECEDENCE`, `E-PRECEDENCE-WITHOUT-ASSOC`) did not
+  match what `GrammarValidator` and ubnfc actually emit (`E-MAPPING-UNLISTED-CAPTURE`,
+  `E-ASSOC-NO-PRECEDENCE`, `E-PRECEDENCE-NO-ASSOC`); the docs are renamed to the implemented
+  names. Implementations are unchanged — both implementations already agreed with each other, so
+  the spec text was the stale side (#277, #279).
+- Release policy: the "one Maven Central publish per calendar month" rule is now a guideline, not
+  a hard cap. `release/central-release-queue.yml`'s `maxPublishOperationsPerCalendarMonth` is
+  raised to accommodate multiple ready candidates in the same month, and readiness (green CI,
+  updated changelog, version bump) gates a release instead of a fixed publish count (#296, #299).
+
+### Fixed
+- A repetition body was skipped one iteration too eagerly: the "skip when nothing was consumed"
+  check compared the wrong cursor pair, so a failed terminal that reset the matched-but-not the
+  consumed cursor could make a following repetition wrongly treat its body as a no-op and accept
+  input it should have rejected (e.g. `(T) ['x'] (U) 'ab'` incorrectly accepting `"ab"`). The
+  check now requires the consumed and matched cursors to coincide before skipping. Found by the
+  Rust conformance CI job's cross-language corpus, not by either implementation's own test suite
+  (#302).
+- `UBNFMapper`'s hand-written `toAtomicElement`/`toQuantifiedRef` only ever used the first two
+  identifiers of a dotted rule reference (`namespace = segments[0]`, `name = segments[1]`),
+  silently dropping segments beyond the second for 3+ segment references even though parsing
+  itself already accepted them. Both call sites now share a `buildRuleRef()` helper: the last
+  identifier is always `name`, everything before it joins with `.` into `namespace` (#285).
+
+### Performance
+Six rounds of profiling work against issue #276/#292 targeted the packrat combinator runtime's
+opt-in deferred-diagnostics mode (`ParseOptions.Diagnostics.DETAILED_ON_FAILURE`), using the
+`complex` (332 B) and `complex-x64` (20,923 B, `complex` concatenated 64x) tinyexpression P4
+fixtures. Each round is its own A/B session on a shared, noisy host (load average observed
+7-49), measured as wall-clock minimum over repeated interleaved runs; a round's "before" number
+is that round's own baseline run, not necessarily the previous round's "after" number, so
+`complex`'s value moves within measurement noise round to round while `complex-x64` shows the
+cumulative effect of shrinking allocation and the live object set:
+
+| Round | Case | PR | What changed | `complex` before → after | `complex-x64` before → after |
+|---|---|---|---|---:|---:|
+| 1 | 32 | #281 | Stop allocating always-empty per-token/per-diagnostic-frame containers (-12% allocation) | 14.38 → 14.54 ms | 1,552.84 → 1,390.95 ms (-10.4%) |
+| 2 | 33 | #286 | Token ranges without `CursorRange`; expected-source index without `IdentityHashMap` (-27% allocation) | 12.28 → 9.95 ms (-18.9%) | 1,276.26 → 989.86 ms (-22.4%) |
+| 3 | 34 | #287 | Stop building `DETAILED_ON_FAILURE` bookkeeping the mode never reads (#263) | 8.109 → 6.294 ms (-22.4%, median) | 664.836 → 568.791 ms (-14.4%, median) |
+| 4 | 35 | #289 | Evict packrat memo entries outside the backtracking window (peak entries 102,054 → 8,424 on x64) | 5.920 → 5.998 ms (±noise) | 558.187 → 498.397 ms (-10.7%) |
+| 5 | 36 | #291 | Shrink the retained CST itself: source views, shared empty lists, unboxed value objects (-33%/-40% retained memory) | 6.673 → 5.794 ms (-13.2%) | 550.735 → 466.352 ms (-15.3%) |
+| 6 | 37 | #302 | Runtime FIRST-set candidate exclusion (rule evaluations -41%, transactions -47% on x64) | 7.129 → 5.087 ms (-28.6%) | 419.701 → 370.888 ms (-11.6%) |
+
+Across the six rounds, `complex-x64` wall-clock minimum went from round 1's baseline (~1,553 ms)
+to round 6's result (~371 ms) on this host; allocation, GC pause time, and operation counts each
+fell by roughly a third to a half per round and are the more load-independent evidence for the
+improvement (see `docs/performance-tuning-ja.md` cases 32-37 for the full JFR/GC-log breakdown).
+**Issue #292's target of `complex-x64` ≤ 350 ms in deferred mode was not confirmed on this shared
+host** — the best observed minimum was 370.9 ms; subtracting GC pause and extrapolating the
+round's CPU-time improvement onto round 5's quieter-host baseline (466 ms) estimates roughly
+290 ms, but this has not been directly measured.
+
+Default (`DETAILED`) diagnostics mode was not the target of this work and is deliberately
+untouched by the FIRST-set exclusion (round 6 changes zero instructions on that path). Round 6
+re-verified no regression: operation counts and allocation are bit-identical between base and
+candidate, and wall-clock time on the four fixtures moved by -0.5% to +4.8% (noise), e.g.
+`complex-x64` 667.4 ms → 658.6 ms.
+
+### Deprecated
+- Nothing is removed in this release. `Token.tokenString`/`tokenRange` (deprecated since an
+  earlier release in favor of `sourceRange()` and related accessors) remain as working bridges;
+  their removal is deferred to 4.0, consistent with this being a backward-compatible minor
+  release.
 
 ### Tests
 - The spec-derived UBNF oracle is now a permanent test on both implementations. 129 cases derived
