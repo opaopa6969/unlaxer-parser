@@ -48,6 +48,15 @@ public final class PackratMemoTable {
     private final int endMatched;
     private final Parser chosenChild;
     private final Map<ChoiceInterface, Parser> choices;
+    /*
+     * Eviction index (#276 round 4). Every stored entry is also threaded onto a singly linked
+     * chain of the entries created at the same start position, so dropping a whole position is
+     * O(entries at that position) instead of a scan of the table. Carrying the three links on the
+     * entry itself rather than in separate index nodes keeps the put path allocation-free.
+     */
+    private Parser indexedParser;
+    private PositionKey indexedKey;
+    private Entry nextAtPosition;
 
     private Entry(ParseContext.FailureDiagnostic diagnostic) {
       this(diagnostic, null, 0, 0, null, Map.of());
@@ -75,14 +84,20 @@ public final class PackratMemoTable {
       return null;
     }
     if (false == isExactSafeClass(parser)) return null;
-    Entry entry = parseContext.getPackratMemoTable()
-        .get(parser, positionKeyOf(parseContext, tokenKind, invertMatch));
+    PackratMemoTable table = parseContext.getPackratMemoTable();
+    PositionKey positionKey = positionKeyOf(parseContext, tokenKind, invertMatch);
+    if (table.evictionEnabled && positionKey.consumed() < table.evictedBelow) {
+      table.reportEvictionUnderrun(positionKey.consumed());
+    }
+    Entry entry = table.get(parser, positionKey);
     if (entry != null) {
+      int lookback = table.highWater - positionKey.consumed();
+      if (lookback > table.maxHitLookback) table.maxHitLookback = lookback;
       if (entry.tokens == null) {
         parseContext.replayMemoTransactionEvents(entry.diagnostic);
-        parseContext.getPackratMemoTable().failureHits++;
+        table.failureHits++;
       } else {
-        parseContext.getPackratMemoTable().successHits++;
+        table.successHits++;
       }
       parseContext.replayFailureDiagnostic(entry.diagnostic);
     }
@@ -228,6 +243,37 @@ public final class PackratMemoTable {
   private int failureHits;
   private int successHits;
 
+  /*
+   * Bounding the memo live set (#276 round 4).
+   *
+   * A memo entry keyed at a start position the parse can no longer re-enter is dead but
+   * reachable, and at complex-x64 roughly 100k of them survive to the end of the parse and make
+   * every GC cycle proportional to the input. The table therefore drops entries whose start
+   * position falls more than {@link #window} code points behind the furthest position the cursor
+   * has reached.
+   *
+   * Dropping is transparent by construction: lookup is a pure cache probe and a miss re-parses
+   * the rule, replaying nothing. Only the hit rate is at stake, and that is guarded at runtime —
+   * a probe below the watermark counts an under-run and widens the window to at least twice the
+   * observed look-back, so a grammar that backtracks further than the window degrades to the
+   * previous behaviour instead of silently losing hits. See ParseContext#observeMemoCursor.
+   */
+  static final int DEFAULT_WINDOW = Integer.getInteger("unlaxer.memo.window", 1024);
+  private static final int EVICT_STEP = 256;
+
+  boolean evictionEnabled =
+      false == "false".equals(System.getProperty("unlaxer.memo.evictBelowFrontier"));
+  private Entry[] entryChainByPosition = new Entry[1024];
+  private int window = DEFAULT_WINDOW;
+  int highWater;
+  int evictedBelow;
+  private int entryCount;
+  private int maxEntryCount;
+  private int evictedCount;
+  private int deadOnArrival;
+  private int evictionUnderruns;
+  private int maxHitLookback;
+
   public Entry get(Parser parser, PositionKey positionKey) {
     Map<PositionKey, Entry> entryByPosition = entryByPositionByParser.get(parser);
     if (entryByPosition == null) {
@@ -237,11 +283,101 @@ public final class PackratMemoTable {
   }
 
   public void put(Parser parser, PositionKey positionKey, Entry entry) {
+    int position = positionKey.consumed();
+    if (evictionEnabled && position < evictedBelow) {
+      // The watermark already passed this rule's start, so nothing can probe it again.
+      deadOnArrival++;
+      return;
+    }
     entryByPositionByParser
         .computeIfAbsent(parser, ignored -> new HashMap<>())
         .put(positionKey, entry);
+    entryCount++;
+    if (entryCount > maxEntryCount) maxEntryCount = entryCount;
+    if (false == evictionEnabled) return;
+    if (position >= entryChainByPosition.length) {
+      int length = entryChainByPosition.length;
+      while (position >= length) length *= 2;
+      entryChainByPosition = java.util.Arrays.copyOf(entryChainByPosition, length);
+    }
+    entry.indexedParser = parser;
+    entry.indexedKey = positionKey;
+    entry.nextAtPosition = entryChainByPosition[position];
+    entryChainByPosition[position] = entry;
+  }
+
+  /**
+   * Advances the retained window. Called once per transaction begin with that transaction's start
+   * cursor; the scan visits each position once and unlinks each entry once over the whole parse,
+   * so eviction stays O(input + entries) rather than a table scan per commit.
+   */
+  void observeCursor(int cursor) {
+    if (cursor > highWater) highWater = cursor;
+    if (false == evictionEnabled) return;
+    int target = highWater - window;
+    if (target - evictedBelow >= EVICT_STEP) evictBelow(target);
+  }
+
+  private void evictBelow(int watermark) {
+    int limit = Math.min(watermark, entryChainByPosition.length);
+    for (int position = evictedBelow; position < limit; position++) {
+      Entry entry = entryChainByPosition[position];
+      entryChainByPosition[position] = null;
+      while (entry != null) {
+        Entry next = entry.nextAtPosition;
+        entry.nextAtPosition = null;
+        Map<PositionKey, Entry> byKey = entryByPositionByParser.get(entry.indexedParser);
+        if (byKey != null && byKey.remove(entry.indexedKey, entry)) {
+          entryCount--;
+          evictedCount++;
+          if (byKey.isEmpty()) entryByPositionByParser.remove(entry.indexedParser);
+        }
+        entry.indexedParser = null;
+        entry.indexedKey = null;
+        entry = next;
+      }
+    }
+    evictedBelow = watermark;
+  }
+
+  /**
+   * A probe arrived below the watermark, so the window was narrower than this grammar's
+   * look-back. Widen it past twice the observed distance; the window only grows, so the parse
+   * pays at most a geometric series of re-parses before it stops evicting what it still needs.
+   */
+  private void reportEvictionUnderrun(int position) {
+    evictionUnderruns++;
+    int lookback = highWater - position;
+    int widened = Math.max(window * 2, lookback * 2);
+    window = widened <= 0 ? Integer.MAX_VALUE : widened;
+  }
+
+  /** Test seam: turning eviction off reproduces the pre-#276 table exactly. */
+  void setEvictionEnabled(boolean enabled) {
+    evictionEnabled = enabled;
+  }
+
+  /** Test seam for exercising the guard without a multi-megabyte fixture. */
+  void setWindow(int positions) {
+    window = positions;
   }
 
   public int failureHits() { return failureHits; }
   public int successHits() { return successHits; }
+  /** Entries currently held; with eviction on this plateaus instead of growing with the input. */
+  public int entryCount() { return entryCount; }
+  /** High-water mark of {@link #entryCount()} — the live memo set this parse ever held. */
+  public int maxEntryCount() { return maxEntryCount; }
+  /** Entries dropped because the watermark passed their start position. */
+  public int evictedCount() { return evictedCount; }
+  /** Rules memoized at a start position the watermark had already passed; never stored. */
+  public int deadOnArrival() { return deadOnArrival; }
+  /** Probes below the watermark. Zero means no hit was lost; each one widens the window. */
+  public int evictionUnderruns() { return evictionUnderruns; }
+  /** Furthest a hit ever reached back from the cursor high-water mark: the look-back to cover. */
+  public int maxHitLookback() { return maxHitLookback; }
+  public int watermark() { return evictedBelow; }
+  /** Furthest consumed position any transaction has started at during this parse. */
+  public int cursorHighWater() { return highWater; }
+  public int window() { return window; }
 }

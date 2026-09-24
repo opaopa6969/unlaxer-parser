@@ -2233,3 +2233,245 @@ Java 側をその形に寄せた変更であり、観測可能な振る舞いの
   の 72 通りについて `ParseFailureDiagnostics` の全項目（offset / line / column / stack / expected / hints /
   expectedTokens / deepestRule / trials）をテキストへ落とし、変更前後で **byte 一致**を確認した。
   「テストが緑」より強い証拠が要る変更では、この形の差分ダンプを作る。
+
+## ケース35: memo 表の live 集合を入力長から切り離す（Java、#276 round 4）
+
+### 出発点
+
+ケース32〜34 で機構は確定している。**超線形 = GC 回数（∝ 1 parse の割当）× 1 回のコスト（∝ live 集合）**で、
+GC pause を引いた µs/byte はどの build でも ×0.96〜×1.09、つまり**パーサ本体は線形**。round 2 は第 1 因子（割当 -27%）、
+round 3 は entry 1 個あたりの live（634→532 byte、-16%）を削ったが、**第 2 因子の「entry 個数」は手つかず**で、
+`complex-x64` では parse 終了まで **102,054 件**が live に残っていた（532 byte/件 ≒ 53 MB）。
+
+round 4 の狙いは「1 件を小さくする」ではなく「**件数を入力長から切り離す**」である。
+
+### 不変条件を先に書く（そして、それが役に立たないことを確かめる）
+
+packrat の entry が再び読まれるのは、その開始位置へ parse が戻ってきたときだけである。
+戻れる位置は「**開いている transaction のどれかの consumed cursor**」に限られる。
+`Transaction.begin` は親の cursor を複製するので、開いている transaction の cursor は
+スタックの下から上へ**単調非減少**であり、rollback は必ずどれかの開いた transaction の cursor へ戻り、
+consume は前へしか進まない。したがって
+
+> **committed frontier**（= 開いている transaction の cursor の最小値）より前の位置を持つ entry は、二度と参照されない。
+
+これは厳密に正しい。**ところが、この最小値はこの実装では常に 0 である。** 最下段は `ParseContext` 自身が
+コンストラクタで積む root `TransactionElement` で、位置 0 に置かれ、pop されることがなく、
+最外 parser が commit する parse の最後にしか動かない。`tokenStack` を 1 ms ごとに覗く計測を入れて確かめた:
+
+| fixture | frontier の最大値 | cursor - frontier（最大 / 平均） | root を除いた最外 parser の cursor - それ（最大 / 平均） | stack 深さ最大 |
+|---|---:|---:|---:|---:|
+| `complex` (326 B) | **0** | 325 / 78.2 | 185 / 35.1 | 78 |
+| `complex-x16` (5,179 B) | **0**（最後の 1 標本のみ 5,179） | 5,179 / 1,444.4 | 5,180 / 575.1 | 79 |
+| `complex-x64` (20,923 B) | **0** | 20,923 / 9,273.8 | **13,292 / 4,621.7** | 83 |
+
+**厳密な frontier は正しいが、parse 中ずっと 0 である。** 最下段を除外すれば最外 parser の transaction は前へ動くが、
+`complex-x64` で cursor から**平均 4,622 位置・最大 13,292 位置**遅れる（`commit` は親の cursor に子の終端を入れるので、
+**親が動くのは直下の子が commit したときだけ**。`Program := Statement*` 型の文法では、これは「いま読んでいる文の始まり」ではなく
+「最外規則の直下の子の始まり」である）。つまりこの frontier で切っても表の 22〜64% が残り、依然として O(入力) のままである。
+
+一方、次節のとおり **hit が実際に戻る距離は入力長によらず 78 位置**だった。安全側の frontier は正しいが、
+必要な窓より **60 倍**ゆるい。
+
+### 進むのは cursor そのものなので、窓で持つ
+
+そこで entry の保持を「cursor の到達最大点から **W 位置**ぶん後ろまで」に限る。W は文法依存の見積もりなので、
+**証明ではなく計測＋実行時ガード**で扱う。
+
+- **evict は結果を変えない。** `PackratMemoTable.lookup` は純粋なキャッシュ照会で、miss は普通に再 parse するだけである。
+  `replayMemoTransactionEvents` / `replayFailureDiagnostic` は「hit を再 parse と区別できなくする」ために存在するので、
+  entry を捨てれば本物の transaction event と診断が記録される。表の外から entry を参照するものは無い。
+  遅延 `registerTransactionalState` も同じ理由で影響を受けない。
+- **危ないのは hit 率だけ。** そこで watermark より前への照会（under-run）を数え、
+  1 件でも起きたら窓を「観測した look-back の 2 倍」以上へ広げる。窓は増える一方なので、
+  窓より遠くまで backtrack する文法は**等比級数ぶんの再 parse を払ったあとは従来と同じ挙動**に戻る。
+  packrat の線形保証を黙って失うことはない。
+- **失敗 entry と成功 entry を区別しない。** key の matched 位置と state version も見ない。比較するのは consumed 開始位置だけで、
+  照会側の consumed 位置は cursor そのものである。
+- **入力が窓より短ければ 1 件も捨てない**（`complex` 326 byte、tinyexpression の実用式はすべてここに入る）。
+
+実装は `PackratMemoTable`:
+
+- entry 自身に `indexedParser` / `indexedKey` / `nextAtPosition` を持たせ、**開始位置ごとの単方向リスト**に繋ぐ
+  （索引ノードを別に確保しないので put 側の割当は増えない）。
+- `ParseContext.checkpointTransactionalState`（= 全 transaction begin）から `observeCursor` を呼び、
+  `highWater - W` が watermark より 256 以上進んだら、その範囲の位置を 1 回ずつ走査して外す。
+  **位置は parse 全体で 1 回ずつ、entry も 1 回ずつしか触らない**ので O(入力長 + entry 数)。
+  commit ごとに表を全走査したら超線形が戻ってくる。
+- evict の hook を `begin` に置くのは、**直前に終わった rule の `put` がまだ残っている唯一の場所を避ける**ため
+  （`commitSuccess` は commit → endParse → put の順で、commit の finally で evict すると自分の entry を先に捨ててしまう）。
+
+既定の窓は **1,024 位置**（`-Dunlaxer.memo.window`）、evict 自体は `-Dunlaxer.memo.evictBelowFrontier=false` で止められる。
+
+### 必要な窓を測る（= 実際の look-back）
+
+計測用カウンタ `maxHitLookback`（hit した照会が cursor 到達最大点からどれだけ戻った位置か）を入れて 1 parse ずつ数えた。
+
+| fixture | byte | 最大 look-back |
+|---|---:|---:|
+| `complex` | 326 | 74 |
+| `complex-x4` | 1,293 | 76 |
+| `complex-x16` | 5,179 | 78 |
+| `complex-x64` | 20,923 | **78** |
+| `large-match` | 1,380 | 7 |
+| `flat-arithmetic` | 1,426 | 0 |
+
+**入力を 64 倍にしても look-back は 78 位置で頭打ちになる。** これが「memo の live 集合が O(入力) である必要はない」ことの実測根拠で、
+既定の窓 1,024 はその **13 倍**の余裕を取っている。
+
+### memo entry 数（evict 前 / 後、1 parse）
+
+| fixture | before: 最大 entry | after: 最大 entry | after: 最終 entry | evict 件数 | 削減 |
+|---|---:|---:|---:|---:|---:|
+| `complex` | 1,695 | 1,695 | 1,695 | 0 | 0%（窓より短い） |
+| `complex-x4` | 6,474 | 6,369 | 6,132 | 342 | -1.6% |
+| `complex-x16` | 25,590 | 8,439 | 4,343 | 21,247 | **-67%** |
+| `complex-x64` | **102,054** | **8,424** | 3,989 | 98,065 | **-91.7%** |
+
+窓を変えたときの `complex-x64` の最大 entry: W=256 → 3,334 / W=512 → 5,068 / W=1,024 → 8,424 / W=4,096 → 27,848。
+**W を 1,024 より小さくしても live 集合の残りは CST 本体が支配する**（ケース34 の内訳）ので、安全余裕のほうを取った。
+
+### hit 数の同一性（受け入れ条件）
+
+evict あり / なしを同じ build で切り替え、`root`（DETAILED）と `root-deferred`（DETAILED_ON_FAILURE）の両方、
+root parser が受理する 9 fixture すべてで **失敗 hit / 成功 hit が 1 件も違わない**。
+`complex-x64` は両方とも 123,508 / 194,944。**under-run 0 件、watermark 通過後の put（dead on arrival）0 件。**
+
+### 診断の同値性
+
+失敗入力 18 件 × `DETAILED` / `DETAILED_ON_FAILURE` × memo `OFF` / `SAFE_FAILURES` の 72 通りで
+`ParseFailureDiagnostics` の全 getter をテキスト化し、base / cand で **byte 一致**。
+さらに窓を 8 位置まで縮めて（= この短い入力でも必ず evict が起きる条件で）同じダンプを取り、やはり **byte 一致**だった。
+
+### live 集合（`jcmd GC.class_histogram`、`complex-x64` の parse 中と parse 直後）
+
+| 標本 | evict なし: entry / live | evict あり: entry / live |
+|---|---:|---:|
+| 序盤 | 80 / 12.19 MB | 131 / 10.80 MB |
+| 中盤 | 15,595 / 23.06 MB | 8,235 / 18.31 MB |
+| 中盤 | 53,854 / 43.26 MB | 7,789 / 27.47 MB |
+| 終盤 | 94,043 / 61.80 MB | 6,591 / 35.90 MB |
+| **parse 直後** | **102,054 / 61.76 MB**（1,997,580 個） | **3,989 / 37.87 MB**（1,365,500 個） |
+
+**entry 数は evict ありでは増え続けずに窓のところで頭打ちになる**（8,235 → 7,789 → 6,591 → 3,989）。
+一方 live 全体は CST が伸びるぶん増え続けるが、終端で **61.76 → 37.87 MB（-38.7%）**、オブジェクト数 -31.6%。
+
+parse 直後のヒストグラム上位の差（`complex-x64`）:
+
+| クラス | evict なし | evict あり |
+|---|---:|---:|
+| `ParseContext$FailureDiagnostic` | 102,054（6.53 MB） | 上位から消滅 |
+| `PackratMemoTable$Entry` | 102,054（4.90 MB） | 3,989（0.19 MB） |
+| `PackratMemoTable$PositionKey` | 102,054（4.08 MB） | 3,989（0.16 MB） |
+| `Token` | 94,459（5.29 MB） | 81,676（4.57 MB） |
+| `TokenList` | 200,070（3.20 MB） | 164,044（2.62 MB） |
+| 位置索引 `Entry[]` | — | 1 個（0.13 MB） |
+
+`Token` / `TokenList` も減っているのは、成功 memo が抱えていた deep copy ごと落ちるからである。
+**evict のために足した索引は `Entry[]` 1 本（131 KB）だけ**で、entry 側は既存フィールド 3 本の追加で済んでいる。
+
+### スケーリング（`legacy-bench.sh root-deferred`、`SAFE_FAILURES`、`-Xss512m -Xms2g -Xmx2g`、`taskset -c 24` → Serial GC）
+
+ホストが他エージェントの Rust ビルドと共有で load average が 8〜47 の間を動いたため、
+**fixture ごとに base / cand を交互に、4 ラウンド（各 3 run）**回し、12 run の最小値と中央値の両方を出す。
+
+| fixture | base 最小 | cand 最小 | base 中央値 | cand 中央値 | base 割当 | cand 割当 | base GC 比率 | cand GC 比率 | base µs/byte | cand µs/byte |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `complex` | 5.920 ms | 5.998 ms | 7.739 | 7.204 | 12.79 MB | 12.77 MB | 1.03% | 0.90% | 18.16 | 18.40 |
+| `complex-x4` | 23.666 ms | 24.678 ms | 31.044 | 30.234 | 48.91 MB | 49.25 MB | 2.48% | 2.50% | 18.30 | 19.09 |
+| `complex-x16` | 104.550 ms | 114.178 ms | 140.365 | 137.441 | 194.79 MB | 193.79 MB | 9.55% | **7.87%** | 20.19 | 22.05 |
+| `complex-x64` | 558.187 ms | **498.397 ms** | 673.359 | 656.229 | 772.26 MB | 760.42 MB | 28.99% | **20.71%** | 26.68 | **23.82** |
+
+- **`complex-x64` は最小値で -10.7%、GC 比率 28.99% → 20.71%。** GC ログでは pause 合計が 34.1→23.6 s / 42.3→28.1 s
+  （ラウンドごと、-31〜-33%）、1 回あたりの pause が 137 ms → 76 ms（**-45%**、= live 集合の効果）。
+- **`complex` は窓（1,024）より短いので evict が 1 件も起きない。** 差分は `observeCursor` の 1 呼び出し
+  （transaction begin あたり、`complex` で 13,986 回）だけで、最小値 +1.3%。
+- `complex-x4` / `complex-x16` の最小値が悪化しているのは負荷の当たり外れで、同じラウンド内で比べると逆転する
+  （x16 ラウンド2: base 104.5/127.7/124.0、cand 127.4/115.4/114.2）。中央値と GC 比率は両方とも cand が良い。
+- **µs/byte 倍率（`complex` → `complex-x64`）: ×1.469 → ×1.295。受け入れ条件の ×1.2 は未達。**
+- GC pause を引いた µs/byte 倍率は **base ×1.054 / cand ×1.036** で、ケース32〜34 と同じく**パーサ本体は線形**。
+
+既定モード（`legacy-bench.sh root`、`Diagnostics.DETAILED`）の退行確認。**このパスだけは load average 33〜59 の窓に当たり、
+2 ラウンド（各 3 run）しか取れていない**ので、中央値は信用できない。GC 比率と割当は負荷に依らないので、そちらを見る。
+
+| fixture | base 最小 | cand 最小 | base 中央値 | cand 中央値 | base 割当 | cand 割当 | base GC 比率 | cand GC 比率 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| `complex` | 10.590 ms | 11.926 ms | 14.704 | 14.025 | 16.46 MB | 16.48 MB | 0.95% | 1.89% |
+| `complex-x4` | 49.665 ms | 46.847 ms | 60.615 | 53.121 | 62.92 MB | 63.27 MB | 3.07% | 2.91% |
+| `complex-x16` | 217.333 ms | 234.533 ms | 344.379 | 347.621 | 248.58 MB | 248.97 MB | 12.70% | **8.98%** |
+| `complex-x64` | 1366.972 ms | **927.720 ms** | 1513.526 | 1712.868 | 997.54 MB | 990.95 MB | 35.74% | **16.90%** |
+
+**割当は全サイズで ±0.6% 以内**（施策は割当を動かさない）、**GC 比率は大きい入力で確実に下がる**（x64 で 35.74% → 16.90%）。
+`complex-x64` の倍率はこのパスだと base ×2.011 / cand ×1.212 になるが、base の ×2.011 は round 3 の ×1.570 より悪く、
+**負荷の混入ぶんである**。`DETAILED` の数字は退行が無いことの確認にとどめ、受け入れ条件の判定には
+静穏側の `root-deferred`（4 ラウンド）を使う。
+
+### #276 の ×1.2 について: **未達**。ただし残差の分解は round 3 から変わった
+
+| round | `complex` µs/byte | `complex-x64` µs/byte | 倍率 | x64 の GC 比率 |
+|---|---:|---:|---:|---:|
+| round 3 base（`DETAILED_ON_FAILURE`） | 24.42 | 31.78 | ×1.301 | 26.67% |
+| round 3 cand | 18.96 | 27.18 | ×1.434 | 27.90% |
+| **round 4 base（= round 3 cand）** | 18.16 | 26.68 | ×1.469 | 28.99% |
+| **round 4 cand** | **18.40** | **23.82** | **×1.295** | **20.71%** |
+
+round 3 は CPU を削ったので「GC がほぼ無い小入力ほど効いて倍率が悪化した」。
+**round 4 は逆に、GC 律速の大入力だけに効く施策なので倍率が改善する。** 残っている ×1.295 の内訳は
+
+- `complex-x64` の GC 比率 **20.71%**（`complex` は 0.90%）。GC pause を引くと ×1.036。
+- **つまり残りはまだ全部 collector である。** live 集合のうち memo が抱えていた 24 MB は消えたが、
+  **残り 37.9 MB は CST 本体（`Token` 81,676 + `StringSource` 81,229 + `TokenList` 164,044）で、これは構文木そのもの**である。
+  1 parse が入力長ぶんの木を作る以上 O(N) は避けられず、これを削るには
+  「sub-source を root の view にする」（ケース32 の 1 番、`StringSource` 81,229 個分）か、
+  `TokenList` の裏の空 `ArrayList` 2 本の遅延化（ケース33 / 34 の残件）しかない。
+- 割当（第 1 因子）は -1.5% しか動いていない。**今回の施策は純粋に第 2 因子（live 集合）だけを動かした**もので、
+  ケース32 の式のどちらを削ったかがそのまま結果に出ている。
+
+### 検証
+
+- `unlaxer-common` 699 件（新規 3 件を含む）/ `unlaxer-dsl` 1,012 件（skip 23）緑。
+- isolated maven repo で tinyexpression 全テスト **769 件（skip 10）緑**（`c70416e1` を候補 jar で再ビルド）。
+  深い入れ子式の `P4PackratFraudFormulaTest` もここに含まれる（入力が窓より短いので evict が 1 件も起きない）。
+- hit 数の同一性: 9 fixture × `root` / `root-deferred` × evict on/off で失敗 hit・成功 hit とも完全一致、under-run 0。
+- 診断の同値性: 72 通りのダンプが base / cand で byte 一致。窓 8 位置（強制 evict）でも一致。
+- 新規テスト: `MemoEvictionTest`（hit 数が evict の有無で変わらず entry 数は頭打ちになる /
+  watermark より前への照会が窓を広げる / 窓より短い入力では 1 件も捨てない）。
+- 計測条件: `ubnfc/examples/p4-java/scripts/legacy-bench.sh`、`Memoization.SAFE_FAILURES`、
+  `-Xss512m -Xms2g -Xmx2g`、`taskset -c 24`（1 CPU → Serial GC）、jar-first classpath、
+  build ごとの isolated maven repo で tinyexpression `c70416e1` を再ビルド、fixture ごとに base/cand を交互。
+  **ホストは共有で load average 8〜59。`root-deferred` は 4 ラウンド、`root` は 2 ラウンド。**
+
+### Java / Rust の対称性
+
+`rust/unlaxer-runtime` の `FailureMemoBuckets` も**同じく入力長に比例して増え続ける**。
+`insert` は `remaining` を必要なだけ `resize_with` で伸ばすだけで、どのバケットも parse 終了まで解放されない。
+つまり live 集合が O(入力) なのは Java 固有の設計ミスではなく、両実装に共通の性質である。
+
+違うのは**その代償**のほうである。Rust には GC が無いので「live 集合 × GC 回数」の積が生じず、
+効くのはピーク常駐量とハッシュ表の局所性だけである（同じ比較で tinyexpression-rs は ×1.17 で、
+Java の ×1.4〜1.6 のような超線形は観測されていない）。値も軽く、`Diagnostics::DetailedOnFailure` では
+`FailureDiagnostic::default()` しか入らず、成功 memo（CST の deep copy）に相当するものが無い。
+バケットは既に scalar 位置 / 256 で整列しているので、同じ窓方式は `remaining[..k]` を差し替えるだけで入る。
+
+**緊急性が違うので本 PR では実装せず、同じ梃子で Rust 側の issue を立てた**（受け入れ条件は
+「窓より前のバケットを落とす」「watermark より前への照会で窓を広げる」「hit 数が evict の有無で変わらない」）。
+
+### 教材としての要点
+
+- **「証明できる不変条件」と「役に立つ不変条件」は別である。** committed frontier は厳密に正しいのに、
+  最下段の transaction が位置 0 に居座るせいで**一度も進まない**。
+  不変条件を書いたら、**それが実際にどう動くかを 1 回測る**（今回は 0 のままだった）。
+  そこで諦めずに、「戻ってくる距離」を直接測って窓にした。
+- **キャッシュの正しさと、キャッシュの効き目は別の証明でよい。** memo 表は純粋なキャッシュで、
+  捨てても結果は変わらない（miss は再 parse するだけ）。だから**厳密な証明が要るのは「結果」ではなく「hit 率」だけ**で、
+  hit 率は実行時カウンタで測れる。今回は「watermark より前への照会を数え、起きたら窓を倍以上に広げる」
+  という自己修復を入れたので、窓の見積もりを外しても**等比級数ぶんの損で従来の挙動へ戻る**。
+  最悪ケースが「遅くなる」ではなく「元に戻る」で抑えられるなら、ヒューリスティックは採用してよい。
+- **「どこまで戻るか」は入力長に比例しない。** 入力を 64 倍にしても最大 look-back は 78 位置のままだった。
+  packrat の表を入力長ぶん持つのは、この距離を測っていないからである。
+  **表のサイズを決めるのは入力長ではなく文法の backtrack 距離**で、後者は測れる。
+- **evict の hook を置く場所は「自分の entry がまだ書かれていない所」。** `commitSuccess` は
+  commit → endParse → put の順なので、commit の finally で evict すると直前の rule の entry を自分で捨ててしまう。
+  transaction の `begin` はその隙間が無い唯一の点だった。
+- **索引ノードを別に作らない。** 位置ごとの連結リストは entry 自身のフィールド 3 本で足りる。
+  「evict のために索引を足したら割当が増えた」では本末転倒になる。
