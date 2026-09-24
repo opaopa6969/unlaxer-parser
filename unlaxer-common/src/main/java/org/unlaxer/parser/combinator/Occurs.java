@@ -35,6 +35,12 @@ public interface Occurs extends MetaFunctionParser , NonTerminallSymbol {
 		 * Same conservative FIRST-set test as ChoiceInterface: when the body cannot start on the next
 		 * code point the loop is already over, so the body is not evaluated even once. A terminator
 		 * has to be consulted before the body, so repetitions that own one keep the ordinary path.
+		 *
+		 * Unlike a choice candidate or a chain element, the body runs inside this repetition's own
+		 * transaction, which is committed afterwards. A failing terminal still calls consume(0), and
+		 * consuming resets the matched cursor to the consumed one, so after a lookahead (MatchOnly)
+		 * has moved the matched cursor ahead, even a failed body is observable. The body is therefore
+		 * skipped only while the two cursors coincide, where that reset changes nothing.
 		 */
 		boolean excludeBody = false == invertMatch && terminator.isEmpty()
 			&& parseContext.isCandidateExclusionEnabled();
@@ -46,7 +52,9 @@ public interface Occurs extends MetaFunctionParser , NonTerminallSymbol {
 		  CodePointIndex startPosition = parseContext.getPosition(tokenKind);
 			
 			if (excludeBody
-				&& false == bodyFirstSet.mayStartWith(parseContext.lookaheadCodePoint(tokenKind))) {
+				&& false == bodyFirstSet.mayStartWith(parseContext.lookaheadCodePoint(tokenKind))
+				&& parseContext.getPosition(TokenKind.consumed).value()
+					== parseContext.getPosition(TokenKind.matchOnly).value()) {
 				break;
 			}
 			

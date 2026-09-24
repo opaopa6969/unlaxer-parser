@@ -253,6 +253,34 @@ public class FirstSetExclusionTest {
     }
   }
 
+  /**
+   * Regression (RustConformanceTest, LOOKAHEAD corpus): a failing terminal inside a repetition still
+   * resets the matched cursor to the consumed one, and the repetition commits. After a lookahead has
+   * moved the matched cursor, skipping that body would let the next lookahead see a different
+   * position, so {@code (T) ['x'] (U) 'ab'} must keep rejecting "ab" exactly as without exclusion.
+   */
+  @Test
+  public void aSkippedRepetitionBodyCannotHideTheMatchedCursorReset() {
+    Parser word = new org.unlaxer.parser.combinator.Chain(
+        new org.unlaxer.parser.combinator.MatchOnly(new WordParser("a")),
+        new Optional(new WordParser("x")),
+        new org.unlaxer.parser.combinator.MatchOnly(new WordParser("b")),
+        new WordParser("ab"), new org.unlaxer.parser.elementary.EndOfSourceParser());
+    Parser group = new org.unlaxer.parser.combinator.Chain(
+        new org.unlaxer.parser.combinator.MatchOnly(new WordParser("a")),
+        new Optional(new org.unlaxer.parser.combinator.Chain(new WordParser("x"))),
+        new org.unlaxer.parser.combinator.MatchOnly(new WordParser("b")),
+        new WordParser("ab"), new org.unlaxer.parser.elementary.EndOfSourceParser());
+    for (Memoization memoization : Memoization.values()) {
+      Observation rejected = parse(word, "ab", Diagnostics.DETAILED, memoization);
+      assertFalse(rejected.succeeded());
+      assertEquals(rejected, parse(word, "ab", Diagnostics.DETAILED_ON_FAILURE, memoization));
+      Observation accepted = parse(group, "ab", Diagnostics.DETAILED, memoization);
+      assertTrue(accepted.succeeded());
+      assertEquals(accepted, parse(group, "ab", Diagnostics.DETAILED_ON_FAILURE, memoization));
+    }
+  }
+
   /** A recursive grammar makes the parser graph cyclic; the analysis has to reach a fixed point. */
   static final class Expression extends LazyChoice implements SafeFailureMemoizable {
     private static final long serialVersionUID = 1L;

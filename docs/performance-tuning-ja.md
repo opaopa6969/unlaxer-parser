@@ -2842,6 +2842,23 @@ UBNF の `RuleDecl ::= Annotation* IDENTIFIER …` の FIRST から `@` が落�
 nullable でも**先頭集合は外側の chain に union される**ので保存値そのものが必要である。`FirstSet` に構造的な `equals` を入れて
 それで比べるように直し、回帰テスト（`aNullableRepetitionKeepsGrowingItsStartSetUntilTheFixedPoint`）を足した。
 
+### 見つかった不具合 2: 失敗した評価にも副作用がある（反復の本体だけ）
+
+CI の `RustConformanceTest`（`-DrustConformance=true`、ローカルの素の `mvn test` では skip）が
+`token T = LOOKAHEAD('a')`、`token U = LOOKAHEAD('b')`、`(T) [ 'x' ] (U) 'ab'` を `"ab"` で**受理してしまう**ことを捕まえた（正しくは拒否）。
+`AbstractTokenParser` は失敗しても `consume(0)` を呼び、consume は **matched cursor を consumed cursor に戻す**。
+`MatchOnly` が matched を 1 に進めたあとで `[ 'x' ]` の本体 `'x'` が失敗すると matched が 0 に戻り、`U` は `a` を見て失敗する。
+本体を評価せずに飛ばすとこの巻き戻しが起きず、`U` が `b` を見て通ってしまう（`[ ('x') ]` の方は本体が chain で、
+自分の transaction の中で失敗して捨てられるので巻き戻しが外に漏れず、元から受理される）。
+
+choice の候補と chain の要素は、評価が必ず**捨てられる transaction の中**で起きるので同じ漏れは無い。反復の本体だけが
+**後で commit される反復自身の transaction の中**で評価される。そこで反復の本体は **consumed と matched が一致しているときだけ**飛ばす
+（一致していれば巻き戻しは何も変えない。実測で計数の変化は無い）。最小再現を回帰テスト
+`aSkippedRepetitionBodyCannotHideTheMatchedCursorReset` にした。
+
+最初の健全性監査は「除外した候補が実際に**成功**するか」しか見ていなかったので、これを見逃した。
+**除外の健全性は「成功しないこと」だけでなく「失敗の副作用が観測されないこと」まで要る。**
+
 ### 並行性と shadow
 
 parser はスレッド間で共有される singleton なので、解析は `FirstSets` のロック下で部分グラフごとに行い、
@@ -2891,9 +2908,9 @@ tinyexpression `c70416e1` を build ごとの isolated maven repo で再ビル�
 
 ### 検証
 
-- `unlaxer-common` 713 件 / `unlaxer-dsl` 1,024 件（skip 23）緑（#301 の golden 再生成込み）。
+- `unlaxer-common` 714 件 / `unlaxer-dsl` 1,024 件（skip 23、`-DrustConformance=true` では skip 3）緑（#301 の golden 再生成込み）。
 - isolated maven repo で tinyexpression `c70416e1` を候補 jar で再ビルドし、全テスト **769 件（skip 10）緑**。base も同じ。
-- 140 通りの同値性ダンプ（上記）、健全性監査で成功した除外 0 件。
+- 140 通りの同値性ダンプ（上記）、健全性監査で成功した除外 0 件、`-DrustConformance=true` の言語横断コーパス緑。
 
 ### Java / Rust の対称性
 
@@ -2910,7 +2927,9 @@ trivia を先頭に持つ規則・再帰規則は除外できない。除外は 
   入力に依存する記録を静的に再現しようとすると、正しさの証明が文法ごとに要る。
 - **nullable は比較の罠。** 「何でも通す」集合同士は外から見ると区別できないが、中身は外側に伝播する。不動点の収束判定は答えでなく状態で行う。
 - **除外の健全性は「除外したものを実際に走らせる」監査で確かめる。** 2 つの独立な実装（CST ダンプと監査フック）のうち、
-  不具合を捕まえたのは監査の方だった（CST ダンプの 140 通りには `@` で始まる規則を持つ文法が無かった）。
+  1 つ目の不具合を捕まえたのは監査の方だった（CST ダンプの 140 通りには `@` で始まる規則を持つ文法が無かった）。
+  2 つ目（失敗の副作用）は監査も素通りし、**lookahead を組み合わせた言語横断コーパス**（CI の rustConformance）が捕まえた。
+  「成功しないこと」の監査は必要条件でしかない。
 
 ### これで旧版コンビネータ runtime の速度作業は打ち止めにする
 
