@@ -453,3 +453,7 @@ curl http://127.0.0.1:9228/healthz
 - Min role: MEMBER
 
 設計の詳細は `docs/mcp/DESIGN.md`、デプロイ状況は `docs/mcp/STATUS.md` を参照してください。
+
+## Classic と ubnfc の選び方
+
+このリポジトリのコンビネータ実行系（**unlaxer Classic**）と、UBNF コンパイラ **ubnfc** のどちらを使うかの目安: [docs/engine-selection-guide-ja.md](docs/engine-selection-guide-ja.md)
