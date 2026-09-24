@@ -12,6 +12,17 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 - Java `Memoization.SAFE_FAILURES` also replays safe successes for exact classes directly implementing `SafeSuccessMemoizable`. Entries retain rule-local diagnostics, independent token snapshots, cursors, and choice selections.
 - The Java generator proves success safety transitively, excludes listener/state-dependent rules and uncertified custom tokens, and marks generated whitespace delimitors. Runtime replay also covers their `Occurs` entry point. Memoization remains off by default; Rust behavior and generated Rust sources are unchanged.
 
+### Changed
+- The packrat memo table no longer keeps every entry for the whole parse. Entries whose start
+  position falls more than `unlaxer.memo.window` code points (default 1024) behind the furthest
+  position the cursor reached are dropped, which bounds the memo live set by the grammar's
+  backtracking distance instead of the input length; on a 20 KB input the peak entry count falls
+  from 102,054 to 8,424 with identical memo hit counts. Eviction cannot change a parse result — a
+  miss simply re-parses — and a probe below the watermark widens the window past twice the
+  observed look-back, so a grammar that backtracks further degrades to the previous behaviour.
+  Inputs shorter than the window are untouched. Set `-Dunlaxer.memo.evictBelowFrontier=false` to
+  restore the previous table. Rust behavior is unchanged.
+
 ## [3.0.15] - 2026-09-01
 
 ### Added

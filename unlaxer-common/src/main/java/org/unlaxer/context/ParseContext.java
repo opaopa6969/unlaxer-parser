@@ -129,6 +129,9 @@ public class ParseContext implements
     }
 
     void checkpointTransactionalState(TransactionElement frame) {
+        if (packratMemoTable != null) {
+            observeMemoCursor(frame.getPosition(TokenKind.consumed).value());
+        }
         recordMemoTransactionBegin();
         transactionalFrames.add(frame);
         frame.saveMemoizationStateVersion(memoizationStateVersion);
@@ -153,6 +156,47 @@ public class ParseContext implements
         }
         recordMemoTransactionFinish(restore
             ? MemoTransactionEvent.ROLLBACK : MemoTransactionEvent.COMMIT);
+    }
+
+    /**
+     * Bounds the memo live set by dropping entries the parse is very unlikely to reach again
+     * (#276 round 4). Called on every transaction begin, which is the one place where no memo
+     * insertion for a just-finished rule is still pending.
+     *
+     * <p>The exact invariant would be the <em>committed frontier</em>: the smallest consumed
+     * cursor among the open transactions. Transactions nest and {@link Transaction#begin} copies
+     * the enclosing cursor, so those cursors are non-decreasing from the bottom of the stack up,
+     * and every future probe starts at or above the smallest of them — a rollback returns the
+     * cursor to some still-open transaction and consuming only moves it forward. The frontier is
+     * therefore the cursor of the bottom-most open transaction, which is this context's own root
+     * element: it is created at position 0, is never popped, and only takes the outermost
+     * parser's end cursor when the whole parse finishes — measured over a 20 KB parse it stays at
+     * 0 throughout. Excluding it leaves the outermost <em>parser</em> transaction, which does
+     * advance but lags the cursor by 4,622 positions on average and 13,292 at worst on that same
+     * input, because a parent's cursor only moves when a direct child commits. The sound frontier
+     * is exact and far looser than what the grammar actually needs: over the same parse, no memo
+     * hit ever reached further back than 78 positions.
+     *
+     * <p>What does advance is the cursor itself, so the table keeps a window of positions behind
+     * its high-water mark instead. That is a measured bound, not a proof, so it is guarded:
+     * <ul>
+     *   <li>Eviction cannot change a parse result. {@link PackratMemoTable#lookup} is a pure
+     *       cache probe; a miss re-parses the rule, and both {@code replayMemoTransactionEvents}
+     *       and {@code replayFailureDiagnostic} exist only to make a hit indistinguishable from
+     *       that re-parse. Nothing outside the table references an entry, and late
+     *       {@link #registerTransactionalState} is unaffected because a re-parse records the real
+     *       transaction events rather than replaying stored ones.</li>
+     *   <li>Only the hit rate is at risk, and the table counts every probe that lands below its
+     *       watermark and widens the window past twice the observed look-back. A grammar that
+     *       backtracks further than the window therefore pays a geometric series of re-parses and
+     *       then behaves exactly as before, rather than losing hits for the rest of the parse.</li>
+     *   <li>Failure and success entries are treated alike, and the key's matched position and
+     *       state version are ignored: only the consumed start position is compared, and a
+     *       probe's consumed position is the cursor itself.</li>
+     * </ul>
+     */
+    private void observeMemoCursor(int cursor) {
+        packratMemoTable.observeCursor(cursor);
     }
 
     private void checkpointState(TransactionElement frame, TransactionalState state) {
