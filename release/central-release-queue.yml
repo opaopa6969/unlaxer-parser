@@ -25,7 +25,16 @@ nextWindow:
   candidates:
     - repository: opaopa6969/unlaxer-parser
       status: collecting
-      requestedVersion: null
+      requestedVersion: "3.1.0"
+      note: >-
+        Backward-compatible minor: spec corrections (#277), bootstrap fixes
+        (#278/#282/#284 — trailing input rejected, empty grammar accepted,
+        chained dotted refs), runtime perf rounds 1-6 (#276/#263/#292,
+        cases 32-37). Deprecated Token field removal deferred to 4.0.
     - repository: opaopa6969/tinyexpression
       status: collecting
-      requestedVersion: null
+      requestedVersion: "1.5.0"
+      note: >-
+        Opt-in ubnfc emitter mode (dependency-free generated P4 parser vendored,
+        ubnfc issue #62 facade) — needs no new unlaxer version; can take the
+        2026-11 slot after unlaxer 3.1.0, or 2026-10 if preferred.
