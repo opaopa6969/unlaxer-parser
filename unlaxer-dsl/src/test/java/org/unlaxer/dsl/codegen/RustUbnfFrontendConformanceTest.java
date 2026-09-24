@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.junit.Rule;
 import org.junit.Test;
@@ -18,12 +19,33 @@ import org.junit.rules.TemporaryFolder;
 import org.unlaxer.dsl.bootstrap.UBNFAST;
 import org.unlaxer.dsl.bootstrap.UBNFMapper;
 
-/** Native frontend comparison only: no Rust backend assumptions or Java class loading. */
+/**
+ * Native frontend comparison only: no Rust backend assumptions or Java class loading.
+ *
+ * <p><b>This test only runs when {@code -DrustConformance=true} is passed and a {@code rustc}
+ * toolchain is on {@code PATH}.</b> A plain local {@code mvn test} skips it, so in practice it is
+ * verified by the CI job "Rust backend and Java conformance" (see {@code .github/workflows/maven.yml}).
+ * To run it locally: {@code mvn -pl unlaxer-common,unlaxer-dsl -am test
+ * -Dtest=RustUbnfFrontendConformanceTest -DrustConformance=true}. The skip reason is printed to
+ * stdout so a skipped run is visible in the surefire output instead of silently passing (#282).
+ */
 public class RustUbnfFrontendConformanceTest {
     @Rule public TemporaryFolder temporary = new TemporaryFolder();
     private final Path repo = Path.of("..").toAbsolutePath().normalize();
 
+    /**
+     * negative.tsv cases where both frontends must not only reject, but reject at the same
+     * 1-based line/column. #282: the spec's {@code UBNFFile ::= { '//' LINE_COMMENT } GrammarDecl+}
+     * leaves no room for residual input, so trailing garbage is a positioned error on both sides.
+     */
+    private static final Set<String> POSITIONED_REJECTIONS = Set.of("trailing-input", "trailing-input-no-space");
+
     @Test public void nativeFrontendMatchesJavaSyntaxAndRecordsKnownMapperDifferences() throws Exception {
+        if (false == Boolean.getBoolean("rustConformance")) {
+            System.out.println("[assumption] RustUbnfFrontendConformanceTest skipped:"
+                + " requires -DrustConformance=true and a rustc toolchain on PATH."
+                + " Verified by the CI job \"Rust backend and Java conformance\".");
+        }
         assumeTrue("enable with -DrustConformance=true (requires rustc)", Boolean.getBoolean("rustConformance"));
         Path crate = repo.resolve("rust/unlaxer-ubnf");
         Path library = temporary.getRoot().toPath().resolve("libunlaxer_ubnf.rlib");
@@ -57,11 +79,14 @@ public class RustUbnfFrontendConformanceTest {
             Files.writeString(source, input);
             JsonObject nativeResult = inspect(binary, source);
             assertTrue(parts[0] + " " + nativeResult, nativeResult.has("error"));
-            if (parts[0].equals("trailing-input")) {
-                assertEquals(1, UBNFMapper.parse(input).grammars().size());
-                report.add(parts[0] + "\tknown-prefix-acceptance\taccepted-prefix\t" + nativeResult);
+            RuntimeException javaError = assertThrows(parts[0], RuntimeException.class, () -> UBNFMapper.parse(input));
+            if (POSITIONED_REJECTIONS.contains(parts[0])) {
+                String position = "line " + nativeResult.get("line").getAsInt()
+                    + ", column " + nativeResult.get("column").getAsInt();
+                assertTrue(parts[0] + ": java=" + javaError.getMessage() + " rust=" + nativeResult,
+                    javaError.getMessage().contains(position));
+                report.add(parts[0] + "\treject-same-position\t" + position + "\t" + nativeResult);
             } else {
-                assertThrows(parts[0], RuntimeException.class, () -> UBNFMapper.parse(input));
                 report.add(parts[0] + "\treject\trejected\t" + nativeResult);
             }
         }

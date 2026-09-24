@@ -4,6 +4,10 @@
 - 共通の入力・期待値・ソース位置・失敗条件で比較し、片側だけのテスト成功を両方の完了根拠にしない。
 - 言語固有の制約や段階的実装による差は、対応表・issue・受け入れ条件に明記する。片側が未対応のまま共通機能を完了扱いにしない。
 - 新しい機能提案をissue化するときも、Java / Rust双方の実装と検証を受け入れ条件に含める。
+- `RustUbnfFrontendConformanceTest` など `-DrustConformance=true` を要するテストは、**素の `mvn test` では skip され CI でしか検証されない**。
+  frontend の受理/拒否や UBNFMapper の挙動を変えたら、ローカルでも `rustc`（`rustup` で導入）を用意して
+  `mvn -pl unlaxer-common,unlaxer-dsl -am test -Dtest=RustUbnfFrontendConformanceTest -DrustConformance=true` を実行する。
+  skip された場合は surefire の標準出力に `[assumption] ...` として理由が出る。
 
 ## DGE — Dialogue-driven Gap Extraction
 
