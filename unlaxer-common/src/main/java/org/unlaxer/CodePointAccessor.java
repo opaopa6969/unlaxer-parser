@@ -38,6 +38,16 @@ public interface CodePointAccessor extends Comparable<CodePointAccessor> {
     return new CodePoint(sourceAsString().codePointAt(toStringIndex(index).value()));
   }
 
+  /**
+   * The code point at {@code index}, or {@code -1} when the index is outside this source. Unlike
+   * {@link #codePointAt(CodePointIndex)} it allocates nothing and does not materialise the source
+   * as a String, so a parser can read the next input character on every rule evaluation.
+   */
+  default int codePointValueAt(int index) {
+    return index < 0 || index >= codePointLength().value() ? -1
+        : codePointAt(new CodePointIndex(index)).value();
+  }
+
   default CodePoint codePointBefore(CodePointIndex index) {
     return new CodePoint(sourceAsString().codePointBefore(toStringIndex(index).value()));
   }

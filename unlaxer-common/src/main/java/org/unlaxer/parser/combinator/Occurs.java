@@ -7,6 +7,8 @@ import org.unlaxer.Parsed;
 import org.unlaxer.TokenKind;
 import org.unlaxer.context.ParseContext;
 import org.unlaxer.context.PackratMemoTable;
+import org.unlaxer.parser.FirstSet;
+import org.unlaxer.parser.FirstSets;
 import org.unlaxer.parser.MetaFunctionParser;
 import org.unlaxer.parser.NonTerminallSymbol;
 import org.unlaxer.parser.Parser;
@@ -29,11 +31,24 @@ public interface Occurs extends MetaFunctionParser , NonTerminallSymbol {
 		parseContext.begin(this);
 		int matchCount = 0;
 		Optional<Parser> terminator = getTerminator();
+		/*
+		 * Same conservative FIRST-set test as ChoiceInterface: when the body cannot start on the next
+		 * code point the loop is already over, so the body is not evaluated even once. A terminator
+		 * has to be consulted before the body, so repetitions that own one keep the ordinary path.
+		 */
+		boolean excludeBody = false == invertMatch && terminator.isEmpty()
+			&& parseContext.isCandidateExclusionEnabled();
+		FirstSet bodyFirstSet = excludeBody ? FirstSets.of(getChild()) : null;
 		while (true) {
 		  
 //		  infiniteLoopDetector.incrementsAndThrow(1000);
 		  
 		  CodePointIndex startPosition = parseContext.getPosition(tokenKind);
+			
+			if (excludeBody
+				&& false == bodyFirstSet.mayStartWith(parseContext.lookaheadCodePoint(tokenKind))) {
+				break;
+			}
 			
 			if(terminator.isPresent()){
 				parseContext.begin(this);
