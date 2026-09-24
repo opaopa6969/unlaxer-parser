@@ -2736,6 +2736,209 @@ live と違って割当はクラスで切り分けられないので、**候補�
   読み取りでは同じでも、`set` / `remove(int)` / `addAll(int,…)` の例外型と `listIterator()` / `subList()` の
   可変性が違う。**「読み取りは共有、書き込みで差し替え」だけでは足りず、例外の同値まで見る**。
 
+## ケース37: 実行時 FIRST 集合で候補を評価せずに落とす（Java、#292 round 6 ── コンビネータ runtime の最終ラウンド）
+
+### 出発点
+
+ケース32〜36 でパーサ本体は線形と確定し、残る CPU は**回数**の問題になった。`complex`（325 code point）で
+1 byte あたり rule 評価 44・transaction 43・memo 参照 36・Token 生成 44。同じ文法を ubnfc は rule 評価 1.8/byte で走らせ、
+その最大の要因は FIRST 集合による候補除外だった（`ubnfc/docs/reports/2026-09-22-p4-java-perf-m5.md` 第 4 段）。
+round 6 はその考えを**文法も生成物も変えずに** runtime だけで入れる。
+
+### 設計
+
+**`FirstSets`（新規）が、各 `Parser` について「成功する match の先頭になり得る code point の集合」と
+nullable を、コンビネータグラフ上の最小不動点として初回に 1 度だけ計算する。** 表現は `FirstSet`
+（ASCII 0〜127 を `long` 2 語の bitset、それ以上は「非 ASCII で始まり得る」フラグ 1 つ、nullable、unknown）。
+
+| 構成子 | 規則 |
+|---|---|
+| `ChoiceInterface`（`LongestChoice` を含む） | 候補の union。nullable は「どれかが nullable」 |
+| `ChainInterface` | 先頭から nullable な要素の FIRST を union し、最初の非 nullable 要素で止める。全要素 nullable なら nullable |
+| `Occurs`（`ZeroOrMore` / `OneOrMore` / `Optional` / `Repeat` …） | 本体（＋terminator、保守側）の FIRST。`min() == 0` か本体が nullable なら nullable |
+| `WordParser` / `IgnoreCaseWordParser` | 先頭 1 code point（ignoreCase は大小両方）。空語は nullable |
+| `SingleCharacterParser`（`posix/*` `ascii/*` を含む） | `isMatch(cp)` を 0〜127 で走査した正確な bitset ＋ 非 ASCII は「あり得る」 |
+| **それ以外すべて**（`Not` / `MatchOnly` / `PropagatableSource` による反転 / `ParserWrapper` / `SyncPointRecoveryParser` / `ContainerParser` / 参照系 / 独自 `parse` を持つもの / 子が空のもの） | **unknown**（全 code point で「あり得る」＝決して除外しない） |
+
+trivia は ParseContext ではなく **chain の先頭子（`SpaceDelimitor`、nullable な `ZeroOrMore`）**として存在するので、
+nullable 前置の union で空白・`/` が FIRST に自然に入る（`ChoicePredictor.mayStartWithUnconsumedTrivia` のような特別扱いは要らない）。
+
+**除外は 3 か所。** `ChoiceInterface` は次の code point が FIRST に無い候補を `begin` 前に飛ばす。
+`ChainInterface` は要素ごとに（cursor が動くので毎回読み直して）FIRST に無ければその時点で chain を失敗にする。
+`Occurs` は terminator の無い反復で、本体が次の code point で始まれないなら 1 回も評価せずにループを終える。
+どれも `invertMatch` のときは使わない（端末の受理集合が反転するため）。
+
+**適用条件は `ParseContext.isCandidateExclusionEnabled()`**: `DETAILED_ON_FAILURE`、trial 記録なし、parser listener なし、
+additional commit action なし、memo 非透過な transaction listener なし。`-Dunlaxer.parser.firstSetExclusion.disabled=true` で丸ごと切れる。
+
+### 静的再生をしなかった理由（DETAILED は構造的に不変）
+
+issue は「除外した候補の expected を静的に加える」ことを求めていた。Java の診断を調べると、
+失敗 1 件ごとに `(失敗した parser, その時点の最深 TerminalSymbol)` の組が identity で記録され、
+**どの parser が走るかは入力に依存する**（例: `Chain[Not(X), Y]` は `X` が先頭文字に一致すれば `Y` に入らない）。
+除外した候補の「記録されたはずの組の列」を入力から独立に再構成することは一般にはできないので、
+byte 一致を保証できる静的再生は作れない。一方、`DETAILED_ON_FAILURE` では `registerFailureCandidate` が何も記録せず、
+失敗を説明したい呼び出し側（生成 mapper の `AUTO`）は**新しい `DETAILED` context で parse し直す**。
+よって**除外は `DETAILED_ON_FAILURE` に限り、`DETAILED` は 1 命令も変えない**ことにした。
+診断は「同じになるように作る」のではなく「除外する経路では記録が存在しない」ことで同値になる。
+
+同じ調査で、issue の施策2（expected の蓄積を失敗時だけに）は**既に成立している**と分かった。
+`addAll`（ケース32 の 525/byte）の呼び出し元 `mergeFrame` / `replayFailureDiagnostic` は `deferredDiagnostics` で
+早期 return しており、deferred の計数は round 6 の前から **0** である（下表）。`DETAILED` では成功した規則の内側の失敗も
+最遠失敗になり得るので、成功経路の merge は意味論として外せない。
+
+### 数える（計数専用 build、1 parse、cold、`SAFE_FAILURES`）
+
+`root-deferred`（`DETAILED_ON_FAILURE`）。before は同じ build を `-Dunlaxer.parser.firstSetExclusion.disabled=true` で走らせた値で、
+ケース32 の表と一致する（complex 14,487 / 13,986 / 11,810 / 14,317）。
+
+| fixture | rule 評価 | transaction begin | memo lookup | Token 生成 | snapshot node | expected `addAll` |
+|---|---:|---:|---:|---:|---:|---:|
+| `complex` (325) | 14,487 → **8,384（-42.1%）** | 13,986 → **7,421（-46.9%）** | 11,810 → **6,704（-43.2%）** | 14,317 → **9,282（-35.2%）** | 1 → 1 | 0 → 0 |
+| `complex-x4` (1,293) | 56,119 → 32,784（-41.6%） | 53,606 → 28,630（-46.6%） | 45,417 → 26,001（-42.8%） | 55,874 → 36,586（-34.5%） | 0 → 0 | 0 → 0 |
+| `complex-x16` (5,179) | 222,163 → 129,900（-41.5%） | 211,382 → 112,762（-46.7%） | 179,493 → 102,837（-42.7%） | 221,798 → 145,498（-34.4%） | 0 → 0 | 0 → 0 |
+| `complex-x64` (20,923) | 888,979 → **521,004（-41.4%）** | 842,486 → **449,290（-46.7%）** | 715,797 → **410,181（-42.7%）** | 888,134 → **583,786（-34.3%）** | 0 → 0 | 0 → 0 |
+
+1 byte あたり（complex）: rule 44.6 → 25.8、transaction 43.0 → 22.8、memo 36.3 → 20.6、Token 44.1 → 28.6。
+memo hit も失敗 2,044 → 532、成功 3,172 → 1,946 に減る（参照そのものが減るため）。
+`DETAILED` は同じ build で 14,487 / 13,986 / 11,810 / 14,317 / snapshot 30,013 / `addAll` 120,150 のまま**完全に不変**。
+
+**受け入れ条件の「半減」には届いていない**（transaction は -47% でほぼ半減、rule -41%、Token -34%）。
+rule 評価を parser 別に数えると理由がはっきりする（`complex`、deferred）:
+
+| parser | before | after |
+|---|---:|---:|
+| `TinyExpressionP4SpaceDelimitor`（chain の要素間の trivia） | 3,329 | **2,098** |
+| `WordParser`（キーワード・記号） | 2,155 | **287（-87%）** |
+| `__CaptureSite` | 1,308 | 1,083 |
+| `AlphabetNumericUnderScoreParser` | 730 | 573 |
+| `Choice` | 426 | 236 |
+| 合計 | 14,487 | 8,384 |
+
+除外が効くべき所（キーワードの総当たり）は **-87%** まで落ちた。残りの首位は**成功経路の trivia**で、chain の要素の数＋1 回、
+空でも必ず評価されて CST に空 token を 1 個残す。これは「規則ごとに transaction・Token・memo・snapshot を作る」
+実行モデルそのものの回数で、CST の形を変えずには消せない。
+
+### 同値性
+
+- **ケース36 と同じ形の 140 通り**（16 fixture + 不正入力 19 件 × {`DETAILED`, `DETAILED_ON_FAILURE`} × memo {`OFF`, `SAFE_FAILURES`}）で
+  CST 全体・`ParseFailureDiagnostics` の全 getter・memo カウンタをダンプ（588,430 行）。**memo カウンタ行以外は byte 一致**
+  （memo 行を除いた md5 `2d1e205d…` が一致）。変わったのは `DETAILED_ON_FAILURE × SAFE_FAILURES` の 35 行だけで、
+  除外で memo 参照そのものが減るので当然である。`DETAILED` の memo 行は 1 件も変わらない。
+  kill switch を立てた候補は base と **memo 行まで含めて byte 一致**。
+- `ParseEqualityGoldenTest`（#301、tinycalc 280 通り）は **`-Dunlaxer.golden.regenerate=true` で作り直した**。
+  差分は 140 hunk すべてが `DETAILED_ON_FAILURE` 区画の `memo failureHits=…` / `transactions opened=…` 行で、
+  診断と CST の行は 0 行（CST はテスト内の不変条件でも突き合わせている）。上の理由で意図した変化である。
+- **健全性の監査**: 除外した候補を**その場で実際に走らせ、成功したら報告する**一時フックを入れた build で
+  `unlaxer-common` / `unlaxer-dsl` / tinyexpression の全テストを流し、**成功した除外は 0 件**。
+  この監査が不動点の収束判定の不具合を 1 件見つけた（下記）。
+
+### 見つかった不具合: nullable な集合は `mayStartWith` で比べてはいけない
+
+最初の版は不動点の収束を「0〜127 の各 code point で `mayStartWith` が同じか」で判定していた。
+nullable な集合は全 code point に `true` を返すので、**1 巡目に本体より先に評価された nullable 反復**
+（`ZeroOrMore(Annotation)` が 1 巡目では「nullable・先頭集合なし」）が、2 巡目に `@` を得ても「変化なし」と判定され、
+UBNF の `RuleDecl ::= Annotation* IDENTIFIER …` の FIRST から `@` が落ちた（`ParserScalingSmokeTest` が `@root` 付きの規則を拒否）。
+nullable でも**先頭集合は外側の chain に union される**ので保存値そのものが必要である。`FirstSet` に構造的な `equals` を入れて
+それで比べるように直し、回帰テスト（`aNullableRepetitionKeepsGrowingItsStartSetUntilTheFixedPoint`）を足した。
+
+### 見つかった不具合 2: 失敗した評価にも副作用がある（反復の本体だけ）
+
+CI の `RustConformanceTest`（`-DrustConformance=true`、ローカルの素の `mvn test` では skip）が
+`token T = LOOKAHEAD('a')`、`token U = LOOKAHEAD('b')`、`(T) [ 'x' ] (U) 'ab'` を `"ab"` で**受理してしまう**ことを捕まえた（正しくは拒否）。
+`AbstractTokenParser` は失敗しても `consume(0)` を呼び、consume は **matched cursor を consumed cursor に戻す**。
+`MatchOnly` が matched を 1 に進めたあとで `[ 'x' ]` の本体 `'x'` が失敗すると matched が 0 に戻り、`U` は `a` を見て失敗する。
+本体を評価せずに飛ばすとこの巻き戻しが起きず、`U` が `b` を見て通ってしまう（`[ ('x') ]` の方は本体が chain で、
+自分の transaction の中で失敗して捨てられるので巻き戻しが外に漏れず、元から受理される）。
+
+choice の候補と chain の要素は、評価が必ず**捨てられる transaction の中**で起きるので同じ漏れは無い。反復の本体だけが
+**後で commit される反復自身の transaction の中**で評価される。そこで反復の本体は **consumed と matched が一致しているときだけ**飛ばす
+（一致していれば巻き戻しは何も変えない。実測で計数の変化は無い）。最小再現を回帰テスト
+`aSkippedRepetitionBodyCannotHideTheMatchedCursorReset` にした。
+
+最初の健全性監査は「除外した候補が実際に**成功**するか」しか見ていなかったので、これを見逃した。
+**除外の健全性は「成功しないこと」だけでなく「失敗の副作用が観測されないこと」まで要る。**
+
+### 並行性と shadow
+
+parser はスレッド間で共有される singleton なので、解析は `FirstSets` のロック下で部分グラフごとに行い、
+結果は不変オブジェクトとして `ConcurrentHashMap` に公開する（8 スレッドが同じ parser で同時に初回 parse する
+`theLazyCacheIsSafeWhenThreadsParseTheSameParserInstance`）。当初は `AbstractParser` に `volatile` フィールドで持たせたが、
+**tinyexpression は `org.unlaxer.parser.AbstractParser` を自前の fork で shadow する**ため、tiny-first の classpath では
+そのフィールドが存在せず `NoSuchFieldError` で 345 件が落ちた。**shadow され得るクラスには状態を足さない**。
+map は parser の identity で引く（本ライブラリの parser は `equals` / `hashCode` を上書きしない）。上限 200,000 件で追加を止める。
+
+### A/B
+
+条件: `legacy-bench.sh`、`SAFE_FAILURES`、`-Xss512m -Xms2g -Xmx2g`、`taskset -c 24`（1 CPU → Serial GC）、jar-first classpath、
+tinyexpression `c70416e1` を build ごとの isolated maven repo で再ビルド、fixture ごとに base / cand を交互実行、`-Xlog:gc`。
+**ホストは他エージェントと共有で load average 7〜32**（計測中に x64 の 1 parse が 370 ms から 2,000 ms 超まで振れた）。
+このため wall の中央値は読めず、wall は最小値、加えて**負荷に依らない割当**と、**プロセス CPU 時間**（`getProcessCpuTime`、
+待ち時間を含まず GC を含む。5 ブロックの平均の最小）を主の指標にした。
+
+`root-deferred`（`DETAILED_ON_FAILURE`、4 ラウンド × 3 run = 各 12 run）:
+
+| fixture | base wall 最小 | cand wall 最小 | Δ | base 割当 | cand 割当 | Δ割当 | base CPU 最小 | cand CPU 最小 | ΔCPU |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `complex` (325) | 7.129 ms | **5.087 ms** | -28.6% | 11.16 MB | 7.15 MB | **-35.9%** | 6.40 ms | **3.30 ms** | **-48.4%** |
+| `complex-x4` (1,293) | 29.780 ms | **19.618 ms** | -34.1% | 43.04 MB | 27.85 MB | **-35.3%** | 23.33 ms | **13.67 ms** | **-41.4%** |
+| `complex-x16` (5,179) | 175.456 ms | **93.008 ms** | -47.0% | 168.99 MB | 109.87 MB | **-35.0%** | 132.5 ms | **80.0 ms** | **-39.6%** |
+| `complex-x64` (20,923) | 419.701 ms | **370.888 ms** | -11.6% | 663.53 MB | 431.57 MB | **-35.0%** | 790 ms | **487 ms** | **-38.4%** |
+
+`complex-x64` だけをさらに 5 ラウンド取り直した session 2 は最小 base 434.6 / cand 428.8 ms（-1.4%）で、wall の最小値は
+負荷の谷に当たったかどうかでしか決まっていない。割当（-35.0%、2 session で一致）、CPU 時間（-38%）、計数（-41〜-47%）の
+3 つが揃って 4 割減を示しており、**効果は wall の最小値が示すより大きい**と判断する。
+
+**issue の目標「deferred x64 ≤ 350 ms」は、このホスト状態では確認できなかった**（最良 370.9 ms）。ケース36 の base（466 ms）と
+比べれば -20%、同じ session の base 比で -12% だが、同じ条件の base 自体が round 5 の計測（466 ms）と噛み合わないほど負荷が高い。
+静かなホストで取り直す価値はあるが、CPU 時間の -38% を round 5 の 466 ms に当てると約 290 ms になる、というのが現時点の見積もりである。
+
+`root`（`DETAILED`、退行確認。3 ラウンド × 3 run と追加 4 ラウンド）:
+
+| fixture | base 割当 | cand 割当 | base CPU 最小 | cand CPU 最小 | ΔCPU | base wall 最小 | cand wall 最小 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `complex` | 15.02 MB | 14.99 MB | 9.80 ms | 8.70 ms | -11.2% | 8.721 ms | 8.512 ms |
+| `complex-x4` | 57.90 MB | 57.64 MB | 42.33 ms | 44.00 ms | +3.9% | 33.193 ms | 37.094 ms |
+| `complex-x16` | 227.35 MB | 227.05 MB | 286.3 ms | 300.0 ms | +4.8% | 146.137 ms | 150.335 ms |
+| `complex-x64` | 914.41 MB | 915.25 MB | 1,326.7 ms | 1,320.0 ms | -0.5% | 667.449 ms | 658.559 ms |
+
+`DETAILED` は計数（rule 評価・transaction・Token・snapshot・`addAll`）も割当も**完全に同じ**で、追加されたのは choice / chain / 反復の
+入口ごとに `isCandidateExclusionEnabled()` を 1 回読むことだけである。時間の差（-11〜+5%）は符号が fixture ごとに入れ替わる
+ノイズの範囲で、**退行はない**と判断する。
+
+### 検証
+
+- `unlaxer-common` 714 件 / `unlaxer-dsl` 1,024 件（skip 23、`-DrustConformance=true` では skip 3）緑（#301 の golden 再生成込み）。
+- isolated maven repo で tinyexpression `c70416e1` を候補 jar で再ビルドし、全テスト **769 件（skip 10）緑**。base も同じ。
+- 140 通りの同値性ダンプ（上記）、健全性監査で成功した除外 0 件、`-DrustConformance=true` の言語横断コーパス緑。
+
+### Java / Rust の対称性
+
+`rust/unlaxer-runtime` には**同等のものが無い**。`Expr::PredictiveChoice` と `Predictor` はあるが、predictor は generator が生成時に付け
+（`unlaxer-generator/src/lowering.rs` の `first_predictor`）、**nullable な要素に当たると `Any` に落ちる**（不動点を取らない）ので
+trivia を先頭に持つ規則・再帰規則は除外できない。除外は `PredictiveChoice` だけで `Sequence` / `Repeat` には効かず、
+さらに**絞った走査が失敗すると全候補を順に試し直す**ので失敗経路の回数は減らない。→ **#300** に切った。
+
+### 教材としての要点
+
+- **「半分にする」前に、残る回数が何かを parser 別に数える。** 除外の対象（`WordParser`）は -87% まで落ち、
+  残りの首位は成功経路の trivia だった。これは施策の不足ではなく実行モデルの下限である。
+- **診断を「同じになるように再生する」より、「その経路では記録が存在しない」ことで同値にする方が安い。**
+  入力に依存する記録を静的に再現しようとすると、正しさの証明が文法ごとに要る。
+- **nullable は比較の罠。** 「何でも通す」集合同士は外から見ると区別できないが、中身は外側に伝播する。不動点の収束判定は答えでなく状態で行う。
+- **除外の健全性は「除外したものを実際に走らせる」監査で確かめる。** 2 つの独立な実装（CST ダンプと監査フック）のうち、
+  1 つ目の不具合を捕まえたのは監査の方だった（CST ダンプの 140 通りには `@` で始まる規則を持つ文法が無かった）。
+  2 つ目（失敗の副作用）は監査も素通りし、**lookahead を組み合わせた言語横断コーパス**（CI の rustConformance）が捕まえた。
+  「成功しないこと」の監査は必要条件でしかない。
+
+### これで旧版コンビネータ runtime の速度作業は打ち止めにする
+
+round 1〜6（ケース32〜37）で、パーサ本体は線形、GC は live 集合の問題として処理し、回数は除外で約 4 割削った。
+残る回数（1 byte あたり rule 26・transaction 23・Token 29）は**規則ごとに transaction・Token・memo・snapshot を作り、
+trivia を毎回空 token として木に残す**実行モデルの回数で、ubnfc（rule 1.8/byte）との 10 倍以上の差はその差である。
+**これ以上の速度が必要な場合は、コンビネータ runtime の改修ではなく ubnfc への移行**（tinyexpression の生成パーサを
+ubnfc Java 版へ差し替える API 互換層、#293）を推奨する。
+
 ---
 
 ## 付録: 大きい入力を Java で parse するときの実行条件（#276 の decision）

@@ -251,9 +251,19 @@ public class DetailedOnFailureTest {
             replayOfDeepNesting(Diagnostics.DETAILED_ON_FAILURE));
     }
 
+    /**
+     * The innermost rule has to start matching before it fails, otherwise FIRST-set candidate
+     * exclusion (#292) drops the whole nest at the outermost element and no frame is ever opened.
+     */
+    static final class MatchesThenFails extends LazyChain {
+        @Override public Parsers getLazyParsers() {
+            return new Parsers(new WordParser("y"), new WordParser("x"));
+        }
+    }
+
     /** Hooks a memo hit on a 24-level nest runs, as {@code hits/checkpoints/restores}. */
     private static String replayOfDeepNesting(Diagnostics diagnostics) {
-        Parser root = new WordParser("x");
+        Parser root = new MatchesThenFails();
         for (int level = 0; level < 24; level++) root = new Nested(root);
         try (var context = ParseContext.withOptions(StringSource.createRootSource("y"),
                 ParseOptions.withMemoization(Memoization.SAFE_FAILURES).withDiagnostics(diagnostics))) {
@@ -266,7 +276,7 @@ public class DetailedOnFailureTest {
             assertTrue(root.parse(context).isFailed());
             int parsedCheckpoints = checkpoints[0];
             int parsedRestores = restores[0];
-            assertEquals(24, parsedCheckpoints);
+            assertEquals(25, parsedCheckpoints);
             assertTrue(root.parse(context).isFailed());
             assertEquals(1, context.getPackratMemoTable().failureHits());
             return context.getPackratMemoTable().failureHits()

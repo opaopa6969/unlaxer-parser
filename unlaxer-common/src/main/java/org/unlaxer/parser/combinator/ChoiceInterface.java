@@ -7,6 +7,7 @@ import org.unlaxer.Token;
 import org.unlaxer.TokenKind;
 import org.unlaxer.context.ParseContext;
 import org.unlaxer.context.PackratMemoTable;
+import org.unlaxer.parser.FirstSets;
 import org.unlaxer.parser.Parser;
 import org.unlaxer.util.annotation.TokenExtractor;
 
@@ -27,7 +28,20 @@ public interface ChoiceInterface extends Parser{
 		parseContext.startParse(this, parseContext, tokenKind, invertMatch);
 		List<Parser> children = getChildren();
 
+		/*
+		 * An alternative whose FIRST set does not contain the next code point cannot succeed here, so
+		 * it is skipped before a transaction is begun, a token is built or the memo table is probed.
+		 * FirstSet is a conservative over-approximation and answers "unknown" for everything the
+		 * analysis does not model, so this never removes an alternative that could have matched.
+		 * invertMatch flips what the terminals accept, so the set does not apply under inversion.
+		 */
+		boolean excludeCandidates = false == invertMatch && parseContext.isCandidateExclusionEnabled();
+		int lookahead = excludeCandidates ? parseContext.lookaheadCodePoint(tokenKind) : 0;
+
 		for (Parser parser : children) {
+			if (excludeCandidates && false == FirstSets.of(parser).mayStartWith(lookahead)) {
+				continue;
+			}
 			parseContext.begin(this);
 			Parsed parsed = parser.parse(parseContext, tokenKind, invertMatch);
 

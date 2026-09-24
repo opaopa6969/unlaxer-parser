@@ -377,6 +377,30 @@ public class ParseContext implements
 		memoizationPermanentlyDisabled = true;
 	}
 
+	/*
+	 * FIRST-set candidate exclusion (#292) removes a candidate's whole evaluation - its transaction,
+	 * its token, its memo probes and its failure record - so every observer of those evaluations has
+	 * to switch it off. Syntax diagnostics observe each failed candidate, so exclusion is confined to
+	 * DETAILED_ON_FAILURE, where registerFailureCandidate records nothing at all; a caller that needs
+	 * a failure explained re-parses in a fresh DETAILED context, which sees every candidate as before.
+	 */
+	private static final boolean CANDIDATE_EXCLUSION_AVAILABLE =
+			false == Boolean.getBoolean("unlaxer.parser.firstSetExclusion.disabled");
+
+	/** Whether a choice or repetition may skip a candidate whose FIRST set excludes the next input. */
+	public boolean isCandidateExclusionEnabled() {
+		if (false == CANDIDATE_EXCLUSION_AVAILABLE || false == deferredDiagnostics || recordingTrials) {
+			return false;
+		}
+		return parserListenerByName.isEmpty() && actions.isEmpty()
+				&& false == hasOpaqueTransactionListener();
+	}
+
+	/** The code point the given cursor is on, or {@code -1} at end of input. Allocates nothing. */
+	public int lookaheadCodePoint(TokenKind tokenKind) {
+		return source.codePointValueAt(getPosition(tokenKind).value());
+	}
+
 	@Override
 	public void addParserListener(Name name, ParserListener parserListener) {
 		disableMemoizationPermanently();

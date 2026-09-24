@@ -415,6 +415,11 @@ public class StringSource implements Source {
   }
 
   @Override
+  public int codePointValueAt(int index) {
+    return index < 0 || index >= codePointLength ? -1 : codePoints[codePointOffsetInArray + index];
+  }
+
+  @Override
   public int[] subCodePoints(CodePointIndex startIndexInclusive, CodePointIndex endIndexExclusive) {
     return Arrays.copyOfRange(codePoints, codePointOffsetInArray + startIndexInclusive.value(),
         codePointOffsetInArray + endIndexExclusive.value());
