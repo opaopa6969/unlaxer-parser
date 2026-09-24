@@ -50,6 +50,16 @@ done
 
 repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root"
+# Central credentials live in a file the self-hosted runners never overwrite
+# (~/.m2/settings.xml is rewritten by actions/setup-java jobs). Override with MAVEN_SETTINGS.
+settings_file=${MAVEN_SETTINGS:-$HOME/.m2/settings-central.xml}
+mvn_settings=()
+if [ -f "$settings_file" ]; then
+  mvn_settings=(-s "$settings_file")
+  echo "Using Maven settings: $settings_file"
+else
+  echo "Note: $settings_file not found; falling back to ~/.m2/settings.xml (may lack the 'central' server)."
+fi
 month=$(date -u +%Y-%m)
 # Monthly limit comes from the queue file (owner decision 2026-09-24: the
 # "one per month" rule is a guideline; the yml carries the actual cap).
@@ -113,4 +123,4 @@ else
 fi
 
 echo "Publishing org.unlaxer unlaxer-parser reactor version $version"
-mvn -B -pl .,unlaxer-common,unlaxer-dsl clean deploy -DskipPublishing=false
+mvn "${mvn_settings[@]}" -B -pl .,unlaxer-common,unlaxer-dsl clean deploy -DskipPublishing=false
