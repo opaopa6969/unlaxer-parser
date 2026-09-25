@@ -132,6 +132,15 @@ fn check_auto_entry_allocation_profile_matches_resolved_policy() {
                 expression: Expr::choice([Expr::literal("first"), Expr::literal("second")]),
             },
         ]);
+        // The first deferred parse of a shared grammar analyses and caches its FIRST sets
+        // once (#300); measure the steady state, as a generated parser's OnceLock would.
+        let _ = parse_detailed_shared_with_options(
+            &grammar,
+            0,
+            false,
+            "actual",
+            ParseOptions::default().with_diagnostics(Diagnostics::DetailedOnFailure),
+        );
         for memoization in [Memoization::Off, Memoization::SafeFailures] {
             for shared in [false, true] {
                 for input in ["actual", "invalid", "actual@"] {

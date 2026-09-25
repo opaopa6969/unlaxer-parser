@@ -58,6 +58,9 @@
   {"token":"ANY", "body":"T{0,0} 'ab' @value", "cases":[{"input":"ab"}]},
   {"token":"LOOKAHEAD('a')", "extra":"token U = LOOKAHEAD('b')", "body":"(T) [ 'x' ] (U) 'ab' @value", "cases":[{"input":"ab"}]},
   {"token":"LOOKAHEAD('a')", "extra":"token U = LOOKAHEAD('b') token X = CHAR_RANGE('x','x')", "body":"(T) [ X ] (U) 'ab' @value", "cases":[{"input":"ab"}]},
+  {"token":"LOOKAHEAD('a')", "extra":"token U = LOOKAHEAD('b')", "body":"(T) { 'x' } (U) 'ab' @value", "cases":[{"input":"ab","value":"ab"}, {"input":"xab"}]},
+  {"token":"LOOKAHEAD('a')", "extra":"token U = LOOKAHEAD('b')", "body":"(T) [ ('x') ] (U) 'ab' @value", "cases":[{"input":"ab","value":"ab"}]},
+  {"token":"NEGATIVE_LOOKAHEAD('x')", "extra":"token U = LOOKAHEAD('b')", "body":"(T) [ 'a' ] (U) 'b' @value", "cases":[{"input":"b","value":"b"}, {"input":"ab","value":"b"}, {"input":"xb"}]},
   {"token":"NEGATION('')", "body":"T @value", "cases":[{"input":"😀","value":"😀"}, {"input":""}]},
   {"token":"EMPTY", "body":"T{1,2} @value", "cases":[{"input":"","value":[""]}]},
   {"token":"EMPTY", "body":"T % ',' @value", "cases":[

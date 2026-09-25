@@ -5,7 +5,10 @@ use std::hash::{BuildHasher, Hasher};
 use std::rc::Rc;
 use std::sync::Arc;
 
+mod first;
 mod scope;
+#[doc(hidden)]
+pub use first::{set_candidate_exclusion_for_current_thread, CandidateExclusion};
 pub use scope::{
     Declaration, ReferenceInfo, RuleEffects, ScopeMode, ScopeStore, Severity, SymbolDiagnostic,
     SymbolInfo,
@@ -881,6 +884,10 @@ pub struct ParseContext<'a> {
     memoized_failure_hits: usize,
     checkpoint_metrics: Option<CheckpointMetrics>,
     checkpoint_metrics_scope_journal_base: u64,
+    // FIRST sets of `rules` (#300) while candidate exclusion is active, i.e. only
+    // with DetailedOnFailure, where a failed candidate records no diagnostics.
+    first_sets: Option<Arc<[first::FirstSet]>>,
+    exclusion_audit: bool,
 }
 
 /// Ordered choice with rollback and full-input acceptance. Rule nesting is bounded at 256.
@@ -997,6 +1004,9 @@ fn parse_detailed_owned(
     let mut parser = ParseContext::with_options(input, options);
     parser.rules = rules;
     parser.whitespace = whitespace;
+    if parser.first_sets.is_some() {
+        parser.first_sets = Some(first::table(&parser.rules));
+    }
     if options.memoization == Memoization::SafeFailures {
         parser.memo_safe_rules = memo_safe_rules(&parser.rules);
     }
@@ -1100,7 +1110,22 @@ impl<'a> ParseContext<'a> {
             memoized_failure_hits: 0,
             checkpoint_metrics: None,
             checkpoint_metrics_scope_journal_base: 0,
+            first_sets: None,
+            exclusion_audit: false,
         }
+        .with_candidate_exclusion()
+    }
+
+    fn with_candidate_exclusion(mut self) -> Self {
+        let mode = first::mode();
+        if self.options.diagnostics == Diagnostics::DetailedOnFailure
+            && mode != CandidateExclusion::Off
+        {
+            // Rule references into the empty initial grammar fail, as in the empty table.
+            self.first_sets = Some(Arc::from([]));
+            self.exclusion_audit = mode == CandidateExclusion::Audit;
+        }
+        self
     }
 
     /// Returns the resolved options; `diagnostics` is never [`Diagnostics::Auto`].
@@ -1323,6 +1348,8 @@ impl<'a> ParseContext<'a> {
             vec![]
         };
         let previous_safe_rules = std::mem::replace(&mut self.memo_safe_rules, safe_rules);
+        let first_sets = self.first_sets.as_ref().map(|_| first::table(grammar));
+        let previous_first_sets = std::mem::replace(&mut self.first_sets, first_sets);
         let previous_failure_memo = std::mem::take(&mut self.failure_memo);
         let previous_session = self.grammar_session;
         let active_session = self.next_grammar_session;
@@ -1333,6 +1360,7 @@ impl<'a> ParseContext<'a> {
         self.rules = previous_rules;
         self.whitespace = previous_whitespace;
         self.memo_safe_rules = previous_safe_rules;
+        self.first_sets = previous_first_sets;
         self.grammar_session = previous_session;
         result
     }
@@ -1709,7 +1737,12 @@ impl<'a> ParseContext<'a> {
             Expr::Optional(child) | Expr::JavaOptional(child) => {
                 let start = self.position;
                 let count = self.nodes.len();
-                match self.expression(child, depth) {
+                let attempt = if self.excludes(child, depth) {
+                    None
+                } else {
+                    self.expression(child, depth)
+                };
+                match attempt {
                     Some(fragment) => Some(fragment),
                     None => {
                         self.position = start;
@@ -1732,7 +1765,14 @@ impl<'a> ParseContext<'a> {
                 while (java && iterations == 0) || max.is_none_or(|max| iterations < max) {
                     let start = self.position;
                     let count = self.nodes.len();
-                    match self.expression(child, depth) {
+                    // A skipped body takes the failure branch, including Java's
+                    // failed-atom cursor reset, exactly as an evaluated failure would.
+                    let attempt = if self.excludes(child, depth) {
+                        None
+                    } else {
+                        self.expression(child, depth)
+                    };
+                    match attempt {
                         Some(mut fragment) => {
                             if self.position == start && max.is_none() && !java {
                                 self.nodes.truncate(count);
@@ -1866,6 +1906,9 @@ impl<'a> ParseContext<'a> {
                 let mut result = Fragment::default();
                 self.skip();
                 for element in elements {
+                    if self.excludes(element, depth) {
+                        return None;
+                    }
                     let mut fragment = self.expression(element, depth)?;
                     result.nodes.append(&mut fragment.nodes);
                     result.captures.append(&mut fragment.captures);
@@ -2049,6 +2092,9 @@ impl<'a> ParseContext<'a> {
         let node_start = self.nodes.len();
         let mut winner: Option<ChoiceWinner> = None;
         for alternative in alternatives {
+            if self.excludes(alternative, depth) {
+                continue;
+            }
             let checkpoint = self.checkpoint();
             if let Some(fragment) = self.expression(alternative, depth) {
                 let consumed = self.position - start;
@@ -2101,6 +2147,9 @@ impl<'a> ParseContext<'a> {
         let start = self.position;
         let count = self.nodes.len();
         for alternative in alternatives {
+            if self.excludes(alternative, depth) {
+                continue;
+            }
             if let Some(fragment) = self.expression(alternative, depth) {
                 return Some(fragment);
             }
@@ -2116,7 +2165,9 @@ impl<'a> ParseContext<'a> {
         predictors: &[Predictor],
         depth: usize,
     ) -> Option<Fragment> {
-        if alternatives.len() != predictors.len() {
+        // With structural FIRST sets the generated predictors, and the retry that guards
+        // them against a conservative predictor, are unnecessary (#300).
+        if alternatives.len() != predictors.len() || self.first_sets.is_some() {
             return self.ordered_choice(alternatives.iter(), depth);
         }
         let raw = self.remaining();
@@ -2147,6 +2198,33 @@ impl<'a> ParseContext<'a> {
         }
         self.restore(checkpoint);
         self.ordered_choice(alternatives.iter(), depth)
+    }
+
+    /// Whether `candidate` is proven to fail here from its FIRST set, so it is not evaluated.
+    /// Only active with deferred diagnostics: a failed candidate records nothing there, and
+    /// the transaction around it restores every other observable (cursor, matched cursor,
+    /// CST, captures, scopes and user state). Failure memo entries and hit counters may differ.
+    #[inline]
+    fn excludes(&mut self, candidate: &Expr, depth: usize) -> bool {
+        let Some(table) = &self.first_sets else {
+            return false;
+        };
+        if first::of(candidate, table).may_start(&self.input[self.position..], self.whitespace) {
+            return false;
+        }
+        if self.exclusion_audit {
+            // The audit evaluation replaces the skipped one (a failed `expression` restores
+            // its checkpoint), so nested audits stay linear instead of doubling per level.
+            let checkpoint = self.checkpoint();
+            let matched = self.expression(candidate, depth).is_some();
+            self.restore(checkpoint);
+            assert!(
+                !matched,
+                "FIRST-set exclusion would skip a candidate that matches at byte {}",
+                self.position
+            );
+        }
+        true
     }
 
     fn prediction_after_trivia<'b>(&self, raw: &'b str) -> &'b str {
@@ -2723,6 +2801,9 @@ mod tests {
 
     #[test]
     fn deferred_diagnostics_preserve_memo_keys_hits_and_checkpoint_metrics() {
+        // This pins the deferred pass itself; FIRST-set exclusion (#300) legitimately
+        // removes memo probes and checkpoints and is covered by its own tests.
+        set_candidate_exclusion_for_current_thread(Some(CandidateExclusion::Off));
         let grammar = share_grammar(vec![
             Rule {
                 name: "root",
