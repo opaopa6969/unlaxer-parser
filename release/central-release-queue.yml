@@ -9,22 +9,23 @@ policy:
   emergencyRequiresReason: true
 
 lastObserved:
-  asOf: "2026-08-27"
-  month: "2026-08"
-  publishedOperations: 8
+  asOf: "2026-09-25"
+  month: "2026-09"
+  publishedOperations: 5
   source: https://repo1.maven.org/maven2/org/unlaxer/
   releases:
     - repository: opaopa6969/tinyexpression
       versions: [1.4.11, 1.4.12, 1.4.13, 1.4.14, 1.4.15]
     - repository: opaopa6969/unlaxer-parser
-      versions: [3.0.12, 3.0.13, 3.0.14]
+      versions: [3.0.12, 3.0.13, 3.0.14, 3.0.15, 3.1.0]
 
 nextWindow:
   month: "2026-09"
   selected: null
   candidates:
     - repository: opaopa6969/unlaxer-parser
-      status: collecting
+      status: published
+      publishedAt: "2026-09-25T00:35Z"
       requestedVersion: "3.1.0"
       note: >-
         Backward-compatible minor: spec corrections (#277), bootstrap fixes
