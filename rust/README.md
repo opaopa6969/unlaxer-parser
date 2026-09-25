@@ -136,6 +136,22 @@ Java の `DETAILED_ON_FAILURE` は issue #259 で実装済み。Auto は issue #
 Rust の既存の生成文字列が変わらないことを `RustNativeEmitterTest` で検証する。
 [Auto の facade 前後計測と検証結果](diagnostics-auto-measurement.md)も参照。
 
+### FIRST 集合による候補除外（#300、Java #292 / ケース37 と対称）
+
+`DetailedOnFailure` の初回 parse では、runtime が規則グラフから FIRST 集合（開始し得る code point の
+ASCII bitset・非 ASCII フラグ・nullable・unknown・「sequence が先に trivia を飛ばし得るか」）を最小不動点で求め、
+`Choice` / `LongestChoice` / `PredictiveChoice` の候補、`Sequence` の要素、`Repeat` / `Optional` の本体のうち
+**次の code point から始まり得ないものを評価しない**。`SharedGrammar` は grammar ごとに 1 度だけ解析し
+（`Weak` を鍵にした process 内 cache）、`parse(&[Rule])` のような一時 grammar は parse ごとに解析する。
+
+- 除外するのは失敗が確定した候補だけで、失敗した候補の作用は transaction がすべて戻すので、受理・CST・capture・
+  scope・user state は変わらない。`Detailed` と、失敗時の `Detailed` 再解析では 1 件も除外しないので診断も変わらない。
+  変わるのは failure memo の件数と hit 数、checkpoint カウンタだけ。
+- custom parser・後方参照・`Until` / `JavaUntil`・それらを子に持つ lookahead は **unknown** として決して除外しない
+  （消費する前に到達し得る位置にある場合。消費した後に来る custom は FIRST を広げない）。
+- `PredictiveChoice` は deferred では生成時 predictor を使わず、構造的な FIRST で除外する（全候補の retry も不要）。
+- `UNLAXER_CANDIDATE_EXCLUSION=off` で無効化、`=audit` で除外した候補を実際に評価して成功したら panic する（検証用）。
+
 ### 対応するUBNF
 
 - 1ファイル・1文法、ちょうど1つの`@root`。

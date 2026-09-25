@@ -2918,6 +2918,7 @@ tinyexpression `c70416e1` を build ごとの isolated maven repo で再ビル�
 （`unlaxer-generator/src/lowering.rs` の `first_predictor`）、**nullable な要素に当たると `Any` に落ちる**（不動点を取らない）ので
 trivia を先頭に持つ規則・再帰規則は除外できない。除外は `PredictiveChoice` だけで `Sequence` / `Repeat` には効かず、
 さらに**絞った走査が失敗すると全候補を順に試し直す**ので失敗経路の回数は減らない。→ **#300** に切った。
+→ **ケース38 で対応済み**（規則グラフの不動点で FIRST を求め、`Choice` / `Sequence` / `Repeat` で除外。P4 x64 deferred で rule 評価 -72%、wall -52〜-60%）。
 
 ### 教材としての要点
 
@@ -2938,6 +2939,139 @@ round 1〜6（ケース32〜37）で、パーサ本体は線形、GC は live �
 trivia を毎回空 token として木に残す**実行モデルの回数で、ubnfc（rule 1.8/byte）との 10 倍以上の差はその差である。
 **これ以上の速度が必要な場合は、コンビネータ runtime の改修ではなく ubnfc への移行**（tinyexpression の生成パーサを
 ubnfc Java 版へ差し替える API 互換層、#293）を推奨する。
+
+
+## ケース38: 規則グラフの FIRST 集合で候補を評価せずに落とす（Rust、#300 ── ケース37 の対称実装）
+
+### 出発点
+
+ケース37 の「Java / Rust の対称性」で書いたとおり、`rust/unlaxer-runtime` の候補除外は generator が付ける
+`PredictiveChoice` の predictor だけで、nullable な要素に当たると `Predictor::Any` に落ち、`Sequence` / `Repeat` には効かず、
+絞った走査が失敗すると全候補を試し直していた。tinyexpression-rs の生成パーサ（`src/generated/parser.rs`）は
+`PredictiveChoice` を 1 つも含まないので、**P4 では除外が 1 件も起きていなかった**。
+
+### 設計
+
+**`first.rs`（新規）が、各規則について「消費する match の先頭になり得る code point の集合」・nullable・unknown・trivia を、
+規則グラフ上の最小不動点として grammar ごとに 1 度だけ計算する。** 表現は Java と同じく ASCII 0〜127 の bitset（`u128`）と
+「非 ASCII で始まり得る」フラグ 1 つ。inline の式は、候補を試す直前にその表を引いて構造的に評価する（深さは式の入れ子だけ）。
+
+| `Expr` | 規則 |
+|---|---|
+| `Choice` / `LongestChoice` / `PredictiveChoice` | 候補の union。nullable は「どれかが nullable」 |
+| `Sequence` | 先頭から nullable な要素の FIRST を union し、最初の非 nullable 要素で止める。**trivia 印**（下記）を付ける |
+| `Optional` / `JavaOptional` / `Repeat` / `JavaRepeat` | 本体の FIRST。`Optional` と `min == 0` は nullable |
+| `Literal` / `Quoted` / `CodeStart` / `CodeEnd` | 先頭 1 code point（空リテラルは nullable） |
+| `Number` / `Identifier` / `CharRange` / `Except` / `Any` | 実装と同じ ASCII 集合（`Number` は `+-.0-9`、`Except` は非 ASCII を常に「あり得る」） |
+| `Capture` / `TextValue` / `ValueBoundary` / `RuleEffects` / `TriviaScope` | 子の FIRST（`TriviaScope` は trivia 印を確定させる） |
+| `Lookahead` | nullable（消費しない）。**子が unknown なら unknown**（子はこの位置で走るため） |
+| `Eof` / `Empty` / `JavaEmpty` / `JavaLookahead` | nullable |
+| `Error` | 空集合（必ず失敗） |
+| `Custom` / `CustomWith` / `Backreference` / `Until` / `JavaUntil` | **unknown**（決して除外しない） |
+
+**trivia の扱いが Java と違う唯一の点。** Java では trivia が chain の先頭子（`SpaceDelimitor`）として存在し、
+nullable 前置の union で FIRST に自然に入った。Rust は `Sequence` の入口で runtime が `ParseContext::skip` を呼ぶので、
+集合に空白を足すのではなく「この式は先に trivia を飛ばし得る」という印（`None` / `Dynamic` / `Always`）を持たせ、
+**判定の時点の trivia 方針**（`self.whitespace`）で解決する。trivia が有効で次が空白・`//`・`/*` なら「始まり得る」と答える。
+`TriviaScope(true/false)` は `Dynamic` を `Always` / `None` に確定させる。これで issue の「trivia を飛ばした後の code point で判定するか、
+FIRST に trivia を足すか」は後者（ただし方針依存の印として）に決めた。前者は判定のたびに trivia を走査するので採らなかった。
+
+**不動点の収束判定は集合そのもので比べる**（`FirstSet: PartialEq`）。ケース37 の不具合 1（nullable な集合は外から区別できないが
+先頭集合は外側へ伝播する）を最初から避け、同じ回帰テスト `a_nullable_repetition_keeps_growing_its_start_set_until_the_fixed_point` を置いた。
+
+**除外は 3 種類の入口**: `ordered_choice` / `longest_choice` の候補（checkpoint を張る前に飛ばす）、`Sequence` の各要素（cursor が動くので
+毎回判定し、始まれなければその時点で sequence を失敗にする）、`Optional` / `Repeat` の本体（失敗の分岐をそのまま通る）。
+`PredictiveChoice` は除外が有効なとき**生成時 predictor を使わず** `ordered_choice` に落とす。構造的な FIRST が健全なので
+「絞った走査が失敗したら全候補を試し直す」retry は不要になった。
+
+**適用条件は `Diagnostics::DetailedOnFailure` の context だけ**（`Auto` が deferred に解決した場合を含む）。`Detailed` と、
+失敗時の `Detailed` 再解析では 1 件も除外しない。`UNLAXER_CANDIDATE_EXCLUSION=off` で丸ごと切れ、`=audit` は除外する候補を
+その場で実際に評価して**成功したら panic** する（検証用。評価した結果をそのまま「失敗」として使うので、入れ子の監査でも回数は 2 倍に増えない）。
+
+**表の寿命**: `SharedGrammar`（生成パーサの `OnceLock`）は `Weak` を鍵にした process 内 cache で 1 度だけ解析する。
+`parse(&[Rule])` のような一時 grammar は parse ごとに解析する（cache に入れない）。`parse_shared_grammar` の入れ子 grammar も同じ経路で引く。
+
+### 失敗の副作用（ケース37 の不具合 2）は Rust では構造的に起きない
+
+Rust の `expression` は**失敗したら必ず自分の checkpoint に戻す**（cursor・matched cursor・node・capture・scope・user state）。
+Java の `AbstractTokenParser` が失敗時に matched cursor を consumed cursor に戻す作用は、Rust では `JavaOptional` / `JavaRepeat` が
+本体の失敗後に `java_failed_atom` として**外側で**行っている。本体を飛ばした経路も同じ失敗の分岐を通るので、この作用は除外しても残る。
+Java は「consumed と matched が一致するときだけ反復の本体を飛ばす」ことで同じ性質を得たが、Rust は常に飛ばしてよい。
+**除外の判断が Java と Rust で食い違う**のはこの点と、`Not` / `MatchOnly`（Java は unknown、Rust の `Lookahead` / `JavaLookahead` は
+子が unknown でなければ nullable）の 2 点で、どちらも観測は同じになる。これを共有コーパスで固定するため、
+`unlaxer-dsl/src/test/resources/primitives/corpus.json` に 3 件足した（`RustConformanceTest`、`-DrustConformance=true`）:
+
+- `(T) { 'x' } (U) 'ab'`（`T = LOOKAHEAD('a')`、`U = LOOKAHEAD('b')`）: `"ab"` を**受理**、`"xab"` を拒否。`[ 'x' ]` 版（既存、拒否）と違い、
+  Java の `ZeroOrMore` は失敗した本体の巻き戻しを外に漏らさない。Rust も同じ結果
+- `(T) [ ('x') ] (U) 'ab'`: 本体が chain なので巻き戻しは漏れず `"ab"` を受理（ケース37 の記述どおり）
+- `T = NEGATIVE_LOOKAHEAD('x')`、`(T) [ 'a' ] (U) 'b'`: `"b"` / `"ab"` を受理、`"xb"` を拒否（否定先読みの後ろの反復本体を飛ばす形）
+
+### 数える（計数専用 build、warm で 2 回目の parse、`SafeFailures`）
+
+tinyexpression-rs `14af5ae2` の生成パーサ、`root` を `DetailedOnFailure` で。before は同じ build を除外 off で走らせた値。
+
+| fixture | rule 評価 | checkpoint | CST node | 除外した候補 |
+|---|---:|---:|---:|---:|
+| `complex` (325) | 13,902 → **3,749（-73.0%）** | 53,984 → **17,115（-68.3%）** | 3,224 → 3,224 | 7,304 |
+| `complex-x4` (1,293) | 53,496 → 14,648（-72.6%） | 209,186 → 66,222（-68.3%） | 12,242 → 12,242 | 27,320 |
+| `complex-x16` (5,179) | 211,872 → 58,244（-72.5%） | 829,994 → 262,650（-68.4%） | 48,314 → 48,314 | 107,384 |
+| `complex-x64` (20,923) | 845,376 → **232,628（-72.5%）** | 3,313,226 → **1,048,362（-68.4%）** | 192,602 → 192,602 | 427,640 |
+
+1 byte あたり（complex）: rule 42.8 → **11.5**。Java（ケース37、44.6 → 25.8、-41%）より大きく減るのは、Rust では trivia が
+規則ではなく runtime の `skip` なので、Java で残った首位（成功経路の `SpaceDelimitor` 評価）がそもそも数に入らないためである。
+memo lookup は rule 評価と同数で同じ比率で減る。`Detailed` は 4 fixture とも**完全に不変**（rule・checkpoint・node とも off と一致）。
+
+### A/B
+
+条件: release build、`taskset -c 24`（session 1）/ `-c 26`（session 2）、fixture ごとに iteration 数を固定（complex 3,000 〜 x64 95）、
+warm-up 後の 1 parse ごとの wall の中央値、base / cand を交互に 2 run ずつ。ホストは共有で load average 5〜13。
+各 session の値は **2 run の中央値の小さい方**（他プロセスの割り込みで 1 run だけ数倍に振れたものを捨てるため）。
+割当は計数 allocator で 1 parse 分（負荷に依らない）。base は `859d7f5`、cand は本変更。
+
+`root`（`DetailedOnFailure`）:
+
+| fixture | base s1 | cand s1 | Δ s1 | base s2 | cand s2 | Δ s2 | base 割当 | cand 割当 | Δ割当（byte） |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `complex` (325) | 1.633 ms | **0.835 ms** | -48.9% | 1.545 ms | **0.720 ms** | -53.4% | 2.25 MB / 10,814 回 | 1.20 MB / 10,809 回 | **-46.6%** |
+| `complex-x4` (1,293) | 6.308 ms | **2.732 ms** | -56.7% | 5.997 ms | **2.654 ms** | -55.7% | 8.96 MB | 4.50 MB | **-49.7%** |
+| `complex-x16` (5,179) | 24.679 ms | **10.755 ms** | -56.4% | 23.853 ms | **10.567 ms** | -55.7% | 32.88 MB | 17.93 MB | **-45.5%** |
+| `complex-x64` (20,923) | 109.17 ms | **44.19 ms** | -59.5% | 88.90 ms | **42.45 ms** | -52.2% | 133.50 MB / 636,700 回 | 71.66 MB / 636,433 回 | **-46.3%** |
+
+割当回数はほぼ同じで byte が半減するのは、減った分が主に **failure memo の entry**（失敗した rule 評価そのものが減る）だからである。
+
+`root`（`Detailed`、退行確認）:
+
+| fixture | base s1 | cand s1 | base s2 | cand s2 | 割当 |
+|---|---:|---:|---:|---:|---:|
+| `complex` | 2.435 ms | 3.013 ms | 2.403 ms | 2.386 ms | 2.62 MB で同一 |
+| `complex-x4` | 9.300 ms | 8.966 ms | 8.589 ms | 8.687 ms | 10.37 MB で同一 |
+| `complex-x16` | 38.33 ms | 36.46 ms | 35.59 ms | 35.88 ms | 38.46 MB で同一 |
+| `complex-x64` | 208.30 ms | 146.00 ms | 144.11 ms | 141.85 ms | 155.76 MB で同一 |
+
+`Detailed` は計数も割当も完全に同じで、足されたのは候補ごとに `first_sets` が `None` かを読む分岐 1 つだけである。
+session 1 の差（complex +24%、x64 -30%）は同じ session の中で符号が入れ替わり、静かだった session 2 では ±1% に収まるのでノイズと判断する。
+
+### 同値性
+
+- **tinyexpression 差分コーパス 544 入力**（fixture・テスト入力と、その途中切断などの不正入力）× memo {`Off`（2,000 byte 以下）, `SafeFailures`} ×
+  diagnostics {`Auto`, `DetailedOnFailure`} で、生成パーサの `parse_tree_detailed_with_options` の結果（CST・診断の `Debug` 全文）と
+  facade `tinyexpression_rs::parse` の結果を除外 off / on / audit で比較し、**全件一致**（parser 成功 472・失敗 1,690 組）。
+  `ScopeStore::journal_entries_created`（巻き戻された記録も数える計数で、`ScopeStore` の等価性からも外れている）だけは正規化した。
+- `unlaxer-runtime` の `tests/candidate_exclusion.rs`: 式文法 15 入力 × memo 2 × diagnostics 3 × shared 2 を off / on / audit で一致、
+  custom parser は除外 on でも呼び出し回数が変わらないこと、`JavaOptional` / `JavaRepeat` の失敗 atom の cursor 巻き戻し、
+  `PredictiveChoice`（保守的な predictor と誤った predictor の両方）と `LongestChoice` の同値性。
+- `UNLAXER_CANDIDATE_EXCLUSION=audit` で `rust/` workspace 全テストと tinyexpression-rs 全テストを流し、**成功した除外は 0 件**。
+- `RustConformanceTest`（16 件、上の 3 件を含む）と `RustUbnfFrontendConformanceTest` を `-DrustConformance=true` で緑。
+
+### 教材としての要点
+
+- **trivia が「文法の要素」か「runtime の動作」かで、FIRST の作り方が変わる。** Java は要素なので集合に入り、Rust は動作なので
+  「飛ばし得る」という印を持たせて判定時の方針で解く。どちらも「trivia の可能性があれば除外しない」という同じ保守性に落ちる。
+- **失敗の副作用を checkpoint の外に漏らさない設計は、除外の健全性の証明を短くする。** Java で反復の本体に条件が要ったのは
+  失敗が matched cursor を動かし、それが後で commit される transaction の中に残ったからである。Rust では失敗の作用を
+  呼び出し側の分岐（`java_failed_atom`）に寄せてあったので、飛ばしても同じ分岐を通るだけで済んだ。
+- **監査フックは入れ子で指数的になり得る。** 「除外するはずの候補を評価してから、改めて評価する」実装は入れ子 1 段ごとに 2 倍になる。
+  監査の評価結果を失敗としてそのまま使えば、コストは除外 off と同じになる。
 
 ---
 

@@ -1,9 +1,10 @@
 use unlaxer_runtime::{
     grammar_allows_deferred_diagnostics, parse, parse_detailed, parse_detailed_shared,
     parse_detailed_shared_with_options, parse_detailed_with_options, parse_shared,
-    parse_shared_with_options, parse_with_options, share_grammar, Declaration, Diagnostics, Expr,
-    Memoization, ParseContext, ParseError, ParseOptions, ParseResult, Predictor, Rule, RuleEffects,
-    ScopeMode, SharedGrammar, Tree,
+    parse_shared_with_options, parse_with_options, set_candidate_exclusion_for_current_thread,
+    share_grammar, CandidateExclusion, Declaration, Diagnostics, Expr, Memoization, ParseContext,
+    ParseError, ParseOptions, ParseResult, Predictor, Rule, RuleEffects, ScopeMode, SharedGrammar,
+    Tree,
 };
 
 fn expression_grammar() -> SharedGrammar {
@@ -145,7 +146,13 @@ fn deferred_diagnostics_preserve_scopes_captures_and_checkpoint_metrics() {
             ..RuleEffects::default()
         }),
     }]);
-    for memoization in [Memoization::Off, Memoization::SafeFailures] {
+    for (memoization, exclusion) in [
+        (Memoization::Off, CandidateExclusion::Off),
+        (Memoization::SafeFailures, CandidateExclusion::Off),
+        (Memoization::Off, CandidateExclusion::On),
+        (Memoization::SafeFailures, CandidateExclusion::On),
+    ] {
+        set_candidate_exclusion_for_current_thread(Some(exclusion));
         let options = ParseOptions::with_memoization(memoization);
         let mut a = ParseContext::with_options("known: known + unknown", options);
         let mut b = ParseContext::with_options(
@@ -181,10 +188,17 @@ fn deferred_diagnostics_preserve_scopes_captures_and_checkpoint_metrics() {
             .unwrap();
             assert_same_tree(&a.tree(a_root.root_node().unwrap()).unwrap(), &tree);
         }
-        assert_eq!(
-            a.snapshot_checkpoint_metrics(),
-            b.snapshot_checkpoint_metrics()
-        );
+        if exclusion == CandidateExclusion::Off {
+            assert_eq!(
+                a.snapshot_checkpoint_metrics(),
+                b.snapshot_checkpoint_metrics()
+            );
+        } else {
+            // FIRST-set exclusion (#300) skips candidates only in the deferred pass.
+            assert!(
+                b.snapshot_checkpoint_metrics().opened < a.snapshot_checkpoint_metrics().opened
+            );
+        }
         assert!(!a.failure().expected.is_empty());
         assert!(b.failure().expected.is_empty());
     }
