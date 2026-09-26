@@ -142,7 +142,7 @@
 				<artifactId>maven-surefire-plugin</artifactId>
 				<version>3.2.5</version>
 				<configuration>
-					<skipTests>${unlaxer.jdk17.skipTests}</skipTests>
+					<skip>${unlaxer.jdk17.skipTests}</skip>
 					<!-- tests resolve fixtures relative to the shared module directory -->
 					<workingDirectory>${unlaxer.jdk17.shared}</workingDirectory>
 				</configuration>
