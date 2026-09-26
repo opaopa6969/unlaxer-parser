@@ -16,6 +16,9 @@
 	<modules>
 		<module>unlaxer-common</module>
 		<module>unlaxer-dsl</module>
+		<!-- Java 17 builds of the same sources, published as *-jdk17 (#311) -->
+		<module>unlaxer-common-jdk17</module>
+		<module>unlaxer-dsl-jdk17</module>
 		<!-- VS Code 拡張 (リファレンス実装兼ドッグフード)。
 		     unlaxer-dsl/ubnf-vscode は ubnf.ubnf 自身の IDE (#4)。
 		     unlaxer-dsl/tinycalc-vscode は教育用デモ DSL。
@@ -47,7 +50,7 @@
 	</developers>
 
 	<properties>
-		<revision>3.1.0</revision> <!-- ここを変えるだけで全体が変わるようになります -->
+		<revision>3.1.1</revision> <!-- ここを変えるだけで全体が変わるようになります -->
 		<!-- Central upload is opt-in through scripts/release-central.sh. -->
 		<skipPublishing>true</skipPublishing>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

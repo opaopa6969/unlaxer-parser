@@ -31,7 +31,7 @@ public class PureMappedAliasRuntimeTest {
             }
             """.formatted(body)).grammars().get(0);
         var units = List.of(new ParserGenerator().generate(grammar), new ASTGenerator().generate(grammar),
-            new MapperGenerator().generate(grammar), new EvaluatorGenerator().generate(grammar))
+            new MapperGenerator().generate(grammar), GeneratedJavaRelease.evaluatorGenerator().generate(grammar))
             .stream().map(source -> new SimpleJavaFileObject(
                 URI.create("string:///org/example/alias/" + source.className() + ".java"), JavaFileObject.Kind.SOURCE) {
                     @Override public CharSequence getCharContent(boolean ignoreEncodingErrors) { return source.source(); }
@@ -41,7 +41,7 @@ public class PureMappedAliasRuntimeTest {
         var output = temporary.newFolder().toPath();
         try (var manager = compiler.getStandardFileManager(diagnostics, Locale.ROOT, StandardCharsets.UTF_8)) {
             boolean succeeded = compiler.getTask(null, manager, diagnostics,
-                List.of("--enable-preview", "--release", "21", "-classpath", System.getProperty("java.class.path"),
+                List.of("--release", GeneratedJavaRelease.EVALUATOR_RELEASE_OPTION, "-classpath", System.getProperty("java.class.path"),
                     "-d", output.toString()), null, units).call();
             assertTrue(body + "\n" + diagnostics.getDiagnostics(), succeeded);
         }

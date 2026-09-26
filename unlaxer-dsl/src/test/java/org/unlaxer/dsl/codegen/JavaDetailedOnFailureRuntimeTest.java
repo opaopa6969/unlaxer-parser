@@ -76,7 +76,7 @@ public class JavaDetailedOnFailureRuntimeTest {
         var output = temporary.newFolder().toPath();
         try (var manager = compiler.getStandardFileManager(diagnostics, null, null)) {
             boolean success = compiler.getTask(null, manager, diagnostics,
-                List.of("--enable-preview", "--release", "21", "-classpath", System.getProperty("java.class.path"),
+                List.of("--release", "17", "-classpath", System.getProperty("java.class.path"),
                     "-d", output.toString()), null, units).call();
             assertTrue(diagnostics.getDiagnostics().toString(), success);
         }

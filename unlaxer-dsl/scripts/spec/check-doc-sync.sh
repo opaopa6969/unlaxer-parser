@@ -28,6 +28,7 @@ EXPECTED_FLAGS=(
   '--report-version'
   '--report-schema-check'
   '--warnings-as-json'
+  '--java-release'
 )
 
 extract_table_flags() {

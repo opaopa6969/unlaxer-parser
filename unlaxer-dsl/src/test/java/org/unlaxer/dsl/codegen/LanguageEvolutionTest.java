@@ -26,7 +26,7 @@ public class LanguageEvolutionTest {
     @Rule public TemporaryFolder temporary = new TemporaryFolder();
     private static final String PACKAGE = "org.example.evolution";
     private static final List<CodeGenerator> GENERATORS = List.of(new ParserGenerator(), new ASTGenerator(),
-        new MapperGenerator(), new EvaluatorGenerator(), new LSPGenerator(), new LSPLauncherGenerator(),
+        new MapperGenerator(), GeneratedJavaRelease.evaluatorGenerator(), new LSPGenerator(), new LSPLauncherGenerator(),
         new DAPGenerator(), new DAPLauncherGenerator());
 
     private String fixture(int stage, String file) throws Exception {
@@ -57,7 +57,7 @@ public class LanguageEvolutionTest {
         Path directory = temporary.newFolder().toPath();
         try (var manager = compiler.getStandardFileManager(diagnostics, Locale.ROOT, StandardCharsets.UTF_8)) {
             boolean success = compiler.getTask(null, manager, diagnostics,
-                List.of("--enable-preview", "--release", "21", "-classpath", System.getProperty("java.class.path"),
+                List.of("--release", GeneratedJavaRelease.EVALUATOR_RELEASE_OPTION, "-classpath", System.getProperty("java.class.path"),
                     "-d", directory.toString()), null, units).call();
             String text = diagnostics.getDiagnostics().stream()
                 .map(d -> d.getCode() + ": " + d.getMessage(Locale.ROOT)).reduce("", (a, b) -> a + "\n" + b);
@@ -84,8 +84,14 @@ public class LanguageEvolutionTest {
                 var stale = new ArrayList<>(generated);
                 stale.set(3, previous.get(3)); // new AST + old dispatch
                 var staleResult = compile(stale, null, null);
-                assertFalse(staleResult.diagnostics(), staleResult.success());
-                assertTrue(staleResult.diagnostics(), staleResult.diagnostics().contains("compiler.err.not.exhaustive"));
+                if (GeneratedJavaRelease.sealedSwitchDispatch()) {
+                    assertFalse(staleResult.diagnostics(), staleResult.success());
+                    assertTrue(staleResult.diagnostics(), staleResult.diagnostics().contains("compiler.err.not.exhaustive"));
+                } else {
+                    // --java-release 17: instanceof dispatch has no compile-time exhaustiveness (#311);
+                    // EvaluatorVariantRuntimeTest checks that the unknown node fails at run time.
+                    assertTrue(staleResult.diagnostics(), staleResult.success());
+                }
                 var missing = compile(generated, fixture(stage - 1, "Calculator.java.txt"), null);
                 assertFalse(missing.diagnostics(), missing.success());
                 assertTrue(missing.diagnostics(), missing.diagnostics().contains(stage == 2 ? "evalNegation" : "evalConditional"));

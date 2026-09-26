@@ -83,7 +83,7 @@ public class ScopeAnnotationsEndToEndTest {
                 }
             };
             List<String> options = List.of(
-                "--enable-preview", "--release", "21",
+                "--release", "17",
                 "-classpath", System.getProperty("java.class.path"),
                 "-d", outputDir.toString());
             StringWriter diagnostics = new StringWriter();

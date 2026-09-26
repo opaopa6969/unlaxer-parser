@@ -181,55 +181,119 @@ public final class RustBackend {
     }
 
     private String expression(Expression expression) {
-        return switch (expression) {
-            case RuleEffects scope -> expression(scope.child()) + ".rule_effects(" + effects(scope.effects()) + ")";
-            case Literal literal -> "Expr::Literal(" + quote(literal.text()) + ")";
-            case NumberToken ignored -> "Expr::Number";
-            case IdentifierToken ignored -> "Expr::Identifier";
-            case QuotedToken quoted -> "Expr::Quoted('\\u{" + Integer.toHexString(quoted.quote()) + "}')";
-            case CodeStartToken ignored -> "Expr::CodeStart";
-            case CodeEndToken ignored -> "Expr::CodeEnd";
-            case AnyToken ignored -> "Expr::Any";
-            case EofToken ignored -> "Expr::Eof";
-            case EmptyToken ignored -> "Expr::JavaEmpty";
-            case CharRangeToken range -> "Expr::CharRange('\\u{" + Integer.toHexString(range.min())
+        if (expression instanceof RuleEffects scope) {
+            return expression(scope.child()) + ".rule_effects(" + effects(scope.effects()) + ")";
+        }
+        if (expression instanceof Literal literal) {
+            return "Expr::Literal(" + quote(literal.text()) + ")";
+        }
+        if (expression instanceof NumberToken ignored) {
+            return "Expr::Number";
+        }
+        if (expression instanceof IdentifierToken ignored) {
+            return "Expr::Identifier";
+        }
+        if (expression instanceof QuotedToken quoted) {
+            return "Expr::Quoted('\\u{" + Integer.toHexString(quoted.quote()) + "}')";
+        }
+        if (expression instanceof CodeStartToken ignored) {
+            return "Expr::CodeStart";
+        }
+        if (expression instanceof CodeEndToken ignored) {
+            return "Expr::CodeEnd";
+        }
+        if (expression instanceof AnyToken ignored) {
+            return "Expr::Any";
+        }
+        if (expression instanceof EofToken ignored) {
+            return "Expr::Eof";
+        }
+        if (expression instanceof EmptyToken ignored) {
+            return "Expr::JavaEmpty";
+        }
+        if (expression instanceof CharRangeToken range) {
+            return "Expr::CharRange('\\u{" + Integer.toHexString(range.min())
                 + "}', '\\u{" + Integer.toHexString(range.max()) + "}')";
-            case ExceptToken except -> "Expr::Except(" + quote(except.excluded()) + ")";
-            case UntilToken until -> "Expr::JavaUntil(" + quote(until.terminator()) + ")";
-            case LookaheadToken lookahead -> "Expr::JavaLookahead { pattern: " + quote(lookahead.pattern())
+        }
+        if (expression instanceof ExceptToken except) {
+            return "Expr::Except(" + quote(except.excluded()) + ")";
+        }
+        if (expression instanceof UntilToken until) {
+            return "Expr::JavaUntil(" + quote(until.terminator()) + ")";
+        }
+        if (expression instanceof LookaheadToken lookahead) {
+            return "Expr::JavaLookahead { pattern: " + quote(lookahead.pattern())
                 + ", positive: " + lookahead.positive() + " }";
-            case Reference reference -> "Expr::Rule(" + reference.rule() + ")";
-            case Sequence sequence -> "Expr::Sequence(vec![" + expressions(sequence.elements()) + "])";
-            case Delimited delimited -> "Expr::Sequence(vec![" + expression(delimited.child()) + "])";
-            case Choice choice -> "Expr::Choice(vec![" + expressions(choice.alternatives()) + "])";
-            case LongestChoice choice -> "Expr::LongestChoice(vec![" + expressions(choice.alternatives()) + "])";
-            case PredictiveChoice choice -> "Expr::PredictiveChoice { alternatives: vec!["
+        }
+        if (expression instanceof Reference reference) {
+            return "Expr::Rule(" + reference.rule() + ")";
+        }
+        if (expression instanceof Sequence sequence) {
+            return "Expr::Sequence(vec![" + expressions(sequence.elements()) + "])";
+        }
+        if (expression instanceof Delimited delimited) {
+            return "Expr::Sequence(vec![" + expression(delimited.child()) + "])";
+        }
+        if (expression instanceof Choice choice) {
+            return "Expr::Choice(vec![" + expressions(choice.alternatives()) + "])";
+        }
+        if (expression instanceof LongestChoice choice) {
+            return "Expr::LongestChoice(vec![" + expressions(choice.alternatives()) + "])";
+        }
+        if (expression instanceof PredictiveChoice choice) {
+            return "Expr::PredictiveChoice { alternatives: vec!["
                 + expressions(choice.alternatives()) + "], predictors: vec!["
                 + choice.predictors().stream().map(this::predictor).collect(java.util.stream.Collectors.joining(", "))
                 + "] }";
-            case Capture capture -> "Expr::Capture(" + quote(capture.name()) + ", Box::new(" + expression(capture.expression()) + "))";
-            case TextValue text -> expression(text.child()) + ".text_value()";
-            case ValueBoundary boundary -> expression(boundary.child()) + ".value_boundary()";
-            case TriviaScope scope -> expression(scope.child()) + ".trivia_scope(" + scope.javaWhitespace() + ")";
-            case OptionalExpr optional -> expression(optional.child()) + ".optional_java()";
-            case Repeat repeat -> expression(repeat.child()) + ".repeat_java(" + repeat.min() + ", "
+        }
+        if (expression instanceof Capture capture) {
+            return "Expr::Capture(" + quote(capture.name()) + ", Box::new(" + expression(capture.expression()) + "))";
+        }
+        if (expression instanceof TextValue text) {
+            return expression(text.child()) + ".text_value()";
+        }
+        if (expression instanceof ValueBoundary boundary) {
+            return expression(boundary.child()) + ".value_boundary()";
+        }
+        if (expression instanceof TriviaScope scope) {
+            return expression(scope.child()) + ".trivia_scope(" + scope.javaWhitespace() + ")";
+        }
+        if (expression instanceof OptionalExpr optional) {
+            return expression(optional.child()) + ".optional_java()";
+        }
+        if (expression instanceof Repeat repeat) {
+            return expression(repeat.child()) + ".repeat_java(" + repeat.min() + ", "
                 + (repeat.max() == null ? "None" : "Some(" + repeat.max() + ")") + ")";
-            case Separated separated -> expression(separated.child()) + ".separated_by(" + expression(separated.separator()) + ")";
-        };
+        }
+        if (expression instanceof Separated separated) {
+            return expression(separated.child()) + ".separated_by(" + expression(separated.separator()) + ")";
+        }
+        throw new IllegalStateException("unhandled " + expression);
     }
 
     private String predictor(Predictor predictor) {
-        return switch (predictor) {
-            case AnyPredictor ignored -> "unlaxer_runtime::Predictor::Any";
-            case LiteralPredictor literal -> "unlaxer_runtime::Predictor::Literal(" + quote(literal.text()) + ")";
-            case NumberPredictor ignored -> "unlaxer_runtime::Predictor::Number";
-            case IdentifierPredictor ignored -> "unlaxer_runtime::Predictor::Identifier";
-            case QuotedPredictor quoted -> "unlaxer_runtime::Predictor::Quoted('\\u{"
+        if (predictor instanceof AnyPredictor ignored) {
+            return "unlaxer_runtime::Predictor::Any";
+        }
+        if (predictor instanceof LiteralPredictor literal) {
+            return "unlaxer_runtime::Predictor::Literal(" + quote(literal.text()) + ")";
+        }
+        if (predictor instanceof NumberPredictor ignored) {
+            return "unlaxer_runtime::Predictor::Number";
+        }
+        if (predictor instanceof IdentifierPredictor ignored) {
+            return "unlaxer_runtime::Predictor::Identifier";
+        }
+        if (predictor instanceof QuotedPredictor quoted) {
+            return "unlaxer_runtime::Predictor::Quoted('\\u{"
                 + Integer.toHexString(quoted.quote()) + "}')";
-            case AnyOfPredictor anyOf -> "unlaxer_runtime::Predictor::OneOf(vec!["
+        }
+        if (predictor instanceof AnyOfPredictor anyOf) {
+            return "unlaxer_runtime::Predictor::OneOf(vec!["
                 + anyOf.alternatives().stream().map(this::predictor)
                     .collect(java.util.stream.Collectors.joining(", ")) + "])";
-        };
+        }
+        throw new IllegalStateException("unhandled " + predictor);
     }
 
     private String effects(Effects effects) {

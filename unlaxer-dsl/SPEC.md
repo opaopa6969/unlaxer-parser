@@ -177,6 +177,7 @@ Current behavior:
 - `--report-version 1` selects JSON schema version (currently only version `1` is supported).
 - `--report-schema-check` validates JSON payload schema before emitting/writing reports.
 - `--warnings-as-json` emits warning diagnostics as JSON to stderr even when `--report-format text` is used.
+- `--java-release 21|17` (default `21`) selects the Java release generated Java targets. `17` changes only the Evaluator dispatch (ordered `instanceof` chain instead of an exhaustive sealed `switch`; an unknown node then fails at run time with `IllegalStateException`). A non-default value is included in `argsHash`.
 - On schema-check failure, CLI emits stable error codes prefixed with `E-REPORT-SCHEMA-*`.
 - In normal generation mode with `--report-format json`, CLI emits generation summary (`generatedCount`, `generatedFiles`).
 - JSON report schema includes stable top-level fields:

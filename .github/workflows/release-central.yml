@@ -129,7 +129,7 @@ jobs:
           # CI (.github/workflows/maven.yml) already gates merges to master with
           # `mvn clean test`; this deploy step re-runs the build only to produce
           # and upload artifacts, so tests are explicitly skipped here.
-          mvn -B -pl .,unlaxer-common,unlaxer-dsl clean deploy -DskipPublishing=false -DskipTests
+          mvn -B -pl .,unlaxer-common,unlaxer-dsl,unlaxer-common-jdk17,unlaxer-dsl-jdk17 clean deploy -DskipPublishing=false -DskipTests
 
       - name: Tag the release
         run: |

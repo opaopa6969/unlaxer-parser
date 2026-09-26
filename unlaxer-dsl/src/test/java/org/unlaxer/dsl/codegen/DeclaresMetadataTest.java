@@ -42,7 +42,7 @@ public class DeclaresMetadataTest {
         var output = temporary.newFolder().toPath();
         try (var manager = compiler.getStandardFileManager(diagnostics, null, null)) {
             assertTrue(diagnostics.getDiagnostics().toString(), compiler.getTask(null, manager, diagnostics,
-                List.of("--release", "21", "-d", output.toString()), null, List.of(unit)).call());
+                List.of("--release", "17", "-d", output.toString()), null, List.of(unit)).call());
         }
         try (var loader = new URLClassLoader(new URL[]{output.toUri().toURL()}, getClass().getClassLoader())) {
             var metadata = loader.loadClass("Metadata");

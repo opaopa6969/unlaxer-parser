@@ -59,7 +59,7 @@ public class MappedRootTokenRuntimeTest {
         Path output = temporary.newFolder().toPath();
         try (var manager = compiler.getStandardFileManager(diagnostics, Locale.ROOT, StandardCharsets.UTF_8)) {
             assertTrue(rules + "\n" + diagnostics.getDiagnostics(), compiler.getTask(null, manager, diagnostics,
-                List.of("--enable-preview", "--release", "21", "-classpath", System.getProperty("java.class.path"),
+                List.of("--release", "17", "-classpath", System.getProperty("java.class.path"),
                     "-d", output.toString()), null, units).call());
         }
         return new URLClassLoader(new URL[]{output.toUri().toURL()}, getClass().getClassLoader());
@@ -205,8 +205,13 @@ public class MappedRootTokenRuntimeTest {
                 }
                 return null;
             }).toList();
-            try (var executor = Executors.newFixedThreadPool(inputs.size())) {
+            // Java 17: ExecutorService は AutoCloseable ではない (close() は Java 19+)。
+            var executor = Executors.newFixedThreadPool(inputs.size());
+            try {
                 for (var future : executor.invokeAll(jobs)) future.get(30, TimeUnit.SECONDS);
+            } finally {
+                executor.shutdown();
+                executor.awaitTermination(30, TimeUnit.SECONDS);
             }
         }
     }

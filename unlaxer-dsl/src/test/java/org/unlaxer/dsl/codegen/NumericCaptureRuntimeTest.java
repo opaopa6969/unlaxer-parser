@@ -167,7 +167,7 @@ public class NumericCaptureRuntimeTest {
     private URLClassLoader compile(String parser, String body) throws Exception {
         var grammar = grammar(parser, body);
         var generated = List.of(new ASTGenerator().generate(grammar), new ParserGenerator().generate(grammar),
-            new MapperGenerator().generate(grammar), new EvaluatorGenerator().generate(grammar));
+            new MapperGenerator().generate(grammar), GeneratedJavaRelease.evaluatorGenerator().generate(grammar));
         List<JavaFileObject> sources = generated.stream().<JavaFileObject>map(source -> new SimpleJavaFileObject(
             URI.create("string:///" + source.packageName().replace('.', '/') + "/" + source.className() + ".java"),
             JavaFileObject.Kind.SOURCE) {
@@ -178,7 +178,7 @@ public class NumericCaptureRuntimeTest {
         StringWriter diagnostics = new StringWriter();
         try (var manager = compiler.getStandardFileManager(null, null, null)) {
             boolean success = compiler.getTask(diagnostics, manager, null,
-                List.of("--enable-preview", "--release", "21", "-classpath", System.getProperty("java.class.path"),
+                List.of("--release", GeneratedJavaRelease.EVALUATOR_RELEASE_OPTION, "-classpath", System.getProperty("java.class.path"),
                     "-d", output.toString()), null, sources).call();
             assertTrue(parser + " " + body + "\n" + diagnostics, success);
         }

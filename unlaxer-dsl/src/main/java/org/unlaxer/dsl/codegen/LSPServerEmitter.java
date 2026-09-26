@@ -799,23 +799,26 @@ class LSPServerEmitter {
     }
 
     private static void collectFromBody(RuleBody body, Set<String> acc) {
-        switch (body) {
-            case ChoiceBody cb -> {
-                for (var alt : cb.alternatives()) collectFromBody(alt, acc);
-            }
-            case SequenceBody sb -> {
-                for (AnnotatedElement ae : sb.elements()) collectFromElement(ae.element(), acc);
-            }
+        if (body instanceof ChoiceBody cb) {
+            for (var alt : cb.alternatives()) collectFromBody(alt, acc);
+        } else if (body instanceof SequenceBody sb) {
+            for (AnnotatedElement ae : sb.elements()) collectFromElement(ae.element(), acc);
+        } else {
+            throw new IllegalStateException("unhandled " + body);
         }
     }
 
     private static void collectFromElement(AtomicElement element, Set<String> acc) {
-        switch (element) {
-            case TerminalElement t -> acc.add(stripQuotes(t.value()));
-            case GroupElement g -> collectFromBody(g.body(), acc);
-            case OptionalElement o -> collectFromBody(o.body(), acc);
-            case RepeatElement r -> collectFromBody(r.body(), acc);
-            default -> {}
+        if (element instanceof TerminalElement t) {
+            acc.add(stripQuotes(t.value()));
+        } else if (element instanceof GroupElement g) {
+            collectFromBody(g.body(), acc);
+        } else if (element instanceof OptionalElement o) {
+            collectFromBody(o.body(), acc);
+        } else if (element instanceof RepeatElement r) {
+            collectFromBody(r.body(), acc);
+        } else {
+
         }
     }
 

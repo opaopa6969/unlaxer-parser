@@ -2,6 +2,7 @@ package org.unlaxer.dsl;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -192,6 +193,35 @@ public class CodegenCliParserTest {
         } catch (CodegenCliParser.UsageException e) {
             assertFalse(e.showUsage());
             assertTrue(e.getMessage().contains("Unsupported --manifest-format"));
+        }
+    }
+
+    @Test
+    public void testJavaReleaseDefaultsTo21AndAccepts17() throws Exception {
+        assertEquals(21, CodegenCliParser.parse(new String[] {"--grammar", "a.ubnf", "--output", "out"}).javaRelease());
+        var options = CodegenCliParser.parse(new String[] {
+            "--grammar", "a.ubnf", "--output", "out", "--java-release", "17"
+        });
+        assertEquals(17, options.javaRelease());
+        var defaults = CodegenCliParser.parse(new String[] {"--grammar", "a.ubnf", "--output", "out"});
+        var explicit21 = CodegenCliParser.parse(new String[] {
+            "--grammar", "a.ubnf", "--output", "out", "--java-release", "21"
+        });
+        // The default keeps the pre-#311 argsHash; only a non-default release changes it.
+        assertEquals(ArgsHashUtil.fromOptions(defaults), ArgsHashUtil.fromOptions(explicit21));
+        assertNotEquals(ArgsHashUtil.fromOptions(defaults), ArgsHashUtil.fromOptions(options));
+    }
+
+    @Test
+    public void testRejectUnsupportedJavaRelease() {
+        for (String value : new String[] {"11", "x"}) {
+            try {
+                CodegenCliParser.parse(new String[] {"--grammar", "a.ubnf", "--output", "out", "--java-release", value});
+                fail("expected parser usage error");
+            } catch (CodegenCliParser.UsageException e) {
+                assertFalse(e.showUsage());
+                assertTrue(e.getMessage().contains("Unsupported --java-release"));
+            }
         }
     }
 

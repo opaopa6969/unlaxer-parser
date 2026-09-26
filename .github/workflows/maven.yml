@@ -113,6 +113,13 @@ jobs:
     - name: Build with Maven
       run: mvn -B clean test
 
+    # #311: the main artifacts stay Java 21 (major 65); the -jdk17 ones are major 61.
+    - name: Package library jars and check class file majors
+      run: |
+        mvn -B -pl .,unlaxer-common,unlaxer-dsl,unlaxer-common-jdk17,unlaxer-dsl-jdk17 package -DskipTests -Dgpg.skip=true
+        python3 scripts/check_class_major.py 65 unlaxer-common/target/unlaxer-common-*[0-9].jar unlaxer-dsl/target/unlaxer-dsl-*[0-9].jar
+        python3 scripts/check_class_major.py 61 unlaxer-common-jdk17/target/unlaxer-common-jdk17-*[0-9].jar unlaxer-dsl-jdk17/target/unlaxer-dsl-jdk17-*[0-9].jar
+
     # 静的解析 (issue #37): Error Prone (compile 時) + SpotBugs。
     # 生成コードは除外 (config/spotbugs-exclude.xml / -XepExcludedPaths)。
     - name: Static analysis (Error Prone + SpotBugs)
@@ -120,6 +127,32 @@ jobs:
         mvn -B -Pstatic-analysis -pl unlaxer-common,unlaxer-dsl
         clean test-compile
         com.github.spotbugs:spotbugs-maven-plugin:4.10.2.0:check
+
+  # Java 17 artifacts (#311): the *-jdk17 modules recompile the same sources with release 17.
+  # Build and test them on a Java 17 JVM (profile jdk17-tests turns their tests on) and require
+  # class file major 61 in every class of their jars.
+  build-jdk17:
+    name: "*-jdk17 artifacts on JDK 17"
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Build and test the -jdk17 modules on JDK 17
+      run: mvn -B -pl unlaxer-common-jdk17,unlaxer-dsl-jdk17 -am clean package -Dgpg.skip=true
+
+    - name: Require class file major 61 (Java 17) in the -jdk17 jars
+      run: >
+        python3 scripts/check_class_major.py 61
+        unlaxer-common-jdk17/target/unlaxer-common-jdk17-*[0-9].jar
+        unlaxer-dsl-jdk17/target/unlaxer-dsl-jdk17-*[0-9].jar
 
   # UBNF VSIX を成果物として添付する。タグ push 時の Release 添付は
   # release-vsix.yml を参照。

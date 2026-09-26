@@ -203,7 +203,7 @@ public class SelfHostingTest {
         } catch (java.io.IOException e) {
             throw new RuntimeException(e);
         }
-        List<String> options = List.of("--enable-preview", "--release", "21", "-classpath", classpath, "-d", tmpDir);
+        List<String> options = List.of("--release", "17", "-classpath", classpath, "-d", tmpDir);
 
         StringWriter diag = new StringWriter();
         boolean ok = compiler.getTask(new PrintWriter(diag), fm, null, options, null, List.of(src)).call();

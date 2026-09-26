@@ -95,13 +95,14 @@ class ParserRuleEmitter {
     }
 
     static void analyzeHelpersInBody(ParserGenerator.GenContext ctx, String ruleName, RuleBody body, List<HelperSpec> specs) {
-        switch (body) {
-            case ChoiceBody choice -> {
-                for (SequenceBody alt : choice.alternatives()) {
-                    analyzeHelpersInSequence(ctx, ruleName, alt, specs);
-                }
+        if (body instanceof ChoiceBody choice) {
+            for (SequenceBody alt : choice.alternatives()) {
+                analyzeHelpersInSequence(ctx, ruleName, alt, specs);
             }
-            case SequenceBody seq -> analyzeHelpersInSequence(ctx, ruleName, seq, specs);
+        } else if (body instanceof SequenceBody seq) {
+            analyzeHelpersInSequence(ctx, ruleName, seq, specs);
+        } else {
+            throw new IllegalStateException("unhandled " + body);
         }
     }
 
@@ -112,62 +113,56 @@ class ParserRuleEmitter {
     }
 
     static void analyzeHelpersInElement(ParserGenerator.GenContext ctx, String ruleName, AtomicElement element, List<HelperSpec> specs) {
-        switch (element) {
-            case RepeatElement rep -> {
-                if (!isSingleRuleRef(rep.body())) {
-                    int n = ctx.nextRepeat(ruleName);
-                    String helperName = ruleName + "Repeat" + n + "Parser";
-                    ctx.registerHelper(ruleName, element, helperName);
-                    analyzeHelpersInBody(ctx, ruleName, rep.body(), specs);
-                    specs.add(new HelperSpec.ChainHelper(helperName, rep.body()));
-                }
-            }
-            case OptionalElement opt -> {
-                if (!isSingleAtomicElement(opt.body())
-                        || !(getSingleAtomicElementFrom(opt.body()) instanceof RuleRefElement
-                            || getSingleAtomicElementFrom(opt.body()) instanceof TerminalElement)) {
-                    int n = ctx.nextOpt(ruleName);
-                    String helperName = ruleName + "Opt" + n + "Parser";
-                    ctx.registerHelper(ruleName, element, helperName);
-                    analyzeHelpersInBody(ctx, ruleName, opt.body(), specs);
-                    specs.add(new HelperSpec.ChainHelper(helperName, opt.body()));
-                }
-            }
-            case OneOrMoreElement one -> {
-                if (!isSingleRuleRef(one.body())) {
-                    int n = ctx.nextRepeat(ruleName);
-                    String helperName = ruleName + "OneOrMore" + n + "Parser";
-                    ctx.registerHelper(ruleName, element, helperName);
-                    analyzeHelpersInBody(ctx, ruleName, one.body(), specs);
-                    specs.add(new HelperSpec.ChainHelper(helperName, atomicAsRuleBody(one.body())));
-                }
-            }
-            case BoundedRepeatElement bounded -> {
-                if (!isSingleRuleRef(bounded.body())) {
-                    int n = ctx.nextRepeat(ruleName);
-                    String helperName = ruleName + "Bounded" + n + "Parser";
-                    ctx.registerHelper(ruleName, element, helperName);
-                    analyzeHelpersInBody(ctx, ruleName, bounded.body(), specs);
-                    specs.add(new HelperSpec.ChainHelper(helperName, atomicAsRuleBody(bounded.body())));
-                }
-            }
-            case GroupElement g -> {
-                int n = ctx.nextGroup(ruleName);
-                String helperName = ruleName + "Group" + n + "Parser";
+        if (element instanceof RepeatElement rep) {
+            if (!isSingleRuleRef(rep.body())) {
+                int n = ctx.nextRepeat(ruleName);
+                String helperName = ruleName + "Repeat" + n + "Parser";
                 ctx.registerHelper(ruleName, element, helperName);
-                analyzeHelpersInBody(ctx, ruleName, g.body(), specs);
-                specs.add(new HelperSpec.ChainHelper(helperName, g.body()));
+                analyzeHelpersInBody(ctx, ruleName, rep.body(), specs);
+                specs.add(new HelperSpec.ChainHelper(helperName, rep.body()));
             }
-            case SeparatedElement sep -> {
-                int n = ctx.nextSep(ruleName);
-                String bodyHelperName = ruleName + "Sep" + n + "BodyParser";
-                String outerHelperName = ruleName + "Sep" + n + "Parser";
-                ctx.registerHelper(ruleName, element, outerHelperName);
-                analyzeHelpersInElement(ctx, ruleName, sep.element(), specs);
-                analyzeHelpersInElement(ctx, ruleName, sep.separator(), specs);
-                specs.add(new HelperSpec.SepHelper(bodyHelperName, outerHelperName, sep.element(), sep.separator()));
+        } else if (element instanceof OptionalElement opt) {
+            if (!isSingleAtomicElement(opt.body())
+                    || !(getSingleAtomicElementFrom(opt.body()) instanceof RuleRefElement
+                        || getSingleAtomicElementFrom(opt.body()) instanceof TerminalElement)) {
+                int n = ctx.nextOpt(ruleName);
+                String helperName = ruleName + "Opt" + n + "Parser";
+                ctx.registerHelper(ruleName, element, helperName);
+                analyzeHelpersInBody(ctx, ruleName, opt.body(), specs);
+                specs.add(new HelperSpec.ChainHelper(helperName, opt.body()));
             }
-            default -> {} // TerminalElement, RuleRefElement, ErrorElement
+        } else if (element instanceof OneOrMoreElement one) {
+            if (!isSingleRuleRef(one.body())) {
+                int n = ctx.nextRepeat(ruleName);
+                String helperName = ruleName + "OneOrMore" + n + "Parser";
+                ctx.registerHelper(ruleName, element, helperName);
+                analyzeHelpersInBody(ctx, ruleName, one.body(), specs);
+                specs.add(new HelperSpec.ChainHelper(helperName, atomicAsRuleBody(one.body())));
+            }
+        } else if (element instanceof BoundedRepeatElement bounded) {
+            if (!isSingleRuleRef(bounded.body())) {
+                int n = ctx.nextRepeat(ruleName);
+                String helperName = ruleName + "Bounded" + n + "Parser";
+                ctx.registerHelper(ruleName, element, helperName);
+                analyzeHelpersInBody(ctx, ruleName, bounded.body(), specs);
+                specs.add(new HelperSpec.ChainHelper(helperName, atomicAsRuleBody(bounded.body())));
+            }
+        } else if (element instanceof GroupElement g) {
+            int n = ctx.nextGroup(ruleName);
+            String helperName = ruleName + "Group" + n + "Parser";
+            ctx.registerHelper(ruleName, element, helperName);
+            analyzeHelpersInBody(ctx, ruleName, g.body(), specs);
+            specs.add(new HelperSpec.ChainHelper(helperName, g.body()));
+        } else if (element instanceof SeparatedElement sep) {
+            int n = ctx.nextSep(ruleName);
+            String bodyHelperName = ruleName + "Sep" + n + "BodyParser";
+            String outerHelperName = ruleName + "Sep" + n + "Parser";
+            ctx.registerHelper(ruleName, element, outerHelperName);
+            analyzeHelpersInElement(ctx, ruleName, sep.element(), specs);
+            analyzeHelpersInElement(ctx, ruleName, sep.separator(), specs);
+            specs.add(new HelperSpec.SepHelper(bodyHelperName, outerHelperName, sep.element(), sep.separator()));
+        } else {
+
         }
     }
 
@@ -177,14 +172,13 @@ class ParserRuleEmitter {
 
     static void emitAnalyzedHelpers(ParserGenerator.GenContext ctx, String ruleName, List<HelperSpec> specs) {
         for (HelperSpec spec : specs) {
-            switch (spec) {
-                case HelperSpec.ChainHelper chain -> {
-                    String helperCode = generateHelperCode(ctx, ruleName, chain.name(), chain.body());
-                    ctx.addHelper(ruleName, helperCode);
-                }
-                case HelperSpec.SepHelper sep -> {
-                    generateSepHelperCode(ctx, ruleName, sep);
-                }
+            if (spec instanceof HelperSpec.ChainHelper chain) {
+                String helperCode = generateHelperCode(ctx, ruleName, chain.name(), chain.body());
+                ctx.addHelper(ruleName, helperCode);
+            } else if (spec instanceof HelperSpec.SepHelper sep) {
+                generateSepHelperCode(ctx, ruleName, sep);
+            } else {
+                throw new IllegalStateException("unhandled " + spec);
             }
         }
     }
@@ -314,13 +308,14 @@ class ParserRuleEmitter {
 
     private static void collectFollowFromBody(
             ParserGenerator.GenContext ctx, RuleBody body, String targetRule, LinkedHashSet<String> tokens) {
-        switch (body) {
-            case ChoiceBody choice -> {
-                for (SequenceBody alt : choice.alternatives()) {
-                    collectFollowFromSequence(ctx, alt, targetRule, tokens);
-                }
+        if (body instanceof ChoiceBody choice) {
+            for (SequenceBody alt : choice.alternatives()) {
+                collectFollowFromSequence(ctx, alt, targetRule, tokens);
             }
-            case SequenceBody seq -> collectFollowFromSequence(ctx, seq, targetRule, tokens);
+        } else if (body instanceof SequenceBody seq) {
+            collectFollowFromSequence(ctx, seq, targetRule, tokens);
+        } else {
+            throw new IllegalStateException("unhandled " + body);
         }
     }
 
@@ -377,24 +372,30 @@ class ParserRuleEmitter {
      */
     private static void collectFirstTerminals(
             ParserGenerator.GenContext ctx, AtomicElement elem, LinkedHashSet<String> tokens, Set<String> visited) {
-        switch (elem) {
-            case TerminalElement t -> tokens.add(t.value());
-            case GroupElement g -> collectFirstTerminalsFromBody(ctx, g.body(), tokens, visited);
-            case OptionalElement opt -> collectFirstTerminalsFromBody(ctx, opt.body(), tokens, visited);
-            case RepeatElement rep -> collectFirstTerminalsFromBody(ctx, rep.body(), tokens, visited);
-            case OneOrMoreElement oneOrMore -> collectFirstTerminalsFromBody(ctx, oneOrMore.body(), tokens, visited);
-            case BoundedRepeatElement bounded -> collectFirstTerminalsFromBody(ctx, bounded.body(), tokens, visited);
-            case SeparatedElement sep -> collectFirstTerminals(ctx, sep.element(), tokens, visited);
-            case RuleRefElement ref -> {
-                String refName = ref.name();
-                if (false == visited.contains(refName)) {
-                    visited.add(refName);
-                    Optional<RuleDecl> resolved = findRuleByName(ctx, refName);
-                    resolved.ifPresent(ruleDecl ->
-                        collectFirstTerminalsFromBody(ctx, ruleDecl.body(), tokens, visited));
-                }
+        if (elem instanceof TerminalElement t) {
+            tokens.add(t.value());
+        } else if (elem instanceof GroupElement g) {
+            collectFirstTerminalsFromBody(ctx, g.body(), tokens, visited);
+        } else if (elem instanceof OptionalElement opt) {
+            collectFirstTerminalsFromBody(ctx, opt.body(), tokens, visited);
+        } else if (elem instanceof RepeatElement rep) {
+            collectFirstTerminalsFromBody(ctx, rep.body(), tokens, visited);
+        } else if (elem instanceof OneOrMoreElement oneOrMore) {
+            collectFirstTerminalsFromBody(ctx, oneOrMore.body(), tokens, visited);
+        } else if (elem instanceof BoundedRepeatElement bounded) {
+            collectFirstTerminalsFromBody(ctx, bounded.body(), tokens, visited);
+        } else if (elem instanceof SeparatedElement sep) {
+            collectFirstTerminals(ctx, sep.element(), tokens, visited);
+        } else if (elem instanceof RuleRefElement ref) {
+            String refName = ref.name();
+            if (false == visited.contains(refName)) {
+                visited.add(refName);
+                Optional<RuleDecl> resolved = findRuleByName(ctx, refName);
+                resolved.ifPresent(ruleDecl ->
+                    collectFirstTerminalsFromBody(ctx, ruleDecl.body(), tokens, visited));
             }
-            default -> {}
+        } else {
+
         }
     }
 
@@ -409,19 +410,18 @@ class ParserRuleEmitter {
 
     private static void collectFirstTerminalsFromBody(
             ParserGenerator.GenContext ctx, RuleBody body, LinkedHashSet<String> tokens, Set<String> visited) {
-        switch (body) {
-            case ChoiceBody choice -> {
-                for (SequenceBody alt : choice.alternatives()) {
-                    if (false == alt.elements().isEmpty()) {
-                        collectFirstFromSequenceElements(ctx, alt.elements(), 0, tokens, visited);
-                    }
+        if (body instanceof ChoiceBody choice) {
+            for (SequenceBody alt : choice.alternatives()) {
+                if (false == alt.elements().isEmpty()) {
+                    collectFirstFromSequenceElements(ctx, alt.elements(), 0, tokens, visited);
                 }
             }
-            case SequenceBody seq -> {
-                if (false == seq.elements().isEmpty()) {
-                    collectFirstFromSequenceElements(ctx, seq.elements(), 0, tokens, visited);
-                }
+        } else if (body instanceof SequenceBody seq) {
+            if (false == seq.elements().isEmpty()) {
+                collectFirstFromSequenceElements(ctx, seq.elements(), 0, tokens, visited);
             }
+        } else {
+            throw new IllegalStateException("unhandled " + body);
         }
     }
 
@@ -472,13 +472,16 @@ class ParserRuleEmitter {
     }
 
     private static boolean containsRuleRef(RuleBody body, String targetRule) {
-        return switch (body) {
-            case ChoiceBody choice -> choice.alternatives().stream()
+        if (body instanceof ChoiceBody choice) {
+            return choice.alternatives().stream()
                 .anyMatch(alt -> alt.elements().stream()
                     .anyMatch(ae -> ae.element() instanceof RuleRefElement ref && ref.name().equals(targetRule)));
-            case SequenceBody seq -> seq.elements().stream()
+        }
+        if (body instanceof SequenceBody seq) {
+            return seq.elements().stream()
                 .anyMatch(ae -> ae.element() instanceof RuleRefElement ref && ref.name().equals(targetRule));
-        };
+        }
+        throw new IllegalStateException("unhandled " + body);
     }
 
     /**
@@ -756,32 +759,45 @@ class ParserRuleEmitter {
         ParserGenerator.GenContext ctx, RuleBody body, Set<String> visiting,
         Map<String, PredictorSpec> memo
     ) {
-        return switch (body) {
-            case SequenceBody sequence -> predictorSpec(ctx, sequence, visiting, memo);
-            case ChoiceBody choice -> PredictorSpec.union(choice.alternatives().stream()
+        if (body instanceof SequenceBody sequence) {
+            return predictorSpec(ctx, sequence, visiting, memo);
+        }
+        if (body instanceof ChoiceBody choice) {
+            return PredictorSpec.union(choice.alternatives().stream()
                 .map(sequence -> predictorSpec(ctx, sequence, new HashSet<>(visiting), memo))
                 .toList());
-        };
+        }
+        throw new IllegalStateException("unhandled " + body);
     }
 
     private static PredictorSpec predictorSpec(
         ParserGenerator.GenContext ctx, AtomicElement element, Set<String> visiting,
         Map<String, PredictorSpec> memo
     ) {
-        return switch (element) {
-            case TerminalElement terminal -> terminal.value().isEmpty()
+        if (element instanceof TerminalElement terminal) {
+            return terminal.value().isEmpty()
                 ? PredictorSpec.unknown()
                 : PredictorSpec.atom("ChoicePredictor.literal(\""
                     + ParserCodegenUtil.escapeString(terminal.value()) + "\")");
-            case GroupElement group -> predictorSpec(ctx, group.body(), visiting, memo);
-            case OneOrMoreElement one -> predictorSpec(ctx, one.body(), visiting, memo);
-            case BoundedRepeatElement bounded -> bounded.min() > 0
+        }
+        if (element instanceof GroupElement group) {
+            return predictorSpec(ctx, group.body(), visiting, memo);
+        }
+        if (element instanceof OneOrMoreElement one) {
+            return predictorSpec(ctx, one.body(), visiting, memo);
+        }
+        if (element instanceof BoundedRepeatElement bounded) {
+            return bounded.min() > 0
                 ? predictorSpec(ctx, bounded.body(), visiting, memo)
                 : PredictorSpec.unknown();
-            case SeparatedElement separated -> predictorSpec(ctx, separated.element(), visiting, memo);
-            case RuleRefElement ref -> predictorForReference(ctx, ref, visiting, memo);
-            default -> PredictorSpec.unknown();
-        };
+        }
+        if (element instanceof SeparatedElement separated) {
+            return predictorSpec(ctx, separated.element(), visiting, memo);
+        }
+        if (element instanceof RuleRefElement ref) {
+            return predictorForReference(ctx, ref, visiting, memo);
+        }
+        return PredictorSpec.unknown();
     }
 
     private static PredictorSpec predictorForReference(
@@ -985,25 +1001,24 @@ class ParserRuleEmitter {
     static String generateBodyElements(ParserGenerator.GenContext ctx, String ruleName, RuleBody body, String indent) {
         List<String> elementCodes = new ArrayList<>();
 
-        switch (body) {
-            case ChoiceBody choice -> {
-                if (choice.alternatives().size() == 1) {
-                    // 単一代替 → SequenceBody として扱う
-                    for (AnnotatedElement ae : choice.alternatives().get(0).elements()) {
-                        elementCodes.add(generateElementCode(ctx, ruleName, ae.element()));
-                    }
-                } else {
-                    // 複数代替 → 各代替を1エントリに
-                    for (SequenceBody alt : choice.alternatives()) {
-                        elementCodes.add(generateAlternativeCode(ctx, ruleName, alt, indent));
-                    }
-                }
-            }
-            case SequenceBody seq -> {
-                for (AnnotatedElement ae : seq.elements()) {
+        if (body instanceof ChoiceBody choice) {
+            if (choice.alternatives().size() == 1) {
+                // 単一代替 → SequenceBody として扱う
+                for (AnnotatedElement ae : choice.alternatives().get(0).elements()) {
                     elementCodes.add(generateElementCode(ctx, ruleName, ae.element()));
                 }
+            } else {
+                // 複数代替 → 各代替を1エントリに
+                for (SequenceBody alt : choice.alternatives()) {
+                    elementCodes.add(generateAlternativeCode(ctx, ruleName, alt, indent));
+                }
             }
+        } else if (body instanceof SequenceBody seq) {
+            for (AnnotatedElement ae : seq.elements()) {
+                elementCodes.add(generateElementCode(ctx, ruleName, ae.element()));
+            }
+        } else {
+            throw new IllegalStateException("unhandled " + body);
         }
 
         return elementCodes.stream()
@@ -1065,74 +1080,65 @@ class ParserRuleEmitter {
     // =========================================================================
 
     static ElementModel resolveElement(ParserGenerator.GenContext ctx, String ruleName, AtomicElement element) {
-        ElementModel model = switch (element) {
-            case TerminalElement t -> new ElementModel.WordMatch(t.value());
-
-            case RuleRefElement r -> resolveRuleRefModel(ctx, r.name());
-
-            case RepeatElement rep -> {
-                if (isSingleRuleRef(rep.body())) {
-                    AtomicElement single = getSingleAtomicElementFrom(rep.body());
-                    yield new ElementModel.ZeroOrMoreOf(resolveElement(ctx, ruleName, single));
-                } else {
-                    String helperName = ctx.helperName(ruleName, element);
-                    yield new ElementModel.ZeroOrMoreOf(new ElementModel.ClassRef(helperName + ".class"));
-                }
-            }
-
-            case OptionalElement opt -> {
-                if (isSingleAtomicElement(opt.body())) {
-                    AtomicElement inner = getSingleAtomicElementFrom(opt.body());
-                    if (inner instanceof RuleRefElement || inner instanceof TerminalElement) {
-                        yield new ElementModel.OptionalOf(resolveElement(ctx, ruleName, inner));
-                    } else {
-                        String helperName = ctx.helperName(ruleName, element);
-                        yield new ElementModel.OptionalOf(new ElementModel.ClassRef(helperName + ".class"));
-                    }
-                } else {
-                    String helperName = ctx.helperName(ruleName, element);
-                    yield new ElementModel.OptionalOf(new ElementModel.ClassRef(helperName + ".class"));
-                }
-            }
-
-            case OneOrMoreElement one -> {
-                if (isSingleRuleRef(one.body())) {
-                    AtomicElement single = getSingleAtomicElementFrom(one.body());
-                    yield new ElementModel.OneOrMoreOf(resolveElement(ctx, ruleName, single));
-                } else {
-                    String helperName = ctx.helperName(ruleName, element);
-                    yield new ElementModel.OneOrMoreOf(new ElementModel.ClassRef(helperName + ".class"));
-                }
-            }
-
-            case BoundedRepeatElement bounded -> {
-                String minStr = String.valueOf(bounded.min());
-                String maxStr = bounded.max() == BoundedRepeatElement.UNBOUNDED
-                    ? "Integer.MAX_VALUE"
-                    : String.valueOf(bounded.max());
-                if (isSingleRuleRef(bounded.body())) {
-                    AtomicElement single = getSingleAtomicElementFrom(bounded.body());
-                    yield new ElementModel.BoundedRepeatOf(
-                        resolveElement(ctx, ruleName, single), minStr, maxStr);
-                } else {
-                    String helperName = ctx.helperName(ruleName, element);
-                    yield new ElementModel.BoundedRepeatOf(
-                        new ElementModel.ClassRef(helperName + ".class"), minStr, maxStr);
-                }
-            }
-
-            case GroupElement g -> {
+        final ElementModel model;
+        if (element instanceof TerminalElement t) {
+            model = new ElementModel.WordMatch(t.value());
+        } else if (element instanceof RuleRefElement r) {
+            model = resolveRuleRefModel(ctx, r.name());
+        } else if (element instanceof RepeatElement rep) {
+            if (isSingleRuleRef(rep.body())) {
+                AtomicElement single = getSingleAtomicElementFrom(rep.body());
+                model = new ElementModel.ZeroOrMoreOf(resolveElement(ctx, ruleName, single));
+            } else {
                 String helperName = ctx.helperName(ruleName, element);
-                yield new ElementModel.ClassRef(helperName + ".class");
+                model = new ElementModel.ZeroOrMoreOf(new ElementModel.ClassRef(helperName + ".class"));
             }
-
-            case SeparatedElement sep -> {
-                String outerHelperName = ctx.helperName(ruleName, element);
-                yield new ElementModel.ClassRef(outerHelperName + ".class");
+        } else if (element instanceof OptionalElement opt) {
+            if (isSingleAtomicElement(opt.body())) {
+                AtomicElement inner = getSingleAtomicElementFrom(opt.body());
+                if (inner instanceof RuleRefElement || inner instanceof TerminalElement) {
+                    model = new ElementModel.OptionalOf(resolveElement(ctx, ruleName, inner));
+                } else {
+                    String helperName = ctx.helperName(ruleName, element);
+                    model = new ElementModel.OptionalOf(new ElementModel.ClassRef(helperName + ".class"));
+                }
+            } else {
+                String helperName = ctx.helperName(ruleName, element);
+                model = new ElementModel.OptionalOf(new ElementModel.ClassRef(helperName + ".class"));
             }
-
-            case ErrorElement err -> new ElementModel.ErrorExpected(err.message());
-        };
+        } else if (element instanceof OneOrMoreElement one) {
+            if (isSingleRuleRef(one.body())) {
+                AtomicElement single = getSingleAtomicElementFrom(one.body());
+                model = new ElementModel.OneOrMoreOf(resolveElement(ctx, ruleName, single));
+            } else {
+                String helperName = ctx.helperName(ruleName, element);
+                model = new ElementModel.OneOrMoreOf(new ElementModel.ClassRef(helperName + ".class"));
+            }
+        } else if (element instanceof BoundedRepeatElement bounded) {
+            String minStr = String.valueOf(bounded.min());
+            String maxStr = bounded.max() == BoundedRepeatElement.UNBOUNDED
+                ? "Integer.MAX_VALUE"
+                : String.valueOf(bounded.max());
+            if (isSingleRuleRef(bounded.body())) {
+                AtomicElement single = getSingleAtomicElementFrom(bounded.body());
+                model = new ElementModel.BoundedRepeatOf(
+                    resolveElement(ctx, ruleName, single), minStr, maxStr);
+            } else {
+                String helperName = ctx.helperName(ruleName, element);
+                model = new ElementModel.BoundedRepeatOf(
+                    new ElementModel.ClassRef(helperName + ".class"), minStr, maxStr);
+            }
+        } else if (element instanceof GroupElement g) {
+            String helperName = ctx.helperName(ruleName, element);
+            model = new ElementModel.ClassRef(helperName + ".class");
+        } else if (element instanceof SeparatedElement sep) {
+            String outerHelperName = ctx.helperName(ruleName, element);
+            model = new ElementModel.ClassRef(outerHelperName + ".class");
+        } else if (element instanceof ErrorElement err) {
+            model = new ElementModel.ErrorExpected(err.message());
+        } else {
+            throw new IllegalStateException("unhandled " + element);
+        }
         List<String> bindings = ctx.captureBindings.get(ruleName).bindings(element);
         return bindings.isEmpty() ? model : new ElementModel.Captured(model, bindings);
     }
@@ -1180,48 +1186,62 @@ class ParserRuleEmitter {
     // =========================================================================
 
     static String renderElement(ElementModel model) {
-        return switch (model) {
-            case ElementModel.WordMatch m ->
-                "new WordParser(\"" + ParserCodegenUtil.escapeString(m.word()) + "\")";
-            case ElementModel.ClassRef m ->
-                "Parser.get(" + m.className() + ")";
-            case ElementModel.ErrorExpected m ->
-                "org.unlaxer.parser.ErrorMessageParser.expected(\""
+        if (model instanceof ElementModel.WordMatch m) {
+            return "new WordParser(\"" + ParserCodegenUtil.escapeString(m.word()) + "\")";
+        }
+        if (model instanceof ElementModel.ClassRef m) {
+            return "Parser.get(" + m.className() + ")";
+        }
+        if (model instanceof ElementModel.ErrorExpected m) {
+            return "org.unlaxer.parser.ErrorMessageParser.expected(\""
                 + ParserCodegenUtil.escapeString(m.message()) + "\")";
-            case ElementModel.UntilParser m ->
-                "new org.unlaxer.parser.elementary.WildCardStringTerminatorParser(\""
+        }
+        if (model instanceof ElementModel.UntilParser m) {
+            return "new org.unlaxer.parser.elementary.WildCardStringTerminatorParser(\""
                 + ParserCodegenUtil.escapeString(m.terminator()) + "\")";
-            case ElementModel.LookaheadParser m ->
-                "new MatchOnly(new WordParser(\"" + ParserCodegenUtil.escapeString(m.pattern()) + "\"))";
-            case ElementModel.NegLookaheadParser m ->
-                "new Not(new WordParser(\"" + ParserCodegenUtil.escapeString(m.pattern()) + "\"))";
-            case ElementModel.AnyCharParser m ->
-                "new org.unlaxer.parser.elementary.WildCardCharacterParser()";
-            case ElementModel.EofParser m ->
-                "new org.unlaxer.parser.elementary.EndOfSourceParser()";
-            case ElementModel.EmptyParser m ->
-                "new org.unlaxer.parser.elementary.EmptyParser()";
-            case ElementModel.IgnoreCaseWord m ->
-                "new org.unlaxer.parser.elementary.IgnoreCaseWordParser(\""
+        }
+        if (model instanceof ElementModel.LookaheadParser m) {
+            return "new MatchOnly(new WordParser(\"" + ParserCodegenUtil.escapeString(m.pattern()) + "\"))";
+        }
+        if (model instanceof ElementModel.NegLookaheadParser m) {
+            return "new Not(new WordParser(\"" + ParserCodegenUtil.escapeString(m.pattern()) + "\"))";
+        }
+        if (model instanceof ElementModel.AnyCharParser m) {
+            return "new org.unlaxer.parser.elementary.WildCardCharacterParser()";
+        }
+        if (model instanceof ElementModel.EofParser m) {
+            return "new org.unlaxer.parser.elementary.EndOfSourceParser()";
+        }
+        if (model instanceof ElementModel.EmptyParser m) {
+            return "new org.unlaxer.parser.elementary.EmptyParser()";
+        }
+        if (model instanceof ElementModel.IgnoreCaseWord m) {
+            return "new org.unlaxer.parser.elementary.IgnoreCaseWordParser(\""
                 + ParserCodegenUtil.escapeString(m.word()) + "\")";
-            case ElementModel.ZeroOrMoreOf m ->
-                "new ZeroOrMore(" + renderInner(m.inner()) + ")";
-            case ElementModel.OneOrMoreOf m ->
-                "new OneOrMore(" + renderInner(m.inner()) + ")";
-            case ElementModel.OptionalOf m ->
-                "new Optional(" + renderInner(m.inner()) + ")";
-            case ElementModel.BoundedRepeatOf m ->
-                "new Repeat(" + renderInner(m.inner()) + ", " + m.min() + ", " + m.max() + ")";
-            case ElementModel.Captured m ->
-                "new __CaptureSite(" + renderElement(m.inner()) + ", " + bindingArguments(m.bindings()) + ")";
-        };
+        }
+        if (model instanceof ElementModel.ZeroOrMoreOf m) {
+            return "new ZeroOrMore(" + renderInner(m.inner()) + ")";
+        }
+        if (model instanceof ElementModel.OneOrMoreOf m) {
+            return "new OneOrMore(" + renderInner(m.inner()) + ")";
+        }
+        if (model instanceof ElementModel.OptionalOf m) {
+            return "new Optional(" + renderInner(m.inner()) + ")";
+        }
+        if (model instanceof ElementModel.BoundedRepeatOf m) {
+            return "new Repeat(" + renderInner(m.inner()) + ", " + m.min() + ", " + m.max() + ")";
+        }
+        if (model instanceof ElementModel.Captured m) {
+            return "new __CaptureSite(" + renderElement(m.inner()) + ", " + bindingArguments(m.bindings()) + ")";
+        }
+        throw new IllegalStateException("unhandled " + model);
     }
 
     static String renderInner(ElementModel model) {
-        return switch (model) {
-            case ElementModel.ClassRef m -> m.className();
-            default -> renderElement(model);
-        };
+        if (model instanceof ElementModel.ClassRef m) {
+            return m.className();
+        }
+        return renderElement(model);
     }
 
     /** body が複数代替の ChoiceBody かどうか */
@@ -1257,15 +1277,14 @@ class ParserRuleEmitter {
 
     /** body から単一の AtomicElement を取り出す（なければ null） */
     static AtomicElement getSingleAtomicElementFrom(RuleBody body) {
-        return switch (body) {
-            case SequenceBody seq when seq.elements().size() == 1 ->
-                seq.elements().get(0).element();
-            case ChoiceBody choice when choice.alternatives().size() == 1 -> {
-                SequenceBody seq = choice.alternatives().get(0);
-                yield seq.elements().size() == 1 ? seq.elements().get(0).element() : null;
-            }
-            default -> null;
-        };
+        if (body instanceof SequenceBody seq && seq.elements().size() == 1) {
+            return seq.elements().get(0).element();
+        }
+        if (body instanceof ChoiceBody choice && choice.alternatives().size() == 1) {
+            SequenceBody seq = choice.alternatives().get(0);
+            return seq.elements().size() == 1 ? seq.elements().get(0).element() : null;
+        }
+        return null;
     }
 
     /** 単一 RuleRef body からパーサークラス参照を取り出す */
@@ -1417,11 +1436,13 @@ class ParserRuleEmitter {
     }
 
     static SequenceBody getSingleSequenceFrom(RuleBody body) {
-        return switch (body) {
-            case SequenceBody seq -> seq;
-            case ChoiceBody choice when choice.alternatives().size() == 1 -> choice.alternatives().get(0);
-            default -> null;
-        };
+        if (body instanceof SequenceBody seq) {
+            return seq;
+        }
+        if (body instanceof ChoiceBody choice && choice.alternatives().size() == 1) {
+            return choice.alternatives().get(0);
+        }
+        return null;
     }
 
     /**

@@ -85,6 +85,7 @@ java -cp ... org.unlaxer.dsl.CodegenMain [options]
 | `--report-version <N>` | JSON スキーマバージョン（現在は `1` のみ） |
 | `--report-schema-check` | JSON ペイロードのスキーマ検証を有効化 |
 | `--warnings-as-json` | `text` 形式でも警告を JSON で stderr に出力 |
+| `--java-release 21\|17` | 生成 Java の対象リリース（既定 `21`）。`17` は Evaluator の dispatch を `instanceof` 連鎖にする |
 
 ### マニフェスト
 

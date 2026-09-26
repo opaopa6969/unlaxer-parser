@@ -73,7 +73,7 @@ public class SelfHostingRoundTripTest {
 
         String classpath = System.getProperty("java.class.path");
         List<String> options = List.of(
-            "--enable-preview", "--release", "21",
+            "--release", "17",
             "-classpath", classpath,
             "-d", tmpDir.toString()
         );

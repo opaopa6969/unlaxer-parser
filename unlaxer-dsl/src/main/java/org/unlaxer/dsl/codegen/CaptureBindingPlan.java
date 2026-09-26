@@ -41,17 +41,21 @@ final class CaptureBindingPlan {
     }
 
     private void markSemanticValues(AtomicElement element, SemanticCardinality semantics) {
-        switch (element) {
-            case GroupElement group -> markSemanticValues(group.body(), semantics);
-            case OptionalElement optional -> markSemanticItem(optional.body(), semantics);
-            case RepeatElement repeat -> markSemanticItem(repeat.body(), semantics);
-            case OneOrMoreElement repeat -> markSemanticItem(repeat.body(), semantics);
-            case BoundedRepeatElement repeat -> markSemanticItem(repeat.body(), semantics);
-            case SeparatedElement separated -> {
-                markSemanticItem(separated.element(), semantics);
-                markSemanticValues(separated.separator(), semantics);
-            }
-            default -> { }
+        if (element instanceof GroupElement group) {
+            markSemanticValues(group.body(), semantics);
+        } else if (element instanceof OptionalElement optional) {
+            markSemanticItem(optional.body(), semantics);
+        } else if (element instanceof RepeatElement repeat) {
+            markSemanticItem(repeat.body(), semantics);
+        } else if (element instanceof OneOrMoreElement repeat) {
+            markSemanticItem(repeat.body(), semantics);
+        } else if (element instanceof BoundedRepeatElement repeat) {
+            markSemanticItem(repeat.body(), semantics);
+        } else if (element instanceof SeparatedElement separated) {
+            markSemanticItem(separated.element(), semantics);
+            markSemanticValues(separated.separator(), semantics);
+        } else {
+
         }
     }
 
@@ -91,9 +95,10 @@ final class CaptureBindingPlan {
     List<Site> allSites() { return sites.values().stream().flatMap(List::stream).toList(); }
 
     private void visit(RuleBody body) {
-        switch (body) {
-            case ChoiceBody choice -> choice.alternatives().forEach(this::visit);
-            case SequenceBody sequence -> sequence.elements().forEach(annotated -> {
+        if (body instanceof ChoiceBody choice) {
+            choice.alternatives().forEach(this::visit);
+        } else if (body instanceof SequenceBody sequence) {
+            sequence.elements().forEach(annotated -> {
                 annotated.captureName().ifPresent(name -> {
                     String id = ruleName + ":" + nextId++;
                     sites.computeIfAbsent(name, ignored -> new ArrayList<>())
@@ -102,30 +107,43 @@ final class CaptureBindingPlan {
                 });
                 visit(annotated.element());
             });
+        } else {
+            throw new IllegalStateException("unhandled " + body);
         }
     }
 
     private void visit(AtomicElement element) {
-        switch (element) {
-            case GroupElement group -> visit(group.body());
-            case OptionalElement optional -> visit(optional.body());
-            case RepeatElement repeat -> visit(repeat.body());
-            case OneOrMoreElement repeat -> visit(repeat.body());
-            case BoundedRepeatElement repeat -> visit(repeat.body());
-            case SeparatedElement separated -> { visit(separated.element()); visit(separated.separator()); }
-            default -> { }
+        if (element instanceof GroupElement group) {
+            visit(group.body());
+        } else if (element instanceof OptionalElement optional) {
+            visit(optional.body());
+        } else if (element instanceof RepeatElement repeat) {
+            visit(repeat.body());
+        } else if (element instanceof OneOrMoreElement repeat) {
+            visit(repeat.body());
+        } else if (element instanceof BoundedRepeatElement repeat) {
+            visit(repeat.body());
+        } else if (element instanceof SeparatedElement separated) {
+            visit(separated.element()); visit(separated.separator()); 
+        } else {
+
         }
     }
 
     // Bind each value occurrence, not its optional/list container or a separator.
     private void bindValues(AtomicElement element, String id) {
-        switch (element) {
-            case OptionalElement optional -> bindValues(optional.body(), id);
-            case RepeatElement repeat -> bindValues(repeat.body(), id);
-            case OneOrMoreElement repeat -> bindValues(repeat.body(), id);
-            case BoundedRepeatElement repeat -> bindValues(repeat.body(), id);
-            case SeparatedElement separated -> bindValues(separated.element(), id);
-            default -> bind(element, id);
+        if (element instanceof OptionalElement optional) {
+            bindValues(optional.body(), id);
+        } else if (element instanceof RepeatElement repeat) {
+            bindValues(repeat.body(), id);
+        } else if (element instanceof OneOrMoreElement repeat) {
+            bindValues(repeat.body(), id);
+        } else if (element instanceof BoundedRepeatElement repeat) {
+            bindValues(repeat.body(), id);
+        } else if (element instanceof SeparatedElement separated) {
+            bindValues(separated.element(), id);
+        } else {
+            bind(element, id);
         }
     }
 

@@ -99,7 +99,7 @@ public class DAPCompileVerificationTest {
         } catch (java.io.IOException e) {
             throw new RuntimeException(e);
         }
-        List<String> options = List.of("--enable-preview", "--release", "21", "-classpath", classpath, "-d", tmpDir);
+        List<String> options = List.of("--release", "17", "-classpath", classpath, "-d", tmpDir);
 
         StringWriter diagnostics = new StringWriter();
         JavaCompiler.CompilationTask task = compiler.getTask(

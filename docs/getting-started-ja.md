@@ -4,7 +4,7 @@
 
 # unlaxer-parser 入門ガイド
 
-**バージョン**: 3.1.0
+**バージョン**: 3.1.1
 
 このガイドでは、unlaxer-parser を使って完全な計算機言語をゼロから構築する手順を説明します — Maven の設定、文法の記述、コード生成、そして動作するエバリュエーターの実装まで。
 
@@ -28,7 +28,7 @@
 
 ## 前提条件
 
-- Java 21 以降
+- Java 21 以降（Java 17 では代わりに `unlaxer-common-jdk17` / `unlaxer-dsl-jdk17` を使う。README 参照）
 - Maven 3.8 以降
 - Java の基本知識
 
@@ -62,12 +62,12 @@ cd tinycalc
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-common</artifactId>
-        <version>3.1.0</version>
+        <version>3.1.1</version>
     </dependency>
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-dsl</artifactId>
-        <version>3.1.0</version>
+        <version>3.1.1</version>
     </dependency>
 
     <!-- テスト用 -->

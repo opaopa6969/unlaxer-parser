@@ -20,11 +20,11 @@
 [![Maven Central](https://img.shields.io/maven-central/v/org.unlaxer/unlaxer-common)](https://central.sonatype.com/artifact/org.unlaxer/unlaxer-common)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Java 21+](https://img.shields.io/badge/Java-21%2B-orange.svg)]()
-[![Version](https://img.shields.io/badge/version-3.1.0-blue)]()
+[![Version](https://img.shields.io/badge/version-3.1.1-blue)]()
 
 ---
 
-> **最新リリース — 3.1.0**: 後方互換の minor リリース。実行時 FIRST 集合による候補除外で、大きい入力の deferred 診断モードの CPU コストを約半分に削減（6 ラウンドの計測詳細は CHANGELOG 参照）。UBNF bootstrap は Rust frontend と同様に末尾未消費入力を拒否し、空文法を受理するようになりました。自己ホスト文法での 3 段以上の dotted 参照（`a.b.Value`）も正しくパースできます。全履歴は [CHANGELOG](./CHANGELOG.md) を参照してください。履歴上の注意: **3.0.2 は Maven Central に公開されていません** — 3.0.1 からアップグレードする場合は 3.0.3 以降へ直接進んでください。`unlaxer-common` または `unlaxer-dsl` の `2.x` に依存している場合は、[CHANGELOG](./CHANGELOG.md) と下記の[downstream ドリフト警告](#downstream-ドリフト警告)を参照してください。
+> **最新リリース — 3.1.1**: 後方互換の minor リリース。実行時 FIRST 集合による候補除外で、大きい入力の deferred 診断モードの CPU コストを約半分に削減（6 ラウンドの計測詳細は CHANGELOG 参照）。UBNF bootstrap は Rust frontend と同様に末尾未消費入力を拒否し、空文法を受理するようになりました。自己ホスト文法での 3 段以上の dotted 参照（`a.b.Value`）も正しくパースできます。全履歴は [CHANGELOG](./CHANGELOG.md) を参照してください。履歴上の注意: **3.0.2 は Maven Central に公開されていません** — 3.0.1 からアップグレードする場合は 3.0.3 以降へ直接進んでください。`unlaxer-common` または `unlaxer-dsl` の `2.x` に依存している場合は、[CHANGELOG](./CHANGELOG.md) と下記の[downstream ドリフト警告](#downstream-ドリフト警告)を参照してください。
 
 ---
 
@@ -141,15 +141,36 @@ MulOp ::= '*' | '/' ;
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-common</artifactId>
-        <version>3.1.0</version>
+        <version>3.1.1</version>
     </dependency>
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-dsl</artifactId>
-        <version>3.1.0</version>
+        <version>3.1.1</version>
     </dependency>
 </dependencies>
 ```
+
+**Java 17 の利用者**（例: Corretto 17）: 上の artifact は Java 21 向け（class file major 65）です。
+代わりに差し替え可能な `-jdk17` 版に依存してください。groupId・version・package・クラスは同じで、
+`--release 17`（major 61）でコンパイルしています。
+
+```xml
+<dependency>
+    <groupId>org.unlaxer</groupId>
+    <artifactId>unlaxer-common-jdk17</artifactId>
+    <version>3.1.1</version>
+</dependency>
+<dependency>
+    <groupId>org.unlaxer</groupId>
+    <artifactId>unlaxer-dsl-jdk17</artifactId>
+    <version>3.1.1</version>
+</dependency>
+```
+
+`unlaxer-dsl-jdk17` は `unlaxer-common-jdk17` だけに依存します。2 系統を混ぜないでください。
+生成 Java も Java 17 で動かす場合は `CodegenMain` に `--java-release 17` を渡します
+（変わるのは Evaluator の dispatch だけ。[unlaxer-dsl/README.ja.md](unlaxer-dsl/README.ja.md)）。
 
 ### 2. 文法を書く
 

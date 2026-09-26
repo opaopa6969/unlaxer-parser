@@ -81,7 +81,7 @@ public class DAPNonBmpLineMappingTest {
 
         compileDir = Files.createTempDirectory("dap-nonbmp");
         String classpath = System.getProperty("java.class.path");
-        List<String> options = List.of("--enable-preview", "--release", "21",
+        List<String> options = List.of("--release", "17",
             "-classpath", classpath, "-d", compileDir.toString());
 
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();

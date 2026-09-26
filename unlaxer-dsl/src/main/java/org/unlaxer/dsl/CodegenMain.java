@@ -266,6 +266,7 @@ public class CodegenMain {
                 + " [--report-version 1]"
                 + " [--report-schema-check]"
                 + " [--warnings-as-json]"
+                + " [--java-release 21|17]"
                 + "\nExperimental Rust: CodegenMain generate --target rust --grammar <file.ubnf> --output <module-directory> [--check]"
         );
     }

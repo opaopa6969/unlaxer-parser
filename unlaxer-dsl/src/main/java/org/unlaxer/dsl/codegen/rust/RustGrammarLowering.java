@@ -288,56 +288,66 @@ public final class RustGrammarLowering {
     }
 
     private Expression retainTextValues(Expression expression, Mapping mapping) {
-        return switch (expression) {
-            case TextValue ignored -> expression;
-            case Capture capture -> {
-                Expression child = retainTextValues(capture.expression(), mapping);
-                if (mapping != null && mapping.fields().stream().anyMatch(field ->
-                        field.name().equals(capture.name()) && field.kind() == Kind.VALUE)) {
-                    Shape shape = shape(capture.expression(), new HashSet<>());
-                    if (shape.kind() == Kind.TEXT) child = new TextValue(child);
-                    else if (shape.kind() == Kind.VALUE && shape.cardinality() != Cardinality.MANY) {
-                        child = new ValueBoundary(child);
-                    }
+        if (expression instanceof TextValue ignored) {
+            return expression;
+        }
+        if (expression instanceof Capture capture) {
+            Expression child = retainTextValues(capture.expression(), mapping);
+            if (mapping != null && mapping.fields().stream().anyMatch(field ->
+                    field.name().equals(capture.name()) && field.kind() == Kind.VALUE)) {
+                Shape shape = shape(capture.expression(), new HashSet<>());
+                if (shape.kind() == Kind.TEXT) child = new TextValue(child);
+                else if (shape.kind() == Kind.VALUE && shape.cardinality() != Cardinality.MANY) {
+                    child = new ValueBoundary(child);
                 }
-                yield new Capture(capture.name(), child);
             }
-            case Choice choice -> {
-                boolean mixed = shape(choice, new HashSet<>()).kind() == Kind.VALUE;
-                yield new Choice(choice.alternatives().stream().map(alternative -> {
-                    Expression child = retainTextValues(alternative, mapping);
-                    return mixed && shape(alternative, new HashSet<>()).kind() == Kind.TEXT
-                        ? new TextValue(child) : child;
-                }).toList());
-            }
-            case LongestChoice choice -> {
-                boolean mixed = shape(new Choice(choice.alternatives()), new HashSet<>()).kind() == Kind.VALUE;
-                yield new LongestChoice(choice.alternatives().stream().map(alternative -> {
-                    Expression child = retainTextValues(alternative, mapping);
-                    return mixed && shape(alternative, new HashSet<>()).kind() == Kind.TEXT
-                        ? new TextValue(child) : child;
-                }).toList());
-            }
-            case PredictiveChoice choice -> {
-                boolean mixed = shape(new Choice(choice.alternatives()), new HashSet<>()).kind() == Kind.VALUE;
-                yield new PredictiveChoice(choice.alternatives().stream().map(alternative -> {
-                    Expression child = retainTextValues(alternative, mapping);
-                    return mixed && shape(alternative, new HashSet<>()).kind() == Kind.TEXT
-                        ? new TextValue(child) : child;
-                }).toList(), choice.predictors());
-            }
-            case Sequence sequence -> new Sequence(sequence.elements().stream()
+            return new Capture(capture.name(), child);
+        }
+        if (expression instanceof Choice choice) {
+            boolean mixed = shape(choice, new HashSet<>()).kind() == Kind.VALUE;
+            return new Choice(choice.alternatives().stream().map(alternative -> {
+                Expression child = retainTextValues(alternative, mapping);
+                return mixed && shape(alternative, new HashSet<>()).kind() == Kind.TEXT
+                    ? new TextValue(child) : child;
+            }).toList());
+        }
+        if (expression instanceof LongestChoice choice) {
+            boolean mixed = shape(new Choice(choice.alternatives()), new HashSet<>()).kind() == Kind.VALUE;
+            return new LongestChoice(choice.alternatives().stream().map(alternative -> {
+                Expression child = retainTextValues(alternative, mapping);
+                return mixed && shape(alternative, new HashSet<>()).kind() == Kind.TEXT
+                    ? new TextValue(child) : child;
+            }).toList());
+        }
+        if (expression instanceof PredictiveChoice choice) {
+            boolean mixed = shape(new Choice(choice.alternatives()), new HashSet<>()).kind() == Kind.VALUE;
+            return new PredictiveChoice(choice.alternatives().stream().map(alternative -> {
+                Expression child = retainTextValues(alternative, mapping);
+                return mixed && shape(alternative, new HashSet<>()).kind() == Kind.TEXT
+                    ? new TextValue(child) : child;
+            }).toList(), choice.predictors());
+        }
+        if (expression instanceof Sequence sequence) {
+            return new Sequence(sequence.elements().stream()
                 .map(child -> retainTextValues(child, mapping)).toList());
-            case Delimited delimited -> new Delimited(retainTextValues(delimited.child(), mapping));
-            case OptionalExpr optional -> new OptionalExpr(mapping == null
+        }
+        if (expression instanceof Delimited delimited) {
+            return new Delimited(retainTextValues(delimited.child(), mapping));
+        }
+        if (expression instanceof OptionalExpr optional) {
+            return new OptionalExpr(mapping == null
                 ? retainHelperValue(optional.child()) : retainTextValues(optional.child(), mapping));
-            case Repeat repeat -> new Repeat(mapping == null
+        }
+        if (expression instanceof Repeat repeat) {
+            return new Repeat(mapping == null
                 ? retainHelperValue(repeat.child()) : retainTextValues(repeat.child(), mapping), repeat.min(), repeat.max());
-            case Separated separated -> new Separated(mapping == null
+        }
+        if (expression instanceof Separated separated) {
+            return new Separated(mapping == null
                 ? retainHelperValue(separated.child()) : retainTextValues(separated.child(), mapping),
                 retainTextValues(separated.separator(), mapping));
-            default -> expression;
-        };
+        }
+        return expression;
     }
 
     private Expression rightAssocBody(Expression expression) {
@@ -370,11 +380,15 @@ public final class RustGrammarLowering {
     /** Preserve the declared vector fields, but parse at most one recursive right operand. */
     private Expression lowerRightAssoc(int rule, Mapping mapping) {
         // Preserve the syntax boundary used by Java's canonical parser rewrite.
-        SequenceBody declared = switch (grammar.rules().get(rule).body()) {
-            case SequenceBody sequence -> sequence;
-            case ChoiceBody choice when choice.alternatives().size() == 1 -> choice.alternatives().get(0);
-            default -> null;
-        };
+        final SequenceBody declared;
+        var switchSubject = grammar.rules().get(rule).body();
+        if (switchSubject instanceof SequenceBody sequence) {
+            declared = sequence;
+        } else if (switchSubject instanceof ChoiceBody choice && choice.alternatives().size() == 1) {
+            declared = choice.alternatives().get(0);
+        } else {
+            declared = null;
+        }
         if (declared == null || declared.elements().size() != 2
             || !(declared.elements().get(1).element() instanceof RepeatElement)
             || mapping == null || !mapping.fields().stream().map(Field::name).toList().equals(List.of("left", "op", "right"))
@@ -396,46 +410,57 @@ public final class RustGrammarLowering {
     }
 
     private Expression body(RuleBody body) {
-        return switch (body) {
-            case ChoiceBody choice -> choice.alternatives().size() == 1 ? body(choice.alternatives().get(0))
+        if (body instanceof ChoiceBody choice) {
+            return choice.alternatives().size() == 1 ? body(choice.alternatives().get(0))
                 : new Choice(choice.alternatives().stream().map(alt -> {
                     Expression lowered = body(alt);
                     return alt.elements().size() == 1 ? ((Sequence) lowered).elements().get(0) : lowered;
                 }).toList());
-            case SequenceBody sequence -> new Sequence(sequence.elements().stream().map(element -> {
+        }
+        if (body instanceof SequenceBody sequence) {
+            return new Sequence(sequence.elements().stream().map(element -> {
                 if (element.typeofConstraint().isPresent()) throw unsupported("@typeof");
                 Expression expression = atomic(element.element());
                 if (element.captureName().isEmpty()) return expression;
                 return capture(element.captureName().get(), expression);
             }).toList());
-        };
+        }
+        throw new IllegalStateException("unhandled " + body);
     }
 
     private Expression atomic(AtomicElement element) {
-        return switch (element) {
-            case TerminalElement terminal -> {
-                if (terminal.value().isEmpty()) throw unsupported("empty literal");
-                yield new Literal(scalarText(terminal.value()));
-            }
-            case RuleRefElement reference -> {
-                if (reference.namespace().isPresent()) throw unsupported("qualified rule reference");
-                if (tokens.containsKey(reference.name())) yield tokens.get(reference.name());
-                Integer id = ruleIds.get(reference.name());
-                if (id == null) throw unsupported("unknown reference " + reference.name());
-                yield new Reference(id);
-            }
-            case GroupElement group -> body(group.body());
-            case OptionalElement optional -> new OptionalExpr(singleBody(optional.body(), false));
-            case RepeatElement repeat -> new Repeat(singleBody(repeat.body(), true), 0, null);
-            case OneOrMoreElement repeat -> new Repeat(repeatedAtom(repeat.body()), 1, null);
-            case BoundedRepeatElement repeat -> {
-                if (repeat.min() < 0 || repeat.max() < repeat.min()) throw unsupported("invalid repetition bounds");
-                yield new Repeat(repeatedAtom(repeat.body()), repeat.min(),
-                    repeat.max() == BoundedRepeatElement.UNBOUNDED ? null : repeat.max());
-            }
-            case SeparatedElement separated -> new Separated(atomic(separated.element()), atomic(separated.separator()));
-            default -> throw unsupported(element.getClass().getSimpleName());
-        };
+        if (element instanceof TerminalElement terminal) {
+            if (terminal.value().isEmpty()) throw unsupported("empty literal");
+            return new Literal(scalarText(terminal.value()));
+        }
+        if (element instanceof RuleRefElement reference) {
+            if (reference.namespace().isPresent()) throw unsupported("qualified rule reference");
+            if (tokens.containsKey(reference.name())) return tokens.get(reference.name());
+            Integer id = ruleIds.get(reference.name());
+            if (id == null) throw unsupported("unknown reference " + reference.name());
+            return new Reference(id);
+        }
+        if (element instanceof GroupElement group) {
+            return body(group.body());
+        }
+        if (element instanceof OptionalElement optional) {
+            return new OptionalExpr(singleBody(optional.body(), false));
+        }
+        if (element instanceof RepeatElement repeat) {
+            return new Repeat(singleBody(repeat.body(), true), 0, null);
+        }
+        if (element instanceof OneOrMoreElement repeat) {
+            return new Repeat(repeatedAtom(repeat.body()), 1, null);
+        }
+        if (element instanceof BoundedRepeatElement repeat) {
+            if (repeat.min() < 0 || repeat.max() < repeat.min()) throw unsupported("invalid repetition bounds");
+            return new Repeat(repeatedAtom(repeat.body()), repeat.min(),
+                repeat.max() == BoundedRepeatElement.UNBOUNDED ? null : repeat.max());
+        }
+        if (element instanceof SeparatedElement separated) {
+            return new Separated(atomic(separated.element()), atomic(separated.separator()));
+        }
+        throw unsupported(element.getClass().getSimpleName());
     }
 
     // Match the Java generator's direct optional/ref-repeat optimization, including trivia boundaries.
@@ -470,49 +495,81 @@ public final class RustGrammarLowering {
                 throw unsupported("nested container capture; name the inner element or a mapped wrapper rule");
             }
         }
-        return switch (expression) {
-            case Delimited delimited -> new Delimited(capture(name, delimited.child()));
-            case OptionalExpr optional -> new OptionalExpr(capture(name, optional.child()));
-            case Repeat repeat -> new Repeat(capture(name, repeat.child()), repeat.min(), repeat.max());
-            case Separated separated -> new Separated(capture(name, separated.child()), separated.separator());
-            default -> new Capture(name, expression);
-        };
+        if (expression instanceof Delimited delimited) {
+            return new Delimited(capture(name, delimited.child()));
+        }
+        if (expression instanceof OptionalExpr optional) {
+            return new OptionalExpr(capture(name, optional.child()));
+        }
+        if (expression instanceof Repeat repeat) {
+            return new Repeat(capture(name, repeat.child()), repeat.min(), repeat.max());
+        }
+        if (expression instanceof Separated separated) {
+            return new Separated(capture(name, separated.child()), separated.separator());
+        }
+        return new Capture(name, expression);
     }
 
     private Predictor firstPredictor(
         Expression expression, Set<Integer> visiting, Map<Integer, Predictor> cache
     ) {
         if (nullable(expression)) return new AnyPredictor();
-        return switch (expression) {
-            case Literal literal when !literal.text().isEmpty() -> new LiteralPredictor(literal.text());
-            case NumberToken ignored -> new NumberPredictor();
-            case IdentifierToken ignored -> new IdentifierPredictor();
-            case QuotedToken quoted -> new QuotedPredictor(quoted.quote());
-            case Reference reference -> {
-                if (nullableRules.contains(reference.rule()) || !visiting.add(reference.rule())) {
-                    yield new AnyPredictor();
-                }
-                Predictor result = cache.get(reference.rule());
-                if (result == null) {
-                    result = firstPredictor(bodies.get(reference.rule()), visiting, cache);
-                    cache.put(reference.rule(), result);
-                }
-                visiting.remove(reference.rule());
-                yield result;
+        if (expression instanceof Literal literal && !literal.text().isEmpty()) {
+            return new LiteralPredictor(literal.text());
+        }
+        if (expression instanceof NumberToken ignored) {
+            return new NumberPredictor();
+        }
+        if (expression instanceof IdentifierToken ignored) {
+            return new IdentifierPredictor();
+        }
+        if (expression instanceof QuotedToken quoted) {
+            return new QuotedPredictor(quoted.quote());
+        }
+        if (expression instanceof Reference reference) {
+            if (nullableRules.contains(reference.rule()) || !visiting.add(reference.rule())) {
+                return new AnyPredictor();
             }
-            case Sequence sequence -> sequence.elements().isEmpty() || nullable(sequence.elements().get(0))
+            Predictor result = cache.get(reference.rule());
+            if (result == null) {
+                result = firstPredictor(bodies.get(reference.rule()), visiting, cache);
+                cache.put(reference.rule(), result);
+            }
+            visiting.remove(reference.rule());
+            return result;
+        }
+        if (expression instanceof Sequence sequence) {
+            return sequence.elements().isEmpty() || nullable(sequence.elements().get(0))
                 ? new AnyPredictor() : firstPredictor(sequence.elements().get(0), visiting, cache);
-            case Choice choice -> combinePredictors(choice.alternatives(), visiting, cache);
-            case LongestChoice choice -> combinePredictors(choice.alternatives(), visiting, cache);
-            case Capture capture -> firstPredictor(capture.expression(), visiting, cache);
-            case Delimited delimited -> firstPredictor(delimited.child(), visiting, cache);
-            case TextValue text -> firstPredictor(text.child(), visiting, cache);
-            case ValueBoundary boundary -> firstPredictor(boundary.child(), visiting, cache);
-            case RuleEffects effects -> firstPredictor(effects.child(), visiting, cache);
-            case Repeat repeat when repeat.min() > 0 -> firstPredictor(repeat.child(), visiting, cache);
-            case Separated separated -> firstPredictor(separated.child(), visiting, cache);
-            default -> new AnyPredictor();
-        };
+        }
+        if (expression instanceof Choice choice) {
+            return combinePredictors(choice.alternatives(), visiting, cache);
+        }
+        if (expression instanceof LongestChoice choice) {
+            return combinePredictors(choice.alternatives(), visiting, cache);
+        }
+        if (expression instanceof Capture capture) {
+            return firstPredictor(capture.expression(), visiting, cache);
+        }
+        if (expression instanceof Delimited delimited) {
+            return firstPredictor(delimited.child(), visiting, cache);
+        }
+        if (expression instanceof TextValue text) {
+            return firstPredictor(text.child(), visiting, cache);
+        }
+        if (expression instanceof ValueBoundary boundary) {
+            return firstPredictor(boundary.child(), visiting, cache);
+        }
+        if (expression instanceof RuleEffects effects) {
+            return firstPredictor(effects.child(), visiting, cache);
+        }
+        if (expression instanceof Repeat repeat && repeat.min() > 0) {
+            return firstPredictor(repeat.child(), visiting, cache);
+        }
+        if (expression instanceof Separated separated) {
+            return firstPredictor(separated.child(), visiting, cache);
+        }
+        return new AnyPredictor();
     }
 
     private Predictor combinePredictors(
@@ -542,27 +599,51 @@ public final class RustGrammarLowering {
     }
 
     private boolean nullable(Expression expression) {
-        return switch (expression) {
-            case EmptyToken ignored -> true;
-            case EofToken ignored -> true;
-            case LookaheadToken ignored -> true;
-            case UntilToken ignored -> true;
-            case Reference reference -> nullableRules.contains(reference.rule());
-            case Capture capture -> nullable(capture.expression());
-            case Delimited delimited -> nullable(delimited.child());
-            case Sequence sequence -> sequence.elements().stream().allMatch(this::nullable);
-            case Choice choice -> choice.alternatives().stream().anyMatch(this::nullable);
-            case PredictiveChoice choice -> choice.alternatives().stream().anyMatch(this::nullable);
-            case OptionalExpr ignored -> true;
-            case Repeat repeat -> repeat.min() == 0 || nullable(repeat.child());
-            case Separated separated -> nullable(separated.child());
-            default -> false;
-        };
+        if (expression instanceof EmptyToken ignored) {
+            return true;
+        }
+        if (expression instanceof EofToken ignored) {
+            return true;
+        }
+        if (expression instanceof LookaheadToken ignored) {
+            return true;
+        }
+        if (expression instanceof UntilToken ignored) {
+            return true;
+        }
+        if (expression instanceof Reference reference) {
+            return nullableRules.contains(reference.rule());
+        }
+        if (expression instanceof Capture capture) {
+            return nullable(capture.expression());
+        }
+        if (expression instanceof Delimited delimited) {
+            return nullable(delimited.child());
+        }
+        if (expression instanceof Sequence sequence) {
+            return sequence.elements().stream().allMatch(this::nullable);
+        }
+        if (expression instanceof Choice choice) {
+            return choice.alternatives().stream().anyMatch(this::nullable);
+        }
+        if (expression instanceof PredictiveChoice choice) {
+            return choice.alternatives().stream().anyMatch(this::nullable);
+        }
+        if (expression instanceof OptionalExpr ignored) {
+            return true;
+        }
+        if (expression instanceof Repeat repeat) {
+            return repeat.min() == 0 || nullable(repeat.child());
+        }
+        if (expression instanceof Separated separated) {
+            return nullable(separated.child());
+        }
+        return false;
     }
 
     private Expression token(TokenDecl token) {
-        return switch (token) {
-            case TokenDecl.Simple simple -> switch (simple.parserClass()) {
+        if (token instanceof TokenDecl.Simple simple) {
+            return switch (simple.parserClass()) {
                 case "NumberParser", "org.unlaxer.parser.elementary.NumberParser" -> new NumberToken();
                 case "IdentifierParser", "org.unlaxer.parser.clang.IdentifierParser" -> new IdentifierToken();
                 case "SingleQuotedParser", "org.unlaxer.parser.elementary.SingleQuotedParser" -> new QuotedToken('\'');
@@ -574,21 +655,35 @@ public final class RustGrammarLowering {
                 case "EndOfSourceParser", "org.unlaxer.parser.elementary.EndOfSourceParser" -> new EofToken();
                 default -> throw unsupported("external token " + simple.parserClass());
             };
-            case TokenDecl.Any ignored -> new AnyToken();
-            case TokenDecl.Eof ignored -> new EofToken();
-            case TokenDecl.Empty ignored -> new EmptyToken();
-            case TokenDecl.CharRange range -> {
-                if (range.min() > range.max() || Character.isSurrogate(range.min()) || Character.isSurrogate(range.max())) {
-                    throw unsupported("invalid character range " + range.name());
-                }
-                yield new CharRangeToken(range.min(), range.max());
+        }
+        if (token instanceof TokenDecl.Any ignored) {
+            return new AnyToken();
+        }
+        if (token instanceof TokenDecl.Eof ignored) {
+            return new EofToken();
+        }
+        if (token instanceof TokenDecl.Empty ignored) {
+            return new EmptyToken();
+        }
+        if (token instanceof TokenDecl.CharRange range) {
+            if (range.min() > range.max() || Character.isSurrogate(range.min()) || Character.isSurrogate(range.max())) {
+                throw unsupported("invalid character range " + range.name());
             }
-            case TokenDecl.Negation negation -> new ExceptToken(scalarText(negation.excludedChars()));
-            case TokenDecl.Until until -> new UntilToken(scalarText(until.terminator()));
-            case TokenDecl.Lookahead lookahead -> new LookaheadToken(scalarText(lookahead.pattern()), true);
-            case TokenDecl.NegativeLookahead lookahead -> new LookaheadToken(scalarText(lookahead.pattern()), false);
-            default -> throw unsupported("token " + token.name() + " (" + token.getClass().getSimpleName() + ")");
-        };
+            return new CharRangeToken(range.min(), range.max());
+        }
+        if (token instanceof TokenDecl.Negation negation) {
+            return new ExceptToken(scalarText(negation.excludedChars()));
+        }
+        if (token instanceof TokenDecl.Until until) {
+            return new UntilToken(scalarText(until.terminator()));
+        }
+        if (token instanceof TokenDecl.Lookahead lookahead) {
+            return new LookaheadToken(scalarText(lookahead.pattern()), true);
+        }
+        if (token instanceof TokenDecl.NegativeLookahead lookahead) {
+            return new LookaheadToken(scalarText(lookahead.pattern()), false);
+        }
+        throw unsupported("token " + token.name() + " (" + token.getClass().getSimpleName() + ")");
     }
 
     private String scalarText(String text) {
@@ -599,22 +694,25 @@ public final class RustGrammarLowering {
     }
 
     private void checkRepetition(Expression expression) {
-        switch (expression) {
-            case Repeat repeat -> {
-                if (repeat.max() == null && nullable(repeat.child())) throw unsupported("nullable unbounded repetition");
-                checkRepetition(repeat.child());
-            }
-            case Separated separated -> {
-                if (nullable(separated.child()) && nullable(separated.separator())) throw unsupported("nullable unbounded separation");
-                if (shape(separated.separator(), new HashSet<>()).kind() != Kind.TEXT) throw unsupported("mapped separator");
-                checkRepetition(separated.child()); checkRepetition(separated.separator());
-            }
-            case OptionalExpr optional -> checkRepetition(optional.child());
-            case Capture capture -> checkRepetition(capture.expression());
-            case Delimited delimited -> checkRepetition(delimited.child());
-            case Sequence sequence -> sequence.elements().forEach(this::checkRepetition);
-            case Choice choice -> choice.alternatives().forEach(this::checkRepetition);
-            default -> { }
+        if (expression instanceof Repeat repeat) {
+            if (repeat.max() == null && nullable(repeat.child())) throw unsupported("nullable unbounded repetition");
+            checkRepetition(repeat.child());
+        } else if (expression instanceof Separated separated) {
+            if (nullable(separated.child()) && nullable(separated.separator())) throw unsupported("nullable unbounded separation");
+            if (shape(separated.separator(), new HashSet<>()).kind() != Kind.TEXT) throw unsupported("mapped separator");
+            checkRepetition(separated.child()); checkRepetition(separated.separator());
+        } else if (expression instanceof OptionalExpr optional) {
+            checkRepetition(optional.child());
+        } else if (expression instanceof Capture capture) {
+            checkRepetition(capture.expression());
+        } else if (expression instanceof Delimited delimited) {
+            checkRepetition(delimited.child());
+        } else if (expression instanceof Sequence sequence) {
+            sequence.elements().forEach(this::checkRepetition);
+        } else if (expression instanceof Choice choice) {
+            choice.alternatives().forEach(this::checkRepetition);
+        } else {
+
         }
     }
 
@@ -627,39 +725,47 @@ public final class RustGrammarLowering {
     }
 
     private Set<Integer> leadingRules(Expression expression) {
-        return switch (expression) {
-            case Reference reference -> Set.of(reference.rule());
-            case Capture capture -> leadingRules(capture.expression());
-            case Delimited delimited -> leadingRules(delimited.child());
-            case OptionalExpr optional -> leadingRules(optional.child());
-            case Repeat repeat -> leadingRules(repeat.child());
-            case Separated separated -> {
-                Set<Integer> result = new HashSet<>(leadingRules(separated.child()));
-                if (nullable(separated.child())) result.addAll(leadingRules(separated.separator()));
-                yield result;
+        if (expression instanceof Reference reference) {
+            return Set.of(reference.rule());
+        }
+        if (expression instanceof Capture capture) {
+            return leadingRules(capture.expression());
+        }
+        if (expression instanceof Delimited delimited) {
+            return leadingRules(delimited.child());
+        }
+        if (expression instanceof OptionalExpr optional) {
+            return leadingRules(optional.child());
+        }
+        if (expression instanceof Repeat repeat) {
+            return leadingRules(repeat.child());
+        }
+        if (expression instanceof Separated separated) {
+            Set<Integer> result = new HashSet<>(leadingRules(separated.child()));
+            if (nullable(separated.child())) result.addAll(leadingRules(separated.separator()));
+            return result;
+        }
+        if (expression instanceof Sequence sequence) {
+            Set<Integer> result = new HashSet<>();
+            for (Expression child : sequence.elements()) {
+                result.addAll(leadingRules(child));
+                if (!nullable(child)) break;
             }
-            case Sequence sequence -> {
-                Set<Integer> result = new HashSet<>();
-                for (Expression child : sequence.elements()) {
-                    result.addAll(leadingRules(child));
-                    if (!nullable(child)) break;
-                }
-                yield result;
-            }
-            case Choice choice -> {
-                if (choice.alternatives().isEmpty()) throw unsupported("empty choice");
-                Set<Integer> result = new HashSet<>();
-                choice.alternatives().forEach(e -> result.addAll(leadingRules(e)));
-                yield result;
-            }
-            case PredictiveChoice choice -> {
-                if (choice.alternatives().isEmpty()) throw unsupported("empty choice");
-                Set<Integer> result = new HashSet<>();
-                choice.alternatives().forEach(e -> result.addAll(leadingRules(e)));
-                yield result;
-            }
-            default -> Set.of();
-        };
+            return result;
+        }
+        if (expression instanceof Choice choice) {
+            if (choice.alternatives().isEmpty()) throw unsupported("empty choice");
+            Set<Integer> result = new HashSet<>();
+            choice.alternatives().forEach(e -> result.addAll(leadingRules(e)));
+            return result;
+        }
+        if (expression instanceof PredictiveChoice choice) {
+            if (choice.alternatives().isEmpty()) throw unsupported("empty choice");
+            Set<Integer> result = new HashSet<>();
+            choice.alternatives().forEach(e -> result.addAll(leadingRules(e)));
+            return result;
+        }
+        return Set.of();
     }
 
     private Shape shape(int rule, Set<Integer> visiting) {
@@ -671,36 +777,44 @@ public final class RustGrammarLowering {
     }
 
     private Shape shape(Expression expression, Set<Integer> visiting) {
-        return switch (expression) {
-            case Reference reference -> shape(reference.rule(), visiting);
-            case Capture capture -> shape(capture.expression(), visiting);
-            case Delimited delimited -> shape(delimited.child(), visiting);
-            case OptionalExpr optional -> wrapNode(shape(optional.child(), visiting), Cardinality.OPTIONAL);
-            case Repeat repeat -> wrapNode(shape(repeat.child(), visiting), Cardinality.MANY);
-            case Separated separated -> {
-                if (shape(separated.separator(), visiting).kind() != Kind.TEXT) throw unsupported("mapped separator");
-                yield wrapNode(shape(separated.child(), visiting), Cardinality.MANY);
-            }
-            case Sequence sequence -> {
-                var nodes = sequence.elements().stream().map(e -> shape(e, visiting)).filter(s -> s.kind() != Kind.TEXT).toList();
-                Shape result = nodes.isEmpty() ? new Shape(Kind.TEXT, Cardinality.ONE) : nodes.get(0);
-                for (int i = 1; i < nodes.size(); i++) result = merge(result, nodes.get(i), true);
-                yield result;
-            }
-            case Choice choice -> {
-                var shapes = choice.alternatives().stream().map(e -> shape(e, visiting)).toList();
-                Shape result = shapes.get(0);
-                for (Shape alternative : shapes) result = merge(result, alternative, false);
-                yield result;
-            }
-            case PredictiveChoice choice -> {
-                var shapes = choice.alternatives().stream().map(e -> shape(e, visiting)).toList();
-                Shape result = shapes.get(0);
-                for (Shape alternative : shapes) result = merge(result, alternative, false);
-                yield result;
-            }
-            default -> new Shape(Kind.TEXT, Cardinality.ONE);
-        };
+        if (expression instanceof Reference reference) {
+            return shape(reference.rule(), visiting);
+        }
+        if (expression instanceof Capture capture) {
+            return shape(capture.expression(), visiting);
+        }
+        if (expression instanceof Delimited delimited) {
+            return shape(delimited.child(), visiting);
+        }
+        if (expression instanceof OptionalExpr optional) {
+            return wrapNode(shape(optional.child(), visiting), Cardinality.OPTIONAL);
+        }
+        if (expression instanceof Repeat repeat) {
+            return wrapNode(shape(repeat.child(), visiting), Cardinality.MANY);
+        }
+        if (expression instanceof Separated separated) {
+            if (shape(separated.separator(), visiting).kind() != Kind.TEXT) throw unsupported("mapped separator");
+            return wrapNode(shape(separated.child(), visiting), Cardinality.MANY);
+        }
+        if (expression instanceof Sequence sequence) {
+            var nodes = sequence.elements().stream().map(e -> shape(e, visiting)).filter(s -> s.kind() != Kind.TEXT).toList();
+            Shape result = nodes.isEmpty() ? new Shape(Kind.TEXT, Cardinality.ONE) : nodes.get(0);
+            for (int i = 1; i < nodes.size(); i++) result = merge(result, nodes.get(i), true);
+            return result;
+        }
+        if (expression instanceof Choice choice) {
+            var shapes = choice.alternatives().stream().map(e -> shape(e, visiting)).toList();
+            Shape result = shapes.get(0);
+            for (Shape alternative : shapes) result = merge(result, alternative, false);
+            return result;
+        }
+        if (expression instanceof PredictiveChoice choice) {
+            var shapes = choice.alternatives().stream().map(e -> shape(e, visiting)).toList();
+            Shape result = shapes.get(0);
+            for (Shape alternative : shapes) result = merge(result, alternative, false);
+            return result;
+        }
+        return new Shape(Kind.TEXT, Cardinality.ONE);
     }
 
     private Shape wrapNode(Shape shape, Cardinality cardinality) {
@@ -729,44 +843,48 @@ public final class RustGrammarLowering {
     }
 
     private Map<String, Shape> captures(Expression expression) {
-        return switch (expression) {
-            case Capture capture -> {
-                Map<String, Shape> result = new LinkedHashMap<>(captures(capture.expression()));
-                result.merge(capture.name(), shape(capture.expression(), new HashSet<>()), (a, b) -> merge(a, b, true));
-                yield result;
+        if (expression instanceof Capture capture) {
+            Map<String, Shape> result = new LinkedHashMap<>(captures(capture.expression()));
+            result.merge(capture.name(), shape(capture.expression(), new HashSet<>()), (a, b) -> merge(a, b, true));
+            return result;
+        }
+        if (expression instanceof OptionalExpr optional) {
+            return wrappedCaptures(optional.child(), Cardinality.OPTIONAL);
+        }
+        if (expression instanceof Delimited delimited) {
+            return captures(delimited.child());
+        }
+        if (expression instanceof Repeat repeat) {
+            return wrappedCaptures(repeat.child(), Cardinality.MANY);
+        }
+        if (expression instanceof Separated separated) {
+            if (!captures(separated.separator()).isEmpty()) throw unsupported("captures in separator");
+            return wrappedCaptures(separated.child(), Cardinality.MANY);
+        }
+        if (expression instanceof Sequence sequence) {
+            Map<String, Shape> result = new LinkedHashMap<>();
+            for (var element : sequence.elements()) for (var field : captures(element).entrySet()) {
+                result.merge(field.getKey(), field.getValue(), (a, b) -> merge(a, b, true));
             }
-            case OptionalExpr optional -> wrappedCaptures(optional.child(), Cardinality.OPTIONAL);
-            case Delimited delimited -> captures(delimited.child());
-            case Repeat repeat -> wrappedCaptures(repeat.child(), Cardinality.MANY);
-            case Separated separated -> {
-                if (!captures(separated.separator()).isEmpty()) throw unsupported("captures in separator");
-                yield wrappedCaptures(separated.child(), Cardinality.MANY);
-            }
-            case Sequence sequence -> {
-                Map<String, Shape> result = new LinkedHashMap<>();
-                for (var element : sequence.elements()) for (var field : captures(element).entrySet()) {
-                    result.merge(field.getKey(), field.getValue(), (a, b) -> merge(a, b, true));
-                }
-                yield result;
-            }
-            case Choice choice -> {
-                var alternatives = choice.alternatives().stream().map(this::captures).toList();
-                Map<String, Shape> result = new LinkedHashMap<>();
-                alternatives.forEach(fields -> fields.forEach((name, shape) -> result.merge(name, shape, (a, b) -> merge(a, b, false))));
-                result.replaceAll((name, shape) -> alternatives.stream().anyMatch(fields -> !fields.containsKey(name))
-                    ? wrap(shape, Cardinality.OPTIONAL) : shape);
-                yield result;
-            }
-            case PredictiveChoice choice -> {
-                var alternatives = choice.alternatives().stream().map(this::captures).toList();
-                Map<String, Shape> result = new LinkedHashMap<>();
-                alternatives.forEach(fields -> fields.forEach((name, shape) -> result.merge(name, shape, (a, b) -> merge(a, b, false))));
-                result.replaceAll((name, shape) -> alternatives.stream().anyMatch(fields -> !fields.containsKey(name))
-                    ? wrap(shape, Cardinality.OPTIONAL) : shape);
-                yield result;
-            }
-            default -> Map.of();
-        };
+            return result;
+        }
+        if (expression instanceof Choice choice) {
+            var alternatives = choice.alternatives().stream().map(this::captures).toList();
+            Map<String, Shape> result = new LinkedHashMap<>();
+            alternatives.forEach(fields -> fields.forEach((name, shape) -> result.merge(name, shape, (a, b) -> merge(a, b, false))));
+            result.replaceAll((name, shape) -> alternatives.stream().anyMatch(fields -> !fields.containsKey(name))
+                ? wrap(shape, Cardinality.OPTIONAL) : shape);
+            return result;
+        }
+        if (expression instanceof PredictiveChoice choice) {
+            var alternatives = choice.alternatives().stream().map(this::captures).toList();
+            Map<String, Shape> result = new LinkedHashMap<>();
+            alternatives.forEach(fields -> fields.forEach((name, shape) -> result.merge(name, shape, (a, b) -> merge(a, b, false))));
+            result.replaceAll((name, shape) -> alternatives.stream().anyMatch(fields -> !fields.containsKey(name))
+                ? wrap(shape, Cardinality.OPTIONAL) : shape);
+            return result;
+        }
+        return Map.of();
     }
 
     private static void identifier(String value) {

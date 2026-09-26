@@ -37,14 +37,22 @@ final class SemanticCardinality {
     }
 
     Shape siteShape(AtomicElement element) {
-        return switch (element) {
-            case OptionalElement optional -> siteShape(optional.body());
-            case RepeatElement repeat -> siteShape(repeat.body());
-            case OneOrMoreElement repeat -> siteShape(repeat.body());
-            case BoundedRepeatElement repeat -> siteShape(repeat.body());
-            case SeparatedElement separated -> siteShape(separated.element());
-            default -> shape(element);
-        };
+        if (element instanceof OptionalElement optional) {
+            return siteShape(optional.body());
+        }
+        if (element instanceof RepeatElement repeat) {
+            return siteShape(repeat.body());
+        }
+        if (element instanceof OneOrMoreElement repeat) {
+            return siteShape(repeat.body());
+        }
+        if (element instanceof BoundedRepeatElement repeat) {
+            return siteShape(repeat.body());
+        }
+        if (element instanceof SeparatedElement separated) {
+            return siteShape(separated.element());
+        }
+        return shape(element);
     }
 
     private Shape siteShape(RuleBody body) {
@@ -88,29 +96,37 @@ final class SemanticCardinality {
     Shape shape(RuleBody body) { return shape(body, new HashSet<>()); }
 
     private Shape shape(AtomicElement element, Set<String> visiting) {
-        return switch (element) {
-            case RuleRefElement ref -> {
-                RuleDecl rule = rules.get(ref.name());
-                if (rule == null || !MapperElementUtil.containsMappedValue(ref, rules)) yield text();
-                if (MapperElementUtil.getMappingAnnotation(rule).isPresent()) yield new Shape(Kind.NODE, Count.ONE);
-                if (!visiting.add(ref.name())) throw new IllegalArgumentException("Recursive unmapped semantic helper: " + ref.name());
-                Shape result = shape(rule.body(), visiting);
-                visiting.remove(ref.name());
-                yield result;
+        if (element instanceof RuleRefElement ref) {
+            RuleDecl rule = rules.get(ref.name());
+            if (rule == null || !MapperElementUtil.containsMappedValue(ref, rules)) return text();
+            if (MapperElementUtil.getMappingAnnotation(rule).isPresent()) return new Shape(Kind.NODE, Count.ONE);
+            if (!visiting.add(ref.name())) throw new IllegalArgumentException("Recursive unmapped semantic helper: " + ref.name());
+            Shape result = shape(rule.body(), visiting);
+            visiting.remove(ref.name());
+            return result;
+        }
+        if (element instanceof GroupElement group) {
+            return shape(group.body(), visiting);
+        }
+        if (element instanceof OptionalElement optional) {
+            return semanticWrap(shape(optional.body(), visiting), Count.OPTIONAL);
+        }
+        if (element instanceof RepeatElement repeat) {
+            return semanticWrap(shape(repeat.body(), visiting), Count.MANY);
+        }
+        if (element instanceof OneOrMoreElement repeat) {
+            return semanticWrap(shape(repeat.body(), visiting), Count.MANY);
+        }
+        if (element instanceof BoundedRepeatElement repeat) {
+            return semanticWrap(shape(repeat.body(), visiting), Count.MANY);
+        }
+        if (element instanceof SeparatedElement separated) {
+            if (shape(separated.separator(), visiting).kind() != Kind.TEXT) {
+                throw new IllegalArgumentException("Mapped semantic separator is unsupported");
             }
-            case GroupElement group -> shape(group.body(), visiting);
-            case OptionalElement optional -> semanticWrap(shape(optional.body(), visiting), Count.OPTIONAL);
-            case RepeatElement repeat -> semanticWrap(shape(repeat.body(), visiting), Count.MANY);
-            case OneOrMoreElement repeat -> semanticWrap(shape(repeat.body(), visiting), Count.MANY);
-            case BoundedRepeatElement repeat -> semanticWrap(shape(repeat.body(), visiting), Count.MANY);
-            case SeparatedElement separated -> {
-                if (shape(separated.separator(), visiting).kind() != Kind.TEXT) {
-                    throw new IllegalArgumentException("Mapped semantic separator is unsupported");
-                }
-                yield semanticWrap(shape(separated.element(), visiting), Count.MANY);
-            }
-            default -> text();
-        };
+            return semanticWrap(shape(separated.element(), visiting), Count.MANY);
+        }
+        return text();
     }
 
     private Shape shape(RuleBody body, Set<String> visiting) {
@@ -124,14 +140,22 @@ final class SemanticCardinality {
     }
 
     private Shape capturedShape(AtomicElement element) {
-        return switch (element) {
-            case OptionalElement optional -> wrap(siteShape(optional.body()), Count.OPTIONAL);
-            case RepeatElement repeat -> wrap(siteShape(repeat.body()), Count.MANY);
-            case OneOrMoreElement repeat -> wrap(siteShape(repeat.body()), Count.MANY);
-            case BoundedRepeatElement repeat -> wrap(siteShape(repeat.body()), Count.MANY);
-            case SeparatedElement separated -> wrap(siteShape(separated.element()), Count.MANY);
-            default -> shape(element);
-        };
+        if (element instanceof OptionalElement optional) {
+            return wrap(siteShape(optional.body()), Count.OPTIONAL);
+        }
+        if (element instanceof RepeatElement repeat) {
+            return wrap(siteShape(repeat.body()), Count.MANY);
+        }
+        if (element instanceof OneOrMoreElement repeat) {
+            return wrap(siteShape(repeat.body()), Count.MANY);
+        }
+        if (element instanceof BoundedRepeatElement repeat) {
+            return wrap(siteShape(repeat.body()), Count.MANY);
+        }
+        if (element instanceof SeparatedElement separated) {
+            return wrap(siteShape(separated.element()), Count.MANY);
+        }
+        return shape(element);
     }
 
     private Map<String, Shape> captures(RuleBody body) {
@@ -152,15 +176,25 @@ final class SemanticCardinality {
     }
 
     private Map<String, Shape> captures(AtomicElement element) {
-        return switch (element) {
-            case GroupElement group -> captures(group.body());
-            case OptionalElement optional -> wrapCaptures(captures(optional.body()), Count.OPTIONAL);
-            case RepeatElement repeat -> wrapCaptures(captures(repeat.body()), Count.MANY);
-            case OneOrMoreElement repeat -> wrapCaptures(captures(repeat.body()), Count.MANY);
-            case BoundedRepeatElement repeat -> wrapCaptures(captures(repeat.body()), Count.MANY);
-            case SeparatedElement separated -> wrapCaptures(captures(separated.element()), Count.MANY);
-            default -> Map.of();
-        };
+        if (element instanceof GroupElement group) {
+            return captures(group.body());
+        }
+        if (element instanceof OptionalElement optional) {
+            return wrapCaptures(captures(optional.body()), Count.OPTIONAL);
+        }
+        if (element instanceof RepeatElement repeat) {
+            return wrapCaptures(captures(repeat.body()), Count.MANY);
+        }
+        if (element instanceof OneOrMoreElement repeat) {
+            return wrapCaptures(captures(repeat.body()), Count.MANY);
+        }
+        if (element instanceof BoundedRepeatElement repeat) {
+            return wrapCaptures(captures(repeat.body()), Count.MANY);
+        }
+        if (element instanceof SeparatedElement separated) {
+            return wrapCaptures(captures(separated.element()), Count.MANY);
+        }
+        return Map.of();
     }
 
     private static Map<String, Shape> wrapCaptures(Map<String, Shape> fields, Count count) {

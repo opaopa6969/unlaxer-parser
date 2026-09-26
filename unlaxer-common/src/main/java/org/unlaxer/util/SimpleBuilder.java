@@ -119,14 +119,14 @@ public class SimpleBuilder implements CharSequence{
     return this;
   }
 
-  static byte tabBytes = " ".getBytes()[0];
+  static byte tabBytes = " ".getBytes(java.nio.charset.StandardCharsets.UTF_8)[0];
 
   private SimpleBuilder tab() {
     byte[] tabs = new byte[index];
     for (int i = 0; i < index * tabSpace; i++) {
       tabs[i] = tabBytes;
     }
-    builder.append(new String(tabs));
+    builder.append(new String(tabs, java.nio.charset.StandardCharsets.UTF_8));
     return this;
   }
 

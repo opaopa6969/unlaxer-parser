@@ -74,60 +74,65 @@ class MapperTypeResolver {
 
     static String inferTypeFromElement(GrammarDecl grammar, AtomicElement element) {
         String astClassName = grammar.name() + "AST";
-        return switch (element) {
-            case TerminalElement ignored -> "String";
-            case RuleRefElement ruleRefElement -> {
-                Optional<MappingAnnotation> mapping = grammar.rules().stream()
-                    .filter(r -> r.name().equals(ruleRefElement.name()))
-                    .flatMap(r -> r.annotations().stream())
-                    .filter(a -> a instanceof MappingAnnotation)
-                    .map(a -> (MappingAnnotation) a)
-                    .findFirst();
-                if (mapping.isPresent()) {
-                    yield astClassName + "." + mapping.get().className();
-                }
-                // @enum ルール参照 → enum 型として推論
-                boolean isEnum = grammar.rules().stream()
-                    .filter(r -> r.name().equals(ruleRefElement.name()))
-                    .flatMap(r -> r.annotations().stream())
-                    .anyMatch(a -> a instanceof UBNFAST.EnumAnnotation);
-                if (isEnum) {
-                    yield astClassName + "." + ruleRefElement.name();
-                }
-                // token 型推論: parser class 名から Java 型を導出
-                String tokenType = inferTypeFromTokenName(grammar, ruleRefElement.name());
-                if (tokenType != null) {
-                    yield tokenType;
-                }
-                // 透過 mapped alias/choice は Object 経由で実ノードを保持する。
-                if (isTransparentMappedChoice(grammar, ruleRefElement.name())) {
-                    yield "Object";
-                }
-                yield "String";
+        if (element instanceof TerminalElement ignored) {
+            return "String";
+        }
+        if (element instanceof RuleRefElement ruleRefElement) {
+            Optional<MappingAnnotation> mapping = grammar.rules().stream()
+                .filter(r -> r.name().equals(ruleRefElement.name()))
+                .flatMap(r -> r.annotations().stream())
+                .filter(a -> a instanceof MappingAnnotation)
+                .map(a -> (MappingAnnotation) a)
+                .findFirst();
+            if (mapping.isPresent()) {
+                return astClassName + "." + mapping.get().className();
             }
-            case RepeatElement repeatElement -> {
-                String inner = inferTypeFromBody(grammar, repeatElement.body());
-                yield "List<" + boxedType(inner) + ">";
+            // @enum ルール参照 → enum 型として推論
+            boolean isEnum = grammar.rules().stream()
+                .filter(r -> r.name().equals(ruleRefElement.name()))
+                .flatMap(r -> r.annotations().stream())
+                .anyMatch(a -> a instanceof UBNFAST.EnumAnnotation);
+            if (isEnum) {
+                return astClassName + "." + ruleRefElement.name();
             }
-            case OneOrMoreElement oneOrMoreElement -> {
-                String inner = inferTypeFromElement(grammar, oneOrMoreElement.body());
-                yield "List<" + boxedType(inner) + ">";
+            // token 型推論: parser class 名から Java 型を導出
+            String tokenType = inferTypeFromTokenName(grammar, ruleRefElement.name());
+            if (tokenType != null) {
+                return tokenType;
             }
-            case BoundedRepeatElement boundedRepeatElement -> {
-                String inner = inferTypeFromElement(grammar, boundedRepeatElement.body());
-                yield "List<" + boxedType(inner) + ">";
+            // 透過 mapped alias/choice は Object 経由で実ノードを保持する。
+            if (isTransparentMappedChoice(grammar, ruleRefElement.name())) {
+                return "Object";
             }
-            case OptionalElement optionalElement -> {
-                String inner = inferTypeFromBody(grammar, optionalElement.body());
-                yield "Optional<" + boxedType(inner) + ">";
-            }
-            case SeparatedElement sep -> {
-                String inner = inferTypeFromElement(grammar, sep.element());
-                yield "List<" + boxedType(inner) + ">";
-            }
-            case GroupElement ignored -> "Object";
-            case ErrorElement ignored -> "Object";
-        };
+            return "String";
+        }
+        if (element instanceof RepeatElement repeatElement) {
+            String inner = inferTypeFromBody(grammar, repeatElement.body());
+            return "List<" + boxedType(inner) + ">";
+        }
+        if (element instanceof OneOrMoreElement oneOrMoreElement) {
+            String inner = inferTypeFromElement(grammar, oneOrMoreElement.body());
+            return "List<" + boxedType(inner) + ">";
+        }
+        if (element instanceof BoundedRepeatElement boundedRepeatElement) {
+            String inner = inferTypeFromElement(grammar, boundedRepeatElement.body());
+            return "List<" + boxedType(inner) + ">";
+        }
+        if (element instanceof OptionalElement optionalElement) {
+            String inner = inferTypeFromBody(grammar, optionalElement.body());
+            return "Optional<" + boxedType(inner) + ">";
+        }
+        if (element instanceof SeparatedElement sep) {
+            String inner = inferTypeFromElement(grammar, sep.element());
+            return "List<" + boxedType(inner) + ">";
+        }
+        if (element instanceof GroupElement ignored) {
+            return "Object";
+        }
+        if (element instanceof ErrorElement ignored) {
+            return "Object";
+        }
+        throw new IllegalStateException("unhandled " + element);
     }
 
     private static final Map<String, String> NUMERIC_PARSER_TYPES = Map.of(
@@ -176,14 +181,15 @@ class MapperTypeResolver {
     }
 
     static String inferTypeFromBody(GrammarDecl grammar, RuleBody body) {
-        AnnotatedElement single = switch (body) {
-            case SequenceBody sequenceBody when sequenceBody.elements().size() == 1 -> sequenceBody.elements().get(0);
-            case ChoiceBody choiceBody when choiceBody.alternatives().size() == 1 -> {
-                SequenceBody sequenceBody = choiceBody.alternatives().get(0);
-                yield sequenceBody.elements().size() == 1 ? sequenceBody.elements().get(0) : null;
-            }
-            default -> null;
-        };
+        final AnnotatedElement single;
+        if (body instanceof SequenceBody sequenceBody && sequenceBody.elements().size() == 1) {
+            single = sequenceBody.elements().get(0);
+        } else if (body instanceof ChoiceBody choiceBody && choiceBody.alternatives().size() == 1) {
+            SequenceBody sequenceBody = choiceBody.alternatives().get(0);
+            single = sequenceBody.elements().size() == 1 ? sequenceBody.elements().get(0) : null;
+        } else {
+            single = null;
+        }
         if (single == null) {
             return "Object";
         }
@@ -197,12 +203,15 @@ class MapperTypeResolver {
     static List<CaptureResult> findCapturedTypesInBody(
         RuleBody body, String captureName, boolean inOptional, boolean inRepeat) {
 
-        return switch (body) {
-            case ChoiceBody choiceBody -> choiceBody.alternatives().stream()
+        if (body instanceof ChoiceBody choiceBody) {
+            return choiceBody.alternatives().stream()
                 .flatMap(sequenceBody -> findCapturedTypesInSequence(sequenceBody, captureName, inOptional, inRepeat).stream())
                 .toList();
-            case SequenceBody sequenceBody -> findCapturedTypesInSequence(sequenceBody, captureName, inOptional, inRepeat);
-        };
+        }
+        if (body instanceof SequenceBody sequenceBody) {
+            return findCapturedTypesInSequence(sequenceBody, captureName, inOptional, inRepeat);
+        }
+        throw new IllegalStateException("unhandled " + body);
     }
 
     static List<CaptureResult> findCapturedTypesInSequence(
@@ -221,21 +230,25 @@ class MapperTypeResolver {
     static List<CaptureResult> findCapturedTypesInAtomic(
         AtomicElement element, String captureName, boolean inOptional, boolean inRepeat) {
 
-        return switch (element) {
-            case OptionalElement optionalElement ->
-                findCapturedTypesInBody(optionalElement.body(), captureName, true, inRepeat);
-            case RepeatElement repeatElement ->
-                findCapturedTypesInBody(repeatElement.body(), captureName, inOptional, true);
-            case OneOrMoreElement one ->
-                findCapturedTypesInAtomic(one.body(), captureName, inOptional, true);
-            case BoundedRepeatElement bounded ->
-                findCapturedTypesInAtomic(bounded.body(), captureName, inOptional, true);
-            case UBNFAST.SeparatedElement separated ->
-                findCapturedTypesInAtomic(separated.element(), captureName, inOptional, true);
-            case GroupElement groupElement ->
-                findCapturedTypesInBody(groupElement.body(), captureName, inOptional, inRepeat);
-            default -> List.of();
-        };
+        if (element instanceof OptionalElement optionalElement) {
+            return findCapturedTypesInBody(optionalElement.body(), captureName, true, inRepeat);
+        }
+        if (element instanceof RepeatElement repeatElement) {
+            return findCapturedTypesInBody(repeatElement.body(), captureName, inOptional, true);
+        }
+        if (element instanceof OneOrMoreElement one) {
+            return findCapturedTypesInAtomic(one.body(), captureName, inOptional, true);
+        }
+        if (element instanceof BoundedRepeatElement bounded) {
+            return findCapturedTypesInAtomic(bounded.body(), captureName, inOptional, true);
+        }
+        if (element instanceof UBNFAST.SeparatedElement separated) {
+            return findCapturedTypesInAtomic(separated.element(), captureName, inOptional, true);
+        }
+        if (element instanceof GroupElement groupElement) {
+            return findCapturedTypesInBody(groupElement.body(), captureName, inOptional, inRepeat);
+        }
+        return List.of();
     }
 
     static Optional<String> unwrapListType(String type) {

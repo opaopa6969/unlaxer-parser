@@ -54,7 +54,7 @@ UBNF（Unlaxer BNF）記法で書いた文法定義から、Java のパーサー
   - `XxxDapLauncher.java` — stdio 経由で起動する DAP サーバーの main クラス
 - **CLI ツール `CodegenMain`** — `.ubnf` ファイルを指定してコマンド 1 行でソースを生成
 - **VSIX ワンコマンドビルド** — `tinycalc-vscode/` または `ubnf-vscode/` で `mvn verify` を実行するだけで VS Code 拡張（`.vsix`）が `target/` に生成される。LSP + DAP は同一 fat jar に収録
-- **Java 21 対応** — sealed interface・record・switch 式をフル活用
+- **Java 21 対応** — sealed interface・record・switch 式をフル活用（Java 17 向けビルドは `unlaxer-dsl-jdk17`、生成 Java を 17 向けにするには `--java-release 17`）
 - **自己ホスティング達成** — `grammar/ubnf.ubnf` を `ParserGenerator` で処理して生成した `UBNFParsers` が、`ubnf.ubnf` 自身を完全にパースできることを `SelfHostingRoundTripTest` で検証済み
 
 ---
@@ -63,7 +63,7 @@ UBNF（Unlaxer BNF）記法で書いた文法定義から、Java のパーサー
 
 | ソフトウェア | バージョン | 用途 |
 |---|---|---|
-| Java | 21 以上（`--enable-preview` 有効） | ライブラリ本体・コード生成 |
+| Java | 21 以上（`--enable-preview` 有効）。Java 17 は `unlaxer-dsl-jdk17` | ライブラリ本体・コード生成 |
 | Maven | 3.8 以上 | ビルド管理 |
 | Node.js + npm | 18 以上 | VSIX ビルド時のみ必要 |
 
@@ -1160,6 +1160,7 @@ Parser IR の draft schema は `docs/schema/parser-ir-v1.draft.json` を参照�
 | `--report-version 1` | JSON レポートスキーマのバージョン | `1` |
 | `--report-schema-check` | JSON ペイロードを出力前にスキーマ検証する | `false` |
 | `--warnings-as-json` | warning 診断を stderr に JSON で出力する（text モード） | `false` |
+| `--java-release 21\|17` | 生成 Java の対象リリース。`17` では Evaluator の dispatch を sealed パターン `switch` ではなく `instanceof` 連鎖で出し、生成物すべてが Java 17（javac release 17）で通る | `21` |
 
 使用可能な生成器名: `AST`, `Parser`, `Mapper`, `Evaluator`, `LSP`, `Launcher`, `DAP`, `DAPLauncher`
 `--generators` はカンマ区切り値をトリムし、空要素はエラーとして拒否する（例: `"AST, LSP"` は有効）。
