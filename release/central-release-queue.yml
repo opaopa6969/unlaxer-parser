@@ -9,15 +9,15 @@ policy:
   emergencyRequiresReason: true
 
 lastObserved:
-  asOf: "2026-09-25"
+  asOf: "2026-09-26"
   month: "2026-09"
-  publishedOperations: 6
+  publishedOperations: 8
   source: https://repo1.maven.org/maven2/org/unlaxer/
   releases:
     - repository: opaopa6969/tinyexpression
-      versions: [1.4.11, 1.4.12, 1.4.13, 1.4.14, 1.4.15, 2.0.0]
+      versions: [1.4.11, 1.4.12, 1.4.13, 1.4.14, 1.4.15, 2.0.0, 2.0.1]
     - repository: opaopa6969/unlaxer-parser
-      versions: [3.0.12, 3.0.13, 3.0.14, 3.0.15, 3.1.0]
+      versions: [3.0.12, 3.0.13, 3.0.14, 3.0.15, 3.1.0, 3.1.1]
 
 nextWindow:
   month: "2026-09"
@@ -42,3 +42,19 @@ nextWindow:
         a `legacy` emitter mode in 2.0 and is removed in 3.0. Needs no new
         unlaxer version; can take the 2026-11 slot after unlaxer 3.1.0, or
         2026-10 if preferred.
+    - repository: opaopa6969/unlaxer-parser
+      status: published
+      publishedAt: "2026-09-26T13:00Z"
+      requestedVersion: "3.1.1"
+      note: >-
+        Backward-compatible minor: adds Java 17 artifacts
+        `unlaxer-common-jdk17` / `unlaxer-dsl-jdk17` (#311), built with
+        `--release 17` alongside the unchanged Java 21 main artifacts.
+    - repository: opaopa6969/tinyexpression
+      status: published
+      publishedAt: "2026-09-26T13:15Z"
+      requestedVersion: "2.0.1"
+      note: >-
+        Adds Java 17 artifact `tinyExpression-jdk17` (#220), bumps
+        `unlaxer.version` to 3.1.1, and fixes a FormulaInfo END_OF_PART
+        line-variant bug (#211).

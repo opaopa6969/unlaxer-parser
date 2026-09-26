@@ -8,7 +8,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ## [Unreleased]
 
-## [3.1.1] - Unreleased
+## [3.1.1] - 2026-09-26
 
 ### Added
 - **Java 17 artifacts** `org.unlaxer:unlaxer-common-jdk17` and `org.unlaxer:unlaxer-dsl-jdk17` (#311):
