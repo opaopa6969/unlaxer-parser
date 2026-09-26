@@ -89,6 +89,27 @@
 				</configuration>
 			</plugin>
 			<plugin>
+				<!-- The shared tests write reports to target/ relative to their working directory
+				     (the shared module), which does not exist when only the -jdk17 modules are built. -->
+				<artifactId>maven-antrun-plugin</artifactId>
+				<version>3.1.0</version>
+				<executions>
+					<execution>
+						<id>shared-test-output-dir</id>
+						<phase>process-test-classes</phase>
+						<goals>
+							<goal>run</goal>
+						</goals>
+						<configuration>
+							<skip>${unlaxer.jdk17.skipTests}</skip>
+							<target>
+								<mkdir dir="${unlaxer.jdk17.shared}/target"/>
+							</target>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
 				<artifactId>maven-surefire-plugin</artifactId>
 				<version>2.22.1</version>
 				<configuration>
