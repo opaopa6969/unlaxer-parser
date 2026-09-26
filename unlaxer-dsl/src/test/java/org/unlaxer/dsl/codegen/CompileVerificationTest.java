@@ -23,8 +23,8 @@ import org.unlaxer.dsl.bootstrap.UBNFMapper;
  * ParserGenerator / ASTGenerator / MapperGenerator / EvaluatorGenerator が
  * 生成する Java ソースが実際にコンパイルできることを検証するテスト。
  *
- * <p>unlaxer-common は --enable-preview でビルドされているため、
- * javax.tools.JavaCompiler を直接使い、--enable-preview --release 21 を
+ * <p>生成コードが最低サポート版 (Java 17) で通ることを保証するため、
+ * javax.tools.JavaCompiler を直接使い、--release 17 を
  * 明示的に渡してコンパイルする。</p>
  */
 public class CompileVerificationTest {
@@ -87,7 +87,7 @@ public class CompileVerificationTest {
         GrammarDecl grammar = parseGrammar(TINYCALC_GRAMMAR);
         // Evaluator は AST 型を参照するため AST を先にコンパイルする
         CodeGenerator.GeneratedSource astResult  = new ASTGenerator().generate(grammar);
-        CodeGenerator.GeneratedSource evalResult = new EvaluatorGenerator().generate(grammar);
+        CodeGenerator.GeneratedSource evalResult = GeneratedJavaRelease.evaluatorGenerator().generate(grammar);
         assertCompiles(astResult, evalResult);
     }
 
@@ -133,7 +133,7 @@ public class CompileVerificationTest {
         CodeGenerator.GeneratedSource astResult    = new ASTGenerator().generate(grammar);
         CodeGenerator.GeneratedSource parserResult = new ParserGenerator().generate(grammar);
         CodeGenerator.GeneratedSource mapperResult = new MapperGenerator().generate(grammar);
-        CodeGenerator.GeneratedSource evalResult   = new EvaluatorGenerator().generate(grammar);
+        CodeGenerator.GeneratedSource evalResult   = GeneratedJavaRelease.evaluatorGenerator().generate(grammar);
         assertCompiles(astResult, parserResult, mapperResult, evalResult);
     }
 
@@ -164,7 +164,7 @@ public class CompileVerificationTest {
         } catch (java.io.IOException e) {
             throw new RuntimeException(e);
         }
-        List<String> options = List.of("--enable-preview", "--release", "21", "-classpath", classpath, "-d", tmpDir);
+        List<String> options = List.of("--release", GeneratedJavaRelease.EVALUATOR_RELEASE_OPTION, "-classpath", classpath, "-d", tmpDir);
 
         StringWriter diagnostics = new StringWriter();
         JavaCompiler.CompilationTask task = compiler.getTask(

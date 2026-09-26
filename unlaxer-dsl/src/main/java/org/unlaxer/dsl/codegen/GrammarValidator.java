@@ -345,13 +345,14 @@ public final class GrammarValidator {
     }
 
     private static void collectLeftmostRefs(RuleBody body, Set<String> out) {
-        switch (body) {
-            case ChoiceBody choice -> {
-                for (SequenceBody seq : choice.alternatives()) {
-                    collectLeftmostRefsFromSequence(seq, out);
-                }
+        if (body instanceof ChoiceBody choice) {
+            for (SequenceBody seq : choice.alternatives()) {
+                collectLeftmostRefsFromSequence(seq, out);
             }
-            case SequenceBody seq -> collectLeftmostRefsFromSequence(seq, out);
+        } else if (body instanceof SequenceBody seq) {
+            collectLeftmostRefsFromSequence(seq, out);
+        } else {
+            throw new IllegalStateException("unhandled " + body);
         }
     }
 
@@ -373,29 +374,29 @@ public final class GrammarValidator {
      *         (allowing the next element to potentially be leftmost)
      */
     private static boolean collectLeftmostRefsFromAtomic(AtomicElement element, Set<String> out) {
-        return switch (element) {
-            case RuleRefElement ref -> {
-                String fullName = ref.namespace()
-                    .map(ns -> ns + "." + ref.name())
-                    .orElse(ref.name());
-                out.add(fullName);
-                yield false; // conservative: assume the referenced rule consumes input
-            }
-            case UBNFAST.TerminalElement t -> false; // always consumes input
-            case OptionalElement opt -> {
-                collectLeftmostRefs(opt.body(), out);
-                yield true; // optional always can be empty
-            }
-            case RepeatElement rep -> {
-                collectLeftmostRefs(rep.body(), out);
-                yield true; // zero-or-more can be empty
-            }
-            case GroupElement group -> {
-                collectLeftmostRefs(group.body(), out);
-                yield false; // conservative: treat group as non-empty
-            }
-            default -> false;
-        };
+        if (element instanceof RuleRefElement ref) {
+            String fullName = ref.namespace()
+                .map(ns -> ns + "." + ref.name())
+                .orElse(ref.name());
+            out.add(fullName);
+            return false; // conservative: assume the referenced rule consumes input
+        }
+        if (element instanceof UBNFAST.TerminalElement t) {
+            return false;
+        }
+        if (element instanceof OptionalElement opt) {
+            collectLeftmostRefs(opt.body(), out);
+            return true; // optional always can be empty
+        }
+        if (element instanceof RepeatElement rep) {
+            collectLeftmostRefs(rep.body(), out);
+            return true; // zero-or-more can be empty
+        }
+        if (element instanceof GroupElement group) {
+            collectLeftmostRefs(group.body(), out);
+            return false; // conservative: treat group as non-empty
+        }
+        return false;
     }
 
     private static void findLeftRecursion(
@@ -720,14 +721,22 @@ public final class GrammarValidator {
         }
         // Non-Simple tokens that emit a generated class all use the token-name-derived
         // class name. Until / CaseInsensitive / Negation / CharRange / Regex fall here.
-        return switch (token) {
-            case TokenDecl.Until ignored -> ParserCodegenUtil.toParserClassName(token.name());
-            case TokenDecl.Negation ignored -> ParserCodegenUtil.toParserClassName(token.name());
-            case TokenDecl.CharRange ignored -> ParserCodegenUtil.toParserClassName(token.name());
-            case TokenDecl.Regex ignored -> ParserCodegenUtil.toParserClassName(token.name());
-            case TokenDecl.CaseInsensitive ignored -> ParserCodegenUtil.toParserClassName(token.name());
-            default -> null; // Any, Eof, Empty, Lookahead, NegativeLookahead emit no parser class
-        };
+        if (token instanceof TokenDecl.Until ignored) {
+            return ParserCodegenUtil.toParserClassName(token.name());
+        }
+        if (token instanceof TokenDecl.Negation ignored) {
+            return ParserCodegenUtil.toParserClassName(token.name());
+        }
+        if (token instanceof TokenDecl.CharRange ignored) {
+            return ParserCodegenUtil.toParserClassName(token.name());
+        }
+        if (token instanceof TokenDecl.Regex ignored) {
+            return ParserCodegenUtil.toParserClassName(token.name());
+        }
+        if (token instanceof TokenDecl.CaseInsensitive ignored) {
+            return ParserCodegenUtil.toParserClassName(token.name());
+        }
+        return null;
     }
 
     /**
@@ -987,13 +996,18 @@ public final class GrammarValidator {
                 continue;
             }
             // @enum ルールは Choice+Terminal のみ許容
-            boolean allTerminals = switch (rule.body()) {
-                case UBNFAST.ChoiceBody choice -> choice.alternatives().stream()
+            final boolean allTerminals;
+            var switchSubject2 = rule.body();
+            if (switchSubject2 instanceof UBNFAST.ChoiceBody choice) {
+                allTerminals = choice.alternatives().stream()
                     .allMatch(seq -> seq.elements().size() == 1
                         && seq.elements().get(0).element() instanceof UBNFAST.TerminalElement);
-                case UBNFAST.SequenceBody seq -> seq.elements().size() == 1
+            } else if (switchSubject2 instanceof UBNFAST.SequenceBody seq) {
+                allTerminals = seq.elements().size() == 1
                     && seq.elements().get(0).element() instanceof UBNFAST.TerminalElement;
-            };
+            } else {
+                throw new IllegalStateException("unhandled " + switchSubject2);
+            }
             if (!allTerminals) {
                 addRuleError(errors, rule.name(),
                     "@enum rule " + rule.name() + " must consist only of terminal literals (e.g. 'a' | 'b')",
@@ -1061,23 +1075,32 @@ public final class GrammarValidator {
     }
 
     private static java.util.stream.Stream<UBNFAST.BoundedRepeatElement> collectBoundedElements(UBNFAST.RuleBody body) {
-        return switch (body) {
-            case UBNFAST.ChoiceBody choice -> choice.alternatives().stream()
+        if (body instanceof UBNFAST.ChoiceBody choice) {
+            return choice.alternatives().stream()
                 .flatMap(seq -> seq.elements().stream())
                 .flatMap(ae -> collectBoundedFromAtomic(ae.element()));
-            case UBNFAST.SequenceBody seq -> seq.elements().stream()
+        }
+        if (body instanceof UBNFAST.SequenceBody seq) {
+            return seq.elements().stream()
                 .flatMap(ae -> collectBoundedFromAtomic(ae.element()));
-        };
+        }
+        throw new IllegalStateException("unhandled " + body);
     }
 
     private static java.util.stream.Stream<UBNFAST.BoundedRepeatElement> collectBoundedFromAtomic(UBNFAST.AtomicElement element) {
-        return switch (element) {
-            case UBNFAST.BoundedRepeatElement b -> java.util.stream.Stream.of(b);
-            case UBNFAST.GroupElement g -> collectBoundedElements(g.body());
-            case UBNFAST.OptionalElement o -> collectBoundedElements(o.body());
-            case UBNFAST.RepeatElement r -> collectBoundedElements(r.body());
-            default -> java.util.stream.Stream.empty();
-        };
+        if (element instanceof UBNFAST.BoundedRepeatElement b) {
+            return java.util.stream.Stream.of(b);
+        }
+        if (element instanceof UBNFAST.GroupElement g) {
+            return collectBoundedElements(g.body());
+        }
+        if (element instanceof UBNFAST.OptionalElement o) {
+            return collectBoundedElements(o.body());
+        }
+        if (element instanceof UBNFAST.RepeatElement r) {
+            return collectBoundedElements(r.body());
+        }
+        return java.util.stream.Stream.empty();
     }
 
     private static void addRuleError(
@@ -1131,13 +1154,14 @@ public final class GrammarValidator {
     }
 
     private static void collectCaptureNamesFromBody(RuleBody body, Set<String> captures) {
-        switch (body) {
-            case ChoiceBody choice -> {
-                for (SequenceBody seq : choice.alternatives()) {
-                    collectCaptureNamesFromSequence(seq, captures);
-                }
+        if (body instanceof ChoiceBody choice) {
+            for (SequenceBody seq : choice.alternatives()) {
+                collectCaptureNamesFromSequence(seq, captures);
             }
-            case SequenceBody seq -> collectCaptureNamesFromSequence(seq, captures);
+        } else if (body instanceof SequenceBody seq) {
+            collectCaptureNamesFromSequence(seq, captures);
+        } else {
+            throw new IllegalStateException("unhandled " + body);
         }
     }
 
@@ -1149,19 +1173,21 @@ public final class GrammarValidator {
     }
 
     private static void collectCaptureNamesFromAtomic(AtomicElement element, Set<String> captures) {
-        switch (element) {
-            case GroupElement group -> collectCaptureNamesFromBody(group.body(), captures);
-            case OptionalElement opt -> collectCaptureNamesFromBody(opt.body(), captures);
-            case RepeatElement rep -> collectCaptureNamesFromBody(rep.body(), captures);
-            case UBNFAST.OneOrMoreElement rep -> collectCaptureNamesFromAtomic(rep.body(), captures);
-            case UBNFAST.BoundedRepeatElement rep -> collectCaptureNamesFromAtomic(rep.body(), captures);
-            case UBNFAST.SeparatedElement separated -> {
-                collectCaptureNamesFromAtomic(separated.element(), captures);
-                collectCaptureNamesFromAtomic(separated.separator(), captures);
-            }
-            default -> {
-                // TerminalElement / RuleRefElement have no nested bodies.
-            }
+        if (element instanceof GroupElement group) {
+            collectCaptureNamesFromBody(group.body(), captures);
+        } else if (element instanceof OptionalElement opt) {
+            collectCaptureNamesFromBody(opt.body(), captures);
+        } else if (element instanceof RepeatElement rep) {
+            collectCaptureNamesFromBody(rep.body(), captures);
+        } else if (element instanceof UBNFAST.OneOrMoreElement rep) {
+            collectCaptureNamesFromAtomic(rep.body(), captures);
+        } else if (element instanceof UBNFAST.BoundedRepeatElement rep) {
+            collectCaptureNamesFromAtomic(rep.body(), captures);
+        } else if (element instanceof UBNFAST.SeparatedElement separated) {
+            collectCaptureNamesFromAtomic(separated.element(), captures);
+            collectCaptureNamesFromAtomic(separated.separator(), captures);
+        } else {
+            // TerminalElement / RuleRefElement have no nested bodies.
         }
     }
 
@@ -1172,13 +1198,14 @@ public final class GrammarValidator {
     }
 
     private static void collectReferencedRuleNamesFromBody(RuleBody body, Set<String> refs) {
-        switch (body) {
-            case ChoiceBody choice -> {
-                for (SequenceBody seq : choice.alternatives()) {
-                    collectReferencedRuleNamesFromSequence(seq, refs);
-                }
+        if (body instanceof ChoiceBody choice) {
+            for (SequenceBody seq : choice.alternatives()) {
+                collectReferencedRuleNamesFromSequence(seq, refs);
             }
-            case SequenceBody seq -> collectReferencedRuleNamesFromSequence(seq, refs);
+        } else if (body instanceof SequenceBody seq) {
+            collectReferencedRuleNamesFromSequence(seq, refs);
+        } else {
+            throw new IllegalStateException("unhandled " + body);
         }
     }
 
@@ -1189,29 +1216,32 @@ public final class GrammarValidator {
     }
 
     private static void collectReferencedRuleNamesFromAtomic(AtomicElement element, Set<String> refs) {
-        switch (element) {
-            case RuleRefElement ref -> {
-                // 名前空間付き参照 (alias.RuleName) はそのまま追加
-                String fullName = ref.namespace()
-                    .map(ns -> ns + "." + ref.name())
-                    .orElse(ref.name());
-                refs.add(fullName);
-            }
-            case GroupElement group -> collectReferencedRuleNamesFromBody(group.body(), refs);
-            case OptionalElement opt -> collectReferencedRuleNamesFromBody(opt.body(), refs);
-            case RepeatElement rep -> collectReferencedRuleNamesFromBody(rep.body(), refs);
-            default -> {
-                // TerminalElement has no nested refs.
-            }
+        if (element instanceof RuleRefElement ref) {
+            // 名前空間付き参照 (alias.RuleName) はそのまま追加
+            String fullName = ref.namespace()
+                .map(ns -> ns + "." + ref.name())
+                .orElse(ref.name());
+            refs.add(fullName);
+        } else if (element instanceof GroupElement group) {
+            collectReferencedRuleNamesFromBody(group.body(), refs);
+        } else if (element instanceof OptionalElement opt) {
+            collectReferencedRuleNamesFromBody(opt.body(), refs);
+        } else if (element instanceof RepeatElement rep) {
+            collectReferencedRuleNamesFromBody(rep.body(), refs);
+        } else {
+            // TerminalElement has no nested refs.
         }
     }
 
     private static boolean containsRepeat(RuleBody body) {
-        return switch (body) {
-            case ChoiceBody choice -> choice.alternatives().stream()
+        if (body instanceof ChoiceBody choice) {
+            return choice.alternatives().stream()
                 .anyMatch(GrammarValidator::containsRepeatInSequence);
-            case SequenceBody seq -> containsRepeatInSequence(seq);
-        };
+        }
+        if (body instanceof SequenceBody seq) {
+            return containsRepeatInSequence(seq);
+        }
+        throw new IllegalStateException("unhandled " + body);
     }
 
     private static boolean containsRepeatInSequence(SequenceBody seq) {
@@ -1224,12 +1254,16 @@ public final class GrammarValidator {
     }
 
     private static boolean containsRepeatInAtomic(AtomicElement element) {
-        return switch (element) {
-            case RepeatElement rep -> true;
-            case GroupElement group -> containsRepeat(group.body());
-            case OptionalElement opt -> containsRepeat(opt.body());
-            default -> false;
-        };
+        if (element instanceof RepeatElement rep) {
+            return true;
+        }
+        if (element instanceof GroupElement group) {
+            return containsRepeat(group.body());
+        }
+        if (element instanceof OptionalElement opt) {
+            return containsRepeat(opt.body());
+        }
+        return false;
     }
 
     private static boolean isCanonicalRightAssocShape(RuleDecl rule) {
@@ -1250,11 +1284,13 @@ public final class GrammarValidator {
     }
 
     private static SequenceBody getSingleSequence(RuleBody body) {
-        return switch (body) {
-            case SequenceBody seq -> seq;
-            case ChoiceBody choice when choice.alternatives().size() == 1 -> choice.alternatives().get(0);
-            default -> null;
-        };
+        if (body instanceof SequenceBody seq) {
+            return seq;
+        }
+        if (body instanceof ChoiceBody choice && choice.alternatives().size() == 1) {
+            return choice.alternatives().get(0);
+        }
+        return null;
     }
 
     // =========================================================================
@@ -1292,13 +1328,14 @@ public final class GrammarValidator {
     }
 
     private static void collectTypeofUsagesFromBody(RuleBody body, List<TypeofUsage> usages) {
-        switch (body) {
-            case ChoiceBody choice -> {
-                for (SequenceBody seq : choice.alternatives()) {
-                    collectTypeofUsagesFromSequence(seq, usages);
-                }
+        if (body instanceof ChoiceBody choice) {
+            for (SequenceBody seq : choice.alternatives()) {
+                collectTypeofUsagesFromSequence(seq, usages);
             }
-            case SequenceBody seq -> collectTypeofUsagesFromSequence(seq, usages);
+        } else if (body instanceof SequenceBody seq) {
+            collectTypeofUsagesFromSequence(seq, usages);
+        } else {
+            throw new IllegalStateException("unhandled " + body);
         }
     }
 
@@ -1314,11 +1351,14 @@ public final class GrammarValidator {
     }
 
     private static void collectTypeofUsagesFromAtomic(AtomicElement element, List<TypeofUsage> usages) {
-        switch (element) {
-            case GroupElement group -> collectTypeofUsagesFromBody(group.body(), usages);
-            case OptionalElement opt -> collectTypeofUsagesFromBody(opt.body(), usages);
-            case RepeatElement rep -> collectTypeofUsagesFromBody(rep.body(), usages);
-            default -> {}
+        if (element instanceof GroupElement group) {
+            collectTypeofUsagesFromBody(group.body(), usages);
+        } else if (element instanceof OptionalElement opt) {
+            collectTypeofUsagesFromBody(opt.body(), usages);
+        } else if (element instanceof RepeatElement rep) {
+            collectTypeofUsagesFromBody(rep.body(), usages);
+        } else {
+
         }
     }
 

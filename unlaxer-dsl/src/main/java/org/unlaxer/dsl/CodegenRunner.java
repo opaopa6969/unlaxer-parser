@@ -66,7 +66,7 @@ final class CodegenRunner {
         String source = fs.readString(Path.of(config.grammarFile()));
         UBNFFile file = UBNFMapper.parse(source);
 
-        Map<String, CodeGenerator> generatorMap = generatorMap();
+        Map<String, CodeGenerator> generatorMap = generatorMap(config.javaRelease());
 
         List<ReportJsonWriter.ValidationIssueRow> validationRows = collectValidationRows(file);
         List<ReportJsonWriter.ValidationIssueRow> sortedRows = sortValidationRows(validationRows);
@@ -413,12 +413,12 @@ final class CodegenRunner {
         return "json".equals(reportFormat) || "ndjson".equals(reportFormat);
     }
 
-    private static Map<String, CodeGenerator> generatorMap() {
+    private static Map<String, CodeGenerator> generatorMap(int javaRelease) {
         Map<String, CodeGenerator> generatorMap = new LinkedHashMap<>();
         generatorMap.put("AST", new ASTGenerator());
         generatorMap.put("Parser", new ParserGenerator());
         generatorMap.put("Mapper", new MapperGenerator());
-        generatorMap.put("Evaluator", new EvaluatorGenerator());
+        generatorMap.put("Evaluator", new EvaluatorGenerator(javaRelease));
         generatorMap.put("LSP", new LSPGenerator());
         generatorMap.put("Launcher", new LSPLauncherGenerator());
         generatorMap.put("DAP", new DAPGenerator());

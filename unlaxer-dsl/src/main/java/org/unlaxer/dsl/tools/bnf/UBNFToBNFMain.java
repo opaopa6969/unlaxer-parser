@@ -67,7 +67,7 @@ public final class UBNFToBNFMain {
      * @throws IOException ファイル読み込み失敗時
      */
     private static String readFile(String filePath) throws IOException {
-        return new String(Files.readAllBytes(Paths.get(filePath)));
+        return new String(Files.readAllBytes(Paths.get(filePath)), java.nio.charset.StandardCharsets.UTF_8);
     }
 
     /**

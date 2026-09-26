@@ -45,7 +45,7 @@ A tool that automatically generates Java parsers, ASTs, mappers, and evaluators 
   - `XxxAST.java`: type-safe AST using sealed interfaces + records
   - `XxxMapper.java`: parse-tree -> AST mapping skeleton
   - `XxxEvaluator.java`: abstract evaluator that traverses AST
-- **Java 21 support**: Full use of sealed interfaces, records, and switch expressions
+- **Java 21 support**: Full use of sealed interfaces, records, and switch expressions (Java 17 build: `unlaxer-dsl-jdk17`; generated Java for 17: `--java-release 17`)
 - **Self-hosting design**: UBNF grammar itself is written in UBNF, aiming to eventually process itself
 
 ---
@@ -54,7 +54,7 @@ A tool that automatically generates Java parsers, ASTs, mappers, and evaluators 
 
 | Software | Version |
 |---|---|
-| Java | 21+ (with `--enable-preview`) |
+| Java | 21+ (with `--enable-preview`); Java 17: `unlaxer-dsl-jdk17` |
 | Maven | 3.8+ |
 
 ---
@@ -983,6 +983,7 @@ Validation failure reports also include `severityCounts` and `categoryCounts` su
 | `--report-version 1` | JSON report schema version | `1` |
 | `--report-schema-check` | Validate JSON payload shape before emitting it | `false` |
 | `--warnings-as-json` | Emit warning diagnostics as JSON to stderr (text mode) | `false` |
+| `--java-release 21\|17` | Java release the generated Java targets. `17` emits the Evaluator dispatch as an `instanceof` chain (no sealed pattern `switch`) so all generated Java compiles for Java 17 (javac release 17) | `21` |
 
 Available generator names: `AST`, `Parser`, `Mapper`, `Evaluator`, `LSP`, `Launcher`, `DAP`, `DAPLauncher`
 `--generators` values are trimmed by comma, empty entries are rejected (for example, `"AST, LSP"` is valid).

@@ -226,19 +226,40 @@ public class UBNFMapper {
 
     private static TokenDecl prefixTokenDecl(TokenDecl token, String alias) {
         String prefixed = alias + "." + token.name();
-        return switch (token) {
-            case UBNFAST.TokenDecl.Simple t -> new UBNFAST.TokenDecl.Simple(prefixed, t.parserClass());
-            case UBNFAST.TokenDecl.Until t -> new UBNFAST.TokenDecl.Until(prefixed, t.terminator());
-            case UBNFAST.TokenDecl.Negation t -> new UBNFAST.TokenDecl.Negation(prefixed, t.excludedChars());
-            case UBNFAST.TokenDecl.Lookahead t -> new UBNFAST.TokenDecl.Lookahead(prefixed, t.pattern());
-            case UBNFAST.TokenDecl.NegativeLookahead t -> new UBNFAST.TokenDecl.NegativeLookahead(prefixed, t.pattern());
-            case UBNFAST.TokenDecl.Any t -> new UBNFAST.TokenDecl.Any(prefixed);
-            case UBNFAST.TokenDecl.Eof t -> new UBNFAST.TokenDecl.Eof(prefixed);
-            case UBNFAST.TokenDecl.Empty t -> new UBNFAST.TokenDecl.Empty(prefixed);
-            case UBNFAST.TokenDecl.CharRange t -> new UBNFAST.TokenDecl.CharRange(prefixed, t.min(), t.max());
-            case UBNFAST.TokenDecl.CaseInsensitive t -> new UBNFAST.TokenDecl.CaseInsensitive(prefixed, t.word());
-            case UBNFAST.TokenDecl.Regex t -> new UBNFAST.TokenDecl.Regex(prefixed, t.pattern());
-        };
+        if (token instanceof UBNFAST.TokenDecl.Simple t) {
+            return new UBNFAST.TokenDecl.Simple(prefixed, t.parserClass());
+        }
+        if (token instanceof UBNFAST.TokenDecl.Until t) {
+            return new UBNFAST.TokenDecl.Until(prefixed, t.terminator());
+        }
+        if (token instanceof UBNFAST.TokenDecl.Negation t) {
+            return new UBNFAST.TokenDecl.Negation(prefixed, t.excludedChars());
+        }
+        if (token instanceof UBNFAST.TokenDecl.Lookahead t) {
+            return new UBNFAST.TokenDecl.Lookahead(prefixed, t.pattern());
+        }
+        if (token instanceof UBNFAST.TokenDecl.NegativeLookahead t) {
+            return new UBNFAST.TokenDecl.NegativeLookahead(prefixed, t.pattern());
+        }
+        if (token instanceof UBNFAST.TokenDecl.Any t) {
+            return new UBNFAST.TokenDecl.Any(prefixed);
+        }
+        if (token instanceof UBNFAST.TokenDecl.Eof t) {
+            return new UBNFAST.TokenDecl.Eof(prefixed);
+        }
+        if (token instanceof UBNFAST.TokenDecl.Empty t) {
+            return new UBNFAST.TokenDecl.Empty(prefixed);
+        }
+        if (token instanceof UBNFAST.TokenDecl.CharRange t) {
+            return new UBNFAST.TokenDecl.CharRange(prefixed, t.min(), t.max());
+        }
+        if (token instanceof UBNFAST.TokenDecl.CaseInsensitive t) {
+            return new UBNFAST.TokenDecl.CaseInsensitive(prefixed, t.word());
+        }
+        if (token instanceof UBNFAST.TokenDecl.Regex t) {
+            return new UBNFAST.TokenDecl.Regex(prefixed, t.pattern());
+        }
+        throw new IllegalStateException("unhandled " + token);
     }
 
     private static RuleDecl prefixRuleDecl(RuleDecl rule, String alias) {

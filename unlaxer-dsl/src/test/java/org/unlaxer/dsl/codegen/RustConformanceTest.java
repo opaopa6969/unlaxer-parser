@@ -872,7 +872,7 @@ public class RustConformanceTest {
 
     private URLClassLoader compileJava(org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl grammar, List<GeneratedSource> extra) throws Exception {
         var sources = new ArrayList<GeneratedSource>();
-        for (CodeGenerator generator : List.of(new ParserGenerator(), new ASTGenerator(), new MapperGenerator(), new EvaluatorGenerator())) {
+        for (CodeGenerator generator : List.of(new ParserGenerator(), new ASTGenerator(), new MapperGenerator(), GeneratedJavaRelease.evaluatorGenerator())) {
             sources.add(generator.generate(grammar));
         }
         sources.addAll(extra);
@@ -885,7 +885,7 @@ public class RustConformanceTest {
         Path output = temporary.newFolder().toPath();
         try (var manager = compiler.getStandardFileManager(diagnostics, Locale.ROOT, StandardCharsets.UTF_8)) {
             boolean compiled = compiler.getTask(null, manager, diagnostics,
-                List.of("--enable-preview", "--release", "21", "-classpath", System.getProperty("java.class.path"), "-d", output.toString()),
+                List.of("--release", GeneratedJavaRelease.EVALUATOR_RELEASE_OPTION, "-classpath", System.getProperty("java.class.path"), "-d", output.toString()),
                 null, units).call();
             assertTrue(diagnostics.getDiagnostics().toString(), compiled);
         }

@@ -84,18 +84,30 @@ public class ParserGenerator implements CodeGenerator {
             this.tokenCIMap = new LinkedHashMap<>();
             this.tokenRegexMap = new LinkedHashMap<>();
             for (TokenDecl token : grammar.tokens()) {
-                switch (token) {
-                    case TokenDecl.Simple s              -> tokenParserMap.put(s.name(), s.parserClass());
-                    case TokenDecl.Until u               -> tokenUntilMap.put(u.name(), u.terminator());
-                    case TokenDecl.Negation n            -> tokenNegationMap.put(n.name(), n.excludedChars());
-                    case TokenDecl.Lookahead la          -> tokenLookaheadMap.put(la.name(), la.pattern());
-                    case TokenDecl.NegativeLookahead nla -> tokenNegLookaheadMap.put(nla.name(), nla.pattern());
-                    case TokenDecl.Any a                 -> tokenAnySet.add(a.name());
-                    case TokenDecl.Eof e                 -> tokenEofSet.add(e.name());
-                    case TokenDecl.Empty em              -> tokenEmptySet.add(em.name());
-                    case TokenDecl.CharRange cr          -> tokenCharRangeMap.put(cr.name(), new int[]{cr.min(), cr.max()});
-                    case TokenDecl.CaseInsensitive ci    -> tokenCIMap.put(ci.name(), ci.word());
-                    case TokenDecl.Regex rx              -> tokenRegexMap.put(rx.name(), rx.pattern());
+                if (token instanceof TokenDecl.Simple s) {
+                    tokenParserMap.put(s.name(), s.parserClass());
+                } else if (token instanceof TokenDecl.Until u) {
+                    tokenUntilMap.put(u.name(), u.terminator());
+                } else if (token instanceof TokenDecl.Negation n) {
+                    tokenNegationMap.put(n.name(), n.excludedChars());
+                } else if (token instanceof TokenDecl.Lookahead la) {
+                    tokenLookaheadMap.put(la.name(), la.pattern());
+                } else if (token instanceof TokenDecl.NegativeLookahead nla) {
+                    tokenNegLookaheadMap.put(nla.name(), nla.pattern());
+                } else if (token instanceof TokenDecl.Any a) {
+                    tokenAnySet.add(a.name());
+                } else if (token instanceof TokenDecl.Eof e) {
+                    tokenEofSet.add(e.name());
+                } else if (token instanceof TokenDecl.Empty em) {
+                    tokenEmptySet.add(em.name());
+                } else if (token instanceof TokenDecl.CharRange cr) {
+                    tokenCharRangeMap.put(cr.name(), new int[]{cr.min(), cr.max()});
+                } else if (token instanceof TokenDecl.CaseInsensitive ci) {
+                    tokenCIMap.put(ci.name(), ci.word());
+                } else if (token instanceof TokenDecl.Regex rx) {
+                    tokenRegexMap.put(rx.name(), rx.pattern());
+                } else {
+                    throw new IllegalStateException("unhandled " + token);
                 }
             }
             this.ruleNames = grammar.rules().stream()
@@ -375,12 +387,14 @@ public class ParserGenerator implements CodeGenerator {
     }
 
     private static boolean collectMemoDependencies(GenContext ctx, RuleBody body, Set<String> refs) {
-        return switch (body) {
-            case org.unlaxer.dsl.bootstrap.UBNFAST.ChoiceBody choice -> choice.alternatives().stream()
+        if (body instanceof org.unlaxer.dsl.bootstrap.UBNFAST.ChoiceBody choice) {
+            return choice.alternatives().stream()
                 .allMatch(sequence -> collectMemoDependencies(ctx, sequence, refs));
-            case org.unlaxer.dsl.bootstrap.UBNFAST.SequenceBody sequence ->
-                collectMemoDependencies(ctx, sequence, refs);
-        };
+        }
+        if (body instanceof org.unlaxer.dsl.bootstrap.UBNFAST.SequenceBody sequence) {
+            return collectMemoDependencies(ctx, sequence, refs);
+        }
+        throw new IllegalStateException("unhandled " + body);
     }
 
     private static boolean collectMemoDependencies(GenContext ctx,
@@ -393,34 +407,43 @@ public class ParserGenerator implements CodeGenerator {
     }
 
     private static boolean collectMemoDependencies(GenContext ctx, AtomicElement element, Set<String> refs) {
-        return switch (element) {
-            case org.unlaxer.dsl.bootstrap.UBNFAST.RuleRefElement ref -> {
-                if (ref.namespace().isPresent()) yield false;
-                if (ctx.ruleNames.contains(ref.name())) {
-                    refs.add(ref.name());
-                    yield true;
-                }
-                yield ctx.grammar.tokens().stream()
-                    .filter(token -> token.name().equals(ref.name()))
-                    .findFirst().map(token -> !(token instanceof TokenDecl.Simple)
-                        || ctx.explicitlySafeMemoTokens.contains(ref.name())).orElse(false);
+        if (element instanceof org.unlaxer.dsl.bootstrap.UBNFAST.RuleRefElement ref) {
+            if (ref.namespace().isPresent()) return false;
+            if (ctx.ruleNames.contains(ref.name())) {
+                refs.add(ref.name());
+                return true;
             }
-            case org.unlaxer.dsl.bootstrap.UBNFAST.TerminalElement ignored -> true;
-            case org.unlaxer.dsl.bootstrap.UBNFAST.RepeatElement repeat ->
-                collectMemoDependencies(ctx, repeat.body(), refs);
-            case org.unlaxer.dsl.bootstrap.UBNFAST.OptionalElement optional ->
-                collectMemoDependencies(ctx, optional.body(), refs);
-            case org.unlaxer.dsl.bootstrap.UBNFAST.OneOrMoreElement one ->
-                collectMemoDependencies(ctx, one.body(), refs);
-            case org.unlaxer.dsl.bootstrap.UBNFAST.BoundedRepeatElement bounded ->
-                collectMemoDependencies(ctx, bounded.body(), refs);
-            case org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement group ->
-                collectMemoDependencies(ctx, group.body(), refs);
-            case org.unlaxer.dsl.bootstrap.UBNFAST.SeparatedElement separated ->
-                collectMemoDependencies(ctx, separated.element(), refs)
+            return ctx.grammar.tokens().stream()
+                .filter(token -> token.name().equals(ref.name()))
+                .findFirst().map(token -> !(token instanceof TokenDecl.Simple)
+                    || ctx.explicitlySafeMemoTokens.contains(ref.name())).orElse(false);
+        }
+        if (element instanceof org.unlaxer.dsl.bootstrap.UBNFAST.TerminalElement ignored) {
+            return true;
+        }
+        if (element instanceof org.unlaxer.dsl.bootstrap.UBNFAST.RepeatElement repeat) {
+            return collectMemoDependencies(ctx, repeat.body(), refs);
+        }
+        if (element instanceof org.unlaxer.dsl.bootstrap.UBNFAST.OptionalElement optional) {
+            return collectMemoDependencies(ctx, optional.body(), refs);
+        }
+        if (element instanceof org.unlaxer.dsl.bootstrap.UBNFAST.OneOrMoreElement one) {
+            return collectMemoDependencies(ctx, one.body(), refs);
+        }
+        if (element instanceof org.unlaxer.dsl.bootstrap.UBNFAST.BoundedRepeatElement bounded) {
+            return collectMemoDependencies(ctx, bounded.body(), refs);
+        }
+        if (element instanceof org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement group) {
+            return collectMemoDependencies(ctx, group.body(), refs);
+        }
+        if (element instanceof org.unlaxer.dsl.bootstrap.UBNFAST.SeparatedElement separated) {
+            return collectMemoDependencies(ctx, separated.element(), refs)
                     && collectMemoDependencies(ctx, separated.separator(), refs);
-            case org.unlaxer.dsl.bootstrap.UBNFAST.ErrorElement ignored -> true;
-        };
+        }
+        if (element instanceof org.unlaxer.dsl.bootstrap.UBNFAST.ErrorElement ignored) {
+            return true;
+        }
+        throw new IllegalStateException("unhandled " + element);
     }
 
     // =========================================================================

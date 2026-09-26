@@ -4,7 +4,7 @@
 
 # Getting Started with unlaxer-parser
 
-**Version**: 3.1.0
+**Version**: 3.1.1
 
 This guide walks you through building a complete calculator language with unlaxer-parser from scratch — Maven setup, grammar, code generation, and a working evaluator.
 
@@ -28,7 +28,7 @@ This guide walks you through building a complete calculator language with unlaxe
 
 ## Prerequisites
 
-- Java 21 or later
+- Java 21 or later (on Java 17 use the `unlaxer-common-jdk17` / `unlaxer-dsl-jdk17` artifacts instead; see the README)
 - Maven 3.8 or later
 - Basic Java knowledge
 
@@ -62,12 +62,12 @@ Edit `pom.xml` to require Java 21 and add unlaxer:
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-common</artifactId>
-        <version>3.1.0</version>
+        <version>3.1.1</version>
     </dependency>
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-dsl</artifactId>
-        <version>3.1.0</version>
+        <version>3.1.1</version>
     </dependency>
 
     <!-- for tests -->

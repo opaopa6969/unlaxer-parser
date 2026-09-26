@@ -16,9 +16,9 @@ public class StartOfLineParser extends AbstractParser{
 	
 	private static final long serialVersionUID = -2867989603696996683L;
 	
-	static final String LF = new String(new byte[] {0x0a/*lf*/});
-	static final String CR = new String(new byte[] {0x0d/*cr*/});
-	static final String CRLF = new String(new byte[] {0x0d/*cr*/,0x0a/*lf*/});
+	static final String LF = new String(new byte[] {0x0a/*lf*/}, java.nio.charset.StandardCharsets.UTF_8);
+	static final String CR = new String(new byte[] {0x0d/*cr*/}, java.nio.charset.StandardCharsets.UTF_8);
+	static final String CRLF = new String(new byte[] {0x0d/*cr*/,0x0a/*lf*/}, java.nio.charset.StandardCharsets.UTF_8);
 
 	@Override
 	public void prepareChildren(Parsers childrenContainer) {

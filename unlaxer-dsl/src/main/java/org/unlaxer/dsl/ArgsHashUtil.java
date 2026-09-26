@@ -32,6 +32,10 @@ final class ArgsHashUtil {
             updateHash(md, "overwrite", config.overwrite());
             updateHash(md, "failOn", config.failOn());
             updateHash(md, "failOnWarningsThreshold", Integer.toString(config.failOnWarningsThreshold()));
+            // Hashed only when non-default so that existing argsHash values stay stable (#311).
+            if (config.javaRelease() != CodegenCliParser.DEFAULT_JAVA_RELEASE) {
+                updateHash(md, "javaRelease", Integer.toString(config.javaRelease()));
+            }
             byte[] digest = md.digest();
             StringBuilder sb = new StringBuilder(digest.length * 2);
             for (byte b : digest) {

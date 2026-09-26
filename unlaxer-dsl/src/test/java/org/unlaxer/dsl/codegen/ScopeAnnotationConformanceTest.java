@@ -357,7 +357,7 @@ public class ScopeAnnotationConformanceTest {
         try (var manager = compiler.getStandardFileManager(compilerDiagnostics, Locale.ROOT,
                 StandardCharsets.UTF_8)) {
             boolean compiled = compiler.getTask(null, manager, compilerDiagnostics,
-                List.of("--enable-preview", "--release", "21", "-classpath",
+                List.of("--release", "17", "-classpath",
                     System.getProperty("java.class.path") + File.pathSeparator, "-d", output.toString()),
                 null, units).call();
             assertTrue(compilerDiagnostics.getDiagnostics().toString(), compiled);

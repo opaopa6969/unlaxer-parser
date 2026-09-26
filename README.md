@@ -18,11 +18,11 @@
 [![Maven Central](https://img.shields.io/maven-central/v/org.unlaxer/unlaxer-common)](https://central.sonatype.com/artifact/org.unlaxer/unlaxer-common)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Java 21+](https://img.shields.io/badge/Java-21%2B-orange.svg)]()
-[![Version](https://img.shields.io/badge/version-3.1.0-blue)]()
+[![Version](https://img.shields.io/badge/version-3.1.1-blue)]()
 
 ---
 
-> **Latest release — 3.1.0**: a backward-compatible minor. Runtime FIRST-set candidate exclusion cuts deferred-diagnostics-mode CPU work roughly in half on large inputs (six profiling rounds, see the CHANGELOG), the UBNF bootstrap now rejects trailing input and accepts empty grammars like the Rust frontend, and chained (3+ segment) dotted rule references parse correctly in the self-hosting grammar. See the [CHANGELOG](./CHANGELOG.md) for the full history. Historical note: **3.0.2 was never published to Maven Central** — if upgrading from 3.0.1, go directly to 3.0.3 or later. If you depend on `unlaxer-common` or `unlaxer-dsl` at `2.x`, see the [CHANGELOG](./CHANGELOG.md) and the [downstream drift warning](#downstream-drift-warning) below.
+> **Latest release — 3.1.1**: a backward-compatible minor. Runtime FIRST-set candidate exclusion cuts deferred-diagnostics-mode CPU work roughly in half on large inputs (six profiling rounds, see the CHANGELOG), the UBNF bootstrap now rejects trailing input and accepts empty grammars like the Rust frontend, and chained (3+ segment) dotted rule references parse correctly in the self-hosting grammar. See the [CHANGELOG](./CHANGELOG.md) for the full history. Historical note: **3.0.2 was never published to Maven Central** — if upgrading from 3.0.1, go directly to 3.0.3 or later. If you depend on `unlaxer-common` or `unlaxer-dsl` at `2.x`, see the [CHANGELOG](./CHANGELOG.md) and the [downstream drift warning](#downstream-drift-warning) below.
 
 ---
 
@@ -142,15 +142,36 @@ From this, unlaxer generates:
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-common</artifactId>
-        <version>3.1.0</version>
+        <version>3.1.1</version>
     </dependency>
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-dsl</artifactId>
-        <version>3.1.0</version>
+        <version>3.1.1</version>
     </dependency>
 </dependencies>
 ```
+
+**Java 17 users** (for example Corretto 17): the artifacts above are built for Java 21
+(class file major 65). Depend on the drop-in `-jdk17` builds instead — same groupId, version,
+packages and classes, compiled with `--release 17` (major 61):
+
+```xml
+<dependency>
+    <groupId>org.unlaxer</groupId>
+    <artifactId>unlaxer-common-jdk17</artifactId>
+    <version>3.1.1</version>
+</dependency>
+<dependency>
+    <groupId>org.unlaxer</groupId>
+    <artifactId>unlaxer-dsl-jdk17</artifactId>
+    <version>3.1.1</version>
+</dependency>
+```
+
+`unlaxer-dsl-jdk17` depends on `unlaxer-common-jdk17` only. Use one family, not both. If the
+generated Java must also run on Java 17, pass `--java-release 17` to `CodegenMain` (it changes only
+the Evaluator dispatch; see [unlaxer-dsl/README.md](unlaxer-dsl/README.md)).
 
 ### 2. Write a grammar
 

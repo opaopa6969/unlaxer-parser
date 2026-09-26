@@ -12,9 +12,9 @@ import org.unlaxer.parser.combinator.LazyChoice;
 public class LineTerminatorParser extends LazyChoice{
 
 	private static final long serialVersionUID = -325480488364751237L;
-	static final String LF = new String(new byte[] {0x0a/*lf*/});
-	static final String CR = new String(new byte[] {0x0d/*cr*/});
-	static final String CRLF = new String(new byte[] {0x0d/*cr*/,0x0a/*lf*/});
+	static final String LF = new String(new byte[] {0x0a/*lf*/}, java.nio.charset.StandardCharsets.UTF_8);
+	static final String CR = new String(new byte[] {0x0d/*cr*/}, java.nio.charset.StandardCharsets.UTF_8);
+	static final String CRLF = new String(new byte[] {0x0d/*cr*/,0x0a/*lf*/}, java.nio.charset.StandardCharsets.UTF_8);
 
 	@Override
 	public Parsers getLazyParsers() {

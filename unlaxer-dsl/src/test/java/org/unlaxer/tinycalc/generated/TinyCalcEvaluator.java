@@ -16,13 +16,12 @@ public abstract class TinyCalcEvaluator<T> {
     }
 
     private T evalInternal(TinyCalcAST node) {
-        return switch (node) {
-            case TinyCalcAST.TinyCalcProgram n -> evalTinyCalcProgram(n);
-            case TinyCalcAST.VarDecl n -> evalVarDecl(n);
-            case TinyCalcAST.BinaryExpr n -> evalBinaryExpr(n);
-            case TinyCalcAST.NumberLiteral n -> evalNumberLiteral(n);
-            case TinyCalcAST.VariableRef n -> evalVariableRef(n);
-        };
+        if (node instanceof TinyCalcAST.TinyCalcProgram n) return evalTinyCalcProgram(n);
+        if (node instanceof TinyCalcAST.VarDecl n) return evalVarDecl(n);
+        if (node instanceof TinyCalcAST.BinaryExpr n) return evalBinaryExpr(n);
+        if (node instanceof TinyCalcAST.NumberLiteral n) return evalNumberLiteral(n);
+        if (node instanceof TinyCalcAST.VariableRef n) return evalVariableRef(n);
+        throw new IllegalStateException("unhandled node: " + node);
     }
 
     protected abstract T evalTinyCalcProgram(TinyCalcAST.TinyCalcProgram node);

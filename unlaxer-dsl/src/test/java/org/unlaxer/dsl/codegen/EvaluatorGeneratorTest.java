@@ -1,6 +1,8 @@
 package org.unlaxer.dsl.codegen;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -139,6 +141,32 @@ public class EvaluatorGeneratorTest {
         String source = gen.generate(grammar).source();
         assertTrue("should contain evalBinaryExpr",
             source.contains("evalBinaryExpr"));
+    }
+
+    @Test
+    public void testJava17ReleaseEmitsInstanceofDispatchInSameOrder() {
+        GrammarDecl grammar = parseGrammar(TINYCALC_GRAMMAR);
+        String defaultSource = new EvaluatorGenerator().generate(grammar).source();
+        String java17 = new EvaluatorGenerator(17).generate(grammar).source();
+        assertTrue(defaultSource.contains("return switch (node) {"));
+        assertFalse(java17.contains("switch (node)"));
+        assertEquals(1, countOccurrences(java17, "if (node instanceof TinyCalcAST.BinaryExpr n) return evalBinaryExpr(n);"));
+        assertTrue(java17.contains("throw new IllegalStateException(\"unhandled node: \" + node);"));
+        // Same dispatch order as the sealed switch.
+        StringBuilder expected = new StringBuilder();
+        for (String line : defaultSource.split("\n")) {
+            String prefix = "            case ";
+            int arrow = line.indexOf(" n -> ");
+            if (line.startsWith(prefix) && arrow > 0) {
+                String type = line.substring(prefix.length(), arrow);
+                String call = line.substring(arrow + " n -> ".length());
+                expected.append("        if (node instanceof ").append(type).append(" n) return ").append(call).append('\n');
+            }
+        }
+        assertTrue(expected.length() > 0);
+        assertTrue(java17.contains(expected.toString()));
+        assertEquals(new EvaluatorGenerator(21).generate(grammar).source(), defaultSource);
+        assertThrows(IllegalArgumentException.class, () -> new EvaluatorGenerator(11));
     }
 
     @Test

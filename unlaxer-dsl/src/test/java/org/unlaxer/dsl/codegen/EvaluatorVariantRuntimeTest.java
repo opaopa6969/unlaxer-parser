@@ -46,7 +46,7 @@ public class EvaluatorVariantRuntimeTest {
         boolean success;
         try (var manager = compiler.getStandardFileManager(diagnostics, Locale.ROOT, StandardCharsets.UTF_8)) {
             success = compiler.getTask(null, manager, diagnostics,
-                List.of("--release", "21", "-classpath", System.getProperty("java.class.path"), "-d", output.toString()),
+                List.of("--release", GeneratedJavaRelease.EVALUATOR_RELEASE_OPTION, "-classpath", System.getProperty("java.class.path"), "-d", output.toString()),
                 null, units).call();
         }
         String messages = diagnostics.getDiagnostics().stream().map(d -> d.getCode() + ": " + d.getMessage(Locale.ROOT))
@@ -55,7 +55,7 @@ public class EvaluatorVariantRuntimeTest {
     }
 
     private void run(GrammarDecl grammar, String methods, int expected) throws Exception {
-        var result = compile(grammar, new EvaluatorGenerator().generate(grammar).source(), methods);
+        var result = compile(grammar, GeneratedJavaRelease.evaluatorGenerator().generate(grammar).source(), methods);
         assertTrue(result.diagnostics(), result.success());
         try (var loader = new URLClassLoader(new URL[]{result.output().toUri().toURL()}, getClass().getClassLoader())) {
             assertEquals(expected, loader.loadClass("example.variants.Semantics").getMethod("run").invoke(null));
@@ -136,15 +136,41 @@ public class EvaluatorVariantRuntimeTest {
             """, 5);
     }
 
+    /**
+     * #311: {@code --java-release 17} cannot use a sealed pattern switch, so a stale instanceof dispatch
+     * still compiles; the unknown variant is rejected when it is evaluated. Handwritten semantics are
+     * still checked at compile time (abstract methods), on every JDK.
+     */
+    @Test public void java17StaleDispatchRejectsNewVariantAtRunTime() throws Exception {
+        GrammarDecl before = grammar("@root @mapping(Node) Root ::= First; @mapping(Node.A) First ::= 'a';");
+        GrammarDecl after = grammar("@root @mapping(Node) Root ::= First | Second; "
+            + "@mapping(Node.A) First ::= 'a'; @mapping(Node.B) Second ::= 'b';");
+        String source = new EvaluatorGenerator(17).generate(before).source();
+        assertFalse(source, source.contains("switch (node)"));
+        var stale = compile(after, source, """
+            @Override protected Integer evalNodeA(VariantAST.Node.A node) { return 1; }
+            public static int run() { return new Semantics().eval(new VariantAST.Node.B()); }
+            """);
+        assertTrue(stale.diagnostics(), stale.success());
+        try (var loader = new URLClassLoader(new URL[]{stale.output().toUri().toURL()}, getClass().getClassLoader())) {
+            var error = assertThrows(java.lang.reflect.InvocationTargetException.class,
+                () -> loader.loadClass("example.variants.Semantics").getMethod("run").invoke(null));
+            assertTrue(String.valueOf(error.getCause()), error.getCause() instanceof IllegalStateException);
+            assertTrue(error.getCause().getMessage(), error.getCause().getMessage().startsWith("unhandled node: "));
+        }
+    }
+
     @Test public void newVariantBreaksStaleDispatchAndMissingHandwrittenSemantics() throws Exception {
         GrammarDecl before = grammar("@root @mapping(Node) Root ::= First; @mapping(Node.A) First ::= 'a';");
         GrammarDecl after = grammar("@root @mapping(Node) Root ::= First | Second; "
             + "@mapping(Node.A) First ::= 'a'; @mapping(Node.B) Second ::= 'b';");
         String oldMethods = "@Override protected Integer evalNodeA(VariantAST.Node.A node) { return 1; }";
-        var stale = compile(after, new EvaluatorGenerator().generate(before).source(), null);
-        assertFalse("stale dispatch must be rejected", stale.success());
-        assertTrue(stale.diagnostics(), stale.diagnostics().contains("not.exhaustive"));
-        var missing = compile(after, new EvaluatorGenerator().generate(after).source(), oldMethods);
+        if (GeneratedJavaRelease.sealedSwitchDispatch()) {
+            var stale = compile(after, new EvaluatorGenerator().generate(before).source(), null);
+            assertFalse("stale dispatch must be rejected", stale.success());
+            assertTrue(stale.diagnostics(), stale.diagnostics().contains("not.exhaustive"));
+        }
+        var missing = compile(after, GeneratedJavaRelease.evaluatorGenerator().generate(after).source(), oldMethods);
         assertFalse("new semantics must be implemented", missing.success());
         assertTrue(missing.diagnostics(), missing.diagnostics().contains("does not override"));
         assertTrue(missing.diagnostics(), missing.diagnostics().contains("evalNodeB"));

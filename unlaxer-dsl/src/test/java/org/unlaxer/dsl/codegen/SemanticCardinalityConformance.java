@@ -232,7 +232,7 @@ final class SemanticCardinalityConformance {
 
     private URLClassLoader compileJava(org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl grammar, Path dir) throws Exception {
         var sources = new ArrayList<CodeGenerator.GeneratedSource>();
-        for (CodeGenerator generator : List.of(new ParserGenerator(), new ASTGenerator(), new MapperGenerator(), new EvaluatorGenerator())) sources.add(generator.generate(grammar));
+        for (CodeGenerator generator : List.of(new ParserGenerator(), new ASTGenerator(), new MapperGenerator(), GeneratedJavaRelease.evaluatorGenerator())) sources.add(generator.generate(grammar));
         var units = sources.stream().map(source -> new SimpleJavaFileObject(
             URI.create("string:///" + source.packageName().replace('.', '/') + "/" + source.className() + ".java"), JavaFileObject.Kind.SOURCE) {
                 @Override public CharSequence getCharContent(boolean ignored) { return source.source(); }
@@ -242,7 +242,7 @@ final class SemanticCardinalityConformance {
         Path output = Files.createDirectory(dir.resolve("java"));
         try (var manager = compiler.getStandardFileManager(diagnostics, Locale.ROOT, StandardCharsets.UTF_8)) {
             boolean compiled = compiler.getTask(null, manager, diagnostics,
-                List.of("--enable-preview", "--release", "21", "-classpath", System.getProperty("java.class.path"), "-d", output.toString()), null, units).call();
+                List.of("--release", GeneratedJavaRelease.EVALUATOR_RELEASE_OPTION, "-classpath", System.getProperty("java.class.path"), "-d", output.toString()), null, units).call();
             assertTrue(diagnostics.getDiagnostics().toString(), compiled);
         }
         return new URLClassLoader(new URL[]{output.toUri().toURL()}, getClass().getClassLoader());

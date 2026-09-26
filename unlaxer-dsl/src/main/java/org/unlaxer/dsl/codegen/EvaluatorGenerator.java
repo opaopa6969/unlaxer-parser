@@ -12,7 +12,7 @@ import java.util.Set;
 /**
  * GrammarDecl から XxxEvaluator.java を生成する。
  *
- * <p>Java 21 sealed switch で dispatch する abstract class を生成する。
+ * <p>Java 21 sealed switch（{@code --java-release 17} では instanceof 連鎖）で dispatch する abstract class を生成する。
  * DebugStrategy インターフェースと StepCounterStrategy / NOOP 実装を内包する。</p>
  *
  * <p>{@code @eval} アノテーションが付与されたルールに対しては、{@code strategy} と
@@ -20,6 +20,30 @@ import java.util.Set;
  * {@code strategy='manual'} の場合は従来どおり abstract メソッドを生成する。</p>
  */
 public class EvaluatorGenerator implements CodeGenerator {
+
+    /** Java release from which the exhaustive sealed pattern {@code switch} dispatch is emitted. */
+    static final int SEALED_SWITCH_RELEASE = 21;
+
+    private final int javaRelease;
+
+    /** Historical output: {@code evalInternal} is an exhaustive sealed pattern {@code switch} (Java 21+). */
+    public EvaluatorGenerator() {
+        this(SEALED_SWITCH_RELEASE);
+    }
+
+    /**
+     * @param javaRelease Java release the generated source targets. Below 21 (i.e. 17) the dispatch is an
+     *     {@code instanceof} chain in the same order, which compiles with {@code --release 17}; a node
+     *     type the dispatch does not know then fails at run time ({@link IllegalStateException}) instead
+     *     of at compile time ({@code not.exhaustive}). Handwritten semantics are still checked at compile
+     *     time through the generated abstract {@code evalXxx} methods (#311).
+     */
+    public EvaluatorGenerator(int javaRelease) {
+        if (javaRelease < 17) {
+            throw new IllegalArgumentException("javaRelease must be >= 17: " + javaRelease);
+        }
+        this.javaRelease = javaRelease;
+    }
 
     @Override
     public GeneratedSource generate(GrammarDecl grammar) {
@@ -70,16 +94,27 @@ public class EvaluatorGenerator implements CodeGenerator {
             sb.append("        throw new UnsupportedOperationException(\"No mapping classes for evaluation\");\n");
             sb.append("    }\n\n");
         } else {
-            // evalInternal（sealed switch dispatch）
+            // evalInternal: Java 21+ は網羅性をコンパイラが検査する sealed switch（従来出力）。
+            // --java-release 17 では switch のパターンマッチが使えないため instanceof 連鎖 (#311)。
             sb.append("    private T evalInternal(").append(astClass).append(" node) {\n");
-            sb.append("        return switch (node) {\n");
+            boolean sealedSwitch = javaRelease >= SEALED_SWITCH_RELEASE;
+            if (sealedSwitch) sb.append("        return switch (node) {\n");
             for (String name : mappedRules.keySet()) {
                 if (sumTypes.contains(name)) continue;
                 String methodName = "eval" + MapperElementUtil.methodNameFor(name);
-                sb.append("            case ").append(astClass).append(".").append(name)
-                  .append(" n -> ").append(methodName).append("(n);\n");
+                if (sealedSwitch) {
+                    sb.append("            case ").append(astClass).append(".").append(name)
+                      .append(" n -> ").append(methodName).append("(n);\n");
+                } else {
+                    sb.append("        if (node instanceof ").append(astClass).append(".").append(name)
+                      .append(" n) return ").append(methodName).append("(n);\n");
+                }
             }
-            sb.append("        };\n");
+            if (sealedSwitch) {
+                sb.append("        };\n");
+            } else {
+                sb.append("        throw new IllegalStateException(\"unhandled node: \" + node);\n");
+            }
             sb.append("    }\n\n");
 
             // メソッド群（abstract or concrete）

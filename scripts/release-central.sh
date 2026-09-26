@@ -123,4 +123,4 @@ else
 fi
 
 echo "Publishing org.unlaxer unlaxer-parser reactor version $version"
-mvn "${mvn_settings[@]}" -B -pl .,unlaxer-common,unlaxer-dsl clean deploy -DskipPublishing=false
+mvn "${mvn_settings[@]}" -B -pl .,unlaxer-common,unlaxer-dsl,unlaxer-common-jdk17,unlaxer-dsl-jdk17 clean deploy -DskipPublishing=false

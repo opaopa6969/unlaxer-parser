@@ -143,19 +143,32 @@ public final class UBNFToBNFConverter {
         ConversionContext context
     ) {
         String name = token.name();
-        String tokenValue = switch (token) {
-            case UBNFAST.TokenDecl.Simple s              -> s.parserClass();
-            case UBNFAST.TokenDecl.Until u               -> "UNTIL('" + u.terminator() + "')";
-            case UBNFAST.TokenDecl.Negation n            -> "NEGATION('" + n.excludedChars() + "')";
-            case UBNFAST.TokenDecl.Lookahead la          -> "LOOKAHEAD('" + la.pattern() + "')";
-            case UBNFAST.TokenDecl.NegativeLookahead nla -> "NEGATIVE_LOOKAHEAD('" + nla.pattern() + "')";
-            case UBNFAST.TokenDecl.Any a                 -> "ANY";
-            case UBNFAST.TokenDecl.Eof e                 -> "EOF";
-            case UBNFAST.TokenDecl.Empty em              -> "EMPTY";
-            case UBNFAST.TokenDecl.CharRange cr          -> "CHAR_RANGE('" + cr.min() + "','" + cr.max() + "')";
-            case UBNFAST.TokenDecl.CaseInsensitive ci    -> "CI('" + ci.word() + "')";
-            case UBNFAST.TokenDecl.Regex rx              -> "REGEX('" + rx.pattern() + "')";
-        };
+        final String tokenValue;
+        if (token instanceof UBNFAST.TokenDecl.Simple s) {
+            tokenValue = s.parserClass();
+        } else if (token instanceof UBNFAST.TokenDecl.Until u) {
+            tokenValue = "UNTIL('" + u.terminator() + "')";
+        } else if (token instanceof UBNFAST.TokenDecl.Negation n) {
+            tokenValue = "NEGATION('" + n.excludedChars() + "')";
+        } else if (token instanceof UBNFAST.TokenDecl.Lookahead la) {
+            tokenValue = "LOOKAHEAD('" + la.pattern() + "')";
+        } else if (token instanceof UBNFAST.TokenDecl.NegativeLookahead nla) {
+            tokenValue = "NEGATIVE_LOOKAHEAD('" + nla.pattern() + "')";
+        } else if (token instanceof UBNFAST.TokenDecl.Any a) {
+            tokenValue = "ANY";
+        } else if (token instanceof UBNFAST.TokenDecl.Eof e) {
+            tokenValue = "EOF";
+        } else if (token instanceof UBNFAST.TokenDecl.Empty em) {
+            tokenValue = "EMPTY";
+        } else if (token instanceof UBNFAST.TokenDecl.CharRange cr) {
+            tokenValue = "CHAR_RANGE('" + cr.min() + "','" + cr.max() + "')";
+        } else if (token instanceof UBNFAST.TokenDecl.CaseInsensitive ci) {
+            tokenValue = "CI('" + ci.word() + "')";
+        } else if (token instanceof UBNFAST.TokenDecl.Regex rx) {
+            tokenValue = "REGEX('" + rx.pattern() + "')";
+        } else {
+            throw new IllegalStateException("unhandled " + token);
+        }
 
         builder.append("(* token: ");
         builder.append(name);

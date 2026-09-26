@@ -429,7 +429,7 @@ public class ParseEqualityGoldenTest {
         var output = temporary.newFolder(label).toPath();
         try (var manager = compiler.getStandardFileManager(diagnostics, null, null)) {
             boolean success = compiler.getTask(null, manager, diagnostics,
-                List.of("--enable-preview", "--release", "21",
+                List.of("--release", "17",
                     "-classpath", System.getProperty("java.class.path"), "-d", output.toString()),
                 null, units).call();
             assertTrue(label + ": " + diagnostics.getDiagnostics(), success);

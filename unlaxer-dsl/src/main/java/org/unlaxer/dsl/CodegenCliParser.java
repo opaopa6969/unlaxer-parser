@@ -13,6 +13,14 @@ final class CodegenCliParser {
 
     static final int DEFAULT_REPORT_VERSION = 1;
 
+    /**
+     * Java release the generated Java sources target. 21 (default) keeps the historical output
+     * (the Evaluator dispatches with an exhaustive sealed {@code switch}); 17 makes every
+     * generator emit sources that compile with {@code --release 17} (#311).
+     */
+    static final int DEFAULT_JAVA_RELEASE = 21;
+    static final int MIN_JAVA_RELEASE = 17;
+
     static CliOptions parse(String[] args) throws UsageException {
         String grammarFile = null;
         String outputDir = null;
@@ -35,6 +43,7 @@ final class CodegenCliParser {
         String overwrite = "always";
         String failOn = "conflict";
         int failOnWarningsThreshold = -1;
+        int javaRelease = DEFAULT_JAVA_RELEASE;
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
@@ -172,6 +181,26 @@ final class CodegenCliParser {
                         );
                     }
                 }
+                case "--java-release" -> {
+                    if (i + 1 >= args.length) {
+                        throw new UsageException("Missing value for --java-release", true);
+                    }
+                    String raw = args[++i].trim();
+                    try {
+                        javaRelease = Integer.parseInt(raw);
+                    } catch (NumberFormatException e) {
+                        throw new UsageException(
+                            "Unsupported --java-release: " + raw + "\nAllowed values: an integer >= " + MIN_JAVA_RELEASE,
+                            false
+                        );
+                    }
+                    if (javaRelease < MIN_JAVA_RELEASE) {
+                        throw new UsageException(
+                            "Unsupported --java-release: " + javaRelease + "\nAllowed values: an integer >= " + MIN_JAVA_RELEASE,
+                            false
+                        );
+                    }
+                }
                 case "--manifest-format" -> {
                     if (i + 1 >= args.length) {
                         throw new UsageException("Missing value for --manifest-format", true);
@@ -210,7 +239,8 @@ final class CodegenCliParser {
                 warningsAsJson,
                 overwrite,
                 failOn,
-                failOnWarningsThreshold
+                failOnWarningsThreshold,
+                javaRelease
             );
         }
 
@@ -242,7 +272,8 @@ final class CodegenCliParser {
                 warningsAsJson,
                 overwrite,
                 failOn,
-                failOnWarningsThreshold
+                failOnWarningsThreshold,
+                javaRelease
             );
         }
 
@@ -274,7 +305,8 @@ final class CodegenCliParser {
                 warningsAsJson,
                 overwrite,
                 failOn,
-                failOnWarningsThreshold
+                failOnWarningsThreshold,
+                javaRelease
             );
         }
 
@@ -303,7 +335,8 @@ final class CodegenCliParser {
             warningsAsJson,
             overwrite,
             failOn,
-            failOnWarningsThreshold
+            failOnWarningsThreshold,
+            javaRelease
         );
     }
 
@@ -328,8 +361,39 @@ final class CodegenCliParser {
         boolean warningsAsJson,
         String overwrite,
         String failOn,
-        int failOnWarningsThreshold
-    ) {}
+        int failOnWarningsThreshold,
+        int javaRelease
+    ) {
+        /** Pre-#311 arity: generated Java targets the default release. */
+        CliOptions(
+            String grammarFile,
+            String outputDir,
+            List<String> generators,
+            boolean validateOnly,
+            boolean dryRun,
+            boolean cleanOutput,
+            boolean strict,
+            boolean help,
+            boolean version,
+            String reportFormat,
+            String reportFile,
+            String outputManifest,
+            String validateParserIrFile,
+            String exportParserIrFile,
+            String manifestFormat,
+            int reportVersion,
+            boolean reportSchemaCheck,
+            boolean warningsAsJson,
+            String overwrite,
+            String failOn,
+            int failOnWarningsThreshold
+        ) {
+            this(grammarFile, outputDir, generators, validateOnly, dryRun, cleanOutput, strict, help, version,
+                reportFormat, reportFile, outputManifest, validateParserIrFile, exportParserIrFile, manifestFormat,
+                reportVersion, reportSchemaCheck, warningsAsJson, overwrite, failOn, failOnWarningsThreshold,
+                DEFAULT_JAVA_RELEASE);
+        }
+    }
 
     static final class UsageException extends Exception {
         private final boolean showUsage;

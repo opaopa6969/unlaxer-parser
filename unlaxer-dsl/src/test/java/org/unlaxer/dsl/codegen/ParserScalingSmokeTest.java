@@ -193,7 +193,7 @@ public class ParserScalingSmokeTest {
             threads instanceof com.sun.management.ThreadMXBean);
         var sunThreads = (com.sun.management.ThreadMXBean) threads;
         Assume.assumeTrue("スレッド割当計測が無効", sunThreads.isThreadAllocatedMemoryEnabled());
-        long id = Thread.currentThread().threadId();
+        long id = Thread.currentThread().getId(); // threadId() は Java 19+
 
         // 割当は負荷に依らないが、初回は classload とキャッシュ充填が混ざる。
         parseOnce(root, input, memoization);
@@ -245,7 +245,7 @@ public class ParserScalingSmokeTest {
         var output = temporary.newFolder().toPath();
         try (var manager = compiler.getStandardFileManager(diagnostics, null, null)) {
             boolean success = compiler.getTask(null, manager, diagnostics,
-                List.of("--enable-preview", "--release", "21",
+                List.of("--release", "17",
                     "-classpath", System.getProperty("java.class.path"), "-d", output.toString()),
                 null, units).call();
             assertTrue(diagnostics.getDiagnostics().toString(), success);

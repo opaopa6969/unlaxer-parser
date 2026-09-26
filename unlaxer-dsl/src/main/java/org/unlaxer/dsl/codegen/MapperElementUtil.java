@@ -191,142 +191,175 @@ class MapperElementUtil {
     }
 
     private static void collectRuleRefsFromBody(RuleBody body, List<RuleRefElement> refs) {
-        switch (body) {
-            case ChoiceBody choice -> choice.alternatives().forEach(seq -> collectRuleRefsFromBody(seq, refs));
-            case SequenceBody seq -> seq.elements().forEach(e -> collectRuleRefsFromElement(e.element(), refs));
+        if (body instanceof ChoiceBody choice) {
+            choice.alternatives().forEach(seq -> collectRuleRefsFromBody(seq, refs));
+        } else if (body instanceof SequenceBody seq) {
+            seq.elements().forEach(e -> collectRuleRefsFromElement(e.element(), refs));
+        } else {
+            throw new IllegalStateException("unhandled " + body);
         }
     }
 
     private static void collectRuleRefsFromElement(AtomicElement element, List<RuleRefElement> refs) {
-        switch (element) {
-            case RuleRefElement ref -> refs.add(ref);
-            case GroupElement g -> collectRuleRefsFromBody(g.body(), refs);
-            case OptionalElement o -> collectRuleRefsFromBody(o.body(), refs);
-            case RepeatElement r -> collectRuleRefsFromBody(r.body(), refs);
-            case UBNFAST.OneOrMoreElement one -> collectRuleRefsFromElement(one.body(), refs);
-            case UBNFAST.BoundedRepeatElement b -> collectRuleRefsFromElement(b.body(), refs);
-            case UBNFAST.SeparatedElement s -> {
-                collectRuleRefsFromElement(s.element(), refs);
-                collectRuleRefsFromElement(s.separator(), refs);
-            }
-            default -> { }
+        if (element instanceof RuleRefElement ref) {
+            refs.add(ref);
+        } else if (element instanceof GroupElement g) {
+            collectRuleRefsFromBody(g.body(), refs);
+        } else if (element instanceof OptionalElement o) {
+            collectRuleRefsFromBody(o.body(), refs);
+        } else if (element instanceof RepeatElement r) {
+            collectRuleRefsFromBody(r.body(), refs);
+        } else if (element instanceof UBNFAST.OneOrMoreElement one) {
+            collectRuleRefsFromElement(one.body(), refs);
+        } else if (element instanceof UBNFAST.BoundedRepeatElement b) {
+            collectRuleRefsFromElement(b.body(), refs);
+        } else if (element instanceof UBNFAST.SeparatedElement s) {
+            collectRuleRefsFromElement(s.element(), refs);
+            collectRuleRefsFromElement(s.separator(), refs);
+        } else {
+
         }
     }
 
     static Optional<SequenceBody> firstSequence(RuleBody body) {
-        return switch (body) {
-            case SequenceBody sequenceBody -> Optional.of(sequenceBody);
-            case ChoiceBody choiceBody -> choiceBody.alternatives().stream().findFirst();
-        };
+        if (body instanceof SequenceBody sequenceBody) {
+            return Optional.of(sequenceBody);
+        }
+        if (body instanceof ChoiceBody choiceBody) {
+            return choiceBody.alternatives().stream().findFirst();
+        }
+        throw new IllegalStateException("unhandled " + body);
     }
 
     static Optional<AtomicElement> findCapturedElement(RuleBody body, String captureName) {
-        return switch (body) {
-            case ChoiceBody choiceBody -> choiceBody.alternatives().stream()
+        if (body instanceof ChoiceBody choiceBody) {
+            return choiceBody.alternatives().stream()
                 .flatMap(alt -> findCapturedElement(alt, captureName).stream())
                 .findFirst();
-            case SequenceBody sequenceBody -> {
-                for (AnnotatedElement element : sequenceBody.elements()) {
-                    if (element.captureName().isPresent() && captureName.equals(element.captureName().get())) {
-                        yield Optional.of(element.element());
-                    }
-                    Optional<AtomicElement> nested = findCapturedElementInAtomic(element.element(), captureName);
-                    if (nested.isPresent()) {
-                        yield nested;
-                    }
+        }
+        if (body instanceof SequenceBody sequenceBody) {
+            for (AnnotatedElement element : sequenceBody.elements()) {
+                if (element.captureName().isPresent() && captureName.equals(element.captureName().get())) {
+                    return Optional.of(element.element());
                 }
-                yield Optional.empty();
+                Optional<AtomicElement> nested = findCapturedElementInAtomic(element.element(), captureName);
+                if (nested.isPresent()) {
+                    return nested;
+                }
             }
-        };
+            return Optional.empty();
+        }
+        throw new IllegalStateException("unhandled " + body);
     }
 
     static Optional<AtomicElement> findCapturedElementInAtomic(AtomicElement element, String captureName) {
-        return switch (element) {
-            case GroupElement groupElement -> findCapturedElement(groupElement.body(), captureName);
-            case OptionalElement optionalElement -> findCapturedElement(optionalElement.body(), captureName);
-            case RepeatElement repeatElement -> findCapturedElement(repeatElement.body(), captureName);
-            case UBNFAST.OneOrMoreElement one -> findCapturedElementInAtomic(one.body(), captureName);
-            case UBNFAST.BoundedRepeatElement bounded -> findCapturedElementInAtomic(bounded.body(), captureName);
-            case UBNFAST.SeparatedElement separated -> findCapturedElementInAtomic(separated.element(), captureName);
-            default -> Optional.empty();
-        };
+        if (element instanceof GroupElement groupElement) {
+            return findCapturedElement(groupElement.body(), captureName);
+        }
+        if (element instanceof OptionalElement optionalElement) {
+            return findCapturedElement(optionalElement.body(), captureName);
+        }
+        if (element instanceof RepeatElement repeatElement) {
+            return findCapturedElement(repeatElement.body(), captureName);
+        }
+        if (element instanceof UBNFAST.OneOrMoreElement one) {
+            return findCapturedElementInAtomic(one.body(), captureName);
+        }
+        if (element instanceof UBNFAST.BoundedRepeatElement bounded) {
+            return findCapturedElementInAtomic(bounded.body(), captureName);
+        }
+        if (element instanceof UBNFAST.SeparatedElement separated) {
+            return findCapturedElementInAtomic(separated.element(), captureName);
+        }
+        return Optional.empty();
     }
 
     static List<AtomicElement> findCapturedElements(RuleBody body, String captureName) {
-        return switch (body) {
-            case ChoiceBody choiceBody -> choiceBody.alternatives().stream()
+        if (body instanceof ChoiceBody choiceBody) {
+            return choiceBody.alternatives().stream()
                 .flatMap(alt -> findCapturedElements(alt, captureName).stream())
                 .toList();
-            case SequenceBody sequenceBody -> {
-                List<AtomicElement> elements = new ArrayList<>();
-                for (AnnotatedElement element : sequenceBody.elements()) {
-                    if (element.captureName().isPresent() && captureName.equals(element.captureName().get())) {
-                        elements.add(element.element());
-                    }
-                    elements.addAll(findCapturedElementsInAtomic(element.element(), captureName));
+        }
+        if (body instanceof SequenceBody sequenceBody) {
+            List<AtomicElement> elements = new ArrayList<>();
+            for (AnnotatedElement element : sequenceBody.elements()) {
+                if (element.captureName().isPresent() && captureName.equals(element.captureName().get())) {
+                    elements.add(element.element());
                 }
-                yield elements;
+                elements.addAll(findCapturedElementsInAtomic(element.element(), captureName));
             }
-        };
+            return elements;
+        }
+        throw new IllegalStateException("unhandled " + body);
     }
 
     static List<AtomicElement> findCapturedElementsInAtomic(AtomicElement element, String captureName) {
-        return switch (element) {
-            case GroupElement groupElement -> findCapturedElements(groupElement.body(), captureName);
-            case OptionalElement optionalElement -> findCapturedElements(optionalElement.body(), captureName);
-            case RepeatElement repeatElement -> findCapturedElements(repeatElement.body(), captureName);
-            case UBNFAST.OneOrMoreElement one -> findCapturedElementsInAtomic(one.body(), captureName);
-            case UBNFAST.BoundedRepeatElement bounded -> findCapturedElementsInAtomic(bounded.body(), captureName);
-            case UBNFAST.SeparatedElement separated -> findCapturedElementsInAtomic(separated.element(), captureName);
-            default -> List.of();
-        };
+        if (element instanceof GroupElement groupElement) {
+            return findCapturedElements(groupElement.body(), captureName);
+        }
+        if (element instanceof OptionalElement optionalElement) {
+            return findCapturedElements(optionalElement.body(), captureName);
+        }
+        if (element instanceof RepeatElement repeatElement) {
+            return findCapturedElements(repeatElement.body(), captureName);
+        }
+        if (element instanceof UBNFAST.OneOrMoreElement one) {
+            return findCapturedElementsInAtomic(one.body(), captureName);
+        }
+        if (element instanceof UBNFAST.BoundedRepeatElement bounded) {
+            return findCapturedElementsInAtomic(bounded.body(), captureName);
+        }
+        if (element instanceof UBNFAST.SeparatedElement separated) {
+            return findCapturedElementsInAtomic(separated.element(), captureName);
+        }
+        return List.of();
     }
 
     static Optional<String> parserClassLiteral(AtomicElement element, String parsersClass,
         Map<String, TokenDecl> tokenDeclByName, Map<String, RuleDecl> ruleByName) {
 
-        return switch (element) {
-            case RuleRefElement ruleRefElement -> {
-                if (ruleByName.containsKey(ruleRefElement.name())) {
-                    yield Optional.of(parsersClass + "." + ruleRefElement.name() + "Parser.class");
-                }
-                if (tokenDeclByName.containsKey(ruleRefElement.name())) {
-                    TokenDecl tokenDecl = tokenDeclByName.get(ruleRefElement.name());
-                    if (tokenDecl instanceof TokenDecl.Simple simple) {
-                        String parserClass = simple.parserClass();
-                        String simpleName = parserClass.substring(parserClass.lastIndexOf('.') + 1);
-                        if ("NumberParser".equals(simpleName) || "DigitParser".equals(simpleName)) {
-                            if (parserClass.contains(".")) {
-                                yield Optional.of(parsersClass + "." + ParserCodegenUtil.toParserClassName(ruleRefElement.name()) + ".class");
-                            }
-                            String prefix = "NumberParser".equals(simpleName)
-                                ? "org.unlaxer.parser.elementary." : "org.unlaxer.parser.posix.";
-                            yield Optional.of(prefix + simpleName + ".class");
-                        }
-                    }
-                    if (isIdentifierToken(tokenDecl)) {
-                        // Mirror ParserRuleEmitter.resolveParserClass exactly so the mapper
-                        // references the SAME class the parser put in the tree (findDescendants
-                        // matches by exact getClass()). A fully-qualified token parser is wrapped
-                        // in a generated subclass (ParserTokenEmitter, "Plan S: findDescendants
-                        // 互換"); a short-named one is referenced directly via the parser's import.
-                        // Previously this always emitted the base clang class, so for FQN tokens
-                        // the capture (VariableRef @name, import @alias/@method) silently resolved
-                        // to empty and only the source-snippet shadow recovered it.
-                        // (tinyexpression #32: empty VariableRefExpr.name on the pure AST path)
-                        String parserClass = tokenDecl.parserClass();
-                        if (parserClass != null && parserClass.contains(".")) {
-                            yield Optional.of(parsersClass + "." + ParserCodegenUtil.toParserClassName(ruleRefElement.name()) + ".class");
-                        }
-                        yield Optional.of("org.unlaxer.parser.clang.IdentifierParser.class");
-                    }
-                    yield Optional.empty();
-                }
-                yield Optional.empty();
+        if (element instanceof RuleRefElement ruleRefElement) {
+            if (ruleByName.containsKey(ruleRefElement.name())) {
+                return Optional.of(parsersClass + "." + ruleRefElement.name() + "Parser.class");
             }
-            case TerminalElement ignored -> Optional.of("org.unlaxer.parser.elementary.WordParser.class");
-            default -> Optional.empty();
-        };
+            if (tokenDeclByName.containsKey(ruleRefElement.name())) {
+                TokenDecl tokenDecl = tokenDeclByName.get(ruleRefElement.name());
+                if (tokenDecl instanceof TokenDecl.Simple simple) {
+                    String parserClass = simple.parserClass();
+                    String simpleName = parserClass.substring(parserClass.lastIndexOf('.') + 1);
+                    if ("NumberParser".equals(simpleName) || "DigitParser".equals(simpleName)) {
+                        if (parserClass.contains(".")) {
+                            return Optional.of(parsersClass + "." + ParserCodegenUtil.toParserClassName(ruleRefElement.name()) + ".class");
+                        }
+                        String prefix = "NumberParser".equals(simpleName)
+                            ? "org.unlaxer.parser.elementary." : "org.unlaxer.parser.posix.";
+                        return Optional.of(prefix + simpleName + ".class");
+                    }
+                }
+                if (isIdentifierToken(tokenDecl)) {
+                    // Mirror ParserRuleEmitter.resolveParserClass exactly so the mapper
+                    // references the SAME class the parser put in the tree (findDescendants
+                    // matches by exact getClass()). A fully-qualified token parser is wrapped
+                    // in a generated subclass (ParserTokenEmitter, "Plan S: findDescendants
+                    // 互換"); a short-named one is referenced directly via the parser's import.
+                    // Previously this always emitted the base clang class, so for FQN tokens
+                    // the capture (VariableRef @name, import @alias/@method) silently resolved
+                    // to empty and only the source-snippet shadow recovered it.
+                    // (tinyexpression #32: empty VariableRefExpr.name on the pure AST path)
+                    String parserClass = tokenDecl.parserClass();
+                    if (parserClass != null && parserClass.contains(".")) {
+                        return Optional.of(parsersClass + "." + ParserCodegenUtil.toParserClassName(ruleRefElement.name()) + ".class");
+                    }
+                    return Optional.of("org.unlaxer.parser.clang.IdentifierParser.class");
+                }
+                return Optional.empty();
+            }
+            return Optional.empty();
+        }
+        if (element instanceof TerminalElement ignored) {
+            return Optional.of("org.unlaxer.parser.elementary.WordParser.class");
+        }
+        return Optional.empty();
     }
 
     /**
@@ -461,11 +494,14 @@ class MapperElementUtil {
     static boolean usesBoundTextCapture(AtomicElement element, Map<String, RuleDecl> ruleByName,
             Map<String, TokenDecl> tokenDeclByName) {
         Object value = captureValueShape(element);
-        RuleBody body = switch (value) {
-            case GroupElement group -> group.body();
-            case RuleBody compound -> compound;
-            default -> null;
-        };
+        final RuleBody body;
+        if (value instanceof GroupElement group) {
+            body = group.body();
+        } else if (value instanceof RuleBody compound) {
+            body = compound;
+        } else {
+            body = null;
+        }
         if (body == null) return false;
         var visited = new java.util.HashSet<String>();
         return collectRuleRefs(body).stream().noneMatch(ref ->
@@ -474,14 +510,22 @@ class MapperElementUtil {
 
     // Mirrors CaptureBindingPlan.bindValues: unwrap cardinality, but not a source group.
     private static Object captureValueShape(AtomicElement element) {
-        return switch (element) {
-            case OptionalElement optional -> captureValueShape(optional.body());
-            case RepeatElement repeat -> captureValueShape(repeat.body());
-            case UBNFAST.OneOrMoreElement repeat -> captureValueShape(repeat.body());
-            case UBNFAST.BoundedRepeatElement repeat -> captureValueShape(repeat.body());
-            case UBNFAST.SeparatedElement separated -> captureValueShape(separated.element());
-            default -> element;
-        };
+        if (element instanceof OptionalElement optional) {
+            return captureValueShape(optional.body());
+        }
+        if (element instanceof RepeatElement repeat) {
+            return captureValueShape(repeat.body());
+        }
+        if (element instanceof UBNFAST.OneOrMoreElement repeat) {
+            return captureValueShape(repeat.body());
+        }
+        if (element instanceof UBNFAST.BoundedRepeatElement repeat) {
+            return captureValueShape(repeat.body());
+        }
+        if (element instanceof UBNFAST.SeparatedElement separated) {
+            return captureValueShape(separated.element());
+        }
+        return element;
     }
 
     private static Object captureValueShape(RuleBody body) {
@@ -506,27 +550,40 @@ class MapperElementUtil {
     }
 
     static Optional<AtomicElement> normalizeCapturedElement(AtomicElement element) {
-        return switch (element) {
-            case GroupElement groupElement -> firstAtomicElement(groupElement.body());
-            case OptionalElement optionalElement -> firstAtomicElement(optionalElement.body());
-            case RepeatElement repeatElement -> firstAtomicElement(repeatElement.body());
-            case UBNFAST.OneOrMoreElement one -> normalizeCapturedElement(one.body());
-            case UBNFAST.BoundedRepeatElement bounded -> normalizeCapturedElement(bounded.body());
-            case UBNFAST.SeparatedElement separated -> normalizeCapturedElement(separated.element());
-            default -> Optional.of(element);
-        };
+        if (element instanceof GroupElement groupElement) {
+            return firstAtomicElement(groupElement.body());
+        }
+        if (element instanceof OptionalElement optionalElement) {
+            return firstAtomicElement(optionalElement.body());
+        }
+        if (element instanceof RepeatElement repeatElement) {
+            return firstAtomicElement(repeatElement.body());
+        }
+        if (element instanceof UBNFAST.OneOrMoreElement one) {
+            return normalizeCapturedElement(one.body());
+        }
+        if (element instanceof UBNFAST.BoundedRepeatElement bounded) {
+            return normalizeCapturedElement(bounded.body());
+        }
+        if (element instanceof UBNFAST.SeparatedElement separated) {
+            return normalizeCapturedElement(separated.element());
+        }
+        return Optional.of(element);
     }
 
     static Optional<AtomicElement> firstAtomicElement(RuleBody body) {
-        return switch (body) {
-            case SequenceBody sequenceBody -> sequenceBody.elements().stream()
+        if (body instanceof SequenceBody sequenceBody) {
+            return sequenceBody.elements().stream()
                 .findFirst()
                 .map(AnnotatedElement::element)
                 .flatMap(MapperElementUtil::normalizeCapturedElement);
-            case ChoiceBody choiceBody -> choiceBody.alternatives().stream()
+        }
+        if (body instanceof ChoiceBody choiceBody) {
+            return choiceBody.alternatives().stream()
                 .findFirst()
                 .flatMap(MapperElementUtil::firstAtomicElement);
-        };
+        }
+        throw new IllegalStateException("unhandled " + body);
     }
 
     static String safeName(String name) {
@@ -548,13 +605,14 @@ class MapperElementUtil {
     }
 
     static void collectTypeofConstraintsFromBody(RuleBody body, Map<String, String> result) {
-        switch (body) {
-            case ChoiceBody choiceBody -> {
-                for (SequenceBody seq : choiceBody.alternatives()) {
-                    collectTypeofConstraintsFromSequence(seq, result);
-                }
+        if (body instanceof ChoiceBody choiceBody) {
+            for (SequenceBody seq : choiceBody.alternatives()) {
+                collectTypeofConstraintsFromSequence(seq, result);
             }
-            case SequenceBody seq -> collectTypeofConstraintsFromSequence(seq, result);
+        } else if (body instanceof SequenceBody seq) {
+            collectTypeofConstraintsFromSequence(seq, result);
+        } else {
+            throw new IllegalStateException("unhandled " + body);
         }
     }
 
@@ -564,11 +622,15 @@ class MapperElementUtil {
                 TypeofElement te = ae.typeofConstraint().get();
                 result.put(ae.captureName().get(), te.captureName());
             } else {
-                switch (ae.element()) {
-                    case GroupElement g -> collectTypeofConstraintsFromBody(g.body(), result);
-                    case OptionalElement o -> collectTypeofConstraintsFromBody(o.body(), result);
-                    case RepeatElement r -> collectTypeofConstraintsFromBody(r.body(), result);
-                    default -> {}
+                var switchSubject = ae.element();
+                if (switchSubject instanceof GroupElement g) {
+                    collectTypeofConstraintsFromBody(g.body(), result);
+                } else if (switchSubject instanceof OptionalElement o) {
+                    collectTypeofConstraintsFromBody(o.body(), result);
+                } else if (switchSubject instanceof RepeatElement r) {
+                    collectTypeofConstraintsFromBody(r.body(), result);
+                } else {
+
                 }
             }
         }

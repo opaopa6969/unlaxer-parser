@@ -353,19 +353,22 @@ public class ASTGenerator implements CodeGenerator {
     }
 
     private List<String> collectTerminalLiterals(UBNFAST.RuleBody body) {
-        return switch (body) {
-            case UBNFAST.ChoiceBody choice -> choice.alternatives().stream()
+        if (body instanceof UBNFAST.ChoiceBody choice) {
+            return choice.alternatives().stream()
                 .flatMap(seq -> seq.elements().stream())
                 .map(ae -> ae.element())
                 .filter(e -> e instanceof UBNFAST.TerminalElement)
                 .map(e -> ((UBNFAST.TerminalElement) e).value())
                 .toList();
-            case UBNFAST.SequenceBody seq -> seq.elements().stream()
+        }
+        if (body instanceof UBNFAST.SequenceBody seq) {
+            return seq.elements().stream()
                 .map(ae -> ae.element())
                 .filter(e -> e instanceof UBNFAST.TerminalElement)
                 .map(e -> ((UBNFAST.TerminalElement) e).value())
                 .toList();
-        };
+        }
+        throw new IllegalStateException("unhandled " + body);
     }
 
     private String inferCommonFieldType(GrammarDecl grammar, String sealedName,
@@ -477,46 +480,51 @@ public class ASTGenerator implements CodeGenerator {
 
     private String inferTypeFromElement(GrammarDecl grammar, AtomicElement element) {
         String astClassName = grammar.name() + "AST";
-        return switch (element) {
-            case TerminalElement t -> "String";
-            case RuleRefElement r -> {
-                Optional<MappingAnnotation> mapping = findMappingForRule(grammar, r.name());
-                if (mapping.isPresent()) {
-                    yield astClassName + "." + mapping.get().className();
-                }
-                String tokenType = MapperTypeResolver.inferTypeFromTokenName(grammar, r.name());
-                if (tokenType != null) {
-                    yield tokenType;
-                }
-                // 透過 mapped choice（異種選択肢）は単一スカラーに収束しない → Object
-                if (MapperTypeResolver.isTransparentMappedChoice(grammar, r.name())) {
-                    yield "Object";
-                }
-                yield "String";
+        if (element instanceof TerminalElement t) {
+            return "String";
+        }
+        if (element instanceof RuleRefElement r) {
+            Optional<MappingAnnotation> mapping = findMappingForRule(grammar, r.name());
+            if (mapping.isPresent()) {
+                return astClassName + "." + mapping.get().className();
             }
-            case RepeatElement rep -> {
-                String inner = inferTypeFromBody(grammar, rep.body());
-                yield "List<" + MapperTypeResolver.boxedType(inner) + ">";
+            String tokenType = MapperTypeResolver.inferTypeFromTokenName(grammar, r.name());
+            if (tokenType != null) {
+                return tokenType;
             }
-            case OneOrMoreElement one -> {
-                String inner = inferTypeFromElement(grammar, one.body());
-                yield "List<" + MapperTypeResolver.boxedType(inner) + ">";
+            // 透過 mapped choice（異種選択肢）は単一スカラーに収束しない → Object
+            if (MapperTypeResolver.isTransparentMappedChoice(grammar, r.name())) {
+                return "Object";
             }
-            case BoundedRepeatElement bounded -> {
-                String inner = inferTypeFromElement(grammar, bounded.body());
-                yield "List<" + MapperTypeResolver.boxedType(inner) + ">";
-            }
-            case OptionalElement opt -> {
-                String inner = inferTypeFromBody(grammar, opt.body());
-                yield "Optional<" + MapperTypeResolver.boxedType(inner) + ">";
-            }
-            case SeparatedElement sep -> {
-                String inner = inferTypeFromElement(grammar, sep.element());
-                yield "List<" + MapperTypeResolver.boxedType(inner) + ">";
-            }
-            case GroupElement g -> "Object";
-            case ErrorElement e -> "Object";
-        };
+            return "String";
+        }
+        if (element instanceof RepeatElement rep) {
+            String inner = inferTypeFromBody(grammar, rep.body());
+            return "List<" + MapperTypeResolver.boxedType(inner) + ">";
+        }
+        if (element instanceof OneOrMoreElement one) {
+            String inner = inferTypeFromElement(grammar, one.body());
+            return "List<" + MapperTypeResolver.boxedType(inner) + ">";
+        }
+        if (element instanceof BoundedRepeatElement bounded) {
+            String inner = inferTypeFromElement(grammar, bounded.body());
+            return "List<" + MapperTypeResolver.boxedType(inner) + ">";
+        }
+        if (element instanceof OptionalElement opt) {
+            String inner = inferTypeFromBody(grammar, opt.body());
+            return "Optional<" + MapperTypeResolver.boxedType(inner) + ">";
+        }
+        if (element instanceof SeparatedElement sep) {
+            String inner = inferTypeFromElement(grammar, sep.element());
+            return "List<" + MapperTypeResolver.boxedType(inner) + ">";
+        }
+        if (element instanceof GroupElement g) {
+            return "Object";
+        }
+        if (element instanceof ErrorElement e) {
+            return "Object";
+        }
+        throw new IllegalStateException("unhandled " + element);
     }
 
     private String inferTypeFromBody(GrammarDecl grammar, RuleBody body) {
@@ -529,14 +537,14 @@ public class ASTGenerator implements CodeGenerator {
     }
 
     private AnnotatedElement getSingleElement(RuleBody body) {
-        return switch (body) {
-            case SequenceBody seq when seq.elements().size() == 1 -> seq.elements().get(0);
-            case ChoiceBody choice when choice.alternatives().size() == 1 -> {
-                SequenceBody seq = choice.alternatives().get(0);
-                yield seq.elements().size() == 1 ? seq.elements().get(0) : null;
-            }
-            default -> null;
-        };
+        if (body instanceof SequenceBody seq && seq.elements().size() == 1) {
+            return seq.elements().get(0);
+        }
+        if (body instanceof ChoiceBody choice && choice.alternatives().size() == 1) {
+            SequenceBody seq = choice.alternatives().get(0);
+            return seq.elements().size() == 1 ? seq.elements().get(0) : null;
+        }
+        return null;
     }
 
     private Optional<MappingAnnotation> findMappingForRule(GrammarDecl grammar, String ruleName) {
@@ -562,12 +570,15 @@ public class ASTGenerator implements CodeGenerator {
 
     private List<CaptureResult> findCapturedElementsInBody(
             RuleBody body, String captureName, boolean inOptional, boolean inRepeat) {
-        return switch (body) {
-            case ChoiceBody choice -> choice.alternatives().stream()
+        if (body instanceof ChoiceBody choice) {
+            return choice.alternatives().stream()
                 .flatMap(seq -> findCapturedElementsInSequence(seq, captureName, inOptional, inRepeat).stream())
                 .toList();
-            case SequenceBody seq -> findCapturedElementsInSequence(seq, captureName, inOptional, inRepeat);
-        };
+        }
+        if (body instanceof SequenceBody seq) {
+            return findCapturedElementsInSequence(seq, captureName, inOptional, inRepeat);
+        }
+        throw new IllegalStateException("unhandled " + body);
     }
 
     private List<CaptureResult> findCapturedElementsInSequence(
@@ -585,21 +596,25 @@ public class ASTGenerator implements CodeGenerator {
 
     private List<CaptureResult> findCapturedElementsInAtomic(
             AtomicElement element, String captureName, boolean inOptional, boolean inRepeat) {
-        return switch (element) {
-            case OptionalElement opt ->
-                findCapturedElementsInBody(opt.body(), captureName, true, inRepeat);
-            case RepeatElement rep ->
-                findCapturedElementsInBody(rep.body(), captureName, inOptional, true);
-            case OneOrMoreElement one ->
-                findCapturedElementsInAtomic(one.body(), captureName, inOptional, true);
-            case BoundedRepeatElement bounded ->
-                findCapturedElementsInAtomic(bounded.body(), captureName, inOptional, true);
-            case UBNFAST.SeparatedElement separated ->
-                findCapturedElementsInAtomic(separated.element(), captureName, inOptional, true);
-            case GroupElement g ->
-                findCapturedElementsInBody(g.body(), captureName, inOptional, inRepeat);
-            default -> List.of();
-        };
+        if (element instanceof OptionalElement opt) {
+            return findCapturedElementsInBody(opt.body(), captureName, true, inRepeat);
+        }
+        if (element instanceof RepeatElement rep) {
+            return findCapturedElementsInBody(rep.body(), captureName, inOptional, true);
+        }
+        if (element instanceof OneOrMoreElement one) {
+            return findCapturedElementsInAtomic(one.body(), captureName, inOptional, true);
+        }
+        if (element instanceof BoundedRepeatElement bounded) {
+            return findCapturedElementsInAtomic(bounded.body(), captureName, inOptional, true);
+        }
+        if (element instanceof UBNFAST.SeparatedElement separated) {
+            return findCapturedElementsInAtomic(separated.element(), captureName, inOptional, true);
+        }
+        if (element instanceof GroupElement g) {
+            return findCapturedElementsInBody(g.body(), captureName, inOptional, inRepeat);
+        }
+        return List.of();
     }
 
     // =========================================================================

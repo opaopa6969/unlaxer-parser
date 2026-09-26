@@ -8,6 +8,38 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ## [Unreleased]
 
+## [3.1.1] - Unreleased
+
+### Added
+- **Java 17 artifacts** `org.unlaxer:unlaxer-common-jdk17` and `org.unlaxer:unlaxer-dsl-jdk17` (#311):
+  the same sources, packages and classes as `unlaxer-common` / `unlaxer-dsl`, compiled with
+  `--release 17` (class file major 61), with their own flattened POM, sources and javadoc jars.
+  **Java 17 users: depend on `<artifact>-jdk17`** instead of the plain artifact;
+  `unlaxer-dsl-jdk17` depends on `unlaxer-common-jdk17` only. They are built by the new reactor
+  modules `unlaxer-common-jdk17/` and `unlaxer-dsl-jdk17/` (no copied sources) and published by
+  `scripts/release-central.sh` / `release-central.yml` together with the main artifacts.
+- `CodegenMain --java-release 21|17` (`new EvaluatorGenerator(17)`): with `17` all generated Java
+  (Parser / AST / Mapper / Evaluator / LSP / DAP) compiles with `--release 17`. Only the Evaluator
+  dispatch changes, to an `instanceof` chain in the same order as the sealed `switch`; a stale
+  dispatch that misses a new AST variant is then reported at run time
+  (`IllegalStateException("unhandled node: ...")`) instead of by javac (`not.exhaustive`). Missing
+  handwritten `evalXxx` semantics are still compile errors. The default stays `21` (output
+  unchanged) and `argsHash` only changes when a non-default value is given.
+- CI: a JDK 17 job builds and tests the `-jdk17` modules on Java 17 and requires class file major 61
+  in their jars; the JDK 21 build requires major 65 in the main jars.
+
+### Changed
+- The main artifacts `unlaxer-common` / `unlaxer-dsl` are unchanged: still built for Java 21
+  (major 65), same generated output by default.
+- The sources compile with `--release 17` so that one source tree serves both builds: Java 21
+  pattern-matching `switch` in `unlaxer-dsl` (code generators, validator, mapper, Rust lowering) was
+  rewritten as equivalent `instanceof` chains in the same case order (an `IllegalStateException`
+  where the switch had no `default`, previously unreachable for sealed types). `new String(byte[])` /
+  `getBytes()` / reading a `.ubnf` file now name UTF-8 explicitly (the Java 18+ default), so the
+  Java 17 build decodes exactly like the Java 21 one. No behaviour change for non-null input.
+- Tests that compile generated sources in memory use `--release 17` (the Evaluator follows the
+  running JDK: sealed `switch` with `--release 21` on Java 21+, `--java-release 17` on Java 17).
+
 ## [3.1.0] - 2026-09-25
 
 ### Added

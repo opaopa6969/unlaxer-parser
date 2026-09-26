@@ -68,7 +68,7 @@ public class LSPNonBmpOffsetTest {
         boolean ok;
         try (var manager = compiler.getStandardFileManager(null, null, null)) {
             ok = compiler.getTask(new PrintWriter(diagnostics), manager, null,
-                List.of("--enable-preview", "--release", "21",
+                List.of("--release", "17",
                     "-classpath", System.getProperty("java.class.path"), "-d", out.toString()),
                 null, java.util.stream.Stream.concat(
                     generated.stream().map(LSPNonBmpOffsetTest::toJavaFileObject),

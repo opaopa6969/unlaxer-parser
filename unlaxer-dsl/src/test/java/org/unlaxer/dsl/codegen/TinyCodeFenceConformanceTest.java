@@ -241,7 +241,7 @@ public class TinyCodeFenceConformanceTest {
         try (var manager = compiler.getStandardFileManager(diagnostics, Locale.ROOT,
                 StandardCharsets.UTF_8)) {
             boolean compiled = compiler.getTask(null, manager, diagnostics,
-                List.of("--enable-preview", "--release", "21", "-classpath", classpath, "-d",
+                List.of("--release", "17", "-classpath", classpath, "-d",
                     output.toString()), null, units).call();
             assertTrue(diagnostics.getDiagnostics().toString(), compiled);
         }
