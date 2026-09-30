@@ -25,7 +25,7 @@ class MapperRuleEmitter {
     private MapperRuleEmitter() {}
 
     /** One mapping generation retained independently of the mutable mapping memos. */
-    static String emitMappedTree(String astClass) {
+    static String emitMappedTree(String astClass, boolean hasSkippedRules) {
         return """
                 /**
                  * One token-tree mapping with a frozen identity-based source map.
@@ -87,7 +87,7 @@ class MapperRuleEmitter {
 
                 private static void collectMappedTreeCandidates(Token token, int depth,
                         List<MappedTreeCandidate> candidates) {
-                    if (token == null) return;
+                    if (token == null%2$s) return;
                     %1$s mapped = mapToken(token);
                     if (mapped != null) {
                         candidates.add(new MappedTreeCandidate(token, depth, tokenStartOffsetCompat(token),
@@ -98,7 +98,7 @@ class MapperRuleEmitter {
                     }
                 }
 
-            """.formatted(astClass);
+            """.formatted(astClass, hasSkippedRules ? " || isSkippedRuleToken(token)" : "");
     }
 
     /**

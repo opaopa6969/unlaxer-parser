@@ -112,7 +112,8 @@ public class MapperGenerator implements CodeGenerator {
         // ----- Entry Point -----
         emitEntryPoint(sb, grammar, astClass, parsersClass, rootClassName, rootRule);
 
-        sb.append(MapperRuleEmitter.emitMappedTree(astClass));
+        sb.append(MapperRuleEmitter.emitMappedTree(astClass,
+            grammar.rules().stream().anyMatch(MapperElementUtil::isSkipped)));
 
         // ----- mapToken -----
         sb.append(MapperRuleEmitter.emitMapTokenMethod(astClass, parsersClass, allMappingRules));

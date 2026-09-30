@@ -181,6 +181,15 @@ public class SkipMappingConformanceTest {
                         assertTrue(label + " absent mapped root",
                             failure.getCause().getMessage().contains("No mapped node"));
                         assertTrue(label + " no Rust AST", rust.get("ast").isJsonNull());
+                        Token committedRoot = javaTokens.stream()
+                            .filter(token -> token.parser == parser).findFirst().orElseThrow();
+                        for (String method : List.of("mapParsedTree", "mapSubtreeTree")) {
+                            InvocationTargetException retainedFailure = assertThrows(label + " " + method,
+                                InvocationTargetException.class,
+                                () -> mapper.getMethod(method, Token.class).invoke(null, committedRoot));
+                            assertTrue(retainedFailure.getCause() instanceof IllegalArgumentException);
+                            assertTrue(retainedFailure.getCause().getMessage().contains("No mapped node"));
+                        }
                     } else {
                         assertTrue(label + " no AST", rust.get("ast").isJsonNull());
                     }

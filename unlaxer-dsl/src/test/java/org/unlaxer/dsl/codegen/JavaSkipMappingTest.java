@@ -168,6 +168,38 @@ public class JavaSkipMappingTest {
         }
     }
 
+    @Test public void retainedAndOneShotSelectionsNeverVisitSkippedSubtrees() throws Exception {
+        try (var loader = compile("""
+            @root @mapping(Root) Root ::= Hidden Visible;
+            @skip Hidden ::= 'x' Child 'z';
+            @mapping(Child) Child ::= 'q';
+            @mapping(Visible) Visible ::= 'v';
+            """)) {
+            var mapper = loader.loadClass("org.example.skipprojection.SkipProjectionMapper");
+            var parsers = loader.loadClass("org.example.skipprojection.SkipProjectionParsers");
+            Parser parser = (Parser) parsers.getMethod("getRootParser").invoke(null);
+            try (var context = new org.unlaxer.context.ParseContext(
+                    org.unlaxer.StringSource.createRootSource("xqzv"))) {
+                assertTrue(parser.parse(context).isSucceeded());
+                var root = context.getCurrent().getTokens().stream()
+                    .filter(token -> token.parser == parser).findFirst().orElseThrow();
+                Object oneShot = mapper.getMethod("selectParsedTokenWithSourceMap",
+                    org.unlaxer.Token.class, String.class).invoke(null, root, "Child");
+                assertEquals("Root", field(field(oneShot, "sourceMap"), "ast")
+                    .getClass().getSimpleName());
+                for (String method : List.of("mapParsedTree", "mapSubtreeTree")) {
+                    Object tree = mapper.getMethod(method, org.unlaxer.Token.class).invoke(null, root);
+                    Object hidden = tree.getClass().getMethod("select", String.class).invoke(tree, "Child");
+                    assertEquals(method, "Root", field(field(hidden, "sourceMap"), "ast")
+                        .getClass().getSimpleName());
+                    Object visible = tree.getClass().getMethod("select", String.class).invoke(tree, "Visible");
+                    assertEquals(method, "Visible", field(field(visible, "sourceMap"), "ast")
+                        .getClass().getSimpleName());
+                }
+            }
+        }
+    }
+
     @Test public void skippedRootWithoutAnyMappedRuleStillCompiles() throws Exception {
         try (var loader = compile("@root @skip Root ::= 'q';")) {
             var mapper = loader.loadClass("org.example.skipprojection.SkipProjectionMapper");
@@ -176,6 +208,30 @@ public class JavaSkipMappingTest {
                 () -> parse(loader, "q"));
             assertTrue(failure.getCause().getMessage(),
                 failure.getCause().getMessage().contains("No mapped node"));
+        }
+    }
+
+    @Test public void retainedMappingRejectsASkippedRootWithMappedChildren() throws Exception {
+        try (var loader = compile("""
+            @root @skip Root ::= Child;
+            @mapping(Child) Child ::= 'q';
+            """)) {
+            var mapper = loader.loadClass("org.example.skipprojection.SkipProjectionMapper");
+            var parsers = loader.loadClass("org.example.skipprojection.SkipProjectionParsers");
+            Parser parser = (Parser) parsers.getMethod("getRootParser").invoke(null);
+            try (var context = new org.unlaxer.context.ParseContext(
+                    org.unlaxer.StringSource.createRootSource("q"))) {
+                assertTrue(parser.parse(context).isSucceeded());
+                var root = context.getCurrent().getTokens().stream()
+                    .filter(token -> token.parser == parser).findFirst().orElseThrow();
+                for (String method : List.of("mapParsedTree", "mapSubtreeTree")) {
+                    InvocationTargetException failure = assertThrows(method,
+                        InvocationTargetException.class,
+                        () -> mapper.getMethod(method, org.unlaxer.Token.class).invoke(null, root));
+                    assertTrue(failure.getCause() instanceof IllegalArgumentException);
+                    assertTrue(failure.getCause().getMessage().contains("No mapped node"));
+                }
+            }
         }
     }
 }

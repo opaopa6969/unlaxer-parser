@@ -46,6 +46,8 @@ root が `@skip`、または透明な alias / group / choice を通じて skippe
 解析成功と AST の存在は別である。AST が得られない入力に対し、mapper は明示的なエラーを返す。
 Rust の root mapper は、従来どおり投影結果がちょうど 1 node であることを要求する。
 空 AST 型を含む生成物もコンパイルできるが、存在しない値を evaluator が評価することはない。
+Java の retained mapping API（`mapParsedTree` / `mapSubtreeTree`）も同じ境界を守る。
+skipped root の内部に mapped 子があっても、候補として再発見しない。
 
 親に `@mapping(Root)` があれば、その親は独立した AST node である。子がすべて skipped でも親まで自動的に消えることはない。
 
