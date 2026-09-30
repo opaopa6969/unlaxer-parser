@@ -1,0 +1,5 @@
+grammar CustomVersion {
+  @tokenAdapter: { id: 'example.word' version: '1' java: 'example.WordParser' rust: 'crate::word_token' }
+  token WORD = ADAPTER('example.word', version=2)
+  @root @mapping(Value, params=[value]) Root ::= WORD @value;
+}

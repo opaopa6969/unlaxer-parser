@@ -57,6 +57,14 @@ public class TinyCodeFenceConformanceTest {
     private final Path repo = Path.of("..").toAbsolutePath().normalize();
 
     @Test public void realTinyParsersJavaRustAndNativeFrontendsShareOneCorpus() throws Exception {
+        runCorpus(false);
+    }
+
+    @Test public void registeredAdaptersPreserveTheRealTinyCodeFenceContract() throws Exception {
+        runCorpus(true);
+    }
+
+    private void runCorpus(boolean adapters) throws Exception {
         assumeTrue("enable with -DrustConformance=true (requires rustc/cargo)",
             Boolean.getBoolean("rustConformance"));
         String configured = System.getProperty("tinyexpression.classes");
@@ -93,7 +101,7 @@ public class TinyCodeFenceConformanceTest {
         for (JsonElement fixtureElement : corpus) {
             JsonObject fixture = fixtureElement.getAsJsonObject();
             String name = fixture.get("name").getAsString();
-            String source = grammar(fixture);
+            String source = grammar(fixture, adapters);
             var grammar = UBNFMapper.parse(source).grammars().get(0);
             var javaRust = new RustBackend().generate(grammar);
             assertEquals(name + " Java Rust backend file count", 5, javaRust.size());
@@ -172,18 +180,19 @@ public class TinyCodeFenceConformanceTest {
 
         Path target = Path.of("target");
         Files.createDirectories(target);
-        Files.write(target.resolve("rust-tiny-code-fence.tsv"), report, StandardCharsets.UTF_8);
+        Files.write(target.resolve(adapters ? "rust-tiny-code-fence-adapters.tsv" : "rust-tiny-code-fence.tsv"),
+            report, StandardCharsets.UTF_8);
     }
 
-    private String grammar(JsonObject fixture) {
+    private String grammar(JsonObject fixture, boolean adapters) {
         String params = String.join(", ", fixture.getAsJsonArray("params").asList().stream()
             .map(JsonElement::getAsString).toList());
         String mapping = params.isEmpty() ? "@mapping(Fence)" : "@mapping(Fence, params=[" + params + "])";
         return "grammar TinyFence { @package: " + PACKAGE + " "
             + (fixture.has("whitespace") ? "@whitespace: javaStyle " : "")
-            + "token START = " + START_PARSER + "\n"
-            + "token CLOSE = " + END_PARSER + "\n"
-            + "token LONG = " + LONG_PARSER + "\n"
+            + "token START = " + (adapters ? "ADAPTER('tinyexpression.code-start', version=1)" : START_PARSER) + "\n"
+            + "token CLOSE = " + (adapters ? "ADAPTER('tinyexpression.code-end', version=1)" : END_PARSER) + "\n"
+            + "token LONG = " + (adapters ? "ADAPTER('tinyexpression.long-code-block', version=1)" : LONG_PARSER) + "\n"
             + "token BODY = UNTIL('```')\n"
             + "token CHAR = ANY\n"
             + "token END = EOF\n"

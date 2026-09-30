@@ -1,0 +1,5 @@
+// 😀 unknown adapter at a nonzero code-point position
+grammar Unknown {
+  token WORD = ADAPTER('example.missing', version=1)
+  @root @mapping(Value, params=[value]) Root ::= WORD @value;
+}

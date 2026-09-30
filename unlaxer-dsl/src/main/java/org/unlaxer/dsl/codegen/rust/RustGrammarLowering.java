@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.unlaxer.dsl.bootstrap.UBNFAST.*;
+import org.unlaxer.dsl.bootstrap.TokenAdapterRegistry;
 import org.unlaxer.dsl.codegen.rust.GrammarIR.*;
 
 /** Validates the entire input before emitting anything; unsupported syntax never silently degrades. */
@@ -14,6 +15,7 @@ public final class RustGrammarLowering {
     private static final int MAX_PREDICTOR_ATOMS = 64;
     private static final int MAX_ANALYSIS_DEPTH = 256;
     private final GrammarDecl grammar;
+    private final TokenAdapterRegistry adapters;
     private final Map<String, Integer> ruleIds = new LinkedHashMap<>();
     private final Map<String, Expression> tokens = new LinkedHashMap<>();
     private final List<Expression> bodies = new ArrayList<>();
@@ -26,7 +28,10 @@ public final class RustGrammarLowering {
     private int analysisDepth;
     private record Shape(Kind kind, Cardinality cardinality) {}
 
-    private RustGrammarLowering(GrammarDecl grammar) { this.grammar = grammar; }
+    private RustGrammarLowering(GrammarDecl grammar) {
+        this.grammar = grammar;
+        this.adapters = TokenAdapterRegistry.requireValid(grammar);
+    }
 
     private void enterAnalysis() {
         if (analysisDepth >= MAX_ANALYSIS_DEPTH) throw unsupported("structural analysis depth exceeds 256");
@@ -45,6 +50,7 @@ public final class RustGrammarLowering {
         Set<String> settings = new HashSet<>();
         Set<String> memoSafeTokens = new HashSet<>();
         for (var setting : grammar.settings()) {
+            if (setting.key().equals("tokenAdapter")) continue; // checked by the pure registry
             if (!setting.key().equals("memoSafeToken") && !settings.add(setting.key())) {
                 throw unsupported("duplicate setting " + setting.key());
             }
@@ -64,8 +70,12 @@ public final class RustGrammarLowering {
                 TokenDecl token = grammar.tokens().stream()
                     .filter(candidate -> candidate.name().equals(alias))
                     .findFirst().orElseThrow(() -> unsupported("memoSafeToken undefined token alias " + alias));
-                if (!(token instanceof TokenDecl.Simple)) {
-                    throw unsupported("memoSafeToken alias must name a Simple token " + alias);
+                if (!(token instanceof TokenDecl.Simple)
+                    && !(token instanceof TokenDecl.Adapter adapter
+                        && TokenAdapterRegistry.isBuiltin(adapter.id(), Integer.parseInt(adapter.version())))) {
+                    throw unsupported(token instanceof TokenDecl.Adapter
+                        ? "memoSafeToken alias must name a Simple or built-in Adapter token " + alias
+                        : "memoSafeToken alias must name a Simple token " + alias);
                 }
             } else if (!setting.key().equals("package")) throw unsupported("setting " + setting.key());
         }
@@ -613,6 +623,10 @@ public final class RustGrammarLowering {
     }
 
     private boolean nullable(Expression expression) {
+        if (expression instanceof CustomToken ignored) {
+            // An external function can succeed without consuming; neither host may assume otherwise.
+            return true;
+        }
         if (expression instanceof EmptyToken ignored) {
             return true;
         }
@@ -656,6 +670,17 @@ public final class RustGrammarLowering {
     }
 
     private Expression token(TokenDecl token) {
+        if (token instanceof TokenDecl.Adapter adapter) {
+            var descriptor = adapters.find(adapter.id(), Integer.parseInt(adapter.version())).orElseThrow();
+            if (!descriptor.builtin()) return new CustomToken(descriptor.rustPath());
+            return switch (descriptor.id()) {
+                case "tinyexpression.string" -> new Choice(List.of(new QuotedToken('"'), new QuotedToken('\'')));
+                case "tinyexpression.code-start" -> new CodeStartToken();
+                case "tinyexpression.code-end" -> new CodeEndToken();
+                case "tinyexpression.long-code-block" -> new LongCodeBlockToken();
+                default -> throw unsupported("unknown builtin adapter " + descriptor.id());
+            };
+        }
         if (token instanceof TokenDecl.Simple simple) {
             Expression supported = simpleToken(simple.parserClass());
             if (supported == null) throw unsupported("external token " + simple.parserClass());

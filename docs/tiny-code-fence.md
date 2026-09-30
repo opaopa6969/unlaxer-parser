@@ -92,8 +92,9 @@ Java ソースの Rust への自動翻訳も行わない。
 閉じ fence が欠ける場合も `CodeEnd` が失敗する。Markdown の汎用 fenced code block
 scanner や、埋め込み言語の文字列/commentを解釈する scanner ではない。
 
-汎用 token ID/schema/登録 API を含む #158、残る annotation/evaluator、
-tinyexpression-rs 全体、LSP/DAP は引き続き未完了である。
+#158 の [token adapter 契約](token-adapters.md) では各 FQN に対応する ID からも同じ corpus を
+実行し、`target/rust-tiny-code-fence-adapters.tsv` に別記録する。既存 FQN は維持する。
+残る annotation/evaluator、tinyexpression-rs 全体、LSP/DAP は引き続き対応表で追跡する。
 
 以下は #170 時点の歴史的な制約であり、#316 の現在の完了根拠ではない。その時点で固定した P4 文法全体を native generator に渡すと、token 宣言の検証後に
 `unsupported annotation Interleave { profile: "javaStyle" } on Formula` と終了コード3で

@@ -12,6 +12,9 @@ Java 向け生成の可否を調べる `--target java` は未実装で、引数�
 `portable: true` は、現在の Rust backend の対応範囲・構造検証を通ったという意味。
 生成コードのコンパイル、手書き semantics の実装、言語間の評価結果、LSP/DAP、全機能の
 移植完了まで保証しない。対応範囲は [FULL-SPEC 対応表](../rust/FULL-SPEC.md) を参照する。
+`ADAPTER` / `@tokenAdapter` は [token adapter 契約](token-adapters.md) に従って検査する。
+custom binding の class / function の探索・コンパイルはせず、`portable: true` でも
+外部 provider の実在・署名・意味的同値性を保証しない。
 
 ## CLI
 
@@ -105,6 +108,10 @@ JSON 値と配列順を両 host で比較する。空白や `\n` / `\u000a` 等�
 | `P-WHITESPACE` | `none` / `javaStyle` 以外 / style |
 | `P-EXTERNAL-TOKEN` | 実際の lowerer の組み込み対応表にない Simple token / class 名 |
 | `P-TOKEN-KIND` | 未対応の `REGEX` / `CI` |
+| `P-ADAPTER-DEFINITION` | adapter schema・ID・version・binding path 不正 / ID（不明なら `tokenAdapter`） |
+| `P-ADAPTER-DUPLICATE` | 同じ ID/version の重複登録 / ID（後出 setting の範囲） |
+| `P-ADAPTER-UNKNOWN` | 未登録 adapter 参照 / ID（token 全体） |
+| `P-ADAPTER-VERSION` | 既知 ID の未登録 version / ID（token 全体） |
 | `P-ANNOTATION` | `eval` / `doc` / `recovery` / `skip` / `commonField` / `enum` / Simple annotation 名 |
 | `P-MAPPING-TYPE` | 対応しない mapping 型名 / class 名 |
 | `P-FIELD-NAME` | 対応しない field 名 / param 名 |

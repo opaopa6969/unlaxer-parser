@@ -1,0 +1,5 @@
+grammar Aliases {
+  token FIRST = ADAPTER('tinyexpression.string', version=1)
+  token SECOND = ADAPTER('tinyexpression.string', version=1)
+  @root @mapping(Value, params=[value]) Root ::= FIRST @value | SECOND @value;
+}

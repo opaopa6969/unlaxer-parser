@@ -1,0 +1,4 @@
+grammar DuplicateBuiltin {
+  @tokenAdapter: { id: 'tinyexpression.string' version: '1' java: 'example.WordParser' rust: 'crate::word_token' }
+  @root @mapping(Value, params=[value]) Root ::= 'x' @value;
+}

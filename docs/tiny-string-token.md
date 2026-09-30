@@ -27,7 +27,7 @@ backslash と次の文字を一組として扱うが、escape のデコードは
 `TinyStringTokenConformanceTest` は、固定した tinyexpression checkout をビルドした
 `target/classes` を明示的に受け取り、実 `StringLiteralParser` と生成 Java parser/AST/mapper
 を使う。同名の代替 test class で比較しない。
-CI の oracle は tinyexpression commit `2a2db7c4ce38234c2ec8c4ddbf7d51eed08fc4ba`。
+CI の oracle は tinyexpression commit `7d7bd1cbfab1bd9548ba53c73cc50502f0437c67`。
 ロードされたクラスの code source が指定したディレクトリであることも検査する。
 
 ```sh
@@ -48,8 +48,9 @@ Java frontend と native Rust frontend の生成物も全5ファイル（計35�
 
 ## 残る範囲
 
-これは既存 binding の明示的な移行対応であり、target-neutral token ID/schema、登録 API、
-未登録・重複 adapter の診断を含む #158 全体の完了ではない。
+既存 FQN は維持し、#158 の [token adapter 契約](token-adapters.md) では
+`ADAPTER('tinyexpression.string', version=1)` でも同じ corpus を実行する。
+adapter 指定の結果は `target/rust-tiny-string-adapters.tsv` に別記録する。
 `CodeStartParser` / `CodeEndParser` の字句認識は [#170 の別契約](tiny-code-fence.md)で扱う。
 UBNF annotation、tinyexpression の評価機能、
 `rustcodeblock`、LSP/DAP は引き続き対応表で追跡する。

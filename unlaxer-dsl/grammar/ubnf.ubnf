@@ -78,6 +78,7 @@ grammar UBNF {
     | CharRangeExpression
     | CIExpression
     | RegexExpression
+    | AdapterExpression
     | AnyExpression
     | EofExpression
     | EmptyExpression
@@ -110,6 +111,10 @@ grammar UBNF {
   // REGEX('pattern')
   @mapping(RegexExpression, params=[pattern])
   RegexExpression ::= 'REGEX' '(' STRING @pattern ')' ;
+
+  // ADAPTER('target-neutral.id', version=1)
+  @mapping(AdapterExpression, params=[id, version])
+  AdapterExpression ::= 'ADAPTER' '(' STRING @id ',' 'version' '=' UNSIGNED_INTEGER @version ')' ;
 
   // ANY
   @mapping(AnyExpression)

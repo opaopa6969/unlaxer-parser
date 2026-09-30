@@ -50,6 +50,14 @@ public class TinyStringTokenConformanceTest {
     private final Path repo = Path.of("..").toAbsolutePath().normalize();
 
     @Test public void realTinyParserJavaRustAndNativeFrontendsShareOneCorpus() throws Exception {
+        runCorpus(false);
+    }
+
+    @Test public void registeredAdapterPreservesTheRealTinyStringContract() throws Exception {
+        runCorpus(true);
+    }
+
+    private void runCorpus(boolean adapters) throws Exception {
         assumeTrue("enable with -DrustConformance=true (requires rustc/cargo)",
             Boolean.getBoolean("rustConformance"));
         String configured = System.getProperty("tinyexpression.classes");
@@ -81,7 +89,7 @@ public class TinyStringTokenConformanceTest {
         for (JsonElement fixtureElement : corpus) {
             JsonObject fixture = fixtureElement.getAsJsonObject();
             String name = fixture.get("name").getAsString();
-            String source = grammar(fixture);
+            String source = grammar(fixture, adapters);
             var grammar = UBNFMapper.parse(source).grammars().get(0);
             var javaRust = new RustBackend().generate(grammar);
             assertEquals(name + " Java Rust backend file count", 5, javaRust.size());
@@ -155,13 +163,14 @@ public class TinyStringTokenConformanceTest {
 
         Path target = Path.of("target");
         Files.createDirectories(target);
-        Files.write(target.resolve("rust-tiny-string.tsv"), report, StandardCharsets.UTF_8);
+        Files.write(target.resolve(adapters ? "rust-tiny-string-adapters.tsv" : "rust-tiny-string.tsv"),
+            report, StandardCharsets.UTF_8);
     }
 
-    private String grammar(JsonObject fixture) {
+    private String grammar(JsonObject fixture, boolean adapters) {
         return "grammar TinyString { @package: " + PACKAGE + " "
             + (fixture.has("whitespace") ? "@whitespace: javaStyle " : "")
-            + "token STRING = " + TINY_PARSER + "\n"
+            + "token STRING = " + (adapters ? "ADAPTER('tinyexpression.string', version=1)" : TINY_PARSER) + "\n"
             + "token END = EOF\n"
             + (fixture.has("extra") ? fixture.get("extra").getAsString() : "") + "\n"
             + "@root @mapping(Value, params=[value]) Root ::= " + fixture.get("body").getAsString() + "; }";

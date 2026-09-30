@@ -1,0 +1,8 @@
+// 😀 source coordinates count code points, not bytes or UTF-16 units
+grammar Builtins {
+  token STRING = ADAPTER('tinyexpression.string', version=1)
+  token START = ADAPTER('tinyexpression.code-start', version=1)
+  token CLOSE = ADAPTER('tinyexpression.code-end', version=1)
+  token LONG = ADAPTER('tinyexpression.long-code-block', version=1)
+  @root @mapping(Value, params=[value]) Root ::= STRING @value;
+}

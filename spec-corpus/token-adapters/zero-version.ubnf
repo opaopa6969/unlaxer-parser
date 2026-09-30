@@ -1,0 +1,4 @@
+grammar ZeroVersion {
+  token STRING = ADAPTER('tinyexpression.string', version=0)
+  @root @mapping(Value, params=[value]) Root ::= STRING @value;
+}

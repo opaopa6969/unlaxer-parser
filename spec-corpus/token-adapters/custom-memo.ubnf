@@ -1,0 +1,6 @@
+grammar CustomMemo {
+  @tokenAdapter: { id: 'example.word' version: '1' java: 'example.WordParser' rust: 'crate::word_token' }
+  @memoSafeToken: WORD
+  token WORD = ADAPTER('example.word', version=1)
+  @root @mapping(Value, params=[value]) Root ::= WORD @value;
+}

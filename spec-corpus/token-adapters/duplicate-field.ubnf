@@ -1,0 +1,4 @@
+grammar DuplicateField {
+  @tokenAdapter: { id: 'example.word' version: '1' java: 'example.WordParser' java: 'example.OtherParser' rust: 'crate::word_token' }
+  @root @mapping(Value, params=[value]) Root ::= 'x' @value;
+}

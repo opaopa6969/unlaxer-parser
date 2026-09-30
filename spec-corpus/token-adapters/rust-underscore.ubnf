@@ -1,0 +1,5 @@
+// 😀 A placeholder is not a provider function identifier.
+grammar RustUnderscore {
+  @tokenAdapter: { id: 'example.word' version: '1' java: 'example.WordParser' rust: 'crate::_' }
+  @root @mapping(Value, params=[value]) Root ::= 'x' @value;
+}

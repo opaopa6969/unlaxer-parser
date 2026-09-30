@@ -8,6 +8,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.RootAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RuleBody;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RuleDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.TokenDecl;
+import org.unlaxer.dsl.bootstrap.TokenAdapterRegistry;
 import org.unlaxer.RecursiveMode;
 
 import java.util.ArrayList;
@@ -64,10 +65,20 @@ public class ParserGenerator implements CodeGenerator {
         final List<String> delimitorClasses = new ArrayList<>();
         /** rule name -> RecoveryAnnotation (for rules that have @recovery) */
         final Map<String, org.unlaxer.dsl.bootstrap.UBNFAST.RecoveryAnnotation> recoveryRules = new LinkedHashMap<>();
+        final boolean adapterShadowsWordParser;
+        final String spaceParserClass;
 
         GenContext(GrammarDecl grammar) {
             this.grammar = grammar;
             this.grammarName = grammar.name();
+            TokenAdapterRegistry adapters = TokenAdapterRegistry.requireValid(grammar);
+            this.adapterShadowsWordParser = grammar.tokens().stream()
+                .anyMatch(token -> token instanceof TokenDecl.Adapter
+                    && ParserCodegenUtil.toParserClassName(token.name()).equals("WordParser"));
+            this.spaceParserClass = grammar.tokens().stream()
+                .anyMatch(token -> token instanceof TokenDecl.Adapter
+                    && ParserCodegenUtil.toParserClassName(token.name()).equals("SpaceParser"))
+                ? "org.unlaxer.parser.posix.SpaceParser.class" : "SpaceParser.class";
             SemanticCardinality semantics = new SemanticCardinality(grammar);
             boolean semanticCollections = semantics.enabled();
             grammar.rules().forEach(rule -> captureBindings.put(rule.name(), semanticCollections
@@ -86,6 +97,9 @@ public class ParserGenerator implements CodeGenerator {
             for (TokenDecl token : grammar.tokens()) {
                 if (token instanceof TokenDecl.Simple s) {
                     tokenParserMap.put(s.name(), s.parserClass());
+                } else if (token instanceof TokenDecl.Adapter adapter) {
+                    int version = Integer.parseInt(adapter.version());
+                    tokenParserMap.put(adapter.name(), adapters.find(adapter.id(), version).orElseThrow().javaClass());
                 } else if (token instanceof TokenDecl.Until u) {
                     tokenUntilMap.put(u.name(), u.terminator());
                 } else if (token instanceof TokenDecl.Negation n) {
@@ -301,7 +315,7 @@ public class ParserGenerator implements CodeGenerator {
             || anyRuleRequestsDelimited || anyRuleInterleaveDelimited;
 
         if (ctx.hasDelimitedChain && (hasGlobalWhitespace || anyRuleRequestsDelimited || anyRuleInterleaveDelimited)) {
-            ctx.delimitorClasses.add("SpaceParser.class");
+            ctx.delimitorClasses.add(ctx.spaceParserClass);
         }
         if (hasGlobalComment || hasGlobalWhitespace || anyRuleRequestsDelimited || anyRuleInterleaveDelimited) {
             ctx.needsCPPComment = true;
@@ -415,8 +429,14 @@ public class ParserGenerator implements CodeGenerator {
             }
             return ctx.grammar.tokens().stream()
                 .filter(token -> token.name().equals(ref.name()))
-                .findFirst().map(token -> !(token instanceof TokenDecl.Simple)
-                    || ctx.explicitlySafeMemoTokens.contains(ref.name())).orElse(false);
+                .findFirst().map(token -> {
+                    if (token instanceof TokenDecl.Adapter adapter) {
+                        return TokenAdapterRegistry.isBuiltin(adapter.id(), Integer.parseInt(adapter.version()))
+                            && ctx.explicitlySafeMemoTokens.contains(ref.name());
+                    }
+                    return !(token instanceof TokenDecl.Simple)
+                        || ctx.explicitlySafeMemoTokens.contains(ref.name());
+                }).orElse(false);
         }
         if (element instanceof org.unlaxer.dsl.bootstrap.UBNFAST.TerminalElement ignored) {
             return true;
@@ -462,7 +482,8 @@ public class ParserGenerator implements CodeGenerator {
         sb.append("        public Supplier<Parser> getLazyParser() {\n");
 
         if (ctx.delimitorClasses.isEmpty()) {
-            sb.append("            return new SupplierBoundCache<>(() -> Parser.get(SpaceParser.class));\n");
+            sb.append("            return new SupplierBoundCache<>(() -> Parser.get(")
+                .append(ctx.spaceParserClass).append("));\n");
         } else if (ctx.delimitorClasses.size() == 1) {
             sb.append("            return new SupplierBoundCache<>(() -> Parser.get(")
               .append(ctx.delimitorClasses.get(0)).append("));\n");

@@ -29,6 +29,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.StringSettingValue;
 import org.unlaxer.dsl.bootstrap.UBNFAST.TokenDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.TypeofElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.WhitespaceAnnotation;
+import org.unlaxer.dsl.bootstrap.TokenAdapterRegistry;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -103,11 +104,17 @@ public final class GrammarValidator {
     private static List<ValidationIssue> validate(GrammarDecl grammar, boolean resolveParserClasses) {
         List<ValidationIssue> errors = new ArrayList<>();
 
+        for (TokenAdapterRegistry.Diagnostic issue : TokenAdapterRegistry.build(grammar, null).diagnostics()) {
+            errors.add(new ValidationIssue(issue.code(), issue.code() + ": " + issue.subject(),
+                "Correct the token adapter declaration or registration."));
+        }
+
         validateGlobalWhitespace(grammar, errors);
         validateMemoSafeTokens(grammar, errors);
         validateRootPresence(grammar, errors);
         if (resolveParserClasses) validateTokens(grammar, errors);
         validateRuleTokenParserNameCollisions(grammar, errors);
+        validateAdapterTokenParserNameCollisions(grammar, errors);
         validateBoundedRepeatElements(grammar, errors);
         validateCommonFields(grammar, errors);
         validateEnumRules(grammar, errors);
@@ -609,13 +616,22 @@ public final class GrammarValidator {
                         "global @memoSafeToken references undefined token alias: " + alias,
                         "Declare token " + alias + " or remove this @memoSafeToken setting.",
                         "E-MEMO-SAFE-TOKEN-UNDEFINED");
-                } else if (!(token instanceof TokenDecl.Simple)) {
+                } else if (!(token instanceof TokenDecl.Simple)
+                    && !(token instanceof TokenDecl.Adapter adapter && builtinAdapter(adapter))) {
                     addError(errors,
-                        "global @memoSafeToken alias must name a Simple token: " + alias,
-                        "Remove the setting; built-in token declarations are already proven safe.",
+                        "global @memoSafeToken alias must name a Simple or built-in Adapter token: " + alias,
+                        "Remove the setting or use a Simple or built-in Adapter token.",
                         "E-MEMO-SAFE-TOKEN-KIND");
                 }
             });
+    }
+
+    private static boolean builtinAdapter(TokenDecl.Adapter adapter) {
+        try {
+            return TokenAdapterRegistry.isBuiltin(adapter.id(), Integer.parseInt(adapter.version()));
+        } catch (NumberFormatException error) {
+            return false;
+        }
     }
 
     private static void validateRootPresence(GrammarDecl grammar, List<ValidationIssue> errors) {
@@ -707,6 +723,36 @@ public final class GrammarValidator {
         }
     }
 
+    /** An adapter wrapper can shadow another token's parser class or duplicate its wrapper. */
+    private static void validateAdapterTokenParserNameCollisions(
+        GrammarDecl grammar,
+        List<ValidationIssue> errors
+    ) {
+        Map<String, TokenDecl> firstByParserName = new LinkedHashMap<>();
+        for (TokenDecl token : grammar.tokens()) {
+            String parserName = tokenParserClassReference(token);
+            if (parserName == null) continue;
+            TokenDecl first = firstByParserName.putIfAbsent(parserName, token);
+            if (first == null || !(first instanceof TokenDecl.Adapter || token instanceof TokenDecl.Adapter)) {
+                continue;
+            }
+            addError(errors,
+                "token " + first.name() + " and token " + token.name()
+                    + " both resolve to parser class " + parserName,
+                "Rename one token or use a distinct parser class so the adapter wrapper cannot shadow it.",
+                "E-TOKEN-ADAPTER-NAME-COLLISION");
+        }
+    }
+
+    private static String tokenParserClassReference(TokenDecl token) {
+        if (token instanceof TokenDecl.Adapter || token instanceof TokenDecl.Simple
+            || token instanceof TokenDecl.Negation || token instanceof TokenDecl.CharRange
+            || token instanceof TokenDecl.Regex) {
+            return generatedTokenParserClassName(token);
+        }
+        return null;
+    }
+
     /**
      * Returns the generated parser class name a token declaration resolves to,
      * or {@code null} when the token does not produce a generated wrapper class
@@ -719,6 +765,7 @@ public final class GrammarValidator {
      * token name via {@link ParserCodegenUtil#toParserClassName}.
      */
     private static String generatedTokenParserClassName(TokenDecl token) {
+        if (token instanceof TokenDecl.Adapter) return ParserCodegenUtil.toParserClassName(token.name());
         if (token instanceof TokenDecl.Simple simple) {
             String parserClass = simple.parserClass();
             if (parserClass == null || parserClass.isBlank()) {

@@ -1,0 +1,5 @@
+grammar BuiltinMemo {
+  @memoSafeToken: WORD
+  token WORD = ADAPTER('tinyexpression.string', version=1)
+  @root @mapping(Value, params=[value]) Root ::= WORD @value;
+}

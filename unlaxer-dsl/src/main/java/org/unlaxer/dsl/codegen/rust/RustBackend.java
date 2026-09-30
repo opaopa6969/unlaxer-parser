@@ -205,6 +205,9 @@ public final class RustBackend {
         if (expression instanceof LongCodeBlockToken ignored) {
             return "Expr::LongCodeBlock";
         }
+        if (expression instanceof CustomToken custom) {
+            return "Expr::Custom(" + custom.functionPath() + ")";
+        }
         if (expression instanceof AnyToken ignored) {
             return "Expr::Any";
         }

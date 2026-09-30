@@ -9,6 +9,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.*;
 import org.unlaxer.dsl.bootstrap.UBNFMapper;
 import org.unlaxer.dsl.bootstrap.UBNFSourceSnapshot;
 import org.unlaxer.dsl.bootstrap.UBNFSourceSnapshot.Span;
+import org.unlaxer.dsl.bootstrap.TokenAdapterRegistry;
 import org.unlaxer.dsl.codegen.GrammarValidator;
 import org.unlaxer.dsl.codegen.rust.RustGrammarLowering;
 
@@ -66,10 +67,13 @@ public final class PortabilityCheck {
     }
 
     private static void scanGrammar(GrammarDecl grammar, UBNFSourceSnapshot snapshot, List<Diagnostic> out) {
+        for (TokenAdapterRegistry.Diagnostic issue : TokenAdapterRegistry.build(grammar, snapshot).diagnostics()) {
+            out.add(new Diagnostic(issue.code(), issue.span(), issue.subject()));
+        }
         for (ImportDecl decl : grammar.imports()) add(out, "P-IMPORT", snapshot, decl, decl.path());
         for (GlobalSetting setting : grammar.settings()) {
-            if (!Set.of("whitespace", "package", "memoSafeToken").contains(setting.key())
-                || setting.value() instanceof BlockSettingValue) {
+            if (!Set.of("whitespace", "package", "memoSafeToken", "tokenAdapter").contains(setting.key())
+                || (setting.value() instanceof BlockSettingValue && !setting.key().equals("tokenAdapter"))) {
                 add(out, "P-SETTING", snapshot, setting, setting.key());
             }
             if (setting.key().equals("whitespace") && setting.value() instanceof StringSettingValue value

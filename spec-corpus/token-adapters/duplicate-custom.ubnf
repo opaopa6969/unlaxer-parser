@@ -1,0 +1,5 @@
+grammar Duplicate {
+  @tokenAdapter: { id: 'example.word' version: '1' java: 'example.WordParser' rust: 'crate::word_token' }
+  @tokenAdapter: { id: 'example.word' version: '1' java: 'example.WordParser' rust: 'crate::word_token' }
+  @root @mapping(Value, params=[value]) Root ::= 'x' @value;
+}

@@ -1,0 +1,4 @@
+grammar MissingBinding {
+  @tokenAdapter: { id: 'example.word' version: '1' java: 'example.WordParser' }
+  @root @mapping(Value, params=[value]) Root ::= 'x' @value;
+}
