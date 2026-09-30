@@ -118,8 +118,6 @@ public final class GrammarValidator {
         validateBoundedRepeatElements(grammar, errors);
         validateCommonFields(grammar, errors);
         validateEnumRules(grammar, errors);
-        boolean scopeReferences = grammar.rules().stream().anyMatch(rule -> rule.annotations().stream()
-            .anyMatch(annotation -> annotation instanceof ScopeTreeAnnotation));
 
         for (RuleDecl rule : grammar.rules()) {
             MappingAnnotation mapping = null;
@@ -175,7 +173,7 @@ public final class GrammarValidator {
                 predictiveChoiceAnnotations, errors);
             validatePrecedence(rule, hasLeftAssoc, hasRightAssoc, precedenceAnnotations, errors);
             validateAdvancedAnnotations(rule, interleaveAnnotations, backrefAnnotations, scopeTreeAnnotations, errors);
-            validateScopeCaptures(rule, scopeReferences, errors);
+            validateScopeCaptures(rule, errors);
             validateTypeofElements(rule, errors);
             validateCatalogAnnotations(rule, errors);
         }
@@ -951,8 +949,7 @@ public final class GrammarValidator {
         }
     }
 
-    private static void validateScopeCaptures(RuleDecl rule, boolean scopeReferences,
-            List<ValidationIssue> errors) {
+    private static void validateScopeCaptures(RuleDecl rule, List<ValidationIssue> errors) {
         var declarations = rule.annotations().stream().filter(DeclaresAnnotation.class::isInstance)
             .map(DeclaresAnnotation.class::cast).toList();
         if (declarations.size() > 1) {
@@ -966,7 +963,7 @@ public final class GrammarValidator {
             if (annotation instanceof DeclaresAnnotation declaration) {
                 target = declaration.symbolCapture();
                 code = "E-ANNOTATION-DECLARES-CAPTURE";
-            } else if (scopeReferences && annotation instanceof BackrefAnnotation reference) {
+            } else if (annotation instanceof BackrefAnnotation reference) {
                 target = reference.name();
                 code = "E-ANNOTATION-BACKREF-CAPTURE";
             } else {

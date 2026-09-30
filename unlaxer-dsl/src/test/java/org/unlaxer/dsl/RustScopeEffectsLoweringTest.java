@@ -48,7 +48,6 @@ public class RustScopeEffectsLoweringTest {
             GRAMMAR.replace("@backref(name=name)", "@backref(name=name) @backref(name=name)"),
             GRAMMAR.replace("symbol=name", "symbol=missing"),
             GRAMMAR.replace("@backref(name=name)", "@backref(name=missing)"),
-            GRAMMAR.replace("@scopeTree(mode=dynamic)", ""),
             GRAMMAR.replace("Decl ::= ID @noise ':' ID @name", "Decl ::= { [ ID ] } @name"),
             GRAMMAR.replace("Decl ::= ID @noise ':' ID @name", "Decl ::= Decl @name")
         }) {

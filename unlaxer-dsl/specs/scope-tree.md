@@ -188,15 +188,18 @@ VarRef ::= IDENTIFIER @varName ;
 
 ## 別ユースケース: XML タグ名一致（後方参照モード）
 
-`@scopeTree` なしで `@backref` のみを使うと、同一ルール内の後方参照になる:
+文法全体に `@scopeTree` がなければ、`@backref` は同一ルール内の同名captureを比較する:
 
 ```ubnf
 @backref(name=tagName)
-Element ::= '<' TAGNAME @tagName '>' Content '</' TAGNAME '>' ;
+Element ::= '<' TAGNAME @tagName '>' Content '</' TAGNAME @tagName '>' ;
 ```
 
-`<div>` を開いたら `</div>` で閉じることをパース時に検証する。
-現在の手書き実装では `backref` ロジックをカスタムパーサーで書く必要がある。
+Java/Rustの生成parserは、両端をtrimしたcaptureのtextが異なれば`ERROR`意味診断を残す。
+`<div></span>`のような不一致は、構文解析の失敗にはしない。閉じタグにも`@tagName`が必要で、
+参照先`Content`内部のcaptureは比較に混ぜない。
+[空capture・位置・rollbackと移行](../../docs/generated-scope-effects.md)を参照。
+入力を消費して再照合するruntimeのcapture-and-replayとは別契約である。
 
 ---
 

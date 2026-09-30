@@ -28,6 +28,7 @@ pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
         tokens: HashMap::new(),
         bodies: Vec::new(),
         mappings: Vec::new(),
+        comparisons: Vec::new(),
         skips: Vec::new(),
         operators: Vec::new(),
         catalogs: Vec::new(),
@@ -45,6 +46,7 @@ struct Lowering<'a> {
     tokens: HashMap<String, Expression>,
     bodies: Vec<Expression>,
     mappings: Vec<Option<(String, Vec<String>)>>,
+    comparisons: Vec<Option<String>>,
     skips: Vec<bool>,
     operators: Vec<Option<Operator>>,
     catalogs: Vec<Option<String>>,
@@ -164,6 +166,7 @@ impl Lowering<'_> {
             let mut interleave = false;
             let mut catalog = None;
             let mut effects = RuleEffects::default();
+            let mut comparison = None;
             for annotation in &rule.annotations {
                 match &annotation.kind {
                     AnnotationKind::Root => {
@@ -262,10 +265,12 @@ impl Lowering<'_> {
                         });
                     }
                     AnnotationKind::Backref { name } => {
-                        if !has_scope {
-                            return Err("@backref without @scopeTree is unsupported".into());
-                        }
-                        if effects.backref.replace(name.clone()).is_some() {
+                        let previous = if has_scope {
+                            effects.backref.replace(name.clone())
+                        } else {
+                            comparison.replace(name.clone())
+                        };
+                        if previous.is_some() {
                             return Err(format!("duplicate @backref on {}", rule.name));
                         }
                     }
@@ -327,6 +332,7 @@ impl Lowering<'_> {
             }));
             self.catalogs.push(catalog);
             self.mappings.push(mapping);
+            self.comparisons.push(comparison);
             self.skips.push(skip);
         }
         let root = root.ok_or("exactly one @root is required")?;
@@ -369,6 +375,7 @@ impl Lowering<'_> {
                 .iter()
                 .map(|decl| &decl.symbol_capture)
                 .chain(effects.backref.iter())
+                .chain(self.comparisons[i].iter())
             {
                 if !captures.contains_key(target) {
                     return Err(format!(
@@ -409,6 +416,7 @@ impl Lowering<'_> {
                 if !self.skips[i]
                     && !captures.is_empty()
                     && *effects == RuleEffects::default()
+                    && self.comparisons[i].is_none()
                     && self.catalogs[i].is_none()
                 {
                     return Err(format!(
@@ -547,6 +555,12 @@ impl Lowering<'_> {
                 rule.body = Expression::RuleEffects {
                     child: Box::new(rule.body.clone()),
                     effects: rule_effects[i].clone(),
+                };
+            }
+            if let Some(name) = &self.comparisons[i] {
+                rule.body = Expression::CaptureEquality {
+                    child: Box::new(rule.body.clone()),
+                    name: name.clone(),
                 };
             }
         }
@@ -745,9 +759,11 @@ impl Lowering<'_> {
             | Expression::CustomToken(_)
             | Expression::OptionalExpr(_) => true,
             Expression::Reference(rule) => self.nullable.contains(rule),
-            Expression::Capture { expression, .. } | Expression::Delimited(expression) => {
-                self.is_nullable(expression)
-            }
+            Expression::Capture { expression, .. }
+            | Expression::Delimited(expression)
+            | Expression::CaptureEquality {
+                child: expression, ..
+            } => self.is_nullable(expression),
             Expression::Sequence(elements) => elements.iter().all(|e| self.is_nullable(e)),
             Expression::Choice(elements) => elements.iter().any(|e| self.is_nullable(e)),
             Expression::Repeat { child, min, .. } => *min == 0 || self.is_nullable(child),
@@ -839,7 +855,7 @@ impl Lowering<'_> {
         rule: usize,
         visiting: &mut HashSet<usize>,
     ) -> Result<bool> {
-        if self.skips[rule] {
+        if self.skips[rule] || (self.mappings[rule].is_none() && self.comparisons[rule].is_some()) {
             return Ok(true);
         }
         if self.mappings[rule].is_some() || !visiting.insert(rule) {
@@ -896,9 +912,11 @@ impl Lowering<'_> {
         let _depth = self.enter_analysis()?;
         match expression {
             Expression::Reference(rule) => self.rule_shape(*rule, visiting),
-            Expression::Capture { expression, .. } | Expression::Delimited(expression) => {
-                self.shape(expression, visiting)
-            }
+            Expression::Capture { expression, .. }
+            | Expression::Delimited(expression)
+            | Expression::CaptureEquality {
+                child: expression, ..
+            } => self.shape(expression, visiting),
             Expression::OptionalExpr(child) => Ok(wrap_node(
                 self.shape(child, visiting)?,
                 Cardinality::Optional,
@@ -1024,6 +1042,9 @@ impl Lowering<'_> {
             | Expression::ValueBoundary(expression)
             | Expression::Delimited(expression)
             | Expression::RuleEffects {
+                child: expression, ..
+            }
+            | Expression::CaptureEquality {
                 child: expression, ..
             } => self.first_predictor(expression, visiting, cache),
             Expression::Repeat { child, min, .. } if *min > 0 => {
@@ -1171,6 +1192,10 @@ impl Lowering<'_> {
             Expression::Delimited(child) => {
                 Expression::Delimited(Box::new(self.project_text_values(child, mapping)?))
             }
+            Expression::CaptureEquality { child, name } => Expression::CaptureEquality {
+                child: Box::new(self.project_text_values(child, mapping)?),
+                name: name.clone(),
+            },
             _ => expression.clone(),
         })
     }
@@ -1191,7 +1216,9 @@ impl Lowering<'_> {
             Expression::OptionalExpr(child) => {
                 self.wrapped_captures(child, Cardinality::Optional)?
             }
-            Expression::Delimited(child) => self.captures(child)?,
+            Expression::Delimited(child) | Expression::CaptureEquality { child, .. } => {
+                self.captures(child)?
+            }
             Expression::Repeat { child, .. } => self.wrapped_captures(child, Cardinality::Many)?,
             Expression::Separated { child, separator } => {
                 if !self.captures(separator)?.is_empty() {
@@ -1586,6 +1613,9 @@ fn children(expression: &Expression) -> Vec<&Expression> {
         Expression::Sequence(elements) | Expression::Choice(elements) => elements.iter().collect(),
         Expression::Capture { expression, .. }
         | Expression::Delimited(expression)
+        | Expression::CaptureEquality {
+            child: expression, ..
+        }
         | Expression::OptionalExpr(expression)
         | Expression::Repeat {
             child: expression, ..

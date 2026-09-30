@@ -271,11 +271,17 @@ Java parser と両 Rust 生成経路で対応。[両言語の契約・global non
 文法に`@scopeTree`があれば、Java/Rustとも指定captureの各出現をscope storeへ参照として記録し、
 未定義ならwarningを残す（構文解析の失敗にはしない）。対象captureは同じルール本体に必要。
 Javaは生成query API、Rustは`RuleEffects.backref`にも対象名を保持する。
-scopeがない場合のJava同一ルール内テキスト比較は別契約で、Rust生成は明示的に未対応。
+文法全体に`@scopeTree`がなければ、Java/Rustとも同じルール本体の同名captureを完了順に比較する。
+Java `String.trim()`相当のtextが最初の出現と異なれば`ERROR`意味診断を追加するが、構文解析は失敗させない。
+空textも含め、0/1出現なら診断なし。offset/lengthはtrim後のUnicodeコードポイント範囲。
+参照先rule内部のcaptureは混ぜず、失敗branch・親rollbackでは診断も戻す。
+対象capture欠損と重複注釈はどちらのmodeでも検証エラー。
+[capture比較・scope参照・replayの区別と移行](../../docs/generated-scope-effects.md)を参照。
 
 ### バックログ
 
-Rust LSPへのdiagnostics搬送、scopeなしの後方参照、および評価時環境は未対応。
+Rust LSPへのdiagnostics搬送、および評価時環境は未対応。
+context-wide capture-and-replay combinatorのUBNF接続は、この比較注釈とは別の未対応項目。
 
 ---
 
@@ -353,12 +359,13 @@ Rustのowned `Tree.scopes()`は取得時のscope store snapshotを持つ。
 
 ## 現在の制限事項
 
-- `@backref`: scopeなしの同一ルール内テキスト比較はRust生成未対応
+- `@backref`: capture比較またはscope参照の意味診断。入力を消費するcapture-and-replayのUBNF接続ではない
 - `@scopeTree`: 両modeは解析時stack。評価時dynamic環境・永続scope treeは未対応
 - `@leftAssoc` はバリデーション対象だが、パーサー生成での直接的な消費は限定的
 
 ## 変更履歴
 
+- 2026-09-30: scopeなし`@backref`のJava/Rust capture比較、診断位置、rollback、移行を明記（#325）。
 - 2026-09-24: `@root` の SHOULD 違反（複数ルール付与）時の挙動を明記（現在の実装は検出・
   警告せず受理する）。`ubnf-syntax.md` の完全版 MiniLang 文法が本ドキュメントの
   「`@leftAssoc` は `@precedence` を伴う（MUST）」に違反していた矛盾は、MiniLang 側の

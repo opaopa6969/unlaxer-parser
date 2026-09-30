@@ -897,46 +897,7 @@ class ParserRuleEmitter {
                 .filter(a -> a instanceof BackrefAnnotation)
                 .map(a -> ((BackrefAnnotation) a).name())
                 .findFirst().orElse("");
-            String captureParserClass = findCaptureParserClass(ctx, rule, backrefCapture);
-            w.line("// @backref(name=" + backrefCapture + ") \u2014 back-reference mode (same-rule token match)");
-            w.line("if (!tokens.isEmpty()) {");
-            w.indent();
-            w.line("org.unlaxer.Token ruleToken = tokens.get(0);");
-            if (captureParserClass != null) {
-                // instanceof は class リテラルを取らないので .class を除去
-                String instanceofClass = captureParserClass.endsWith(".class")
-                    ? captureParserClass.substring(0, captureParserClass.length() - ".class".length())
-                    : captureParserClass;
-                // filteredChildren から同パーサークラスの全トークンを収集し、テキストが一致するか検証
-                w.line("java.util.List<org.unlaxer.Token> __backrefTokens =");
-                w.line("    (ruleToken.filteredChildren == null)");
-                w.line("    ? java.util.Collections.emptyList()");
-                w.line("    : __semanticChildren(ruleToken)");
-                w.line("        .filter(c -> c.getParser() instanceof " + instanceofClass + ")");
-                w.line("        .collect(java.util.stream.Collectors.toList());");
-                w.line("if (__backrefTokens.size() >= 2) {");
-                w.indent();
-                w.line("String __expected = __backrefTokens.get(0).source == null ? \"\" : __backrefTokens.get(0).source.sourceAsString().trim();");
-                w.line("for (int __bi = 1; __bi < __backrefTokens.size(); __bi++) {");
-                w.indent();
-                w.line("org.unlaxer.Token __bt = __backrefTokens.get(__bi);");
-                w.line("if (__bt.source == null) continue;");
-                w.line("String __actual = __bt.source.sourceAsString().trim();");
-                w.line("if (!__expected.equals(__actual)) {");
-                w.indent();
-                w.line("org.unlaxer.dsl.runtime.ScopeStore.addDiagnostic(ctx,");
-                w.line("    \"back-reference mismatch: expected '\" + __expected + \"' but got '\" + __actual + \"'\",");
-                w.line("    __bt.source.offsetFromRoot().value(), __actual.length(),");
-                w.line("    org.unlaxer.dsl.runtime.ScopeStore.Severity.ERROR);");
-                w.dedent();
-                w.line("}");
-                w.dedent();
-                w.line("}");
-                w.dedent();
-                w.line("}");
-            }
-            w.dedent();
-            w.line("}");
+            w.raw(ParserScopeEmitter.equalityAction(ctx, rule, backrefCapture));
         }
         w.dedent();
         w.line("}");
@@ -1450,22 +1411,4 @@ class ParserRuleEmitter {
         return null;
     }
 
-    /**
-     * @declares(symbol=captureName) に対して、そのキャプチャ要素のパーサークラス式を返す。
-     */
-    static String findCaptureParserClass(ParserGenerator.GenContext ctx, RuleDecl rule, String captureName) {
-        RuleBody body = rule.body();
-        if (!(body instanceof ChoiceBody choice)) return null;
-        for (SequenceBody seq : choice.alternatives()) {
-            for (AnnotatedElement ae : seq.elements()) {
-                if (ae.captureName().isPresent() && captureName.equals(ae.captureName().get())) {
-                    if (ae.element() instanceof RuleRefElement ref) {
-                        String parserClass = resolveParserClass(ctx, ref.name());
-                        return parserClass != null ? parserClass : null;
-                    }
-                }
-            }
-        }
-        return null;
-    }
 }

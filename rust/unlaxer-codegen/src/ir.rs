@@ -90,6 +90,11 @@ pub enum Expression {
         child: Box<Expression>,
         effects: RuleEffects,
     },
+    /// Compare this rule body's completed named captures after a successful parse.
+    CaptureEquality {
+        child: Box<Expression>,
+        name: String,
+    },
     Literal(String),
     NumberToken,
     IdentifierToken,
