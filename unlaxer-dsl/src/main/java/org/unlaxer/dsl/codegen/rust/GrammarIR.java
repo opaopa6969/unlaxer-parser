@@ -35,11 +35,23 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     public record RuleEffects(Expression child, Effects effects) implements Expression {}
     /** Compares this rule's own completed named captures; differences are semantic diagnostics. */
     public record CaptureEquality(Expression child, String name) implements Expression {}
+    public enum RecoveryMode { SYNC, BEFORE_SYNC, SKIP }
+    /** Rule-level transactional recovery; a recovered tree must not be mapped as a normal AST. */
+    public record Recovery(Expression child, RecoveryMode mode, List<String> tokens, String message)
+            implements Expression {
+        public Recovery {
+            tokens = List.copyOf(tokens);
+            if (tokens.stream().anyMatch(String::isEmpty)
+                || new java.util.HashSet<>(tokens).size() != tokens.size()) {
+                throw new IllegalArgumentException("duplicate or empty recovery sync token");
+            }
+        }
+    }
     public sealed interface Expression permits Literal, NumberToken, Reference, Sequence, Choice, LongestChoice, PredictiveChoice, Capture,
         OptionalExpr, Repeat, Separated, AnyToken, EofToken, EmptyToken, ErrorExpected, CharRangeToken,
         ExceptToken, UntilToken, LookaheadToken, Delimited, IdentifierToken, QuotedToken,
         CodeStartToken, CodeEndToken, LongCodeBlockToken, CustomToken, TextValue, ValueBoundary, TriviaScope, RuleEffects,
-        CaptureEquality {}
+        CaptureEquality, Recovery {}
     /** Rule-local trivia policy, transparent to captures and semantic values. */
     public record TriviaScope(Expression child, boolean javaWhitespace) implements Expression {}
     /** Retains an otherwise unmapped text branch as a source-positioned semantic value. */

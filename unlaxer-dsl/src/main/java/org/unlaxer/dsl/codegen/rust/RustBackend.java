@@ -184,6 +184,16 @@ public final class RustBackend {
     }
 
     private String expression(Expression expression) {
+        if (expression instanceof Recovery recovery) {
+            String tokens = recovery.tokens().stream().map(RustBackend::quote)
+                .collect(java.util.stream.Collectors.joining(", "));
+            return "Expr::Recovery { child: Box::new(" + expression(recovery.child())
+                + "), mode: unlaxer_runtime::RecoveryMode::" + switch (recovery.mode()) {
+                    case SYNC -> "Sync";
+                    case BEFORE_SYNC -> "BeforeSync";
+                    case SKIP -> "Skip";
+                } + ", tokens: vec![" + tokens + "], message: " + quote(recovery.message()) + " }";
+        }
         if (expression instanceof CaptureEquality equality) {
             return "Expr::compare_captures(" + quote(equality.name()) + ", " + expression(equality.child()) + ")";
         }
@@ -333,11 +343,15 @@ public final class RustBackend {
         StringBuilder out = new StringBuilder(HEADER);
         if (hasValues(ir)) out.append("use super::ast::AstValue;\n");
         out.append("use super::ast::Ast;\nuse unlaxer_runtime::Tree;\n\n");
+        if (ir.rules().stream().anyMatch(rule -> containsRecovery(rule.body()))) {
+            out.append("pub fn map(tree: &Tree) -> Result<Ast, String> {\n"
+                + "    if !tree.recoveries().is_empty() { return Err(\"cannot map recovered syntax\".into()); }\n"
+                + "    required(map_node(tree, tree.root)?, \"root\")\n}\n\n");
+        } else {
+            out.append("pub fn map(tree: &Tree) -> Result<Ast, String> {\n"
+                + "    required(map_node(tree, tree.root)?, \"root\")\n}\n\n");
+        }
         out.append("""
-            pub fn map(tree: &Tree) -> Result<Ast, String> {
-                required(map_node(tree, tree.root)?, "root")
-            }
-
             fn required<T>(mut values: Vec<T>, name: &str) -> Result<T, String> {
                 if values.len() != 1 { return Err(format!("expected one value for {name}, got {}", values.len())); }
                 Ok(values.remove(0))
@@ -492,6 +506,27 @@ public final class RustBackend {
             case OPTIONAL -> name + ".as_ref().map_or_else(|| \"null\".to_owned(), |value| " + value + ")";
             case MANY -> "format!(\"[{}]\", " + name + ".iter().map(|value| " + value + ").collect::<Vec<_>>().join(\",\"))";
         };
+    }
+
+    private static boolean containsRecovery(Expression expression) {
+        if (expression instanceof Recovery) return true;
+        // A user adapter callback can parse a recovery expression inside its own provider.
+        if (expression instanceof CustomToken) return true;
+        if (expression instanceof RuleEffects value) return containsRecovery(value.child());
+        if (expression instanceof CaptureEquality value) return containsRecovery(value.child());
+        if (expression instanceof TriviaScope value) return containsRecovery(value.child());
+        if (expression instanceof TextValue value) return containsRecovery(value.child());
+        if (expression instanceof ValueBoundary value) return containsRecovery(value.child());
+        if (expression instanceof Delimited value) return containsRecovery(value.child());
+        if (expression instanceof Capture value) return containsRecovery(value.expression());
+        if (expression instanceof OptionalExpr value) return containsRecovery(value.child());
+        if (expression instanceof Repeat value) return containsRecovery(value.child());
+        if (expression instanceof Separated value) return containsRecovery(value.child()) || containsRecovery(value.separator());
+        if (expression instanceof Sequence value) return value.elements().stream().anyMatch(RustBackend::containsRecovery);
+        if (expression instanceof Choice value) return value.alternatives().stream().anyMatch(RustBackend::containsRecovery);
+        if (expression instanceof LongestChoice value) return value.alternatives().stream().anyMatch(RustBackend::containsRecovery);
+        if (expression instanceof PredictiveChoice value) return value.alternatives().stream().anyMatch(RustBackend::containsRecovery);
+        return false;
     }
 
     private static boolean hasValues(GrammarIR ir) {

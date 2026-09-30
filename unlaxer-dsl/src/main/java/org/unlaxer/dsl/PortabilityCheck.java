@@ -112,7 +112,6 @@ public final class PortabilityCheck {
         String unsupported = null;
         if (annotation instanceof EvalAnnotation) unsupported = "eval";
         else if (annotation instanceof DocAnnotation) unsupported = "doc";
-        else if (annotation instanceof RecoveryAnnotation) unsupported = "recovery";
         else if (annotation instanceof SimpleAnnotation simple) unsupported = simple.name();
         else if (annotation instanceof CommonFieldAnnotation) unsupported = "commonField";
         else if (annotation instanceof EnumAnnotation) unsupported = "enum";

@@ -257,10 +257,20 @@ fn custom_function_binding_compiles_and_runs_only_in_the_generated_host() {
         r#"
 mod generated;
 fn word_token(context: &mut unlaxer_runtime::ParseContext<'_>) -> unlaxer_runtime::ParseResult {
-    context.parse(&unlaxer_runtime::Expr::Literal("word"))
+    context.parse(&unlaxer_runtime::Expr::Literal("word").recover(
+        unlaxer_runtime::RecoveryMode::Sync,
+        [";"],
+        "provider recovery",
+    ))
 }
 fn main() {
-    assert!(generated::parser::parse_tree("word").is_ok());
+    let normal = generated::parser::parse_tree("word").unwrap();
+    assert!(normal.recoveries().is_empty());
+    assert!(generated::mapper::map(&normal).is_ok());
+    let recovered = generated::parser::parse_tree("other;").unwrap();
+    assert_eq!(recovered.recoveries().len(), 1);
+    assert_eq!(recovered.recoveries()[0].message, "provider recovery");
+    assert_eq!(generated::mapper::map(&recovered).unwrap_err(), "cannot map recovered syntax");
     assert!(generated::parser::parse_tree("other").is_err());
 }
 "#,

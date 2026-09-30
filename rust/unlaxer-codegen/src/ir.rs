@@ -84,6 +84,13 @@ pub struct RuleEffects {
     pub backref: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RecoveryMode {
+    Sync,
+    BeforeSync,
+    Skip,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression {
     RuleEffects {
@@ -94,6 +101,12 @@ pub enum Expression {
     CaptureEquality {
         child: Box<Expression>,
         name: String,
+    },
+    Recovery {
+        child: Box<Expression>,
+        mode: RecoveryMode,
+        tokens: Vec<String>,
+        message: String,
     },
     Literal(String),
     /// Always fails without consuming input; the message is an expected hint.
