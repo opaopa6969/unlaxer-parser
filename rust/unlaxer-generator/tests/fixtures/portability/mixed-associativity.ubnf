@@ -1,0 +1,11 @@
+grammar MixedAssoc {
+  @root @mapping(Root, params=[value])
+  Start ::= Left @value | Right @value ;
+  Item ::= 'n' ;
+  @leftAssoc @precedence(level=1)
+  @mapping(LeftExpr, params=[left, op, right])
+  Left ::= Item @left { '+' @op Item @right } ;
+  @rightAssoc @precedence(level=1)
+  @mapping(RightExpr, params=[left, op, right])
+  Right ::= Item @left { '^' @op Right @right } ;
+}

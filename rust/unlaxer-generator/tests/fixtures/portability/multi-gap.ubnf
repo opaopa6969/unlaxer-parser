@@ -1,0 +1,15 @@
+// 😀 source positions are code points
+grammar Bad {
+  @import lib from 'missing.ubnf'
+  @unknown: x
+  @comment: { line: '//' }
+  @whitespace: custom
+  token A = example.ExternalParser
+  token B = REGEX('a')
+  token C = CI('b')
+  @root @mapping(Outer.Node, params=[span,_x])
+  @eval(kind='literal') @doc('before') @recovery(auto) @skip @enum @custom @commonField(a)
+  @whitespace(spaceOnly) @interleave(profile=unknown) @scopeTree(mode=unknown)
+  R ::= '' @a lib.Item ( @typeof(a) A @x ) ERROR('bad 😀 " newline\n');
+  @doc('later') Another ::= lib.Last;
+}

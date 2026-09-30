@@ -10,7 +10,7 @@ Issue: [#318](https://github.com/opaopa6969/unlaxer-parser/issues/318)
 同値のリテラルが複数の場所にあっても別の位置を保持する。
 
 これは診断用の位置保持 API であり、未対応機能を全件報告する portability check ではない。
-後者の集約・JSON/CLI・exit status は #157 に残る。
+後者の集約・JSON/CLI・exit status は [移植可能性チェック #157](portability-check.md) が担当する。
 生成 parser の入力位置や LSP の UTF-16 列とも別の、**UBNF ファイル自体の位置**である。
 
 ## API

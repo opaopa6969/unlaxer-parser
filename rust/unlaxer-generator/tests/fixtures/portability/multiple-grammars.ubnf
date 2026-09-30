@@ -1,0 +1,2 @@
+grammar A { @doc('first') X ::= 'x'; }
+grammar B { @skip Y ::= ERROR('second'); }

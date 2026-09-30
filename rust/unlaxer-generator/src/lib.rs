@@ -1,5 +1,6 @@
 //! Native UBNF -> normalized IR -> Rust modules. No Java process is launched.
 pub mod lowering;
+pub mod portability;
 
 /// Parse and validate the complete grammar before producing any artifacts.
 pub fn generate(source: &str) -> Result<Vec<unlaxer_codegen::GeneratedFile>, String> {

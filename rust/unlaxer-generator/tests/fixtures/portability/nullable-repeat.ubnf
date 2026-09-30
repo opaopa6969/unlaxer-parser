@@ -1,0 +1,1 @@
+grammar G { token E = EMPTY @root @mapping(R, params=[items]) R ::= E* @items; }

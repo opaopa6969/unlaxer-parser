@@ -92,12 +92,21 @@ public final class GrammarValidator {
     }
 
     public static List<ValidationIssue> validate(GrammarDecl grammar) {
+        return validate(grammar, true);
+    }
+
+    /** Pure validation for tooling that must not resolve Java parser classes. */
+    public static List<ValidationIssue> validateWithoutClassLoading(GrammarDecl grammar) {
+        return validate(grammar, false);
+    }
+
+    private static List<ValidationIssue> validate(GrammarDecl grammar, boolean resolveParserClasses) {
         List<ValidationIssue> errors = new ArrayList<>();
 
         validateGlobalWhitespace(grammar, errors);
         validateMemoSafeTokens(grammar, errors);
         validateRootPresence(grammar, errors);
-        validateTokens(grammar, errors);
+        if (resolveParserClasses) validateTokens(grammar, errors);
         validateRuleTokenParserNameCollisions(grammar, errors);
         validateBoundedRepeatElements(grammar, errors);
         validateCommonFields(grammar, errors);
