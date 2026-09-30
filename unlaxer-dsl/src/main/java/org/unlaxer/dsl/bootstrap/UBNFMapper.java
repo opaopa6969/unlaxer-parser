@@ -69,7 +69,24 @@ import org.unlaxer.parser.Parser;
  */
 public class UBNFMapper {
 
-    private UBNFMapper() {}
+    private final UBNFSourceSnapshot.Builder sourceSnapshot;
+
+    private UBNFMapper(UBNFSourceSnapshot.Builder sourceSnapshot) {
+        this.sourceSnapshot = sourceSnapshot;
+    }
+
+    private <T> T bind(T node, Token token) {
+        return sourceSnapshot == null ? node : sourceSnapshot.bind(node, token);
+    }
+
+    private <T> T synthetic(T node, Object from) {
+        return sourceSnapshot == null ? node
+            : sourceSnapshot.derive(node, from, UBNFSourceSnapshot.Kind.SYNTHETIC);
+    }
+
+    private <T> T extend(T node, Object from, Token last) {
+        return sourceSnapshot == null ? node : sourceSnapshot.extend(node, from, last);
+    }
 
     // =========================================================================
     // エントリーポイント
@@ -84,6 +101,24 @@ public class UBNFMapper {
      * @throws IllegalArgumentException パースに失敗した場合、または入力全体を消費できなかった場合
      */
     public static UBNFFile parse(String source) {
+        return new UBNFMapper(null).parseInternal(source);
+    }
+
+    /**
+     * Parse once and retain an owned, identity-indexed source snapshot alongside
+     * the unchanged semantic AST. Imports are recorded, not resolved; parse each
+     * imported source separately to retain its own origin.
+     */
+    public static UBNFSourceSnapshot parseWithSource(String source) {
+        UBNFSourceSnapshot.Builder builder = new UBNFSourceSnapshot.Builder(source);
+        UBNFFile ast = new UBNFMapper(builder).parseInternal(source);
+        builder.origins.put(ast, new UBNFSourceSnapshot.Origin(
+            new UBNFSourceSnapshot.Span(0, source.codePointCount(0, source.length())),
+            UBNFSourceSnapshot.Kind.SOURCE));
+        return new UBNFSourceSnapshot(ast, builder);
+    }
+
+    private UBNFFile parseInternal(String source) {
         StringSource stringSource = StringSource.createRootSource(source);
         try (ParseContext context = new ParseContext(stringSource)) {
             Parser rootParser = UBNFParsers.getRootParser();
@@ -271,42 +306,54 @@ public class UBNFMapper {
     // ファイルレベル変換
     // =========================================================================
 
-    static UBNFFile toUBNFFile(Token token) {
+    UBNFFile toUBNFFile(Token token) {
+        return bind(mapUBNFFile(token), token);
+    }
+
+    private UBNFFile mapUBNFFile(Token token) {
         List<GrammarDecl> grammars = findDescendants(token, UBNFParsers.GrammarDeclParser.class)
             .stream()
-            .map(UBNFMapper::toGrammarDecl)
+            .map(this::toGrammarDecl)
             .toList();
         return new UBNFFile(grammars);
     }
 
-    static GrammarDecl toGrammarDecl(Token token) {
+    GrammarDecl toGrammarDecl(Token token) {
+        return bind(mapGrammarDecl(token), token);
+    }
+
+    private GrammarDecl mapGrammarDecl(Token token) {
         List<Token> identifiers = findDescendants(token, UBNFParsers.IdentifierParser.class);
         String name = identifiers.isEmpty() ? "" : identifiers.get(0).source.toString().trim();
 
         List<ImportDecl> imports = findDescendants(token, UBNFParsers.ImportDeclParser.class)
             .stream()
-            .map(UBNFMapper::toImportDecl)
+            .map(this::toImportDecl)
             .toList();
 
         List<GlobalSetting> settings = findDescendants(token, UBNFParsers.GlobalSettingParser.class)
             .stream()
-            .map(UBNFMapper::toGlobalSetting)
+            .map(this::toGlobalSetting)
             .toList();
 
         List<TokenDecl> tokens = findDescendants(token, UBNFParsers.TokenDeclParser.class)
             .stream()
-            .map(UBNFMapper::toTokenDecl)
+            .map(this::toTokenDecl)
             .toList();
 
         List<RuleDecl> rules = findDescendants(token, UBNFParsers.RuleDeclParser.class)
             .stream()
-            .map(UBNFMapper::toRuleDecl)
+            .map(this::toRuleDecl)
             .toList();
 
         return new GrammarDecl(name, imports, settings, tokens, rules);
     }
 
-    static ImportDecl toImportDecl(Token token) {
+    ImportDecl toImportDecl(Token token) {
+        return bind(mapImportDecl(token), token);
+    }
+
+    private ImportDecl mapImportDecl(Token token) {
         List<Token> identifiers = findDescendants(token, UBNFParsers.IdentifierParser.class);
         String alias = identifiers.isEmpty() ? "" : identifiers.get(0).source.toString().trim();
         List<Token> strings = findDescendants(token, org.unlaxer.parser.elementary.SingleQuotedParser.class);
@@ -318,14 +365,22 @@ public class UBNFMapper {
     // グローバル設定変換
     // =========================================================================
 
-    static GlobalSetting toGlobalSetting(Token token) {
+    GlobalSetting toGlobalSetting(Token token) {
+        return bind(mapGlobalSetting(token), token);
+    }
+
+    private GlobalSetting mapGlobalSetting(Token token) {
         List<Token> identifiers = findDescendants(token, UBNFParsers.IdentifierParser.class);
         String key = identifiers.isEmpty() ? "" : identifiers.get(0).source.toString().trim();
         SettingValue value = toSettingValue(token);
         return new GlobalSetting(key, value);
     }
 
-    static SettingValue toSettingValue(Token token) {
+    SettingValue toSettingValue(Token token) {
+        return bind(mapSettingValue(token), token);
+    }
+
+    private SettingValue mapSettingValue(Token token) {
         List<Token> blockTokens = findDescendants(token, UBNFParsers.BlockSettingValueParser.class);
         if (false == blockTokens.isEmpty()) {
             return toBlockSettingValue(blockTokens.get(0));
@@ -337,21 +392,33 @@ public class UBNFMapper {
         return new StringSettingValue("");
     }
 
-    static StringSettingValue toStringSettingValue(Token token) {
+    StringSettingValue toStringSettingValue(Token token) {
+        return bind(mapStringSettingValue(token), token);
+    }
+
+    private StringSettingValue mapStringSettingValue(Token token) {
         List<Token> dottedTokens = findDescendants(token, UBNFParsers.DottedIdentifierParser.class);
         String value = dottedTokens.isEmpty() ? "" : dottedTokens.get(0).source.toString().trim();
         return new StringSettingValue(value);
     }
 
-    static BlockSettingValue toBlockSettingValue(Token token) {
+    BlockSettingValue toBlockSettingValue(Token token) {
+        return bind(mapBlockSettingValue(token), token);
+    }
+
+    private BlockSettingValue mapBlockSettingValue(Token token) {
         List<KeyValuePair> entries = findDescendants(token, UBNFParsers.KeyValuePairParser.class)
             .stream()
-            .map(UBNFMapper::toKeyValuePair)
+            .map(this::toKeyValuePair)
             .toList();
         return new BlockSettingValue(entries);
     }
 
-    static KeyValuePair toKeyValuePair(Token token) {
+    KeyValuePair toKeyValuePair(Token token) {
+        return bind(mapKeyValuePair(token), token);
+    }
+
+    private KeyValuePair mapKeyValuePair(Token token) {
         List<Token> identifiers = findDescendants(token, UBNFParsers.IdentifierParser.class);
         List<Token> strings = findDescendants(token, org.unlaxer.parser.elementary.SingleQuotedParser.class);
         String key = identifiers.isEmpty() ? "" : identifiers.get(0).source.toString().trim();
@@ -363,7 +430,11 @@ public class UBNFMapper {
     // トークン宣言変換
     // =========================================================================
 
-    static TokenDecl toTokenDecl(Token token) {
+    TokenDecl toTokenDecl(Token token) {
+        return bind(mapTokenDecl(token), token);
+    }
+
+    private TokenDecl mapTokenDecl(Token token) {
         List<Token> identifiers = findDescendants(token, UBNFParsers.IdentifierParser.class);
         String name = identifiers.size() > 0 ? identifiers.get(0).source.toString().trim() : "";
 
@@ -454,7 +525,7 @@ public class UBNFMapper {
     }
 
     /** 文字列から先頭の空白を除き、最初の空白文字より前の部分だけを返す。 */
-    private static String firstWord(String text) {
+    private String firstWord(String text) {
         String trimmed = text.trim();
         for (int i = 0; i < trimmed.length(); i++) {
             if (Character.isWhitespace(trimmed.charAt(i))) {
@@ -468,7 +539,11 @@ public class UBNFMapper {
     // ルール宣言変換
     // =========================================================================
 
-    static RuleDecl toRuleDecl(Token token) {
+    RuleDecl toRuleDecl(Token token) {
+        return bind(mapRuleDecl(token), token);
+    }
+
+    private RuleDecl mapRuleDecl(Token token) {
         List<Annotation> annotations = collectAnnotations(token);
 
         // アノテーション内の identifier を誤検出しないよう直接子だけを見る
@@ -490,11 +565,11 @@ public class UBNFMapper {
     // アノテーション変換
     // =========================================================================
 
-    static List<Annotation> collectAnnotations(Token token) {
+    List<Annotation> collectAnnotations(Token token) {
         List<Annotation> result = new ArrayList<>();
         for (Token child : token.filteredChildren) {
             if (child.parser.getClass() == UBNFParsers.RootAnnotationParser.class) {
-                result.add(new RootAnnotation());
+                result.add(bind(new RootAnnotation(), child));
             } else if (child.parser.getClass() == UBNFParsers.MappingAnnotationParser.class) {
                 result.add(toMappingAnnotation(child));
             } else if (child.parser.getClass() == UBNFParsers.EvalAnnotationParser.class) {
@@ -514,13 +589,13 @@ public class UBNFMapper {
             } else if (child.parser.getClass() == UBNFParsers.CatalogAnnotationParser.class) {
                 result.add(toCatalogAnnotation(child));
             } else if (child.parser.getClass() == UBNFParsers.LeftAssocAnnotationParser.class) {
-                result.add(new LeftAssocAnnotation());
+                result.add(bind(new LeftAssocAnnotation(), child));
             } else if (child.parser.getClass() == UBNFParsers.RightAssocAnnotationParser.class) {
-                result.add(new RightAssocAnnotation());
+                result.add(bind(new RightAssocAnnotation(), child));
             } else if (child.parser.getClass() == UBNFParsers.LongestChoiceAnnotationParser.class) {
-                result.add(new LongestChoiceAnnotation());
+                result.add(bind(new LongestChoiceAnnotation(), child));
             } else if (child.parser.getClass() == UBNFParsers.PredictiveChoiceAnnotationParser.class) {
-                result.add(new PredictiveChoiceAnnotation());
+                result.add(bind(new PredictiveChoiceAnnotation(), child));
             } else if (child.parser.getClass() == UBNFParsers.PrecedenceAnnotationParser.class) {
                 result.add(toPrecedenceAnnotation(child));
             } else if (child.parser.getClass() == UBNFParsers.DocAnnotationParser.class) {
@@ -528,9 +603,9 @@ public class UBNFMapper {
             } else if (child.parser.getClass() == UBNFParsers.RecoveryAnnotationParser.class) {
                 result.add(toRecoveryAnnotation(child));
             } else if (child.parser.getClass() == UBNFParsers.SkipAnnotationParser.class) {
-                result.add(new SkipAnnotation());
+                result.add(bind(new SkipAnnotation(), child));
             } else if (child.parser.getClass() == UBNFParsers.EnumAnnotationParser.class) {
-                result.add(new UBNFAST.EnumAnnotation());
+                result.add(bind(new UBNFAST.EnumAnnotation(), child));
             } else if (child.parser.getClass() == UBNFParsers.CommonFieldAnnotationParser.class) {
                 result.add(toCommonFieldAnnotation(child));
             } else if (child.parser.getClass() == UBNFParsers.SimpleAnnotationParser.class) {
@@ -543,7 +618,11 @@ public class UBNFMapper {
         return result;
     }
 
-    static MappingAnnotation toMappingAnnotation(Token token) {
+    MappingAnnotation toMappingAnnotation(Token token) {
+        return bind(mapMappingAnnotation(token), token);
+    }
+
+    private MappingAnnotation mapMappingAnnotation(Token token) {
         // Class name is the first DottedIdentifier under @mapping(...).
         // It may be a single name ("Foo") or dotted ("Outer.Inner") — both are
         // preserved verbatim, and ASTGenerator decides how to render them
@@ -564,7 +643,11 @@ public class UBNFMapper {
         return new MappingAnnotation(className, List.copyOf(paramNames));
     }
 
-    static EvalAnnotation toEvalAnnotation(Token token) {
+    EvalAnnotation toEvalAnnotation(Token token) {
+        return bind(mapEvalAnnotation(token), token);
+    }
+
+    private EvalAnnotation mapEvalAnnotation(Token token) {
         // Collect all SingleQuotedParser descendants for positional values
         List<Token> quoted = findDescendants(
             token, org.unlaxer.parser.elementary.SingleQuotedParser.class);
@@ -592,7 +675,11 @@ public class UBNFMapper {
         return new EvalAnnotation(kind, strategy, Map.copyOf(params));
     }
 
-    static WhitespaceAnnotation toWhitespaceAnnotation(Token token) {
+    WhitespaceAnnotation toWhitespaceAnnotation(Token token) {
+        return bind(mapWhitespaceAnnotation(token), token);
+    }
+
+    private WhitespaceAnnotation mapWhitespaceAnnotation(Token token) {
         List<Token> identifiers = findDescendants(token, UBNFParsers.IdentifierParser.class);
         Optional<String> style = identifiers.isEmpty()
             ? Optional.empty()
@@ -600,44 +687,72 @@ public class UBNFMapper {
         return new WhitespaceAnnotation(style);
     }
 
-    static InterleaveAnnotation toInterleaveAnnotation(Token token) {
+    InterleaveAnnotation toInterleaveAnnotation(Token token) {
+        return bind(mapInterleaveAnnotation(token), token);
+    }
+
+    private InterleaveAnnotation mapInterleaveAnnotation(Token token) {
         List<Token> identifiers = findDescendants(token, UBNFParsers.IdentifierParser.class);
         String profile = identifiers.isEmpty() ? "" : identifiers.get(0).source.toString().trim();
         return new InterleaveAnnotation(profile);
     }
 
-    static BackrefAnnotation toBackrefAnnotation(Token token) {
+    BackrefAnnotation toBackrefAnnotation(Token token) {
+        return bind(mapBackrefAnnotation(token), token);
+    }
+
+    private BackrefAnnotation mapBackrefAnnotation(Token token) {
         List<Token> identifiers = findDescendants(token, UBNFParsers.IdentifierParser.class);
         String name = identifiers.isEmpty() ? "" : identifiers.get(0).source.toString().trim();
         return new BackrefAnnotation(name);
     }
 
-    static ScopeTreeAnnotation toScopeTreeAnnotation(Token token) {
+    ScopeTreeAnnotation toScopeTreeAnnotation(Token token) {
+        return bind(mapScopeTreeAnnotation(token), token);
+    }
+
+    private ScopeTreeAnnotation mapScopeTreeAnnotation(Token token) {
         List<Token> identifiers = findDescendants(token, UBNFParsers.IdentifierParser.class);
         String mode = identifiers.isEmpty() ? "" : identifiers.get(0).source.toString().trim();
         return new ScopeTreeAnnotation(mode);
     }
 
-    static DeclaresAnnotation toDeclaresAnnotation(Token token) {
+    DeclaresAnnotation toDeclaresAnnotation(Token token) {
+        return bind(mapDeclaresAnnotation(token), token);
+    }
+
+    private DeclaresAnnotation mapDeclaresAnnotation(Token token) {
         List<Token> identifiers = findDescendants(token, UBNFParsers.IdentifierParser.class);
         String symbolCapture = identifiers.isEmpty() ? "" : identifiers.get(0).source.toString().trim();
         return new DeclaresAnnotation(symbolCapture, null);
     }
 
-    static DeclaresAnnotation toDeclaresWithDescriptionAnnotation(Token token) {
+    DeclaresAnnotation toDeclaresWithDescriptionAnnotation(Token token) {
+        return bind(mapDeclaresWithDescriptionAnnotation(token), token);
+    }
+
+    private DeclaresAnnotation mapDeclaresWithDescriptionAnnotation(Token token) {
         List<Token> identifiers = findDescendants(token, UBNFParsers.IdentifierParser.class);
         String symbolCapture = identifiers.size() > 0 ? identifiers.get(0).source.toString().trim() : "";
         String description = identifiers.size() > 1 ? identifiers.get(1).source.toString().trim() : null;
         return new DeclaresAnnotation(symbolCapture, description);
     }
 
-    static CatalogAnnotation toCatalogAnnotation(Token token) {
+    CatalogAnnotation toCatalogAnnotation(Token token) {
+        return bind(mapCatalogAnnotation(token), token);
+    }
+
+    private CatalogAnnotation mapCatalogAnnotation(Token token) {
         List<Token> quoted = findDescendants(token, org.unlaxer.parser.elementary.SingleQuotedParser.class);
         String context = quoted.isEmpty() ? "" : stripQuotes(quoted.get(0).source.toString().trim());
         return new CatalogAnnotation(context);
     }
 
-    static RecoveryAnnotation toRecoveryAnnotation(Token token) {
+    RecoveryAnnotation toRecoveryAnnotation(Token token) {
+        return bind(mapRecoveryAnnotation(token), token);
+    }
+
+    private RecoveryAnnotation mapRecoveryAnnotation(Token token) {
         // Detect sync mode by presence of SingleQuotedParser descendant
         List<Token> quoted = findDescendants(token, org.unlaxer.parser.elementary.SingleQuotedParser.class);
         if (false == quoted.isEmpty()) {
@@ -658,28 +773,40 @@ public class UBNFMapper {
         return new RecoveryAnnotation(UBNFAST.RecoveryMode.SKIP, List.of());
     }
 
-    static UBNFAST.CommonFieldAnnotation toCommonFieldAnnotation(Token token) {
+    UBNFAST.CommonFieldAnnotation toCommonFieldAnnotation(Token token) {
         List<Token> identifiers = findDescendants(token, UBNFParsers.IdentifierParser.class);
         List<String> fieldNames = identifiers.stream()
             .map(t -> t.source.toString().trim())
             .toList();
-        return new UBNFAST.CommonFieldAnnotation(fieldNames);
+        return bind(new UBNFAST.CommonFieldAnnotation(fieldNames), token);
     }
 
-    static SimpleAnnotation toSimpleAnnotation(Token token) {
+    SimpleAnnotation toSimpleAnnotation(Token token) {
+        return bind(mapSimpleAnnotation(token), token);
+    }
+
+    private SimpleAnnotation mapSimpleAnnotation(Token token) {
         List<Token> identifiers = findDescendants(token, UBNFParsers.IdentifierParser.class);
         String name = identifiers.isEmpty() ? "" : identifiers.get(0).source.toString().trim();
         return new SimpleAnnotation(name);
     }
 
-    static DocAnnotation toDocAnnotation(Token token) {
+    DocAnnotation toDocAnnotation(Token token) {
+        return bind(mapDocAnnotation(token), token);
+    }
+
+    private DocAnnotation mapDocAnnotation(Token token) {
         List<Token> quoted = findDescendants(
             token, org.unlaxer.parser.elementary.SingleQuotedParser.class);
         String text = quoted.isEmpty() ? "" : stripQuotes(quoted.get(0).source.toString().trim());
         return new DocAnnotation(text);
     }
 
-    static PrecedenceAnnotation toPrecedenceAnnotation(Token token) {
+    PrecedenceAnnotation toPrecedenceAnnotation(Token token) {
+        return bind(mapPrecedenceAnnotation(token), token);
+    }
+
+    private PrecedenceAnnotation mapPrecedenceAnnotation(Token token) {
         List<Token> numberTokens = findDescendants(token, UBNFParsers.UnsignedIntegerParser.class);
         int level = numberTokens.isEmpty()
             ? 0
@@ -691,18 +818,26 @@ public class UBNFMapper {
     // ルール本体変換
     // =========================================================================
 
-    static ChoiceBody toChoiceBody(Token token) {
+    ChoiceBody toChoiceBody(Token token) {
+        return bind(mapChoiceBody(token), token);
+    }
+
+    private ChoiceBody mapChoiceBody(Token token) {
         List<Token> sequenceTokens = findDescendants(token, UBNFParsers.SequenceBodyParser.class);
         List<SequenceBody> alternatives = sequenceTokens.stream()
-            .map(UBNFMapper::toSequenceBody)
+            .map(this::toSequenceBody)
             .toList();
         return new ChoiceBody(alternatives.isEmpty() ? List.of() : alternatives);
     }
 
-    static SequenceBody toSequenceBody(Token token) {
+    SequenceBody toSequenceBody(Token token) {
+        return bind(mapSequenceBody(token), token);
+    }
+
+    private SequenceBody mapSequenceBody(Token token) {
         List<Token> elementTokens = findDescendants(token, UBNFParsers.AnnotatedElementParser.class);
         List<AnnotatedElement> elements = elementTokens.stream()
-            .map(UBNFMapper::toAnnotatedElement)
+            .map(this::toAnnotatedElement)
             .toList();
         // Fix the "typeof" capture name issue:
         // If we have an element with captureName="typeof" followed by a GroupElement,
@@ -721,7 +856,7 @@ public class UBNFMapper {
      * We reconstruct this as:
      * - Element: @typeof(identifier) element @capture
      */
-    static List<AnnotatedElement> fixTypeofCaptureName(List<AnnotatedElement> elements) {
+    List<AnnotatedElement> fixTypeofCaptureName(List<AnnotatedElement> elements) {
         List<AnnotatedElement> result = new ArrayList<>();
         int i = 0;
         while (i < elements.size()) {
@@ -753,6 +888,26 @@ public class UBNFMapper {
                     nextElement.captureName(),
                     Optional.of(new TypeofElement(identifier))  // Add the @typeof constraint
                 );
+                if (sourceSnapshot != null) {
+                    var currentOrigin = sourceSnapshot.origins.get(current);
+                    var atomicOrigin = sourceSnapshot.origins.get(current.element());
+                    var typeofStart = sourceSnapshot.captures.get(current);
+                    var groupOrigin = sourceSnapshot.origins.get(group);
+                    var nextOrigin = sourceSnapshot.origins.get(nextElement);
+                    if (currentOrigin != null && atomicOrigin != null) {
+                        sourceSnapshot.origins.put(fixedCurrent, new UBNFSourceSnapshot.Origin(
+                            currentOrigin.span().through(atomicOrigin.span()), UBNFSourceSnapshot.Kind.REWRITTEN));
+                    }
+                    if (typeofStart != null && groupOrigin != null && nextOrigin != null) {
+                        sourceSnapshot.origins.put(fixedNext.typeofConstraint().orElseThrow(),
+                            new UBNFSourceSnapshot.Origin(typeofStart.through(groupOrigin.span()),
+                                UBNFSourceSnapshot.Kind.REWRITTEN));
+                        sourceSnapshot.origins.put(fixedNext, new UBNFSourceSnapshot.Origin(
+                            typeofStart.through(nextOrigin.span()), UBNFSourceSnapshot.Kind.REWRITTEN));
+                    }
+                    var capture = sourceSnapshot.captures.get(nextElement);
+                    if (capture != null) sourceSnapshot.captures.put(fixedNext, capture);
+                }
                 result.add(fixedNext);
 
                 // Skip the GroupElement since we've incorporated it
@@ -769,7 +924,7 @@ public class UBNFMapper {
      * Extract the identifier from a GroupElement body.
      * The GroupElement contains something like (identifier) which parses to a GroupElement with a body.
      */
-    static String extractIdentifierFromGroup(GroupElement group) {
+    String extractIdentifierFromGroup(GroupElement group) {
         // The group.body() contains a RuleBody with the identifier
         // We need to extract the first identifier from it
         RuleBody body = group.body();
@@ -791,7 +946,11 @@ public class UBNFMapper {
         return "";
     }
 
-    static AnnotatedElement toAnnotatedElement(Token token) {
+    AnnotatedElement toAnnotatedElement(Token token) {
+        return bind(mapAnnotatedElement(token), token);
+    }
+
+    private AnnotatedElement mapAnnotatedElement(Token token) {
         // AtomicElementParser のトークンを直接取得する（SeparatedByParser 内の AtomicElement と混同しないため）
         List<Token> baseAtomicTokens = findDescendants(token, UBNFParsers.AtomicElementParser.class);
         AtomicElement baseElement = baseAtomicTokens.isEmpty()
@@ -812,6 +971,7 @@ public class UBNFMapper {
                 : "*".equals(postfix)
                     ? new RepeatElement(wrapElementInSequenceBody(baseElement))
                     : new OptionalElement(wrapElementInSequenceBody(baseElement));
+            extend(element, baseElement, postfixTokens.get(0));
         } else if (!boundedTokens.isEmpty()) {
             element = parseBoundedRepeat(boundedTokens.get(0), baseElement);
         } else if (!separatedTokens.isEmpty()) {
@@ -821,6 +981,7 @@ public class UBNFMapper {
                 ? new RuleRefElement("ERROR_NO_SEPARATOR")
                 : toAtomicElement(sepAtomicTokens.get(0));
             element = new SeparatedElement(baseElement, separator);
+            extend(element, baseElement, separatedTokens.get(0));
         } else {
             element = baseElement;
         }
@@ -828,19 +989,24 @@ public class UBNFMapper {
         Optional<String> captureName = findCaptureNameInAnnotatedElement(token);
         Optional<TypeofElement> typeofConstraint = findTypeofConstraintInAnnotatedElement(token);
 
-        return new AnnotatedElement(element, captureName, typeofConstraint);
+        AnnotatedElement annotated = new AnnotatedElement(element, captureName, typeofConstraint);
+        if (sourceSnapshot != null && captureName.isPresent()) {
+            findCaptureSpan(token).ifPresent(span -> sourceSnapshot.captures.put(annotated, span));
+        }
+        return annotated;
     }
 
-    private static RuleBody wrapElementInSequenceBody(AtomicElement element) {
-        AnnotatedElement ae = new AnnotatedElement(element, Optional.empty(), Optional.empty());
-        return new SequenceBody(List.of(ae));
+    private RuleBody wrapElementInSequenceBody(AtomicElement element) {
+        AnnotatedElement ae = synthetic(
+            new AnnotatedElement(element, Optional.empty(), Optional.empty()), element);
+        return synthetic(new SequenceBody(List.of(ae)), element);
     }
 
     /**
      * Parses a BoundedQuantifierParser token and wraps baseElement in a BoundedRepeatElement.
      * Handles: {n}  {n,m}  {n,}
      */
-    private static BoundedRepeatElement parseBoundedRepeat(Token boundedToken, AtomicElement baseElement) {
+    private BoundedRepeatElement parseBoundedRepeat(Token boundedToken, AtomicElement baseElement) {
         // Collect all DigitParser groups in the bounded token.
         // BoundedQuantifierParser structure: '{' OneOrMore(Digit) [CommaParser [OneOrMore(Digit)?]] '}'
         // We extract the digit runs as strings by scanning children.
@@ -858,10 +1024,10 @@ public class UBNFMapper {
             String maxStr = inner.substring(commaIdx + 1).trim();
             max = maxStr.isEmpty() ? BoundedRepeatElement.UNBOUNDED : Integer.parseInt(maxStr);
         }
-        return new BoundedRepeatElement(baseElement, min, max);
+        return extend(new BoundedRepeatElement(baseElement, min, max), baseElement, boundedToken);
     }
 
-    static Optional<String> findCaptureNameInAnnotatedElement(Token token) {
+    Optional<String> findCaptureNameInAnnotatedElement(Token token) {
         // AnnotatedElementParser 内の直接子トークンを走査して
         // AtSignParser の次にある IdentifierParser を見つける
         boolean foundAtSign = false;
@@ -885,17 +1051,41 @@ public class UBNFMapper {
         return Optional.empty();
     }
 
-    static Optional<TypeofElement> findTypeofConstraintInAnnotatedElement(Token token) {
+    Optional<TypeofElement> findTypeofConstraintInAnnotatedElement(Token token) {
         // AnnotatedElementParser のプレフィックス Optional 内の TypeofElementParser を探す
         List<Token> typeofTokens = findDescendants(token, UBNFParsers.TypeofElementParser.class);
         if (typeofTokens.isEmpty()) return Optional.empty();
         Token typeofToken = typeofTokens.get(0);
         List<Token> identifiers = findDescendants(typeofToken, UBNFParsers.IdentifierParser.class);
         String refCapture = identifiers.isEmpty() ? "" : identifiers.get(0).source.toString().trim();
-        return Optional.of(new TypeofElement(refCapture));
+        return Optional.of(bind(new TypeofElement(refCapture), typeofToken));
     }
 
-    static AtomicElement toAtomicElement(Token token) {
+    private Optional<UBNFSourceSnapshot.Span> findCaptureSpan(Token token) {
+        Token atSign = null;
+        for (Token child : token.filteredChildren) {
+            if (child.parser.getClass() == UBNFParsers.AtSignParser.class) atSign = child;
+            else if (atSign != null && child.parser.getClass() == UBNFParsers.IdentifierParser.class) {
+                var start = sourceSnapshot.tokenSpan(atSign);
+                var end = sourceSnapshot.tokenSpan(child);
+                if (start.isPresent() && end.isPresent()) return Optional.of(start.get().through(end.get()));
+            }
+        }
+        for (Token child : token.filteredChildren) {
+            if (child.parser.getClass() != UBNFParsers.AtSignParser.class
+                    && !isAtomicElementParser(child.parser.getClass())) {
+                var found = findCaptureSpan(child);
+                if (found.isPresent()) return found;
+            }
+        }
+        return Optional.empty();
+    }
+
+    AtomicElement toAtomicElement(Token token) {
+        return bind(mapAtomicElement(token), token);
+    }
+
+    private AtomicElement mapAtomicElement(Token token) {
         // GroupElement
         List<Token> groupTokens = findAtElementLevel(token, UBNFParsers.GroupElementParser.class);
         if (false == groupTokens.isEmpty()) {
@@ -964,7 +1154,7 @@ public class UBNFMapper {
      * それより前のすべてのトークンを '.' 結合したものを namespace とする
      * （Issue #284: 段数を1個に決め打ちしていたバグの修正）。
      */
-    private static RuleRefElement buildRuleRef(List<Token> identifiers) {
+    private RuleRefElement buildRuleRef(List<Token> identifiers) {
         if (identifiers.size() >= 2) {
             String name = identifiers.get(identifiers.size() - 1).source.toString().trim();
             StringBuilder namespace = new StringBuilder();
@@ -987,7 +1177,11 @@ public class UBNFMapper {
      * '{n,m}' → BoundedRepeatElement
      * '%' sep → SeparatedElement
      */
-    static AtomicElement toQuantifiedRef(Token token) {
+    AtomicElement toQuantifiedRef(Token token) {
+        return bind(mapQuantifiedRef(token), token);
+    }
+
+    private AtomicElement mapQuantifiedRef(Token token) {
         // ベース: RuleRefElement (namespace + name)。namespace は最後のセグメントより前の
         // すべてのセグメントを '.' 結合したもの（chained dot, 例: a.b.Value → namespace=a.b, name=Value）。
         List<Token> refTokens = findDescendants(token, UBNFParsers.RuleRefElementParser.class);

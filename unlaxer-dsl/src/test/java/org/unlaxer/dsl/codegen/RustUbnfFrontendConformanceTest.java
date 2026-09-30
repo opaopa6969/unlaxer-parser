@@ -131,7 +131,7 @@ public class RustUbnfFrontendConformanceTest {
         return output;
     }
 
-    private JsonElement canonical(Object value) throws Exception {
+    JsonElement canonical(Object value) throws Exception {
         if (value == null) return JsonNull.INSTANCE;
         if (value instanceof Optional<?> optional) return canonical(optional.orElse(null));
         if (value instanceof String string) return new JsonPrimitive(string);

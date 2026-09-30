@@ -68,3 +68,32 @@ pub(crate) fn diagnostic(
 pub fn parse(source: &str) -> Result<UbnfFile, Diagnostic> {
     parser::parse(source, lexer::lex(source)?)
 }
+
+/// Source and AST owned by one parse, independent of subsequent parser activity.
+/// Imports are recorded but never opened. Offsets are those of this single input.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SourceSnapshot {
+    source: String,
+    ast: UbnfFile,
+}
+
+impl SourceSnapshot {
+    pub fn source(&self) -> &str {
+        &self.source
+    }
+    pub fn ast(&self) -> &UbnfFile {
+        &self.ast
+    }
+    /// Slice using a span's UTF-8 byte bounds, rejecting invalid character boundaries.
+    /// Use codepoint_start/end to compare positions with the Java frontend.
+    pub fn slice(&self, span: Span) -> Option<&str> {
+        self.source.get(span.byte_start..span.byte_end)
+    }
+}
+
+/// Parse once while retaining the input, without changing the ordinary parse API.
+pub fn parse_with_source(source: impl Into<String>) -> Result<SourceSnapshot, Diagnostic> {
+    let source = source.into();
+    let ast = parse(&source)?;
+    Ok(SourceSnapshot { source, ast })
+}
