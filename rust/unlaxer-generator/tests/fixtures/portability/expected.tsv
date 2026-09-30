@@ -1,7 +1,7 @@
 valid.ubnf	passed	0
 shared-precedence.ubnf	passed	0
-multi-gap.ubnf	blocked	26
-multiple-grammars.ubnf	blocked	4
+multi-gap.ubnf	blocked	22
+multiple-grammars.ubnf	blocked	3
 no-root.ubnf	failed	1
 root-text.ubnf	failed	1
 nullable-repeat.ubnf	failed	1

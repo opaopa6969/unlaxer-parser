@@ -5,7 +5,15 @@ import java.util.List;
 /** Target-neutral structural subset; deliberately separate from the metadata-only Parser IR. */
 public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     public GrammarIR { rules = List.copyOf(rules); }
-    public record Rule(String name, Expression body, Mapping mapping, Operator operator, Catalog catalog) {}
+    /** Skip hides an entire AST projection, never the parser/CST or its state effects. */
+    public record Rule(String name, Expression body, Mapping mapping, Operator operator, Catalog catalog, boolean skip) {
+        public Rule {
+            if (skip && mapping != null) throw new IllegalArgumentException("skipped rule has mapping: " + name);
+        }
+        public Rule(String name, Expression body, Mapping mapping, Operator operator, Catalog catalog) {
+            this(name, body, mapping, operator, catalog, false);
+        }
+    }
     public record Catalog(String context, List<String> captures) {
         public Catalog { captures = List.copyOf(captures); }
     }

@@ -104,6 +104,9 @@ pub(super) fn validate(ir: &GrammarIr) -> Result<(), GenerateError> {
         }
         let mut captures = BTreeSet::new();
         expression(&rule.body, ir.rules.len(), &mut captures)?;
+        if rule.skip && rule.mapping.is_some() {
+            return Err(fail(format!("skipped rule has mapping: {}", rule.name)));
+        }
         if let Some(mapping) = &rule.mapping {
             identifier(&mapping.name)?;
             if mappings
@@ -141,7 +144,7 @@ pub(super) fn validate(ir: &GrammarIr) -> Result<(), GenerateError> {
             }
         }
     }
-    if mappings.is_empty() {
+    if mappings.is_empty() && !ir.rules.iter().any(|rule| rule.skip) {
         return Err(fail("at least one mapped rule is required"));
     }
     Ok(())

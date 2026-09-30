@@ -20,6 +20,7 @@ public final class RustGrammarLowering {
     private final Map<String, Expression> tokens = new LinkedHashMap<>();
     private final List<Expression> bodies = new ArrayList<>();
     private final List<MappingAnnotation> mappings = new ArrayList<>();
+    private final List<Boolean> skips = new ArrayList<>();
     private final List<Operator> operators = new ArrayList<>();
     private final List<String> catalogs = new ArrayList<>();
     private final List<Boolean> longestChoices = new ArrayList<>();
@@ -95,6 +96,7 @@ public final class RustGrammarLowering {
                 throw unsupported("duplicate rule/token " + rule.name());
             }
             MappingAnnotation mapping = null;
+            boolean skip = rule.annotations().stream().anyMatch(SkipAnnotation.class::isInstance);
             boolean leftAssoc = false;
             boolean rightAssoc = false;
             boolean longestChoice = false;
@@ -112,12 +114,14 @@ public final class RustGrammarLowering {
                     root = i;
                 } else if (annotation instanceof MappingAnnotation value) {
                     if (mapping != null) throw unsupported("multiple @mapping on " + rule.name());
-                    identifier(value.className());
-                    String previous = methods.putIfAbsent(methodName(value.className()), value.className());
+                    if (!skip) identifier(value.className());
+                    String previous = skip ? null : methods.putIfAbsent(methodName(value.className()), value.className());
                     if (previous != null && !previous.equals(value.className())) {
                         throw unsupported("mapping method collision " + previous + " / " + value.className());
                     }
                     mapping = value;
+                } else if (annotation instanceof SkipAnnotation) {
+                    // The complete projection boundary is carried separately from syntax.
                 } else if (annotation instanceof LeftAssocAnnotation) {
                     if (leftAssoc || rightAssoc) throw unsupported("duplicate/conflicting associativity on " + rule.name());
                     leftAssoc = true;
@@ -183,6 +187,7 @@ public final class RustGrammarLowering {
             hasLocalTrivia |= localWhitespace != null || interleave;
             ruleWhitespace.add(localWhitespace == null ? whitespace || interleave : localWhitespace);
             mappings.add(mapping);
+            skips.add(skip);
             operators.add(leftAssoc || rightAssoc || precedence != null
                 ? new Operator(leftAssoc ? Associativity.LEFT : rightAssoc ? Associativity.RIGHT : Associativity.NONE, precedence == null ? -1 : precedence)
                 : null);
@@ -197,7 +202,8 @@ public final class RustGrammarLowering {
         } while (changed);
         bodies.forEach(this::checkRepetition);
         for (int i = 0; i < bodies.size(); i++) checkLeftRecursion(i, new HashSet<>(), new HashSet<>());
-        if (!shape(root, new HashSet<>()).equals(new Shape(Kind.NODE, Cardinality.ONE))) {
+        if (!skippedProjection(new Reference(root), new HashSet<>())
+            && !shape(root, new HashSet<>()).equals(new Shape(Kind.NODE, Cardinality.ONE))) {
             throw unsupported("root must resolve to exactly one AST node");
         }
         List<Rule> rules = new ArrayList<>();
@@ -221,7 +227,9 @@ public final class RustGrammarLowering {
             }
             Mapping mapping = null;
             if (annotation == null) {
-                if (!captures.isEmpty() && effects == null && catalog == null) throw unsupported("captures without @mapping on " + grammar.rules().get(i).name());
+                if (!captures.isEmpty() && effects == null && catalog == null && !skips.get(i)) {
+                    throw unsupported("captures without @mapping on " + grammar.rules().get(i).name());
+                }
             } else {
                 if (new HashSet<>(annotation.paramNames()).size() != annotation.paramNames().size()
                     || !captures.keySet().equals(new HashSet<>(annotation.paramNames()))) {
@@ -229,8 +237,10 @@ public final class RustGrammarLowering {
                 }
                 List<Field> fields = new ArrayList<>();
                 for (String name : annotation.paramNames()) {
-                    identifier(name);
-                    if (Set.of("span", "semantics").contains(name)) throw unsupported("capture name " + name + " is reserved");
+                    if (!skips.get(i)) {
+                        identifier(name);
+                        if (Set.of("span", "semantics").contains(name)) throw unsupported("capture name " + name + " is reserved");
+                    }
                     fields.add(new Field(name, captures.get(name).kind(), captures.get(name).cardinality()));
                 }
                 mapping = new Mapping(annotation.className(), fields);
@@ -241,6 +251,7 @@ public final class RustGrammarLowering {
             if (operators.get(i) != null && operators.get(i).associativity() == Associativity.RIGHT) {
                 lowerRightAssoc(i, mapping);
             }
+            if (skips.get(i)) mapping = null;
             if (mapping != null) variants.merge(mapping.name(), mapping, this::mergeMappings);
             Expression ruleBody = bodies.get(i);
             if (longestChoices.get(i)) {
@@ -251,7 +262,7 @@ public final class RustGrammarLowering {
                 ruleBody = new PredictiveChoice(alternatives, alternatives.stream()
                     .map(alternative -> firstPredictor(alternative, new HashSet<>(), predictorCache)).toList());
             }
-            rules.add(new Rule(grammar.rules().get(i).name(), ruleBody, mapping, operators.get(i), catalog));
+            rules.add(new Rule(grammar.rules().get(i).name(), ruleBody, mapping, operators.get(i), catalog, skips.get(i)));
         }
         List<Rule> rewritten = new ArrayList<>();
         boolean hasValues = variants.values().stream().flatMap(mapping -> mapping.fields().stream())
@@ -259,7 +270,7 @@ public final class RustGrammarLowering {
         for (int i = 0; i < rules.size(); i++) {
             Rule rule = rules.get(i);
             Mapping mapping = rule.mapping() == null ? null : variants.get(rule.mapping().name());
-            Expression expression = hasValues
+            Expression expression = hasValues && !rule.skip()
                 ? mapping == null ? retainHelperValue(rule.body()) : retainTextValues(rule.body(), mapping)
                 : rule.body();
             // Rewrite only after source-level shapes have been analyzed: this synthetic choice
@@ -270,7 +281,7 @@ public final class RustGrammarLowering {
             // Every rule resolves against the grammar default, never against its caller.
             if (hasLocalTrivia) expression = new TriviaScope(expression, ruleWhitespace.get(i));
             if (ruleEffects.get(i) != null) expression = new RuleEffects(expression, ruleEffects.get(i));
-            rewritten.add(new Rule(rule.name(), expression, mapping, rule.operator(), rule.catalog()));
+            rewritten.add(new Rule(rule.name(), expression, mapping, rule.operator(), rule.catalog(), rule.skip()));
         }
         return new GrammarIR(rewritten, root, whitespace);
     }
@@ -426,7 +437,7 @@ public final class RustGrammarLowering {
             || !captures(left.expression()).isEmpty() || !captures(op.expression()).isEmpty()
             || mapping.fields().get(0).cardinality() != Cardinality.ONE
             || !mapping.fields().get(1).equals(new Field("op", Kind.TEXT, Cardinality.MANY))
-            || !mapping.fields().get(2).equals(new Field("right", Kind.NODE, Cardinality.MANY))) {
+            || !mapping.fields().get(2).equals(new Field("right", skips.get(rule) ? Kind.TEXT : Kind.NODE, Cardinality.MANY))) {
             throw unsupported("@rightAssoc requires left { op Self } with scalar base and params=[left, op, right] on "
                 + grammar.rules().get(rule).name());
         }
@@ -821,9 +832,36 @@ public final class RustGrammarLowering {
         return Set.of();
     }
 
+    /** A skipped root/transparent branch can parse successfully without yielding an AST. */
+    private boolean skippedProjection(Expression expression, Set<Integer> visited) {
+        enterAnalysis();
+        try {
+            if (expression instanceof Reference reference) {
+                int rule = reference.rule();
+                if (skips.get(rule)) return true;
+                if (mappings.get(rule) != null || !visited.add(rule)) return false;
+                return skippedProjection(bodies.get(rule), visited);
+            }
+            if (expression instanceof Capture capture) return skippedProjection(capture.expression(), visited);
+            if (expression instanceof Delimited delimited) return skippedProjection(delimited.child(), visited);
+            if (expression instanceof OptionalExpr optional) return skippedProjection(optional.child(), visited);
+            if (expression instanceof Repeat repeat) return skippedProjection(repeat.child(), visited);
+            if (expression instanceof Separated separated) return skippedProjection(separated.child(), visited)
+                || skippedProjection(separated.separator(), visited);
+            if (expression instanceof Sequence sequence) return sequence.elements().stream()
+                .anyMatch(child -> skippedProjection(child, visited));
+            if (expression instanceof Choice choice) return choice.alternatives().stream()
+                .anyMatch(child -> skippedProjection(child, visited));
+            return false;
+        } finally {
+            leaveAnalysis();
+        }
+    }
+
     private Shape shape(int rule, Set<Integer> visiting) {
         enterAnalysis();
         try {
+            if (skips.get(rule)) return new Shape(Kind.TEXT, Cardinality.ONE);
             if (mappings.get(rule) != null) return new Shape(Kind.NODE, Cardinality.ONE);
             if (!visiting.add(rule)) throw unsupported("recursive unmapped rule " + grammar.rules().get(rule).name());
             if (visiting.size() > MAX_ANALYSIS_DEPTH) throw unsupported("rule shape depth exceeds 256");

@@ -32,7 +32,8 @@ public final class RustBackend {
 
     private String ast(GrammarIR ir) {
         StringBuilder out = new StringBuilder(HEADER);
-        out.append("use unlaxer_runtime::{Span, json_string};\n\n");
+        out.append(ir.mappings().isEmpty() ? "use unlaxer_runtime::Span;\n\n"
+            : "use unlaxer_runtime::{Span, json_string};\n\n");
         if (hasValues(ir)) out.append("""
             #[derive(Debug, Clone, PartialEq)]
             pub enum AstValue {
@@ -64,11 +65,13 @@ public final class RustBackend {
                 .append(fieldType(field, false));
             out.append(" },\n");
         }
-        out.append("}\n\n#[allow(non_snake_case)]\nimpl Ast {\n    pub fn span(&self) -> Span {\n        match self {\n");
+        out.append("}\n\n#[allow(non_snake_case)]\nimpl Ast {\n    pub fn span(&self) -> Span {\n        match ")
+            .append(ir.mappings().isEmpty() ? "*self" : "self").append(" {\n");
         for (Mapping mapping : ir.mappings()) {
             out.append("            Self::r#").append(mapping.name()).append(" { span, .. } => *span,\n");
         }
-        out.append("        }\n    }\n\n    pub fn canonical_json(&self) -> String {\n        match self {\n");
+        out.append("        }\n    }\n\n    pub fn canonical_json(&self) -> String {\n        match ")
+            .append(ir.mappings().isEmpty() ? "*self" : "self").append(" {\n");
         for (Mapping mapping : ir.mappings()) {
             out.append("            ").append(pattern(mapping, "Self")).append(" => {\n");
             out.append("                let fields: Vec<String> = vec![\n");
@@ -367,8 +370,16 @@ public final class RustBackend {
             List<String> ids = new ArrayList<>();
             for (int i = 0; i < ir.rules().size(); i++) if (ir.rules().get(i).mapping() != null) ids.add(Integer.toString(i));
             out.append("            ").append(String.join(" | ", ids))
-                .append(" => found.extend(map_node(tree, id)?.into_iter().map(|node| AstValue::Node(Box::new(node)))),\n")
-                .append("            _ => found.extend(map_values(tree, &node.children)?),\n        }\n    }\n    Ok(found)\n}\n");
+                .append(" => found.extend(map_node(tree, id)?.into_iter().map(|node| AstValue::Node(Box::new(node)))),\n");
+            List<String> skipped = new ArrayList<>();
+            for (int i = 0; i < ir.rules().size(); i++) if (ir.rules().get(i).skip()) skipped.add(Integer.toString(i));
+            if (!skipped.isEmpty()) out.append("            ").append(String.join(" | ", skipped)).append("""
+                 => found.push(AstValue::Text {
+                                text: unlaxer_runtime::java_capture_text(tree.text(node.span)).to_owned(),
+                                span: node.span,
+                            }),
+                """);
+            out.append("            _ => found.extend(map_values(tree, &node.children)?),\n        }\n    }\n    Ok(found)\n}\n");
         }
         if (ir.rules().stream().filter(r -> r.mapping() != null).flatMap(r -> r.mapping().fields().stream())
             .anyMatch(f -> f.cardinality() == Cardinality.OPTIONAL)) out.append("""
@@ -383,8 +394,11 @@ public final class RustBackend {
             fn map_node(tree: &Tree, id: usize) -> Result<Vec<Ast>, String> {
                 match tree.nodes[id].rule {
             """);
-        for (int i = 0; i < ir.rules().size(); i++) if (ir.rules().get(i).mapping() != null) {
-            out.append("        ").append(i).append(" => map_rule_").append(i).append("(tree, id),\n");
+        for (int i = 0; i < ir.rules().size(); i++) {
+            if (ir.rules().get(i).skip()) out.append("        ").append(i).append(" => Ok(Vec::new()),\n");
+            else if (ir.rules().get(i).mapping() != null) {
+                out.append("        ").append(i).append(" => map_rule_").append(i).append("(tree, id),\n");
+            }
         }
         out.append("        _ => map_nodes(tree, &tree.nodes[id].children),\n    }\n}\n");
         for (int i = 0; i < ir.rules().size(); i++) if (ir.rules().get(i).mapping() != null) {
@@ -409,14 +423,19 @@ public final class RustBackend {
     private String evaluator(GrammarIR ir) {
         StringBuilder out = new StringBuilder(HEADER);
         if (hasValues(ir)) out.append("use super::ast::AstValue;\n");
-        out.append("use super::ast::Ast;\nuse unlaxer_runtime::Span;\n\n#[allow(non_snake_case)]\npub trait Semantics {\n    type Output;\n");
+        out.append("use super::ast::Ast;\n");
+        if (!ir.mappings().isEmpty()) out.append("use unlaxer_runtime::Span;\n");
+        out.append("\n#[allow(non_snake_case)]\npub trait Semantics {\n    type Output;\n");
         for (Mapping mapping : ir.mappings()) {
             out.append("    fn ").append(RustGrammarLowering.methodName(mapping.name())).append("(&mut self");
             for (Field field : mapping.fields()) out.append(", r#").append(field.name()).append(": ")
                 .append(fieldType(field, true));
             out.append(", span: Span) -> Self::Output;\n");
         }
-        out.append("}\n\n#[allow(non_snake_case)]\npub fn evaluate<S: Semantics>(node: &Ast, semantics: &mut S) -> S::Output {\n    match node {\n");
+        out.append("}\n\n#[allow(non_snake_case)]\npub fn evaluate<S: Semantics>(node: &Ast, ")
+            .append(ir.mappings().isEmpty() ? "_semantics" : "semantics")
+            .append(": &mut S) -> S::Output {\n    match ")
+            .append(ir.mappings().isEmpty() ? "*node" : "node").append(" {\n");
         for (Mapping mapping : ir.mappings()) {
             var args = new ArrayList<>(mapping.fields().stream().map(f -> "r#" + f.name()
                 + (f.cardinality() == Cardinality.OPTIONAL ? (f.kind() == Kind.VALUE ? ".as_ref()" : ".as_deref()") : "")).toList());

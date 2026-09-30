@@ -871,10 +871,11 @@ public class ParserGeneratorTest {
         "}";
 
     @Test
-    public void testSkipGeneratesContainsRoot() {
+    public void testSkipTagsOnlyItsRuleParser() {
         String source = generate(SKIP_GRAMMAR);
-        assertTrue("@skip should generate getNotAstNodeSpecifier with containsRoot",
-            source.contains("RecursiveMode.containsRoot"));
+        assertTrue(source.contains("public CommaParser() { addTag(org.unlaxer.reducer.TagBasedReducer.NodeKind.notNode.getTag()); }"));
+        assertTrue(source.contains("public java.util.Optional<RecursiveMode> getNotAstNodeSpecifier() { return java.util.Optional.empty(); }"));
+        assertFalse(source.contains("RecursiveMode.containsRoot"));
     }
 
     // =========================================================================

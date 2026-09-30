@@ -194,8 +194,9 @@ ASCII bitset・非 ASCII フラグ・nullable・unknown・「sequence が先に 
 - `@rightAssoc`の`Base @left { Op @op Self @right }`形（`Self`は宣言rule自身への直接参照）。同じparamsとprecedenceを用い、右辺を再帰的に生成する。
 - `@whitespace: javaStyle`（ASCII空白、行/ブロックコメント）または`none`。未指定は`none`。rule の `@whitespace` / `@whitespace(javaStyle)` / `@whitespace(none)` と `@interleave(profile=javaStyle|commentsAndSpaces)` による局所設定も生成する。[優先順位・Javaとの共通契約](../docs/rule-trivia.md)を参照。`@package`はRustでは使用しない。
 - `@catalog(context='...')`。解析時には作用せず、rule名・context・local capture名を`parser::CATALOGS`へ保持する。catalogがない文法の出力は変えない。[metadata契約とJava LSPの現状](../docs/catalog-metadata.md)を参照。Rustのcatalog completion/hoverは未実装。
+- `@skip`。構文・CST・capture・scope/rollback は保持し、その規則と子の AST 投影を省く。明示 capture は text として保持する。[root・型・移行と検証の契約](../docs/skip-ast-projection.md)を参照。
 
-imports、上記以外の外部token parser、`@typeof`、`@eval`等の他のannotation、左再帰などは明示的に拒否する。mapping名・field名はASCII識別子に制限し、Rustのraw identifierで出力する。`self`/`Self`/`super`/`crate`、fieldの`span`/`semantics`、shared mappingのschema不一致・異なるmappingからの生成method名衝突は拒否する。rootはちょうど1つのAST nodeへ解決される必要がある。optionalの先にある参照も左再帰検査に含め、空一致の可能性がある無限反復は生成前に拒否する。
+imports、上記以外の外部token parser、`@typeof`、`@eval`等の他のannotation、左再帰などは明示的に拒否する。生成するmapping名・field名はASCII識別子に制限し、Rustのraw identifierで出力する。`self`/`Self`/`super`/`crate`、fieldの`span`/`semantics`、shared mappingのschema不一致・異なるmappingからの生成method名衝突は拒否する（投影しないskipped mappingはこの生成名制約の対象外）。通常のrootはちょうど1つのAST nodeへ解決される必要がある。rootの投影経路に`@skip`がある場合はASTなしの構文解析も許すが、mapperは投影結果が1 nodeでなければ明示失敗する。optionalの先にある参照も左再帰検査に含め、空一致の可能性がある無限反復は生成前に拒否する。
 
 ### 演算子の列と優先順位
 

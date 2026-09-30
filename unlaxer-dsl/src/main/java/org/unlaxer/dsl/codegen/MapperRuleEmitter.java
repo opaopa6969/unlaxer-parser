@@ -166,7 +166,7 @@ class MapperRuleEmitter {
      * ノードを解決する。ノードが見つからなければ firstTokenText にフォールバック。
      * (unlaxer-parser #43 family / tinyexpression #32)
      */
-    static String emitMapTransparentValue(String astClass) {
+    static String emitMapTransparentValue(String astClass, boolean hasSkippedRules) {
         IndentedWriter w = new IndentedWriter(1);
         w.line("private static Object mapTransparentValue(Token token) {");
         w.indent();
@@ -192,6 +192,7 @@ class MapperRuleEmitter {
         w.line("}");
         w.dedent();
         w.line("}");
+        if (hasSkippedRules) w.line("if (hasSkippedRuleToken(token)) return skippedRuleText(token);");
         w.line("return stripQuotes(firstTokenText(token));");
         w.dedent();
         w.line("}");
@@ -202,8 +203,40 @@ class MapperRuleEmitter {
     /**
      * findBestMappedToken 関連メソッドと MappingCandidate 内部クラスを生成する。
      */
-    static String emitFindBestMappedToken(String astClass) {
+    static String emitFindBestMappedToken(String astClass, String parsersClass, List<String> skippedRules) {
         IndentedWriter w = new IndentedWriter(1);
+        if (!skippedRules.isEmpty()) {
+            w.line("private static boolean isSkippedRuleToken(Token token) {");
+            w.indent();
+            w.line("if (token == null || token.parser == null) return false;");
+            w.line("Class<?> parserClass = token.parser.getClass();");
+            w.line("return " + skippedRules.stream()
+                .map(name -> "parserClass == " + parsersClass + "." + name + "Parser.class")
+                .collect(java.util.stream.Collectors.joining("\n            || ")) + ";");
+            w.dedent();
+            w.line("}");
+            w.blankLine();
+            w.line("private static String skippedRuleText(Token token) {");
+            w.indent();
+            w.line("String raw = tokenTextCompat(token);");
+            w.line("return raw == null ? null : stripQuotes(raw.strip());");
+            w.dedent();
+            w.line("}");
+            w.blankLine();
+            w.line("private static boolean hasSkippedRuleToken(Token token) {");
+            w.indent();
+            w.line("if (token == null) return false;");
+            w.line("if (isSkippedRuleToken(token)) return true;");
+            w.line("for (Token child : token.filteredChildren) {");
+            w.indent();
+            w.line("if (hasSkippedRuleToken(child)) return true;");
+            w.dedent();
+            w.line("}");
+            w.line("return false;");
+            w.dedent();
+            w.line("}");
+            w.blankLine();
+        }
         w.line("private static Token findBestMappedToken(Token token, String preferredAstSimpleName) {");
         w.indent();
         w.line("MappingCandidate best = findBestMappedToken(token, 0, null, preferredAstSimpleName);");
@@ -226,6 +259,7 @@ class MapperRuleEmitter {
         w.line("return best;");
         w.dedent();
         w.line("}");
+        if (!skippedRules.isEmpty()) w.line("if (isSkippedRuleToken(token)) return best;");
         w.line("if (preferredAstSimpleName == null || preferredAstSimpleName.isBlank()) {");
         w.indent();
         w.line("MappingCandidate subtree = bestMappedInSubtree(token);");
@@ -258,6 +292,14 @@ class MapperRuleEmitter {
         w.line("return BEST_MEMO.get(token);");
         w.dedent();
         w.line("}");
+        if (!skippedRules.isEmpty()) {
+            w.line("if (isSkippedRuleToken(token)) {");
+            w.indent();
+            w.line("BEST_MEMO.put(token, null);");
+            w.line("return null;");
+            w.dedent();
+            w.line("}");
+        }
         w.line("MappingCandidate best = null;");
         w.line("if (mapToken(token) != null) {");
         w.indent();
@@ -892,6 +934,7 @@ class MapperRuleEmitter {
         for (int i = 0; i < sites.size(); i++) {
             CaptureBindingPlan.Site site = sites.get(i);
             boolean boundText = MapperElementUtil.usesBoundTextCapture(site.element(), ruleByName, tokenDeclByName);
+            boolean skippedText = boundText && MapperElementUtil.containsSkippedReference(site.element(), ruleByName);
             boolean boundValue = "Object".equals(valueType) && MapperElementUtil.containsMappedValue(site.element(), ruleByName);
             AtomicElement normalized = boundValue ? site.element()
                 : MapperElementUtil.normalizeCapturedElement(site.element()).orElse(site.element());
@@ -906,7 +949,8 @@ class MapperRuleEmitter {
                 : "findDescendants(" + siteToken + ", " + parserClass + ").stream().findFirst().orElse(null)") + ";");
             w.line("if (" + valueToken + " != null) {");
             w.indent();
-            String expression = boundText ? "stripQuotes(firstTokenText(" + valueToken + "))"
+            String expression = skippedText ? "skippedRuleText(" + valueToken + ")"
+                : boundText ? "stripQuotes(firstTokenText(" + valueToken + "))"
                 : MapperElementUtil.mapExpressionForTargetType(valueType, normalized, valueToken,
                 mappedClassByRuleName, tokenDeclByName, ruleByName);
             if (boundText || "String".equals(valueType)) {
@@ -981,7 +1025,7 @@ class MapperRuleEmitter {
                 var shape = semantics.shape(new RuleRefElement(rule.name()));
                 return shape.kind() == SemanticCardinality.Kind.VALUE && shape.count() != SemanticCardinality.Count.MANY;
             }).map(rule -> parsersClass + "." + rule.name() + "Parser.class").toList();
-        return """
+        String source = """
 
                 private static final java.util.Set<Class<?>> SEMANTIC_VALUE_BOUNDARIES = java.util.Set.of(%s);
 
@@ -1006,6 +1050,12 @@ class MapperRuleEmitter {
                 }
 
             """.formatted(String.join(", ", boundaries), SemanticCardinality.TEXT_BINDING, SemanticCardinality.BOUNDARY_BINDING);
+        if (grammar.rules().stream().noneMatch(MapperElementUtil::isSkipped)) return source;
+        return source.replace("stripQuotes(firstTokenText(token))",
+                "hasSkippedRuleToken(token) ? skippedRuleText(token) : stripQuotes(firstTokenText(token))")
+            .replace("if (hasCaptureBinding(token, \"" + SemanticCardinality.TEXT_BINDING + "\"))",
+                "if (isSkippedRuleToken(token)) return List.of(semanticText(token));\n"
+                    + "        if (hasCaptureBinding(token, \"" + SemanticCardinality.TEXT_BINDING + "\"))");
     }
 
     /** Plain mappings consume each completed grammar binding, including coincident sites. */

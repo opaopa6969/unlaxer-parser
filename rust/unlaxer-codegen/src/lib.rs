@@ -75,7 +75,11 @@ fn has_values(ir: &GrammarIr) -> bool {
 
 fn ast(ir: &GrammarIr) -> String {
     let mut out = String::from(HEADER);
-    out.push_str("use unlaxer_runtime::{Span, json_string};\n\n");
+    if mappings(ir).is_empty() {
+        out.push_str("use unlaxer_runtime::Span;\n\n");
+    } else {
+        out.push_str("use unlaxer_runtime::{Span, json_string};\n\n");
+    }
     if has_values(ir) {
         out.push_str("#[derive(Debug, Clone, PartialEq)]\npub enum AstValue {\n    Text { text: String, span: Span },\n    Node(Box<Ast>),\n}\n\nimpl AstValue {\n    pub fn span(&self) -> Span {\n        match self {\n            Self::Text { span, .. } => *span,\n            Self::Node(node) => node.span(),\n        }\n    }\n\n    pub fn canonical_json(&self) -> String {\n        match self {\n            Self::Text { text, .. } => json_string(text),\n            Self::Node(node) => node.canonical_json(),\n        }\n    }\n}\n\n");
     }
@@ -87,7 +91,11 @@ fn ast(ir: &GrammarIr) -> String {
         }
         out.push_str(" },\n");
     }
-    out.push_str("}\n\n#[allow(non_snake_case)]\nimpl Ast {\n    pub fn span(&self) -> Span {\n        match self {\n");
+    out.push_str(if mappings(ir).is_empty() {
+        "}\n\n#[allow(non_snake_case)]\nimpl Ast {\n    pub fn span(&self) -> Span {\n        match *self {\n"
+    } else {
+        "}\n\n#[allow(non_snake_case)]\nimpl Ast {\n    pub fn span(&self) -> Span {\n        match self {\n"
+    });
     for mapping in mappings(ir) {
         writeln!(
             out,
@@ -96,9 +104,11 @@ fn ast(ir: &GrammarIr) -> String {
         )
         .unwrap();
     }
-    out.push_str(
-        "        }\n    }\n\n    pub fn canonical_json(&self) -> String {\n        match self {\n",
-    );
+    out.push_str(if mappings(ir).is_empty() {
+        "        }\n    }\n\n    pub fn canonical_json(&self) -> String {\n        match *self {\n"
+    } else {
+        "        }\n    }\n\n    pub fn canonical_json(&self) -> String {\n        match self {\n"
+    });
     for mapping in mappings(ir) {
         writeln!(out, "            {} => {{", pattern(mapping, "Self")).unwrap();
         out.push_str("                let fields: Vec<String> = vec![\n");
@@ -317,6 +327,16 @@ fn mapper(ir: &GrammarIr) -> String {
             .map(|(id, _)| id.to_string())
             .collect();
         writeln!(out, "            {} => found.extend(map_node(tree, id)?.into_iter().map(|node| AstValue::Node(Box::new(node)))),", ids.join(" | ")).unwrap();
+        let skipped: Vec<_> = ir
+            .rules
+            .iter()
+            .enumerate()
+            .filter(|(_, rule)| rule.skip)
+            .map(|(id, _)| id.to_string())
+            .collect();
+        if !skipped.is_empty() {
+            writeln!(out, "            {} => found.push(AstValue::Text {{\n                text: unlaxer_runtime::java_capture_text(tree.text(node.span)).to_owned(),\n                span: node.span,\n            }}),", skipped.join(" | ")).unwrap();
+        }
         out.push_str("            _ => found.extend(map_values(tree, &node.children)?),\n        }\n    }\n    Ok(found)\n}\n");
     }
     if mappings(ir)
@@ -328,7 +348,9 @@ fn mapper(ir: &GrammarIr) -> String {
     }
     out.push_str("\nfn map_node(tree: &Tree, id: usize) -> Result<Vec<Ast>, String> {\n    match tree.nodes[id].rule {\n");
     for (index, rule) in ir.rules.iter().enumerate() {
-        if rule.mapping.is_some() {
+        if rule.skip {
+            writeln!(out, "        {index} => Ok(Vec::new()),").unwrap();
+        } else if rule.mapping.is_some() {
             writeln!(out, "        {index} => map_rule_{index}(tree, id),").unwrap();
         }
     }
@@ -366,7 +388,11 @@ fn evaluator(ir: &GrammarIr) -> String {
     if has_values(ir) {
         out.push_str("use super::ast::AstValue;\n");
     }
-    out.push_str("use super::ast::Ast;\nuse unlaxer_runtime::Span;\n\n#[allow(non_snake_case)]\npub trait Semantics {\n    type Output;\n");
+    out.push_str("use super::ast::Ast;\n");
+    if !mappings(ir).is_empty() {
+        out.push_str("use unlaxer_runtime::Span;\n");
+    }
+    out.push_str("\n#[allow(non_snake_case)]\npub trait Semantics {\n    type Output;\n");
     for mapping in mappings(ir) {
         write!(out, "    fn {}(&mut self", method_name(&mapping.name)).unwrap();
         for field in &mapping.fields {
@@ -374,7 +400,11 @@ fn evaluator(ir: &GrammarIr) -> String {
         }
         out.push_str(", span: Span) -> Self::Output;\n");
     }
-    out.push_str("}\n\n#[allow(non_snake_case)]\npub fn evaluate<S: Semantics>(node: &Ast, semantics: &mut S) -> S::Output {\n    match node {\n");
+    out.push_str(if mappings(ir).is_empty() {
+        "}\n\n#[allow(non_snake_case)]\npub fn evaluate<S: Semantics>(node: &Ast, _semantics: &mut S) -> S::Output {\n    match *node {\n"
+    } else {
+        "}\n\n#[allow(non_snake_case)]\npub fn evaluate<S: Semantics>(node: &Ast, semantics: &mut S) -> S::Output {\n    match node {\n"
+    });
     for mapping in mappings(ir) {
         let mut args: Vec<_> = mapping
             .fields
