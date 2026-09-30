@@ -49,6 +49,8 @@ public class TinyCodeFenceConformanceTest {
         "org.unlaxer.tinyexpression.parser.javalang.CodeStartParser";
     private static final String END_PARSER =
         "org.unlaxer.tinyexpression.parser.javalang.CodeEndParser";
+    private static final String LONG_PARSER =
+        "org.unlaxer.tinyexpression.parser.javalang.LongCodeBlockParser";
     private static final String PACKAGE = "org.example.tinyfence";
 
     @Rule public TemporaryFolder temporary = new TemporaryFolder();
@@ -64,7 +66,7 @@ public class TinyCodeFenceConformanceTest {
         Path tinyClasses = Path.of(configured).toAbsolutePath().normalize();
         assertTrue("tinyexpression.classes must be a directory: " + tinyClasses,
             Files.isDirectory(tinyClasses));
-        for (String parser : List.of(START_PARSER, END_PARSER)) {
+        for (String parser : List.of(START_PARSER, END_PARSER, LONG_PARSER)) {
             assertTrue("real tiny parser is missing from " + tinyClasses,
                 Files.isRegularFile(tinyClasses.resolve(parser.replace('.', '/') + ".class")));
         }
@@ -181,6 +183,7 @@ public class TinyCodeFenceConformanceTest {
             + (fixture.has("whitespace") ? "@whitespace: javaStyle " : "")
             + "token START = " + START_PARSER + "\n"
             + "token CLOSE = " + END_PARSER + "\n"
+            + "token LONG = " + LONG_PARSER + "\n"
             + "token BODY = UNTIL('```')\n"
             + "token CHAR = ANY\n"
             + "token END = EOF\n"
@@ -192,18 +195,19 @@ public class TinyCodeFenceConformanceTest {
     private void assertRealOracle(Path tinyClasses) throws Exception {
         try (var loader = new URLClassLoader(new URL[]{tinyClasses.toUri().toURL()},
                 getClass().getClassLoader())) {
-            for (String parserName : List.of(START_PARSER, END_PARSER)) {
+            for (String parserName : List.of(START_PARSER, END_PARSER, LONG_PARSER)) {
                 Class<?> parser = Class.forName(parserName, true, loader);
                 assertEquals("the configured real class must win over any parent/test double",
                     tinyClasses.toRealPath(), codeSource(parser));
-                assertEquals("org.unlaxer.parser.combinator.LazyChain", parser.getSuperclass().getName());
+                assertEquals(parserName.equals(LONG_PARSER) ? "org.unlaxer.parser.elementary.AbstractTokenParser"
+                    : "org.unlaxer.parser.combinator.LazyChain", parser.getSuperclass().getName());
                 assertTrue(parser.getConstructor().newInstance() instanceof Parser);
             }
         }
     }
 
     private void assertLoadedFromConfiguredOracle(ClassLoader loader, Path tinyClasses) throws Exception {
-        for (String parserName : List.of(START_PARSER, END_PARSER)) {
+        for (String parserName : List.of(START_PARSER, END_PARSER, LONG_PARSER)) {
             Class<?> parser = Class.forName(parserName, true, loader);
             assertEquals("generated Java parser must bind to configured tinyexpression target/classes",
                 tinyClasses.toRealPath(), codeSource(parser));

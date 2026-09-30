@@ -139,7 +139,7 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
         Expr::Identifier => {
             FirstSet::of_chars("_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
         }
-        Expr::CodeStart | Expr::CodeEnd => FirstSet::of_char('`'),
+        Expr::CodeStart | Expr::CodeEnd | Expr::LongCodeBlock => FirstSet::of_char('`'),
         Expr::Quoted(quote) => FirstSet::of_char(*quote),
         // Outside the table (a grammar installed without its analysis) nothing is proven.
         Expr::Rule(id) => rules.get(*id).copied().unwrap_or(FirstSet::UNKNOWN),

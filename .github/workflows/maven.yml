@@ -230,10 +230,9 @@ jobs:
       uses: actions/checkout@v4
       with:
         repository: opaopa6969/tinyexpression
-        # Consumer migration and real token oracle; update deliberately with their contracts.
-        # ee51999 carries tinyexpression #161 (thread-safe lazy children in its forked
-        # AbstractParser, unlaxer-parser #202) and the x4/x16/x64 scaling fixtures.
-        ref: ee519996e5f82d26d12e2bb6269edaf3600794a4
+        # Real LongCodeBlockParser + source-preserving AST, tinyexpression #236 / #237.
+        # Keep the token oracle and downstream grammar synchronized with #316.
+        ref: 7d7bd1cbfab1bd9548ba53c73cc50502f0437c67
         path: tinyexpression
 
     - name: Point tinyexpression at the unlaxer under test

@@ -94,6 +94,7 @@ pub enum Expression {
     QuotedToken(char),
     CodeStartToken,
     CodeEndToken,
+    LongCodeBlockToken,
     AnyToken,
     EofToken,
     EmptyToken,

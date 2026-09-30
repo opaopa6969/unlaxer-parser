@@ -1378,6 +1378,9 @@ fn token_expression(token: &TokenKind) -> Result<Expression> {
                 Expression::CodeStartToken
             }
             "org.unlaxer.tinyexpression.parser.javalang.CodeEndParser" => Expression::CodeEndToken,
+            "org.unlaxer.tinyexpression.parser.javalang.LongCodeBlockParser" => {
+                Expression::LongCodeBlockToken
+            }
             "EndOfSourceParser" | "org.unlaxer.parser.elementary.EndOfSourceParser" => {
                 Expression::EofToken
             }

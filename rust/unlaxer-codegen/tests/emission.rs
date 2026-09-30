@@ -428,6 +428,7 @@ fn expression_variants_escape_unicode_and_control_characters() {
             },
             CodeStartToken,
             CodeEndToken,
+            LongCodeBlockToken,
         ]),
     });
     let files = generate(&grammar).unwrap();
@@ -445,6 +446,7 @@ fn expression_variants_escape_unicode_and_control_characters() {
         ".repeat_java(1, Some(2))",
         "Expr::CodeStart",
         "Expr::CodeEnd",
+        "Expr::LongCodeBlock",
     ] {
         assert!(parser.contains(expected), "{expected}");
     }

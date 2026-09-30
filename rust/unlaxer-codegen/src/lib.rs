@@ -200,6 +200,7 @@ fn expression(expr: &Expression) -> String {
         QuotedToken(q) => format!("Expr::Quoted('\\u{{{:x}}}')", u32::from(*q)),
         CodeStartToken => "Expr::CodeStart".into(),
         CodeEndToken => "Expr::CodeEnd".into(),
+        LongCodeBlockToken => "Expr::LongCodeBlock".into(),
         AnyToken => "Expr::Any".into(),
         EofToken => "Expr::Eof".into(),
         EmptyToken => "Expr::JavaEmpty".into(),

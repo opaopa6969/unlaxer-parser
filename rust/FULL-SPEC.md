@@ -24,6 +24,7 @@
 | Identifier・Single/DoubleQuoted・EndOfSource token binding | UBNF生成・runtime実装 | 22文法78入力の受理/両cursor比較と受理48 AST/spanのfixture。ASCII identifier、生escape、single quoteだけ除去するJava mapper契約。tinyexpression文字列評価は別途検証 |
 | tinyexpression StringLiteral token binding | exact FQNを両生成経路で対応（#168） | 固定した実tinyexpressionクラスと共通corpusで字句・両cursor・AST/spanを比較。文字列評価の意味論は別途検証 |
 | tinyexpression CodeStart/CodeEnd token binding | exact FQNを両生成経路で対応（#170）。内部triviaなしの原子的字句 | 実tinyexpressionクラスと共通corpusで行頭/行末・両cursor・AST/spanを比較。codeblockの実行やJavaのparser tag/CST構造同値は含まない |
+| tinyexpression LongCodeBlock token binding | exact FQN を Java/native Rust 両生成器から `Expr::LongCodeBlock` に写像（#316 / tinyexpression#232） | N >= 4、同幅の単独終端行、opaque 本文、Unicode/CRLF/CR、atomic failure、実 Java parser と14文法86入力の比較。本文の AOT 実行は TinyExpression 側の別 API |
 | CASE_INSENSITIVE・REGEX・任意外部token | 未対応（上記の明示bindingを除く） | Unicode/regex方言を確定。任意Java parserクラスはRust実装または明示adapterを要求 |
 | global/rule whitespace・interleave | javaStyle/none と interleave 両profileを両生成経路で対応（#172） | 親子の独立設定・明示override・連接/choice/量指定子の境界を共通corpusで比較。任意triviaとglobal comment設定は未対応 |
 | imports・複数grammar・namespace | 未対応 | 現在は単一grammar。依存解決・循環・文法別IDを検証 |

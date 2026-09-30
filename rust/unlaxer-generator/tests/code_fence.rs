@@ -8,8 +8,9 @@ grammar CodeFence {
   @whitespace: javaStyle
   token START = org.unlaxer.tinyexpression.parser.javalang.CodeStartParser
   token END = org.unlaxer.tinyexpression.parser.javalang.CodeEndParser
+  token LONG = org.unlaxer.tinyexpression.parser.javalang.LongCodeBlockParser
   @root @mapping(Value, params=[value])
-  Root ::= (START | END) @value;
+  Root ::= (LONG | START | END) @value;
 }
 "#;
 
@@ -58,11 +59,19 @@ fn exact_tiny_expression_classes_lower_to_atomic_fence_expressions() {
         .unwrap()
         .content;
     assert!(
-        parser.contains("Expr::Choice(vec![Expr::CodeStart, Expr::CodeEnd])"),
+        parser.contains("Expr::Choice(vec![Expr::LongCodeBlock, Expr::CodeStart, Expr::CodeEnd])"),
         "{parser}"
     );
 
     for (exact, rejected) in [
+        (
+            "org.unlaxer.tinyexpression.parser.javalang.LongCodeBlockParser",
+            "LongCodeBlockParser",
+        ),
+        (
+            "org.unlaxer.tinyexpression.parser.javalang.LongCodeBlockParser",
+            "other.LongCodeBlockParser",
+        ),
         (
             "org.unlaxer.tinyexpression.parser.javalang.CodeStartParser",
             "CodeStartParser",
@@ -127,12 +136,14 @@ mod generated;
 use unlaxer_runtime::{Expr, ParseContext};
 
 fn main() {
-    for source in ["```java:a.B", "```java:a.b.Co\n", "```", "```\r\n"] {
+    for source in ["```java:a.B", "```java:a.b.Co\n", "```", "```\r\n",
+        "````rust:a.B\r\n// 😀 ```\r\n```\r\n`````\r\n````\r\n"] {
         assert!(generated::parser::parse_tree(source).is_ok(), "{source:?}");
     }
     for source in [
         "``` java:a.B", "```java :a.B", "```java: a.B", "```java:a. B",
         "```java:a.B trailing", "``` trailing", "x```\n",
+        "````rust:A\nx\n```\n", "````rust:A\nx\n`````\n",
     ] {
         assert!(generated::parser::parse_tree(source).is_err(), "{source:?}");
     }
