@@ -150,7 +150,7 @@ public class RustBackendTest {
         }
         for (String parser : new String[]{"other.IdentifierParser", "StringLiteralParser",
                 "other.StringLiteralParser", "CodeStartParser", "other.CodeStartParser",
-                "CodeEndParser", "other.CodeEndParser", "QuotedParser"}) {
+                "CodeEndParser", "other.CodeEndParser", "LongCodeBlockParser", "other.LongCodeBlockParser", "QuotedParser"}) {
             reject(SIMPLE.replace("grammar Example {", "grammar Example { token T = " + parser + "\n"), "external token");
         }
     }
@@ -172,18 +172,19 @@ public class RustBackendTest {
                 grammar Example {
                 token START = org.unlaxer.tinyexpression.parser.javalang.CodeStartParser
                 token END = org.unlaxer.tinyexpression.parser.javalang.CodeEndParser
+                token LONG = org.unlaxer.tinyexpression.parser.javalang.LongCodeBlockParser
                 """)
-            .replace("'hello' @value", "(START | END) @value");
+            .replace("'hello' @value", "(START | END | LONG) @value");
         var grammar = UBNFMapper.parse(source).grammars().get(0);
         var body = RustGrammarLowering.lower(grammar).rules().get(0).body();
         assertEquals(
             new GrammarIR.Sequence(List.of(new GrammarIR.Capture("value", new GrammarIR.Choice(List.of(
-                new GrammarIR.CodeStartToken(), new GrammarIR.CodeEndToken()))))),
+                new GrammarIR.CodeStartToken(), new GrammarIR.CodeEndToken(), new GrammarIR.LongCodeBlockToken()))))),
             body);
         String parser = new RustBackend().generate(grammar).stream()
             .filter(file -> file.relativePath().equals("parser.rs"))
             .findFirst().orElseThrow().content();
-        assertTrue(parser, parser.contains("Expr::Choice(vec![Expr::CodeStart, Expr::CodeEnd])"));
+        assertTrue(parser, parser.contains("Expr::Choice(vec![Expr::CodeStart, Expr::CodeEnd, Expr::LongCodeBlock])"));
     }
 
     @Test public void cardinalityReachesAstAndSemantics() {

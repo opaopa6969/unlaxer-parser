@@ -1,6 +1,58 @@
 use unlaxer_runtime::{Expr, ParseContext, Rule};
 
 #[test]
+fn extended_blocks_preserve_body_cursors_state_and_atomic_failure() {
+    for width in [4, 5, 128] {
+        for newline in ["\n", "\r\n", "\r"] {
+            let fence = "`".repeat(width);
+            let body = format!("/* 😀 ``` */{newline}```{newline}`{}{newline}", fence);
+            for ending in [newline, ""] {
+                let block = format!("{fence}rust:a.B{newline}{body}{fence}{ending}");
+                let source = format!("😀\n{block}");
+                let mut context = ParseContext::new(&source);
+                context.parse(&Expr::literal("😀\n")).unwrap();
+                context.set_state("attempts", 7_u32);
+                let matched = context
+                    .parse(&Expr::long_code_block().capture("block"))
+                    .unwrap();
+                assert_eq!(matched.span.start, 2);
+                assert_eq!(matched.span.end, source.chars().count());
+                assert_eq!(context.text(matched.span), Some(block.as_str()));
+                assert_eq!(context.position(), context.matched_position());
+                assert_eq!(context.state::<u32>("attempts"), Some(&7));
+            }
+        }
+    }
+    for block in [
+        "````rust:A\nx\n```\n",
+        "````rust:A\nx\n`````\n",
+        "````rust:A\nx\n```` \n",
+        "````rust:A",
+        "````rust:../bad\nx\n````\n",
+        "````rust:A\nx ````\n",
+    ] {
+        let source = format!("😀\n{block}");
+        let mut context = ParseContext::new(&source);
+        context.parse(&Expr::literal("😀\n")).unwrap();
+        context
+            .parse(&Expr::JavaLookahead {
+                pattern: "````",
+                positive: true,
+            })
+            .unwrap();
+        context.set_state("attempts", 7_u32);
+        let error = context
+            .parse(&Expr::LongCodeBlock.capture("block"))
+            .unwrap_err();
+        assert_eq!(error.offset, 2);
+        assert!(error.expected.iter().any(|s| s == "long code block"));
+        assert_eq!((context.position(), context.matched_position()), (2, 6));
+        assert_eq!(context.captured("block"), None);
+        assert_eq!(context.state::<u32>("attempts"), Some(&7));
+    }
+}
+
+#[test]
 fn code_start_matches_the_tinyexpression_lexical_shape_and_line_endings() {
     for source in [
         "```java:a.B",

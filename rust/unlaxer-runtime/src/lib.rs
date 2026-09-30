@@ -6,6 +6,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 mod first;
+mod long_code_fence;
 #[cfg(test)]
 mod memo_retention_tests;
 mod scope;
@@ -41,6 +42,8 @@ pub enum Expr {
     CodeStart,
     /// tinyexpression CodeEndParser: an atomic line-oriented closing code fence.
     CodeEnd,
+    /// tinyexpression LongCodeBlockParser: N >= 4 backticks, exact-width closing line.
+    LongCodeBlock,
     /// Java single/double-quoted text: backslash followed by any scalar, no escape decoding.
     Quoted(char),
     Rule(usize),
@@ -190,6 +193,10 @@ impl Expr {
     /// Match tinyexpression's closing code fence without applying grammar trivia between parts.
     pub fn code_end() -> Self {
         Self::CodeEnd
+    }
+
+    pub fn long_code_block() -> Self {
+        Self::LongCodeBlock
     }
     pub fn then(self, next: Self) -> Self {
         Self::sequence([self, next])
@@ -1959,6 +1966,16 @@ impl<'a> ParseContext<'a> {
                     None
                 }
             }
+            Expr::LongCodeBlock => {
+                if let Some(end) = long_code_fence::end(self.input, self.position) {
+                    self.position = end;
+                    self.matched_position = end;
+                    Some(Fragment::default())
+                } else {
+                    self.fail("long code block");
+                    None
+                }
+            }
             Expr::Quoted(quote) => {
                 if !matches!(quote, '\'' | '"') {
                     self.fail("single or double quote delimiter");
@@ -2491,6 +2508,7 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
         | Expr::Identifier
         | Expr::CodeStart
         | Expr::CodeEnd
+        | Expr::LongCodeBlock
         | Expr::Quoted(_)
         | Expr::Rule(_)
         | Expr::Any

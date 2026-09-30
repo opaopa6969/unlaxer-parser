@@ -1,5 +1,195 @@
 [
   {
+    "name": "long-block",
+    "params": [
+      "value"
+    ],
+    "body": "LONG @value END",
+    "cases": [
+      {
+        "id": "lf",
+        "input": "````rust:Demo\nlet s = \"```\";\n````\n",
+        "prefix": [
+          true,
+          34,
+          34
+        ],
+        "accepted": true,
+        "span": [
+          0,
+          34
+        ],
+        "fields": {
+          "value": "````rust:Demo\nlet s = \"```\";\n````"
+        }
+      },
+      {
+        "id": "crlf",
+        "input": "````java:p.Demo\r\n// 😀 ```\r\n```\r\n`````\r\n````\r\n",
+        "prefix": [
+          true,
+          45,
+          45
+        ],
+        "accepted": true,
+        "span": [
+          0,
+          45
+        ],
+        "fields": {
+          "value": "````java:p.Demo\r\n// 😀 ```\r\n```\r\n`````\r\n````"
+        }
+      },
+      {
+        "id": "cr",
+        "input": "`````rust:raw\rr#\"````\"#\r`````\r",
+        "prefix": [
+          true,
+          30,
+          30
+        ],
+        "accepted": true,
+        "span": [
+          0,
+          30
+        ],
+        "fields": {
+          "value": "`````rust:raw\rr#\"````\"#\r`````"
+        }
+      },
+      {
+        "id": "eof",
+        "input": "````rust:empty\n````",
+        "prefix": [
+          true,
+          19,
+          19
+        ],
+        "accepted": true,
+        "span": [
+          0,
+          19
+        ],
+        "fields": {
+          "value": "````rust:empty\n````"
+        }
+      },
+      {
+        "id": "empty",
+        "input": "````rust:empty\n````\n",
+        "prefix": [
+          true,
+          20,
+          20
+        ],
+        "accepted": true,
+        "span": [
+          0,
+          20
+        ],
+        "fields": {
+          "value": "````rust:empty\n````"
+        }
+      },
+      {
+        "id": "missing",
+        "input": "````rust:Demo\nx\n",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      },
+      {
+        "id": "short",
+        "input": "````rust:Demo\nx\n```\n",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      },
+      {
+        "id": "long",
+        "input": "````rust:Demo\nx\n`````\n",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      },
+      {
+        "id": "space",
+        "input": "````rust:Demo\nx\n```` \n",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      },
+      {
+        "id": "inline",
+        "input": "````rust:Demo\nx ````\n",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      },
+      {
+        "id": "bad-label",
+        "input": "````rust:../bad\nx\n````\n",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      },
+      {
+        "id": "bad-scheme",
+        "input": "````型:Demo\nx\n````\n",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      }
+    ]
+  },
+  {
+    "name": "long-block-shifted",
+    "params": [
+      "value"
+    ],
+    "body": "'😀\\n' LONG @value END",
+    "cases": [
+      {
+        "id": "unicode-prefix",
+        "input": "😀\n````rust:A\r\n// 😀 ```\r\n````\r\n",
+        "prefix": [
+          true,
+          30,
+          30
+        ],
+        "accepted": true,
+        "span": [
+          0,
+          30
+        ],
+        "fields": {
+          "value": "````rust:A\r\n// 😀 ```\r\n````"
+        }
+      }
+    ]
+  },
+  {
     "name": "start-direct",
     "params": ["value"],
     "body": "START @value END",

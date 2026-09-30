@@ -202,6 +202,9 @@ public final class RustBackend {
         if (expression instanceof CodeEndToken ignored) {
             return "Expr::CodeEnd";
         }
+        if (expression instanceof LongCodeBlockToken ignored) {
+            return "Expr::LongCodeBlock";
+        }
         if (expression instanceof AnyToken ignored) {
             return "Expr::Any";
         }
