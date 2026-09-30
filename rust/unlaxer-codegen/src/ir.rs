@@ -96,6 +96,8 @@ pub enum Expression {
         name: String,
     },
     Literal(String),
+    /// Always fails without consuming input; the message is an expected hint.
+    ErrorExpected(String),
     NumberToken,
     IdentifierToken,
     QuotedToken(char),

@@ -36,7 +36,7 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     /** Compares this rule's own completed named captures; differences are semantic diagnostics. */
     public record CaptureEquality(Expression child, String name) implements Expression {}
     public sealed interface Expression permits Literal, NumberToken, Reference, Sequence, Choice, LongestChoice, PredictiveChoice, Capture,
-        OptionalExpr, Repeat, Separated, AnyToken, EofToken, EmptyToken, CharRangeToken,
+        OptionalExpr, Repeat, Separated, AnyToken, EofToken, EmptyToken, ErrorExpected, CharRangeToken,
         ExceptToken, UntilToken, LookaheadToken, Delimited, IdentifierToken, QuotedToken,
         CodeStartToken, CodeEndToken, LongCodeBlockToken, CustomToken, TextValue, ValueBoundary, TriviaScope, RuleEffects,
         CaptureEquality {}
@@ -57,6 +57,8 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     public record AnyToken() implements Expression {}
     public record EofToken() implements Expression {}
     public record EmptyToken() implements Expression {}
+    /** A non-consuming, always-failing expected hint; distinct from recovery. */
+    public record ErrorExpected(String message) implements Expression {}
     public record CharRangeToken(char min, char max) implements Expression {}
     public record ExceptToken(String excluded) implements Expression {}
     public record UntilToken(String terminator) implements Expression {}

@@ -475,6 +475,9 @@ public final class RustGrammarLowering {
             if (terminal.value().isEmpty()) throw unsupported("empty literal");
             return new Literal(scalarText(terminal.value()));
         }
+        if (element instanceof ErrorElement error) {
+            return new ErrorExpected(scalarText(error.message()));
+        }
         if (element instanceof RuleRefElement reference) {
             if (reference.namespace().isPresent()) throw unsupported("qualified rule reference");
             if (tokens.containsKey(reference.name())) return tokens.get(reference.name());
@@ -555,6 +558,8 @@ public final class RustGrammarLowering {
     private Predictor firstPredictor(
         Expression expression, Set<Integer> visiting, Map<Integer, Predictor> cache
     ) {
+        // A failing hint must still be tried so it can contribute its expected candidate.
+        if (expression instanceof ErrorExpected ignored) return new AnyPredictor();
         if (nullable(expression)) return new AnyPredictor();
         if (expression instanceof Literal literal && !literal.text().isEmpty()) {
             return new LiteralPredictor(literal.text());
@@ -644,6 +649,9 @@ public final class RustGrammarLowering {
     }
 
     private boolean nullable(Expression expression) {
+        if (expression instanceof ErrorExpected ignored) {
+            return false;
+        }
         if (expression instanceof CustomToken ignored) {
             // An external function can succeed without consuming; neither host may assume otherwise.
             return true;
@@ -799,6 +807,7 @@ public final class RustGrammarLowering {
     }
 
     private Set<Integer> leadingRules(Expression expression) {
+        if (expression instanceof ErrorExpected ignored) return Set.of();
         if (expression instanceof Reference reference) {
             return Set.of(reference.rule());
         }
@@ -887,6 +896,9 @@ public final class RustGrammarLowering {
     private Shape shape(Expression expression, Set<Integer> visiting) {
         enterAnalysis();
         try {
+            if (expression instanceof ErrorExpected ignored) {
+                return new Shape(Kind.TEXT, Cardinality.ONE);
+            }
             if (expression instanceof Reference reference) {
                 return shape(reference.rule(), visiting);
             }

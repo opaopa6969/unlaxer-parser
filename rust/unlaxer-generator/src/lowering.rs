@@ -709,7 +709,7 @@ impl Lowering<'_> {
                 child: Box::new(self.atomic(element)?),
                 separator: Box::new(self.atomic(separator)?),
             },
-            ElementKind::Error(_) => return Err("unsupported error element".into()),
+            ElementKind::Error(message) => Expression::ErrorExpected(message.clone()),
         })
     }
 

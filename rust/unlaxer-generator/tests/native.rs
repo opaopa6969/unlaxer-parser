@@ -425,10 +425,6 @@ fn lowerer_rejects_unsupported_or_inconsistent_grammars_without_artifacts() {
             "unsupported token",
         ),
         (
-            simple.replace("'x' @value", "ERROR('bad') @value"),
-            "unsupported error",
-        ),
-        (
             simple.replace("grammar G {", "grammar G { @whitespace: python\n"),
             "unsupported setting",
         ),

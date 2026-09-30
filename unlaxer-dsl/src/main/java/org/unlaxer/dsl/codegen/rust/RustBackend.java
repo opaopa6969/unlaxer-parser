@@ -223,6 +223,9 @@ public final class RustBackend {
         if (expression instanceof EmptyToken ignored) {
             return "Expr::JavaEmpty";
         }
+        if (expression instanceof ErrorExpected error) {
+            return "Expr::Error(" + quote(error.message()) + ")";
+        }
         if (expression instanceof CharRangeToken range) {
             return "Expr::CharRange('\\u{" + Integer.toHexString(range.min())
                 + "}', '\\u{" + Integer.toHexString(range.max()) + "}')";

@@ -119,7 +119,7 @@ JSON 値と配列順を両 host で比較する。空白や `\n` / `\u000a` 等�
 | `P-SCOPE-MODE` | 未対応 scope mode / mode 名 |
 | `P-TYPEOF` | `@typeof` / capture 名（prefix 自体の範囲） |
 | `P-QUALIFIED-REFERENCE` | 名前空間付き参照 / `namespace.name` |
-| `P-ERROR-ELEMENT` | `ERROR(...)` / message |
+| `P-ERROR-ELEMENT` | 旧版の`ERROR(...)`未対応診断。#329以降は生成対応により発行しない（別用途へ転用しない） |
 | `P-EMPTY-LITERAL` | 空 literal / `empty literal` |
 | `P-STRUCTURE` | 構造検証失敗 / `Rust structural constraints` |
 | `P-SYNTAX` | 構文失敗 / `UBNF syntax` |
@@ -150,7 +150,7 @@ mvn -B -pl unlaxer-common,unlaxer-dsl -am test \
 ```
 
 共有 fixture は [`tests/fixtures/portability`](../rust/unlaxer-generator/tests/fixtures/portability/)。
-26 件の未対応機能を持つ入力、同値の複数出現、Unicode、複数 grammar、構文/構造失敗、
+21 件の未対応機能を持つ入力、同値の複数出現、Unicode、複数 grammar、構文/構造失敗、
 同一 precedence の左右混在を検査する。13 fixture、5 種類の alias chain、2 種類の括弧の入れ子を
 LF/CRLF で比較し、`target/rust-portability.tsv` に 40 ケースの JSON・終了コード一致を残す。
 既存の生成可能な 122 文法でも両 host の check 成功と 610 生成ファイルの byte 一致を検査する。
