@@ -6,6 +6,8 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 mod first;
+#[cfg(test)]
+mod memo_retention_tests;
 mod scope;
 #[doc(hidden)]
 pub use first::{set_candidate_exclusion_for_current_thread, CandidateExclusion};
@@ -813,13 +815,91 @@ const FAILURE_MEMO_BUCKET_SIZE: usize = 256;
 
 /// Keep nearby failures together for lookup and destruction. The first bucket is
 /// inline so inputs shorter than one bucket need no additional allocation.
-#[derive(Default)]
 struct FailureMemoBuckets {
     first: FailureMemoMap,
     remaining: Vec<FailureMemoMap>,
+    window: Option<usize>,
+    high_water: usize,
+    evicted_buckets: usize,
+    eviction_underruns: usize,
+    #[cfg(test)]
+    evicted_entries: usize,
+}
+
+impl Default for FailureMemoBuckets {
+    fn default() -> Self {
+        // Like Java's system properties, read process-level tuning only once.
+        static WINDOW: std::sync::OnceLock<Option<usize>> = std::sync::OnceLock::new();
+        Self::with_window(*WINDOW.get_or_init(|| {
+            if std::env::var("UNLAXER_MEMO_EVICT_BELOW_FRONTIER").as_deref() == Ok("false") {
+                None
+            } else {
+                Some(
+                    std::env::var("UNLAXER_MEMO_WINDOW")
+                        .ok()
+                        .and_then(|value| value.parse::<usize>().ok())
+                        .filter(|&value| value > 0)
+                        .unwrap_or(1024),
+                )
+            }
+        }))
+    }
 }
 
 impl FailureMemoBuckets {
+    fn with_window(window: Option<usize>) -> Self {
+        Self {
+            first: FailureMemoMap::default(),
+            remaining: vec![],
+            window,
+            high_water: 0,
+            evicted_buckets: 0,
+            eviction_underruns: 0,
+            #[cfg(test)]
+            evicted_entries: 0,
+        }
+    }
+
+    fn observe_cursor(&mut self, position: usize) {
+        self.high_water = self.high_water.max(position);
+        let Some(window) = self.window else { return };
+        // Only whole buckets strictly behind the retained scalar-position window.
+        let target = self.high_water.saturating_sub(window) / FAILURE_MEMO_BUCKET_SIZE;
+        if target <= self.evicted_buckets {
+            return;
+        }
+        for bucket in self.evicted_buckets..target.min(self.remaining.len() + 1) {
+            let map = if bucket == 0 {
+                &mut self.first
+            } else {
+                &mut self.remaining[bucket - 1]
+            };
+            #[cfg(test)]
+            {
+                self.evicted_entries += map.len();
+            }
+            // clear() would keep the allocation alive. Drop the hash table itself.
+            *map = FailureMemoMap::default();
+        }
+        self.evicted_buckets = target;
+    }
+
+    fn probe(&mut self, position: usize, key: &FailureMemoKey) -> Option<&FailureDiagnostic> {
+        self.observe_cursor(position);
+        let bucket = position / FAILURE_MEMO_BUCKET_SIZE;
+        if bucket < self.evicted_buckets {
+            self.eviction_underruns += 1;
+            let lookback = self.high_water.saturating_sub(position);
+            let window = self.window.unwrap_or(0).max(lookback).saturating_mul(2);
+            self.window = Some(window);
+            // Already evicted entries cannot be recovered, but the re-parse must be
+            // allowed to memoize here again. Growing only the window is insufficient.
+            self.evicted_buckets =
+                self.high_water.saturating_sub(window) / FAILURE_MEMO_BUCKET_SIZE;
+        }
+        self.get(bucket, key)
+    }
+
     fn get(&self, bucket: usize, key: &FailureMemoKey) -> Option<&FailureDiagnostic> {
         if bucket == 0 {
             self.first.get(key)
@@ -829,6 +909,11 @@ impl FailureMemoBuckets {
     }
 
     fn insert(&mut self, bucket: usize, key: FailureMemoKey, diagnostic: FailureDiagnostic) {
+        // An enclosing rule can finish after traversal has passed its start.
+        // A later probe below this frontier widens the window and re-evaluates it.
+        if bucket < self.evicted_buckets {
+            return;
+        }
         let map = if bucket == 0 {
             &mut self.first
         } else {
@@ -1394,6 +1479,10 @@ impl<'a> ParseContext<'a> {
     }
 
     fn checkpoint(&mut self) -> Checkpoint {
+        if self.options.memoization == Memoization::SafeFailures {
+            self.failure_memo
+                .observe_cursor(self.code_point(self.position));
+        }
         let captures_nonempty = !self.captures.is_empty();
         let captures_journal_mark = self.captures.checkpoint();
         let state = (!self.state.0.is_empty()).then(|| Rc::clone(&self.state));
@@ -1559,7 +1648,7 @@ impl<'a> ParseContext<'a> {
         .then(|| {
             (
                 // Route by scalar position; keep the existing byte-based key intact.
-                self.code_point(self.position) / FAILURE_MEMO_BUCKET_SIZE,
+                self.code_point(self.position),
                 FailureMemoKey::new(
                     id,
                     self.position,
@@ -1569,8 +1658,8 @@ impl<'a> ParseContext<'a> {
                 ),
             )
         });
-        if let Some((bucket, key)) = memo_key {
-            if let Some(diagnostic) = self.failure_memo.get(bucket, &key).cloned() {
+        if let Some((position, key)) = memo_key {
+            if let Some(diagnostic) = self.failure_memo.probe(position, &key).cloned() {
                 self.memoized_failure_hits += 1;
                 self.replay_failure(&diagnostic);
                 return None;
@@ -1601,7 +1690,7 @@ impl<'a> ParseContext<'a> {
                 None
             }
         };
-        if let Some((bucket, key)) = memo_key {
+        if let Some((position, key)) = memo_key {
             let diagnostic = if record_diagnostics {
                 let diagnostic = self
                     .diagnostic_frames
@@ -1615,7 +1704,8 @@ impl<'a> ParseContext<'a> {
                 FailureDiagnostic::default()
             };
             if result.is_none() {
-                self.failure_memo.insert(bucket, key, diagnostic);
+                self.failure_memo
+                    .insert(position / FAILURE_MEMO_BUCKET_SIZE, key, diagnostic);
             }
         }
         result

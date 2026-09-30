@@ -36,6 +36,7 @@
 | scopeTree/declares/スコープ参照 | 両frontendから生成、Java capture-site選択も修正（#176）。mode/description metadata保持、CP位置、nested/repeated captureとrollbackを比較 | 両modeは解析時stack。評価時dynamic環境やclosure、LSP/DAP利用は未対応 |
 | catalog/doc/skip/simple等 | `@catalog` は両frontendから静的 `CatalogSpec` を生成（#180）。parser/AST/evaluatorには作用しない。doc/skip/simpleは未対応 | catalog resolver・context別LSP利用とprotocol test、残るannotationのJava実動作を検証 |
 | recovery・incremental cache | 未対応 | 編集差分と全再解析の一致、位置・診断・利用者状態の無効化、回復後の評価境界 |
+| SafeFailures memoの保持窓 | Javaの保持窓に対応するRustのbucket解放と、両言語の遠距離backtrack後の再保存を実装（#290） | 共通6入力で受理・consumed/farthest位置を照合、各言語で窓OFF/ONの診断・hit数一致、32,000 CP人工負荷の追加heap peak約95.5%削減。任意文法のhit不変・時間計算量保証・stateful memo parityの完了は含まない |
 | LSP/DAP | 未対応 | UTF-16変換、diagnostics/completion、breakpoint/step/変数表示を実protocolで検証 |
 | tinyexpression-rs | 未対応 | 値・null/欠損・変数・演算子・関数・外部呼出し・日時/数値仕様を棚卸しし、同一入力で値/失敗分類を比較 |
 | rustcodeblock | 未対応 | 既定無効・明示許可付きAOT、元の位置へのcompiler診断、通常parse/LSPの非実行保証。Javaソースの自動翻訳はしない |

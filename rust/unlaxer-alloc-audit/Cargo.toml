@@ -24,3 +24,7 @@ harness = false
 [[test]]
 name = "diagnostic_allocation"
 harness = false
+
+[[test]]
+name = "memo_retention"
+harness = false

@@ -4,6 +4,7 @@ import static org.junit.Assert.*;
 
 import java.util.Optional;
 import java.util.function.Supplier;
+import java.nio.charset.StandardCharsets;
 import org.junit.Test;
 import org.unlaxer.Parsed;
 import org.unlaxer.StringSource;
@@ -14,6 +15,7 @@ import org.unlaxer.parser.combinator.Choice;
 import org.unlaxer.parser.combinator.LazyChoice;
 import org.unlaxer.parser.combinator.LazyZeroOrMore;
 import org.unlaxer.parser.elementary.WordParser;
+import org.unlaxer.parser.elementary.EndOfSourceParser;
 
 /**
  * Bounding the memo live set below the retained window (#276 round 4).
@@ -23,6 +25,44 @@ import org.unlaxer.parser.elementary.WordParser;
  * with the guard that widens the window when a probe does land below the watermark.
  */
 public class MemoEvictionTest {
+
+    static final class FailingAtom extends Chain implements SafeFailureMemoizable {
+        FailingAtom(String token) { super(new WordParser(token), new WordParser("!")); }
+    }
+
+    @Test public void sharedJavaRustRetentionCorpus() throws Exception {
+        String corpus;
+        try (var input = getClass().getResourceAsStream("/memo-retention.tsv")) {
+            assertNotNull(input);
+            corpus = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        for (String row : corpus.lines().filter(line -> !line.startsWith("#")).toList()) {
+            String[] fields = row.split("\t");
+            int count = Integer.parseInt(fields[1]);
+            String source = fields[0].repeat(count) + (fields[2].equals("-") ? "" : fields[2]);
+            Parser atom = new FailingAtom(fields[0]);
+            Parser parser = new Chain(new Items(new Choice(atom, atom, new WordParser(fields[0]))),
+                new EndOfSourceParser());
+            try (ParseContext off = context(source); ParseContext on = context(source)) {
+                off.getPackratMemoTable().setEvictionEnabled(false);
+                on.getPackratMemoTable().setWindow(1024);
+                assertEquals(row, Boolean.parseBoolean(fields[3]), parser.parse(off).isSucceeded());
+                assertEquals(row, Boolean.parseBoolean(fields[3]), parser.parse(on).isSucceeded());
+                assertEquals(Integer.parseInt(fields[4]), on.getConsumedPosition().value());
+                assertEquals(off.getConsumedPosition(), on.getConsumedPosition());
+                assertEquals(off.getMatchedPosition(), on.getMatchedPosition());
+                var oldDiagnostic = off.getParseFailureDiagnostics();
+                var diagnostic = on.getParseFailureDiagnostics();
+                assertEquals(Integer.parseInt(fields[5]), diagnostic.getFarthestOffset());
+                assertEquals(oldDiagnostic.getFarthestOffset(), diagnostic.getFarthestOffset());
+                assertEquals(oldDiagnostic.getExpectedTokens(), diagnostic.getExpectedTokens());
+                assertEquals(count + 1, on.getPackratMemoTable().failureHits());
+                assertEquals(off.getPackratMemoTable().failureHits(), on.getPackratMemoTable().failureHits());
+                assertEquals(0, on.getPackratMemoTable().evictionUnderruns());
+                assertEquals(count > 1024, on.getPackratMemoTable().evictedCount() > 0);
+            }
+        }
+    }
 
     /** Memoizable leaf: one entry per start position, probed twice per position below. */
     static final class Atom extends LazyChoice implements SafeSuccessMemoizable {
@@ -76,7 +116,7 @@ public class MemoEvictionTest {
         String source = repeat(2000);
         Parser atoms = new Items(new Atom());
         // The first alternative consumes everything and then fails, so the second re-parses from 0.
-        Parser parser = new Choice(new Chain(atoms, new WordParser("z")), new Items(new Atom()));
+        Parser parser = new Choice(new Chain(atoms, new WordParser("z")), new Items(new Item()));
         try (ParseContext context = context(source)) {
             context.getPackratMemoTable().setWindow(64);
             Parsed parsed = parser.parse(context);
@@ -85,6 +125,11 @@ public class MemoEvictionTest {
             assertTrue(context.getPackratMemoTable().evictionUnderruns() > 0);
             // Widened past twice the observed look-back, so the retry is memoized end to end.
             assertTrue(context.getPackratMemoTable().window() >= 4000);
+            // The old watermark must also retreat: the retry must STORE entries again,
+            // not merely stop future evictions while rejecting every old start position.
+            assertEquals(0, context.getPackratMemoTable().watermark());
+            assertEquals(0, context.getPackratMemoTable().deadOnArrival());
+            assertEquals(2000, context.getPackratMemoTable().successHits());
         }
     }
 

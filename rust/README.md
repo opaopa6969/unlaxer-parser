@@ -366,3 +366,12 @@ Rust生成parserの`parse_tree_detailed(&str)`は`Result<Tree, ParseDiagnostic>`
 さらに[`diagnostics.json`](../unlaxer-dsl/src/test/resources/evolution/diagnostics.json)の8境界例をstage 3で検査し、`target/rust-diagnostics-edge.tsv`へ保存する。7件は位置一致、`neg(1e+)`はJavaが位置7、Rustが位置5を返すことを明示的な差として固定する。Javaは失敗した指数部の内部位置を記録し、Rustは指数部をrollbackした後の終端不一致を記録するためである。比較のためにどちらかの位置を捏造・置換しない。
 
 TSVは`unlaxer-dsl/target/`配下で、CI artifact `rust-conformance`にも添付する。66件・8件はJUnit内のケース数で、独立したテストメソッド数ではない。Unicode位置、rollback、source-map非干渉、Java診断listの防御的コピー/不変性、Rust旧APIの情報維持もテストする。有限corpusの一致は全UBNF・全入力の等価性証明でも、性能・生産性の比較でもない。
+
+## Failure memo の保持範囲
+
+`Memoization::SafeFailures` 使用時は、consumed cursorの最大到達位置から1,024 code pointを
+保持窓とし、古い失敗memoのHashMapを解放する（#290）。遠い位置へbacktrackすると窓を広げ、
+失われたentryは再解析で復元する。解析結果は維持するが、任意文法でhit数や速度は保証しない。
+`UNLAXER_MEMO_WINDOW`（正の整数）で窓を指定し、`UNLAXER_MEMO_EVICT_BELOW_FRONTIER=false`
+で解放を止められる。両設定は最初のcontext生成時に一度だけ読む。memo化自体は既定OFFのまま。
+詳しくは[測定・Javaとの対称性・制約](../benchmarks/results/2026-09-30-rust-memo-retention.md)を参照。
