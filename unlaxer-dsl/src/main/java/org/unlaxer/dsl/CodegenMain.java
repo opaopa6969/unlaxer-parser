@@ -35,6 +35,9 @@ public class CodegenMain {
     }
 
     static int run(String[] args, PrintStream out, PrintStream err) {
+        if (args.length > 0 && "impact".equals(args[0])) {
+            return ApiImpactCommand.run(args, out, err);
+        }
         if (args.length > 0 && "check".equals(args[0])) {
             return PortabilityCheckCommand.run(args, out, err);
         }
@@ -272,6 +275,7 @@ public class CodegenMain {
                 + " [--java-release 21|17]"
                 + "\nExperimental Rust: CodegenMain generate --target rust --grammar <file.ubnf> --output <module-directory> [--check]"
                 + "\nPortability: CodegenMain check --target rust --grammar <file.ubnf> [--format json]"
+                + "\nAPI impact: CodegenMain impact --target java|rust --before <old.ubnf> --after <new.ubnf> [--format json]"
         );
     }
 

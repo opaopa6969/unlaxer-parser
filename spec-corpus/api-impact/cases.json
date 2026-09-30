@@ -1,0 +1,291 @@
+[
+  {
+    "name": "comments",
+    "before": "comments/before.ubnf",
+    "after": "comments/after.ubnf",
+    "javaChanges": [],
+    "rustChanges": [],
+    "legacySemantics": {
+      "java": true,
+      "rust": true
+    },
+    "legacyConsumer": {
+      "java": true,
+      "rust": true
+    },
+    "node": "Value",
+    "consumer": "field"
+  },
+  {
+    "name": "node-add",
+    "before": "node-add/before.ubnf",
+    "after": "node-add/after.ubnf",
+    "javaChanges": [
+      "METHOD_ADDED:evalExtra",
+      "NODE_ADDED:Extra"
+    ],
+    "rustChanges": [
+      "METHOD_ADDED:eval_extra",
+      "NODE_ADDED:Extra"
+    ],
+    "legacySemantics": {
+      "java": false,
+      "rust": false
+    },
+    "legacyConsumer": {
+      "java": true,
+      "rust": true
+    },
+    "node": "Value",
+    "consumer": "field"
+  },
+  {
+    "name": "node-remove",
+    "before": "node-remove/before.ubnf",
+    "after": "node-remove/after.ubnf",
+    "javaChanges": [
+      "METHOD_REMOVED:evalExtra",
+      "NODE_REMOVED:Extra"
+    ],
+    "rustChanges": [
+      "METHOD_REMOVED:eval_extra",
+      "NODE_REMOVED:Extra"
+    ],
+    "legacySemantics": {
+      "java": false,
+      "rust": false
+    },
+    "legacyConsumer": {
+      "java": true,
+      "rust": true
+    },
+    "node": "Value",
+    "consumer": "field"
+  },
+  {
+    "name": "numeric-to-text",
+    "before": "numeric-to-text/before.ubnf",
+    "after": "numeric-to-text/after.ubnf",
+    "javaChanges": [
+      "FIELD_TYPE_CHANGED:Value.value"
+    ],
+    "rustChanges": [],
+    "legacySemantics": {
+      "java": true,
+      "rust": true
+    },
+    "legacyConsumer": {
+      "java": false,
+      "rust": true
+    },
+    "node": "Value",
+    "consumer": "field"
+  },
+  {
+    "name": "text-to-node",
+    "before": "text-to-node/before.ubnf",
+    "after": "text-to-node/after.ubnf",
+    "javaChanges": [
+      "FIELD_TYPE_CHANGED:Value.value",
+      "METHOD_ADDED:evalChild",
+      "NODE_ADDED:Child"
+    ],
+    "rustChanges": [
+      "FIELD_TYPE_CHANGED:Value.value",
+      "METHOD_ADDED:eval_child",
+      "METHOD_SIGNATURE_CHANGED:eval_value",
+      "NODE_ADDED:Child"
+    ],
+    "legacySemantics": {
+      "java": false,
+      "rust": false
+    },
+    "legacyConsumer": {
+      "java": false,
+      "rust": false
+    },
+    "node": "Value",
+    "consumer": "field"
+  },
+  {
+    "name": "optional",
+    "before": "optional/before.ubnf",
+    "after": "optional/after.ubnf",
+    "javaChanges": [
+      "FIELD_CARDINALITY_CHANGED:Value.value",
+      "FIELD_TYPE_CHANGED:Value.value"
+    ],
+    "rustChanges": [
+      "FIELD_CARDINALITY_CHANGED:Value.value",
+      "FIELD_TYPE_CHANGED:Value.value",
+      "METHOD_SIGNATURE_CHANGED:eval_value"
+    ],
+    "legacySemantics": {
+      "java": true,
+      "rust": false
+    },
+    "legacyConsumer": {
+      "java": false,
+      "rust": false
+    },
+    "node": "Value",
+    "consumer": "field"
+  },
+  {
+    "name": "many",
+    "before": "many/before.ubnf",
+    "after": "many/after.ubnf",
+    "javaChanges": [
+      "FIELD_CARDINALITY_CHANGED:Value.value",
+      "FIELD_TYPE_CHANGED:Value.value"
+    ],
+    "rustChanges": [
+      "FIELD_CARDINALITY_CHANGED:Value.value",
+      "FIELD_TYPE_CHANGED:Value.value",
+      "METHOD_SIGNATURE_CHANGED:eval_value"
+    ],
+    "legacySemantics": {
+      "java": true,
+      "rust": false
+    },
+    "legacyConsumer": {
+      "java": false,
+      "rust": false
+    },
+    "node": "Value",
+    "consumer": "field"
+  },
+  {
+    "name": "field-add",
+    "before": "field-add/before.ubnf",
+    "after": "field-add/after.ubnf",
+    "javaChanges": [
+      "FIELD_ADDED:Value.suffix"
+    ],
+    "rustChanges": [
+      "FIELD_ADDED:Value.suffix",
+      "METHOD_SIGNATURE_CHANGED:eval_value"
+    ],
+    "legacySemantics": {
+      "java": true,
+      "rust": false
+    },
+    "legacyConsumer": {
+      "java": false,
+      "rust": false
+    },
+    "node": "Value",
+    "consumer": "constructor"
+  },
+  {
+    "name": "field-remove",
+    "before": "field-remove/before.ubnf",
+    "after": "field-remove/after.ubnf",
+    "javaChanges": [
+      "FIELD_REMOVED:Value.suffix"
+    ],
+    "rustChanges": [
+      "FIELD_REMOVED:Value.suffix",
+      "METHOD_SIGNATURE_CHANGED:eval_value"
+    ],
+    "legacySemantics": {
+      "java": true,
+      "rust": false
+    },
+    "legacyConsumer": {
+      "java": false,
+      "rust": false
+    },
+    "node": "Value",
+    "consumer": "constructor"
+  },
+  {
+    "name": "field-order",
+    "before": "field-order/before.ubnf",
+    "after": "field-order/after.ubnf",
+    "javaChanges": [
+      "FIELD_ORDER_CHANGED:Value"
+    ],
+    "rustChanges": [
+      "FIELD_ORDER_CHANGED:Value",
+      "METHOD_SIGNATURE_CHANGED:eval_value"
+    ],
+    "legacySemantics": {
+      "java": true,
+      "rust": true
+    },
+    "legacyConsumer": {
+      "java": false,
+      "rust": true
+    },
+    "node": "Value",
+    "consumer": "constructor"
+  },
+  {
+    "name": "shared-merge",
+    "before": "shared-merge/before.ubnf",
+    "after": "shared-merge/after.ubnf",
+    "javaChanges": [
+      "FIELD_TYPE_CHANGED:Left.value",
+      "METHOD_REMOVED:evalRight",
+      "NODE_REMOVED:Right",
+      "NODE_RULES_CHANGED:Left"
+    ],
+    "rustChanges": [
+      "FIELD_TYPE_CHANGED:Left.value",
+      "METHOD_REMOVED:eval_right",
+      "METHOD_SIGNATURE_CHANGED:eval_left",
+      "NODE_REMOVED:Right",
+      "NODE_RULES_CHANGED:Left"
+    ],
+    "legacySemantics": {
+      "java": false,
+      "rust": false
+    },
+    "legacyConsumer": {
+      "java": false,
+      "rust": false
+    },
+    "node": "Left",
+    "consumer": "field"
+  },
+  {
+    "name": "operator-only",
+    "before": "operator-only/before.ubnf",
+    "after": "operator-only/after.ubnf",
+    "javaChanges": [],
+    "rustChanges": [],
+    "legacySemantics": {
+      "java": true,
+      "rust": true
+    },
+    "legacyConsumer": {
+      "java": true,
+      "rust": true
+    },
+    "node": "Value",
+    "consumer": "field"
+  },
+  {
+    "name": "grammar-rename",
+    "before": "grammar-rename/before.ubnf",
+    "after": "grammar-rename/after.ubnf",
+    "javaChanges": [
+      "AST_TYPE_CHANGED:ast",
+      "EVALUATOR_TYPE_CHANGED:evaluator",
+      "METHOD_SIGNATURE_CHANGED:evalValue",
+      "NODE_PARENTS_CHANGED:Value"
+    ],
+    "rustChanges": [],
+    "legacySemantics": {
+      "java": false,
+      "rust": true
+    },
+    "legacyConsumer": {
+      "java": false,
+      "rust": true
+    },
+    "node": "Value",
+    "consumer": "field"
+  }
+]

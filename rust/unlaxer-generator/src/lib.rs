@@ -1,5 +1,6 @@
 //! Native UBNF -> normalized IR -> Rust modules. No Java process is launched.
 pub mod adapters;
+pub mod impact;
 pub mod lowering;
 pub mod portability;
 
