@@ -8,10 +8,8 @@ final class ParserScopeEmitter {
     private ParserScopeEmitter() {}
 
     static String helpers(GrammarDecl grammar) {
-        boolean scope = grammar.rules().stream().anyMatch(rule -> rule.annotations().stream()
-            .anyMatch(annotation -> annotation instanceof ScopeTreeAnnotation));
         if (grammar.rules().stream().noneMatch(rule -> rule.annotations().stream().anyMatch(annotation ->
-                annotation instanceof DeclaresAnnotation || scope && annotation instanceof BackrefAnnotation))) {
+                annotation instanceof DeclaresAnnotation || annotation instanceof BackrefAnnotation))) {
             return "";
         }
         String boundaries = grammar.rules().stream().map(rule -> rule.name() + "Parser.class")
@@ -77,6 +75,34 @@ final class ParserScopeEmitter {
             w.dedent();
             w.line("}");
         }
+        w.dedent();
+        w.line("}");
+        return w.build();
+    }
+
+    static String equalityAction(ParserGenerator.GenContext ctx, RuleDecl rule, String capture) {
+        String ids = ctx.captureBindings.get(rule.name()).sites(capture).stream()
+            .map(site -> "\"" + ParserCodegenUtil.escapeString(site.id()) + "\"")
+            .collect(Collectors.joining(", "));
+        var w = new IndentedWriter(3);
+        w.line("// Compare completed occurrences of the named capture within this rule.");
+        w.line("java.util.List<org.unlaxer.Token> __sites = __scopeCaptureSites(");
+        w.line("    tokens.isEmpty() ? null : tokens.get(0), java.util.Set.of(" + ids + "));");
+        w.line("if (__sites.size() > 1) {");
+        w.indent();
+        w.line("String __expected = __scopeCaptureValue(__sites.get(0)).name();");
+        w.line("for (int __bi = 1; __bi < __sites.size(); __bi++) {");
+        w.indent();
+        w.line("__ScopeCapture __actual = __scopeCaptureValue(__sites.get(__bi));");
+        w.line("if (!__expected.equals(__actual.name())) {");
+        w.indent();
+        w.line("org.unlaxer.dsl.runtime.ScopeStore.addDiagnostic(ctx,");
+        w.line("    \"back-reference mismatch: expected '\" + __expected + \"' but got '\" + __actual.name() + \"'\",");
+        w.line("    __actual.offset(), __actual.length(), org.unlaxer.dsl.runtime.ScopeStore.Severity.ERROR);");
+        w.dedent();
+        w.line("}");
+        w.dedent();
+        w.line("}");
         w.dedent();
         w.line("}");
         return w.build();

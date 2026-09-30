@@ -195,8 +195,9 @@ ASCII bitset・非 ASCII フラグ・nullable・unknown・「sequence が先に 
 - `@whitespace: javaStyle`（ASCII空白、行/ブロックコメント）または`none`。未指定は`none`。rule の `@whitespace` / `@whitespace(javaStyle)` / `@whitespace(none)` と `@interleave(profile=javaStyle|commentsAndSpaces)` による局所設定も生成する。[優先順位・Javaとの共通契約](../docs/rule-trivia.md)を参照。`@package`はRustでは使用しない。
 - `@catalog(context='...')`。解析時には作用せず、rule名・context・local capture名を`parser::CATALOGS`へ保持する。catalogがない文法の出力は変えない。[metadata契約とJava LSPの現状](../docs/catalog-metadata.md)を参照。Rustのcatalog completion/hoverは未実装。
 - `@skip`。構文・CST・capture・scope/rollback は保持し、その規則と子の AST 投影を省く。明示 capture は text として保持する。[root・型・移行と検証の契約](../docs/skip-ast-projection.md)を参照。
+- `@scopeTree` / `@declares` / `@backref`。scopeのある文法では宣言への参照、ない文法では同一rule内のcapture比較を行う。構文の受理は変えず意味診断を保持する。[capture選択・空text・CP位置・rollbackの契約](../docs/generated-scope-effects.md)を参照。
 
-imports、上記以外の外部token parser、`@typeof`、`@eval`等の他のannotation、左再帰などは明示的に拒否する。生成するmapping名・field名はASCII識別子に制限し、Rustのraw identifierで出力する。`self`/`Self`/`super`/`crate`、fieldの`span`/`semantics`、shared mappingのschema不一致・異なるmappingからの生成method名衝突は拒否する（投影しないskipped mappingはこの生成名制約の対象外）。通常のrootはちょうど1つのAST nodeへ解決される必要がある。rootの投影経路に`@skip`がある場合はASTなしの構文解析も許すが、mapperは投影結果が1 nodeでなければ明示失敗する。optionalの先にある参照も左再帰検査に含め、空一致の可能性がある無限反復は生成前に拒否する。
+imports、上記以外の外部token parser、`@typeof`、`@eval`等の他のannotation、左再帰などは明示的に拒否する。生成するmapping名・field名はASCII識別子に制限し、Rustのraw identifierで出力する。`self`/`Self`/`super`/`crate`、fieldの`span`/`semantics`、shared mappingのschema不一致・異なるmappingからの生成method名衝突は拒否する（投影しないskipped mappingはこの生成名制約の対象外）。通常のrootはちょうど1つのAST nodeへ解決される必要がある。rootの投影経路に`@skip`またはmappingのないscopeなしcapture比較ruleがある場合はASTなしの構文解析も許すが、mapperは投影結果が1 nodeでなければ明示失敗する。optionalの先にある参照も左再帰検査に含め、空一致の可能性がある無限反復は生成前に拒否する。
 
 ### 演算子の列と優先順位
 
@@ -274,6 +275,9 @@ let matched = context.parse(&MyParser)?;
 `Expr`には`then`/`or`/`optional`/`repeat`/`zero_or_more`/`one_or_more`/`separated_by`/`capture`/`ahead`/`not_ahead`を用意する。`separated_by`は1個以上。genericな無限反復の子が入力を消費せず成功した場合はエラーとする。`Custom(fn)`でcontextを取る関数を組み込める。`Any`/`CharRange`/`Except`は1コードポイント、`Until`は終端の直前まで（終端がなければ失敗）、`Eof`/`Empty`/`Error`も利用できる。UBNFではJava互換用の`JavaOptional`/`JavaRepeat`等も生成する。Custom・BackreferenceのUBNF接続は未実装。
 
 `captured(name)`と`Backreference(name)`はcontext全体の同名captureの最新成功分を使用する。`capture_spans`は成功履歴を返す。字句スコープやJavaのcapture伝播規則を再現したものではない。
+`Expr::compare_captures(name, child)`は別のeffectで、childが返す同名captureを完了順に比較し、
+異なれば`ERROR`意味診断を追加する。空textも比較し、受理自体は変えない。scopeなしUBNFの
+`@backref`はこれを生成し、context-wideなcapture replayは生成しない。
 
 字句スコープの宣言・参照・semantic diagnostics は別の `scopes()` / `scopes_mut()` で扱う。
 `with_scope` は子スコープを開き、成功後は名前を隠してイベント履歴を保持し、失敗時は
@@ -362,7 +366,7 @@ v6と同じ[`evolution/{0,1,2,3}`](../unlaxer-dsl/src/test/resources/evolution/)
 
 差分実験で見つかったJava mapperのcapture選択不具合[issue #116](https://github.com/opaopa6969/unlaxer-parser/issues/116)は、生成parserの文法位置bindingで修正した。欠損optionalがrepeat側のItemを奪うことや、literalの代わりに区切りを拾うことを防ぎ、plus/bounded/separatedも各値の出現順に対応する。旧`javaKnown`不具合snapshotを除き、正しい期待ASTとの一致とJava/Rust相互一致を検査する。双方の結果は`target/rust-cardinality.tsv`とCI artifactに保存する。
 
-Javaではparserとmapperを同じgenerator revisionで**一緒に再生成**する必要がある。新mapperは新parserの`__CaptureBinding` metadataを必要とし、旧parserとの混在は非互換（コンパイルエラー）になる。旧parser＋旧mapperの組はそのまま利用できるが、旧capture不具合も残る。追加wrapperは専用instanceであり`Parser.get`の共有instanceは変更しない。scope付き文法の宣言/参照listenerも位置bindingを使い、別ルール内部へは入らない（#176）。scopeなしbackrefの旧経路は変更しない。入れ子量指定子の内側に置いたcaptureは検証済みだが、`[ { Item } ] @values`のような外側captureの`Optional<List<_>>`再構築はJava/Rust双方の未完了項目で、今回の位置binding修正とは別である。
+Javaではparserとmapperを同じgenerator revisionで**一緒に再生成**する必要がある。新mapperは新parserの`__CaptureBinding` metadataを必要とし、旧parserとの混在は非互換（コンパイルエラー）になる。旧parser＋旧mapperの組はそのまま利用できるが、旧capture不具合も残る。追加wrapperは専用instanceであり`Parser.get`の共有instanceは変更しない。scope付き文法の宣言/参照listenerも位置bindingを使い、別ルール内部へは入らない（#176）。scopeなしbackrefも同じbindingを使い、parser class推測を廃止する（#325）。入れ子量指定子の内側に置いたcaptureは検証済みだが、`[ { Item } ] @values`のような外側captureの`Optional<List<_>>`再構築はJava/Rust双方の未完了項目で、今回の位置binding修正とは別である。
 
 数値は既存evolutionと同じ`Digits ::= NUMBER`のtext用rule経由でcaptureする。[issue #115](https://github.com/opaopa6969/unlaxer-parser/issues/115)のJava直接captureの不正なprimitive初期化とgeneric型は修正した。scalarの既存`int` APIを維持し、optional/listは`Integer`へboxingする。Java mapperは`Integer.parseInt`により小数・指数・overflowを明示的に拒否し、Rust mapperは字句を`String`として保持する。この型・変換契約はまだ同値ではない。
 

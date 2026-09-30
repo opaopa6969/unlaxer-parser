@@ -1,0 +1,116 @@
+[
+  {
+    "name":"TagPair",
+    "grammar":"grammar TagPair { @package: org.example.captureequality token ID = org.unlaxer.parser.clang.IdentifierParser @root @backref(name=tag) @mapping(Root, params=[tag]) Root ::= '<' ID @tag '>' '</' ID @tag '>'; }",
+    "cases":[
+      {"id":"equal", "input":"<a></a>","prefix":[true,7,7],"syntax":true,"mapping":"ok","ast":{"type":"Root","span":[0,7],"fields":{"tag":["a","a"]}},"diagnostics":[],"declarations":[],"references":[],"parentRollback":true},
+      {"id":"mismatch", "input":"<a></b>","prefix":[true,7,7],"syntax":true,"mapping":"ok","ast":{"type":"Root","span":[0,7],"fields":{"tag":["a","b"]}},"diagnostics":[{"message":"back-reference mismatch: expected 'a' but got 'b'","offset":5,"length":1,"severity":"ERROR"}],"declarations":[],"references":[],"parentRollback":true},
+      {"id":"valid-prefix", "input":"<a></b>!","prefix":[true,7,7],"syntax":false,"mapping":"none","diagnostics":[{"message":"back-reference mismatch: expected 'a' but got 'b'","offset":5,"length":1,"severity":"ERROR"}],"declarations":[],"references":[]},
+      {"id":"syntax-failure", "input":"<a></", "prefix":[false,0,0],"syntax":false,"mapping":"none","diagnostics":[],"declarations":[],"references":[]}
+    ]
+  },
+  {
+    "name":"CaptureSites",
+    "grammar":"grammar CaptureSites { @package: org.example.captureequality token ID = org.unlaxer.parser.clang.IdentifierParser @root @backref(name=tag) @mapping(Root, params=[noise,tag]) Root ::= ID @noise ':' ID @tag ':' ID @tag ':' ID @tag; }",
+    "cases":[
+      {"id":"different-name-same-parser", "input":"x:a:b:c","prefix":[true,7,7],"syntax":true,"mapping":"ok","ast":{"type":"Root","span":[0,7],"fields":{"noise":"x","tag":["a","b","c"]}},"diagnostics":[{"message":"back-reference mismatch: expected 'a' but got 'b'","offset":4,"length":1,"severity":"ERROR"},{"message":"back-reference mismatch: expected 'a' but got 'c'","offset":6,"length":1,"severity":"ERROR"}],"declarations":[],"references":[]},
+      {"id":"all-equal", "input":"x:a:a:a","prefix":[true,7,7],"syntax":true,"mapping":"ok","ast":{"type":"Root","span":[0,7],"fields":{"noise":"x","tag":["a","a","a"]}},"diagnostics":[],"declarations":[],"references":[]}
+    ]
+  },
+  {
+    "name":"DifferentParsers",
+    "grammar":"grammar DifferentParsers { @package: org.example.captureequality token ID = org.unlaxer.parser.clang.IdentifierParser @root @backref(name=tag) @mapping(Root, params=[tag]) Root ::= 'a' @tag ':' ID @tag; }",
+    "cases":[
+      {"id":"same-name-different-parser", "input":"a:b","prefix":[true,3,3],"syntax":true,"mapping":"ok","ast":{"type":"Root","span":[0,3],"fields":{"tag":["a","b"]}},"diagnostics":[{"message":"back-reference mismatch: expected 'a' but got 'b'","offset":2,"length":1,"severity":"ERROR"}],"declarations":[],"references":[]},
+      {"id":"same-value", "input":"a:a","prefix":[true,3,3],"syntax":true,"mapping":"ok","ast":{"type":"Root","span":[0,3],"fields":{"tag":["a","a"]}},"diagnostics":[],"declarations":[],"references":[]}
+    ]
+  },
+  {
+    "name":"NestedGroups",
+    "grammar":"grammar NestedGroups { @package: org.example.captureequality token ID = org.unlaxer.parser.clang.IdentifierParser @root @backref(name=tag) @mapping(Root, params=[tag]) Root ::= Alias @tag ':' (ID @tag) @tag; Alias ::= ID; }",
+    "cases":[
+      {"id":"alias-and-nested", "input":"a:b","prefix":[true,3,3],"syntax":true,"mapping":"ok","ast":{"type":"Root","span":[0,3],"fields":{"tag":["a","b","b"]}},"diagnostics":[{"message":"back-reference mismatch: expected 'a' but got 'b'","offset":2,"length":1,"severity":"ERROR"},{"message":"back-reference mismatch: expected 'a' but got 'b'","offset":2,"length":1,"severity":"ERROR"}],"declarations":[],"references":[]}
+    ]
+  },
+  {
+    "name":"RepeatedTags",
+    "grammar":"grammar RepeatedTags { @package: org.example.captureequality token ID = org.unlaxer.parser.clang.IdentifierParser @root @backref(name=tag) @mapping(Root, params=[tag]) Root ::= (ID @tag ',')+; }",
+    "cases":[
+      {"id":"repeat-mismatch-each", "input":"a,b,c,","prefix":[true,6,6],"syntax":true,"mapping":"ok","ast":{"type":"Root","span":[0,6],"fields":{"tag":["a","b","c"]}},"diagnostics":[{"message":"back-reference mismatch: expected 'a' but got 'b'","offset":2,"length":1,"severity":"ERROR"},{"message":"back-reference mismatch: expected 'a' but got 'c'","offset":4,"length":1,"severity":"ERROR"}],"declarations":[],"references":[]},
+      {"id":"single-no-comparison", "input":"a,","prefix":[true,2,2],"syntax":true,"mapping":"ok","ast":{"type":"Root","span":[0,2],"fields":{"tag":["a"]}},"diagnostics":[],"declarations":[],"references":[]}
+    ]
+  },
+  {
+    "name":"SkippedCapture",
+    "grammar":"grammar SkippedCapture { @package: org.example.captureequality token ID = org.unlaxer.parser.clang.IdentifierParser @root @backref(name=tag) @mapping(Root, params=[tag]) Root ::= Hidden @tag ':' ID @tag; @skip @mapping(Ghost) Hidden ::= ID; }",
+    "cases":[
+      {"id":"skip-does-not-remove-capture", "input":"a:b","prefix":[true,3,3],"syntax":true,"mapping":"ok","ast":{"type":"Root","span":[0,3],"fields":{"tag":["a","b"]}},"diagnostics":[{"message":"back-reference mismatch: expected 'a' but got 'b'","offset":2,"length":1,"severity":"ERROR"}],"declarations":[],"references":[]}
+    ]
+  },
+  {
+    "name":"NoAst",
+    "grammar":"grammar NoAst { @package: org.example.captureequality token ID = org.unlaxer.parser.clang.IdentifierParser @root @backref(name=tag) Root ::= ID @tag ':' ID @tag; }",
+    "cases":[
+      {"id":"syntax-success-mapping-failure", "input":"a:b","prefix":[true,3,3],"syntax":true,"mapping":"failure","diagnostics":[{"message":"back-reference mismatch: expected 'a' but got 'b'","offset":2,"length":1,"severity":"ERROR"}],"declarations":[],"references":[]}
+    ]
+  },
+  {
+    "name":"ScopedReference",
+    "grammar":"grammar ScopedReference { @package: org.example.captureequality token ID = org.unlaxer.parser.clang.IdentifierParser @root @scopeTree(mode=lexical) @mapping(Root, params=[decl,ref]) Root ::= Decl @decl Ref @ref; @declares(symbol=name) @mapping(Decl, params=[name]) Decl ::= ID @name ';'; @backref(name=name) @mapping(Ref, params=[name]) Ref ::= ID @name; }",
+    "cases":[
+      {"id":"scope-reference-resolves", "input":"a;a","prefix":[true,3,3],"syntax":true,"mapping":"ok","ast":{"type":"Root","span":[0,3],"fields":{"decl":{"type":"Decl","span":[0,2],"fields":{"name":"a"}},"ref":{"type":"Ref","span":[2,3],"fields":{"name":"a"}}}},"diagnostics":[],"declarations":[{"name":"a","sourceOffset":0}],"references":[{"name":"a","offset":2,"length":1}]},
+      {"id":"scope-unresolved-warning", "input":"a;b","prefix":[true,3,3],"syntax":true,"mapping":"ok","ast":{"type":"Root","span":[0,3],"fields":{"decl":{"type":"Decl","span":[0,2],"fields":{"name":"a"}},"ref":{"type":"Ref","span":[2,3],"fields":{"name":"b"}}}},"diagnostics":[{"message":"未定義のシンボル: 'b'","offset":2,"length":1,"severity":"WARNING"}],"declarations":[{"name":"a","sourceOffset":0}],"references":[{"name":"b","offset":2,"length":1}]}
+    ]
+  },
+  {
+    "name":"ZeroOrOne",
+    "grammar":"grammar ZeroOrOne { @package: org.example.captureequality token ID = org.unlaxer.parser.clang.IdentifierParser @root @backref(name=tag) @mapping(Root, params=[tag]) Root ::= [ ID @tag ]; }",
+    "cases":[
+      {"id":"zero-no-comparison","input":"","prefix":[true,0,0],"syntax":true,"mapping":"ok","ast":{"type":"Root","span":[0,0],"fields":{"tag":null}},"diagnostics":[],"declarations":[],"references":[]},
+      {"id":"one-no-comparison","input":"a","prefix":[true,1,1],"syntax":true,"mapping":"ok","ast":{"type":"Root","span":[0,1],"fields":{"tag":"a"}},"diagnostics":[],"declarations":[],"references":[]}
+    ]
+  },
+  {
+    "name":"WhitespaceUnicode",
+    "grammar":"grammar WhitespaceUnicode { @package: org.example.captureequality @root @backref(name=tag) @mapping(Root, params=[tag]) Root ::= '😀' (' ' 'a' '\\r\\n') @tag '|' ('\\t' 'b' ' ') @tag; }",
+    "cases":[
+      {"id":"trim-unicode-crlf-tab","input":"😀 a\r\n|\tb ","prefix":[true,9,9],"syntax":true,"mapping":"ok","ast":{"type":"Root","span":[0,9],"fields":{"tag":["a","b"]}},"diagnostics":[{"message":"back-reference mismatch: expected 'a' but got 'b'","offset":7,"length":1,"severity":"ERROR"}],"declarations":[],"references":[]}
+    ]
+  },
+  {
+    "name":"EmptyTrim",
+    "grammar":"grammar EmptyTrim { @package: org.example.captureequality @root @backref(name=tag) @mapping(Root, params=[tag]) Root ::= 'a' @tag '|' '   ' @tag; }",
+    "cases":[
+      {"id":"all-space-second-capture","input":"a|   ","prefix":[true,5,5],"syntax":true,"mapping":"ok","ast":{"type":"Root","span":[0,5],"fields":{"tag":["a",""]}},"diagnostics":[{"message":"back-reference mismatch: expected 'a' but got ''","offset":5,"length":0,"severity":"ERROR"}],"declarations":[],"references":[]}
+    ]
+  },
+  {
+    "name":"ChoiceRollback",
+    "grammar":"grammar ChoiceRollback { @package: org.example.captureequality token ID = org.unlaxer.parser.clang.IdentifierParser @root @mapping(Root, params=[value]) Root ::= (Probe '!' | Probe) @value; @backref(name=tag) Probe ::= ID @tag ':' ID @tag; }",
+    "cases":[
+      {"id":"first-branch-effect-rolls-back","input":"a:b","prefix":[true,3,3],"syntax":true,"mapping":"ok","ast":{"type":"Root","span":[0,3],"fields":{"value":"a:b"}},"diagnostics":[{"message":"back-reference mismatch: expected 'a' but got 'b'","offset":2,"length":1,"severity":"ERROR"}],"declarations":[],"references":[],"parentRollback":true}
+    ]
+  },
+  {
+    "name":"ParentFailure",
+    "grammar":"grammar ParentFailure { @package: org.example.captureequality token ID = org.unlaxer.parser.clang.IdentifierParser @root Root ::= Probe '!'; @backref(name=tag) Probe ::= ID @tag ':' ID @tag; }",
+    "cases":[
+      {"id":"child-success-parent-failure","input":"a:b","prefix":[false,0,0],"syntax":false,"mapping":"none","diagnostics":[],"declarations":[],"references":[]}
+    ]
+  },
+  {
+    "name":"EmptyTokenOffset",
+    "grammar":"grammar EmptyTokenOffset { @package: org.example.captureequality token E = EMPTY @root @backref(name=tag) @mapping(Root, params=[tag]) Root ::= 'a' @tag E @tag; }",
+    "cases":[
+      {"id":"empty-capture-after-nonzero-position","input":"a","prefix":[true,1,1],"syntax":true,"mapping":"ok","ast":{"type":"Root","span":[0,1],"fields":{"tag":["a",""]}},"diagnostics":[{"message":"back-reference mismatch: expected 'a' but got ''","offset":1,"length":0,"severity":"ERROR"}],"declarations":[],"references":[]}
+    ]
+  },
+  {
+    "name":"CalleeCapture",
+    "grammar":"grammar CalleeCapture { @package: org.example.captureequality token ID = org.unlaxer.parser.clang.IdentifierParser @root @backref(name=tag) @mapping(Root, params=[tag]) Root ::= ID @tag ':' Inner ':' ID @tag; @mapping(Inner, params=[tag]) Inner ::= ID @tag; }",
+    "cases":[
+      {"id":"callee-capture-excluded","input":"a:b:a","prefix":[true,5,5],"syntax":true,"mapping":"ok","ast":{"type":"Root","span":[0,5],"fields":{"tag":["a","a"]}},"diagnostics":[],"declarations":[],"references":[]},
+      {"id":"outer-mismatch-only","input":"a:b:c","prefix":[true,5,5],"syntax":true,"mapping":"ok","ast":{"type":"Root","span":[0,5],"fields":{"tag":["a","c"]}},"diagnostics":[{"message":"back-reference mismatch: expected 'a' but got 'c'","offset":4,"length":1,"severity":"ERROR"}],"declarations":[],"references":[]}
+    ]
+  }
+]

@@ -74,6 +74,77 @@ fn skipped_rule_cannot_retain_a_mapping_in_raw_ir() {
 }
 
 #[test]
+fn capture_equality_raw_ir_requires_a_local_capture_target() {
+    let mut grammar = support::fixture("evolution");
+    grammar.rules[0].body = Expression::CaptureEquality {
+        child: Box::new(grammar.rules[0].body.clone()),
+        name: "missing".into(),
+    };
+    let error = validate_ir(&grammar).unwrap_err();
+    assert_eq!(error.0, "missing capture-equality target: missing");
+}
+
+#[test]
+fn parser_only_raw_ir_requires_a_root_reachable_projection_boundary() {
+    fn rule(name: &str, body: Expression, skip: bool) -> Rule {
+        Rule {
+            name: name.into(),
+            body,
+            skip,
+            mapping: None,
+            operator: None,
+            catalog: None,
+        }
+    }
+    let equality = Expression::CaptureEquality {
+        child: Box::new(Expression::Capture {
+            name: "item".into(),
+            expression: Box::new(Expression::Literal("x".into())),
+        }),
+        name: "item".into(),
+    };
+    for grammar in [
+        GrammarIr {
+            rules: vec![rule("Root", equality.clone(), false)],
+            root: 0,
+            java_whitespace: false,
+        },
+        GrammarIr {
+            rules: vec![
+                rule("Root", Expression::Reference(1), false),
+                rule("Alias", equality.clone(), false),
+            ],
+            root: 0,
+            java_whitespace: false,
+        },
+        GrammarIr {
+            rules: vec![
+                rule("Root", Expression::Reference(1), false),
+                rule("Hidden", Expression::Literal("x".into()), true),
+            ],
+            root: 0,
+            java_whitespace: false,
+        },
+    ] {
+        assert!(generate(&grammar).is_ok());
+    }
+    for (hidden, skip) in [(equality, false), (Expression::Literal("x".into()), true)] {
+        let grammar = GrammarIr {
+            rules: vec![
+                rule("Root", Expression::Literal("x".into()), false),
+                rule("Unused", hidden, skip),
+            ],
+            root: 0,
+            java_whitespace: false,
+        };
+        assert_eq!(
+            validate_ir(&grammar).unwrap_err().0,
+            "at least one mapped rule is required"
+        );
+    }
+}
+
+#[test]
 fn wide_generated_mapper_runs_on_two_mib_thread_stack_in_debug_build() {
     let temp = Temp::new();
     let runtime = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../unlaxer-runtime/src/lib.rs");

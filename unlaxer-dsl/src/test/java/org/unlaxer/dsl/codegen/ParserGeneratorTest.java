@@ -1076,8 +1076,12 @@ public class ParserGeneratorTest {
     @Test
     public void testBackrefBackrefModeGeneratesFilteredChildrenCollect() {
         String source = generate(BACKREF_GRAMMAR);
-        assertTrue("@backref back-reference mode should collect filteredChildren by parser class",
-            source.contains("filteredChildren.stream()"));
+        assertTrue("@backref should compare named grammar capture sites",
+            source.contains("__scopeCaptureSites("));
+        assertTrue("@backref should use capture bindings",
+            source.contains("java.util.Set.of(\"Element:"));
+        assertFalse("@backref must not select all tokens of a parser class",
+            source.contains("__backrefTokens"));
     }
 
     // =========================================================================

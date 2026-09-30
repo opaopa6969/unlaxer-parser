@@ -504,9 +504,12 @@ public class GrammarValidatorTest {
     }
 
     @Test
-    public void testScopeAbsentBackrefValidationContractUnchanged() {
+    public void testScopeAbsentBackrefRequiresLocalCapture() {
         var grammar = parseGrammar("grammar ScopeValidation { @root @backref(name=old) Start ::= 'x'; }");
-        assertTrue(GrammarValidator.validate(grammar).isEmpty());
+        assertTrue(GrammarValidator.validate(grammar).stream()
+            .anyMatch(issue -> issue.code().equals("E-ANNOTATION-BACKREF-CAPTURE")));
+        var valid = parseGrammar("grammar ScopeValidation { @root @backref(name=old) Start ::= 'x' @old; }");
+        assertTrue(GrammarValidator.validate(valid).toString(), GrammarValidator.validate(valid).isEmpty());
     }
 
     // =========================================================================

@@ -128,7 +128,7 @@ style の比較は trim 後、大文字小文字を区別しない。rule の引
 | `E-ANNOTATION-INTERLEAVE-PROFILE` | `@interleave` の `profile` が不正な値 |
 | `E-ANNOTATION-SCOPETREE-MODE` | `@scopeTree` の `mode` が不正な値 |
 | `E-ANNOTATION-DECLARES-CAPTURE` | `@declares(symbol=...)` の対象captureが同じルール本体に存在しない |
-| `E-ANNOTATION-BACKREF-CAPTURE` | scope付き文法で`@backref(name=...)` の対象captureが同じルール本体に存在しない |
+| `E-ANNOTATION-BACKREF-CAPTURE` | scopeの有無によらず`@backref(name=...)` の対象captureが同じルール本体に存在しない |
 
 ### BOUNDED エラー（量指定子 `{n}` / `{n,m}` / `{n,}`）
 

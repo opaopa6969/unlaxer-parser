@@ -21,6 +21,7 @@ public final class RustGrammarLowering {
     private final List<Expression> bodies = new ArrayList<>();
     private final List<MappingAnnotation> mappings = new ArrayList<>();
     private final List<Boolean> skips = new ArrayList<>();
+    private final List<String> comparisons = new ArrayList<>();
     private final List<Operator> operators = new ArrayList<>();
     private final List<String> catalogs = new ArrayList<>();
     private final List<Boolean> longestChoices = new ArrayList<>();
@@ -158,7 +159,6 @@ public final class RustGrammarLowering {
                     if (declares != null) throw unsupported("duplicate @declares on " + rule.name());
                     declares = new Declaration(value.symbolCapture(), value.description());
                 } else if (annotation instanceof BackrefAnnotation value) {
-                    if (!hasScope) throw unsupported("@backref without @scopeTree");
                     if (backref != null) throw unsupported("duplicate @backref on " + rule.name());
                     backref = value.name();
                 } else if (annotation instanceof CatalogAnnotation value) {
@@ -166,8 +166,10 @@ public final class RustGrammarLowering {
                     catalog = value.context();
                 } else throw unsupported("annotation " + annotation + " on " + rule.name());
             }
-            ruleEffects.add(scopeMode == null && declares == null && backref == null ? null
-                : new Effects(scopeMode, declares, backref));
+            comparisons.add(hasScope ? null : backref);
+            String scopedBackref = hasScope ? backref : null;
+            ruleEffects.add(scopeMode == null && declares == null && scopedBackref == null ? null
+                : new Effects(scopeMode, declares, scopedBackref));
             if (longestChoice && (!(rule.body() instanceof ChoiceBody choice)
                 || choice.alternatives().size() < 2)) {
                 throw unsupported("@longestChoice requires multiple alternatives on " + rule.name());
@@ -210,6 +212,9 @@ public final class RustGrammarLowering {
         Map<String, Mapping> variants = new LinkedHashMap<>();
         for (int i = 0; i < bodies.size(); i++) {
             Map<String, Shape> captures = captures(bodies.get(i));
+            if (comparisons.get(i) != null && !captures.containsKey(comparisons.get(i))) {
+                throw unsupported("missing rule-effect capture " + comparisons.get(i));
+            }
             Effects effects = ruleEffects.get(i);
             if (effects != null) {
                 if (effects.declares() != null && !captures.containsKey(effects.declares().symbolCapture())) {
@@ -227,7 +232,8 @@ public final class RustGrammarLowering {
             }
             Mapping mapping = null;
             if (annotation == null) {
-                if (!captures.isEmpty() && effects == null && catalog == null && !skips.get(i)) {
+                if (!captures.isEmpty() && effects == null && catalog == null && !skips.get(i)
+                        && comparisons.get(i) == null) {
                     throw unsupported("captures without @mapping on " + grammar.rules().get(i).name());
                 }
             } else {
@@ -281,6 +287,7 @@ public final class RustGrammarLowering {
             // Every rule resolves against the grammar default, never against its caller.
             if (hasLocalTrivia) expression = new TriviaScope(expression, ruleWhitespace.get(i));
             if (ruleEffects.get(i) != null) expression = new RuleEffects(expression, ruleEffects.get(i));
+            if (comparisons.get(i) != null) expression = new CaptureEquality(expression, comparisons.get(i));
             rewritten.add(new Rule(rule.name(), expression, mapping, rule.operator(), rule.catalog(), rule.skip()));
         }
         return new GrammarIR(rewritten, root, whitespace);
@@ -598,6 +605,9 @@ public final class RustGrammarLowering {
         if (expression instanceof RuleEffects effects) {
             return firstPredictor(effects.child(), visiting, cache);
         }
+        if (expression instanceof CaptureEquality equality) {
+            return firstPredictor(equality.child(), visiting, cache);
+        }
         if (expression instanceof Repeat repeat && repeat.min() > 0) {
             return firstPredictor(repeat.child(), visiting, cache);
         }
@@ -832,13 +842,14 @@ public final class RustGrammarLowering {
         return Set.of();
     }
 
-    /** A skipped root/transparent branch can parse successfully without yielding an AST. */
+    /** Skip and syntax-only capture checks can parse successfully without yielding an AST. */
     private boolean skippedProjection(Expression expression, Set<Integer> visited) {
         enterAnalysis();
         try {
             if (expression instanceof Reference reference) {
                 int rule = reference.rule();
                 if (skips.get(rule)) return true;
+                if (mappings.get(rule) == null && comparisons.get(rule) != null) return true;
                 if (mappings.get(rule) != null || !visited.add(rule)) return false;
                 return skippedProjection(bodies.get(rule), visited);
             }

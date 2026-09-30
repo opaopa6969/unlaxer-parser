@@ -184,6 +184,9 @@ public final class RustBackend {
     }
 
     private String expression(Expression expression) {
+        if (expression instanceof CaptureEquality equality) {
+            return "Expr::compare_captures(" + quote(equality.name()) + ", " + expression(equality.child()) + ")";
+        }
         if (expression instanceof RuleEffects scope) {
             return expression(scope.child()) + ".rule_effects(" + effects(scope.effects()) + ")";
         }

@@ -62,7 +62,6 @@ fn invalid_metadata_and_structural_errors_remain_explicit() {
         ),
         GRAMMAR.replace("symbol=name", "symbol=missing"),
         GRAMMAR.replace("@backref(name=name)", "@backref(name=missing)"),
-        GRAMMAR.replace("@scopeTree(mode=dynamic)", ""),
         GRAMMAR.replace(
             "Decl ::= ID @noise ':' ID @name",
             "Decl ::= { [ ID ] } @name",

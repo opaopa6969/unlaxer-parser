@@ -68,6 +68,11 @@ pub enum Expr {
         child: Box<Expr>,
         effects: RuleEffects,
     },
+    /// Compare completed captures from this child, without changing syntax acceptance.
+    CaptureEquality {
+        child: Box<Expr>,
+        name: &'static str,
+    },
     /// Apply a local trivia policy to sequence boundaries, restoring the caller afterwards.
     TriviaScope {
         child: Box<Expr>,
@@ -252,6 +257,13 @@ impl Expr {
         Self::RuleEffects {
             child: Box::new(self),
             effects,
+        }
+    }
+    /// Compare this child's own named captures after parsing, retaining semantic errors.
+    pub fn compare_captures(name: &'static str, child: Self) -> Self {
+        Self::CaptureEquality {
+            child: Box::new(child),
+            name,
         }
     }
     pub fn ahead(self) -> Self {
@@ -2078,6 +2090,36 @@ impl<'a> ParseContext<'a> {
                 }
                 Some(fragment)
             }
+            Expr::CaptureEquality { child, name } => {
+                let fragment = self.expression(child, depth)?;
+                let mut first: Option<String> = None;
+                for capture in fragment
+                    .captures
+                    .iter()
+                    .filter(|capture| capture.name == *name)
+                {
+                    let raw = self
+                        .text(capture.span)
+                        .expect("capture span belongs to source");
+                    let leading = raw.chars().take_while(|ch| *ch <= '\u{20}').count();
+                    let value = raw.trim_matches(|ch| ch <= '\u{20}').to_owned();
+                    let offset = capture.span.start + leading;
+                    let length = value.chars().count();
+                    if let Some(expected) = &first {
+                        if expected != &value {
+                            self.scopes_mut().add_diagnostic(
+                                &format!("back-reference mismatch: expected '{expected}' but got '{value}'"),
+                                offset,
+                                length,
+                                Severity::Error,
+                            );
+                        }
+                    } else {
+                        first = Some(value);
+                    }
+                }
+                Some(fragment)
+            }
             Expr::TriviaScope { child, whitespace } => {
                 self.with_trivia(*whitespace, |context| context.expression(child, depth))
             }
@@ -2502,6 +2544,7 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
         | Expr::JavaRepeat { child, .. }
         | Expr::Lookahead { child, .. }
         | Expr::RuleEffects { child, .. }
+        | Expr::CaptureEquality { child, .. }
         | Expr::TriviaScope { child, .. } => expression_allows_deferred_diagnostics(child),
         Expr::Literal(_)
         | Expr::Number
@@ -2560,7 +2603,10 @@ fn memo_safe_rules(rules: &[Rule]) -> Vec<bool> {
 
 fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>) -> bool {
     match expression {
-        Expr::Custom(_) | Expr::CustomWith { .. } | Expr::Backreference(_) => false,
+        Expr::Custom(_)
+        | Expr::CustomWith { .. }
+        | Expr::Backreference(_)
+        | Expr::CaptureEquality { .. } => false,
         Expr::Rule(id) => {
             references.push(*id);
             true

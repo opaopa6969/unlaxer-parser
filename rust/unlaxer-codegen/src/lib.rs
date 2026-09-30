@@ -214,6 +214,13 @@ fn expression(expr: &Expression) -> String {
             let declares = effects.declares.as_ref().map_or_else(|| "None".into(), |decl| format!("Some(unlaxer_runtime::Declaration {{ symbol_capture: {}, description: {} }})", quote(&decl.symbol_capture), option_text(decl.description.as_deref())));
             format!("{}.rule_effects(unlaxer_runtime::RuleEffects {{ scope_mode: {scope}, declares: {declares}, backref: {} }})", expression(child), option_text(effects.backref.as_deref()))
         }
+        CaptureEquality { child, name } => {
+            format!(
+                "Expr::compare_captures({}, {})",
+                quote(name),
+                expression(child)
+            )
+        }
         Literal(s) => format!("Expr::Literal({})", quote(s)),
         NumberToken => "Expr::Number".into(),
         IdentifierToken => "Expr::Identifier".into(),

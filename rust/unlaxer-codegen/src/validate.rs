@@ -144,10 +144,59 @@ pub(super) fn validate(ir: &GrammarIr) -> Result<(), GenerateError> {
             }
         }
     }
-    if mappings.is_empty() && !ir.rules.iter().any(|rule| rule.skip) {
+    if mappings.is_empty() && !root_reaches_projection_boundary(ir) {
         return Err(fail("at least one mapped rule is required"));
     }
     Ok(())
+}
+
+/// A parser-only grammar is valid only when the root can reach a projection
+/// boundary. Mapped rules stop traversal; their children are private to that AST.
+fn root_reaches_projection_boundary(ir: &GrammarIr) -> bool {
+    use Expression::*;
+    let mut pending_rules = vec![ir.root];
+    let mut visited = BTreeSet::new();
+    while let Some(id) = pending_rules.pop() {
+        if !visited.insert(id) {
+            continue;
+        }
+        let rule = &ir.rules[id];
+        if rule.skip {
+            return true;
+        }
+        if rule.mapping.is_some() {
+            continue;
+        }
+        let mut pending = vec![&rule.body];
+        while let Some(expression) = pending.pop() {
+            match expression {
+                CaptureEquality { .. } => return true,
+                Reference(id) => pending_rules.push(*id),
+                Sequence(children) | Choice(children) | LongestChoice(children) => {
+                    pending.extend(children);
+                }
+                PredictiveChoice { alternatives, .. } => pending.extend(alternatives),
+                Capture { expression, .. }
+                | OptionalExpr(expression)
+                | Delimited(expression)
+                | TextValue(expression)
+                | ValueBoundary(expression)
+                | RuleEffects {
+                    child: expression, ..
+                }
+                | TriviaScope {
+                    child: expression, ..
+                } => pending.push(expression),
+                Repeat { child, .. } => pending.push(child),
+                Separated { child, separator } => {
+                    pending.push(child);
+                    pending.push(separator);
+                }
+                _ => {}
+            }
+        }
+    }
+    false
 }
 
 fn expression(
@@ -157,6 +206,14 @@ fn expression(
 ) -> Result<(), GenerateError> {
     use Expression::*;
     match expr {
+        CaptureEquality { child, name } => {
+            let mut local = BTreeSet::new();
+            expression(child, count, &mut local)?;
+            if !local.contains(name) {
+                return Err(fail(format!("missing capture-equality target: {name}")));
+            }
+            captures.extend(local);
+        }
         RuleEffects { child, effects } => {
             let mut local = BTreeSet::new();
             expression(child, count, &mut local)?;
