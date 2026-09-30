@@ -1,0 +1,7 @@
+# token repetitions suffix(- means empty) accepted consumed failure-offset
+a	200	-	true	200	200
+a	1024	-	true	1024	1024
+a	4000	-	true	4000	4000
+😀	4000	-	true	4000	4000
+a	4000	z	false	0	4000
+😀	4000	z	false	0	4000

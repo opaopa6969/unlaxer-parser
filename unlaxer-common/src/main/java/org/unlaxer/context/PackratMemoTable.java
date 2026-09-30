@@ -256,7 +256,9 @@ public final class PackratMemoTable {
    * the rule, replaying nothing. Only the hit rate is at stake, and that is guarded at runtime —
    * a probe below the watermark counts an under-run and widens the window to at least twice the
    * observed look-back, so a grammar that backtracks further than the window degrades to the
-   * previous behaviour instead of silently losing hits. See ParseContext#observeMemoCursor.
+   * unbounded retention when necessary. Already evicted entries must be re-parsed;
+   * this is not a guarantee of unchanged hit counts or linear time for every grammar.
+   * See ParseContext#observeMemoCursor.
    */
   static final int DEFAULT_WINDOW = Integer.getInteger("unlaxer.memo.window", 1024);
   private static final int EVICT_STEP = 256;
@@ -285,7 +287,8 @@ public final class PackratMemoTable {
   public void put(Parser parser, PositionKey positionKey, Entry entry) {
     int position = positionKey.consumed();
     if (evictionEnabled && position < evictedBelow) {
-      // The watermark already passed this rule's start, so nothing can probe it again.
+      // This start is outside the current retention window. A later probe may
+      // widen the window and re-parse it; eviction is not a committed frontier.
       deadOnArrival++;
       return;
     }
@@ -348,8 +351,10 @@ public final class PackratMemoTable {
   private void reportEvictionUnderrun(int position) {
     evictionUnderruns++;
     int lookback = highWater - position;
-    int widened = Math.max(window * 2, lookback * 2);
-    window = widened <= 0 ? Integer.MAX_VALUE : widened;
+    window = (int) Math.min(Integer.MAX_VALUE, 2L * Math.max(window, lookback));
+    // Lost entries cannot be recovered, but their positions must accept new
+    // entries again. Otherwise every retry below the old watermark keeps missing.
+    evictedBelow = Math.max(0, highWater - window);
   }
 
   /** Test seam: turning eviction off reproduces the pre-#276 table exactly. */
