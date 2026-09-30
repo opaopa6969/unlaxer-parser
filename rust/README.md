@@ -81,6 +81,16 @@ targetは現在`rust`のみ。fail-firstの構造検証との区別、位置・�
 
 ## 構成と保証範囲
 
+### 文法変更による生成 API の影響
+
+`unlaxer impact --target rust --before old.ubnf --after new.ubnf` は生成 AST / Semantics の
+型・field・多重度・method の差分を JSON に出す。Java host の `CodegenMain impact` は
+`--target java` と `--target rust` に対応する。元文法と仮想生成物の位置を保持し、手書きコードや
+生成ファイルを書き換えない。API差分なしを意味的互換性やコンパイル成功の保証とは扱わない。
+[契約・共通 language-evolution corpus・実 compiler 検証](../docs/api-impact-report.md) を参照。
+
+### 実行経路
+
 ```text
 UBNF → 既存Java frontend → RustGrammarLowering → GrammarIR → RustBackend
                                                            ↓

@@ -432,7 +432,7 @@ public final class RustBackend {
         return type + "::r#" + mapping.name() + " { span" + fields + " }";
     }
 
-    private static String fieldType(Field field, boolean borrowed) {
+    static String fieldType(Field field, boolean borrowed) {
         String one = switch (field.kind()) {
             case NODE -> borrowed ? "&Ast" : "Box<Ast>";
             case TEXT -> borrowed ? "&str" : "String";

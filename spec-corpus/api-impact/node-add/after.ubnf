@@ -1,0 +1,10 @@
+// 😀 API impact corpus
+grammar Impact {
+  @package: org.example.impact
+  token NUMBER = NumberParser
+  @root Entry ::= Leaf | Extra;
+  @mapping(Value, params=[value])
+  Leaf ::= NUMBER @value;
+  @mapping(Extra, params=[text])
+  Extra ::= 'extra' @text;
+}

@@ -445,6 +445,16 @@ fn field_type(field: &Field, borrowed: bool) -> String {
     }
 }
 
+/// The exact type spelling emitted for a generated AST variant field.
+pub fn ast_field_type(field: &Field) -> String {
+    field_type(field, false)
+}
+
+/// The exact borrowed type spelling emitted for a `Semantics` parameter.
+pub fn evaluator_parameter_type(field: &Field) -> String {
+    field_type(field, true)
+}
+
 fn mapped_value(field: &Field) -> String {
     let name = quote(&field.name);
     match field.cardinality {
@@ -492,6 +502,11 @@ fn method_name(name: &str) -> String {
         previous = Some(c);
     }
     result
+}
+
+/// The exact method name emitted for a mapped AST variant.
+pub fn evaluator_method_name(name: &str) -> String {
+    method_name(name)
 }
 
 fn quote(value: &str) -> String {
