@@ -124,6 +124,7 @@ impl Lowering<'_> {
         let mut rule_whitespace = Vec::new();
         let mut has_local_trivia = false;
         let mut methods = HashMap::new();
+        let mut associativity_by_level = HashMap::new();
         for (i, rule) in self.grammar.rules.iter().enumerate() {
             if self.ids.insert(rule.name.clone(), i).is_some()
                 || self.tokens.contains_key(&rule.name)
@@ -283,6 +284,13 @@ impl Lowering<'_> {
                     "associativity and @precedence must occur together on {}",
                     rule.name
                 ));
+            }
+            if let (Some(level), Some(assoc)) = (precedence, associativity) {
+                if let Some(previous) = associativity_by_level.insert(level, assoc) {
+                    if previous != assoc {
+                        return Err(format!("precedence level {level} mixes associativity"));
+                    }
+                }
             }
             self.operators.push(precedence.map(|precedence| Operator {
                 associativity: associativity.expect("validated annotation pair"),
@@ -1355,7 +1363,7 @@ fn parser_class_name(name: &str) -> String {
     result
 }
 
-fn token_expression(token: &TokenKind) -> Result<Expression> {
+pub(crate) fn token_expression(token: &TokenKind) -> Result<Expression> {
     Ok(match token {
         TokenKind::Simple { parser_class } => match parser_class.as_str() {
             "NumberParser" | "org.unlaxer.parser.elementary.NumberParser" => {

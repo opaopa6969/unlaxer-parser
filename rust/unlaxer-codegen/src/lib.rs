@@ -27,7 +27,7 @@ impl std::error::Error for GenerateError {}
 
 /// Validate structural IR and emit five files. No filesystem writes or Java calls.
 pub fn generate(ir: &GrammarIr) -> Result<Vec<GeneratedFile>, GenerateError> {
-    validate::validate(ir)?;
+    validate_ir(ir)?;
     Ok([
         (
             "mod.rs",
@@ -44,6 +44,11 @@ pub fn generate(ir: &GrammarIr) -> Result<Vec<GeneratedFile>, GenerateError> {
         content,
     })
     .collect())
+}
+
+/// Validate normalized IR without rendering or writing generated modules.
+pub fn validate_ir(ir: &GrammarIr) -> Result<(), GenerateError> {
+    validate::validate(ir)
 }
 
 fn mappings(ir: &GrammarIr) -> Vec<&Mapping> {

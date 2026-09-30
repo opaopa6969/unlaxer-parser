@@ -32,10 +32,12 @@ jobs:
     - name: Cross-language fixtures, compile failures, and generated-file drift
       run: >
         mvn -B -pl unlaxer-common,unlaxer-dsl -am test
-        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest -DrustConformance=true
+        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,RustPortabilityConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest -DrustConformance=true
         -Dsurefire.failIfNoSpecifiedTests=false
     - name: Require UBNF source position conformance evidence
       run: test -s unlaxer-dsl/target/rust-ubnf-source.tsv
+    - name: Require portability check conformance evidence
+      run: test -s unlaxer-dsl/target/rust-portability.tsv
     - name: Require rule trivia conformance evidence
       run: test -s unlaxer-dsl/target/rust-rule-trivia.tsv
     - name: Require transactional scope conformance evidence
@@ -58,6 +60,7 @@ jobs:
           unlaxer-dsl/target/rust-lexical.tsv
           unlaxer-dsl/target/rust-ubnf-frontend.tsv
           unlaxer-dsl/target/rust-ubnf-source.tsv
+          unlaxer-dsl/target/rust-portability.tsv
           unlaxer-dsl/target/rust-associative.tsv
           unlaxer-dsl/target/rust-right-associative.tsv
           unlaxer-dsl/target/rust-mixed-values.tsv
@@ -82,6 +85,7 @@ jobs:
       run: |
         cargo build --release --locked --manifest-path rust/Cargo.toml -p unlaxer-generator
         PATH='' JAVA_HOME=/nonexistent-java rust/target/release/unlaxer generate --grammar unlaxer-dsl/src/test/resources/evolution/3/Evolution.ubnf --output rust/examples/evolution/src/generated --check
+        PATH='' JAVA_HOME=/nonexistent-java rust/target/release/unlaxer check --target rust --grammar unlaxer-dsl/src/test/resources/evolution/3/Evolution.ubnf --format json
         tar -czf rust/target/unlaxer-generator-linux-x86_64.tar.gz -C rust/target/release unlaxer
     - uses: actions/upload-artifact@v4
       with:
@@ -285,6 +289,19 @@ jobs:
       with:
         name: tiny-code-fence-conformance
         path: unlaxer-parser/unlaxer-dsl/target/rust-tiny-code-fence.tsv
+        if-no-files-found: error
+
+    - name: Check actual tinyexpression portability and injected diagnostics in both hosts
+      working-directory: unlaxer-parser
+      run: |
+        mvn -B -pl unlaxer-dsl test -Dtest=RustPortabilityConformanceTest -DrustConformance=true \
+          -Dtinyexpression.grammar="$GITHUB_WORKSPACE/tinyexpression/tools/tinyexpression-p4-lsp-vscode/grammar/tinyexpression-p4.ubnf"
+        test -s unlaxer-dsl/target/rust-portability-tiny.tsv
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: tiny-portability-conformance
+        path: unlaxer-parser/unlaxer-dsl/target/rust-portability-tiny.tsv
         if-no-files-found: error
 
     # 3.0.3 リグレッションを実際に検出したのはこの LSP smoke

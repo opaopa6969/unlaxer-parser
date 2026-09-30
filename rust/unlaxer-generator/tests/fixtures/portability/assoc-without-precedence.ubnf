@@ -1,0 +1,4 @@
+grammar G {
+ @root @leftAssoc @mapping(Add, params=[left,op,right]) Expr ::= Atom @left { '+' @op Atom @right };
+ @mapping(Atom) Atom ::= 'x';
+}

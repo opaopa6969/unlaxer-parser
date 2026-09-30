@@ -1,0 +1,7 @@
+// 😀
+grammar Valid {
+  @whitespace: none
+  token N = NumberParser
+  @root @mapping(Number, params=[value])
+  Root ::= N @value;
+}

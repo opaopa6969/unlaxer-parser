@@ -90,8 +90,11 @@ public class RustNativeGeneratorTest {
         var report = new ArrayList<>(List.of("grammar_index\tstatus\tfiles_identical"));
         int index = 0;
         for (String source : grammars) {
+            assertTrue(source + "\n" + PortabilityCheck.check(source), PortabilityCheck.check(source).portable());
             Path grammar = temporary.newFile().toPath();
             Files.writeString(grammar, source);
+            var portability = command(List.of(binary.toString(), "check", "--target", "rust", "--grammar", grammar.toString()), true);
+            assertEquals(source + "\n" + portability.output(), 0, portability.code());
             Path output = temporary.getRoot().toPath().resolve("generated-" + index);
             var generated = command(List.of(binary.toString(), "generate", "--grammar", grammar.toString(), "--output", output.toString()), true);
             assertEquals(source + "\n" + generated.output(), 0, generated.code());

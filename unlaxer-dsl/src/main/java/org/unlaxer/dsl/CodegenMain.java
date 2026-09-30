@@ -35,6 +35,9 @@ public class CodegenMain {
     }
 
     static int run(String[] args, PrintStream out, PrintStream err) {
+        if (args.length > 0 && "check".equals(args[0])) {
+            return PortabilityCheckCommand.run(args, out, err);
+        }
         if (args.length > 0 && "generate".equals(args[0])) {
             return RustGenerateCommand.run(args, out, err);
         }
@@ -268,6 +271,7 @@ public class CodegenMain {
                 + " [--warnings-as-json]"
                 + " [--java-release 21|17]"
                 + "\nExperimental Rust: CodegenMain generate --target rust --grammar <file.ubnf> --output <module-directory> [--check]"
+                + "\nPortability: CodegenMain check --target rust --grammar <file.ubnf> [--format json]"
         );
     }
 

@@ -1,0 +1,5 @@
+grammar G {
+ token N = NumberParser
+ @root @mapping(R) Root ::= Number;
+ @mapping(F) Number ::= N;
+}

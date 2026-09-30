@@ -1,0 +1,13 @@
+valid.ubnf	passed	0
+shared-precedence.ubnf	passed	0
+multi-gap.ubnf	blocked	26
+multiple-grammars.ubnf	blocked	4
+no-root.ubnf	failed	1
+root-text.ubnf	failed	1
+nullable-repeat.ubnf	failed	1
+left-recursion.ubnf	failed	1
+mapping-fields.ubnf	failed	1
+assoc-without-precedence.ubnf	failed	1
+mixed-associativity.ubnf	failed	1
+parser-name-collision.ubnf	failed	1
+syntax.ubnf	unavailable	1

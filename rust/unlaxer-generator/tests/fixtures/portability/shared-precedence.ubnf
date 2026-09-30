@@ -1,0 +1,11 @@
+grammar SharedPrecedence {
+  @root @mapping(Root, params=[value])
+  Start ::= Left @value | AlsoLeft @value ;
+  Item ::= 'n' ;
+  @leftAssoc @precedence(level=1)
+  @mapping(LeftExpr, params=[left, op, right])
+  Left ::= Item @left { '+' @op Item @right } ;
+  @leftAssoc @precedence(level=1)
+  @mapping(AlsoLeftExpr, params=[left, op, right])
+  AlsoLeft ::= Item @left { '-' @op Item @right } ;
+}
