@@ -32,8 +32,10 @@ jobs:
     - name: Cross-language fixtures, compile failures, and generated-file drift
       run: >
         mvn -B -pl unlaxer-common,unlaxer-dsl -am test
-        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest -DrustConformance=true
+        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest -DrustConformance=true
         -Dsurefire.failIfNoSpecifiedTests=false
+    - name: Require UBNF source position conformance evidence
+      run: test -s unlaxer-dsl/target/rust-ubnf-source.tsv
     - name: Require rule trivia conformance evidence
       run: test -s unlaxer-dsl/target/rust-rule-trivia.tsv
     - name: Require transactional scope conformance evidence
@@ -55,6 +57,7 @@ jobs:
           unlaxer-dsl/target/rust-primitives.tsv
           unlaxer-dsl/target/rust-lexical.tsv
           unlaxer-dsl/target/rust-ubnf-frontend.tsv
+          unlaxer-dsl/target/rust-ubnf-source.tsv
           unlaxer-dsl/target/rust-associative.tsv
           unlaxer-dsl/target/rust-right-associative.tsv
           unlaxer-dsl/target/rust-mixed-values.tsv

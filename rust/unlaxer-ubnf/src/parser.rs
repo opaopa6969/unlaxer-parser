@@ -156,6 +156,7 @@ impl Parser<'_> {
             self.pos += 1;
             let key = self.identifier()?;
             self.expect(':')?;
+            let value_start = self.current().span;
             let value = if self.eat('{') {
                 let mut entries = Vec::new();
                 while !self.is('}') {
@@ -177,6 +178,7 @@ impl Parser<'_> {
             settings.push(GlobalSetting {
                 key,
                 value,
+                value_span: self.span_from(value_start),
                 span: self.span_from(start),
             });
         }
@@ -524,11 +526,13 @@ impl Parser<'_> {
     }
     fn element(&mut self) -> Result<AnnotatedElement> {
         let start = self.current().span;
+        let mut typeof_span = None;
         let typeof_constraint = if self.annotation_is("typeof") {
             self.pos += 2;
             self.expect('(')?;
             let name = self.identifier()?;
             self.expect(')')?;
+            typeof_span = Some(self.span_from(start));
             Some(name)
         } else {
             None
@@ -554,6 +558,8 @@ impl Parser<'_> {
                         element,
                         capture: None,
                         typeof_constraint: None,
+                        capture_span: None,
+                        typeof_span: None,
                     }],
                 }],
             };
@@ -602,6 +608,7 @@ impl Parser<'_> {
             };
         }
         // @typeof belongs to the next element, not to a capture named "typeof".
+        let mut capture_span = None;
         let capture = if self.is('@')
             && !(self.annotation_is("typeof")
                 && self
@@ -609,8 +616,11 @@ impl Parser<'_> {
                     .get(self.pos + 2)
                     .is_some_and(|t| t.kind == Kind::Symbol('(')))
         {
+            let capture_start = self.current().span;
             self.pos += 1;
-            Some(self.identifier()?)
+            let name = self.identifier()?;
+            capture_span = Some(self.span_from(capture_start));
+            Some(name)
         } else {
             None
         };
@@ -618,6 +628,8 @@ impl Parser<'_> {
             element,
             capture,
             typeof_constraint,
+            capture_span,
+            typeof_span,
             span: self.span_from(start),
         })
     }

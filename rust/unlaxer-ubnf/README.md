@@ -19,6 +19,13 @@ assert_eq!(element.element.kind, ElementKind::Terminal("hello".into()));
 `parse(&str) -> Result<UbnfFile, Diagnostic>`。入力の最後まで検査する。
 ASTは入力の借用を持たず、入力文字列破棄後も使用できる。型定義は[`src/ast.rs`](src/ast.rs)。
 
+`parse_with_source(source: impl Into<String>) -> Result<SourceSnapshot, Diagnostic>` は、
+同じparseのASTに加えて元入力も所有する（#318）。`snapshot.ast()`、`source()`、
+`slice(span)`で参照でき、後続・並列parseで上書きされない。
+`AnnotatedElement.capture_span/typeof_span`は付加構文自体、
+`GlobalSetting.value_span`は設定値の範囲。Java側の対応APIとsynthetic nodeの扱いは
+[source snapshot契約](../../docs/ubnf-source-snapshot.md)を参照。
+
 - declaration、annotation、element、body/sequenceの`span`はtriviaを除く半開区間。
   fileのspanのみ入力全体。`byte_start/end`はUTF-8 byte、`codepoint_start/end`はUnicode scalar数。
 - `Diagnostic`はkind/message/spanと1始まりのline/columnを持つ。列はUnicode scalar数。

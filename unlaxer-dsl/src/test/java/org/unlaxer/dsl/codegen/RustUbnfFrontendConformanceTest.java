@@ -84,6 +84,10 @@ public class RustUbnfFrontendConformanceTest {
             JsonObject nativeResult = inspect(binary, source);
             assertTrue(parts[0] + " " + nativeResult, nativeResult.has("error"));
             RuntimeException javaError = assertThrows(parts[0], RuntimeException.class, () -> UBNFMapper.parse(input));
+            RuntimeException snapshotError = assertThrows(parts[0], RuntimeException.class,
+                () -> UBNFMapper.parseWithSource(input));
+            assertEquals(parts[0], javaError.getClass(), snapshotError.getClass());
+            assertEquals(parts[0], javaError.getMessage(), snapshotError.getMessage());
             if (POSITIONED_REJECTIONS.contains(parts[0])) {
                 String position = "line " + nativeResult.get("line").getAsInt()
                     + ", column " + nativeResult.get("column").getAsInt();
@@ -131,7 +135,7 @@ public class RustUbnfFrontendConformanceTest {
         return output;
     }
 
-    private JsonElement canonical(Object value) throws Exception {
+    JsonElement canonical(Object value) throws Exception {
         if (value == null) return JsonNull.INSTANCE;
         if (value instanceof Optional<?> optional) return canonical(optional.orElse(null));
         if (value instanceof String string) return new JsonPrimitive(string);

@@ -1,0 +1,15 @@
+// 😀 leading comment
+ grammar Locations {
+  @import lib from '😀.ubnf' // import
+  @package: org.example
+  @comment: { line: '//' end: '*/' }
+  token T = ANY // token
+  @root @doc('😀 // text')
+  R ::= '😀' @first // a duplicate value at another position
+    '😀' @second
+    [ T? ] @maybe { T* } ( T+ | T{2,3} ) @group
+    T % ',' @items @typeof(first) T @typed;
+  Repaired ::= 'x' @typeof(first) T @next;
+}
+grammar Second { R ::= ' // 😀 ' | ERROR('bad 😀'); }
+// trailing comment

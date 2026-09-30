@@ -52,6 +52,7 @@ pub struct ImportDecl {
 pub struct GlobalSetting {
     pub key: String,
     pub value: SettingValue,
+    pub value_span: Span,
     pub span: Span,
 }
 
@@ -180,6 +181,10 @@ pub struct AnnotatedElement {
     pub element: AtomicElement,
     pub capture: Option<String>,
     pub typeof_constraint: Option<String>,
+    /// The complete capture suffix, including '@'; absent on synthetic wrappers.
+    pub capture_span: Option<Span>,
+    /// The complete '@typeof(...)' prefix.
+    pub typeof_span: Option<Span>,
     pub span: Span,
 }
 

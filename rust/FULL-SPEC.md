@@ -15,6 +15,7 @@
 | 機能群 | 現状 | 追加の受け入れ条件 |
 |---|---|---|
 | Java UBNF frontend → Rust generator | 限定範囲で生成済み。隣接参照の識別子境界 #131 修正 | 全構文・annotationのpositive/negative fixture、未対応の明示拒否、再生成一致 |
+| UBNF source snapshot | Java `parseWithSource` / Rust `parse_with_source`。同じparseのowned AST・元入力・code-point位置、capture/typeofの範囲を保持（#318） | [契約と検証](../docs/ubnf-source-snapshot.md)。LF/CRLFの共通corpusで全ノードの位置・元textを比較。import展開後の複数ファイル由来・移植可能性レポート #157 は別作業 |
 | 公開ParseContext・custom parser | runtimeと生成入口を実装。生成grammarは`OnceLock<SharedGrammar>`で1回構築し、並行parseでは不変graphだけを共有（#185） | 共有入力・Unicode位置・typed状態・CST/captureのrollback、先読み、生成parser混在を継続検証。tinyexpressionでsetup/探索を分離して再測定 |
 | literal・参照・sequence・ordered choice・group | 生成済み | optional経由の再帰等も検証し、非消費ループを拒否 |
 | optional・0/1回以上・bounded repeat・separated | UBNF生成・Option/Vec AST・mapper・Semantics実装 | 70ケースの受理一致、20成功ケースのJava/Rust AST全field・全span一致、Rust評価値oracle。外側captureの入れ子container型は両backendとも未完了 |
