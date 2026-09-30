@@ -1,4 +1,5 @@
 //! Supported structural semantics, independent of JVM parser class loading.
+use crate::adapters::{AdapterBinding, AdapterRegistry, BuiltinAdapter};
 use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 use unlaxer_codegen::ir::*;
@@ -71,10 +72,17 @@ impl Lowering<'_> {
         if !self.grammar.imports.is_empty() {
             return Err("unsupported imports".into());
         }
+        let (adapter_registry, adapter_issues) = AdapterRegistry::from_grammar(self.grammar);
+        if let Some(issue) = adapter_issues.first() {
+            return Err(format!("{}: {}", issue.code, issue.subject));
+        }
         let mut whitespace = false;
         let mut settings = HashSet::new();
         let mut memo_safe_tokens = HashSet::new();
         for setting in &self.grammar.settings {
+            if setting.key == "tokenAdapter" {
+                continue;
+            }
             if setting.key != "memoSafeToken" && !settings.insert(&setting.key) {
                 return Err(format!("duplicate setting {}", setting.key));
             }
@@ -99,17 +107,27 @@ impl Lowering<'_> {
                     else {
                         return Err(format!("memoSafeToken undefined token alias {alias}"));
                     };
-                    if !matches!(token.kind, TokenKind::Simple { .. }) {
-                        return Err(format!(
-                            "memoSafeToken alias must name a Simple token {alias}"
-                        ));
+                    let memo_allowed = match &token.kind {
+                        TokenKind::Simple { .. } => true,
+                        TokenKind::Adapter { id, version } => matches!(
+                            adapter_registry.resolve(id, version),
+                            Ok(AdapterBinding::Builtin(_))
+                        ),
+                        _ => false,
+                    };
+                    if !memo_allowed {
+                        return Err(if matches!(token.kind, TokenKind::Adapter { .. }) {
+                            format!("memoSafeToken alias must name a Simple or builtin Adapter token {alias}")
+                        } else {
+                            format!("memoSafeToken alias must name a Simple token {alias}")
+                        });
                     }
                 }
                 _ => return Err(format!("unsupported setting {}: {value}", setting.key)),
             }
         }
         for token in &self.grammar.tokens {
-            let expression = token_expression(&token.kind)?;
+            let expression = token_expression_with_registry(&token.kind, &adapter_registry)?;
             if self.tokens.insert(token.name.clone(), expression).is_some() {
                 return Err(format!("duplicate token {}", token.name));
             }
@@ -530,17 +548,36 @@ impl Lowering<'_> {
             .iter()
             .map(|rule| format!("{}Parser", rule.name))
             .collect();
+        let mut token_classes = HashMap::new();
         for token in &self.grammar.tokens {
             let class = match &token.kind {
                 TokenKind::Simple { parser_class } if !parser_class.contains('.') => {
                     Some(parser_class.clone())
                 }
                 TokenKind::Simple { .. }
+                | TokenKind::Adapter { .. }
                 | TokenKind::Until { .. }
                 | TokenKind::Negation { .. }
                 | TokenKind::CharRange { .. } => Some(parser_class_name(&token.name)),
                 _ => None,
             };
+            if let Some(name) = &class {
+                let adapter = matches!(token.kind, TokenKind::Adapter { .. });
+                // UNTIL is emitted inline, so it does not introduce or reference this class.
+                let previous = if matches!(token.kind, TokenKind::Until { .. }) {
+                    None
+                } else {
+                    token_classes.insert(name.clone(), adapter)
+                };
+                if let Some(previous_adapter) = previous {
+                    if adapter || previous_adapter {
+                        return Err(format!(
+                            "token/adapter parser name collision for {}",
+                            token.name
+                        ));
+                    }
+                }
+            }
             if class
                 .as_ref()
                 .is_some_and(|name| rule_classes.contains(name))
@@ -688,6 +725,7 @@ impl Lowering<'_> {
             | Expression::EofToken
             | Expression::LookaheadToken { .. }
             | Expression::UntilToken(_)
+            | Expression::CustomToken(_)
             | Expression::OptionalExpr(_) => true,
             Expression::Reference(rule) => self.nullable.contains(rule),
             Expression::Capture { expression, .. } | Expression::Delimited(expression) => {
@@ -1364,7 +1402,29 @@ fn parser_class_name(name: &str) -> String {
 }
 
 pub(crate) fn token_expression(token: &TokenKind) -> Result<Expression> {
+    token_expression_with_registry(token, &AdapterRegistry::builtins())
+}
+
+fn token_expression_with_registry(
+    token: &TokenKind,
+    registry: &AdapterRegistry,
+) -> Result<Expression> {
     Ok(match token {
+        TokenKind::Adapter { id, version } => match registry.resolve(id, version) {
+            Ok(AdapterBinding::Builtin(BuiltinAdapter::StringLiteral)) => Expression::Choice(vec![
+                Expression::QuotedToken('"'),
+                Expression::QuotedToken('\''),
+            ]),
+            Ok(AdapterBinding::Builtin(BuiltinAdapter::CodeStart)) => Expression::CodeStartToken,
+            Ok(AdapterBinding::Builtin(BuiltinAdapter::CodeEnd)) => Expression::CodeEndToken,
+            Ok(AdapterBinding::Builtin(BuiltinAdapter::LongCodeBlock)) => {
+                Expression::LongCodeBlockToken
+            }
+            Ok(AdapterBinding::Custom(custom)) => {
+                Expression::CustomToken(custom.rust_function.clone())
+            }
+            Err((code, subject)) => return Err(format!("{code}: {subject}")),
+        },
         TokenKind::Simple { parser_class } => match parser_class.as_str() {
             "NumberParser" | "org.unlaxer.parser.elementary.NumberParser" => {
                 Expression::NumberToken

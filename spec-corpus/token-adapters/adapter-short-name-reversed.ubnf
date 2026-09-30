@@ -1,0 +1,5 @@
+grammar AdapterShortNameReversed {
+  token IDENTIFIER = ADAPTER('tinyexpression.string', version=1)
+  token ID = IdentifierParser
+  @root @mapping(Value, params=[value]) Root ::= ID @value;
+}

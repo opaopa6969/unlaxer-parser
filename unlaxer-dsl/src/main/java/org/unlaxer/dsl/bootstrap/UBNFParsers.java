@@ -616,11 +616,30 @@ public class UBNFParsers {
         }
     }
 
+    /** ADAPTER('target-neutral.id', version=1). */
+    public static class AdapterExpressionParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                new WordParser("ADAPTER"),
+                Parser.get(LeftParenthesisParser.class),
+                Parser.get(SingleQuotedParser.class),
+                Parser.get(CommaParser.class),
+                new WordParser("version"),
+                Parser.get(EqualParser.class),
+                Parser.get(UnsignedIntegerParser.class),
+                Parser.get(RightParenthesisParser.class)
+            );
+        }
+    }
+
     /**
      * TokenValueParser: UntilExpressionParser | NegationExpressionParser
      *                 | LookaheadExpressionParser | NegativeLookaheadExpressionParser
      *                 | CharRangeExpressionParser | CIExpressionParser
-     *                 | RegexExpressionParser
+     *                 | RegexExpressionParser | AdapterExpressionParser
      *                 | AnyKeywordParser | EofKeywordParser | EmptyKeywordParser
      *                 | QualifiedClassNameParser
      */
@@ -637,6 +656,7 @@ public class UBNFParsers {
                 Parser.get(CharRangeExpressionParser.class),
                 Parser.get(CIExpressionParser.class),
                 Parser.get(RegexExpressionParser.class),
+                Parser.get(AdapterExpressionParser.class),
                 Parser.get(AnyKeywordParser.class),
                 Parser.get(EofKeywordParser.class),
                 Parser.get(EmptyKeywordParser.class),

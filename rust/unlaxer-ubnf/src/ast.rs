@@ -78,17 +78,39 @@ pub struct TokenDecl {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TokenKind {
-    Simple { parser_class: String },
-    Until { terminator: String },
-    Negation { excluded_chars: String },
-    Lookahead { pattern: String },
-    NegativeLookahead { pattern: String },
+    Simple {
+        parser_class: String,
+    },
+    /// Target-neutral token adapter reference. Validation and binding happen after parsing.
+    Adapter {
+        id: String,
+        version: String,
+    },
+    Until {
+        terminator: String,
+    },
+    Negation {
+        excluded_chars: String,
+    },
+    Lookahead {
+        pattern: String,
+    },
+    NegativeLookahead {
+        pattern: String,
+    },
     Any,
     Eof,
     Empty,
-    CharRange { min: char, max: char },
-    CaseInsensitive { word: String },
-    Regex { pattern: String },
+    CharRange {
+        min: char,
+        max: char,
+    },
+    CaseInsensitive {
+        word: String,
+    },
+    Regex {
+        pattern: String,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

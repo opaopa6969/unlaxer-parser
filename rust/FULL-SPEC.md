@@ -27,7 +27,8 @@
 | tinyexpression StringLiteral token binding | exact FQNを両生成経路で対応（#168） | 固定した実tinyexpressionクラスと共通corpusで字句・両cursor・AST/spanを比較。文字列評価の意味論は別途検証 |
 | tinyexpression CodeStart/CodeEnd token binding | exact FQNを両生成経路で対応（#170）。内部triviaなしの原子的字句 | 実tinyexpressionクラスと共通corpusで行頭/行末・両cursor・AST/spanを比較。codeblockの実行やJavaのparser tag/CST構造同値は含まない |
 | tinyexpression LongCodeBlock token binding | exact FQN を Java/native Rust 両生成器から `Expr::LongCodeBlock` に写像（#316 / tinyexpression#232） | N >= 4、同幅の単独終端行、opaque 本文、Unicode/CRLF/CR、atomic failure、実 Java parser と14文法86入力の比較。本文の AOT 実行は TinyExpression 側の別 API |
-| CASE_INSENSITIVE・REGEX・任意外部token | 未対応（上記の明示bindingを除く） | Unicode/regex方言を確定。任意Java parserクラスはRust実装または明示adapterを要求 |
+| target-neutral token adapter | `ADAPTER(id, version)` / `@tokenAdapter`、4 builtin と独自 Java class / Rust function 登録を両hostから生成（#158） | [契約と検証](../docs/token-adapters.md)。46位置診断ケース、16 custom実行、実Tiny 125入力×FQN/adapter。外部実装の意味的同値性・任意コード翻訳は保証しない |
+| CASE_INSENSITIVE・REGEX・任意外部token | 未対応（上記の明示binding / adapterを除く） | Unicode/regex方言を確定。任意Java parserクラスはRust実装と明示adapterを要求 |
 | global/rule whitespace・interleave | javaStyle/none と interleave 両profileを両生成経路で対応（#172） | 親子の独立設定・明示override・連接/choice/量指定子の境界を共通corpusで比較。任意triviaとglobal comment設定は未対応 |
 | imports・複数grammar・namespace | 未対応 | 現在は単一grammar。依存解決・循環・文法別IDを検証 |
 | mapping・capture・source-preserving AST | scalar/optional/list/groupと混在Text/Node値を生成。Rustはspan付きAstValue、JavaはObject系。shared mappingの型joinは宣言順非依存。単一capture内の複数semantic子とhelper内部optional/repeatのcardinality・全値収集を両言語で実装（#160）。純mapped aliasもNodeを保持し、直接/多段/group/delimiter・複数targetの値と位置を両backendで比較（#163）。Java位置binding #116・zero-field生成 #129・複合text capture #132・混在値 #156を修正 | 入れ子container型、再帰的unmapped rule、typeof/commonField/enum、全Java capture規則との互換性 |
@@ -44,7 +45,7 @@
 | tinyexpression-rs | 未対応 | 値・null/欠損・変数・演算子・関数・外部呼出し・日時/数値仕様を棚卸しし、同一入力で値/失敗分類を比較 |
 | rustcodeblock | 未対応 | 既定無効・明示許可付きAOT、元の位置へのcompiler診断、通常parse/LSPの非実行保証。Javaソースの自動翻訳はしない |
 | ネイティブ配布 | 縮小文法CLIのみ | tinyexpression CLI、対象OS別artifact、stdin/file/終了コード・制限のsmoke |
-| Rust製UBNF frontend・native generator | syntax frontend全18annotation/11token/9element種、対応範囲のlowering/CLI/5module emitterを実装 | Java/nativeの既存・混在値文法で全5file一致、空PATHの生成/check、手書き/symlink保護。全backend機能の生成完了とは区別。frontend既知差と構造分析上限を文書化 |
+| Rust製UBNF frontend・native generator | syntax frontend全18annotation/12token/9element種、対応範囲のlowering/CLI/5module emitterを実装 | Java/nativeの既存・混在値文法で全5file一致、空PATHの生成/check、手書き/symlink保護。全backend機能の生成完了とは区別。frontend既知差と構造分析上限を文書化 |
 | 入力DSLの機械語生成 | 未対応・設計未確定 | generatorや評価器のnativeバイナリ化と区別し、必要な意味論・成果物を別ADRで確定 |
 
 ## 完了の扱いと順序
@@ -61,7 +62,7 @@ tinyexpressionはowned source resolverで従来のslice字句処理を維持す�
 Javaのpreferred型候補探索自体のRust移植は未対応。
 
 tinyexpressionのStringLiteral対応（#168）は[実クラスとの比較・字句契約](../docs/tiny-string-token.md)を参照。
-これは既存FQN bindingの移行であり、汎用token adapter契約 #158 の完了ではない。
+既存FQNを維持した上で、#158 の [token ID・登録API・位置診断](../docs/token-adapters.md)からも生成・実行を検証する。
 CodeStart/CodeEnd対応（#170）の[行境界・字句契約と実行機能との区別](../docs/tiny-code-fence.md)も参照。
 rule-level trivia（#172）の[契約と Java global none の移行](../docs/rule-trivia.md)も参照。
 transactional scope store（#174）の[rollback契約とruntime API](../docs/transactional-scopes.md)も参照。
@@ -77,5 +78,5 @@ parser生成は当面`Expr`combinator定義を生成し、共通runtimeで実行
 移植に伴う追加提案は、両言語を対象とする受け入れ条件付きで追跡する。未実装の計画を上記の対応済み件数には含めない。
 
 - [#157](https://github.com/opaopa6969/unlaxer-parser/issues/157): portability検査と機械可読な診断レポート（上記範囲を実装）。
-- [#158](https://github.com/opaopa6969/unlaxer-parser/issues/158): target-neutralなtoken adapter契約。
+- [#158](https://github.com/opaopa6969/unlaxer-parser/issues/158): target-neutralなtoken adapter契約（上記範囲を実装）。
 - [#159](https://github.com/opaopa6969/unlaxer-parser/issues/159): 文法進化に伴う生成API影響レポート。

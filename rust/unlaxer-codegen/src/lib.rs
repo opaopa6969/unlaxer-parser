@@ -51,6 +51,11 @@ pub fn validate_ir(ir: &GrammarIr) -> Result<(), GenerateError> {
     validate::validate(ir)
 }
 
+/// Reject arbitrary source text before a custom token function path is emitted.
+pub fn valid_custom_token_path(path: &str) -> bool {
+    validate::valid_custom_token_path(path)
+}
+
 fn mappings(ir: &GrammarIr) -> Vec<&Mapping> {
     let mut result = Vec::new();
     for mapping in ir.rules.iter().filter_map(|r| r.mapping.as_ref()) {
@@ -206,6 +211,7 @@ fn expression(expr: &Expression) -> String {
         CodeStartToken => "Expr::CodeStart".into(),
         CodeEndToken => "Expr::CodeEnd".into(),
         LongCodeBlockToken => "Expr::LongCodeBlock".into(),
+        CustomToken(path) => format!("Expr::Custom({path})"),
         AnyToken => "Expr::Any".into(),
         EofToken => "Expr::Eof".into(),
         EmptyToken => "Expr::JavaEmpty".into(),

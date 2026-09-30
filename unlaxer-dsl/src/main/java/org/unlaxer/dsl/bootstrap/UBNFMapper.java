@@ -264,6 +264,9 @@ public class UBNFMapper {
         if (token instanceof UBNFAST.TokenDecl.Simple t) {
             return new UBNFAST.TokenDecl.Simple(prefixed, t.parserClass());
         }
+        if (token instanceof UBNFAST.TokenDecl.Adapter t) {
+            return new UBNFAST.TokenDecl.Adapter(prefixed, t.id(), t.version());
+        }
         if (token instanceof UBNFAST.TokenDecl.Until t) {
             return new UBNFAST.TokenDecl.Until(prefixed, t.terminator());
         }
@@ -437,6 +440,15 @@ public class UBNFMapper {
     private TokenDecl mapTokenDecl(Token token) {
         List<Token> identifiers = findDescendants(token, UBNFParsers.IdentifierParser.class);
         String name = identifiers.size() > 0 ? identifiers.get(0).source.toString().trim() : "";
+
+        List<Token> adapterTokens = findDescendants(token, UBNFParsers.AdapterExpressionParser.class);
+        if (!adapterTokens.isEmpty()) {
+            Token adapter = adapterTokens.get(0);
+            String id = extractQuotedValue(adapter);
+            List<Token> versions = findDescendants(adapter, UBNFParsers.UnsignedIntegerParser.class);
+            String version = versions.isEmpty() ? "" : versions.get(0).source.toString().trim();
+            return new TokenDecl.Adapter(name, id, version);
+        }
 
         // UNTIL('terminator') 形式のチェック
         List<Token> untilTokens = findDescendants(token, UBNFParsers.UntilExpressionParser.class);

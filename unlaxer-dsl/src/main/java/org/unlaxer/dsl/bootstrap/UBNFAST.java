@@ -85,7 +85,7 @@ public sealed interface UBNFAST permits
      * TokenDecl: token NAME = ( ParserClass | UNTIL(terminator) )
      */
     sealed interface TokenDecl extends UBNFAST
-        permits TokenDecl.Simple, TokenDecl.Until,
+        permits TokenDecl.Simple, TokenDecl.Adapter, TokenDecl.Until,
                 TokenDecl.Negation, TokenDecl.Lookahead, TokenDecl.NegativeLookahead,
                 TokenDecl.Any, TokenDecl.Eof, TokenDecl.Empty,
                 TokenDecl.CharRange, TokenDecl.CaseInsensitive,
@@ -100,6 +100,9 @@ public sealed interface UBNFAST permits
 
         /** token NAME = ClassName */
         record Simple(String name, String parserClass) implements TokenDecl {}
+
+        /** Versioned, target-neutral token adapter reference. Version is validated after parsing. */
+        record Adapter(String name, String id, String version) implements TokenDecl {}
 
         /** token NAME = UNTIL('terminator') — matches until terminator string */
         record Until(String name, String terminator) implements TokenDecl {}

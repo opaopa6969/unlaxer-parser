@@ -168,6 +168,9 @@ ASCII bitset・非 ASCII フラグ・nullable・unknown・「sequence が先に 
 ### 対応するUBNF
 
 - 1ファイル・1文法、ちょうど1つの`@root`。
+- `ADAPTER('id', version=N)` と `@tokenAdapter` による target-neutral token binding。
+  TinyExpression の4種の組み込み ID、独自 Java class / Rust function の明示登録、位置付き診断に対応。
+  [schema・公開API・信頼境界・共通corpus](../docs/token-adapters.md)を参照。
 - 非空の文字列terminal、rule参照、sequence、ordered choice、group、optional、0/1回以上のrepeat、bounded repeat、separated list。
 - `NumberParser`またはその完全修飾名へのtoken binding。符号・小数・指数を含む。
 - `IdentifierParser`、`SingleQuotedParser`、`DoubleQuotedParser`、`EndOfSourceParser`の短名または既定packageの完全修飾名。字句とmapperの契約は下記参照。
@@ -190,7 +193,7 @@ imports、上記以外の外部token parser、`@typeof`、`@eval`等の他のann
 
 `@rightAssoc`はcanonical形を`Base Op Self | Base`へ変換する。leftは単一text/node、op/rightは従来の`Vec`型を維持するが各ノードに0または1件だけ格納し、右側を再帰的なASTにする。`2^3^2`は`2^(3^2)`となり、評価器はこの構造をそのまま評価する。別ruleへの右参照・groupで包んだSelf・optionalなbase・入れ子captureなど非canonical形は明示拒否する。leftとrightの型を同一に強制せず、textのbaseとnodeの右辺も保持する。
 
-`parser::OPERATORS`はrule名、`i32`のprecedence、`Associativity::{Left,Right,None}`を保持する生成metadataで、level→rule名の順に並ぶ。Rightは使用する文法だけに出力し、既存文法の生成物は変えない。構文の優先順位はruleの参照階層で定義する。CLIはassoc/precedenceの併記・非負level・operand側が高優先であることを要求し、不整合な文法を生成前に拒否する。Java CLIは共通検証のERRORを拒否し、Javaクラス解決のWARNINGはRust token対応の根拠にしない。token対応は両経路ともRust側の明示allowlistで検証する。
+`parser::OPERATORS`はrule名、`i32`のprecedence、`Associativity::{Left,Right,None}`を保持する生成metadataで、level→rule名の順に並ぶ。Rightは使用する文法だけに出力し、既存文法の生成物は変えない。構文の優先順位はruleの参照階層で定義する。CLIはassoc/precedenceの併記・非負level・operand側が高優先であることを要求し、不整合な文法を生成前に拒否する。Java CLIは共通検証のERRORを拒否し、Javaクラス解決のWARNINGはRust token対応の根拠にしない。token対応は両経路とも既存bindingの明示allowlist、または上記adapter registryで検証する。
 
 低水準の`RustBackend.generate`を直接呼ぶ場合は、Java各generatorと同様、共通validatorの呼出しは利用者側の責任である。この直接APIでは結合性だけのlevelは`-1`、precedenceだけの結合性は`None`として記録する。比較テストのmetadata逆転モードはvalidatorを意図的に迂回した性質検査で、数値自体が構文を組み替えないことを確認する。逆転した文法がCLIで受理されるという意味ではない。
 

@@ -1,5 +1,6 @@
 //! Read-only capability inventory followed by structural validation when possible.
 //! No imports, external parser loading, code generation, or subprocesses.
+use crate::adapters::AdapterRegistry;
 use std::fmt::Write;
 use unlaxer_ubnf::*;
 
@@ -144,12 +145,16 @@ impl Inventory {
         });
     }
     fn grammar(&mut self, grammar: &GrammarDecl) {
+        let (adapter_registry, adapter_issues) = AdapterRegistry::from_grammar(grammar);
+        for issue in adapter_issues {
+            self.add(issue.code, issue.subject, issue.span);
+        }
         for import in &grammar.imports {
             self.add("P-IMPORT", &import.path, import.span);
         }
         for setting in &grammar.settings {
             match (&*setting.key, &setting.value) {
-                ("package" | "memoSafeToken", SettingValue::String(_)) => {}
+                ("package" | "memoSafeToken", SettingValue::String(_)) | ("tokenAdapter", _) => {}
                 ("whitespace", SettingValue::String(value)) => {
                     if !whitespace(value) {
                         self.add("P-WHITESPACE", value, setting.value_span);
@@ -163,6 +168,11 @@ impl Inventory {
                 TokenKind::Simple { parser_class } => {
                     if crate::lowering::token_expression(&token.kind).is_err() {
                         self.add("P-EXTERNAL-TOKEN", parser_class, token.span);
+                    }
+                }
+                TokenKind::Adapter { id, version } => {
+                    if let Err((code, subject)) = adapter_registry.resolve(id, version) {
+                        self.add(code, subject, token.span);
                     }
                 }
                 TokenKind::Regex { .. } => self.add("P-TOKEN-KIND", "REGEX", token.span),

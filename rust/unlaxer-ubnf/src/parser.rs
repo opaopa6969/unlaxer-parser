@@ -249,6 +249,22 @@ impl Parser<'_> {
                 }
                 TokenKind::CharRange { min, max }
             }
+            "ADAPTER" if self.is('(') => {
+                self.expect('(')?;
+                let id = self.quoted()?;
+                self.expect(',')?;
+                self.word("version")?;
+                self.expect('=')?;
+                let version = if let Kind::Number(value) = &self.current().kind {
+                    let value = value.clone();
+                    self.pos += 1;
+                    value
+                } else {
+                    return Err(self.error("expected adapter version integer"));
+                };
+                self.expect(')')?;
+                TokenKind::Adapter { id, version }
+            }
             _ => {
                 if self.is('(') {
                     return Err(diagnostic(

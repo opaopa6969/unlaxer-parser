@@ -48,13 +48,16 @@ ASTは入力の借用を持たず、入力文字列破棄後も使用できる�
 | file/grammar | 複数`grammar NAME { ... }`、各grammarに1個以上のrule |
 | declarations | import→setting→token→ruleの順序、`@import alias from 'path'` |
 | settings | `@key: dotted.value`、`@key: { key: 'value' ... }` |
-| token（11種類） | Simple(parser class/FQN)、UNTIL、NEGATION、LOOKAHEAD、NEGATIVE_LOOKAHEAD、ANY、EOF、EMPTY、CHAR_RANGE、CI、REGEX |
+| token（12種類） | Simple(parser class/FQN)、UNTIL、NEGATION、LOOKAHEAD、NEGATIVE_LOOKAHEAD、ANY、EOF、EMPTY、CHAR_RANGE、CI、REGEX、ADAPTER |
 | annotation（18種類） | root、mapping(dotted class, params)、eval、whitespace、interleave、backref、scopeTree、declares、catalog、leftAssoc、rightAssoc、precedence、doc、recovery、skip、Simple、commonField、enum |
 | element（9種類） | Group、Optional、Repeat、OneOrMore、BoundedRepeat、Separated、Terminal、RuleRef(namespace)、Error |
 | element付加構文 | 前置`@typeof(name)`、後置`@capture`、`+ ? * {n} {n,m} {n,} % separator`（suffixは一つ） |
 | body | 非空sequenceと`|`choice、入れ子の`() [] {}`、`ERROR('message')` |
 
-字句識別子はASCII `[A-Za-z_][A-Za-z0-9_]*`。整数はASCII数字、上限2147483647。
+字句識別子はASCII `[A-Za-z_][A-Za-z0-9_]*`。整数はASCII数字、通常は上限2147483647。
+`ADAPTER('id', version=N)` の version だけは raw 字句を AST に保持し、0 / overflow を
+後続 registry が位置付きで拒否する。`@tokenAdapter` は通常の block setting として保持する。
+ID / schema / target binding の意味検証は [token adapter 契約](../../docs/token-adapters.md)を参照。
 UBNF内triviaはASCII空白（space/tab/LF/CR/VT/FF）と`//`行コメント。
 対象言語の`@whitespace: javaStyle`とは別で、UBNF自身の`/*...*/`は未対応として診断する。
 文字列はsingle quote。`\n \t \r \\ \'`を復号し、それ以外のescapeはbackslashごと保持する

@@ -86,6 +86,7 @@ pub fn file(file: &UbnfFile) -> String {
 fn token(t: &TokenDecl) -> String {
     let (name, args) = match &t.kind {
         TokenKind::Simple { parser_class } => ("Simple", vec![quote(parser_class)]),
+        TokenKind::Adapter { id, version } => ("Adapter", vec![quote(id), quote(version)]),
         TokenKind::Until { terminator } => ("Until", vec![quote(terminator)]),
         TokenKind::Negation { excluded_chars } => ("Negation", vec![quote(excluded_chars)]),
         TokenKind::Lookahead { pattern } => ("Lookahead", vec![quote(pattern)]),

@@ -383,6 +383,12 @@ fn invalid_ir_is_rejected_before_emission() {
     g.rules[3].body = Expression::CharRangeToken { min: 'z', max: 'a' };
     cases.push(g);
     let mut g = base.clone();
+    g.rules[3].body = Expression::CustomToken("crate::safe); std::fs::remove_file(\"x\")".into());
+    cases.push(g);
+    let mut g = base.clone();
+    g.rules[3].body = Expression::CustomToken("crate::_".into());
+    cases.push(g);
+    let mut g = base.clone();
     g.rules[3].body = Expression::Repeat {
         child: Box::new(Expression::NumberToken),
         min: 2,
@@ -392,6 +398,17 @@ fn invalid_ir_is_rejected_before_emission() {
     for (index, case) in cases.iter().enumerate() {
         assert!(generate(case).is_err(), "case {index}");
     }
+}
+
+#[test]
+fn standalone_underscore_custom_path_is_rejected_before_emission() {
+    let mut grammar = support::fixture("evolution");
+    grammar.rules[3].body = Expression::CustomToken("crate::_".into());
+    let error = validate_ir(&grammar).unwrap_err();
+    assert!(
+        error.0.contains("invalid custom token function path"),
+        "{error}"
+    );
 }
 
 #[test]

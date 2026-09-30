@@ -95,6 +95,8 @@ pub enum Expression {
     CodeStartToken,
     CodeEndToken,
     LongCodeBlockToken,
+    /// A trusted, validated Rust function path supplied by a token adapter registry.
+    CustomToken(String),
     AnyToken,
     EofToken,
     EmptyToken,

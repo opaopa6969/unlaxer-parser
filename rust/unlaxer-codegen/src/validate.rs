@@ -16,6 +16,75 @@ fn identifier(name: &str) -> Result<(), GenerateError> {
     Ok(())
 }
 
+pub(super) fn valid_custom_token_path(path: &str) -> bool {
+    let parts: Vec<_> = path.split("::").collect();
+    parts.len() >= 2
+        && parts.iter().enumerate().all(|(index, part)| {
+            let mut chars = part.bytes();
+            *part != "_"
+                && chars
+                    .next()
+                    .is_some_and(|first| first.is_ascii_alphabetic() || first == b'_')
+                && chars.all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+                && (index == 0 && matches!(*part, "crate" | "self" | "super")
+                    || !matches!(
+                        *part,
+                        "as" | "async"
+                            | "await"
+                            | "break"
+                            | "const"
+                            | "continue"
+                            | "crate"
+                            | "dyn"
+                            | "else"
+                            | "enum"
+                            | "extern"
+                            | "false"
+                            | "fn"
+                            | "for"
+                            | "if"
+                            | "impl"
+                            | "in"
+                            | "let"
+                            | "loop"
+                            | "match"
+                            | "mod"
+                            | "move"
+                            | "mut"
+                            | "pub"
+                            | "ref"
+                            | "return"
+                            | "self"
+                            | "Self"
+                            | "static"
+                            | "struct"
+                            | "super"
+                            | "trait"
+                            | "true"
+                            | "type"
+                            | "unsafe"
+                            | "use"
+                            | "where"
+                            | "while"
+                            | "abstract"
+                            | "become"
+                            | "box"
+                            | "do"
+                            | "final"
+                            | "gen"
+                            | "macro"
+                            | "override"
+                            | "priv"
+                            | "try"
+                            | "typeof"
+                            | "unsized"
+                            | "virtual"
+                            | "yield"
+                            | "union"
+                    ))
+        })
+}
+
 pub(super) fn validate(ir: &GrammarIr) -> Result<(), GenerateError> {
     if ir.root >= ir.rules.len() {
         return Err(fail("root rule index out of range"));
@@ -105,6 +174,9 @@ fn expression(
         }
         QuotedToken(q) if !matches!(q, '\'' | '"') => {
             return Err(fail("quoted token must use single or double quote"))
+        }
+        CustomToken(path) if !valid_custom_token_path(path) => {
+            return Err(fail(format!("invalid custom token function path: {path}")))
         }
         CharRangeToken { min, max } if min > max || u32::from(*max) > 0xffff => {
             return Err(fail("character range must be ordered BMP scalars"))

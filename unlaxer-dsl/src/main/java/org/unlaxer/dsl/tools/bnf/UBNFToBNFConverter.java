@@ -146,6 +146,8 @@ public final class UBNFToBNFConverter {
         final String tokenValue;
         if (token instanceof UBNFAST.TokenDecl.Simple s) {
             tokenValue = s.parserClass();
+        } else if (token instanceof UBNFAST.TokenDecl.Adapter adapter) {
+            tokenValue = "ADAPTER('" + adapter.id() + "', version=" + adapter.version() + ")";
         } else if (token instanceof UBNFAST.TokenDecl.Until u) {
             tokenValue = "UNTIL('" + u.terminator() + "')";
         } else if (token instanceof UBNFAST.TokenDecl.Negation n) {

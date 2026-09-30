@@ -1,0 +1,5 @@
+// 😀 Keep the raw version in the syntax AST; reject it with a token span.
+grammar OverflowVersion {
+  token WORD = ADAPTER('tinyexpression.string', version=2147483648)
+  @root @mapping(Value, params=[value]) Root ::= WORD @value;
+}

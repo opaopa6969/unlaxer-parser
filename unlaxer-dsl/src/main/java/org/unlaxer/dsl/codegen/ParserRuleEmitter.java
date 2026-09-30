@@ -1072,7 +1072,7 @@ class ParserRuleEmitter {
      * 内部的に resolveElement（解決）と renderElement（レンダリング）に分離。
      */
     static String generateElementCode(ParserGenerator.GenContext ctx, String ruleName, AtomicElement element) {
-        return renderElement(resolveElement(ctx, ruleName, element));
+        return renderElement(resolveElement(ctx, ruleName, element), ctx.adapterShadowsWordParser);
     }
 
     // =========================================================================
@@ -1185,9 +1185,11 @@ class ParserRuleEmitter {
     // renderElement / renderInner: ElementModel → String（純粋レンダリング）
     // =========================================================================
 
-    static String renderElement(ElementModel model) {
+    static String renderElement(ElementModel model, boolean adapterShadowsWordParser) {
+        String wordParser = adapterShadowsWordParser
+            ? "org.unlaxer.parser.elementary.WordParser" : "WordParser";
         if (model instanceof ElementModel.WordMatch m) {
-            return "new WordParser(\"" + ParserCodegenUtil.escapeString(m.word()) + "\")";
+            return "new " + wordParser + "(\"" + ParserCodegenUtil.escapeString(m.word()) + "\")";
         }
         if (model instanceof ElementModel.ClassRef m) {
             return "Parser.get(" + m.className() + ")";
@@ -1201,10 +1203,10 @@ class ParserRuleEmitter {
                 + ParserCodegenUtil.escapeString(m.terminator()) + "\")";
         }
         if (model instanceof ElementModel.LookaheadParser m) {
-            return "new MatchOnly(new WordParser(\"" + ParserCodegenUtil.escapeString(m.pattern()) + "\"))";
+            return "new MatchOnly(new " + wordParser + "(\"" + ParserCodegenUtil.escapeString(m.pattern()) + "\"))";
         }
         if (model instanceof ElementModel.NegLookaheadParser m) {
-            return "new Not(new WordParser(\"" + ParserCodegenUtil.escapeString(m.pattern()) + "\"))";
+            return "new Not(new " + wordParser + "(\"" + ParserCodegenUtil.escapeString(m.pattern()) + "\"))";
         }
         if (model instanceof ElementModel.AnyCharParser m) {
             return "new org.unlaxer.parser.elementary.WildCardCharacterParser()";
@@ -1220,28 +1222,28 @@ class ParserRuleEmitter {
                 + ParserCodegenUtil.escapeString(m.word()) + "\")";
         }
         if (model instanceof ElementModel.ZeroOrMoreOf m) {
-            return "new ZeroOrMore(" + renderInner(m.inner()) + ")";
+            return "new ZeroOrMore(" + renderInner(m.inner(), adapterShadowsWordParser) + ")";
         }
         if (model instanceof ElementModel.OneOrMoreOf m) {
-            return "new OneOrMore(" + renderInner(m.inner()) + ")";
+            return "new OneOrMore(" + renderInner(m.inner(), adapterShadowsWordParser) + ")";
         }
         if (model instanceof ElementModel.OptionalOf m) {
-            return "new Optional(" + renderInner(m.inner()) + ")";
+            return "new Optional(" + renderInner(m.inner(), adapterShadowsWordParser) + ")";
         }
         if (model instanceof ElementModel.BoundedRepeatOf m) {
-            return "new Repeat(" + renderInner(m.inner()) + ", " + m.min() + ", " + m.max() + ")";
+            return "new Repeat(" + renderInner(m.inner(), adapterShadowsWordParser) + ", " + m.min() + ", " + m.max() + ")";
         }
         if (model instanceof ElementModel.Captured m) {
-            return "new __CaptureSite(" + renderElement(m.inner()) + ", " + bindingArguments(m.bindings()) + ")";
+            return "new __CaptureSite(" + renderElement(m.inner(), adapterShadowsWordParser) + ", " + bindingArguments(m.bindings()) + ")";
         }
         throw new IllegalStateException("unhandled " + model);
     }
 
-    static String renderInner(ElementModel model) {
+    static String renderInner(ElementModel model, boolean adapterShadowsWordParser) {
         if (model instanceof ElementModel.ClassRef m) {
             return m.className();
         }
-        return renderElement(model);
+        return renderElement(model, adapterShadowsWordParser);
     }
 
     /** body が複数代替の ChoiceBody かどうか */
@@ -1346,11 +1348,15 @@ class ParserRuleEmitter {
         }
         String laPattern = ctx.tokenLookaheadMap.get(name);
         if (laPattern != null) {
-            return "new MatchOnly(new WordParser(\"" + ParserCodegenUtil.escapeString(laPattern) + "\"))";
+            String wordParser = ctx.adapterShadowsWordParser
+                ? "org.unlaxer.parser.elementary.WordParser" : "WordParser";
+            return "new MatchOnly(new " + wordParser + "(\"" + ParserCodegenUtil.escapeString(laPattern) + "\"))";
         }
         String nlaPattern = ctx.tokenNegLookaheadMap.get(name);
         if (nlaPattern != null) {
-            return "new Not(new WordParser(\"" + ParserCodegenUtil.escapeString(nlaPattern) + "\"))";
+            String wordParser = ctx.adapterShadowsWordParser
+                ? "org.unlaxer.parser.elementary.WordParser" : "WordParser";
+            return "new Not(new " + wordParser + "(\"" + ParserCodegenUtil.escapeString(nlaPattern) + "\"))";
         }
         if (ctx.tokenAnySet.contains(name)) {
             return "new org.unlaxer.parser.elementary.WildCardCharacterParser()";

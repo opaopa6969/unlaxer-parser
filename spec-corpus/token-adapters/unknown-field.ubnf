@@ -1,0 +1,4 @@
+grammar UnknownField {
+  @tokenAdapter: { id: 'example.word' version: '1' java: 'example.WordParser' rust: 'crate::word_token' extra: 'ignored?' }
+  @root @mapping(Value, params=[value]) Root ::= 'x' @value;
+}

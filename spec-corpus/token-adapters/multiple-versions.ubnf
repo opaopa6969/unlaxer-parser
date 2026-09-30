@@ -1,0 +1,7 @@
+grammar MultipleVersions {
+  @tokenAdapter: { id: 'example.word' version: '1' java: 'example.WordParser' rust: 'crate::word_token' }
+  @tokenAdapter: { id: 'example.word' version: '2' java: 'example.NewWordParser' rust: 'crate::new_word_token' }
+  token OLD = ADAPTER('example.word', version=01)
+  token NEW = ADAPTER('example.word', version=2)
+  @root @mapping(Value, params=[value]) Root ::= (OLD | NEW) @value;
+}

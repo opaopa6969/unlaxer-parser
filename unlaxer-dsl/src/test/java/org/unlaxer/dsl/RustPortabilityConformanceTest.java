@@ -132,6 +132,43 @@ public class RustPortabilityConformanceTest {
         Files.write(Path.of("target/rust-portability-tiny.tsv"), report);
     }
 
+    @Test public void tokenAdapterRegistryDiagnosticsAgreeWithSourcePositions() throws Exception {
+        Path binary = binary();
+        Path cwd = temporary.newFolder().toPath();
+        Path fixtures = repo.resolve("spec-corpus/token-adapters");
+        List<String> report = new ArrayList<>(List.of("case\tline_endings\tstructure\tcodes\tresult"));
+        for (String line : Files.readAllLines(fixtures.resolve("cases.tsv"))) {
+            String[] fields = line.split("\t");
+            String source = Files.readString(fixtures.resolve(fields[0]));
+            for (String ending : List.of("LF", "CRLF")) {
+                String input = ending.equals("LF") ? source : source.replace("\n", "\r\n");
+                JsonObject result = compare(binary, cwd, input);
+                assertEquals(fields[0], fields[1], result.get("structure").getAsString());
+                List<String> codes = new ArrayList<>();
+                for (var entry : result.getAsJsonArray("diagnostics")) {
+                    JsonObject diagnostic = entry.getAsJsonObject();
+                    codes.add(diagnostic.get("code").getAsString());
+                    assertFalse("adapter diagnostics must have source positions", diagnostic.get("span").isJsonNull());
+                    JsonObject span = diagnostic.getAsJsonObject("span");
+                    String text = input.substring(input.offsetByCodePoints(0, span.get("start").getAsInt()),
+                        input.offsetByCodePoints(0, span.get("end").getAsInt()));
+                    assertTrue(text, diagnostic.get("code").getAsString().equals("P-STRUCTURE")
+                        ? text.startsWith("grammar ")
+                        : text.startsWith("@tokenAdapter:") || text.startsWith("token "));
+                    if (codes.get(codes.size() - 1).equals("P-ADAPTER-DUPLICATE")) {
+                        int offset = input.offsetByCodePoints(0, span.get("start").getAsInt());
+                        assertEquals("the conflicting registration, not an arbitrary token", input.lastIndexOf("@tokenAdapter:"), offset);
+                    }
+                }
+                String actual = codes.isEmpty() ? "-" : String.join(",", codes);
+                assertEquals(fields[0], fields[2], actual);
+                report.add(fields[0] + "\t" + ending + "\t" + fields[1] + "\t" + actual + "\tequal");
+            }
+        }
+        try (var files = Files.list(cwd)) { assertEquals(0, files.count()); }
+        Files.write(Path.of("target/rust-token-adapter-diagnostics.tsv"), report);
+    }
+
     private JsonObject compare(Path binary, Path cwd, String source) throws Exception {
         Path input = temporary.newFile().toPath();
         Files.writeString(input, source);

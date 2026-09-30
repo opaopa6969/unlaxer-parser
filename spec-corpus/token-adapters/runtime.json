@@ -1,0 +1,28 @@
+[
+  {"name":"prefix", "body":"WORD @value", "cases":[
+    {"input":"😀x", "prefix":[true,2,2], "value":"😀x", "span":[0,2]},
+    {"input":"😀xtail", "prefix":[true,2,2]},
+    {"input":"😀?", "prefix":[false,0,0]},
+    {"input":"", "prefix":[false,0,0]}
+  ]},
+  {"name":"choice-rollback", "body":"(WORD @value '!' | '😀x?' @value) END", "cases":[
+    {"input":"😀x!", "prefix":[true,3,3], "value":"😀x", "span":[0,3]},
+    {"input":"😀x?", "prefix":[true,3,3], "value":"😀x?", "span":[0,3]},
+    {"input":"😀?", "prefix":[false,0,0]}
+  ]},
+  {"name":"optional", "body":"[WORD @value] '!' END", "cases":[
+    {"input":"!", "prefix":[true,1,1], "value":null, "span":[0,1]},
+    {"input":"😀x!", "prefix":[true,3,3], "value":"😀x", "span":[0,3]},
+    {"input":"😀?!", "prefix":[false,0,0]}
+  ]},
+  {"name":"space-alias-trivia", "alias":"SPACE", "whitespace":true, "body":"SPACE @value '!' END", "cases":[
+    {"input":"😀x!", "prefix":[true,3,3], "value":"😀x", "span":[0,3]},
+    {"input":"😀x !", "prefix":[true,4,4], "value":"😀x", "span":[0,4]},
+    {"input":"😀?", "prefix":[false,0,0]}
+  ]},
+  {"name":"guarded-repeat", "body":"{'[' WORD @value ']'} END", "cases":[
+    {"input":"", "prefix":[true,0,0], "value":[], "span":[0,0]},
+    {"input":"[😀x][😀x]", "prefix":[true,8,8], "value":["😀x","😀x"], "span":[0,8]},
+    {"input":"[😀x][😀?]", "prefix":[false,0,0]}
+  ]}
+]

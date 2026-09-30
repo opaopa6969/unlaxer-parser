@@ -1,0 +1,5 @@
+grammar AdapterShortNameCollision {
+  token ID = IdentifierParser
+  token IDENTIFIER = ADAPTER('tinyexpression.string', version=1)
+  @root @mapping(Value, params=[value]) Root ::= ID @value;
+}

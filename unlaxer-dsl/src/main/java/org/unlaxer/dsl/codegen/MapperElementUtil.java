@@ -324,6 +324,10 @@ class MapperElementUtil {
             }
             if (tokenDeclByName.containsKey(ruleRefElement.name())) {
                 TokenDecl tokenDecl = tokenDeclByName.get(ruleRefElement.name());
+                if (tokenDecl instanceof TokenDecl.Adapter) {
+                    return Optional.of(parsersClass + "."
+                        + ParserCodegenUtil.toParserClassName(ruleRefElement.name()) + ".class");
+                }
                 if (tokenDecl instanceof TokenDecl.Simple simple) {
                     String parserClass = simple.parserClass();
                     String simpleName = parserClass.substring(parserClass.lastIndexOf('.') + 1);

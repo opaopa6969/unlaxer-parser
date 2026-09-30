@@ -32,12 +32,16 @@ jobs:
     - name: Cross-language fixtures, compile failures, and generated-file drift
       run: >
         mvn -B -pl unlaxer-common,unlaxer-dsl -am test
-        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,RustPortabilityConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest -DrustConformance=true
+        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,RustPortabilityConformanceTest,TokenAdapterConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest -DrustConformance=true
         -Dsurefire.failIfNoSpecifiedTests=false
     - name: Require UBNF source position conformance evidence
       run: test -s unlaxer-dsl/target/rust-ubnf-source.tsv
     - name: Require portability check conformance evidence
       run: test -s unlaxer-dsl/target/rust-portability.tsv
+    - name: Require token adapter diagnostics and runtime evidence
+      run: |
+        test -s unlaxer-dsl/target/rust-token-adapter-diagnostics.tsv
+        test -s unlaxer-dsl/target/rust-token-adapter-runtime.tsv
     - name: Require rule trivia conformance evidence
       run: test -s unlaxer-dsl/target/rust-rule-trivia.tsv
     - name: Require transactional scope conformance evidence
@@ -61,6 +65,8 @@ jobs:
           unlaxer-dsl/target/rust-ubnf-frontend.tsv
           unlaxer-dsl/target/rust-ubnf-source.tsv
           unlaxer-dsl/target/rust-portability.tsv
+          unlaxer-dsl/target/rust-token-adapter-diagnostics.tsv
+          unlaxer-dsl/target/rust-token-adapter-runtime.tsv
           unlaxer-dsl/target/rust-associative.tsv
           unlaxer-dsl/target/rust-right-associative.tsv
           unlaxer-dsl/target/rust-mixed-values.tsv
@@ -278,6 +284,16 @@ jobs:
           -Dtinyexpression.classes="$GITHUB_WORKSPACE/tinyexpression/target/classes"
         test -s unlaxer-dsl/target/rust-tiny-string.tsv
         test -s unlaxer-dsl/target/rust-tiny-code-fence.tsv
+        test -s unlaxer-dsl/target/rust-tiny-string-adapters.tsv
+        test -s unlaxer-dsl/target/rust-tiny-code-fence-adapters.tsv
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: tiny-token-adapter-conformance
+        path: |
+          unlaxer-parser/unlaxer-dsl/target/rust-tiny-string-adapters.tsv
+          unlaxer-parser/unlaxer-dsl/target/rust-tiny-code-fence-adapters.tsv
+        if-no-files-found: error
 
     - uses: actions/upload-artifact@v4
       with:
