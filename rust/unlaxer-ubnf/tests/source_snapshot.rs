@@ -6,6 +6,18 @@ mod source_spans;
 const SOURCE: &str = include_str!("fixtures/source/locations.ubnf");
 
 #[test]
+fn snapshot_preserves_every_shared_negative_diagnostic() {
+    for line in include_str!("fixtures/negative.tsv").lines() {
+        let (name, source) = line.split_once('\t').unwrap_or((line, ""));
+        assert_eq!(
+            parse(source).unwrap_err(),
+            parse_with_source(source).unwrap_err(),
+            "{name}"
+        );
+    }
+}
+
+#[test]
 fn snapshot_owns_source_and_survives_later_failed_and_parallel_parses() {
     let snapshot = parse_with_source(SOURCE.to_owned()).unwrap();
     assert_eq!(*snapshot.ast(), parse(SOURCE).unwrap());
