@@ -85,6 +85,23 @@ fn capture_equality_raw_ir_requires_a_local_capture_target() {
 }
 
 #[test]
+fn error_expected_raw_ir_emits_runtime_error_without_new_ast_shape() {
+    let mut grammar = support::fixture("evolution");
+    grammar.rules[0].body = Expression::Choice(vec![
+        grammar.rules[0].body.clone(),
+        Expression::ErrorExpected("need 😀 \" newline\n".into()),
+    ]);
+    validate_ir(&grammar).unwrap();
+    let parser = generate(&grammar)
+        .unwrap()
+        .into_iter()
+        .find(|file| file.relative_path == "parser.rs")
+        .unwrap()
+        .content;
+    assert!(parser.contains("Expr::Error(\"need 😀 \\\" newline\\n\")"));
+}
+
+#[test]
 fn parser_only_raw_ir_requires_a_root_reachable_projection_boundary() {
     fn rule(name: &str, body: Expression, skip: bool) -> Rule {
         Rule {

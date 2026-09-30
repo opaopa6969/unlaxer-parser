@@ -1,0 +1,93 @@
+[
+  {
+    "name":"DirectError",
+    "grammar":"grammar DirectError { @package: org.example.errorelements @root @mapping(Result) Root ::= ERROR('name expected'); }",
+    "cases":[
+      {"id":"empty-input","input":"","prefix":[false,0,0],"diagnostic":{"kind":"syntax","offset":0,"expected":["name expected"],"farthestOffset":0,"farthestExpected":["name expected"]},"state":{"declarations":[],"references":[],"diagnostics":[]}},
+      {"id":"nonempty-input","input":"x","prefix":[false,0,0],"diagnostic":{"kind":"syntax","offset":0,"expected":["name expected"],"farthestOffset":0,"farthestExpected":["name expected"]},"state":{"declarations":[],"references":[],"diagnostics":[]}}
+    ]
+  },
+  {
+    "name":"ChoiceError",
+    "grammar":"grammar ChoiceError { @package: org.example.errorelements @root @mapping(Root, params=[value]) Root ::= 'a' @value | ERROR('need a'); }",
+    "cases":[
+      {"id":"first-branch-success","input":"a","prefix":[true,1,1],"diagnostic":null,"ast":{"type":"Root","span":[0,1],"fields":{"value":"a"}},"state":{"declarations":[],"references":[],"diagnostics":[]}},
+      {"id":"both-branches-fail","input":"z","prefix":[false,0,0],"diagnostic":{"kind":"syntax","offset":0,"expected":["a","need a"],"farthestOffset":0,"farthestExpected":["a","need a"]},"javaDiagnostic":{"kind":"syntax","offset":0,"expected":["'a'","need a"],"farthestOffset":0,"farthestExpected":["'a'","need a"]},"state":{"declarations":[],"references":[],"diagnostics":[]}},
+      {"id":"valid-prefix-extra-input","input":"a!","prefix":[true,1,1],"diagnostic":{"kind":"trailing_input","offset":1,"expected":["end of input"],"farthestOffset":1,"farthestExpected":["end of input"]},"javaDiagnostic":{"kind":"trailing_input","offset":1,"expected":["end of input"],"farthestOffset":1,"farthestExpected":[]},"state":{"declarations":[],"references":[],"diagnostics":[]}}
+    ]
+  },
+  {
+    "name":"SequenceError",
+    "grammar":"grammar SequenceError { @package: org.example.errorelements @root @mapping(Result) Root ::= '😀' ERROR('need tail'); }",
+    "cases":[
+      {"id":"failed-after-supplementary","input":"😀","prefix":[false,0,0],"diagnostic":{"kind":"syntax","offset":1,"expected":["need tail"],"farthestOffset":1,"farthestExpected":["need tail"]},"state":{"declarations":[],"references":[],"diagnostics":[]}}
+    ]
+  },
+  {
+    "name":"OptionalRepeatError",
+    "grammar":"grammar OptionalRepeatError { @package: org.example.errorelements @root @mapping(Root, params=[value,maybe,many]) Root ::= 'a' @value [ ERROR('optional') @maybe ] { ERROR('repeat') @many } 'b'; }",
+    "cases":[
+      {"id":"failed-error-elements-do-not-block-success","input":"ab","prefix":[true,2,2],"diagnostic":null,"ast":{"type":"Root","span":[0,2],"fields":{"value":"a","maybe":null,"many":[]}},"state":{"declarations":[],"references":[],"diagnostics":[]}},
+      {"id":"terminal-failure-after-optional-repeat","input":"ac","prefix":[false,0,0],"diagnostic":{"kind":"syntax","offset":1,"expected":["b","optional","repeat"],"farthestOffset":1,"farthestExpected":["b","optional","repeat"]},"javaDiagnostic":{"kind":"syntax","offset":1,"expected":["'b'","optional","repeat"],"farthestOffset":1,"farthestExpected":["'b'","optional","repeat"]},"state":{"declarations":[],"references":[],"diagnostics":[]}}
+    ]
+  },
+  {
+    "name":"GroupReferenceError",
+    "grammar":"grammar GroupReferenceError { @package: org.example.errorelements @root @mapping(Result) Root ::= Helper; Helper ::= ('a' ERROR('group failed')); }",
+    "cases":[
+      {"id":"group-and-rule-reference","input":"a","prefix":[false,0,0],"diagnostic":{"kind":"syntax","offset":1,"expected":["group failed"],"farthestOffset":1,"farthestExpected":["group failed"]},"state":{"declarations":[],"references":[],"diagnostics":[]}}
+    ]
+  },
+  {
+    "name":"TriviaEscapedError",
+    "grammar":"grammar TriviaEscapedError { @package: org.example.errorelements @whitespace: javaStyle @root @mapping(Result) Root ::= '😀' ERROR('行\\n\\'尾'); }",
+    "cases":[
+      {"id":"unicode-crlf-trivia-and-escaped-message","input":" /*x*/ 😀\r\n","prefix":[false,0,0],"diagnostic":{"kind":"syntax","offset":10,"expected":["行\n'尾"],"farthestOffset":10,"farthestExpected":["行\n'尾"]},"javaDiagnostic":{"kind":"syntax","offset":10,"expected":["' '","'*/'","'/*'","'//'","行\n'尾"],"farthestOffset":10,"farthestExpected":["' '","'*/'","'/*'","'//'","行\n'尾"]},"state":{"declarations":[],"references":[],"diagnostics":[]}}
+    ]
+  },
+  {
+    "name":"EmptyMessage",
+    "grammar":"grammar EmptyMessage { @package: org.example.errorelements @root @mapping(Result) Root ::= ERROR(''); }",
+    "cases":[
+      {"id":"empty-expected-hint","input":"","prefix":[false,0,0],"diagnostic":{"kind":"syntax","offset":0,"expected":[],"farthestOffset":0,"farthestExpected":[]},"javaDiagnostic":{"kind":"syntax","offset":0,"expected":["ErrorMessageParser","RootParser"],"farthestOffset":0,"farthestExpected":["ErrorMessageParser","RootParser"]},"state":{"declarations":[],"references":[],"diagnostics":[]}}
+    ]
+  },
+  {
+    "name":"BlankMessage",
+    "grammar":"grammar BlankMessage { @package: org.example.errorelements @root @mapping(Result) Root ::= ERROR('   '); }",
+    "cases":[
+      {"id":"blank-expected-hint","input":"","prefix":[false,0,0],"diagnostic":{"kind":"syntax","offset":0,"expected":[],"farthestOffset":0,"farthestExpected":[]},"javaDiagnostic":{"kind":"syntax","offset":0,"expected":["ErrorMessageParser","RootParser"],"farthestOffset":0,"farthestExpected":["ErrorMessageParser","RootParser"]},"state":{"declarations":[],"references":[],"diagnostics":[]}}
+    ]
+  },
+  {
+    "name":"RuleNamedError",
+    "grammar":"grammar RuleNamedError { @package: org.example.errorelements @root @mapping(Root, params=[value]) Root ::= ERROR @value | ERROR('fallback'); ERROR ::= 'x'; }",
+    "cases":[
+      {"id":"ordinary-rule-reference","input":"x","prefix":[true,1,1],"diagnostic":null,"ast":{"type":"Root","span":[0,1],"fields":{"value":"x"}},"state":{"declarations":[],"references":[],"diagnostics":[]}},
+      {"id":"special-error-element","input":"z","prefix":[false,0,0],"diagnostic":{"kind":"syntax","offset":0,"expected":["fallback","x"],"farthestOffset":0,"farthestExpected":["fallback","x"]},"javaDiagnostic":{"kind":"syntax","offset":0,"expected":["'x'","fallback"],"farthestOffset":0,"farthestExpected":["'x'","fallback"]},"state":{"declarations":[],"references":[],"diagnostics":[]}}
+    ]
+  },
+  {
+    "name":"PredictiveError",
+    "grammar":"grammar PredictiveError { @package: org.example.errorelements @root @mapping(Root, params=[value]) @predictiveChoice Root ::= 'a' @value | ERROR('predicted failure'); }",
+    "cases":[
+      {"id":"first-set-success","input":"a","prefix":[true,1,1],"diagnostic":null,"ast":{"type":"Root","span":[0,1],"fields":{"value":"a"}},"state":{"declarations":[],"references":[],"diagnostics":[]}},
+      {"id":"first-set-failure","input":"z","prefix":[false,0,0],"diagnostic":{"kind":"syntax","offset":0,"expected":["a","predicted failure"],"farthestOffset":0,"farthestExpected":["a","predicted failure"]},"javaDiagnostic":{"kind":"syntax","offset":0,"expected":["'a'","predicted failure"],"farthestOffset":0,"farthestExpected":["'a'","predicted failure"]},"state":{"declarations":[],"references":[],"diagnostics":[]}}
+    ]
+  },
+  {
+    "name":"LongestError",
+    "grammar":"grammar LongestError { @package: org.example.errorelements @root @mapping(Root, params=[value]) @longestChoice Root ::= 'a' @value | 'ab' @value | ERROR('longest failed'); }",
+    "cases":[
+      {"id":"longest-success","input":"ab","prefix":[true,2,2],"diagnostic":null,"ast":{"type":"Root","span":[0,2],"fields":{"value":"ab"}},"state":{"declarations":[],"references":[],"diagnostics":[]}},
+      {"id":"all-fail","input":"z","prefix":[false,0,0],"diagnostic":{"kind":"syntax","offset":0,"expected":["a","ab","longest failed"],"farthestOffset":0,"farthestExpected":["a","ab","longest failed"]},"javaDiagnostic":{"kind":"syntax","offset":0,"expected":["'a'","'ab'","longest failed"],"farthestOffset":0,"farthestExpected":["'a'","'ab'","longest failed"]},"state":{"declarations":[],"references":[],"diagnostics":[]}}
+    ]
+  },
+  {
+    "name":"StateRollbackError",
+    "grammar":"grammar StateRollbackError { @package: org.example.errorelements token ID = org.unlaxer.parser.clang.IdentifierParser @root @mapping(Result) @scopeTree(mode=lexical) Root ::= Decl ERROR('halt'); @declares(symbol=name) Decl ::= ID @name; }",
+    "cases":[
+      {"id":"declaration-rolls-back-after-error","input":"a","prefix":[false,0,0],"diagnostic":{"kind":"syntax","offset":1,"expected":["halt"],"farthestOffset":1,"farthestExpected":["halt"]},"javaDiagnostic":{"kind":"syntax","offset":1,"expected":["AlphabetNumericUnderScoreParser","halt"],"farthestOffset":1,"farthestExpected":["AlphabetNumericUnderScoreParser","halt"]},"state":{"declarations":[],"references":[],"diagnostics":[]}}
+    ]
+  }
+]

@@ -222,6 +222,7 @@ fn expression(expr: &Expression) -> String {
             )
         }
         Literal(s) => format!("Expr::Literal({})", quote(s)),
+        ErrorExpected(message) => format!("Expr::Error({})", quote(message)),
         NumberToken => "Expr::Number".into(),
         IdentifierToken => "Expr::Identifier".into(),
         QuotedToken(q) => format!("Expr::Quoted('\\u{{{:x}}}')", u32::from(*q)),

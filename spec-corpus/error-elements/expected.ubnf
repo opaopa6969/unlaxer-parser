@@ -1,0 +1,5 @@
+grammar Expected {
+  @package: org.example.errorelements
+  @root @mapping(Result)
+  Root ::= 'ok' | ERROR('expected ok');
+}

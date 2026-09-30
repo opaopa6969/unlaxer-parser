@@ -32,7 +32,7 @@ jobs:
     - name: Cross-language fixtures, compile failures, and generated-file drift
       run: >
         mvn -B -pl unlaxer-common,unlaxer-dsl -am test
-        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,RustPortabilityConformanceTest,TokenAdapterConformanceTest,ApiImpactConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest,SkipMappingConformanceTest,CaptureEqualityConformanceTest -DrustConformance=true
+        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,RustPortabilityConformanceTest,TokenAdapterConformanceTest,ApiImpactConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest,SkipMappingConformanceTest,CaptureEqualityConformanceTest,ErrorElementConformanceTest -DrustConformance=true
         -Dsurefire.failIfNoSpecifiedTests=false
     - name: Require UBNF source position conformance evidence
       run: test -s unlaxer-dsl/target/rust-ubnf-source.tsv
@@ -60,6 +60,8 @@ jobs:
       run: test -s unlaxer-dsl/target/rust-skip-mapping.tsv
     - name: Require capture equality conformance evidence
       run: test -s unlaxer-dsl/target/rust-capture-equality.tsv
+    - name: Require ERROR element conformance evidence
+      run: test -s unlaxer-dsl/target/rust-error-elements.tsv
     - uses: actions/upload-artifact@v4
       with:
         name: rust-conformance
@@ -93,6 +95,7 @@ jobs:
           unlaxer-dsl/target/rust-catalog-metadata.tsv
           unlaxer-dsl/target/rust-skip-mapping.tsv
           unlaxer-dsl/target/rust-capture-equality.tsv
+          unlaxer-dsl/target/rust-error-elements.tsv
         if-no-files-found: error
     - name: Build and smoke-test the native subset example
       run: |
@@ -104,6 +107,10 @@ jobs:
         cargo build --release --locked --manifest-path rust/Cargo.toml -p unlaxer-generator
         PATH='' JAVA_HOME=/nonexistent-java rust/target/release/unlaxer generate --grammar unlaxer-dsl/src/test/resources/evolution/3/Evolution.ubnf --output rust/examples/evolution/src/generated --check
         PATH='' JAVA_HOME=/nonexistent-java rust/target/release/unlaxer check --target rust --grammar unlaxer-dsl/src/test/resources/evolution/3/Evolution.ubnf --format json
+        PATH='' JAVA_HOME=/nonexistent-java rust/target/release/unlaxer check --target rust --grammar spec-corpus/error-elements/expected.ubnf --format json | python3 -c 'import json,sys; r=json.load(sys.stdin); assert r["portable"] and not r["diagnostics"]'
+        error_generated_dir="$(mktemp -d)"
+        PATH='' JAVA_HOME=/nonexistent-java rust/target/release/unlaxer generate --grammar spec-corpus/error-elements/expected.ubnf --output "$error_generated_dir"
+        for module in mod.rs ast.rs parser.rs mapper.rs evaluator.rs; do test -s "$error_generated_dir/$module"; done
         PATH='' JAVA_HOME=/nonexistent-java rust/target/release/unlaxer impact --target rust --before spec-corpus/api-impact/node-add/before.ubnf --after spec-corpus/api-impact/node-add/after.ubnf | python3 -c 'import json,sys; r=json.load(sys.stdin); assert r["ok"] and [(c["kind"], c["subject"]) for c in r["changes"]] == [("METHOD_ADDED", "eval_extra"), ("NODE_ADDED", "Extra")]'
         tar -czf rust/target/unlaxer-generator-linux-x86_64.tar.gz -C rust/target/release unlaxer
     - uses: actions/upload-artifact@v4

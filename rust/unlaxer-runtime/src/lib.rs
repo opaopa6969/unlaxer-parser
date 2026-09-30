@@ -703,6 +703,13 @@ struct FailureDiagnostic {
 }
 
 impl FailureDiagnostic {
+    fn record_position(&mut self, position: usize) {
+        if self.farthest.is_none_or(|farthest| position > farthest) {
+            self.farthest = Some(position);
+            self.expected = ExpectedIds::Empty;
+        }
+    }
+
     fn record(&mut self, position: usize, expected: u32) {
         if self.farthest.is_none_or(|farthest| position > farthest) {
             self.farthest = Some(position);
@@ -1603,6 +1610,20 @@ impl<'a> ParseContext<'a> {
         self.fail_at(self.position, expected);
     }
 
+    fn fail_without_expected(&mut self) {
+        if self.options.diagnostics == Diagnostics::DetailedOnFailure {
+            return;
+        }
+        let position = self.position;
+        if let Some(frame) = self.diagnostic_frames.last_mut() {
+            frame.record_position(position);
+        }
+        if position > self.farthest {
+            self.farthest = position;
+            self.expected.clear();
+        }
+    }
+
     fn fail_at(&mut self, position: usize, expected: &str) {
         if self.options.diagnostics == Diagnostics::DetailedOnFailure {
             return;
@@ -1814,7 +1835,11 @@ impl<'a> ParseContext<'a> {
                 }
             }
             Expr::Error(message) => {
-                self.fail(message);
+                if strip_capture(message).is_empty() {
+                    self.fail_without_expected();
+                } else {
+                    self.fail(message);
+                }
                 None
             }
             Expr::Any | Expr::CharRange(_, _) | Expr::Except(_) => {

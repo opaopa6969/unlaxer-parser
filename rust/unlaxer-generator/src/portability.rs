@@ -281,7 +281,7 @@ impl Inventory {
                 format!("{namespace}.{name}"),
                 element.span,
             ),
-            ElementKind::Error(message) => self.add("P-ERROR-ELEMENT", message, element.span),
+            ElementKind::Error(_) => {}
             ElementKind::Terminal(value) if value.is_empty() => {
                 self.add("P-EMPTY-LITERAL", "empty literal", element.span)
             }
