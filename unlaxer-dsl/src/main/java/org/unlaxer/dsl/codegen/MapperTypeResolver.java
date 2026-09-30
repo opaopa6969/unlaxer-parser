@@ -78,11 +78,11 @@ class MapperTypeResolver {
             return "String";
         }
         if (element instanceof RuleRefElement ruleRefElement) {
+            if (grammar.rules().stream().anyMatch(r -> r.name().equals(ruleRefElement.name())
+                    && MapperElementUtil.isSkipped(r))) return "String";
             Optional<MappingAnnotation> mapping = grammar.rules().stream()
                 .filter(r -> r.name().equals(ruleRefElement.name()))
-                .flatMap(r -> r.annotations().stream())
-                .filter(a -> a instanceof MappingAnnotation)
-                .map(a -> (MappingAnnotation) a)
+                .flatMap(r -> MapperElementUtil.getMappingAnnotation(r).stream())
                 .findFirst();
             if (mapping.isPresent()) {
                 return astClassName + "." + mapping.get().className();

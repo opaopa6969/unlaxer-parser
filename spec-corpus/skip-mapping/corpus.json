@@ -1,0 +1,126 @@
+[
+  {
+    "name": "SkipCapture",
+    "grammar": "grammar SkipCapture { @package: org.example.skipmapping @whitespace: javaStyle @root @mapping(Root, params=[hidden,visible]) Root ::= Hidden @hidden Visible @visible; @skip @mapping(Ghost) Hidden ::= '😀' Child 'z'; @mapping(Child, params=[value]) Child ::= 'q' @value; @mapping(Visible, params=[value]) Visible ::= 'v' @value; }",
+    "cases": [
+      {"id":"full-text-and-child-exclusion", "input":"😀qzv", "prefix":[true,4,4], "syntax":true, "mapping":"ok", "cst":{"Hidden":1,"Child":1,"Visible":1}, "captureSpans":{"hidden":[0,3]}, "declarations":0,"references":0,
+       "ast":{"type":"Root","span":[0,4],"fields":{"hidden":"😀qz","visible":{"type":"Visible","span":[3,4],"fields":{"value":"v"}}}}},
+      {"id":"trivia-crlf-and-trailing", "input":" /*😀*/ 😀 q z\r\n v ", "prefix":[true,17,17], "syntax":true, "mapping":"ok", "cst":{"Hidden":1,"Child":1,"Visible":1}, "declarations":0,"references":0,
+       "ast":{"type":"Root","span":[0,17],"fields":{"hidden":"😀 q z","visible":{"type":"Visible","span":[15,17],"fields":{"value":"v"}}}}},
+      {"id":"valid-prefix-extra-input", "input":"😀qzv!", "prefix":[true,4,4], "syntax":false, "mapping":"none", "declarations":0,"references":0},
+      {"id":"syntax-failure", "input":"😀qz!", "prefix":[false,0,0], "syntax":false, "mapping":"none", "declarations":0,"references":0}
+    ]
+  },
+  {
+    "name":"SkipQuantified",
+    "grammar":"grammar SkipQuantified { @package: org.example.skipmapping @root @mapping(Root, params=[maybe,many,group,alias]) Root ::= [Hidden] @maybe {Hidden} @many ('|' 'g') @group Alias @alias; Alias ::= Child; @skip @mapping(Ghost) Hidden ::= 'x' Child; @mapping(Child, params=[value]) Child ::= 'q' @value; }",
+    "cases":[
+      {"id":"optional-list-alias-group", "input":"xqxqxq|gq", "prefix":[true,9,9], "syntax":true,"mapping":"ok", "cst":{"Hidden":3,"Child":4,"Alias":1},"declarations":0,"references":0,
+       "ast":{"type":"Root","span":[0,9],"fields":{"maybe":"xq","many":["xq","xq"],"group":"|g","alias":{"type":"Child","span":[8,9],"fields":{"value":"q"}}}}},
+      {"id":"empty-optional-list", "input":"|gq", "prefix":[true,3,3], "syntax":true,"mapping":"ok", "cst":{"Hidden":0,"Child":1,"Alias":1},"declarations":0,"references":0,
+       "ast":{"type":"Root","span":[0,3],"fields":{"maybe":null,"many":[],"group":"|g","alias":{"type":"Child","span":[2,3],"fields":{"value":"q"}}}}}
+    ]
+  },
+  {
+    "name":"SkipRoot",
+    "grammar":"grammar SkipRoot { @package: org.example.skipmapping @root @skip @mapping(Ghost) Root ::= Child; @mapping(Child, params=[value]) Child ::= 'q' @value; }",
+    "cases":[
+      {"id":"root-has-no-projection", "input":"q", "prefix":[true,1,1],"syntax":true,"mapping":"failure","cst":{"Root":1,"Child":1},"declarations":0,"references":0},
+      {"id":"root-parse-fails", "input":"x", "prefix":[false,0,0],"syntax":false,"mapping":"none","declarations":0,"references":0}
+    ]
+  },
+  {
+    "name":"SkipAliasRoot",
+    "grammar":"grammar SkipAliasRoot { @package: org.example.skipmapping @root Root ::= Hidden; @skip @mapping(Ghost) Hidden ::= Child; @mapping(Child, params=[value]) Child ::= 'q' @value; }",
+    "cases":[
+      {"id":"alias-root-has-no-projection", "input":"q", "prefix":[true,1,1],"syntax":true,"mapping":"failure","cst":{"Root":1,"Hidden":1,"Child":1},"declarations":0,"references":0}
+    ]
+  },
+  {
+    "name":"SkipScope",
+    "grammar":"grammar SkipScope { @package: org.example.skipmapping token ID = org.unlaxer.parser.clang.IdentifierParser @root @mapping(Root, params=[hidden,ref]) Root ::= (Attempt '!' | Hidden) @hidden Ref @ref; @scopeTree(mode=lexical) @skip @mapping(Ghost) Attempt ::= Decl; @skip @mapping(Hidden) Hidden ::= Decl; @declares(symbol=name) @mapping(Decl, params=[name]) Decl ::= ID @name ';'; @backref(name=name) @mapping(Ref, params=[name]) Ref ::= ID @name; }",
+    "cases":[
+      {"id":"failed-choice-rolls-back-declaration", "input":"a;a", "prefix":[true,3,3],"syntax":true,"mapping":"ok","cst":{"Attempt":0,"Hidden":1,"Decl":1,"Ref":1},"declarations":1,"references":1,
+       "ast":{"type":"Root","span":[0,3],"fields":{"hidden":"a;","ref":{"type":"Ref","span":[2,3],"fields":{"name":"a"}}}}},
+      {"id":"failed-whole-root-rolls-back-state", "input":"a;!", "prefix":[false,0,0],"syntax":false,"mapping":"none","declarations":0,"references":0}
+    ]
+  },
+  {
+    "name":"SkipRightAssoc",
+    "grammar":"grammar SkipRightAssoc { @package: org.example.skipmapping @root @mapping(Root, params=[hidden]) Root ::= Hidden @hidden; @skip @mapping(Ghost, params=[left,op,right]) @rightAssoc @precedence(level=10) Hidden ::= 'x' @left { '^' @op Hidden @right }; }",
+    "cases":[
+      {"id":"recursive-skip", "input":"x^x", "prefix":[true,3,3],"syntax":true,"mapping":"ok","cst":{"Hidden":2},"declarations":0,"references":0,
+       "ast":{"type":"Root","span":[0,3],"fields":{"hidden":"x^x"}}}
+    ]
+  },
+  {
+    "name":"SkipOnlyAst",
+    "grammar":"grammar SkipOnlyAst { @package: org.example.skipmapping @root @skip @mapping(Ghost) Root ::= 'x'; }",
+    "cases":[
+      {"id":"only-skipped-mapping", "input":"x", "prefix":[true,1,1],"syntax":true,"mapping":"failure","cst":{"Root":1},"declarations":0,"references":0}
+    ]
+  },
+  {
+    "name":"SkipMixed",
+    "grammar":"grammar SkipMixed { @package: org.example.skipmapping @root @mapping(Root, params=[choice,items]) Root ::= (Hidden | Visible | 't') @choice { (Hidden | Visible | 't') @items }; @skip @mapping(Ghost) Hidden ::= 'h' Child; @mapping(Visible, params=[value]) Visible ::= 'v' @value; @mapping(Child, params=[value]) Child ::= 'q' @value; }",
+    "cases":[
+      {"id":"skip-text-then-node-and-text", "input":"hqvt", "prefix":[true,4,4],"syntax":true,"mapping":"ok","cst":{"Hidden":1,"Child":1,"Visible":1},"declarations":0,"references":0,
+       "ast":{"type":"Root","span":[0,4],"fields":{"choice":"hq","items":[{"type":"Visible","span":[2,3],"fields":{"value":"v"}},"t"]}}},
+      {"id":"node-then-skip-text", "input":"vhq", "prefix":[true,3,3],"syntax":true,"mapping":"ok","cst":{"Hidden":1,"Child":1,"Visible":1},"declarations":0,"references":0,
+       "ast":{"type":"Root","span":[0,3],"fields":{"choice":{"type":"Visible","span":[0,1],"fields":{"value":"v"}},"items":["hq"]}}}
+    ]
+  },
+  {
+    "name":"SkipShared",
+    "grammar":"grammar SkipShared { @package: org.example.skipmapping @root @mapping(Root, params=[hidden,visible]) Root ::= Hidden @hidden Visible @visible; @skip @mapping(Item, params=[wrong]) Hidden ::= 'h' @wrong; @mapping(Item, params=[value]) Visible ::= 'v' @value; }",
+    "cases":[
+      {"id":"skipped-variant-excluded-from-shared-schema", "input":"hv", "prefix":[true,2,2],"syntax":true,"mapping":"ok","cst":{"Hidden":1,"Visible":1},"declarations":0,"references":0,
+       "ast":{"type":"Root","span":[0,2],"fields":{"hidden":"h","visible":{"type":"Item","span":[1,2],"fields":{"value":"v"}}}}}
+    ]
+  },
+  {
+    "name":"SkipAliasChain",
+    "grammar":"grammar SkipAliasChain { @package: org.example.skipmapping @root @mapping(Root, params=[alias,group]) Root ::= First @alias ('-' First) @group; First ::= Second; Second ::= Hidden; @skip @mapping(Ghost) Hidden ::= '😀' Child; @mapping(Child) Child ::= 'q'; }",
+    "cases":[
+      {"id":"two-aliases-preserve-whole-skipped-text", "input":"😀q-😀q", "prefix":[true,5,5],"syntax":true,"mapping":"ok","cst":{"First":2,"Second":2,"Hidden":2,"Child":2},"captureSpans":{"alias":[0,2],"group":[2,5]},"declarations":0,"references":0,
+       "ast":{"type":"Root","span":[0,5],"fields":{"alias":"😀q","group":"-😀q"}}}
+    ]
+  },
+  {
+    "name":"SkipOwnEffects",
+    "grammar":"grammar SkipOwnEffects { @package: org.example.skipmapping token ID = org.unlaxer.parser.clang.IdentifierParser @root @scopeTree(mode=lexical) @mapping(Root, params=[hidden,ref]) Root ::= Hidden @hidden Ref @ref; @skip @declares(symbol=name) @mapping(Ghost, params=[name]) Hidden ::= ID @name ';'; @backref(name=name) @mapping(Ref, params=[name]) Ref ::= ID @name; }",
+    "cases":[
+      {"id":"skipped-rule-keeps-own-declaration", "input":"a;a", "prefix":[true,3,3],"syntax":true,"mapping":"ok","cst":{"Hidden":1,"Ref":1},"declarations":1,"references":1,
+       "ast":{"type":"Root","span":[0,3],"fields":{"hidden":"a;","ref":{"type":"Ref","span":[2,3],"fields":{"name":"a"}}}}}
+    ]
+  },
+  {
+    "name":"SkipQuoted",
+    "grammar":"grammar SkipQuoted { @package: org.example.skipmapping token Q = org.unlaxer.parser.elementary.SingleQuotedParser @root @mapping(Root, params=[value]) Root ::= Hidden @value; @skip Hidden ::= Q; }",
+    "cases":[
+      {"id":"quote-normalization-preserves-source-span", "input":"'😀'", "prefix":[true,3,3],"syntax":true,"mapping":"ok","cst":{"Hidden":1},"captureSpans":{"value":[0,3]},"declarations":0,"references":0,
+       "ast":{"type":"Root","span":[0,3],"fields":{"value":"😀"}}},
+      {"id":"empty-text-retains-nonempty-source-span", "input":"''", "prefix":[true,2,2],"syntax":true,"mapping":"ok","cst":{"Hidden":1},"captureSpans":{"value":[0,2]},"declarations":0,"references":0,
+       "ast":{"type":"Root","span":[0,2],"fields":{"value":""}}}
+    ]
+  },
+  {
+    "name":"SkipChoiceRoot",
+    "grammar":"grammar SkipChoiceRoot { @package: org.example.skipmapping @root Root ::= Hidden | Visible; @skip @mapping(Ghost) Hidden ::= 'h' Child; @mapping(Child) Child ::= 'q'; @mapping(Visible, params=[value]) Visible ::= 'v' @value; }",
+    "cases":[
+      {"id":"skipped-root-branch-hides-mapped-child", "input":"hq", "prefix":[true,2,2],"syntax":true,"mapping":"failure","cst":{"Root":1,"Hidden":1,"Child":1,"Visible":0},"declarations":0,"references":0},
+      {"id":"visible-root-branch-still-maps", "input":"v", "prefix":[true,1,1],"syntax":true,"mapping":"ok","cst":{"Root":1,"Hidden":0,"Child":0,"Visible":1},"declarations":0,"references":0,
+       "ast":{"type":"Visible","span":[0,1],"fields":{"value":"v"}}}
+    ]
+  },
+  {
+    "name":"SkippedChoice",
+    "grammar":"grammar SkippedChoice { @package: org.example.skipmapping @root @mapping(Root, params=[value]) Root ::= Hidden @value; @skip @mapping(Ghost) Hidden ::= First | Second; @mapping(First) First ::= 'a'; @mapping(Second) Second ::= 'b'; }",
+    "cases":[
+      {"id":"first-mapped-alternative-becomes-text", "input":"a", "prefix":[true,1,1],"syntax":true,"mapping":"ok","cst":{"Root":1,"Hidden":1,"First":1,"Second":0},"declarations":0,"references":0,
+       "ast":{"type":"Root","span":[0,1],"fields":{"value":"a"}}},
+      {"id":"second-mapped-alternative-becomes-text", "input":"b", "prefix":[true,1,1],"syntax":true,"mapping":"ok","cst":{"Root":1,"Hidden":1,"First":0,"Second":1},"declarations":0,"references":0,
+       "ast":{"type":"Root","span":[0,1],"fields":{"value":"b"}}}
+    ]
+  }
+]

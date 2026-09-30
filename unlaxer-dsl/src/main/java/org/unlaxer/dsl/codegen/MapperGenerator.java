@@ -112,16 +112,19 @@ public class MapperGenerator implements CodeGenerator {
         // ----- Entry Point -----
         emitEntryPoint(sb, grammar, astClass, parsersClass, rootClassName, rootRule);
 
-        sb.append(MapperRuleEmitter.emitMappedTree(astClass));
+        sb.append(MapperRuleEmitter.emitMappedTree(astClass,
+            grammar.rules().stream().anyMatch(MapperElementUtil::isSkipped)));
 
         // ----- mapToken -----
         sb.append(MapperRuleEmitter.emitMapTokenMethod(astClass, parsersClass, allMappingRules));
 
         // ----- findBestMappedToken -----
-        sb.append(MapperRuleEmitter.emitFindBestMappedToken(astClass));
+        sb.append(MapperRuleEmitter.emitFindBestMappedToken(astClass, parsersClass,
+            grammar.rules().stream().filter(MapperElementUtil::isSkipped).map(RuleDecl::name).toList()));
 
         // ----- mapTransparentValue (heterogeneous @value node resolution) -----
-        sb.append(MapperRuleEmitter.emitMapTransparentValue(astClass));
+        sb.append(MapperRuleEmitter.emitMapTransparentValue(astClass,
+            grammar.rules().stream().anyMatch(MapperElementUtil::isSkipped)));
 
         // ----- Mapping Methods -----
         sb.append(MapperRuleEmitter.emitMappingMethods(grammar, astClass, parsersClass,
@@ -129,7 +132,8 @@ public class MapperGenerator implements CodeGenerator {
 
         // ----- Utilities -----
         sb.append(MapperRuleEmitter.emitUtilities(parsersClass, mappedClassByRuleName.keySet()));
-        if (grammar.rules().stream().anyMatch(rule -> !SemanticCardinality.associative(rule)
+        if (grammar.rules().stream().anyMatch(rule -> !MapperElementUtil.isSkipped(rule)
+                && !SemanticCardinality.associative(rule)
                 && MapperElementUtil.getMappingAnnotation(rule).isPresent())) {
             sb.append(MapperRuleEmitter.emitCaptureOccurrenceUtilities(parsersClass, ruleByName.keySet()));
         }
@@ -416,6 +420,8 @@ public class MapperGenerator implements CodeGenerator {
             sb.append("            throw new IllegalArgumentException(\"Root mapping token not found for ").append(rr.name()).append("\");\n");
             sb.append("        }\n");
             sb.append("        return to").append(rootMappingClass).append("(mappingRoot);\n");
+        } else if (rootRule.isPresent() && MapperElementUtil.isSkipped(rootRule.get())) {
+            sb.append("        throw new IllegalArgumentException(\"No mapped node found in parse tree: @skip root\");\n");
         } else {
             sb.append("        Token bestMappedToken = findBestMappedToken(rootToken, preferredAstSimpleName);\n");
             sb.append("        ").append(astClass).append(" mapped = mapToken(bestMappedToken);\n");

@@ -10,6 +10,8 @@ pub struct GrammarIr {
 pub struct Rule {
     pub name: String,
     pub body: Expression,
+    /// Parsed normally, but excluded with all descendants from AST projection.
+    pub skip: bool,
     pub mapping: Option<Mapping>,
     pub operator: Option<Operator>,
     pub catalog: Option<Catalog>,

@@ -14,6 +14,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.RuleBody;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RuleDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RuleRefElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.SequenceBody;
+import org.unlaxer.dsl.bootstrap.UBNFAST.SkipAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.TerminalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.TokenDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.TypeofElement;
@@ -170,7 +171,7 @@ class MapperElementUtil {
             return;
         }
         RuleDecl rule = ruleByName.get(name);
-        if (rule == null) {
+        if (rule == null || isSkipped(rule)) {
             return;
         }
         Optional<MappingAnnotation> mapping = getMappingAnnotation(rule);
@@ -457,7 +458,7 @@ class MapperElementUtil {
      * at runtime rather than dropped to {@code firstTokenText}. (unlaxer-parser #43 family)
      */
     static boolean isTransparentMappedChoice(RuleDecl rule, Map<String, RuleDecl> ruleByName) {
-        if (rule == null || getMappingAnnotation(rule).isPresent()) {
+        if (rule == null || isSkipped(rule) || getMappingAnnotation(rule).isPresent()) {
             return false;
         }
         return containsMappedValue(new GroupElement(rule.body()), ruleByName);
@@ -473,7 +474,7 @@ class MapperElementUtil {
         if (element instanceof RuleRefElement ref) {
             if (!visited.add(ref.name())) return false;
             RuleDecl rule = ruleByName.get(ref.name());
-            return rule != null && (getMappingAnnotation(rule).isPresent()
+            return rule != null && !isSkipped(rule) && (getMappingAnnotation(rule).isPresent()
                 || containsMappedValue(new GroupElement(rule.body()), ruleByName, visited));
         }
         Object value = captureValueShape(element);
@@ -498,6 +499,10 @@ class MapperElementUtil {
     static boolean usesBoundTextCapture(AtomicElement element, Map<String, RuleDecl> ruleByName,
             Map<String, TokenDecl> tokenDeclByName) {
         Object value = captureValueShape(element);
+        if (value instanceof RuleRefElement ref) {
+            return containsSkippedReference(ref, ruleByName)
+                && !containsMappedValue(ref, ruleByName);
+        }
         final RuleBody body;
         if (value instanceof GroupElement group) {
             body = group.body();
@@ -510,6 +515,29 @@ class MapperElementUtil {
         var visited = new java.util.HashSet<String>();
         return collectRuleRefs(body).stream().noneMatch(ref ->
             reachesMappedOrEnum(ref.name(), ruleByName, tokenDeclByName, visited));
+    }
+
+    /** A capture involving @skip retains the complete matched source slice as text. */
+    static boolean containsSkippedReference(AtomicElement element, Map<String, RuleDecl> ruleByName) {
+        Object value = captureValueShape(element);
+        if (value instanceof RuleRefElement ref) {
+            return reachesSkippedRule(ref.name(), ruleByName, new java.util.HashSet<>());
+        }
+        RuleBody body = value instanceof GroupElement group ? group.body()
+            : value instanceof RuleBody compound ? compound : null;
+        return body != null && collectRuleRefs(body).stream()
+            .anyMatch(ref -> reachesSkippedRule(ref.name(), ruleByName, new java.util.HashSet<>()));
+    }
+
+    private static boolean reachesSkippedRule(String name, Map<String, RuleDecl> ruleByName,
+            java.util.Set<String> visited) {
+        if (!visited.add(name)) return false;
+        RuleDecl rule = ruleByName.get(name);
+        if (rule == null) return false;
+        if (isSkipped(rule)) return true;
+        if (getMappingAnnotation(rule).isPresent()) return false;
+        return collectRuleRefs(rule.body()).stream()
+            .anyMatch(ref -> reachesSkippedRule(ref.name(), ruleByName, visited));
     }
 
     // Mirrors CaptureBindingPlan.bindValues: unwrap cardinality, but not a source group.
@@ -546,7 +574,7 @@ class MapperElementUtil {
             Map<String, TokenDecl> tokenDeclByName, java.util.Set<String> visited) {
         if (tokenDeclByName.containsKey(name) || !visited.add(name)) return false;
         RuleDecl rule = ruleByName.get(name);
-        if (rule == null) return false;
+        if (rule == null || isSkipped(rule)) return false;
         if (getMappingAnnotation(rule).isPresent()
                 || rule.annotations().stream().anyMatch(a -> a instanceof UBNFAST.EnumAnnotation)) return true;
         return collectRuleRefs(rule.body()).stream().anyMatch(ref ->
@@ -595,10 +623,15 @@ class MapperElementUtil {
     }
 
     static Optional<MappingAnnotation> getMappingAnnotation(RuleDecl rule) {
+        if (isSkipped(rule)) return Optional.empty();
         return rule.annotations().stream()
             .filter(a -> a instanceof MappingAnnotation)
             .map(a -> (MappingAnnotation) a)
             .findFirst();
+    }
+
+    static boolean isSkipped(RuleDecl rule) {
+        return rule != null && rule.annotations().stream().anyMatch(SkipAnnotation.class::isInstance);
     }
 
     /** ルール本体から @typeof(x) @param の関係を収集する: paramName -> referencedCaptureName */

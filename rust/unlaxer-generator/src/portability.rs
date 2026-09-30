@@ -188,7 +188,14 @@ impl Inventory {
             }
         }
         for rule in &grammar.rules {
+            let skip = rule
+                .annotations
+                .iter()
+                .any(|annotation| matches!(annotation.kind, AnnotationKind::Skip));
             for annotation in &rule.annotations {
+                if skip && matches!(annotation.kind, AnnotationKind::Mapping { .. }) {
+                    continue;
+                }
                 self.annotation(annotation);
             }
             self.body(&rule.body);
@@ -236,7 +243,7 @@ impl Inventory {
             AnnotationKind::Eval { .. } => self.add("P-ANNOTATION", "eval", span),
             AnnotationKind::Doc { .. } => self.add("P-ANNOTATION", "doc", span),
             AnnotationKind::Recovery { .. } => self.add("P-ANNOTATION", "recovery", span),
-            AnnotationKind::Skip => self.add("P-ANNOTATION", "skip", span),
+            AnnotationKind::Skip => {}
             AnnotationKind::Simple { name } => self.add("P-ANNOTATION", name, span),
             AnnotationKind::CommonField { .. } => self.add("P-ANNOTATION", "commonField", span),
             AnnotationKind::Enum => self.add("P-ANNOTATION", "enum", span),

@@ -66,6 +66,14 @@ fn generated_mapper_dispatches_to_out_of_line_rule_mappers() {
 }
 
 #[test]
+fn skipped_rule_cannot_retain_a_mapping_in_raw_ir() {
+    let mut grammar = support::fixture("evolution");
+    grammar.rules[1].skip = true;
+    let error = validate_ir(&grammar).unwrap_err();
+    assert_eq!(error.0, "skipped rule has mapping: Binary");
+}
+
+#[test]
 fn wide_generated_mapper_runs_on_two_mib_thread_stack_in_debug_build() {
     let temp = Temp::new();
     let runtime = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../unlaxer-runtime/src/lib.rs");
@@ -417,6 +425,7 @@ fn expression_variants_escape_unicode_and_control_characters() {
     let mut grammar = support::fixture("shared");
     grammar.rules.push(Rule {
         name: "Tokens".into(),
+        skip: false,
         mapping: None,
         operator: None,
         catalog: None,

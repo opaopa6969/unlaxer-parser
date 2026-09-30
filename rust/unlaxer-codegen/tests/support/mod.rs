@@ -17,6 +17,7 @@ fn rule(name: &str, body: Expression, mapping: Option<(&str, Vec<Field>)>) -> Ru
     Rule {
         name: name.into(),
         body,
+        skip: false,
         mapping: mapping.map(|(name, fields)| Mapping {
             name: name.into(),
             fields,

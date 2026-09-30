@@ -484,6 +484,8 @@ public class ASTGenerator implements CodeGenerator {
             return "String";
         }
         if (element instanceof RuleRefElement r) {
+            if (grammar.rules().stream().anyMatch(rule -> rule.name().equals(r.name())
+                    && MapperElementUtil.isSkipped(rule))) return "String";
             Optional<MappingAnnotation> mapping = findMappingForRule(grammar, r.name());
             if (mapping.isPresent()) {
                 return astClassName + "." + mapping.get().className();
@@ -550,9 +552,7 @@ public class ASTGenerator implements CodeGenerator {
     private Optional<MappingAnnotation> findMappingForRule(GrammarDecl grammar, String ruleName) {
         return grammar.rules().stream()
             .filter(r -> r.name().equals(ruleName))
-            .flatMap(r -> r.annotations().stream())
-            .filter(a -> a instanceof MappingAnnotation)
-            .map(a -> (MappingAnnotation) a)
+            .flatMap(r -> MapperElementUtil.getMappingAnnotation(r).stream())
             .findFirst();
     }
 
@@ -622,10 +622,7 @@ public class ASTGenerator implements CodeGenerator {
     // =========================================================================
 
     Optional<MappingAnnotation> getMappingAnnotation(RuleDecl rule) {
-        return rule.annotations().stream()
-            .filter(a -> a instanceof MappingAnnotation)
-            .map(a -> (MappingAnnotation) a)
-            .findFirst();
+        return MapperElementUtil.getMappingAnnotation(rule);
     }
 
     String getPackageName(GrammarDecl grammar) {

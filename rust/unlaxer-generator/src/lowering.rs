@@ -28,6 +28,7 @@ pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
         tokens: HashMap::new(),
         bodies: Vec::new(),
         mappings: Vec::new(),
+        skips: Vec::new(),
         operators: Vec::new(),
         catalogs: Vec::new(),
         longest_choices: Vec::new(),
@@ -44,6 +45,7 @@ struct Lowering<'a> {
     tokens: HashMap<String, Expression>,
     bodies: Vec<Expression>,
     mappings: Vec<Option<(String, Vec<String>)>>,
+    skips: Vec<bool>,
     operators: Vec<Option<Operator>>,
     catalogs: Vec<Option<String>>,
     longest_choices: Vec<bool>,
@@ -150,6 +152,10 @@ impl Lowering<'_> {
                 return Err(format!("duplicate rule/token {}", rule.name));
             }
             let mut mapping = None;
+            let skip = rule
+                .annotations
+                .iter()
+                .any(|annotation| matches!(annotation.kind, AnnotationKind::Skip));
             let mut associativity = None;
             let mut longest_choice = false;
             let mut predictive_choice = false;
@@ -169,17 +175,22 @@ impl Lowering<'_> {
                         if mapping.is_some() {
                             return Err(format!("multiple @mapping on {}", rule.name));
                         }
-                        identifier(class_name)?;
-                        let method = method_name(class_name);
-                        if let Some(previous) = methods.insert(method, class_name) {
-                            if previous != class_name {
-                                return Err(format!(
-                                    "mapping method collision {previous} / {class_name}"
-                                ));
+                        if !skip {
+                            identifier(class_name)?;
+                        }
+                        if !skip {
+                            let method = method_name(class_name);
+                            if let Some(previous) = methods.insert(method, class_name) {
+                                if previous != class_name {
+                                    return Err(format!(
+                                        "mapping method collision {previous} / {class_name}"
+                                    ));
+                                }
                             }
                         }
                         mapping = Some((class_name.clone(), params.clone()));
                     }
+                    AnnotationKind::Skip => {}
                     AnnotationKind::LeftAssoc | AnnotationKind::RightAssoc => {
                         let value = if matches!(annotation.kind, AnnotationKind::LeftAssoc) {
                             Associativity::Left
@@ -316,6 +327,7 @@ impl Lowering<'_> {
             }));
             self.catalogs.push(catalog);
             self.mappings.push(mapping);
+            self.skips.push(skip);
         }
         let root = root.ok_or("exactly one @root is required")?;
         self.check_parser_names()?;
@@ -339,11 +351,12 @@ impl Lowering<'_> {
         for i in 0..self.bodies.len() {
             self.check_left_recursion(i, &mut HashSet::new(), &mut HashSet::new())?;
         }
-        if self.rule_shape(root, &mut HashSet::new())?
-            != (Shape {
-                kind: Kind::Node,
-                cardinality: Cardinality::One,
-            })
+        if !self.expression_reaches_skip(&Expression::Reference(root), &mut HashSet::new())?
+            && self.rule_shape(root, &mut HashSet::new())?
+                != (Shape {
+                    kind: Kind::Node,
+                    cardinality: Cardinality::One,
+                })
         {
             return Err("root must resolve to exactly one AST node".into());
         }
@@ -374,9 +387,11 @@ impl Lowering<'_> {
                 }
                 let mut fields = Vec::new();
                 for name in params {
-                    identifier(name)?;
-                    if name == "span" || name == "semantics" {
-                        return Err(format!("reserved capture name {name}"));
+                    if !self.skips[i] {
+                        identifier(name)?;
+                        if name == "span" || name == "semantics" {
+                            return Err(format!("reserved capture name {name}"));
+                        }
                     }
                     let shape = captures[name];
                     fields.push(Field {
@@ -391,7 +406,8 @@ impl Lowering<'_> {
                 };
                 Some(mapping)
             } else {
-                if !captures.is_empty()
+                if !self.skips[i]
+                    && !captures.is_empty()
                     && *effects == RuleEffects::default()
                     && self.catalogs[i].is_none()
                 {
@@ -469,7 +485,8 @@ impl Lowering<'_> {
             rules.push(Rule {
                 name: self.grammar.rules[i].name.clone(),
                 body,
-                mapping,
+                skip: self.skips[i],
+                mapping: if self.skips[i] { None } else { mapping },
                 operator: self.operators[i],
                 catalog,
             });
@@ -505,7 +522,7 @@ impl Lowering<'_> {
             if let Some(mapping) = &rule.mapping {
                 rule.mapping = Some(variants[&mapping.name].clone());
             }
-            if needs_values {
+            if needs_values && !rule.skip {
                 rule.body = if rule.mapping.is_none() {
                     self.project_helper_value(&rule.body)?
                 } else {
@@ -817,8 +834,44 @@ impl Lowering<'_> {
         }
     }
 
+    fn root_projection_reaches_skip(
+        &self,
+        rule: usize,
+        visiting: &mut HashSet<usize>,
+    ) -> Result<bool> {
+        if self.skips[rule] {
+            return Ok(true);
+        }
+        if self.mappings[rule].is_some() || !visiting.insert(rule) {
+            return Ok(false);
+        }
+        self.expression_reaches_skip(&self.bodies[rule], visiting)
+    }
+
+    fn expression_reaches_skip(
+        &self,
+        expression: &Expression,
+        visiting: &mut HashSet<usize>,
+    ) -> Result<bool> {
+        let _depth = self.enter_analysis()?;
+        match expression {
+            Expression::Reference(rule) => self.root_projection_reaches_skip(*rule, visiting),
+            _ => {
+                for child in children(expression) {
+                    if self.expression_reaches_skip(child, visiting)? {
+                        return Ok(true);
+                    }
+                }
+                Ok(false)
+            }
+        }
+    }
+
     fn rule_shape(&self, rule: usize, visiting: &mut HashSet<usize>) -> Result<Shape> {
         let _depth = self.enter_analysis()?;
+        if self.skips[rule] {
+            return Ok(text_shape());
+        }
         if self.mappings[rule].is_some() {
             return Ok(Shape {
                 kind: Kind::Node,
@@ -1262,7 +1315,11 @@ impl Lowering<'_> {
             || mapping.fields[2]
                 != (Field {
                     name: "right".into(),
-                    kind: Kind::Node,
+                    kind: if self.skips[rule] {
+                        Kind::Text
+                    } else {
+                        Kind::Node
+                    },
                     cardinality: Cardinality::Many,
                 })
         {

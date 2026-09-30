@@ -91,7 +91,10 @@ public final class PortabilityCheck {
             }
         }
         for (RuleDecl rule : grammar.rules()) {
-            for (Annotation annotation : rule.annotations()) scanAnnotation(annotation, snapshot, out);
+            boolean skip = rule.annotations().stream().anyMatch(SkipAnnotation.class::isInstance);
+            for (Annotation annotation : rule.annotations()) {
+                if (!(skip && annotation instanceof MappingAnnotation)) scanAnnotation(annotation, snapshot, out);
+            }
             scanBody(rule.body(), snapshot, out);
         }
     }
@@ -110,7 +113,6 @@ public final class PortabilityCheck {
         if (annotation instanceof EvalAnnotation) unsupported = "eval";
         else if (annotation instanceof DocAnnotation) unsupported = "doc";
         else if (annotation instanceof RecoveryAnnotation) unsupported = "recovery";
-        else if (annotation instanceof SkipAnnotation) unsupported = "skip";
         else if (annotation instanceof SimpleAnnotation simple) unsupported = simple.name();
         else if (annotation instanceof CommonFieldAnnotation) unsupported = "commonField";
         else if (annotation instanceof EnumAnnotation) unsupported = "enum";

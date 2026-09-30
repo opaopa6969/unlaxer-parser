@@ -654,6 +654,10 @@ class ParserRuleEmitter {
         w.line("public static class " + className + " extends " + baseClass + implSuffix + " {");
         w.indent();
         w.line("private static final long serialVersionUID = 1L;");
+        boolean hasSkip = rule.annotations().stream().anyMatch(a -> a instanceof SkipAnnotation);
+        if (hasSkip) {
+            w.line("public " + className + "() { addTag(org.unlaxer.reducer.TagBasedReducer.NodeKind.notNode.getTag()); }");
+        }
         if (predictiveChoice) {
             w.line("private static final java.util.List<ChoicePredictor> __CHOICE_PREDICTORS = java.util.List.of("
                 + generateChoicePredictors(ctx, rule) + ");");
@@ -678,14 +682,9 @@ class ParserRuleEmitter {
             w.dedent();
             w.line("}");
         }
-        boolean hasSkip = rule.annotations().stream().anyMatch(a -> a instanceof SkipAnnotation);
         if (isChoice || hasSkip) {
             w.line("@Override");
-            if (hasSkip) {
-                w.line("public java.util.Optional<RecursiveMode> getNotAstNodeSpecifier() { return java.util.Optional.of(RecursiveMode.containsRoot); }");
-            } else {
-                w.line("public java.util.Optional<RecursiveMode> getNotAstNodeSpecifier() { return java.util.Optional.empty(); }");
-            }
+            w.line("public java.util.Optional<RecursiveMode> getNotAstNodeSpecifier() { return java.util.Optional.empty(); }");
         }
         // @scopeTree / @declares / @backref → TransactionListener 実装を生成
         boolean hasScopeTree = rule.annotations().stream().anyMatch(a -> a instanceof ScopeTreeAnnotation);
