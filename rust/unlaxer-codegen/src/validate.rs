@@ -184,6 +184,9 @@ fn root_reaches_projection_boundary(ir: &GrammarIr) -> bool {
                 | RuleEffects {
                     child: expression, ..
                 }
+                | Recovery {
+                    child: expression, ..
+                }
                 | TriviaScope {
                     child: expression, ..
                 } => pending.push(expression),
@@ -206,6 +209,13 @@ fn expression(
 ) -> Result<(), GenerateError> {
     use Expression::*;
     match expr {
+        Recovery { child, tokens, .. } => {
+            let distinct: BTreeSet<_> = tokens.iter().collect();
+            if tokens.iter().any(String::is_empty) || distinct.len() != tokens.len() {
+                return Err(fail("duplicate or empty recovery sync token"));
+            }
+            expression(child, count, captures)?;
+        }
         CaptureEquality { child, name } => {
             let mut local = BTreeSet::new();
             expression(child, count, &mut local)?;

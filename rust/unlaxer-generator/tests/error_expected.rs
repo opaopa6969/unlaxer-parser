@@ -51,10 +51,10 @@ fn error_element_preserves_empty_blank_and_escaped_messages() {
 }
 
 #[test]
-fn error_element_is_not_nullable_and_does_not_hide_unsupported_recovery() {
+fn error_element_is_not_nullable_and_recovery_is_supported() {
     let source = "grammar G { @root @mapping(Root) Root ::= (ERROR('no'))*; }";
     assert!(unlaxer_generator::generate(source).is_ok());
     let recovery = source.replace("@root", "@root @recovery(auto)");
-    assert!(!unlaxer_generator::portability::check(&recovery).portable);
-    assert!(unlaxer_generator::generate(&recovery).is_err());
+    assert!(unlaxer_generator::portability::check(&recovery).portable);
+    assert!(unlaxer_generator::generate(&recovery).is_ok());
 }
