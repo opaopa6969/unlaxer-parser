@@ -1,14 +1,25 @@
 # Rust full-spec対応表
 
-親issue: [#111](https://github.com/opaopa6969/unlaxer-parser/issues/111)。限定デモの完成とfull-specの完成を区別する。以下は初期の機能群別台帳であり、全メソッドを監査した完全互換宣言ではない。各群の実装前に受け入れcorpusを追加し、差を明記する。
+親issue: [#111](https://github.com/opaopa6969/unlaxer-parser/issues/111)。限定デモの完成とfull-specの完成を区別する。以下は機能群別台帳であり、全メソッドを監査した完全互換宣言ではない。各群の実装前に受け入れcorpusを追加し、差を明記する。
 
 ## 基準と判定
 
-- unlaxer-parser基準: `72de487020cd6321660dc7114f31ae008c629416`。構文・annotationの列挙元は`unlaxer-dsl/src/main/java/org/unlaxer/dsl/bootstrap/UBNFAST.java`、仕様案は`unlaxer-dsl/specs/`。文書と実装が異なる場合はテストで差を確認し、意図を記録する。
-- tinyexpression基準: `6c8196b7879abe58d6b739d3e63a16e853745ced`。実言語仕様の棚卸し・バックエンド間の差の確定は未完了。
+- 初期互換基準: unlaxer-parser `72de487020cd6321660dc7114f31ae008c629416`、tinyexpression `6c8196b7879abe58d6b739d3e63a16e853745ced`。構文・annotationの列挙元は`unlaxer-dsl/src/main/java/org/unlaxer/dsl/bootstrap/UBNFAST.java`、仕様案は`unlaxer-dsl/specs/`。文書と実装が異なる場合はテストで差を確認し、意図を記録する。
+- 現状監査（2026-09-30、#327）: unlaxer-parser `0b79ca4ddcfdde2fbce893bf30f3a64ae2a49d0a`、tinyexpression `19945446216b7f0d6d8817b353385cbb96bcee25`。初期基準からの要求を消したり、別engineの実装でClassicの互換性を証明したことにはしない。
 - 「生成済み」は現在の限定UBNFから生成・コンパイル・実行できる範囲。「runtimeのみ」は手書きAPIで使えるがUBNF経路は未対応。「未対応」は今後の作業で、対応済みとして数えない。
 - 共通機能はJava/Rust双方で実装・検証する。片側だけの完了は共通機能の完了とせず、言語固有の表現差・制約を対応表とissueに残す。
 - 共通corpusは既存`evolution/conformance.json`の37入力×4段階、診断境界は`evolution/diagnostics.json`の8入力。full-spec用corpusは各行の拡張とともに追加する。現在の有限corpusは全言語の互換性証明ではない。
+
+## 二つの対応軸
+
+このrepositoryのRust `unlaxer-runtime` / `unlaxer-generator` は **Classicの状態付きcombinator経路**。
+一方、現在の下流 `tinyexpression-rs` は公開repositoryにvendoringされた **ubnfc生成parser** を使い、
+`unlaxer-runtime` には依存しない。[選び方](../docs/engine-selection-guide-ja.md)を参照。
+
+TinyExpressionの評価器・CLI・AOTの実在は製品側の到達点として数えるが、Classicの未移植
+annotation、`ParseContext` API、consume/invert伝播、incremental、IDE protocolの完了証拠にはしない。
+下表は、明記しない限りこのrepositoryのClassic Rust生成・runtimeを対象とする。
+「下流」とした行の根拠・再現条件は後段の現状監査に記録する。
 
 ## 対応表
 
@@ -19,6 +30,8 @@
 | 移植可能性チェック | 両hostの `check --target rust` と位置付きJSON（#157）。未対応機能の全出現inventory、対応範囲内は構造検証 | [契約と検証](../docs/portability-check.md)。共通corpus/実P4/注入負例で結果・位置・exit一致、無書込み・外部class非実行。構造検証はfail-first、target Javaや完全移植の保証とは区別 |
 | 公開ParseContext・custom parser | runtimeと生成入口を実装。生成grammarは`OnceLock<SharedGrammar>`で1回構築し、並行parseでは不変graphだけを共有（#185） | 共有入力・Unicode位置・typed状態・CST/captureのrollback、先読み、生成parser混在を継続検証。tinyexpressionでsetup/探索を分離して再測定 |
 | literal・参照・sequence・ordered choice・group | 生成済み | optional経由の再帰等も検証し、非消費ループを拒否 |
+| longestChoice/predictiveChoice | 両frontendから生成、Java/Rust runtimeを実装 | 最大消費・同長の宣言順・敗者のrollback、保守的FIRSTと全候補失敗時の診断を検証。最長選択は意味論、予測選択は最適化であり、通常choiceやroot retryの解消とは別（[実践ノート](../docs/performance-tuning-ja.md) ケース1・2） |
+| 診断policy・FIRST候補除外 | Java/RustのDetailed/失敗時詳細化/Auto、候補除外を実装 | 再実行可能性・診断参照・custom parserの宣言に依存。低水準APIと生成入口を区別し、意味診断と失敗位置を保持。任意副作用の安全性や常時高速化は保証しない（同ノート ケース25〜27） |
 | optional・0/1回以上・bounded repeat・separated | UBNF生成・Option/Vec AST・mapper・Semantics実装 | 70ケースの受理一致、20成功ケースのJava/Rust AST全field・全span一致、Rust評価値oracle。外側captureの入れ子container型は両backendとも未完了 |
 | ANY/EOF/EMPTY/CHAR_RANGE/NEGATION/UNTIL/LOOKAHEAD/NEGATIVE_LOOKAHEAD | UBNF生成とJava互換Expr・両cursorを実装 | 48文法・109入力でprefix受理/両cursorと全入力受理が一致、受理56入力のAST/spanも独立fixtureに一致。汎用consume/invert伝播と全CST同値は未完了 |
 | error | runtimeのみ | UBNF接続・診断位置/候補と回復境界の比較 |
@@ -43,16 +56,73 @@
 | catalog/doc/simple等 | `@catalog` は両frontendから静的 `CatalogSpec` を生成（#180）。parser/AST/evaluatorには作用しない。doc/simpleは未対応 | catalog resolver・context別LSP利用とprotocol test、残るannotationのJava実動作を検証 |
 | recovery・incremental cache | 未対応 | 編集差分と全再解析の一致、位置・診断・利用者状態の無効化、回復後の評価境界 |
 | SafeFailures memoの保持窓 | Javaの保持窓に対応するRustのbucket解放と、両言語の遠距離backtrack後の再保存を実装（#290） | 共通6入力で受理・consumed/farthest位置を照合、各言語で窓OFF/ONの診断・hit数一致、32,000 CP人工負荷の追加heap peak約95.5%削減。任意文法のhit不変・時間計算量保証・stateful memo parityの完了は含まない |
-| LSP/DAP | 未対応 | UTF-16変換、diagnostics/completion、breakpoint/step/変数表示を実protocolで検証 |
-| tinyexpression-rs | 未対応 | 値・null/欠損・変数・演算子・関数・外部呼出し・日時/数値仕様を棚卸しし、同一入力で値/失敗分類を比較 |
-| rustcodeblock | 未対応 | 既定無効・明示許可付きAOT、元の位置へのcompiler診断、通常parse/LSPの非実行保証。Javaソースの自動翻訳はしない |
-| ネイティブ配布 | 縮小文法CLIのみ | tinyexpression CLI、対象OS別artifact、stdin/file/終了コード・制限のsmoke |
+| LSP/DAP | Classic Rust経路は未対応。下流TinyExpressionのVSIX/LSP/DAPはJavaサーバーを使う | Rust AST/eval traceのspan保持は実装済みだが、Rust製LSP/DAPとは別。UTF-16変換、diagnostics/completion、breakpoint/step/変数表示を実protocolで検証する必要がある |
+| tinyexpression-rs | 下流にparser・typed AST・scalar/context付き評価器・FormulaInfo loader・CLIを実装済み。parserはubnfc生成物 | Java goldenとの値/数値bits/失敗種別、tree/closure/traceを比較する有限corpusがある。Java任意classや全バックエンド互換の証明ではない。root-family retryは残る |
+| rustcodeblock | 下流に本文/span保持、既定拒否、明示許可付き`tinyexpression-aot`と型付きnative bindingを実装済み | 実Java/Rust本文を共有oracleでcompile/execute、rustc診断を元のCP位置へ戻す。通常parse/evalはcompiler非起動。sandboxではなく、Java自動翻訳・FormulaInfo全体AOT・AOTのLSP/DAP統合は未対応 |
+| ネイティブ配布 | 本repoはgeneratorと縮小文法CLI。下流は`tinyexpression` / `tinyexpression-aot`、C ABI、wasmのbuild・smoke・配布経路を持つ | 下流CLIのstdin/file/JSON/終了コードを検証。確認したnative archiveはLinux x86_64用であり、全OS・完全static・全tagの配布実績は主張しない |
 | Rust製UBNF frontend・native generator | syntax frontend全18annotation/12token/9element種、対応範囲のlowering/CLI/5module emitterを実装 | Java/nativeの既存・混在値文法で全5file一致、空PATHの生成/check、手書き/symlink保護。全backend機能の生成完了とは区別。frontend既知差と構造分析上限を文書化 |
-| 入力DSLの機械語生成 | 未対応・設計未確定 | generatorや評価器のnativeバイナリ化と区別し、必要な意味論・成果物を別ADRで確定 |
+| 入力DSLの機械語生成 | DSL全式の専用machine-code loweringは未対応 | 下流AOTはRust本文をcompile/linkするが、固定したDSLソースは実行時にparseしtyped-AST評価器で評価する。generator/評価CLI/native本文のバイナリ化とは区別する |
+
+## 下流TinyExpressionの現状監査（2026-09-30）
+
+以下は上記の固定revisionに対する証拠であり、初期基準の全機能が移植されたという宣言ではない。
+共有worktreeの変更には触れず、隔離したcheckoutで検証した。
+
+| 対象 | 今回確認した証拠 | 証明しない範囲 |
+|---|---|---|
+| Rust workspace | Rust 1.85.0で109テスト成功、失敗・ignoreなし。CLI、評価器、native binding、AOTの実compiler試験を含む | 全OS、すべてのJavaバックエンド、任意の利用者コード |
+| Java側の再検証 | Classic `0b79ca4`を隔離Maven repositoryへinstall後、下記の選択17テスト成功、失敗・error・skipなし。本文の非実行契約、実Java本文、評価oracle、Classic生成parserの共有fixtureを含む | Java全suiteや全backendの検証ではない |
+| 評価互換 | `java-diff/golden` の953式・12,609行をRust tree/closure/traceと照合。型・数値bits・文字列/boolean・Java例外種別を比較 | 今回Java goldenを再生成したわけではない。random()の数値は一致対象外。Javaクラス呼出しの一部はRust hostの代替実装 |
+| FormulaInfo | 保存済みJava golden 53行とのload/eval比較、文書内CP位置の試験 | FormulaInfo全体のAOT、任意JVMクラスのロード |
+| Rust本文の実行 | `native-bindings/cases.json` の29ケースをJava実本文とRust実本文でcompile/executeし、同じ期待値・失敗種別と比較 | Javaソースの自動翻訳ではない。未登録classの1ケースだけは既存stub機構で状態を構成 |
+| JVMなしCLI | 空PATH・存在しないJAVA_HOMEで`(1+2)*3`を評価して9、`"こんにちは😀"`をparseしてroot span `[0,8)` | compilerや通常のOS動的ライブラリも不要という意味ではない。AOTのbuildにはrustc/linkerが必要 |
+| 生成物の整合性 | P4/FormulaInfoのvendored SHA-256 manifest、compat生成物、pin定数が一致 | private生成器による再生成は実行していない。manifest一致だけでは生成器の正しさを証明しない |
+| 配布・IDE | v2.0.0 ReleaseにLinux x86_64 CLI/libとwasmのassetが存在。現行sourceのAOT build/配布経路も確認。VSIXのLSP/DAP起動先はJava | 今回Release assetをダウンロードして動作検証したわけではない。全tagの配布やRust製LSP/DAPの証明ではない |
+
+公開ソースの根拠:
+
+- [評価差分テスト](https://github.com/opaopa6969/tinyexpression/blob/19945446216b7f0d6d8817b353385cbb96bcee25/rust/tinyexpression-rs/tests/java_differential.rs)と[FormulaInfo比較](https://github.com/opaopa6969/tinyexpression/blob/19945446216b7f0d6d8817b353385cbb96bcee25/rust/tinyexpression-rs/tests/formula_info.rs)。Rust `Program::compile`はclosure準備であり、式全体の機械語生成ではない。
+- [AOT契約・Java/Rust型境界](https://github.com/opaopa6969/tinyexpression/blob/19945446216b7f0d6d8817b353385cbb96bcee25/docs/rust-codeblock-aot.md)、[実compiler試験](https://github.com/opaopa6969/tinyexpression/blob/19945446216b7f0d6d8817b353385cbb96bcee25/rust/tinyexpression-aot/tests/build.rs)、[共通29ケースのRust側](https://github.com/opaopa6969/tinyexpression/blob/19945446216b7f0d6d8817b353385cbb96bcee25/rust/tinyexpression-aot/tests/native_shared.rs)と[Java側](https://github.com/opaopa6969/tinyexpression/blob/19945446216b7f0d6d8817b353385cbb96bcee25/src/test/java/org/unlaxer/tinyexpression/codeblock/NativeBindingConformanceTest.java)。明示許可はsandboxを提供しない。
+- [生成物検査](https://github.com/opaopa6969/tinyexpression/blob/19945446216b7f0d6d8817b353385cbb96bcee25/rust/check-generated.sh)、[root-family retry](https://github.com/opaopa6969/tinyexpression/blob/19945446216b7f0d6d8817b353385cbb96bcee25/rust/tinyexpression-rs/src/lib.rs)、[VSIXのJava起動](https://github.com/opaopa6969/tinyexpression/blob/19945446216b7f0d6d8817b353385cbb96bcee25/tools/tinyexpression-p4-lsp-vscode/src/extension.ts)、[v2.0.0 Release](https://github.com/opaopa6969/tinyexpression/releases/tag/v2.0.0)。
+
+### 再現コマンドと検証境界
+
+JDK 21、Maven、Rust 1.85.0、linkerを用意し、冒頭のrevisionを別々のcheckoutへ固定する。
+以下の2変数はそれぞれのcheckoutの絶対pathに置き換える。Maven repositoryは隔離し、
+同じ`3.1.1`というversion名だけで異なる候補buildを混同しない。
+
+```sh
+classic_repo=/path/to/unlaxer-parser-at-0b79ca4
+tiny_repo=/path/to/tinyexpression-at-19945446
+audit_m2=$(mktemp -d)
+
+cd "$classic_repo"
+mvn -B -ntp -Dmaven.repo.local="$audit_m2" \
+  -pl unlaxer-common,unlaxer-dsl -am install -DskipTests -Dgpg.skip=true
+
+cd "$tiny_repo"
+cargo +1.85.0 test --workspace --locked --manifest-path rust/Cargo.toml
+UBNFC_DIR=/nonexistent-ubnfc-checkout bash rust/check-generated.sh
+mvn -B -ntp -Dmaven.repo.local="$audit_m2" clean test \
+  -Dgpg.skip=true -Dtinyexpression.skipRailroad=true \
+  -Dtinyexpression.rust.shared=true \
+  -Dtest=NativeBindingConformanceTest,CodeBlockSourceTest,CodeBlockNoCompilerTest,EvalContextContractTest,P4RustNumericEvaluatorOracleTest,P4RustScalarEvaluatorOracleTest,P4RustRootExpressionAcceptanceTest,P4RustSharedFixtureAcceptanceTest
+
+printf '%s' '(1+2)*3' | env PATH='' JAVA_HOME=/nonexistent-jvm \
+  "$tiny_repo/rust/target/debug/tinyexpression" eval -
+printf '%s' '"こんにちは😀"' | env PATH='' JAVA_HOME=/nonexistent-jvm \
+  "$tiny_repo/rust/target/debug/tinyexpression" parse -
+```
+
+installではflattenを無効にせず、`${revision}`を解決したPOMを隔離repositoryへ入れる。
+`-DskipTests`のinstall成功自体はテスト成功ではない。Rust workspaceの成功と、上記の
+Java選択テストの成功だけを今回の実行証拠とする。Java全suite・全backend互換やClassicの
+未実装機能まで検証したことにはしない。共有fixtureのJava試験はClassic生成parserを対象とし、
+それだけで下流ubnfc parserの全AST同値を証明するものでもない。
 
 ## 完了の扱いと順序
 
-公開context/combinator、optional/repeatとtyped ASTを基盤として、次はtoken/annotationとcapture互換性を拡げる。追加実験で見つけたJava numeric capture #115とcapture選択 #116の生成コードは修正した。int変換とRustの字句保持の差は共有corpusで固定し、数値意味論のbackend間統一と外側captureの入れ子container型は未完了事項とする。次に実tinyexpressionの仕様corpusと評価器、信頼されたrustcodeblock、IDE/debuggerを進める。各行を小さなPRに分け、テスト・CI・merge・子issue closeまで行う。全体issueは未対応行を残したままcloseしない。
+公開context/combinator、optional/repeatとtyped ASTを基盤として、次はtoken/annotationとcapture互換性を拡げる。追加実験で見つけたJava numeric capture #115とcapture選択 #116の生成コードは修正した。int変換とRustの字句保持の差は共有corpusで固定し、数値意味論のbackend間統一と外側captureの入れ子container型は未完了事項とする。下流の実装済み評価器・rustcodeblockはその契約とcorpusを利用し、Classic側の未対応と製品側の残る境界を別々に進める。各行を小さなPRに分け、テスト・CI・merge・子issue closeまで行う。全体issueは未対応行を残したままcloseしない。
 
 Javaの継承階層を一対一に移植するのではなく、文法と観測可能な振る舞いを対象とする。JVM任意オブジェクト・reflection・bytecodeのnative直接実行はできないため、Rust側のhost interfaceと移植コードの境界を明記する。差を消して比較を通したことにせず、意図的な差は独立したfixtureにする。
 
@@ -75,7 +145,7 @@ transactional scope store（#174）の[rollback契約とruntime API](../docs/tra
 `@catalog`（#180）の[静的metadata契約と既存Java LSPの限界](../docs/catalog-metadata.md)も参照。
 Rustのcontext-aware completion/hoverはまだ未実装であり、metadata生成とLSP対応を区別する。
 
-parser生成は当面`Expr`combinator定義を生成し、共通runtimeで実行する。直接parser関数を出力する高速化backendは、その意味論との同値性を測定できてから検討する。Rustでビルドされた実行ファイルであることは、入力式を機械語にコンパイルしていることを意味しない。
+Classicのparser生成は`Expr`combinator定義を生成し、共通runtimeで実行する。直接コードを出す別engineの存在は、この状態付きruntimeを移植し終えた証拠ではない。Rustでビルドされた実行ファイルであることは、入力式を機械語にコンパイルしていることを意味しない。
 
 移植に伴う追加提案は、両言語を対象とする受け入れ条件付きで追跡する。未実装の計画を上記の対応済み件数には含めない。
 
