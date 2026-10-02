@@ -1,5 +1,8 @@
 //! Supported structural semantics, independent of JVM parser class loading.
-use crate::adapters::{AdapterBinding, AdapterRegistry, BuiltinAdapter};
+use crate::adapters::{
+    feature_diagnostics, token_contract_diagnostics, AdapterBinding, AdapterRegistry,
+    BuiltinAdapter,
+};
 use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 use unlaxer_codegen::ir::*;
@@ -80,11 +83,17 @@ impl Lowering<'_> {
         if let Some(issue) = adapter_issues.first() {
             return Err(format!("{}: {}", issue.code, issue.subject));
         }
+        if let Some(issue) = token_contract_diagnostics(self.grammar).first() {
+            return Err(format!("{}: {}", issue.code, issue.subject));
+        }
+        if let Some(issue) = feature_diagnostics(self.grammar).first() {
+            return Err(format!("{}: {}", issue.code, issue.subject));
+        }
         let mut whitespace = false;
         let mut settings = HashSet::new();
         let mut memo_safe_tokens = HashSet::new();
         for setting in &self.grammar.settings {
-            if setting.key == "tokenAdapter" {
+            if setting.key == "tokenAdapter" || setting.key == "tokenContract" {
                 continue;
             }
             if setting.key != "memoSafeToken" && !settings.insert(&setting.key) {
@@ -97,6 +106,12 @@ impl Lowering<'_> {
                 return Err(format!("unsupported block setting {}", setting.key));
             };
             match setting.key.as_str() {
+                "ubnf" if value == "v1" || value == "v2" => {}
+                "feature"
+                    if matches!(
+                        value.as_str(),
+                        "tokenContractsV1" | "contextAccessorsV1" | "tokenProgressContractsV1"
+                    ) => {}
                 "whitespace" => {
                     whitespace = whitespace_style(value)
                         .map_err(|_| format!("unsupported setting whitespace: {value}"))?

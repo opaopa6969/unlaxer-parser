@@ -30,6 +30,8 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.TokenDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.TypeofElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.WhitespaceAnnotation;
 import org.unlaxer.dsl.bootstrap.TokenAdapterRegistry;
+import org.unlaxer.dsl.bootstrap.TokenContractRegistry;
+import org.unlaxer.dsl.bootstrap.UBNFFeatures;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -108,8 +110,17 @@ public final class GrammarValidator {
             errors.add(new ValidationIssue(issue.code(), issue.code() + ": " + issue.subject(),
                 "Correct the token adapter declaration or registration."));
         }
+        for (TokenContractRegistry.Diagnostic issue : TokenContractRegistry.build(grammar, null).diagnostics()) {
+            errors.add(new ValidationIssue(issue.code(), issue.code() + ": " + issue.subject(),
+                "Correct the format-2 token contract declaration."));
+        }
+        for (UBNFFeatures.Diagnostic issue : UBNFFeatures.validate(grammar)) {
+            errors.add(new ValidationIssue(issue.code(), issue.code() + ": " + issue.subject(),
+                "Use a supported format-2 @feature declaration."));
+        }
 
         validateGlobalWhitespace(grammar, errors);
+        validateUbnfFormat(grammar, errors);
         validateMemoSafeTokens(grammar, errors);
         validateRootPresence(grammar, errors);
         if (resolveParserClasses) validateTokens(grammar, errors);
@@ -582,6 +593,26 @@ public final class GrammarValidator {
                         "E-WHITESPACE-GLOBAL-STYLE");
                 }
             });
+    }
+
+    /**
+     * UBNF 2 makes external token contracts part of the grammar. Older grammars
+     * remain valid and are interpreted as format 1 for source compatibility.
+     */
+    private static void validateUbnfFormat(GrammarDecl grammar, List<ValidationIssue> errors) {
+        List<org.unlaxer.dsl.bootstrap.UBNFAST.GlobalSetting> versions = grammar.settings().stream()
+            .filter(setting -> "ubnf".equals(setting.key())).toList();
+        if (versions.size() > 1) {
+            addError(errors, "duplicate global @ubnf setting",
+                "Keep exactly one '@ubnf: v2' declaration.", "E-UBNF-VERSION-DUPLICATE");
+            return;
+        }
+        if (versions.isEmpty()) return;
+        if (!(versions.get(0).value() instanceof StringSettingValue value)
+            || !(value.value().equals("v1") || value.value().equals("v2"))) {
+            addError(errors, "@ubnf must be format version v1 or v2",
+                "Use '@ubnf: v2' for context-aware external token contracts.", "E-UBNF-VERSION");
+        }
     }
 
     private static void validateMemoSafeTokens(GrammarDecl grammar, List<ValidationIssue> errors) {

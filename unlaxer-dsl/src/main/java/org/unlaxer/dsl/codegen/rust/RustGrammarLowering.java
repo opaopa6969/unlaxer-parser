@@ -52,7 +52,7 @@ public final class RustGrammarLowering {
         Set<String> settings = new HashSet<>();
         Set<String> memoSafeTokens = new HashSet<>();
         for (var setting : grammar.settings()) {
-            if (setting.key().equals("tokenAdapter")) continue; // checked by the pure registry
+            if (setting.key().equals("tokenAdapter") || setting.key().equals("tokenContract")) continue;
             if (!setting.key().equals("memoSafeToken") && !settings.add(setting.key())) {
                 throw unsupported("duplicate setting " + setting.key());
             }
@@ -79,7 +79,10 @@ public final class RustGrammarLowering {
                         ? "memoSafeToken alias must name a Simple or built-in Adapter token " + alias
                         : "memoSafeToken alias must name a Simple token " + alias);
                 }
-            } else if (!setting.key().equals("package")) throw unsupported("setting " + setting.key());
+            } else if (!setting.key().equals("package")
+                && !(setting.key().equals("ubnf") && value.value().matches("v[12]"))) {
+                throw unsupported("setting " + setting.key());
+            }
         }
         for (var token : grammar.tokens()) {
             if (tokens.putIfAbsent(token.name(), token(token)) != null) throw unsupported("duplicate token " + token.name());

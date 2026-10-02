@@ -1,6 +1,6 @@
 //! Read-only capability inventory followed by structural validation when possible.
 //! No imports, external parser loading, code generation, or subprocesses.
-use crate::adapters::AdapterRegistry;
+use crate::adapters::{feature_diagnostics, token_contract_diagnostics, AdapterRegistry};
 use std::fmt::Write;
 use unlaxer_ubnf::*;
 
@@ -149,12 +149,25 @@ impl Inventory {
         for issue in adapter_issues {
             self.add(issue.code, issue.subject, issue.span);
         }
+        for issue in token_contract_diagnostics(grammar) {
+            self.add(issue.code, issue.subject, issue.span);
+        }
+        for issue in feature_diagnostics(grammar) {
+            self.add(issue.code, issue.subject, issue.span);
+        }
         for import in &grammar.imports {
             self.add("P-IMPORT", &import.path, import.span);
         }
         for setting in &grammar.settings {
             match (&*setting.key, &setting.value) {
-                ("package" | "memoSafeToken", SettingValue::String(_)) | ("tokenAdapter", _) => {}
+                ("package" | "memoSafeToken", SettingValue::String(_)) => {}
+                ("ubnf", SettingValue::String(value)) if value == "v1" || value == "v2" => {}
+                ("feature", SettingValue::String(value))
+                    if matches!(
+                        value.as_str(),
+                        "tokenContractsV1" | "contextAccessorsV1" | "tokenProgressContractsV1"
+                    ) => {}
+                ("tokenAdapter" | "tokenContract", _) => {}
                 ("whitespace", SettingValue::String(value)) => {
                     if !whitespace(value) {
                         self.add("P-WHITESPACE", value, setting.value_span);
