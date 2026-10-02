@@ -10,6 +10,7 @@ import org.unlaxer.dsl.bootstrap.UBNFMapper;
 import org.unlaxer.dsl.bootstrap.UBNFSourceSnapshot;
 import org.unlaxer.dsl.bootstrap.UBNFSourceSnapshot.Span;
 import org.unlaxer.dsl.bootstrap.TokenAdapterRegistry;
+import org.unlaxer.dsl.bootstrap.TokenContractRegistry;
 import org.unlaxer.dsl.codegen.GrammarValidator;
 import org.unlaxer.dsl.codegen.rust.RustGrammarLowering;
 
@@ -70,10 +71,13 @@ public final class PortabilityCheck {
         for (TokenAdapterRegistry.Diagnostic issue : TokenAdapterRegistry.build(grammar, snapshot).diagnostics()) {
             out.add(new Diagnostic(issue.code(), issue.span(), issue.subject()));
         }
+        for (TokenContractRegistry.Diagnostic issue : TokenContractRegistry.build(grammar, snapshot).diagnostics()) {
+            out.add(new Diagnostic(issue.code(), issue.span(), issue.subject()));
+        }
         for (ImportDecl decl : grammar.imports()) add(out, "P-IMPORT", snapshot, decl, decl.path());
         for (GlobalSetting setting : grammar.settings()) {
-            if (!Set.of("whitespace", "package", "memoSafeToken", "tokenAdapter").contains(setting.key())
-                || (setting.value() instanceof BlockSettingValue && !setting.key().equals("tokenAdapter"))) {
+            if (!Set.of("whitespace", "package", "memoSafeToken", "tokenAdapter", "tokenContract", "ubnf", "feature").contains(setting.key())
+                || (setting.value() instanceof BlockSettingValue && !Set.of("tokenAdapter", "tokenContract").contains(setting.key()))) {
                 add(out, "P-SETTING", snapshot, setting, setting.key());
             }
             if (setting.key().equals("whitespace") && setting.value() instanceof StringSettingValue value

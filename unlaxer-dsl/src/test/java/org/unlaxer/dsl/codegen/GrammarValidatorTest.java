@@ -17,6 +17,20 @@ import org.unlaxer.dsl.bootstrap.UBNFMapper;
 public class GrammarValidatorTest {
 
     @Test
+    public void ubnfFormatVersionAcceptsV1AndV2AndRejectsOtherOrDuplicateDeclarations() {
+        for (String version : List.of("v1", "v2")) {
+            assertFalse(GrammarValidator.validate(parseGrammar("grammar G { @ubnf: " + version
+                + " @root Start ::= 'x'; }")).toString(), GrammarValidator.validate(parseGrammar(
+                "grammar G { @ubnf: " + version + " @root Start ::= 'x'; }")).stream()
+                .anyMatch(issue -> issue.code().startsWith("E-UBNF-VERSION")));
+        }
+        assertTrue(GrammarValidator.validate(parseGrammar("grammar G { @ubnf: v3 @root Start ::= 'x'; }"))
+            .stream().anyMatch(issue -> issue.code().equals("E-UBNF-VERSION")));
+        assertTrue(GrammarValidator.validate(parseGrammar("grammar G { @ubnf: v2 @ubnf: v2 @root Start ::= 'x'; }"))
+            .stream().anyMatch(issue -> issue.code().equals("E-UBNF-VERSION-DUPLICATE")));
+    }
+
+    @Test
     public void testValidMappingPasses() {
         GrammarDecl grammar = parseGrammar(
             "grammar G {\n"

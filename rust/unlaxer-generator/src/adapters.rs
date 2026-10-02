@@ -17,6 +17,10 @@ pub struct CustomAdapter {
     pub version: u32,
     pub java_class: String,
     pub rust_function: String,
+    pub accepts: Option<String>,
+    pub failure: Option<String>,
+    pub consumes: Option<String>,
+    pub context_accessors: BTreeSet<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -120,8 +124,10 @@ fn parse_definition(setting: &GlobalSetting) -> Result<CustomAdapter, String> {
     let mut fields = BTreeMap::new();
     let mut seen = BTreeSet::new();
     for entry in entries {
-        if !matches!(entry.key.as_str(), "id" | "version" | "java" | "rust")
-            || !seen.insert(&entry.key)
+        if !matches!(
+            entry.key.as_str(),
+            "id" | "version" | "java" | "rust" | "accepts" | "failure" | "consumes" | "context"
+        ) || !seen.insert(&entry.key)
         {
             return Err(entries
                 .iter()
@@ -131,7 +137,11 @@ fn parse_definition(setting: &GlobalSetting) -> Result<CustomAdapter, String> {
         fields.insert(entry.key.as_str(), entry.value.as_str());
     }
     let id = fields.get("id").copied().unwrap_or("tokenAdapter");
-    if fields.len() != 4 || !valid_id(id) {
+    if !["id", "version", "java", "rust"]
+        .iter()
+        .all(|key| fields.contains_key(key))
+        || !valid_id(id)
+    {
         return Err(id.to_owned());
     }
     let version = valid_version(fields["version"]).ok_or_else(|| id.to_owned())?;
@@ -140,12 +150,183 @@ fn parse_definition(setting: &GlobalSetting) -> Result<CustomAdapter, String> {
     if !valid_java_fqn(java_class) || !valid_rust_path(rust_function) {
         return Err(id.to_owned());
     }
+    let accepts = fields.get("accepts").map(|value| (*value).to_owned());
+    if accepts
+        .as_ref()
+        .is_some_and(|value| value.trim().is_empty())
+    {
+        return Err(id.to_owned());
+    }
+    let failure = fields.get("failure").map(|value| (*value).to_owned());
+    if failure
+        .as_deref()
+        .is_some_and(|value| !matches!(value, "no-consume" | "may-consume"))
+    {
+        return Err(id.to_owned());
+    }
+    let consumes = fields.get("consumes").map(|value| (*value).to_owned());
+    if consumes
+        .as_deref()
+        .is_some_and(|value| !matches!(value, "always" | "maybe" | "never"))
+    {
+        return Err(id.to_owned());
+    }
+    let context_accessors = match fields.get("context") {
+        None | Some(&"") => BTreeSet::new(),
+        Some(value) => value.split(',').map(str::trim).map(str::to_owned).collect(),
+    };
+    let context_count = fields
+        .get("context")
+        .filter(|value| !value.is_empty())
+        .map_or(0, |value| value.split(',').count());
+    if context_accessors.len() != context_count
+        || !context_accessors.iter().all(|value| {
+            matches!(
+                value.as_str(),
+                "source" | "remaining" | "position" | "matchedPosition"
+            )
+        })
+    {
+        return Err(id.to_owned());
+    }
     Ok(CustomAdapter {
         id: id.to_owned(),
         version,
         java_class: java_class.to_owned(),
         rust_function: rust_function.to_owned(),
+        accepts,
+        failure,
+        consumes,
+        context_accessors,
     })
+}
+
+/// Validates source-visible format-2 contracts. Contracts supplement a token
+/// binding, so they apply equally to a direct host class and to an ADAPTER.
+pub fn token_contract_diagnostics(grammar: &GrammarDecl) -> Vec<AdapterDiagnostic> {
+    let format2 = grammar.settings.iter().any(|setting| {
+        setting.key == "ubnf"
+            && matches!(&setting.value, SettingValue::String(value) if value == "v2")
+    });
+    let tokens: BTreeSet<_> = grammar
+        .tokens
+        .iter()
+        .map(|token| token.name.as_str())
+        .collect();
+    let mut seen = BTreeSet::new();
+    let mut diagnostics = Vec::new();
+    for setting in grammar
+        .settings
+        .iter()
+        .filter(|setting| setting.key == "tokenContract")
+    {
+        if !format2 {
+            diagnostics.push(AdapterDiagnostic {
+                code: "P-TOKEN-CONTRACT-VERSION",
+                subject: "tokenContract".into(),
+                span: setting.span,
+            });
+            continue;
+        }
+        let SettingValue::Block(entries) = &setting.value else {
+            diagnostics.push(AdapterDiagnostic {
+                code: "P-TOKEN-CONTRACT-DEFINITION",
+                subject: "tokenContract".into(),
+                span: setting.span,
+            });
+            continue;
+        };
+        let mut fields = BTreeMap::new();
+        let mut valid = true;
+        for entry in entries {
+            if !matches!(
+                entry.key.as_str(),
+                "token" | "accepts" | "failure" | "consumes" | "context"
+            ) || fields
+                .insert(entry.key.as_str(), entry.value.as_str())
+                .is_some()
+            {
+                valid = false;
+            }
+        }
+        let token = fields.get("token").copied().unwrap_or("tokenContract");
+        let context = fields.get("context").copied().unwrap_or("");
+        let contexts: BTreeSet<_> = if context.is_empty() {
+            BTreeSet::new()
+        } else {
+            context.split(',').map(str::trim).collect()
+        };
+        valid &= fields.len() == 5
+            && tokens.contains(token)
+            && !fields["accepts"].trim().is_empty()
+            && matches!(fields["failure"], "no-consume" | "may-consume")
+            && matches!(fields["consumes"], "always" | "maybe" | "never")
+            && contexts.len()
+                == if context.is_empty() {
+                    0
+                } else {
+                    context.split(',').count()
+                }
+            && contexts.iter().all(|value| {
+                matches!(
+                    *value,
+                    "source" | "remaining" | "position" | "matchedPosition"
+                )
+            });
+        if !valid {
+            diagnostics.push(AdapterDiagnostic {
+                code: "P-TOKEN-CONTRACT-DEFINITION",
+                subject: token.into(),
+                span: setting.span,
+            });
+        } else if !seen.insert(token.to_owned()) {
+            diagnostics.push(AdapterDiagnostic {
+                code: "P-TOKEN-CONTRACT-DUPLICATE",
+                subject: token.into(),
+                span: setting.span,
+            });
+        }
+    }
+    diagnostics
+}
+
+pub fn feature_diagnostics(grammar: &GrammarDecl) -> Vec<AdapterDiagnostic> {
+    let format2 = grammar.settings.iter().any(|setting| {
+        setting.key == "ubnf"
+            && matches!(&setting.value, SettingValue::String(value) if value == "v2")
+    });
+    let mut seen = BTreeSet::new();
+    grammar
+        .settings
+        .iter()
+        .filter(|setting| setting.key == "feature")
+        .filter_map(|setting| {
+            let SettingValue::String(value) = &setting.value else {
+                return Some(AdapterDiagnostic {
+                    code: "E-FEATURE-UNKNOWN",
+                    subject: "feature".into(),
+                    span: setting.span,
+                });
+            };
+            let code = if !format2 {
+                Some("E-FEATURE-VERSION")
+            } else if !matches!(
+                value.as_str(),
+                "tokenContractsV1" | "contextAccessorsV1" | "tokenProgressContractsV1"
+            ) {
+                Some("E-FEATURE-UNKNOWN")
+            } else if !seen.insert(value.clone()) {
+                Some("E-FEATURE-DUPLICATE")
+            } else {
+                None
+            };
+            code.map(|code| AdapterDiagnostic {
+                code,
+                subject: value.clone(),
+                span: setting.span,
+            })
+        })
+        .collect()
 }
 
 pub fn valid_id(id: &str) -> bool {

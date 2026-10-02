@@ -1,4 +1,5 @@
 use std::{
+    collections::BTreeSet,
     fs,
     path::PathBuf,
     process::Command,
@@ -161,6 +162,33 @@ fn custom_registration_is_data_only_and_emits_a_validated_function_reference() {
         parser.contains("Expr::Custom(crate::word_token)"),
         "{parser}"
     );
+}
+
+#[test]
+fn format2_contract_is_retained_and_rejects_nonportable_context_accessors() {
+    let source = grammar(
+        "@ubnf: v2 @tokenAdapter: { id: 'example.word' version: '1' java: 'example.WordParser' rust: 'crate::word_token' accepts: 'ASCII word' failure: 'no-consume' context: 'remaining,position' }",
+        "token W = ADAPTER('example.word', version=1)",
+        "W",
+    );
+    let snapshot = parse_with_source(&source).unwrap();
+    let (registry, issues) = AdapterRegistry::from_grammar(&snapshot.ast().grammars[0]);
+    assert!(issues.is_empty(), "{issues:?}");
+    let Ok(AdapterBinding::Custom(adapter)) = registry.resolve("example.word", "1") else {
+        panic!("expected custom adapter");
+    };
+    assert_eq!(adapter.accepts.as_deref(), Some("ASCII word"));
+    assert_eq!(adapter.failure.as_deref(), Some("no-consume"));
+    assert_eq!(
+        adapter.context_accessors,
+        BTreeSet::from(["position".into(), "remaining".into()])
+    );
+    assert!(check(&source).portable, "{:?}", check(&source));
+
+    let invalid = source.replace("remaining,position", "captures");
+    let report = check(&invalid);
+    assert_eq!("blocked", report.structure);
+    assert_eq!("P-ADAPTER-DEFINITION", report.diagnostics[0].code);
 }
 
 #[test]
