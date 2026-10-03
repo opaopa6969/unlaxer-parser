@@ -6,3 +6,6 @@ UBNF の知識も Java のクラス名も不要です。
 [画面内の catalog/help を開く](command:ubnfLsp.openHelp)
 
 既存の文書は上書きしません。サンプルは新規文書として開きます。
+
+.ubnf として保存したら、エディタ右上の ▶ から、その言語の playground を生成できます。
+画面内の「環境準備」で Java / Node / Rust の準備、保存、再生成、ログの読み方を確認してください。

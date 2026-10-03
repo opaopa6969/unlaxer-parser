@@ -6,10 +6,22 @@
     "1. サンプルを選び『新規文書で開く』。既存の編集内容は置き換えません。",
     "2. .ubnf として保存。赤い下線にマウスを置くと問題を確認できます。",
     "3. 文法を変更。まず 'hello' を別の単語に変えてみましょう。",
-    "4. 文法から playground を生成し、入力例と失敗例を試します。文法と試験入力は別のものです。"
+    "4. エディタ右上の ▶ または下の『Playground を生成して開く』で生成し、入力例と失敗例を試します。文法と試験入力は別のものです。"
+  ],
+  "setup": [
+    "文法を書く・help を読むだけなら Rust や Node は不要です。LSP の診断・補完には Java 21 が必要です。",
+    "playground の生成には Java 21、Node 20 以上、Rust 1.85 以上と wasm32-unknown-unknown target が必要です。端末で java -version / node --version / cargo --version を確認してください。",
+    "Rust が入っていれば、端末で rustup target add wasm32-unknown-unknown を実行して target を準備します。拡張は不足ツールを自動インストールしません。",
+    "VS Code がツールを見つけられないときは、設定 ubnfLsp.server.javaPath / ubnfLsp.playground.nodePath / ubnfLsp.playground.cargoPath に実行ファイルの絶対パスを指定できます。",
+    "1. サンプルを新規文書で開き、.ubnf として保存します。import するファイルも保存してください。2. 対象の文法のエディタで ▶ を押します。3. 生成と WASM ビルドを待ちます。4. 開いた入力欄に、レッスンの試験入力を書き『解析する』を押します。",
+    "生成コマンドは信頼したワークスペースでだけ使えます。初回の build は数秒以上かかることがあります。文法→parser、parser→WASM の各処理は最長180秒で打ち切ります。",
+    "生成先は拡張が管理する新規フォルダです。元の文法や既存の project は上書きせず、HTTP server の起動や外部公開もしません。生成先のパスは UBNF LSP のログに表示します。",
+    "文法を変更したら保存し、もう一度 ▶ を押して新しく生成します。開いている playground は生成時のスナップショットです。別の未保存 UBNF ファイルがある場合は、先に保存してから実行してください。",
+    "失敗したら通知の『ログを開く』で原因を確認できます。Rust target がなければ上記コマンドで追加し、旧 Java parser binding や未対応機能なら宣言的 token の例へ書き換えます。",
+    "VS Code 以外では、生成 CLI の playground --grammar <file.ubnf> --output <新規dir> → 生成先で npm run build → npm start の順です。ブラウザ画面は Node/Java/Rust を直接起動できません。"
   ],
   "lessons": [
-    {"id":"hello","title":"1 · 単語を受け入れる","goal":"hello だけを受け入れる文法を作る。","example":"hello","steps":["grammar Hello { … } が文法全体です。Hello は自由に付ける名前です。","@root が読み始めるルールを指定します。Start ::= 'hello'; は hello という文字列を受け入れます。","引用符は文法で使う記号です。試験入力には hello とだけ入力します。","'hello' を 'こんにちは' に変え、入力も同じ文字列にすると成功します。"],"check":"hello は成功。Hello、hello!、空の入力は失敗。大文字小文字を区別し、入力の末尾まで確認します。"},
+    {"id":"hello","title":"1 · 単語を受け入れる","goal":"hello だけを受け入れる文法を作る。","example":"hello","steps":["grammar Hello { … } が文法全体です。Hello は自由に付ける名前です。","@ubnf: v2 は文法の書式、@package: guide.demo は生成コードの所属名です。最初はそのままで構いません。","@root が読み始めるルールを指定します。Start ::= 'hello'; は hello という文字列を受け入れます。::= は定義、末尾の ; は定義の終わりです。","@text は読んだ文字列の名前。@mapping(Greeting, params=[text]) は結果を Greeting という型の text に取り出す設定です。最初はこの2行もそのまま使えます。","@doc('…') は生成した言語の利用者向けの説明です。入力として読まれる文字ではありません。","引用符は文法で使う記号です。試験入力には hello とだけ入力します。","'hello' を 'こんにちは' に変えて保存し、再生成します。playground の入力も同じ文字列にすると成功します。"],"check":"hello は成功。Hello、hello!、空の入力は失敗。大文字小文字を区別し、入力の末尾まで確認します。"},
     {"id":"number","title":"2 · 数字を組み立てる","goal":"1 文字の条件から、桁数が自由な数を作る。","example":"number","steps":["token は空白を挟まない文字のまとまり。DIGIT は 0〜9 の 1 文字です。","DIGIT+ は 1 回以上の繰り返しです。NUMBER は符号・小数部を任意に持ちます。","[ … ] は省略可能。('+' | '-') は + または - のどちらかです。","Start は NUMBER を呼ぶルールです。NumberParser のような既存実装への mapping は不要です。"],"check":"12、-3.5、+0 は成功。1 2、.5、12.、1e3 はこの文法では失敗。指数は自動では追加されません。"},
     {"id":"assignment","title":"3 · 名前と値を組み合わせる","goal":"price = 12; のような小さな言語を作る。","example":"assignment","steps":["IDENTIFIER は英字または _ で始まり、後ろには数字も使えます。","要素を並べると、その順序で読みます。'=' と ';' も入力の一部です。","@whitespace: javaStyle により、ルールの要素間には空白や改行を置けます。token の内部には入りません。","@name と @value は読み取った部分の名前（capture）。@mapping により AST（必要な値だけをまとめた構造）に取り出します。"],"check":"price = 12; は成功。12 = price; は失敗。文法を読むだけで、使える名前と数の範囲が分かります。"},
     {"id":"list","title":"4 · 複数の値を読む","goal":"カンマ区切りのリストを作る。","example":"list","steps":["'[' と ']' は入力に必要な括弧です。引用符なしの [ … ] は省略可能という文法記号です。","NUMBER { ',' NUMBER } は最初の数に続いて、カンマと数を 0 回以上読みます。","外側を [ … ] で囲むと空のリストも受け入れます。","{ … } は 0 回以上、+ は 1 回以上。区切りだけで終わる入力は受け入れません。"],"check":"[]、[1,2,30] は成功。[1,] は失敗。"},
@@ -32,7 +44,7 @@
     {"id":"CAPTURE","category":"context","title":"CAPTURE / SAME_AS — 同じ文字列を再利用","syntax":"CAPTURE(mark, '~'+) … SAME_AS(mark)","summary":"同じ token の実行内で、読み取った区切りを保存して再利用します。","details":["選択肢が失敗すると、その選択肢の capture は巻き戻されます。別の試験入力に状態が漏れません。","SAME_AS は名前が未設定なら失敗します。Java の任意の ParseContext メソッド呼び出しではありません。"],"insertText":"CAPTURE(mark, '~'+)"},
     {"id":"capture","category":"AST","title":"@name — 読み取った部分に名前を付ける","syntax":"NUMBER @value","summary":"token またはルールの後ろに名前を付けます。","details":["@mapping の params にその名前を並べると生成 AST のフィールドになります。","ここでの @value は任意に付ける名前で、CAPTURE(value, …) とは異なります。"]},
     {"id":"mapping","category":"AST","title":"@mapping — 必要な値を AST にする","syntax":"@mapping(Assignment, params=[name, value])","summary":"CST は読み取り構造、AST はプログラムで使う形に整理した構造です。","details":["params の各名前にはルール本体の capture が必要です。Java は record、Rust は enum の AST を生成します。","mapping は認識の代わりではありません。token の認識仕様は ::= の右側に書きます。","Java では @mapping なしでも文法と CST は作れます。現行 Rust 生成経路は通常、入口から 1 つの AST node を要求するため、入門の例では @mapping も付けています。評価（計算）の実装は認識とは別です。"],"insertText":"@mapping(Value, params=[text])"},
-    {"id":"whitespace","category":"設定","title":"@whitespace — 空白の扱い","syntax":"@whitespace: javaStyle","summary":"ルール要素の間で Java の空白文字を読み飛ばします。","details":["token の内部には影響しません。NUMBER 内の 1 2 を 12 としては受け入れません。","空白を言語の一部として厳密に扱う場合は設定を省き、必要な空白を文法で書きます。"]},
+    {"id":"whitespace","category":"設定","title":"@whitespace — 空白の扱い","syntax":"@whitespace: javaStyle","summary":"ルール要素の間で Java 形式の空白・コメントを読み飛ばします。","details":["javaStyle は // から行末までのコメントと /* … */ のコメントも含みます。","token の内部には影響しません。NUMBER 内の 1 2 を 12 としては受け入れません。","空白を言語の一部として厳密に扱う場合は設定を省き、必要な空白を文法で書きます。"]},
     {"id":"import","category":"部品化","title":"@import — 別ファイルの字句を使う","syntax":"@import num from 'numbers.ubnf'\n…\nStart ::= num.NUMBER;","summary":"宣言的 token の文法部品を alias（ここでは num）で区別して参照します。","details":["import は grammar の直後、@ubnf などの設定より前に置きます。","パスは import 元ファイルからの相対パスです。両方のファイルを保存してください。","現行の共通 loader は宣言的 token の部品を扱います。任意のルール import やインターネット URL の取得はしません。"],"insertText":"@import num from 'numbers.ubnf'"},
     {"id":"doc","category":"ヘルプ","title":"@doc — 作った言語の説明","syntax":"@doc('名前と値を = で結び、; で終えます。')","summary":"ルールの利用者に伝える説明を書きます。文法そのもののコメントとは別です。","details":["文法内の // コメントは文法を編集する人向けです。@doc は生成した言語のヘルプに渡すために使えます。"],"insertText":"@doc('このルールが受け入れる入力の説明')"},
     {"id":"settings","category":"設定","title":"@ubnf / @package / @feature","syntax":"@ubnf: v2\n@package: guide.demo","summary":"文法の版と生成 Java コードのパッケージを指定します。","details":["製品のリリース番号 3.x と、文法形式 v2 は別のバージョンです。","@feature は必要な機能契約を記録します。@ubnf を上げただけで未実装機能が使えるわけではありません。"]},

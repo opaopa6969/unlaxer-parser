@@ -13,7 +13,8 @@
   "activationEvents": [
     "onLanguage:ubnf",
     "onCommand:ubnfLsp.showServerOutput",
-    "onCommand:ubnfLsp.openHelp"
+    "onCommand:ubnfLsp.openHelp",
+    "onCommand:ubnfLsp.openPlayground"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -45,6 +46,14 @@
           "default": "java",
           "description": "Java executable to launch the language server."
         },
+        "ubnfLsp.playground.nodePath": {
+          "type": "string", "default": "node",
+          "description": "Playground をビルドする Node 20+ の実行ファイル。生成は信頼済みワークスペースに限ります。"
+        },
+        "ubnfLsp.playground.cargoPath": {
+          "type": "string", "default": "cargo",
+          "description": "Rust 1.85+ の cargo 実行ファイル。wasm32-unknown-unknown target が必要です。"
+        },
         "ubnfLsp.server.jarPath": {
           "type": "string",
           "default": "",
@@ -68,6 +77,11 @@
     ],
     "commands": [
       {
+        "command": "ubnfLsp.openPlayground",
+        "title": "UBNF: この文法の Playground を生成して開く",
+        "icon": "$(play-circle)"
+      },
+      {
         "command": "ubnfLsp.openHelp",
         "title": "UBNF: はじめの一歩 / Catalog・Help",
         "icon": "$(book)"
@@ -79,6 +93,7 @@
     ],
     "menus": {
       "editor/title": [
+        {"command": "ubnfLsp.openPlayground", "when": "resourceLangId == ubnf", "group": "navigation"},
         {"command": "ubnfLsp.openHelp", "when": "resourceLangId == ubnf", "group": "navigation"}
       ]
     },
@@ -92,6 +107,12 @@
         "description": "[はじめの一歩を開く](command:ubnfLsp.openHelp)\nサンプルを新規文書で開いて .ubnf として保存します。",
         "media": {"markdown": "help-welcome.md"},
         "completionEvents": ["onCommand:ubnfLsp.openHelp"]
+      }, {
+        "id": "openPlayground",
+        "title": "保存した文法から playground を生成する",
+        "description": "Java 21、Node 20、Rust 1.85+ と wasm32 target が必要です。[画面内の環境準備を読む](command:ubnfLsp.openHelp)\n[文法を生成して試す](command:ubnfLsp.openPlayground)",
+        "media": {"markdown": "help-welcome.md"},
+        "completionEvents": ["onCommand:ubnfLsp.openPlayground"]
       }]
     }],
     "semanticTokenScopes": [
@@ -135,7 +156,7 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "node scripts/prepare-help.mjs && tsc -p ./",
-    "test:help": "npm run compile && node --test scripts/help.test.mjs && node scripts/help-browser.mjs",
+    "test:help": "npm run compile && node --test scripts/help.test.mjs scripts/playground.test.mjs && node scripts/help-browser.mjs",
     "test:vsix": "node scripts/vsix-smoke.mjs",
     "watch": "tsc -watch -p ./"
   },

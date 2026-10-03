@@ -8,12 +8,12 @@ import {fileURLToPath} from 'node:url';
 test('webview host only opens bundled examples in new documents', async () => {
   const root = fileURLToPath(new URL('../', import.meta.url));
   let command, handler, panel, disposal;
-  const opened = [], shown = [];
+  const opened = [], shown = [], commands = [];
   const uri = fsPath => ({fsPath});
   const vscode = {
     Uri: {joinPath: (base, ...parts) => uri(path.join(base.fsPath, ...parts))},
     ViewColumn: {One: 1, Beside: -2},
-    commands: {registerCommand: (_id, fn) => {command = fn; return {}; }},
+    commands: {registerCommand: (_id, fn) => {command = fn; return {}; }, executeCommand: async id => commands.push(id)},
     window: {
       createWebviewPanel: (_id, _title, _column, options) => {
         assert.deepEqual(JSON.parse(JSON.stringify(options.localResourceRoots)), [uri(path.join(root, 'help-dist'))]);
@@ -43,4 +43,6 @@ test('webview host only opens bundled examples in new documents', async () => {
   assert.equal(opened[0].language, 'ubnf');
   assert.equal(shown[0][1], 1);
   assert.equal('uri' in opened[0], false, 'never writes over an existing document');
+  await handler({type: 'generatePlayground', command: 'untrusted', path: '/untrusted'});
+  assert.deepEqual(commands, ['ubnfLsp.openPlayground'], 'only the fixed host command is allowed');
 });

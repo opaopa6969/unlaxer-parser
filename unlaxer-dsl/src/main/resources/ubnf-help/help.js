@@ -61,6 +61,11 @@
     const catalog = await response.json();
     byId('intro').textContent = catalog.intro;
     for (const text of catalog.workflow) byId('workflow').append(node('li', text));
+    for (const text of catalog.setup) byId('setup').append(node('p', text));
+    if (host) {
+      byId('generate').hidden = false;
+      byId('generate').addEventListener('click', () => host.postMessage({type: 'generatePlayground'}));
+    }
     for (const lesson of catalog.lessons) {
       const item = button(lesson.title, () => showLesson(catalog, lesson)); item.dataset.lesson = lesson.id;
       byId('lessons').append(item);

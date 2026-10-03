@@ -12,6 +12,9 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ### Added
 
+- VSIX の ▶ / Help から保存済み UBNF → 生成 parser → WASM playground を開く操作 (#358)。
+  画面内に環境準備・保存・再生成・トラブル時の案内を追加。信頼済み workspace のみ、
+  新規生成先・shell 不使用・時間制限付きで実行し、配布 VSIX の実 webview まで検証する。
 - Java-hosted / native Rust の `playground --grammar --output` から parser、vendored runtime、
   WASM wrapper、静的ブラウザ UI を生成。CST/AST、診断、消費位置、`@doc` catalog、
   authoring help を同梱する (#356)。生成物の一致と Java/Rust/WASM の共通70入力を検証。

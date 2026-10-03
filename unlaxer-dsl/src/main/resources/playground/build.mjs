@@ -3,7 +3,7 @@ import {copyFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 
 const root = new URL('./', import.meta.url);
-const result = spawnSync('cargo', ['build', '--offline', '--release', '--target', 'wasm32-unknown-unknown'], {
+const result = spawnSync(process.env.UBNF_CARGO || 'cargo', ['build', '--offline', '--release', '--target', 'wasm32-unknown-unknown'], {
   cwd: fileURLToPath(root), stdio: 'inherit', shell: false
 });
 if (result.error || result.status !== 0) {

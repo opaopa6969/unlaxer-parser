@@ -24,6 +24,8 @@ try {
   await page.route('**/*', route => route.request().url().startsWith(url) ? route.continue() : route.abort());
   await page.goto(url);
   await page.locator('#lesson pre').waitFor();
+  assert.equal(await page.locator('#generate').isVisible(), false, 'standalone help cannot launch host tools');
+  assert.match(await page.locator('#setup').textContent(), /wasm32-unknown-unknown/);
   assert.equal(await page.locator('#lessons button').count(), 6);
   for (const lesson of catalog.lessons) {
     await page.locator(`[data-lesson="${lesson.id}"]`).click();
@@ -55,6 +57,8 @@ try {
   await page.reload();
   await page.getByRole('button', {name: '新規文書で開く', exact: true}).click();
   assert.deepEqual(await page.evaluate(() => window.messages), [{type: 'openExample', id: 'hello'}]);
+  await page.getByRole('button', {name: '保存した文法の Playground を生成して開く', exact: true}).click();
+  assert.deepEqual(await page.evaluate(() => window.messages.at(-1)), {type: 'generatePlayground'});
   assert.deepEqual(errors, []);
   await context.close();
   console.log('UBNF help browser: 6 lessons, examples, search, troubleshooting, download, mobile, webview bridge passed');
