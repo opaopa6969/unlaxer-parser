@@ -33,6 +33,9 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ### Fixed
 
+- UBNF VSIX の import-aware 補完・hover・定義移動と module 診断 (#360)。開いた module の
+  編集を反映し、AST 起点の rename でコメント・文字列・capture と grammar ごとのスコープを区別する。
+  未完成・曖昧・外部公開 token の rename は拒否し、画面内 help で対応範囲を明記。
 - VSIX が実行時依存の `vscode-languageclient` を除外していた梱包設定を修正。
   配布 VSIX を隔離した VS Code に読み込み、拡張起動・help・Java LSP 補完を CI で検証する。
 

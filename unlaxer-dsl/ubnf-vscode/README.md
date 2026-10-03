@@ -38,6 +38,27 @@ VS Code を使わない場合は [生成 CLI](../../docs/ubnf-playground-ja.md) 
 `DeclarativeTokenConformanceTest#authoringCatalogExamplesAgreeInJavaAndRust` が
 Java / Rust の受理・拒否、消費位置、AST・Unicode span、両 Rust emitter の一致を検証します。
 
+## v2 / import の編集支援
+
+`token NAME ::= ...` の補完は宣言的字句の語彙と token 名を出します。旧 Java FQN 候補は
+`token NAME = ...` のときだけです。初期 grammar snippet は `@mapping` / `@doc` を含み、
+そのまま playground を生成できます。
+
+相対 `@import num from 'numbers.ubnf'` を解決し、`num.` の補完、hover、定義への移動を提供します。
+module の認識と検証は共通の `UBNFMapper` / `UBNFModuleLoader` を使います。
+開いている import 元の編集 buffer を優先し、変更・保存・close 時には利用側の診断を更新します。
+外部から変更された保存済み module は次の editor request で再読込します。
+生成コマンドは保存済みファイルを使うため、生成前にはすべて保存してください。
+
+rename / linked editing は AST の参照とソース位置に基づきます。文字列・コメント・capture・
+mapping 型名を同名という理由で書き換えず、grammar ごとの宣言を区別します。
+壊れた構文、重複名、予約語、import alias、capture、外部参照、token-only module の公開 token は
+自動 rename しません。未開封の利用元を把握できないため、外部 module は定義へ移動して確認します。
+参照一覧は現在の文書と外部の定義位置までで、workspace 全体の検索ではありません。
+
+この editor API は VSIX の Java LSP 固有です。Java/Rust の文法認識・module 解決は変更せず、
+共通 conformance を維持します。Rust LSP を新設する変更ではありません。
+
 ```bash
 npm ci
 npx playwright install chromium
