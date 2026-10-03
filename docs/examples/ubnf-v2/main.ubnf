@@ -1,0 +1,11 @@
+grammar Illustrated {
+  @import num from 'lexical/numbers.ubnf'
+  @import names from 'lexical/identifiers.ubnf'
+  @ubnf: v2
+  @package: guide.demo
+  @whitespace: javaStyle
+
+  @root
+  @mapping(Assignment, params=[name, value])
+  Assignment ::= names.IDENTIFIER @name '=' num.NUMBER @value ';';
+}

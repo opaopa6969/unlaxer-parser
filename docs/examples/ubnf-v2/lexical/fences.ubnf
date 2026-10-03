@@ -1,0 +1,7 @@
+grammar Fences {
+  @ubnf: v2
+  token NL ::= '\r\n' | '\r' | '\n';
+  token BLOCK ::= BOL CAPTURE(fence, '`'{4,}) NL
+    { NEGATIVE_LOOKAHEAD(BOL SAME_AS(fence) EOL) ANY }
+    BOL SAME_AS(fence) ( NL | EOF );
+}

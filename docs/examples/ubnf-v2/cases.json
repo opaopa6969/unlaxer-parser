@@ -1,0 +1,61 @@
+[
+  {"name":"assignment", "file":"main.ubnf", "cases":[
+    {"input":"price = 12.5;", "prefix":[true,13,13], "type":"Assignment", "fields":{"name":"price","value":"12.5"}},
+    {"input":"price=12.5;", "prefix":[true,11,11], "type":"Assignment", "fields":{"name":"price","value":"12.5"}},
+    {"input":"_price2 = -.5E-2;", "prefix":[true,17,17], "type":"Assignment", "fields":{"name":"_price2","value":"-.5E-2"}},
+    {"input":"price = 1 .2;", "prefix":[false,0,0]},
+    {"input":"price = 1e+;", "prefix":[false,0,0]},
+    {"input":"2price = 1;", "prefix":[false,0,0]},
+    {"input":"price = 1", "prefix":[false,0,0]},
+    {"input":"price = 1;extra", "prefix":[true,10,10]},
+    {"input":"", "prefix":[false,0,0]}
+  ]},
+  {"name":"number", "file":"probes.ubnf", "body":"num.NUMBER @text", "cases":[
+    {"input":"12.5", "prefix":[true,4,4], "type":"Value", "fields":{"text":"12.5"}},
+    {"input":"-.5E-2", "prefix":[true,6,6], "type":"Value", "fields":{"text":"-.5E-2"}},
+    {"input":"+12.", "prefix":[true,4,4], "type":"Value", "fields":{"text":"+12."}},
+    {"input":"1e+", "prefix":[true,1,1]},
+    {"input":"1 .2", "prefix":[true,1,1]},
+    {"input":"+", "prefix":[false,0,0]}
+  ]},
+  {"name":"completeNumber", "file":"probes.ubnf", "body":"COMPLETE_NUMBER @text", "cases":[
+    {"input":"12.5", "prefix":[true,4,4], "type":"Value", "fields":{"text":"12.5"}},
+    {"input":"1e+", "prefix":[false,0,0]}
+  ]},
+  {"name":"identifier", "file":"probes.ubnf", "body":"names.IDENTIFIER @text", "cases":[
+    {"input":"_price2", "prefix":[true,7,7], "type":"Value", "fields":{"text":"_price2"}},
+    {"input":"2price", "prefix":[false,0,0]},
+    {"input":"価格", "prefix":[false,0,0]}
+  ]},
+  {"name":"string", "file":"probes.ubnf", "body":"strings.STRING @text", "cases":[
+    {"input":"\"a\\\"b\"", "prefix":[true,6,6], "type":"Value", "fields":{"text":"\"a\\\"b\""}},
+    {"input":"\"😀\"", "prefix":[true,3,3], "type":"Value", "fields":{"text":"\"😀\""}},
+    {"input":"\"a\\n\"", "prefix":[true,5,5], "type":"Value", "fields":{"text":"\"a\\n\""}},
+    {"input":"\"a\\q\"", "prefix":[true,5,5], "type":"Value", "fields":{"text":"\"a\\q\""}},
+    {"input":"\"a\nb\"", "prefix":[true,5,5], "type":"Value", "fields":{"text":"\"a\nb\""}},
+    {"input":"\"abc", "prefix":[false,0,0]},
+    {"input":"\"a\\", "prefix":[false,0,0]}
+  ]},
+  {"name":"fence", "file":"probes.ubnf", "body":"fences.BLOCK @text", "cases":[
+    {"input":"````\n😀\n````", "prefix":[true,11,11], "type":"Value", "fields":{"text":"````\n😀\n````"}},
+    {"input":"````\n```\n`````\n````", "prefix":[true,19,19], "type":"Value", "fields":{"text":"````\n```\n`````\n````"}},
+    {"input":"````\r\n````\r\n", "prefix":[true,12,12], "type":"Value", "fields":{"text":"````\r\n````"}},
+    {"input":"````\r````\r", "prefix":[true,10,10], "type":"Value", "fields":{"text":"````\r````"}},
+    {"input":"````\n`````", "prefix":[false,0,0]},
+    {"input":"````\n```` ", "prefix":[false,0,0]},
+    {"input":"````\nx````", "prefix":[false,0,0]},
+    {"input":"```\n```", "prefix":[false,0,0]}
+  ]},
+  {"name":"rollback", "file":"probes.ubnf", "body":"PAIR @text", "cases":[
+    {"input":"aba", "prefix":[true,3,3], "type":"Value", "fields":{"text":"aba"}},
+    {"input":"ab!b", "prefix":[true,4,4], "type":"Value", "fields":{"text":"ab!b"}},
+    {"input":"abb", "prefix":[false,0,0]}
+  ]},
+  {"name":"firstChoice", "file":"probes.ubnf", "body":"FIRST @text", "cases":[
+    {"input":"ac", "prefix":[true,2,2], "type":"Value", "fields":{"text":"ac"}},
+    {"input":"abc", "prefix":[false,0,0]}
+  ]},
+  {"name":"possessive", "file":"probes.ubnf", "body":"GREEDY @text", "cases":[
+    {"input":"aa", "prefix":[false,0,0]}
+  ]}
+]

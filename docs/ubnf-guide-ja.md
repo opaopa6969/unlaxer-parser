@@ -8,6 +8,9 @@
 
 UBNF（Unlaxer BNF）は unlaxer-parser の文法定義言語です。認識セマンティクスだけでなく、コード生成の意図も表現するために設計された、型付きでアノテーション駆動の EBNF 拡張です。
 
+新しい宣言的 token を学ぶ入口は [図でわかる UBNF v2](ubnf-v2-illustrated-ja.md) です。
+本ガイドには旧形式の例も含まれます。v2 の認識仕様と部品化は図解入門と [宣言的 token の仕様](declarative-tokens.md) を参照してください。
+
 ---
 
 ## 目次

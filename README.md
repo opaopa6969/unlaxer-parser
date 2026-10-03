@@ -363,6 +363,7 @@ Public API removals and renames go through at least **one minor version with an 
 
 | Document | Description | Languages |
 |----------|-------------|-----------|
+| [図でわかる UBNF v2](./docs/ubnf-v2-illustrated-ja.md) | 宣言的 token、AST、grammar の部品化、capture と巻き戻しの図解入門 | [JA](./docs/ubnf-v2-illustrated-ja.md) |
 | [Getting Started](./docs/getting-started.md) | Maven setup, first grammar, full walkthrough | [EN](./docs/getting-started.md) / [JA](./docs/getting-started-ja.md) |
 | [UBNF Guide](./docs/ubnf-guide.md) | Full UBNF syntax, all annotations, feature matrix | [EN](./docs/ubnf-guide.md) / [JA](./docs/ubnf-guide-ja.md) |
 | [Architecture](./docs/architecture.md) | Bootstrap pipeline, combinator catalog, ParserIR | [EN](./docs/architecture.md) / [JA](./docs/architecture-ja.md) |

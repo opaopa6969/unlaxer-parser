@@ -1,0 +1,6 @@
+grammar Identifiers {
+  @import num from 'numbers.ubnf'
+  @ubnf: v2
+  token LETTER ::= CHAR_RANGE('a', 'z') | CHAR_RANGE('A', 'Z') | '_';
+  token IDENTIFIER ::= LETTER ( LETTER | num.DIGIT )*;
+}
