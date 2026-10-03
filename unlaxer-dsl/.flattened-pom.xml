@@ -84,6 +84,20 @@
   <build>
     <resources>
       <resource>
+        <targetPath>playground/runtime/src</targetPath>
+        <directory>../rust/unlaxer-runtime/src</directory>
+        <includes>
+          <include>*.rs</include>
+        </includes>
+      </resource>
+      <resource>
+        <targetPath>playground/runtime</targetPath>
+        <directory>..</directory>
+        <includes>
+          <include>LICENSE</include>
+        </includes>
+      </resource>
+      <resource>
         <directory>src/main/resources</directory>
       </resource>
       <resource>

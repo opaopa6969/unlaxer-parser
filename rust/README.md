@@ -8,6 +8,10 @@ full-specの進捗は[対応表と受け入れ条件](FULL-SPEC.md)で追跡す�
 
 ## すぐ動かす
 
+3.3.0-SNAPSHOT では `unlaxer playground --grammar ... --output ...` により、
+この生成 parser と runtime source を含む [言語 playground](../docs/ubnf-playground-ja.md) も作れます。
+ブラウザでは WASM を実行し、入門/catalog、CST/AST、位置付き診断を表示します。
+
 生成済みのexampleにはJVMも外部crateも不要。repoルートで実行する。Rust 1.85以上、Cargoを使用する。
 
 ```sh

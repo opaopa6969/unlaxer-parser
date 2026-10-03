@@ -1,0 +1,115 @@
+# UBNF 文法から playground を作る
+
+開発版 **3.3.0-SNAPSHOT**。公開済み 3.2.0 にはこの生成コマンドは含まれません。
+
+UBNF を書く人には VSIX の **UBNF: はじめの一歩 / Catalog・Help**、
+できた言語を試す人には、この手順で生成するブラウザ画面を用意しています。
+ブラウザで動くのは **生成 Rust parser の WebAssembly** です。
+Java-hosted compiler / native Rust compiler は同じプロジェクトを生成します。
+
+## まず動かす
+
+リポジトリのルートで実行します。Rust 1.85 以上、Node 20 以上が必要です。
+出力先は新しいディレクトリにしてください。既存ディレクトリは上書きしません。
+
+```sh
+rustup target add wasm32-unknown-unknown
+cargo run --locked --manifest-path rust/Cargo.toml -p unlaxer-generator -- \
+  playground --grammar docs/examples/ubnf-v2/main.ubnf --output build/assignment-playground
+cd build/assignment-playground
+npm run build
+npm start
+```
+
+表示された `UBNF_PLAYGROUND_URL=http://127.0.0.1:.../` を開き、`price = 12.5;` と入力して
+「解析する」を押します。`price = 1e+;` や `price = 1;extra` も試してください。
+文法は import された数値・識別子の部品を使用します。
+
+生成後の build は `cargo --offline` を使います。`npm install`、CDN、外部 registry の
+runtime は不要です。初回の Rust/Node/toolchain 準備だけは別途必要です。
+
+## Java 側の生成コマンド
+
+リポジトリのルートで Java 21 を使い、先に開発版をローカルへ install します。
+Central へ公開する操作ではありません。
+
+```sh
+mvn -q -pl .,unlaxer-common,unlaxer-dsl install -DskipTests -Dgpg.skip=true
+mvn -q -pl unlaxer-dsl exec:java \
+  -Dexec.mainClass=org.unlaxer.dsl.CodegenMain \
+  -Dexec.args='playground --grammar docs/examples/ubnf-v2/main.ubnf --output build/java-playground'
+```
+
+同じ `npm run build` / `npm start` で開けます。Java-hosted compiler を使っても、
+ブラウザで JVM を起動するわけではありません。生成先は両経路とも Rust/WASM です。
+
+## 画面に含まれるもの
+
+- 入力全体の成功・不一致、部分解析の消費位置と最大一致位置。
+- Unicode コードポイントの診断位置と、1 始まりの行・列。
+- CST の node、子 node、範囲。範囲を押すと対応する入力を選択。
+- `@mapping` による AST。認識成功と AST 投影エラーは区別。
+- ルールの `@doc` を表示する検索付き言語 catalog。
+- 生成時点の元文法、エラーの読み方、文法作者向けの入門/catalog/help へのリンク。
+
+```ubnf
+grammar Hello {
+  @ubnf: v2
+  @package: example.hello
+  @root
+  @mapping(Greeting, params=[text])
+  @doc('hello と入力してください。大文字小文字を区別します。')
+  Start ::= 'hello' @text;
+}
+```
+
+この例を `hello.ubnf` に保存して生成すると、言語 catalog に「hello と入力してください」と
+表示されます。HTML として実行せずテキストとして表示します。
+
+## UBNF 自体の playground
+
+`--grammar unlaxer-dsl/grammar/ubnf.ubnf` を指定すれば、UBNF を受け入れる playground も生成できます。
+そこには**文法そのものを試験入力として**入れます。生成されたメタ文法 parser が、
+入門の6文法とメタ文法自身を読み取れることをテストしています。
+
+メタ文法が入力を構文として読めることと、その文法から目的の backend を生成できることは別です。
+名前解決・左再帰・backend の対応範囲などの検証は生成コマンドで行います。
+ブラウザ上で入力した新しい文法をその場でコンパイルする機能ではありません。
+
+## 再生成と安全性
+
+元の `.ubnf` を編集したら、別の新規ディレクトリへ再生成して build してください。
+`public/grammar.ubnf` は表示用スナップショットなので、それだけを編集しても WASM は変わりません。
+import は生成時に解決します。生成後のブラウザから import 元への通信は行いません。
+
+`playground --grammar ... --output ... --check` は生成予定のファイルと既存出力を比較する読み取り専用操作です。
+手書きファイルの上書きや symlink 経由の出力は拒否します。失敗時の staging が残った場合は、そのパスを報告します。
+
+入力はブラウザから外へ送信しません。初版の制限は UTF-8 で 64 KiB、Worker の実行3秒、
+結果4 MiB、WASM メモリ256 MiB。打ち切り・WASM trap は「不一致」でなく「実行エラー」と表示します。
+静的 UI からのコード実行・評価・外部 context の呼び出しはありません。
+
+生成 project の `public/` は静的ホストに配置できますが、このコマンドは公開・deploy しません。
+`serve.mjs` はループバックに bind するローカル試験用サーバーです。
+
+## 対応範囲と検証
+
+宣言的 token と Rust backend が対応するルールが対象です。旧 Java parser binding、
+任意の host code、未対応 annotation は生成前に拒否します。
+通常は入口から1つの mapped AST node が必要なので、入門例は `@mapping` を付けています。
+例外的な parser-only / `@skip` の仕様は [AST 投影の契約](skip-ast-projection.md) を参照してください。
+
+Java / native Rust の生成 project 全ファイルの一致、入門29入力と import を含む図解ガイド41入力の
+受理・拒否、消費位置、AST、Unicode span を Java / Rust / WASM で検証します。
+ブラウザテストでは実 WASM、catalog、CST 選択、AST、位置付きエラー、サイズ制限、
+タイムアウト後の再試行、HTML の無害な表示、狭い画面と authoring help を確認します。
+
+```sh
+mvn -pl unlaxer-common,unlaxer-dsl -am test \
+  -Dtest=PlaygroundCommandTest,DeclarativeTokenConformanceTest \
+  -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
+cd unlaxer-dsl/ubnf-vscode
+npm ci
+npx playwright install chromium
+node scripts/playground-browser.mjs
+```

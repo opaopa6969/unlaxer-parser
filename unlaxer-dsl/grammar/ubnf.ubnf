@@ -23,7 +23,7 @@ grammar UBNF {
   @feature: declarativeTokensV1
   @package: org.unlaxer.dsl.bootstrap.generated
   @whitespace: javaStyle
-  @comment: { line: '//' }
+  // javaStyle includes line/block comments; no separate host-only @comment setting is needed.
 
   // ===== トークン定義 =====
   // 認識仕様から生成する。既存の IdentifierParser / NumberParser は呼ばない。

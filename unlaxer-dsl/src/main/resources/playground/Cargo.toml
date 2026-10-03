@@ -1,0 +1,19 @@
+# Generated UBNF playground. Recognition lives in src/generated/.
+[package]
+name = "ubnf-playground"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+publish = false
+
+[workspace]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+unlaxer-runtime = { path = "runtime" }
+
+[profile.release]
+opt-level = "s"
+panic = "abort"

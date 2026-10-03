@@ -101,6 +101,16 @@
 		<testSourceDirectory>${unlaxer.jdk17.shared}/src/test/java</testSourceDirectory>
 		<resources>
 			<resource>
+				<directory>${unlaxer.jdk17.shared}/../rust/unlaxer-runtime/src</directory>
+				<targetPath>playground/runtime/src</targetPath>
+				<includes><include>*.rs</include></includes>
+			</resource>
+			<resource>
+				<directory>${unlaxer.jdk17.shared}/..</directory>
+				<includes><include>LICENSE</include></includes>
+				<targetPath>playground/runtime</targetPath>
+			</resource>
+			<resource>
 				<directory>${unlaxer.jdk17.shared}/grammar</directory>
 				<includes><include>ubnf.ubnf</include></includes>
 				<targetPath>ubnf-help</targetPath>

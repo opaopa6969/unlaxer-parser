@@ -35,6 +35,9 @@ public class CodegenMain {
     }
 
     static int run(String[] args, PrintStream out, PrintStream err) {
+        if (args.length > 0 && "playground".equals(args[0])) {
+            return PlaygroundCommand.run(args, out, err);
+        }
         if (args.length > 0 && "impact".equals(args[0])) {
             return ApiImpactCommand.run(args, out, err);
         }
@@ -253,6 +256,7 @@ public class CodegenMain {
     }
 
     private static void printUsage(PrintStream err) {
+        err.println("Playground: CodegenMain playground --grammar <file.ubnf> --output <new-directory> [--check]");
         err.println(
             "Usage: CodegenMain [--help] [--version] --grammar <file.ubnf> --output <dir>"
                 + " [--generators AST,Parser,Mapper,Evaluator,LSP,Launcher,DAP,DAPLauncher]"

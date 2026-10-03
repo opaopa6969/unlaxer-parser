@@ -17,6 +17,7 @@
 
 開発版は **3.3.0-SNAPSHOT**（未公開）です。以下の依存例は最新安定版 **3.2.0** を使用します。
 開発版の UBNF VSIX には、画面内で学べる [はじめの一歩・catalog/help](unlaxer-dsl/ubnf-vscode/README.md) を追加しています。
+書いた文法から [言語の playground を生成](docs/ubnf-playground-ja.md) できます。UBNF 自体の文法も入力にできます。
 
 **文法を書くだけで言語が手に入る — Parser + AST + Evaluator + LSP + DAP をすべて自動生成**
 
