@@ -50,14 +50,14 @@ public record LexicalExpression(Op op, String text, int min, int max,
     private int eval(String s, int p, Map<String, String> bindings) {
         return switch (op) {
             case LITERAL -> s.startsWith(text, p) ? p + text.length() : -1;
-            case ANY -> p < s.length() ? p + Character.charCount(s.codePointAt(p)) : -1;
+            case ANY -> scalarAt(s, p) >= 0 ? p + Character.charCount(s.codePointAt(p)) : -1;
             case EOF -> p == s.length() ? p : -1;
             case BOF -> p == 0 ? p : -1;
             case BOL -> p == 0 || s.charAt(p - 1) == '\r' || s.charAt(p - 1) == '\n' ? p : -1;
             case EOL -> p == s.length() || s.charAt(p) == '\r' || s.charAt(p) == '\n' ? p : -1;
-            case RANGE -> p < s.length() && s.codePointAt(p) >= min && s.codePointAt(p) <= max
+            case RANGE -> scalarAt(s, p) >= 0 && s.codePointAt(p) >= min && s.codePointAt(p) <= max
                 ? p + Character.charCount(s.codePointAt(p)) : -1;
-            case EXCEPT -> p < s.length() && text.indexOf(s.codePointAt(p)) < 0
+            case EXCEPT -> scalarAt(s, p) >= 0 && text.indexOf(s.codePointAt(p)) < 0
                 ? p + Character.charCount(s.codePointAt(p)) : -1;
             case SEQUENCE -> {
                 int end = p;
@@ -96,6 +96,12 @@ public record LexicalExpression(Op op, String text, int min, int max,
             case SCOPE -> children.get(0).match(s, p, new HashMap<>());
             case REF -> throw new IllegalStateException("unresolved lexical reference: " + text);
         };
+    }
+
+    private static int scalarAt(String source, int position) {
+        if (position >= source.length()) return -1;
+        int cp = source.codePointAt(position);
+        return cp >= 0xd800 && cp <= 0xdfff ? -1 : cp;
     }
 
     /** Conservative nullability, after references have been expanded. */

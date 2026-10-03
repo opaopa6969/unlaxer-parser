@@ -10,6 +10,34 @@ import org.unlaxer.dsl.bootstrap.UBNFMapper;
 import org.unlaxer.dsl.runtime.LexicalTokenParser;
 
 public class DeclarativeTokenTest {
+    @Test public void unicodePrimitivesRejectIsolatedSurrogatesButAcceptPairs() {
+        // Rust str cannot contain isolated UTF-16 surrogates; Java String can.
+        for (String expression : List.of("ANY", "CHAR_RANGE('a','🙏')", "NEGATION('x')")) {
+            var parser = parser("token T ::= " + expression + ";");
+            for (String source : List.of(String.valueOf((char) 0xd800), String.valueOf((char) 0xdfff))) {
+                try (var context = new ParseContext(StringSource.createRootSource(source))) {
+                    assertTrue(expression, parser.parse(context).isFailed());
+                    assertEquals(0, context.position());
+                    assertEquals(0, context.matchedPosition());
+                }
+            }
+            try (var context = new ParseContext(StringSource.createRootSource("😀"))) {
+                assertTrue(expression, parser.parse(context).isSucceeded());
+                assertEquals(1, context.position());
+                assertEquals(1, context.matchedPosition());
+            }
+        }
+    }
+
+    @Test public void commentedSettingsRetainTheirSemanticValues() throws Exception {
+        var path = java.nio.file.Path.of("../rust/unlaxer-ubnf/tests/fixtures/positive/settings-comments.ubnf");
+        var grammar = UBNFMapper.parse(java.nio.file.Files.readString(path)).grammars().get(0);
+        assertEquals("v2", ((org.unlaxer.dsl.bootstrap.UBNFAST.StringSettingValue) grammar.settings().get(0).value()).value());
+        assertEquals("lexical.probe", ((org.unlaxer.dsl.bootstrap.UBNFAST.StringSettingValue) grammar.settings().get(1).value()).value());
+        assertEquals("javaStyle", ((org.unlaxer.dsl.bootstrap.UBNFAST.StringSettingValue) grammar.settings().get(2).value()).value());
+        assertNotNull(LexicalCompiler.compile(grammar).get("NUMBER"));
+        assertNotNull(new ParserGenerator().generate(grammar));
+    }
     private LexicalTokenParser parser(String declarations) {
         var grammar = UBNFMapper.parse("grammar G { @ubnf: v2 " + declarations
             + " @root @mapping(Value, params=[value]) Root ::= T @value; }").grammars().get(0);
