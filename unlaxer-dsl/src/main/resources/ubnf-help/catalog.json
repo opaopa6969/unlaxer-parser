@@ -12,7 +12,7 @@
     "文法を書く・help を読むだけなら Rust や Node は不要です。LSP の診断・補完には Java 21 が必要です。",
     "playground の生成には Java 21、Node 20 以上、Rust 1.85 以上と wasm32-unknown-unknown target が必要です。端末で java -version / node --version / cargo --version を確認してください。",
     "Rust が入っていれば、端末で rustup target add wasm32-unknown-unknown を実行して target を準備します。拡張は不足ツールを自動インストールしません。",
-    "VS Code がツールを見つけられないときは、設定 ubnfLsp.server.javaPath / ubnfLsp.playground.nodePath / ubnfLsp.playground.cargoPath に実行ファイルの絶対パスを指定できます。",
+    "VS Code がツールを見つけられないときは、設定 ubnfLsp.server.javaPath / ubnfLsp.playground.nodePath / ubnfLsp.playground.cargoPath に実行ファイルの絶対パスを指定できます。Java の設定を変えたら、コマンドパレットで Developer: Reload Window（開発者: ウィンドウの再読み込み）を実行してください。",
     "1. サンプルを新規文書で開き、.ubnf として保存します。import するファイルも保存してください。2. 対象の文法のエディタで ▶ を押します。3. 生成と WASM ビルドを待ちます。4. 開いた入力欄に、レッスンの試験入力を書き『解析する』を押します。",
     "生成コマンドは信頼したワークスペースでだけ使えます。初回の build は数秒以上かかることがあります。文法→parser、parser→WASM の各処理は最長180秒で打ち切ります。",
     "生成先は拡張が管理する新規フォルダです。元の文法や既存の project は上書きせず、HTTP server の起動や外部公開もしません。生成先のパスは UBNF LSP のログに表示します。",
@@ -59,7 +59,7 @@
     {"title":"空白が入ると失敗","why":"空白の自動読み飛ばしがないか、token の途中に空白があります。","fix":"ルールの要素間なら @whitespace: javaStyle を設定。token の中は自動で空白を飛ばさないので、必要な空白を明示します。"},
     {"title":"左再帰 / 繰り返しが前に進まない","why":"Expr ::= Expr '+' NUMBER のように、文字を読む前に自分を呼んでいます。","fix":"まず Expr ::= NUMBER { '+' NUMBER }; と書き換えます。省略可能な要素だけの無限反復も避けます。"},
     {"title":"日本語・絵文字の位置の数え方","why":"解析位置は Unicode コードポイントで数え、先頭を 0 とします。","fix":"[start, end) の end は含みません。エディタの UTF-16 位置や UTF-8 のバイト数とは異なります。行・列表示ではその変換が必要です。"},
-    {"title":"LSP が起動しない","why":"Java が見つからないか、対応する Java 21 環境で起動できていません。","fix":"UBNF: Show Language Server Output を開いて原因を確認し、設定 ubnfLsp.server.javaPath を Java 21 の実行ファイルにします。catalog は LSP なしでも読めます。"}
+    {"title":"LSP が起動しない","why":"Java が見つからないか、対応する Java 21 環境で起動できていません。","fix":"UBNF: Show Language Server Output を開いて原因を確認し、設定 ubnfLsp.server.javaPath を Java 21 の実行ファイルにします。その後 Developer: Reload Window（開発者: ウィンドウの再読み込み）を実行。catalog は LSP なしでも読めます。"}
   ],
   "examples": [
     {"id":"hello","name":"Hello","source":"grammar Hello {\n  @ubnf: v2\n  @package: guide.demo\n\n  @root\n  @mapping(Greeting, params=[text])\n  @doc('hello と入力してください。大文字小文字を区別します。')\n  Start ::= 'hello' @text;\n}\n","cases":[{"input":"hello","fields":{"text":"hello"}},{"input":"Hello"},{"input":"hello!"},{"input":""}]},
