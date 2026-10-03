@@ -1,0 +1,17 @@
+grammar LexicalExamples {
+  @import num from 'lexical/numbers.ubnf'
+  @import names from 'lexical/identifiers.ubnf'
+  @import strings from 'lexical/strings.ubnf'
+  @import fences from 'lexical/fences.ubnf'
+  @ubnf: v2
+  @package: guide.demo
+
+  token PAIR ::= CAPTURE(mark, 'a')
+    ( CAPTURE(mark, 'b') '!' | 'b' ) SAME_AS(mark);
+  token FIRST ::= ( 'a' | 'ab' ) 'c';
+  token GREEDY ::= 'a'+ 'a';
+  token COMPLETE_NUMBER ::= num.NUMBER EOF;
+
+  @root @mapping(Value, params=[text])
+  Root ::= num.NUMBER @text;
+}

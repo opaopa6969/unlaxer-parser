@@ -36,6 +36,104 @@ public class DeclarativeTokenConformanceTest {
     @Rule public TemporaryFolder temporary = new TemporaryFolder();
     private final Path repo = Path.of("..").toAbsolutePath().normalize();
 
+    @Test public void illustratedGuideEmbedsExactExampleFiles() throws Exception {
+        String guide = Files.readString(repo.resolve("docs/ubnf-v2-illustrated-ja.md"));
+        var examples = java.util.regex.Pattern.compile(
+            "<!-- example: ([^\\n]+) -->\\n```ubnf\\n(.*?)\\n```",
+            java.util.regex.Pattern.DOTALL).matcher(guide);
+        var embedded = new java.util.HashSet<Path>();
+        while (examples.find()) {
+            Path file = repo.resolve("docs").resolve(examples.group(1)).normalize();
+            assertTrue("duplicate example: " + file, embedded.add(file));
+            assertEquals(file.toString(), Files.readString(file).strip(), examples.group(2));
+        }
+        try (var files = Files.walk(repo.resolve("docs/examples/ubnf-v2"))) {
+            var grammars = files.filter(p -> p.toString().endsWith(".ubnf"))
+                .collect(java.util.stream.Collectors.toSet());
+            assertEquals("Every guide grammar must be embedded and kept in sync", grammars, embedded);
+            assertEquals(6, embedded.size());
+        }
+    }
+
+    @Test public void illustratedGuideExamplesAgreeInJavaAndRust() throws Exception {
+        if (!Boolean.getBoolean("rustConformance")) System.out.println(
+            "[assumption] illustrated guide conformance requires -DrustConformance=true");
+        assumeTrue(Boolean.getBoolean("rustConformance"));
+        Path fixtures = repo.resolve("docs/examples/ubnf-v2");
+        Path library = temporary.getRoot().toPath().resolve("libunlaxer_runtime.rlib");
+        success(run(List.of("rustc", "--edition=2021", "--crate-type=rlib", "--crate-name=unlaxer_runtime",
+            repo.resolve("rust/unlaxer-runtime/src/lib.rs").toString(), "-o", library.toString()), "", false));
+        success(run(List.of("cargo", "build", "--locked", "--manifest-path", repo.resolve("rust/Cargo.toml").toString(),
+            "-p", "unlaxer-generator"), "", false));
+        Path nativeGenerator = repo.resolve("rust/target/debug/unlaxer");
+        var corpus = JsonParser.parseString(Files.readString(fixtures.resolve("cases.json"))).getAsJsonArray();
+        for (var item : corpus) {
+            var fixture = item.getAsJsonObject();
+            String name = fixture.get("name").getAsString();
+            Path directory = temporary.newFolder().toPath();
+            try (var paths = Files.walk(fixtures)) {
+                for (Path from : paths.filter(Files::isRegularFile).toList()) {
+                    Path to = directory.resolve(fixtures.relativize(from));
+                    Files.createDirectories(to.getParent());
+                    Files.copy(from, to);
+                }
+            }
+            Path source = directory.resolve(fixture.get("file").getAsString());
+            if (fixture.has("body")) Files.writeString(source, Files.readString(source).replace(
+                "Root ::= num.NUMBER @text;", "Root ::= " + fixture.get("body").getAsString() + ";"));
+            assertTrue(name, PortabilityCheck.checkFile(source).portable());
+            GrammarDecl grammar = UBNFModuleLoader.load(source).grammars().get(0);
+            success(run(List.of(nativeGenerator.toString(), "generate", "--grammar", source.toString(),
+                "--output", directory.resolve("generated").toString()), "", true));
+            for (var file : new RustBackend().generate(grammar)) assertEquals(name + "/" + file.relativePath(),
+                file.content(), Files.readString(directory.resolve("generated").resolve(file.relativePath())));
+            Files.writeString(directory.resolve("main.rs"), rustProbe(false));
+            Path binary = directory.resolve("probe");
+            success(run(List.of("rustc", "--edition=2021", "--extern", "unlaxer_runtime=" + library,
+                directory.resolve("main.rs").toString(), "-o", binary.toString()), "", false));
+            var cases = fixture.getAsJsonArray("cases");
+            String inputs = String.join("\n", cases.asList().stream().map(row -> HexFormat.of().formatHex(
+                row.getAsJsonObject().get("input").getAsString().getBytes(StandardCharsets.UTF_8))).toList()) + "\n";
+            Run rust = run(List.of(binary.toString()), inputs, true);
+            success(rust);
+            var results = rust.output().lines().toList();
+            assertEquals(cases.size(), results.size());
+            try (URLClassLoader loader = compileJava(grammar)) {
+                String prefix = "guide.demo." + grammar.name();
+                Parser parser = (Parser) loader.loadClass(prefix + "Parsers").getMethod("getRootParser").invoke(null);
+                Class<?> mapper = loader.loadClass(prefix + "Mapper");
+                for (int i = 0; i < cases.size(); i++) {
+                    var row = cases.get(i).getAsJsonObject();
+                    String text = row.get("input").getAsString();
+                    String label = name + "/" + row.get("input");
+                    var actualRust = JsonParser.parseString(results.get(i)).getAsJsonObject();
+                    JsonArray position = new JsonArray();
+                    try (var context = new ParseContext(StringSource.createRootSource(text))) {
+                        position.add(parser.parse(context).isSucceeded());
+                        position.add(context.position()); position.add(context.matchedPosition());
+                    }
+                    assertEquals(label, row.get("prefix"), position);
+                    assertEquals(label, position, actualRust.get("prefix"));
+                    Optional<?> diagnostic = (Optional<?>) mapper.getMethod("diagnose", String.class).invoke(null, text);
+                    assertEquals(label, row.has("fields"), diagnostic.isEmpty());
+                    JsonElement ast = JsonNull.INSTANCE;
+                    if (row.has("fields")) {
+                        Object mapped = mapper.getMethod("parseWithSourceMap", String.class).invoke(null, text);
+                        Object node = mapped.getClass().getMethod("ast").invoke(mapped);
+                        ast = canonical(node, mapped);
+                        JsonObject expected = new JsonObject();
+                        expected.add("type", row.get("type"));
+                        JsonArray span = new JsonArray(); span.add(0); span.add(text.codePointCount(0, text.length()));
+                        expected.add("span", span);
+                        expected.add("fields", row.get("fields"));
+                        assertEquals(label, expected, ast);
+                    }
+                    assertEquals(label, ast, actualRust.get("ast"));
+                }
+            }
+        }
+    }
+
     @Test public void lexicalModulesHaveIndependentNamesCapturesAndPaths() throws Exception {
         if (!Boolean.getBoolean("rustConformance")) System.out.println(
             "[assumption] lexical module conformance requires -DrustConformance=true");

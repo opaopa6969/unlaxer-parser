@@ -358,6 +358,7 @@ UBNF 文法ファイル `unlaxer-dsl/grammar/ubnf.ubnf` 自体が UBNF で記述
 
 | ドキュメント | 説明 | 言語 |
 |------------|------|------|
+| [図でわかる UBNF v2](./docs/ubnf-v2-illustrated-ja.md) | 宣言的 token から AST、grammar の部品化、capture と巻き戻しまで。検証済みの例付き | [JA](./docs/ubnf-v2-illustrated-ja.md) |
 | [Getting Started](./docs/getting-started-ja.md) | Maven 設定、最初の文法、完全ウォークスルー | [EN](./docs/getting-started.md) / [JA](./docs/getting-started-ja.md) |
 | [UBNF ガイド](./docs/ubnf-guide-ja.md) | UBNF 構文全体、全アノテーション、機能マトリックス | [EN](./docs/ubnf-guide.md) / [JA](./docs/ubnf-guide-ja.md) |
 | [アーキテクチャ](./docs/architecture-ja.md) | Bootstrap パイプライン、コンビネータカタログ、ParserIR | [EN](./docs/architecture.md) / [JA](./docs/architecture-ja.md) |

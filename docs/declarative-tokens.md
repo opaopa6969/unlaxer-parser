@@ -1,5 +1,8 @@
 # 宣言的 token — UBNF format 2
 
+初めて読む場合は [図でわかる UBNF v2](ubnf-v2-illustrated-ja.md) から始めてください。
+この文書は認識規約と実装範囲のリファレンスです。
+
 この機能を含む Maven 開発版は `3.2.0-SNAPSHOT`。公開済み `3.1.1` は対応しない。
 UBNF の format version と Maven artifact version は別に管理する。
 
