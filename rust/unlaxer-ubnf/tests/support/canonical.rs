@@ -85,6 +85,7 @@ pub fn file(file: &UbnfFile) -> String {
 }
 fn token(t: &TokenDecl) -> String {
     let (name, args) = match &t.kind {
+        TokenKind::Declarative { expression } => ("Declarative", vec![lexical(expression)]),
         TokenKind::Simple { parser_class } => ("Simple", vec![quote(parser_class)]),
         TokenKind::Adapter { id, version } => ("Adapter", vec![quote(id), quote(version)]),
         TokenKind::Until { terminator } => ("Until", vec![quote(terminator)]),
@@ -102,6 +103,18 @@ fn token(t: &TokenDecl) -> String {
         TokenKind::Regex { pattern } => ("Regex", vec![quote(pattern)]),
     };
     tag(name, std::iter::once(quote(&t.name)).chain(args))
+}
+fn lexical(e: &unlaxer_ubnf::lexical::LexicalExpression) -> String {
+    tag(
+        "LexicalExpression",
+        [
+            quote(&format!("{:?}", e.op)),
+            quote(&e.text),
+            e.min.to_string(),
+            e.max.to_string(),
+            list(e.children.iter().map(lexical)),
+        ],
+    )
 }
 fn annotation(a: &Annotation) -> String {
     let (name, args) = match &a.kind {

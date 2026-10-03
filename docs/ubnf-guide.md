@@ -58,7 +58,22 @@ A grammar block can `@import` rules from another grammar:
 
 ## Token Declarations
 
-Tokens are the leaf parsers that recognize character sequences. They are declared with the `token` keyword and must reference a Java class that implements `Parser`.
+Tokens recognize character sequences. In format 2, `token NAME ::= expression ;` declares
+the recognition itself and generates Java/Rust parsers without calling a host parser class.
+
+```ubnf
+grammar Numbers {
+  @ubnf: v2
+  @feature: declarativeTokensV1
+  token DIGIT ::= CHAR_RANGE('0', '9');
+  token INTEGER ::= ['+' | '-'] DIGIT+;
+  @root @mapping(Value, params=[text]) Root ::= INTEGER @text;
+}
+```
+
+No implicit trivia is inserted inside tokens. See [declarative tokens](declarative-tokens.md)
+for expression lookahead, local raw capture/backreferences, strings and variable-length fences.
+The `token NAME = ...` forms below remain available for compatibility.
 
 ### Simple token (class reference)
 

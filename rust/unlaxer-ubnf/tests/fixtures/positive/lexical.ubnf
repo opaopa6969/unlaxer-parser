@@ -1,0 +1,12 @@
+grammar Lexical {
+  @ubnf: v2
+  token DIGIT ::= CHAR_RANGE('0','9');
+  token NUMBER ::= [ '+' | '-' ] ( DIGIT+ '.' DIGIT* | '.' DIGIT+ | DIGIT+ )
+    [ ( 'e' | 'E' ) [ '+' | '-' ] DIGIT+ ];
+  token SCALAR ::= CHAR_RANGE('😀','🙏') | NEGATION('\n\r');
+  token ASSERTION ::= BOF LOOKAHEAD(ANY) NEGATIVE_LOOKAHEAD('!') SCALAR? EOF;
+  token BLOCK ::= BOL CAPTURE(fence, '`'{4,}) '\n'
+    { NEGATIVE_LOOKAHEAD(BOL SAME_AS(fence) EOL) ANY }
+    BOL SAME_AS(fence) EOL;
+  @root @mapping(Value, params=[text]) Root ::= NUMBER @text;
+}

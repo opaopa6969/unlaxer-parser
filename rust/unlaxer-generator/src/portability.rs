@@ -165,7 +165,10 @@ impl Inventory {
                 ("feature", SettingValue::String(value))
                     if matches!(
                         value.as_str(),
-                        "tokenContractsV1" | "contextAccessorsV1" | "tokenProgressContractsV1"
+                        "tokenContractsV1"
+                            | "contextAccessorsV1"
+                            | "tokenProgressContractsV1"
+                            | "declarativeTokensV1"
                     ) => {}
                 ("tokenAdapter" | "tokenContract", _) => {}
                 ("whitespace", SettingValue::String(value)) => {
@@ -178,6 +181,7 @@ impl Inventory {
         }
         for token in &grammar.tokens {
             match &token.kind {
+                TokenKind::Declarative { .. } => {}
                 TokenKind::Simple { parser_class } => {
                     if crate::lowering::token_expression(&token.kind).is_err() {
                         self.add("P-EXTERNAL-TOKEN", parser_class, token.span);

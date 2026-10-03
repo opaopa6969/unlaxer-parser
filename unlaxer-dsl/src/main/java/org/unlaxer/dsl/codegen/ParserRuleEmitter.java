@@ -26,6 +26,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.RecoveryAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RecoveryMode;
 import org.unlaxer.dsl.bootstrap.UBNFAST.SkipAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.TerminalElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.TokenDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.WhitespaceAnnotation;
 
 import java.util.ArrayList;
@@ -805,6 +806,8 @@ class ParserRuleEmitter {
     ) {
         if (ref.namespace().isPresent()) return PredictorSpec.unknown();
         String name = ref.name();
+        if (ctx.grammar.tokens().stream().anyMatch(token -> token.name().equals(name)
+                && token instanceof TokenDecl.Declarative)) return PredictorSpec.unknown();
         String tokenParser = ctx.tokenParserMap.get(name);
         if (tokenParser != null) return predictorForTokenParser(tokenParser);
         if (!ctx.ruleNames.contains(name)) return PredictorSpec.unknown();

@@ -312,7 +312,10 @@ pub fn feature_diagnostics(grammar: &GrammarDecl) -> Vec<AdapterDiagnostic> {
                 Some("E-FEATURE-VERSION")
             } else if !matches!(
                 value.as_str(),
-                "tokenContractsV1" | "contextAccessorsV1" | "tokenProgressContractsV1"
+                "tokenContractsV1"
+                    | "contextAccessorsV1"
+                    | "tokenProgressContractsV1"
+                    | "declarativeTokensV1"
             ) {
                 Some("E-FEATURE-UNKNOWN")
             } else if !seen.insert(value.clone()) {

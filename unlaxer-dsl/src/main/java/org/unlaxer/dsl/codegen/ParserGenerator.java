@@ -73,10 +73,10 @@ public class ParserGenerator implements CodeGenerator {
             this.grammarName = grammar.name();
             TokenAdapterRegistry adapters = TokenAdapterRegistry.requireValid(grammar);
             this.adapterShadowsWordParser = grammar.tokens().stream()
-                .anyMatch(token -> token instanceof TokenDecl.Adapter
+                .anyMatch(token -> (token instanceof TokenDecl.Adapter || token instanceof TokenDecl.Declarative)
                     && ParserCodegenUtil.toParserClassName(token.name()).equals("WordParser"));
             this.spaceParserClass = grammar.tokens().stream()
-                .anyMatch(token -> token instanceof TokenDecl.Adapter
+                .anyMatch(token -> (token instanceof TokenDecl.Adapter || token instanceof TokenDecl.Declarative)
                     && ParserCodegenUtil.toParserClassName(token.name()).equals("SpaceParser"))
                 ? "org.unlaxer.parser.posix.SpaceParser.class" : "SpaceParser.class";
             SemanticCardinality semantics = new SemanticCardinality(grammar);
@@ -95,7 +95,9 @@ public class ParserGenerator implements CodeGenerator {
             this.tokenCIMap = new LinkedHashMap<>();
             this.tokenRegexMap = new LinkedHashMap<>();
             for (TokenDecl token : grammar.tokens()) {
-                if (token instanceof TokenDecl.Simple s) {
+                if (token instanceof TokenDecl.Declarative lexical) {
+                    tokenParserMap.put(lexical.name(), ParserCodegenUtil.toParserClassName(lexical.name()));
+                } else if (token instanceof TokenDecl.Simple s) {
                     tokenParserMap.put(s.name(), s.parserClass());
                 } else if (token instanceof TokenDecl.Adapter adapter) {
                     int version = Integer.parseInt(adapter.version());
@@ -261,6 +263,7 @@ public class ParserGenerator implements CodeGenerator {
         // Simple / NEGATION / CHAR_RANGE / REGEX トークン用の生成内部クラス
         sb.append(ParserTokenEmitter.generateSimpleTokenWrappers(ctx));
         sb.append(ParserTokenEmitter.generateNegationClasses(ctx));
+        sb.append(ParserTokenEmitter.generateLexicalClasses(ctx));
         sb.append(ParserTokenEmitter.generateCharRangeClasses(ctx));
         sb.append(ParserTokenEmitter.generateRegexClasses(ctx));
 

@@ -86,6 +86,10 @@ pub struct RuleEffects {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression {
+    LexicalToken {
+        name: String,
+        expression: crate::lexical::LexicalExpression,
+    },
     RuleEffects {
         child: Box<Expression>,
         effects: RuleEffects,

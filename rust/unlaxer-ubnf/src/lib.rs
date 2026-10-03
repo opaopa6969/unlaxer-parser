@@ -1,6 +1,7 @@
 //! Java-free UBNF syntax frontend. No imports are opened and no code is executed.
 pub mod ast;
 mod lexer;
+pub mod lexical;
 mod parser;
 pub use ast::*;
 
