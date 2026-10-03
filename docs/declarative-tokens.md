@@ -3,7 +3,7 @@
 初めて読む場合は [図でわかる UBNF v2](ubnf-v2-illustrated-ja.md) から始めてください。
 この文書は認識規約と実装範囲のリファレンスです。
 
-この機能を含む Maven 開発版は `3.2.0-SNAPSHOT`。公開済み `3.1.1` は対応しない。
+この機能を含む Maven 版は `3.2.0` 以降。`3.1.1` は対応しない。
 UBNF の format version と Maven artifact version は別に管理する。
 
 `token NAME ::= expression ;` を認識仕様の正本にする。Java/Rust の generator は式を
