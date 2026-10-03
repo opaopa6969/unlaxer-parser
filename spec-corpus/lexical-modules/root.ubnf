@@ -1,0 +1,11 @@
+grammar LexicalProbe {
+  @import numbers from 'parts/numbers.ubnf'
+  @import pairs from 'parts/pairs.ubnf'
+  @import numbersAgain from 'parts/../parts/numbers.ubnf'
+  @ubnf: v2
+  @package: lexical.probe
+  token DIGIT ::= 'x';
+  token ALL ::= CAPTURE(x, 'a') numbers.NUMBER ':' pairs.PAIR SAME_AS(x);
+  @root @mapping(Value, params=[value])
+  Root ::= (ALL | numbers.NUMBER | numbersAgain.NUMBER) @value;
+}

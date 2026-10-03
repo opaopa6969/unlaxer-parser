@@ -26,6 +26,7 @@ import org.unlaxer.StringSource;
 import org.unlaxer.context.ParseContext;
 import org.unlaxer.dsl.PortabilityCheck;
 import org.unlaxer.dsl.bootstrap.UBNFMapper;
+import org.unlaxer.dsl.bootstrap.UBNFModuleLoader;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
 import org.unlaxer.dsl.codegen.rust.RustBackend;
 import org.unlaxer.parser.Parser;
@@ -34,6 +35,90 @@ import org.unlaxer.parser.Parser;
 public class DeclarativeTokenConformanceTest {
     @Rule public TemporaryFolder temporary = new TemporaryFolder();
     private final Path repo = Path.of("..").toAbsolutePath().normalize();
+
+    @Test public void lexicalModulesHaveIndependentNamesCapturesAndPaths() throws Exception {
+        if (!Boolean.getBoolean("rustConformance")) System.out.println(
+            "[assumption] lexical module conformance requires -DrustConformance=true");
+        assumeTrue(Boolean.getBoolean("rustConformance"));
+        Path fixtures = repo.resolve("spec-corpus/lexical-modules");
+        Path directory = temporary.newFolder().toPath();
+        Path library = directory.resolve("libunlaxer_runtime.rlib");
+        success(run(List.of("rustc", "--edition=2021", "--crate-type=rlib", "--crate-name=unlaxer_runtime",
+            repo.resolve("rust/unlaxer-runtime/src/lib.rs").toString(), "-o", library.toString()), "", false));
+        success(run(List.of("cargo", "build", "--locked", "--manifest-path", repo.resolve("rust/Cargo.toml").toString(),
+            "-p", "unlaxer-generator"), "", false));
+        Path nativeGenerator = repo.resolve("rust/target/debug/unlaxer");
+        GrammarDecl grammar = UBNFModuleLoader.load(fixtures.resolve("root.ubnf")).grammars().get(0);
+        assertTrue(PortabilityCheck.checkFile(fixtures.resolve("root.ubnf")).portable());
+        assertTrue(grammar.imports().isEmpty());
+        assertFalse(grammar.settings().stream().anyMatch(s -> s.key().equals("whitespace")));
+        success(run(List.of(nativeGenerator.toString(), "generate", "--grammar", fixtures.resolve("root.ubnf").toString(),
+            "--output", directory.resolve("generated").toString()), "", true));
+        for (var file : new RustBackend().generate(grammar)) assertEquals(file.relativePath(), file.content(),
+            Files.readString(directory.resolve("generated").resolve(file.relativePath())));
+        Files.writeString(directory.resolve("main.rs"), rustProbe(false));
+        Path binary = directory.resolve("probe");
+        success(run(List.of("rustc", "--edition=2021", "--extern", "unlaxer_runtime=" + library,
+            directory.resolve("main.rs").toString(), "-o", binary.toString()), "", false));
+        var cases = JsonParser.parseString(Files.readString(fixtures.resolve("runtime.json"))).getAsJsonArray();
+        String input = String.join("\n", cases.asList().stream().map(row -> HexFormat.of().formatHex(
+            row.getAsJsonObject().get("input").getAsString().getBytes(StandardCharsets.UTF_8))).toList()) + "\n";
+        Run rust = run(List.of(binary.toString()), input, true);
+        success(rust);
+        var rows = rust.output().lines().toList();
+        assertEquals(cases.size(), rows.size());
+        try (URLClassLoader loader = compileJava(grammar)) {
+            Parser parser = (Parser) loader.loadClass("lexical.probe.LexicalProbeParsers").getMethod("getRootParser").invoke(null);
+            Class<?> mapper = loader.loadClass("lexical.probe.LexicalProbeMapper");
+            for (int i = 0; i < cases.size(); i++) {
+                var row = cases.get(i).getAsJsonObject();
+                String text = row.get("input").getAsString();
+                var actual = JsonParser.parseString(rows.get(i)).getAsJsonObject();
+                JsonArray prefix = new JsonArray();
+                try (var context = new ParseContext(StringSource.createRootSource(text))) {
+                    prefix.add(parser.parse(context).isSucceeded());
+                    prefix.add(context.position()); prefix.add(context.matchedPosition());
+                }
+                assertEquals(text, row.get("prefix"), prefix);
+                assertEquals(text, prefix, actual.get("prefix"));
+                Optional<?> diagnostic = (Optional<?>) mapper.getMethod("diagnose", String.class).invoke(null, text);
+                assertEquals(text, row.has("value"), diagnostic.isEmpty());
+                if (row.has("value")) {
+                    Object mapped = mapper.getMethod("parseWithSourceMap", String.class).invoke(null, text);
+                    Object node = mapped.getClass().getMethod("ast").invoke(mapped);
+                    JsonObject ast = canonical(node, mapped).getAsJsonObject();
+                    assertEquals(row.get("value"), ast.getAsJsonObject("fields").get("value"));
+                    assertEquals(text, ast, actual.get("ast"));
+                } else assertTrue(actual.get("ast").isJsonNull());
+            }
+        }
+        for (var item : JsonParser.parseString(Files.readString(fixtures.resolve("invalid.json"))).getAsJsonArray()) {
+            var fixture = item.getAsJsonObject();
+            Path invalid = temporary.newFolder().toPath();
+            for (var file : fixture.getAsJsonObject("files").entrySet())
+                Files.writeString(invalid.resolve(file.getKey()), file.getValue().getAsString());
+            assertThrows(fixture.get("name").getAsString(), Exception.class, () -> {
+                var g = UBNFModuleLoader.load(invalid.resolve("root.ubnf")).grammars().get(0);
+                new ParserGenerator().generate(g);
+            });
+            Run failed = run(List.of(nativeGenerator.toString(), "generate", "--grammar", invalid.resolve("root.ubnf").toString(),
+                "--output", invalid.resolve("generated").toString()), "", true);
+            assertNotEquals(fixture.get("name") + ": " + failed.output(), 0, failed.code());
+            assertFalse(Files.exists(invalid.resolve("generated")));
+            Run checked = run(List.of(nativeGenerator.toString(), "check", "--target", "rust", "--grammar",
+                invalid.resolve("root.ubnf").toString()), "", true);
+            assertEquals(checked.output(), 3, checked.code());
+            var nativeReport = JsonParser.parseString(checked.output()).getAsJsonObject();
+            var javaReport = PortabilityCheck.checkFile(invalid.resolve("root.ubnf"));
+            assertEquals(fixture.get("name").toString(), javaReport.structure(), nativeReport.get("structure").getAsString());
+            assertEquals(javaReport.diagnostics().size(), nativeReport.getAsJsonArray("diagnostics").size());
+            for (int i = 0; i < javaReport.diagnostics().size(); i++) {
+                var diagnostic = nativeReport.getAsJsonArray("diagnostics").get(i).getAsJsonObject();
+                assertEquals(javaReport.diagnostics().get(i).code(), diagnostic.get("code").getAsString());
+                assertTrue(diagnostic.get("span").isJsonNull());
+            }
+        }
+    }
 
     @Test public void generatedProgramsPreserveCursorsCapturesSpansAndRollback() throws Exception {
         if (!Boolean.getBoolean("rustConformance")) System.out.println(

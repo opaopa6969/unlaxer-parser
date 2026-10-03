@@ -1,0 +1,12 @@
+[
+  {"name":"duplicate-alias","files":{"root.ubnf":"grammar G { @import a from 'child.ubnf' @import a from 'child.ubnf' @ubnf: v2 }","child.ubnf":"grammar C { @ubnf: v2 token T ::= 'a'; }"}},
+  {"name":"cycle","files":{"root.ubnf":"grammar G { @import a from 'child.ubnf' @ubnf: v2 }","child.ubnf":"grammar C { @import a from 'root.ubnf' @ubnf: v2 token T ::= 'a'; }"}},
+  {"name":"undefined-export","files":{"root.ubnf":"grammar G { @import a from 'child.ubnf' @ubnf: v2 token T ::= a.MISSING; }","child.ubnf":"grammar C { @ubnf: v2 token T ::= 'a'; }"}},
+  {"name":"ambiguous-grammar","files":{"root.ubnf":"grammar G { @import a from 'child.ubnf' @ubnf: v2 }","child.ubnf":"grammar A { @ubnf: v2 token T ::= 'a'; } grammar B { @ubnf: v2 token T ::= 'b'; }"}},
+  {"name":"rule-module","files":{"root.ubnf":"grammar G { @import a from 'child.ubnf' @ubnf: v2 }","child.ubnf":"grammar C { @ubnf: v2 @root R ::= 'a'; }"}},
+  {"name":"host-parser-module","files":{"root.ubnf":"grammar G { @import a from 'child.ubnf' @ubnf: v2 }","child.ubnf":"grammar C { token T = org.unlaxer.parser.elementary.NumberParser }"}},
+  {"name":"network","files":{"root.ubnf":"grammar G { @import a from 'https://example.invalid/grammar.ubnf' @ubnf: v2 }"}},
+  {"name":"missing-file","files":{"root.ubnf":"grammar G { @import a from 'missing.ubnf' @ubnf: v2 }"}},
+  {"name":"caller-must-not-resolve-child","files":{"root.ubnf":"grammar G { @import a from 'child.ubnf' @ubnf: v2 token DIGIT ::= '0'; token T ::= a.NUMBER; }","child.ubnf":"grammar C { @ubnf: v2 token NUMBER ::= DIGIT+; }"}},
+  {"name":"private-capture","files":{"root.ubnf":"grammar G { @import a from 'child.ubnf' @ubnf: v2 token T ::= a.T SAME_AS(x); @root @mapping(V,params=[v]) R ::= T @v; }","child.ubnf":"grammar C { @ubnf: v2 token T ::= CAPTURE(x,'a'); }"}}
+]

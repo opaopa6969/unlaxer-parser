@@ -179,8 +179,7 @@ public class CodegenMain {
         boolean ndjsonRequested
     ) throws IOException {
         try {
-            String source = Files.readString(Path.of(config.grammarFile()));
-            UBNFFile ubnf = UBNFMapper.parse(source);
+            UBNFFile ubnf = org.unlaxer.dsl.bootstrap.UBNFModuleLoader.load(Path.of(config.grammarFile()));
             if (ubnf.grammars().isEmpty()) {
                 throw new IllegalArgumentException("no grammar blocks found for parser ir export");
             }

@@ -5,6 +5,13 @@ use unlaxer_ubnf::lexical::{LexicalExpression as Syntax, Op};
 use unlaxer_ubnf::{GrammarDecl, SettingValue, TokenKind};
 
 pub fn compile(grammar: &GrammarDecl) -> Result<HashMap<String, Program>, String> {
+    Ok(compile_syntax(grammar)?
+        .into_iter()
+        .map(|(name, value)| (name, convert(&value)))
+        .collect())
+}
+
+pub(crate) fn compile_syntax(grammar: &GrammarDecl) -> Result<HashMap<String, Syntax>, String> {
     let mut definitions = HashMap::new();
     for token in &grammar.tokens {
         if let TokenKind::Declarative { expression } = &token.kind {
@@ -22,7 +29,11 @@ pub fn compile(grammar: &GrammarDecl) -> Result<HashMap<String, Program>, String
         return Err("declarative tokens require @ubnf: v2".into());
     }
     let mut compiled = HashMap::new();
-    for name in definitions.keys() {
+    for token in &grammar.tokens {
+        let name = &token.name;
+        if !definitions.contains_key(name) {
+            continue;
+        }
         let expression = expand(
             &Syntax::leaf(Op::REF, name.clone()),
             &definitions,
@@ -31,7 +42,7 @@ pub fn compile(grammar: &GrammarDecl) -> Result<HashMap<String, Program>, String
             &mut 0,
         )?;
         validate(&expression, &mut HashSet::new())?;
-        compiled.insert(name.clone(), convert(&expression));
+        compiled.insert(name.clone(), expression);
     }
     Ok(compiled)
 }

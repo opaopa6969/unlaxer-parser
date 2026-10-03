@@ -1,0 +1,5 @@
+grammar Chars {
+  @ubnf: v2
+  token DIGIT ::= CHAR_RANGE('0','9');
+  token EMOJI ::= '😀';
+}
