@@ -78,3 +78,6 @@ Only trusted workflow code should run on a machine with access to local data.
 CI does not overwrite existing Maven settings or the user's default Rust
 toolchain. Central credentials use `settings-central.xml` (or `MAVEN_SETTINGS`),
 not the shared default Maven settings file.
+Maven dependencies persist in the runner's local repository. Do not enable the
+remote `setup-java` Maven cache here: restoring the multi-GB archive on every
+job duplicates that local cache and delays verification without adding coverage.

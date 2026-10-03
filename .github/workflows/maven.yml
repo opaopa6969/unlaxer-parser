@@ -2,6 +2,7 @@ name: Java CI with Maven
 
 # Repository-scoped self-hosted runner. The custom label avoids picking up old
 # queued jobs that target only the generic self-hosted label.
+# Maven dependencies persist locally; do not transfer the multi-GB remote cache.
 
 on:
   push:
@@ -20,7 +21,6 @@ jobs:
         java-version: '21'
         distribution: 'temurin'
         overwrite-settings: false
-        cache: maven
     - name: Set up Rust (minimum supported version)
       run: |
         export PATH="$HOME/.cargo/bin:$PATH"
@@ -145,7 +145,6 @@ jobs:
         java-version: '21'
         distribution: 'temurin'
         overwrite-settings: false
-        cache: maven
 
     - name: Validate Central release guard
       run: |
@@ -187,7 +186,6 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
         overwrite-settings: false
-        cache: maven
 
     - name: Build and test the -jdk17 modules on JDK 17
       run: mvn -B -pl unlaxer-common-jdk17,unlaxer-dsl-jdk17 -am clean package -Dgpg.skip=true
@@ -213,7 +211,6 @@ jobs:
         java-version: '21'
         distribution: 'temurin'
         overwrite-settings: false
-        cache: maven
 
     - name: Set up Node.js (for vsce)
       uses: actions/setup-node@v4
@@ -251,7 +248,6 @@ jobs:
         java-version: '21'
         distribution: 'temurin'
         overwrite-settings: false
-        cache: maven
 
     - name: Install unlaxer to local repo
       working-directory: unlaxer-parser
