@@ -8,6 +8,27 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ## [Unreleased]
 
+## [3.3.0-SNAPSHOT] - Unreleased
+
+### Added
+
+- UBNF VSIX の画面内 catalog/help。6 段階の入門、全文サンプルと成功・失敗入力、
+  構文検索、症状別の修正方法、新規文書で開く操作を追加 (#354)。サンプルの
+  Java / Rust 生成 parser・AST・Unicode 位置を共通テストで検証する。
+- Rust の両生成経路で `@doc` を順序付き `RULE_DOCS` metadata として保持。
+  認識と AST は変えず、portability check でも対応済みとして扱う。
+
+### Changed
+
+- UBNF LSP の用語をメタ文法の AST から抽出。宣言的 token を索引へ登録し、
+  既定の snippet は外部 Java parser binding ではなく v2 の認識定義を使用する。
+- 開発版を 3.3.0-SNAPSHOT とし、公開済みの 3.2.0 は変更しない。Central への公開は未実施。
+
+### Fixed
+
+- VSIX が実行時依存の `vscode-languageclient` を除外していた梱包設定を修正。
+  配布 VSIX を隔離した VS Code に読み込み、拡張起動・help・Java LSP 補完を CI で検証する。
+
 ## [3.2.0] - 2026-10-03
 
 ### Added

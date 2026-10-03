@@ -194,6 +194,7 @@ ASCII bitset・非 ASCII フラグ・nullable・unknown・「sequence が先に 
 - `@rightAssoc`の`Base @left { Op @op Self @right }`形（`Self`は宣言rule自身への直接参照）。同じparamsとprecedenceを用い、右辺を再帰的に生成する。
 - `@whitespace: javaStyle`（ASCII空白、行/ブロックコメント）または`none`。未指定は`none`。rule の `@whitespace` / `@whitespace(javaStyle)` / `@whitespace(none)` と `@interleave(profile=javaStyle|commentsAndSpaces)` による局所設定も生成する。[優先順位・Javaとの共通契約](../docs/rule-trivia.md)を参照。`@package`はRustでは使用しない。
 - `@catalog(context='...')`。解析時には作用せず、rule名・context・local capture名を`parser::CATALOGS`へ保持する。catalogがない文法の出力は変えない。[metadata契約とJava LSPの現状](../docs/catalog-metadata.md)を参照。Rustのcatalog completion/hoverは未実装。
+- `@doc('...')`（3.3.0-SNAPSHOT）。rule 名と順序付き説明を `parser::RULE_DOCS` に保持する。認識・AST は変えない。説明がない文法には定数を出力しない。
 - `@skip`。構文・CST・capture・scope/rollback は保持し、その規則と子の AST 投影を省く。明示 capture は text として保持する。[root・型・移行と検証の契約](../docs/skip-ast-projection.md)を参照。
 - `@scopeTree` / `@declares` / `@backref`。scopeのある文法では宣言への参照、ない文法では同一rule内のcapture比較を行う。構文の受理は変えず意味診断を保持する。[capture選択・空text・CP位置・rollbackの契約](../docs/generated-scope-effects.md)を参照。
 

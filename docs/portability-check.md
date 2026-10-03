@@ -154,7 +154,7 @@ mvn -B -pl unlaxer-common,unlaxer-dsl -am test \
 ```
 
 共有 fixture は [`tests/fixtures/portability`](../rust/unlaxer-generator/tests/fixtures/portability/)。
-21 件の未対応機能を持つ入力、同値の複数出現、Unicode、複数 grammar、構文/構造失敗、
+19 件の未対応機能を持つ入力、同値の複数出現、Unicode、複数 grammar、構文/構造失敗、
 同一 precedence の左右混在を検査する。13 fixture、5 種類の alias chain、2 種類の括弧の入れ子を
 LF/CRLF で比較し、`target/rust-portability.tsv` に 40 ケースの JSON・終了コード一致を残す。
 既存の生成可能な 122 文法でも両 host の check 成功と 610 生成ファイルの byte 一致を検査する。
@@ -166,7 +166,8 @@ SHA-256 は `b3ebead02cf9c4ff2c8d8b56767ca51f3665331d7b84cf1f1fce79d600774347`�
 CI の既存 downstream pin `7d7bd1c` も同じ grammar hash である。
 
 この実文法はすでに **診断 0 件**。過去の未対応状態を装わず、元文法の成功に加え、コピーへ
-`example.UnportedParser` と `@doc` を明示的に注入した負例で 2 件の全件収集を検査する。
+`example.UnportedParser` と未対応の `@portabilityProbe` を明示的に注入した負例で 2 件の全件収集を検査する。
+3.3.0-SNAPSHOT から `@doc` は両 Rust emitter が metadata として保持するため、未対応診断には含めない。
 注入負例を実 TinyExpression の未対応件数として扱わない。
 
 ```sh

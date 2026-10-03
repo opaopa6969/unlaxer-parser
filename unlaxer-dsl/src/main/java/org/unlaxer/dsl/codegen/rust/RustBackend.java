@@ -180,6 +180,18 @@ public final class RustBackend {
             });
             out.append("];\n");
         }
+        if (ir.rules().stream().anyMatch(rule -> !rule.documentation().isEmpty())) {
+            out.append("\n/// Ordered rule documentation; does not affect parsing.\n")
+                .append("pub const RULE_DOCS: &[(&str, &[&str])] = &[\n");
+            for (var rule : ir.rules()) {
+                if (rule.documentation().isEmpty()) continue;
+                out.append("    (").append(quote(rule.name())).append(", &[")
+                    .append(rule.documentation().stream().map(RustBackend::quote)
+                        .collect(java.util.stream.Collectors.joining(", ")))
+                    .append("]),\n");
+            }
+            out.append("];\n");
+        }
         return out.toString();
     }
 

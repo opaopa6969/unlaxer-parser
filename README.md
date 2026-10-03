@@ -13,6 +13,9 @@
 
 # unlaxer-parser
 
+Development: **3.3.0-SNAPSHOT** (not published). The dependency examples below use the latest stable **3.2.0**.
+The development UBNF VSIX includes an in-editor [beginner catalog/help](unlaxer-dsl/ubnf-vscode/README.md).
+
 **Write a grammar, get a language — Parser + AST + Evaluator + LSP + DAP, all generated**
 
 [![Maven Central](https://img.shields.io/maven-central/v/org.unlaxer/unlaxer-common)](https://central.sonatype.com/artifact/org.unlaxer/unlaxer-common)

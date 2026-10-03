@@ -206,6 +206,22 @@ fn parser(ir: &GrammarIr) -> String {
         }
         out.push_str("];\n");
     }
+    if ir.rules.iter().any(|rule| !rule.documentation.is_empty()) {
+        out.push_str("\n/// Ordered rule documentation; does not affect parsing.\npub const RULE_DOCS: &[(&str, &[&str])] = &[\n");
+        for rule in &ir.rules {
+            if rule.documentation.is_empty() {
+                continue;
+            }
+            let paragraphs = rule
+                .documentation
+                .iter()
+                .map(|text| quote(text))
+                .collect::<Vec<_>>()
+                .join(", ");
+            writeln!(out, "    ({}, &[{}]),", quote(&rule.name), paragraphs).unwrap();
+        }
+        out.push_str("];\n");
+    }
     out
 }
 

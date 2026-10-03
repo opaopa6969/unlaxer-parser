@@ -4,11 +4,47 @@ This is the VS Code extension for `.ubnf` files — and it is **generated
 from `ubnf.ubnf`**, the meta-grammar that describes the UBNF syntax in
 UBNF itself.
 
-In other words: this directory is where unlaxer eats its own dog food.
-Every keyword completion, every diagnostic, every "go to definition"
-that this extension provides was synthesized by feeding `ubnf.ubnf`
-through the same code generators that ship to end-users via
-`unlaxer init`.
+The base LSP is generated from the meta-grammar. The handwritten extension adds
+validation, navigation, snippets and authoring help. Keyword vocabulary is read
+from the meta-grammar AST; descriptions and tutorials are maintained separately.
+This is not yet a fully generated replacement for the handwritten UBNF frontend.
+
+## はじめて使う場合：画面内の catalog/help
+
+拡張をインストールしたら、コマンドパレットから
+**UBNF: はじめの一歩 / Catalog・Help** を開いてください。
+`.ubnf` のエディタ右上の本のアイコン、および VS Code の Getting Started からも開けます。
+
+- **はじめの一歩**：単語 → 数字 → 代入 → リスト → 文字列 → 同じ区切りの6段階。
+  文法の全文、行ごとの意味、成功入力・失敗入力、確認項目を同じ画面に表示します。
+- **構文 catalog**：日本語のやりたいこと・記号・キーワードから検索できます。
+- **困ったとき**：文法エラー、未定義名、入口、空白、左再帰、Unicode位置、LSP起動の直し方。
+- **新規文書で開く**：同梱サンプルを未保存の新規 UBNF 文書に開きます。既存文書を変更しません。
+  `.ubnf` として保存すると LSP が診断します。
+
+help は LSP が起動できなくても利用でき、外部サイト・CDN・通信は不要です。
+試験入力欄の成功/失敗はテスト済みの**期待値**で、help 画面で解析を実行した結果ではありません。
+言語用 playground の生成・実行は親 issue #353 で接続する次の工程です。
+
+共通 assets は `../src/main/resources/ubnf-help/` にあります。`npm run compile` で
+`help-dist/` にコピーされ、VSIX に同梱されます。`catalog.json` の全文例は
+`DeclarativeTokenConformanceTest#authoringCatalogExamplesAgreeInJavaAndRust` が
+Java / Rust の受理・拒否、消費位置、AST・Unicode span、両 Rust emitter の一致を検証します。
+
+```bash
+npm ci
+npx playwright install chromium
+npm run test:help
+# Linux: 配布する VSIX そのものを、隔離した VS Code profile で起動検証
+xvfb-run -a npm run test:vsix -- target/ubnf-lsp-3.3.0-SNAPSHOT.vsix
+```
+
+Chromium で全レッスン・検索・ダウンロード・モバイル幅を操作し、別のテストで
+webview から未検証のパスやコマンドを受け付けないことを確認します。
+スクリーンショットは `target/ubnf-help-desktop.png` と `target/ubnf-help-mobile.png` です。
+VSIX smoke は配布物を一時ディレクトリへ展開し、拡張の起動・help の表示・同梱 Java LSP の
+補完を検証します。ユーザーの VS Code profile や拡張には触れません。初回は公式の VS Code
+テスト用実行ファイルをダウンロードするためネットワーク接続が必要です。
 
 ## Why this exists
 

@@ -113,7 +113,7 @@ public class RustPortabilityConformanceTest {
         // Regression evidence stays tied to the real pinned grammar, not an invented tiny subset.
         assertEquals("b3ebead02cf9c4ff2c8d8b56767ca51f3665331d7b84cf1f1fce79d600774347", hash);
         String injected = source.replaceFirst("(?m)^([ \\t]*)token ", "$1token PORTABILITY_PROBE = example.UnportedParser\n$1token ")
-            .replaceFirst("(?m)^([ \\t]*)@root\\b", "$1@doc('portability probe')\n$1@root");
+            .replaceFirst("(?m)^([ \\t]*)@root\\b", "$1@portabilityProbe\n$1@root");
         assertNotEquals(source, injected);
         List<String> report = new ArrayList<>(List.of("case\tline_endings\tbaseline_sha256\tdiagnostics\tresult"));
         for (String ending : List.of("LF", "CRLF")) {

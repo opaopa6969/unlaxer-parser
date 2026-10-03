@@ -299,7 +299,7 @@ impl Inventory {
                 }
             }
             AnnotationKind::Eval { .. } => self.add("P-ANNOTATION", "eval", span),
-            AnnotationKind::Doc { .. } => self.add("P-ANNOTATION", "doc", span),
+            AnnotationKind::Doc { .. } => {}
             AnnotationKind::Recovery { .. } => self.add("P-ANNOTATION", "recovery", span),
             AnnotationKind::Skip => {}
             AnnotationKind::Simple { name } => self.add("P-ANNOTATION", name, span),

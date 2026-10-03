@@ -89,6 +89,14 @@
 	</dependencies>
 
 	<build>
+		<resources>
+			<resource><directory>src/main/resources</directory></resource>
+			<resource>
+				<directory>grammar</directory>
+				<includes><include>ubnf.ubnf</include></includes>
+				<targetPath>ubnf-help</targetPath>
+			</resource>
+		</resources>
 		<plugins>
 			<plugin>
 				<artifactId>maven-clean-plugin</artifactId>

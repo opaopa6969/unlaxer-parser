@@ -308,6 +308,7 @@ impl Lowering<'_> {
                             return Err(format!("duplicate @catalog on {}", rule.name));
                         }
                     }
+                    AnnotationKind::Doc { .. } => {}
                     other => {
                         return Err(format!("unsupported annotation {other:?} on {}", rule.name))
                     }
@@ -526,6 +527,17 @@ impl Lowering<'_> {
                 mapping: if self.skips[i] { None } else { mapping },
                 operator: self.operators[i],
                 catalog,
+                documentation: self.grammar.rules[i]
+                    .annotations
+                    .iter()
+                    .filter_map(|annotation| {
+                        if let AnnotationKind::Doc { text } = &annotation.kind {
+                            Some(text.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect(),
             });
         }
         // A shared variant has one public type contract, independent of declaration order.

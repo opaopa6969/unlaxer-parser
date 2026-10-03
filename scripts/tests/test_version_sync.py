@@ -17,7 +17,20 @@ pom = read("pom.xml")
 match = re.search(r"<revision>([^<]+)</revision>", pom)
 if match is None:
     raise SystemExit("pom.xml has no <revision>")
-version = match.group(1)
+revision = match.group(1)
+# Consumer instructions name the last immutable release, not an unpublished
+# development coordinate. Development must still have its own changelog entry.
+version = revision
+if revision.endswith("-SNAPSHOT"):
+    release = re.search(r"^## \[(\d+\.\d+\.\d+)\] - ", read("CHANGELOG.md"), re.MULTILINE)
+    if release is None:
+        raise SystemExit("No stable release found in CHANGELOG.md")
+    version = release.group(1)
+    if f"## [{revision}]" not in read("CHANGELOG.md"):
+        raise SystemExit(f"Missing development changelog: {revision}")
+    for path in ("README.md", "README-ja.md"):
+        if revision not in read(path):
+            raise SystemExit(f"{path}: missing development revision {revision}")
 
 required = {
     "README.md": [
@@ -65,4 +78,4 @@ if errors:
         print(f"- {error}", file=sys.stderr)
     raise SystemExit(1)
 
-print(f"Documentation version sync OK: {version}")
+print(f"Documentation version sync OK: release={version}, development={revision}")
