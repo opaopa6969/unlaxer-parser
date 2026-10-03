@@ -9,7 +9,7 @@ on:
 jobs:
   rust:
     name: Rust backend and Java conformance
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-java@v4
@@ -125,7 +125,7 @@ jobs:
         if-no-files-found: error
 
   build:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
     - uses: actions/checkout@v4
@@ -166,7 +166,7 @@ jobs:
   # class file major 61 in every class of their jars.
   build-jdk17:
     name: "*-jdk17 artifacts on JDK 17"
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
     - uses: actions/checkout@v4
@@ -191,7 +191,7 @@ jobs:
   # release-vsix.yml を参照。
   vsix:
     name: UBNF VSIX (ubnf-vscode)
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
     - uses: actions/checkout@v4
@@ -226,7 +226,7 @@ jobs:
   # ビルド中の unlaxer に対して downstream の smoke を回し、再発を防ぐ。
   downstream:
     name: Downstream smoke (tinyexpression)
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
     - uses: actions/checkout@v4
