@@ -159,8 +159,9 @@ jobs:
     - name: Package library jars and check class file majors
       run: |
         mvn -B -pl .,unlaxer-common,unlaxer-dsl,unlaxer-common-jdk17,unlaxer-dsl-jdk17 package -DskipTests -Dgpg.skip=true
-        python3 scripts/check_class_major.py 65 unlaxer-common/target/unlaxer-common-*[0-9].jar unlaxer-dsl/target/unlaxer-dsl-*[0-9].jar
-        python3 scripts/check_class_major.py 61 unlaxer-common-jdk17/target/unlaxer-common-jdk17-*[0-9].jar unlaxer-dsl-jdk17/target/unlaxer-dsl-jdk17-*[0-9].jar
+        artifact_version=$(mvn -q help:evaluate -Dexpression=revision -DforceStdout)
+        python3 scripts/check_class_major.py 65 "unlaxer-common/target/unlaxer-common-${artifact_version}.jar" "unlaxer-dsl/target/unlaxer-dsl-${artifact_version}.jar"
+        python3 scripts/check_class_major.py 61 "unlaxer-common-jdk17/target/unlaxer-common-jdk17-${artifact_version}.jar" "unlaxer-dsl-jdk17/target/unlaxer-dsl-jdk17-${artifact_version}.jar"
 
     # 静的解析 (issue #37): Error Prone (compile 時) + SpotBugs。
     # 生成コードは除外 (config/spotbugs-exclude.xml / -XepExcludedPaths)。
@@ -191,10 +192,9 @@ jobs:
       run: mvn -B -pl unlaxer-common-jdk17,unlaxer-dsl-jdk17 -am clean package -Dgpg.skip=true
 
     - name: Require class file major 61 (Java 17) in the -jdk17 jars
-      run: >
-        python3 scripts/check_class_major.py 61
-        unlaxer-common-jdk17/target/unlaxer-common-jdk17-*[0-9].jar
-        unlaxer-dsl-jdk17/target/unlaxer-dsl-jdk17-*[0-9].jar
+      run: |
+        artifact_version=$(mvn -q help:evaluate -Dexpression=revision -DforceStdout)
+        python3 scripts/check_class_major.py 61 "unlaxer-common-jdk17/target/unlaxer-common-jdk17-${artifact_version}.jar" "unlaxer-dsl-jdk17/target/unlaxer-dsl-jdk17-${artifact_version}.jar"
 
   # UBNF VSIX を成果物として添付する。タグ push 時の Release 添付は
   # release-vsix.yml を参照。
@@ -222,6 +222,16 @@ jobs:
 
     - name: Build ubnf-vscode VSIX
       run: mvn -B -pl unlaxer-dsl/ubnf-vscode verify -Dgpg.skip=true
+
+    - name: Verify authoring help in Chromium and the webview host
+      working-directory: unlaxer-dsl/ubnf-vscode
+      run: |
+        npx playwright install chromium
+        npm run test:help
+
+    - name: Activate the packaged VSIX with isolated VS Code profiles
+      working-directory: unlaxer-dsl/ubnf-vscode
+      run: xvfb-run -a npm run test:vsix
 
     - name: Upload VSIX artifact
       uses: actions/upload-artifact@v4

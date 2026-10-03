@@ -15,6 +15,8 @@ pub struct Rule {
     pub mapping: Option<Mapping>,
     pub operator: Option<Operator>,
     pub catalog: Option<Catalog>,
+    /// Ordered @doc paragraphs. Tooling metadata; never changes recognition.
+    pub documentation: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

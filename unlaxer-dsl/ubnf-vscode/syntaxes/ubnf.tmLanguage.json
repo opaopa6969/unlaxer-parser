@@ -64,7 +64,7 @@
     },
     "annotation": {
       "name": "storage.modifier.annotation.ubnf",
-      "match": "@(root|mapping|whitespace|leftAssoc|rightAssoc|precedence|enum|commonField|scopeTree|declares|backref|import|recovery|skip|interleave|typeof|catalog|eval|doc|package|comment)\\b"
+      "match": "@(ubnf|feature|tokenContract|tokenAdapter|contextAccessor|root|mapping|whitespace|leftAssoc|rightAssoc|longestChoice|predictiveChoice|precedence|enum|commonField|scopeTree|declares|backref|import|recovery|skip|interleave|typeof|catalog|eval|doc|package|comment)\\b"
     },
     "capture": {
       "name": "variable.other.capture.ubnf",

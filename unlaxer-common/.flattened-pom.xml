@@ -5,11 +5,11 @@
   <parent>
     <groupId>org.unlaxer</groupId>
     <artifactId>unlaxer-parser</artifactId>
-    <version>3.2.0</version>
+    <version>3.3.0-SNAPSHOT</version>
   </parent>
   <groupId>org.unlaxer</groupId>
   <artifactId>unlaxer-common</artifactId>
-  <version>3.2.0</version>
+  <version>3.3.0-SNAPSHOT</version>
   <name>unlaxer-common</name>
   <description>Unlaxer parser combinator inspired by RelaxNG</description>
   <url>https://github.com/opaopa6969/unlaxer-parser</url>

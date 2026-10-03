@@ -3,10 +3,11 @@
     "prefix": "grammar",
     "body": [
       "grammar ${1:Name} {",
+      "  @ubnf: v2",
       "  @package: ${2:org.example}",
       "",
-      "  token ${3:NUMBER} = org.unlaxer.parser.elementary.NumberParser",
-      "  token ${4:IDENTIFIER} = org.unlaxer.parser.clang.IdentifierParser",
+      "  token ${3:NUMBER} ::= CHAR_RANGE('0', '9')+;",
+      "  token ${4:IDENTIFIER} ::= (CHAR_RANGE('a', 'z') | '_')+;",
       "",
       "  @root",
       "  ${5:Start} ::= ${6:NUMBER} ;",
@@ -41,8 +42,8 @@
   },
   "Token declaration": {
     "prefix": "token",
-    "body": ["token ${1:NAME} = ${2:org.unlaxer.parser.elementary.NumberParser}"],
-    "description": "Token declaration with fully qualified parser class"
+    "body": ["token ${1:NAME} ::= ${2:CHAR_RANGE('0', '9')+};"],
+    "description": "Declarative token: generate recognition from the grammar"
   },
   "UNTIL token": {
     "prefix": "until",
@@ -52,7 +53,7 @@
   "Grammar import": {
     "prefix": "import",
     "body": ["@import ${1:alias} from '${2:path/to/base.ubnf}'"],
-    "description": "Import rules from another grammar"
+    "description": "Import declarative tokens; place before settings and refer to alias.TOKEN"
   },
   "Scope rule": {
     "prefix": "scope-rule",

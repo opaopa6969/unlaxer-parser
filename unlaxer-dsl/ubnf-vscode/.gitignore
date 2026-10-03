@@ -1,5 +1,7 @@
 node_modules/
+.vscode-test/
 out/
 target/
 server-dist/
+help-dist/
 *.vsix

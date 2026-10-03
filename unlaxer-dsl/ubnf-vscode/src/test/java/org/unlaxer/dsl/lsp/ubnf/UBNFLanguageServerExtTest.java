@@ -54,6 +54,24 @@ import org.junit.Test;
  */
 public class UBNFLanguageServerExtTest {
 
+    @Test public void declarativeTokensAreIndexedAndVocabularyIncludesV2() {
+        var server = new UBNFLanguageServerExt();
+        var index = server.ensureIndex("file:///new.ubnf", """
+            grammar New {
+              @ubnf: v2
+              token NUMBER ::= CHAR_RANGE('0', '9')+;
+              @root
+              Start ::= NUMBER;
+            }
+            """);
+        assertTrue(index.decls.containsKey("NUMBER"));
+        assertEquals("token", index.decls.get("NUMBER").kind());
+        assertEquals(2, index.decls.get("NUMBER").line());
+        assertTrue(UBNFLanguageServerExt.CORE_KEYWORDS.containsAll(List.of("CAPTURE", "SAME_AS", "ADAPTER", "BOF")));
+        assertTrue(UBNFLanguageServerExt.BLOCK_SNIPPETS.get(0).body().contains("@ubnf: v2"));
+        assertFalse(UBNFLanguageServerExt.BLOCK_SNIPPETS.get(0).body().contains("NumberParser"));
+    }
+
     private static final String URI = "file:///sample.ubnf";
 
     private static final String VALID_UBNF = """
@@ -192,6 +210,20 @@ public class UBNFLanguageServerExtTest {
         List<CompletionItem> items = service.completion(params).get().getLeft();
         assertTrue(items.stream()
             .anyMatch(i -> i.getLabel().equals("org.unlaxer.parser.elementary.NumberParser")));
+    }
+
+    @Test
+    public void declarativeCompletionAndHoverShareBeginnerHelp() throws Exception {
+        open("grammar G {\n  @ubnf: v2\n  token NUMBER ::= CHAR_RANGE('0', '9')+;\n  @root\n  Start ::= NUMBER;\n}\n");
+        var items = service.completion(new CompletionParams(new TextDocumentIdentifier(URI), new Position(2, 19))).get().getLeft();
+        var range = items.stream().filter(item -> item.getLabel().equals("CHAR_RANGE")).findFirst().orElseThrow();
+        assertTrue(range.getDocumentation().getRight().getValue().contains("1 文字"));
+        assertTrue(items.stream().anyMatch(item -> item.getLabel().equals("CAPTURE")));
+        var hover = service.hover(new HoverParams(new TextDocumentIdentifier(URI), new Position(2, 24))).get();
+        assertTrue(hover.getContents().getRight().getValue().contains("1 文字"));
+        var locations = service.definition(new DefinitionParams(new TextDocumentIdentifier(URI), new Position(4, 14))).get().getLeft();
+        assertEquals(1, locations.size());
+        assertEquals(2, locations.get(0).getRange().getStart().getLine());
     }
 
     @Test

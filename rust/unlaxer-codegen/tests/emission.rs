@@ -111,6 +111,7 @@ fn parser_only_raw_ir_requires_a_root_reachable_projection_boundary() {
             mapping: None,
             operator: None,
             catalog: None,
+            documentation: Vec::new(),
         }
     }
     let equality = Expression::CaptureEquality {
@@ -517,6 +518,7 @@ fn expression_variants_escape_unicode_and_control_characters() {
         mapping: None,
         operator: None,
         catalog: None,
+        documentation: Vec::new(),
         body: Sequence(vec![
             Literal("\"\\\n\r\t\0\u{7f}😀".into()),
             AnyToken,

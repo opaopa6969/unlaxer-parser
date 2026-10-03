@@ -1,6 +1,7 @@
 import * as path from "path";
 import * as vscode from "vscode";
 import { LanguageClient, LanguageClientOptions, ServerOptions } from "vscode-languageclient/node";
+import { registerHelp } from "./help";
 
 let client: LanguageClient | undefined;
 let outputChannel: vscode.OutputChannel | undefined;
@@ -10,6 +11,7 @@ function getBundledJarPath(context: vscode.ExtensionContext): string {
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  registerHelp(context);
   const config: vscode.WorkspaceConfiguration =
     vscode.workspace.getConfiguration("ubnfLsp");
 

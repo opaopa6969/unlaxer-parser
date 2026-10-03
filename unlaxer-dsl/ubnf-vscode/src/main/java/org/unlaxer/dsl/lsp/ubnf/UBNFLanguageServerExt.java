@@ -61,6 +61,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST;
 import org.unlaxer.dsl.bootstrap.UBNFMapper;
 import org.unlaxer.dsl.bootstrap.generated.UBNFLanguageServer;
 import org.unlaxer.dsl.codegen.GrammarValidator;
+import org.unlaxer.dsl.tooling.AuthoringCatalog;
 
 /**
  * UBNF 文法編集向けのリッチ LSP 実装。生成された {@link UBNFLanguageServer} を
@@ -80,6 +81,9 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
     record AnnotationDoc(String label, String snippet, String signature, String doc) {}
 
     static final List<AnnotationDoc> ANNOTATIONS = List.of(
+        new AnnotationDoc("@ubnf", "@ubnf: v2", "@ubnf: v2", "文法形式 v2 を指定します。製品のバージョンとは別です。"),
+        new AnnotationDoc("@feature", "@feature: ${1:declarativeTokensV1}", "@feature: name", "この文法に必要な機能契約を記録します。"),
+        new AnnotationDoc("@package", "@package: ${1:org.example}", "@package: name", "生成 Java コードのパッケージです。"),
         new AnnotationDoc("@root", "@root", "@root",
             "Marks the grammar entry point. Exactly one rule must be annotated."),
         new AnnotationDoc("@mapping", "@mapping(${1:TypeName}, params=[${2:field}])",
@@ -105,9 +109,9 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
             "Marks the capture as a reference to a previously declared symbol."),
         new AnnotationDoc("@import", "@import ${1:alias} from '${2:path/to/grammar.ubnf}'",
             "@import alias from 'path'",
-            "Imports rules from another .ubnf grammar."),
+            "宣言的 token の部品を相対パスから読み込みます。設定より前に置き、alias.TOKEN で参照します。任意のルール import は未対応です。"),
         new AnnotationDoc("@recovery", "@recovery(${1:sync})", "@recovery(sync|auto|skip)",
-            "Error recovery strategy for this rule."),
+            "Recovery metadata. Execution support depends on the backend; do not assume recognition implies recovery support."),
         new AnnotationDoc("@skip", "@skip", "@skip",
             "Excludes this rule from AST output."),
         new AnnotationDoc("@interleave", "@interleave(${1:profile})", "@interleave(profile)",
@@ -135,18 +139,16 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
         "org.unlaxer.parser.posix.CommaParser",
         "org.unlaxer.parser.posix.SemiColonParser");
 
-    static final List<String> CORE_KEYWORDS = List.of(
-        "grammar", "token", "params", "from", "level", "mode", "symbol",
-        "UNTIL", "NEGATION", "LOOKAHEAD", "NEGATIVE_LOOKAHEAD", "CHAR_RANGE",
-        "REGEX", "ANY", "EOF", "EMPTY", "CI");
+    static final List<String> CORE_KEYWORDS = AuthoringCatalog.keywords();
+    private static final com.google.gson.JsonObject CATALOG = com.google.gson.JsonParser.parseString(AuthoringCatalog.json()).getAsJsonObject();
 
     record BlockSnippet(String label, String detail, String body) {}
 
     static final List<BlockSnippet> BLOCK_SNIPPETS = List.of(
         new BlockSnippet("grammar", "grammar block skeleton",
-            "grammar ${1:Name} {\n  @package: ${2:org.example}\n\n  token ${3:NUMBER} = org.unlaxer.parser.elementary.NumberParser\n\n  @root\n  ${4:Start} ::= ${5:NUMBER} ;\n}$0"),
+            "grammar ${1:Name} {\n  @ubnf: v2\n  @package: ${2:org.example}\n\n  token ${3:NUMBER} ::= CHAR_RANGE('0', '9')+;\n\n  @root\n  ${4:Start} ::= ${3:NUMBER};\n}$0"),
         new BlockSnippet("token", "token declaration",
-            "token ${1:NAME} = ${2:org.unlaxer.parser.elementary.NumberParser}$0"),
+            "token ${1:NAME} ::= ${2:CHAR_RANGE('0', '9')+};$0"),
         new BlockSnippet("rule", "plain rule",
             "${1:RuleName} ::= ${2:body} ;$0"),
         new BlockSnippet("mapped-rule", "rule with @mapping record",
@@ -177,7 +179,7 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
     private final Map<String, DocumentIndex> indexByUri = new LinkedHashMap<>();
 
     private static final Pattern GRAMMAR_DECL = Pattern.compile("^[ \\t]*grammar[ \\t]+([A-Za-z_]\\w*)", Pattern.MULTILINE);
-    private static final Pattern TOKEN_DECL = Pattern.compile("^[ \\t]*token[ \\t]+([A-Za-z_]\\w*)[ \\t]*=[ \\t]*(\\S+)", Pattern.MULTILINE);
+    private static final Pattern TOKEN_DECL = Pattern.compile("^[ \\t]*token[ \\t]+([A-Za-z_]\\w*)[ \\t]*(?:::=|=)[ \\t]*(\\S+)", Pattern.MULTILINE);
     private static final Pattern RULE_DECL = Pattern.compile("^[ \\t]*([A-Za-z_]\\w*)[ \\t]*::=", Pattern.MULTILINE);
 
     DocumentIndex ensureIndex(String uri, String content) {
@@ -379,7 +381,8 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
                     CompletionItem item = new CompletionItem(annotation.label());
                     item.setKind(CompletionItemKind.Event);
                     item.setDetail(annotation.signature());
-                    item.setDocumentation(markdown(annotation.doc()));
+                    String help = catalogHelp(annotation.label().substring(1));
+                    item.setDocumentation(markdown(help == null ? annotation.doc() : help));
                     item.setInsertTextFormat(InsertTextFormat.Snippet);
                     // 行内の '@' から補完が始まるので '@' を除いた snippet を挿入
                     item.setInsertText(annotation.snippet().substring(1));
@@ -403,6 +406,8 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
             for (String keyword : CORE_KEYWORDS) {
                 CompletionItem item = new CompletionItem(keyword);
                 item.setKind(CompletionItemKind.Keyword);
+                String help = catalogHelp(keyword);
+                if (help != null) item.setDocumentation(markdown(help));
                 items.add(item);
             }
             for (BlockSnippet snippet : BLOCK_SNIPPETS) {
@@ -435,6 +440,8 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
             DocumentIndex index = server.ensureIndex(uri, content);
             String word = wordAt(content, params.getPosition(), true);
             if (word != null && word.startsWith("@")) {
+                String help = catalogHelp(word.substring(1));
+                if (help != null) return CompletableFuture.completedFuture(new Hover(markdown(help)));
                 for (AnnotationDoc annotation : ANNOTATIONS) {
                     if (annotation.label().equals(word)) {
                         return CompletableFuture.completedFuture(new Hover(markdown(
@@ -443,6 +450,10 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
                 }
             }
             String plain = word != null && word.startsWith("@") ? word.substring(1) : word;
+            String help = plain == null ? null : catalogHelp(plain);
+            if (help != null && (word.startsWith("@") || CORE_KEYWORDS.contains(plain))) {
+                return CompletableFuture.completedFuture(new Hover(markdown(help)));
+            }
             DeclSite decl = plain == null ? null : index.decls.get(plain);
             if (decl != null) {
                 StringBuilder md = new StringBuilder();
@@ -689,6 +700,19 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
             }
             return CompletableFuture.completedFuture(new SemanticTokens(tokenize(content)));
         }
+    }
+
+    private static String catalogHelp(String id) {
+        for (var item : CATALOG.getAsJsonArray("entries")) {
+            var entry = item.getAsJsonObject();
+            if (!entry.get("id").getAsString().equals(id)) continue;
+            StringBuilder text = new StringBuilder(entry.get("title").getAsString());
+            text.append("\n\n").append(entry.get("summary").getAsString());
+            text.append("\n\n```ubnf\n").append(entry.get("syntax").getAsString()).append("\n```");
+            for (var detail : entry.getAsJsonArray("details")) text.append("\n\n").append(detail.getAsString());
+            return text.toString();
+        }
+        return null;
     }
 
     // =========================================================================

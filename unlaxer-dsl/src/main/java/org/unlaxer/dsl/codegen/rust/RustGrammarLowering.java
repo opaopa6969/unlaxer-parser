@@ -132,6 +132,8 @@ public final class RustGrammarLowering {
                         throw unsupported("mapping method collision " + previous + " / " + value.className());
                     }
                     mapping = value;
+                } else if (annotation instanceof DocAnnotation) {
+                    // Preserved as ordered tooling metadata on the lowered rule below.
                 } else if (annotation instanceof SkipAnnotation) {
                     // The complete projection boundary is carried separately from syntax.
                 } else if (annotation instanceof LeftAssocAnnotation) {
@@ -279,7 +281,10 @@ public final class RustGrammarLowering {
                 ruleBody = new PredictiveChoice(alternatives, alternatives.stream()
                     .map(alternative -> firstPredictor(alternative, new HashSet<>(), predictorCache)).toList());
             }
-            rules.add(new Rule(grammar.rules().get(i).name(), ruleBody, mapping, operators.get(i), catalog, skips.get(i)));
+            var documentation = grammar.rules().get(i).annotations().stream()
+                .filter(DocAnnotation.class::isInstance).map(DocAnnotation.class::cast)
+                .map(DocAnnotation::text).toList();
+            rules.add(new Rule(grammar.rules().get(i).name(), ruleBody, mapping, operators.get(i), catalog, skips.get(i), documentation));
         }
         List<Rule> rewritten = new ArrayList<>();
         boolean hasValues = variants.values().stream().flatMap(mapping -> mapping.fields().stream())
@@ -299,7 +304,7 @@ public final class RustGrammarLowering {
             if (hasLocalTrivia) expression = new TriviaScope(expression, ruleWhitespace.get(i));
             if (ruleEffects.get(i) != null) expression = new RuleEffects(expression, ruleEffects.get(i));
             if (comparisons.get(i) != null) expression = new CaptureEquality(expression, comparisons.get(i));
-            rewritten.add(new Rule(rule.name(), expression, mapping, rule.operator(), rule.catalog(), rule.skip()));
+            rewritten.add(new Rule(rule.name(), expression, mapping, rule.operator(), rule.catalog(), rule.skip(), rule.documentation()));
         }
         return new GrammarIR(rewritten, root, whitespace);
     }

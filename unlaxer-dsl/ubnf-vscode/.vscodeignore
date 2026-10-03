@@ -1,9 +1,11 @@
 .vscode/**
 src/**
+scripts/**
 .gitignore
 tsconfig.json
 **/*.ts
 **/*.map
-node_modules/**
+.vscode-test/**
+.flattened-pom.xml
 target/**
 pom.xml
