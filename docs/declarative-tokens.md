@@ -1,5 +1,8 @@
 # 宣言的 token — UBNF format 2
 
+この機能を含む Maven 開発版は `3.2.0-SNAPSHOT`。公開済み `3.1.1` は対応しない。
+UBNF の format version と Maven artifact version は別に管理する。
+
 `token NAME ::= expression ;` を認識仕様の正本にする。Java/Rust の generator は式を
 構造化した字句プログラムへコンパイルする。生成 parser は FQN の認識実装を呼ばず、
 UBNF ソースを実行時に再解析しない。従来の `token NAME = ...` は互換形式として残る。
