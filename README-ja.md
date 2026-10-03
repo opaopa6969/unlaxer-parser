@@ -20,11 +20,11 @@
 [![Maven Central](https://img.shields.io/maven-central/v/org.unlaxer/unlaxer-common)](https://central.sonatype.com/artifact/org.unlaxer/unlaxer-common)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Java 21+](https://img.shields.io/badge/Java-21%2B-orange.svg)]()
-[![Version](https://img.shields.io/badge/version-3.1.1-blue)]()
+[![Version](https://img.shields.io/badge/version-3.2.0-blue)]()
 
 ---
 
-> **最新リリース — 3.1.1**: 後方互換の minor リリース。実行時 FIRST 集合による候補除外で、大きい入力の deferred 診断モードの CPU コストを約半分に削減（6 ラウンドの計測詳細は CHANGELOG 参照）。UBNF bootstrap は Rust frontend と同様に末尾未消費入力を拒否し、空文法を受理するようになりました。自己ホスト文法での 3 段以上の dotted 参照（`a.b.Value`）も正しくパースできます。全履歴は [CHANGELOG](./CHANGELOG.md) を参照してください。履歴上の注意: **3.0.2 は Maven Central に公開されていません** — 3.0.1 からアップグレードする場合は 3.0.3 以降へ直接進んでください。`unlaxer-common` または `unlaxer-dsl` の `2.x` に依存している場合は、[CHANGELOG](./CHANGELOG.md) と下記の[downstream ドリフト警告](#downstream-ドリフト警告)を参照してください。
+> **最新リリース — 3.2.0**: UBNF v2 の宣言的 token と字句 grammar の部品化に対応。NUMBER・STRING・可変長 fence の認識仕様を UBNF 自体に書き、Java/Rust の parser を生成できます。token/context 契約、portability check、生成 API の差分レポートも追加しました。[図でわかる UBNF v2](./docs/ubnf-v2-illustrated-ja.md) から始められます。Java 21 と Java 17 用 artifact の区別は維持します。全履歴・制限は [CHANGELOG](./CHANGELOG.md) を参照してください。履歴上の注意: **3.0.2 は Maven Central に公開されていません**。`2.x` からの移行は下記の[downstream ドリフト警告](#downstream-ドリフト警告)も確認してください。
 
 ---
 
@@ -141,12 +141,12 @@ MulOp ::= '*' | '/' ;
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-common</artifactId>
-        <version>3.1.1</version>
+        <version>3.2.0</version>
     </dependency>
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-dsl</artifactId>
-        <version>3.1.1</version>
+        <version>3.2.0</version>
     </dependency>
 </dependencies>
 ```
@@ -159,12 +159,12 @@ MulOp ::= '*' | '/' ;
 <dependency>
     <groupId>org.unlaxer</groupId>
     <artifactId>unlaxer-common-jdk17</artifactId>
-    <version>3.1.1</version>
+    <version>3.2.0</version>
 </dependency>
 <dependency>
     <groupId>org.unlaxer</groupId>
     <artifactId>unlaxer-dsl-jdk17</artifactId>
-    <version>3.1.1</version>
+    <version>3.2.0</version>
 </dependency>
 ```
 

@@ -20,9 +20,18 @@ lastObserved:
       versions: [3.0.12, 3.0.13, 3.0.14, 3.0.15, 3.1.0, 3.1.1]
 
 nextWindow:
-  month: "2026-09"
-  selected: null
+  month: "2026-10"
+  selected: opaopa6969/unlaxer-parser
   candidates:
+    - repository: opaopa6969/unlaxer-parser
+      status: ready-for-validation
+      requestedVersion: "3.2.0"
+      checklist: "https://github.com/opaopa6969/unlaxer-parser/issues/349"
+      note: >-
+        UBNF v2 declarative lexical expressions, scoped lexical modules,
+        token/context contracts, Java/Rust conformance and illustrated guide.
+        Publish parent POM plus Java 21 / Java 17 library artifacts only after
+        CI passes. Actual publication and Central verification are tracked in #349.
     - repository: opaopa6969/unlaxer-parser
       status: published
       publishedAt: "2026-09-25T00:35Z"

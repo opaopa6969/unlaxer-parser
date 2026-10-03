@@ -8,6 +8,44 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-10-03
+
+### Added
+
+- UBNF format 2 の宣言的 token (`token NAME ::= expression;`) から Java/Rust の
+  認識処理を生成。文字範囲・補集合・反復・位置検査・純粋な先読み・局所 raw
+  `CAPTURE` / `SAME_AS` により NUMBER・IDENTIFIER・STRING・可変長 fence を
+  host の認識クラスへ依存せず定義できる (#339)。
+- `@import alias from 'path'` による字句 grammar の部品化。alias を名前空間とし、
+  定義元の参照と capture scope を保存する。共通 loader は 1 ファイル 1 grammar の
+  宣言的 token 部品を対象とし、Java/native Rust のファイル API と CLI で解決する (#341)。
+- 外部 token の target-neutral adapter registry、UBNF v2 の認識・消費契約、
+  read-only context accessor を追加。従来の FQN token は互換形式として維持する (#321, #334)。
+- UBNF source snapshot、code point 単位の位置付き diagnostics、Java/native Rust の
+  portability check と生成 API 差分レポートを追加 (#319, #320, #322)。
+- Java/Rust で scope-less capture equality、skip による AST 投影境界を整合させ、
+  両 Rust generator に `ERROR` 要素と atomic long code-block token の生成を追加
+  (#317, #324, #326, #330)。
+- [図でわかる UBNF v2](docs/ubnf-v2-illustrated-ja.md): 6 枚の図、実行可能な grammar、
+  Java/Rust 共通の 41 入力ケースを含む入門。本文と例の一致もテストする (#348)。
+
+### Fixed
+
+- Rust failure memo の保持量を制限し、backtracking 後にも cache を再利用する (#315)。
+- 宣言的 token の文字認識で Unicode scalar の意味を統一。Java の孤立 surrogate は
+  拒否し、非 BMP 文字は両言語で 1 code point として扱う (#343)。
+- UBNF の設定値に後続コメントが混入しないよう、識別子成分から値を構築する (#343)。
+
+### Release notes
+
+- Maven の版は **3.2.0**、UBNF の書式は **v2**。公開済み 3.1.1 には上記の新機能はない。
+  親 POM と Java 21 / Java 17 の 4 library artifact を一緒に公開する。
+- Rust crate の版体系は別管理。今回 crates.io への公開は行わない。
+- 既存 Parser 全体の宣言化、任意 context の可変操作、共通 loader の rule module、
+  Unicode property、引数付き token は完了扱いにしない。
+- CI は repository 専用 self-hosted runner label を使用する。公開条件は CI 成功、
+  guarded release script、Central 上の全 artifact の確認であり、ローカル成功だけでは公開しない。
+
 ## [3.1.1] - 2026-09-26
 
 ### Added
