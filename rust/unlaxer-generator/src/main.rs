@@ -109,8 +109,12 @@ fn run_check(args: Vec<OsString>) -> Result<(u8, String), (u8, String)> {
         return Err((2, CHECK_HELP.into()));
     }
     let grammar = grammar.ok_or((2, CHECK_HELP.into()))?;
-    let source = fs::read_to_string(grammar).map_err(io_error)?;
-    let report = unlaxer_generator::portability::check(&source);
+    let source = fs::read_to_string(&grammar).map_err(io_error)?;
+    let report = if unlaxer_ubnf::parse(&source).is_err() {
+        unlaxer_generator::portability::check(&source)
+    } else {
+        unlaxer_generator::portability::check_file(&grammar)
+    };
     Ok((if report.portable { 0 } else { 3 }, report.to_json()))
 }
 
@@ -169,8 +173,9 @@ fn run(args: Vec<OsString>) -> Result<String, (u8, String)> {
     if grammar.as_os_str().is_empty() || output.as_os_str().is_empty() {
         return Err((2, "grammar and output paths must not be empty".into()));
     }
-    let source = fs::read_to_string(&grammar).map_err(io_error)?;
-    let files = unlaxer_generator::generate(&source).map_err(|message| (3, message))?;
+    // Keep I/O exit status separate from grammar/link errors for the entry file.
+    fs::read_to_string(&grammar).map_err(io_error)?;
+    let files = unlaxer_generator::generate_file(&grammar).map_err(|message| (3, message))?;
     write_artifacts(&output, &files, check).map_err(io_error)?;
     Ok(format!(
         "{} {} Rust module files in {}",

@@ -39,9 +39,13 @@ java -cp "unlaxer-dsl/target/classes:$(tr -d '\n' < unlaxer-dsl/target/rust-clas
 - `check --help` はヘルプを表示する。未知・重複・不完全な option は拒否する。
 - `--output` は受け付けない。既存の **`generate ... --check` は生成物の差分検査**であり、
   この移植可能性検査とは異なる。
-- UTF-8 の指定ファイルだけを読む。import 先は開かず、外部 parser class の探索・初期化、
+- format 2 のファイル入力ではローカルの [字句 module](declarative-tokens.md#字句-grammar-の部品化と名前空間)
+  も読む。文字列 API と format 1 の inventory は import 先を開かない。外部 parser class の探索・初期化、
   生成、コンパイル、対象コードの実行、subprocess 起動は行わない。
   Java は class 探索を除いた共通 validator を使う。native CLI は空の `PATH` でも動く。
+- module 解決エラーは `P-MODULE`（終了 3）。複数ファイルを解決した後の診断は `span: null` とする。
+  schemaVersion 1 の単一ファイル offset を別ファイルの位置として返さない。ファイルごとの
+  元の構文位置が必要な場合は文字列 API を使う。複数ソース provenance の JSON 拡張は別段階。
 
 | 終了コード | stdout | stderr |
 |---|---|---|

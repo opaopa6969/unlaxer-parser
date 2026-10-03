@@ -40,8 +40,7 @@ final class PortabilityCheckCommand {
             return CodegenMain.EXIT_CLI_ERROR;
         }
         try {
-            String source = Files.readString(Path.of(options.get("--grammar")));
-            PortabilityCheck.Result result = PortabilityCheck.check(source);
+            PortabilityCheck.Result result = PortabilityCheck.checkFile(Path.of(options.get("--grammar")));
             out.println(toJson(result));
             return result.portable() ? CodegenMain.EXIT_OK : CodegenMain.EXIT_VALIDATION_ERROR;
         } catch (IOException | InvalidPathException error) {

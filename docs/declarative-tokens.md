@@ -46,6 +46,46 @@ token BLOCK ::= BOL CAPTURE(fence, '`'{4,})
 終端は同じ文字列だけからなる行。短い/長い fence、行中の fence、末尾空白付きの行は
 本文である。本文は不透明であり、host 言語の文字列やコメントを解釈しない。
 
+## 字句 grammar の部品化と名前空間
+
+```ubnf
+// lexical/numbers.ubnf
+grammar Numbers {
+  @ubnf: v2
+  token DIGIT ::= CHAR_RANGE('0','9');
+  token NUMBER ::= ['+'|'-'] DIGIT+;
+}
+// main.ubnf
+grammar Expression {
+  @import num from 'lexical/numbers.ubnf'
+  @ubnf: v2
+  token NEGATIVE ::= '-' num.DIGIT+;
+  @root @mapping(Value, params=[text]) Root ::= num.NUMBER @text;
+}
+```
+
+`@import alias from 'path'` の alias が名前空間。独立した namespace 宣言は設けない。
+パスは **import を書いたファイルのディレクトリ** が基準。入れ子の相対 import と
+同じファイルの別 alias での利用を許す。字句式と文法規則の両方から `alias.TOKEN` を参照できる。
+export はそのファイルに宣言した token のみで、入れ子の alias を自動再 export しない。
+必要なら `token PUBLIC ::= child.TOKEN;` を宣言する。
+
+参照先は定義元で解決する。上の NUMBER が参照する DIGIT は Numbers の DIGIT であり、
+呼出し側に同名 token があっても意味は変化しない。token 参照ごとの capture scope も維持する。
+import 先の package、trivia、root、設定は呼出し側へ継承しない。
+
+この段階での共通 module loader の対象は **一ファイル一 grammar、宣言的 token のみの部品**。
+相互再帰する expression 規則は主 grammar に残す。規則 module、従来の FQN token module、
+複数 grammar を含む曖昧な import、重複 alias、循環、未定義 export、ネットワーク import は拒否する。
+暗黙の上書き、wildcard import、外部 package registry は導入しない。import 深さの上限は 64。
+ファイル群は信頼する build 入力として扱い、ローカル絶対パスと `..` も利用できる。
+
+Java の `UBNFModuleLoader.load(Path)`、native Rust の `modules::load(Path)` と
+両 CLI のファイル生成が対応する。ファイル向け portability check は format 2 の import を解決する。
+文字列だけの parse / portability API は I/O-free のまま。従来の Java `parseWithImports` API の
+caller-supplied resolver による挙動も変更しない。
+共通テストは `spec-corpus/lexical-modules/`。両言語の生成 Rust artifact もバイト単位で比較する。
+
 ## 観測可能な意味
 
 選択は先勝ち、反復は greedy/possessive。後続の失敗を理由に反復を縮めない。

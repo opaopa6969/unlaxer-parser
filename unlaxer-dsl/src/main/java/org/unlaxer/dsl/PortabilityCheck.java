@@ -30,8 +30,35 @@ public final class PortabilityCheck {
         } catch (IllegalArgumentException error) {
             return new Result(false, "unavailable", List.of(new Diagnostic("P-SYNTAX", null, "UBNF syntax")));
         }
+        return check(snapshot, snapshot.ast());
+    }
+
+    /** File API opts into local module loading; the String API remains I/O-free. */
+    public static Result checkFile(java.nio.file.Path path) throws java.io.IOException {
+        UBNFSourceSnapshot snapshot;
+        try {
+            snapshot = UBNFMapper.parseWithSource(java.nio.file.Files.readString(path));
+        } catch (IllegalArgumentException error) {
+            return new Result(false, "unavailable", List.of(new Diagnostic("P-SYNTAX", null, "UBNF syntax")));
+        }
+        if (snapshot.ast().grammars().stream().noneMatch(g -> !g.imports().isEmpty()
+                && g.settings().stream().anyMatch(s -> s.key().equals("ubnf")
+                    && s.value() instanceof StringSettingValue v && v.value().equals("v2"))))
+            return check(snapshot, snapshot.ast());
+        try {
+            var result = check(snapshot, org.unlaxer.dsl.bootstrap.UBNFModuleLoader.resolve(
+                snapshot.ast(), path, java.nio.file.Files::readString));
+            // A single-file offset must not pretend to identify an imported source.
+            return result(result.portable(), result.structure(), result.diagnostics().stream()
+                .map(d -> new Diagnostic(d.code(), null, d.subject())).toList());
+        } catch (IllegalArgumentException | java.io.IOException error) {
+            return new Result(false, "blocked", List.of(new Diagnostic("P-MODULE", null, "UBNF module resolution")));
+        }
+    }
+
+    private static Result check(UBNFSourceSnapshot snapshot, org.unlaxer.dsl.bootstrap.UBNFAST.UBNFFile file) {
         List<Diagnostic> diagnostics = new ArrayList<>();
-        List<GrammarDecl> grammars = snapshot.ast().grammars();
+        List<GrammarDecl> grammars = file.grammars();
         if (grammars.size() != 1) add(diagnostics, "P-GRAMMAR-COUNT", snapshot, snapshot.ast(), "expected one grammar");
         for (GrammarDecl grammar : grammars) scanGrammar(grammar, snapshot, diagnostics);
         if (!diagnostics.isEmpty()) return result(false, "blocked", diagnostics);

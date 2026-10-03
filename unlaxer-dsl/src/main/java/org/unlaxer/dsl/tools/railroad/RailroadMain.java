@@ -139,11 +139,10 @@ public class RailroadMain {
     public static void run(String inputFilePath, String outputDirPath, boolean outputSvg, boolean outputPng, boolean outputMarkdown) throws IOException {
         // Read the input file
         Path inputPath = Paths.get(inputFilePath);
-        String ubnfSource = new String(Files.readAllBytes(inputPath), StandardCharsets.UTF_8);
 
         // Parse the UBNF source
         System.out.println("Parsing: " + inputPath.toAbsolutePath());
-        UBNFFile ubnfFile = UBNFMapper.parse(ubnfSource);
+        UBNFFile ubnfFile = org.unlaxer.dsl.bootstrap.UBNFModuleLoader.load(inputPath);
 
         // Prepare the output directory
         Path outputPath = Paths.get(outputDirPath);

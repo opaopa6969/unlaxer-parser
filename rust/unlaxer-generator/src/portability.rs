@@ -1,5 +1,5 @@
 //! Read-only capability inventory followed by structural validation when possible.
-//! No imports, external parser loading, code generation, or subprocesses.
+//! String API is I/O-free; file API resolves local lexical modules.
 use crate::adapters::{feature_diagnostics, token_contract_diagnostics, AdapterRegistry};
 use std::fmt::Write;
 use unlaxer_ubnf::*;
@@ -87,7 +87,48 @@ pub fn check(source: &str) -> Report {
             }
         }
     };
-    let file = snapshot.ast();
+    check_ast(snapshot.ast())
+}
+
+pub fn check_file(path: &std::path::Path) -> Report {
+    if let Ok(source) = std::fs::read_to_string(path) {
+        match parse(&source) {
+            Ok(file)
+                if file.grammars.iter().any(|g| {
+                    !g.imports.is_empty()
+                        && g.settings.iter().any(|s| {
+                            s.key == "ubnf"
+                                && matches!(&s.value, SettingValue::String(v) if v == "v2")
+                        })
+                }) => {}
+            _ => return check(&source),
+        }
+    }
+    match crate::modules::load(path) {
+        Ok(file) => {
+            let mut report = check_ast(&file);
+            for diagnostic in &mut report.diagnostics {
+                diagnostic.span = None;
+            }
+            report
+                .diagnostics
+                .sort_by(|a, b| a.code.cmp(b.code).then_with(|| a.subject.cmp(&b.subject)));
+            report.diagnostics.dedup();
+            report
+        }
+        Err(_) => Report {
+            portable: false,
+            structure: "blocked",
+            diagnostics: vec![Diagnostic {
+                code: "P-MODULE",
+                subject: "UBNF module resolution".into(),
+                span: None,
+            }],
+        },
+    }
+}
+
+fn check_ast(file: &UbnfFile) -> Report {
     let mut inventory = Inventory {
         diagnostics: Vec::new(),
     };

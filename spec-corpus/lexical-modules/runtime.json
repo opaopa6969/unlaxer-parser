@@ -1,0 +1,10 @@
+[
+  {"input":"a12:😀😀a","prefix":[true,7,7],"value":"a12:😀😀a"},
+  {"input":"12","prefix":[true,2,2],"value":"12"},
+  {"input":"12x","prefix":[true,2,2]},
+  {"input":"a12:😀😀b","prefix":[false,0,0]},
+  {"input":"ax:😀😀a","prefix":[false,0,0]},
+  {"input":"a 12:😀😀a","prefix":[false,0,0]},
+  {"input":" 12","prefix":[false,0,0]},
+  {"input":"","prefix":[false,0,0]}
+]
