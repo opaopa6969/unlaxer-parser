@@ -37,6 +37,33 @@ public class DeclarativeTokenConformanceTest {
     private final Path repo = Path.of("..").toAbsolutePath().normalize();
 
     @Test public void authoringCatalogExamplesAgreeInJavaAndRust() throws Exception {
+        verifyAuthoringExamples(false);
+    }
+
+    @Test public void playgroundCatalogExamplesAgreeInJavaAndWasm() throws Exception {
+        verifyAuthoringExamples(true);
+    }
+
+    @Test public void metaGrammarGeneratesAPlaygroundThatReadsItself() throws Exception {
+        if (!Boolean.getBoolean("rustConformance")) System.out.println(
+            "[assumption] meta playground requires -DrustConformance=true and Rust wasm32 target");
+        assumeTrue(Boolean.getBoolean("rustConformance"));
+        success(run(List.of("cargo", "build", "--locked", "--manifest-path", repo.resolve("rust/Cargo.toml").toString(),
+            "-p", "unlaxer-generator"), "", false));
+        Path source = repo.resolve("unlaxer-dsl/grammar/ubnf.ubnf");
+        Path project = temporary.getRoot().toPath().resolve("meta-playground");
+        success(run(List.of(repo.resolve("rust/target/debug/unlaxer").toString(), "playground", "--grammar", source.toString(),
+            "--output", project.toString()), "", true));
+        for (var file : org.unlaxer.dsl.codegen.rust.PlaygroundGenerator.generate(source).entrySet()) {
+            assertEquals(file.getKey(), file.getValue(), Files.readString(project.resolve(file.getKey())));
+        }
+        success(run(List.of("node", project.resolve("build.mjs").toString()), "", false));
+        success(run(List.of("node", repo.resolve("scripts/playground-meta-probe.mjs").toString(),
+            project.resolve("public/language.wasm").toString(),
+            repo.resolve("unlaxer-dsl/src/main/resources/ubnf-help/catalog.json").toString(), source.toString()), "", false));
+    }
+
+    private void verifyAuthoringExamples(boolean playground) throws Exception {
         if (!Boolean.getBoolean("rustConformance")) System.out.println(
             "[assumption] catalog conformance requires -DrustConformance=true");
         assumeTrue(Boolean.getBoolean("rustConformance"));
@@ -54,18 +81,29 @@ public class DeclarativeTokenConformanceTest {
             String name = fixture.get("name").getAsString();
             GrammarDecl grammar = UBNFModuleLoader.load(source).grammars().get(0);
             assertTrue(name, PortabilityCheck.checkFile(source).portable());
-            success(run(List.of(nativeGenerator.toString(), "generate", "--grammar", source.toString(),
+            success(run(List.of(nativeGenerator.toString(), playground ? "playground" : "generate", "--grammar", source.toString(),
                 "--output", directory.resolve("generated").toString()), "", true));
-            for (var file : new RustBackend().generate(grammar)) assertEquals(name + "/" + file.relativePath(),
-                file.content(), Files.readString(directory.resolve("generated").resolve(file.relativePath())));
-            Files.writeString(directory.resolve("main.rs"), rustProbe(false));
             Path binary = directory.resolve("probe");
-            success(run(List.of("rustc", "--edition=2021", "--extern", "unlaxer_runtime=" + library,
-                directory.resolve("main.rs").toString(), "-o", binary.toString()), "", false));
+            if (playground) {
+                var javaProject = org.unlaxer.dsl.codegen.rust.PlaygroundGenerator.generate(source);
+                for (var file : javaProject.entrySet()) assertEquals(name + "/" + file.getKey(), file.getValue(),
+                    Files.readString(directory.resolve("generated").resolve(file.getKey())));
+                try (var files = Files.walk(directory.resolve("generated"))) {
+                    assertEquals(javaProject.size(), files.filter(Files::isRegularFile).count());
+                }
+                success(run(List.of("node", directory.resolve("generated/build.mjs").toString()), "", false));
+            } else {
+                for (var file : new RustBackend().generate(grammar)) assertEquals(name + "/" + file.relativePath(),
+                    file.content(), Files.readString(directory.resolve("generated").resolve(file.relativePath())));
+                Files.writeString(directory.resolve("main.rs"), rustProbe(false));
+                success(run(List.of("rustc", "--edition=2021", "--extern", "unlaxer_runtime=" + library,
+                    directory.resolve("main.rs").toString(), "-o", binary.toString()), "", false));
+            }
             var cases = fixture.getAsJsonArray("cases");
             String inputs = String.join("\n", cases.asList().stream().map(row -> HexFormat.of().formatHex(
                 row.getAsJsonObject().get("input").getAsString().getBytes(StandardCharsets.UTF_8))).toList()) + "\n";
-            Run rust = run(List.of(binary.toString()), inputs, true);
+            Run rust = playground ? run(List.of("node", repo.resolve("scripts/playground-wasm-probe.mjs").toString(),
+                directory.resolve("generated").toString(), "--require-docs"), inputs, false) : run(List.of(binary.toString()), inputs, true);
             success(rust);
             var results = rust.output().lines().toList();
             assertEquals(name, cases.size(), results.size());
@@ -163,6 +201,20 @@ public class DeclarativeTokenConformanceTest {
             success(rust);
             var results = rust.output().lines().toList();
             assertEquals(cases.size(), results.size());
+            // The imported guide examples also run through the browser's actual WASM ABI.
+            Path project = directory.resolve("playground");
+            success(run(List.of(nativeGenerator.toString(), "playground", "--grammar", source.toString(),
+                "--output", project.toString()), "", true));
+            var javaProject = org.unlaxer.dsl.codegen.rust.PlaygroundGenerator.generate(source);
+            for (var artifact : javaProject.entrySet()) assertEquals(name + "/" + artifact.getKey(),
+                artifact.getValue(), Files.readString(project.resolve(artifact.getKey())));
+            success(run(List.of("node", project.resolve("build.mjs").toString()), "", false));
+            Run wasm = run(List.of("node", repo.resolve("scripts/playground-wasm-probe.mjs").toString(), project.toString()), inputs, false);
+            success(wasm);
+            var wasmResults = wasm.output().lines().toList();
+            assertEquals(results.size(), wasmResults.size());
+            for (int i = 0; i < results.size(); i++) assertEquals(name + "/wasm/" + i,
+                JsonParser.parseString(results.get(i)), JsonParser.parseString(wasmResults.get(i)));
             try (URLClassLoader loader = compileJava(grammar)) {
                 String prefix = "guide.demo." + grammar.name();
                 Parser parser = (Parser) loader.loadClass(prefix + "Parsers").getMethod("getRootParser").invoke(null);

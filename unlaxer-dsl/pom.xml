@@ -90,6 +90,16 @@
 
 	<build>
 		<resources>
+			<resource>
+				<directory>../rust/unlaxer-runtime/src</directory>
+				<targetPath>playground/runtime/src</targetPath>
+				<includes><include>*.rs</include></includes>
+			</resource>
+			<resource>
+				<directory>..</directory>
+				<includes><include>LICENSE</include></includes>
+				<targetPath>playground/runtime</targetPath>
+			</resource>
 			<resource><directory>src/main/resources</directory></resource>
 			<resource>
 				<directory>grammar</directory>

@@ -4,6 +4,7 @@ pub mod impact;
 mod lexical;
 pub mod lowering;
 pub mod modules;
+pub mod playground;
 pub mod portability;
 
 /// Parse and validate the complete grammar before producing any artifacts.

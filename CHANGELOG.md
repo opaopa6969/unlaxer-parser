@@ -12,6 +12,10 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ### Added
 
+- Java-hosted / native Rust の `playground --grammar --output` から parser、vendored runtime、
+  WASM wrapper、静的ブラウザ UI を生成。CST/AST、診断、消費位置、`@doc` catalog、
+  authoring help を同梱する (#356)。生成物の一致と Java/Rust/WASM の共通70入力を検証。
+- UBNF のメタ文法自身から playground を生成し、入門文法と自身を読めることを検証。
 - UBNF VSIX の画面内 catalog/help。6 段階の入門、全文サンプルと成功・失敗入力、
   構文検索、症状別の修正方法、新規文書で開く操作を追加 (#354)。サンプルの
   Java / Rust 生成 parser・AST・Unicode 位置を共通テストで検証する。

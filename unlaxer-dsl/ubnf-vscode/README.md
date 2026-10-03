@@ -24,7 +24,8 @@ This is not yet a fully generated replacement for the handwritten UBNF frontend.
 
 help は LSP が起動できなくても利用でき、外部サイト・CDN・通信は不要です。
 試験入力欄の成功/失敗はテスト済みの**期待値**で、help 画面で解析を実行した結果ではありません。
-言語用 playground の生成・実行は親 issue #353 で接続する次の工程です。
+言語用 playground は [生成 CLI](../../docs/ubnf-playground-ja.md) から作成できます。
+VSIX からの生成・起動導線は親 issue #353 で接続する次の工程です。
 
 共通 assets は `../src/main/resources/ubnf-help/` にあります。`npm run compile` で
 `help-dist/` にコピーされ、VSIX に同梱されます。`catalog.json` の全文例は

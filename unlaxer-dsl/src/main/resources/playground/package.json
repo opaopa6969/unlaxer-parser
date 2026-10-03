@@ -1,0 +1,7 @@
+{
+  "name": "ubnf-generated-playground",
+  "private": true,
+  "type": "module",
+  "scripts": {"build": "node build.mjs", "start": "node serve.mjs"},
+  "engines": {"node": ">=20"}
+}
