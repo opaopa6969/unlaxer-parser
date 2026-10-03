@@ -21,6 +21,12 @@ grammar Numbers {
 - literal、token 参照、連接、ordered choice `|`、group `(...)`、optional `[...]`、
   repeat `{...}`、後置 `?` / `*` / `+` / `{n}` / `{n,m}` / `{n,}`。
 - `ANY` は Unicode scalar 一つ、`EOF` / `BOF` / `BOL` / `EOL` は零幅の位置検査。
+
+Java の `String` は孤立 UTF-16 surrogate を保持できるが、`ANY` / `CHAR_RANGE` /
+`NEGATION` はこれを scalar として消費せず失敗する。Rust の `str` は同じ不正文字を
+表現できない。正しい surrogate pair / UTF-8 非 BMP 文字は両側で 1 scalar として扱う。
+設定値は識別子成分のみを値とし、`@ubnf: v2` の後などに置く `//` コメントは
+版・package・空白設定へ混入しない。コメントは機械可読定義を補足する prose である。
   BOL は入力先頭または直前が CR/LF。EOL は EOF または現在位置が CR/LF。
   改行の消費は `'\r\n' | '\r' | '\n'` と明示する。
 - `CHAR_RANGE('a','z')` と `NEGATION('excluded')`。新形式の範囲は非 BMP も扱う。

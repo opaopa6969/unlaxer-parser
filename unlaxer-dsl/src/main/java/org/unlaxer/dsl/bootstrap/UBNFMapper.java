@@ -404,7 +404,11 @@ public class UBNFMapper {
 
     private StringSettingValue mapStringSettingValue(Token token) {
         List<Token> dottedTokens = findDescendants(token, UBNFParsers.DottedIdentifierParser.class);
-        String value = dottedTokens.isEmpty() ? "" : dottedTokens.get(0).source.toString().trim();
+        // A composite token's source includes delimiter comments; only identifier
+        // leaves belong to the setting value (including comments between dots).
+        String value = dottedTokens.isEmpty() ? "" : findDescendants(dottedTokens.get(0), UBNFParsers.IdentifierParser.class)
+            .stream().map(identifier -> identifier.source.toString().trim())
+            .collect(java.util.stream.Collectors.joining("."));
         return new StringSettingValue(value);
     }
 

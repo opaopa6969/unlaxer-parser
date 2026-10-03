@@ -1,0 +1,10 @@
+grammar Commented {
+  @ubnf: v2 // Machine-readable version, prose must not enter its value.
+  @package: lexical // A comment between identifier components is trivia.
+    . probe
+  @whitespace: javaStyle
+  // A full-line comment following a setting is also trivia.
+  token DIGIT ::= CHAR_RANGE('0','9');
+  token NUMBER ::= DIGIT+;
+  @root @mapping(Value, params=[text]) Root ::= NUMBER @text;
+}
