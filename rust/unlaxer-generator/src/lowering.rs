@@ -76,6 +76,7 @@ impl Lowering<'_> {
         Ok(AnalysisDepth(&self.analysis_depth))
     }
     fn run(mut self) -> Result<GrammarIr> {
+        let mut lexical = crate::lexical::compile(self.grammar)?;
         if !self.grammar.imports.is_empty() {
             return Err("unsupported imports".into());
         }
@@ -96,7 +97,10 @@ impl Lowering<'_> {
             if setting.key == "tokenAdapter" || setting.key == "tokenContract" {
                 continue;
             }
-            if setting.key != "memoSafeToken" && !settings.insert(&setting.key) {
+            if setting.key != "memoSafeToken"
+                && setting.key != "feature"
+                && !settings.insert(&setting.key)
+            {
                 return Err(format!("duplicate setting {}", setting.key));
             }
             let SettingValue::String(value) = &setting.value else {
@@ -110,7 +114,10 @@ impl Lowering<'_> {
                 "feature"
                     if matches!(
                         value.as_str(),
-                        "tokenContractsV1" | "contextAccessorsV1" | "tokenProgressContractsV1"
+                        "tokenContractsV1"
+                            | "contextAccessorsV1"
+                            | "tokenProgressContractsV1"
+                            | "declarativeTokensV1"
                     ) => {}
                 "whitespace" => {
                     whitespace = whitespace_style(value)
@@ -127,7 +134,7 @@ impl Lowering<'_> {
                         return Err(format!("memoSafeToken undefined token alias {alias}"));
                     };
                     let memo_allowed = match &token.kind {
-                        TokenKind::Simple { .. } => true,
+                        TokenKind::Simple { .. } | TokenKind::Declarative { .. } => true,
                         TokenKind::Adapter { id, version } => matches!(
                             adapter_registry.resolve(id, version),
                             Ok(AdapterBinding::Builtin(_))
@@ -146,7 +153,14 @@ impl Lowering<'_> {
             }
         }
         for token in &self.grammar.tokens {
-            let expression = token_expression_with_registry(&token.kind, &adapter_registry)?;
+            let expression = if let Some(expression) = lexical.remove(&token.name) {
+                Expression::LexicalToken {
+                    name: token.name.clone(),
+                    expression,
+                }
+            } else {
+                token_expression_with_registry(&token.kind, &adapter_registry)?
+            };
             if self.tokens.insert(token.name.clone(), expression).is_some() {
                 return Err(format!("duplicate token {}", token.name));
             }
@@ -767,6 +781,7 @@ impl Lowering<'_> {
 
     fn is_nullable(&self, expression: &Expression) -> bool {
         match expression {
+            Expression::LexicalToken { expression, .. } => expression.nullable(),
             Expression::EmptyToken
             | Expression::EofToken
             | Expression::LookaheadToken { .. }

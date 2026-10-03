@@ -48,11 +48,16 @@ public final class RustGrammarLowering {
 
     private GrammarIR run() {
         if (!grammar.imports().isEmpty()) throw unsupported("imports");
+        var lexical = org.unlaxer.dsl.bootstrap.LexicalCompiler.compile(grammar);
         boolean whitespace = false;
         Set<String> settings = new HashSet<>();
         Set<String> memoSafeTokens = new HashSet<>();
         for (var setting : grammar.settings()) {
             if (setting.key().equals("tokenAdapter") || setting.key().equals("tokenContract")) continue;
+            if (setting.key().equals("feature")) {
+                if (!org.unlaxer.dsl.bootstrap.UBNFFeatures.validate(grammar).isEmpty()) throw unsupported("invalid feature");
+                continue;
+            }
             if (!setting.key().equals("memoSafeToken") && !settings.add(setting.key())) {
                 throw unsupported("duplicate setting " + setting.key());
             }
@@ -73,6 +78,7 @@ public final class RustGrammarLowering {
                     .filter(candidate -> candidate.name().equals(alias))
                     .findFirst().orElseThrow(() -> unsupported("memoSafeToken undefined token alias " + alias));
                 if (!(token instanceof TokenDecl.Simple)
+                    && !(token instanceof TokenDecl.Declarative)
                     && !(token instanceof TokenDecl.Adapter adapter
                         && TokenAdapterRegistry.isBuiltin(adapter.id(), Integer.parseInt(adapter.version())))) {
                     throw unsupported(token instanceof TokenDecl.Adapter
@@ -85,7 +91,9 @@ public final class RustGrammarLowering {
             }
         }
         for (var token : grammar.tokens()) {
-            if (tokens.putIfAbsent(token.name(), token(token)) != null) throw unsupported("duplicate token " + token.name());
+            Expression value = token instanceof TokenDecl.Declarative
+                ? new LexicalToken(token.name(), lexical.get(token.name())) : token(token);
+            if (tokens.putIfAbsent(token.name(), value) != null) throw unsupported("duplicate token " + token.name());
         }
         int root = -1;
         boolean hasScope = grammar.rules().stream().flatMap(rule -> rule.annotations().stream())
@@ -652,6 +660,7 @@ public final class RustGrammarLowering {
     }
 
     private boolean nullable(Expression expression) {
+        if (expression instanceof LexicalToken token) return token.expression().nullable();
         if (expression instanceof ErrorExpected ignored) {
             return false;
         }

@@ -206,6 +206,7 @@ fn expression(
 ) -> Result<(), GenerateError> {
     use Expression::*;
     match expr {
+        LexicalToken { expression, .. } => expression.validate().map_err(fail)?,
         CaptureEquality { child, name } => {
             let mut local = BTreeSet::new();
             expression(child, count, &mut local)?;

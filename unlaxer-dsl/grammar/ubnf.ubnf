@@ -20,17 +20,19 @@ grammar UBNF {
   @feature: tokenContractsV1
   @feature: contextAccessorsV1
   @feature: tokenProgressContractsV1
+  @feature: declarativeTokensV1
   @package: org.unlaxer.dsl.bootstrap.generated
   @whitespace: javaStyle
   @comment: { line: '//' }
 
   // ===== トークン定義 =====
-  // 完全修飾名で書く: GrammarValidator が静的に解決可能 (W-TOKEN-UNRESOLVED 警告ゼロ)
-  token IDENTIFIER        = org.unlaxer.parser.clang.IdentifierParser
-  token STRING            = org.unlaxer.parser.elementary.SingleQuotedParser
-  token CLASS_NAME        = org.unlaxer.parser.clang.IdentifierParser
-  token UNSIGNED_INTEGER  = org.unlaxer.parser.elementary.NumberParser
-  token DIGIT             = org.unlaxer.parser.posix.DigitParser
+  // 認識仕様から生成する。既存の IdentifierParser / NumberParser は呼ばない。
+  token DIGIT ::= CHAR_RANGE('0', '9');
+  token LETTER ::= CHAR_RANGE('a', 'z') | CHAR_RANGE('A', 'Z') | '_';
+  token IDENTIFIER ::= LETTER (LETTER | DIGIT)*;
+  token STRING ::= '\'' { '\\' ANY | NEGATION('\'\\') } '\'';
+  token CLASS_NAME ::= IDENTIFIER;
+  token UNSIGNED_INTEGER ::= DIGIT+;
 
   // ===== エントリーポイント =====
   @root
@@ -71,9 +73,34 @@ grammar UBNF {
   KeyValuePair ::= IDENTIFIER @key ':' STRING @value ;
 
   // ===== トークン宣言 =====
-  // token NAME = VALUE （VALUE はクラス名または式）
+  // 旧 host binding と、新しい機械可読な字句定義の両方を読み取る。
   @mapping(TokenDecl, params=[name, value])
-  TokenDecl ::= 'token' IDENTIFIER @name '=' TokenValue @value ;
+  TokenDecl ::= 'token' IDENTIFIER @name
+    ( '=' TokenValue @value | '::=' DeclarativeTokenValue @value ) ;
+
+  @mapping(DeclarativeTokenValue, params=[source])
+  DeclarativeTokenValue ::= LexicalBody @source ';' ;
+  @mapping(LexicalChoice, params=[alternatives])
+  LexicalBody ::= LexicalSequence @alternatives { '|' LexicalSequence @alternatives } ;
+  @mapping(LexicalSequence, params=[elements])
+  LexicalSequence ::= LexicalElement+ @elements ;
+  @mapping(LexicalElement, params=[atom, suffix])
+  LexicalElement ::= LexicalAtom @atom [ LexicalSuffix @suffix ] ;
+  @mapping(LexicalSuffix, params=[text])
+  LexicalSuffix ::= ( '?' | '*' | '+'
+    | '{' UNSIGNED_INTEGER [ ',' [ UNSIGNED_INTEGER ] ] '}' ) @text ;
+  @mapping(LexicalAtom, params=[value])
+  LexicalAtom ::=
+    ( STRING
+    | '(' LexicalBody ')'
+    | '[' LexicalBody ']'
+    | '{' LexicalBody '}'
+    | ( 'LOOKAHEAD' | 'NEGATIVE_LOOKAHEAD' ) '(' LexicalBody ')'
+    | 'CAPTURE' '(' IDENTIFIER ',' LexicalBody ')'
+    | 'SAME_AS' '(' IDENTIFIER ')'
+    | 'CHAR_RANGE' '(' STRING ',' STRING ')'
+    | 'NEGATION' '(' STRING ')'
+    | DottedIdentifier ) @value ;
 
   // トークン値: 式またはクラス名
   TokenValue ::=

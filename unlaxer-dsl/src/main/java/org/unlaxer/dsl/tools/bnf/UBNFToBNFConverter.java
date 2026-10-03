@@ -144,7 +144,9 @@ public final class UBNFToBNFConverter {
     ) {
         String name = token.name();
         final String tokenValue;
-        if (token instanceof UBNFAST.TokenDecl.Simple s) {
+        if (token instanceof UBNFAST.TokenDecl.Declarative lexical) {
+            tokenValue = org.unlaxer.dsl.bootstrap.LexicalSyntax.render(lexical.expression());
+        } else if (token instanceof UBNFAST.TokenDecl.Simple s) {
             tokenValue = s.parserClass();
         } else if (token instanceof UBNFAST.TokenDecl.Adapter adapter) {
             tokenValue = "ADAPTER('" + adapter.id() + "', version=" + adapter.version() + ")";
@@ -174,7 +176,7 @@ public final class UBNFToBNFConverter {
 
         builder.append("(* token: ");
         builder.append(name);
-        builder.append(" = ");
+        builder.append(token instanceof UBNFAST.TokenDecl.Declarative ? " ::= " : " = ");
         builder.append(tokenValue);
         builder.append(" *)");
     }

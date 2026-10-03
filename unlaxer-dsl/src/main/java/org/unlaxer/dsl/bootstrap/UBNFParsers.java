@@ -682,8 +682,17 @@ public class UBNFParsers {
             return new Parsers(
                 new WordParser("token"),
                 Parser.get(IdentifierParser.class),
-                Parser.get(EqualParser.class),
-                Parser.get(TokenValueParser.class)
+                new Choice(
+                    new UBNFLazyChain() {
+                        @Override public Parsers getLazyParsers() {
+                            return Parsers.of(new WordParser("::="), Parser.get(LexicalBodyParser.class));
+                        }
+                    },
+                    new UBNFLazyChain() {
+                        @Override public Parsers getLazyParsers() {
+                            return Parsers.of(Parser.get(EqualParser.class), Parser.get(TokenValueParser.class));
+                        }
+                    })
             );
         }
     }

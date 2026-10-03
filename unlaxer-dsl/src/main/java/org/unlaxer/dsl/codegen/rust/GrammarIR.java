@@ -39,7 +39,8 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
         OptionalExpr, Repeat, Separated, AnyToken, EofToken, EmptyToken, ErrorExpected, CharRangeToken,
         ExceptToken, UntilToken, LookaheadToken, Delimited, IdentifierToken, QuotedToken,
         CodeStartToken, CodeEndToken, LongCodeBlockToken, CustomToken, TextValue, ValueBoundary, TriviaScope, RuleEffects,
-        CaptureEquality {}
+        CaptureEquality, LexicalToken {}
+    public record LexicalToken(String name, org.unlaxer.dsl.runtime.LexicalExpression expression) implements Expression {}
     /** Rule-local trivia policy, transparent to captures and semantic values. */
     public record TriviaScope(Expression child, boolean javaWhitespace) implements Expression {}
     /** Retains an otherwise unmapped text branch as a source-positioned semantic value. */

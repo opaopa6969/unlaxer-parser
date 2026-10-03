@@ -183,6 +183,13 @@ public final class RustBackend {
         return out.toString();
     }
 
+    private String lexicalExpression(org.unlaxer.dsl.runtime.LexicalExpression e) {
+        return "unlaxer_runtime::lexical::LexicalExpression { op: unlaxer_runtime::lexical::Op::" + e.op()
+            + ", text: " + quote(e.text()) + ", min: " + e.min() + ", max: " + e.max()
+            + ", children: vec![" + e.children().stream().map(this::lexicalExpression)
+                .collect(java.util.stream.Collectors.joining(", ")) + "] }";
+    }
+
     private String expression(Expression expression) {
         if (expression instanceof CaptureEquality equality) {
             return "Expr::compare_captures(" + quote(equality.name()) + ", " + expression(equality.child()) + ")";
@@ -210,6 +217,9 @@ public final class RustBackend {
         }
         if (expression instanceof LongCodeBlockToken ignored) {
             return "Expr::LongCodeBlock";
+        }
+        if (expression instanceof LexicalToken token) {
+            return "Expr::Lexical(" + quote(token.name()) + ", " + lexicalExpression(token.expression()) + ")";
         }
         if (expression instanceof CustomToken custom) {
             return "Expr::Custom(" + custom.functionPath() + ")";

@@ -6,6 +6,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 mod first;
+pub mod lexical;
 mod long_code_fence;
 #[cfg(test)]
 mod memo_retention_tests;
@@ -34,6 +35,8 @@ pub const VALUE_BOUNDARY_RULE: usize = usize::MAX - 1;
 
 #[derive(Debug, Clone)]
 pub enum Expr {
+    /// An atomic token compiled from a declarative UBNF lexical expression.
+    Lexical(&'static str, lexical::LexicalExpression),
     Literal(&'static str),
     Number,
     /// Java clang IdentifierParser: ASCII letter/underscore, then ASCII alphanumeric/underscore.
@@ -1771,6 +1774,18 @@ impl<'a> ParseContext<'a> {
                     nodes: matched.nodes,
                     captures: matched.captures,
                 }),
+            Expr::Lexical(label, expression) => {
+                if let Some(end) = expression.match_at(self.input, self.position) {
+                    if end != self.position {
+                        self.matched_position = end;
+                    }
+                    self.position = end;
+                    Some(Fragment::default())
+                } else {
+                    self.fail(label);
+                    None
+                }
+            }
             Expr::Backreference(name) => {
                 let text = self.captured(name);
                 if let Some(text) = text.filter(|text| self.remaining().starts_with(text)) {
@@ -2571,7 +2586,8 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
         | Expr::RuleEffects { child, .. }
         | Expr::CaptureEquality { child, .. }
         | Expr::TriviaScope { child, .. } => expression_allows_deferred_diagnostics(child),
-        Expr::Literal(_)
+        Expr::Lexical(_, _)
+        | Expr::Literal(_)
         | Expr::Number
         | Expr::Identifier
         | Expr::CodeStart

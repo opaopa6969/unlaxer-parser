@@ -261,6 +261,9 @@ public class UBNFMapper {
 
     private static TokenDecl prefixTokenDecl(TokenDecl token, String alias) {
         String prefixed = alias + "." + token.name();
+        if (token instanceof TokenDecl.Declarative t) {
+            return new TokenDecl.Declarative(prefixed, LexicalCompiler.prefix(t.expression(), alias));
+        }
         if (token instanceof UBNFAST.TokenDecl.Simple t) {
             return new UBNFAST.TokenDecl.Simple(prefixed, t.parserClass());
         }
@@ -440,6 +443,11 @@ public class UBNFMapper {
     private TokenDecl mapTokenDecl(Token token) {
         List<Token> identifiers = findDescendants(token, UBNFParsers.IdentifierParser.class);
         String name = identifiers.size() > 0 ? identifiers.get(0).source.toString().trim() : "";
+
+        var lexical = findDescendants(token, LexicalBodyParser.class);
+        if (!lexical.isEmpty()) {
+            return new TokenDecl.Declarative(name, LexicalSyntax.parse(lexical.get(0).source.toString()).expression());
+        }
 
         List<Token> adapterTokens = findDescendants(token, UBNFParsers.AdapterExpressionParser.class);
         if (!adapterTokens.isEmpty()) {

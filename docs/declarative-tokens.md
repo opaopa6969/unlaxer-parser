@@ -1,0 +1,93 @@
+# 宣言的 token — UBNF format 2
+
+`token NAME ::= expression ;` を認識仕様の正本にする。Java/Rust の generator は式を
+構造化した字句プログラムへコンパイルする。生成 parser は FQN の認識実装を呼ばず、
+UBNF ソースを実行時に再解析しない。従来の `token NAME = ...` は互換形式として残る。
+
+## 中核の記法
+
+```ubnf
+grammar Numbers {
+  @ubnf: v2
+  @feature: declarativeTokensV1
+  token DIGIT ::= CHAR_RANGE('0', '9');
+  token NUMBER ::= [ '+' | '-' ]
+    ( DIGIT+ '.' DIGIT* | '.' DIGIT+ | DIGIT+ )
+    [ ( 'e' | 'E' ) [ '+' | '-' ] DIGIT+ ];
+  @root @mapping(Value, params=[text]) Root ::= NUMBER @text;
+}
+```
+
+- literal、token 参照、連接、ordered choice `|`、group `(...)`、optional `[...]`、
+  repeat `{...}`、後置 `?` / `*` / `+` / `{n}` / `{n,m}` / `{n,}`。
+- `ANY` は Unicode scalar 一つ、`EOF` / `BOF` / `BOL` / `EOL` は零幅の位置検査。
+  BOL は入力先頭または直前が CR/LF。EOL は EOF または現在位置が CR/LF。
+  改行の消費は `'\r\n' | '\r' | '\n'` と明示する。
+- `CHAR_RANGE('a','z')` と `NEGATION('excluded')`。新形式の範囲は非 BMP も扱う。
+- `LOOKAHEAD(expression)` / `NEGATIVE_LOOKAHEAD(expression)` は任意の字句式を試し、
+  成否だけを残す。consumed / matched cursor と局所束縛のすべてを復元する。
+- `CAPTURE(name, expression)` は認識した raw text を現在の token 呼出しに束縛する。
+  `SAME_AS(name)` はその raw text に完全一致する入力を消費する。
+  token 参照先は独立した局所束縛を持ち、呼出し元の束縛を読まず、書き換えない。
+
+token 内では空白・コメントを暗黙には消費しない。文法規則からの呼出し位置では従来の
+trivia 規則が適用される。literal は文字列そのものへ一致し、暗黙の単語境界を付けない。
+境界は `NEGATIVE_LOOKAHEAD(...)` で宣言できる。
+
+## 可変長 fence
+
+```ubnf
+token BLOCK ::= BOL CAPTURE(fence, '`'{4,})
+  IDENT ':' CLASS_NAME ( '\r\n' | '\r' | '\n' )
+  { NEGATIVE_LOOKAHEAD(BOL SAME_AS(fence) EOL) ANY }
+  BOL SAME_AS(fence) ( '\r\n' | '\r' | '\n' | EOF );
+```
+
+終端は同じ文字列だけからなる行。短い/長い fence、行中の fence、末尾空白付きの行は
+本文である。本文は不透明であり、host 言語の文字列やコメントを解釈しない。
+
+## 観測可能な意味
+
+選択は先勝ち、反復は greedy/possessive。後続の失敗を理由に反復を縮めない。
+失敗した選択肢・反復試行の局所束縛は復元する。捕捉は trim・unquote・decode しない。
+外側の AST mapper による従来の値変換とは区別する。公開 source span は code point 単位。
+token 自身の失敗は両 cursor を開始時の値に保ち、成功は実際の字句長だけ消費する。
+`NUMBER` は `1e+` から `1` を prefix として認識し、残りを残す。全入力検査は EOF と合成する。
+
+undefined token、FQN への暗黙参照、token 間の循環、未束縛の再照合、零幅になり得る式の
+無制限反復は生成前に拒否する。参照は字句式を持つ token に限定する。
+nullable と局所束縛の解析は保守的に行う。capture は必須経路で束縛された場合だけ後続で
+利用できる。scope 内だけの状態なので、入力と位置以外の外部状態への依存はない。
+字句構文の入れ子と参照展開の深さは 128、各 token の展開は 4096 node まで。
+生成物が外部の NumberParser / IdentifierParser を呼び出す mapping は行わない。
+既存 parser は互換性テストの oracle にだけ用い、値変換と AST mapping は認識とは分離する。
+
+実行可能な定義と入力・期待値は `spec-corpus/declarative-tokens/`。
+現行 AST mapper の既定値変換（周辺空白除去、single quote の除去）は維持する。
+この変換は字句プログラムの CAPTURE / SAME_AS や source span には適用しない。
+
+## Parser 対応と残る設計
+
+| 現行 Parser 群 | 宣言への対応 |
+|---|---|
+| ASCII/POSIX 文字、Word、Number、Identifier | literal / range / choice / repeat |
+| Quoted、Escape | quote、escape、否定集合の合成 |
+| Start/EndOfSource、StartOfLine、LineTerminator | BOF/EOF/BOL、明示的な改行式 |
+| 短い/長い code fence | 行境界、局所 CAPTURE、SAME_AS |
+| Chain、Choice、Optional、Repeat | 既存規則式と字句式 |
+| LongestChoice、PredictiveChoice | 既存 rule annotation。字句式内の最長選択は別途設計 |
+| NonOrdered | 宣言順の試行・各要素一回という実装意味を明示する拡張が必要 |
+| MatchOnly、消費/反転伝播制御 | 既存 match-only cursor と新しい純粋な先読みを区別。全面移行は要検証 |
+| MatchedToken/Reference、WordEffector、任意 Predicate | 局所 text 再照合は対応。履歴検索・変換 callback は個別の宣言化が必要 |
+| AST tag/flatten、listener、recovery、scope | 既存 metadata / runtime 機能との対応を別に検証 |
+
+引数付き字句定義、Unicode property と集合演算は中核の上に拡張する。Unicode property は
+使用するデータ版を両言語で固定する。ASCII identifier の Unicode 化は互換移行と混ぜない。
+この中核だけで全 Parser の置換完了とはしない。
+
+## 検証条件
+
+Java/native Rust frontend の AST、両 generator の出力、生成 Java/Rust の prefix/全入力受理、
+consumed/matched cursor、raw span、失敗/先読み/choice の rollback を共通 fixture で比較する。
+NUMBER/STRING/fence は現行実装とも比較する。LF/CRLF/CR、非 BMP、空入力、未閉じ delimiter、
+capture の shadowing と呼出し間の漏出を含める。
