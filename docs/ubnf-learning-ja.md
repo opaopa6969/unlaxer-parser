@@ -103,6 +103,9 @@ Java / native Rust の生成 parser と学習用 WASM の受理・拒否、消�
 
 GitHub Pages の公開元を GitHub Actions に設定します。`learning-pages.yml` が master の変更から静的サイトを作り、
 ブラウザ試験に通った成果物だけを `github-pages` environment へ deploy します。`workflow_dispatch` で再公開もできます。
+ビルド・ブラウザ試験は既存の self-hosted runner、Pages への配置は標準の GitHub-hosted runner を使います。
+ローカル runner の DNS 待ちが Pages action の接続制限を超えたため、配置処理の実行環境を分けています。
+公開リポジトリの標準 hosted runner は [無料枠の対象](https://docs.github.com/en/actions/reference/runners/github-hosted-runners) です。
 公開対象は `build/learning-site/` だけです。学習者の文法・入力はアップロードしません。
 手順は [GitHub のカスタム workflow](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages) に従います。
 内容を戻す場合は該当 PR を revert して workflow を再実行します。
