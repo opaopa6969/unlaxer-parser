@@ -24,8 +24,14 @@ This is not yet a fully generated replacement for the handwritten UBNF frontend.
 
 help は LSP が起動できなくても利用でき、外部サイト・CDN・通信は不要です。
 試験入力欄の成功/失敗はテスト済みの**期待値**で、help 画面で解析を実行した結果ではありません。
-言語用 playground は [生成 CLI](../../docs/ubnf-playground-ja.md) から作成できます。
-VSIX からの生成・起動導線は親 issue #353 で接続する次の工程です。
+言語用 playground は、保存した文法のエディタ右上の **▶**、または
+**UBNF: この文法の Playground を生成して開く** で作れます。
+画面内の「環境準備」に従い Java 21、Node 20+、Rust 1.85+ と
+`wasm32-unknown-unknown` target を準備してください。信頼済みワークスペースで実行します。
+生成・WASM build 後に、隣の画面で試験入力を解析できます。HTTP server や外部公開は不要です。
+文法や import 元を変更したら保存して再生成します。元ファイルは上書きしません。
+生成先は拡張の管理フォルダで、ログにパスを表示します。
+VS Code を使わない場合は [生成 CLI](../../docs/ubnf-playground-ja.md) も利用できます。
 
 共通 assets は `../src/main/resources/ubnf-help/` にあります。`npm run compile` で
 `help-dist/` にコピーされ、VSIX に同梱されます。`catalog.json` の全文例は
@@ -44,7 +50,8 @@ Chromium で全レッスン・検索・ダウンロード・モバイル幅を�
 webview から未検証のパスやコマンドを受け付けないことを確認します。
 スクリーンショットは `target/ubnf-help-desktop.png` と `target/ubnf-help-mobile.png` です。
 VSIX smoke は配布物を一時ディレクトリへ展開し、拡張の起動・help の表示・同梱 Java LSP の
-補完を検証します。ユーザーの VS Code profile や拡張には触れません。初回は公式の VS Code
+補完、文法からの生成、WASM build、実 webview の起動完了を検証します。
+ユーザーの VS Code profile や拡張には触れません。初回は公式の VS Code
 テスト用実行ファイルをダウンロードするためネットワーク接続が必要です。
 
 ## Why this exists

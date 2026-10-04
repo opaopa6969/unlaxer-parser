@@ -241,7 +241,12 @@ jobs:
 
     - name: Activate the packaged VSIX with isolated VS Code profiles
       working-directory: unlaxer-dsl/ubnf-vscode
-      run: xvfb-run -a npm run test:vsix
+      env:
+        RUSTUP_TOOLCHAIN: 1.85.0
+      run: |
+        export PATH="$HOME/.cargo/bin:$PATH"
+        rustup toolchain install 1.85.0 --profile minimal --target wasm32-unknown-unknown
+        xvfb-run -a npm run test:vsix
 
     - name: Upload VSIX artifact
       uses: actions/upload-artifact@v4

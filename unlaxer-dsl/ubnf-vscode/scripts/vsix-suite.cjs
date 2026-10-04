@@ -30,5 +30,15 @@ exports.run = async function () {
     await new Promise(resolve => setTimeout(resolve, 100));
   } while (Date.now() < deadline);
   assert.ok(completion?.items.some(item => item.label === 'CHAR_RANGE' || item.label?.label === 'CHAR_RANGE'), 'bundled Java LSP provides v2 vocabulary');
-  console.log('Packaged VSIX: activation, catalog webview, .ubnf document and bundled LSP completion passed');
+  let generationTimer;
+  const generated = await Promise.race([
+    vscode.commands.executeCommand('ubnfLsp.openPlayground'),
+    new Promise((_, reject) => {generationTimer = setTimeout(() => reject(new Error('Playground command timed out')), 210000);})
+  ]).finally(() => clearTimeout(generationTimer));
+  assert.ok(generated?.projectPath, 'generation must finish after the real WASM webview reports ready');
+  const wasm = await fs.readFile(path.join(generated.projectPath, 'public/language.wasm'));
+  assert.deepEqual([...wasm.subarray(0, 4)], [0, 97, 115, 109]);
+  assert.ok(vscode.window.tabGroups.all.flatMap(group => group.tabs).some(tab => tab.label.startsWith('UBNF Playground')));
+  assert.equal(await fs.readFile(file.fsPath, 'utf8'), catalog.examples.find(item => item.id === 'number').source);
+  console.log('Packaged VSIX: activation, catalog, LSP, generation, WASM build and live playground webview passed');
 };

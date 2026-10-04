@@ -1,5 +1,6 @@
 'use strict';
 (() => {
+  const host = typeof acquireVsCodeApi === 'function' ? acquireVsCodeApi() : null;
   const $ = id => document.getElementById(id);
   const element = (tag, text, className) => {
     const node = document.createElement(tag); if (text !== undefined) node.textContent = text;
@@ -8,6 +9,7 @@
   let worker, wasm, workerSource, workerUrl, catalog, request = 0, timeout, activeSource = '';
   function stop() { clearTimeout(timeout); worker?.terminate(); worker = null; if (workerUrl) URL.revokeObjectURL(workerUrl); }
   function fail(message) {
+    host?.postMessage({type: 'error', error: message});
     $('status').textContent = `実行エラー：${message}`; $('hint').hidden = false;
     $('hint').textContent = '受理・拒否の判定は完了していません。入力を短くして再試行してください。';
     $('parse').disabled = !wasm;
@@ -74,6 +76,7 @@
         catalog = event.data.catalog; $('name').textContent = `${catalog.name} · 言語を試す`; document.title = `${catalog.name} · UBNF Playground`;
         $('engine').textContent = '準備完了：生成 Rust parser を WebAssembly で実行します。入力はブラウザの中だけで処理します。';
         renderCatalog(); $('parse').disabled = false; afterReady?.();
+        host?.postMessage({type: 'ready'});
       } else { $('parse').disabled = false; render(event.data.result); }
     };
     send('init', {bytes: wasm});
@@ -92,7 +95,8 @@
     const response = await fetch(name); if (!response.ok) throw new Error(`${name}: HTTP ${response.status}`);
     return binary ? response.arrayBuffer() : response.text();
   }
-  Promise.all([load('language.wasm', true), load('worker.js'), load('grammar.ubnf')]).then(([bytes, source, grammar]) => {
+  if (host) document.querySelector('header a').addEventListener('click', event => { event.preventDefault(); host.postMessage({type: 'openHelp'}); });
+  Promise.all([load(document.body.dataset.wasm || 'language.wasm', true), load(document.body.dataset.worker || 'worker.js'), load(document.body.dataset.grammar || 'grammar.ubnf')]).then(([bytes, source, grammar]) => {
     wasm = bytes; workerSource = source; $('grammar').textContent = grammar; startWorker();
   }).catch(error => { $('engine').textContent = 'parser を読み込めませんでした。生成 project で npm run build → npm start を実行し、表示された URL を開いてください。'; fail(String(error)); });
   addEventListener('pagehide', stop);

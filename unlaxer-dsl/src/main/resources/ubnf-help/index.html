@@ -15,7 +15,9 @@
       <h1 id="title">はじめての文法を、ここから。</h1>
       <p id="intro">catalog を読み込んでいます…</p>
       <ol id="workflow" class="workflow"></ol>
-      <p class="notice">この画面は文法を書く人向けのヘルプです。生成した言語を使う人向けの説明は、文法の <code>@doc</code> と入力例から作ります。</p>
+      <p class="notice">この画面は文法を書く人向けのヘルプです。生成した言語を使う人向けの説明は、文法の <code>@doc</code> から表示します。利用者に試してほしい入力例も <code>@doc</code> に書きましょう。</p>
+      <button type="button" id="generate" class="primary" hidden>保存した文法の Playground を生成して開く</button>
+      <details><summary>Playground の環境準備・操作手順</summary><div id="setup"></div></details>
     </section>
     <nav aria-label="ヘルプのページ" class="tabs">
       <button type="button" data-tab="learn" aria-pressed="true">はじめの一歩</button>

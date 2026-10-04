@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { readFile } from "node:fs/promises";
 
-/** Bundled content only: never render workspace text as HTML or execute a command from the webview. */
+/** Bundled content only; the bridge allows two fixed actions, never arbitrary commands or paths. */
 export function registerHelp(context: vscode.ExtensionContext): void {
   let panel: vscode.WebviewPanel | undefined;
   context.subscriptions.push(vscode.commands.registerCommand("ubnfLsp.openHelp", async () => {
@@ -27,6 +27,7 @@ export function registerHelp(context: vscode.ExtensionContext): void {
       created.webview.onDidReceiveMessage(async (message: unknown) => {
         if (typeof message !== "object" || message === null) return;
         const { type, id } = message as {type?: unknown; id?: unknown};
+        if (type === "generatePlayground") { await vscode.commands.executeCommand("ubnfLsp.openPlayground"); return; }
         if (type !== "openExample" || typeof id !== "string") return;
         const example = catalog.examples.find(item => item.id === id);
         if (!example) return;
