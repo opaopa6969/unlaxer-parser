@@ -40,5 +40,22 @@ exports.run = async function () {
   assert.deepEqual([...wasm.subarray(0, 4)], [0, 97, 115, 109]);
   assert.ok(vscode.window.tabGroups.all.flatMap(group => group.tabs).some(tab => tab.label.startsWith('UBNF Playground')));
   assert.equal(await fs.readFile(file.fsPath, 'utf8'), catalog.examples.find(item => item.id === 'number').source);
-  console.log('Packaged VSIX: activation, catalog, LSP, generation, WASM build and live playground webview passed');
+  const moduleFile = vscode.Uri.file(path.join(file.fsPath, '..', 'numbers.ubnf'));
+  const mainFile = vscode.Uri.file(path.join(file.fsPath, '..', 'imports.ubnf'));
+  await vscode.workspace.fs.writeFile(moduleFile, Buffer.from("grammar Numbers { @ubnf: v2 token NUMBER ::= CHAR_RANGE('0','9')+; }"));
+  const mainText = "grammar Main {\n @import num from 'numbers.ubnf'\n @ubnf: v2\n @root @mapping(Value, params=[value])\n Start ::= num.NUMBER @value;\n}";
+  await vscode.workspace.fs.writeFile(mainFile, Buffer.from(mainText));
+  const imported = await vscode.workspace.openTextDocument(mainFile);
+  await vscode.window.showTextDocument(imported);
+  let definitions;
+  const importDeadline = Date.now() + 15000;
+  do {
+    definitions = await vscode.commands.executeCommand('vscode.executeDefinitionProvider', mainFile, new vscode.Position(4, 16));
+    if (definitions?.some(item => (item.uri ?? item.targetUri)?.toString() === moduleFile.toString())) break;
+    await new Promise(resolve => setTimeout(resolve, 100));
+  } while (Date.now() < importDeadline);
+  assert.ok(definitions?.some(item => (item.uri ?? item.targetUri)?.toString() === moduleFile.toString()), 'real LSP resolves imported token locations');
+  const importedCompletion = await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', mainFile, new vscode.Position(4, 15));
+  assert.ok(importedCompletion.items.some(item => item.label === 'num.NUMBER' || item.label?.label === 'num.NUMBER'));
+  console.log('Packaged VSIX: activation, catalog, LSP imports, generation, WASM build and live playground webview passed');
 };

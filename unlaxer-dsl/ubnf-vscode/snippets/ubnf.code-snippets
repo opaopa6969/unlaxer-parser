@@ -10,10 +10,12 @@
       "  token ${4:IDENTIFIER} ::= (CHAR_RANGE('a', 'z') | '_')+;",
       "",
       "  @root",
-      "  ${5:Start} ::= ${6:NUMBER} ;",
+      "  @mapping(Value, params=[text])",
+      "  @doc('数字を入力してください。')",
+      "  ${5:Start} ::= ${3:NUMBER} @text;",
       "}"
     ],
-    "description": "Grammar block with package, tokens and a @root rule"
+    "description": "Playground-ready grammar with declarative tokens, @root, @mapping and @doc"
   },
   "Mapped rule": {
     "prefix": "mapped-rule",
@@ -47,8 +49,8 @@
   },
   "UNTIL token": {
     "prefix": "until",
-    "body": ["token ${1:BODY} = UNTIL('${2:```}')"],
-    "description": "Token matching everything up to a terminator"
+    "body": ["token ${1:BODY} ::= { NEGATIVE_LOOKAHEAD('${2:end}') ANY };"],
+    "description": "Declarative token matching up to a terminator (does not consume it)"
   },
   "Grammar import": {
     "prefix": "import",
