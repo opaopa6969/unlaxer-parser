@@ -46,7 +46,9 @@ jobs:
   deploy:
     if: github.ref == 'refs/heads/master'
     needs: build
-    runs-on: [unlaxer-parser-ci, Linux, X64]
+    # The local runner's DNS lookup can exceed the Pages action's connect timeout.
+    # Standard hosted runners are free for this public repository.
+    runs-on: ubuntu-latest
     permissions:
       pages: write
       id-token: write
