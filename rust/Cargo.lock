@@ -29,6 +29,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "unlaxer-learning"
+version = "0.1.0"
+dependencies = [
+ "unlaxer-codegen",
+ "unlaxer-generator",
+ "unlaxer-runtime",
+ "unlaxer-ubnf",
+]
+
+[[package]]
 name = "unlaxer-runtime"
 version = "0.1.0"
 

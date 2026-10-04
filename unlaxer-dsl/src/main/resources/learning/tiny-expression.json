@@ -1,0 +1,527 @@
+{
+  "schemaVersion": 1,
+  "id": "tiny-expression-ja",
+  "version": 1,
+  "title": "はじめての言語づくり",
+  "description": "読む、考える、書く、試す。小さな式言語を、あなたの手で。",
+  "duration": "全8ステップ · 60〜90分",
+  "steps": [
+    {
+      "id": "step-1",
+      "title": "入口をつくる",
+      "subtitle": "文字列が「この言語の文」になる瞬間",
+      "explanation": [
+        "言語を作る最初の仕事は、どんな文字の並びを受け入れるか決めることです。まずは 42 とだけ書ける言語から始めましょう。",
+        "grammar は言語の名前、@root は読み始める規則、::= は「この並びでできている」、引用符はそのままの文字を表します。末尾の ; は UBNF の規則を閉じる記号です。",
+        "@value は読んだ文字を名付け、@mapping(Number, params=[value]) は値を Number という箱にまとめます。この箱が AST（抽象構文木）です。@whitespace: javaStyle は規則の境界で空白やコメントを扱います。"
+      ],
+      "question": {
+        "prompt": "42 を受け入れる規則でも、42abc を拒否するのはなぜでしょう？",
+        "options": [
+          {
+            "text": "入力全体が言語の規則に合う必要があるから",
+            "feedback": "その通り。先頭だけ読めても、余りがあればプログラム全体としては失敗です。"
+          },
+          {
+            "text": "数字が 2 桁までに制限されるから",
+            "feedback": "まだ桁数の規則はありません。今回は文字列 42 をそのまま要求しています。"
+          },
+          {
+            "text": "AST は数字を保存できないから",
+            "feedback": "AST は読んだ値を保存できます。問題は後ろに残る abc です。"
+          }
+        ],
+        "answer": 0
+      },
+      "task": "Number の hello を 42 に変え、受け入れる入力と拒否する入力の両方を確認しましょう。",
+      "hint": "引用符の中を変えます。Number ::= '42' @value;",
+      "starter": "grammar Learn01 {\n  @ubnf: v2\n  @package: guide.demo\n  @whitespace: javaStyle\n\n  @root\n  @mapping(Number, params=[value])\n  Number ::= 'hello' @value;\n}\n",
+      "solution": "grammar Learn01 {\n  @ubnf: v2\n  @package: guide.demo\n  @whitespace: javaStyle\n\n  @root\n  @mapping(Number, params=[value])\n  Number ::= '42' @value;\n}\n",
+      "sample": "42",
+      "cases": [
+        {
+          "input": "42",
+          "accept": true,
+          "value": 42
+        },
+        {
+          "input": "7",
+          "accept": false
+        },
+        {
+          "input": "hello",
+          "accept": false
+        },
+        {
+          "input": "42abc",
+          "accept": false
+        },
+        {
+          "input": "42😀",
+          "accept": false
+        }
+      ]
+    },
+    {
+      "id": "step-2",
+      "title": "数字を読む",
+      "subtitle": "一つの値から、無数の数値へ",
+      "explanation": [
+        "42 だけでは電卓になりません。0〜9 の数字を 1 個以上読めるようにします。token は空白を挟まずに読むひとかたまりです。",
+        "CHAR_RANGE('0','9') は 1 文字の数字。{ ... } は 0 回以上の繰り返しです。最初の数字を必須にして、その後ろを繰り返すと 1 桁以上になります。",
+        "この教材の数値は 0 以上の整数表記です。負の結果や割り算は後で計算できますが、-3 や 1.5 という数値表記はまだ定義しません。"
+      ],
+      "question": {
+        "prompt": "数字を { CHAR_RANGE('0','9') } だけにすると、何が困るでしょう？",
+        "options": [
+          {
+            "text": "1 桁の数字を読めなくなる",
+            "feedback": "繰り返しは 1 回でも成功します。0 回も成功する点が問題です。"
+          },
+          {
+            "text": "数字の順番が逆になる",
+            "feedback": "繰り返しは左から順に読みます。並び順は変えません。"
+          },
+          {
+            "text": "空の入力も数字になってしまう",
+            "feedback": "正解。0 回も許すので、先頭の 1 文字を繰り返しの外に置きます。"
+          }
+        ],
+        "answer": 2
+      },
+      "task": "DIGITS を 1 桁以上の数字にしてください。1 2 のように数字の途中へ空白を入れた入力は拒否します。",
+      "hint": "CHAR_RANGE('0','9') の後ろに { CHAR_RANGE('0','9') } を加えます。",
+      "starter": "grammar Learn02 {\n  @ubnf: v2\n  @package: guide.demo\n  @whitespace: javaStyle\n\n  token DIGITS ::= CHAR_RANGE('0','9');\n\n\n  @root\n  @mapping(Number, params=[value])\n  Number ::= DIGITS @value;\n}\n",
+      "solution": "grammar Learn02 {\n  @ubnf: v2\n  @package: guide.demo\n  @whitespace: javaStyle\n\n  token DIGITS ::= CHAR_RANGE('0','9') { CHAR_RANGE('0','9') };\n\n\n  @root\n  @mapping(Number, params=[value])\n  Number ::= DIGITS @value;\n}\n",
+      "sample": "0",
+      "cases": [
+        {
+          "input": "0",
+          "accept": true,
+          "value": 0
+        },
+        {
+          "input": "42",
+          "accept": true,
+          "value": 42
+        },
+        {
+          "input": "2026",
+          "accept": true,
+          "value": 2026
+        },
+        {
+          "input": "",
+          "accept": false
+        },
+        {
+          "input": "1 2",
+          "accept": false
+        },
+        {
+          "input": "2a",
+          "accept": false
+        }
+      ]
+    },
+    {
+      "id": "step-3",
+      "title": "足し算と引き算",
+      "subtitle": "繰り返しを AST に残す",
+      "explanation": [
+        "式を「最初の数」と「演算子＋次の数の繰り返し」に分けます。これなら 1+2+3 も書けます。| は候補の選択です。",
+        "Sum の first は最初の Number、ops と rest は繰り返した演算子と Number の配列です。AST には文字列を分割するだけでは分からない構造が残ります。",
+        "計算器は first から始め、ops と rest を左から組にして処理します。10-2-3 は (10-2)-3 = 5 です。この教材では文法から得た AST を固定の学習用評価器で計算します。"
+      ],
+      "question": {
+        "prompt": "10-2-3 を左から計算するといくつでしょう？",
+        "options": [
+          {
+            "text": "9",
+            "feedback": "演算子と右側の数を 1 組ずつ追ってみましょう。"
+          },
+          {
+            "text": "5",
+            "feedback": "正解。最初に 10-2、次に 8-3 です。"
+          },
+          {
+            "text": "11",
+            "feedback": "これは 10-(2-3) の結果です。引き算の順序は意味を変えます。"
+          }
+        ],
+        "answer": 1
+      },
+      "task": "Expression の演算子の選択を直し、+ と - の両方を使えるようにしてください。",
+      "hint": "('+' | '-') @ops の形で、読んだ演算子を残します。",
+      "starter": "grammar Learn03 {\n  @ubnf: v2\n  @package: guide.demo\n  @whitespace: javaStyle\n\n  token DIGITS ::= CHAR_RANGE('0','9') { CHAR_RANGE('0','9') };\n\n  @root\n  @mapping(Sum, params=[first, ops, rest])\n  Expression ::= Number @first { ('-' | '-') @ops Number @rest };\n\n\n  @mapping(Number, params=[value])\n  Number ::= DIGITS @value;\n}\n",
+      "solution": "grammar Learn03 {\n  @ubnf: v2\n  @package: guide.demo\n  @whitespace: javaStyle\n\n  token DIGITS ::= CHAR_RANGE('0','9') { CHAR_RANGE('0','9') };\n\n  @root\n  @mapping(Sum, params=[first, ops, rest])\n  Expression ::= Number @first { ('+' | '-') @ops Number @rest };\n\n\n  @mapping(Number, params=[value])\n  Number ::= DIGITS @value;\n}\n",
+      "sample": "1+2+3",
+      "cases": [
+        {
+          "input": "1+2+3",
+          "accept": true,
+          "value": 6
+        },
+        {
+          "input": "10-2-3",
+          "accept": true,
+          "value": 5
+        },
+        {
+          "input": "8",
+          "accept": true,
+          "value": 8
+        },
+        {
+          "input": "2+",
+          "accept": false
+        },
+        {
+          "input": "+2",
+          "accept": false
+        },
+        {
+          "input": "2**3",
+          "accept": false
+        }
+      ]
+    },
+    {
+      "id": "step-4",
+      "title": "掛け算を先に",
+      "subtitle": "優先順位を文法の階層にする",
+      "explanation": [
+        "1+2*3 は 7 にしたいので、足し算の部品を Number から Term に変えます。Term は掛け算と割り算をまとめる一段深い規則です。",
+        "Expression → Term → Number という順に読むと、2*3 が一つの Product になります。先に Product を評価し、その結果を Sum で足します。",
+        "この文法では @precedence を足すだけで順番が変わるわけではありません。どの規則がどの規則を部品にするかが優先順位を決めます。"
+      ],
+      "question": {
+        "prompt": "1+2*3 の AST では、2*3 はどこに入るでしょう？",
+        "options": [
+          {
+            "text": "Sum の内側の Product",
+            "feedback": "正解。掛け算をひとかたまりにしてから足します。"
+          },
+          {
+            "text": "Product の内側の Sum",
+            "feedback": "この構造では足し算を先にまとめてしまいます。"
+          },
+          {
+            "text": "すべて同じ深さの文字列",
+            "feedback": "構造を保つために Term を導入しました。"
+          }
+        ],
+        "answer": 0
+      },
+      "task": "Term の演算子を * と / に直してください。1+2*3 と 8/2/2 の両方で順序を確認します。",
+      "hint": "Term ::= Number @first { ('*' | '/') @ops Number @rest };",
+      "starter": "grammar Learn04 {\n  @ubnf: v2\n  @package: guide.demo\n  @whitespace: javaStyle\n\n  token DIGITS ::= CHAR_RANGE('0','9') { CHAR_RANGE('0','9') };\n\n  @root\n  @mapping(Sum, params=[first, ops, rest])\n  Expression ::= Term @first { ('+' | '-') @ops Term @rest };\n\n  @mapping(Product, params=[first, ops, rest])\n  Term ::= Number @first { ('+' | '/') @ops Number @rest };\n\n\n  @mapping(Number, params=[value])\n  Number ::= DIGITS @value;\n}\n",
+      "solution": "grammar Learn04 {\n  @ubnf: v2\n  @package: guide.demo\n  @whitespace: javaStyle\n\n  token DIGITS ::= CHAR_RANGE('0','9') { CHAR_RANGE('0','9') };\n\n  @root\n  @mapping(Sum, params=[first, ops, rest])\n  Expression ::= Term @first { ('+' | '-') @ops Term @rest };\n\n  @mapping(Product, params=[first, ops, rest])\n  Term ::= Number @first { ('*' | '/') @ops Number @rest };\n\n\n  @mapping(Number, params=[value])\n  Number ::= DIGITS @value;\n}\n",
+      "sample": "1+2*3",
+      "cases": [
+        {
+          "input": "1+2*3",
+          "accept": true,
+          "value": 7
+        },
+        {
+          "input": "2*3+4*5",
+          "accept": true,
+          "value": 26
+        },
+        {
+          "input": "8/2/2",
+          "accept": true,
+          "value": 2
+        },
+        {
+          "input": "10-2*3",
+          "accept": true,
+          "value": 4
+        },
+        {
+          "input": "1*",
+          "accept": false
+        },
+        {
+          "input": "1*/2",
+          "accept": false
+        }
+      ]
+    },
+    {
+      "id": "step-5",
+      "title": "括弧でまとめる",
+      "subtitle": "小さな式の中に、もう一度式を書く",
+      "explanation": [
+        "Atom は数値や括弧付きの式という、計算の一番小さい単位です。Term の部品を Number から Atom に広げます。",
+        "Atom ::= '(' Expression ')' | Number; とすると、括弧の内側で再び Expression を読めます。これが再帰です。括弧そのものは計算に必要な値ではないため、AST では中の式が渡されます。",
+        "自分を参照するときも、まず開き括弧を読むので入力が進みます。Expression ::= Expression ... のように入力を読まずに自分へ戻る左再帰は、この parser では使えません。"
+      ],
+      "question": {
+        "prompt": "(1+2)*3 が 9 になるのはなぜでしょう？",
+        "options": [
+          {
+            "text": "括弧が掛け算を足し算へ変えるから",
+            "feedback": "演算子の意味は変わりません。まとめる単位が変わります。"
+          },
+          {
+            "text": "左から書いた文字をすべて順番に計算するから",
+            "feedback": "1+2*3 と比較すると、文字順だけでは説明できません。"
+          },
+          {
+            "text": "括弧の中の式を、一つの Atom として読むから",
+            "feedback": "正解。Sum が Product の部品になり、通常の優先順位を上書きできます。"
+          }
+        ],
+        "answer": 2
+      },
+      "task": "Atom を角括弧ではなく丸括弧で式を囲む規則に直してください。入れ子も試します。",
+      "hint": "'[' と ']' を '(' と ')' に置き換えます。",
+      "starter": "grammar Learn05 {\n  @ubnf: v2\n  @package: guide.demo\n  @whitespace: javaStyle\n\n  token DIGITS ::= CHAR_RANGE('0','9') { CHAR_RANGE('0','9') };\n\n  @root\n  @mapping(Sum, params=[first, ops, rest])\n  Expression ::= Term @first { ('+' | '-') @ops Term @rest };\n\n  @mapping(Product, params=[first, ops, rest])\n  Term ::= Atom @first { ('*' | '/') @ops Atom @rest };\n\n  Atom ::= '[' Expression ']' | Number;\n\n\n  @mapping(Number, params=[value])\n  Number ::= DIGITS @value;\n}\n",
+      "solution": "grammar Learn05 {\n  @ubnf: v2\n  @package: guide.demo\n  @whitespace: javaStyle\n\n  token DIGITS ::= CHAR_RANGE('0','9') { CHAR_RANGE('0','9') };\n\n  @root\n  @mapping(Sum, params=[first, ops, rest])\n  Expression ::= Term @first { ('+' | '-') @ops Term @rest };\n\n  @mapping(Product, params=[first, ops, rest])\n  Term ::= Atom @first { ('*' | '/') @ops Atom @rest };\n\n  Atom ::= '(' Expression ')' | Number;\n\n\n  @mapping(Number, params=[value])\n  Number ::= DIGITS @value;\n}\n",
+      "sample": "(1+2)*3",
+      "cases": [
+        {
+          "input": "(1+2)*3",
+          "accept": true,
+          "value": 9
+        },
+        {
+          "input": "2*(3+(4*5))",
+          "accept": true,
+          "value": 46
+        },
+        {
+          "input": "(8-3)/5",
+          "accept": true,
+          "value": 1
+        },
+        {
+          "input": "(1+2",
+          "accept": false
+        },
+        {
+          "input": "1+2)",
+          "accept": false
+        },
+        {
+          "input": "[1+2]",
+          "accept": false
+        }
+      ]
+    },
+    {
+      "id": "step-6",
+      "title": "値に名前をつける",
+      "subtitle": "文法と、名前の意味を分ける",
+      "explanation": [
+        "let price = 12; price*3 のように名前を宣言できるようにします。Program は 0 個以上の Binding と最後の式です。宣言の ; は新しい言語の区切りです。",
+        "IDENT は小文字英字か _ で始まる名前です。Variable という AST を作るところまでが parser の仕事。値の保存や名前の検索は評価器の仕事です。",
+        "宣言は上から順に評価します。未定義の名前と同じ名前の二重宣言は評価エラーにします。if と let は予約語です。文法が読めたことと、意味が正しいことを分けて確かめましょう。"
+      ],
+      "question": {
+        "prompt": "宣言していない missing+1 は、どの段階で失敗するでしょう？",
+        "options": [
+          {
+            "text": "必ず 1 と計算される",
+            "feedback": "未定義の名前を勝手に 0 と扱わず、エラーで知らせます。"
+          },
+          {
+            "text": "文法では読めるが、評価で名前が見つからない",
+            "feedback": "正解。文字の形と値の意味は別の検証です。"
+          },
+          {
+            "text": "UBNF 自体の文法エラーになる",
+            "feedback": "missing は IDENT として読めます。言語の文法定義が壊れたわけではありません。"
+          }
+        ],
+        "answer": 1
+      },
+      "task": "Binding の : を = に変えて、宣言した変数で計算できるようにしてください。",
+      "hint": "Binding ::= 'let' IDENT @name '=' Expression @value ';';",
+      "starter": "grammar Learn06 {\n  @ubnf: v2\n  @package: guide.demo\n  @whitespace: javaStyle\n\n  token DIGITS ::= CHAR_RANGE('0','9') { CHAR_RANGE('0','9') };\n  token IDENT ::= (CHAR_RANGE('a','z') | '_') { CHAR_RANGE('a','z') | CHAR_RANGE('0','9') | '_' };\n\n  @root\n  @mapping(Program, params=[bindings, result])\n  Program ::= { Binding } @bindings Expression @result;\n\n  @mapping(Binding, params=[name, value])\n  Binding ::= 'let' IDENT @name ':' Expression @value ';';\n\n  @mapping(Variable, params=[name])\n  Variable ::= IDENT @name;\n\n  @mapping(Sum, params=[first, ops, rest])\n  Expression ::= Term @first { ('+' | '-') @ops Term @rest };\n\n  @mapping(Product, params=[first, ops, rest])\n  Term ::= Atom @first { ('*' | '/') @ops Atom @rest };\n\n  Atom ::= '(' Expression ')' | Number | Variable;\n\n\n  @mapping(Number, params=[value])\n  Number ::= DIGITS @value;\n}\n",
+      "solution": "grammar Learn06 {\n  @ubnf: v2\n  @package: guide.demo\n  @whitespace: javaStyle\n\n  token DIGITS ::= CHAR_RANGE('0','9') { CHAR_RANGE('0','9') };\n  token IDENT ::= (CHAR_RANGE('a','z') | '_') { CHAR_RANGE('a','z') | CHAR_RANGE('0','9') | '_' };\n\n  @root\n  @mapping(Program, params=[bindings, result])\n  Program ::= { Binding } @bindings Expression @result;\n\n  @mapping(Binding, params=[name, value])\n  Binding ::= 'let' IDENT @name '=' Expression @value ';';\n\n  @mapping(Variable, params=[name])\n  Variable ::= IDENT @name;\n\n  @mapping(Sum, params=[first, ops, rest])\n  Expression ::= Term @first { ('+' | '-') @ops Term @rest };\n\n  @mapping(Product, params=[first, ops, rest])\n  Term ::= Atom @first { ('*' | '/') @ops Atom @rest };\n\n  Atom ::= '(' Expression ')' | Number | Variable;\n\n\n  @mapping(Number, params=[value])\n  Number ::= DIGITS @value;\n}\n",
+      "sample": "let price = 12; price*3",
+      "cases": [
+        {
+          "input": "let price = 12; price*3",
+          "accept": true,
+          "value": 36
+        },
+        {
+          "input": "let x = 2; let y = x+3; y*2",
+          "accept": true,
+          "value": 10
+        },
+        {
+          "input": "1+2",
+          "accept": true,
+          "value": 3
+        },
+        {
+          "input": "let x = 2 x",
+          "accept": false
+        },
+        {
+          "input": "let 2x = 1; 2x",
+          "accept": false
+        },
+        {
+          "input": "missing+1",
+          "accept": true,
+          "evaluationError": "未定義"
+        },
+        {
+          "input": "let x = 1; let x = 2; x",
+          "accept": true,
+          "evaluationError": "二重宣言"
+        }
+      ]
+    },
+    {
+      "id": "step-7",
+      "title": "条件で選ぶ",
+      "subtitle": "選ばれた枝だけを評価する",
+      "explanation": [
+        "if(条件, 真の式, 偽の式) を追加します。ここでは 0 を偽、0 以外を真と決めます。比較演算や真偽値型を後から追加する足場になります。",
+        "Conditional は condition・yes・no の 3 つの AST を持ちます。Atom の選択では Variable より前に置き、if(...) を名前だけで読み終えないようにします。",
+        "条件式では選ばれた枝だけを評価します。if(1, 7, missing) は 7 です。文法としては両方の枝が正しく書かれている必要があります。"
+      ],
+      "question": {
+        "prompt": "if(0, 1/0, 42) の結果はどうすべきでしょう？",
+        "options": [
+          {
+            "text": "42。選ばれなかった枝は評価しない",
+            "feedback": "正解。条件が 0 なので no だけを評価します。"
+          },
+          {
+            "text": "必ずゼロ除算エラー",
+            "feedback": "両枝を先に計算するのではなく、条件を見てから選んだ枝を評価します。"
+          },
+          {
+            "text": "0。条件の値がそのまま答えになる",
+            "feedback": "条件はどちらの枝を選ぶかを決めます。結果は選んだ枝の値です。"
+          }
+        ],
+        "answer": 0
+      },
+      "task": "Conditional の 2 つ目の区切りも , に直し、条件式を完成させてください。",
+      "hint": "3 つの Expression の間を ',' で区切ります。",
+      "starter": "grammar Learn07 {\n  @ubnf: v2\n  @package: guide.demo\n  @whitespace: javaStyle\n\n  token DIGITS ::= CHAR_RANGE('0','9') { CHAR_RANGE('0','9') };\n  token IDENT ::= (CHAR_RANGE('a','z') | '_') { CHAR_RANGE('a','z') | CHAR_RANGE('0','9') | '_' };\n\n  @root\n  @mapping(Program, params=[bindings, result])\n  Program ::= { Binding } @bindings Expression @result;\n\n  @mapping(Binding, params=[name, value])\n  Binding ::= 'let' IDENT @name '=' Expression @value ';';\n\n  @mapping(Variable, params=[name])\n  Variable ::= IDENT @name;\n\n  @mapping(Sum, params=[first, ops, rest])\n  Expression ::= Term @first { ('+' | '-') @ops Term @rest };\n\n  @mapping(Product, params=[first, ops, rest])\n  Term ::= Atom @first { ('*' | '/') @ops Atom @rest };\n\n  Atom ::= Conditional | '(' Expression ')' | Number | Variable;\n\n  @mapping(Conditional, params=[condition, yes, no])\n  Conditional ::= 'if' '(' Expression @condition ',' Expression @yes ';' Expression @no ')';\n\n\n  @mapping(Number, params=[value])\n  Number ::= DIGITS @value;\n}\n",
+      "solution": "grammar Learn07 {\n  @ubnf: v2\n  @package: guide.demo\n  @whitespace: javaStyle\n\n  token DIGITS ::= CHAR_RANGE('0','9') { CHAR_RANGE('0','9') };\n  token IDENT ::= (CHAR_RANGE('a','z') | '_') { CHAR_RANGE('a','z') | CHAR_RANGE('0','9') | '_' };\n\n  @root\n  @mapping(Program, params=[bindings, result])\n  Program ::= { Binding } @bindings Expression @result;\n\n  @mapping(Binding, params=[name, value])\n  Binding ::= 'let' IDENT @name '=' Expression @value ';';\n\n  @mapping(Variable, params=[name])\n  Variable ::= IDENT @name;\n\n  @mapping(Sum, params=[first, ops, rest])\n  Expression ::= Term @first { ('+' | '-') @ops Term @rest };\n\n  @mapping(Product, params=[first, ops, rest])\n  Term ::= Atom @first { ('*' | '/') @ops Atom @rest };\n\n  Atom ::= Conditional | '(' Expression ')' | Number | Variable;\n\n  @mapping(Conditional, params=[condition, yes, no])\n  Conditional ::= 'if' '(' Expression @condition ',' Expression @yes ',' Expression @no ')';\n\n\n  @mapping(Number, params=[value])\n  Number ::= DIGITS @value;\n}\n",
+      "sample": "if(0,1/0,42)",
+      "cases": [
+        {
+          "input": "if(0,1/0,42)",
+          "accept": true,
+          "value": 42
+        },
+        {
+          "input": "if(1,7,missing)",
+          "accept": true,
+          "value": 7
+        },
+        {
+          "input": "let x = 3; if(x, x*2, 0)",
+          "accept": true,
+          "value": 6
+        },
+        {
+          "input": "if(0,1,if(1,2,3))",
+          "accept": true,
+          "value": 2
+        },
+        {
+          "input": "if(1,2)",
+          "accept": false
+        },
+        {
+          "input": "if(1,2,)",
+          "accept": false
+        },
+        {
+          "input": "if(1,1/0,42)",
+          "accept": true,
+          "evaluationError": "ゼロ除算"
+        }
+      ]
+    },
+    {
+      "id": "step-8",
+      "title": "完成した言語を使う",
+      "subtitle": "文法 → AST → 評価を一つにつなぐ",
+      "explanation": [
+        "これで数値・四則演算・括弧・変数・条件式を持つ小さな式言語ができました。TinyExpression の考え方に近い入門用の言語です。TinyExpression 全体の仕様を実装したものではありません。",
+        "最後に評価器の条件分岐を選んで完成させます。文法が作る AST に意味を与えるのが評価器です。AST を開き、Program → Sum → Product → Number / Variable / Conditional のつながりを追いましょう。",
+        "教材の評価器は数値・変数・演算・条件分岐だけを扱い、入力を JavaScript として実行しません。ゼロ除算、未定義名、二重宣言、予約語、有限値でない結果は評価エラーです。計算は JavaScript の Number なので、小数や大きな値には丸めがあります。",
+        "完成文法を保存すれば CLI や VS Code で Java / Rust の parser を生成できます。次は小数、比較、関数、型のどれを足すか考えてみてください。"
+      ],
+      "question": {
+        "prompt": "新しい「関数呼び出し」を足すとき、必要な仕事はどれでしょう？",
+        "options": [
+          {
+            "text": "入力例を説明に書くだけ",
+            "feedback": "説明だけでは parser の受理する形や実行結果は変わりません。"
+          },
+          {
+            "text": "parser が読めれば意味は自動的に決まる",
+            "feedback": "同じ AST にどんな意味を与えるかは、言語を作る人が決めます。"
+          },
+          {
+            "text": "文法・AST・評価の意味・成功例と失敗例を決める",
+            "feedback": "正解。受け入れる形と意味を決め、両方をテストします。"
+          }
+        ],
+        "answer": 2
+      },
+      "task": "評価器の条件分岐を選び、すべての試験に合格させましょう。その後、自分のプログラムを試して文法を保存できます。",
+      "hint": "condition を計算してから、0 なら no、それ以外なら yes を評価します。",
+      "starter": "grammar Learn08 {\n  @ubnf: v2\n  @package: guide.demo\n  @whitespace: javaStyle\n\n  token DIGITS ::= CHAR_RANGE('0','9') { CHAR_RANGE('0','9') };\n  token IDENT ::= (CHAR_RANGE('a','z') | '_') { CHAR_RANGE('a','z') | CHAR_RANGE('0','9') | '_' };\n\n  @root\n  @mapping(Program, params=[bindings, result])\n  Program ::= { Binding } @bindings Expression @result;\n\n  @mapping(Binding, params=[name, value])\n  Binding ::= 'let' IDENT @name '=' Expression @value ';';\n\n  @mapping(Variable, params=[name])\n  Variable ::= IDENT @name;\n\n  @mapping(Sum, params=[first, ops, rest])\n  Expression ::= Term @first { ('+' | '-') @ops Term @rest };\n\n  @mapping(Product, params=[first, ops, rest])\n  Term ::= Atom @first { ('*' | '/') @ops Atom @rest };\n\n  Atom ::= Conditional | '(' Expression ')' | Number | Variable;\n\n  @mapping(Conditional, params=[condition, yes, no])\n  Conditional ::= 'if' '(' Expression @condition ',' Expression @yes ',' Expression @no ')';\n\n\n  @mapping(Number, params=[value])\n  Number ::= DIGITS @value;\n}\n",
+      "solution": "grammar Learn08 {\n  @ubnf: v2\n  @package: guide.demo\n  @whitespace: javaStyle\n\n  token DIGITS ::= CHAR_RANGE('0','9') { CHAR_RANGE('0','9') };\n  token IDENT ::= (CHAR_RANGE('a','z') | '_') { CHAR_RANGE('a','z') | CHAR_RANGE('0','9') | '_' };\n\n  @root\n  @mapping(Program, params=[bindings, result])\n  Program ::= { Binding } @bindings Expression @result;\n\n  @mapping(Binding, params=[name, value])\n  Binding ::= 'let' IDENT @name '=' Expression @value ';';\n\n  @mapping(Variable, params=[name])\n  Variable ::= IDENT @name;\n\n  @mapping(Sum, params=[first, ops, rest])\n  Expression ::= Term @first { ('+' | '-') @ops Term @rest };\n\n  @mapping(Product, params=[first, ops, rest])\n  Term ::= Atom @first { ('*' | '/') @ops Atom @rest };\n\n  Atom ::= Conditional | '(' Expression ')' | Number | Variable;\n\n  @mapping(Conditional, params=[condition, yes, no])\n  Conditional ::= 'if' '(' Expression @condition ',' Expression @yes ',' Expression @no ')';\n\n\n  @mapping(Number, params=[value])\n  Number ::= DIGITS @value;\n}\n",
+      "sample": "let price = 12; let count = 3; if(count,price*count,0)",
+      "cases": [
+        {
+          "input": "let price = 12; let count = 3; if(count,price*count,0)",
+          "accept": true,
+          "value": 36
+        },
+        {
+          "input": "if(0,missing,2+3*4)",
+          "accept": true,
+          "value": 14
+        },
+        {
+          "input": "if(1,(2+3)*4,1/0)",
+          "accept": true,
+          "value": 20
+        },
+        {
+          "input": "let total = 8/2/2; total",
+          "accept": true,
+          "value": 2
+        },
+        {
+          "input": "let x = ; x",
+          "accept": false
+        },
+        {
+          "input": "missing+1",
+          "accept": true,
+          "evaluationError": "未定義"
+        },
+        {
+          "input": "1/0",
+          "accept": true,
+          "evaluationError": "ゼロ除算"
+        },
+        {
+          "input": "let if = 1; if",
+          "accept": true,
+          "evaluationError": "予約語"
+        }
+      ],
+      "semanticsExercise": true
+    }
+  ]
+}

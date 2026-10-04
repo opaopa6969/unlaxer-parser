@@ -7,6 +7,20 @@ UBNF を書く人には VSIX の **UBNF: はじめの一歩 / Catalog・Help**�
 ブラウザで動くのは **生成 Rust parser の WebAssembly** です。
 Java-hosted compiler / native Rust compiler は同じプロジェクトを生成します。
 
+## 言語を作りながら学ぶ
+
+[はじめての言語づくり](https://opaopa6969.github.io/unlaxer-parser/) はインストール不要の体験教材です。
+説明 → 問い → UBNF 文法の編集 → 自動チェックを繰り返し、8 ステップで数値・四則演算・括弧・
+変数・条件式を持つ TinyExpression 風の小さな言語を作ります。完成した AST を学習用評価器で計算できます。
+文法と進捗はブラウザ内に保存され、途中から再開できます。文法は `.ubnf` として保存できます。
+生成 playground と VSIX の Help にも教材へのリンクがあります。リンク先の利用には通信が必要です。
+
+学習画面には、文法を編集してその場で入力を解析する専用 WASM エンジンがあります。
+通常の生成 playground と別の画面で、対応範囲を絞り、既存の Rust frontend / lowering / runtime を利用します。
+Java / native Rust の生成 parser と、全教材の受理・拒否、消費位置、AST 全体とソース位置を比較します。
+一般の UBNF を任意にコンパイルするサービスではありません。
+教材の追加・ローカル起動・公開手順は [学習シナリオの構成](ubnf-learning-ja.md) を参照してください。
+
 ## まず動かす
 
 ### VSIX から操作する

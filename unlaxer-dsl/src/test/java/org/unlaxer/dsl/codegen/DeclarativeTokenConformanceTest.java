@@ -44,6 +44,23 @@ public class DeclarativeTokenConformanceTest {
         verifyAuthoringExamples(true);
     }
 
+    @Test public void learningScenariosAgreeInJavaRustAndBrowserWasm() throws Exception {
+        if (!Boolean.getBoolean("rustConformance")) System.out.println(
+            "[assumption] learning conformance requires -DrustConformance=true and Rust wasm32 target");
+        assumeTrue(Boolean.getBoolean("rustConformance"));
+        success(run(List.of("node", repo.resolve("scripts/build-learning.mjs").toString()), "", false));
+        var fixtures = new JsonArray();
+        var course = JsonParser.parseString(Files.readString(repo.resolve(
+            "unlaxer-dsl/src/main/resources/learning/tiny-expression.json"))).getAsJsonObject();
+        for (var step : course.getAsJsonArray("steps")) {
+            var fixture = step.getAsJsonObject().deepCopy();
+            fixture.add("name", fixture.get("id"));
+            fixture.add("source", fixture.get("solution"));
+            fixtures.add(fixture);
+        }
+        verifyExamples(false, fixtures, true);
+    }
+
     @Test public void metaGrammarGeneratesAPlaygroundThatReadsItself() throws Exception {
         if (!Boolean.getBoolean("rustConformance")) System.out.println(
             "[assumption] meta playground requires -DrustConformance=true and Rust wasm32 target");
@@ -64,6 +81,11 @@ public class DeclarativeTokenConformanceTest {
     }
 
     private void verifyAuthoringExamples(boolean playground) throws Exception {
+        verifyExamples(playground, JsonParser.parseString(org.unlaxer.dsl.tooling.AuthoringCatalog.json())
+            .getAsJsonObject().getAsJsonArray("examples"), false);
+    }
+
+    private void verifyExamples(boolean playground, JsonArray fixtures, boolean learning) throws Exception {
         if (!Boolean.getBoolean("rustConformance")) System.out.println(
             "[assumption] catalog conformance requires -DrustConformance=true");
         assumeTrue(Boolean.getBoolean("rustConformance"));
@@ -73,14 +95,15 @@ public class DeclarativeTokenConformanceTest {
         success(run(List.of("cargo", "build", "--locked", "--manifest-path", repo.resolve("rust/Cargo.toml").toString(),
             "-p", "unlaxer-generator"), "", false));
         Path nativeGenerator = repo.resolve("rust/target/debug/unlaxer");
-        for (var item : JsonParser.parseString(org.unlaxer.dsl.tooling.AuthoringCatalog.json()).getAsJsonObject().getAsJsonArray("examples")) {
+        for (var item : fixtures) {
             var fixture = item.getAsJsonObject();
             Path directory = temporary.newFolder().toPath();
             Path source = directory.resolve("example.ubnf");
             Files.writeString(source, fixture.get("source").getAsString());
             String name = fixture.get("name").getAsString();
             GrammarDecl grammar = UBNFModuleLoader.load(source).grammars().get(0);
-            assertTrue(name, PortabilityCheck.checkFile(source).portable());
+            var readiness = PortabilityCheck.checkFile(source);
+            assertTrue(name + ": " + readiness, readiness.portable());
             success(run(List.of(nativeGenerator.toString(), playground ? "playground" : "generate", "--grammar", source.toString(),
                 "--output", directory.resolve("generated").toString()), "", true));
             Path binary = directory.resolve("probe");
@@ -107,6 +130,14 @@ public class DeclarativeTokenConformanceTest {
             success(rust);
             var results = rust.output().lines().toList();
             assertEquals(name, cases.size(), results.size());
+            List<String> browser = List.of();
+            if (learning) {
+                Run wasm = run(List.of("node", repo.resolve("scripts/learning-wasm-probe.mjs").toString(),
+                    source.toString(), repo.resolve("build/learning-site/learning.wasm").toString()), inputs, false);
+                success(wasm);
+                browser = wasm.output().lines().toList();
+                assertEquals(name, cases.size(), browser.size());
+            }
             try (URLClassLoader loader = compileJava(grammar)) {
                 String prefix = "guide.demo." + grammar.name();
                 Parser parser = (Parser) loader.loadClass(prefix + "Parsers").getMethod("getRootParser").invoke(null);
@@ -123,17 +154,24 @@ public class DeclarativeTokenConformanceTest {
                     }
                     assertEquals(label, position, actualRust.get("prefix"));
                     Optional<?> diagnostic = (Optional<?>) mapper.getMethod("diagnose", String.class).invoke(null, input);
-                    assertEquals(label, row.has("fields"), diagnostic.isEmpty());
+                    boolean accepted = learning ? row.get("accept").getAsBoolean() : row.has("fields");
+                    assertEquals(label, accepted, diagnostic.isEmpty());
                     JsonElement ast = JsonNull.INSTANCE;
-                    if (row.has("fields")) {
+                    if (accepted) {
                         Object mapped = mapper.getMethod("parseWithSourceMap", String.class).invoke(null, input);
                         Object node = mapped.getClass().getMethod("ast").invoke(mapped);
                         ast = canonical(node, mapped);
-                        assertEquals(label, row.get("fields"), ast.getAsJsonObject().get("fields"));
+                        if (!learning) assertEquals(label, row.get("fields"), ast.getAsJsonObject().get("fields"));
                         JsonArray span = new JsonArray(); span.add(0); span.add(input.codePointCount(0, input.length()));
                         assertEquals(label, span, ast.getAsJsonObject().get("span"));
                     }
                     assertEquals(label, ast, actualRust.get("ast"));
+                    if (learning) {
+                        var actualBrowser = JsonParser.parseString(browser.get(i)).getAsJsonObject();
+                        assertEquals(label, accepted, actualBrowser.get("ok").getAsBoolean());
+                        assertEquals(label, position, actualBrowser.get("prefix"));
+                        assertEquals(label, ast, actualBrowser.get("ast"));
+                    }
                 }
             }
         }

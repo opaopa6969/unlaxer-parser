@@ -1,0 +1,59 @@
+name: Learning playground Pages
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'unlaxer-dsl/src/main/resources/learning/**'
+      - 'unlaxer-dsl/src/main/resources/playground/**'
+      - 'unlaxer-dsl/src/main/resources/ubnf-help/**'
+      - 'rust/**'
+      - 'scripts/build-learning.mjs'
+      - 'unlaxer-dsl/ubnf-vscode/scripts/learning-browser.mjs'
+      - '.github/workflows/learning-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: learning-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: [unlaxer-parser-ci, Linux, X64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Prepare Rust and WASM
+        run: |
+          rustup toolchain install 1.85.0 --profile minimal --target wasm32-unknown-unknown
+          echo "RUSTUP_TOOLCHAIN=1.85.0" >> "$GITHUB_ENV"
+      - name: Build the static learning site
+        run: node scripts/build-learning.mjs
+      - name: Verify all lessons in a browser
+        working-directory: unlaxer-dsl/ubnf-vscode
+        run: |
+          npm ci
+          npx playwright install chromium
+          node scripts/learning-browser.mjs
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/learning-site
+  deploy:
+    if: github.ref == 'refs/heads/master'
+    needs: build
+    runs-on: [unlaxer-parser-ci, Linux, X64]
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - uses: actions/deploy-pages@v4
+        id: deployment

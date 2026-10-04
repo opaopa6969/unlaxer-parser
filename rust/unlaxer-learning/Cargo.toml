@@ -1,0 +1,18 @@
+[package]
+name = "unlaxer-learning"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+unlaxer-ubnf = { path = "../unlaxer-ubnf" }
+unlaxer-generator = { path = "../unlaxer-generator" }
+unlaxer-codegen = { path = "../unlaxer-codegen" }
+unlaxer-runtime = { path = "../unlaxer-runtime" }
+
+# Like the generated playground ABI, exports require no raw-pointer access.
