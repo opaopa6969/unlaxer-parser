@@ -4,11 +4,12 @@ import {readFile, mkdir} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 import {chromium} from 'playwright';
+import {verifyCompletion} from './completion-browser.mjs';
 
 const repo = fileURLToPath(new URL('../../../', import.meta.url));
 const root = path.join(repo, 'build/learning-site');
 const course = JSON.parse(await readFile(path.join(root, 'tiny-expression.json'), 'utf8'));
-const mime = {'.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.json':'application/json', '.wasm':'application/wasm'};
+const mime = {'.html':'text/html', '.js':'text/javascript', '.mjs':'text/javascript', '.css':'text/css', '.json':'application/json', '.wasm':'application/wasm'};
 // Serve under the actual project-site prefix to catch absolute asset paths.
 const server = createServer(async (req, res) => {
   try {
@@ -219,6 +220,7 @@ try {
   await draft.waitForFunction(() => !document.getElementById('parse').disabled);
   assert.equal(JSON.parse(await draft.locator('#result').textContent()).ok, true);
   assert.deepEqual(errors, []);
+  await verifyCompletion(browser, url);
   console.log(`Learning browser: ${course.steps.length} lessons, ${course.steps.reduce((n,s) => n+s.cases.length,0)} shared cases, wrong answers, real grammar edits, resume, download, stale work, limits/retry, safe content, mobile and generated playground passed`);
   console.log('UBNF browser: six grammars, self-hosting, rejection location, Unicode CST selection, syntax-only boundary, empty file, mobile, links, preserved drafts and unavailable examples passed');
 } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }

@@ -50,6 +50,7 @@ jobs:
         npm ci
         npx playwright install chromium
         node scripts/playground-browser.mjs
+        node --test scripts/completion.test.mjs
         node scripts/learning-browser.mjs
     - name: Require UBNF source position conformance evidence
       run: test -s unlaxer-dsl/target/rust-ubnf-source.tsv
