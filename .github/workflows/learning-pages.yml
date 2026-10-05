@@ -12,6 +12,7 @@ on:
       - 'rust/**'
       - 'scripts/build-learning.mjs'
       - 'unlaxer-dsl/ubnf-vscode/scripts/learning-browser.mjs'
+      - 'unlaxer-dsl/ubnf-vscode/scripts/completion*.mjs'
       - '.github/workflows/learning-pages.yml'
   workflow_dispatch:
 
@@ -41,6 +42,7 @@ jobs:
         run: |
           npm ci
           npx playwright install chromium
+          node --test scripts/completion.test.mjs
           node scripts/learning-browser.mjs
       - uses: actions/upload-pages-artifact@v3
         with:
