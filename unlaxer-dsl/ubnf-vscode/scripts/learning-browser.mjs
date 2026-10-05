@@ -142,6 +142,83 @@ try {
   await free.locator('#input').fill(course.steps.at(-1).sample); await free.locator('#parse').click();
   await free.waitForFunction(() => !document.getElementById('parse').disabled);
   assert.equal(JSON.parse(await free.locator('#result').textContent()).ok, true);
+  assert.ok(await free.locator('a[href="https://opaopa6969.github.io/unlaxer-parser/ubnf/"]').count());
+  const meta = await browser.newPage({viewport:{width:1380, height:1000}});
+  meta.on('pageerror', error => errors.push(String(error)));
+  await meta.goto(url);
+  await meta.locator('a[href="ubnf/"]').click();
+  assert.equal(new URL(meta.url()).pathname, '/unlaxer-parser/ubnf/');
+  await meta.waitForFunction(() => !document.getElementById('parse').disabled && !document.getElementById('example').disabled);
+  assert.equal(await meta.title(), 'UBNF 文法 Playground');
+  assert.equal(await meta.locator('#name').textContent(), 'UBNF 文法を試す');
+  const catalog = JSON.parse(await readFile(path.join(root, 'help/catalog.json'), 'utf8'));
+  const parseMeta = async () => {
+    await meta.locator('#parse').click();
+    await meta.waitForFunction(() => !document.getElementById('parse').disabled);
+    assert.doesNotMatch(await meta.locator('#status').textContent(), /実行エラー/);
+    return JSON.parse(await meta.locator('#result').textContent());
+  };
+  assert.equal(await meta.locator('#input').inputValue(), catalog.examples[0].source);
+  for (const example of catalog.examples) {
+    await meta.locator('#example').selectOption(example.id);
+    await meta.locator('#load-example').click();
+    assert.equal(await meta.locator('#input').inputValue(), example.source);
+    const result = await parseMeta();
+    assert.equal(result.ok, true, example.id);
+    assert.equal(result.mappingError, null, example.id);
+    assert.equal(result.ast.type, 'UBNFFile');
+    assert.ok(result.cst.nodes.length > 0);
+  }
+  await meta.locator('#example').selectOption('ubnf');
+  await meta.locator('#load-example').click();
+  const original = await readFile(path.join(root, 'ubnf/grammar.ubnf'), 'utf8');
+  // Textarea values normalize CRLF from the checked-in meta-grammar.
+  assert.equal(await meta.locator('#input').inputValue(), original.replace(/\r\n?/g, '\n'));
+  assert.equal((await parseMeta()).ast.type, 'UBNFFile', 'the UBNF parser reads its own grammar');
+  const unicode = catalog.examples[0].source.replace("'hello' @text", "'こんにちは😀' @text");
+  await meta.locator('#input').fill(unicode);
+  const unicodeResult = await parseMeta();
+  await meta.locator('#cst-panel summary').click();
+  // javaStyle nodes include the trailing whitespace they consumed.
+  const stringNode = unicodeResult.cst.nodes.findIndex(node => node.rule === 'TerminalElement' && [...unicode].slice(...node.span).join('') === "'こんにちは😀' ");
+  assert.ok(stringNode >= 0);
+  await meta.locator('#cst button').nth(stringNode).click();
+  assert.equal(await meta.locator('#input').evaluate(input => input.value.slice(input.selectionStart, input.selectionEnd)), "'こんにちは😀' ");
+  await meta.locator('#example').selectOption('broken');
+  assert.equal(await meta.locator('#input').inputValue(), unicode, 'selecting alone does not overwrite edits');
+  await meta.locator('#load-example').click();
+  assert.equal((await parseMeta()).ok, false);
+  assert.match(await meta.locator('#hint').textContent(), /\d+ 行 \d+ 列/);
+  // Syntactic recognition is deliberately distinct from semantic generation validation.
+  await meta.locator('#input').fill('grammar Missing { @root Start ::= Undefined; }');
+  assert.equal((await parseMeta()).ok, true);
+  await meta.locator('#clear').click();
+  assert.equal((await parseMeta()).ok, true, 'the meta grammar allows zero grammar declarations');
+  await meta.locator('#example').selectOption('hello'); await meta.locator('#load-example').click(); await parseMeta();
+  await meta.screenshot({path:new URL('../target/ubnf-meta-desktop.png', import.meta.url).pathname, fullPage:true});
+  await meta.setViewportSize({width:390, height:844});
+  assert.equal(await meta.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  await meta.screenshot({path:new URL('../target/ubnf-meta-mobile.png', import.meta.url).pathname, fullPage:true});
+  await meta.locator('header a[href="help/index.html"]').click();
+  assert.ok(await meta.locator('a[href="https://opaopa6969.github.io/unlaxer-parser/ubnf/"]').count());
+  // A slow example request must not replace a user's draft.
+  const draft = await browser.newPage();
+  let releaseExamples;
+  const examplesPending = new Promise(resolve => { releaseExamples = resolve; });
+  await draft.route('**/help/catalog.json', async route => { await examplesPending; await route.continue(); });
+  await draft.goto(url + 'ubnf/');
+  await draft.locator('#input').fill('grammar MyDraft {');
+  releaseExamples();
+  await draft.waitForFunction(() => !document.getElementById('example').disabled);
+  assert.equal(await draft.locator('#input').inputValue(), 'grammar MyDraft {');
+  await draft.route('**/help/catalog.json', route => route.fulfill({status:503,body:'unavailable'}));
+  await draft.reload();
+  await draft.waitForFunction(() => document.getElementById('example-status').textContent.includes('読み込めません'));
+  await draft.waitForFunction(() => !document.getElementById('parse').disabled);
+  await draft.locator('#input').fill(catalog.examples[0].source); await draft.locator('#parse').click();
+  await draft.waitForFunction(() => !document.getElementById('parse').disabled);
+  assert.equal(JSON.parse(await draft.locator('#result').textContent()).ok, true);
   assert.deepEqual(errors, []);
   console.log(`Learning browser: ${course.steps.length} lessons, ${course.steps.reduce((n,s) => n+s.cases.length,0)} shared cases, wrong answers, real grammar edits, resume, download, stale work, limits/retry, safe content, mobile and generated playground passed`);
+  console.log('UBNF browser: six grammars, self-hosting, rejection location, Unicode CST selection, syntax-only boundary, empty file, mobile, links, preserved drafts and unavailable examples passed');
 } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }

@@ -73,7 +73,9 @@
       clearTimeout(timeout);
       if (event.data.error) { stop(); fail(event.data.error); return; }
       if (event.data.catalog) {
-        catalog = event.data.catalog; $('name').textContent = `${catalog.name} · 言語を試す`; document.title = `${catalog.name} · UBNF Playground`;
+        catalog = event.data.catalog;
+        $('name').textContent = document.body.dataset.heading || `${catalog.name} · 言語を試す`;
+        document.title = document.body.dataset.title || `${catalog.name} · UBNF Playground`;
         $('engine').textContent = '準備完了：生成 Rust parser を WebAssembly で実行します。入力はブラウザの中だけで処理します。';
         renderCatalog(); $('parse').disabled = false; afterReady?.();
         host?.postMessage({type: 'ready'});

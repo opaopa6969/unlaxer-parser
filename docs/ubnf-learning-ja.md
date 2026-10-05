@@ -2,6 +2,9 @@
 
 公開先: [はじめての言語づくり](https://opaopa6969.github.io/unlaxer-parser/)
 
+[UBNF 文法 Playground](https://opaopa6969.github.io/unlaxer-parser/ubnf/) では、自由に書いた UBNF 自体の
+構文の成否・AST・CST を確認できます。教材・完成例の parser と同じ build / Pages 配置に含まれます。
+
 初めて言語を作る人向けに、説明・問い・文法編集・試験をひとつの流れにする教材です。
 各ステップは前段の完成例を土台にした課題から始まり、自分の編集はステップごとに保持します。
 問いと実習の両方に合格すると「次へ」が有効になります。目次からの移動は自由です。

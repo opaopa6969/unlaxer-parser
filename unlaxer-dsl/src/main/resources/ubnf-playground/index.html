@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; worker-src blob:; style-src 'self'; connect-src 'self';">
+  <meta name="description" content="UBNF 文法を書いて、構文チェックと AST・CST をブラウザで試す playground。入門の6文法と UBNF 自身の定義を収録。">
+  <title>UBNF 文法 Playground</title>
+  <link rel="stylesheet" href="help/help.css"><link rel="stylesheet" href="playground.css">
+</head>
+<body data-heading="UBNF 文法を試す" data-title="UBNF 文法 Playground">
+  <header><a class="brand" href="../">UBNF <span class="badge">PLAYGROUND</span></a><a href="help/index.html">UBNF の書き方・構文 catalog ↗</a></header>
+  <main>
+    <p class="eyebrow">UBNF で書かれた UBNF parser</p>
+    <h1 id="name">UBNF 文法を試す</h1>
+    <p>ここには <strong>UBNF の文法そのもの</strong>を書きます。「解析する」で構文を確かめ、文法がどんな構造として読み取られるかを見てみましょう。</p>
+    <p><a href="../">説明・問い・実習で学ぶ「はじめての言語づくり」</a> · <a href="../playground/">完成した式言語の parser を試す</a></p>
+    <p class="notice">この画面で確認するのは UBNF の構文です。成功しても、名前の参照先・左再帰・生成先の対応機能までは検証しません。書いた文法から parser を作るには <a href="help/index.html">CLI / VS Code の生成手順</a>へ進んでください。</p>
+    <p id="engine" class="notice" role="status">WASM parser を読み込んでいます…</p>
+    <div class="playground-layout">
+      <section aria-labelledby="input-title">
+        <h2 id="input-title">1 · 文法を書いて試す</h2>
+        <label for="example">文法の例</label>
+        <div class="actions"><select id="example" disabled aria-describedby="example-status"></select><button id="load-example" disabled>例を入力欄に読み込む</button></div>
+        <p id="example-status" class="small" role="status">文法例を読み込んでいます…</p>
+        <label for="input">あなたの UBNF 文法</label><textarea id="input" spellcheck="false" rows="16" autocapitalize="off" autocomplete="off" placeholder="grammar Hello { … }"></textarea>
+        <div class="actions"><button id="parse" class="primary" disabled>解析する</button><button id="clear">入力を空にする</button></div>
+        <p class="small">入力はサーバーに送信しません。最大 64 KiB (UTF-8)。3 秒を超える解析は中断します。入力は自動保存しません。</p>
+        <h2>2 · 文法の構造を読む</h2>
+        <p id="status" role="status" aria-live="polite">まだ解析していません。</p>
+        <p id="position"></p><p id="hint" class="notice" hidden></p>
+        <details id="ast-panel"><summary>AST — 文法名・設定・token・ルール</summary><p>先頭の UBNFFile に文法全体が入ります。GrammarDecl は文法、RuleDecl はルールの宣言です。</p><pre id="ast">解析すると表示します。</pre></details>
+        <details id="cst-panel"><summary>CST — 読み取った構造と範囲</summary><p>行の範囲を押すと文法内の対応箇所を選択します。位置は Unicode コードポイント、先頭は 0、終点は含みません。</p><div id="cst"></div></details>
+        <details><summary>生の解析結果（JSON）</summary><pre id="result">{}</pre></details>
+      </section>
+      <aside>
+        <h2>最初に試してみよう</h2>
+        <ol><li>「単語を受け入れる」を読み込み、そのまま解析します。</li><li><code>'hello'</code> を <code>'こんにちは'</code> に変え、AST の値を見比べます。</li><li>ルール末尾の <code>;</code> を消して、エラーの位置を確かめます。</li></ol>
+        <p>「UBNF 自身の定義」を選ぶと、この画面の parser を作った文法が、その文法自身を読み取ります。</p>
+        <details><summary>この parser のルールを探す</summary><p>UBNF の構文を読み取るメタ文法のルール一覧です。各構文の説明は <a href="help/index.html">書き方・構文 catalog</a>を参照してください。</p><label for="catalog-search">ルール名・説明を検索</label><input id="catalog-search" type="search" placeholder="GrammarDecl、RuleDecl…"><div id="catalog"></div></details>
+        <details><summary>parser の元になった UBNF 文法</summary><p>生成時点のメタ文法です。入力欄の編集によって、この parser の定義が変わることはありません。</p><pre id="grammar"></pre></details>
+        <details><summary>結果の読み方</summary><p>「成功」は入力全体が UBNF の構文として読めたことを表します。未定義の参照などは生成時に検査します。空入力もメタ文法では「文法が0個あるファイル」として受理します。</p><p>「不一致」の場合は、示された行・列の近くで引用符・括弧・ルール末尾の ; を確認します。「実行エラー」は時間やサイズの制限などにより判定できなかった状態です。</p><p>AST は文法の意味のある要素、CST は解析で読み取った構造と範囲を示します。構文認識と AST の投影に失敗した場合は区別して表示します。</p></details>
+      </aside>
+    </div>
+  </main>
+  <footer>UBNF メタ文法 → 生成 Rust parser → WebAssembly · Java / Rust の生成物は共通テストで検証。ブラウザ内で実行します。</footer>
+  <script src="playground.js"></script><script src="examples.js"></script>
+</body>
+</html>

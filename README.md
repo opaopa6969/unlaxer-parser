@@ -16,6 +16,7 @@
 Development: **3.3.0-SNAPSHOT** (not published). The dependency examples below use the latest stable **3.2.0**.
 The development UBNF VSIX includes an in-editor [beginner catalog/help](unlaxer-dsl/ubnf-vscode/README.md).
 Generate a self-contained [language playground from UBNF](docs/ubnf-playground-ja.md), including UBNF's own meta-grammar.
+Try UBNF grammar syntax, AST and CST in the [online UBNF playground](https://opaopa6969.github.io/unlaxer-parser/ubnf/).
 
 **Write a grammar, get a language — Parser + AST + Evaluator + LSP + DAP, all generated**
 

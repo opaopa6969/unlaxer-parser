@@ -6,7 +6,9 @@ on:
     paths:
       - 'unlaxer-dsl/src/main/resources/learning/**'
       - 'unlaxer-dsl/src/main/resources/playground/**'
+      - 'unlaxer-dsl/src/main/resources/ubnf-playground/**'
       - 'unlaxer-dsl/src/main/resources/ubnf-help/**'
+      - 'unlaxer-dsl/grammar/ubnf.ubnf'
       - 'rust/**'
       - 'scripts/build-learning.mjs'
       - 'unlaxer-dsl/ubnf-vscode/scripts/learning-browser.mjs'

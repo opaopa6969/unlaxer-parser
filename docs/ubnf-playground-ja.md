@@ -105,6 +105,11 @@ grammar Hello {
 
 ## UBNF 自体の playground
 
+[公開版 UBNF 文法 Playground](https://opaopa6969.github.io/unlaxer-parser/ubnf/) は、
+インストールせずに文法そのものを書いて試せる画面です。入門の6文法、UBNF 自身の定義、
+構文エラーの例を読み込み、編集して「解析する」を押します。構文の成否・エラー位置・AST・CST を表示し、
+CST の範囲を押すと入力欄の対応箇所を選択できます。入力はブラウザ内で処理し、自動保存しません。
+
 `--grammar unlaxer-dsl/grammar/ubnf.ubnf` を指定すれば、UBNF を受け入れる playground も生成できます。
 そこには**文法そのものを試験入力として**入れます。生成されたメタ文法 parser が、
 入門の6文法とメタ文法自身を読み取れることをテストしています。
@@ -112,6 +117,11 @@ grammar Hello {
 メタ文法が入力を構文として読めることと、その文法から目的の backend を生成できることは別です。
 名前解決・左再帰・backend の対応範囲などの検証は生成コマンドで行います。
 ブラウザ上で入力した新しい文法をその場でコンパイルする機能ではありません。
+
+公開サイトは `node scripts/build-learning.mjs` で教材・完成例の parser とまとめて生成します。
+メタ文法から生成した `public/` に `unlaxer-dsl/src/main/resources/ubnf-playground/` の入口と例の UI を重ねます。
+解析 UI・Worker・WASM は通常の生成 playground と共通です。入門例はヘルプの catalog から読み込みます。
+`learning-pages.yml` が `master` の変更を配置し、文法例・エラー・範囲選択・狭い画面をブラウザで検証します。
 
 ## 再生成と安全性
 
