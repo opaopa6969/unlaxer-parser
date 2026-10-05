@@ -24,9 +24,16 @@ try {
   const course = JSON.parse(await readFile(path.join(resources, 'learning/tiny-expression.json'), 'utf8'));
   const grammar = path.join(scratch, 'completed.ubnf');
   await writeFile(grammar, course.steps.at(-1).solution);
-  const generated = path.join(scratch, 'playground');
-  run(path.join(repo, 'rust/target/debug/unlaxer'), ['playground', '--grammar', grammar, '--output', generated]);
-  run(process.execPath, [path.join(generated, 'build.mjs')]);
-  await cp(path.join(generated, 'public'), path.join(output, 'playground'), {recursive: true});
+  for (const [route, source] of [
+    ['playground', grammar],
+    ['ubnf', path.join(repo, 'unlaxer-dsl/grammar/ubnf.ubnf')]
+  ]) {
+    const generated = path.join(scratch, route);
+    run(path.join(repo, 'rust/target/debug/unlaxer'), ['playground', '--grammar', source, '--output', generated]);
+    run(process.execPath, [path.join(generated, 'build.mjs')]);
+    await cp(path.join(generated, 'public'), path.join(output, route), {recursive: true});
+  }
+  // The meta-grammar uses the same parser UI, with an author-facing entry page.
+  await cp(path.join(resources, 'ubnf-playground'), path.join(output, 'ubnf'), {recursive: true});
 } finally { await rm(scratch, {recursive: true, force: true}); }
 console.log(`Learning site: ${output}`);
