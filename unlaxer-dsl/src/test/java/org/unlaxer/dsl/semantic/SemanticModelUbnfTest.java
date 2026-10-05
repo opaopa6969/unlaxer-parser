@@ -20,7 +20,7 @@ public class SemanticModelUbnfTest {
         Path dir=Files.createTempDirectory("semantic-ubnf-");
         try {
             String grammarSource=Files.readString(REPO.resolve("spec-corpus/semantic-model/model.ubnf"));
-            var grammar=UBNFMapper.parse(grammarSource).grammars().getFirst();
+            var grammar=UBNFMapper.parse(grammarSource).grammars().get(0);
             var settings=new ArrayList<>(grammar.settings());
             settings.add(new org.unlaxer.dsl.bootstrap.UBNFAST.GlobalSetting("package",new org.unlaxer.dsl.bootstrap.UBNFAST.StringSettingValue("example.semantic")));
             grammar=new org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl(grammar.name(),grammar.imports(),settings,grammar.tokens(),grammar.rules());

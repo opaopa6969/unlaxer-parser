@@ -97,8 +97,8 @@ public final class SemanticModel {
             }
         }
         List<Scope> roots = this.scopes.values().stream().filter(scope -> scope.parent() == null).toList();
-        if (roots.size() != 1 || !roots.getFirst().span().equals(document)) throw error("INVALID_ROOT_SCOPE", document);
-        this.root = roots.getFirst().id();
+        if (roots.size() != 1 || !roots.get(0).span().equals(document)) throw error("INVALID_ROOT_SCOPE", document);
+        this.root = roots.get(0).id();
         for (Scope scope : this.scopes.values()) {
             if (scope.parent() != null && scope.span().start() == scope.span().end()) throw error("EMPTY_SCOPE", scope.span());
             var seen = new HashSet<String>();
