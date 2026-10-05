@@ -1,0 +1,16 @@
+// ユーザー定義型と補完 😀
+builtin String {}
+builtin Object {}
+interface IAccessor {}
+interface IChild : IAccessor {}
+record DbAccessor : IChild { path: String; }
+record Context { accessor: IAccessor; }
+record Result {}
+record Request { context: Context; next: Request; }
+let ctx: Context;
+let db: DbAccessor;
+let cached: IAccessor;
+let text: String;
+let obj: Object;
+fn process(Context, IAccessor): Result;
+call process(ctx, ?);
