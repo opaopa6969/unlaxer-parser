@@ -1,0 +1,2456 @@
+{
+  "model": {
+    "uri": "memory:types",
+    "version": 7,
+    "source": "//😀\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "types": [
+      {
+        "id": "Object",
+        "kind": "BUILTIN",
+        "supertypes": [],
+        "fields": [],
+        "span": [
+          0,
+          0
+        ]
+      },
+      {
+        "id": "String",
+        "kind": "BUILTIN",
+        "supertypes": [],
+        "fields": [],
+        "span": [
+          0,
+          0
+        ]
+      },
+      {
+        "id": "Context",
+        "kind": "RECORD",
+        "supertypes": [],
+        "fields": [],
+        "span": [
+          0,
+          0
+        ]
+      },
+      {
+        "id": "Result",
+        "kind": "RECORD",
+        "supertypes": [],
+        "fields": [],
+        "span": [
+          0,
+          0
+        ]
+      },
+      {
+        "id": "IAccessor",
+        "kind": "INTERFACE",
+        "supertypes": [],
+        "fields": [],
+        "span": [
+          0,
+          0
+        ]
+      },
+      {
+        "id": "IChild",
+        "kind": "INTERFACE",
+        "supertypes": [
+          "IAccessor"
+        ],
+        "fields": [],
+        "span": [
+          0,
+          0
+        ]
+      },
+      {
+        "id": "DbAccessor",
+        "kind": "RECORD",
+        "supertypes": [
+          "IChild"
+        ],
+        "fields": [
+          {
+            "name": "path",
+            "type": "String",
+            "span": [
+              0,
+              0
+            ]
+          }
+        ],
+        "span": [
+          0,
+          0
+        ]
+      },
+      {
+        "id": "Composite",
+        "kind": "RECORD",
+        "supertypes": [],
+        "fields": [
+          {
+            "name": "context",
+            "type": "Context",
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "name": "accessor",
+            "type": "IAccessor",
+            "span": [
+              0,
+              0
+            ]
+          }
+        ],
+        "span": [
+          0,
+          0
+        ]
+      },
+      {
+        "id": "Node",
+        "kind": "RECORD",
+        "supertypes": [],
+        "fields": [
+          {
+            "name": "next",
+            "type": "Node",
+            "span": [
+              0,
+              0
+            ]
+          }
+        ],
+        "span": [
+          0,
+          0
+        ]
+      }
+    ],
+    "scopes": [
+      {
+        "id": "root",
+        "parent": null,
+        "span": [
+          0,
+          200
+        ]
+      },
+      {
+        "id": "inner",
+        "parent": "root",
+        "span": [
+          20,
+          80
+        ]
+      },
+      {
+        "id": "sibling",
+        "parent": "root",
+        "span": [
+          90,
+          120
+        ]
+      }
+    ],
+    "symbols": [
+      {
+        "id": "db",
+        "name": "db",
+        "type": "DbAccessor",
+        "scope": "root",
+        "declaration": [
+          10,
+          12
+        ],
+        "visibleFrom": 12
+      },
+      {
+        "id": "cached",
+        "name": "cached",
+        "type": "IAccessor",
+        "scope": "root",
+        "declaration": [
+          14,
+          18
+        ],
+        "visibleFrom": 18
+      },
+      {
+        "id": "text",
+        "name": "text",
+        "type": "String",
+        "scope": "root",
+        "declaration": [
+          19,
+          21
+        ],
+        "visibleFrom": 21
+      },
+      {
+        "id": "unknown",
+        "name": "pending",
+        "type": "?",
+        "scope": "root",
+        "declaration": [
+          22,
+          23
+        ],
+        "visibleFrom": 23
+      },
+      {
+        "id": "shadow",
+        "name": "db",
+        "type": "String",
+        "scope": "inner",
+        "declaration": [
+          25,
+          28
+        ],
+        "visibleFrom": 28
+      },
+      {
+        "id": "local",
+        "name": "local",
+        "type": "DbAccessor",
+        "scope": "inner",
+        "declaration": [
+          30,
+          35
+        ],
+        "visibleFrom": 35
+      },
+      {
+        "id": "later",
+        "name": "later",
+        "type": "IAccessor",
+        "scope": "inner",
+        "declaration": [
+          60,
+          65
+        ],
+        "visibleFrom": 65
+      },
+      {
+        "id": "sibling",
+        "name": "sibling",
+        "type": "IAccessor",
+        "scope": "sibling",
+        "declaration": [
+          95,
+          100
+        ],
+        "visibleFrom": 100
+      },
+      {
+        "id": "obj",
+        "name": "obj",
+        "type": "Object",
+        "scope": "root",
+        "declaration": [
+          4,
+          7
+        ],
+        "visibleFrom": 7
+      }
+    ],
+    "signatures": [
+      {
+        "id": "process",
+        "name": "process",
+        "parameters": [
+          "Context",
+          "IAccessor"
+        ],
+        "result": "Result",
+        "span": [
+          0,
+          0
+        ]
+      },
+      {
+        "id": "other",
+        "name": "process",
+        "parameters": [
+          "String",
+          "String"
+        ],
+        "result": "Result",
+        "span": [
+          0,
+          0
+        ]
+      }
+    ],
+    "calls": [
+      {
+        "id": "innerCall",
+        "signatures": [
+          "process",
+          "other"
+        ],
+        "arguments": [
+          {
+            "type": "Context",
+            "span": [
+              40,
+              45
+            ]
+          },
+          {
+            "type": "?",
+            "span": [
+              50,
+              52
+            ]
+          }
+        ],
+        "span": [
+          38,
+          54
+        ]
+      },
+      {
+        "id": "rootCall",
+        "signatures": [
+          "process"
+        ],
+        "arguments": [
+          {
+            "type": "Context",
+            "span": [
+              135,
+              139
+            ]
+          },
+          {
+            "type": "?",
+            "span": [
+              145,
+              145
+            ]
+          }
+        ],
+        "span": [
+          130,
+          148
+        ]
+      },
+      {
+        "id": "unresolved",
+        "signatures": [],
+        "arguments": [
+          {
+            "type": "?",
+            "span": [
+              180,
+              180
+            ]
+          }
+        ],
+        "span": [
+          175,
+          181
+        ]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "nominal-scopes-and-calls",
+      "queries": [
+        {
+          "op": "assign",
+          "actual": "DbAccessor",
+          "target": "IAccessor",
+          "expected": "YES"
+        },
+        {
+          "op": "assign",
+          "actual": "Object",
+          "target": "IAccessor",
+          "expected": "NO"
+        },
+        {
+          "op": "assign",
+          "actual": "IAccessor",
+          "target": "DbAccessor",
+          "expected": "NO"
+        },
+        {
+          "op": "assign",
+          "actual": "?",
+          "target": "IAccessor",
+          "expected": "UNKNOWN"
+        },
+        {
+          "op": "visible",
+          "cursor": 51,
+          "expected": [
+            "cached",
+            "shadow",
+            "local",
+            "obj",
+            "unknown",
+            "text"
+          ]
+        },
+        {
+          "op": "visible",
+          "cursor": 21,
+          "expected": [
+            "cached",
+            "db",
+            "obj",
+            "text"
+          ]
+        },
+        {
+          "op": "expected",
+          "call": "innerCall",
+          "index": 1,
+          "expected": [
+            "IAccessor"
+          ]
+        },
+        {
+          "op": "complete",
+          "call": "innerCall",
+          "index": 1,
+          "cursor": 51,
+          "version": 7,
+          "prefix": "",
+          "expected": [
+            {
+              "id": "cached",
+              "name": "cached",
+              "type": "IAccessor",
+              "span": [
+                14,
+                18
+              ],
+              "compatibility": "YES",
+              "expectedTypes": [
+                "IAccessor"
+              ],
+              "reason": "IAccessor -> IAccessor: YES"
+            },
+            {
+              "id": "local",
+              "name": "local",
+              "type": "DbAccessor",
+              "span": [
+                30,
+                35
+              ],
+              "compatibility": "YES",
+              "expectedTypes": [
+                "IAccessor"
+              ],
+              "reason": "DbAccessor -> IAccessor: YES"
+            },
+            {
+              "id": "unknown",
+              "name": "pending",
+              "type": "?",
+              "span": [
+                22,
+                23
+              ],
+              "compatibility": "UNKNOWN",
+              "expectedTypes": [
+                "IAccessor"
+              ],
+              "reason": "? -> IAccessor: UNKNOWN"
+            }
+          ]
+        },
+        {
+          "op": "complete",
+          "call": "rootCall",
+          "index": 1,
+          "cursor": 145,
+          "version": 7,
+          "prefix": "d",
+          "expected": [
+            {
+              "id": "db",
+              "name": "db",
+              "type": "DbAccessor",
+              "span": [
+                10,
+                12
+              ],
+              "compatibility": "YES",
+              "expectedTypes": [
+                "IAccessor"
+              ],
+              "reason": "DbAccessor -> IAccessor: YES"
+            }
+          ]
+        },
+        {
+          "op": "expected",
+          "call": "unresolved",
+          "index": 0,
+          "expected": [
+            "?"
+          ]
+        },
+        {
+          "op": "fields",
+          "type": "Composite",
+          "expected": [
+            "context:Context",
+            "accessor:IAccessor"
+          ]
+        },
+        {
+          "op": "fields",
+          "type": "Node",
+          "expected": [
+            "next:Node"
+          ]
+        },
+        {
+          "op": "complete",
+          "call": "rootCall",
+          "index": 1,
+          "cursor": 145,
+          "version": 6,
+          "prefix": "",
+          "expected": {
+            "error": "STALE_SNAPSHOT",
+            "span": [
+              130,
+              148
+            ]
+          }
+        },
+        {
+          "op": "complete",
+          "call": "rootCall",
+          "index": 1,
+          "cursor": 144,
+          "version": 7,
+          "prefix": "",
+          "expected": {
+            "error": "CURSOR_OUTSIDE_ARGUMENT",
+            "span": [
+              145,
+              145
+            ]
+          }
+        },
+        {
+          "op": "expected",
+          "call": "rootCall",
+          "index": 2,
+          "expected": {
+            "error": "INVALID_ARGUMENT_INDEX",
+            "span": [
+              130,
+              148
+            ]
+          }
+        },
+        {
+          "op": "assign",
+          "actual": "Missing",
+          "target": "IAccessor",
+          "expected": {
+            "error": "UNDEFINED_TYPE",
+            "span": [
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "op": "visible",
+          "cursor": 80,
+          "expected": [
+            "cached",
+            "db",
+            "obj",
+            "unknown",
+            "text"
+          ]
+        },
+        {
+          "op": "visible",
+          "cursor": 200,
+          "expected": [
+            "cached",
+            "db",
+            "obj",
+            "unknown",
+            "text"
+          ]
+        },
+        {
+          "op": "expected",
+          "call": "missing",
+          "index": 0,
+          "expected": {
+            "error": "UNDEFINED_CALL",
+            "span": [
+              0,
+              0
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "no-viable-signature",
+      "queries": [
+        {
+          "op": "expected",
+          "call": "innerCall",
+          "index": 1,
+          "expected": []
+        },
+        {
+          "op": "complete",
+          "call": "innerCall",
+          "index": 1,
+          "cursor": 51,
+          "version": 7,
+          "prefix": "",
+          "expected": []
+        }
+      ],
+      "overrides": {
+        "calls": [
+          {
+            "id": "innerCall",
+            "signatures": [
+              "process",
+              "other"
+            ],
+            "arguments": [
+              {
+                "type": "Object",
+                "span": [
+                  40,
+                  45
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  50,
+                  52
+                ]
+              }
+            ],
+            "span": [
+              38,
+              54
+            ]
+          },
+          {
+            "id": "rootCall",
+            "signatures": [
+              "process"
+            ],
+            "arguments": [
+              {
+                "type": "Context",
+                "span": [
+                  135,
+                  139
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  145,
+                  145
+                ]
+              }
+            ],
+            "span": [
+              130,
+              148
+            ]
+          },
+          {
+            "id": "unresolved",
+            "signatures": [],
+            "arguments": [
+              {
+                "type": "?",
+                "span": [
+                  180,
+                  180
+                ]
+              }
+            ],
+            "span": [
+              175,
+              181
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "overload-unknown-first-argument",
+      "queries": [
+        {
+          "op": "expected",
+          "call": "innerCall",
+          "index": 1,
+          "expected": [
+            "IAccessor",
+            "String"
+          ]
+        }
+      ],
+      "overrides": {
+        "calls": [
+          {
+            "id": "innerCall",
+            "signatures": [
+              "process",
+              "other"
+            ],
+            "arguments": [
+              {
+                "type": "?",
+                "span": [
+                  40,
+                  45
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  50,
+                  52
+                ]
+              }
+            ],
+            "span": [
+              38,
+              54
+            ]
+          },
+          {
+            "id": "rootCall",
+            "signatures": [
+              "process"
+            ],
+            "arguments": [
+              {
+                "type": "Context",
+                "span": [
+                  135,
+                  139
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  145,
+                  145
+                ]
+              }
+            ],
+            "span": [
+              130,
+              148
+            ]
+          },
+          {
+            "id": "unresolved",
+            "signatures": [],
+            "arguments": [
+              {
+                "type": "?",
+                "span": [
+                  180,
+                  180
+                ]
+              }
+            ],
+            "span": [
+              175,
+              181
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "unicode-order",
+      "queries": [
+        {
+          "op": "visible",
+          "cursor": 145,
+          "expected": [
+            "cached",
+            "db",
+            "obj",
+            "unknown",
+            "text",
+            "bmp",
+            "astral"
+          ]
+        }
+      ],
+      "overrides": {
+        "symbols": [
+          {
+            "id": "db",
+            "name": "db",
+            "type": "DbAccessor",
+            "scope": "root",
+            "declaration": [
+              10,
+              12
+            ],
+            "visibleFrom": 12
+          },
+          {
+            "id": "cached",
+            "name": "cached",
+            "type": "IAccessor",
+            "scope": "root",
+            "declaration": [
+              14,
+              18
+            ],
+            "visibleFrom": 18
+          },
+          {
+            "id": "text",
+            "name": "text",
+            "type": "String",
+            "scope": "root",
+            "declaration": [
+              19,
+              21
+            ],
+            "visibleFrom": 21
+          },
+          {
+            "id": "unknown",
+            "name": "pending",
+            "type": "?",
+            "scope": "root",
+            "declaration": [
+              22,
+              23
+            ],
+            "visibleFrom": 23
+          },
+          {
+            "id": "shadow",
+            "name": "db",
+            "type": "String",
+            "scope": "inner",
+            "declaration": [
+              25,
+              28
+            ],
+            "visibleFrom": 28
+          },
+          {
+            "id": "local",
+            "name": "local",
+            "type": "DbAccessor",
+            "scope": "inner",
+            "declaration": [
+              30,
+              35
+            ],
+            "visibleFrom": 35
+          },
+          {
+            "id": "later",
+            "name": "later",
+            "type": "IAccessor",
+            "scope": "inner",
+            "declaration": [
+              60,
+              65
+            ],
+            "visibleFrom": 65
+          },
+          {
+            "id": "sibling",
+            "name": "sibling",
+            "type": "IAccessor",
+            "scope": "sibling",
+            "declaration": [
+              95,
+              100
+            ],
+            "visibleFrom": 100
+          },
+          {
+            "id": "obj",
+            "name": "obj",
+            "type": "Object",
+            "scope": "root",
+            "declaration": [
+              4,
+              7
+            ],
+            "visibleFrom": 7
+          },
+          {
+            "id": "astral",
+            "name": "𐀀",
+            "type": "IAccessor",
+            "scope": "root",
+            "declaration": [
+              0,
+              0
+            ],
+            "visibleFrom": 0
+          },
+          {
+            "id": "bmp",
+            "name": "",
+            "type": "IAccessor",
+            "scope": "root",
+            "declaration": [
+              0,
+              0
+            ],
+            "visibleFrom": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "duplicate-type",
+      "error": {
+        "error": "DUPLICATE_TYPE",
+        "span": [
+          0,
+          0
+        ]
+      },
+      "overrides": {
+        "types": [
+          {
+            "id": "Object",
+            "kind": "BUILTIN",
+            "supertypes": [],
+            "fields": [],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "String",
+            "kind": "BUILTIN",
+            "supertypes": [],
+            "fields": [],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "Context",
+            "kind": "RECORD",
+            "supertypes": [],
+            "fields": [],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "Result",
+            "kind": "RECORD",
+            "supertypes": [],
+            "fields": [],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "IAccessor",
+            "kind": "INTERFACE",
+            "supertypes": [],
+            "fields": [],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "IChild",
+            "kind": "INTERFACE",
+            "supertypes": [
+              "IAccessor"
+            ],
+            "fields": [],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "DbAccessor",
+            "kind": "RECORD",
+            "supertypes": [
+              "IChild"
+            ],
+            "fields": [
+              {
+                "name": "path",
+                "type": "String",
+                "span": [
+                  0,
+                  0
+                ]
+              }
+            ],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "Composite",
+            "kind": "RECORD",
+            "supertypes": [],
+            "fields": [
+              {
+                "name": "context",
+                "type": "Context",
+                "span": [
+                  0,
+                  0
+                ]
+              },
+              {
+                "name": "accessor",
+                "type": "IAccessor",
+                "span": [
+                  0,
+                  0
+                ]
+              }
+            ],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "Node",
+            "kind": "RECORD",
+            "supertypes": [],
+            "fields": [
+              {
+                "name": "next",
+                "type": "Node",
+                "span": [
+                  0,
+                  0
+                ]
+              }
+            ],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "Object",
+            "kind": "BUILTIN",
+            "supertypes": [],
+            "fields": [],
+            "span": [
+              0,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "unknown-field-type",
+      "error": {
+        "error": "UNDEFINED_TYPE",
+        "span": [
+          0,
+          0
+        ]
+      },
+      "overrides": {
+        "types": [
+          {
+            "id": "Object",
+            "kind": "BUILTIN",
+            "supertypes": [],
+            "fields": [],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "String",
+            "kind": "BUILTIN",
+            "supertypes": [],
+            "fields": [],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "Context",
+            "kind": "RECORD",
+            "supertypes": [],
+            "fields": [],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "Result",
+            "kind": "RECORD",
+            "supertypes": [],
+            "fields": [],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "IAccessor",
+            "kind": "INTERFACE",
+            "supertypes": [],
+            "fields": [],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "IChild",
+            "kind": "INTERFACE",
+            "supertypes": [
+              "IAccessor"
+            ],
+            "fields": [],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "DbAccessor",
+            "kind": "RECORD",
+            "supertypes": [
+              "IChild"
+            ],
+            "fields": [
+              {
+                "name": "path",
+                "type": "Missing",
+                "span": [
+                  0,
+                  0
+                ]
+              }
+            ],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "Composite",
+            "kind": "RECORD",
+            "supertypes": [],
+            "fields": [
+              {
+                "name": "context",
+                "type": "Context",
+                "span": [
+                  0,
+                  0
+                ]
+              },
+              {
+                "name": "accessor",
+                "type": "IAccessor",
+                "span": [
+                  0,
+                  0
+                ]
+              }
+            ],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "Node",
+            "kind": "RECORD",
+            "supertypes": [],
+            "fields": [
+              {
+                "name": "next",
+                "type": "Node",
+                "span": [
+                  0,
+                  0
+                ]
+              }
+            ],
+            "span": [
+              0,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "cyclic-interface",
+      "error": {
+        "error": "CYCLIC_TYPE",
+        "span": [
+          0,
+          0
+        ]
+      },
+      "overrides": {
+        "types": [
+          {
+            "id": "Object",
+            "kind": "BUILTIN",
+            "supertypes": [],
+            "fields": [],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "String",
+            "kind": "BUILTIN",
+            "supertypes": [],
+            "fields": [],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "Context",
+            "kind": "RECORD",
+            "supertypes": [],
+            "fields": [],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "Result",
+            "kind": "RECORD",
+            "supertypes": [],
+            "fields": [],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "IAccessor",
+            "kind": "INTERFACE",
+            "supertypes": [
+              "IChild"
+            ],
+            "fields": [],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "IChild",
+            "kind": "INTERFACE",
+            "supertypes": [
+              "IAccessor"
+            ],
+            "fields": [],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "DbAccessor",
+            "kind": "RECORD",
+            "supertypes": [
+              "IChild"
+            ],
+            "fields": [
+              {
+                "name": "path",
+                "type": "String",
+                "span": [
+                  0,
+                  0
+                ]
+              }
+            ],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "Composite",
+            "kind": "RECORD",
+            "supertypes": [],
+            "fields": [
+              {
+                "name": "context",
+                "type": "Context",
+                "span": [
+                  0,
+                  0
+                ]
+              },
+              {
+                "name": "accessor",
+                "type": "IAccessor",
+                "span": [
+                  0,
+                  0
+                ]
+              }
+            ],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "Node",
+            "kind": "RECORD",
+            "supertypes": [],
+            "fields": [
+              {
+                "name": "next",
+                "type": "Node",
+                "span": [
+                  0,
+                  0
+                ]
+              }
+            ],
+            "span": [
+              0,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "record-supertype",
+      "error": {
+        "error": "INVALID_SUPERTYPE",
+        "span": [
+          0,
+          0
+        ]
+      },
+      "overrides": {
+        "types": [
+          {
+            "id": "Object",
+            "kind": "BUILTIN",
+            "supertypes": [],
+            "fields": [],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "String",
+            "kind": "BUILTIN",
+            "supertypes": [],
+            "fields": [],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "Context",
+            "kind": "RECORD",
+            "supertypes": [],
+            "fields": [],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "Result",
+            "kind": "RECORD",
+            "supertypes": [],
+            "fields": [],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "IAccessor",
+            "kind": "INTERFACE",
+            "supertypes": [],
+            "fields": [],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "IChild",
+            "kind": "INTERFACE",
+            "supertypes": [
+              "IAccessor"
+            ],
+            "fields": [],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "DbAccessor",
+            "kind": "RECORD",
+            "supertypes": [
+              "IChild",
+              "Context"
+            ],
+            "fields": [
+              {
+                "name": "path",
+                "type": "String",
+                "span": [
+                  0,
+                  0
+                ]
+              }
+            ],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "Composite",
+            "kind": "RECORD",
+            "supertypes": [],
+            "fields": [
+              {
+                "name": "context",
+                "type": "Context",
+                "span": [
+                  0,
+                  0
+                ]
+              },
+              {
+                "name": "accessor",
+                "type": "IAccessor",
+                "span": [
+                  0,
+                  0
+                ]
+              }
+            ],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "Node",
+            "kind": "RECORD",
+            "supertypes": [],
+            "fields": [
+              {
+                "name": "next",
+                "type": "Node",
+                "span": [
+                  0,
+                  0
+                ]
+              }
+            ],
+            "span": [
+              0,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "duplicate-field",
+      "error": {
+        "error": "DUPLICATE_FIELD",
+        "span": [
+          0,
+          0
+        ]
+      },
+      "overrides": {
+        "types": [
+          {
+            "id": "Object",
+            "kind": "BUILTIN",
+            "supertypes": [],
+            "fields": [],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "String",
+            "kind": "BUILTIN",
+            "supertypes": [],
+            "fields": [],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "Context",
+            "kind": "RECORD",
+            "supertypes": [],
+            "fields": [],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "Result",
+            "kind": "RECORD",
+            "supertypes": [],
+            "fields": [],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "IAccessor",
+            "kind": "INTERFACE",
+            "supertypes": [],
+            "fields": [],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "IChild",
+            "kind": "INTERFACE",
+            "supertypes": [
+              "IAccessor"
+            ],
+            "fields": [],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "DbAccessor",
+            "kind": "RECORD",
+            "supertypes": [
+              "IChild"
+            ],
+            "fields": [
+              {
+                "name": "path",
+                "type": "String",
+                "span": [
+                  0,
+                  0
+                ]
+              },
+              {
+                "name": "path",
+                "type": "String",
+                "span": [
+                  0,
+                  0
+                ]
+              }
+            ],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "Composite",
+            "kind": "RECORD",
+            "supertypes": [],
+            "fields": [
+              {
+                "name": "context",
+                "type": "Context",
+                "span": [
+                  0,
+                  0
+                ]
+              },
+              {
+                "name": "accessor",
+                "type": "IAccessor",
+                "span": [
+                  0,
+                  0
+                ]
+              }
+            ],
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "id": "Node",
+            "kind": "RECORD",
+            "supertypes": [],
+            "fields": [
+              {
+                "name": "next",
+                "type": "Node",
+                "span": [
+                  0,
+                  0
+                ]
+              }
+            ],
+            "span": [
+              0,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "unknown-scope",
+      "error": {
+        "error": "UNDEFINED_SCOPE",
+        "span": [
+          10,
+          12
+        ]
+      },
+      "overrides": {
+        "symbols": [
+          {
+            "id": "db",
+            "name": "db",
+            "type": "DbAccessor",
+            "scope": "missing",
+            "declaration": [
+              10,
+              12
+            ],
+            "visibleFrom": 12
+          },
+          {
+            "id": "cached",
+            "name": "cached",
+            "type": "IAccessor",
+            "scope": "root",
+            "declaration": [
+              14,
+              18
+            ],
+            "visibleFrom": 18
+          },
+          {
+            "id": "text",
+            "name": "text",
+            "type": "String",
+            "scope": "root",
+            "declaration": [
+              19,
+              21
+            ],
+            "visibleFrom": 21
+          },
+          {
+            "id": "unknown",
+            "name": "pending",
+            "type": "?",
+            "scope": "root",
+            "declaration": [
+              22,
+              23
+            ],
+            "visibleFrom": 23
+          },
+          {
+            "id": "shadow",
+            "name": "db",
+            "type": "String",
+            "scope": "inner",
+            "declaration": [
+              25,
+              28
+            ],
+            "visibleFrom": 28
+          },
+          {
+            "id": "local",
+            "name": "local",
+            "type": "DbAccessor",
+            "scope": "inner",
+            "declaration": [
+              30,
+              35
+            ],
+            "visibleFrom": 35
+          },
+          {
+            "id": "later",
+            "name": "later",
+            "type": "IAccessor",
+            "scope": "inner",
+            "declaration": [
+              60,
+              65
+            ],
+            "visibleFrom": 65
+          },
+          {
+            "id": "sibling",
+            "name": "sibling",
+            "type": "IAccessor",
+            "scope": "sibling",
+            "declaration": [
+              95,
+              100
+            ],
+            "visibleFrom": 100
+          },
+          {
+            "id": "obj",
+            "name": "obj",
+            "type": "Object",
+            "scope": "root",
+            "declaration": [
+              4,
+              7
+            ],
+            "visibleFrom": 7
+          }
+        ]
+      }
+    },
+    {
+      "name": "duplicate-name",
+      "error": {
+        "error": "DUPLICATE_SYMBOL_NAME",
+        "span": [
+          14,
+          18
+        ]
+      },
+      "overrides": {
+        "symbols": [
+          {
+            "id": "db",
+            "name": "db",
+            "type": "DbAccessor",
+            "scope": "root",
+            "declaration": [
+              10,
+              12
+            ],
+            "visibleFrom": 12
+          },
+          {
+            "id": "cached",
+            "name": "db",
+            "type": "IAccessor",
+            "scope": "root",
+            "declaration": [
+              14,
+              18
+            ],
+            "visibleFrom": 18
+          },
+          {
+            "id": "text",
+            "name": "text",
+            "type": "String",
+            "scope": "root",
+            "declaration": [
+              19,
+              21
+            ],
+            "visibleFrom": 21
+          },
+          {
+            "id": "unknown",
+            "name": "pending",
+            "type": "?",
+            "scope": "root",
+            "declaration": [
+              22,
+              23
+            ],
+            "visibleFrom": 23
+          },
+          {
+            "id": "shadow",
+            "name": "db",
+            "type": "String",
+            "scope": "inner",
+            "declaration": [
+              25,
+              28
+            ],
+            "visibleFrom": 28
+          },
+          {
+            "id": "local",
+            "name": "local",
+            "type": "DbAccessor",
+            "scope": "inner",
+            "declaration": [
+              30,
+              35
+            ],
+            "visibleFrom": 35
+          },
+          {
+            "id": "later",
+            "name": "later",
+            "type": "IAccessor",
+            "scope": "inner",
+            "declaration": [
+              60,
+              65
+            ],
+            "visibleFrom": 65
+          },
+          {
+            "id": "sibling",
+            "name": "sibling",
+            "type": "IAccessor",
+            "scope": "sibling",
+            "declaration": [
+              95,
+              100
+            ],
+            "visibleFrom": 100
+          },
+          {
+            "id": "obj",
+            "name": "obj",
+            "type": "Object",
+            "scope": "root",
+            "declaration": [
+              4,
+              7
+            ],
+            "visibleFrom": 7
+          }
+        ]
+      }
+    },
+    {
+      "name": "outside-document",
+      "error": {
+        "error": "SPAN_OUTSIDE_DOCUMENT",
+        "span": [
+          1,
+          201
+        ]
+      },
+      "overrides": {
+        "calls": [
+          {
+            "id": "innerCall",
+            "signatures": [
+              "process",
+              "other"
+            ],
+            "arguments": [
+              {
+                "type": "Context",
+                "span": [
+                  40,
+                  45
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  50,
+                  52
+                ]
+              }
+            ],
+            "span": [
+              1,
+              201
+            ]
+          },
+          {
+            "id": "rootCall",
+            "signatures": [
+              "process"
+            ],
+            "arguments": [
+              {
+                "type": "Context",
+                "span": [
+                  135,
+                  139
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  145,
+                  145
+                ]
+              }
+            ],
+            "span": [
+              130,
+              148
+            ]
+          },
+          {
+            "id": "unresolved",
+            "signatures": [],
+            "arguments": [
+              {
+                "type": "?",
+                "span": [
+                  180,
+                  180
+                ]
+              }
+            ],
+            "span": [
+              175,
+              181
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "overlap-siblings",
+      "error": {
+        "error": "OVERLAPPING_SCOPES",
+        "span": [
+          20,
+          80
+        ]
+      },
+      "overrides": {
+        "scopes": [
+          {
+            "id": "root",
+            "parent": null,
+            "span": [
+              0,
+              200
+            ]
+          },
+          {
+            "id": "inner",
+            "parent": "root",
+            "span": [
+              20,
+              80
+            ]
+          },
+          {
+            "id": "sibling",
+            "parent": "root",
+            "span": [
+              70,
+              120
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "invalid-root",
+      "error": {
+        "error": "INVALID_ROOT_SCOPE",
+        "span": [
+          0,
+          200
+        ]
+      },
+      "overrides": {
+        "scopes": [
+          {
+            "id": "root",
+            "parent": null,
+            "span": [
+              0,
+              199
+            ]
+          },
+          {
+            "id": "inner",
+            "parent": "root",
+            "span": [
+              20,
+              80
+            ]
+          },
+          {
+            "id": "sibling",
+            "parent": "root",
+            "span": [
+              90,
+              120
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "empty-child-scope",
+      "error": {
+        "error": "EMPTY_SCOPE",
+        "span": [
+          20,
+          20
+        ]
+      },
+      "overrides": {
+        "scopes": [
+          {
+            "id": "root",
+            "parent": null,
+            "span": [
+              0,
+              200
+            ]
+          },
+          {
+            "id": "inner",
+            "parent": "root",
+            "span": [
+              20,
+              20
+            ]
+          },
+          {
+            "id": "sibling",
+            "parent": "root",
+            "span": [
+              90,
+              120
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "unknown-signature",
+      "error": {
+        "error": "UNDEFINED_SIGNATURE",
+        "span": [
+          38,
+          54
+        ]
+      },
+      "overrides": {
+        "calls": [
+          {
+            "id": "innerCall",
+            "signatures": [
+              "process",
+              "other",
+              "missing"
+            ],
+            "arguments": [
+              {
+                "type": "Context",
+                "span": [
+                  40,
+                  45
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  50,
+                  52
+                ]
+              }
+            ],
+            "span": [
+              38,
+              54
+            ]
+          },
+          {
+            "id": "rootCall",
+            "signatures": [
+              "process"
+            ],
+            "arguments": [
+              {
+                "type": "Context",
+                "span": [
+                  135,
+                  139
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  145,
+                  145
+                ]
+              }
+            ],
+            "span": [
+              130,
+              148
+            ]
+          },
+          {
+            "id": "unresolved",
+            "signatures": [],
+            "arguments": [
+              {
+                "type": "?",
+                "span": [
+                  180,
+                  180
+                ]
+              }
+            ],
+            "span": [
+              175,
+              181
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "overlap-arguments",
+      "error": {
+        "error": "INVALID_ARGUMENT_SPAN",
+        "span": [
+          45,
+          52
+        ]
+      },
+      "overrides": {
+        "calls": [
+          {
+            "id": "innerCall",
+            "signatures": [
+              "process",
+              "other"
+            ],
+            "arguments": [
+              {
+                "type": "Context",
+                "span": [
+                  40,
+                  45
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  45,
+                  52
+                ]
+              }
+            ],
+            "span": [
+              38,
+              54
+            ]
+          },
+          {
+            "id": "rootCall",
+            "signatures": [
+              "process"
+            ],
+            "arguments": [
+              {
+                "type": "Context",
+                "span": [
+                  135,
+                  139
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  145,
+                  145
+                ]
+              }
+            ],
+            "span": [
+              130,
+              148
+            ]
+          },
+          {
+            "id": "unresolved",
+            "signatures": [],
+            "arguments": [
+              {
+                "type": "?",
+                "span": [
+                  180,
+                  180
+                ]
+              }
+            ],
+            "span": [
+              175,
+              181
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "invalid-visibility",
+      "error": {
+        "error": "SYMBOL_OUTSIDE_SCOPE",
+        "span": [
+          25,
+          28
+        ]
+      },
+      "overrides": {
+        "symbols": [
+          {
+            "id": "db",
+            "name": "db",
+            "type": "DbAccessor",
+            "scope": "root",
+            "declaration": [
+              10,
+              12
+            ],
+            "visibleFrom": 12
+          },
+          {
+            "id": "cached",
+            "name": "cached",
+            "type": "IAccessor",
+            "scope": "root",
+            "declaration": [
+              14,
+              18
+            ],
+            "visibleFrom": 18
+          },
+          {
+            "id": "text",
+            "name": "text",
+            "type": "String",
+            "scope": "root",
+            "declaration": [
+              19,
+              21
+            ],
+            "visibleFrom": 21
+          },
+          {
+            "id": "unknown",
+            "name": "pending",
+            "type": "?",
+            "scope": "root",
+            "declaration": [
+              22,
+              23
+            ],
+            "visibleFrom": 23
+          },
+          {
+            "id": "shadow",
+            "name": "db",
+            "type": "String",
+            "scope": "inner",
+            "declaration": [
+              25,
+              28
+            ],
+            "visibleFrom": 81
+          },
+          {
+            "id": "local",
+            "name": "local",
+            "type": "DbAccessor",
+            "scope": "inner",
+            "declaration": [
+              30,
+              35
+            ],
+            "visibleFrom": 35
+          },
+          {
+            "id": "later",
+            "name": "later",
+            "type": "IAccessor",
+            "scope": "inner",
+            "declaration": [
+              60,
+              65
+            ],
+            "visibleFrom": 65
+          },
+          {
+            "id": "sibling",
+            "name": "sibling",
+            "type": "IAccessor",
+            "scope": "sibling",
+            "declaration": [
+              95,
+              100
+            ],
+            "visibleFrom": 100
+          },
+          {
+            "id": "obj",
+            "name": "obj",
+            "type": "Object",
+            "scope": "root",
+            "declaration": [
+              4,
+              7
+            ],
+            "visibleFrom": 7
+          }
+        ]
+      }
+    },
+    {
+      "name": "cyclic-scope",
+      "overrides": {
+        "scopes": [
+          {
+            "id": "root",
+            "parent": null,
+            "span": [
+              0,
+              200
+            ]
+          },
+          {
+            "id": "inner",
+            "parent": "inner",
+            "span": [
+              20,
+              80
+            ]
+          },
+          {
+            "id": "sibling",
+            "parent": "root",
+            "span": [
+              90,
+              120
+            ]
+          }
+        ]
+      },
+      "error": {
+        "error": "CYCLIC_SCOPE",
+        "span": [
+          20,
+          80
+        ]
+      }
+    },
+    {
+      "name": "missing-parent",
+      "overrides": {
+        "scopes": [
+          {
+            "id": "root",
+            "parent": null,
+            "span": [
+              0,
+              200
+            ]
+          },
+          {
+            "id": "inner",
+            "parent": "missing",
+            "span": [
+              20,
+              80
+            ]
+          },
+          {
+            "id": "sibling",
+            "parent": "root",
+            "span": [
+              90,
+              120
+            ]
+          }
+        ]
+      },
+      "error": {
+        "error": "UNDEFINED_SCOPE",
+        "span": [
+          20,
+          80
+        ]
+      }
+    }
+  ]
+}

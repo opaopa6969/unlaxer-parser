@@ -6,6 +6,8 @@ Java版を維持しつつ、UBNFからRustのparser・AST・mapper・evaluator d
 
 full-specの進捗は[対応表と受け入れ条件](FULL-SPEC.md)で追跡する。runtimeの機能とUBNFから生成できる機能を区別する。
 
+3.3.0-SNAPSHOT の `unlaxer_runtime::semantic` は、Java と共通の[型・scope・期待型モデル](../docs/semantic-model.md)を提供する。ユーザー定義型と引数補完の[UBNF 接続例](../examples/semantic-model/README.md)がある。LSP の自動生成や TinyExpression の新しい型構文はこの API の対象外。
+
 ## すぐ動かす
 
 3.3.0-SNAPSHOT では `unlaxer playground --grammar ... --output ...` により、

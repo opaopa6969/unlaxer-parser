@@ -11,6 +11,7 @@ mod long_code_fence;
 #[cfg(test)]
 mod memo_retention_tests;
 mod scope;
+pub mod semantic;
 #[doc(hidden)]
 pub use first::{set_candidate_exclusion_for_current_thread, CandidateExclusion};
 pub use scope::{

@@ -483,3 +483,7 @@ curl http://127.0.0.1:9228/healthz
 ## Classic と ubnfc の選び方
 
 このリポジトリのコンビネータ実行系（**unlaxer Classic**）と、UBNF コンパイラ **ubnfc** のどちらを使うかの目安: [docs/engine-selection-guide-ja.md](docs/engine-selection-guide-ja.md)
+
+## 型に基づく編集支援の API
+
+3.3.0-SNAPSHOT には Java / Rust 共通の[型・scope・期待型モデル](docs/semantic-model.md)がある。UBNF から生成した AST を adapter で接続し、ユーザー定義型を合成して引数の型に適合する変数を補完できる。[実行例](examples/semantic-model/README.md)を参照。既存言語への型構文・LSP の自動追加を意味しない。
