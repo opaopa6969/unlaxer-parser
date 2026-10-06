@@ -1,0 +1,13 @@
+[package]
+name = "resolver-tutorial"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+publish = false
+
+# Tutorial-only JSON dependency; the core workspace remains dependency-free.
+[workspace]
+
+[dependencies]
+unlaxer-runtime = { path = "../../../rust/unlaxer-runtime" }
+serde_json = "1"

@@ -1,0 +1,770 @@
+[
+  {
+    "name": "inline-𠮷野-12",
+    "config": "config/inline.json",
+    "input": "𠮷野-12",
+    "exit": 0,
+    "expected": {
+      "stage": "parse",
+      "revision": "towns-1",
+      "accepted": true,
+      "consumed": 5,
+      "matched": 5,
+      "ast": {
+        "town": "𠮷野",
+        "house": "12"
+      },
+      "captures": [
+        {
+          "text": "𠮷野",
+          "span": [
+            0,
+            2
+          ]
+        },
+        {
+          "text": "12",
+          "span": [
+            3,
+            5
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "inline-東京駅-1",
+    "config": "config/inline.json",
+    "input": "東京駅-1",
+    "exit": 0,
+    "expected": {
+      "stage": "parse",
+      "revision": "towns-1",
+      "accepted": true,
+      "consumed": 5,
+      "matched": 5,
+      "ast": {
+        "town": "東京駅",
+        "house": "1"
+      },
+      "captures": [
+        {
+          "text": "東京駅",
+          "span": [
+            0,
+            3
+          ]
+        },
+        {
+          "text": "1",
+          "span": [
+            4,
+            5
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "inline-大阪-003",
+    "config": "config/inline.json",
+    "input": "大阪-003",
+    "exit": 0,
+    "expected": {
+      "stage": "parse",
+      "revision": "towns-1",
+      "accepted": true,
+      "consumed": 6,
+      "matched": 6,
+      "ast": {
+        "town": "大阪",
+        "house": "003"
+      },
+      "captures": [
+        {
+          "text": "大阪",
+          "span": [
+            0,
+            2
+          ]
+        },
+        {
+          "text": "003",
+          "span": [
+            3,
+            6
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "inline-reject-京都-1",
+    "config": "config/inline.json",
+    "input": "京都-1",
+    "exit": 1,
+    "expected": {
+      "stage": "parse",
+      "revision": "towns-1",
+      "accepted": false,
+      "consumed": 0,
+      "matched": 0,
+      "ast": null,
+      "captures": []
+    }
+  },
+  {
+    "name": "inline-reject-東京-",
+    "config": "config/inline.json",
+    "input": "東京-",
+    "exit": 1,
+    "expected": {
+      "stage": "parse",
+      "revision": "towns-1",
+      "accepted": false,
+      "consumed": 0,
+      "matched": 0,
+      "ast": null,
+      "captures": []
+    }
+  },
+  {
+    "name": "inline-reject-東京-1x",
+    "config": "config/inline.json",
+    "input": "東京-1x",
+    "exit": 1,
+    "expected": {
+      "stage": "parse",
+      "revision": "towns-1",
+      "accepted": false,
+      "consumed": 0,
+      "matched": 0,
+      "ast": null,
+      "captures": []
+    }
+  },
+  {
+    "name": "inline-reject-",
+    "config": "config/inline.json",
+    "input": "",
+    "exit": 1,
+    "expected": {
+      "stage": "parse",
+      "revision": "towns-1",
+      "accepted": false,
+      "consumed": 0,
+      "matched": 0,
+      "ast": null,
+      "captures": []
+    }
+  },
+  {
+    "name": "file-𠮷野-12",
+    "config": "config/file.json",
+    "input": "𠮷野-12",
+    "exit": 0,
+    "expected": {
+      "stage": "parse",
+      "revision": "towns-1",
+      "accepted": true,
+      "consumed": 5,
+      "matched": 5,
+      "ast": {
+        "town": "𠮷野",
+        "house": "12"
+      },
+      "captures": [
+        {
+          "text": "𠮷野",
+          "span": [
+            0,
+            2
+          ]
+        },
+        {
+          "text": "12",
+          "span": [
+            3,
+            5
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "file-東京駅-1",
+    "config": "config/file.json",
+    "input": "東京駅-1",
+    "exit": 0,
+    "expected": {
+      "stage": "parse",
+      "revision": "towns-1",
+      "accepted": true,
+      "consumed": 5,
+      "matched": 5,
+      "ast": {
+        "town": "東京駅",
+        "house": "1"
+      },
+      "captures": [
+        {
+          "text": "東京駅",
+          "span": [
+            0,
+            3
+          ]
+        },
+        {
+          "text": "1",
+          "span": [
+            4,
+            5
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "file-大阪-003",
+    "config": "config/file.json",
+    "input": "大阪-003",
+    "exit": 0,
+    "expected": {
+      "stage": "parse",
+      "revision": "towns-1",
+      "accepted": true,
+      "consumed": 6,
+      "matched": 6,
+      "ast": {
+        "town": "大阪",
+        "house": "003"
+      },
+      "captures": [
+        {
+          "text": "大阪",
+          "span": [
+            0,
+            2
+          ]
+        },
+        {
+          "text": "003",
+          "span": [
+            3,
+            6
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "file-reject-京都-1",
+    "config": "config/file.json",
+    "input": "京都-1",
+    "exit": 1,
+    "expected": {
+      "stage": "parse",
+      "revision": "towns-1",
+      "accepted": false,
+      "consumed": 0,
+      "matched": 0,
+      "ast": null,
+      "captures": []
+    }
+  },
+  {
+    "name": "file-reject-東京-",
+    "config": "config/file.json",
+    "input": "東京-",
+    "exit": 1,
+    "expected": {
+      "stage": "parse",
+      "revision": "towns-1",
+      "accepted": false,
+      "consumed": 0,
+      "matched": 0,
+      "ast": null,
+      "captures": []
+    }
+  },
+  {
+    "name": "file-reject-東京-1x",
+    "config": "config/file.json",
+    "input": "東京-1x",
+    "exit": 1,
+    "expected": {
+      "stage": "parse",
+      "revision": "towns-1",
+      "accepted": false,
+      "consumed": 0,
+      "matched": 0,
+      "ast": null,
+      "captures": []
+    }
+  },
+  {
+    "name": "file-reject-",
+    "config": "config/file.json",
+    "input": "",
+    "exit": 1,
+    "expected": {
+      "stage": "parse",
+      "revision": "towns-1",
+      "accepted": false,
+      "consumed": 0,
+      "matched": 0,
+      "ast": null,
+      "captures": []
+    }
+  },
+  {
+    "name": "unknown-provider",
+    "input": "東京-1",
+    "exit": 2,
+    "expected": {
+      "stage": "resolve",
+      "code": "E-PROVIDER"
+    },
+    "document": {
+      "version": 1,
+      "bindings": {
+        "address.towns": {
+          "resolver": "townCatalog",
+          "schema": "ubnf.words/v1"
+        }
+      },
+      "resolvers": {
+        "townCatalog": {
+          "provider": "rdb/v1",
+          "properties": {
+            "schema": "ubnf.words/v1",
+            "revision": "towns-1",
+            "words": [
+              "東京駅",
+              "東京",
+              "大阪",
+              "𠮷野"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "missing-resolver",
+    "input": "東京-1",
+    "exit": 2,
+    "expected": {
+      "stage": "resolve",
+      "code": "E-RESOLVER"
+    },
+    "document": {
+      "version": 1,
+      "bindings": {
+        "address.towns": {
+          "resolver": "absent",
+          "schema": "ubnf.words/v1"
+        }
+      },
+      "resolvers": {
+        "townCatalog": {
+          "provider": "inline/v1",
+          "properties": {
+            "schema": "ubnf.words/v1",
+            "revision": "towns-1",
+            "words": [
+              "東京駅",
+              "東京",
+              "大阪",
+              "𠮷野"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "missing-binding",
+    "input": "東京-1",
+    "exit": 2,
+    "expected": {
+      "stage": "resolve",
+      "code": "E-BINDING"
+    },
+    "document": {
+      "version": 1,
+      "bindings": {},
+      "resolvers": {
+        "townCatalog": {
+          "provider": "inline/v1",
+          "properties": {
+            "schema": "ubnf.words/v1",
+            "revision": "towns-1",
+            "words": [
+              "東京駅",
+              "東京",
+              "大阪",
+              "𠮷野"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "unknown-config-field",
+    "input": "東京-1",
+    "exit": 2,
+    "expected": {
+      "stage": "resolve",
+      "code": "E-CONFIG"
+    },
+    "document": {
+      "version": 1,
+      "bindings": {
+        "address.towns": {
+          "resolver": "townCatalog",
+          "schema": "ubnf.words/v1"
+        }
+      },
+      "resolvers": {
+        "townCatalog": {
+          "provider": "inline/v1",
+          "properties": {
+            "schema": "ubnf.words/v1",
+            "revision": "towns-1",
+            "words": [
+              "東京駅",
+              "東京",
+              "大阪",
+              "𠮷野"
+            ]
+          }
+        }
+      },
+      "typo": true
+    }
+  },
+  {
+    "name": "wrong-version",
+    "input": "東京-1",
+    "exit": 2,
+    "expected": {
+      "stage": "resolve",
+      "code": "E-CONFIG"
+    },
+    "document": {
+      "version": "1",
+      "bindings": {
+        "address.towns": {
+          "resolver": "townCatalog",
+          "schema": "ubnf.words/v1"
+        }
+      },
+      "resolvers": {
+        "townCatalog": {
+          "provider": "inline/v1",
+          "properties": {
+            "schema": "ubnf.words/v1",
+            "revision": "towns-1",
+            "words": [
+              "東京駅",
+              "東京",
+              "大阪",
+              "𠮷野"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "unsupported-binding-schema",
+    "input": "東京-1",
+    "exit": 2,
+    "expected": {
+      "stage": "resolve",
+      "code": "E-CONFIG"
+    },
+    "document": {
+      "version": 1,
+      "bindings": {
+        "address.towns": {
+          "resolver": "townCatalog",
+          "schema": "ubnf.words/v2"
+        }
+      },
+      "resolvers": {
+        "townCatalog": {
+          "provider": "inline/v1",
+          "properties": {
+            "schema": "ubnf.words/v1",
+            "revision": "towns-1",
+            "words": [
+              "東京駅",
+              "東京",
+              "大阪",
+              "𠮷野"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "empty-word",
+    "input": "東京-1",
+    "exit": 2,
+    "expected": {
+      "stage": "resolve",
+      "code": "E-DATA"
+    },
+    "document": {
+      "version": 1,
+      "bindings": {
+        "address.towns": {
+          "resolver": "townCatalog",
+          "schema": "ubnf.words/v1"
+        }
+      },
+      "resolvers": {
+        "townCatalog": {
+          "provider": "inline/v1",
+          "properties": {
+            "schema": "ubnf.words/v1",
+            "revision": "towns-1",
+            "words": [
+              ""
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "wrong-word-type",
+    "input": "東京-1",
+    "exit": 2,
+    "expected": {
+      "stage": "resolve",
+      "code": "E-DATA"
+    },
+    "document": {
+      "version": 1,
+      "bindings": {
+        "address.towns": {
+          "resolver": "townCatalog",
+          "schema": "ubnf.words/v1"
+        }
+      },
+      "resolvers": {
+        "townCatalog": {
+          "provider": "inline/v1",
+          "properties": {
+            "schema": "ubnf.words/v1",
+            "revision": "towns-1",
+            "words": [
+              42
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "missing-file",
+    "input": "東京-1",
+    "exit": 2,
+    "expected": {
+      "stage": "resolve",
+      "code": "E-IO"
+    },
+    "document": {
+      "version": 1,
+      "bindings": {
+        "address.towns": {
+          "resolver": "townCatalog",
+          "schema": "ubnf.words/v1"
+        }
+      },
+      "resolvers": {
+        "townCatalog": {
+          "provider": "file/v1",
+          "properties": {
+            "path": "../data/missing.json"
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "wrong-data-schema",
+    "input": "東京-1",
+    "exit": 2,
+    "expected": {
+      "stage": "resolve",
+      "code": "E-DATA"
+    },
+    "document": {
+      "version": 1,
+      "bindings": {
+        "address.towns": {
+          "resolver": "townCatalog",
+          "schema": "ubnf.words/v1"
+        }
+      },
+      "resolvers": {
+        "townCatalog": {
+          "provider": "file/v1",
+          "properties": {
+            "path": "../data/case.json"
+          }
+        }
+      }
+    },
+    "data": {
+      "schema": "wrong/v1",
+      "revision": "v1",
+      "words": [
+        "東京"
+      ]
+    }
+  },
+  {
+    "name": "invalid-json",
+    "input": "東京-1",
+    "exit": 2,
+    "expected": {
+      "stage": "resolve",
+      "code": "E-CONFIG"
+    },
+    "document": {
+      "version": 1,
+      "bindings": {
+        "address.towns": {
+          "resolver": "townCatalog",
+          "schema": "ubnf.words/v1"
+        }
+      },
+      "resolvers": {
+        "townCatalog": {
+          "provider": "inline/v1",
+          "properties": {
+            "schema": "ubnf.words/v1",
+            "revision": "towns-1",
+            "words": [
+              "東京駅",
+              "東京",
+              "大阪",
+              "𠮷野"
+            ]
+          }
+        }
+      }
+    },
+    "raw": "{\"version\":"
+  },
+  {
+    "name": "unpaired-surrogate",
+    "input": "東京-1",
+    "exit": 2,
+    "expected": {
+      "stage": "resolve",
+      "code": "E-CONFIG"
+    },
+    "document": {
+      "version": 1,
+      "bindings": {
+        "address.towns": {
+          "resolver": "townCatalog",
+          "schema": "ubnf.words/v1"
+        }
+      },
+      "resolvers": {
+        "townCatalog": {
+          "provider": "inline/v1",
+          "properties": {
+            "schema": "ubnf.words/v1",
+            "revision": "towns-1",
+            "words": [
+              "東京駅",
+              "東京",
+              "大阪",
+              "𠮷野"
+            ]
+          }
+        }
+      }
+    },
+    "raw": "{\"version\": 1, \"bindings\": {\"address.towns\": {\"resolver\": \"townCatalog\", \"schema\": \"ubnf.words/v1\"}}, \"resolvers\": {\"townCatalog\": {\"provider\": \"inline/v1\", \"properties\": {\"schema\": \"ubnf.words/v1\", \"revision\": \"\\ud800\", \"words\": [\"\\u6771\\u4eac\\u99c5\", \"\\u6771\\u4eac\", \"\\u5927\\u962a\", \"\\ud842\\udfb7\\u91ce\"]}}}}"
+  },
+  {
+    "name": "empty-dictionary",
+    "input": "東京駅-1",
+    "document": {
+      "version": 1,
+      "bindings": {
+        "address.towns": {
+          "resolver": "townCatalog",
+          "schema": "ubnf.words/v1"
+        }
+      },
+      "resolvers": {
+        "townCatalog": {
+          "provider": "inline/v1",
+          "properties": {
+            "schema": "ubnf.words/v1",
+            "revision": "towns-1",
+            "words": []
+          }
+        }
+      }
+    },
+    "exit": 1,
+    "expected": {
+      "stage": "parse",
+      "revision": "towns-1",
+      "accepted": false,
+      "consumed": 0,
+      "matched": 0,
+      "ast": null,
+      "captures": []
+    }
+  },
+  {
+    "name": "priority-short-first",
+    "input": "東京駅-1",
+    "document": {
+      "version": 1,
+      "bindings": {
+        "address.towns": {
+          "resolver": "townCatalog",
+          "schema": "ubnf.words/v1"
+        }
+      },
+      "resolvers": {
+        "townCatalog": {
+          "provider": "inline/v1",
+          "properties": {
+            "schema": "ubnf.words/v1",
+            "revision": "towns-1",
+            "words": [
+              "東京",
+              "東京駅"
+            ]
+          }
+        }
+      }
+    },
+    "exit": 1,
+    "expected": {
+      "stage": "parse",
+      "revision": "towns-1",
+      "accepted": false,
+      "consumed": 0,
+      "matched": 0,
+      "ast": null,
+      "captures": []
+    }
+  }
+]

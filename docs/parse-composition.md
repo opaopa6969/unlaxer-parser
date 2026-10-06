@@ -142,3 +142,7 @@ cargo test --locked --manifest-path rust/Cargo.toml
 trivia 公開有無で照合する。adapter 契約の受理・重複・未知 accessor の拒否と診断位置は
 `spec-corpus/token-adapters/cases.tsv` に含める。CI は `rust-parse-bindings.tsv` と
 `rust-token-stream.tsv` の証跡を必須にする。Rust 比較は `-DrustConformance=true` が必要。
+
+## 辞書 resolver のチュートリアル
+
+[Inline → File と取得層の拡張](../examples/resolver-tutorial/README.md)では、同じ UBNF を Java / Rust で実行し、設定切替・snapshot・位置・取得失敗を試せます。Resolver はサンプル側の実装です。
