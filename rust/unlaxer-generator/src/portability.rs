@@ -196,12 +196,15 @@ impl Inventory {
         for issue in feature_diagnostics(grammar) {
             self.add(issue.code, issue.subject, issue.span);
         }
+        for issue in crate::token_stream::problems(grammar) {
+            self.add(issue.code, issue.subject, issue.span);
+        }
         for import in &grammar.imports {
             self.add("P-IMPORT", &import.path, import.span);
         }
         for setting in &grammar.settings {
             match (&*setting.key, &setting.value) {
-                ("package" | "memoSafeToken", SettingValue::String(_)) => {}
+                ("package" | "memoSafeToken" | "tokenStream", SettingValue::String(_)) => {}
                 ("ubnf", SettingValue::String(value)) if value == "v1" || value == "v2" => {}
                 ("feature", SettingValue::String(value))
                     if matches!(

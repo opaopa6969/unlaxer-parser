@@ -1,0 +1,12 @@
+grammar Input {
+ @ubnf: v2
+ @package: example.lexing
+ @tokenStream: enabled
+ @whitespace: javaStyle
+ token LETTER ::= CHAR_RANGE('a','z');
+ token ID ::= LETTER+;
+ @root @mapping(Entries, params=[entries])
+ Root ::= { Entry @entries };
+ @mapping(Entry, params=[left,right])
+ Entry ::= (ID @left '=' ID @right ';' | ID @left ':' ID @right ';');
+}

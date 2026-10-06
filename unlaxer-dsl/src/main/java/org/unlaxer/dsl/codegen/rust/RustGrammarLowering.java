@@ -85,11 +85,12 @@ public final class RustGrammarLowering {
                         ? "memoSafeToken alias must name a Simple or built-in Adapter token " + alias
                         : "memoSafeToken alias must name a Simple token " + alias);
                 }
-            } else if (!setting.key().equals("package")
+            } else if (!setting.key().equals("tokenStream") && !setting.key().equals("package")
                 && !(setting.key().equals("ubnf") && value.value().matches("v[12]"))) {
                 throw unsupported("setting " + setting.key());
             }
         }
+        org.unlaxer.dsl.codegen.TokenStreamGrammar.requireValid(grammar);
         for (var token : grammar.tokens()) {
             Expression value = token instanceof TokenDecl.Declarative
                 ? new LexicalToken(token.name(), lexical.get(token.name())) : token(token);

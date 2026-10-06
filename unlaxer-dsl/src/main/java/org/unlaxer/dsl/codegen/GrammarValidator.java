@@ -124,6 +124,9 @@ public final class GrammarValidator {
                 "Use a supported format-2 @feature declaration."));
         }
 
+        for (var issue : TokenStreamGrammar.problems(grammar)) {
+            errors.add(new ValidationIssue(issue.code(), issue.subject(), "Use the supported @tokenStream:enabled profile."));
+        }
         validateGlobalWhitespace(grammar, errors);
         validateUbnfFormat(grammar, errors);
         validateMemoSafeTokens(grammar, errors);

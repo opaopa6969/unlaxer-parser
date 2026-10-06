@@ -25,9 +25,22 @@ public final class RustBackend {
                 pub mod evaluator;
                 """),
             new GeneratedFile("ast.rs", ast(ir)),
-            new GeneratedFile("parser.rs", parser(ir)),
+            new GeneratedFile("parser.rs", parser(ir) + lexingApi(grammar, ir)),
             new GeneratedFile("mapper.rs", mapper(ir)),
             new GeneratedFile("evaluator.rs", evaluator(ir)));
+    }
+
+    private String lexingApi(GrammarDecl grammar, GrammarIR ir) {
+        if (!org.unlaxer.dsl.codegen.TokenStreamGrammar.enabled(grammar)) return "";
+        var out = new StringBuilder("\npub fn lexical_terminals() -> &'static std::sync::Arc<[unlaxer_runtime::lexing::Terminal]> {\n    static TERMINALS: OnceLock<std::sync::Arc<[unlaxer_runtime::lexing::Terminal]>> = OnceLock::new();\n    TERMINALS.get_or_init(|| vec![\n");
+        for (var terminal : org.unlaxer.dsl.codegen.TokenStreamGrammar.terminals(grammar)) {
+            out.append("        unlaxer_runtime::lexing::Terminal { name: ").append(quote(terminal.name()))
+                .append(", literal: ").append(terminal.literal()).append(", expression: ")
+                .append(lexicalExpression(terminal.expression())).append(" },\n");
+        }
+        return out.append("    ].into())\n}\n\npub fn parse_with_lexing(source: &str, options: unlaxer_runtime::lexing::Options) -> Result<unlaxer_runtime::lexing::Outcome<'_>, String> {\n    unlaxer_runtime::lexing::parse(grammar(), ")
+            .append(ir.root()).append(", ").append(ir.javaWhitespace())
+            .append(", source, options, std::sync::Arc::clone(lexical_terminals()))\n}\n").toString();
     }
 
     private String ast(GrammarIR ir) {

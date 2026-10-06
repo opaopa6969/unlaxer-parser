@@ -66,10 +66,13 @@ public class ParserGenerator implements CodeGenerator {
         /** rule name -> RecoveryAnnotation (for rules that have @recovery) */
         final Map<String, org.unlaxer.dsl.bootstrap.UBNFAST.RecoveryAnnotation> recoveryRules = new LinkedHashMap<>();
         final boolean adapterShadowsWordParser;
+        final boolean tokenStream;
         final String spaceParserClass;
 
         GenContext(GrammarDecl grammar) {
             this.grammar = grammar;
+            TokenStreamGrammar.requireValid(grammar);
+            this.tokenStream = TokenStreamGrammar.enabled(grammar);
             this.grammarName = grammar.name();
             TokenAdapterRegistry adapters = TokenAdapterRegistry.requireValid(grammar);
             this.adapterShadowsWordParser = grammar.tokens().stream()
@@ -252,6 +255,7 @@ public class ParserGenerator implements CodeGenerator {
             """);
 
         sb.append(ParserScopeEmitter.helpers(grammar));
+        sb.append(TokenStreamGrammar.javaApi(grammar));
 
         // チェーンクラス
         sb.append(generatePlainChainClass(ctx));
@@ -498,6 +502,8 @@ public class ParserGenerator implements CodeGenerator {
         sb.append("        }\n");
         sb.append("        @Override\n");
         sb.append("        public java.util.Optional<Parser> getLazyTerminatorParser() { return java.util.Optional.empty(); }\n");
+        if (ctx.tokenStream) sb.append("        @Override public org.unlaxer.Parsed parse(org.unlaxer.context.ParseContext context, org.unlaxer.TokenKind kind, boolean invert) {\n")
+            .append("            return org.unlaxer.dsl.runtime.Lexing.trivia(this, context, kind, invert, () -> super.parse(context, kind, invert));\n        }\n");
         sb.append("    }\n\n");
 
         return sb.toString();

@@ -414,3 +414,5 @@ TSVは`unlaxer-dsl/target/`配下で、CI artifact `rust-conformance`にも添�
 `UNLAXER_MEMO_WINDOW`（正の整数）で窓を指定し、`UNLAXER_MEMO_EVICT_BELOW_FRONTIER=false`
 で解放を止められる。両設定は最初のcontext生成時に一度だけ読む。memo化自体は既定OFFのまま。
 詳しくは[測定・Javaとの対称性・制約](../benchmarks/results/2026-09-30-rust-memo-retention.md)を参照。
+
+3.3.0-SNAPSHOT では [`@tokenStream: enabled`](../docs/token-stream.md) により、生成した Java / Rust parser で文字列直接解析・trivia cache・遅延 token 化・事前 token 化を選択できる。原文の位置とコメントを保持し、既定は直接解析を維持する。

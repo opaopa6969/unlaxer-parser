@@ -20,7 +20,7 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
         }
     }
     let ir = crate::lowering::lower(grammar)?;
-    let mut files = unlaxer_codegen::generate(&ir).map_err(|error| error.to_string())?;
+    let mut files = crate::generate_grammar(grammar)?;
     for file in &mut files {
         file.relative_path = format!("src/generated/{}", file.relative_path);
     }
@@ -55,6 +55,7 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
     runtime!("lib.rs");
     runtime!("scope.rs");
     runtime!("semantic.rs");
+    runtime!("lexing.rs");
     runtime!("first.rs");
     runtime!("lexical.rs");
     runtime!("long_code_fence.rs");

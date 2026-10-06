@@ -1,0 +1,62 @@
+[
+  {
+    "name": "bad-option",
+    "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @tokenStream: auto\n token ID ::= 'a';\n @root @mapping(Value, params=[value])\n Root ::= ID @value;\n}",
+    "code": "E-TOKEN-STREAM-SETTING",
+    "subject": "tokenStream"
+  },
+  {
+    "name": "duplicate-option",
+    "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @tokenStream: enabled\n @tokenStream: enabled\n token ID ::= 'a';\n @root @mapping(Value, params=[value])\n Root ::= ID @value;\n}",
+    "code": "E-TOKEN-STREAM-SETTING",
+    "subject": "tokenStream"
+  },
+  {
+    "name": "nullable",
+    "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @tokenStream: enabled\n token ID ::= ['a'];\n @root @mapping(Value, params=[value])\n Root ::= ID @value;\n}",
+    "code": "E-TOKEN-STREAM-TOKEN",
+    "subject": "ID"
+  },
+  {
+    "name": "external",
+    "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @tokenStream: enabled\n token ID = org.unlaxer.parser.clang.IdentifierParser\n @root @mapping(Value, params=[value])\n Root ::= ID @value;\n}",
+    "code": "E-TOKEN-STREAM-TOKEN",
+    "subject": "ID"
+  },
+  {
+    "name": "raw-any",
+    "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @tokenStream: enabled\n token ID = ANY\n @root @mapping(Value, params=[value])\n Root ::= ID @value;\n}",
+    "code": "E-TOKEN-STREAM-TOKEN",
+    "subject": "ID"
+  },
+  {
+    "name": "local-trivia",
+    "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @tokenStream: enabled\n token ID ::= 'a';\n @whitespace(none) @root @mapping(Value, params=[value])\n Root ::= ID @value;\n}",
+    "code": "E-TOKEN-STREAM-ANNOTATION",
+    "subject": "whitespace"
+  },
+  {
+    "name": "interleave",
+    "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @tokenStream: enabled\n token ID ::= 'a';\n @interleave(profile=javaStyle) @root @mapping(Value, params=[value])\n Root ::= ID @value;\n}",
+    "code": "E-TOKEN-STREAM-ANNOTATION",
+    "subject": "interleave"
+  },
+  {
+    "name": "backref",
+    "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @tokenStream: enabled\n token ID ::= 'a';\n @backref(name=value) @root @mapping(Value, params=[value])\n Root ::= ID @value;\n}",
+    "code": "E-TOKEN-STREAM-ANNOTATION",
+    "subject": "backref"
+  },
+  {
+    "name": "version",
+    "grammar": "grammar Input {\n @package: example.lexing\n @tokenStream: enabled\n token ID = EOF\n @root @mapping(Value, params=[value])\n Root ::= ID @value;\n}",
+    "code": "E-TOKEN-STREAM-VERSION",
+    "subject": "tokenStream"
+  },
+  {
+    "name": "comment-profile",
+    "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @comment: { line: '#' }\n @tokenStream: enabled\n token ID ::= 'a';\n @root @mapping(Value, params=[value])\n Root ::= ID @value;\n}",
+    "code": "E-TOKEN-STREAM-TRIVIA",
+    "subject": "comment"
+  }
+]
