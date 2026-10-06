@@ -1,0 +1,8 @@
+grammar Input {
+ @ubnf: v2
+ @package: example.lexing
+ @tokenStream: enabled
+ token FIRST ::= 'a';
+ token SECOND ::= NEGATIVE_LOOKAHEAD(FIRST) ('ab' | 'b');
+ @root @mapping(Pair, params=[left,right]) Root ::= FIRST @left SECOND @right;
+}

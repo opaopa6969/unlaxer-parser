@@ -1,6 +1,6 @@
 //! Experimental UBNF structural subset. No JVM, unsafe code, or external dependencies.
 use std::any::Any;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::hash::{BuildHasher, Hasher};
 use std::rc::Rc;
 use std::sync::Arc;
@@ -974,6 +974,7 @@ impl FailureMemoBuckets {
 /// Checkpoint counters and memoized-failure hit counts describe only this context's
 /// first pass, not any separate diagnostic retry; semantic diagnostics are unaffected.
 pub struct ParseContext<'a> {
+    bindings: BTreeMap<String, Vec<String>>,
     input: &'a str,
     lexing: Option<lexing::Session<'a>>,
     rules: Arc<[Rule]>,
@@ -1183,6 +1184,16 @@ impl<'a> ParseContext<'a> {
     /// [`Diagnostics::DetailedOnFailure`] disables
     /// syntax diagnostics here and does not automatically retry failed operations.
     pub fn with_options(input: &'a str, options: ParseOptions) -> Self {
+        Self::with_bindings(input, BTreeMap::new(), options)
+    }
+
+    /// Takes ownership of a parse-local snapshot. Values retain order and duplicates.
+    /// No binding can be replaced during this context's lifetime.
+    pub fn with_bindings(
+        input: &'a str,
+        bindings: BTreeMap<String, Vec<String>>,
+        options: ParseOptions,
+    ) -> Self {
         let options = if options.diagnostics == Diagnostics::Auto {
             options.with_diagnostics(Diagnostics::Detailed)
         } else {
@@ -1203,6 +1214,7 @@ impl<'a> ParseContext<'a> {
             offsets
         };
         Self {
+            bindings,
             input,
             lexing: None,
             rules: Arc::from([]),
@@ -1274,6 +1286,12 @@ impl<'a> ParseContext<'a> {
     /// Hits in this context's pass only; excludes any separate detailed retry.
     fn memoized_failure_hits(&self) -> usize {
         self.memoized_failure_hits
+    }
+
+    /// Read-only external data, independent of captures and transactional state.
+    /// An absent key returns an empty slice.
+    pub fn binding_values(&self, name: &str) -> &[String] {
+        self.bindings.get(name).map(Vec::as_slice).unwrap_or(&[])
     }
 
     pub fn source(&self) -> &'a str {
@@ -3719,5 +3737,24 @@ mod tests {
         assert!(context.parse_shared_grammar(&grammar, 0, false).is_err());
         assert_eq!(CUSTOM_CALLS.load(std::sync::atomic::Ordering::Relaxed), 2);
         assert_eq!(context.memoized_failure_hits(), 0);
+    }
+}
+
+#[cfg(test)]
+mod parse_bindings_tests {
+    use super::*;
+    #[test]
+    fn bindings_are_owned_read_only_and_context_local() {
+        let mut bindings = BTreeMap::from([(
+            "words".to_owned(),
+            vec!["𠮷".to_owned(), String::new(), "𠮷".to_owned()],
+        )]);
+        let a = ParseContext::with_bindings("𠮷", bindings.clone(), ParseOptions::default());
+        bindings.insert("words".to_owned(), vec!["changed".to_owned()]);
+        let b = ParseContext::with_bindings("𠮷", bindings, ParseOptions::default());
+        assert_eq!(a.binding_values("words"), ["𠮷", "", "𠮷"]);
+        assert_eq!(b.binding_values("words"), ["changed"]);
+        assert!(a.binding_values("missing").is_empty());
+        assert!(ParseContext::new("𠮷").binding_values("words").is_empty());
     }
 }

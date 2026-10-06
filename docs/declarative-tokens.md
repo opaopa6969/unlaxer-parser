@@ -118,6 +118,9 @@ nullable と局所束縛の解析は保守的に行う。capture は必須経路
 現行 AST mapper の既定値変換（周辺空白除去、single quote の除去）は維持する。
 この変換は字句プログラムの CAPTURE / SAME_AS や source span には適用しない。
 
+文字種境界・登録優先順位の宣言例と、実行時辞書への最小の接続は
+[UBNF とホスト処理の合成](parse-composition.md)を参照。
+
 ## Parser 対応と残る設計
 
 | 現行 Parser 群 | 宣言への対応 |

@@ -29,13 +29,16 @@ grammar Example {
 
 ## 安定 accessor
 
-format 2 が公開する accessor は `source`、`remaining`、`position`、`matchedPosition` だけです。
+format 2 の `contextAccessorsV1` は `source`、`remaining`、`position`、`matchedPosition` を公開します。
+追加能力 `parseBindingsV1` は、解析開始時に固定した外部データを読む `bindings` を公開します。
+[仕様・Java / Rust API・実例](parse-composition.md)を参照してください。
 すべて read-only で、offset は Unicode code point です。Java/Rust の実装詳細、capture と scope の
 可変 API、listener、diagnostic、memoization、任意 user state は意図的に対象外です。これにより
 speculative parse と rollback の観測可能な意味を host ごとに変えません。
 
 将来 accessor を追加するときは、両 runtime に同じ名前・型・offset 単位・EOF 時の挙動を実装し、
-Java/Rust 共通入力で適合テストを追加します。既存 accessor の意味を変更せず、format version を上げます。
+Java/Rust 共通入力で適合テストを追加します。既存 accessor の意味を変更する場合は format version を
+上げます。読み取り専用の追加能力は、既存 feature の契約を変えず、新しい feature 名で識別します。
 
 ## Feature 宣言
 
@@ -46,6 +49,7 @@ format 2 の機能は、必要なら明示的に宣言できます。未宣言�
 @ubnf: v2
 @feature: tokenContractsV1
 @feature: contextAccessorsV1
+@feature: parseBindingsV1
 @feature: tokenProgressContractsV1
 ```
 

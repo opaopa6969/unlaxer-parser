@@ -50,7 +50,15 @@ public class TokenStreamConformanceTest {
     }
     @Test public void javaModesPreserveAuthoredOracles() throws Exception {
         for (var fixture : corpus("corpus.json")) {
-            var f=fixture.getAsJsonObject(); var grammar=UBNFMapper.parse(f.get("grammar").getAsString()).grammars().get(0);
+            var f=fixture.getAsJsonObject();
+            String example = switch (f.get("name").getAsString()) {
+                case "character-kinds" -> "character-kinds.ubnf";
+                case "guarded-first-match" -> "first-match.ubnf";
+                default -> null;
+            };
+            if (example != null) assertEquals("runnable example drift: " + example,
+                f.get("grammar").getAsString().strip(), Files.readString(repo.resolve("examples/parse-composition/" + example)).strip());
+            var grammar=UBNFMapper.parse(f.get("grammar").getAsString()).grammars().get(0);
             GrammarValidator.validateOrThrow(grammar);
             try(var loader=compileJava(grammar)) {
                 for(var c:f.getAsJsonArray("cases")) for(var mode:Lexing.Mode.values()) for(boolean keep:List.of(true,false)) {

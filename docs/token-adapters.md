@@ -67,7 +67,8 @@ grammar Custom {
 - `failure`: `no-consume`（失敗時に consumed cursor を進めない）または `may-consume`。
 - `consumes`: 成功時の consumed cursor 契約。`always`、`maybe`、`never` のいずれか。
 - `context`: 実装が読む read-only accessor をカンマ区切りで列挙する。空または省略は context 非依存。
-  使用可能な値は `source`、`remaining`、`position`、`matchedPosition` のみ。
+  使用可能な値は `source`、`remaining`、`position`、`matchedPosition`、`bindings`。
+  `bindings` は `parseBindingsV1` の追加能力（3.3.0-SNAPSHOT）。[仕様と合成例](parse-composition.md)を参照。
 
 未知の key・重複 key・必須 key の欠損・不正な accessor は拒否する。外部 manifest や plugin を自動探索しない。
 
@@ -141,6 +142,7 @@ format 2 は Java/Rust の `ParseContext` の内部構造を公開しない。ad
 | `remaining` | consumed cursor から入力末尾まで | `peek(consumed, remaining length)` | `remaining()` |
 | `position` | consumed cursor の Unicode code-point offset | `getConsumedPosition()` | `position()` |
 | `matchedPosition` | match-only cursor の Unicode code-point offset | `getMatchedPosition()` | `matched_position()` |
+| `bindings` | 解析開始時に固定した外部データの ordered string list | `bindingValues(name)` | `binding_values(name)` |
 
 これらは観測専用であり、context の cursor・capture・scope・診断・transaction を変更してはならない。
 capture、scope、任意 user state、listener、transaction frame は Java/Rust で同じ安定契約をまだ持たないため
