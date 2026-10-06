@@ -183,7 +183,7 @@ fn parse_definition(setting: &GlobalSetting) -> Result<CustomAdapter, String> {
         || !context_accessors.iter().all(|value| {
             matches!(
                 value.as_str(),
-                "source" | "remaining" | "position" | "matchedPosition"
+                "source" | "remaining" | "position" | "matchedPosition" | "bindings"
             )
         })
     {
@@ -270,7 +270,7 @@ pub fn token_contract_diagnostics(grammar: &GrammarDecl) -> Vec<AdapterDiagnosti
             && contexts.iter().all(|value| {
                 matches!(
                     *value,
-                    "source" | "remaining" | "position" | "matchedPosition"
+                    "source" | "remaining" | "position" | "matchedPosition" | "bindings"
                 )
             });
         if !valid {
@@ -314,6 +314,7 @@ pub fn feature_diagnostics(grammar: &GrammarDecl) -> Vec<AdapterDiagnostic> {
                 value.as_str(),
                 "tokenContractsV1"
                     | "contextAccessorsV1"
+                    | "parseBindingsV1"
                     | "tokenProgressContractsV1"
                     | "declarativeTokensV1"
             ) {

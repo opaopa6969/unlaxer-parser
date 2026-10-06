@@ -416,3 +416,6 @@ TSVは`unlaxer-dsl/target/`配下で、CI artifact `rust-conformance`にも添�
 詳しくは[測定・Javaとの対称性・制約](../benchmarks/results/2026-09-30-rust-memo-retention.md)を参照。
 
 3.3.0-SNAPSHOT では [`@tokenStream: enabled`](../docs/token-stream.md) により、生成した Java / Rust parser で文字列直接解析・trivia cache・遅延 token 化・事前 token 化を選択できる。原文の位置とコメントを保持し、既定は直接解析を維持する。
+
+文字種境界は既存 token の合成で表せる。実行時辞書には Java と共通の immutable parse bindings を使う。
+[仕様と実行例](../docs/parse-composition.md)を参照。

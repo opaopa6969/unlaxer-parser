@@ -7,7 +7,7 @@ import java.util.Set;
 /** Declared UBNF format-2 capability set; unknown features are rejected, never ignored. */
 public final class UBNFFeatures {
     public static final Set<String> SUPPORTED = Set.of(
-        "tokenContractsV1", "contextAccessorsV1", "tokenProgressContractsV1", "declarativeTokensV1");
+        "tokenContractsV1", "contextAccessorsV1", "parseBindingsV1", "tokenProgressContractsV1", "declarativeTokensV1");
 
     public record Diagnostic(String code, String subject) {}
 

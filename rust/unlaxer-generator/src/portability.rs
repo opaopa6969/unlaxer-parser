@@ -211,6 +211,7 @@ impl Inventory {
                         value.as_str(),
                         "tokenContractsV1"
                             | "contextAccessorsV1"
+                            | "parseBindingsV1"
                             | "tokenProgressContractsV1"
                             | "declarativeTokensV1"
                     ) => {}

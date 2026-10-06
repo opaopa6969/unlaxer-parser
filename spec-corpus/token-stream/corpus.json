@@ -1361,5 +1361,813 @@
         ]
       }
     ]
+  },
+  {
+    "name": "character-kinds",
+    "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @tokenStream: enabled\n @whitespace: none\n token KANA ::= CHAR_RANGE('ァ', 'ヶ') | CHAR_RANGE('ｦ', 'ﾝ') | 'ﾞ' | 'ﾟ';\n token LONG_MARK ::= 'ー' | 'ｰ';\n token KATAKANA ::= KANA (KANA | LONG_MARK)*;\n token ALPHABET ::= (CHAR_RANGE('A', 'Z') | CHAR_RANGE('a', 'z') | CHAR_RANGE('Ａ', 'Ｚ') | CHAR_RANGE('ａ', 'ｚ'))+;\n token NUMBER ::= (CHAR_RANGE('0', '9') | CHAR_RANGE('０', '９'))+;\n token HYPHEN ::= '-' | '‐' | '‑' | '‒' | '–' | '—' | '―' | '−' | '－' | '⸺' | '⸻';\n token KNOWN ::= KANA | ALPHABET | NUMBER | HYPHEN | LONG_MARK;\n token OTHER ::= (NEGATIVE_LOOKAHEAD(KNOWN) ANY)+;\n @root @mapping(Pieces, params=[parts])\n Root ::= { (KATAKANA | ALPHABET | NUMBER | HYPHEN | LONG_MARK | OTHER) @parts };\n}\n",
+    "cases": [
+      {
+        "name": "マンションABC－２０３",
+        "input": "マンションABC－２０３",
+        "accepted": true,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "KATAKANA",
+            "span": [
+              0,
+              5
+            ],
+            "text": "マンション"
+          },
+          {
+            "kind": "token",
+            "name": "ALPHABET",
+            "span": [
+              5,
+              8
+            ],
+            "text": "ABC"
+          },
+          {
+            "kind": "token",
+            "name": "HYPHEN",
+            "span": [
+              8,
+              9
+            ],
+            "text": "－"
+          },
+          {
+            "kind": "token",
+            "name": "NUMBER",
+            "span": [
+              9,
+              12
+            ],
+            "text": "２０３"
+          }
+        ],
+        "ast": {
+          "type": "Pieces",
+          "span": [
+            0,
+            12
+          ],
+          "fields": {
+            "parts": [
+              "マンション",
+              "ABC",
+              "－",
+              "２０３"
+            ]
+          }
+        },
+        "captures": [
+          {
+            "name": "parts",
+            "span": [
+              0,
+              5
+            ]
+          },
+          {
+            "name": "parts",
+            "span": [
+              5,
+              8
+            ]
+          },
+          {
+            "name": "parts",
+            "span": [
+              8,
+              9
+            ]
+          },
+          {
+            "name": "parts",
+            "span": [
+              9,
+              12
+            ]
+          }
+        ]
+      },
+      {
+        "name": "コーポA‐12",
+        "input": "コーポA‐12",
+        "accepted": true,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "KATAKANA",
+            "span": [
+              0,
+              3
+            ],
+            "text": "コーポ"
+          },
+          {
+            "kind": "token",
+            "name": "ALPHABET",
+            "span": [
+              3,
+              4
+            ],
+            "text": "A"
+          },
+          {
+            "kind": "token",
+            "name": "HYPHEN",
+            "span": [
+              4,
+              5
+            ],
+            "text": "‐"
+          },
+          {
+            "kind": "token",
+            "name": "NUMBER",
+            "span": [
+              5,
+              7
+            ],
+            "text": "12"
+          }
+        ],
+        "ast": {
+          "type": "Pieces",
+          "span": [
+            0,
+            7
+          ],
+          "fields": {
+            "parts": [
+              "コーポ",
+              "A",
+              "‐",
+              "12"
+            ]
+          }
+        },
+        "captures": [
+          {
+            "name": "parts",
+            "span": [
+              0,
+              3
+            ]
+          },
+          {
+            "name": "parts",
+            "span": [
+              3,
+              4
+            ]
+          },
+          {
+            "name": "parts",
+            "span": [
+              4,
+              5
+            ]
+          },
+          {
+            "name": "parts",
+            "span": [
+              5,
+              7
+            ]
+          }
+        ]
+      },
+      {
+        "name": "カタカナABCカナ",
+        "input": "カタカナABCカナ",
+        "accepted": true,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "KATAKANA",
+            "span": [
+              0,
+              4
+            ],
+            "text": "カタカナ"
+          },
+          {
+            "kind": "token",
+            "name": "ALPHABET",
+            "span": [
+              4,
+              7
+            ],
+            "text": "ABC"
+          },
+          {
+            "kind": "token",
+            "name": "KATAKANA",
+            "span": [
+              7,
+              9
+            ],
+            "text": "カナ"
+          }
+        ],
+        "ast": {
+          "type": "Pieces",
+          "span": [
+            0,
+            9
+          ],
+          "fields": {
+            "parts": [
+              "カタカナ",
+              "ABC",
+              "カナ"
+            ]
+          }
+        },
+        "captures": [
+          {
+            "name": "parts",
+            "span": [
+              0,
+              4
+            ]
+          },
+          {
+            "name": "parts",
+            "span": [
+              4,
+              7
+            ]
+          },
+          {
+            "name": "parts",
+            "span": [
+              7,
+              9
+            ]
+          }
+        ]
+      },
+      {
+        "name": "ＡＢＣカタカナ",
+        "input": "ＡＢＣカタカナ",
+        "accepted": true,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ALPHABET",
+            "span": [
+              0,
+              3
+            ],
+            "text": "ＡＢＣ"
+          },
+          {
+            "kind": "token",
+            "name": "KATAKANA",
+            "span": [
+              3,
+              7
+            ],
+            "text": "カタカナ"
+          }
+        ],
+        "ast": {
+          "type": "Pieces",
+          "span": [
+            0,
+            7
+          ],
+          "fields": {
+            "parts": [
+              "ＡＢＣ",
+              "カタカナ"
+            ]
+          }
+        },
+        "captures": [
+          {
+            "name": "parts",
+            "span": [
+              0,
+              3
+            ]
+          },
+          {
+            "name": "parts",
+            "span": [
+              3,
+              7
+            ]
+          }
+        ]
+      },
+      {
+        "name": "コーポーA",
+        "input": "コーポーA",
+        "accepted": true,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "KATAKANA",
+            "span": [
+              0,
+              4
+            ],
+            "text": "コーポー"
+          },
+          {
+            "kind": "token",
+            "name": "ALPHABET",
+            "span": [
+              4,
+              5
+            ],
+            "text": "A"
+          }
+        ],
+        "ast": {
+          "type": "Pieces",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "parts": [
+              "コーポー",
+              "A"
+            ]
+          }
+        },
+        "captures": [
+          {
+            "name": "parts",
+            "span": [
+              0,
+              4
+            ]
+          },
+          {
+            "name": "parts",
+            "span": [
+              4,
+              5
+            ]
+          }
+        ]
+      },
+      {
+        "name": "A⸺12",
+        "input": "A⸺12",
+        "accepted": true,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ALPHABET",
+            "span": [
+              0,
+              1
+            ],
+            "text": "A"
+          },
+          {
+            "kind": "token",
+            "name": "HYPHEN",
+            "span": [
+              1,
+              2
+            ],
+            "text": "⸺"
+          },
+          {
+            "kind": "token",
+            "name": "NUMBER",
+            "span": [
+              2,
+              4
+            ],
+            "text": "12"
+          }
+        ],
+        "ast": {
+          "type": "Pieces",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {
+            "parts": [
+              "A",
+              "⸺",
+              "12"
+            ]
+          }
+        },
+        "captures": [
+          {
+            "name": "parts",
+            "span": [
+              0,
+              1
+            ]
+          },
+          {
+            "name": "parts",
+            "span": [
+              1,
+              2
+            ]
+          },
+          {
+            "name": "parts",
+            "span": [
+              2,
+              4
+            ]
+          }
+        ]
+      },
+      {
+        "name": "A⸻12",
+        "input": "A⸻12",
+        "accepted": true,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ALPHABET",
+            "span": [
+              0,
+              1
+            ],
+            "text": "A"
+          },
+          {
+            "kind": "token",
+            "name": "HYPHEN",
+            "span": [
+              1,
+              2
+            ],
+            "text": "⸻"
+          },
+          {
+            "kind": "token",
+            "name": "NUMBER",
+            "span": [
+              2,
+              4
+            ],
+            "text": "12"
+          }
+        ],
+        "ast": {
+          "type": "Pieces",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {
+            "parts": [
+              "A",
+              "⸻",
+              "12"
+            ]
+          }
+        },
+        "captures": [
+          {
+            "name": "parts",
+            "span": [
+              0,
+              1
+            ]
+          },
+          {
+            "name": "parts",
+            "span": [
+              1,
+              2
+            ]
+          },
+          {
+            "name": "parts",
+            "span": [
+              2,
+              4
+            ]
+          }
+        ]
+      },
+      {
+        "name": "カタカナ𠮷ABC",
+        "input": "カタカナ𠮷ABC",
+        "accepted": true,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "KATAKANA",
+            "span": [
+              0,
+              4
+            ],
+            "text": "カタカナ"
+          },
+          {
+            "kind": "token",
+            "name": "OTHER",
+            "span": [
+              4,
+              5
+            ],
+            "text": "𠮷"
+          },
+          {
+            "kind": "token",
+            "name": "ALPHABET",
+            "span": [
+              5,
+              8
+            ],
+            "text": "ABC"
+          }
+        ],
+        "ast": {
+          "type": "Pieces",
+          "span": [
+            0,
+            8
+          ],
+          "fields": {
+            "parts": [
+              "カタカナ",
+              "𠮷",
+              "ABC"
+            ]
+          }
+        },
+        "captures": [
+          {
+            "name": "parts",
+            "span": [
+              0,
+              4
+            ]
+          },
+          {
+            "name": "parts",
+            "span": [
+              4,
+              5
+            ]
+          },
+          {
+            "name": "parts",
+            "span": [
+              5,
+              8
+            ]
+          }
+        ]
+      },
+      {
+        "name": "ｺｰﾎﾟA",
+        "input": "ｺｰﾎﾟA",
+        "accepted": true,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "KATAKANA",
+            "span": [
+              0,
+              4
+            ],
+            "text": "ｺｰﾎﾟ"
+          },
+          {
+            "kind": "token",
+            "name": "ALPHABET",
+            "span": [
+              4,
+              5
+            ],
+            "text": "A"
+          }
+        ],
+        "ast": {
+          "type": "Pieces",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "parts": [
+              "ｺｰﾎﾟ",
+              "A"
+            ]
+          }
+        },
+        "captures": [
+          {
+            "name": "parts",
+            "span": [
+              0,
+              4
+            ]
+          },
+          {
+            "name": "parts",
+            "span": [
+              4,
+              5
+            ]
+          }
+        ]
+      },
+      {
+        "name": "８ー３ー２",
+        "input": "８ー３ー２",
+        "accepted": true,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "NUMBER",
+            "span": [
+              0,
+              1
+            ],
+            "text": "８"
+          },
+          {
+            "kind": "token",
+            "name": "LONG_MARK",
+            "span": [
+              1,
+              2
+            ],
+            "text": "ー"
+          },
+          {
+            "kind": "token",
+            "name": "NUMBER",
+            "span": [
+              2,
+              3
+            ],
+            "text": "３"
+          },
+          {
+            "kind": "token",
+            "name": "LONG_MARK",
+            "span": [
+              3,
+              4
+            ],
+            "text": "ー"
+          },
+          {
+            "kind": "token",
+            "name": "NUMBER",
+            "span": [
+              4,
+              5
+            ],
+            "text": "２"
+          }
+        ],
+        "ast": {
+          "type": "Pieces",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "parts": [
+              "８",
+              "ー",
+              "３",
+              "ー",
+              "２"
+            ]
+          }
+        },
+        "captures": [
+          {
+            "name": "parts",
+            "span": [
+              0,
+              1
+            ]
+          },
+          {
+            "name": "parts",
+            "span": [
+              1,
+              2
+            ]
+          },
+          {
+            "name": "parts",
+            "span": [
+              2,
+              3
+            ]
+          },
+          {
+            "name": "parts",
+            "span": [
+              3,
+              4
+            ]
+          },
+          {
+            "name": "parts",
+            "span": [
+              4,
+              5
+            ]
+          }
+        ]
+      },
+      {
+        "name": "empty",
+        "input": "",
+        "accepted": true,
+        "lexemes": [],
+        "ast": {
+          "type": "Pieces",
+          "span": [
+            0,
+            0
+          ],
+          "fields": {
+            "parts": []
+          }
+        },
+        "captures": []
+      }
+    ]
+  },
+  {
+    "name": "guarded-first-match",
+    "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @tokenStream: enabled\n token FIRST ::= 'a';\n token SECOND ::= NEGATIVE_LOOKAHEAD(FIRST) ('ab' | 'b');\n @root @mapping(Pair, params=[left,right]) Root ::= FIRST @left SECOND @right;\n}",
+    "cases": [
+      {
+        "name": "short-first",
+        "input": "ab",
+        "accepted": true,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "FIRST",
+            "span": [
+              0,
+              1
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "token",
+            "name": "SECOND",
+            "span": [
+              1,
+              2
+            ],
+            "text": "b"
+          }
+        ],
+        "ast": {
+          "type": "Pair",
+          "span": [
+            0,
+            2
+          ],
+          "fields": {
+            "left": "a",
+            "right": "b"
+          }
+        },
+        "captures": [
+          {
+            "name": "left",
+            "span": [
+              0,
+              1
+            ]
+          },
+          {
+            "name": "right",
+            "span": [
+              1,
+              2
+            ]
+          }
+        ]
+      }
+    ]
   }
 ]

@@ -22,7 +22,7 @@ public final class TokenAdapterRegistry {
     private static final Set<String> OPTIONAL_FIELDS = Set.of("accepts", "failure", "consumes", "context");
     /** Read-only context surface shared by the Java and Rust adapter entry points. */
     public static final Set<String> CONTEXT_ACCESSORS = Set.of(
-        "source", "remaining", "position", "matchedPosition");
+        "source", "remaining", "position", "matchedPosition", "bindings");
     private static final Set<String> JAVA_RESTRICTED = Set.of("record", "var", "yield", "sealed", "permits");
     private static final Set<String> RUST_KEYWORDS = Set.of(
         "as", "async", "await", "break", "const", "continue", "crate", "dyn", "else", "enum", "extern",
