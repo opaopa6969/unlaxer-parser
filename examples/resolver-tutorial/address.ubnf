@@ -1,0 +1,20 @@
+grammar Address {
+  @ubnf: v2
+  @feature: parseBindingsV1
+  @package: example.resolvers
+  @tokenAdapter: {
+    id: 'example.town'
+    version: '1'
+    java: 'example.resolvers.TownParser'
+    rust: 'crate::town_token'
+    accepts: 'first prefix in the ordered address.towns snapshot'
+    failure: 'no-consume'
+    consumes: 'always'
+    context: 'source,position,bindings'
+  }
+  token TOWN = ADAPTER('example.town', version=1)
+  token HOUSE ::= CHAR_RANGE('0', '9')+;
+  token END = EOF
+  @root @mapping(Address, params=[town,house])
+  Root ::= TOWN @town '-' HOUSE @house END;
+}

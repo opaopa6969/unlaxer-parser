@@ -491,4 +491,4 @@ curl http://127.0.0.1:9228/healthz
 3.3.0-SNAPSHOT では [`@tokenStream: enabled`](docs/token-stream.md) により、生成した Java / Rust parser で文字列直接解析・trivia cache・遅延 token 化・事前 token 化を選択できる。原文の位置とコメントを保持し、既定は直接解析を維持する。
 
 文字種境界は既存 token の合成で表せる。実行時辞書には Java / Rust 共通の immutable parse bindings を使う。
-[仕様と実行例](docs/parse-composition.md)を参照。
+[仕様と実行例](docs/parse-composition.md)、[辞書 resolver の実行チュートリアル](examples/resolver-tutorial/README.md)を参照。

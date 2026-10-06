@@ -44,6 +44,13 @@ jobs:
         mvn -B -pl unlaxer-common,unlaxer-dsl -am test
         -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,RustPortabilityConformanceTest,TokenAdapterConformanceTest,ParseBindingsConformanceTest,DeclarativeTokenConformanceTest,ApiImpactConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest,SkipMappingConformanceTest,CaptureEqualityConformanceTest,ErrorElementConformanceTest,SemanticModelConformanceTest,SemanticModelUbnfTest,TokenStreamConformanceTest -DrustConformance=true -DtokenStreamBench=true
         -Dsurefire.failIfNoSpecifiedTests=false
+    - name: Resolver tutorial (Java and Rust)
+      run: |
+        python3 examples/resolver-tutorial/run.py build
+        python3 examples/resolver-tutorial/run.py check
+        cargo clippy --locked --manifest-path examples/resolver-tutorial/rust/Cargo.toml --all-targets -- -D warnings
+        rustfmt --edition 2021 --config skip_children=true --check examples/resolver-tutorial/rust/src/main.rs examples/resolver-tutorial/rust/src/resolvers.rs
+        test -s examples/resolver-tutorial/target/conformance.tsv
     - name: Generated WASM playground in Chromium
       working-directory: unlaxer-dsl/ubnf-vscode
       run: |
@@ -111,6 +118,7 @@ jobs:
           unlaxer-dsl/target/rust-token-adapter-diagnostics.tsv
           unlaxer-dsl/target/rust-token-adapter-runtime.tsv
           unlaxer-dsl/target/rust-parse-bindings.tsv
+          examples/resolver-tutorial/target/conformance.tsv
           unlaxer-dsl/target/rust-declarative-token-runtime.tsv
           unlaxer-dsl/target/api-impact-conformance.tsv
           unlaxer-dsl/target/api-impact-compile.tsv
