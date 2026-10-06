@@ -101,9 +101,11 @@ public final class PortabilityCheck {
         for (TokenContractRegistry.Diagnostic issue : TokenContractRegistry.build(grammar, snapshot).diagnostics()) {
             out.add(new Diagnostic(issue.code(), issue.span(), issue.subject()));
         }
+        for (var issue : org.unlaxer.dsl.codegen.TokenStreamGrammar.problems(grammar))
+            add(out, issue.code(), snapshot, issue.node(), issue.subject());
         for (ImportDecl decl : grammar.imports()) add(out, "P-IMPORT", snapshot, decl, decl.path());
         for (GlobalSetting setting : grammar.settings()) {
-            if (!Set.of("whitespace", "package", "memoSafeToken", "tokenAdapter", "tokenContract", "ubnf", "feature").contains(setting.key())
+            if (!Set.of("whitespace", "package", "memoSafeToken", "tokenAdapter", "tokenContract", "ubnf", "feature", "tokenStream").contains(setting.key())
                 || (setting.value() instanceof BlockSettingValue && !Set.of("tokenAdapter", "tokenContract").contains(setting.key()))) {
                 add(out, "P-SETTING", snapshot, setting, setting.key());
             }

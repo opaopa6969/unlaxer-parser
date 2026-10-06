@@ -90,6 +90,9 @@ impl Lowering<'_> {
         if let Some(issue) = feature_diagnostics(self.grammar).first() {
             return Err(format!("{}: {}", issue.code, issue.subject));
         }
+        if let Some(issue) = crate::token_stream::problems(self.grammar).first() {
+            return Err(format!("{}: {}", issue.code, issue.subject));
+        }
         let mut whitespace = false;
         let mut settings = HashSet::new();
         let mut memo_safe_tokens = HashSet::new();
@@ -123,7 +126,7 @@ impl Lowering<'_> {
                     whitespace = whitespace_style(value)
                         .map_err(|_| format!("unsupported setting whitespace: {value}"))?
                 }
-                "package" => {}
+                "package" | "tokenStream" => {}
                 "memoSafeToken" => {
                     let alias = value.trim();
                     if !memo_safe_tokens.insert(alias) {

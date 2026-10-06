@@ -42,7 +42,7 @@ jobs:
     - name: Cross-language fixtures, compile failures, and generated-file drift
       run: >
         mvn -B -pl unlaxer-common,unlaxer-dsl -am test
-        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,RustPortabilityConformanceTest,TokenAdapterConformanceTest,DeclarativeTokenConformanceTest,ApiImpactConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest,SkipMappingConformanceTest,CaptureEqualityConformanceTest,ErrorElementConformanceTest,SemanticModelConformanceTest,SemanticModelUbnfTest -DrustConformance=true
+        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,RustPortabilityConformanceTest,TokenAdapterConformanceTest,DeclarativeTokenConformanceTest,ApiImpactConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest,SkipMappingConformanceTest,CaptureEqualityConformanceTest,ErrorElementConformanceTest,SemanticModelConformanceTest,SemanticModelUbnfTest,TokenStreamConformanceTest -DrustConformance=true -DtokenStreamBench=true
         -Dsurefire.failIfNoSpecifiedTests=false
     - name: Generated WASM playground in Chromium
       working-directory: unlaxer-dsl/ubnf-vscode
@@ -52,6 +52,10 @@ jobs:
         node scripts/playground-browser.mjs
         node --test scripts/completion.test.mjs
         node scripts/learning-browser.mjs
+    - name: Require selectable lexing conformance and measurement evidence
+      run: |
+        test -s unlaxer-dsl/target/rust-token-stream.tsv
+        test -s unlaxer-dsl/target/token-stream-benchmark.tsv
     - name: Require semantic model and generated UBNF evidence
       run: |
         test -s unlaxer-dsl/target/rust-semantic-model.tsv
@@ -90,6 +94,8 @@ jobs:
       with:
         name: rust-conformance
         path: |
+          unlaxer-dsl/target/rust-token-stream.tsv
+          unlaxer-dsl/target/token-stream-benchmark.tsv
           unlaxer-dsl/target/rust-semantic-model.tsv
           unlaxer-dsl/target/rust-semantic-ubnf.tsv
           unlaxer-dsl/target/rust-conformance.tsv

@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 mod first;
 pub mod lexical;
+pub mod lexing;
 mod long_code_fence;
 #[cfg(test)]
 mod memo_retention_tests;
@@ -974,6 +975,7 @@ impl FailureMemoBuckets {
 /// first pass, not any separate diagnostic retry; semantic diagnostics are unaffected.
 pub struct ParseContext<'a> {
     input: &'a str,
+    lexing: Option<lexing::Session<'a>>,
     rules: Arc<[Rule]>,
     whitespace: bool,
     position: usize,
@@ -1202,6 +1204,7 @@ impl<'a> ParseContext<'a> {
         };
         Self {
             input,
+            lexing: None,
             rules: Arc::from([]),
             whitespace: false,
             position: 0,
@@ -1776,7 +1779,13 @@ impl<'a> ParseContext<'a> {
                     captures: matched.captures,
                 }),
             Expr::Lexical(label, expression) => {
-                if let Some(end) = expression.match_at(self.input, self.position) {
+                let end = match &mut self.lexing {
+                    Some(session) => {
+                        session.match_at(label, false, Some(expression), self.position)
+                    }
+                    None => expression.match_at(self.input, self.position),
+                };
+                if let Some(end) = end {
                     if end != self.position {
                         self.matched_position = end;
                     }
@@ -1970,8 +1979,14 @@ impl<'a> ParseContext<'a> {
                 }
             }
             Expr::Literal(literal) => {
-                if self.input[self.position..].starts_with(literal) {
-                    self.position += literal.len();
+                let end = match &mut self.lexing {
+                    Some(session) => session.match_at(literal, true, None, self.position),
+                    None => self.input[self.position..]
+                        .starts_with(literal)
+                        .then_some(self.position + literal.len()),
+                };
+                if let Some(end) = end {
+                    self.position = end;
                     self.matched_position = self.position;
                     Some(Fragment::default())
                 } else {
@@ -2447,6 +2462,14 @@ impl<'a> ParseContext<'a> {
 
     fn skip(&mut self) {
         if !self.whitespace {
+            return;
+        }
+        if let Some(session) = &mut self.lexing {
+            let end = session.skip(self.position);
+            if end != self.position {
+                self.position = end;
+                self.matched_position = end;
+            }
             return;
         }
         loop {

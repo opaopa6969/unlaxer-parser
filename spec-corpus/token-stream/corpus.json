@@ -1,0 +1,1365 @@
+[
+  {
+    "name": "pairs",
+    "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @tokenStream: enabled\n @whitespace: javaStyle\n token LETTER ::= CHAR_RANGE('a','z') | '😀';\n token GUARD ::= NEGATIVE_LOOKAHEAD('!');\n token ID ::= GUARD LETTER {LETTER};\n @root @mapping(Pair, params=[left,right])\n Root ::= ID @left ID @right;\n}",
+    "cases": [
+      {
+        "name": "space",
+        "input": "a b",
+        "accepted": true,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              0,
+              1
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "space",
+            "name": "",
+            "span": [
+              1,
+              2
+            ],
+            "text": " "
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              2,
+              3
+            ],
+            "text": "b"
+          }
+        ],
+        "ast": {
+          "type": "Pair",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {
+            "left": "a",
+            "right": "b"
+          }
+        },
+        "captures": [
+          {
+            "name": "left",
+            "span": [
+              0,
+              1
+            ]
+          },
+          {
+            "name": "right",
+            "span": [
+              2,
+              3
+            ]
+          }
+        ]
+      },
+      {
+        "name": "comment-boundary",
+        "input": "a/**/b",
+        "accepted": true,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              0,
+              1
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "blockComment",
+            "name": "",
+            "span": [
+              1,
+              5
+            ],
+            "text": "/**/"
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              5,
+              6
+            ],
+            "text": "b"
+          }
+        ],
+        "ast": {
+          "type": "Pair",
+          "span": [
+            0,
+            6
+          ],
+          "fields": {
+            "left": "a",
+            "right": "b"
+          }
+        },
+        "captures": [
+          {
+            "name": "left",
+            "span": [
+              0,
+              1
+            ]
+          },
+          {
+            "name": "right",
+            "span": [
+              5,
+              6
+            ]
+          }
+        ]
+      },
+      {
+        "name": "unicode-crlf",
+        "input": "\t😀\r\n// c\r\nb ",
+        "accepted": true,
+        "lexemes": [
+          {
+            "kind": "space",
+            "name": "",
+            "span": [
+              0,
+              1
+            ],
+            "text": "\t"
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              1,
+              2
+            ],
+            "text": "😀"
+          },
+          {
+            "kind": "space",
+            "name": "",
+            "span": [
+              2,
+              4
+            ],
+            "text": "\r\n"
+          },
+          {
+            "kind": "lineComment",
+            "name": "",
+            "span": [
+              4,
+              8
+            ],
+            "text": "// c"
+          },
+          {
+            "kind": "space",
+            "name": "",
+            "span": [
+              8,
+              10
+            ],
+            "text": "\r\n"
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              10,
+              11
+            ],
+            "text": "b"
+          },
+          {
+            "kind": "space",
+            "name": "",
+            "span": [
+              11,
+              12
+            ],
+            "text": " "
+          }
+        ],
+        "ast": {
+          "type": "Pair",
+          "span": [
+            0,
+            12
+          ],
+          "fields": {
+            "left": "😀",
+            "right": "b"
+          }
+        },
+        "captures": [
+          {
+            "name": "left",
+            "span": [
+              1,
+              2
+            ]
+          },
+          {
+            "name": "right",
+            "span": [
+              10,
+              11
+            ]
+          }
+        ]
+      },
+      {
+        "name": "merged-word",
+        "input": "ab",
+        "accepted": false,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              0,
+              2
+            ],
+            "text": "ab"
+          }
+        ],
+        "farthest": 2
+      },
+      {
+        "name": "empty",
+        "input": "",
+        "accepted": false,
+        "lexemes": [],
+        "farthest": 0
+      },
+      {
+        "name": "unclosed-comment",
+        "input": "a/*unfinished",
+        "accepted": false,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              0,
+              1
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              1,
+              2
+            ],
+            "text": "/"
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              2,
+              3
+            ],
+            "text": "*"
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              3,
+              13
+            ],
+            "text": "unfinished"
+          }
+        ],
+        "farthest": 1
+      },
+      {
+        "name": "line-to-eof",
+        "input": "a// b",
+        "accepted": false,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              0,
+              1
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "lineComment",
+            "name": "",
+            "span": [
+              1,
+              5
+            ],
+            "text": "// b"
+          }
+        ],
+        "farthest": 5
+      },
+      {
+        "name": "trailing-input",
+        "input": "a b!",
+        "accepted": false,
+        "consumed": 3,
+        "matched": 3,
+        "farthest": 3,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              0,
+              1
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "space",
+            "name": "",
+            "span": [
+              1,
+              2
+            ],
+            "text": " "
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              2,
+              3
+            ],
+            "text": "b"
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              3,
+              4
+            ],
+            "text": "!"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "backtracking",
+    "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @tokenStream: enabled\n @whitespace: javaStyle\n token LETTER ::= CHAR_RANGE('a','z') | '😀';\n token ID ::= LETTER {LETTER};\n @root @mapping(Pair, params=[left,right])\n Root ::= (ID @left '@' ID @right | ID @left ':' ID @right);\n}",
+    "cases": [
+      {
+        "name": "retry",
+        "input": "foo /*😀*/ : bar",
+        "accepted": true,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              0,
+              3
+            ],
+            "text": "foo"
+          },
+          {
+            "kind": "space",
+            "name": "",
+            "span": [
+              3,
+              4
+            ],
+            "text": " "
+          },
+          {
+            "kind": "blockComment",
+            "name": "",
+            "span": [
+              4,
+              9
+            ],
+            "text": "/*😀*/"
+          },
+          {
+            "kind": "space",
+            "name": "",
+            "span": [
+              9,
+              10
+            ],
+            "text": " "
+          },
+          {
+            "kind": "token",
+            "name": ":",
+            "span": [
+              10,
+              11
+            ],
+            "text": ":"
+          },
+          {
+            "kind": "space",
+            "name": "",
+            "span": [
+              11,
+              12
+            ],
+            "text": " "
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              12,
+              15
+            ],
+            "text": "bar"
+          }
+        ],
+        "ast": {
+          "type": "Pair",
+          "span": [
+            0,
+            15
+          ],
+          "fields": {
+            "left": "foo",
+            "right": "bar"
+          }
+        },
+        "captures": [
+          {
+            "name": "left",
+            "span": [
+              0,
+              3
+            ]
+          },
+          {
+            "name": "right",
+            "span": [
+              12,
+              15
+            ]
+          }
+        ]
+      },
+      {
+        "name": "first-branch",
+        "input": "a@b",
+        "accepted": true,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              0,
+              1
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "token",
+            "name": "@",
+            "span": [
+              1,
+              2
+            ],
+            "text": "@"
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              2,
+              3
+            ],
+            "text": "b"
+          }
+        ],
+        "ast": {
+          "type": "Pair",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {
+            "left": "a",
+            "right": "b"
+          }
+        },
+        "captures": [
+          {
+            "name": "left",
+            "span": [
+              0,
+              1
+            ]
+          },
+          {
+            "name": "right",
+            "span": [
+              2,
+              3
+            ]
+          }
+        ]
+      },
+      {
+        "name": "failure-restores",
+        "input": "a/**/:?",
+        "accepted": false,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              0,
+              1
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "blockComment",
+            "name": "",
+            "span": [
+              1,
+              5
+            ],
+            "text": "/**/"
+          },
+          {
+            "kind": "token",
+            "name": ":",
+            "span": [
+              5,
+              6
+            ],
+            "text": ":"
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              6,
+              7
+            ],
+            "text": "?"
+          }
+        ],
+        "farthest": 6
+      }
+    ]
+  },
+  {
+    "name": "keywords",
+    "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @tokenStream: enabled\n @whitespace: javaStyle\n token LETTER ::= CHAR_RANGE('a','z') | '😀';\n token ID ::= LETTER {LETTER};\n @root @mapping(Value, params=[name])\n Root ::= 'if' ID @name;\n}",
+    "cases": [
+      {
+        "name": "keyword",
+        "input": "if x",
+        "accepted": true,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "if",
+            "span": [
+              0,
+              2
+            ],
+            "text": "if"
+          },
+          {
+            "kind": "space",
+            "name": "",
+            "span": [
+              2,
+              3
+            ],
+            "text": " "
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              3,
+              4
+            ],
+            "text": "x"
+          }
+        ],
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {
+            "name": "x"
+          }
+        },
+        "captures": [
+          {
+            "name": "name",
+            "span": [
+              3,
+              4
+            ]
+          }
+        ]
+      },
+      {
+        "name": "maximal-munch",
+        "input": "ifx",
+        "accepted": true,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              0,
+              3
+            ],
+            "text": "ifx"
+          }
+        ],
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {
+            "name": "x"
+          }
+        },
+        "tokens": {
+          "accepted": false,
+          "farthest": 0
+        },
+        "captures": [
+          {
+            "name": "name",
+            "span": [
+              2,
+              3
+            ]
+          }
+        ]
+      },
+      {
+        "name": "keyword-reserved",
+        "input": "if if",
+        "accepted": true,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "if",
+            "span": [
+              0,
+              2
+            ],
+            "text": "if"
+          },
+          {
+            "kind": "space",
+            "name": "",
+            "span": [
+              2,
+              3
+            ],
+            "text": " "
+          },
+          {
+            "kind": "token",
+            "name": "if",
+            "span": [
+              3,
+              5
+            ],
+            "text": "if"
+          }
+        ],
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "name": "if"
+          }
+        },
+        "tokens": {
+          "accepted": false,
+          "farthest": 3
+        },
+        "captures": [
+          {
+            "name": "name",
+            "span": [
+              3,
+              5
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "raw-newline",
+    "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @tokenStream: enabled\n @whitespace: none\n token LETTER ::= CHAR_RANGE('a','z') | '😀';\n token ID ::= LETTER {LETTER};\n @root @mapping(Pair, params=[left,right])\n Root ::= ID @left '\\n' ID @right;\n}",
+    "cases": [
+      {
+        "name": "newline-significant",
+        "input": "a\nb",
+        "accepted": true,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              0,
+              1
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "token",
+            "name": "\n",
+            "span": [
+              1,
+              2
+            ],
+            "text": "\n"
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              2,
+              3
+            ],
+            "text": "b"
+          }
+        ],
+        "ast": {
+          "type": "Pair",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {
+            "left": "a",
+            "right": "b"
+          }
+        },
+        "captures": [
+          {
+            "name": "left",
+            "span": [
+              0,
+              1
+            ]
+          },
+          {
+            "name": "right",
+            "span": [
+              2,
+              3
+            ]
+          }
+        ]
+      },
+      {
+        "name": "space-significant",
+        "input": "a \nb",
+        "accepted": false,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              0,
+              1
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              1,
+              2
+            ],
+            "text": " "
+          },
+          {
+            "kind": "token",
+            "name": "\n",
+            "span": [
+              2,
+              3
+            ],
+            "text": "\n"
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              3,
+              4
+            ],
+            "text": "b"
+          }
+        ],
+        "farthest": 1
+      },
+      {
+        "name": "no-comments",
+        "input": "a/**/\nb",
+        "accepted": false,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              0,
+              1
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              1,
+              2
+            ],
+            "text": "/"
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              2,
+              3
+            ],
+            "text": "*"
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              3,
+              4
+            ],
+            "text": "*"
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              4,
+              5
+            ],
+            "text": "/"
+          },
+          {
+            "kind": "token",
+            "name": "\n",
+            "span": [
+              5,
+              6
+            ],
+            "text": "\n"
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              6,
+              7
+            ],
+            "text": "b"
+          }
+        ],
+        "farthest": 1
+      }
+    ]
+  },
+  {
+    "name": "opaque-code",
+    "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @tokenStream: enabled\n @whitespace: javaStyle\n token STRING ::= '\"' { '\\\\' ANY | NEGATION('\"\\\\') } '\"';\n token BLOCK ::= CAPTURE(fence, '`'{3,}) '\\n'\n     { NEGATIVE_LOOKAHEAD(BOL SAME_AS(fence) EOL) ANY }\n     BOL SAME_AS(fence) ('\\n' | EOF);\n @root @mapping(Pair, params=[left,right])\n Root ::= STRING @left BLOCK @right;\n}",
+    "cases": [
+      {
+        "name": "opaque-content",
+        "input": "\"// inside /* string */\" /* outside */\n```\n// java\nclass X { String s=\"/*\"; }\n```\n",
+        "accepted": true,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "STRING",
+            "span": [
+              0,
+              24
+            ],
+            "text": "\"// inside /* string */\""
+          },
+          {
+            "kind": "space",
+            "name": "",
+            "span": [
+              24,
+              25
+            ],
+            "text": " "
+          },
+          {
+            "kind": "blockComment",
+            "name": "",
+            "span": [
+              25,
+              38
+            ],
+            "text": "/* outside */"
+          },
+          {
+            "kind": "space",
+            "name": "",
+            "span": [
+              38,
+              39
+            ],
+            "text": "\n"
+          },
+          {
+            "kind": "token",
+            "name": "BLOCK",
+            "span": [
+              39,
+              82
+            ],
+            "text": "```\n// java\nclass X { String s=\"/*\"; }\n```\n"
+          }
+        ],
+        "ast": {
+          "type": "Pair",
+          "span": [
+            0,
+            82
+          ],
+          "fields": {
+            "left": "\"// inside /* string */\"",
+            "right": "```\n// java\nclass X { String s=\"/*\"; }\n```"
+          }
+        },
+        "captures": [
+          {
+            "name": "left",
+            "span": [
+              0,
+              24
+            ]
+          },
+          {
+            "name": "right",
+            "span": [
+              39,
+              82
+            ]
+          }
+        ]
+      },
+      {
+        "name": "unclosed-string",
+        "input": "\"// ",
+        "accepted": false,
+        "lexemes": [
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              0,
+              1
+            ],
+            "text": "\""
+          },
+          {
+            "kind": "lineComment",
+            "name": "",
+            "span": [
+              1,
+              4
+            ],
+            "text": "// "
+          }
+        ],
+        "farthest": 0
+      }
+    ]
+  },
+  {
+    "name": "repetition",
+    "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @tokenStream: enabled\n @whitespace: javaStyle\n token LETTER ::= CHAR_RANGE('a','z') | '😀';\n token ID ::= LETTER {LETTER};\n @root @mapping(ItemList, params=[values])\n Root ::= '[' [ ID @values { ',' ID @values } ] ']';\n}",
+    "cases": [
+      {
+        "name": "list",
+        "input": "[a,/**/b]",
+        "accepted": true,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "[",
+            "span": [
+              0,
+              1
+            ],
+            "text": "["
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              1,
+              2
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "token",
+            "name": ",",
+            "span": [
+              2,
+              3
+            ],
+            "text": ","
+          },
+          {
+            "kind": "blockComment",
+            "name": "",
+            "span": [
+              3,
+              7
+            ],
+            "text": "/**/"
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              7,
+              8
+            ],
+            "text": "b"
+          },
+          {
+            "kind": "token",
+            "name": "]",
+            "span": [
+              8,
+              9
+            ],
+            "text": "]"
+          }
+        ],
+        "ast": {
+          "type": "ItemList",
+          "span": [
+            0,
+            9
+          ],
+          "fields": {
+            "values": [
+              "a",
+              "b"
+            ]
+          }
+        },
+        "captures": [
+          {
+            "name": "values",
+            "span": [
+              1,
+              2
+            ]
+          },
+          {
+            "name": "values",
+            "span": [
+              7,
+              8
+            ]
+          }
+        ]
+      },
+      {
+        "name": "empty-list",
+        "input": "[]",
+        "accepted": true,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "[",
+            "span": [
+              0,
+              1
+            ],
+            "text": "["
+          },
+          {
+            "kind": "token",
+            "name": "]",
+            "span": [
+              1,
+              2
+            ],
+            "text": "]"
+          }
+        ],
+        "ast": {
+          "type": "ItemList",
+          "span": [
+            0,
+            2
+          ],
+          "fields": {
+            "values": []
+          }
+        },
+        "captures": []
+      },
+      {
+        "name": "trailing-comma",
+        "input": "[a,]",
+        "accepted": false,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "[",
+            "span": [
+              0,
+              1
+            ],
+            "text": "["
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              1,
+              2
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "token",
+            "name": ",",
+            "span": [
+              2,
+              3
+            ],
+            "text": ","
+          },
+          {
+            "kind": "token",
+            "name": "]",
+            "span": [
+              3,
+              4
+            ],
+            "text": "]"
+          }
+        ],
+        "farthest": 3
+      }
+    ]
+  },
+  {
+    "name": "empty-assertions",
+    "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @tokenStream: enabled\n @whitespace: javaStyle\n token END = EOF\n token EMPTY = EMPTY\n @root @mapping(Pair, params=[left,right])\n Root ::= EMPTY @left END @right;\n}",
+    "cases": [
+      {
+        "name": "empty-input",
+        "input": "",
+        "accepted": true,
+        "lexemes": [],
+        "ast": {
+          "type": "Pair",
+          "span": [
+            0,
+            0
+          ],
+          "fields": {
+            "left": "",
+            "right": ""
+          }
+        },
+        "captures": [
+          {
+            "name": "left",
+            "span": [
+              0,
+              0
+            ]
+          },
+          {
+            "name": "right",
+            "span": [
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      {
+        "name": "only-trivia",
+        "input": "/**/\n",
+        "accepted": true,
+        "lexemes": [
+          {
+            "kind": "blockComment",
+            "name": "",
+            "span": [
+              0,
+              4
+            ],
+            "text": "/**/"
+          },
+          {
+            "kind": "space",
+            "name": "",
+            "span": [
+              4,
+              5
+            ],
+            "text": "\n"
+          }
+        ],
+        "ast": {
+          "type": "Pair",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "left": "",
+            "right": ""
+          }
+        },
+        "captures": [
+          {
+            "name": "left",
+            "span": [
+              5,
+              5
+            ]
+          },
+          {
+            "name": "right",
+            "span": [
+              5,
+              5
+            ]
+          }
+        ]
+      },
+      {
+        "name": "not-eof",
+        "input": "a",
+        "accepted": false,
+        "lexemes": [
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              0,
+              1
+            ],
+            "text": "a"
+          }
+        ],
+        "farthest": 0
+      }
+    ]
+  },
+  {
+    "name": "declaration-priority",
+    "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @tokenStream: enabled\n @whitespace: none\n token FIRST ::= 'a';\n token SECOND ::= 'a';\n @root @mapping(Value, params=[value])\n Root ::= SECOND @value | FIRST @value;\n}",
+    "cases": [
+      {
+        "name": "tie-before-choice",
+        "input": "a",
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            1
+          ],
+          "fields": {
+            "value": "a"
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              0,
+              1
+            ]
+          }
+        ],
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "FIRST",
+            "span": [
+              0,
+              1
+            ],
+            "text": "a"
+          }
+        ]
+      },
+      {
+        "name": "unrecognized",
+        "input": "x",
+        "accepted": false,
+        "farthest": 0,
+        "lexemes": [
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              0,
+              1
+            ],
+            "text": "x"
+          }
+        ]
+      }
+    ]
+  }
+]

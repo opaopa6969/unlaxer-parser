@@ -15,16 +15,21 @@ public class LexicalTokenParser extends NoneChildParser implements TerminalSymbo
     private static final long serialVersionUID = 1L;
     private final LexicalExpression expression;
     private final String label;
+    private final boolean literal;
     public LexicalTokenParser(String label, LexicalExpression expression) {
+        this(label, expression, false);
+    }
+    protected LexicalTokenParser(String label, LexicalExpression expression, boolean literal) {
         this.label = label;
         this.expression = expression;
+        this.literal = literal;
     }
     @Override public Parsed parse(ParseContext context, TokenKind kind, boolean invert) {
         context.startParse(this, context, kind, invert);
         String source = context.getSource().sourceAsString();
         int cp = context.getPosition(kind).value();
-        int start = source.offsetByCodePoints(0, cp);
-        int end = expression.match(source, start);
+        int start = Lexing.charOffset(context, source, cp);
+        int end = Lexing.match(context, label, literal, expression, source, start);
         // Inverted use is a pure assertion; it never guesses a consumption length.
         boolean success = (end >= 0) != invert;
         if (!success) {
