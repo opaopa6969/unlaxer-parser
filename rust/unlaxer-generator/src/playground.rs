@@ -57,6 +57,7 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
     runtime!("semantic.rs");
     runtime!("source.rs");
     runtime!("pipeline.rs");
+    runtime!("semantic_project.rs");
     runtime!("lexing.rs");
     runtime!("first.rs");
     runtime!("lexical.rs");
