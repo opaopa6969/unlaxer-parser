@@ -58,7 +58,10 @@ fn version(value: &str) -> Result<(), String> {
     Ok(())
 }
 fn file(value: &str) -> Result<(), String> {
-    if value.contains(['\\', ':']) || value.split('/').any(|v| matches!(v, "" | "." | "..")) {
+    if value.chars().any(char::is_control)
+        || value.contains(['\\', ':'])
+        || value.split('/').any(|v| matches!(v, "" | "." | ".."))
+    {
         return Err(error("package file path escapes boundary"));
     }
     Ok(())
@@ -452,6 +455,25 @@ impl Resolver {
         }
         Err(error("unknown package source identity"))
     }
+    /// Return only identities whose cached artifact has already passed hash validation.
+    pub fn identity(&mut self, path: &Path) -> Result<Option<Value>, String> {
+        let Some(name) = self.owner(path)? else {
+            return Ok(None);
+        };
+        self.loaded(&name)?;
+        let pinned = self.pinned(&name)?;
+        let base = self.virtual_root.join(string(&pinned, "sha256")?);
+        let file = path
+            .strip_prefix(base)
+            .map_err(|_| error("package boundary"))?
+            .to_string_lossy()
+            .replace('\\', "/");
+        self.read(path)?;
+        Ok(Some(
+            json!({"file":file,"id":name,"sha256":string(&pinned,"sha256")?,"version":string(&pinned,"version")?}),
+        ))
+    }
+
     pub fn import_path(&mut self, current: &Path, reference: &str) -> Result<PathBuf, String> {
         let owner = self.owner(current)?;
         if let Some(name) = reference.strip_prefix("pkg:") {

@@ -51,3 +51,5 @@ pub(crate) fn generate_grammar(
 }
 
 mod package_fetch;
+
+pub mod vocabulary_origins;
