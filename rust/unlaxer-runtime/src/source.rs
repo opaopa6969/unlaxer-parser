@@ -515,7 +515,7 @@ impl LanguageRegions {
         Snapshot::new(self.host.uri.clone(), next_version, text)
     }
 }
-fn validate_edits(edits: &[Edit]) -> Result<()> {
+pub fn validate_edits(edits: &[Edit]) -> Result<()> {
     let mut ordered: Vec<&Edit> = edits.iter().collect();
     ordered.sort_by_key(|edit| edit.span.start);
     for edit in &ordered {

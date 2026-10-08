@@ -139,7 +139,7 @@ public final class LanguageRegions {
         }
         return new DocumentSnapshot(host.uri(), nextVersion, text.toString());
     }
-    private static void validateEdits(List<Edit> edits) {
+    public static void validateEdits(List<Edit> edits) {
         List<Edit> ordered = new ArrayList<>(edits);
         ordered.sort(Comparator.comparingInt(edit -> edit.span.start()));
         for (int index = 1; index < ordered.size(); index++) {
