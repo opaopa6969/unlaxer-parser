@@ -3,6 +3,9 @@ package org.unlaxer.source;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.OptionalInt;
 import org.unlaxer.source.DocumentSnapshot.Span;
 
 /** A total, ordered map from an output snapshot to zero or more original snapshots. */
@@ -91,6 +94,53 @@ public final class SegmentSourceMap {
             if (overlaps && ++aliases > 1) { throw new IllegalArgumentException("duplicated composed origin"); }
         }
         return location;
+    }
+    private record ExactLink(Span output, Location origin) {}
+    private List<ExactLink> exactLinks() {
+        List<ExactLink> links = new ArrayList<>();
+        for (Segment segment : segments) {
+            if (segment.kind == Kind.COPY) { links.add(new ExactLink(segment.output, segment.origin)); }
+        }
+        for (SegmentSourceMap parent : parents) {
+            List<ExactLink> next = new ArrayList<>();
+            List<ExactLink> parentLinks = parent.exactLinks();
+            for (ExactLink link : links) {
+                if (false == link.origin.snapshot.equals(parent.output)) { next.add(link); continue; }
+                for (ExactLink parentLink : parentLinks) {
+                    int start = Math.max(link.origin.span.start(), parentLink.output.start());
+                    int end = Math.min(link.origin.span.end(), parentLink.output.end());
+                    if (start >= end) { continue; }
+                    int mapped = parentLink.origin.span.start() + start - parentLink.output.start();
+                    next.add(new ExactLink(new Span(link.output.start() + start - link.origin.span.start(),
+                            link.output.start() + end - link.origin.span.start()), new Location(parentLink.origin.snapshot,
+                            new Span(mapped, mapped + end - start))));
+                }
+            }
+            links = next;
+        }
+        return links;
+    }
+    /** Unique original cursor to virtual cursor. Inexact or ambiguous boundaries return empty. */
+    public OptionalInt cursor(Location original) {
+        if (original.span.length() != 0) { throw new IllegalArgumentException("cursor must be a point"); }
+        List<ExactLink> links = exactLinks();
+        Set<Integer> candidates = new HashSet<>();
+        for (ExactLink link : links) {
+            if (link.origin.snapshot.equals(original.snapshot) && link.origin.span.contains(original.span)) {
+                candidates.add(link.output.start() + original.span.start() - link.origin.span.start());
+            }
+        }
+        if (candidates.size() != 1) { return OptionalInt.empty(); }
+        int point = candidates.iterator().next();
+        for (ExactLink link : links) {
+            if (link.output.contains(new Span(point, point))) {
+                int mapped = link.origin.span.start() + point - link.output.start();
+                if (false == new Location(link.origin.snapshot, new Span(mapped, mapped)).equals(original)) {
+                    return OptionalInt.empty();
+                }
+            }
+        }
+        return OptionalInt.of(point);
     }
     private List<Mapping> direct(Span span, boolean editing) {
         output.check(span);

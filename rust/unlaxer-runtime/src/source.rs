@@ -246,6 +246,86 @@ impl SourceMap {
         }
         Ok(location)
     }
+    fn exact_links(&self) -> Vec<(Span, Location)> {
+        let mut links: Vec<(Span, Location)> = self
+            .segments
+            .iter()
+            .filter(|segment| segment.kind == Kind::Copy)
+            .map(|segment| {
+                (
+                    segment.output,
+                    segment.origin.as_ref().expect("validated copy").clone(),
+                )
+            })
+            .collect();
+        for parent in &self.parents {
+            let mut next = vec![];
+            let parent_links = parent.exact_links();
+            for (output, origin) in links {
+                if origin.snapshot != parent.output {
+                    next.push((output, origin));
+                    continue;
+                }
+                for (parent_output, parent_origin) in &parent_links {
+                    let start = origin.span.start.max(parent_output.start);
+                    let end = origin.span.end.min(parent_output.end);
+                    if start >= end {
+                        continue;
+                    }
+                    let mapped = parent_origin.span.start + start - parent_output.start;
+                    next.push((
+                        Span {
+                            start: output.start + start - origin.span.start,
+                            end: output.start + end - origin.span.start,
+                        },
+                        Location {
+                            snapshot: parent_origin.snapshot.clone(),
+                            span: Span {
+                                start: mapped,
+                                end: mapped + end - start,
+                            },
+                        },
+                    ));
+                }
+            }
+            links = next;
+        }
+        links
+    }
+    /// Unique original-to-virtual cursor; inexact and ambiguous boundaries return None.
+    pub fn cursor(&self, original: &Location) -> Result<Option<usize>> {
+        original.snapshot.check(original.span)?;
+        if length(original.span) != 0 {
+            return Err("cursor must be a point");
+        }
+        let links = self.exact_links();
+        let candidates: HashSet<usize> = links
+            .iter()
+            .filter(|(_, origin)| {
+                origin.snapshot == original.snapshot && contains(origin.span, original.span)
+            })
+            .map(|(output, origin)| output.start + original.span.start - origin.span.start)
+            .collect();
+        if candidates.len() != 1 {
+            return Ok(None);
+        }
+        let point = *candidates.iter().next().expect("one candidate");
+        for (output, origin) in links {
+            if contains(
+                output,
+                Span {
+                    start: point,
+                    end: point,
+                },
+            ) {
+                let mapped = origin.span.start + point - output.start;
+                if origin.snapshot != original.snapshot || mapped != original.span.start {
+                    return Ok(None);
+                }
+            }
+        }
+        Ok(Some(point))
+    }
     fn direct(&self, span: Span, editing: bool) -> Result<Vec<Mapping>> {
         self.output.check(span)?;
         let mut result = vec![];
@@ -422,6 +502,9 @@ impl LanguageRegions {
             }
         }
         Ok(Self { host, regions })
+    }
+    pub fn host(&self) -> &Snapshot {
+        &self.host
     }
     pub fn at(&self, point: usize) -> Result<Option<&Region>> {
         self.host.check(Span {
