@@ -102,6 +102,54 @@ fn error_expected_raw_ir_emits_runtime_error_without_new_ast_shape() {
 }
 
 #[test]
+fn recovery_raw_ir_emits_runtime_wrapper_and_mapping_guard() {
+    let mut grammar = support::fixture("evolution");
+    grammar.rules[0].body = Expression::Recovery {
+        child: Box::new(grammar.rules[0].body.clone()),
+        mode: RecoveryMode::BeforeSync,
+        tokens: vec![";".into(), "}".into()],
+        message: "syntax error: skipped to sync point".into(),
+    };
+    let generated = generate(&grammar).unwrap();
+    let parser = generated
+        .iter()
+        .find(|file| file.relative_path == "parser.rs")
+        .unwrap();
+    assert!(parser.content.contains("Expr::Recovery { child: Box::new("));
+    assert!(parser
+        .content
+        .contains("unlaxer_runtime::RecoveryMode::BeforeSync"));
+    let mapper = generated
+        .iter()
+        .find(|file| file.relative_path == "mapper.rs")
+        .unwrap();
+    assert!(mapper.content.contains("cannot map recovered syntax"));
+    grammar.rules[0].body = Expression::Recovery {
+        child: Box::new(Expression::Literal("x".into())),
+        mode: RecoveryMode::Sync,
+        tokens: vec![";".into(), ";".into()],
+        message: "error".into(),
+    };
+    assert_eq!(
+        validate_ir(&grammar).unwrap_err().0,
+        "duplicate or empty recovery sync token"
+    );
+}
+
+#[test]
+fn custom_callback_without_visible_recovery_still_guards_mapper() {
+    let mut grammar = support::fixture("evolution");
+    grammar.rules[0].body = Expression::CustomToken("crate::provider".into());
+    let mapper = generate(&grammar)
+        .unwrap()
+        .into_iter()
+        .find(|file| file.relative_path == "mapper.rs")
+        .unwrap()
+        .content;
+    assert!(mapper.contains("cannot map recovered syntax"));
+}
+
+#[test]
 fn parser_only_raw_ir_requires_a_root_reachable_projection_boundary() {
     fn rule(name: &str, body: Expression, skip: bool) -> Rule {
         Rule {
