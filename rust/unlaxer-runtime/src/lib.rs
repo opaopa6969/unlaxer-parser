@@ -11,6 +11,7 @@ pub mod lexing;
 mod long_code_fence;
 #[cfg(test)]
 mod memo_retention_tests;
+pub mod names;
 mod scope;
 pub mod semantic;
 pub mod semantic_project;
@@ -101,6 +102,19 @@ pub enum Expr {
         effects: RuleEffects,
     },
     /// Compare completed captures from this child, without changing syntax acceptance.
+    /// Syntax predicate over an explicit immutable name snapshot.
+    NamePredicate {
+        child: Box<Expr>,
+        snapshot: &'static str,
+        version: &'static str,
+        capture: &'static str,
+        kind: &'static str,
+    },
+    /// Entry boundary: unresolved names cannot become discarded-alternative success.
+    NameResolutionScope {
+        child: Box<Expr>,
+        requirements: Vec<names::Requirement>,
+    },
     CaptureEquality {
         child: Box<Expr>,
         name: &'static str,
@@ -1066,6 +1080,7 @@ pub struct ParseContext<'a> {
     first_sets: Option<Arc<[first::FirstSet]>>,
     exclusion_audit: bool,
     unique_choice_failure_seen: bool,
+    names_state: names::State,
 }
 
 /// Ordered choice with rollback and full-input acceptance. Rule nesting is bounded at 256.
@@ -1138,7 +1153,14 @@ pub fn parse_detailed_with_options(
     input: &str,
     options: ParseOptions,
 ) -> Result<Tree, ParseDiagnostic> {
-    parse_detailed_owned(Arc::from(rules), root, whitespace, input, options)
+    parse_detailed_owned(
+        Arc::from(rules),
+        root,
+        whitespace,
+        input,
+        options,
+        BTreeMap::new(),
+    )
 }
 
 /// Detailed full-input parsing over an immutable grammar graph shared across calls.
@@ -1160,7 +1182,42 @@ pub fn parse_detailed_shared_with_options(
     input: &str,
     options: ParseOptions,
 ) -> Result<Tree, ParseDiagnostic> {
-    parse_detailed_owned(Arc::clone(grammar), root, whitespace, input, options)
+    parse_detailed_owned(
+        Arc::clone(grammar),
+        root,
+        whitespace,
+        input,
+        options,
+        BTreeMap::new(),
+    )
+}
+
+/// Full-input parsing with caller-owned immutable name snapshots; no external name provider.
+pub fn parse_detailed_shared_with_name_snapshots(
+    grammar: &SharedGrammar,
+    root: usize,
+    whitespace: bool,
+    input: &str,
+    options: ParseOptions,
+    snapshots: &[names::Snapshot],
+) -> Result<Tree, ParseDiagnostic> {
+    let bindings = names::bindings_of(snapshots).map_err(|_| ParseDiagnostic {
+        kind: "name_snapshot_invalid",
+        offset: 0,
+        expected: vec!["valid immutable name snapshots".into()],
+        farthest: ParseError {
+            offset: 0,
+            expected: vec!["valid immutable name snapshots".into()],
+        },
+    })?;
+    parse_detailed_owned(
+        Arc::clone(grammar),
+        root,
+        whitespace,
+        input,
+        options,
+        bindings,
+    )
 }
 
 fn parse_detailed_owned(
@@ -1169,6 +1226,7 @@ fn parse_detailed_owned(
     whitespace: bool,
     input: &str,
     options: ParseOptions,
+    bindings: BTreeMap<String, Vec<String>>,
 ) -> Result<Tree, ParseDiagnostic> {
     let options = if options.diagnostics == Diagnostics::Auto {
         options.with_diagnostics(if grammar_allows_deferred_diagnostics(&rules) {
@@ -1179,7 +1237,7 @@ fn parse_detailed_owned(
     } else {
         options
     };
-    let mut parser = ParseContext::with_options(input, options);
+    let mut parser = ParseContext::with_bindings(input, bindings, options);
     parser.rules = rules;
     parser.whitespace = whitespace;
     if parser.first_sets.is_some() {
@@ -1204,7 +1262,16 @@ fn parse_detailed_owned(
         trailing_offset = Some(parser.code_point(parser.position));
         parser.fail("end of input");
     }
+    if let Some(failure) = parser.name_failure() {
+        return Err(ParseDiagnostic {
+            kind: failure.kind,
+            offset: failure.span.start,
+            expected: vec![failure.expected.clone()],
+            farthest: failure.error(),
+        });
+    }
     if options.diagnostics == Diagnostics::DetailedOnFailure {
+        let bindings = parser.bindings.clone();
         let rules = Arc::clone(&parser.rules);
         // Release the first pass, including its empty-diagnostic memo entries.
         drop(parser);
@@ -1214,6 +1281,7 @@ fn parse_detailed_owned(
             whitespace,
             input,
             options.with_diagnostics(Diagnostics::Detailed),
+            bindings,
         );
     }
     let farthest = ParseError {
@@ -1327,6 +1395,7 @@ impl<'a> ParseContext<'a> {
             first_sets: None,
             exclusion_audit: false,
             unique_choice_failure_seen: false,
+            names_state: names::State::default(),
         }
         .with_candidate_exclusion()
     }
@@ -1515,7 +1584,14 @@ impl<'a> ParseContext<'a> {
     }
     /// Current syntax diagnostic; offset zero and no expected names with
     /// [`Diagnostics::DetailedOnFailure`]. Does not trigger a detailed retry.
+    pub fn name_failure(&self) -> Option<&names::Failure> {
+        self.names_state.failure()
+    }
+
     pub fn failure(&self) -> ParseError {
+        if let Some(failure) = self.name_failure() {
+            return failure.error();
+        }
         ParseError {
             offset: self.code_point(self.farthest),
             expected: self.expected_names.strings(&self.expected),
@@ -1822,6 +1898,7 @@ impl<'a> ParseContext<'a> {
             return None;
         }
         let memo_key = (self.options.memoization == Memoization::SafeFailures
+            && self.names_state.frames.is_empty()
             && self.memo_safe_rules.get(id).copied().unwrap_or(false))
         .then(|| {
             (
@@ -1902,6 +1979,17 @@ impl<'a> ParseContext<'a> {
 
     fn expression_inner(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
         match expression {
+            Expr::NameResolutionScope {
+                child,
+                requirements,
+            } => self.name_scope(child, requirements, depth),
+            Expr::NamePredicate {
+                child,
+                snapshot,
+                version,
+                capture,
+                kind,
+            } => self.name_predicate(child, snapshot, version, capture, kind, depth),
             Expr::Custom(parser) | Expr::CustomWith { parser, .. } => self
                 .transaction(|context| parser(context))
                 .ok()
@@ -2849,6 +2937,8 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
         | Expr::Lookahead { child, .. }
         | Expr::RuleEffects { child, .. }
         | Expr::CaptureEquality { child, .. }
+        | Expr::NamePredicate { child, .. }
+        | Expr::NameResolutionScope { child, .. }
         | Expr::Recovery { child, .. }
         | Expr::TriviaScope { child, .. } => expression_allows_deferred_diagnostics(child),
         Expr::Lexical(_, _)
@@ -2913,6 +3003,8 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>) -> bo
         | Expr::CustomWith { .. }
         | Expr::Backreference(_)
         | Expr::CaptureEquality { .. }
+        | Expr::NamePredicate { .. }
+        | Expr::NameResolutionScope { .. }
         | Expr::Recovery { .. } => false,
         Expr::Rule(id) => {
             references.push(*id);
