@@ -1,0 +1,143 @@
+[
+  {
+    "name":"SyncRoot",
+    "grammar":"grammar SyncRoot { @package: org.example.recovery @root @mapping(Value, params=[value]) @recovery(sync=';') Root ::= 'ok' @value; }",
+    "cases":[
+      {"id":"valid","input":"ok","prefix":[true,2,2],"recoveries":[],"ast":{"type":"Value","span":[0,2],"fields":{"value":"ok"}}},
+      {"id":"recovered","input":"bad;","prefix":[true,4,4],"recoveries":[[0,4]]},
+      {"id":"prefix","input":"bad;tail","prefix":[true,4,4],"recoveries":[[0,4]]},
+      {"id":"sync-at-start","input":";","prefix":[true,1,1],"recoveries":[[0,1]]},
+      {"id":"unicode-prefix","input":"😀x;tail","prefix":[true,3,3],"recoveries":[[0,3]]},
+      {"id":"crlf","input":"bad\r\n;","prefix":[true,6,6],"recoveries":[[0,6]]},
+      {"id":"no-sync","input":"bad","prefix":[false,0,0],"recoveries":[]},
+      {"id":"eof","input":"","prefix":[false,0,0],"recoveries":[]}
+    ]
+  },
+  {
+    "name":"SyncNested",
+    "grammar":"grammar SyncNested { @package: org.example.recovery @root @mapping(Result) Root ::= '<' Item '>'; @recovery(sync=';') Item ::= 'ok'; }",
+    "cases":[
+      {"id":"valid","input":"<ok>","prefix":[true,4,4],"recoveries":[],"ast":{"type":"Result","span":[0,4],"fields":{}}},
+      {"id":"nested-span","input":"<bad;>","prefix":[true,6,6],"recoveries":[[1,5]]},
+      {"id":"outer-failure-restores-marker","input":"<bad;!","prefix":[false,0,0],"recoveries":[]}
+    ]
+  },
+  {
+    "name":"LongestSyncToken",
+    "grammar":"grammar LongestSyncToken { @package: org.example.recovery @root @mapping(Result) @recovery(sync=':,::') Root ::= 'ok'; }",
+    "cases":[
+      {"id":"longest-at-same-position","input":"bad::tail","prefix":[true,5,5],"recoveries":[[0,5]]},
+      {"id":"nearest-before-longer","input":"a:b::","prefix":[true,2,2],"recoveries":[[0,2]]}
+    ]
+  },
+  {
+    "name":"UnicodeSyncToken",
+    "grammar":"grammar UnicodeSyncToken { @package: org.example.recovery @root @mapping(Result) @recovery(sync='😀;') Root ::= 'ok'; }",
+    "cases":[{"id":"supplementary-sync-token","input":"a😀;tail","prefix":[true,3,3],"recoveries":[[0,3]]}]
+  },
+  {
+    "name":"EmptySyncDefault",
+    "grammar":"grammar EmptySyncDefault { @package: org.example.recovery @root @mapping(Result) @recovery(sync='') Root ::= 'ok'; }",
+    "cases":[{"id":"empty-list-default","input":"bad;","prefix":[true,4,4],"recoveries":[[0,4]]}]
+  },
+  {
+    "name":"NbspSync",
+    "grammar":"grammar NbspSync { @package: org.example.recovery @root @mapping(Result) @recovery(sync=' ') Root ::= 'ok'; }",
+    "cases":[{"id":"java-trim-keeps-nbsp","input":"x tail","prefix":[true,2,2],"recoveries":[[0,2]]}]
+  },
+  {
+    "name":"EmSpaceSync",
+    "grammar":"grammar EmSpaceSync { @package: org.example.recovery @root @mapping(Result) @recovery(sync=' ') Root ::= 'ok'; }",
+    "cases":[{"id":"java-trim-keeps-em-space","input":"x tail","prefix":[true,2,2],"recoveries":[[0,2]]}]
+  },
+  {
+    "name":"AutoFollow",
+    "grammar":"grammar AutoFollow { @package: org.example.recovery @root @mapping(Result, params=[value]) Root ::= Item @value ';'; @recovery(auto) Item ::= 'ok'; }",
+    "cases":[
+      {"id":"valid","input":"ok;","prefix":[true,3,3],"recoveries":[],"ast":{"type":"Result","span":[0,3],"fields":{"value":"ok"}}},
+      {"id":"leave-follow-for-caller","input":"bad;","prefix":[true,4,4],"recoveries":[[0,3]]},
+      {"id":"no-zero-width-recovery","input":";","prefix":[false,0,0],"recoveries":[]},
+      {"id":"no-follow","input":"bad","prefix":[false,0,0],"recoveries":[]}
+    ]
+  },
+  {
+    "name":"AutoFollowReference",
+    "grammar":"grammar AutoFollowReference { @package: org.example.recovery @root @mapping(Result) Root ::= Item End; @recovery(auto) Item ::= 'ok'; End ::= ';' | '}'; }",
+    "cases":[
+      {"id":"first-of-follow-rule","input":"bad}","prefix":[true,4,4],"recoveries":[[0,3]]},
+      {"id":"another-first-of-follow-rule","input":"bad;","prefix":[true,4,4],"recoveries":[[0,3]]}
+    ]
+  },
+  {
+    "name":"AutoRoot",
+    "grammar":"grammar AutoRoot { @package: org.example.recovery @root @mapping(Result) @recovery(auto) Root ::= 'ok'; }",
+    "cases":[
+      {"id":"no-follow-semicolon-fallback","input":"bad;","prefix":[true,4,4],"recoveries":[[0,4]]},
+      {"id":"fallback-needs-sync","input":"bad","prefix":[false,0,0],"recoveries":[]}
+    ]
+  },
+  {
+    "name":"SkipRoot",
+    "grammar":"grammar SkipRoot { @package: org.example.recovery @root @mapping(Result) @recovery(skip) Root ::= 'ok'; }",
+    "cases":[
+      {"id":"one-code-point","input":"x","prefix":[true,1,1],"recoveries":[[0,1]]},
+      {"id":"one-supplementary-code-point","input":"😀tail","prefix":[true,1,1],"recoveries":[[0,1]]},
+      {"id":"eof","input":"","prefix":[false,0,0],"recoveries":[]},
+      {"id":"valid","input":"ok","prefix":[true,2,2],"recoveries":[],"ast":{"type":"Result","span":[0,2],"fields":{}}}
+    ]
+  },
+  {
+    "name":"SkipFollow",
+    "grammar":"grammar SkipFollow { @package: org.example.recovery @root @mapping(Result) Root ::= Item ';'; @recovery(skip) Item ::= 'ok'; }",
+    "cases":[
+      {"id":"leave-follow","input":"bad;","prefix":[true,4,4],"recoveries":[[0,3]]},
+      {"id":"progress-at-follow-then-outer-fails","input":";","prefix":[false,0,0],"recoveries":[]},
+      {"id":"skip-eof-then-outer-fails","input":"bad","prefix":[false,0,0],"recoveries":[]}
+    ]
+  },
+  {
+    "name":"SkipRollback",
+    "grammar":"grammar SkipRollback { @package: org.example.recovery @root @mapping(Result) Root ::= Item ';' | Item; @recovery(skip) Item ::= 'ok'; }",
+    "cases":[{"id":"failed-choice-removes-first-marker","input":"bad","prefix":[true,3,3],"recoveries":[[0,3]]}]
+  },
+  {
+    "name":"RecoveryRepetition",
+    "grammar":"grammar RecoveryRepetition { @package: org.example.recovery @root @mapping(Result, params=[items]) Root ::= { Item @items }; @recovery(sync=';') Item ::= 'ok;'; }",
+    "cases":[
+      {"id":"valid","input":"ok;ok;","prefix":[true,6,6],"recoveries":[],"ast":{"type":"Result","span":[0,6],"fields":{"items":["ok;","ok;"]}}},
+      {"id":"two-recovered-regions","input":"ok;bad;ok;oops;","prefix":[true,15,15],"recoveries":[[3,7],[10,15]]}
+    ]
+  },
+  {
+    "name":"RecoveryLongest",
+    "grammar":"grammar RecoveryLongest { @package: org.example.recovery @root @mapping(Result) @longestChoice Root ::= Item | 'bad;tail'; @recovery(sync=';') Item ::= 'ok'; }",
+    "cases":[
+      {"id":"losing-recovery-does-not-leak","input":"bad;tail","prefix":[true,8,8],"recoveries":[],"ast":{"type":"Result","span":[0,8],"fields":{}}},
+      {"id":"winning-recovery-keeps-marker","input":"bad;","prefix":[true,4,4],"recoveries":[[0,4]]}
+    ]
+  },
+  {
+    "name":"RecoveryPredictive",
+    "grammar":"grammar RecoveryPredictive { @package: org.example.recovery @root @mapping(Result) @predictiveChoice Root ::= Item | 'z'; @recovery(sync=';') Item ::= 'ok'; }",
+    "cases":[
+      {"id":"recovery-is-not-first-pruned","input":"z;","prefix":[true,2,2],"recoveries":[[0,2]]},
+      {"id":"ordinary-alternative-after-recovery-fails","input":"z","prefix":[true,1,1],"recoveries":[],"ast":{"type":"Result","span":[0,1],"fields":{}}}
+    ]
+  },
+  {
+    "name":"RecoveryFailureHistory",
+    "grammar":"grammar RecoveryFailureHistory { @package: org.example.recovery @root @mapping(Result) Root ::= Item '!'; @recovery(sync=';') Item ::= 'x;abc' ERROR('child tail'); }",
+    "cases":[
+      {"id":"keep-child-failure-beyond-sync","input":"x;abc?","prefix":[false,0,0],"recoveries":[],"failureDetail":{"offset":5,"expected":["child tail"]}}
+    ]
+  },
+  {
+    "name":"RecoveryScope",
+    "grammar":"grammar RecoveryScope { @package: org.example.recovery token ID = org.unlaxer.parser.clang.IdentifierParser @root @mapping(Result) @scopeTree(mode=lexical) Root ::= Item; @recovery(sync=';') Item ::= Decl '!'; @declares(symbol=name) Decl ::= ID @name; }",
+    "cases":[
+      {"id":"normal-declaration-preserved","input":"a!","prefix":[true,2,2],"recoveries":[],"declarations":[{"name":"a","sourceOffset":0}],"ast":{"type":"Result","span":[0,2],"fields":{}}},
+      {"id":"declaration-undone-before-recovery","input":"a;","prefix":[true,2,2],"recoveries":[[0,2]]},
+      {"id":"failed-recovery-no-state","input":"a?","prefix":[false,0,0],"recoveries":[]}
+    ]
+  }
+]

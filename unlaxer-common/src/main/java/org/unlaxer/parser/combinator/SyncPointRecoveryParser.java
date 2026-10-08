@@ -2,7 +2,6 @@ package org.unlaxer.parser.combinator;
 
 import java.util.Set;
 
-import org.unlaxer.CodePointIndex;
 import org.unlaxer.CodePointLength;
 import org.unlaxer.Committed;
 import org.unlaxer.Name;
@@ -11,7 +10,6 @@ import org.unlaxer.Source;
 import org.unlaxer.Token;
 import org.unlaxer.TokenKind;
 import org.unlaxer.context.ParseContext;
-import org.unlaxer.parser.ErrorMessageParser;
 import org.unlaxer.parser.Parser;
 
 /**
@@ -34,11 +32,15 @@ import org.unlaxer.parser.Parser;
  * </pre>
  */
 public class SyncPointRecoveryParser extends ConstructedSingleChildParser {
+	/** Whether to consume the sync token or stop before a following construct. */
+	public enum Mode { SYNC, BEFORE_SYNC, SKIP }
 
 	private static final long serialVersionUID = 1L;
 
 	private final Set<String> syncTokens;
-	private final ErrorMessageParser errorMarker;
+	private final RecoveryDiagnostic.Marker errorMarker;
+	private final Mode mode;
+	private static final String DEFAULT_MESSAGE = "syntax error: skipped to sync point";
 
 	/**
 	 * Creates a recovery parser with the given sync tokens and default error message.
@@ -47,9 +49,7 @@ public class SyncPointRecoveryParser extends ConstructedSingleChildParser {
 	 * @param syncTokens tokens that serve as synchronization points (e.g., ";", "}")
 	 */
 	public SyncPointRecoveryParser(Parser child, String... syncTokens) {
-		super(child);
-		this.syncTokens = Set.of(syncTokens);
-		this.errorMarker = new ErrorMessageParser("syntax error: skipped to sync point");
+		this(child, Mode.SYNC, DEFAULT_MESSAGE, syncTokens);
 	}
 
 	/**
@@ -57,17 +57,31 @@ public class SyncPointRecoveryParser extends ConstructedSingleChildParser {
 	 */
 	public SyncPointRecoveryParser(Name name, Parser child, String... syncTokens) {
 		super(name, child);
-		this.syncTokens = Set.of(syncTokens);
-		this.errorMarker = new ErrorMessageParser("syntax error: skipped to sync point");
+		this.mode = Mode.SYNC;
+		this.syncTokens = checkedTokens(Mode.SYNC, syncTokens);
+		this.errorMarker = new RecoveryDiagnostic.Marker(DEFAULT_MESSAGE);
 	}
 
 	/**
 	 * Private constructor for custom error message (used by static factory).
 	 */
-	private SyncPointRecoveryParser(Parser child, Set<String> syncTokens, String errorMessage) {
+	public SyncPointRecoveryParser(Parser child, Mode mode, String... syncTokens) {
+		this(child, mode, DEFAULT_MESSAGE, syncTokens);
+	}
+
+	private SyncPointRecoveryParser(Parser child, Mode mode, String errorMessage, String... syncTokens) {
 		super(child);
-		this.syncTokens = syncTokens;
-		this.errorMarker = new ErrorMessageParser(errorMessage);
+		this.mode = java.util.Objects.requireNonNull(mode, "mode");
+		this.syncTokens = checkedTokens(mode, syncTokens);
+		this.errorMarker = new RecoveryDiagnostic.Marker(errorMessage);
+	}
+
+	private static Set<String> checkedTokens(Mode mode, String[] tokens) {
+		Set<String> result = Set.of(tokens);
+		if (result.stream().anyMatch(String::isEmpty)) {
+			throw new IllegalArgumentException("recovery sync token must not be empty");
+		}
+		return result;
 	}
 
 	/**
@@ -79,7 +93,7 @@ public class SyncPointRecoveryParser extends ConstructedSingleChildParser {
 	 * @return a new SyncPointRecoveryParser
 	 */
 	public static SyncPointRecoveryParser withMessage(Parser child, String errorMessage, String... syncTokens) {
-		return new SyncPointRecoveryParser(child, Set.of(syncTokens), errorMessage);
+		return new SyncPointRecoveryParser(child, Mode.SYNC, errorMessage, syncTokens);
 	}
 
 	@Override
@@ -102,8 +116,8 @@ public class SyncPointRecoveryParser extends ConstructedSingleChildParser {
 		// Child failed — attempt recovery by scanning to next sync point
 		parseContext.rollback(this);
 
-		// Get remaining source from current consumed position
-		Source remain = parseContext.getRemain(TokenKind.consumed);
+		// Scan from the active cursor. Match-only lookahead must not consume input.
+		Source remain = parseContext.getRemain(tokenKind);
 		String remainStr = remain.toString();
 
 		if (remainStr.isEmpty()) {
@@ -114,34 +128,42 @@ public class SyncPointRecoveryParser extends ConstructedSingleChildParser {
 
 		// Find the nearest sync point in the remaining input
 		int nearestSyncPos = findNearestSyncPoint(remainStr);
-
-		if (nearestSyncPos < 0) {
-			// No sync point found — fail entirely
-			parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);
-			return Parsed.FAILED;
+		int skipUtf16;
+		if (mode == Mode.SYNC) {
+			if (nearestSyncPos < 0) {
+				parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);
+				return Parsed.FAILED;
+			}
+			skipUtf16 = nearestSyncPos + findSyncTokenAt(remainStr, nearestSyncPos).length();
+		} else if (mode == Mode.BEFORE_SYNC) {
+			if (nearestSyncPos <= 0) {
+				parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);
+				return Parsed.FAILED;
+			}
+			skipUtf16 = nearestSyncPos;
+		} else if (syncTokens.isEmpty()) {
+			skipUtf16 = Character.charCount(remainStr.codePointAt(0));
+		} else if (nearestSyncPos < 0) {
+			skipUtf16 = remainStr.length();
+		} else if (nearestSyncPos == 0) {
+			skipUtf16 = Character.charCount(remainStr.codePointAt(0));
+		} else {
+			skipUtf16 = nearestSyncPos;
 		}
-
-		// Calculate skip length: include the sync token itself
-		String syncToken = findSyncTokenAt(remainStr, nearestSyncPos);
-		int skipLength = nearestSyncPos + syncToken.length();
-		CodePointLength skipCodePointLength = new CodePointLength(skipLength);
+		CodePointLength skipCodePointLength = new CodePointLength(remainStr.codePointCount(0, skipUtf16));
 
 		// Begin a new transaction for the recovery region
 		parseContext.begin(this);
 
-		// Place the error marker token at the current position
-		// This embeds the error message in the parse tree
-		errorMarker.parse(parseContext, tokenKind, invertMatch);
-
-		// Get the source covering the skipped region before consuming
-		Source skippedSource = parseContext.peek(TokenKind.consumed, skipCodePointLength);
-
-		// Create a token that covers the skipped region, associated with this parser
-		Token skippedToken = new Token(tokenKind, skippedSource, this);
-		parseContext.getCurrent().addToken(skippedToken, tokenKind);
-
-		// Advance the cursor past the skipped region
-		parseContext.consume(skipCodePointLength);
+		if (tokenKind.isMatchOnly()) {
+			// Lookahead may succeed, but it must not publish semantic recovery state.
+			parseContext.matchOnly(skipCodePointLength);
+		} else {
+			// A full-span marker is both the CST error and the public recovery diagnostic.
+			Source skippedSource = parseContext.peek(tokenKind, skipCodePointLength);
+			parseContext.getCurrent().addToken(new Token(tokenKind, skippedSource, errorMarker), tokenKind);
+			parseContext.consume(skipCodePointLength);
+		}
 
 		// Commit the recovery
 		Committed committed = parseContext.commit(this, tokenKind);
@@ -175,13 +197,13 @@ public class SyncPointRecoveryParser extends ConstructedSingleChildParser {
 	 * @return the sync token at the position
 	 */
 	String findSyncTokenAt(String source, int pos) {
+		String longest = "";
 		for (String syncToken : syncTokens) {
-			if (source.startsWith(syncToken, pos)) {
-				return syncToken;
+			if (source.startsWith(syncToken, pos) && syncToken.length() > longest.length()) {
+				longest = syncToken;
 			}
 		}
-		// Should not happen if called after findNearestSyncPoint
-		return "";
+		return longest;
 	}
 
 	/**
