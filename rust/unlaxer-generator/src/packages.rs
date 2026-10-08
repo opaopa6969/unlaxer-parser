@@ -429,10 +429,11 @@ impl Resolver {
                 return Err(error("locked transitive version mismatch"));
             }
         }
-        self.artifacts.insert(name.into(), value.clone());
         for name in object(&actual, "dependencies")?.keys() {
             self.loaded(name)?;
         }
+        // A failed dependency must not leave a parent reusable as verified.
+        self.artifacts.insert(name.into(), value.clone());
         Ok(value)
     }
     fn owner(&mut self, path: &Path) -> Result<Option<String>, String> {
@@ -496,5 +497,45 @@ impl Resolver {
             .as_str()
             .map(str::to_owned)
             .ok_or_else(|| error(format!("missing package file: {relative}")))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn failed_transitive_verification_cannot_publish_a_parent() {
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../../../unlaxer-dsl/src/test/resources/packages/retry.json"
+        ))
+        .unwrap();
+        let directory = std::env::temp_dir().join(format!(
+            "ubnf-package-retry-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir(&directory).unwrap();
+        for (file, content) in fixture["files"].as_object().unwrap() {
+            std::fs::write(directory.join(file), content.as_str().unwrap()).unwrap();
+        }
+        resolve(&directory.join("ubnf.json")).unwrap();
+        let cached = directory.join(format!(".ubnf-cache/packages/{}.json", hash(STANDARD)));
+        let mut corrupted = STANDARD.to_vec();
+        corrupted.push(b' ');
+        std::fs::write(&cached, corrupted).unwrap();
+        let root = directory.join("root.ubnf");
+        let mut resolver = Resolver::new(&root);
+        for _ in 0..2 {
+            assert!(resolver
+                .import_path(&root, "pkg:team/layout")
+                .unwrap_err()
+                .contains(fixture["message"].as_str().unwrap()));
+        }
+        std::fs::write(cached, STANDARD).unwrap();
+        assert!(resolver.import_path(&root, "pkg:team/layout").is_ok());
+        std::fs::remove_dir_all(directory).unwrap();
     }
 }
