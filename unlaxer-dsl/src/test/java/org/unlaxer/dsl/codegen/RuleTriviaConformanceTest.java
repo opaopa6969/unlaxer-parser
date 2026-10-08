@@ -69,15 +69,17 @@ public class RuleTriviaConformanceTest {
             JsonObject fixture = fixtureElement.getAsJsonObject();
             String name = fixture.get("name").getAsString();
             String source = fixture.get("grammar").getAsString();
-            GrammarDecl grammar = UBNFMapper.parse(source).grammars().get(0);
+            Path fixtureDir = temporary.getRoot().toPath().resolve("fixture-" + fixtureIndex++);
+            Files.createDirectories(fixtureDir);
+            Path ubnf = fixtureDir.resolve("root.ubnf");
+            Files.writeString(ubnf, source);
+            if (fixture.has("modules")) for (var entry : fixture.getAsJsonObject("modules").entrySet())
+                Files.writeString(fixtureDir.resolve(entry.getKey()), entry.getValue().getAsString());
+            GrammarDecl grammar = org.unlaxer.dsl.bootstrap.UBNFModuleLoader.load(ubnf).grammars().get(0);
             GrammarValidator.validateOrThrow(grammar);
             List<RustBackend.GeneratedFile> javaFrontend = new RustBackend().generate(grammar);
             assertEquals(name + " Java frontend Rust file count", 5, javaFrontend.size());
 
-            Path fixtureDir = temporary.getRoot().toPath().resolve("fixture-" + fixtureIndex++);
-            Files.createDirectories(fixtureDir);
-            Path ubnf = fixtureDir.resolve(grammar.name() + ".ubnf");
-            Files.writeString(ubnf, source);
             Path nativeGenerated = fixtureDir.resolve("native-generated");
             success(run(List.of(nativeGenerator.toString(), "generate", "--grammar", ubnf.toString(),
                 "--output", nativeGenerated.toString()), "", true));
@@ -126,6 +128,14 @@ public class RuleTriviaConformanceTest {
                     assertEquals(context + " Rust full-input acceptance", accepted,
                         !rust.get("ast").isJsonNull());
 
+                    if (row.has("diagnostic")) {
+                        Object failure = diagnostic.orElseThrow();
+                        JsonArray javaDiagnostic = new JsonArray();
+                        javaDiagnostic.add((String) failure.getClass().getMethod("kind").invoke(failure));
+                        javaDiagnostic.add((Integer) failure.getClass().getMethod("offset").invoke(failure));
+                        assertEquals(context + " independent diagnostic category/location", row.get("diagnostic"), javaDiagnostic);
+                        assertEquals(context + " Java/Rust diagnostic category/location", javaDiagnostic, rust.get("diagnostic"));
+                    }
                     JsonElement expected = JsonNull.INSTANCE;
                     JsonElement javaAst = JsonNull.INSTANCE;
                     if (accepted) {
@@ -235,7 +245,7 @@ public class RuleTriviaConformanceTest {
                             drop(tree);
                             print!("{}", ast.canonical_json());
                         }
-                        Err(_) => print!("null"),
+                        Err(error) => print!(r#"null,\"diagnostic\":[\"{}\",{}]"#, error.kind, error.offset),
                     }
                     println!("}}");
                 }

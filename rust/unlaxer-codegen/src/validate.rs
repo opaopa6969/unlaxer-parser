@@ -186,6 +186,9 @@ fn root_reaches_projection_boundary(ir: &GrammarIr) -> bool {
                 }
                 | TriviaScope {
                     child: expression, ..
+                }
+                | LexicalTriviaScope {
+                    child: expression, ..
                 } => pending.push(expression),
                 Repeat { child, .. } => pending.push(child),
                 Separated { child, separator } => {
@@ -284,6 +287,13 @@ fn expression(
         | TextValue(child)
         | ValueBoundary(child)
         | TriviaScope { child, .. } => expression(child, count, captures)?,
+        LexicalTriviaScope { child, definition } => {
+            definition.validate().map_err(fail)?;
+            if definition.nullable() {
+                return Err(fail("nullable whitespace definition"));
+            }
+            expression(child, count, captures)?;
+        }
         Repeat { child, min, max } => {
             if *min > i32::MAX as usize
                 || max.is_some_and(|max| max < *min || max > i32::MAX as usize)

@@ -110,7 +110,7 @@ public final class PortabilityCheck {
                 add(out, "P-SETTING", snapshot, setting, setting.key());
             }
             if (setting.key().equals("whitespace") && setting.value() instanceof StringSettingValue value
-                && !whitespaceStyle(value.value())) {
+                && !whitespaceStyle(grammar, value.value())) {
                 add(out, "P-WHITESPACE", snapshot, value, value.value());
             }
         }
@@ -126,22 +126,23 @@ public final class PortabilityCheck {
         for (RuleDecl rule : grammar.rules()) {
             boolean skip = rule.annotations().stream().anyMatch(SkipAnnotation.class::isInstance);
             for (Annotation annotation : rule.annotations()) {
-                if (!(skip && annotation instanceof MappingAnnotation)) scanAnnotation(annotation, snapshot, out);
+                if (!(skip && annotation instanceof MappingAnnotation)) scanAnnotation(grammar, annotation, snapshot, out);
             }
             scanBody(rule.body(), snapshot, out);
         }
     }
 
-    private static boolean whitespaceStyle(String style) {
-        String normalized = style.trim();
-        return normalized.equalsIgnoreCase("none") || normalized.equalsIgnoreCase("javaStyle");
+    private static boolean whitespaceStyle(GrammarDecl grammar, String style) {
+        try { org.unlaxer.dsl.bootstrap.WhitespaceDefinitions.resolve(style,
+            org.unlaxer.dsl.bootstrap.LexicalCompiler.compile(grammar)); return true; }
+        catch (IllegalArgumentException error) { return false; }
     }
 
     private static boolean identifier(String value) {
         return value.matches("[A-Za-z][A-Za-z0-9_]*") && !Set.of("Self", "self", "super", "crate").contains(value);
     }
 
-    private static void scanAnnotation(Annotation annotation, UBNFSourceSnapshot snapshot, List<Diagnostic> out) {
+    private static void scanAnnotation(GrammarDecl grammar, Annotation annotation, UBNFSourceSnapshot snapshot, List<Diagnostic> out) {
         String unsupported = null;
         if (annotation instanceof EvalAnnotation) unsupported = "eval";
         else if (annotation instanceof RecoveryAnnotation) unsupported = "recovery";
@@ -159,7 +160,7 @@ public final class PortabilityCheck {
             }
         } else if (annotation instanceof WhitespaceAnnotation whitespace) {
             String style = whitespace.style().orElse("javaStyle");
-            if (!whitespaceStyle(style)) add(out, "P-WHITESPACE", snapshot, annotation, style);
+            if (!whitespaceStyle(grammar, style)) add(out, "P-WHITESPACE", snapshot, annotation, style);
         } else if (annotation instanceof InterleaveAnnotation interleave) {
             String profile = interleave.profile().trim();
             if (!profile.equals("javaStyle") && !profile.equals("commentsAndSpaces")) {

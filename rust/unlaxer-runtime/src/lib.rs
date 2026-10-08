@@ -79,6 +79,10 @@ pub enum Expr {
         name: &'static str,
     },
     /// Apply a local trivia policy to sequence boundaries, restoring the caller afterwards.
+    LexicalTriviaScope {
+        child: Box<Expr>,
+        definition: lexical::LexicalExpression,
+    },
     TriviaScope {
         child: Box<Expr>,
         whitespace: bool,
@@ -251,6 +255,12 @@ impl Expr {
     /// Preserve a mixed scalar/optional capture boundary; parsing remains transparent.
     pub fn value_boundary(self) -> Self {
         Self::ValueBoundary(Box::new(self))
+    }
+    pub fn lexical_trivia_scope(self, definition: lexical::LexicalExpression) -> Self {
+        Self::LexicalTriviaScope {
+            child: Box::new(self),
+            definition,
+        }
     }
     pub fn trivia_scope(self, whitespace: bool) -> Self {
         Self::TriviaScope {
@@ -979,6 +989,7 @@ pub struct ParseContext<'a> {
     lexing: Option<lexing::Session<'a>>,
     rules: Arc<[Rule]>,
     whitespace: bool,
+    lexical_trivia: Option<lexical::LexicalExpression>,
     position: usize,
     matched_position: usize,
     nodes: Vec<Node>,
@@ -1219,6 +1230,7 @@ impl<'a> ParseContext<'a> {
             lexing: None,
             rules: Arc::from([]),
             whitespace: false,
+            lexical_trivia: None,
             position: 0,
             matched_position: 0,
             nodes: vec![],
@@ -1476,6 +1488,7 @@ impl<'a> ParseContext<'a> {
         root: usize,
         whitespace: bool,
     ) -> ParseResult {
+        let previous_definition = self.lexical_trivia.take();
         let previous_rules = std::mem::replace(&mut self.rules, Arc::clone(grammar));
         let previous_whitespace = std::mem::replace(&mut self.whitespace, whitespace);
         let safe_rules = if self.options.memoization == Memoization::SafeFailures {
@@ -1495,6 +1508,7 @@ impl<'a> ParseContext<'a> {
         self.failure_memo = previous_failure_memo;
         self.rules = previous_rules;
         self.whitespace = previous_whitespace;
+        self.lexical_trivia = previous_definition;
         self.memo_safe_rules = previous_safe_rules;
         self.first_sets = previous_first_sets;
         self.grammar_session = previous_session;
@@ -1508,9 +1522,11 @@ impl<'a> ParseContext<'a> {
         whitespace: bool,
         operation: impl FnOnce(&mut Self) -> T,
     ) -> T {
+        let previous_definition = self.lexical_trivia.take();
         let previous = std::mem::replace(&mut self.whitespace, whitespace);
         let result = operation(self);
         self.whitespace = previous;
+        self.lexical_trivia = previous_definition;
         result
     }
 
@@ -2194,6 +2210,14 @@ impl<'a> ParseContext<'a> {
                 }
                 Some(fragment)
             }
+            Expr::LexicalTriviaScope { child, definition } => {
+                let previous = self.lexical_trivia.replace(definition.clone());
+                let previous_whitespace = std::mem::replace(&mut self.whitespace, false);
+                let result = self.expression(child, depth);
+                self.whitespace = previous_whitespace;
+                self.lexical_trivia = previous;
+                result
+            }
             Expr::TriviaScope { child, whitespace } => {
                 self.with_trivia(*whitespace, |context| context.expression(child, depth))
             }
@@ -2432,6 +2456,9 @@ impl<'a> ParseContext<'a> {
         let Some(table) = &self.first_sets else {
             return false;
         };
+        if self.lexical_trivia.is_some() {
+            return false;
+        }
         if first::of(candidate, table).may_start(&self.input[self.position..], self.whitespace) {
             return false;
         }
@@ -2451,6 +2478,16 @@ impl<'a> ParseContext<'a> {
     }
 
     fn prediction_after_trivia<'b>(&self, raw: &'b str) -> &'b str {
+        if let Some(definition) = &self.lexical_trivia {
+            let mut position = 0;
+            while let Some(end) = definition.match_at(raw, position) {
+                if end <= position {
+                    break;
+                }
+                position = end;
+            }
+            return &raw[position..];
+        }
         if !self.whitespace {
             return raw;
         }
@@ -2479,6 +2516,16 @@ impl<'a> ParseContext<'a> {
     }
 
     fn skip(&mut self) {
+        if let Some(definition) = &self.lexical_trivia {
+            while let Some(end) = definition.match_at(self.input, self.position) {
+                if end <= self.position {
+                    break;
+                }
+                self.position = end;
+                self.matched_position = end;
+            }
+            return;
+        }
         if !self.whitespace {
             return;
         }
@@ -2522,7 +2569,8 @@ impl<'a> ParseContext<'a> {
     fn java_failed_atom(&mut self, child: &Expr) {
         if let Expr::TextValue(child)
         | Expr::ValueBoundary(child)
-        | Expr::TriviaScope { child, .. } = child
+        | Expr::TriviaScope { child, .. }
+        | Expr::LexicalTriviaScope { child, .. } = child
         {
             self.java_failed_atom(child);
             return;
@@ -2627,7 +2675,8 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
         | Expr::Lookahead { child, .. }
         | Expr::RuleEffects { child, .. }
         | Expr::CaptureEquality { child, .. }
-        | Expr::TriviaScope { child, .. } => expression_allows_deferred_diagnostics(child),
+        | Expr::TriviaScope { child, .. }
+        | Expr::LexicalTriviaScope { child, .. } => expression_allows_deferred_diagnostics(child),
         Expr::Lexical(_, _)
         | Expr::Literal(_)
         | Expr::Number
@@ -2711,7 +2760,8 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>) -> bo
         | Expr::JavaRepeat { child, .. }
         | Expr::Lookahead { child, .. }
         | Expr::RuleEffects { child, .. }
-        | Expr::TriviaScope { child, .. } => expression_is_memo_safe(child, references),
+        | Expr::TriviaScope { child, .. }
+        | Expr::LexicalTriviaScope { child, .. } => expression_is_memo_safe(child, references),
         _ => true,
     }
 }
