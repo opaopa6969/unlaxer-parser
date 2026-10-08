@@ -6,9 +6,13 @@ import java.util.List;
 public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     public GrammarIR { rules = List.copyOf(rules); }
     /** Skip hides an entire AST projection, never the parser/CST or its state effects. */
-    public record Rule(String name, Expression body, Mapping mapping, Operator operator, Catalog catalog, boolean skip) {
+    public record Rule(String name, Expression body, Mapping mapping, Operator operator, Catalog catalog, boolean skip, List<String> documentation) {
         public Rule {
+            documentation = List.copyOf(documentation);
             if (skip && mapping != null) throw new IllegalArgumentException("skipped rule has mapping: " + name);
+        }
+        public Rule(String name, Expression body, Mapping mapping, Operator operator, Catalog catalog, boolean skip) {
+            this(name, body, mapping, operator, catalog, skip, List.of());
         }
         public Rule(String name, Expression body, Mapping mapping, Operator operator, Catalog catalog) {
             this(name, body, mapping, operator, catalog, false);
@@ -51,7 +55,8 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
         OptionalExpr, Repeat, Separated, AnyToken, EofToken, EmptyToken, ErrorExpected, CharRangeToken,
         ExceptToken, UntilToken, LookaheadToken, Delimited, IdentifierToken, QuotedToken,
         CodeStartToken, CodeEndToken, LongCodeBlockToken, CustomToken, TextValue, ValueBoundary, TriviaScope, RuleEffects,
-        CaptureEquality, Recovery {}
+        CaptureEquality, Recovery, LexicalToken {}
+    public record LexicalToken(String name, org.unlaxer.dsl.runtime.LexicalExpression expression) implements Expression {}
     /** Rule-local trivia policy, transparent to captures and semantic values. */
     public record TriviaScope(Expression child, boolean javaWhitespace) implements Expression {}
     /** Retains an otherwise unmapped text branch as a source-positioned semantic value. */

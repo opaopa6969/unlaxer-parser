@@ -25,9 +25,22 @@ public final class RustBackend {
                 pub mod evaluator;
                 """),
             new GeneratedFile("ast.rs", ast(ir)),
-            new GeneratedFile("parser.rs", parser(ir)),
+            new GeneratedFile("parser.rs", parser(ir) + lexingApi(grammar, ir)),
             new GeneratedFile("mapper.rs", mapper(ir)),
             new GeneratedFile("evaluator.rs", evaluator(ir)));
+    }
+
+    private String lexingApi(GrammarDecl grammar, GrammarIR ir) {
+        if (!org.unlaxer.dsl.codegen.TokenStreamGrammar.enabled(grammar)) return "";
+        var out = new StringBuilder("\npub fn lexical_terminals() -> &'static std::sync::Arc<[unlaxer_runtime::lexing::Terminal]> {\n    static TERMINALS: OnceLock<std::sync::Arc<[unlaxer_runtime::lexing::Terminal]>> = OnceLock::new();\n    TERMINALS.get_or_init(|| vec![\n");
+        for (var terminal : org.unlaxer.dsl.codegen.TokenStreamGrammar.terminals(grammar)) {
+            out.append("        unlaxer_runtime::lexing::Terminal { name: ").append(quote(terminal.name()))
+                .append(", literal: ").append(terminal.literal()).append(", expression: ")
+                .append(lexicalExpression(terminal.expression())).append(" },\n");
+        }
+        return out.append("    ].into())\n}\n\npub fn parse_with_lexing(source: &str, options: unlaxer_runtime::lexing::Options) -> Result<unlaxer_runtime::lexing::Outcome<'_>, String> {\n    unlaxer_runtime::lexing::parse(grammar(), ")
+            .append(ir.root()).append(", ").append(ir.javaWhitespace())
+            .append(", source, options, std::sync::Arc::clone(lexical_terminals()))\n}\n").toString();
     }
 
     private String ast(GrammarIR ir) {
@@ -180,7 +193,26 @@ public final class RustBackend {
             });
             out.append("];\n");
         }
+        if (ir.rules().stream().anyMatch(rule -> !rule.documentation().isEmpty())) {
+            out.append("\n/// Ordered rule documentation; does not affect parsing.\n")
+                .append("pub const RULE_DOCS: &[(&str, &[&str])] = &[\n");
+            for (var rule : ir.rules()) {
+                if (rule.documentation().isEmpty()) continue;
+                out.append("    (").append(quote(rule.name())).append(", &[")
+                    .append(rule.documentation().stream().map(RustBackend::quote)
+                        .collect(java.util.stream.Collectors.joining(", ")))
+                    .append("]),\n");
+            }
+            out.append("];\n");
+        }
         return out.toString();
+    }
+
+    private String lexicalExpression(org.unlaxer.dsl.runtime.LexicalExpression e) {
+        return "unlaxer_runtime::lexical::LexicalExpression { op: unlaxer_runtime::lexical::Op::" + e.op()
+            + ", text: " + quote(e.text()) + ", min: " + e.min() + ", max: " + e.max()
+            + ", children: vec![" + e.children().stream().map(this::lexicalExpression)
+                .collect(java.util.stream.Collectors.joining(", ")) + "] }";
     }
 
     private String expression(Expression expression) {
@@ -220,6 +252,9 @@ public final class RustBackend {
         }
         if (expression instanceof LongCodeBlockToken ignored) {
             return "Expr::LongCodeBlock";
+        }
+        if (expression instanceof LexicalToken token) {
+            return "Expr::Lexical(" + quote(token.name()) + ", " + lexicalExpression(token.expression()) + ")";
         }
         if (expression instanceof CustomToken custom) {
             return "Expr::Custom(" + custom.functionPath() + ")";

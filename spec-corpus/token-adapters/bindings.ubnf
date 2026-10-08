@@ -1,0 +1,19 @@
+grammar Dictionary {
+  @ubnf: v2
+  @feature: parseBindingsV1
+  @package: example.bindings
+  @tokenAdapter: {
+    id: 'example.dictionary'
+    version: '1'
+    java: 'example.bindings.DictionaryParser'
+    rust: 'crate::word_token'
+    accepts: 'first nonempty prefix from words.<region> in the immutable snapshot'
+    failure: 'no-consume'
+    consumes: 'always'
+    context: 'remaining,position,bindings'
+  }
+  token WORD = ADAPTER('example.dictionary', version=1)
+  token END = EOF
+  @root @mapping(Value, params=[value])
+  Root ::= WORD @value END;
+}

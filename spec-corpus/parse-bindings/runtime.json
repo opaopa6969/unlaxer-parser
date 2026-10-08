@@ -1,0 +1,743 @@
+[
+  {
+    "name": "dictionary",
+    "body": "WORD @value END",
+    "cases": [
+      {
+        "name": "unicode",
+        "input": "𠮷A",
+        "bindings": {
+          "region": [
+            "default"
+          ],
+          "words.default": [
+            "𠮷A"
+          ]
+        },
+        "expected": {
+          "ahead": [
+            false,
+            0,
+            0
+          ],
+          "prefix": [
+            true,
+            2,
+            2
+          ],
+          "ast": {
+            "type": "Value",
+            "span": [
+              0,
+              2
+            ],
+            "fields": {
+              "value": "𠮷A"
+            }
+          },
+          "values": [
+            {
+              "raw": "𠮷A",
+              "normalized": "𠮷A",
+              "tags": [],
+              "span": [
+                0,
+                2
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "empty-dictionary",
+        "input": "東京",
+        "bindings": {
+          "region": [
+            "default"
+          ],
+          "words.default": []
+        },
+        "expected": {
+          "ahead": [
+            true,
+            0,
+            0
+          ],
+          "prefix": [
+            false,
+            0,
+            0
+          ],
+          "ast": null,
+          "values": []
+        }
+      },
+      {
+        "name": "ignore-empty-entry",
+        "input": "東京",
+        "bindings": {
+          "region": [
+            "default"
+          ],
+          "words.default": [
+            "",
+            "東京"
+          ]
+        },
+        "expected": {
+          "ahead": [
+            false,
+            0,
+            0
+          ],
+          "prefix": [
+            true,
+            2,
+            2
+          ],
+          "ast": {
+            "type": "Value",
+            "span": [
+              0,
+              2
+            ],
+            "fields": {
+              "value": "東京"
+            }
+          },
+          "values": [
+            {
+              "raw": "東京",
+              "normalized": "東京",
+              "tags": [],
+              "span": [
+                0,
+                2
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "first-prefix",
+        "input": "ab",
+        "bindings": {
+          "region": [
+            "default"
+          ],
+          "words.default": [
+            "a",
+            "ab"
+          ]
+        },
+        "expected": {
+          "ahead": [
+            false,
+            0,
+            0
+          ],
+          "prefix": [
+            false,
+            0,
+            0
+          ],
+          "ast": null,
+          "values": []
+        }
+      },
+      {
+        "name": "longer-first",
+        "input": "ab",
+        "bindings": {
+          "region": [
+            "default"
+          ],
+          "words.default": [
+            "ab",
+            "a"
+          ]
+        },
+        "expected": {
+          "ahead": [
+            false,
+            0,
+            0
+          ],
+          "prefix": [
+            true,
+            2,
+            2
+          ],
+          "ast": {
+            "type": "Value",
+            "span": [
+              0,
+              2
+            ],
+            "fields": {
+              "value": "ab"
+            }
+          },
+          "values": [
+            {
+              "raw": "ab",
+              "normalized": "ab",
+              "tags": [],
+              "span": [
+                0,
+                2
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "short-first",
+        "input": "a",
+        "bindings": {
+          "region": [
+            "default"
+          ],
+          "words.default": [
+            "a",
+            "ab"
+          ]
+        },
+        "expected": {
+          "ahead": [
+            false,
+            0,
+            0
+          ],
+          "prefix": [
+            true,
+            1,
+            1
+          ],
+          "ast": {
+            "type": "Value",
+            "span": [
+              0,
+              1
+            ],
+            "fields": {
+              "value": "a"
+            }
+          },
+          "values": [
+            {
+              "raw": "a",
+              "normalized": "a",
+              "tags": [],
+              "span": [
+                0,
+                1
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "missing-region",
+        "input": "東京",
+        "bindings": {
+          "region": [
+            "north"
+          ],
+          "words.north": [],
+          "words.south": [
+            "東京"
+          ]
+        },
+        "expected": {
+          "ahead": [
+            true,
+            0,
+            0
+          ],
+          "prefix": [
+            false,
+            0,
+            0
+          ],
+          "ast": null,
+          "values": []
+        }
+      },
+      {
+        "name": "region-selected",
+        "input": "東京",
+        "bindings": {
+          "region": [
+            "south"
+          ],
+          "words.south": [
+            "東京"
+          ],
+          "words.north": [
+            "大阪"
+          ]
+        },
+        "expected": {
+          "ahead": [
+            false,
+            0,
+            0
+          ],
+          "prefix": [
+            true,
+            2,
+            2
+          ],
+          "ast": {
+            "type": "Value",
+            "span": [
+              0,
+              2
+            ],
+            "fields": {
+              "value": "東京"
+            }
+          },
+          "values": [
+            {
+              "raw": "東京",
+              "normalized": "東京",
+              "tags": [],
+              "span": [
+                0,
+                2
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "normalized-value",
+        "input": "ｺｰﾎﾟ",
+        "bindings": {
+          "region": [
+            "default"
+          ],
+          "words.default": [
+            "ｺｰﾎﾟ"
+          ],
+          "normalized.ｺｰﾎﾟ": [
+            "コーポ"
+          ],
+          "tags.ｺｰﾎﾟ": [
+            "katakana",
+            "building"
+          ]
+        },
+        "expected": {
+          "ahead": [
+            false,
+            0,
+            0
+          ],
+          "prefix": [
+            true,
+            4,
+            4
+          ],
+          "ast": {
+            "type": "Value",
+            "span": [
+              0,
+              4
+            ],
+            "fields": {
+              "value": "ｺｰﾎﾟ"
+            }
+          },
+          "values": [
+            {
+              "raw": "ｺｰﾎﾟ",
+              "normalized": "コーポ",
+              "tags": [
+                "katakana",
+                "building"
+              ],
+              "span": [
+                0,
+                4
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "hyphen-tags",
+        "input": "⸺",
+        "bindings": {
+          "region": [
+            "default"
+          ],
+          "words.default": [
+            "⸺"
+          ],
+          "normalized.⸺": [
+            "-"
+          ],
+          "tags.⸺": [
+            "hyphen",
+            "punctuation"
+          ]
+        },
+        "expected": {
+          "ahead": [
+            false,
+            0,
+            0
+          ],
+          "prefix": [
+            true,
+            1,
+            1
+          ],
+          "ast": {
+            "type": "Value",
+            "span": [
+              0,
+              1
+            ],
+            "fields": {
+              "value": "⸺"
+            }
+          },
+          "values": [
+            {
+              "raw": "⸺",
+              "normalized": "-",
+              "tags": [
+                "hyphen",
+                "punctuation"
+              ],
+              "span": [
+                0,
+                1
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "failure",
+        "input": "𠮷B",
+        "bindings": {
+          "region": [
+            "default"
+          ],
+          "words.default": [
+            "𠮷A"
+          ]
+        },
+        "expected": {
+          "ahead": [
+            true,
+            0,
+            0
+          ],
+          "prefix": [
+            false,
+            0,
+            0
+          ],
+          "ast": null,
+          "values": []
+        }
+      },
+      {
+        "name": "empty-input",
+        "input": "",
+        "bindings": {
+          "region": [
+            "default"
+          ],
+          "words.default": [
+            ""
+          ]
+        },
+        "expected": {
+          "ahead": [
+            true,
+            0,
+            0
+          ],
+          "prefix": [
+            false,
+            0,
+            0
+          ],
+          "ast": null,
+          "values": []
+        }
+      }
+    ]
+  },
+  {
+    "name": "choice-rollback",
+    "body": "(WORD @value '!' | WORD @value '?') END",
+    "cases": [
+      {
+        "name": "first",
+        "input": "𠮷A!",
+        "bindings": {
+          "region": [
+            "default"
+          ],
+          "words.default": [
+            "𠮷A"
+          ]
+        },
+        "expected": {
+          "ahead": [
+            false,
+            0,
+            0
+          ],
+          "prefix": [
+            true,
+            3,
+            3
+          ],
+          "ast": {
+            "type": "Value",
+            "span": [
+              0,
+              3
+            ],
+            "fields": {
+              "value": "𠮷A"
+            }
+          },
+          "values": [
+            {
+              "raw": "𠮷A",
+              "normalized": "𠮷A",
+              "tags": [],
+              "span": [
+                0,
+                2
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "second",
+        "input": "𠮷A?",
+        "bindings": {
+          "region": [
+            "default"
+          ],
+          "words.default": [
+            "𠮷A"
+          ]
+        },
+        "expected": {
+          "ahead": [
+            false,
+            0,
+            0
+          ],
+          "prefix": [
+            true,
+            3,
+            3
+          ],
+          "ast": {
+            "type": "Value",
+            "span": [
+              0,
+              3
+            ],
+            "fields": {
+              "value": "𠮷A"
+            }
+          },
+          "values": [
+            {
+              "raw": "𠮷A",
+              "normalized": "𠮷A",
+              "tags": [],
+              "span": [
+                0,
+                2
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "both-fail",
+        "input": "𠮷A.",
+        "bindings": {
+          "region": [
+            "default"
+          ],
+          "words.default": [
+            "𠮷A"
+          ]
+        },
+        "expected": {
+          "ahead": [
+            false,
+            0,
+            0
+          ],
+          "prefix": [
+            false,
+            0,
+            0
+          ],
+          "ast": null,
+          "values": []
+        }
+      }
+    ]
+  },
+  {
+    "name": "guarded-repeat",
+    "body": "{'[' WORD @value ']'} END",
+    "cases": [
+      {
+        "name": "repeat",
+        "input": "[𠮷][ｺｰﾎﾟ]",
+        "bindings": {
+          "words.default": [
+            "𠮷",
+            "ｺｰﾎﾟ"
+          ]
+        },
+        "expected": {
+          "ahead": [
+            true,
+            0,
+            0
+          ],
+          "prefix": [
+            true,
+            9,
+            9
+          ],
+          "ast": {
+            "type": "Value",
+            "span": [
+              0,
+              9
+            ],
+            "fields": {
+              "value": [
+                "𠮷",
+                "ｺｰﾎﾟ"
+              ]
+            }
+          },
+          "values": [
+            {
+              "raw": "𠮷",
+              "normalized": "𠮷",
+              "tags": [],
+              "span": [
+                1,
+                2
+              ]
+            },
+            {
+              "raw": "ｺｰﾎﾟ",
+              "normalized": "ｺｰﾎﾟ",
+              "tags": [],
+              "span": [
+                4,
+                8
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "repeat-failure",
+        "input": "[𠮷][?]",
+        "bindings": {
+          "words.default": [
+            "𠮷"
+          ]
+        },
+        "expected": {
+          "ahead": [
+            true,
+            0,
+            0
+          ],
+          "prefix": [
+            false,
+            0,
+            0
+          ],
+          "ast": null,
+          "values": []
+        }
+      }
+    ]
+  },
+  {
+    "name": "offset-normalization",
+    "body": "'😀:' WORD @value END",
+    "cases": [
+      {
+        "name": "raw-offset",
+        "input": "😀:ｺｰﾎﾟ",
+        "bindings": {
+          "words.default": [
+            "ｺｰﾎﾟ"
+          ],
+          "normalized.ｺｰﾎﾟ": [
+            "コーポ"
+          ],
+          "tags.ｺｰﾎﾟ": [
+            "katakana",
+            "building"
+          ]
+        },
+        "expected": {
+          "ahead": [
+            true,
+            0,
+            0
+          ],
+          "prefix": [
+            true,
+            6,
+            6
+          ],
+          "ast": {
+            "type": "Value",
+            "span": [
+              0,
+              6
+            ],
+            "fields": {
+              "value": "ｺｰﾎﾟ"
+            }
+          },
+          "values": [
+            {
+              "raw": "ｺｰﾎﾟ",
+              "normalized": "コーポ",
+              "tags": [
+                "katakana",
+                "building"
+              ],
+              "span": [
+                2,
+                6
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

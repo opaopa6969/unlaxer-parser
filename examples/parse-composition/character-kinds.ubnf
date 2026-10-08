@@ -1,0 +1,16 @@
+grammar Input {
+ @ubnf: v2
+ @package: example.lexing
+ @tokenStream: enabled
+ @whitespace: none
+ token KANA ::= CHAR_RANGE('ァ', 'ヶ') | CHAR_RANGE('ｦ', 'ﾝ') | 'ﾞ' | 'ﾟ';
+ token LONG_MARK ::= 'ー' | 'ｰ';
+ token KATAKANA ::= KANA (KANA | LONG_MARK)*;
+ token ALPHABET ::= (CHAR_RANGE('A', 'Z') | CHAR_RANGE('a', 'z') | CHAR_RANGE('Ａ', 'Ｚ') | CHAR_RANGE('ａ', 'ｚ'))+;
+ token NUMBER ::= (CHAR_RANGE('0', '9') | CHAR_RANGE('０', '９'))+;
+ token HYPHEN ::= '-' | '‐' | '‑' | '‒' | '–' | '—' | '―' | '−' | '－' | '⸺' | '⸻';
+ token KNOWN ::= KANA | ALPHABET | NUMBER | HYPHEN | LONG_MARK;
+ token OTHER ::= (NEGATIVE_LOOKAHEAD(KNOWN) ANY)+;
+ @root @mapping(Pieces, params=[parts])
+ Root ::= { (KATAKANA | ALPHABET | NUMBER | HYPHEN | LONG_MARK | OTHER) @parts };
+}

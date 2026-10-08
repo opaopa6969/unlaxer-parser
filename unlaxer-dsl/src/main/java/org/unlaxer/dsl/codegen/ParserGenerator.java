@@ -66,17 +66,20 @@ public class ParserGenerator implements CodeGenerator {
         /** rule name -> RecoveryAnnotation (for rules that have @recovery) */
         final Map<String, org.unlaxer.dsl.bootstrap.UBNFAST.RecoveryAnnotation> recoveryRules = new LinkedHashMap<>();
         final boolean adapterShadowsWordParser;
+        final boolean tokenStream;
         final String spaceParserClass;
 
         GenContext(GrammarDecl grammar) {
             this.grammar = grammar;
+            TokenStreamGrammar.requireValid(grammar);
+            this.tokenStream = TokenStreamGrammar.enabled(grammar);
             this.grammarName = grammar.name();
             TokenAdapterRegistry adapters = TokenAdapterRegistry.requireValid(grammar);
             this.adapterShadowsWordParser = grammar.tokens().stream()
-                .anyMatch(token -> token instanceof TokenDecl.Adapter
+                .anyMatch(token -> (token instanceof TokenDecl.Adapter || token instanceof TokenDecl.Declarative)
                     && ParserCodegenUtil.toParserClassName(token.name()).equals("WordParser"));
             this.spaceParserClass = grammar.tokens().stream()
-                .anyMatch(token -> token instanceof TokenDecl.Adapter
+                .anyMatch(token -> (token instanceof TokenDecl.Adapter || token instanceof TokenDecl.Declarative)
                     && ParserCodegenUtil.toParserClassName(token.name()).equals("SpaceParser"))
                 ? "org.unlaxer.parser.posix.SpaceParser.class" : "SpaceParser.class";
             SemanticCardinality semantics = new SemanticCardinality(grammar);
@@ -95,7 +98,9 @@ public class ParserGenerator implements CodeGenerator {
             this.tokenCIMap = new LinkedHashMap<>();
             this.tokenRegexMap = new LinkedHashMap<>();
             for (TokenDecl token : grammar.tokens()) {
-                if (token instanceof TokenDecl.Simple s) {
+                if (token instanceof TokenDecl.Declarative lexical) {
+                    tokenParserMap.put(lexical.name(), ParserCodegenUtil.toParserClassName(lexical.name()));
+                } else if (token instanceof TokenDecl.Simple s) {
                     tokenParserMap.put(s.name(), s.parserClass());
                 } else if (token instanceof TokenDecl.Adapter adapter) {
                     int version = Integer.parseInt(adapter.version());
@@ -250,6 +255,7 @@ public class ParserGenerator implements CodeGenerator {
             """);
 
         sb.append(ParserScopeEmitter.helpers(grammar));
+        sb.append(TokenStreamGrammar.javaApi(grammar));
 
         // チェーンクラス
         sb.append(generatePlainChainClass(ctx));
@@ -261,6 +267,7 @@ public class ParserGenerator implements CodeGenerator {
         // Simple / NEGATION / CHAR_RANGE / REGEX トークン用の生成内部クラス
         sb.append(ParserTokenEmitter.generateSimpleTokenWrappers(ctx));
         sb.append(ParserTokenEmitter.generateNegationClasses(ctx));
+        sb.append(ParserTokenEmitter.generateLexicalClasses(ctx));
         sb.append(ParserTokenEmitter.generateCharRangeClasses(ctx));
         sb.append(ParserTokenEmitter.generateRegexClasses(ctx));
 
@@ -497,6 +504,8 @@ public class ParserGenerator implements CodeGenerator {
         sb.append("        }\n");
         sb.append("        @Override\n");
         sb.append("        public java.util.Optional<Parser> getLazyTerminatorParser() { return java.util.Optional.empty(); }\n");
+        if (ctx.tokenStream) sb.append("        @Override public org.unlaxer.Parsed parse(org.unlaxer.context.ParseContext context, org.unlaxer.TokenKind kind, boolean invert) {\n")
+            .append("            return org.unlaxer.dsl.runtime.Lexing.trivia(this, context, kind, invert, () -> super.parse(context, kind, invert));\n        }\n");
         sb.append("    }\n\n");
 
         return sb.toString();

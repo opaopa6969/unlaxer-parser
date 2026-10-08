@@ -1,0 +1,7 @@
+grammar Numbers {
+  @import chars from '../chars.ubnf'
+  @ubnf: v2
+  @whitespace: javaStyle
+  @package: should.not.leak
+  token NUMBER ::= chars.DIGIT+;
+}

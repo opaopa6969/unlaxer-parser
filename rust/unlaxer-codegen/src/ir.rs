@@ -15,6 +15,8 @@ pub struct Rule {
     pub mapping: Option<Mapping>,
     pub operator: Option<Operator>,
     pub catalog: Option<Catalog>,
+    /// Ordered @doc paragraphs. Tooling metadata; never changes recognition.
+    pub documentation: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -93,6 +95,10 @@ pub enum RecoveryMode {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression {
+    LexicalToken {
+        name: String,
+        expression: crate::lexical::LexicalExpression,
+    },
     RuleEffects {
         child: Box<Expression>,
         effects: RuleEffects,

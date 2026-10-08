@@ -231,7 +231,8 @@ public class SelfHostingRoundTripTest {
     }
 
     private static void collectIdentifierTexts(org.unlaxer.Token token, List<String> names) {
-        if (token.parser instanceof org.unlaxer.parser.clang.IdentifierParser) {
+        if (token.parser instanceof org.unlaxer.dsl.runtime.LexicalTokenParser
+                && token.parser.getClass().getSimpleName().equals("IdentifierParser")) {
             names.add(token.source.sourceAsString());
             return;
         }

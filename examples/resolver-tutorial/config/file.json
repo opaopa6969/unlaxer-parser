@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "bindings": {
+    "address.towns": {
+      "resolver": "townCatalog",
+      "schema": "ubnf.words/v1"
+    }
+  },
+  "resolvers": {
+    "townCatalog": {
+      "provider": "file/v1",
+      "properties": {
+        "path": "../data/towns.json"
+      }
+    }
+  }
+}

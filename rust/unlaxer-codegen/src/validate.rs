@@ -216,6 +216,7 @@ fn expression(
             }
             expression(child, count, captures)?;
         }
+        LexicalToken { expression, .. } => expression.validate().map_err(fail)?,
         CaptureEquality { child, name } => {
             let mut local = BTreeSet::new();
             expression(child, count, &mut local)?;

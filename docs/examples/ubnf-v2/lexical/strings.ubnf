@@ -1,0 +1,4 @@
+grammar Strings {
+  @ubnf: v2
+  token STRING ::= '"' { '\\' ANY | NEGATION('"\\') } '"';
+}

@@ -46,8 +46,31 @@ grammar Custom {
 }
 ```
 
-これは UBNF の data-only block setting。四つの key を各一回だけ指定する。
-未知の key・重複 key・欠損 key は拒否する。外部 manifest や plugin を自動探索しない。
+これは UBNF の data-only block setting。必須 key は `id`、`version`、`java`、`rust` の四つで、
+各一回だけ指定する。UBNF format 2 では、外部実装の受理仕様を読めるよう、次の任意 key も使える。
+
+```ubnf
+@ubnf: v2
+@tokenAdapter: {
+  id: 'example.word'
+  version: '1'
+  java: 'example.WordParser'
+  rust: 'crate::word_token'
+  accepts: 'ASCII letter followed by ASCII letters, digits, or _'
+  failure: 'no-consume'
+  consumes: 'always'
+  context: 'remaining,position'
+}
+```
+
+- `accepts`: 人間とツール向けの簡潔な受理契約。空文字列は不可。
+- `failure`: `no-consume`（失敗時に consumed cursor を進めない）または `may-consume`。
+- `consumes`: 成功時の consumed cursor 契約。`always`、`maybe`、`never` のいずれか。
+- `context`: 実装が読む read-only accessor をカンマ区切りで列挙する。空または省略は context 非依存。
+  使用可能な値は `source`、`remaining`、`position`、`matchedPosition`、`bindings`。
+  `bindings` は `parseBindingsV1` の追加能力（3.3.0-SNAPSHOT）。[仕様と合成例](parse-composition.md)を参照。
+
+未知の key・重複 key・必須 key の欠損・不正な accessor は拒否する。外部 manifest や plugin を自動探索しない。
 
 - ID は case-sensitive な `[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*`。
 - version は ASCII 十進数字で、正規化後は `1..2147483647`。`01` と `1` は同じ version。
@@ -106,6 +129,24 @@ LF / CRLF は元のまま数える。adapter 診断があれば `structure: bloc
 リンク成功・挙動の一致・安全性まで保証しない。
 
 ## ParseContext と安全性の境界
+
+### UBNF format 2 の context accessor
+
+`@ubnf: v2` は format 2 を明示する。指定のない既存 grammar は format 1 として互換に扱う。
+format 2 は Java/Rust の `ParseContext` の内部構造を公開しない。adapter provider が依存してよい
+共通の read-only 表面だけを定義する。
+
+| accessor | 意味 | Java | Rust |
+|---|---|---|---|
+| `source` | 入力全体 | `getSource()` | `source()` |
+| `remaining` | consumed cursor から入力末尾まで | `peek(consumed, remaining length)` | `remaining()` |
+| `position` | consumed cursor の Unicode code-point offset | `getConsumedPosition()` | `position()` |
+| `matchedPosition` | match-only cursor の Unicode code-point offset | `getMatchedPosition()` | `matched_position()` |
+| `bindings` | 解析開始時に固定した外部データの ordered string list | `bindingValues(name)` | `binding_values(name)` |
+
+これらは観測専用であり、context の cursor・capture・scope・診断・transaction を変更してはならない。
+capture、scope、任意 user state、listener、transaction frame は Java/Rust で同じ安定契約をまだ持たないため
+format 2 の accessor には含めない。必要な場合は provider 固有の実装として残し、`context` には列挙しない。
 
 adapter の呼出しは既存 combinator / transaction の中に入る。新しい別 runtime は作らない。
 失敗した枝は consumed / matched cursor、capture、登録された transactional state などを

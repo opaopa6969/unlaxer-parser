@@ -1,5 +1,6 @@
 use crate::ast::*;
 use crate::lexer::{Kind, Token};
+use crate::lexical::{LexicalExpression as Lex, Op};
 use crate::{diagnostic, Diagnostic, DiagnosticKind, MAX_NESTING};
 
 type Result<T> = std::result::Result<T, Diagnostic>;
@@ -210,6 +211,16 @@ impl Parser<'_> {
         let start = self.current().span;
         self.word("token")?;
         let name = self.identifier()?;
+        if self.current().kind == Kind::Define {
+            self.pos += 1;
+            let expression = self.lex_expression()?;
+            self.expect(';')?;
+            return Ok(TokenDecl {
+                name,
+                kind: TokenKind::Declarative { expression },
+                span: self.span_from(start),
+            });
+        }
         self.expect('=')?;
         let value_start = self.current().span;
         let value = self.dotted()?;
@@ -284,6 +295,162 @@ impl Parser<'_> {
             kind,
             span: self.span_from(start),
         })
+    }
+    fn lex_expression(&mut self) -> Result<Lex> {
+        self.depth += 1;
+        if self.depth > MAX_NESTING {
+            return Err(self.error("lexical nesting exceeds 128"));
+        }
+        let mut alternatives = vec![self.lex_sequence()?];
+        while self.eat('|') {
+            alternatives.push(self.lex_sequence()?);
+        }
+        self.depth -= 1;
+        Ok(Lex::node(Op::CHOICE, alternatives))
+    }
+    fn lex_sequence(&mut self) -> Result<Lex> {
+        let mut children = vec![];
+        while matches!(
+            self.current().kind,
+            Kind::Quoted(_) | Kind::Identifier(_) | Kind::Symbol('(' | '[' | '{')
+        ) {
+            children.push(self.lex_element()?);
+        }
+        if children.is_empty() {
+            return Err(self.error("empty lexical sequence"));
+        }
+        Ok(Lex::node(Op::SEQUENCE, children))
+    }
+    fn lex_integer(&mut self) -> Result<i32> {
+        if let Kind::Number(value) = &self.current().kind {
+            let value = value
+                .parse::<i32>()
+                .map_err(|_| self.error("repeat bound exceeds 2147483647"))?;
+            self.pos += 1;
+            Ok(value)
+        } else {
+            Err(self.error("expected repeat bound"))
+        }
+    }
+    fn lex_element(&mut self) -> Result<Lex> {
+        let child = self.lex_atom()?;
+        if self.eat('?') {
+            return Ok(Lex::repeat(child, 0, 1));
+        }
+        if self.eat('*') {
+            return Ok(Lex::repeat(child, 0, -1));
+        }
+        if self.eat('+') {
+            return Ok(Lex::repeat(child, 1, -1));
+        }
+        if self.is('{')
+            && self
+                .tokens
+                .get(self.pos + 1)
+                .is_some_and(|t| matches!(t.kind, Kind::Number(_)))
+        {
+            self.pos += 1;
+            let min = self.lex_integer()?;
+            let max = if self.eat(',') {
+                if self.is('}') {
+                    -1
+                } else {
+                    self.lex_integer()?
+                }
+            } else {
+                min
+            };
+            self.expect('}')?;
+            if max >= 0 && min > max {
+                return Err(self.error("inverted repeat bounds"));
+            }
+            return Ok(Lex::repeat(child, min, max));
+        }
+        Ok(child)
+    }
+    fn lex_atom(&mut self) -> Result<Lex> {
+        if matches!(self.current().kind, Kind::Quoted(_)) {
+            return Ok(Lex::leaf(Op::LITERAL, self.quoted()?));
+        }
+        if self.eat('(') {
+            let child = self.lex_expression()?;
+            self.expect(')')?;
+            return Ok(child);
+        }
+        if self.eat('[') {
+            let child = self.lex_expression()?;
+            self.expect(']')?;
+            return Ok(Lex::repeat(child, 0, 1));
+        }
+        if self.eat('{') {
+            let child = self.lex_expression()?;
+            self.expect('}')?;
+            return Ok(Lex::repeat(child, 0, -1));
+        }
+        let mut name = self.identifier()?;
+        if matches!(
+            name.as_str(),
+            "LOOKAHEAD" | "NEGATIVE_LOOKAHEAD" | "CAPTURE" | "SAME_AS" | "NEGATION" | "CHAR_RANGE"
+        ) && self.eat('(')
+        {
+            let result = match name.as_str() {
+                "LOOKAHEAD" | "NEGATIVE_LOOKAHEAD" => Lex::node(
+                    if name == "LOOKAHEAD" {
+                        Op::LOOK
+                    } else {
+                        Op::NOT
+                    },
+                    vec![self.lex_expression()?],
+                ),
+                "CAPTURE" => {
+                    let text = self.identifier()?;
+                    self.expect(',')?;
+                    Lex {
+                        text,
+                        ..Lex::node(Op::CAPTURE, vec![self.lex_expression()?])
+                    }
+                }
+                "SAME_AS" => Lex::leaf(Op::BACKREF, self.identifier()?),
+                "NEGATION" => Lex::leaf(Op::EXCEPT, self.quoted()?),
+                "CHAR_RANGE" => {
+                    let a = self.quoted()?;
+                    self.expect(',')?;
+                    let b = self.quoted()?;
+                    if a.chars().count() != 1 || b.chars().count() != 1 {
+                        return Err(self.error("range requires scalar boundaries"));
+                    }
+                    let min = a.chars().next().unwrap() as i32;
+                    let max = b.chars().next().unwrap() as i32;
+                    if min > max {
+                        return Err(self.error("invalid scalar range"));
+                    }
+                    Lex {
+                        min,
+                        max,
+                        ..Lex::leaf(Op::RANGE, String::new())
+                    }
+                }
+                _ => return Err(self.error(format!("unknown lexical constructor {name}"))),
+            };
+            self.expect(')')?;
+            return Ok(result);
+        }
+        let op = match name.as_str() {
+            "ANY" => Some(Op::ANY),
+            "EOF" => Some(Op::EOF),
+            "BOF" => Some(Op::BOF),
+            "BOL" => Some(Op::BOL),
+            "EOL" => Some(Op::EOL),
+            _ => None,
+        };
+        if let Some(op) = op {
+            return Ok(Lex::leaf(op, String::new()));
+        }
+        while self.eat('.') {
+            name.push('.');
+            name.push_str(&self.identifier()?);
+        }
+        Ok(Lex::leaf(Op::REF, name))
     }
     fn bmp(&self, value: &str, span: Span) -> Result<char> {
         let mut chars = value.chars();

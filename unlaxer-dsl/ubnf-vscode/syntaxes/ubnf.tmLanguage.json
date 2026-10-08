@@ -64,7 +64,7 @@
     },
     "annotation": {
       "name": "storage.modifier.annotation.ubnf",
-      "match": "@(root|mapping|whitespace|leftAssoc|rightAssoc|precedence|enum|commonField|scopeTree|declares|backref|import|recovery|skip|interleave|typeof|catalog|eval|doc|package|comment)\\b"
+      "match": "@(ubnf|feature|tokenContract|tokenAdapter|contextAccessor|root|mapping|whitespace|leftAssoc|rightAssoc|longestChoice|predictiveChoice|precedence|enum|commonField|scopeTree|declares|backref|import|recovery|skip|interleave|typeof|catalog|eval|doc|package|comment)\\b"
     },
     "capture": {
       "name": "variable.other.capture.ubnf",
@@ -76,7 +76,7 @@
     },
     "token-function": {
       "name": "support.function.token-type.ubnf",
-      "match": "\\b(UNTIL|NEGATION|LOOKAHEAD|NEGATIVE_LOOKAHEAD|CHAR_RANGE|REGEX|ANY|EOF|EMPTY|CI)\\b"
+      "match": "\\b(UNTIL|NEGATION|LOOKAHEAD|NEGATIVE_LOOKAHEAD|CHAR_RANGE|REGEX|ANY|EOF|BOF|BOL|EOL|CAPTURE|SAME_AS|EMPTY|CI)\\b"
     },
     "rule-declaration": {
       "match": "^\\s*([A-Za-z_]\\w*)\\s*(::=)",
@@ -86,7 +86,7 @@
       }
     },
     "token-declaration": {
-      "match": "^\\s*(token)\\s+([A-Z][A-Z0-9_]*)\\s*(=)",
+      "match": "^\\s*(token)\\s+([A-Z][A-Z0-9_]*)\\s*(::=|=)",
       "captures": {
         "1": { "name": "keyword.control.ubnf" },
         "2": { "name": "constant.other.token.ubnf" },

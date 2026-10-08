@@ -1,5 +1,22 @@
 # `@catalog` metadata の生成契約
 
+## UBNF の書き方を学ぶ catalog/help との区別
+
+VSIX の「UBNF: はじめの一歩 / Catalog・Help」は **文法を編集する人向け**の入門と構文一覧です。
+その内容は `unlaxer-dsl/src/main/resources/ubnf-help/catalog.json` で管理し、
+Java / Rust の共通テストで掲載サンプルを検証します。
+以下の `@catalog` は **定義した言語の外部シンボル一覧**の metadata で、別の用途です。
+
+## ルールの利用者向け説明 `@doc`
+
+3.3.0-SNAPSHOT 以降、Java-hosted / native Rust の両 Rust emitter は `@doc('説明')` を
+`parser.rs` の `pub const RULE_DOCS: &[(&str, &[&str])]` に保持します。
+ルール宣言順、同一ルール内の annotation 順を保存し、説明のないルールは含めません。
+説明はデータであり、認識・CST・AST・評価を変更しません。未記載の文法には定数を生成せず、
+従来の生成物を変えません。これは任意の HTML を実行する機能ではありません。
+
+## 外部シンボルの catalog
+
 `@catalog(context='...')` は parser の受理、AST、mapper、evaluator を変更しない tooling 用 annotation である。
 Rust backend は annotation を捨てず、生成する `parser.rs` に次の静的 metadata を宣言する。
 

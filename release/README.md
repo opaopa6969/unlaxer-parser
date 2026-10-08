@@ -8,11 +8,10 @@ documentation releases.
 
 - Publish frequency is not a constraint (owner decision 2026-09-24). What gates a
   publish is readiness: green CI, changelog, version bump, and the release checklist issue.
-- Collect changes in GitHub/CI and select at most one reactor from
-  `central-release-queue.yml` for the monthly slot.
-- Publish dependency reactors before downstream consumers. A downstream project
-  waits for the next slot unless a single combined Central bundle is introduced
-  in the future.
+- Collect changes in GitHub/CI and select one reactor at a time from
+  `central-release-queue.yml`; use its configured monthly cap.
+- Publish dependency reactors before downstream consumers. Each publication
+  must independently meet the readiness checklist and configured budget.
 - GitHub Actions artifacts and GitHub Release VSIX files do not consume this
   slot. Do not publish a Maven version for VSIX- or documentation-only changes.
 - Emergency publication is allowed only for security, data-loss, or critical
@@ -40,9 +39,9 @@ Direct `mvn deploy` is safe by default: both participating POMs set
 
 ## Publishing from GitHub Actions
 
-This machine has no Maven Central credentials, so the actual upload runs in
-GitHub Actions instead of locally. `.github/workflows/release-central.yml`
-(`workflow_dispatch`) mirrors `scripts/release-central.sh`:
+Use the guarded local script when a dedicated Maven Central settings file and
+signing key are available. The optional `.github/workflows/release-central.yml`
+(`workflow_dispatch`) provides a credentialed Actions alternative:
 
 - **Required repo secrets** (environment `release`): `MAVEN_CENTRAL_USERNAME`,
   `MAVEN_CENTRAL_PASSWORD`, `MAVEN_GPG_PRIVATE_KEY`, `MAVEN_GPG_PASSPHRASE`.
@@ -64,3 +63,21 @@ GitHub Actions instead of locally. `.github/workflows/release-central.yml`
   merges to `master` are already gated by `.github/workflows/maven.yml`.
 - `scripts/release-central.sh` remains the local alternative for anyone who
   does have Central credentials configured.
+
+## Dedicated self-hosted runner
+
+CI and release workflows target `[unlaxer-parser-ci, Linux, X64]` on this
+repository's self-hosted runner. Register it with `--no-default-labels` and
+`--labels unlaxer-parser-ci,Linux,X64`; the generic `self-hosted` label is
+intentionally absent so historical queued workflows are not picked up.
+This does not change or reuse TinyExpression or ubnfc runners.
+
+Use a separate installation/work directory and service. Keep registration
+tokens out of logs and source control. Follow the [GitHub runner setup guide](https://docs.github.com/en/actions/how-tos/manage-runners/self-hosted-runners/add-runners).
+Only trusted workflow code should run on a machine with access to local data.
+CI does not overwrite existing Maven settings or the user's default Rust
+toolchain. Central credentials use `settings-central.xml` (or `MAVEN_SETTINGS`),
+not the shared default Maven settings file.
+Maven dependencies persist in the runner's local repository. Do not enable the
+remote `setup-java` Maven cache here: restoring the multi-GB archive on every
+job duplicates that local cache and delays verification without adding coverage.

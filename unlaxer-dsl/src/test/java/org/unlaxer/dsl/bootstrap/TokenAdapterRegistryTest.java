@@ -5,6 +5,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.util.List;
+import java.util.Set;
 import org.junit.Test;
 import org.unlaxer.dsl.PortabilityCheck;
 import org.unlaxer.dsl.bootstrap.UBNFAST.TokenDecl;
@@ -47,6 +48,24 @@ public class TokenAdapterRegistryTest {
             .filter(file -> file.relativePath().equals("parser.rs")).findFirst().orElseThrow().content();
         assertTrue(rust.contains("Expr::Custom(crate::word_token)"));
         assertTrue(PortabilityCheck.check(source).portable());
+    }
+
+    @Test
+    public void format2AdapterContractIsMachineReadableAndRestrictsContextAccessors() {
+        String setting = "@ubnf: v2\n@tokenAdapter: { id: 'example.word' version: '1' "
+            + "java: 'example.WordParser' rust: 'crate::word_token' "
+            + "accepts: 'ASCII word' failure: 'no-consume' context: 'remaining,position' }";
+        var grammar = UBNFMapper.parse(grammar(setting + "\n"
+            + "token WORD = ADAPTER('example.word', version=1)")).grammars().get(0);
+        var descriptor = TokenAdapterRegistry.requireValid(grammar).find("example.word", 1).orElseThrow();
+        assertEquals("ASCII word", descriptor.accepts());
+        assertEquals("no-consume", descriptor.failure());
+        assertEquals(Set.of("remaining", "position"), descriptor.contextAccessors());
+
+        var invalid = UBNFMapper.parse(grammar(CUSTOM_SETTING.replace(" }", " context: 'captures' }")
+            + "\n token WORD = ADAPTER('example.word', version=1)")).grammars().get(0);
+        assertEquals("P-ADAPTER-DEFINITION", TokenAdapterRegistry.build(invalid, null)
+            .diagnostics().get(0).code());
     }
 
     @Test

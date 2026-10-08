@@ -1,0 +1,46 @@
+:root { color-scheme: light dark; --bg: #f6f8fc; --surface: #fff; --ink: #18243a; --muted: #56657b; --line: #d8e0ec; --accent: #175cd3; --soft: #edf4ff; font: 15px/1.75 system-ui, sans-serif; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); }
+header { display: flex; justify-content: space-between; gap: 1rem; padding: 1rem max(1rem, calc((100vw - 1120px)/2)); border-bottom: 1px solid var(--line); background: var(--surface); color: var(--muted); }
+.brand { font-weight: 800; letter-spacing: .07em; color: var(--ink); }
+.badge { font-size: .75rem; background: var(--soft); color: var(--accent); border-radius: 5px; padding: .1rem .4rem; }
+main { max-width: 1120px; margin: auto; padding: 2rem 1.5rem; }
+h1 { font-size: clamp(1.7rem, 4vw, 2.6rem); line-height: 1.4; margin: .4rem 0 1rem; }
+h2 { font-size: 1.3rem; line-height: 1.5; }
+h3 { font-size: 1rem; }
+p { margin: .6rem 0 1rem; }
+.eyebrow { font-size: .82rem; color: var(--accent); font-weight: 700; letter-spacing: .16em; }
+.intro > p { max-width: 58rem; }
+.workflow { display: grid; grid-template-columns: repeat(2, 1fr); gap: .6rem; list-style: none; padding: 0; }
+.workflow li { padding: .75rem 1rem; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+.notice, .check { padding: .75rem 1rem; border-left: 3px solid var(--accent); background: var(--soft); }
+.tabs { display: flex; gap: .4rem; margin: 2rem 0 1.5rem; flex-wrap: wrap; }
+button { cursor: pointer; font: inherit; border-radius: 6px; border: 1px solid var(--line); padding: .45rem .85rem; background: var(--surface); color: var(--ink); }
+button:hover { border-color: var(--accent); }
+button[aria-pressed=true], button.primary { background: var(--accent); color: white; border-color: var(--accent); }
+button:focus-visible, input:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.lesson-layout { display: grid; grid-template-columns: 230px 1fr; gap: 1.5rem; }
+#lessons { display: flex; flex-direction: column; gap: .45rem; align-self: start; }
+#lessons button { text-align: left; }
+article, details { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 1.2rem; min-width: 0; }
+article h2 { margin-top: 0; }
+li { margin-bottom: .5rem; }
+code, pre, textarea { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+pre { background: var(--bg); border: 1px solid var(--line); padding: 1rem; overflow: auto; line-height: 1.55; border-radius: 6px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .85rem; }
+code { font-size: .9em; }
+.actions { display: flex; gap: .5rem; flex-wrap: wrap; margin: 1rem 0; }
+.cases { padding: 0; list-style: none; }
+.cases li { display: flex; align-items: baseline; gap: .7rem; padding: .35rem .6rem; border-bottom: 1px solid var(--line); }
+.cases code { white-space: pre-wrap; overflow-wrap: anywhere; }
+.pass { color: #17643e; font-weight: 700; min-width: 3rem; }
+.fail { color: #a23024; font-weight: 700; min-width: 3rem; }
+label { display: block; font-weight: 700; margin-bottom: .5rem; }
+input { width: 100%; padding: .7rem 1rem; border: 1px solid var(--line); border-radius: 7px; font: inherit; background: var(--surface); color: var(--ink); }
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
+summary { cursor: pointer; font-weight: 700; }
+.category { display: inline-block; color: var(--muted); font-size: .78rem; margin-bottom: .3rem; }
+#count, footer { color: var(--muted); font-size: .85rem; }
+footer { border-top: 1px solid var(--line); padding: 1.5rem; text-align: center; }
+[hidden] { display: none !important; }
+@media (max-width: 700px) { .lesson-layout, .cards, .workflow { grid-template-columns: 1fr; } header > :last-child { display: none; } main { padding: 1.3rem .8rem; } #lessons { display: grid; grid-template-columns: 1fr 1fr; } }
+@media (prefers-color-scheme: dark) { :root { --bg: #111c2c; --surface: #19273a; --ink: #e4ecf9; --muted: #aabbce; --line: #374b65; --accent: #387beb; --soft: #203552; } .pass { color: #8bdfad; } .fail { color: #ffa49a; } }

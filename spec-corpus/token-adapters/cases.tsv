@@ -21,3 +21,6 @@ builtin-memo.ubnf	passed	-
 adapter-name-collision.ubnf	failed	P-STRUCTURE
 adapter-short-name-collision.ubnf	failed	P-STRUCTURE
 adapter-short-name-reversed.ubnf	failed	P-STRUCTURE
+bindings.ubnf	passed	-
+bindings-duplicate.ubnf	blocked	P-ADAPTER-DEFINITION,P-ADAPTER-UNKNOWN
+bindings-unknown.ubnf	blocked	P-ADAPTER-DEFINITION,P-ADAPTER-UNKNOWN

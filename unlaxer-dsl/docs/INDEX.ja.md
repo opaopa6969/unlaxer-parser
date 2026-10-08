@@ -6,6 +6,9 @@
 
 ## チュートリアル
 
+新しい宣言的 token から始める場合は [図でわかる UBNF v2](../../docs/ubnf-v2-illustrated-ja.md) を参照してください。
+文字から AST、外部 grammar、capture と巻き戻しを図と Java/Rust 検証済みサンプルで説明します。
+
 | # | ドキュメント | 説明 |
 |---|-------------|------|
 | 1 | [5分で始める（Quick Start）](./quickstart-dialogue.ja.md) | 先輩と後輩の会話形式で学ぶクイックスタート -- 文法を書いて四則演算言語を50行で作る |

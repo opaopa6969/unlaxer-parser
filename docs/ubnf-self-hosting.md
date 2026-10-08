@@ -4,6 +4,10 @@
 > The current production setup lives under `unlaxer-dsl/ubnf-vscode/`
 > (Maven-driven, integrated into the reactor build).
 
+3.3.0-SNAPSHOT では、このメタ文法から [ブラウザ playground](ubnf-playground-ja.md) も生成できます。
+生成された parser が入門6文法とメタ文法自身を読み取ることを Java/Rust/WASM のテストで確認します。
+手書き bootstrap frontend を完全に置き換えたという意味ではありません。
+
 ## Summary
 
 The UBNF code generators can process `unlaxer-dsl/grammar/ubnf.ubnf`

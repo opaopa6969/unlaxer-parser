@@ -6,8 +6,9 @@ This page covers the three release channels: Maven Central (libraries), GitHub A
 
 ## 1. Maven Central (unlaxer-common / unlaxer-dsl)
 
-Central publications use one organization-wide release train slot per UTC
-calendar month. The canonical policy and queue are
+Central publications are recorded by UTC calendar month and use the queue's
+configured cap. Readiness requires green CI, a changelog, a version bump, and
+the release checklist. The canonical policy and queue are
 [`release/README.md`](../release/README.md) and
 [`release/central-release-queue.yml`](../release/central-release-queue.yml).
 VSIX- or documentation-only changes do not use Central.

@@ -18,7 +18,11 @@ import org.unlaxer.dsl.bootstrap.UBNFSourceSnapshot.Span;
 
 /** Pure-data, versioned adapter catalog. Building it never loads either target's implementation. */
 public final class TokenAdapterRegistry {
-    private static final Set<String> FIELDS = Set.of("id", "version", "java", "rust");
+    private static final Set<String> REQUIRED_FIELDS = Set.of("id", "version", "java", "rust");
+    private static final Set<String> OPTIONAL_FIELDS = Set.of("accepts", "failure", "consumes", "context");
+    /** Read-only context surface shared by the Java and Rust adapter entry points. */
+    public static final Set<String> CONTEXT_ACCESSORS = Set.of(
+        "source", "remaining", "position", "matchedPosition", "bindings");
     private static final Set<String> JAVA_RESTRICTED = Set.of("record", "var", "yield", "sealed", "permits");
     private static final Set<String> RUST_KEYWORDS = Set.of(
         "as", "async", "await", "break", "const", "continue", "crate", "dyn", "else", "enum", "extern",
@@ -28,7 +32,9 @@ public final class TokenAdapterRegistry {
         "priv", "try", "typeof", "unsized", "virtual", "yield", "union"
     );
 
-    public record Descriptor(String id, int version, String javaClass, String rustPath, boolean builtin) {}
+    public record Descriptor(String id, int version, String javaClass, String rustPath,
+                             String accepts, String failure, String consumes, Set<String> contextAccessors,
+                             boolean builtin) {}
     public record Diagnostic(String code, Span span, String subject) {}
     public record Build(TokenAdapterRegistry registry, List<Diagnostic> diagnostics) {}
     private record Key(String id, int version) {}
@@ -61,16 +67,21 @@ public final class TokenAdapterRegistry {
             Map<String, String> fields = new HashMap<>();
             boolean invalid = false;
             for (KeyValuePair entry : block.entries()) {
-                if (!FIELDS.contains(entry.key()) || fields.putIfAbsent(entry.key(), entry.value()) != null) invalid = true;
+                if ((!REQUIRED_FIELDS.contains(entry.key()) && !OPTIONAL_FIELDS.contains(entry.key()))
+                    || fields.putIfAbsent(entry.key(), entry.value()) != null) invalid = true;
             }
             String id = fields.getOrDefault("id", "tokenAdapter");
             Integer version = version(fields.get("version"));
-            if (invalid || fields.size() != FIELDS.size() || !validId(id) || version == null
-                || !validJavaClass(fields.get("java")) || !validRustPath(fields.get("rust"))) {
+            Set<String> contextAccessors = contextAccessors(fields.get("context"));
+            if (invalid || !fields.keySet().containsAll(REQUIRED_FIELDS) || !validId(id) || version == null
+                || !validJavaClass(fields.get("java")) || !validRustPath(fields.get("rust"))
+                || contextAccessors == null || !validContractText(fields.get("accepts"))
+                || !validFailure(fields.get("failure")) || !validConsumes(fields.get("consumes"))) {
                 diagnostics.add(new Diagnostic("P-ADAPTER-DEFINITION", span, id));
                 continue;
             }
-            Descriptor descriptor = new Descriptor(id, version, fields.get("java"), fields.get("rust"), false);
+            Descriptor descriptor = new Descriptor(id, version, fields.get("java"), fields.get("rust"),
+                fields.get("accepts"), fields.get("failure"), fields.get("consumes"), contextAccessors, false);
             if (descriptors.putIfAbsent(new Key(id, version), descriptor) != null) {
                 diagnostics.add(new Diagnostic("P-ADAPTER-DUPLICATE", span, id));
             }
@@ -109,7 +120,30 @@ public final class TokenAdapterRegistry {
     }
 
     private static void builtin(Map<Key, Descriptor> descriptors, String id, String javaClass) {
-        descriptors.put(new Key(id, 1), new Descriptor(id, 1, javaClass, null, true));
+        descriptors.put(new Key(id, 1), new Descriptor(id, 1, javaClass, null,
+            null, null, null, Set.of(), true));
+    }
+
+    private static Set<String> contextAccessors(String raw) {
+        if (raw == null || raw.isBlank()) return Set.of();
+        Set<String> names = new java.util.LinkedHashSet<>();
+        for (String name : raw.split(",", -1)) {
+            String normalized = name.trim();
+            if (!CONTEXT_ACCESSORS.contains(normalized) || !names.add(normalized)) return null;
+        }
+        return Set.copyOf(names);
+    }
+
+    private static boolean validContractText(String text) {
+        return text == null || !text.isBlank();
+    }
+
+    private static boolean validFailure(String failure) {
+        return failure == null || Set.of("no-consume", "may-consume").contains(failure);
+    }
+
+    private static boolean validConsumes(String consumes) {
+        return consumes == null || Set.of("always", "maybe", "never").contains(consumes);
     }
 
     private static Span span(UBNFSourceSnapshot snapshot, Object node) {

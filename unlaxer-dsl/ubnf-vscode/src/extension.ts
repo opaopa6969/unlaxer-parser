@@ -1,6 +1,8 @@
 import * as path from "path";
 import * as vscode from "vscode";
 import { LanguageClient, LanguageClientOptions, ServerOptions } from "vscode-languageclient/node";
+import { registerHelp } from "./help";
+import { registerPlayground } from "./playground";
 
 let client: LanguageClient | undefined;
 let outputChannel: vscode.OutputChannel | undefined;
@@ -10,6 +12,7 @@ function getBundledJarPath(context: vscode.ExtensionContext): string {
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  registerHelp(context);
   const config: vscode.WorkspaceConfiguration =
     vscode.workspace.getConfiguration("ubnfLsp");
 
@@ -24,6 +27,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   outputChannel = vscode.window.createOutputChannel("UBNF LSP");
   outputChannel.appendLine(`[ubnf-lsp] java: ${javaPath}`);
   outputChannel.appendLine(`[ubnf-lsp] jar:  ${jarPath}`);
+  registerPlayground(context, {javaPath, jarPath, jvmArgs, output: outputChannel});
 
   const serverOptions: ServerOptions = {
     command: javaPath,

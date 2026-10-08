@@ -50,11 +50,16 @@ public final class RustGrammarLowering {
 
     private GrammarIR run() {
         if (!grammar.imports().isEmpty()) throw unsupported("imports");
+        var lexical = org.unlaxer.dsl.bootstrap.LexicalCompiler.compile(grammar);
         boolean whitespace = false;
         Set<String> settings = new HashSet<>();
         Set<String> memoSafeTokens = new HashSet<>();
         for (var setting : grammar.settings()) {
-            if (setting.key().equals("tokenAdapter")) continue; // checked by the pure registry
+            if (setting.key().equals("tokenAdapter") || setting.key().equals("tokenContract")) continue;
+            if (setting.key().equals("feature")) {
+                if (!org.unlaxer.dsl.bootstrap.UBNFFeatures.validate(grammar).isEmpty()) throw unsupported("invalid feature");
+                continue;
+            }
             if (!setting.key().equals("memoSafeToken") && !settings.add(setting.key())) {
                 throw unsupported("duplicate setting " + setting.key());
             }
@@ -75,16 +80,23 @@ public final class RustGrammarLowering {
                     .filter(candidate -> candidate.name().equals(alias))
                     .findFirst().orElseThrow(() -> unsupported("memoSafeToken undefined token alias " + alias));
                 if (!(token instanceof TokenDecl.Simple)
+                    && !(token instanceof TokenDecl.Declarative)
                     && !(token instanceof TokenDecl.Adapter adapter
                         && TokenAdapterRegistry.isBuiltin(adapter.id(), Integer.parseInt(adapter.version())))) {
                     throw unsupported(token instanceof TokenDecl.Adapter
                         ? "memoSafeToken alias must name a Simple or built-in Adapter token " + alias
                         : "memoSafeToken alias must name a Simple token " + alias);
                 }
-            } else if (!setting.key().equals("package")) throw unsupported("setting " + setting.key());
+            } else if (!setting.key().equals("tokenStream") && !setting.key().equals("package")
+                && !(setting.key().equals("ubnf") && value.value().matches("v[12]"))) {
+                throw unsupported("setting " + setting.key());
+            }
         }
+        org.unlaxer.dsl.codegen.TokenStreamGrammar.requireValid(grammar);
         for (var token : grammar.tokens()) {
-            if (tokens.putIfAbsent(token.name(), token(token)) != null) throw unsupported("duplicate token " + token.name());
+            Expression value = token instanceof TokenDecl.Declarative
+                ? new LexicalToken(token.name(), lexical.get(token.name())) : token(token);
+            if (tokens.putIfAbsent(token.name(), value) != null) throw unsupported("duplicate token " + token.name());
         }
         int root = -1;
         boolean hasScope = grammar.rules().stream().flatMap(rule -> rule.annotations().stream())
@@ -124,6 +136,8 @@ public final class RustGrammarLowering {
                         throw unsupported("mapping method collision " + previous + " / " + value.className());
                     }
                     mapping = value;
+                } else if (annotation instanceof DocAnnotation) {
+                    // Preserved as ordered tooling metadata on the lowered rule below.
                 } else if (annotation instanceof SkipAnnotation) {
                     // The complete projection boundary is carried separately from syntax.
                 } else if (annotation instanceof LeftAssocAnnotation) {
@@ -275,7 +289,10 @@ public final class RustGrammarLowering {
                 ruleBody = new PredictiveChoice(alternatives, alternatives.stream()
                     .map(alternative -> firstPredictor(alternative, new HashSet<>(), predictorCache)).toList());
             }
-            rules.add(new Rule(grammar.rules().get(i).name(), ruleBody, mapping, operators.get(i), catalog, skips.get(i)));
+            var documentation = grammar.rules().get(i).annotations().stream()
+                .filter(DocAnnotation.class::isInstance).map(DocAnnotation.class::cast)
+                .map(DocAnnotation::text).toList();
+            rules.add(new Rule(grammar.rules().get(i).name(), ruleBody, mapping, operators.get(i), catalog, skips.get(i), documentation));
         }
         List<Rule> rewritten = new ArrayList<>();
         boolean hasValues = variants.values().stream().flatMap(mapping -> mapping.fields().stream())
@@ -311,7 +328,7 @@ public final class RustGrammarLowering {
                 expression = new Recovery(expression, mode, RecoverySupport.validateSyncTokens(tokens),
                     "syntax error: skipped to sync point");
             }
-            rewritten.add(new Rule(rule.name(), expression, mapping, rule.operator(), rule.catalog(), rule.skip()));
+            rewritten.add(new Rule(rule.name(), expression, mapping, rule.operator(), rule.catalog(), rule.skip(), rule.documentation()));
         }
         return new GrammarIR(rewritten, root, whitespace);
     }
@@ -673,6 +690,7 @@ public final class RustGrammarLowering {
     }
 
     private boolean nullable(Expression expression) {
+        if (expression instanceof LexicalToken token) return token.expression().nullable();
         if (expression instanceof ErrorExpected ignored) {
             return false;
         }

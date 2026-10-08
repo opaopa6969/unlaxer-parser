@@ -13,6 +13,20 @@ import java.util.Set;
  */
 class ParserTokenEmitter {
 
+    static String generateLexicalClasses(ParserGenerator.GenContext ctx) {
+        StringBuilder result = new StringBuilder();
+        org.unlaxer.dsl.bootstrap.LexicalCompiler.compile(ctx.grammar).forEach((name, expression) -> {
+            String className = ParserCodegenUtil.toParserClassName(name);
+            result.append("    public static class ").append(className)
+                .append(" extends org.unlaxer.dsl.runtime.LexicalTokenParser {\n")
+                .append("        public ").append(className).append("() { super(\"")
+                .append(ParserCodegenUtil.escapeString(name)).append("\", ")
+                .append(org.unlaxer.dsl.bootstrap.LexicalCompiler.javaExpression(expression)).append("); }\n")
+                .append("    }\n\n");
+        });
+        return result.toString();
+    }
+
     private ParserTokenEmitter() {}
 
     /**

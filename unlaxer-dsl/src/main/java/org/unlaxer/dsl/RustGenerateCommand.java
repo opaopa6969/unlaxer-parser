@@ -43,7 +43,7 @@ final class RustGenerateCommand {
             return CodegenMain.EXIT_CLI_ERROR;
         }
         try {
-            var file = UBNFMapper.parse(Files.readString(Path.of(options.get("--grammar"))));
+            var file = org.unlaxer.dsl.bootstrap.UBNFModuleLoader.load(Path.of(options.get("--grammar")));
             if (file.grammars().size() != 1) throw new IllegalArgumentException("Rust subset requires exactly one grammar");
             // Java class-resolution warnings do not define Rust token support: lowering
             // enforces an explicit Rust allowlist. Common grammar errors remain fatal.

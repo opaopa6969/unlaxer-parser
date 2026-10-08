@@ -15,16 +15,20 @@
 
 # unlaxer-parser
 
+開発版は **3.3.0-SNAPSHOT**（未公開）です。以下の依存例は最新安定版 **3.2.0** を使用します。
+開発版の UBNF VSIX には、画面内で学べる [はじめの一歩・catalog/help](unlaxer-dsl/ubnf-vscode/README.md) を追加しています。
+書いた文法から [言語の playground を生成](docs/ubnf-playground-ja.md) できます。UBNF 自体の文法も入力にできます。
+
 **文法を書くだけで言語が手に入る — Parser + AST + Evaluator + LSP + DAP をすべて自動生成**
 
 [![Maven Central](https://img.shields.io/maven-central/v/org.unlaxer/unlaxer-common)](https://central.sonatype.com/artifact/org.unlaxer/unlaxer-common)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Java 21+](https://img.shields.io/badge/Java-21%2B-orange.svg)]()
-[![Version](https://img.shields.io/badge/version-3.1.1-blue)]()
+[![Version](https://img.shields.io/badge/version-3.2.0-blue)]()
 
 ---
 
-> **最新リリース — 3.1.1**: 後方互換の minor リリース。実行時 FIRST 集合による候補除外で、大きい入力の deferred 診断モードの CPU コストを約半分に削減（6 ラウンドの計測詳細は CHANGELOG 参照）。UBNF bootstrap は Rust frontend と同様に末尾未消費入力を拒否し、空文法を受理するようになりました。自己ホスト文法での 3 段以上の dotted 参照（`a.b.Value`）も正しくパースできます。全履歴は [CHANGELOG](./CHANGELOG.md) を参照してください。履歴上の注意: **3.0.2 は Maven Central に公開されていません** — 3.0.1 からアップグレードする場合は 3.0.3 以降へ直接進んでください。`unlaxer-common` または `unlaxer-dsl` の `2.x` に依存している場合は、[CHANGELOG](./CHANGELOG.md) と下記の[downstream ドリフト警告](#downstream-ドリフト警告)を参照してください。
+> **最新リリース — 3.2.0**: UBNF v2 の宣言的 token と字句 grammar の部品化に対応。NUMBER・STRING・可変長 fence の認識仕様を UBNF 自体に書き、Java/Rust の parser を生成できます。token/context 契約、portability check、生成 API の差分レポートも追加しました。[図でわかる UBNF v2](./docs/ubnf-v2-illustrated-ja.md) から始められます。Java 21 と Java 17 用 artifact の区別は維持します。全履歴・制限は [CHANGELOG](./CHANGELOG.md) を参照してください。履歴上の注意: **3.0.2 は Maven Central に公開されていません**。`2.x` からの移行は下記の[downstream ドリフト警告](#downstream-ドリフト警告)も確認してください。
 
 ---
 
@@ -141,12 +145,12 @@ MulOp ::= '*' | '/' ;
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-common</artifactId>
-        <version>3.1.1</version>
+        <version>3.2.0</version>
     </dependency>
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-dsl</artifactId>
-        <version>3.1.1</version>
+        <version>3.2.0</version>
     </dependency>
 </dependencies>
 ```
@@ -159,12 +163,12 @@ MulOp ::= '*' | '/' ;
 <dependency>
     <groupId>org.unlaxer</groupId>
     <artifactId>unlaxer-common-jdk17</artifactId>
-    <version>3.1.1</version>
+    <version>3.2.0</version>
 </dependency>
 <dependency>
     <groupId>org.unlaxer</groupId>
     <artifactId>unlaxer-dsl-jdk17</artifactId>
-    <version>3.1.1</version>
+    <version>3.2.0</version>
 </dependency>
 ```
 
@@ -358,6 +362,7 @@ UBNF 文法ファイル `unlaxer-dsl/grammar/ubnf.ubnf` 自体が UBNF で記述
 
 | ドキュメント | 説明 | 言語 |
 |------------|------|------|
+| [図でわかる UBNF v2](./docs/ubnf-v2-illustrated-ja.md) | 宣言的 token から AST、grammar の部品化、capture と巻き戻しまで。検証済みの例付き | [JA](./docs/ubnf-v2-illustrated-ja.md) |
 | [Getting Started](./docs/getting-started-ja.md) | Maven 設定、最初の文法、完全ウォークスルー | [EN](./docs/getting-started.md) / [JA](./docs/getting-started-ja.md) |
 | [UBNF ガイド](./docs/ubnf-guide-ja.md) | UBNF 構文全体、全アノテーション、機能マトリックス | [EN](./docs/ubnf-guide.md) / [JA](./docs/ubnf-guide-ja.md) |
 | [アーキテクチャ](./docs/architecture-ja.md) | Bootstrap パイプライン、コンビネータカタログ、ParserIR | [EN](./docs/architecture.md) / [JA](./docs/architecture-ja.md) |
@@ -478,3 +483,12 @@ curl http://127.0.0.1:9228/healthz
 ## Classic と ubnfc の選び方
 
 このリポジトリのコンビネータ実行系（**unlaxer Classic**）と、UBNF コンパイラ **ubnfc** のどちらを使うかの目安: [docs/engine-selection-guide-ja.md](docs/engine-selection-guide-ja.md)
+
+## 型に基づく編集支援の API
+
+3.3.0-SNAPSHOT には Java / Rust 共通の[型・scope・期待型モデル](docs/semantic-model.md)がある。UBNF から生成した AST を adapter で接続し、ユーザー定義型を合成して引数の型に適合する変数を補完できる。[実行例](examples/semantic-model/README.md)を参照。既存言語への型構文・LSP の自動追加を意味しない。
+
+3.3.0-SNAPSHOT では [`@tokenStream: enabled`](docs/token-stream.md) により、生成した Java / Rust parser で文字列直接解析・trivia cache・遅延 token 化・事前 token 化を選択できる。原文の位置とコメントを保持し、既定は直接解析を維持する。
+
+文字種境界は既存 token の合成で表せる。実行時辞書には Java / Rust 共通の immutable parse bindings を使う。
+[仕様と実行例](docs/parse-composition.md)、[辞書 resolver の実行チュートリアル](examples/resolver-tutorial/README.md)を参照。

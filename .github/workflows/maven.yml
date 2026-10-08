@@ -1,5 +1,9 @@
 name: Java CI with Maven
 
+# Repository-scoped self-hosted runner. The custom label avoids picking up old
+# queued jobs that target only the generic self-hosted label.
+# Maven dependencies persist locally; do not transfer the multi-GB remote cache.
+
 on:
   push:
     branches: [ "master" ]
@@ -9,18 +13,21 @@ on:
 jobs:
   rust:
     name: Rust backend and Java conformance
-    runs-on: ubuntu-latest
+    runs-on: [unlaxer-parser-ci, Linux, X64]
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-java@v4
       with:
         java-version: '21'
         distribution: 'temurin'
-        cache: maven
+        overwrite-settings: false
     - name: Set up Rust (minimum supported version)
       run: |
+        export PATH="$HOME/.cargo/bin:$PATH"
+        echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
         rustup toolchain install 1.85.0 --profile minimal --component rustfmt --component clippy
-        rustup default 1.85.0
+        rustup target add --toolchain 1.85.0 wasm32-unknown-unknown
+        echo "RUSTUP_TOOLCHAIN=1.85.0" >> "$GITHUB_ENV"
     - name: Rust standalone checks
       run: |
         cargo fmt --all --manifest-path rust/Cargo.toml --check
@@ -29,11 +36,37 @@ jobs:
     # UbnfSpecCorpusTest は spec-corpus/ubnf/*.json の Java 側の駆動。Rust 側の
     # rust/unlaxer-ubnf/tests/spec_corpus.rs は同 job の `cargo test` が回すので、
     # 同じ fixture の Java / Rust 両方が 1 つの job で緑になることを見えるようにする。
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '20'
     - name: Cross-language fixtures, compile failures, and generated-file drift
       run: >
         mvn -B -pl unlaxer-common,unlaxer-dsl -am test
-        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,RustPortabilityConformanceTest,TokenAdapterConformanceTest,ApiImpactConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest,SkipMappingConformanceTest,CaptureEqualityConformanceTest,ErrorElementConformanceTest,RecoveryConformanceTest -DrustConformance=true
+        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,RustPortabilityConformanceTest,TokenAdapterConformanceTest,ParseBindingsConformanceTest,DeclarativeTokenConformanceTest,ApiImpactConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest,SkipMappingConformanceTest,CaptureEqualityConformanceTest,ErrorElementConformanceTest,RecoveryConformanceTest,SemanticModelConformanceTest,SemanticModelUbnfTest,TokenStreamConformanceTest -DrustConformance=true -DtokenStreamBench=true
         -Dsurefire.failIfNoSpecifiedTests=false
+    - name: Resolver tutorial (Java and Rust)
+      run: |
+        python3 examples/resolver-tutorial/run.py build
+        python3 examples/resolver-tutorial/run.py check
+        cargo clippy --locked --manifest-path examples/resolver-tutorial/rust/Cargo.toml --all-targets -- -D warnings
+        rustfmt --edition 2021 --config skip_children=true --check examples/resolver-tutorial/rust/src/main.rs examples/resolver-tutorial/rust/src/resolvers.rs
+        test -s examples/resolver-tutorial/target/conformance.tsv
+    - name: Generated WASM playground in Chromium
+      working-directory: unlaxer-dsl/ubnf-vscode
+      run: |
+        npm ci
+        npx playwright install chromium
+        node scripts/playground-browser.mjs
+        node --test scripts/completion.test.mjs
+        node scripts/learning-browser.mjs
+    - name: Require selectable lexing conformance and measurement evidence
+      run: |
+        test -s unlaxer-dsl/target/rust-token-stream.tsv
+        test -s unlaxer-dsl/target/token-stream-benchmark.tsv
+    - name: Require semantic model and generated UBNF evidence
+      run: |
+        test -s unlaxer-dsl/target/rust-semantic-model.tsv
+        test -s unlaxer-dsl/target/rust-semantic-ubnf.tsv
     - name: Require UBNF source position conformance evidence
       run: test -s unlaxer-dsl/target/rust-ubnf-source.tsv
     - name: Require portability check conformance evidence
@@ -42,6 +75,9 @@ jobs:
       run: |
         test -s unlaxer-dsl/target/rust-token-adapter-diagnostics.tsv
         test -s unlaxer-dsl/target/rust-token-adapter-runtime.tsv
+        test -s unlaxer-dsl/target/rust-parse-bindings.tsv
+    - name: Require declarative token codegen and runtime evidence
+      run: test -s unlaxer-dsl/target/rust-declarative-token-runtime.tsv
     - name: Require API evolution reports and real compiler evidence
       run: |
         test -s unlaxer-dsl/target/api-impact-conformance.tsv
@@ -68,6 +104,10 @@ jobs:
       with:
         name: rust-conformance
         path: |
+          unlaxer-dsl/target/rust-token-stream.tsv
+          unlaxer-dsl/target/token-stream-benchmark.tsv
+          unlaxer-dsl/target/rust-semantic-model.tsv
+          unlaxer-dsl/target/rust-semantic-ubnf.tsv
           unlaxer-dsl/target/rust-conformance.tsv
           unlaxer-dsl/target/rust-diagnostics.tsv
           unlaxer-dsl/target/rust-diagnostics-edge.tsv
@@ -79,6 +119,9 @@ jobs:
           unlaxer-dsl/target/rust-portability.tsv
           unlaxer-dsl/target/rust-token-adapter-diagnostics.tsv
           unlaxer-dsl/target/rust-token-adapter-runtime.tsv
+          unlaxer-dsl/target/rust-parse-bindings.tsv
+          examples/resolver-tutorial/target/conformance.tsv
+          unlaxer-dsl/target/rust-declarative-token-runtime.tsv
           unlaxer-dsl/target/api-impact-conformance.tsv
           unlaxer-dsl/target/api-impact-compile.tsv
           unlaxer-dsl/target/rust-associative.tsv
@@ -132,7 +175,7 @@ jobs:
         if-no-files-found: error
 
   build:
-    runs-on: ubuntu-latest
+    runs-on: [unlaxer-parser-ci, Linux, X64]
 
     steps:
     - uses: actions/checkout@v4
@@ -142,7 +185,7 @@ jobs:
       with:
         java-version: '21'
         distribution: 'temurin'
-        cache: maven
+        overwrite-settings: false
 
     - name: Validate Central release guard
       run: |
@@ -157,8 +200,9 @@ jobs:
     - name: Package library jars and check class file majors
       run: |
         mvn -B -pl .,unlaxer-common,unlaxer-dsl,unlaxer-common-jdk17,unlaxer-dsl-jdk17 package -DskipTests -Dgpg.skip=true
-        python3 scripts/check_class_major.py 65 unlaxer-common/target/unlaxer-common-*[0-9].jar unlaxer-dsl/target/unlaxer-dsl-*[0-9].jar
-        python3 scripts/check_class_major.py 61 unlaxer-common-jdk17/target/unlaxer-common-jdk17-*[0-9].jar unlaxer-dsl-jdk17/target/unlaxer-dsl-jdk17-*[0-9].jar
+        artifact_version=$(mvn -q help:evaluate -Dexpression=revision -DforceStdout)
+        python3 scripts/check_class_major.py 65 "unlaxer-common/target/unlaxer-common-${artifact_version}.jar" "unlaxer-dsl/target/unlaxer-dsl-${artifact_version}.jar"
+        python3 scripts/check_class_major.py 61 "unlaxer-common-jdk17/target/unlaxer-common-jdk17-${artifact_version}.jar" "unlaxer-dsl-jdk17/target/unlaxer-dsl-jdk17-${artifact_version}.jar"
 
     # 静的解析 (issue #37): Error Prone (compile 時) + SpotBugs。
     # 生成コードは除外 (config/spotbugs-exclude.xml / -XepExcludedPaths)。
@@ -173,7 +217,7 @@ jobs:
   # class file major 61 in every class of their jars.
   build-jdk17:
     name: "*-jdk17 artifacts on JDK 17"
-    runs-on: ubuntu-latest
+    runs-on: [unlaxer-parser-ci, Linux, X64]
 
     steps:
     - uses: actions/checkout@v4
@@ -183,22 +227,21 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
-        cache: maven
+        overwrite-settings: false
 
     - name: Build and test the -jdk17 modules on JDK 17
       run: mvn -B -pl unlaxer-common-jdk17,unlaxer-dsl-jdk17 -am clean package -Dgpg.skip=true
 
     - name: Require class file major 61 (Java 17) in the -jdk17 jars
-      run: >
-        python3 scripts/check_class_major.py 61
-        unlaxer-common-jdk17/target/unlaxer-common-jdk17-*[0-9].jar
-        unlaxer-dsl-jdk17/target/unlaxer-dsl-jdk17-*[0-9].jar
+      run: |
+        artifact_version=$(mvn -q help:evaluate -Dexpression=revision -DforceStdout)
+        python3 scripts/check_class_major.py 61 "unlaxer-common-jdk17/target/unlaxer-common-jdk17-${artifact_version}.jar" "unlaxer-dsl-jdk17/target/unlaxer-dsl-jdk17-${artifact_version}.jar"
 
   # UBNF VSIX を成果物として添付する。タグ push 時の Release 添付は
   # release-vsix.yml を参照。
   vsix:
     name: UBNF VSIX (ubnf-vscode)
-    runs-on: ubuntu-latest
+    runs-on: [unlaxer-parser-ci, Linux, X64]
 
     steps:
     - uses: actions/checkout@v4
@@ -208,7 +251,7 @@ jobs:
       with:
         java-version: '21'
         distribution: 'temurin'
-        cache: maven
+        overwrite-settings: false
 
     - name: Set up Node.js (for vsce)
       uses: actions/setup-node@v4
@@ -220,6 +263,21 @@ jobs:
 
     - name: Build ubnf-vscode VSIX
       run: mvn -B -pl unlaxer-dsl/ubnf-vscode verify -Dgpg.skip=true
+
+    - name: Verify authoring help in Chromium and the webview host
+      working-directory: unlaxer-dsl/ubnf-vscode
+      run: |
+        npx playwright install chromium
+        npm run test:help
+
+    - name: Activate the packaged VSIX with isolated VS Code profiles
+      working-directory: unlaxer-dsl/ubnf-vscode
+      env:
+        RUSTUP_TOOLCHAIN: 1.85.0
+      run: |
+        export PATH="$HOME/.cargo/bin:$PATH"
+        rustup toolchain install 1.85.0 --profile minimal --target wasm32-unknown-unknown
+        xvfb-run -a npm run test:vsix
 
     - name: Upload VSIX artifact
       uses: actions/upload-artifact@v4
@@ -233,7 +291,7 @@ jobs:
   # ビルド中の unlaxer に対して downstream の smoke を回し、再発を防ぐ。
   downstream:
     name: Downstream smoke (tinyexpression)
-    runs-on: ubuntu-latest
+    runs-on: [unlaxer-parser-ci, Linux, X64]
 
     steps:
     - uses: actions/checkout@v4
@@ -245,7 +303,7 @@ jobs:
       with:
         java-version: '21'
         distribution: 'temurin'
-        cache: maven
+        overwrite-settings: false
 
     - name: Install unlaxer to local repo
       working-directory: unlaxer-parser
@@ -302,7 +360,7 @@ jobs:
     - name: Set up Rust for actual tinyexpression token conformance
       run: |
         rustup toolchain install 1.85.0 --profile minimal
-        rustup default 1.85.0
+        echo "RUSTUP_TOOLCHAIN=1.85.0" >> "$GITHUB_ENV"
 
     - name: Compare real tinyexpression external tokens with both Rust generators
       working-directory: unlaxer-parser

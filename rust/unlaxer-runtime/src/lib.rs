@@ -1,15 +1,18 @@
 //! Experimental UBNF structural subset. No JVM, unsafe code, or external dependencies.
 use std::any::Any;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::hash::{BuildHasher, Hasher};
 use std::rc::Rc;
 use std::sync::Arc;
 
 mod first;
+pub mod lexical;
+pub mod lexing;
 mod long_code_fence;
 #[cfg(test)]
 mod memo_retention_tests;
 mod scope;
+pub mod semantic;
 #[doc(hidden)]
 pub use first::{set_candidate_exclusion_for_current_thread, CandidateExclusion};
 pub use scope::{
@@ -58,6 +61,8 @@ pub struct RecoveryDiagnostic {
 
 #[derive(Debug, Clone)]
 pub enum Expr {
+    /// An atomic token compiled from a declarative UBNF lexical expression.
+    Lexical(&'static str, lexical::LexicalExpression),
     Literal(&'static str),
     Number,
     /// Java clang IdentifierParser: ASCII letter/underscore, then ASCII alphanumeric/underscore.
@@ -1021,7 +1026,9 @@ impl FailureMemoBuckets {
 /// Checkpoint counters and memoized-failure hit counts describe only this context's
 /// first pass, not any separate diagnostic retry; semantic diagnostics are unaffected.
 pub struct ParseContext<'a> {
+    bindings: BTreeMap<String, Vec<String>>,
     input: &'a str,
+    lexing: Option<lexing::Session<'a>>,
     rules: Arc<[Rule]>,
     whitespace: bool,
     position: usize,
@@ -1232,6 +1239,16 @@ impl<'a> ParseContext<'a> {
     /// [`Diagnostics::DetailedOnFailure`] disables
     /// syntax diagnostics here and does not automatically retry failed operations.
     pub fn with_options(input: &'a str, options: ParseOptions) -> Self {
+        Self::with_bindings(input, BTreeMap::new(), options)
+    }
+
+    /// Takes ownership of a parse-local snapshot. Values retain order and duplicates.
+    /// No binding can be replaced during this context's lifetime.
+    pub fn with_bindings(
+        input: &'a str,
+        bindings: BTreeMap<String, Vec<String>>,
+        options: ParseOptions,
+    ) -> Self {
         let options = if options.diagnostics == Diagnostics::Auto {
             options.with_diagnostics(Diagnostics::Detailed)
         } else {
@@ -1252,7 +1269,9 @@ impl<'a> ParseContext<'a> {
             offsets
         };
         Self {
+            bindings,
             input,
+            lexing: None,
             rules: Arc::from([]),
             whitespace: false,
             position: 0,
@@ -1323,6 +1342,12 @@ impl<'a> ParseContext<'a> {
     /// Hits in this context's pass only; excludes any separate detailed retry.
     fn memoized_failure_hits(&self) -> usize {
         self.memoized_failure_hits
+    }
+
+    /// Read-only external data, independent of captures and transactional state.
+    /// An absent key returns an empty slice.
+    pub fn binding_values(&self, name: &str) -> &[String] {
+        self.bindings.get(name).map(Vec::as_slice).unwrap_or(&[])
     }
 
     pub fn source(&self) -> &'a str {
@@ -1855,6 +1880,24 @@ impl<'a> ParseContext<'a> {
                     nodes: matched.nodes,
                     captures: matched.captures,
                 }),
+            Expr::Lexical(label, expression) => {
+                let end = match &mut self.lexing {
+                    Some(session) => {
+                        session.match_at(label, false, Some(expression), self.position)
+                    }
+                    None => expression.match_at(self.input, self.position),
+                };
+                if let Some(end) = end {
+                    if end != self.position {
+                        self.matched_position = end;
+                    }
+                    self.position = end;
+                    Some(Fragment::default())
+                } else {
+                    self.fail(label);
+                    None
+                }
+            }
             Expr::Backreference(name) => {
                 let text = self.captured(name);
                 if let Some(text) = text.filter(|text| self.remaining().starts_with(text)) {
@@ -2084,8 +2127,14 @@ impl<'a> ParseContext<'a> {
                 }
             }
             Expr::Literal(literal) => {
-                if self.input[self.position..].starts_with(literal) {
-                    self.position += literal.len();
+                let end = match &mut self.lexing {
+                    Some(session) => session.match_at(literal, true, None, self.position),
+                    None => self.input[self.position..]
+                        .starts_with(literal)
+                        .then_some(self.position + literal.len()),
+                };
+                if let Some(end) = end {
+                    self.position = end;
                     self.matched_position = self.position;
                     Some(Fragment::default())
                 } else {
@@ -2586,6 +2635,14 @@ impl<'a> ParseContext<'a> {
         if !self.whitespace {
             return;
         }
+        if let Some(session) = &mut self.lexing {
+            let end = session.skip(self.position);
+            if end != self.position {
+                self.position = end;
+                self.matched_position = end;
+            }
+            return;
+        }
         loop {
             let start = self.position;
             while self
@@ -2725,7 +2782,8 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
         | Expr::CaptureEquality { child, .. }
         | Expr::Recovery { child, .. }
         | Expr::TriviaScope { child, .. } => expression_allows_deferred_diagnostics(child),
-        Expr::Literal(_)
+        Expr::Lexical(_, _)
+        | Expr::Literal(_)
         | Expr::Number
         | Expr::Identifier
         | Expr::CodeStart
@@ -3834,5 +3892,24 @@ mod tests {
         assert!(context.parse_shared_grammar(&grammar, 0, false).is_err());
         assert_eq!(CUSTOM_CALLS.load(std::sync::atomic::Ordering::Relaxed), 2);
         assert_eq!(context.memoized_failure_hits(), 0);
+    }
+}
+
+#[cfg(test)]
+mod parse_bindings_tests {
+    use super::*;
+    #[test]
+    fn bindings_are_owned_read_only_and_context_local() {
+        let mut bindings = BTreeMap::from([(
+            "words".to_owned(),
+            vec!["𠮷".to_owned(), String::new(), "𠮷".to_owned()],
+        )]);
+        let a = ParseContext::with_bindings("𠮷", bindings.clone(), ParseOptions::default());
+        bindings.insert("words".to_owned(), vec!["changed".to_owned()]);
+        let b = ParseContext::with_bindings("𠮷", bindings, ParseOptions::default());
+        assert_eq!(a.binding_values("words"), ["𠮷", "", "𠮷"]);
+        assert_eq!(b.binding_values("words"), ["changed"]);
+        assert!(a.binding_values("missing").is_empty());
+        assert!(ParseContext::new("𠮷").binding_values("words").is_empty());
     }
 }

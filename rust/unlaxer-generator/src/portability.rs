@@ -1,6 +1,6 @@
 //! Read-only capability inventory followed by structural validation when possible.
-//! No imports, external parser loading, code generation, or subprocesses.
-use crate::adapters::AdapterRegistry;
+//! String API is I/O-free; file API resolves local lexical modules.
+use crate::adapters::{feature_diagnostics, token_contract_diagnostics, AdapterRegistry};
 use std::fmt::Write;
 use unlaxer_ubnf::*;
 
@@ -87,7 +87,48 @@ pub fn check(source: &str) -> Report {
             }
         }
     };
-    let file = snapshot.ast();
+    check_ast(snapshot.ast())
+}
+
+pub fn check_file(path: &std::path::Path) -> Report {
+    if let Ok(source) = std::fs::read_to_string(path) {
+        match parse(&source) {
+            Ok(file)
+                if file.grammars.iter().any(|g| {
+                    !g.imports.is_empty()
+                        && g.settings.iter().any(|s| {
+                            s.key == "ubnf"
+                                && matches!(&s.value, SettingValue::String(v) if v == "v2")
+                        })
+                }) => {}
+            _ => return check(&source),
+        }
+    }
+    match crate::modules::load(path) {
+        Ok(file) => {
+            let mut report = check_ast(&file);
+            for diagnostic in &mut report.diagnostics {
+                diagnostic.span = None;
+            }
+            report
+                .diagnostics
+                .sort_by(|a, b| a.code.cmp(b.code).then_with(|| a.subject.cmp(&b.subject)));
+            report.diagnostics.dedup();
+            report
+        }
+        Err(_) => Report {
+            portable: false,
+            structure: "blocked",
+            diagnostics: vec![Diagnostic {
+                code: "P-MODULE",
+                subject: "UBNF module resolution".into(),
+                span: None,
+            }],
+        },
+    }
+}
+
+fn check_ast(file: &UbnfFile) -> Report {
     let mut inventory = Inventory {
         diagnostics: Vec::new(),
     };
@@ -149,12 +190,32 @@ impl Inventory {
         for issue in adapter_issues {
             self.add(issue.code, issue.subject, issue.span);
         }
+        for issue in token_contract_diagnostics(grammar) {
+            self.add(issue.code, issue.subject, issue.span);
+        }
+        for issue in feature_diagnostics(grammar) {
+            self.add(issue.code, issue.subject, issue.span);
+        }
+        for issue in crate::token_stream::problems(grammar) {
+            self.add(issue.code, issue.subject, issue.span);
+        }
         for import in &grammar.imports {
             self.add("P-IMPORT", &import.path, import.span);
         }
         for setting in &grammar.settings {
             match (&*setting.key, &setting.value) {
-                ("package" | "memoSafeToken", SettingValue::String(_)) | ("tokenAdapter", _) => {}
+                ("package" | "memoSafeToken" | "tokenStream", SettingValue::String(_)) => {}
+                ("ubnf", SettingValue::String(value)) if value == "v1" || value == "v2" => {}
+                ("feature", SettingValue::String(value))
+                    if matches!(
+                        value.as_str(),
+                        "tokenContractsV1"
+                            | "contextAccessorsV1"
+                            | "parseBindingsV1"
+                            | "tokenProgressContractsV1"
+                            | "declarativeTokensV1"
+                    ) => {}
+                ("tokenAdapter" | "tokenContract", _) => {}
                 ("whitespace", SettingValue::String(value)) => {
                     if !whitespace(value) {
                         self.add("P-WHITESPACE", value, setting.value_span);
@@ -165,6 +226,7 @@ impl Inventory {
         }
         for token in &grammar.tokens {
             match &token.kind {
+                TokenKind::Declarative { .. } => {}
                 TokenKind::Simple { parser_class } => {
                     if crate::lowering::token_expression(&token.kind).is_err() {
                         self.add("P-EXTERNAL-TOKEN", parser_class, token.span);
@@ -241,8 +303,7 @@ impl Inventory {
                 }
             }
             AnnotationKind::Eval { .. } => self.add("P-ANNOTATION", "eval", span),
-            AnnotationKind::Doc { .. } => self.add("P-ANNOTATION", "doc", span),
-            AnnotationKind::Recovery { .. } => {}
+            AnnotationKind::Doc { .. } | AnnotationKind::Recovery { .. } => {}
             AnnotationKind::Skip => {}
             AnnotationKind::Simple { name } => self.add("P-ANNOTATION", name, span),
             AnnotationKind::CommonField { .. } => self.add("P-ANNOTATION", "commonField", span),

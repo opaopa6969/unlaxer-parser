@@ -9,20 +9,41 @@ policy:
   emergencyRequiresReason: true
 
 lastObserved:
-  asOf: "2026-09-26"
-  month: "2026-09"
-  publishedOperations: 8
-  source: https://repo1.maven.org/maven2/org/unlaxer/
+  asOf: "2026-10-03"
+  month: "2026-10"
+  publishedOperations: 1
+  source: https://repo1.maven.org/maven2/org/unlaxer/unlaxer-parser/3.2.0/unlaxer-parser-3.2.0.pom
+  deploymentId: "6235b68e-9cdd-48a5-8f0c-61b38f04f4ab"
+  note: >-
+    One verified deployment: Publisher API reports PUBLISHED and all five
+    coordinates are downloadable. The directory-index guard still reported
+    zero at 14:41 UTC because its listings lagged behind the actual files;
+    this observation uses the deployment and signed artifacts, not an inferred
+    directory-index timestamp. Artifact Last-Modified is 2026-10-03T14:36:11Z.
+    Signatures/checksums for all 17 files and isolated Java 21 / Java 17 consumers
+    passed. Evidence and source commit are recorded in #349.
   releases:
-    - repository: opaopa6969/tinyexpression
-      versions: [1.4.11, 1.4.12, 1.4.13, 1.4.14, 1.4.15, 2.0.0, 2.0.1]
     - repository: opaopa6969/unlaxer-parser
-      versions: [3.0.12, 3.0.13, 3.0.14, 3.0.15, 3.1.0, 3.1.1]
+      versions: [3.2.0]
 
 nextWindow:
-  month: "2026-09"
+  month: "2026-10"
   selected: null
   candidates:
+    - repository: opaopa6969/unlaxer-parser
+      status: published
+      publishedAt: "2026-10-03T14:36Z"
+      requestedVersion: "3.2.0"
+      checklist: "https://github.com/opaopa6969/unlaxer-parser/issues/349"
+      release: "https://github.com/opaopa6969/unlaxer-parser/releases/tag/v3.2.0"
+      sourceCommit: "ea1f3c6fd78c7b864cce03369c06f795de5db565"
+      note: >-
+        UBNF v2 declarative lexical expressions, scoped lexical modules,
+        token/context contracts, Java/Rust conformance and illustrated guide.
+        Published parent POM plus Java 21 / Java 17 library artifacts after all
+        five PR and master CI jobs passed. v3.2.0 identifies the verified source
+        commit; the matching GitHub Release includes the UBNF VSIX. Public POMs,
+        jars, sources, javadocs, signatures and fresh consumer resolution passed.
     - repository: opaopa6969/unlaxer-parser
       status: published
       publishedAt: "2026-09-25T00:35Z"

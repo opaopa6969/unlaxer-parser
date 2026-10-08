@@ -4,9 +4,12 @@
 
 # UBNF 言語ガイド
 
-**バージョン**: 3.1.1
+**バージョン**: 3.2.0
 
 UBNF（Unlaxer BNF）は unlaxer-parser の文法定義言語です。認識セマンティクスだけでなく、コード生成の意図も表現するために設計された、型付きでアノテーション駆動の EBNF 拡張です。
+
+新しい宣言的 token を学ぶ入口は [図でわかる UBNF v2](ubnf-v2-illustrated-ja.md) です。
+本ガイドには旧形式の例も含まれます。v2 の認識仕様と部品化は図解入門と [宣言的 token の仕様](declarative-tokens.md) を参照してください。
 
 ---
 
@@ -58,7 +61,22 @@ grammar GrammarName {
 
 ## トークン宣言
 
-トークンは文字シーケンスを認識するリーフパーサーです。`token` キーワードで宣言され、`Parser` を実装する Java クラスを参照する必要があります。
+トークンは文字シーケンスを認識するリーフパーサーです。format 2 では認識仕様そのものを
+`token NAME ::= expression ;` と宣言し、Java/Rust の parser を生成できます。
+
+```ubnf
+grammar Numbers {
+  @ubnf: v2
+  @feature: declarativeTokensV1
+  token DIGIT ::= CHAR_RANGE('0', '9');
+  token INTEGER ::= ['+' | '-'] DIGIT+;
+  @root @mapping(Value, params=[text]) Root ::= INTEGER @text;
+}
+```
+
+token 内に空白は自動挿入されません。式への先読みと局所 raw capture / 再照合を含む
+仕様・STRING・可変長 fence の例は [宣言的 token](declarative-tokens.md) を参照してください。
+以下の `token NAME = ...` は既存文法の互換形式です。
 
 ### シンプルトークン（クラス参照）
 

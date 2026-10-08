@@ -1,0 +1,7 @@
+grammar Numbers {
+  @ubnf: v2
+  token DIGIT ::= CHAR_RANGE('0', '9');
+  token NUMBER ::= [ '+' | '-' ]
+    ( DIGIT+ '.' DIGIT* | '.' DIGIT+ | DIGIT+ )
+    [ ( 'e' | 'E' ) [ '+' | '-' ] DIGIT+ ];
+}

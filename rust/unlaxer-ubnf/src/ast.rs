@@ -78,6 +78,9 @@ pub struct TokenDecl {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TokenKind {
+    Declarative {
+        expression: crate::lexical::LexicalExpression,
+    },
     Simple {
         parser_class: String,
     },

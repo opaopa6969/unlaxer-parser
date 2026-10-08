@@ -26,6 +26,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.RecoveryAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RecoveryMode;
 import org.unlaxer.dsl.bootstrap.UBNFAST.SkipAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.TerminalElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.TokenDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.WhitespaceAnnotation;
 
 import java.util.ArrayList;
@@ -736,6 +737,8 @@ class ParserRuleEmitter {
     ) {
         if (ref.namespace().isPresent()) return PredictorSpec.unknown();
         String name = ref.name();
+        if (ctx.grammar.tokens().stream().anyMatch(token -> token.name().equals(name)
+                && token instanceof TokenDecl.Declarative)) return PredictorSpec.unknown();
         String tokenParser = ctx.tokenParserMap.get(name);
         if (tokenParser != null) return predictorForTokenParser(tokenParser);
         if (!ctx.ruleNames.contains(name)) return PredictorSpec.unknown();
@@ -963,7 +966,7 @@ class ParserRuleEmitter {
      * 内部的に resolveElement（解決）と renderElement（レンダリング）に分離。
      */
     static String generateElementCode(ParserGenerator.GenContext ctx, String ruleName, AtomicElement element) {
-        return renderElement(resolveElement(ctx, ruleName, element), ctx.adapterShadowsWordParser);
+        return renderElement(resolveElement(ctx, ruleName, element), ctx.adapterShadowsWordParser, ctx.tokenStream);
     }
 
     // =========================================================================
@@ -1077,7 +1080,10 @@ class ParserRuleEmitter {
     // =========================================================================
 
     static String renderElement(ElementModel model, boolean adapterShadowsWordParser) {
-        String wordParser = adapterShadowsWordParser
+        return renderElement(model, adapterShadowsWordParser, false);
+    }
+    static String renderElement(ElementModel model, boolean adapterShadowsWordParser, boolean tokenStream) {
+        String wordParser = tokenStream ? "org.unlaxer.dsl.runtime.Lexing.LiteralParser" : adapterShadowsWordParser
             ? "org.unlaxer.parser.elementary.WordParser" : "WordParser";
         if (model instanceof ElementModel.WordMatch m) {
             return "new " + wordParser + "(\"" + ParserCodegenUtil.escapeString(m.word()) + "\")";
@@ -1103,38 +1109,41 @@ class ParserRuleEmitter {
             return "new org.unlaxer.parser.elementary.WildCardCharacterParser()";
         }
         if (model instanceof ElementModel.EofParser m) {
-            return "new org.unlaxer.parser.elementary.EndOfSourceParser()";
+            return tokenStream ? "new org.unlaxer.dsl.runtime.Lexing.EofParser()" : "new org.unlaxer.parser.elementary.EndOfSourceParser()";
         }
         if (model instanceof ElementModel.EmptyParser m) {
-            return "new org.unlaxer.parser.elementary.EmptyParser()";
+            return tokenStream ? "new org.unlaxer.dsl.runtime.Lexing.LiteralParser(\"\")" : "new org.unlaxer.parser.elementary.EmptyParser()";
         }
         if (model instanceof ElementModel.IgnoreCaseWord m) {
             return "new org.unlaxer.parser.elementary.IgnoreCaseWordParser(\""
                 + ParserCodegenUtil.escapeString(m.word()) + "\")";
         }
         if (model instanceof ElementModel.ZeroOrMoreOf m) {
-            return "new ZeroOrMore(" + renderInner(m.inner(), adapterShadowsWordParser) + ")";
+            return "new ZeroOrMore(" + renderInner(m.inner(), adapterShadowsWordParser, tokenStream) + ")";
         }
         if (model instanceof ElementModel.OneOrMoreOf m) {
-            return "new OneOrMore(" + renderInner(m.inner(), adapterShadowsWordParser) + ")";
+            return "new OneOrMore(" + renderInner(m.inner(), adapterShadowsWordParser, tokenStream) + ")";
         }
         if (model instanceof ElementModel.OptionalOf m) {
-            return "new Optional(" + renderInner(m.inner(), adapterShadowsWordParser) + ")";
+            return "new Optional(" + renderInner(m.inner(), adapterShadowsWordParser, tokenStream) + ")";
         }
         if (model instanceof ElementModel.BoundedRepeatOf m) {
-            return "new Repeat(" + renderInner(m.inner(), adapterShadowsWordParser) + ", " + m.min() + ", " + m.max() + ")";
+            return "new Repeat(" + renderInner(m.inner(), adapterShadowsWordParser, tokenStream) + ", " + m.min() + ", " + m.max() + ")";
         }
         if (model instanceof ElementModel.Captured m) {
-            return "new __CaptureSite(" + renderElement(m.inner(), adapterShadowsWordParser) + ", " + bindingArguments(m.bindings()) + ")";
+            return "new __CaptureSite(" + renderElement(m.inner(), adapterShadowsWordParser, tokenStream) + ", " + bindingArguments(m.bindings()) + ")";
         }
         throw new IllegalStateException("unhandled " + model);
     }
 
     static String renderInner(ElementModel model, boolean adapterShadowsWordParser) {
+        return renderInner(model, adapterShadowsWordParser, false);
+    }
+    static String renderInner(ElementModel model, boolean adapterShadowsWordParser, boolean tokenStream) {
         if (model instanceof ElementModel.ClassRef m) {
             return m.className();
         }
-        return renderElement(model, adapterShadowsWordParser);
+        return renderElement(model, adapterShadowsWordParser, tokenStream);
     }
 
     /** body が複数代替の ChoiceBody かどうか */
@@ -1253,10 +1262,10 @@ class ParserRuleEmitter {
             return "new org.unlaxer.parser.elementary.WildCardCharacterParser()";
         }
         if (ctx.tokenEofSet.contains(name)) {
-            return "new org.unlaxer.parser.elementary.EndOfSourceParser()";
+            return ctx.tokenStream ? "new org.unlaxer.dsl.runtime.Lexing.EofParser()" : "new org.unlaxer.parser.elementary.EndOfSourceParser()";
         }
         if (ctx.tokenEmptySet.contains(name)) {
-            return "new org.unlaxer.parser.elementary.EmptyParser()";
+            return ctx.tokenStream ? "new org.unlaxer.dsl.runtime.Lexing.LiteralParser(\"\")" : "new org.unlaxer.parser.elementary.EmptyParser()";
         }
         String ciWord = ctx.tokenCIMap.get(name);
         if (ciWord != null) {

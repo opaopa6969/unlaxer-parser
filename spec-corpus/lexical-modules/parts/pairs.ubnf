@@ -1,0 +1,5 @@
+grammar Pairs {
+  @import chars from '../chars.ubnf'
+  @ubnf: v2
+  token PAIR ::= CAPTURE(x, chars.EMOJI) SAME_AS(x);
+}

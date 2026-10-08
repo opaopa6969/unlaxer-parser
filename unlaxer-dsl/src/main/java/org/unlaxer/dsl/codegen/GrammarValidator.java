@@ -30,6 +30,8 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.TokenDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.TypeofElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.WhitespaceAnnotation;
 import org.unlaxer.dsl.bootstrap.TokenAdapterRegistry;
+import org.unlaxer.dsl.bootstrap.TokenContractRegistry;
+import org.unlaxer.dsl.bootstrap.UBNFFeatures;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -104,12 +106,29 @@ public final class GrammarValidator {
     private static List<ValidationIssue> validate(GrammarDecl grammar, boolean resolveParserClasses) {
         List<ValidationIssue> errors = new ArrayList<>();
 
+        try { org.unlaxer.dsl.bootstrap.LexicalCompiler.compile(grammar); }
+        catch (IllegalArgumentException error) {
+            errors.add(new ValidationIssue("E-LEXICAL", error.getMessage(), "Correct the declarative token expression."));
+        }
+
         for (TokenAdapterRegistry.Diagnostic issue : TokenAdapterRegistry.build(grammar, null).diagnostics()) {
             errors.add(new ValidationIssue(issue.code(), issue.code() + ": " + issue.subject(),
                 "Correct the token adapter declaration or registration."));
         }
+        for (TokenContractRegistry.Diagnostic issue : TokenContractRegistry.build(grammar, null).diagnostics()) {
+            errors.add(new ValidationIssue(issue.code(), issue.code() + ": " + issue.subject(),
+                "Correct the format-2 token contract declaration."));
+        }
+        for (UBNFFeatures.Diagnostic issue : UBNFFeatures.validate(grammar)) {
+            errors.add(new ValidationIssue(issue.code(), issue.code() + ": " + issue.subject(),
+                "Use a supported format-2 @feature declaration."));
+        }
 
+        for (var issue : TokenStreamGrammar.problems(grammar)) {
+            errors.add(new ValidationIssue(issue.code(), issue.subject(), "Use the supported @tokenStream:enabled profile."));
+        }
         validateGlobalWhitespace(grammar, errors);
+        validateUbnfFormat(grammar, errors);
         validateMemoSafeTokens(grammar, errors);
         validateRootPresence(grammar, errors);
         if (resolveParserClasses) validateTokens(grammar, errors);
@@ -584,6 +603,26 @@ public final class GrammarValidator {
             });
     }
 
+    /**
+     * UBNF 2 makes external token contracts part of the grammar. Older grammars
+     * remain valid and are interpreted as format 1 for source compatibility.
+     */
+    private static void validateUbnfFormat(GrammarDecl grammar, List<ValidationIssue> errors) {
+        List<org.unlaxer.dsl.bootstrap.UBNFAST.GlobalSetting> versions = grammar.settings().stream()
+            .filter(setting -> "ubnf".equals(setting.key())).toList();
+        if (versions.size() > 1) {
+            addError(errors, "duplicate global @ubnf setting",
+                "Keep exactly one '@ubnf: v2' declaration.", "E-UBNF-VERSION-DUPLICATE");
+            return;
+        }
+        if (versions.isEmpty()) return;
+        if (!(versions.get(0).value() instanceof StringSettingValue value)
+            || !(value.value().equals("v1") || value.value().equals("v2"))) {
+            addError(errors, "@ubnf must be format version v1 or v2",
+                "Use '@ubnf: v2' for context-aware external token contracts.", "E-UBNF-VERSION");
+        }
+    }
+
     private static void validateMemoSafeTokens(GrammarDecl grammar, List<ValidationIssue> errors) {
         Map<String, TokenDecl> tokens = new LinkedHashMap<>();
         for (TokenDecl token : grammar.tokens()) {
@@ -615,6 +654,7 @@ public final class GrammarValidator {
                         "Declare token " + alias + " or remove this @memoSafeToken setting.",
                         "E-MEMO-SAFE-TOKEN-UNDEFINED");
                 } else if (!(token instanceof TokenDecl.Simple)
+                    && !(token instanceof TokenDecl.Declarative)
                     && !(token instanceof TokenDecl.Adapter adapter && builtinAdapter(adapter))) {
                     addError(errors,
                         "global @memoSafeToken alias must name a Simple or built-in Adapter token: " + alias,
@@ -731,7 +771,8 @@ public final class GrammarValidator {
             String parserName = tokenParserClassReference(token);
             if (parserName == null) continue;
             TokenDecl first = firstByParserName.putIfAbsent(parserName, token);
-            if (first == null || !(first instanceof TokenDecl.Adapter || token instanceof TokenDecl.Adapter)) {
+            if (first == null || !(first instanceof TokenDecl.Adapter || token instanceof TokenDecl.Adapter
+                    || first instanceof TokenDecl.Declarative || token instanceof TokenDecl.Declarative)) {
                 continue;
             }
             addError(errors,
@@ -743,7 +784,7 @@ public final class GrammarValidator {
     }
 
     private static String tokenParserClassReference(TokenDecl token) {
-        if (token instanceof TokenDecl.Adapter || token instanceof TokenDecl.Simple
+        if (token instanceof TokenDecl.Declarative || token instanceof TokenDecl.Adapter || token instanceof TokenDecl.Simple
             || token instanceof TokenDecl.Negation || token instanceof TokenDecl.CharRange
             || token instanceof TokenDecl.Regex) {
             return generatedTokenParserClassName(token);
@@ -763,7 +804,8 @@ public final class GrammarValidator {
      * token name via {@link ParserCodegenUtil#toParserClassName}.
      */
     private static String generatedTokenParserClassName(TokenDecl token) {
-        if (token instanceof TokenDecl.Adapter) return ParserCodegenUtil.toParserClassName(token.name());
+        if (token instanceof TokenDecl.Adapter || token instanceof TokenDecl.Declarative)
+            return ParserCodegenUtil.toParserClassName(token.name());
         if (token instanceof TokenDecl.Simple simple) {
             String parserClass = simple.parserClass();
             if (parserClass == null || parserClass.isBlank()) {

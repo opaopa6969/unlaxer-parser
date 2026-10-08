@@ -58,9 +58,9 @@ import org.eclipse.lsp4j.WorkspaceEdit;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.TextDocumentService;
 import org.unlaxer.dsl.bootstrap.UBNFAST;
-import org.unlaxer.dsl.bootstrap.UBNFMapper;
 import org.unlaxer.dsl.bootstrap.generated.UBNFLanguageServer;
 import org.unlaxer.dsl.codegen.GrammarValidator;
+import org.unlaxer.dsl.tooling.AuthoringCatalog;
 
 /**
  * UBNF 文法編集向けのリッチ LSP 実装。生成された {@link UBNFLanguageServer} を
@@ -80,6 +80,9 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
     record AnnotationDoc(String label, String snippet, String signature, String doc) {}
 
     static final List<AnnotationDoc> ANNOTATIONS = List.of(
+        new AnnotationDoc("@ubnf", "@ubnf: v2", "@ubnf: v2", "文法形式 v2 を指定します。製品のバージョンとは別です。"),
+        new AnnotationDoc("@feature", "@feature: ${1:declarativeTokensV1}", "@feature: name", "この文法に必要な機能契約を記録します。"),
+        new AnnotationDoc("@package", "@package: ${1:org.example}", "@package: name", "生成 Java コードのパッケージです。"),
         new AnnotationDoc("@root", "@root", "@root",
             "Marks the grammar entry point. Exactly one rule must be annotated."),
         new AnnotationDoc("@mapping", "@mapping(${1:TypeName}, params=[${2:field}])",
@@ -105,9 +108,9 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
             "Marks the capture as a reference to a previously declared symbol."),
         new AnnotationDoc("@import", "@import ${1:alias} from '${2:path/to/grammar.ubnf}'",
             "@import alias from 'path'",
-            "Imports rules from another .ubnf grammar."),
+            "宣言的 token の部品を相対パスから読み込みます。設定より前に置き、alias.TOKEN で参照します。任意のルール import は未対応です。"),
         new AnnotationDoc("@recovery", "@recovery(${1:sync})", "@recovery(sync|auto|skip)",
-            "Error recovery strategy for this rule."),
+            "Recovery metadata. Execution support depends on the backend; do not assume recognition implies recovery support."),
         new AnnotationDoc("@skip", "@skip", "@skip",
             "Excludes this rule from AST output."),
         new AnnotationDoc("@interleave", "@interleave(${1:profile})", "@interleave(profile)",
@@ -135,18 +138,18 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
         "org.unlaxer.parser.posix.CommaParser",
         "org.unlaxer.parser.posix.SemiColonParser");
 
-    static final List<String> CORE_KEYWORDS = List.of(
-        "grammar", "token", "params", "from", "level", "mode", "symbol",
-        "UNTIL", "NEGATION", "LOOKAHEAD", "NEGATIVE_LOOKAHEAD", "CHAR_RANGE",
-        "REGEX", "ANY", "EOF", "EMPTY", "CI");
+    static final List<String> CORE_KEYWORDS = AuthoringCatalog.keywords();
+    static final List<String> LEXICAL_KEYWORDS = List.of("CHAR_RANGE", "NEGATION", "LOOKAHEAD", "NEGATIVE_LOOKAHEAD",
+        "ANY", "EOF", "BOF", "BOL", "EOL", "CAPTURE", "SAME_AS");
+    private static final com.google.gson.JsonObject CATALOG = com.google.gson.JsonParser.parseString(AuthoringCatalog.json()).getAsJsonObject();
 
     record BlockSnippet(String label, String detail, String body) {}
 
     static final List<BlockSnippet> BLOCK_SNIPPETS = List.of(
         new BlockSnippet("grammar", "grammar block skeleton",
-            "grammar ${1:Name} {\n  @package: ${2:org.example}\n\n  token ${3:NUMBER} = org.unlaxer.parser.elementary.NumberParser\n\n  @root\n  ${4:Start} ::= ${5:NUMBER} ;\n}$0"),
+            "grammar ${1:Name} {\n  @ubnf: v2\n  @package: ${2:org.example}\n\n  token ${3:NUMBER} ::= CHAR_RANGE('0', '9')+;\n\n  @root\n  @mapping(Value, params=[text])\n  @doc('数字を入力してください。')\n  ${4:Start} ::= ${3:NUMBER} @text;\n}$0"),
         new BlockSnippet("token", "token declaration",
-            "token ${1:NAME} = ${2:org.unlaxer.parser.elementary.NumberParser}$0"),
+            "token ${1:NAME} ::= ${2:CHAR_RANGE('0', '9')+};$0"),
         new BlockSnippet("rule", "plain rule",
             "${1:RuleName} ::= ${2:body} ;$0"),
         new BlockSnippet("mapped-rule", "rule with @mapping record",
@@ -167,55 +170,54 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
         final List<UBNFAST.GrammarDecl> grammars;
         final Map<String, DeclSite> decls = new LinkedHashMap<>();
         final List<Diagnostic> validation = new ArrayList<>();
+        final UbnfEditorIndex editor;
 
-        DocumentIndex(String content, List<UBNFAST.GrammarDecl> grammars) {
+        DocumentIndex(String content, List<UBNFAST.GrammarDecl> grammars, UbnfEditorIndex editor) {
             this.content = content;
             this.grammars = grammars;
+            this.editor = editor;
         }
     }
 
     private final Map<String, DocumentIndex> indexByUri = new LinkedHashMap<>();
 
-    private static final Pattern GRAMMAR_DECL = Pattern.compile("^[ \\t]*grammar[ \\t]+([A-Za-z_]\\w*)", Pattern.MULTILINE);
-    private static final Pattern TOKEN_DECL = Pattern.compile("^[ \\t]*token[ \\t]+([A-Za-z_]\\w*)[ \\t]*=[ \\t]*(\\S+)", Pattern.MULTILINE);
-    private static final Pattern RULE_DECL = Pattern.compile("^[ \\t]*([A-Za-z_]\\w*)[ \\t]*::=", Pattern.MULTILINE);
-
     DocumentIndex ensureIndex(String uri, String content) {
         DocumentIndex cached = indexByUri.get(uri);
-        if (cached != null && cached.content.equals(content)) {
+        if (cached != null && cached.content.equals(content) && !content.contains("@import")) {
             return cached;
         }
-        List<UBNFAST.GrammarDecl> grammars = null;
-        try {
-            grammars = UBNFMapper.parse(content).grammars();
-        } catch (RuntimeException ignored) {
-            // パース失敗時は構文ベース機能のみ提供
+        var editor = new UbnfEditorIndex(uri, content, path -> {
+            for (var state : documents.values()) {
+                try {
+                    if (java.nio.file.Path.of(java.net.URI.create(state.uri())).toAbsolutePath().normalize().equals(path)) return state.content();
+                } catch (IllegalArgumentException ignored) { /* Non-file editor. */ }
+            }
+            return java.nio.file.Files.readString(path);
+        });
+        var grammars = editor.snapshot == null ? null : editor.snapshot.ast().grammars();
+        DocumentIndex index = new DocumentIndex(content, grammars, editor);
+        for (var symbol : editor.declarations) {
+            addDecl(index, content, symbol.start(), symbol.name(), symbol.kind(), symbol.kind().equals("token") ? tokenDetail(symbol.detail()) : null);
         }
-        DocumentIndex index = new DocumentIndex(content, grammars);
-        indexDecls(content, index);
-        if (grammars != null) {
-            collectValidationDiagnostics(content, grammars, index);
+        if (editor.linked != null && editor.problems.isEmpty()) collectValidationDiagnostics(content, editor.linked, index);
+        for (var problem : editor.problems) {
+            var diagnostic = new Diagnostic(problem.range(), problem.message(), DiagnosticSeverity.Error, "ubnf-module");
+            diagnostic.setCode("E-MODULE"); index.validation.add(diagnostic);
         }
         indexByUri.put(uri, index);
         return index;
     }
 
-    private void indexDecls(String content, DocumentIndex index) {
-        Matcher g = GRAMMAR_DECL.matcher(content);
-        while (g.find()) {
-            addDecl(index, content, g.start(1), g.group(1), "grammar", null);
-        }
-        Matcher t = TOKEN_DECL.matcher(content);
-        while (t.find()) {
-            addDecl(index, content, t.start(1), t.group(1), "token", t.group(2));
-        }
-        Matcher r = RULE_DECL.matcher(content);
-        while (r.find()) {
-            String name = r.group(1);
-            if ("grammar".equals(name) || "token".equals(name)) {
-                continue;
-            }
-            addDecl(index, content, r.start(1), name, "rule", null);
+    private static String tokenDetail(String declaration) {
+        var matcher = Pattern.compile("(?s)\\btoken\\s+\\w+\\s*(?:::=|=)\\s*(.*)").matcher(declaration);
+        return matcher.find() ? matcher.group(1).strip() : "";
+    }
+
+    private void refreshImporters(String changedUri) {
+        indexByUri.clear();
+        // Re-publish dependent diagnostics using current open buffers. No external file writes.
+        for (var state : new ArrayList<>(documents.values())) {
+            if (!state.uri().equals(changedUri) && state.content().contains("@import")) parseDocument(state.uri(), state.content());
         }
     }
 
@@ -232,6 +234,8 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
                 new ArrayList<>(GrammarValidator.validate(grammar));
             issues.addAll(GrammarValidator.detectLeftRecursionIssues(grammar));
             for (GrammarValidator.ValidationIssue issue : issues) {
+                if (grammar.rules().isEmpty() && grammar.tokens().stream().allMatch(token -> token instanceof UBNFAST.TokenDecl.Declarative)
+                        && "W-GENERAL-NO-ROOT".equals(issue.code())) continue; // Token libraries intentionally have no entry rule.
                 Diagnostic diagnostic = new Diagnostic();
                 diagnostic.setCode(issue.code());
                 diagnostic.setSource("ubnf-validator");
@@ -342,12 +346,14 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
         @Override
         public void didOpen(DidOpenTextDocumentParams params) {
             server.parseDocument(params.getTextDocument().getUri(), params.getTextDocument().getText());
+            server.refreshImporters(params.getTextDocument().getUri());
         }
 
         @Override
         public void didChange(DidChangeTextDocumentParams params) {
             server.parseDocumentIncremental(
                 params.getTextDocument().getUri(), params.getContentChanges().get(0).getText());
+            server.refreshImporters(params.getTextDocument().getUri());
         }
 
         @Override
@@ -355,10 +361,11 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
             String uri = params.getTextDocument().getUri();
             server.documents.remove(uri);
             server.indexByUri.remove(uri);
+            server.refreshImporters(uri);
         }
 
         @Override
-        public void didSave(DidSaveTextDocumentParams params) {}
+        public void didSave(DidSaveTextDocumentParams params) { server.refreshImporters(params.getTextDocument().getUri()); }
 
         // ---------------------------------------------------------------- completion
 
@@ -379,7 +386,8 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
                     CompletionItem item = new CompletionItem(annotation.label());
                     item.setKind(CompletionItemKind.Event);
                     item.setDetail(annotation.signature());
-                    item.setDocumentation(markdown(annotation.doc()));
+                    String help = catalogHelp(annotation.label().substring(1));
+                    item.setDocumentation(markdown(help == null ? annotation.doc() : help));
                     item.setInsertTextFormat(InsertTextFormat.Snippet);
                     // 行内の '@' から補完が始まるので '@' を除いた snippet を挿入
                     item.setInsertText(annotation.snippet().substring(1));
@@ -400,12 +408,20 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
                 return CompletableFuture.completedFuture(Either.forLeft(items));
             }
 
-            for (String keyword : CORE_KEYWORDS) {
+            int offset = UbnfEditorIndex.offset(content, params.getPosition());
+            int assignment = index.editor.code.lastIndexOf("::=", offset);
+            boolean lexical = assignment >= 0 && index.editor.code.substring(0, assignment).matches("(?s).*\\btoken\\s+\\w+\\s*")
+                && index.editor.code.substring(assignment, offset).indexOf(';') < 0;
+            var qualifier = Pattern.compile("([A-Za-z_]\\w*\\.)\\w*$").matcher(prefix);
+            boolean qualified = qualifier.find();
+            for (String keyword : qualified ? List.<String>of() : lexical ? LEXICAL_KEYWORDS : CORE_KEYWORDS) {
                 CompletionItem item = new CompletionItem(keyword);
                 item.setKind(CompletionItemKind.Keyword);
+                String help = catalogHelp(keyword);
+                if (help != null) item.setDocumentation(markdown(help));
                 items.add(item);
             }
-            for (BlockSnippet snippet : BLOCK_SNIPPETS) {
+            for (BlockSnippet snippet : lexical || qualified ? List.<BlockSnippet>of() : BLOCK_SNIPPETS) {
                 CompletionItem item = new CompletionItem(snippet.label());
                 item.setKind(CompletionItemKind.Snippet);
                 item.setDetail(snippet.detail());
@@ -413,11 +429,19 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
                 item.setInsertText(snippet.body());
                 items.add(item);
             }
-            for (DeclSite decl : index.decls.values()) {
-                CompletionItem item = new CompletionItem(decl.name());
-                item.setKind("token".equals(decl.kind())
-                    ? CompletionItemKind.Constant : CompletionItemKind.Class);
-                item.setDetail(decl.kind() + (decl.detail() != null ? " = " + decl.detail() : ""));
+            var scope = index.editor.scopeAt(offset);
+            if (scope != null) for (var entry : scope.symbols.entrySet()) {
+                if (entry.getValue().size() != 1) continue;
+                var symbol = entry.getValue().get(0);
+                if (lexical && !symbol.kind().equals("token")) continue;
+                if (qualified && !entry.getKey().startsWith(qualifier.group(1))) continue;
+                CompletionItem item = new CompletionItem(entry.getKey());
+                item.setKind("token".equals(symbol.kind()) ? CompletionItemKind.Constant : CompletionItemKind.Class);
+                item.setDetail(symbol.kind() + " · " + symbol.uri());
+                item.setDocumentation(markdown("```ubnf\n" + symbol.detail() + "\n```"));
+                int start = offset;
+                while (start > 0 && (Character.isLetterOrDigit(content.charAt(start - 1)) || "_.".indexOf(content.charAt(start - 1)) >= 0)) start--;
+                item.setTextEdit(Either.forLeft(new TextEdit(UbnfEditorIndex.rangeOf(content, start, offset), entry.getKey())));
                 items.add(item);
             }
             return CompletableFuture.completedFuture(Either.forLeft(items));
@@ -435,6 +459,8 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
             DocumentIndex index = server.ensureIndex(uri, content);
             String word = wordAt(content, params.getPosition(), true);
             if (word != null && word.startsWith("@")) {
+                String help = catalogHelp(word.substring(1));
+                if (help != null) return CompletableFuture.completedFuture(new Hover(markdown(help)));
                 for (AnnotationDoc annotation : ANNOTATIONS) {
                     if (annotation.label().equals(word)) {
                         return CompletableFuture.completedFuture(new Hover(markdown(
@@ -443,17 +469,18 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
                 }
             }
             String plain = word != null && word.startsWith("@") ? word.substring(1) : word;
-            DeclSite decl = plain == null ? null : index.decls.get(plain);
+            String help = plain == null ? null : catalogHelp(plain);
+            if (help != null && (word.startsWith("@") || CORE_KEYWORDS.contains(plain))) {
+                return CompletableFuture.completedFuture(new Hover(markdown(help)));
+            }
+            var use = index.editor.useAt(UbnfEditorIndex.offset(content, params.getPosition()));
+            var decl = index.editor.target(use);
             if (decl != null) {
                 StringBuilder md = new StringBuilder();
                 md.append("**").append(decl.kind()).append(" ").append(decl.name()).append("**");
-                if (decl.detail() != null) {
-                    md.append(" = `").append(decl.detail()).append("`");
-                }
-                String declLine = lineAt(content, decl.line()).strip();
-                md.append("\n\n```ubnf\n").append(declLine).append("\n```");
-                int refs = findWordOccurrences(content, decl.name()).size();
-                md.append("\n\n").append(refs - 1).append(" reference(s)");
+                md.append("\n\n```ubnf\n").append(decl.detail()).append("\n```\n\n").append(decl.uri());
+                long refs = index.editor.references(use).stream().filter(item -> !item.declaration()).count();
+                md.append("\n\n").append(refs).append(" reference(s) in this document");
                 return CompletableFuture.completedFuture(new Hover(markdown(md.toString())));
             }
             DocumentState state = server.documents.get(uri);
@@ -477,14 +504,11 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
                 return CompletableFuture.completedFuture(Either.forLeft(List.of()));
             }
             DocumentIndex index = server.ensureIndex(uri, content);
-            String word = wordAt(content, params.getPosition(), false);
-            DeclSite decl = word == null ? null : index.decls.get(word);
+            var decl = index.editor.target(index.editor.useAt(UbnfEditorIndex.offset(content, params.getPosition())));
             if (decl == null) {
                 return CompletableFuture.completedFuture(Either.forLeft(List.of()));
             }
-            Range range = new Range(new Position(decl.line(), decl.startChar()),
-                new Position(decl.line(), decl.endChar()));
-            return CompletableFuture.completedFuture(Either.forLeft(List.of(new Location(uri, range))));
+            return CompletableFuture.completedFuture(Either.forLeft(List.of(decl.location())));
         }
 
         @Override
@@ -494,14 +518,15 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
             if (content == null) {
                 return CompletableFuture.completedFuture(List.of());
             }
-            String word = wordAt(content, params.getPosition(), false);
-            if (word == null) {
-                return CompletableFuture.completedFuture(List.of());
-            }
+            var editor = server.ensureIndex(uri, content).editor;
+            var use = editor.useAt(UbnfEditorIndex.offset(content, params.getPosition()));
             List<Location> locations = new ArrayList<>();
-            for (Range range : findWordOccurrences(content, word)) {
-                locations.add(new Location(uri, range));
+            for (var reference : editor.references(use)) {
+                if (!reference.declaration() || params.getContext().isIncludeDeclaration())
+                    locations.add(new Location(uri, UbnfEditorIndex.rangeOf(content, reference.start(), reference.end())));
             }
+            var target = editor.target(use);
+            if (target != null && !uri.equals(target.uri()) && params.getContext().isIncludeDeclaration()) locations.add(target.location());
             return CompletableFuture.completedFuture(locations);
         }
 
@@ -512,13 +537,18 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
             if (content == null) {
                 return CompletableFuture.completedFuture(new WorkspaceEdit());
             }
-            String word = wordAt(content, params.getPosition(), false);
-            if (word == null) {
-                return CompletableFuture.completedFuture(new WorkspaceEdit());
+            var editor = server.ensureIndex(uri, content).editor;
+            var use = editor.useAt(UbnfEditorIndex.offset(content, params.getPosition()));
+            String name = params.getNewName();
+            if (!editor.editable(use) || !name.matches("[A-Za-z_]\\w*") || CORE_KEYWORDS.contains(name)
+                    || use.scope().symbols.containsKey(name)) {
+                return CompletableFuture.failedFuture(new org.eclipse.lsp4j.jsonrpc.ResponseErrorException(
+                    new org.eclipse.lsp4j.jsonrpc.messages.ResponseError(org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode.InvalidParams,
+                        "安全に名前変更できません。完成した文法のローカル宣言を選び、重複・予約語を避けてください。外部 module の token / import alias / capture は一括 rename の対象外です。", null)));
             }
             List<TextEdit> edits = new ArrayList<>();
-            for (Range range : findWordOccurrences(content, word)) {
-                edits.add(new TextEdit(range, params.getNewName()));
+            for (var reference : editor.references(use)) {
+                edits.add(new TextEdit(UbnfEditorIndex.rangeOf(content, reference.start(), reference.end()), name));
             }
             WorkspaceEdit edit = new WorkspaceEdit();
             edit.setChanges(Map.of(uri, edits));
@@ -532,13 +562,13 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
             if (content == null) {
                 return CompletableFuture.completedFuture(null);
             }
-            String word = wordAt(content, params.getPosition(), false);
-            DocumentIndex index = server.ensureIndex(uri, content);
-            if (word == null || !index.decls.containsKey(word)) {
+            var editor = server.ensureIndex(uri, content).editor;
+            var use = editor.useAt(UbnfEditorIndex.offset(content, params.getPosition()));
+            if (!editor.editable(use)) {
                 return CompletableFuture.completedFuture(null);
             }
             return CompletableFuture.completedFuture(
-                new LinkedEditingRanges(findWordOccurrences(content, word)));
+                new LinkedEditingRanges(editor.references(use).stream().map(ref -> UbnfEditorIndex.rangeOf(content, ref.start(), ref.end())).toList()));
         }
 
         // ---------------------------------------------------------------- structure
@@ -553,28 +583,19 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
                 return CompletableFuture.completedFuture(result);
             }
             DocumentIndex index = server.ensureIndex(uri, content);
-            DocumentSymbol currentGrammar = null;
-            int totalLines = countLines(content);
-            for (DeclSite decl : index.decls.values()) {
-                Range range = new Range(new Position(decl.line(), decl.startChar()),
-                    new Position(decl.line(), decl.endChar()));
-                if ("grammar".equals(decl.kind())) {
-                    DocumentSymbol symbol = new DocumentSymbol(decl.name(), SymbolKind.Namespace,
-                        new Range(new Position(decl.line(), 0), new Position(totalLines - 1, 0)), range);
-                    symbol.setChildren(new ArrayList<>());
-                    result.add(Either.forRight(symbol));
-                    currentGrammar = symbol;
-                    continue;
-                }
-                SymbolKind kind = "token".equals(decl.kind()) ? SymbolKind.Constant : SymbolKind.Class;
-                DocumentSymbol symbol = new DocumentSymbol(decl.name(), kind, range, range);
-                if (decl.detail() != null) {
-                    symbol.setDetail(decl.detail());
-                }
-                if (currentGrammar != null) {
-                    currentGrammar.getChildren().add(symbol);
-                } else {
-                    result.add(Either.forRight(symbol));
+            for (var scope : index.editor.scopes) {
+                DocumentSymbol currentGrammar = null;
+                for (var decl : index.editor.declarations) {
+                    if (decl.start() < scope.start || decl.end() > scope.end) continue;
+                    Range range = decl.range();
+                    if ("grammar".equals(decl.kind())) {
+                        var symbol = new DocumentSymbol(decl.name(), SymbolKind.Namespace,
+                            UbnfEditorIndex.rangeOf(content, scope.start, scope.end), range);
+                        symbol.setChildren(new ArrayList<>()); result.add(Either.forRight(symbol)); currentGrammar = symbol;
+                    } else {
+                        var symbol = new DocumentSymbol(decl.name(), "token".equals(decl.kind()) ? SymbolKind.Constant : SymbolKind.Class, range, range);
+                        if (currentGrammar != null) currentGrammar.getChildren().add(symbol); else result.add(Either.forRight(symbol));
+                    }
                 }
             }
             return CompletableFuture.completedFuture(result);
@@ -691,6 +712,19 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
         }
     }
 
+    private static String catalogHelp(String id) {
+        for (var item : CATALOG.getAsJsonArray("entries")) {
+            var entry = item.getAsJsonObject();
+            if (!entry.get("id").getAsString().equals(id)) continue;
+            StringBuilder text = new StringBuilder(entry.get("title").getAsString());
+            text.append("\n\n").append(entry.get("summary").getAsString());
+            text.append("\n\n```ubnf\n").append(entry.get("syntax").getAsString()).append("\n```");
+            for (var detail : entry.getAsJsonArray("details")) text.append("\n\n").append(detail.getAsString());
+            return text.toString();
+        }
+        return null;
+    }
+
     // =========================================================================
     // semantic tokenizer (行ベース、parse 失敗時も機能する)
     // =========================================================================
@@ -768,10 +802,6 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
         return line >= 0 && line < lines.length ? lines[line] : "";
     }
 
-    static int countLines(String content) {
-        return content.split("\n", -1).length;
-    }
-
     /** カーソル位置の単語。includeAt が true なら直前の '@' も含める。 */
     static String wordAt(String content, Position position, boolean includeAt) {
         String line = lineAt(content, position.getLine());
@@ -794,41 +824,6 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
         return word;
     }
 
-    /** 文字列・コメントを除いた word の全出現範囲。 */
-    static List<Range> findWordOccurrences(String content, String word) {
-        List<Range> occurrences = new ArrayList<>();
-        String[] lines = content.split("\n", -1);
-        Pattern pattern = Pattern.compile("\\b" + Pattern.quote(word) + "\\b");
-        for (int lineNumber = 0; lineNumber < lines.length; lineNumber++) {
-            String line = lines[lineNumber];
-            int comment = line.indexOf("//");
-            Matcher matcher = pattern.matcher(line);
-            while (matcher.find()) {
-                if (comment >= 0 && matcher.start() >= comment) {
-                    break;
-                }
-                if (insideString(line, matcher.start())) {
-                    continue;
-                }
-                occurrences.add(new Range(new Position(lineNumber, matcher.start()),
-                    new Position(lineNumber, matcher.end())));
-            }
-        }
-        return occurrences;
-    }
-
-    private static boolean insideString(String line, int index) {
-        boolean inString = false;
-        for (int i = 0; i < index; i++) {
-            char c = line.charAt(i);
-            if (c == '\\') {
-                i++;
-            } else if (c == '\'') {
-                inString = !inString;
-            }
-        }
-        return inString;
-    }
 
     static MarkupContent markdown(String value) {
         MarkupContent content = new MarkupContent();

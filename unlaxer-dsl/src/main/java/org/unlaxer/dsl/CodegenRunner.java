@@ -64,7 +64,8 @@ final class CodegenRunner {
         FileSystemPort fs
     ) throws IOException {
         String source = fs.readString(Path.of(config.grammarFile()));
-        UBNFFile file = UBNFMapper.parse(source);
+        UBNFFile file = org.unlaxer.dsl.bootstrap.UBNFModuleLoader.resolve(
+            UBNFMapper.parse(source), Path.of(config.grammarFile()), fs::readString);
 
         Map<String, CodeGenerator> generatorMap = generatorMap(config.javaRelease());
 

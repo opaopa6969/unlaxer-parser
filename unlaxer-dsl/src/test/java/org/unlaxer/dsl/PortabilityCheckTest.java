@@ -45,7 +45,7 @@ public class PortabilityCheckTest {
             grammar Unsupported {
               token Bad = example.UnsafeParser
               token Pattern = REGEX('a')
-              @root @mapping(Root, params=[value]) @doc('x')
+              @root @mapping(Root, params=[value]) @custom
               Start ::= ('') | ERROR('bad') | remote.Item | @typeof(value) 'x' @value ;
               Other ::= remote.Item ;
             }
@@ -57,7 +57,7 @@ public class PortabilityCheckTest {
         assertEquals("P-EXTERNAL-TOKEN", result.diagnostics().get(0).code());
         assertEquals("example.UnsafeParser", result.diagnostics().get(0).subject());
         assertTrue(result.diagnostics().stream().anyMatch(d -> d.code().equals("P-TOKEN-KIND") && d.subject().equals("REGEX")));
-        assertTrue(result.diagnostics().stream().anyMatch(d -> d.code().equals("P-ANNOTATION") && d.subject().equals("doc")));
+        assertTrue(result.diagnostics().stream().anyMatch(d -> d.code().equals("P-ANNOTATION") && d.subject().equals("custom")));
         assertTrue(result.diagnostics().stream().anyMatch(d -> d.code().equals("P-EMPTY-LITERAL")));
         assertEquals(2, result.diagnostics().stream().filter(d -> d.code().equals("P-QUALIFIED-REFERENCE")).count());
         assertTrue(result.diagnostics().stream().anyMatch(d -> d.code().equals("P-TYPEOF") && d.subject().equals("value")));

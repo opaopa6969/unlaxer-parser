@@ -1,5 +1,8 @@
 //! Supported structural semantics, independent of JVM parser class loading.
-use crate::adapters::{AdapterBinding, AdapterRegistry, BuiltinAdapter};
+use crate::adapters::{
+    feature_diagnostics, token_contract_diagnostics, AdapterBinding, AdapterRegistry,
+    BuiltinAdapter,
+};
 use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 use unlaxer_codegen::ir::*;
@@ -216,6 +219,7 @@ impl Lowering<'_> {
         Ok(AnalysisDepth(&self.analysis_depth))
     }
     fn run(mut self) -> Result<GrammarIr> {
+        let mut lexical = crate::lexical::compile(self.grammar)?;
         if !self.grammar.imports.is_empty() {
             return Err("unsupported imports".into());
         }
@@ -223,14 +227,26 @@ impl Lowering<'_> {
         if let Some(issue) = adapter_issues.first() {
             return Err(format!("{}: {}", issue.code, issue.subject));
         }
+        if let Some(issue) = token_contract_diagnostics(self.grammar).first() {
+            return Err(format!("{}: {}", issue.code, issue.subject));
+        }
+        if let Some(issue) = feature_diagnostics(self.grammar).first() {
+            return Err(format!("{}: {}", issue.code, issue.subject));
+        }
+        if let Some(issue) = crate::token_stream::problems(self.grammar).first() {
+            return Err(format!("{}: {}", issue.code, issue.subject));
+        }
         let mut whitespace = false;
         let mut settings = HashSet::new();
         let mut memo_safe_tokens = HashSet::new();
         for setting in &self.grammar.settings {
-            if setting.key == "tokenAdapter" {
+            if setting.key == "tokenAdapter" || setting.key == "tokenContract" {
                 continue;
             }
-            if setting.key != "memoSafeToken" && !settings.insert(&setting.key) {
+            if setting.key != "memoSafeToken"
+                && setting.key != "feature"
+                && !settings.insert(&setting.key)
+            {
                 return Err(format!("duplicate setting {}", setting.key));
             }
             let SettingValue::String(value) = &setting.value else {
@@ -240,11 +256,21 @@ impl Lowering<'_> {
                 return Err(format!("unsupported block setting {}", setting.key));
             };
             match setting.key.as_str() {
+                "ubnf" if value == "v1" || value == "v2" => {}
+                "feature"
+                    if matches!(
+                        value.as_str(),
+                        "tokenContractsV1"
+                            | "contextAccessorsV1"
+                            | "parseBindingsV1"
+                            | "tokenProgressContractsV1"
+                            | "declarativeTokensV1"
+                    ) => {}
                 "whitespace" => {
                     whitespace = whitespace_style(value)
                         .map_err(|_| format!("unsupported setting whitespace: {value}"))?
                 }
-                "package" => {}
+                "package" | "tokenStream" => {}
                 "memoSafeToken" => {
                     let alias = value.trim();
                     if !memo_safe_tokens.insert(alias) {
@@ -255,7 +281,7 @@ impl Lowering<'_> {
                         return Err(format!("memoSafeToken undefined token alias {alias}"));
                     };
                     let memo_allowed = match &token.kind {
-                        TokenKind::Simple { .. } => true,
+                        TokenKind::Simple { .. } | TokenKind::Declarative { .. } => true,
                         TokenKind::Adapter { id, version } => matches!(
                             adapter_registry.resolve(id, version),
                             Ok(AdapterBinding::Builtin(_))
@@ -274,7 +300,14 @@ impl Lowering<'_> {
             }
         }
         for token in &self.grammar.tokens {
-            let expression = token_expression_with_registry(&token.kind, &adapter_registry)?;
+            let expression = if let Some(expression) = lexical.remove(&token.name) {
+                Expression::LexicalToken {
+                    name: token.name.clone(),
+                    expression,
+                }
+            } else {
+                token_expression_with_registry(&token.kind, &adapter_registry)?
+            };
             if self.tokens.insert(token.name.clone(), expression).is_some() {
                 return Err(format!("duplicate token {}", token.name));
             }
@@ -428,6 +461,7 @@ impl Lowering<'_> {
                             return Err(format!("duplicate @catalog on {}", rule.name));
                         }
                     }
+                    AnnotationKind::Doc { .. } => {}
                     other => {
                         return Err(format!("unsupported annotation {other:?} on {}", rule.name))
                     }
@@ -647,6 +681,17 @@ impl Lowering<'_> {
                 mapping: if self.skips[i] { None } else { mapping },
                 operator: self.operators[i],
                 catalog,
+                documentation: self.grammar.rules[i]
+                    .annotations
+                    .iter()
+                    .filter_map(|annotation| {
+                        if let AnnotationKind::Doc { text } = &annotation.kind {
+                            Some(text.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect(),
             });
         }
         // A shared variant has one public type contract, independent of declaration order.
@@ -911,6 +956,7 @@ impl Lowering<'_> {
 
     fn is_nullable(&self, expression: &Expression) -> bool {
         match expression {
+            Expression::LexicalToken { expression, .. } => expression.nullable(),
             Expression::EmptyToken
             | Expression::EofToken
             | Expression::LookaheadToken { .. }

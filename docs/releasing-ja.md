@@ -6,7 +6,8 @@
 
 ## 1. Maven Central (unlaxer-common / unlaxer-dsl)
 
-`org.unlaxer` 全体で **UTC月1回** のrelease trainを使う。正本の台帳と方針は
+`org.unlaxer` 全体の公開を UTC 月単位で台帳管理する。公開上限は queue の設定に従い、
+公開可否は CI 成功・CHANGELOG・版番号・チェックリストで判断する。正本の台帳と方針は
 [`release/central-release-queue.yml`](../release/central-release-queue.yml) と
 [`release/README.md`](../release/README.md)。VSIX・文書だけの変更はCentralへ出さない。
 

@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "bindings": {
+    "address.towns": {
+      "resolver": "townCatalog",
+      "schema": "ubnf.words/v1"
+    }
+  },
+  "resolvers": {
+    "townCatalog": {
+      "provider": "inline/v1",
+      "properties": {
+        "schema": "ubnf.words/v1",
+        "revision": "towns-1",
+        "words": [
+          "東京駅",
+          "東京",
+          "大阪",
+          "𠮷野"
+        ]
+      }
+    }
+  }
+}

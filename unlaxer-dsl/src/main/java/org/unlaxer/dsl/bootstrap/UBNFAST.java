@@ -85,7 +85,7 @@ public sealed interface UBNFAST permits
      * TokenDecl: token NAME = ( ParserClass | UNTIL(terminator) )
      */
     sealed interface TokenDecl extends UBNFAST
-        permits TokenDecl.Simple, TokenDecl.Adapter, TokenDecl.Until,
+        permits TokenDecl.Simple, TokenDecl.Declarative, TokenDecl.Adapter, TokenDecl.Until,
                 TokenDecl.Negation, TokenDecl.Lookahead, TokenDecl.NegativeLookahead,
                 TokenDecl.Any, TokenDecl.Eof, TokenDecl.Empty,
                 TokenDecl.CharRange, TokenDecl.CaseInsensitive,
@@ -100,6 +100,9 @@ public sealed interface UBNFAST permits
 
         /** token NAME = ClassName */
         record Simple(String name, String parserClass) implements TokenDecl {}
+
+        /** A lexical expression compiled from UBNF, independent of a host parser class. */
+        record Declarative(String name, org.unlaxer.dsl.runtime.LexicalExpression expression) implements TokenDecl {}
 
         /** Versioned, target-neutral token adapter reference. Version is validated after parsing. */
         record Adapter(String name, String id, String version) implements TokenDecl {}

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; style-src 'self'; connect-src 'self';">
+  <meta name="description" content="UBNF で小さな式言語をつくる無料の体験教材。説明、問い、文法の編集と実行をブラウザだけで。">
+  <title>はじめての言語づくり · UBNF Playground</title>
+  <link rel="stylesheet" href="learning.css">
+</head>
+<body>
+  <header><a class="brand" href="./">UBNF <span>PLAYGROUND / LEARN</span></a><a href="help/index.html">UBNF の書き方 ↗</a></header>
+  <main>
+    <section class="intro">
+      <p class="eyebrow">文字の並びが、あなたの言語になる。</p>
+      <h1>はじめての言語づくり</h1>
+      <p id="description">読む、考える、書く、試す。小さな式言語を、あなたの手で。</p>
+      <p class="small">インストール不要 · 文法と入力はブラウザ内で処理 · 途中から再開できます</p>
+      <p class="small">各ステップは前段の完成例を土台にした課題から始まります。あなたの編集内容はステップごとに残ります。</p>
+      <p><a href="ubnf/">UBNF 文法を自由に書いて試す ↗</a> · 構文の成否と AST・CST を確認できます。</p>
+      <label for="course">学習シナリオ</label><select id="course" disabled></select>
+    </section>
+    <p id="load-status" role="status">教材を読み込んでいます…</p>
+    <p id="storage-status" class="small">進捗と入力はこのブラウザに保存します。他の端末とは同期しません。</p>
+    <div class="workspace" id="workspace" hidden>
+      <nav aria-label="学習ステップ"><p id="progress-text"></p><progress id="progress" value="0" max="8" aria-label="完了したステップ"></progress><ol id="steps"></ol><a href="playground/">完成例の parser を自由に試す ↗</a></nav>
+      <article>
+        <p id="step-number" class="eyebrow"></p><h2 id="step-title" tabindex="-1"></h2><p id="subtitle" class="subtitle"></p>
+        <div id="explanation"></div>
+        <section class="question" aria-labelledby="question-title"><p class="eyebrow">01 / 考えてみよう</p><h3 id="question-title"></h3><fieldset id="answers"><legend class="sr-only">問いへの回答</legend></fieldset><p id="answer-feedback" role="status"></p></section>
+        <section aria-labelledby="task-title"><p class="eyebrow">02 / 書いて、確かめよう</p><h3 id="task-title">文法を育てる</h3><p id="task"></p>
+          <details><summary>ヒントを読む</summary><p id="hint"></p></details>
+          <label for="grammar">あなたの UBNF 文法</label><textarea id="grammar" spellcheck="false" rows="18" autocapitalize="off" autocomplete="off"></textarea>
+          <div id="semantics" hidden><label for="policy">条件式の評価方法</label><select id="policy"><option value="eager">両方の枝を評価してから、結果を選ぶ</option><option value="lazy">条件を見て、選んだ枝だけを評価する</option></select><pre id="policy-code"></pre></div>
+          <div class="actions"><button id="check" class="primary" disabled>課題をチェック</button><button id="reset">このステップの初期文法に戻す</button><button id="download">文法を保存</button></div>
+          <p id="check-status" role="status" aria-live="polite">問いに答え、文法を編集してチェックしましょう。</p><ul id="checks"></ul>
+          <details><summary>解答例と読み方</summary><p>まず自分の文法と比べ、違いを説明してみましょう。解答を見ただけでは完了になりません。</p><pre id="solution"></pre></details>
+        </section>
+        <section class="try" aria-labelledby="try-title"><p class="eyebrow">03 / 自分でも試そう</p><h3 id="try-title">この文法で、何が書ける？</h3><label for="input">プログラムの試験入力</label><textarea id="input" rows="3" spellcheck="false" autocapitalize="off"></textarea><button id="run" disabled>解析して計算する</button><p id="run-status" role="status" aria-live="polite"></p><details><summary>AST とソース位置を見る</summary><pre id="ast">試すと、ここに構造が現れます。</pre></details><p class="small">位置は Unicode コードポイント。先頭は 0、終点は含みません。</p></section>
+        <div class="navigation"><button id="previous">← 前へ</button><button id="next" class="primary" disabled>次のステップへ →</button></div>
+        <section id="complete" class="completion" hidden><p class="eyebrow">LANGUAGE COMPLETE</p><h3>あなたの小さな言語ができました。</h3><p>入力を読み、構造を作り、意味を与える。その一通りを体験しました。文法を保存して、自分の言語に育ててみましょう。</p><a href="help/index.html">CLI / VS Code で続ける ↗</a></section>
+      </article>
+    </div>
+    <details class="limits"><summary>この教材の対応範囲とデータ保存</summary><p>UBNF のリテラル、宣言的 token、参照、選択、繰り返し、capture、text / node の mapping が対象です。import、host binding、状態付きの機能、text / node が混在する capture などは学習エンジンで明示的に拒否します。一般の UBNF は CLI / VS Code で利用できます。</p><p>文法 16 KiB、入力 8 KiB、1 回のチェック 5 秒、WASM メモリ 256 MiB まで。実行の打ち切りは「不一致」と区別します。コードを JavaScript として実行することはありません。進捗はシナリオのバージョンごとにこのブラウザへ保存します。ブラウザのサイトデータを削除すると進捗も消えます。評価器は教材固有で、任意の UBNF に意味を付けるものではありません。</p></details>
+  </main>
+  <footer>UBNF · 説明から、実際に動く言語へ。<a href="https://github.com/opaopa6969/unlaxer-parser">ソースと教材</a></footer>
+  <script type="module" src="learning.js"></script>
+</body>
+</html>

@@ -49,6 +49,8 @@ public class ParseContext implements
 	private long memoizationStateVersion;
 	private long nextMemoizationStateVersion;
 
+	private final Map<String, List<String>> bindings;
+
 	public final Source source;
 
 	boolean createMetaToken = true;
@@ -304,6 +306,18 @@ public class ParseContext implements
 
 	private ParseContext(Source source, ParseOptions options,
 			ParseContextEffector... parseContextEffectors) {
+		this(source, options, Map.of(), parseContextEffectors);
+	}
+
+	private ParseContext(Source source, ParseOptions options, Map<String, ? extends List<String>> bindings,
+			ParseContextEffector... parseContextEffectors) {
+		if (bindings.isEmpty()) {
+			this.bindings = Map.of();
+		} else {
+			var snapshot = new java.util.HashMap<String, List<String>>();
+			bindings.forEach((key, values) -> snapshot.put(java.util.Objects.requireNonNull(key), List.copyOf(values)));
+			this.bindings = Map.copyOf(snapshot);
+		}
 	  parseContextByThread.set(this);
 	  if(source.sourceKind() != SourceKind.root) {
 	    throw new IllegalArgumentException();
@@ -329,6 +343,21 @@ public class ParseContext implements
 			ParseContextEffector... effectors) {
 		return new ParseContext(source, options, effectors);
 	}
+
+	/** Creates an immutable, parse-local snapshot before effectors and onOpen callbacks run.
+	 * Values retain their order and duplicates; absent keys return an empty list.
+	 * No binding can be replaced during this context's lifetime.
+	 */
+	public static ParseContext withBindings(Source source, Map<String, ? extends List<String>> bindings,
+			ParseOptions options, ParseContextEffector... effectors) {
+		return new ParseContext(source, options, bindings, effectors);
+	}
+
+	/** Read-only external data, independent of captures and transactional state. */
+	public List<String> bindingValues(String name) {
+		return bindings.getOrDefault(java.util.Objects.requireNonNull(name), List.of());
+	}
+
 	
 	@Override
 	public Deque<TransactionElement> getTokenStack(){
@@ -1082,6 +1111,34 @@ public class ParseContext implements
 	public Source getSource() {
 		return source;
 	}
+
+  /**
+   * Format-2 adapter accessor: complete immutable input text.
+   * This is observational only and does not create a transaction frame.
+   */
+  public String sourceText() {
+    return source.toString();
+  }
+
+  /**
+   * Format-2 adapter accessor: input from the consumed cursor to EOF.
+   * The returned offset unit is Unicode code points, matching {@link #position()}.
+   */
+  public String remainingText() {
+    int start = getConsumedPosition().value();
+    return source.peek(new CodePointIndex(start),
+        new CodePointLength(source.codePointLength().value() - start)).toString();
+  }
+
+  /** Format-2 adapter accessor: consumed-cursor Unicode code-point offset. */
+  public int position() {
+    return getConsumedPosition().value();
+  }
+
+  /** Format-2 adapter accessor: match-only-cursor Unicode code-point offset. */
+  public int matchedPosition() {
+    return getMatchedPosition().value();
+  }
 
   @Override
   public Collection<AdditionalCommitAction> getActions() {

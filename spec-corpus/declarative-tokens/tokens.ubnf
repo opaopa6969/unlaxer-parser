@@ -1,0 +1,31 @@
+grammar LexicalProbe {
+  @ubnf: v2
+  @feature: declarativeTokensV1
+  @feature: contextAccessorsV1
+  @package: lexical.probe
+  token DIGIT ::= CHAR_RANGE('0','9');
+  token NUMBER ::= ['+'|'-'] (DIGIT+ '.' DIGIT* | '.' DIGIT+ | DIGIT+)
+    [('e'|'E') ['+'|'-'] DIGIT+];
+  token LETTER ::= CHAR_RANGE('a','z') | CHAR_RANGE('A','Z') | '_';
+  token IDENTIFIER ::= LETTER (LETTER | DIGIT)*;
+  token STRING ::= '"' { '\\' ANY | NEGATION('"\\') } '"'
+    | '\'' { '\\' ANY | NEGATION('\'\\') } '\'';
+  token NL ::= '\r\n' | '\r' | '\n';
+  token CLASS_NAME ::= IDENTIFIER ('.' IDENTIFIER)*;
+  token BLOCK ::= BOL CAPTURE(fence, '`'{4,}) IDENTIFIER ':' CLASS_NAME NL
+    { NEGATIVE_LOOKAHEAD(BOL SAME_AS(fence) EOL) ANY }
+    BOL SAME_AS(fence) (NL | EOF);
+  token CHILD ::= CAPTURE(x,'b') SAME_AS(x);
+  token ROLLBACK ::= CAPTURE(x,'😀') LOOKAHEAD(CAPTURE(x,'a'))
+    (CAPTURE(x,'a') '!' | 'a') CHILD SAME_AS(x);
+  token PURE ::= CAPTURE(x,'a') [CAPTURE(x,'b') '!'] SAME_AS(x);
+  token BOUNDED ::= 'a'{2,3} 'b'? ['c'] {'d'};
+  token UNICODE ::= CHAR_RANGE('😀','🙏')+;
+  token POSITION ::= BOF 'a' NL BOL 'b' EOL EOF;
+  token EMPTY_TOKEN ::= LOOKAHEAD(EOF) NEGATIVE_LOOKAHEAD(ANY);
+  // Names must not accidentally select the built-in predictor or whitespace parser.
+  token WORD ::= '😀';
+  token SPACE ::= 'x';
+  @root @mapping(Value, params=[value])
+  Root ::= NUMBER @value;
+}

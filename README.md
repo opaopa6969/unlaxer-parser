@@ -13,16 +13,21 @@
 
 # unlaxer-parser
 
+Development: **3.3.0-SNAPSHOT** (not published). The dependency examples below use the latest stable **3.2.0**.
+The development UBNF VSIX includes an in-editor [beginner catalog/help](unlaxer-dsl/ubnf-vscode/README.md).
+Generate a self-contained [language playground from UBNF](docs/ubnf-playground-ja.md), including UBNF's own meta-grammar.
+Try UBNF grammar syntax, AST and CST in the [online UBNF playground](https://opaopa6969.github.io/unlaxer-parser/ubnf/).
+
 **Write a grammar, get a language — Parser + AST + Evaluator + LSP + DAP, all generated**
 
 [![Maven Central](https://img.shields.io/maven-central/v/org.unlaxer/unlaxer-common)](https://central.sonatype.com/artifact/org.unlaxer/unlaxer-common)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Java 21+](https://img.shields.io/badge/Java-21%2B-orange.svg)]()
-[![Version](https://img.shields.io/badge/version-3.1.1-blue)]()
+[![Version](https://img.shields.io/badge/version-3.2.0-blue)]()
 
 ---
 
-> **Latest release — 3.1.1**: a backward-compatible minor. Runtime FIRST-set candidate exclusion cuts deferred-diagnostics-mode CPU work roughly in half on large inputs (six profiling rounds, see the CHANGELOG), the UBNF bootstrap now rejects trailing input and accepts empty grammars like the Rust frontend, and chained (3+ segment) dotted rule references parse correctly in the self-hosting grammar. See the [CHANGELOG](./CHANGELOG.md) for the full history. Historical note: **3.0.2 was never published to Maven Central** — if upgrading from 3.0.1, go directly to 3.0.3 or later. If you depend on `unlaxer-common` or `unlaxer-dsl` at `2.x`, see the [CHANGELOG](./CHANGELOG.md) and the [downstream drift warning](#downstream-drift-warning) below.
+> **Latest release — 3.2.0**: UBNF v2 declarative tokens and scoped lexical grammar modules. Define NUMBER, STRING, and variable-length fences in UBNF itself and generate their Java/Rust recognizers. Includes token/context contracts, portability checks, and generated API impact reports. Start with the [illustrated UBNF v2 guide (Japanese)](./docs/ubnf-v2-illustrated-ja.md). Java 21 and Java 17 artifacts remain separate. See the [CHANGELOG](./CHANGELOG.md) for details and limits. Historical note: **3.0.2 was never published to Maven Central**. For migrations from `2.x`, also see the [downstream drift warning](#downstream-drift-warning).
 
 ---
 
@@ -142,12 +147,12 @@ From this, unlaxer generates:
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-common</artifactId>
-        <version>3.1.1</version>
+        <version>3.2.0</version>
     </dependency>
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-dsl</artifactId>
-        <version>3.1.1</version>
+        <version>3.2.0</version>
     </dependency>
 </dependencies>
 ```
@@ -160,12 +165,12 @@ packages and classes, compiled with `--release 17` (major 61):
 <dependency>
     <groupId>org.unlaxer</groupId>
     <artifactId>unlaxer-common-jdk17</artifactId>
-    <version>3.1.1</version>
+    <version>3.2.0</version>
 </dependency>
 <dependency>
     <groupId>org.unlaxer</groupId>
     <artifactId>unlaxer-dsl-jdk17</artifactId>
-    <version>3.1.1</version>
+    <version>3.2.0</version>
 </dependency>
 ```
 
@@ -363,6 +368,7 @@ Public API removals and renames go through at least **one minor version with an 
 
 | Document | Description | Languages |
 |----------|-------------|-----------|
+| [図でわかる UBNF v2](./docs/ubnf-v2-illustrated-ja.md) | 宣言的 token、AST、grammar の部品化、capture と巻き戻しの図解入門 | [JA](./docs/ubnf-v2-illustrated-ja.md) |
 | [Getting Started](./docs/getting-started.md) | Maven setup, first grammar, full walkthrough | [EN](./docs/getting-started.md) / [JA](./docs/getting-started-ja.md) |
 | [UBNF Guide](./docs/ubnf-guide.md) | Full UBNF syntax, all annotations, feature matrix | [EN](./docs/ubnf-guide.md) / [JA](./docs/ubnf-guide-ja.md) |
 | [Architecture](./docs/architecture.md) | Bootstrap pipeline, combinator catalog, ParserIR | [EN](./docs/architecture.md) / [JA](./docs/architecture-ja.md) |
