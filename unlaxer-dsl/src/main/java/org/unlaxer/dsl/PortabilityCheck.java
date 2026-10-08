@@ -145,7 +145,6 @@ public final class PortabilityCheck {
     private static void scanAnnotation(GrammarDecl grammar, Annotation annotation, UBNFSourceSnapshot snapshot, List<Diagnostic> out) {
         String unsupported = null;
         if (annotation instanceof EvalAnnotation) unsupported = "eval";
-        else if (annotation instanceof RecoveryAnnotation) unsupported = "recovery";
         else if (annotation instanceof SimpleAnnotation simple) unsupported = simple.name();
         else if (annotation instanceof CommonFieldAnnotation) unsupported = "commonField";
         else if (annotation instanceof EnumAnnotation) unsupported = "enum";

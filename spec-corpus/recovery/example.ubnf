@@ -1,0 +1,6 @@
+grammar RecoveringStatements {
+  @root @mapping(Program, params=[statements])
+  Program ::= { Statement @statements };
+  @recovery(sync=';')
+  Statement ::= 'ok;';
+}

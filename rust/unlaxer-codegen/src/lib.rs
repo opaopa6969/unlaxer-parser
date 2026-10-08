@@ -98,6 +98,28 @@ fn has_values(ir: &GrammarIr) -> bool {
         .any(|f| f.kind == Kind::Value)
 }
 
+fn contains_recovery(expression: &Expression) -> bool {
+    use Expression::*;
+    match expression {
+        Recovery { .. } | CustomToken(_) => true,
+        RuleEffects { child, .. }
+        | CaptureEquality { child, .. }
+        | TriviaScope { child, .. }
+        | TextValue(child)
+        | ValueBoundary(child)
+        | Delimited(child)
+        | OptionalExpr(child)
+        | Repeat { child, .. } => contains_recovery(child),
+        Capture { expression, .. } => contains_recovery(expression),
+        Separated { child, separator } => contains_recovery(child) || contains_recovery(separator),
+        Sequence(values) | Choice(values) | LongestChoice(values) => {
+            values.iter().any(contains_recovery)
+        }
+        PredictiveChoice { alternatives, .. } => alternatives.iter().any(contains_recovery),
+        _ => false,
+    }
+}
+
 fn ast(ir: &GrammarIr) -> String {
     let mut out = String::from(HEADER);
     if mappings(ir).is_empty() {
@@ -247,6 +269,9 @@ fn parser(ir: &GrammarIr) -> String {
 fn expression(expr: &Expression) -> String {
     use Expression::*;
     match expr {
+        Recovery { child, mode, tokens, message } => format!(
+            "Expr::Recovery {{ child: Box::new({}), mode: unlaxer_runtime::RecoveryMode::{mode:?}, tokens: vec![{}], message: {} }}",
+            expression(child), tokens.iter().map(|token| quote(token)).collect::<Vec<_>>().join(", "), quote(message)),
         RuleEffects { child, effects } => {
             let scope = effects.scope_mode.map_or_else(
                 || "None".into(),
@@ -377,7 +402,11 @@ fn mapper(ir: &GrammarIr) -> String {
     if has_values(ir) {
         out.push_str("use super::ast::AstValue;\n");
     }
-    out.push_str("use super::ast::Ast;\nuse unlaxer_runtime::Tree;\n\npub fn map(tree: &Tree) -> Result<Ast, String> {\n    required(map_node(tree, tree.root)?, \"root\")\n}\n\nfn required<T>(mut values: Vec<T>, name: &str) -> Result<T, String> {\n    if values.len() != 1 { return Err(format!(\"expected one value for {name}, got {}\", values.len())); }\n    Ok(values.remove(0))\n}\n\nfn map_nodes(tree: &Tree, ids: &[usize]) -> Result<Vec<Ast>, String> {\n    let mut found = Vec::new();\n    for &id in ids { found.extend(map_node(tree, id)?); }\n    Ok(found)\n}\n");
+    out.push_str("use super::ast::Ast;\nuse unlaxer_runtime::Tree;\n\npub fn map(tree: &Tree) -> Result<Ast, String> {\n");
+    if ir.rules.iter().any(|rule| contains_recovery(&rule.body)) {
+        out.push_str("    if !tree.recoveries().is_empty() { return Err(\"cannot map recovered syntax\".into()); }\n");
+    }
+    out.push_str("    required(map_node(tree, tree.root)?, \"root\")\n}\n\nfn required<T>(mut values: Vec<T>, name: &str) -> Result<T, String> {\n    if values.len() != 1 { return Err(format!(\"expected one value for {name}, got {}\", values.len())); }\n    Ok(values.remove(0))\n}\n\nfn map_nodes(tree: &Tree, ids: &[usize]) -> Result<Vec<Ast>, String> {\n    let mut found = Vec::new();\n    for &id in ids { found.extend(map_node(tree, id)?); }\n    Ok(found)\n}\n");
     if has_values(ir) {
         out.push_str("\nfn map_values(tree: &Tree, ids: &[usize]) -> Result<Vec<AstValue>, String> {\n    let mut found = Vec::new();\n    for &id in ids {\n        let node = &tree.nodes[id];\n        match node.rule {\n            unlaxer_runtime::TEXT_VALUE_RULE => found.push(AstValue::Text {\n                text: unlaxer_runtime::java_capture_text(tree.text(node.span)).to_owned(),\n                span: node.span,\n            }),\n");
         out.push_str("            unlaxer_runtime::VALUE_BOUNDARY_RULE => {\n                let values = map_values(tree, &node.children)?;\n                if !values.is_empty() && values.iter().all(|value| matches!(value, AstValue::Text { .. })) {\n                    found.push(AstValue::Text {\n                        text: unlaxer_runtime::java_capture_text(tree.text(node.span)).to_owned(),\n                        span: node.span,\n                    });\n                } else {\n                    found.extend(values);\n                }\n            },\n");
