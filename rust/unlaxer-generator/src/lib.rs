@@ -5,6 +5,7 @@ pub mod impact;
 mod lexical;
 pub mod lowering;
 pub mod modules;
+pub mod packages;
 pub mod playground;
 pub mod portability;
 mod token_stream;
@@ -55,3 +56,7 @@ pub(crate) fn generate_grammar(
         .push_str(&embedded::api(grammar, &ir)?);
     Ok(files)
 }
+
+mod package_fetch;
+
+pub mod vocabulary_origins;

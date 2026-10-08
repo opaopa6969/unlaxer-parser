@@ -69,15 +69,26 @@ public class RuleTriviaConformanceTest {
             JsonObject fixture = fixtureElement.getAsJsonObject();
             String name = fixture.get("name").getAsString();
             String source = fixture.get("grammar").getAsString();
-            GrammarDecl grammar = UBNFMapper.parse(source).grammars().get(0);
+            Path fixtureDir = temporary.getRoot().toPath().resolve("fixture-" + fixtureIndex++);
+            Files.createDirectories(fixtureDir);
+            Path ubnf = fixtureDir.resolve("root.ubnf");
+            Files.writeString(ubnf, source);
+            if (fixture.has("modules")) for (var entry : fixture.getAsJsonObject("modules").entrySet())
+                Files.writeString(fixtureDir.resolve(entry.getKey()), entry.getValue().getAsString());
+            if (fixture.has("manifest")) {
+                Path manifest = fixtureDir.resolve("ubnf.json");
+                Files.writeString(manifest, fixture.get("manifest").toString());
+                org.unlaxer.dsl.bootstrap.UBNFPackageResolver.resolve(manifest);
+                String javaLock = Files.readString(fixtureDir.resolve("ubnf.lock.json"));
+                success(run(List.of(nativeGenerator.toString(), "deps", "resolve", "--manifest", manifest.toString()), "", true));
+                assertEquals(name + " exact package identity/hash lock parity", javaLock,
+                    Files.readString(fixtureDir.resolve("ubnf.lock.json")));
+            }
+            GrammarDecl grammar = org.unlaxer.dsl.bootstrap.UBNFModuleLoader.load(ubnf).grammars().get(0);
             GrammarValidator.validateOrThrow(grammar);
             List<RustBackend.GeneratedFile> javaFrontend = new RustBackend().generate(grammar);
             assertEquals(name + " Java frontend Rust file count", 5, javaFrontend.size());
 
-            Path fixtureDir = temporary.getRoot().toPath().resolve("fixture-" + fixtureIndex++);
-            Files.createDirectories(fixtureDir);
-            Path ubnf = fixtureDir.resolve(grammar.name() + ".ubnf");
-            Files.writeString(ubnf, source);
             Path nativeGenerated = fixtureDir.resolve("native-generated");
             success(run(List.of(nativeGenerator.toString(), "generate", "--grammar", ubnf.toString(),
                 "--output", nativeGenerated.toString()), "", true));
@@ -126,6 +137,14 @@ public class RuleTriviaConformanceTest {
                     assertEquals(context + " Rust full-input acceptance", accepted,
                         !rust.get("ast").isJsonNull());
 
+                    if (row.has("diagnostic")) {
+                        Object failure = diagnostic.orElseThrow();
+                        JsonArray javaDiagnostic = new JsonArray();
+                        javaDiagnostic.add((String) failure.getClass().getMethod("kind").invoke(failure));
+                        javaDiagnostic.add((Integer) failure.getClass().getMethod("offset").invoke(failure));
+                        assertEquals(context + " independent diagnostic category/location", row.get("diagnostic"), javaDiagnostic);
+                        assertEquals(context + " Java/Rust diagnostic category/location", javaDiagnostic, rust.get("diagnostic"));
+                    }
                     JsonElement expected = JsonNull.INSTANCE;
                     JsonElement javaAst = JsonNull.INSTANCE;
                     if (accepted) {
@@ -177,13 +196,19 @@ public class RuleTriviaConformanceTest {
     }
 
     private JsonArray prefix(Parser parser, String input) throws Exception {
-        var result = new JsonArray();
-        try (var context = new ParseContext(org.unlaxer.StringSource.createRootSource(input))) {
-            result.add(parser.parse(context).isSucceeded());
-            result.add(context.getConsumedPosition().value());
-            result.add(context.getMatchedPosition().value());
+        JsonArray expected = null;
+        for (boolean memo : new boolean[]{false, true}) {
+            var result = new JsonArray();
+            try (var context = new ParseContext(org.unlaxer.StringSource.createRootSource(input))) {
+                if (memo) context.enableMemoize();
+                result.add(parser.parse(context).isSucceeded());
+                result.add(context.getConsumedPosition().value());
+                result.add(context.getMatchedPosition().value());
+            }
+            if (expected == null) expected = result;
+            else assertEquals("Java memo OFF/ON prefix parity: " + input, expected, result);
         }
-        return result;
+        return expected;
     }
 
     private JsonObject canonical(Object ast, Object mapped) throws Exception {
@@ -227,15 +252,26 @@ public class RuleTriviaConformanceTest {
                     let input = String::from_utf8(bytes).unwrap();
                     let mut context = unlaxer_runtime::ParseContext::new(&input);
                     let prefix_ok = generated::parser::parse_context(&mut context).is_ok();
+                    let options = unlaxer_runtime::ParseOptions::with_memoization(unlaxer_runtime::Memoization::SafeFailures);
+                    let mut memo_context = unlaxer_runtime::ParseContext::with_options(&input, options);
+                    let memo_ok = generated::parser::parse_context(&mut memo_context).is_ok();
+                    assert_eq!((prefix_ok, context.position(), context.matched_position()),
+                        (memo_ok, memo_context.position(), memo_context.matched_position()));
                     print!(r#"{{\"prefix\":[{},{},{}],\"ast\":"#,
                         prefix_ok, context.position(), context.matched_position());
                     match generated::parser::parse_tree_detailed(&input) {
                         Ok(tree) => {
                             let ast = generated::mapper::map(&tree).unwrap();
                             drop(tree);
-                            print!("{}", ast.canonical_json());
+                            let canonical = ast.canonical_json();
+                            let memo_tree = generated::parser::parse_tree_detailed_with_options(&input, options).unwrap();
+                            assert_eq!(canonical, generated::mapper::map(&memo_tree).unwrap().canonical_json());
+                            print!("{}", canonical);
                         }
-                        Err(_) => print!("null"),
+                        Err(error) => {
+                            assert_eq!(error, generated::parser::parse_tree_detailed_with_options(&input, options).unwrap_err());
+                            print!(r#"null,\"diagnostic\":[\"{}\",{}]"#, error.kind, error.offset);
+                        }
                     }
                     println!("}}");
                 }

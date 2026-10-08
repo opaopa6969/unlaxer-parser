@@ -8,5 +8,8 @@
   {"name":"network","files":{"root.ubnf":"grammar G { @import a from 'https://example.invalid/grammar.ubnf' @ubnf: v2 }"}},
   {"name":"missing-file","files":{"root.ubnf":"grammar G { @import a from 'missing.ubnf' @ubnf: v2 }"}},
   {"name":"caller-must-not-resolve-child","files":{"root.ubnf":"grammar G { @import a from 'child.ubnf' @ubnf: v2 token DIGIT ::= '0'; token T ::= a.NUMBER; }","child.ubnf":"grammar C { @ubnf: v2 token NUMBER ::= DIGIT+; }"}},
-  {"name":"private-capture","files":{"root.ubnf":"grammar G { @import a from 'child.ubnf' @ubnf: v2 token T ::= a.T SAME_AS(x); @root @mapping(V,params=[v]) R ::= T @v; }","child.ubnf":"grammar C { @ubnf: v2 token T ::= CAPTURE(x,'a'); }"}}
+  {"name":"private-capture","files":{"root.ubnf":"grammar G { @import a from 'child.ubnf' @ubnf: v2 token T ::= a.T SAME_AS(x); @root @mapping(V,params=[v]) R ::= T @v; }","child.ubnf":"grammar C { @ubnf: v2 token T ::= CAPTURE(x,'a'); }"}},
+  {"name": "undefined-whitespace", "files": {"root.ubnf": "grammar Invalid { @ubnf: v2 @whitespace: MISSING token GAP ::= ' '; @root @mapping(Value, params=[value]) Root ::= 'a' @value 'b'; }"}},
+  {"name": "nullable-whitespace", "files": {"root.ubnf": "grammar Invalid { @ubnf: v2 @whitespace: GAP token GAP ::= ''; @root @mapping(Value, params=[value]) Root ::= 'a' @value 'b'; }"}},
+  {"name": "case-sensitive-whitespace", "files": {"root.ubnf": "grammar Invalid { @ubnf: v2 @whitespace: gap token GAP ::= ' '; @root @mapping(Value, params=[value]) Root ::= 'a' @value 'b'; }"}}
 ]

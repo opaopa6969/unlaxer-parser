@@ -368,7 +368,12 @@ public class DeclarativeTokenConformanceTest {
             for (int i = 0; i < javaReport.diagnostics().size(); i++) {
                 var diagnostic = nativeReport.getAsJsonArray("diagnostics").get(i).getAsJsonObject();
                 assertEquals(javaReport.diagnostics().get(i).code(), diagnostic.get("code").getAsString());
-                assertTrue(diagnostic.get("span").isJsonNull());
+                var javaSpan = javaReport.diagnostics().get(i).span();
+                if (javaSpan == null) assertTrue(diagnostic.get("span").isJsonNull());
+                else {
+                    assertEquals(javaSpan.start(), diagnostic.getAsJsonObject("span").get("start").getAsInt());
+                    assertEquals(javaSpan.end(), diagnostic.getAsJsonObject("span").get("end").getAsInt());
+                }
             }
         }
     }

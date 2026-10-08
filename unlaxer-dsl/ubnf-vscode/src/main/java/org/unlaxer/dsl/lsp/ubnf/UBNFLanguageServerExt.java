@@ -94,8 +94,8 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
             "Right-associative folding for binary rules."),
         new AnnotationDoc("@precedence", "@precedence(level=${1:10})", "@precedence(level=N)",
             "Operator precedence level for this rule."),
-        new AnnotationDoc("@whitespace", "@whitespace: ${1:javaStyle}", "@whitespace: javaStyle|none",
-            "Implicit whitespace skipping between rule elements."),
+        new AnnotationDoc("@whitespace", "@whitespace: ${1:javaStyle}", "@whitespace: javaStyle|none|TOKEN|alias.TOKEN",
+            "ルールの連接境界で組込みまたは non-nullable な宣言的 token を読み飛ばします。"),
         new AnnotationDoc("@enum", "@enum", "@enum",
             "Generates a Java enum from string-literal alternatives."),
         new AnnotationDoc("@commonField", "@commonField(${1:name})", "@commonField(field)",
@@ -321,6 +321,12 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
         capabilities.setSemanticTokensProvider(semanticTokens);
     }
 
+    public record PackageSourceRequest(String uri) {}
+    @org.eclipse.lsp4j.jsonrpc.services.JsonRequest("ubnf/packageSource")
+    public CompletableFuture<String> packageSource(PackageSourceRequest params) {
+        return new ExtTextDocumentService(this).packageSource(params);
+    }
+
     @Override
     public TextDocumentService getTextDocumentService() {
         return new ExtTextDocumentService(this);
@@ -336,6 +342,17 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
 
         ExtTextDocumentService(UBNFLanguageServerExt server) {
             this.server = server;
+        }
+
+        CompletableFuture<String> packageSource(PackageSourceRequest params) {
+            String uri = params == null ? null : params.uri();
+            // Only snapshots previously verified while indexing an importing document are exposed.
+            if (uri == null || !uri.startsWith("ubnf-package:/")) return CompletableFuture.completedFuture(null);
+            for (var index : server.indexByUri.values()) {
+                String source = index.editor.virtualSources.get(uri);
+                if (source != null) return CompletableFuture.completedFuture(source);
+            }
+            return CompletableFuture.completedFuture(null);
         }
 
         private String contentOf(String uri) {
@@ -409,19 +426,24 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
             }
 
             int offset = UbnfEditorIndex.offset(content, params.getPosition());
+            boolean whitespace = prefix.matches(".*@whitespace\\s*(?::|\\()\\s*[A-Za-z_0-9.]*$");
+            if (whitespace) for (String style : List.of("javaStyle", "none")) {
+                CompletionItem item = new CompletionItem(style); item.setKind(CompletionItemKind.Constant);
+                item.setDetail(style.equals("none") ? "自動読み飛ばしなし" : "組込みの空白・行/block コメント"); items.add(item);
+            }
             int assignment = index.editor.code.lastIndexOf("::=", offset);
             boolean lexical = assignment >= 0 && index.editor.code.substring(0, assignment).matches("(?s).*\\btoken\\s+\\w+\\s*")
                 && index.editor.code.substring(assignment, offset).indexOf(';') < 0;
             var qualifier = Pattern.compile("([A-Za-z_]\\w*\\.)\\w*$").matcher(prefix);
             boolean qualified = qualifier.find();
-            for (String keyword : qualified ? List.<String>of() : lexical ? LEXICAL_KEYWORDS : CORE_KEYWORDS) {
+            for (String keyword : qualified || whitespace ? List.<String>of() : lexical ? LEXICAL_KEYWORDS : CORE_KEYWORDS) {
                 CompletionItem item = new CompletionItem(keyword);
                 item.setKind(CompletionItemKind.Keyword);
                 String help = catalogHelp(keyword);
                 if (help != null) item.setDocumentation(markdown(help));
                 items.add(item);
             }
-            for (BlockSnippet snippet : lexical || qualified ? List.<BlockSnippet>of() : BLOCK_SNIPPETS) {
+            for (BlockSnippet snippet : lexical || qualified || whitespace ? List.<BlockSnippet>of() : BLOCK_SNIPPETS) {
                 CompletionItem item = new CompletionItem(snippet.label());
                 item.setKind(CompletionItemKind.Snippet);
                 item.setDetail(snippet.detail());
@@ -433,11 +455,13 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
             if (scope != null) for (var entry : scope.symbols.entrySet()) {
                 if (entry.getValue().size() != 1) continue;
                 var symbol = entry.getValue().get(0);
-                if (lexical && !symbol.kind().equals("token")) continue;
+                if ((lexical || whitespace) && !symbol.kind().equals("token")) continue;
+                if (whitespace && (!symbol.detail().matches("(?s).*\\btoken\\s+\\w+\\s*::=.*")
+                        || entry.getKey().equalsIgnoreCase("none") || entry.getKey().equalsIgnoreCase("javaStyle"))) continue;
                 if (qualified && !entry.getKey().startsWith(qualifier.group(1))) continue;
                 CompletionItem item = new CompletionItem(entry.getKey());
                 item.setKind("token".equals(symbol.kind()) ? CompletionItemKind.Constant : CompletionItemKind.Class);
-                item.setDetail(symbol.kind() + " · " + symbol.uri());
+                item.setDetail(symbol.kind() + " · " + symbol.origin());
                 item.setDocumentation(markdown("```ubnf\n" + symbol.detail() + "\n```"));
                 int start = offset;
                 while (start > 0 && (Character.isLetterOrDigit(content.charAt(start - 1)) || "_.".indexOf(content.charAt(start - 1)) >= 0)) start--;
@@ -478,7 +502,7 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
             if (decl != null) {
                 StringBuilder md = new StringBuilder();
                 md.append("**").append(decl.kind()).append(" ").append(decl.name()).append("**");
-                md.append("\n\n```ubnf\n").append(decl.detail()).append("\n```\n\n").append(decl.uri());
+                md.append("\n\n```ubnf\n").append(decl.detail()).append("\n```\n\n").append(decl.origin());
                 long refs = index.editor.references(use).stream().filter(item -> !item.declaration()).count();
                 md.append("\n\n").append(refs).append(" reference(s) in this document");
                 return CompletableFuture.completedFuture(new Hover(markdown(md.toString())));

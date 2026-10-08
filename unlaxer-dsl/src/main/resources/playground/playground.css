@@ -5,6 +5,8 @@ textarea:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; 
 select { max-width: 100%; padding: .45rem .7rem; border: 1px solid var(--line); border-radius: 6px; font: inherit; background: var(--surface); color: var(--ink); }
 select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .small { color: var(--muted); font-size: .83rem; }
+#vocabulary { overflow-wrap: anywhere; }
+#vocabulary pre { white-space: pre-wrap; max-height: 24rem; }
 details { margin: .8rem 0; }
 #catalog { margin-top: 1rem; }
 #catalog article { margin-bottom: .7rem; }

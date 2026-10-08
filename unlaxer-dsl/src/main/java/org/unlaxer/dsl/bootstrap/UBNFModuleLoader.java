@@ -21,17 +21,18 @@ import org.unlaxer.dsl.runtime.LexicalExpression.Op;
 public final class UBNFModuleLoader {
     @FunctionalInterface public interface SourceReader { String read(Path path) throws IOException; }
     private final SourceReader reader;
+    private final UBNFPackageResolver packages;
     private final Map<Path, Map<String, LexicalExpression>> modules = new LinkedHashMap<>();
     private final Set<Path> stack = new java.util.LinkedHashSet<>();
 
-    private UBNFModuleLoader(SourceReader reader) { this.reader = reader; }
+    private UBNFModuleLoader(SourceReader reader, Path path) { this.packages = new UBNFPackageResolver(path, reader); this.reader = packages::read; }
 
     public static UBNFFile load(Path path) throws IOException {
         return resolve(UBNFMapper.parse(Files.readString(path)), path, Files::readString);
     }
 
     public static UBNFFile resolve(UBNFFile file, Path path, SourceReader reader) throws IOException {
-        var loader = new UBNFModuleLoader(reader);
+        var loader = new UBNFModuleLoader(reader, path);
         path = path.toAbsolutePath().normalize();
         loader.stack.add(path);
         var grammars = new ArrayList<GrammarDecl>();
@@ -69,7 +70,7 @@ public final class UBNFModuleLoader {
         for (var declaration : grammar.imports()) {
             if (!aliases.add(declaration.alias())) throw error("duplicate import alias: " + declaration.alias());
             if (declaration.path().contains("://")) throw error("network imports are unsupported: " + declaration.path());
-            var exports = module(path.getParent().resolve(declaration.path()));
+            var exports = module(packages.importPath(path, declaration.path()));
             for (var entry : exports.entrySet())
                 imported.put(declaration.alias() + "." + entry.getKey(), entry.getValue());
         }
@@ -82,11 +83,28 @@ public final class UBNFModuleLoader {
         grammar.tokens().forEach(t -> used.add(t.name()));
         grammar.rules().forEach(r -> used.add(r.name()));
         var synthetic = new LinkedHashMap<String, String>();
+        var settings = new ArrayList<GlobalSetting>();
+        for (var setting : grammar.settings()) {
+            settings.add(setting.key().equals("whitespace") && setting.value() instanceof StringSettingValue value
+                ? new GlobalSetting(setting.key(), new StringSettingValue(policy(value.value(), imported, tokens, used, synthetic))) : setting);
+        }
         var rules = new ArrayList<RuleDecl>();
         for (var rule : grammar.rules()) {
-            rules.add(new RuleDecl(rule.annotations(), rule.name(), body(rule.body(), imported, tokens, used, synthetic)));
+            var annotations = new ArrayList<Annotation>();
+            for (var annotation : rule.annotations()) annotations.add(annotation instanceof WhitespaceAnnotation value
+                && value.style().isPresent() ? new WhitespaceAnnotation(java.util.Optional.of(policy(value.style().get(), imported, tokens, used, synthetic))) : annotation);
+            rules.add(new RuleDecl(annotations, rule.name(), body(rule.body(), imported, tokens, used, synthetic)));
         }
-        return new GrammarDecl(grammar.name(), List.of(), grammar.settings(), tokens, rules);
+        return new GrammarDecl(grammar.name(), List.of(), settings, tokens, rules);
+    }
+
+    private String policy(String style, Map<String, LexicalExpression> imported, List<TokenDecl> tokens,
+            Set<String> used, Map<String, String> synthetic) {
+        if (!style.contains(".")) return style;
+        int dot = style.indexOf('.');
+        RuleRefElement resolved = (RuleRefElement) atom(new RuleRefElement(java.util.Optional.of(style.substring(0, dot)),
+            style.substring(dot + 1)), imported, tokens, used, synthetic);
+        return resolved.name();
     }
 
     private LexicalExpression externalRefs(LexicalExpression expression, Map<String, LexicalExpression> imported) {
