@@ -111,6 +111,11 @@
 				<targetPath>playground/runtime</targetPath>
 			</resource>
 			<resource>
+				<directory>${unlaxer.jdk17.shared}/../spec-corpus/xid-identifier</directory>
+				<includes><include>UNICODE-LICENSE.txt</include></includes>
+				<targetPath>playground/runtime</targetPath>
+			</resource>
+			<resource>
 				<directory>${unlaxer.jdk17.shared}/grammar</directory>
 				<includes><include>ubnf.ubnf</include></includes>
 				<targetPath>ubnf-help</targetPath>
