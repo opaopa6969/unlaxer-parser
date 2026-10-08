@@ -197,6 +197,13 @@ fn parser(ir: &GrammarIr) -> String {
         ir.root, ir.java_whitespace
     )
     .unwrap();
+    out.push_str("\n/// Bounded editor-only EOF repair; synthetic syntax never becomes a normal AST value.\npub fn parse_editor_cst(source: &str, completions: &[&str], options: unlaxer_runtime::editor_cst::Options) -> Result<unlaxer_runtime::editor_cst::EditorCst, &'static str> {\n    unlaxer_runtime::editor_cst::parse(grammar(), ");
+    writeln!(
+        out,
+        "{}, {}, source, completions, options)\n}}",
+        ir.root, ir.java_whitespace
+    )
+    .unwrap();
     let mut operators: Vec<_> = ir
         .rules
         .iter()

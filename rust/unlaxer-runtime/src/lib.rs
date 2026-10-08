@@ -6,6 +6,8 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 pub mod call_inference;
+pub mod editor;
+pub mod editor_cst;
 pub mod embedded;
 mod first;
 pub mod language_queries;

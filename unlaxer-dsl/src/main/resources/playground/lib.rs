@@ -1,6 +1,7 @@
 // Generated UBNF playground ABI. Buffers own their memory; no raw-pointer dereferences.
 #![allow(dead_code)]
 mod generated;
+mod editor_adapter;
 use std::cell::RefCell;
 use unlaxer_runtime::{json_string, ParseContext};
 
@@ -60,6 +61,29 @@ pub fn analyze(input: &str) -> String {
                 prefix, tree.root, nodes, ast, mapping_error)
         }
     }
+}
+
+/// Cursor is an original-source code-point offset, never a synthetic suffix location.
+pub fn analyze_editor(input: &str, cursor: usize) -> String {
+    if cursor > input.chars().count() { return r#"{"runtimeError":"カーソル位置が入力の外です。"}"#.into(); }
+    let completions = unlaxer_runtime::editor_cst::literal_completions(generated::parser::grammar());
+    let cst = match generated::parser::parse_editor_cst(input, &completions, unlaxer_runtime::editor_cst::Options::default()) {
+        Ok(cst) => cst,
+        Err(error) => return format!(r#"{{"runtimeError":{}}}"#, json_string(error)),
+    };
+    let typed = editor_adapter::analyze(input, cursor).unwrap_or_else(|| "null".into());
+    let mut value = analyze(input);
+    value.pop();
+    format!(r#"{},"editor":{},"typed":{}}}"#, value, cst.canonical_json(), typed)
+}
+
+#[no_mangle]
+pub extern "C" fn pg_editor(cursor: usize) {
+    let input = BUFFERS.with(|buffers| String::from_utf8(buffers.borrow().input.clone()));
+    output(match input {
+        Ok(input) => analyze_editor(&input, cursor),
+        Err(_) => r#"{"runtimeError":"入力は UTF-8 である必要があります。"}"#.into(),
+    });
 }
 
 #[no_mangle]
