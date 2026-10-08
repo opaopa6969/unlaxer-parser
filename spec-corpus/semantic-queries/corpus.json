@@ -26,6 +26,7 @@
     {"op":"cancelResult","save":"cancelled","expected":"CANCELLED"},
     {"op":"foreign","save":"second","expected":"STALE"},
     {"op":"update","version":5,"inputs":{},"expected":"STALE"},
+    {"op":"query","version":1,"kind":"read","id":"a","args":"","expected":"STALE","evaluated":0,"hits":0},
     {"op":"close","expected":"0/0/0"},
     {"op":"accept","save":"second","expected":"CLOSED"},
     {"op":"query","kind":"read","id":"a","args":"","expected":"CLOSED","evaluated":0,"hits":0}

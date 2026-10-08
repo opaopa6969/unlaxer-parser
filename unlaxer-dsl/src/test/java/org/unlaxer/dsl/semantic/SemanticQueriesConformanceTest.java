@@ -41,7 +41,7 @@ public class SemanticQueriesConformanceTest {
                     }
                     case "query","cancelBefore" -> {
                         Cancellation cancellation=new Cancellation();token.set(cancellation);if(op.equals("cancelBefore"))cancellation.cancel();
-                        Result result=db.evaluate(new Key(text(step,"kind"),text(step,"id"),text(step,"args")),cancellation);value=db.accept(result);
+                        Key key=new Key(text(step,"kind"),text(step,"id"),text(step,"args"));Result result=step.has("version")?db.evaluate(step.get("version").getAsLong(),key,cancellation):db.evaluate(key,cancellation);value=db.accept(result);
                         if(step.has("save")) {saved.put(text(step,"save"),result);tokens.put(text(step,"save"),cancellation);}
                     }
                     case "accept" -> value=db.accept(saved.get(text(step,"save")));
@@ -136,7 +136,7 @@ public class SemanticQueriesConformanceTest {
                 }
                 case "query","cancelBefore" -> {
                     code.append("let cancel=Cancellation::default();*token.lock().unwrap()=cancel.clone();");if(op.equals("cancelBefore"))code.append("cancel.cancel();");
-                    code.append("let r=db.evaluate(Key::new(&").append(q(text(s,"kind"))).append(",&").append(q(text(s,"id"))).append(",&").append(q(text(s,"args"))).append(")?,cancel.clone())?;let value=db.accept(&r)?.to_string();");
+                    code.append(s.has("version")?"let r=db.evaluate_at("+s.get("version")+",Key::new(&":"let r=db.evaluate(Key::new(&").append(q(text(s,"kind"))).append(",&").append(q(text(s,"id"))).append(",&").append(q(text(s,"args"))).append(")?,cancel.clone())?;let value=db.accept(&r)?.to_string();");
                     if(s.has("save"))code.append("saved.insert(").append(q(text(s,"save"))).append(",r);tokens.insert(").append(q(text(s,"save"))).append(",cancel);");code.append("Ok(value)\n");
                 }
                 case "accept" -> code.append("db.accept(&saved[&").append(q(text(s,"save"))).append("]).map(str::to_string)\n");

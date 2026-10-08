@@ -250,6 +250,20 @@ impl SemanticQueries {
     fn input_revision(&self, key: &str) -> u64 {
         self.inputs.get(key).map_or(0, |input| input.revision)
     }
+    /// Supply the snapshot version used to construct an asynchronous request key.
+    pub fn evaluate_at(
+        &mut self,
+        expected_version: i64,
+        key: Key,
+        cancellation: Cancellation,
+    ) -> Result<QueryResult, Failure> {
+        self.open()?;
+        if self.version != Some(expected_version) {
+            return Err(Failure::Stale);
+        }
+        self.evaluate(key, cancellation)
+    }
+    /// Synchronous convenience for keys constructed on the current serialized editor lane.
     pub fn evaluate(
         &mut self,
         key: Key,

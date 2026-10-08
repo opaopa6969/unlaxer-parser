@@ -13,7 +13,10 @@ Input は URI、非負の文書 / artifact version、value を持つ。同じ sl
 内容を変えるには version を増やす。projectVersion は毎回増やす。入力の削除と
 再追加には内部で新しい revision を割り当てる。失敗した update は公開 snapshot を変えない。
 
-Key は query kind、対象 identity、正規化した引数の組である。Result はこの Key に
+Key は query kind、対象 identity、正規化した引数の組である。非同期要求は、その key を作った snapshot version を Java の `evaluate(version, key, token)` /
+Rust の `evaluate_at(version, key, token)` に渡す。古い入力位置から作った key を新 snapshot
+として解析することを拒否する。version を省く evaluate は同じ editor lane 上で現在の入力から
+key を作る同期呼出し向けである。Result はこの Key に
 project identity / version と query revision を付けて返す。kind の executor は
 データベースの寿命中に差し替えない。grammar、provider の設定、package の lock hash、
 AST schema など、結果に影響する可変データは必ず Input として登録する。
@@ -80,7 +83,7 @@ cache byte 予算の対象外であり、それぞれの所有者が寿命と上
 
 ## 共通検証と計測
 
-[基本 corpus](../spec-corpus/semantic-queries/corpus.json) は28操作の列で、無関係な入力、
+[基本 corpus](../spec-corpus/semantic-queries/corpus.json) は29操作の列で、無関係な入力、
 負の依存、追加・削除、引数別 key、古い結果、キャンセル、循環、予算、破棄を検証する。
 [意味解析の編集列](../spec-corpus/semantic-queries/semantic-edits.json) は12 snapshotで、
 実際の SemanticModel / ProjectSymbolIndex を再構築し、型追加・削除・parent 変更、

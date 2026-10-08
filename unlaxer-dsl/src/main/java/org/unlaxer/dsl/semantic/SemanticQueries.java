@@ -93,6 +93,11 @@ public final class SemanticQueries implements AutoCloseable {
     }
     private long inputRevision(String id) { Versioned input=inputs.get(id); return input==null?0:input.revision; }
     private boolean valid(Cached cached) { return cached.inputs.entrySet().stream().allMatch(e->inputRevision(e.getKey())==e.getValue()); }
+    /** Asynchronous editor requests must supply the snapshot version used to construct their key. */
+    public synchronized Result evaluate(long expectedVersion,Key key,Cancellation cancellation) {
+        open(); if(expectedVersion!=version) throw failure(Failure.STALE); return evaluate(key,cancellation);
+    }
+    /** Synchronous convenience for a key constructed from the current snapshot on the same editor lane. */
     public synchronized Result evaluate(Key key,Cancellation cancellation) {
         idle(); Objects.requireNonNull(key); Objects.requireNonNull(cancellation); if(version<0) throw failure(Failure.STALE);
         busy=true;
