@@ -219,7 +219,19 @@ public class MapperGenerator implements CodeGenerator {
                         int offset = source.codePointCount(0, consumedLengthCompat(parsed.getConsumed()));
                         return new ParseDiagnostic("trailing_input", offset, List.of("end of input"), farthest, hints);
                     }
-                    return new ParseDiagnostic("syntax", farthest, hints, farthest, hints);
+            """);
+        if (grammar.rules().stream().anyMatch(rule -> rule.annotations().stream().anyMatch(
+                org.unlaxer.dsl.bootstrap.UBNFAST.UniqueLongestChoiceAnnotation.class::isInstance))) {
+            sb.append("""
+                    String kind = hints.contains("unique longest alternative") ? "ambiguity"
+                        : hints.contains("nonempty unique longest alternative") ? "empty_choice"
+                        : hints.contains("2 to 64 unique longest alternatives") ? "choice_limit" : "syntax";
+                    return new ParseDiagnostic(kind, farthest, hints, farthest, hints);
+            """);
+        } else {
+            sb.append("        return new ParseDiagnostic(\"syntax\", farthest, hints, farthest, hints);\n");
+        }
+        sb.append("""
                 }
 
             """);

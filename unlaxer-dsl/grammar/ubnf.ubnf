@@ -185,6 +185,7 @@ grammar UBNF {
     | LeftAssocAnnotation
     | RightAssocAnnotation
     | LongestChoiceAnnotation
+    | UniqueLongestChoiceAnnotation
     | PredictiveChoiceAnnotation
     | PrecedenceAnnotation
     | DocAnnotation
@@ -233,6 +234,9 @@ grammar UBNF {
 
   @mapping(LongestChoiceAnnotation)
   LongestChoiceAnnotation ::= '@longestChoice' ;
+
+  @mapping(UniqueLongestChoiceAnnotation)
+  UniqueLongestChoiceAnnotation ::= '@uniqueLongestChoice' ;
 
   @mapping(PredictiveChoiceAnnotation)
   PredictiveChoiceAnnotation ::= '@predictiveChoice' ;

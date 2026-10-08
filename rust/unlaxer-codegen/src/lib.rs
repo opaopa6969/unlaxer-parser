@@ -112,7 +112,7 @@ fn contains_recovery(expression: &Expression) -> bool {
         | Repeat { child, .. } => contains_recovery(child),
         Capture { expression, .. } => contains_recovery(expression),
         Separated { child, separator } => contains_recovery(child) || contains_recovery(separator),
-        Sequence(values) | Choice(values) | LongestChoice(values) => {
+        Sequence(values) | Choice(values) | LongestChoice(values) | UniqueLongestChoice(values) => {
             values.iter().any(contains_recovery)
         }
         PredictiveChoice { alternatives, .. } => alternatives.iter().any(contains_recovery),
@@ -330,6 +330,7 @@ fn expression(expr: &Expression) -> String {
             format!("{}.trivia_scope({java_whitespace})", expression(child))
         }
         Choice(items) => format!("Expr::Choice(vec![{}])", expressions(items)),
+        UniqueLongestChoice(items) => format!("Expr::UniqueLongestChoice(vec![{}])", expressions(items)),
         LongestChoice(items) => format!("Expr::LongestChoice(vec![{}])", expressions(items)),
         PredictiveChoice {
             alternatives,

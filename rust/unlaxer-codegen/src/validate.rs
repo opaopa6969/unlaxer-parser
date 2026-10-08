@@ -172,7 +172,10 @@ fn root_reaches_projection_boundary(ir: &GrammarIr) -> bool {
             match expression {
                 CaptureEquality { .. } => return true,
                 Reference(id) => pending_rules.push(*id),
-                Sequence(children) | Choice(children) | LongestChoice(children) => {
+                Sequence(children)
+                | Choice(children)
+                | LongestChoice(children)
+                | UniqueLongestChoice(children) => {
                     pending.extend(children);
                 }
                 PredictiveChoice { alternatives, .. } => pending.extend(alternatives),
@@ -270,7 +273,10 @@ fn expression(
             captures.insert(name.clone());
             expression(child, count, captures)?;
         }
-        Sequence(children) | Choice(children) | LongestChoice(children) => {
+        Sequence(children)
+        | Choice(children)
+        | LongestChoice(children)
+        | UniqueLongestChoice(children) => {
             if children.is_empty() {
                 return Err(fail("empty sequence/choice"));
             }

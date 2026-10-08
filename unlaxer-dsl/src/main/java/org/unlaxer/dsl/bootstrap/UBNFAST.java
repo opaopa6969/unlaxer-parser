@@ -179,6 +179,7 @@ public sealed interface UBNFAST permits
         UBNFAST.LeftAssocAnnotation,
         UBNFAST.RightAssocAnnotation,
         UBNFAST.LongestChoiceAnnotation,
+        UBNFAST.UniqueLongestChoiceAnnotation,
         UBNFAST.PredictiveChoiceAnnotation,
         UBNFAST.PrecedenceAnnotation,
         UBNFAST.DocAnnotation,
@@ -239,6 +240,9 @@ public sealed interface UBNFAST permits
 
     /** @longestChoice — choose the successful alternative consuming the most input. */
     record LongestChoiceAnnotation() implements Annotation {}
+
+    /** @uniqueLongestChoice — reject ties and empty winners. */
+    record UniqueLongestChoiceAnnotation() implements Annotation {}
 
     /** @predictiveChoice — conservatively prune alternatives by their FIRST prefix. */
     record PredictiveChoiceAnnotation() implements Annotation {}

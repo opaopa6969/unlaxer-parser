@@ -183,6 +183,12 @@ public class ParserGenerator implements CodeGenerator {
 
     @Override
     public GeneratedSource generate(GrammarDecl grammar) {
+        if (grammar.rules().stream().anyMatch(rule -> rule.annotations().stream().anyMatch(
+                org.unlaxer.dsl.bootstrap.UBNFAST.UniqueLongestChoiceAnnotation.class::isInstance))) {
+            var profileErrors = GrammarValidator.validateWithoutClassLoading(grammar).stream()
+                .filter(issue -> issue.code().startsWith("E-UNIQUE-LONGEST-")).toList();
+            if (!profileErrors.isEmpty()) throw new IllegalArgumentException(profileErrors.toString());
+        }
         String packageName = ParserCodegenUtil.getPackageName(grammar);
         String grammarName = grammar.name();
         String className = grammarName + "Parsers";
