@@ -1,0 +1,8 @@
+grammar FormulaInfo {
+  @ubnf: v2
+  @package: org.example.embedded
+  @embedded: { rule: 'Formula' body: 'body' language: 'tiny' package: 'example' version: '1' grammar: 'TinyExpression' entry: 'Expression' }
+  token BODY ::= { NEGATIVE_LOOKAHEAD('}F') ANY };
+  @root @mapping(Document) Document ::= '😀' { Formula };
+  @mapping(Formula, params=[body]) Formula ::= 'F{' BODY @body '}F';
+}

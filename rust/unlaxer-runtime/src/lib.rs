@@ -5,10 +5,10 @@ use std::hash::{BuildHasher, Hasher};
 use std::rc::Rc;
 use std::sync::Arc;
 
-pub mod embedded;
 pub mod editor;
 pub mod editor_cst;
 pub mod editor_queries;
+pub mod embedded;
 mod first;
 pub mod language_queries;
 pub mod lexical;

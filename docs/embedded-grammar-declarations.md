@@ -61,3 +61,81 @@ mvn -pl unlaxer-common,unlaxer-dsl -am test -Dtest=EmbeddedLanguagesTest,Embedde
 cargo test --manifest-path rust/Cargo.toml -p unlaxer-runtime --test embedded
 cargo test --manifest-path rust/Cargo.toml -p unlaxer-generator --test embedded
 ```
+
+## Partial editor regions
+
+Generated parsers provide an opt-in editor registry:
+
+```java
+var formula = FormulaInfoParsers.embeddedEditorGrammar(
+    List.of("}F"), org.unlaxer.editor.EditorCst.Options.defaults());
+var tiny = TinyExpressionParsers.embeddedEditorGrammar(
+    List.of("]T"), org.unlaxer.editor.EditorCst.Options.defaults());
+```
+
+```rust
+let formula = formula::parser::embedded_editor_grammar(
+    vec!["}F".into()], unlaxer_runtime::editor_cst::Options::default());
+```
+
+Use these adapters in the same `EmbeddedLanguages.parse` / `embedded::parse`
+registry as strict child grammars or external providers. Strict parsing is attempted
+first; EOF repair runs only after failure and remains bounded by the supplied
+fragment/attempt limits. Completion fragments are explicit caller configuration;
+the adapter does not invent a universal list of missing delimiters.
+
+A repaired grammar reports PARTIAL. Discovered child full/body spans are clipped
+original-source CP ranges, and child inputs contain only original text. An opening
+must have original text before its body; a capture containing inserted body text
+is not exposed as a child region. Empty original bodies are allowed when the opening
+exists. A missing child provider stays UNAVAILABLE, and a syntactically invalid child
+does not prevent a healthy sibling from being parsed. EOF repair does not repair an
+invalid middle of the document or change the strict grammar's accepted language.
+
+Rebuild the region tree from each immutable document snapshot. Region IDs express
+current tree paths; a moved block may acquire another path, and the ID alone does
+not establish snapshot identity. The shared `editor.tsv` corpus runs 23 edit states,
+including parent/child delimiter removal and restoration, block insertion, movement
+and deletion, empty inputs, synthetic-body refusal, budgets and provider absence.
+Every old tree is rejected against the next project snapshot. Body source maps remain
+exact COPY maps of original text; no missing closing delimiter enters an edit.
+
+`Result.canonicalJson()` / `Output::canonical_json()` provides the same region
+view in Java and Rust, with the snapshot version represented as a decimal string so
+JavaScript cannot round a 64-bit version. Grammar/entry/state/full/body and parent IDs
+are explicit; this representation does not claim semantic capabilities.
+
+### Generated Playground integration
+
+Generated projects include `src/region_adapter.rs`, defaulting to no registered
+languages. Register known grammars explicitly in this hook. The working adapter at
+[`fixtures/embedded-grammars/region_adapter.rs`](fixtures/embedded-grammars/region_adapter.rs)
+uses the generated FormulaInfo → TinyExpression → Java registry, the same partial
+mode and the same original-source ownership rules as the Java host. Its Java grammar
+is the portable parser fixture; it does not pretend to run javac in a browser.
+
+To reproduce the fixture project, generate a Playground from
+`FormulaInfoPlayground.ubnf`, generate `TinyExpression.ubnf` and `Java.ubnf` into
+`src/tiny` and `src/java`, and copy that adapter to `src/region_adapter.rs`. The
+Playground root uses the declarative equivalent of UNTIL because browser generation
+requires declarative tokens; its independent expected editor positions are the same.
+
+Editor mode passes a request version through `pg_editor_snapshot(cursor, version)`.
+The older `pg_editor(cursor)` remains supported with version zero. The language panel
+shows complete, partial, failed, unavailable, unsupported and timed-out states, and
+selects each body's original text. Selection refuses changed input; the Worker also
+discards outdated request responses. Both Java-generated and native-generated
+Playgrounds use the same assets and registry hook.
+
+`EmbeddedGrammarConformanceTest` runs the shared Java/native Rust edit sequence and
+an actual generated WASM project. `scripts/embedded-regions-browser.mjs` (under
+`unlaxer-dsl/ubnf-vscode`) verifies Chromium display, Unicode CP→UTF16 selection,
+partial/failed siblings, block edits, stale selection and strict-mode compatibility.
+The `embedded-grammars` CI job runs both and uploads browser observations.
+
+This completes the partial-region/update/Playground slice #421. Shared-input grammar
+calls, a generated LSP registry bridge, full semantic query wiring for every child
+language, and the existing TinyExpression production-editor migration remain parent
+#369 requirements. Existing `LanguageQueries` and external-provider bridges remain
+available to explicitly registered clients; this view does not imply a provider is
+installed or attach guessed semantics to incomplete source.

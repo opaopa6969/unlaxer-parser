@@ -41,6 +41,7 @@ public final class PlaygroundGenerator {
             .replace("@@DOCS@@", ir.rules().stream().anyMatch(rule -> !rule.documentation().isEmpty()) ? "generated::parser::RULE_DOCS" : "&[]")
             .replace("@@NAME@@", RustBackend.quote(grammar.name())).replace("@@ROOT@@", Integer.toString(ir.root())));
         files.put("src/editor_adapter.rs", resource("playground/editor_adapter.rs"));
+        files.put("src/region_adapter.rs", resource("playground/region_adapter.rs"));
         for (String name : new String[] {"index.html", "playground.css", "playground.js", "worker.js"}) {
             files.put("public/" + name, resource("playground/" + name));
         }

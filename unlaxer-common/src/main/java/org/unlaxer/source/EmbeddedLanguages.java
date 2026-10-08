@@ -48,6 +48,28 @@ public final class EmbeddedLanguages {
     public record Result(DocumentSnapshot snapshot, List<Region> regions) {
         public Result { regions = List.copyOf(regions); new LanguageRegions(snapshot, regions); }
         public LanguageRegions tree() { return new LanguageRegions(snapshot, regions); }
+        public String canonicalJson() {
+            List<String> rows = new ArrayList<>();
+            for (Region region : regions) {
+                rows.add("{\"id\":" + quote(region.id()) + ",\"parent\":" + (region.parent() == null ? "null" : quote(region.parent()))
+                    + ",\"language\":" + quote(region.language().id()) + ",\"grammar\":" + quote(region.language().grammar())
+                    + ",\"entry\":" + quote(region.language().entry()) + ",\"state\":" + quote(region.parseState().name())
+                    + ",\"full\":[" + region.full().start() + "," + region.full().end() + "],\"body\":[" + region.body().start() + "," + region.body().end() + "]}");
+            }
+            return "{\"uri\":" + quote(snapshot.uri()) + ",\"version\":" + quote(Long.toString(snapshot.version())) + ",\"regions\":[" + String.join(",", rows) + "]}";
+        }
+        private static String quote(String value) {
+            StringBuilder out = new StringBuilder("\"");
+            value.codePoints().forEach(c -> {
+                if (c == '"' || c == '\\') { out.append('\\').appendCodePoint(c); }
+                else if (c == '\n') { out.append("\\n"); }
+                else if (c == '\r') { out.append("\\r"); }
+                else if (c == '\t') { out.append("\\t"); }
+                else if (c < 32) { out.append(String.format(java.util.Locale.ROOT, "\\u%04x", c)); }
+                else { out.appendCodePoint(c); }
+            });
+            return out.append('"').toString();
+        }
     }
     public static Result parse(DocumentSnapshot snapshot, Language language,
             Map<Language, Grammar> providers, int maximumDepth, int maximumRegions) {

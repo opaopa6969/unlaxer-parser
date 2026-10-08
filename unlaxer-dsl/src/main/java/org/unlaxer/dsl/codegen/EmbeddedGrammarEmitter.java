@@ -68,9 +68,18 @@ public final class EmbeddedGrammarEmitter {
             bindings.add("            new org.unlaxer.source.CstGrammar.Binding(" + d.rule + "Parser.class, java.util.Set.of(" + quote(capture)
                 + "), new org.unlaxer.source.LanguageRegions.Language(" + String.join(", ", List.of(quote(d.language), quote(d.packageId), quote(d.version), quote(d.grammar), quote(d.entry))) + "))");
         }
-        return out.append(String.join(",\n", bindings)).append("), java.util.Set.of(").append(String.join(", ", boundaries))
+        out.append(String.join(",\n", bindings)).append("), java.util.Set.of(").append(String.join(", ", boundaries))
             .append("), token -> token.parser instanceof __CaptureBinding capture ? capture.captureBindings() : java.util.List.of(), ")
-            .append(TokenStreamGrammar.whitespace(grammar)).append(");\n    }\n\n").toString();
+            .append(TokenStreamGrammar.whitespace(grammar)).append(");\n    }\n\n");
+        out.append("    public static org.unlaxer.source.EmbeddedLanguages.Grammar embeddedEditorGrammar(java.util.List<String> completions, org.unlaxer.editor.EditorCst.Options options) {\n")
+            .append("        return embeddedGrammar().editor(completions, parser -> {\n");
+        for (var rule : grammar.rules()) {
+            out.append("            if (parser instanceof ").append(rule.name()).append("Parser) return ").append(quote(rule.name())).append(";\n");
+            if (rule.annotations().stream().anyMatch(a -> a instanceof RecoveryAnnotation)) {
+                out.append("            if (parser instanceof ").append(rule.name()).append("RecoveryParser) return ").append(quote(rule.name())).append(";\n");
+            }
+        }
+        return out.append("            return null;\n        }, parser -> parser instanceof __CaptureBinding capture ? capture.captureBindings() : java.util.List.of(), options);\n    }\n\n").toString();
     }
     public static String rustApi(GrammarDecl grammar, List<String> rules, boolean whitespace) {
         var declarations = declarations(grammar);
@@ -83,7 +92,7 @@ public final class EmbeddedGrammarEmitter {
             .append(", capture: ").append(rustQuote(d.body)).append(".into(), language: unlaxer_runtime::source::Language { id: ").append(rustQuote(d.language))
             .append(".into(), package_id: ").append(rustQuote(d.packageId)).append(".into(), version: ").append(rustQuote(d.version))
             .append(".into(), grammar: ").append(rustQuote(d.grammar)).append(".into(), entry: ").append(rustQuote(d.entry)).append(".into() } },\n");
-        return out.append("    ] }\n}\n").toString();
+        return out.append("    ] }\n}\npub fn embedded_editor_grammar(completions: Vec<String>, options: unlaxer_runtime::editor_cst::Options) -> unlaxer_runtime::embedded::EditorGrammar {\n    embedded_grammar().editor(completions, options)\n}\n").toString();
     }
     private static String rustQuote(String value) {
         var out = new StringBuilder("\"");
