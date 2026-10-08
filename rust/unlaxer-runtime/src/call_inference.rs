@@ -585,6 +585,29 @@ impl<'a, P: Provider> CallInference<'a, P> {
         result
     }
     pub fn assess(&self, resolution: &Resolution, index: usize, actual: &TypeRef) -> Decision {
+        let failure = match resolution.state {
+            State::Unsupported => Some(Status::Unsupported),
+            State::Cycle => Some(Status::Cycle),
+            State::Limit => Some(Status::Limit),
+            State::Invalid => Some(Status::Invalid),
+            _ => None,
+        };
+        if let Some(status) = failure {
+            return Decision {
+                status,
+                rule: "INFERENCE_FAILURE".into(),
+                evidence: resolution
+                    .candidates
+                    .iter()
+                    .flat_map(|candidate| {
+                        candidate
+                            .constraints
+                            .iter()
+                            .map(|constraint| constraint.decision.clone())
+                    })
+                    .collect(),
+            };
+        }
         combine(
             false,
             "EXPECTED_ARGUMENT",

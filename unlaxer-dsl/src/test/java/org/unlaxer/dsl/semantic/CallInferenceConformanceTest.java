@@ -54,6 +54,10 @@ public class CallInferenceConformanceTest {
             if(q.has("values")) {
                 List<Value> values=list(q,"values",v->new Value(text(v,"id"),text(v,"name"),type(v.get("type")),text(v,"uri"),v.get("version").getAsLong(),span(v.get("span"))));
                 List<Completion> completions=inference.complete(values,r,index);
+                if(Set.of(State.UNSUPPORTED,State.CYCLE,State.LIMIT,State.INVALID).contains(r.state())) for(Value value:values) {
+                    var assessment=inference.assess(r,index,value.type());assertEquals("INFERENCE_FAILURE",assessment.rule());
+                    assertEquals(r.candidates().stream().flatMap(candidate->candidate.constraints().stream()).map(Constraint::decision).toList(),assessment.evidence());
+                }
                 for(Completion completion:completions) assertEquals(inference.assess(r,index,completion.value().type()),completion.decision());
                 JsonElement items=json(completions.stream().map(c->Map.of("id",c.value().id(),"name",c.value().name(),"type",render(c.value().type()),"uri",c.value().uri(),"version",c.value().version(),"span",position(c.value().span()),"status",c.decision().status().name(),"rule",c.decision().rule())).toList());
                 assertEquals(text(q,"name"),q.get("completionExpected"),items);result.add(items);
@@ -108,6 +112,8 @@ public class CallInferenceConformanceTest {
                 code.append("let values=vec![");for(JsonElement v:q.getAsJsonArray("values")) {JsonObject value=v.getAsJsonObject();code.append("ci::Value {id:").append(rs(value,"id")).append(",name:").append(rs(value,"name")).append(",type_ref:").append(rt(type(value.get("type")))).append(",uri:").append(rs(value,"uri")).append(",version:").append(value.get("version")).append(",span:").append(rsp(value,"span")).append("},");}
                 code.append("];let items=inference.complete(&values,&r,").append(index).append(");for c in &items {assert_eq!(c.decision,inference.assess(&r,").append(index).append(",&c.value.type_ref));}\n")
                     .append("println!(\"{}\",arr(items.iter().map(completion)));println!(\"{}\",arr(values.iter().map(|v|json_string(inference.assess(&r,").append(index).append(",&v.type_ref).status.name()))));\n");
+                if(Set.of("UNSUPPORTED","CYCLE","LIMIT","INVALID").contains(text(q.getAsJsonObject("expected"),"state")))
+                    code.append("for value in &values {let assessment=inference.assess(&r,").append(index).append(",&value.type_ref);assert_eq!(assessment.rule,\"INFERENCE_FAILURE\");assert_eq!(assessment.evidence,r.candidates.iter().flat_map(|candidate|candidate.constraints.iter().map(|c|c.decision.clone())).collect::<Vec<_>>());}\n");
             }
             code.append("}\n");
         }
