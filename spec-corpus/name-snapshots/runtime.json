@@ -346,5 +346,56 @@
       "cst": null
     },
     "child": true
+  },
+  {
+    "name": "multiple-name-captures",
+    "input": "T(a);",
+    "lexeme": "T",
+    "bindings": {
+      "ubnf.name.cxx23.version": [
+        "v1"
+      ],
+      "ubnf.name.cxx23.type": [
+        "T"
+      ]
+    },
+    "expected": {
+      "accepted": false,
+      "cursor": 0,
+      "matched": 0,
+      "selection": "none",
+      "kind": "name_capture",
+      "span": [
+        0,
+        0
+      ],
+      "cst": null
+    },
+    "capture": "multiple"
+  },
+  {
+    "name": "empty-normalized-name-capture",
+    "input": " (a);",
+    "lexeme": " ",
+    "bindings": {
+      "ubnf.name.cxx23.version": [
+        "v1"
+      ],
+      "ubnf.name.cxx23.type": [
+        "T"
+      ]
+    },
+    "expected": {
+      "accepted": false,
+      "cursor": 0,
+      "matched": 0,
+      "selection": "none",
+      "kind": "name_capture",
+      "span": [
+        1,
+        1
+      ],
+      "cst": null
+    }
   }
 ]

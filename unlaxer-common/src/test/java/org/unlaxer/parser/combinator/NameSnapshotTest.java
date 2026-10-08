@@ -58,8 +58,9 @@ public class NameSnapshotTest {
         }
     }
     @Test public void rejectedCandidateRollsBackRegisteredStateAndKnownKindCanFallback() {
+        for (String name : List.of("T","U")) {
         int[] state={0};
-        var rejected = new NamePredicateParser(new WordParser("T") {
+        var rejected = new NamePredicateParser(new WordParser(name) {
             private static final long serialVersionUID=1L;
             @Override public Parsed parse(ParseContext context,TokenKind kind,boolean invert) {
                 Parsed result=super.parse(context,kind,invert); if(result.isSucceeded())state[0]++; return result;
@@ -68,11 +69,14 @@ public class NameSnapshotTest {
             private static final long serialVersionUID=1L;
             @Override protected List<Token> nameCaptureSites(Token root) {return List.of(root);}
         };
-        var choice=new Choice(rejected,gate("T","type"));
-        try(var context=ParseContext.withBindings(StringSource.createRootSource("T"),bindings("T"),ParseOptions.DEFAULT)) {
+        var choice=new Choice(rejected,name.equals("T") ? gate("T","type") : new WordParser("U"));
+        try(var context=ParseContext.withBindings(StringSource.createRootSource(name),bindings("T"),ParseOptions.DEFAULT)) {
             context.registerTransactionalState(() -> {int saved=state[0]; return ()->state[0]=saved;});
-            assertTrue(new NameResolutionScope(choice,List.of(REQUIREMENT)).parse(context).isSucceeded());
-            assertEquals(0,state[0]); assertTrue(NameResolution.failure(context).isEmpty());
+            assertEquals(name.equals("T"),new NameResolutionScope(choice,List.of(REQUIREMENT)).parse(context).isSucceeded());
+            assertEquals(0,state[0]);
+            if(name.equals("T")) assertTrue(NameResolution.failure(context).isEmpty());
+            else {assertEquals("unresolved_name",NameResolution.failure(context).orElseThrow().kind());assertEquals(0,context.position());}
+        }
         }
     }
     @Test public void undeclaredRequirementAndEmptyCaptureCannotBecomeSuccess() {

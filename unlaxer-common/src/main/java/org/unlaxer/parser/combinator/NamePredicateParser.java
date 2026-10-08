@@ -19,12 +19,13 @@ public abstract class NamePredicateParser extends ConstructedSingleChildParser i
     @Override public Parsed parse(ParseContext context, TokenKind kind, boolean invert) {
         context.startParse(this, context, kind, invert);
         context.begin(this);
+        int entryStart = context.getConsumedPosition().value();
         Parsed parsed = getChild().parse(context, kind, invert);
         boolean accepted = parsed.isSucceeded();
         if (accepted) {
             var sites = nameCaptureSites(parsed.getConsumed());
-            if (sites.size() != 1 || sites.get(0).source == null || sites.get(0).source.isEmpty()) {
-                int at = context.getConsumedPosition().value();
+            if (sites.size() != 1 || sites.get(0).source == null) {
+                int at = entryStart;
                 NameResolution.reject(context, "name_capture", at, at, "single nonempty name capture");
                 accepted = false;
             } else {

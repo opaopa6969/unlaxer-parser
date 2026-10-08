@@ -588,4 +588,47 @@ mod tests {
             }
         }
     }
+    fn marked(context: &mut ParseContext<'_>) -> crate::ParseResult {
+        let name = if context.remaining().starts_with('T') {
+            "T"
+        } else {
+            "U"
+        };
+        let parsed = context.parse(&Expr::Literal(name))?;
+        context.set_state("candidate", 1usize);
+        context.scopes_mut().declare("discarded", 0);
+        Ok(parsed)
+    }
+    #[test]
+    fn rejected_candidates_and_fatal_entries_restore_state_and_scopes() {
+        for name in ["T", "U"] {
+            let rejected = Expr::NamePredicate {
+                child: Box::new(Expr::Custom(marked).capture("name")),
+                snapshot: "names",
+                version: "v1",
+                capture: "name",
+                kind: "value",
+            };
+            let mut context =
+                ParseContext::with_name_snapshots(name, &[snapshot("T")], ParseOptions::default())
+                    .unwrap();
+            let child = if name == "T" {
+                gate("T", "type")
+            } else {
+                Expr::Literal("U")
+            };
+            assert_eq!(
+                context
+                    .parse(&scope(Expr::choice([rejected, child])))
+                    .is_ok(),
+                name == "T"
+            );
+            assert!(context.state::<usize>("candidate").is_none());
+            assert!(!context.scopes().is_declared("discarded"));
+            if name == "U" {
+                assert_eq!(context.name_failure().unwrap().kind, "unresolved_name");
+                assert_eq!(context.position(), 0);
+            }
+        }
+    }
 }
