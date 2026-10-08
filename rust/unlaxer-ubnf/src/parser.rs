@@ -676,7 +676,9 @@ impl Parser<'_> {
                         let tokens = self
                             .quoted()?
                             .split(',')
-                            .map(str::trim)
+                            // UBNFMapper splits sync lists using Java String.trim(),
+                            // not Unicode whitespace (NBSP and EM SPACE are tokens).
+                            .map(|token| token.trim_matches(|ch| ch <= '\u{0020}'))
                             .filter(|s| !s.is_empty())
                             .map(str::to_owned)
                             .collect();
