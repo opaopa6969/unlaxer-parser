@@ -205,6 +205,9 @@ fn resolve_one(
     if visiting.len() > 64 {
         return Err(error("package dependency depth exceeds 64"));
     }
+    if !packages.contains_key(name) && packages.len() >= 128 {
+        return Err(error("package count exceeds 128"));
+    }
     let source = string(dependency, "source")?;
     let (bytes, child_directory) = if source == "builtin:std/layout@1.0.0" {
         (STANDARD.to_vec(), directory.to_owned())
@@ -228,6 +231,9 @@ fn resolve_one(
             return Err(error(format!("conflicting package identity: {name}")));
         }
     } else {
+        if blobs.values().map(Vec::len).sum::<usize>() + bytes.len() > 64 * 1024 * 1024 {
+            return Err(error("package graph exceeds cache limits"));
+        }
         packages.insert(name.into(), pinned);
         blobs.insert(sha, bytes);
         for (name, dependency) in object(&value["dependencies"], "dependencies")? {
@@ -313,6 +319,7 @@ pub struct Resolver {
     virtual_root: PathBuf,
     lock: Option<Value>,
     artifacts: BTreeMap<String, Value>,
+    loaded_bytes: usize,
 }
 fn normalize(path: &Path) -> PathBuf {
     let mut result = PathBuf::new();
@@ -335,6 +342,7 @@ impl Resolver {
             directory,
             lock: None,
             artifacts: BTreeMap::new(),
+            loaded_bytes: 0,
         }
     }
     fn lock(&mut self) -> Result<&Value, String> {
@@ -389,6 +397,10 @@ impl Resolver {
         let bytes = read_bytes(&path).map_err(|_| {
             error("missing artifact; run unlaxer deps resolve --manifest ubnf.json")
         })?;
+        self.loaded_bytes += bytes.len();
+        if self.loaded_bytes > 64 * 1024 * 1024 {
+            return Err(error("package graph exceeds cache limits"));
+        }
         if hash(&bytes) != string(&pinned, "sha256")? {
             return Err(error(format!("artifact hash mismatch: {name}")));
         }

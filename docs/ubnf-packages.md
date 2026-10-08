@@ -81,7 +81,7 @@ export は `SPACES`、`LINE_COMMENT`、`BLOCK_COMMENT`、`SPACES_AND_COMMENTS`�
 従来の javaStyle 11文法・24入力を明示 import に置き換えた共通 fixture で、受理/拒否、
 consumed/matched cursor、AST 全 field/node span と生成物を比較する。
 
-Java / native Rust の lock bytes と生成物の比較、ローカル・推移的 import、16 の共通
+Java / native Rust の lock bytes と生成物の比較、ローカル・推移的 import、17 の共通
 拒否条件、HTTP 接続を監視したオフライン生成を conformance test で検証する。結果は
 `target/rust-packages.tsv` と既存 `target/rust-rule-trivia.tsv` に保存し、CI が必須にする。
 

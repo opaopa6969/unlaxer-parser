@@ -17,6 +17,7 @@ public final class UBNFPackageResolver {
     private final Path virtualRoot;
     private final UBNFModuleLoader.SourceReader reader;
     private JsonObject lock;
+    private long loadedBytes;
     private final Map<String, JsonObject> artifacts = new TreeMap<>();
 
     public UBNFPackageResolver(Path grammar, UBNFModuleLoader.SourceReader reader) {
@@ -131,6 +132,7 @@ public final class UBNFPackageResolver {
             Map<String, JsonObject> packages, Map<String, byte[]> blobs, Set<String> visiting) throws IOException {
         if (!visiting.add(name)) throw error("cyclic package dependency: " + name);
         if (visiting.size() > 64) throw error("package dependency depth exceeds 64");
+        if (!packages.containsKey(name) && packages.size() >= 128) throw error("package count exceeds 128");
         String source = string(dependency, "source");
         byte[] bytes;
         Path childDirectory = sourceDirectory;
@@ -161,6 +163,8 @@ public final class UBNFPackageResolver {
         JsonObject previous = packages.putIfAbsent(name, pinned);
         if (previous != null && !previous.equals(pinned)) throw error("conflicting package identity: " + name);
         if (previous == null) {
+            if (blobs.values().stream().mapToLong(blob -> blob.length).sum() + bytes.length > 64L * 1024 * 1024)
+                throw error("package graph exceeds cache limits");
             blobs.put(hash, bytes);
             for (var entry : nested.entrySet()) resolveOne(entry.getKey(), entry.getValue().getAsJsonObject(),
                 childDirectory, packages, blobs, visiting);
@@ -230,6 +234,8 @@ public final class UBNFPackageResolver {
         if (!Files.isRegularFile(cache)) throw error("missing artifact; run unlaxer deps resolve --manifest ubnf.json");
         if (Files.size(cache) > MAX_BYTES) throw error("artifact exceeds 8 MiB");
         byte[] bytes = Files.readAllBytes(cache);
+        loadedBytes += bytes.length;
+        if (loadedBytes > 64L * 1024 * 1024) throw error("package graph exceeds cache limits");
         if (!sha256(bytes).equals(string(pinned, "sha256"))) throw error("artifact hash mismatch: " + name);
         JsonObject value = artifact(bytes);
         if (!name.equals(string(value, "id")) || !string(value, "version").equals(string(pinned, "version")))
