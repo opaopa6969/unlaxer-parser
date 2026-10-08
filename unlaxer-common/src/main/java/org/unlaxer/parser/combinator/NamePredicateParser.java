@@ -6,16 +6,25 @@ import org.unlaxer.context.*;
 import org.unlaxer.parser.*;
 
 /** Syntax followed by a pure, versioned name classification; generated capture sites supply names. */
-public abstract class NamePredicateParser extends ConstructedSingleChildParser implements DiagnosticsAgnostic {
+public abstract class NamePredicateParser extends ConstructedAbstractParser implements HasChildrenParser, DiagnosticsAgnostic {
     private static final long serialVersionUID = 1L;
     private final String snapshot, version, expectedKind;
     protected NamePredicateParser(Parser child, String snapshot, String version, String expectedKind) {
-        super(child);
+        super(new Parsers(child));
         new NameSnapshot.Requirement(snapshot, version);
         if (!List.of("type", "value", "resolved").contains(expectedKind)) throw new IllegalArgumentException("invalid name predicate kind");
         this.snapshot = snapshot; this.version = version; this.expectedKind = expectedKind;
     }
     protected abstract List<Token> nameCaptureSites(Token root);
+    @Override public ChildOccurs getChildOccurs() {return ChildOccurs.single;}
+    @Override public HasChildrenParser createWith(Parsers children) {
+        if(children.size()!=1) throw new IllegalArgumentException("name predicate needs one child");
+        var owner=this;
+        return new NamePredicateParser(children.get(0),snapshot,version,expectedKind) {
+            private static final long serialVersionUID=1L;
+            @Override protected List<Token> nameCaptureSites(Token root) {return owner.nameCaptureSites(root);}
+        };
+    }
     @Override public Parsed parse(ParseContext context, TokenKind kind, boolean invert) {
         context.startParse(this, context, kind, invert);
         context.begin(this);
