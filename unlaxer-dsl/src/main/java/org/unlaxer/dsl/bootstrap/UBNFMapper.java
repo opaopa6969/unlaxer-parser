@@ -601,6 +601,13 @@ public class UBNFMapper {
                 result.add(toEvalAnnotation(child));
             } else if (child.parser.getClass() == UBNFParsers.WhitespaceAnnotationParser.class) {
                 result.add(toWhitespaceAnnotation(child));
+            } else if (child.parser.getClass() == UBNFParsers.LexicalContextAnnotationParser.class) {
+                List<Token> lists = findDescendants(child, UBNFParsers.LexicalContextListParser.class);
+                List<String> tokens = findDescendants(lists.get(0), org.unlaxer.parser.elementary.SingleQuotedParser.class).stream()
+                    .map(value -> stripQuotes(value.source.toString().trim())).toList();
+                List<String> literals = lists.size() < 2 ? List.of() : findDescendants(lists.get(1), org.unlaxer.parser.elementary.SingleQuotedParser.class).stream()
+                    .map(value -> stripQuotes(value.source.toString().trim())).toList();
+                result.add(bind(new UBNFAST.LexicalContextAnnotation(tokens, literals), child));
             } else if (child.parser.getClass() == UBNFParsers.InterleaveAnnotationParser.class) {
                 result.add(toInterleaveAnnotation(child));
             } else if (child.parser.getClass() == UBNFParsers.BackrefAnnotationParser.class) {

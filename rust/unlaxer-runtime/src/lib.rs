@@ -124,6 +124,10 @@ pub enum Expr {
         child: Box<Expr>,
         definition: lexical::LexicalExpression,
     },
+    LexicalContextScope {
+        child: Box<Expr>,
+        terminals: Arc<[lexing::Terminal]>,
+    },
     TriviaScope {
         child: Box<Expr>,
         whitespace: bool,
@@ -307,6 +311,13 @@ impl Expr {
     pub fn value_boundary(self) -> Self {
         Self::ValueBoundary(Box::new(self))
     }
+    pub fn lexical_context_scope(self, terminals: Vec<lexing::Terminal>) -> Self {
+        Self::LexicalContextScope {
+            child: Box::new(self),
+            terminals: terminals.into(),
+        }
+    }
+
     pub fn lexical_trivia_scope(self, definition: lexical::LexicalExpression) -> Self {
         Self::LexicalTriviaScope {
             child: Box::new(self),
@@ -1062,6 +1073,7 @@ pub struct ParseContext<'a> {
     rules: Arc<[Rule]>,
     whitespace: bool,
     lexical_trivia: Option<lexical::LexicalExpression>,
+    lexical_context: Option<Arc<[lexing::Terminal]>>,
     position: usize,
     matched_position: usize,
     nodes: Vec<Node>,
@@ -1382,6 +1394,7 @@ impl<'a> ParseContext<'a> {
             rules: Arc::from([]),
             whitespace: false,
             lexical_trivia: None,
+            lexical_context: None,
             position: 0,
             matched_position: 0,
             nodes: vec![],
@@ -1676,6 +1689,13 @@ impl<'a> ParseContext<'a> {
         whitespace: bool,
     ) -> ParseResult {
         let previous_definition = self.lexical_trivia.take();
+        let previous_goal = self.lexical_context.take();
+        let outer_entry = self.rules.is_empty();
+        let previous_lexing = if outer_entry {
+            None
+        } else {
+            self.lexing.take()
+        };
         let previous_rules = std::mem::replace(&mut self.rules, Arc::clone(grammar));
         let previous_whitespace = std::mem::replace(&mut self.whitespace, whitespace);
         let safe_rules = if self.options.memoization == Memoization::SafeFailures {
@@ -1694,6 +1714,10 @@ impl<'a> ParseContext<'a> {
         let result = self.parse_expression(&Expr::Rule(root));
         self.failure_memo = previous_failure_memo;
         self.rules = previous_rules;
+        self.lexical_context = previous_goal;
+        if !outer_entry {
+            self.lexing = previous_lexing;
+        }
         self.whitespace = previous_whitespace;
         self.lexical_trivia = previous_definition;
         self.memo_safe_rules = previous_safe_rules;
@@ -1916,6 +1940,7 @@ impl<'a> ParseContext<'a> {
         let memo_key = (self.options.memoization == Memoization::SafeFailures
             && self.names_state.frames.is_empty()
             && self.lexical_trivia.is_none()
+            && self.lexical_context.is_none()
             && self.memo_safe_rules.get(id).copied().unwrap_or(false))
         .then(|| {
             (
@@ -1991,6 +2016,9 @@ impl<'a> ParseContext<'a> {
                 nodes: vec![id],
                 captures: Vec::new(),
             }),
+            Expr::LexicalContextScope { child, terminals } => {
+                self.expression_with_lexical_context(child, terminals, depth)
+            }
             Expr::LexicalTriviaScope { child, definition } => {
                 self.expression_with_lexical_trivia(child, definition, depth)
             }
@@ -2025,6 +2053,19 @@ impl<'a> ParseContext<'a> {
         } else {
             self.commit_checkpoint(checkpoint);
         }
+        result
+    }
+
+    #[inline(never)]
+    fn expression_with_lexical_context(
+        &mut self,
+        child: &Expr,
+        terminals: &Arc<[lexing::Terminal]>,
+        depth: usize,
+    ) -> Option<Fragment> {
+        let previous = self.lexical_context.replace(Arc::clone(terminals));
+        let result = self.expression(child, depth);
+        self.lexical_context = previous;
         result
     }
 
@@ -2073,10 +2114,19 @@ impl<'a> ParseContext<'a> {
                 }),
             Expr::Lexical(label, expression) => {
                 let end = match &mut self.lexing {
-                    Some(session) => {
-                        session.match_at(label, false, Some(expression), self.position)
-                    }
-                    None => expression.match_at(self.input, self.position),
+                    Some(session) => session.match_at(
+                        label,
+                        false,
+                        Some(expression),
+                        self.position,
+                        self.lexical_context.as_ref(),
+                    ),
+                    None => match &self.lexical_context {
+                        Some(goal) => {
+                            lexing::match_goal(self.input, self.position, label, false, goal)
+                        }
+                        None => expression.match_at(self.input, self.position),
+                    },
                 };
                 if let Some(end) = end {
                     if end != self.position {
@@ -2319,10 +2369,21 @@ impl<'a> ParseContext<'a> {
             }
             Expr::Literal(literal) => {
                 let end = match &mut self.lexing {
-                    Some(session) => session.match_at(literal, true, None, self.position),
-                    None => self.input[self.position..]
-                        .starts_with(literal)
-                        .then_some(self.position + literal.len()),
+                    Some(session) => session.match_at(
+                        literal,
+                        true,
+                        None,
+                        self.position,
+                        self.lexical_context.as_ref(),
+                    ),
+                    None => match &self.lexical_context {
+                        Some(goal) => {
+                            lexing::match_goal(self.input, self.position, literal, true, goal)
+                        }
+                        None => self.input[self.position..]
+                            .starts_with(literal)
+                            .then_some(self.position + literal.len()),
+                    },
                 };
                 if let Some(end) = end {
                     self.position = end;
@@ -2502,7 +2563,9 @@ impl<'a> ParseContext<'a> {
                 }
                 Some(fragment)
             }
-            Expr::LexicalTriviaScope { .. } | Expr::TriviaScope { .. } => {
+            Expr::LexicalContextScope { .. }
+            | Expr::LexicalTriviaScope { .. }
+            | Expr::TriviaScope { .. } => {
                 unreachable!("trivia scopes are dispatched by expression")
             }
             Expr::TextValue(child) | Expr::ValueBoundary(child) => {
@@ -2871,7 +2934,7 @@ impl<'a> ParseContext<'a> {
             return;
         }
         if let Some(session) = &mut self.lexing {
-            let end = session.skip(self.position);
+            let end = session.skip(self.position, self.lexical_context.is_some());
             if end != self.position {
                 self.position = end;
                 self.matched_position = end;
@@ -2911,7 +2974,8 @@ impl<'a> ParseContext<'a> {
         if let Expr::TextValue(child)
         | Expr::ValueBoundary(child)
         | Expr::TriviaScope { child, .. }
-        | Expr::LexicalTriviaScope { child, .. } = child
+        | Expr::LexicalTriviaScope { child, .. }
+        | Expr::LexicalContextScope { child, .. } = child
         {
             self.java_failed_atom(child);
             return;
@@ -3023,7 +3087,8 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
         | Expr::NameResolutionScope { child, .. }
         | Expr::Recovery { child, .. }
         | Expr::TriviaScope { child, .. }
-        | Expr::LexicalTriviaScope { child, .. } => expression_allows_deferred_diagnostics(child),
+        | Expr::LexicalTriviaScope { child, .. }
+        | Expr::LexicalContextScope { child, .. } => expression_allows_deferred_diagnostics(child),
         Expr::Lexical(_, _)
         | Expr::Literal(_)
         | Expr::Number
@@ -3112,7 +3177,8 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>) -> bo
         | Expr::Lookahead { child, .. }
         | Expr::RuleEffects { child, .. }
         | Expr::TriviaScope { child, .. }
-        | Expr::LexicalTriviaScope { child, .. } => expression_is_memo_safe(child, references),
+        | Expr::LexicalTriviaScope { child, .. }
+        | Expr::LexicalContextScope { child, .. } => expression_is_memo_safe(child, references),
         _ => true,
     }
 }

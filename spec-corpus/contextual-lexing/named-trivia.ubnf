@@ -1,0 +1,9 @@
+grammar Input {
+ @ubnf: v2
+ @package: example.lexing
+ @whitespace: GAP
+ token GAP ::= '#'+;
+ token ID ::= 'a';
+ @root @mapping(Value, params=[value]) @lexicalContext(tokens=['ID'])
+ Root ::= ID @value;
+}

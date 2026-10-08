@@ -16,11 +16,24 @@ pub fn lexing_api(
     root: usize,
     whitespace: bool,
 ) -> String {
+    lexing_api_with_context(terminals, root, whitespace, false)
+}
+pub fn lexing_api_with_context(
+    terminals: &[(String, bool, lexical::LexicalExpression)],
+    root: usize,
+    whitespace: bool,
+    contextual: bool,
+) -> String {
     let mut out = String::from("\npub fn lexical_terminals() -> &'static std::sync::Arc<[unlaxer_runtime::lexing::Terminal]> {\n    static TERMINALS: OnceLock<std::sync::Arc<[unlaxer_runtime::lexing::Terminal]>> = OnceLock::new();\n    TERMINALS.get_or_init(|| vec![\n");
     for (name, literal, expression) in terminals {
         writeln!(out, "        unlaxer_runtime::lexing::Terminal {{ name: {}, literal: {}, expression: {} }},", quote(name), literal, lexical_expression(expression)).unwrap();
     }
-    out.push_str("    ].into())\n}\n\npub fn parse_with_lexing(source: &str, options: unlaxer_runtime::lexing::Options) -> Result<unlaxer_runtime::lexing::Outcome<'_>, String> {\n    unlaxer_runtime::lexing::parse(grammar(), ");
+    out.push_str("    ].into())\n}\n\npub fn parse_with_lexing(source: &str, options: unlaxer_runtime::lexing::Options) -> Result<unlaxer_runtime::lexing::Outcome<'_>, String> {\n    unlaxer_runtime::lexing::");
+    out.push_str(if contextual {
+        "parse_contextual(grammar(), "
+    } else {
+        "parse(grammar(), "
+    });
     writeln!(
         out,
         "{root}, {whitespace}, source, options, std::sync::Arc::clone(lexical_terminals()))\n}}"
@@ -105,6 +118,7 @@ fn contains_recovery(expression: &Expression) -> bool {
         RuleEffects { child, .. }
         | CaptureEquality { child, .. }
         | TriviaScope { child, .. }
+        | LexicalContextScope { child, .. }
         | TextValue(child)
         | ValueBoundary(child)
         | Delimited(child)
@@ -323,6 +337,12 @@ fn expression(expr: &Expression) -> String {
         Delimited(child) => format!("Expr::Sequence(vec![{}])", expression(child)),
         TextValue(child) => format!("{}.text_value()", expression(child)),
         ValueBoundary(child) => format!("{}.value_boundary()", expression(child)),
+        LexicalContextScope { child, terminals } => format!(
+            "{}.lexical_context_scope(vec![{}])", expression(child),
+            terminals.iter().map(|(name, literal, definition)| format!(
+                "unlaxer_runtime::lexing::Terminal {{ name: {}, literal: {}, expression: {} }}",
+                quote(name), literal, lexical_expression(definition))).collect::<Vec<_>>().join(", ")
+        ),
         LexicalTriviaScope { child, definition } => format!(
             "{}.lexical_trivia_scope({})",
             expression(child),

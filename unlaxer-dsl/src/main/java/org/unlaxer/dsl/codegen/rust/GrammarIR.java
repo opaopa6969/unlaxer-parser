@@ -55,7 +55,10 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
         OptionalExpr, Repeat, Separated, AnyToken, EofToken, EmptyToken, ErrorExpected, CharRangeToken,
         ExceptToken, UntilToken, LookaheadToken, Delimited, IdentifierToken, QuotedToken,
         CodeStartToken, CodeEndToken, LongCodeBlockToken, CustomToken, TextValue, ValueBoundary, TriviaScope, RuleEffects,
-        CaptureEquality, Recovery, LexicalToken, LexicalTriviaScope {}
+        CaptureEquality, Recovery, LexicalToken, LexicalTriviaScope, LexicalContextScope {}
+    public record LexicalContextScope(Expression child, List<org.unlaxer.dsl.runtime.Lexing.Terminal> terminals) implements Expression {
+        public LexicalContextScope { terminals = List.copyOf(terminals); }
+    }
     public record LexicalToken(String name, org.unlaxer.dsl.runtime.LexicalExpression expression) implements Expression {}
     /** Rule-local trivia policy, transparent to captures and semantic values. */
     public record LexicalTriviaScope(Expression child, org.unlaxer.dsl.runtime.LexicalExpression definition) implements Expression {}

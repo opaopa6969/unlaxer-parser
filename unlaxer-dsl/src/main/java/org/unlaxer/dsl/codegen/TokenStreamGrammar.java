@@ -43,8 +43,11 @@ public final class TokenStreamGrammar {
                 issues.add(new Problem("E-TOKEN-STREAM-TOKEN", token.name(), token));
         }
         for (var rule : grammar.rules()) for (var annotation : rule.annotations()) {
-            String name = annotation instanceof WhitespaceAnnotation ? "whitespace"
-                : annotation instanceof InterleaveAnnotation ? "interleave"
+            boolean contextualTrivia = LexicalContexts.enabled(grammar) &&
+                (annotation instanceof WhitespaceAnnotation value && (value.style().isEmpty() || value.style().get().equalsIgnoreCase("none") || value.style().get().equalsIgnoreCase("javaStyle"))
+                 || annotation instanceof InterleaveAnnotation);
+            String name = annotation instanceof WhitespaceAnnotation && !contextualTrivia ? "whitespace"
+                : annotation instanceof InterleaveAnnotation && !contextualTrivia ? "interleave"
                 : annotation instanceof BackrefAnnotation ? "backref"
                 : annotation instanceof RecoveryAnnotation ? "recovery" : null;
             if (name != null) issues.add(new Problem("E-TOKEN-STREAM-ANNOTATION", name, annotation));
@@ -90,7 +93,7 @@ public final class TokenStreamGrammar {
         out.append(String.join(",\n", rows)).append("\n    );\n\n")
             .append("    public static org.unlaxer.dsl.runtime.Lexing.Outcome parseWithLexing(String source, org.unlaxer.dsl.runtime.Lexing.Options options) {\n")
             .append("        return org.unlaxer.dsl.runtime.Lexing.parse(getRootParser(), source, options, __LEXICAL_TERMINALS, ")
-            .append(whitespace(grammar)).append(");\n    }\n\n");
+            .append(whitespace(grammar)).append(LexicalContexts.enabled(grammar) ? ", true" : "").append(");\n    }\n\n");
         return out.toString();
     }
 }

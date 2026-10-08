@@ -193,6 +193,9 @@ fn root_reaches_projection_boundary(ir: &GrammarIr) -> bool {
                 | TriviaScope {
                     child: expression, ..
                 }
+                | LexicalContextScope {
+                    child: expression, ..
+                }
                 | LexicalTriviaScope {
                     child: expression, ..
                 } => pending.push(expression),
@@ -303,6 +306,22 @@ fn expression(
         | TextValue(child)
         | ValueBoundary(child)
         | TriviaScope { child, .. } => expression(child, count, captures)?,
+        LexicalContextScope { child, terminals } => {
+            if terminals.len() > 256 {
+                return Err(fail("lexical context exceeds 256 terminals"));
+            }
+            let mut seen = std::collections::HashSet::new();
+            for (name, literal, definition) in terminals {
+                definition.validate().map_err(fail)?;
+                if definition.nullable()
+                    || !seen.insert((name, literal))
+                    || *literal && name.is_empty()
+                {
+                    return Err(fail("duplicate or nullable lexical context terminal"));
+                }
+            }
+            expression(child, count, captures)?;
+        }
         LexicalTriviaScope { child, definition } => {
             definition.validate().map_err(fail)?;
             if definition.nullable() {
