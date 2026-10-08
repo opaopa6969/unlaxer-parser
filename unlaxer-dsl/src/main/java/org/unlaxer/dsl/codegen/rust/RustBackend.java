@@ -298,6 +298,9 @@ public final class RustBackend {
         if (expression instanceof Choice choice) {
             return "Expr::Choice(vec![" + expressions(choice.alternatives()) + "])";
         }
+        if (expression instanceof UniqueLongestChoice choice) {
+            return "Expr::UniqueLongestChoice(vec![" + expressions(choice.alternatives()) + "])";
+        }
         if (expression instanceof LongestChoice choice) {
             return "Expr::LongestChoice(vec![" + expressions(choice.alternatives()) + "])";
         }
@@ -565,6 +568,7 @@ public final class RustBackend {
         if (expression instanceof Separated value) return containsRecovery(value.child()) || containsRecovery(value.separator());
         if (expression instanceof Sequence value) return value.elements().stream().anyMatch(RustBackend::containsRecovery);
         if (expression instanceof Choice value) return value.alternatives().stream().anyMatch(RustBackend::containsRecovery);
+        if (expression instanceof UniqueLongestChoice value) return value.alternatives().stream().anyMatch(RustBackend::containsRecovery);
         if (expression instanceof LongestChoice value) return value.alternatives().stream().anyMatch(RustBackend::containsRecovery);
         if (expression instanceof PredictiveChoice value) return value.alternatives().stream().anyMatch(RustBackend::containsRecovery);
         return false;

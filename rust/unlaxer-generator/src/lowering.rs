@@ -65,6 +65,7 @@ pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
         operators: Vec::new(),
         catalogs: Vec::new(),
         longest_choices: Vec::new(),
+        unique_longest_choices: Vec::new(),
         predictive_choices: Vec::new(),
         recoveries: Vec::new(),
         nullable: HashSet::new(),
@@ -84,6 +85,7 @@ struct Lowering<'a> {
     operators: Vec<Option<Operator>>,
     catalogs: Vec<Option<String>>,
     longest_choices: Vec<bool>,
+    unique_longest_choices: Vec<bool>,
     predictive_choices: Vec<bool>,
     recoveries: Vec<Option<(ast::RecoveryMode, Vec<String>)>>,
     nullable: HashSet<usize>,
@@ -355,6 +357,7 @@ impl Lowering<'_> {
                 .any(|annotation| matches!(annotation.kind, AnnotationKind::Skip));
             let mut associativity = None;
             let mut longest_choice = false;
+            let mut unique_longest_choice = false;
             let mut predictive_choice = false;
             let mut recovery = None;
             let mut precedence = None;
@@ -408,6 +411,12 @@ impl Lowering<'_> {
                             return Err(format!("duplicate @longestChoice on {}", rule.name));
                         }
                         longest_choice = true;
+                    }
+                    AnnotationKind::UniqueLongestChoice => {
+                        if unique_longest_choice {
+                            return Err(format!("duplicate @uniqueLongestChoice on {}", rule.name));
+                        }
+                        unique_longest_choice = true;
                     }
                     AnnotationKind::PredictiveChoice => {
                         if predictive_choice {
@@ -515,6 +524,18 @@ impl Lowering<'_> {
                     rule.name
                 ));
             }
+            if unique_longest_choice {
+                if !(2..=64).contains(&rule.body.alternatives.len()) {
+                    return Err(format!(
+                        "@uniqueLongestChoice requires 2 to 64 alternatives on {}",
+                        rule.name
+                    ));
+                }
+                if associativity.is_some() || longest_choice || predictive_choice {
+                    return Err(format!("conflicting @uniqueLongestChoice on {}", rule.name));
+                }
+            }
+            self.unique_longest_choices.push(unique_longest_choice);
             self.longest_choices.push(longest_choice);
             self.predictive_choices.push(predictive_choice);
             self.recoveries.push(recovery);
@@ -671,7 +692,12 @@ impl Lowering<'_> {
                     }
                 }
             }
-            let body = if self.longest_choices[i] {
+            let body = if self.unique_longest_choices[i] {
+                let Expression::Choice(alternatives) = expression else {
+                    unreachable!("validated unique longest choice shape")
+                };
+                Expression::UniqueLongestChoice(alternatives.clone())
+            } else if self.longest_choices[i] {
                 let Expression::Choice(alternatives) = expression else {
                     unreachable!("validated longest choice shape")
                 };
@@ -1294,7 +1320,9 @@ impl Lowering<'_> {
                     self.first_predictor(first, visiting, cache)
                 }
             }
-            Expression::Choice(alternatives) | Expression::LongestChoice(alternatives) => {
+            Expression::Choice(alternatives)
+            | Expression::LongestChoice(alternatives)
+            | Expression::UniqueLongestChoice(alternatives) => {
                 let mut values = Vec::new();
                 for alternative in alternatives {
                     let predictor = self.first_predictor(alternative, visiting, cache);
@@ -1360,6 +1388,28 @@ impl Lowering<'_> {
                 let ordinary = Expression::Choice(alternatives.clone());
                 let mixed = self.shape(&ordinary, &mut HashSet::new())?.kind == Kind::Value;
                 Expression::LongestChoice(
+                    alternatives
+                        .iter()
+                        .map(|alternative| {
+                            let projected = self.project_text_values(alternative, mapping)?;
+                            Ok(
+                                if mixed
+                                    && self.shape(alternative, &mut HashSet::new())?.kind
+                                        == Kind::Text
+                                {
+                                    Expression::TextValue(Box::new(projected))
+                                } else {
+                                    projected
+                                },
+                            )
+                        })
+                        .collect::<Result<_>>()?,
+                )
+            }
+            Expression::UniqueLongestChoice(alternatives) => {
+                let ordinary = Expression::Choice(alternatives.clone());
+                let mixed = self.shape(&ordinary, &mut HashSet::new())?.kind == Kind::Value;
+                Expression::UniqueLongestChoice(
                     alternatives
                         .iter()
                         .map(|alternative| {

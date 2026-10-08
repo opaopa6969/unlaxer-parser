@@ -159,6 +159,7 @@ fn annotation(a: &Annotation) -> String {
         AnnotationKind::LeftAssoc => ("LeftAssocAnnotation", vec![]),
         AnnotationKind::RightAssoc => ("RightAssocAnnotation", vec![]),
         AnnotationKind::LongestChoice => ("LongestChoiceAnnotation", vec![]),
+        AnnotationKind::UniqueLongestChoice => ("UniqueLongestChoiceAnnotation", vec![]),
         AnnotationKind::PredictiveChoice => ("PredictiveChoiceAnnotation", vec![]),
         AnnotationKind::Precedence { level } => ("PrecedenceAnnotation", vec![level.to_string()]),
         AnnotationKind::Doc { text } => ("DocAnnotation", vec![quote(text)]),

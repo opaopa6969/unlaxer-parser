@@ -146,6 +146,7 @@ pub enum Expression {
     Sequence(Vec<Expression>),
     Choice(Vec<Expression>),
     LongestChoice(Vec<Expression>),
+    UniqueLongestChoice(Vec<Expression>),
     PredictiveChoice {
         alternatives: Vec<Expression>,
         predictors: Vec<Predictor>,
