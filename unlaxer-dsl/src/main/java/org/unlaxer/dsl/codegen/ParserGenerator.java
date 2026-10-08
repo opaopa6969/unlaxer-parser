@@ -286,7 +286,9 @@ public class ParserGenerator implements CodeGenerator {
         // ファクトリメソッド
         String rootRuleName = findRootRuleName(grammar);
         sb.append("    public static Parser getRootParser() {\n");
-        sb.append("        return Parser.get(").append(rootRuleName).append("Parser.class);\n");
+        sb.append("        return Parser.get(").append(rootRuleName)
+            .append(ctx.recoveryRules.containsKey(rootRuleName) ? "RecoveryParser.class" : "Parser.class")
+            .append(");\n");
         sb.append("    }\n");
 
         sb.append("}\n");
