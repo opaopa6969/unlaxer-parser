@@ -17,6 +17,7 @@ ShiftExpression ::= ID SHIFT ID;
 |---|---|---|
 | 優先順位・結合性 | 既存の rule graph と assoc annotation | 既存仕様を保持 |
 | 左再帰 | 前方試行前に非左再帰の rule graph へ変換 | 左再帰を runtime に追加しない |
+| long code fence | 既存の host token / 宣言的 CAPTURE・SAME_AS | 既存入口を保持し、新 goal は宣言的 token を使う |
 | PEG の choice | 既存の順序付き / longest / predictive choice | 選択順を文法で明示 |
 | 一致時の LOOK / NOT、CAPTURE / SAME_AS | 既存の原子的な宣言的 lexical program | goal 内でも private capture と rollback を保持 |
 | `>>`、division / regex、文字列 / JSX 本文 | scoped lexical goal の runtime 拡張 | 明示 terminal 集合を切替 |
@@ -42,6 +43,7 @@ cargo +1.85.0 test --locked --manifest-path rust/Cargo.toml
 cd unlaxer-dsl/ubnf-vscode
 npm ci
 node scripts/contextual-lexing-reference.mjs
+node scripts/contextual-lexing-wasm.mjs
 ```
 
-手書き oracle は `spec-corpus/contextual-lexing/corpus.json`（26 入力）、`runtime.json`（6 境界入力）、`invalid.json`（8 宣言、LF / CRLF）である。生成 Java / native Rust の全ファイル一致、受理、消費、AST / capture の CP span、Unicode、CRLF、失敗位置、import、goal の nested rollback を比較する。TEXT の mapper 値は従来どおり外側の trivia を trim するが、capture span は元ソースを保持する。証跡は `unlaxer-dsl/target/rust-contextual-lexing.tsv` 、`rust-contextual-lexing-invalid.tsv`、`rust-contextual-lexing-boundaries.tsv` と `unlaxer-dsl/ubnf-vscode/target/contextual-lexing-reference.tsv`。
+手書き oracle は `spec-corpus/contextual-lexing/corpus.json`（29 入力）、`runtime.json`（6 境界入力）、`invalid.json`（8 宣言、LF / CRLF）である。生成 Java / native Rust の全ファイル一致、受理、消費、AST / capture の CP span、Unicode、CRLF、失敗位置、import、goal の nested rollback を比較する。TEXT の mapper 値は従来どおり外側の trivia を trim するが、capture span は元ソースを保持する。証跡は `unlaxer-dsl/target/rust-contextual-lexing.tsv` 、`rust-contextual-lexing-invalid.tsv`、`rust-contextual-lexing-boundaries.tsv` と `unlaxer-dsl/ubnf-vscode/target/contextual-lexing-reference.tsv`、`contextual-lexing-wasm.tsv`。WASM の 226 比較も同じ原文・手書き oracle で実行し、生成 Playground の同梱 runtime は既存 Chromium 検証で実際に build / 実行する。

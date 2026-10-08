@@ -57,6 +57,7 @@ jobs:
         npm ci
         npx playwright install chromium
         node scripts/contextual-lexing-reference.mjs
+        node scripts/contextual-lexing-wasm.mjs
         node scripts/playground-browser.mjs
         node --test scripts/completion.test.mjs
         node scripts/learning-browser.mjs
@@ -68,6 +69,7 @@ jobs:
         test -s unlaxer-dsl/target/rust-contextual-lexing-invalid.tsv
         test -s unlaxer-dsl/target/rust-contextual-lexing-boundaries.tsv
         test -s unlaxer-dsl/ubnf-vscode/target/contextual-lexing-reference.tsv
+        test -s unlaxer-dsl/ubnf-vscode/target/contextual-lexing-wasm.tsv
     - name: Require semantic model and generated UBNF evidence
       run: |
         test -s unlaxer-dsl/target/rust-semantic-model.tsv
@@ -118,6 +120,7 @@ jobs:
           unlaxer-dsl/target/rust-contextual-lexing-invalid.tsv
           unlaxer-dsl/target/rust-contextual-lexing-boundaries.tsv
           unlaxer-dsl/ubnf-vscode/target/contextual-lexing-reference.tsv
+          unlaxer-dsl/ubnf-vscode/target/contextual-lexing-wasm.tsv
           unlaxer-dsl/target/rust-semantic-model.tsv
           unlaxer-dsl/target/rust-project-symbols.tsv
           unlaxer-dsl/target/rust-semantic-ubnf.tsv

@@ -1951,7 +1951,9 @@ impl<'a> ParseContext<'a> {
             Expr::Sequence(elements) => self.sequence(elements, depth),
             Expr::Choice(alternatives) => self.ordered_choice(alternatives.iter(), depth),
             Expr::LongestChoice(alternatives) => self.longest_choice(alternatives, depth, false),
-            Expr::UniqueLongestChoice(alternatives) => self.longest_choice(alternatives, depth, true),
+            Expr::UniqueLongestChoice(alternatives) => {
+                self.longest_choice(alternatives, depth, true)
+            }
             Expr::PredictiveChoice {
                 alternatives,
                 predictors,

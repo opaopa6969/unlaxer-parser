@@ -692,5 +692,71 @@
         ]
       }
     ]
+  },
+  {
+    "name": "fixed-indent",
+    "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @tokenStream: enabled\n @whitespace: none\n token ID ::= 'a' | 'b' | '𐐀';\n token NEWLINE ::= '\\r\\n' | '\\n';\n token INDENT ::= BOL '  ';\n token END = EOF\n @root @mapping(Value, params=[value])\n @lexicalContext(tokens=['ID','NEWLINE','INDENT'])\n Root ::= (ID NEWLINE INDENT ID) @value END;\n}\n",
+    "cases": [
+      {
+        "name": "lf-fixed-indent",
+        "input": "a\n  b",
+        "sourceLength": 5,
+        "utf16Length": 5,
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "value": "a\n  b"
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              0,
+              5
+            ]
+          }
+        ]
+      },
+      {
+        "name": "crlf-unicode-fixed-indent",
+        "input": "a\r\n  𐐀",
+        "sourceLength": 6,
+        "utf16Length": 7,
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            6
+          ],
+          "fields": {
+            "value": "a\r\n  𐐀"
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              0,
+              6
+            ]
+          }
+        ]
+      },
+      {
+        "name": "wrong-indent",
+        "input": "a\r\n 𐐀",
+        "sourceLength": 5,
+        "utf16Length": 6,
+        "accepted": false,
+        "farthest": 3
+      }
+    ]
   }
 ]
