@@ -14,6 +14,7 @@ mod memo_retention_tests;
 pub mod pipeline;
 mod scope;
 pub mod semantic;
+pub mod semantic_project;
 pub mod source;
 #[doc(hidden)]
 pub use first::{set_candidate_exclusion_for_current_thread, CandidateExclusion};
