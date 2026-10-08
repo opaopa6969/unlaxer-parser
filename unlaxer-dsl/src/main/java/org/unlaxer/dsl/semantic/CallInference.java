@@ -169,6 +169,9 @@ public final class CallInference {
     }
     /** Diagnostics and completion consume this exact decision tree. */
     public Decision assess(Resolution resolution,int index,TypeRef actual) {
+        if(index<0) throw new IllegalArgumentException("invalid argument index");
+        if(Set.of(State.UNSUPPORTED,State.CYCLE,State.LIMIT,State.INVALID).contains(resolution.state()))
+            return new Decision(Status.valueOf(resolution.state().name()),"INFERENCE_FAILURE",resolution.candidates().stream().flatMap(c->c.constraints().stream()).map(Constraint::decision).toList());
         return TypeSystem.combine(false,"EXPECTED_ARGUMENT",expectedTypes(resolution,index).stream().map(t->types.compare(actual,t)).toList());
     }
     public List<Completion> complete(List<Value> visible,Resolution resolution,int index) {

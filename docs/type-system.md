@@ -105,6 +105,8 @@ Result の URI だけで別文書の宣言 span を解釈してはいけない�
 使って YES / UNKNOWN の値をこの順で並べる。同順位は名前の code point 順。
 不適合・未対応の理由を UI に出す場合も `assess` の根拠を使う。
 値が持つ定義 URI / version / span は保持する。
+推論自体が UNSUPPORTED / CYCLE / LIMIT / INVALID の場合、assess もその失敗状態と
+元の制約の根拠を保持し、単なる型不適合 NO に置き換えない。
 
 ```java
 var inference = new CallInference(typeSystem, 256);

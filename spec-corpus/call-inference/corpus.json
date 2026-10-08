@@ -511,7 +511,10 @@
           }
         ]
       },
-      "omit": ["UNION"]
+      "omit": ["UNION"],
+      "values": [{"id":"probe","name":"probe","type":"Int","uri":"file:value","version":9,"span":[1,2]}],
+      "completionExpected": [],
+      "assessmentExpected": ["UNSUPPORTED"]
     },
     {
       "name": "argument-being-edited-is-ignored",
@@ -617,7 +620,10 @@
           }
         ]
       },
-      "inferLimit": 1
+      "inferLimit": 1,
+      "values": [{"id":"probe","name":"probe","type":"Int","uri":"file:value","version":9,"span":[1,2]}],
+      "completionExpected": [],
+      "assessmentExpected": ["LIMIT"]
     },
     {
       "name": "invalid-result-is-not-success",
@@ -641,7 +647,10 @@
             "version": 2
           }
         ]
-      }
+      },
+      "values": [{"id":"probe","name":"probe","type":"Int","uri":"file:value","version":9,"span":[1,2]}],
+      "completionExpected": [],
+      "assessmentExpected": ["INVALID"]
     },
     {
       "name": "cycle-result-is-not-unknown",
@@ -665,7 +674,10 @@
             "version": 2
           }
         ]
-      }
+      },
+      "values": [{"id":"probe","name":"probe","type":"Int","uri":"file:value","version":9,"span":[1,2]}],
+      "completionExpected": [],
+      "assessmentExpected": ["CYCLE"]
     },
     {
       "name": "completion-reuses-type-decisions",
