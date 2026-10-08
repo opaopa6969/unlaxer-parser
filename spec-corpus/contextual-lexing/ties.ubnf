@@ -5,6 +5,7 @@ grammar Input {
  @whitespace: javaStyle
  token FIRST ::= '>';
  token SECOND ::= '>';
+ token E = EMPTY
  token END = EOF
  @root @mapping(Value, params=[value])
  Root ::= 'named' Named @value END | 'literal' Literal @value END | 'empty' Empty @value;
@@ -13,5 +14,5 @@ grammar Input {
  @lexicalContext(tokens=['FIRST'], literals=['>'])
  Literal ::= '>';
  @lexicalContext(tokens=[])
- Empty ::= END;
+ Empty ::= E;
 }

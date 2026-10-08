@@ -611,7 +611,7 @@
   },
   {
     "name": "ties",
-    "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @tokenStream: enabled\n @whitespace: javaStyle\n token FIRST ::= '>';\n token SECOND ::= '>';\n token END = EOF\n @root @mapping(Value, params=[value])\n Root ::= 'named' Named @value END | 'literal' Literal @value END | 'empty' Empty @value;\n @lexicalContext(tokens=['SECOND','FIRST'])\n Named ::= FIRST;\n @lexicalContext(tokens=['FIRST'], literals=['>'])\n Literal ::= '>';\n @lexicalContext(tokens=[])\n Empty ::= END;\n}\n",
+    "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @tokenStream: enabled\n @whitespace: javaStyle\n token FIRST ::= '>';\n token SECOND ::= '>';\n token E = EMPTY\n token END = EOF\n @root @mapping(Value, params=[value])\n Root ::= 'named' Named @value END | 'literal' Literal @value END | 'empty' Empty @value;\n @lexicalContext(tokens=['SECOND','FIRST'])\n Named ::= FIRST;\n @lexicalContext(tokens=['FIRST'], literals=['>'])\n Literal ::= '>';\n @lexicalContext(tokens=[])\n Empty ::= E;\n}\n",
     "cases": [
       {
         "name": "named-declaration-order",
