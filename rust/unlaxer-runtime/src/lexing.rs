@@ -331,12 +331,16 @@ pub fn parse<'a>(
     let complete = root_node.is_some() && consumed == source.chars().count();
     let error = context.failure();
     let trailing = root_node.is_some() && !complete;
+    let recoveries = root_node
+        .map(|root| context.selected_recoveries(root))
+        .unwrap_or_default();
     let tree = root_node.map(|root| Tree {
         source: source.to_owned(),
         nodes: std::mem::take(&mut context.nodes),
         root,
         byte_offsets: std::mem::take(&mut context.byte_offsets),
         scopes: std::mem::take(&mut context.scopes),
+        recoveries,
     });
     Ok(Outcome {
         tree,

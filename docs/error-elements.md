@@ -18,7 +18,7 @@ grammar Expected {
 後続の選択肢を試すことを妨げない。
 
 - 成功するerrorノード、回復処理、入力読み飛ばしを作る機能ではない。
-- `@recovery`はこの変更の対象外であり、Rust targetでは引き続き未対応として拒否する。
+- `ERROR`自体は回復しない。別の[`@recovery`](error-recovery.md)が外側で失敗を回復する場合はある。
 - メッセージは通常のUBNF文字列として読む。コード・format式として評価しない。
 - `ERROR`という名前自体を予約しない。`ERROR ::= 'x'; Root ::= ERROR;`のような
   通常のrule名・参照は既存の意味を維持する。
@@ -89,5 +89,5 @@ opt-inのない`mvn test`でこの比較がskipされても、Java/Rust同値を
 
 Javaの既存ERROR動作を変更するための機能ではない。Rustの旧移植可能性診断
 `P-ERROR-ELEMENT`は発行しなくなるが、このcodeを別の意味には転用しない。
-汎用consume/invert伝播、error CSTを伴う回復、増分解析、Rust LSP/DAPは別の未完了項目として
-[FULL-SPEC](../rust/FULL-SPEC.md)で追跡する。
+error CSTを伴う回復は後続の[#331](error-recovery.md)で追加した。汎用consume/invert伝播、
+部分/error AST型、増分解析、Rust LSP/DAPは[FULL-SPEC](../rust/FULL-SPEC.md)で別途追跡する。
