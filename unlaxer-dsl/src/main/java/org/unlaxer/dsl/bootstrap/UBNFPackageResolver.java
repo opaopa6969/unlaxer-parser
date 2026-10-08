@@ -103,7 +103,7 @@ public final class UBNFPackageResolver {
         Map<String, JsonObject> packages = new TreeMap<>();
         Map<String, byte[]> blobs = new TreeMap<>();
         for (var root : roots.entrySet()) resolveOne(root.getKey(), root.getValue().getAsJsonObject(),
-            manifest.getParent(), packages, blobs, new LinkedHashSet<>());
+            manifest.getParent(), packages, blobs, new LinkedHashSet<>(), false);
         if (packages.size() > 128 || blobs.values().stream().mapToLong(b -> b.length).sum() > 64L * 1024 * 1024)
             throw error("package graph exceeds cache limits");
         JsonObject lock = new JsonObject();
@@ -129,7 +129,7 @@ public final class UBNFPackageResolver {
         } finally { Files.deleteIfExists(temporary); }
     }
     private static void resolveOne(String name, JsonObject dependency, Path sourceDirectory,
-            Map<String, JsonObject> packages, Map<String, byte[]> blobs, Set<String> visiting) throws IOException {
+            Map<String, JsonObject> packages, Map<String, byte[]> blobs, Set<String> visiting, boolean remote) throws IOException {
         if (!visiting.add(name)) throw error("cyclic package dependency: " + name);
         if (visiting.size() > 64) throw error("package dependency depth exceeds 64");
         if (!packages.containsKey(name) && packages.size() >= 128) throw error("package count exceeds 128");
@@ -142,11 +142,14 @@ public final class UBNFPackageResolver {
                 bytes = stream.readNBytes(MAX_BYTES + 1);
             }
         } else if (source.startsWith("local:")) {
+            if (remote) throw error("remote artifact cannot use local dependencies");
             Path path = sourceDirectory.resolve(source.substring(6)).normalize();
             if (Files.size(path) > MAX_BYTES) throw error("artifact exceeds 8 MiB");
             bytes = Files.readAllBytes(path);
             childDirectory = path.toAbsolutePath().getParent();
-        } else throw error("unsupported artifact source; use explicit local: or builtin:");
+        } else if (source.startsWith("https:")) {
+            bytes = UBNFPackageFetcher.fetch(source);
+        } else throw error("unsupported artifact source; use HTTPS, local: or builtin:");
         JsonObject artifact = artifact(bytes);
         if (!string(artifact, "id").equals(name) || !string(artifact, "version").equals(string(dependency, "version")))
             throw error("package name/version mismatch: " + name);
@@ -167,7 +170,7 @@ public final class UBNFPackageResolver {
                 throw error("package graph exceeds cache limits");
             blobs.put(hash, bytes);
             for (var entry : nested.entrySet()) resolveOne(entry.getKey(), entry.getValue().getAsJsonObject(),
-                childDirectory, packages, blobs, visiting);
+                childDirectory, packages, blobs, visiting, remote || source.startsWith("https:"));
         }
         visiting.remove(name);
     }

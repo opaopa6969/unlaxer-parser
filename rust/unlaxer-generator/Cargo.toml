@@ -11,6 +11,7 @@ unlaxer-ubnf = { path = "../unlaxer-ubnf" }
 unlaxer-codegen = { path = "../unlaxer-codegen" }
 serde_json = "1"
 sha2 = "0.10"
+ureq = { version = "3", default-features = false, features = ["rustls"] }
 
 [[bin]]
 name = "unlaxer"

@@ -49,3 +49,5 @@ pub(crate) fn generate_grammar(
     }
     Ok(files)
 }
+
+mod package_fetch;

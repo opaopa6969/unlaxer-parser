@@ -142,6 +142,7 @@ pub fn resolve(manifest: &Path) -> Result<Value, String> {
             &mut packages,
             &mut blobs,
             &mut BTreeSet::new(),
+            false,
         )?;
     }
     if packages.len() > 128 || blobs.values().map(Vec::len).sum::<usize>() > 64 * 1024 * 1024 {
@@ -198,6 +199,7 @@ fn resolve_one(
     packages: &mut Map<String, Value>,
     blobs: &mut BTreeMap<String, Vec<u8>>,
     visiting: &mut BTreeSet<String>,
+    remote: bool,
 ) -> Result<(), String> {
     if !visiting.insert(name.into()) {
         return Err(error(format!("cyclic package dependency: {name}")));
@@ -212,11 +214,16 @@ fn resolve_one(
     let (bytes, child_directory) = if source == "builtin:std/layout@1.0.0" {
         (STANDARD.to_vec(), directory.to_owned())
     } else if let Some(relative) = source.strip_prefix("local:") {
+        if remote {
+            return Err(error("remote artifact cannot use local dependencies"));
+        }
         let path = directory.join(relative);
         (read_bytes(&path)?, path.parent().unwrap().to_owned())
+    } else if source.starts_with("https:") {
+        (crate::package_fetch::fetch(source)?, directory.to_owned())
     } else {
         return Err(error(
-            "unsupported artifact source; use explicit local: or builtin:",
+            "unsupported artifact source; use HTTPS, local: or builtin:",
         ));
     };
     let value = artifact(&bytes)?;
@@ -244,6 +251,7 @@ fn resolve_one(
                 packages,
                 blobs,
                 visiting,
+                remote || source.starts_with("https:"),
             )?;
         }
     }
