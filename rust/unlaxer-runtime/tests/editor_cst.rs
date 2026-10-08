@@ -98,3 +98,29 @@ fn callbacks_without_replay_contract_are_run_once() {
     );
     assert_eq!(INVOCATIONS.load(Ordering::SeqCst), 1);
 }
+
+#[test]
+fn coincident_captures_have_deterministic_name_order() {
+    let grammar = vec![Rule {
+        name: "Root",
+        expression: Expr::Capture(
+            "a",
+            Box::new(Expr::Capture("z", Box::new(Expr::Literal("😀")))),
+        ),
+    }]
+    .into();
+    let parsed = editor_cst::parse(&grammar, 0, false, "😀", &[], Options::default()).unwrap();
+    let captures = &parsed.nodes()[0].captures;
+    assert_eq!(
+        captures
+            .iter()
+            .map(|capture| capture.name.as_str())
+            .collect::<Vec<_>>(),
+        ["a", "z"]
+    );
+    for capture in captures {
+        assert_eq!(capture.span, Span { start: 0, end: 1 });
+        assert_eq!(capture.text, "😀");
+        assert!(!capture.synthetic);
+    }
+}

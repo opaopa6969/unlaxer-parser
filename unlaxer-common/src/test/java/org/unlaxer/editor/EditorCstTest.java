@@ -18,6 +18,17 @@ public class EditorCstTest {
         assertEquals(new EditorCst.Span(0,1),capture.span());assertTrue(capture.synthetic());assertEquals("😀",capture.text());
         assertEquals(new EditorCst.Span(1,1),parsed.defects().get(0).span());assertEquals(List.of("Root"),parsed.defects().get(0).candidateRules());
     }
+    @Test public void coincidentCapturesHaveDeterministicNameOrder() {
+        Parser parser = new WordParser("😀");
+        EditorCst parsed = EditorCst.parse("😀", parser, List.of(), value -> value == parser ? "Root" : null,
+            value -> value == parser ? List.of("z", "a") : List.of(), EditorCst.Options.defaults());
+        assertEquals(List.of("a", "z"), parsed.nodes().get(0).captures().stream().map(EditorCst.Capture::name).toList());
+        for (EditorCst.Capture capture : parsed.nodes().get(0).captures()) {
+            assertEquals(new EditorCst.Span(0, 1), capture.span());
+            assertEquals("😀", capture.text());
+            assertFalse(capture.synthetic());
+        }
+    }
     @Test public void syntaxAndSearchLimitRemainDistinct() {
         assertEquals(EditorCst.Reason.SYNTAX,parse("h@","hello",List.of("o"),EditorCst.Options.defaults()).reason());
         assertEquals(EditorCst.Reason.LIMIT,parse("hell","hello",List.of("o"),new EditorCst.Options(4,0)).reason());

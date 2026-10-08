@@ -365,6 +365,63 @@
       },
       "expectedTypes": [],
       "arguments": []
+    },
+    {
+      "id": "recovery-crossing-eof",
+      "tail": "broken invalid",
+      "cursor": 221,
+      "status": "PARTIAL",
+      "reason": "REPAIRED",
+      "strict": false,
+      "completions": [],
+      "prefix": "",
+      "sourceLength": 221,
+      "utf16Length": 222,
+      "defectSpan": [
+        214,
+        221
+      ],
+      "defectKinds": [
+        "ERROR",
+        "MISSING"
+      ],
+      "expectedTypes": [],
+      "arguments": []
     }
-  ]
+  ],
+  "nested": {
+    "tail": "call process(ctx, d ",
+    "cursor": 226,
+    "hostCursor": 241,
+    "hostUtf16Cursor": 243,
+    "offset": 15,
+    "expected": {
+      "state": "PARTIAL",
+      "region": "inner",
+      "items": [
+        {
+          "label": "db",
+          "detail": "DbAccessor; expected=IAccessor",
+          "locations": [
+            [
+              136,
+              157
+            ]
+          ],
+          "edits": [
+            [
+              240,
+              241,
+              "db"
+            ]
+          ]
+        }
+      ],
+      "utf16Cursor": 243,
+      "blocked": [
+        "UNSUPPORTED",
+        "UNSUPPORTED"
+      ]
+    }
+  }
 }

@@ -222,7 +222,7 @@ fn snapshot(grammar: &SharedGrammar, source: &str, tree: &Tree, repaired: bool) 
         let Some(rule) = grammar.get(node.rule) else {
             continue;
         };
-        let captures = node
+        let mut captures: Vec<Capture> = node
             .captures
             .iter()
             .map(|capture| {
@@ -235,6 +235,13 @@ fn snapshot(grammar: &SharedGrammar, source: &str, tree: &Tree, repaired: bool) 
                 }
             })
             .collect();
+        captures.sort_by(|left, right| {
+            (left.span.start, left.span.end, &left.name).cmp(&(
+                right.span.start,
+                right.span.end,
+                &right.name,
+            ))
+        });
         nodes.push(Node {
             rule: rule.name.into(),
             span: clipped(node.span, length),
@@ -244,18 +251,19 @@ fn snapshot(grammar: &SharedGrammar, source: &str, tree: &Tree, repaired: bool) 
     }
     let mut defects = Vec::new();
     for diagnostic in tree.recoveries() {
-        if diagnostic.span.start >= length || diagnostic.span.end > length {
+        if diagnostic.span.start >= length {
             continue;
         }
+        let diagnostic_span = clipped(diagnostic.span, length);
         defects.push(Defect {
             kind: DefectKind::Error,
-            span: diagnostic.span,
+            span: diagnostic_span,
             candidate_rules: candidates(
                 nodes
                     .iter()
                     .filter(|node| {
                         node.span.start <= diagnostic.span.start
-                            && diagnostic.span.end <= node.span.end
+                            && diagnostic_span.end <= node.span.end
                     })
                     .collect(),
             ),

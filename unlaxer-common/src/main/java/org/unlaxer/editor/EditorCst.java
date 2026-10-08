@@ -140,17 +140,20 @@ public final class EditorCst {
             }
             List<Capture> captures = new ArrayList<>();
             collectCaptures(token, true, source, length, ruleName, bindings, captures);
+            captures.sort(java.util.Comparator.comparingInt((Capture capture) -> capture.span().start())
+                .thenComparingInt(capture -> capture.span().end()).thenComparing(Capture::name));
             nodes.add(new Node(name, span(token, length), synthetic(token, length), captures));
         }
         List<Defect> defects = new ArrayList<>();
         for (RecoveryDiagnostic diagnostic : RecoveryDiagnostic.from(tree)) {
-            if (diagnostic.start() >= length || diagnostic.end() > length) {
+            if (diagnostic.start() >= length) {
                 continue;
             }
+            int diagnosticEnd = Math.min(diagnostic.end(), length);
             List<String> candidates = nodes.stream().filter(node -> node.span().start() <= diagnostic.start()
-                    && diagnostic.end() <= node.span().end()).sorted(java.util.Comparator.comparingInt(
+                    && diagnosticEnd <= node.span().end()).sorted(java.util.Comparator.comparingInt(
                         (Node node) -> node.span().end() - node.span().start()).thenComparing(Node::rule)).map(Node::rule).distinct().toList();
-            defects.add(new Defect(DefectKind.ERROR, new Span(diagnostic.start(), diagnostic.end()), candidates));
+            defects.add(new Defect(DefectKind.ERROR, new Span(diagnostic.start(), diagnosticEnd), candidates));
         }
         if (repaired) {
             List<String> candidates = nodes.stream().filter(Node::synthetic)
