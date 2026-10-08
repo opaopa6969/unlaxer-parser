@@ -33,6 +33,8 @@
   }
   function render(value) {
     $('result').textContent = JSON.stringify(value, null, 2);
+    $('typed-completions').hidden = !value.typed;
+    if (value.typed) $('typed-completions').textContent = `期待型：${value.typed.expectedTypes.join(' / ') || '不明'}。補完：${value.typed.completions.map(item => item.label).join(' / ') || '候補なし'}。`;
     $('hint').hidden = true; $('position').textContent = ''; $('ast').textContent = 'AST はありません。'; $('cst').replaceChildren();
     if (value.runtimeError) { fail(value.runtimeError); return; }
     const stale = $('input').value !== activeSource;
@@ -41,9 +43,13 @@
     if (!value.ok) {
       $('hint').hidden = false;
       $('hint').textContent = `${location(activeSource, value.diagnostic.offset)}：${value.diagnostic.kind}。期待：${value.diagnostic.expected.join(' / ') || '文法の条件を確認してください。'}`;
-      return;
+      if (!value.editor || value.editor.status === 'FAILED') return;
     }
-    $('ast').textContent = value.mappingError ? `AST の投影に失敗：${value.mappingError}` : JSON.stringify(value.ast, null, 2);
+    if (value.editor && value.editor.status === 'PARTIAL') {
+      $('status').textContent = (stale ? '前の入力の結果：' : '') + '部分結果：入力は編集途中です。';
+      value.cst = {root: -1, nodes: value.editor.nodes};
+      $('ast').textContent = '編集途中です。missing / error node は生の解析結果で確認できます。';
+    } else $('ast').textContent = value.mappingError ? `AST の投影に失敗：${value.mappingError}` : JSON.stringify(value.ast, null, 2);
     $('ast-panel').open = true;
     const points = [...activeSource];
     value.cst.nodes.slice(0, 500).forEach((node, index) => {
@@ -86,7 +92,7 @@
   function parse() {
     activeSource = $('input').value;
     if (new TextEncoder().encode(activeSource).length > 65536) { fail('入力は 64 KiB (UTF-8) 以下にしてください。'); return; }
-    const run = () => { $('parse').disabled = true; $('status').textContent = '解析中…'; send('parse', {input: activeSource}); };
+    const run = () => { $('parse').disabled = true; $('status').textContent = '解析中…'; send('parse', {input: activeSource, editor: $('editor-mode').checked, cursor: [...activeSource.slice(0, $('input').selectionStart)].length}); };
     if (worker) run(); else startWorker(run);
   }
   $('parse').addEventListener('click', parse);

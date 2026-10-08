@@ -6,6 +6,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 pub mod editor;
+pub mod editor_cst;
 mod first;
 pub mod lexical;
 pub mod lexing;
