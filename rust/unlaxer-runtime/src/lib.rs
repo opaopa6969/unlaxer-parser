@@ -5,6 +5,7 @@ use std::hash::{BuildHasher, Hasher};
 use std::rc::Rc;
 use std::sync::Arc;
 
+pub mod editor;
 mod first;
 pub mod lexical;
 pub mod lexing;
