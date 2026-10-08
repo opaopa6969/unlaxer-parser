@@ -172,6 +172,7 @@ public sealed interface UBNFAST permits
         UBNFAST.EvalAnnotation,
         UBNFAST.WhitespaceAnnotation,
         UBNFAST.InterleaveAnnotation,
+        UBNFAST.LexicalContextAnnotation,
         UBNFAST.BackrefAnnotation,
         UBNFAST.ScopeTreeAnnotation,
         UBNFAST.DeclaresAnnotation,
@@ -187,6 +188,11 @@ public sealed interface UBNFAST permits
         UBNFAST.SimpleAnnotation,
         UBNFAST.CommonFieldAnnotation,
         UBNFAST.EnumAnnotation {}
+
+    /** Scoped, explicitly selected lexical goal; literals win equal-length ties. */
+    record LexicalContextAnnotation(List<String> tokens, List<String> literals) implements Annotation {
+        public LexicalContextAnnotation { tokens = List.copyOf(tokens); literals = List.copyOf(literals); }
+    }
 
     /** @root */
     record RootAnnotation() implements Annotation {}

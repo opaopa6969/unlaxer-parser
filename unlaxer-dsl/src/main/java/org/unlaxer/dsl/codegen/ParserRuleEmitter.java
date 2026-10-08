@@ -590,6 +590,12 @@ class ParserRuleEmitter {
         if (hasSkip) {
             w.line("public " + className + "() { addTag(org.unlaxer.reducer.TagBasedReducer.NodeKind.notNode.getTag()); }");
         }
+        for (var annotation : rule.annotations()) if (annotation instanceof org.unlaxer.dsl.bootstrap.UBNFAST.LexicalContextAnnotation lexicalContext) {
+            w.line("private static final java.util.List<org.unlaxer.dsl.runtime.Lexing.Terminal> __LEXICAL_CONTEXT = " + LexicalContexts.javaTerminals(ctx.grammar, lexicalContext) + ";");
+            w.line("@Override public org.unlaxer.Parsed parse(org.unlaxer.context.ParseContext context, org.unlaxer.TokenKind kind, boolean invert) {");
+            w.line("    return org.unlaxer.dsl.runtime.Lexing.withContext(context, __LEXICAL_CONTEXT, () -> super.parse(context, kind, invert));");
+            w.line("}");
+        }
         if (predictiveChoice) {
             w.line("private static final java.util.List<ChoicePredictor> __CHOICE_PREDICTORS = java.util.List.of("
                 + generateChoicePredictors(ctx, rule) + ");");

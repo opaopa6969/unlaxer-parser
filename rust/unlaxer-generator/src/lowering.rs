@@ -53,6 +53,7 @@ struct Shape {
 }
 
 pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
+    crate::lexical_contexts::validate(grammar)?;
     Lowering {
         grammar,
         ids: HashMap::new(),
@@ -159,11 +160,11 @@ impl Lowering<'_> {
                         self.follow_body(inner, target, tokens);
                     }
                     ElementKind::OneOrMore(inner)
-                    | ElementKind::BoundedRepeat { element: inner, .. } => {
-                        if direct_ref(inner, target) {
-                            if let Some(next) = next {
-                                self.first_atom(next, tokens, &mut HashSet::new());
-                            }
+                    | ElementKind::BoundedRepeat { element: inner, .. }
+                        if direct_ref(inner, target) =>
+                    {
+                        if let Some(next) = next {
+                            self.first_atom(next, tokens, &mut HashSet::new());
                         }
                         // Java's AtomicElement overload has no internal sequence.
                     }
@@ -427,6 +428,7 @@ impl Lowering<'_> {
                             return Err("precedence must be non-negative".into());
                         }
                     }
+                    AnnotationKind::LexicalContext { .. } => {}
                     AnnotationKind::Whitespace { style } => {
                         let enabled = named_whitespace_style(
                             style.as_deref().unwrap_or("javaStyle"),
@@ -794,6 +796,18 @@ impl Lowering<'_> {
                     child: Box::new(rule.body.clone()),
                     java_whitespace: rule_whitespace[i],
                 };
+            }
+            for annotation in &self.grammar.rules[i].annotations {
+                if let AnnotationKind::LexicalContext { tokens, literals } = &annotation.kind {
+                    rule.body = Expression::LexicalContextScope {
+                        child: Box::new(rule.body.clone()),
+                        terminals: crate::lexical_contexts::terminals(
+                            self.grammar,
+                            tokens,
+                            literals,
+                        )?,
+                    };
+                }
             }
             if rule_effects[i] != RuleEffects::default() {
                 rule.body = Expression::RuleEffects {

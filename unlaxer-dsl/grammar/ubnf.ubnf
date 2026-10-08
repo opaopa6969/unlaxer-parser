@@ -178,6 +178,7 @@ grammar UBNF {
     | EvalAnnotation
     | WhitespaceAnnotation
     | InterleaveAnnotation
+    | LexicalContextAnnotation
     | BackrefAnnotation
     | ScopeTreeAnnotation
     | DeclaresAnnotation
@@ -209,6 +210,9 @@ grammar UBNF {
 
   @mapping(WhitespaceAnnotation, params=[style])
   WhitespaceAnnotation ::= '@whitespace' [ '(' IDENTIFIER @style ')' ] ;
+
+  @mapping(LexicalContextAnnotation, params=[tokens,literals])
+  LexicalContextAnnotation ::= '@lexicalContext' '(' 'tokens' '=' '[' [ STRING @tokens { ',' STRING @tokens } ] ']' [ ',' 'literals' '=' '[' [ STRING @literals { ',' STRING @literals } ] ']' ] ')' ;
 
   @mapping(InterleaveAnnotation, params=[profile])
   InterleaveAnnotation ::= '@interleave' '(' 'profile' '=' IDENTIFIER @profile ')' ;

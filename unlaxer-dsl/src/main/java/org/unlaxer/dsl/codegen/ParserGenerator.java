@@ -73,7 +73,8 @@ public class ParserGenerator implements CodeGenerator {
         GenContext(GrammarDecl grammar) {
             this.grammar = grammar;
             TokenStreamGrammar.requireValid(grammar);
-            this.tokenStream = TokenStreamGrammar.enabled(grammar);
+            LexicalContexts.requireValid(grammar);
+            this.tokenStream = TokenStreamGrammar.enabled(grammar) || LexicalContexts.enabled(grammar);
             this.grammarName = grammar.name();
             TokenAdapterRegistry adapters = TokenAdapterRegistry.requireValid(grammar);
             this.adapterShadowsWordParser = grammar.tokens().stream()
@@ -504,6 +505,10 @@ public class ParserGenerator implements CodeGenerator {
                 .append("        public Supplier<Parser> getLazyParser() { return () -> Parser.get(")
                 .append(ParserCodegenUtil.toParserClassName(style)).append(".class); }\n")
                 .append("        public java.util.Optional<Parser> getLazyTerminatorParser() { return java.util.Optional.empty(); }\n    }\n");
+            if (LexicalContexts.enabled(ctx.grammar)) {
+                int end = result.lastIndexOf("    }\n");
+                result.insert(end, "        @Override public org.unlaxer.Parsed parse(org.unlaxer.context.ParseContext context, org.unlaxer.TokenKind kind, boolean invert) { return org.unlaxer.dsl.runtime.Lexing.withIndependentLexing(context, () -> super.parse(context, kind, invert)); }\n");
+            }
             result.append("    public static abstract class ").append(name)
                 .append(" extends LazyChain implements org.unlaxer.context.DiagnosticsAgnostic {\n")
                 .append("        private static final Parser SPACE = space();\n")

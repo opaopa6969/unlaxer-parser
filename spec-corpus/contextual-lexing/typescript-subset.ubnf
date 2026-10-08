@@ -1,0 +1,30 @@
+grammar Input {
+ @ubnf: v2
+ @package: example.lexing
+ @tokenStream: enabled
+ @whitespace: javaStyle
+ token LETTER ::= CHAR_RANGE('a','z') | CHAR_RANGE('A','Z') | '𐐀';
+ token ID ::= LETTER+;
+ token SHIFT ::= '>>';
+ token CONTENT ::= ('\\' ANY | NEGATION('"\\'))+;
+ token TEXT ::= NEGATION('<')+;
+ token REGEX ::= '/' { '\\' ANY | NEGATION('/\\\r\n') } '/' ['u'];
+ token END = EOF
+ @root @mapping(Value, params=[value])
+ Root ::= Declaration @value END;
+ @lexicalContext(tokens=['ID'], literals=['const','=',';'])
+ Declaration ::= 'const' ID '=' Expression ';';
+ Expression ::= ShiftExpression | Division | RegexLiteral | String | Jsx;
+ @lexicalContext(tokens=['ID','SHIFT'])
+ ShiftExpression ::= ID SHIFT ID;
+ @lexicalContext(tokens=['ID'], literals=['/'])
+ Division ::= ID '/' ID { '/' ID };
+ @lexicalContext(tokens=['REGEX'])
+ RegexLiteral ::= REGEX;
+ @whitespace(none) @lexicalContext(tokens=['CONTENT'], literals=['"'])
+ String ::= '"' [CONTENT] '"';
+ @whitespace(none) @lexicalContext(tokens=['ID'], literals=['<','>','</'])
+ Jsx ::= '<' ID '>' TextExpression '</' ID '>';
+ @whitespace(none) @lexicalContext(tokens=['TEXT'])
+ TextExpression ::= TEXT;
+}

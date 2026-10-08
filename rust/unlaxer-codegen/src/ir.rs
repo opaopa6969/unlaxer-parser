@@ -95,6 +95,10 @@ pub enum RecoveryMode {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression {
+    LexicalContextScope {
+        child: Box<Expression>,
+        terminals: Vec<(String, bool, crate::lexical::LexicalExpression)>,
+    },
     LexicalToken {
         name: String,
         expression: crate::lexical::LexicalExpression,

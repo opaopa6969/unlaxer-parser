@@ -847,6 +847,38 @@ public class UBNFParsers {
     /**
      * InterleaveAnnotation: '@interleave' '(' 'profile' '=' IDENTIFIER ')'
      */
+    public static class LexicalContextListParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+        @Override public Parsers getLazyParsers() {
+            return new Parsers(Parser.get(LeftBracketParser.class),
+                new org.unlaxer.parser.combinator.Optional(new UBNFLazyChain() {
+                    private static final long serialVersionUID = 1L;
+                    @Override public Parsers getLazyParsers() {
+                        return new Parsers(Parser.get(SingleQuotedParser.class), new ZeroOrMore(new UBNFLazyChain() {
+                            private static final long serialVersionUID = 1L;
+                            @Override public Parsers getLazyParsers() {
+                                return new Parsers(Parser.get(CommaParser.class), Parser.get(SingleQuotedParser.class));
+                            }
+                        }));
+                    }
+                }), Parser.get(RightBracketParser.class));
+        }
+    }
+    public static class LexicalContextAnnotationParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+        @Override public Parsers getLazyParsers() {
+            return new Parsers(new WordParser("@lexicalContext"), Parser.get(LeftParenthesisParser.class),
+                new WordParser("tokens"), Parser.get(EqualParser.class), Parser.get(LexicalContextListParser.class),
+                new org.unlaxer.parser.combinator.Optional(new UBNFLazyChain() {
+                    private static final long serialVersionUID = 1L;
+                    @Override public Parsers getLazyParsers() {
+                        return new Parsers(Parser.get(CommaParser.class), new WordParser("literals"),
+                            Parser.get(EqualParser.class), Parser.get(LexicalContextListParser.class));
+                    }
+                }), Parser.get(RightParenthesisParser.class));
+        }
+    }
+
     public static class InterleaveAnnotationParser extends UBNFLazyChain {
         private static final long serialVersionUID = 1L;
 
@@ -1257,6 +1289,7 @@ public class UBNFParsers {
                 Parser.get(EvalAnnotationParser.class),
                 Parser.get(WhitespaceAnnotationParser.class),
                 Parser.get(InterleaveAnnotationParser.class),
+                Parser.get(LexicalContextAnnotationParser.class),
                 Parser.get(BackrefAnnotationParser.class),
                 Parser.get(ScopeTreeAnnotationParser.class),
                 Parser.get(DeclaresWithDescriptionAnnotationParser.class),

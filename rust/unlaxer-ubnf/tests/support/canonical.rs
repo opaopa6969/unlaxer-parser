@@ -140,6 +140,10 @@ fn annotation(a: &Annotation) -> String {
             );
             ("EvalAnnotation", vec![quote(kind), quote(strategy), params])
         }
+        AnnotationKind::LexicalContext { tokens, literals } => (
+            "LexicalContextAnnotation",
+            vec![strings(tokens), strings(literals)],
+        ),
         AnnotationKind::Whitespace { style } => ("WhitespaceAnnotation", vec![optional(style)]),
         AnnotationKind::Interleave { profile } => ("InterleaveAnnotation", vec![quote(profile)]),
         AnnotationKind::Backref { name } => ("BackrefAnnotation", vec![quote(name)]),
