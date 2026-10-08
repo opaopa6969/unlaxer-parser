@@ -8,13 +8,20 @@ use std::sync::Arc;
 pub mod editor;
 pub mod editor_cst;
 mod first;
+pub mod language_queries;
 pub mod lexical;
 pub mod lexing;
 mod long_code_fence;
 #[cfg(test)]
 mod memo_retention_tests;
+pub mod pipeline;
 mod scope;
 pub mod semantic;
+pub mod semantic_project;
+pub mod semantic_queries;
+pub mod semantic_rename;
+pub mod source;
+pub mod source_edits;
 #[doc(hidden)]
 pub use first::{set_candidate_exclusion_for_current_thread, CandidateExclusion};
 pub use scope::{

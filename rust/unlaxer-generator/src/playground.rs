@@ -57,6 +57,13 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
     runtime!("semantic.rs");
     runtime!("editor.rs");
     runtime!("editor_cst.rs");
+    runtime!("language_queries.rs");
+    runtime!("semantic_queries.rs");
+    runtime!("semantic_project.rs");
+    runtime!("semantic_rename.rs");
+    runtime!("source_edits.rs");
+    runtime!("source.rs");
+    runtime!("pipeline.rs");
     runtime!("lexing.rs");
     runtime!("first.rs");
     runtime!("lexical.rs");

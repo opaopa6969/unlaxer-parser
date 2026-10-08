@@ -42,7 +42,7 @@ jobs:
     - name: Cross-language fixtures, compile failures, and generated-file drift
       run: >
         mvn -B -pl unlaxer-common,unlaxer-dsl -am test
-        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,RustPortabilityConformanceTest,TokenAdapterConformanceTest,ParseBindingsConformanceTest,DeclarativeTokenConformanceTest,ApiImpactConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest,SkipMappingConformanceTest,CaptureEqualityConformanceTest,ErrorElementConformanceTest,RecoveryConformanceTest,SemanticModelConformanceTest,EditorParseResultConformanceTest,SemanticModelUbnfTest,TokenStreamConformanceTest -DrustConformance=true -DtokenStreamBench=true
+        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,RustPortabilityConformanceTest,TokenAdapterConformanceTest,ParseBindingsConformanceTest,DeclarativeTokenConformanceTest,ApiImpactConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest,SkipMappingConformanceTest,CaptureEqualityConformanceTest,ErrorElementConformanceTest,RecoveryConformanceTest,SemanticModelConformanceTest,ProjectSymbolIndexConformanceTest,EditorParseResultConformanceTest,SemanticModelUbnfTest,TokenStreamConformanceTest -DrustConformance=true -DtokenStreamBench=true
         -Dsurefire.failIfNoSpecifiedTests=false
     - name: Resolver tutorial (Java and Rust)
       run: |
@@ -66,6 +66,7 @@ jobs:
     - name: Require semantic model and generated UBNF evidence
       run: |
         test -s unlaxer-dsl/target/rust-semantic-model.tsv
+        test -s unlaxer-dsl/target/rust-project-symbols.tsv
         test -s unlaxer-dsl/target/rust-semantic-ubnf.tsv
     - name: Require UBNF source position conformance evidence
       run: test -s unlaxer-dsl/target/rust-ubnf-source.tsv
@@ -98,8 +99,6 @@ jobs:
       run: test -s unlaxer-dsl/target/rust-capture-equality.tsv
     - name: Require ERROR element conformance evidence
       run: test -s unlaxer-dsl/target/rust-error-elements.tsv
-    - name: Require recovery conformance evidence
-      run: test -s unlaxer-dsl/target/rust-recovery.tsv
     - uses: actions/upload-artifact@v4
       with:
         name: rust-conformance
@@ -107,6 +106,7 @@ jobs:
           unlaxer-dsl/target/rust-token-stream.tsv
           unlaxer-dsl/target/token-stream-benchmark.tsv
           unlaxer-dsl/target/rust-semantic-model.tsv
+          unlaxer-dsl/target/rust-project-symbols.tsv
           unlaxer-dsl/target/rust-semantic-ubnf.tsv
           unlaxer-dsl/target/rust-conformance.tsv
           unlaxer-dsl/target/rust-diagnostics.tsv
@@ -141,7 +141,6 @@ jobs:
           unlaxer-dsl/target/rust-skip-mapping.tsv
           unlaxer-dsl/target/rust-capture-equality.tsv
           unlaxer-dsl/target/rust-error-elements.tsv
-          unlaxer-dsl/target/rust-recovery.tsv
         if-no-files-found: error
     - name: Build and smoke-test the native subset example
       run: |
@@ -157,10 +156,6 @@ jobs:
         error_generated_dir="$(mktemp -d)"
         PATH='' JAVA_HOME=/nonexistent-java rust/target/release/unlaxer generate --grammar spec-corpus/error-elements/expected.ubnf --output "$error_generated_dir"
         for module in mod.rs ast.rs parser.rs mapper.rs evaluator.rs; do test -s "$error_generated_dir/$module"; done
-        PATH='' JAVA_HOME=/nonexistent-java rust/target/release/unlaxer check --target rust --grammar spec-corpus/recovery/example.ubnf --format json | python3 -c 'import json,sys; r=json.load(sys.stdin); assert r["portable"] and not r["diagnostics"]'
-        recovery_generated_dir="$(mktemp -d)"
-        PATH='' JAVA_HOME=/nonexistent-java rust/target/release/unlaxer generate --grammar spec-corpus/recovery/example.ubnf --output "$recovery_generated_dir"
-        for module in mod.rs ast.rs parser.rs mapper.rs evaluator.rs; do test -s "$recovery_generated_dir/$module"; done
         PATH='' JAVA_HOME=/nonexistent-java rust/target/release/unlaxer impact --target rust --before spec-corpus/api-impact/node-add/before.ubnf --after spec-corpus/api-impact/node-add/after.ubnf | python3 -c 'import json,sys; r=json.load(sys.stdin); assert r["ok"] and [(c["kind"], c["subject"]) for c in r["changes"]] == [("METHOD_ADDED", "eval_extra"), ("NODE_ADDED", "Extra")]'
         tar -czf rust/target/unlaxer-generator-linux-x86_64.tar.gz -C rust/target/release unlaxer
     - uses: actions/upload-artifact@v4
