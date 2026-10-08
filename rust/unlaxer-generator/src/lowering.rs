@@ -18,6 +18,19 @@ fn whitespace_style(style: &str) -> Result<bool> {
         _ => Err(format!("unsupported whitespace {style}")),
     }
 }
+
+fn direct_ref(atom: &ast::AtomicElement, target: &str) -> bool {
+    matches!(&atom.kind, ElementKind::RuleRef { name, .. } if name == target)
+}
+
+fn direct_ref_in_body(body: &ast::RuleBody, target: &str) -> bool {
+    body.alternatives.iter().any(|alternative| {
+        alternative
+            .elements
+            .iter()
+            .any(|annotated| direct_ref(&annotated.element, target))
+    })
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Shape {
     kind: Kind,
@@ -37,6 +50,7 @@ pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
         catalogs: Vec::new(),
         longest_choices: Vec::new(),
         predictive_choices: Vec::new(),
+        recoveries: Vec::new(),
         nullable: HashSet::new(),
         analysis_depth: Cell::new(0),
     }
@@ -55,6 +69,7 @@ struct Lowering<'a> {
     catalogs: Vec<Option<String>>,
     longest_choices: Vec<bool>,
     predictive_choices: Vec<bool>,
+    recoveries: Vec<Option<(ast::RecoveryMode, Vec<String>)>>,
     nullable: HashSet<usize>,
     analysis_depth: Cell<usize>,
 }
@@ -67,6 +82,134 @@ impl Drop for AnalysisDepth<'_> {
 }
 
 impl Lowering<'_> {
+    fn lower_recovery(
+        &self,
+        mode: ast::RecoveryMode,
+        sync_tokens: &[String],
+        rule_name: &str,
+    ) -> (RecoveryMode, Vec<String>) {
+        match mode {
+            ast::RecoveryMode::Sync => (
+                RecoveryMode::Sync,
+                if sync_tokens.is_empty() {
+                    vec![";".into()]
+                } else {
+                    sync_tokens.to_vec()
+                },
+            ),
+            ast::RecoveryMode::Auto => {
+                let follow = self.follow_tokens(rule_name);
+                if follow.is_empty() {
+                    (RecoveryMode::Sync, vec![";".into()])
+                } else {
+                    (RecoveryMode::BeforeSync, follow)
+                }
+            }
+            ast::RecoveryMode::Skip => (RecoveryMode::Skip, self.follow_tokens(rule_name)),
+        }
+    }
+
+    /// Mirrors Java's deliberately conservative immediate-successor heuristic.
+    fn follow_tokens(&self, target: &str) -> Vec<String> {
+        let mut tokens = Vec::new();
+        for rule in &self.grammar.rules {
+            self.follow_body(&rule.body, target, &mut tokens);
+        }
+        tokens
+    }
+
+    fn follow_body(&self, body: &ast::RuleBody, target: &str, tokens: &mut Vec<String>) {
+        for alternative in &body.alternatives {
+            for (index, annotated) in alternative.elements.iter().enumerate() {
+                let atom = &annotated.element;
+                let next = alternative
+                    .elements
+                    .get(index + 1)
+                    .map(|value| &value.element);
+                if matches!(&atom.kind, ElementKind::RuleRef { name, .. } if name == target) {
+                    if let Some(next) = next {
+                        self.first_atom(next, tokens, &mut HashSet::new());
+                    }
+                }
+                match &atom.kind {
+                    ElementKind::Group(inner) | ElementKind::Optional(inner) => {
+                        self.follow_body(inner, target, tokens);
+                    }
+                    ElementKind::Repeat(inner) => {
+                        if direct_ref_in_body(inner, target) {
+                            if let Some(next) = next {
+                                self.first_atom(next, tokens, &mut HashSet::new());
+                            }
+                        }
+                        self.follow_body(inner, target, tokens);
+                    }
+                    ElementKind::OneOrMore(inner)
+                    | ElementKind::BoundedRepeat { element: inner, .. } => {
+                        if direct_ref(inner, target) {
+                            if let Some(next) = next {
+                                self.first_atom(next, tokens, &mut HashSet::new());
+                            }
+                        }
+                        // Java's AtomicElement overload has no internal sequence.
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    fn first_body(
+        &self,
+        body: &ast::RuleBody,
+        tokens: &mut Vec<String>,
+        visited: &mut HashSet<String>,
+    ) {
+        for alternative in &body.alternatives {
+            for annotated in &alternative.elements {
+                let atom = &annotated.element;
+                self.first_atom(atom, tokens, visited);
+                if !matches!(
+                    &atom.kind,
+                    ElementKind::Optional(_)
+                        | ElementKind::Repeat(_)
+                        | ElementKind::BoundedRepeat { min: 0, .. }
+                ) {
+                    break;
+                }
+            }
+        }
+    }
+
+    fn first_atom(
+        &self,
+        atom: &ast::AtomicElement,
+        tokens: &mut Vec<String>,
+        visited: &mut HashSet<String>,
+    ) {
+        match &atom.kind {
+            ElementKind::Terminal(value) => {
+                if !tokens.contains(value) {
+                    tokens.push(value.clone());
+                }
+            }
+            ElementKind::Group(inner)
+            | ElementKind::Optional(inner)
+            | ElementKind::Repeat(inner) => {
+                self.first_body(inner, tokens, visited);
+            }
+            ElementKind::OneOrMore(inner) | ElementKind::BoundedRepeat { element: inner, .. } => {
+                self.first_atom(inner, tokens, visited);
+            }
+            ElementKind::Separated { element, .. } => self.first_atom(element, tokens, visited),
+            ElementKind::RuleRef { name, .. } if visited.insert(name.clone()) => {
+                if let Some(rule) = self.grammar.rules.iter().find(|rule| rule.name == *name) {
+                    self.first_body(&rule.body, tokens, visited);
+                }
+            }
+            _ => {}
+        }
+    }
+
     fn enter_analysis(&self) -> Result<AnalysisDepth<'_>> {
         let depth = self.analysis_depth.get();
         if depth >= 256 {
@@ -194,6 +337,7 @@ impl Lowering<'_> {
             let mut associativity = None;
             let mut longest_choice = false;
             let mut predictive_choice = false;
+            let mut recovery = None;
             let mut precedence = None;
             let mut local_whitespace = None;
             let mut interleave = false;
@@ -251,6 +395,11 @@ impl Lowering<'_> {
                             return Err(format!("duplicate @predictiveChoice on {}", rule.name));
                         }
                         predictive_choice = true;
+                    }
+                    AnnotationKind::Recovery { mode, sync_tokens } => {
+                        if recovery.replace((*mode, sync_tokens.clone())).is_some() {
+                            return Err(format!("duplicate @recovery on {}", rule.name));
+                        }
                     }
                     AnnotationKind::Precedence { level } => {
                         if precedence.replace(*level).is_some() {
@@ -345,6 +494,7 @@ impl Lowering<'_> {
             }
             self.longest_choices.push(longest_choice);
             self.predictive_choices.push(predictive_choice);
+            self.recoveries.push(recovery);
             has_local_trivia |= local_whitespace.is_some() || interleave;
             rule_whitespace.push(local_whitespace.unwrap_or(whitespace || interleave));
             if associativity.is_some() != precedence.is_some() {
@@ -606,6 +756,15 @@ impl Lowering<'_> {
                 rule.body = Expression::CaptureEquality {
                     child: Box::new(rule.body.clone()),
                     name: name.clone(),
+                };
+            }
+            if let Some((mode, sync_tokens)) = &self.recoveries[i] {
+                let (mode, tokens) = self.lower_recovery(*mode, sync_tokens, &rule.name);
+                rule.body = Expression::Recovery {
+                    child: Box::new(rule.body.clone()),
+                    mode,
+                    tokens,
+                    message: "syntax error: skipped to sync point".into(),
                 };
             }
         }
@@ -1047,7 +1206,10 @@ impl Lowering<'_> {
             Expression::IdentifierToken => Predictor::Identifier,
             Expression::QuotedToken(quote) => Predictor::Quoted(*quote),
             Expression::Reference(rule) => {
-                if self.nullable.contains(rule) || !visiting.insert(*rule) {
+                if self.recoveries[*rule].is_some()
+                    || self.nullable.contains(rule)
+                    || !visiting.insert(*rule)
+                {
                     return Predictor::Any;
                 }
                 if let Some(cached) = cache.get(rule) {
