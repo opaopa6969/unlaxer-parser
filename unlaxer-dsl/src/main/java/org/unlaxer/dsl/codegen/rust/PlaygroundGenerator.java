@@ -34,12 +34,13 @@ public final class PlaygroundGenerator {
         files.put(".cargo/config.toml", resource("playground/config.toml"));
         files.put("runtime/Cargo.toml", resource("playground/runtime-Cargo.toml"));
         files.put("runtime/LICENSE", resource("playground/runtime/LICENSE"));
-        for (String name : new String[] {"lib.rs", "scope.rs", "semantic.rs", "language_queries.rs", "semantic_queries.rs", "semantic_project.rs", "semantic_rename.rs", "source_edits.rs", "source.rs", "embedded.rs", "provider_protocol.rs", "provider_process.rs", "pipeline.rs", "lexing.rs", "first.rs", "lexical.rs", "long_code_fence.rs", "memo_retention_tests.rs"}) {
+        for (String name : new String[] {"lib.rs", "scope.rs", "semantic.rs", "editor.rs", "editor_cst.rs", "editor_queries.rs", "language_queries.rs", "semantic_queries.rs", "semantic_project.rs", "semantic_rename.rs", "source_edits.rs", "source.rs", "embedded.rs", "provider_protocol.rs", "provider_process.rs", "pipeline.rs", "lexing.rs", "first.rs", "lexical.rs", "long_code_fence.rs", "memo_retention_tests.rs"}) {
             files.put("runtime/src/" + name, resource("playground/runtime/src/" + name));
         }
         files.put("src/lib.rs", resource("playground/lib.rs")
             .replace("@@DOCS@@", ir.rules().stream().anyMatch(rule -> !rule.documentation().isEmpty()) ? "generated::parser::RULE_DOCS" : "&[]")
             .replace("@@NAME@@", RustBackend.quote(grammar.name())).replace("@@ROOT@@", Integer.toString(ir.root())));
+        files.put("src/editor_adapter.rs", resource("playground/editor_adapter.rs"));
         for (String name : new String[] {"index.html", "playground.css", "playground.js", "worker.js"}) {
             files.put("public/" + name, resource("playground/" + name));
         }

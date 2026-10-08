@@ -146,6 +146,8 @@ public final class RustBackend {
         out.append("\npub fn parse_tree_detailed(source: &str) -> Result<Tree, ParseDiagnostic> {\n    parse_tree_detailed_with_options(source, ParseOptions::default())\n}\n")
             .append("\npub fn parse_tree_detailed_with_options(source: &str, options: ParseOptions) -> Result<Tree, ParseDiagnostic> {\n    unlaxer_runtime::parse_detailed_shared_with_options(grammar(), ")
             .append(ir.root()).append(", ").append(ir.javaWhitespace()).append(", source, options)\n}\n");
+        out.append("\n/// Bounded editor-only EOF repair; synthetic syntax never becomes a normal AST value.\npub fn parse_editor_cst(source: &str, completions: &[&str], options: unlaxer_runtime::editor_cst::Options) -> Result<unlaxer_runtime::editor_cst::EditorCst, &'static str> {\n    unlaxer_runtime::editor_cst::parse(grammar(), ")
+            .append(ir.root()).append(", ").append(ir.javaWhitespace()).append(", source, completions, options)\n}\n");
         if (ir.rules().stream().anyMatch(r -> r.operator() != null)) {
             out.append("""
 

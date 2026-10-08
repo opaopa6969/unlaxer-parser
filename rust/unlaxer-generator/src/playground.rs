@@ -55,6 +55,9 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
     runtime!("lib.rs");
     runtime!("scope.rs");
     runtime!("semantic.rs");
+    runtime!("editor.rs");
+    runtime!("editor_cst.rs");
+    runtime!("editor_queries.rs");
     runtime!("language_queries.rs");
     runtime!("semantic_queries.rs");
     runtime!("semantic_project.rs");
@@ -85,6 +88,7 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
         relative_path: "src/lib.rs".into(),
         content: wrapper,
     });
+    asset!("src/editor_adapter.rs", "playground/editor_adapter.rs");
     asset!("public/index.html", "playground/index.html");
     asset!("public/playground.css", "playground/playground.css");
     asset!("public/playground.js", "playground/playground.js");
