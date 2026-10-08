@@ -5,6 +5,7 @@ use std::hash::{BuildHasher, Hasher};
 use std::rc::Rc;
 use std::sync::Arc;
 
+pub mod embedded;
 mod first;
 pub mod language_queries;
 pub mod lexical;

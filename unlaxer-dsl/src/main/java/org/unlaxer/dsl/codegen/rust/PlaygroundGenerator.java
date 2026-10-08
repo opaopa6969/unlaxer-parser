@@ -34,7 +34,7 @@ public final class PlaygroundGenerator {
         files.put(".cargo/config.toml", resource("playground/config.toml"));
         files.put("runtime/Cargo.toml", resource("playground/runtime-Cargo.toml"));
         files.put("runtime/LICENSE", resource("playground/runtime/LICENSE"));
-        for (String name : new String[] {"lib.rs", "scope.rs", "semantic.rs", "language_queries.rs", "semantic_queries.rs", "semantic_project.rs", "semantic_rename.rs", "source_edits.rs", "source.rs", "pipeline.rs", "lexing.rs", "first.rs", "lexical.rs", "long_code_fence.rs", "memo_retention_tests.rs"}) {
+        for (String name : new String[] {"lib.rs", "scope.rs", "semantic.rs", "language_queries.rs", "semantic_queries.rs", "semantic_project.rs", "semantic_rename.rs", "source_edits.rs", "source.rs", "embedded.rs", "pipeline.rs", "lexing.rs", "first.rs", "lexical.rs", "long_code_fence.rs", "memo_retention_tests.rs"}) {
             files.put("runtime/src/" + name, resource("playground/runtime/src/" + name));
         }
         files.put("src/lib.rs", resource("playground/lib.rs")
