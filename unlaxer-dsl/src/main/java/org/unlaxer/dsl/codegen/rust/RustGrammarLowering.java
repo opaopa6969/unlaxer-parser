@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Set;
 import org.unlaxer.dsl.bootstrap.UBNFAST.*;
 import org.unlaxer.dsl.bootstrap.TokenAdapterRegistry;
+import org.unlaxer.dsl.codegen.RecoverySupport;
 import org.unlaxer.dsl.codegen.rust.GrammarIR.*;
 
 /** Validates the entire input before emitting anything; unsupported syntax never silently degrades. */
@@ -26,6 +27,7 @@ public final class RustGrammarLowering {
     private final List<String> catalogs = new ArrayList<>();
     private final List<Boolean> longestChoices = new ArrayList<>();
     private final List<Boolean> predictiveChoices = new ArrayList<>();
+    private final List<RecoveryAnnotation> recoveries = new ArrayList<>();
     private final Set<Integer> nullableRules = new HashSet<>();
     private int analysisDepth;
     private record Shape(Kind kind, Cardinality cardinality) {}
@@ -117,6 +119,7 @@ public final class RustGrammarLowering {
             boolean rightAssoc = false;
             boolean longestChoice = false;
             boolean predictiveChoice = false;
+            RecoveryAnnotation recovery = null;
             Integer precedence = null;
             Boolean localWhitespace = null;
             boolean interleave = false;
@@ -152,6 +155,9 @@ public final class RustGrammarLowering {
                 } else if (annotation instanceof PredictiveChoiceAnnotation) {
                     if (predictiveChoice) throw unsupported("duplicate @predictiveChoice on " + rule.name());
                     predictiveChoice = true;
+                } else if (annotation instanceof RecoveryAnnotation value) {
+                    if (recovery != null) throw unsupported("duplicate @recovery on " + rule.name());
+                    recovery = value;
                 } else if (annotation instanceof PrecedenceAnnotation value) {
                     if (precedence != null) throw unsupported("duplicate @precedence on " + rule.name());
                     precedence = value.level();
@@ -205,6 +211,7 @@ public final class RustGrammarLowering {
             }
             longestChoices.add(longestChoice);
             predictiveChoices.add(predictiveChoice);
+            recoveries.add(recovery);
             hasLocalTrivia |= localWhitespace != null || interleave;
             ruleWhitespace.add(localWhitespace == null ? whitespace || interleave : localWhitespace);
             mappings.add(mapping);
@@ -316,6 +323,22 @@ public final class RustGrammarLowering {
                 expression = new TriviaScope(expression, ruleWhitespace.get(i));
             if (ruleEffects.get(i) != null) expression = new RuleEffects(expression, ruleEffects.get(i));
             if (comparisons.get(i) != null) expression = new CaptureEquality(expression, comparisons.get(i));
+            if (recoveries.get(i) != null) {
+                RecoveryAnnotation recovery = recoveries.get(i);
+                List<String> tokens = recovery.mode() == org.unlaxer.dsl.bootstrap.UBNFAST.RecoveryMode.SYNC
+                    ? recovery.syncTokens().isEmpty() ? List.of(";") : recovery.syncTokens()
+                    : RecoverySupport.followTokens(grammar, rule.name());
+                GrammarIR.RecoveryMode mode = switch (recovery.mode()) {
+                    case SYNC -> GrammarIR.RecoveryMode.SYNC;
+                    case AUTO -> tokens.isEmpty() ? GrammarIR.RecoveryMode.SYNC : GrammarIR.RecoveryMode.BEFORE_SYNC;
+                    case SKIP -> GrammarIR.RecoveryMode.SKIP;
+                };
+                if (recovery.mode() == org.unlaxer.dsl.bootstrap.UBNFAST.RecoveryMode.AUTO && tokens.isEmpty()) {
+                    tokens = List.of(";");
+                }
+                expression = new Recovery(expression, mode, RecoverySupport.validateSyncTokens(tokens),
+                    "syntax error: skipped to sync point");
+            }
             rewritten.add(new Rule(rule.name(), expression, mapping, rule.operator(), rule.catalog(), rule.skip(), rule.documentation()));
         }
         return new GrammarIR(rewritten, root, whitespace);
@@ -602,7 +625,8 @@ public final class RustGrammarLowering {
             return new QuotedPredictor(quoted.quote());
         }
         if (expression instanceof Reference reference) {
-            if (nullableRules.contains(reference.rule()) || !visiting.add(reference.rule())) {
+            if (recoveries.get(reference.rule()) != null || nullableRules.contains(reference.rule())
+                || !visiting.add(reference.rule())) {
                 return new AnyPredictor();
             }
             Predictor result = cache.get(reference.rule());

@@ -35,6 +35,30 @@ pub const TEXT_VALUE_RULE: usize = usize::MAX;
 /// A mapper may collapse a nonempty all-text projection to this complete source span.
 pub const VALUE_BOUNDARY_RULE: usize = usize::MAX - 1;
 
+/// Reserved CST rule ID for a successfully recovered invalid source region.
+/// Recovery nodes are not grammar rules or typed AST values.
+pub const RECOVERY_ERROR_RULE: usize = usize::MAX - 2;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RecoveryMode {
+    /// Resume after the nearest sync token, consuming that token.
+    Sync,
+    /// Resume immediately before the nearest known following token.
+    BeforeSync,
+    /// Resume before a following token, or consume one scalar if none is known.
+    Skip,
+}
+
+/// A committed recovery event, retained with the CST rather than a fatal parse error.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecoveryDiagnostic {
+    /// Half-open Unicode-scalar span of the consumed invalid region.
+    pub span: Span,
+    pub message: &'static str,
+    /// CST node carrying `RECOVERY_ERROR_RULE` and this event's span.
+    pub node: usize,
+}
+
 #[derive(Debug, Clone)]
 pub enum Expr {
     /// An atomic token compiled from a declarative UBNF lexical expression.
@@ -121,6 +145,13 @@ pub enum Expr {
     /// Java UNTIL succeeds at EOF even if its non-consuming terminator is absent.
     JavaUntil(&'static str),
     Error(&'static str),
+    /// Recover after a failed child parse, keeping a CST marker for skipped source.
+    Recovery {
+        child: Box<Expr>,
+        mode: RecoveryMode,
+        tokens: Vec<&'static str>,
+        message: &'static str,
+    },
     /// Undeclared custom parser: [`Diagnostics::Auto`] conservatively uses `Detailed`.
     Custom(fn(&mut ParseContext<'_>) -> ParseResult),
     /// Custom parser with a caller-supplied contract for automatic diagnostics.
@@ -281,6 +312,20 @@ impl Expr {
             name,
         }
     }
+    /// Wrap an expression with an error-recovery strategy. Empty tokens fail closed at parse time.
+    pub fn recover(
+        self,
+        mode: RecoveryMode,
+        tokens: impl IntoIterator<Item = &'static str>,
+        message: &'static str,
+    ) -> Self {
+        Self::Recovery {
+            child: Box::new(self),
+            mode,
+            tokens: tokens.into_iter().collect(),
+            message,
+        }
+    }
     pub fn ahead(self) -> Self {
         Self::Lookahead {
             child: Box::new(self),
@@ -390,9 +435,14 @@ pub struct Tree {
     pub root: usize,
     byte_offsets: Vec<usize>,
     scopes: ScopeStore,
+    recoveries: Vec<RecoveryDiagnostic>,
 }
 
 impl Tree {
+    /// Recovery events reachable from this tree's selected root only.
+    pub fn recoveries(&self) -> &[RecoveryDiagnostic] {
+        &self.recoveries
+    }
     /// Owned semantic metadata as of tree creation, independent of subsequent context changes.
     pub fn scopes(&self) -> &ScopeStore {
         &self.scopes
@@ -643,6 +693,7 @@ struct Checkpoint {
     captures_journal_mark: usize,
     state: Option<Rc<StateMap>>,
     scopes_journal_mark: usize,
+    recoveries: usize,
 }
 
 struct ChoiceWinner {
@@ -653,6 +704,7 @@ struct ChoiceWinner {
     captures: CaptureStore,
     state: Rc<StateMap>,
     scopes: ScopeStore,
+    recoveries: Vec<RecoveryDiagnostic>,
     fragment: Fragment,
 }
 
@@ -1003,6 +1055,7 @@ pub struct ParseContext<'a> {
     captures: CaptureStore,
     state: Rc<StateMap>,
     scopes: ScopeStore,
+    recoveries: Vec<RecoveryDiagnostic>,
     call_depth: usize,
     options: ParseOptions,
     grammar_session: u64,
@@ -1142,12 +1195,14 @@ fn parse_detailed_owned(
     let mut trailing_offset = None;
     if let Some(root) = parser.rule(root, 0) {
         if parser.position == input.len() {
+            let recoveries = parser.selected_recoveries(root);
             return Ok(Tree {
                 source: input.to_owned(),
                 nodes: parser.nodes,
                 root,
                 byte_offsets: parser.byte_offsets,
                 scopes: parser.scopes,
+                recoveries,
             });
         }
         trailing_offset = Some(parser.code_point(parser.position));
@@ -1242,6 +1297,7 @@ impl<'a> ParseContext<'a> {
             captures: CaptureStore::default(),
             state: Rc::new(StateMap::default()),
             scopes: ScopeStore::default(),
+            recoveries: Vec::new(),
             call_depth: 0,
             options,
             grammar_session: 0,
@@ -1331,7 +1387,33 @@ impl<'a> ParseContext<'a> {
             root,
             byte_offsets: self.byte_offsets.clone(),
             scopes: self.scopes.clone(),
+            recoveries: self.selected_recoveries(root),
         })
+    }
+
+    /// Committed recovery events in this context; rollback removes failed branches.
+    pub fn recoveries(&self) -> &[RecoveryDiagnostic] {
+        &self.recoveries
+    }
+
+    fn selected_recoveries(&self, root: usize) -> Vec<RecoveryDiagnostic> {
+        if self.recoveries.is_empty() {
+            return Vec::new();
+        }
+        let mut reachable = vec![false; self.nodes.len()];
+        let mut pending = vec![root];
+        while let Some(id) = pending.pop() {
+            if id >= self.nodes.len() || reachable[id] {
+                continue;
+            }
+            reachable[id] = true;
+            pending.extend(&self.nodes[id].children);
+        }
+        self.recoveries
+            .iter()
+            .filter(|event| reachable.get(event.node).copied().unwrap_or(false))
+            .cloned()
+            .collect()
     }
     pub fn text(&self, span: Span) -> Option<&'a str> {
         if span.start > span.end {
@@ -1571,6 +1653,7 @@ impl<'a> ParseContext<'a> {
             metrics_counted,
             captures_journal_mark,
             scopes_journal_mark,
+            recoveries: self.recoveries.len(),
             state,
         }
     }
@@ -1594,6 +1677,7 @@ impl<'a> ParseContext<'a> {
         self.position = checkpoint.position;
         self.matched_position = checkpoint.matched_position;
         self.nodes.truncate(checkpoint.nodes);
+        self.recoveries.truncate(checkpoint.recoveries);
         self.captures
             .rollback_checkpoint(checkpoint.captures_journal_mark);
         if let Some(state) = checkpoint.state {
@@ -1725,6 +1809,7 @@ impl<'a> ParseContext<'a> {
             return None;
         }
         let memo_key = (self.options.memoization == Memoization::SafeFailures
+            && self.lexical_trivia.is_none()
             && self.memo_safe_rules.get(id).copied().unwrap_or(false))
         .then(|| {
             (
@@ -1900,6 +1985,52 @@ impl<'a> ParseContext<'a> {
                     self.fail(message);
                 }
                 None
+            }
+            Expr::Recovery {
+                child,
+                mode,
+                tokens,
+                message,
+            } => {
+                if tokens.iter().any(|token| token.is_empty()) {
+                    self.fail("nonempty recovery token");
+                    return None;
+                }
+                if tokens
+                    .iter()
+                    .enumerate()
+                    .any(|(index, token)| tokens[..index].contains(token))
+                {
+                    self.fail("unique recovery token");
+                    return None;
+                }
+                let start = self.position;
+                if let Some(fragment) = self.expression(child, depth) {
+                    return Some(fragment);
+                }
+                let end = self.recovery_end(*mode, tokens)?;
+                self.position = end;
+                self.matched_position = end;
+                let span = Span {
+                    start: self.code_point(start),
+                    end: self.code_point(end),
+                };
+                let node = self.nodes.len();
+                self.nodes.push(Node {
+                    rule: RECOVERY_ERROR_RULE,
+                    span,
+                    children: Vec::new(),
+                    captures: Vec::new(),
+                });
+                self.recoveries.push(RecoveryDiagnostic {
+                    span,
+                    message,
+                    node,
+                });
+                Some(Fragment {
+                    nodes: vec![node],
+                    captures: Vec::new(),
+                })
             }
             Expr::Any | Expr::CharRange(_, _) | Expr::Except(_) => {
                 let next = self.input[self.position..].chars().next();
@@ -2365,6 +2496,7 @@ impl<'a> ParseContext<'a> {
                             scopes.commit_checkpoint();
                             scopes
                         },
+                        recoveries: self.recoveries.clone(),
                         fragment,
                     });
                 }
@@ -2382,6 +2514,7 @@ impl<'a> ParseContext<'a> {
                 .scopes
                 .retain_journal_entry_count(self.scopes.journal_entries_created());
             self.scopes = winner.scopes;
+            self.recoveries = winner.recoveries;
             winner.fragment
         })
     }
@@ -2513,6 +2646,27 @@ impl<'a> ParseContext<'a> {
                 return &raw[position..];
             }
         }
+    }
+
+    fn recovery_end(&self, mode: RecoveryMode, tokens: &[&str]) -> Option<usize> {
+        let remaining = &self.input[self.position..];
+        if remaining.is_empty() {
+            return None;
+        }
+        let nearest = tokens
+            .iter()
+            .filter_map(|token| remaining.find(token).map(|at| (at, token.len())))
+            .min_by(|left, right| left.0.cmp(&right.0).then(right.1.cmp(&left.1)));
+        let length = match (mode, nearest) {
+            (RecoveryMode::Sync, Some((at, token_len))) => at + token_len,
+            (RecoveryMode::BeforeSync, Some((at, _))) if at > 0 => at,
+            (RecoveryMode::BeforeSync, _) | (RecoveryMode::Sync, None) => return None,
+            (RecoveryMode::Skip, Some((at, _))) if at > 0 => at,
+            (RecoveryMode::Skip, Some(_)) => remaining.chars().next()?.len_utf8(),
+            (RecoveryMode::Skip, None) if tokens.is_empty() => remaining.chars().next()?.len_utf8(),
+            (RecoveryMode::Skip, None) => remaining.len(),
+        };
+        Some(self.position + length)
     }
 
     fn skip(&mut self) {
@@ -2675,6 +2829,7 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
         | Expr::Lookahead { child, .. }
         | Expr::RuleEffects { child, .. }
         | Expr::CaptureEquality { child, .. }
+        | Expr::Recovery { child, .. }
         | Expr::TriviaScope { child, .. }
         | Expr::LexicalTriviaScope { child, .. } => expression_allows_deferred_diagnostics(child),
         Expr::Lexical(_, _)
@@ -2738,7 +2893,8 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>) -> bo
         Expr::Custom(_)
         | Expr::CustomWith { .. }
         | Expr::Backreference(_)
-        | Expr::CaptureEquality { .. } => false,
+        | Expr::CaptureEquality { .. }
+        | Expr::Recovery { .. } => false,
         Expr::Rule(id) => {
             references.push(*id);
             true
@@ -3521,6 +3677,43 @@ mod tests {
             ),
             vec!["frame"]
         );
+    }
+
+    #[test]
+    fn lexical_trivia_cannot_replay_failures_from_another_definition() {
+        fn trivia(text: &'static str) -> lexical::LexicalExpression {
+            lexical::LexicalExpression {
+                op: lexical::Op::LITERAL,
+                text,
+                min: 0,
+                max: 0,
+                children: vec![],
+            }
+        }
+        for memoization in [Memoization::Off, Memoization::SafeFailures] {
+            let rules = vec![
+                Rule {
+                    name: "root",
+                    expression: Expr::Choice(vec![
+                        Expr::Rule(1).lexical_trivia_scope(trivia("#")),
+                        Expr::Rule(1).lexical_trivia_scope(trivia(" ")),
+                    ]),
+                },
+                Rule {
+                    name: "pair",
+                    expression: Expr::Sequence(vec![Expr::Literal("a"), Expr::Literal("b")]),
+                },
+            ];
+            let tree = parse_detailed_with_options(
+                &rules,
+                0,
+                false,
+                "a b",
+                ParseOptions::with_memoization(memoization),
+            )
+            .unwrap();
+            assert_eq!(tree.nodes[tree.root].span, Span { start: 0, end: 3 });
+        }
     }
 
     #[test]

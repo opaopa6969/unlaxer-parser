@@ -232,6 +232,7 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
         | Expr::JavaUntil(_)
         | Expr::Custom(_)
         | Expr::CustomWith { .. }
+        | Expr::Recovery { .. }
         | Expr::Backreference(_) => FirstSet::UNKNOWN,
     }
 }

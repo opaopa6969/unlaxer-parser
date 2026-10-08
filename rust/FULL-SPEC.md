@@ -34,7 +34,7 @@ annotation、`ParseContext` API、consume/invert伝播、incremental、IDE proto
 | 診断policy・FIRST候補除外 | Java/RustのDetailed/失敗時詳細化/Auto、候補除外を実装 | 再実行可能性・診断参照・custom parserの宣言に依存。低水準APIと生成入口を区別し、意味診断と失敗位置を保持。任意副作用の安全性や常時高速化は保証しない（同ノート ケース25〜27） |
 | optional・0/1回以上・bounded repeat・separated | UBNF生成・Option/Vec AST・mapper・Semantics実装 | 70ケースの受理一致、20成功ケースのJava/Rust AST全field・全span一致、Rust評価値oracle。外側captureの入れ子container型は両backendとも未完了 |
 | ANY/EOF/EMPTY/CHAR_RANGE/NEGATION/UNTIL/LOOKAHEAD/NEGATIVE_LOOKAHEAD | UBNF生成とJava互換Expr・両cursorを実装 | 48文法・109入力でprefix受理/両cursorと全入力受理が一致、受理56入力のAST/spanも独立fixtureに一致。汎用consume/invert伝播と全CST同値は未完了 |
-| error | `ERROR(...)`をJava/native Rust両hostから生成（#329）。非消費で必ず失敗し、expected候補を提示 | [12文法19入力の契約・corpus・再現手順](../docs/error-elements.md)。受理/両cursor、CP位置と明示hint、AST/span、状態rollback、診断/memo modeを比較。native候補の表示差は個別oracleで保持。成功するerror CSTや`@recovery`とは別 |
+| error | `ERROR(...)`をJava/native Rust両hostから生成（#329）。非消費で必ず失敗し、expected候補を提示 | [12文法19入力の契約・corpus・再現手順](../docs/error-elements.md)。受理/両cursor、CP位置と明示hint、AST/span、状態rollback、診断/memo modeを比較。native候補の表示差は個別oracleで保持。下記の回復とは別 |
 | Number token | 限定生成済み | 不完全指数の診断差を記録済み。数値型・overflow・triviaを実言語仕様に合わせる |
 | Identifier・Single/DoubleQuoted・EndOfSource token binding | UBNF生成・runtime実装 | 22文法78入力の受理/両cursor比較と受理48 AST/spanのfixture。ASCII identifier、生escape、single quoteだけ除去するJava mapper契約。tinyexpression文字列評価は別途検証 |
 | tinyexpression StringLiteral token binding | exact FQNを両生成経路で対応（#168） | 固定した実tinyexpressionクラスと共通corpusで字句・両cursor・AST/spanを比較。文字列評価の意味論は別途検証 |
@@ -54,7 +54,8 @@ annotation、`ParseContext` API、consume/invert伝播、incremental、IDE proto
 | scopeTree/declares/スコープ参照 | 両frontendから生成、Java capture-site選択も修正（#176）。mode/description metadata保持、CP位置、nested/repeated captureとrollbackを比較 | 両modeは解析時stack。評価時dynamic環境やclosure、LSP/DAP利用は未対応 |
 | skip | Java の存在しない AST 型参照を修正し、両hostの Rust 生成に AST subtree 投影境界を実装（#323） | [契約・移行・共通corpus](../docs/skip-ast-projection.md)。構文・capture・scope/rollback は保持し、明示captureはtext。rootのsyntax成功とASTなしのmapping失敗を区別 |
 | catalog/doc/simple等 | `@catalog` は両frontendから静的 `CatalogSpec` を生成（#180）。parser/AST/evaluatorには作用しない。doc/simpleは未対応 | catalog resolver・context別LSP利用とprotocol test、残るannotationのJava実動作を検証 |
-| recovery・incremental cache | 未対応 | 編集差分と全再解析の一致、位置・診断・利用者状態の無効化、回復後の評価境界 |
+| recovery | Java/Rust runtimeと両hostの`@recovery(sync/auto/skip)`生成、CP span/message付きCST marker（#331） | [契約・共通corpus・再現手順](../docs/error-recovery.md)。18文法43入力×6設定で回復情報、両cursor、rollback、正常ASTと回復時mapping拒否を比較。部分/error AST型と汎用伝播は未対応 |
+| incremental cache | Rust未対応 | 編集差分と全再解析の一致、位置・診断・利用者状態・回復情報の無効化 |
 | SafeFailures memoの保持窓 | Javaの保持窓に対応するRustのbucket解放と、両言語の遠距離backtrack後の再保存を実装（#290） | 共通6入力で受理・consumed/farthest位置を照合、各言語で窓OFF/ONの診断・hit数一致、32,000 CP人工負荷の追加heap peak約95.5%削減。任意文法のhit不変・時間計算量保証・stateful memo parityの完了は含まない |
 | LSP/DAP | Classic Rust経路は未対応。下流TinyExpressionのVSIX/LSP/DAPはJavaサーバーを使う | Rust AST/eval traceのspan保持は実装済みだが、Rust製LSP/DAPとは別。UTF-16変換、diagnostics/completion、breakpoint/step/変数表示を実protocolで検証する必要がある |
 | tinyexpression-rs | 下流にparser・typed AST・scalar/context付き評価器・FormulaInfo loader・CLIを実装済み。parserはubnfc生成物 | Java goldenとの値/数値bits/失敗種別、tree/closure/traceを比較する有限corpusがある。Java任意classや全バックエンド互換の証明ではない。root-family retryは残る |

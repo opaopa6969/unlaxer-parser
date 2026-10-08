@@ -196,13 +196,19 @@ public class RuleTriviaConformanceTest {
     }
 
     private JsonArray prefix(Parser parser, String input) throws Exception {
-        var result = new JsonArray();
-        try (var context = new ParseContext(org.unlaxer.StringSource.createRootSource(input))) {
-            result.add(parser.parse(context).isSucceeded());
-            result.add(context.getConsumedPosition().value());
-            result.add(context.getMatchedPosition().value());
+        JsonArray expected = null;
+        for (boolean memo : new boolean[]{false, true}) {
+            var result = new JsonArray();
+            try (var context = new ParseContext(org.unlaxer.StringSource.createRootSource(input))) {
+                if (memo) context.enableMemoize();
+                result.add(parser.parse(context).isSucceeded());
+                result.add(context.getConsumedPosition().value());
+                result.add(context.getMatchedPosition().value());
+            }
+            if (expected == null) expected = result;
+            else assertEquals("Java memo OFF/ON prefix parity: " + input, expected, result);
         }
-        return result;
+        return expected;
     }
 
     private JsonObject canonical(Object ast, Object mapped) throws Exception {
@@ -246,15 +252,26 @@ public class RuleTriviaConformanceTest {
                     let input = String::from_utf8(bytes).unwrap();
                     let mut context = unlaxer_runtime::ParseContext::new(&input);
                     let prefix_ok = generated::parser::parse_context(&mut context).is_ok();
+                    let options = unlaxer_runtime::ParseOptions::with_memoization(unlaxer_runtime::Memoization::SafeFailures);
+                    let mut memo_context = unlaxer_runtime::ParseContext::with_options(&input, options);
+                    let memo_ok = generated::parser::parse_context(&mut memo_context).is_ok();
+                    assert_eq!((prefix_ok, context.position(), context.matched_position()),
+                        (memo_ok, memo_context.position(), memo_context.matched_position()));
                     print!(r#"{{\"prefix\":[{},{},{}],\"ast\":"#,
                         prefix_ok, context.position(), context.matched_position());
                     match generated::parser::parse_tree_detailed(&input) {
                         Ok(tree) => {
                             let ast = generated::mapper::map(&tree).unwrap();
                             drop(tree);
-                            print!("{}", ast.canonical_json());
+                            let canonical = ast.canonical_json();
+                            let memo_tree = generated::parser::parse_tree_detailed_with_options(&input, options).unwrap();
+                            assert_eq!(canonical, generated::mapper::map(&memo_tree).unwrap().canonical_json());
+                            print!("{}", canonical);
                         }
-                        Err(error) => print!(r#"null,\"diagnostic\":[\"{}\",{}]"#, error.kind, error.offset),
+                        Err(error) => {
+                            assert_eq!(error, generated::parser::parse_tree_detailed_with_options(&input, options).unwrap_err());
+                            print!(r#"null,\"diagnostic\":[\"{}\",{}]"#, error.kind, error.offset);
+                        }
                     }
                     println!("}}");
                 }

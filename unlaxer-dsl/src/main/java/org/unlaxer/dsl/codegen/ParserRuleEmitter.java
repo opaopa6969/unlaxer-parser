@@ -498,8 +498,8 @@ class ParserRuleEmitter {
     /**
      * Generates a recovery wrapper class for a rule with @recovery annotation.
      * For SYNC mode, wraps the rule parser with SyncPointRecoveryParser.
-     * For AUTO mode, uses ";" as default sync token.
-     * For SKIP mode, generates a wrapper that catches failure and returns an error node.
+     * AUTO stops before a known FOLLOW token, otherwise uses inclusive ";" sync.
+     * SKIP stops before a known FOLLOW token and always makes progress.
      */
     static String generateRecoveryWrapper(ParserGenerator.GenContext ctx, RuleDecl rule, RecoveryAnnotation recovery) {
         String ruleName = rule.name();
@@ -508,105 +508,36 @@ class ParserRuleEmitter {
         IndentedWriter w = new IndentedWriter(1);
 
         RecoveryMode mode = recovery.mode();
+        List<String> tokens = mode == RecoveryMode.SYNC
+            ? (recovery.syncTokens().isEmpty() ? List.of(";") : recovery.syncTokens())
+            : computeFollowTokens(ctx, ruleName);
+        tokens = RecoverySupport.validateSyncTokens(tokens);
+        String runtimeMode;
         if (mode == RecoveryMode.SYNC) {
-            String[] tokens = recovery.syncTokens().isEmpty()
-                ? new String[]{ ";" }
-                : recovery.syncTokens().toArray(new String[0]);
-            String syncArgs = java.util.Arrays.stream(tokens)
-                .map(t -> "\"" + ParserCodegenUtil.escapeString(t) + "\"")
-                .collect(Collectors.joining(", "));
-            w.line("public static class " + wrapperName + " extends org.unlaxer.parser.combinator.SyncPointRecoveryParser implements org.unlaxer.context.DiagnosticsAgnostic {");
-            w.indent();
-            w.line("private static final long serialVersionUID = 1L;");
-            w.line("public " + wrapperName + "() {");
-            w.indent();
-            w.line("super(Parser.get(" + className + ".class), " + syncArgs + ");");
-            w.dedent();
-            w.line("}");
-            w.dedent();
-            w.line("}");
-            w.blankLine();
+            runtimeMode = "SYNC";
+        } else if (mode == RecoveryMode.AUTO && tokens.isEmpty()) {
+            runtimeMode = "SYNC";
+            tokens = List.of(";");
         } else if (mode == RecoveryMode.AUTO) {
-            // Auto-infer sync tokens from grammar FOLLOW set
-            List<String> followTokens = computeFollowTokens(ctx, ruleName);
-            if (followTokens.isEmpty()) {
-                followTokens = List.of(";"); // fallback
-            }
-            String syncArgs = followTokens.stream()
-                .map(t -> "\"" + ParserCodegenUtil.escapeString(t) + "\"")
-                .collect(Collectors.joining(", "));
-            w.line("public static class " + wrapperName + " extends org.unlaxer.parser.combinator.SyncPointRecoveryParser implements org.unlaxer.context.DiagnosticsAgnostic {");
-            w.indent();
-            w.line("private static final long serialVersionUID = 1L;");
-            w.line("public " + wrapperName + "() {");
-            w.indent();
-            w.line("super(Parser.get(" + className + ".class), " + syncArgs + ");");
-            w.dedent();
-            w.line("}");
-            w.dedent();
-            w.line("}");
-            w.blankLine();
+            runtimeMode = "BEFORE_SYNC";
         } else {
-            // SKIP mode: on failure, skip until a FOLLOW set token is found and return
-            // success with error marker. This ensures the AST always has a node
-            // (Hejlsberg principle: always produce an AST).
-            List<String> skipFollowTokens = computeFollowTokens(ctx, ruleName);
-            w.line("public static class " + wrapperName + " extends org.unlaxer.parser.combinator.ConstructedSingleChildParser implements org.unlaxer.context.DiagnosticsAgnostic {");
-            w.indent();
-            w.line("private static final long serialVersionUID = 1L;");
-            w.line("public " + wrapperName + "() {");
-            w.indent();
-            w.line("super(Parser.get(" + className + ".class));");
-            w.dedent();
-            w.line("}");
-            w.line("@Override");
-            w.line("public org.unlaxer.Parsed parse(org.unlaxer.context.ParseContext parseContext, org.unlaxer.TokenKind tokenKind, boolean invertMatch) {");
-            w.indent();
-            w.line("parseContext.begin(this);");
-            w.line("org.unlaxer.Parsed result = getChild().parse(parseContext, tokenKind, invertMatch);");
-            w.line("if (result.isSucceeded()) {");
-            w.indent();
-            w.line("return parseContext.commit(this, tokenKind).toParsed();");
-            w.dedent();
-            w.line("}");
-            w.line("parseContext.rollback(this);");
-            w.line("// Skip mode: advance cursor until a FOLLOW set token is found");
-            w.line("if (parseContext.source.isEmpty() || parseContext.isAtEnd()) {");
-            w.indent();
-            w.line("return org.unlaxer.Parsed.FAILED;");
-            w.dedent();
-            w.line("}");
-            w.line("parseContext.begin(this);");
-            if (skipFollowTokens.isEmpty()) {
-                // No FOLLOW tokens known — fall back to skipping a single character
-                w.line("parseContext.advanceCursor(1);");
-            } else {
-                // Generate a loop that advances until a FOLLOW set token is found
-                w.line("String remainingSource = parseContext.source.substring(parseContext.getCursor());");
-                // Build the condition to check for any FOLLOW token
-                String followCondition = skipFollowTokens.stream()
-                    .map(t -> "false == remainingSource.startsWith(\"" + ParserCodegenUtil.escapeString(t) + "\", skipOffset)")
-                    .collect(Collectors.joining(" && "));
-                w.line("int skipOffset = 0;");
-                w.line("while (skipOffset < remainingSource.length() && " + followCondition + ") {");
-                w.indent();
-                w.line("skipOffset++;");
-                w.dedent();
-                w.line("}");
-                w.line("if (skipOffset == 0) {");
-                w.indent();
-                w.line("skipOffset = 1; // always advance at least one character to avoid infinite loop");
-                w.dedent();
-                w.line("}");
-                w.line("parseContext.advanceCursor(skipOffset);");
-            }
-            w.line("return parseContext.commit(this, tokenKind).toParsed();");
-            w.dedent();
-            w.line("}");
-            w.dedent();
-            w.line("}");
-            w.blankLine();
+            runtimeMode = "SKIP";
         }
+        String syncArgs = tokens.stream()
+            .map(t -> "\"" + ParserCodegenUtil.escapeString(t) + "\"")
+            .collect(Collectors.joining(", "));
+        w.line("public static class " + wrapperName + " extends org.unlaxer.parser.combinator.SyncPointRecoveryParser implements org.unlaxer.context.DiagnosticsAgnostic {");
+        w.indent();
+        w.line("private static final long serialVersionUID = 1L;");
+        w.line("public " + wrapperName + "() {");
+        w.indent();
+        w.line("super(Parser.get(" + className + ".class), org.unlaxer.parser.combinator.SyncPointRecoveryParser.Mode."
+            + runtimeMode + (syncArgs.isEmpty() ? "" : ", " + syncArgs) + ");");
+        w.dedent();
+        w.line("}");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
 
         return w.build();
     }
