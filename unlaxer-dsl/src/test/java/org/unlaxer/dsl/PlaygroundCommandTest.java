@@ -20,6 +20,13 @@ public class PlaygroundCommandTest {
         var first = CodegenTestHelper.runCodegen("playground", "--grammar", input.toString(), "--output", output.toString());
         assertEquals(first.err(), 0, first.exitCode());
         assertTrue(Files.exists(output.resolve("public/help/catalog.json")));
+        for (String line : Files.readAllLines(output.resolve("runtime/src/lib.rs"))) {
+            var module = java.util.regex.Pattern.compile("^(?:pub )?mod ([a-z_]+);$").matcher(line);
+            if (module.matches()) {
+                assertTrue("missing runtime module: " + module.group(1),
+                        Files.isRegularFile(output.resolve("runtime/src/" + module.group(1) + ".rs")));
+            }
+        }
         assertTrue(Files.readString(output.resolve("src/lib.rs")).contains("generated::parser::RULE_DOCS"));
         var repeat = CodegenTestHelper.runCodegen("playground", "--grammar", input.toString(), "--output", output.toString());
         assertEquals(4, repeat.exitCode());
