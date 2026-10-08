@@ -153,6 +153,8 @@ public class MapperGenerator implements CodeGenerator {
             String astClass, String parsersClass, String rootClassName,
             Optional<RuleDecl> rootRule) {
 
+        boolean mayRecover = mayRecover(grammar);
+
         sb.append("    // =========================================================================\n");
         sb.append("    // Entry Point\n");
         sb.append("    // =========================================================================\n\n");
@@ -188,7 +190,19 @@ public class MapperGenerator implements CodeGenerator {
                     try (ParseContext context = ParseContext.withOptions(createRootSourceCompat(source), options)) {
                         Parsed parsed = rootParser.parse(context);
                         int consumed = consumedLengthCompat(parsed.getConsumed());
-                        if (parsed.isSucceeded() && consumed == source.length()) return Optional.empty();
+                        if (parsed.isSucceeded() && consumed == source.length()) {
+            """);
+        if (mayRecover) sb.append("""
+                            var recoveries = org.unlaxer.parser.combinator.RecoveryDiagnostic.from(context);
+                            if (!recoveries.isEmpty()) {
+                                var first = recoveries.get(0);
+                                return Optional.of(new ParseDiagnostic("recovery", first.start(),
+                                    List.of(first.message()), first.end(), List.of()));
+                            }
+            """);
+        sb.append("""
+                            return Optional.empty();
+                        }
                         if (options.diagnostics() == ParseOptions.Diagnostics.DETAILED) {
                             return Optional.of(failureDiagnostic(source, context, parsed));
                         }
@@ -295,10 +309,15 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("        if (rootToken == null) {\n");
         sb.append("            throw new IllegalArgumentException(\"rootToken must not be null\");\n");
         sb.append("        }\n");
+        if (mayRecover) sb.append("        rejectRecoveredSyntax(rootToken);\n");
         if (rootRule.isPresent() && MapperElementUtil.getMappingAnnotation(rootRule.get()).isPresent()) {
             String ruleName = rootRule.get().name();
+            boolean recoveredRoot = ParserRuleEmitter.findRecoveryAnnotation(rootRule.get()).isPresent();
             sb.append("        if (rootToken.parser.getClass() != ").append(parsersClass).append(".")
-                .append(ruleName).append("Parser.class) {\n");
+                .append(ruleName).append("Parser.class");
+            if (recoveredRoot) sb.append(" && rootToken.parser.getClass() != ")
+                .append(parsersClass).append(".").append(ruleName).append("RecoveryParser.class");
+            sb.append(") {\n");
             sb.append("            throw new IllegalArgumentException(\"Mapped root token is missing for ")
                 .append(ruleName).append("; pass the committed parser root from ParseContext.getCurrent().getTokens(), not a root-stripped token\");\n");
             sb.append("        }\n");
@@ -325,10 +344,18 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("        if (subtreeToken == null) {\n");
         sb.append("            throw new IllegalArgumentException(\"subtreeToken must not be null\");\n");
         sb.append("        }\n");
+        if (mayRecover) sb.append("        rejectRecoveredSyntax(subtreeToken);\n");
         sb.append("        if (!isGeneratedRuleToken(subtreeToken)) {\n");
         sb.append("            throw new IllegalArgumentException(\"subtreeToken must be produced by a rule parser from this generated grammar\");\n");
         sb.append("        }\n");
         sb.append("    }\n\n");
+        if (mayRecover) {
+            sb.append("    private static void rejectRecoveredSyntax(Token token) {\n");
+            sb.append("        if (!org.unlaxer.parser.combinator.RecoveryDiagnostic.from(token).isEmpty()) {\n");
+            sb.append("            throw new IllegalArgumentException(\"cannot map recovered syntax\");\n");
+            sb.append("        }\n");
+            sb.append("    }\n\n");
+        }
         sb.append("    private static boolean isGeneratedRuleToken(Token token) {\n");
         sb.append("        if (token.parser == null) return false;\n");
         sb.append("        Class<?> parserClass = token.parser.getClass();\n");
@@ -339,6 +366,10 @@ public class MapperGenerator implements CodeGenerator {
             if (i > 0) sb.append("\n            || ");
             sb.append("parserClass == ").append(parsersClass).append(".")
                 .append(rule.name()).append("Parser.class");
+            if (ParserRuleEmitter.findRecoveryAnnotation(rule).isPresent()) {
+                sb.append("\n            || parserClass == ").append(parsersClass).append(".")
+                    .append(rule.name()).append("RecoveryParser.class");
+            }
         }
         sb.append(";\n");
         sb.append("    }\n\n");
@@ -378,8 +409,10 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("        ParseContext context = ParseContext.withOptions(createRootSourceCompat(source), options);\n");
         sb.append("        Parsed parsed;\n");
         sb.append("        Token rootToken = null;\n");
+        if (mayRecover) sb.append("        boolean recovered = false;\n");
         sb.append("        try {\n");
         sb.append("            parsed = rootParser.parse(context);\n");
+        if (mayRecover) sb.append("            recovered = !org.unlaxer.parser.combinator.RecoveryDiagnostic.from(context).isEmpty();\n");
         // ChoiceInterface returns its winning child's Parsed, while commit stores the
         // actual mapped choice wrapper in the context. Retain that root before closing.
         sb.append("            if (parsed.isSucceeded()) {\n");
@@ -395,6 +428,7 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("            context.close();\n");
         sb.append("        }\n");
         sb.append("        int consumed = consumedLengthCompat(parsed.getConsumed());\n");
+        if (mayRecover) sb.append("        if (recovered) throw new IllegalArgumentException(\"cannot map recovered syntax\");\n");
         sb.append("        if ((!parsed.isSucceeded() || consumed != source.length())\n");
         sb.append("                && options.diagnostics() == ParseOptions.Diagnostics.DETAILED_ON_FAILURE) {\n");
         sb.append("            return parse(source, preferredAstSimpleName, options.withDiagnostics(ParseOptions.Diagnostics.DETAILED));\n");
@@ -431,6 +465,15 @@ public class MapperGenerator implements CodeGenerator {
             sb.append("        return (").append(rootClassName).append(") mapped;\n");
         }
         sb.append("    }\n\n");
+    }
+
+    /** External parsers/adapters and imports may recover even without a local annotation. */
+    private static boolean mayRecover(GrammarDecl grammar) {
+        return !grammar.imports().isEmpty()
+            || grammar.tokens().stream().anyMatch(token -> token instanceof TokenDecl.Simple
+                || token instanceof TokenDecl.Adapter)
+            || grammar.rules().stream().anyMatch(rule ->
+                ParserRuleEmitter.findRecoveryAnnotation(rule).isPresent());
     }
 
     private String getPackageName(GrammarDecl grammar) {
