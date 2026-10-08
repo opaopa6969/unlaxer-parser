@@ -16,7 +16,9 @@ const PLAYGROUND_HELP: &str =
 
 fn main() -> ExitCode {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
-    let result = if args.first().and_then(|s| s.to_str()) == Some("playground") {
+    let result = if args.first().and_then(|s| s.to_str()) == Some("deps") {
+        run_deps(args)
+    } else if args.first().and_then(|s| s.to_str()) == Some("playground") {
         run_playground(args).map(|message| (0, message))
     } else if args.first().and_then(|s| s.to_str()) == Some("check") {
         run_check(args)
@@ -35,6 +37,19 @@ fn main() -> ExitCode {
             ExitCode::from(code)
         }
     }
+}
+
+fn run_deps(args: Vec<OsString>) -> Result<(u8, String), (u8, String)> {
+    let help = "Usage: unlaxer deps resolve --manifest <ubnf.json>";
+    if args == [OsString::from("deps"), OsString::from("--help")] {
+        return Ok((0, help.into()));
+    }
+    if args.len() != 4 || args[1] != "resolve" || args[2] != "--manifest" || args[3].is_empty() {
+        return Err((2, help.into()));
+    }
+    unlaxer_generator::packages::resolve(&PathBuf::from(&args[3]))
+        .map(|lock| (0, lock.to_string()))
+        .map_err(|message| (3, message))
 }
 
 fn run_impact(args: Vec<OsString>) -> Result<(u8, String), (u8, String)> {

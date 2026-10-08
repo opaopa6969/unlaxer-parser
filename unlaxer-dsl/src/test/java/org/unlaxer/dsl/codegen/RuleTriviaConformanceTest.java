@@ -75,6 +75,15 @@ public class RuleTriviaConformanceTest {
             Files.writeString(ubnf, source);
             if (fixture.has("modules")) for (var entry : fixture.getAsJsonObject("modules").entrySet())
                 Files.writeString(fixtureDir.resolve(entry.getKey()), entry.getValue().getAsString());
+            if (fixture.has("manifest")) {
+                Path manifest = fixtureDir.resolve("ubnf.json");
+                Files.writeString(manifest, fixture.get("manifest").toString());
+                org.unlaxer.dsl.bootstrap.UBNFPackageResolver.resolve(manifest);
+                String javaLock = Files.readString(fixtureDir.resolve("ubnf.lock.json"));
+                success(run(List.of(nativeGenerator.toString(), "deps", "resolve", "--manifest", manifest.toString()), "", true));
+                assertEquals(name + " exact package identity/hash lock parity", javaLock,
+                    Files.readString(fixtureDir.resolve("ubnf.lock.json")));
+            }
             GrammarDecl grammar = org.unlaxer.dsl.bootstrap.UBNFModuleLoader.load(ubnf).grammars().get(0);
             GrammarValidator.validateOrThrow(grammar);
             List<RustBackend.GeneratedFile> javaFrontend = new RustBackend().generate(grammar);

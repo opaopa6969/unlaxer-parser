@@ -1,0 +1,159 @@
+[
+  {
+    "name": "missing-lock",
+    "operation": "load",
+    "mutation": "missing-lock",
+    "message": "missing lock",
+    "files": {
+      "ubnf.json": "{\"schemaVersion\": 1, \"dependencies\": {\"std/layout\": {\"version\": \"1.0.0\", \"source\": \"builtin:std/layout@1.0.0\"}}}",
+      "root.ubnf": "grammar RootGrammar { @import layout from 'pkg:std/layout' @ubnf: v2 @whitespace: layout.SPACES_AND_COMMENTS @root @mapping(Root,params=[value]) Root ::= 'a' @value 'b'; }"
+    }
+  },
+  {
+    "name": "missing-cache",
+    "operation": "load",
+    "mutation": "missing-cache",
+    "message": "missing artifact",
+    "files": {
+      "ubnf.json": "{\"schemaVersion\": 1, \"dependencies\": {\"std/layout\": {\"version\": \"1.0.0\", \"source\": \"builtin:std/layout@1.0.0\"}}}",
+      "root.ubnf": "grammar RootGrammar { @import layout from 'pkg:std/layout' @ubnf: v2 @whitespace: layout.SPACES_AND_COMMENTS @root @mapping(Root,params=[value]) Root ::= 'a' @value 'b'; }"
+    }
+  },
+  {
+    "name": "hash-mismatch",
+    "operation": "load",
+    "mutation": "hash-mismatch",
+    "message": "hash mismatch",
+    "files": {
+      "ubnf.json": "{\"schemaVersion\": 1, \"dependencies\": {\"std/layout\": {\"version\": \"1.0.0\", \"source\": \"builtin:std/layout@1.0.0\"}}}",
+      "root.ubnf": "grammar RootGrammar { @import layout from 'pkg:std/layout' @ubnf: v2 @whitespace: layout.SPACES_AND_COMMENTS @root @mapping(Root,params=[value]) Root ::= 'a' @value 'b'; }"
+    }
+  },
+  {
+    "name": "stale-lock",
+    "operation": "load",
+    "mutation": "stale-lock",
+    "message": "stale lock",
+    "files": {
+      "ubnf.json": "{\"schemaVersion\": 1, \"dependencies\": {\"std/layout\": {\"version\": \"1.0.0\", \"source\": \"builtin:std/layout@1.0.0\"}}}",
+      "root.ubnf": "grammar RootGrammar { @import layout from 'pkg:std/layout' @ubnf: v2 @whitespace: layout.SPACES_AND_COMMENTS @root @mapping(Root,params=[value]) Root ::= 'a' @value 'b'; }"
+    }
+  },
+  {
+    "name": "lock-cycle",
+    "operation": "load",
+    "mutation": "lock-cycle",
+    "message": "cyclic package",
+    "files": {
+      "ubnf.json": "{\"schemaVersion\": 1, \"dependencies\": {\"std/layout\": {\"version\": \"1.0.0\", \"source\": \"builtin:std/layout@1.0.0\"}}}",
+      "root.ubnf": "grammar RootGrammar { @import layout from 'pkg:std/layout' @ubnf: v2 @whitespace: layout.SPACES_AND_COMMENTS @root @mapping(Root,params=[value]) Root ::= 'a' @value 'b'; }"
+    }
+  },
+  {
+    "name": "invalid-lock-hash",
+    "operation": "load",
+    "mutation": "invalid-lock-hash",
+    "message": "invalid locked SHA",
+    "files": {
+      "ubnf.json": "{\"schemaVersion\": 1, \"dependencies\": {\"std/layout\": {\"version\": \"1.0.0\", \"source\": \"builtin:std/layout@1.0.0\"}}}",
+      "root.ubnf": "grammar RootGrammar { @import layout from 'pkg:std/layout' @ubnf: v2 @whitespace: layout.SPACES_AND_COMMENTS @root @mapping(Root,params=[value]) Root ::= 'a' @value 'b'; }"
+    }
+  },
+  {
+    "name": "undeclared-dependency",
+    "operation": "load",
+    "message": "undeclared package",
+    "files": {
+      "ubnf.json": "{\"schemaVersion\": 1, \"dependencies\": {\"std/layout\": {\"version\": \"1.0.0\", \"source\": \"builtin:std/layout@1.0.0\"}}}",
+      "root.ubnf": "grammar RootGrammar { @import layout from 'pkg:other/layout' @ubnf: v2 @whitespace: layout.SPACES_AND_COMMENTS @root @mapping(Root,params=[value]) Root ::= 'a' @value 'b'; }"
+    }
+  },
+  {
+    "name": "name-mismatch",
+    "operation": "resolve",
+    "message": "name/version mismatch",
+    "files": {
+      "ubnf.json": "{\"schemaVersion\": 1, \"dependencies\": {\"team/layout\": {\"version\": \"1.0.0\", \"source\": \"local:layout.json\"}}}",
+      "layout.json": "{\"schemaVersion\": 1, \"id\": \"other/layout\", \"version\": \"1.0.0\", \"entry\": \"layout.ubnf\", \"files\": {\"layout.ubnf\": \"grammar Layout { @ubnf: v2 token GAP ::= '#'; }\"}, \"dependencies\": {}}",
+      "root.ubnf": "grammar RootGrammar { @import layout from 'pkg:team/layout' @ubnf: v2 @whitespace: layout.GAP @root @mapping(Root,params=[value]) Root ::= 'a' @value 'b'; }"
+    }
+  },
+  {
+    "name": "version-mismatch",
+    "operation": "resolve",
+    "message": "name/version mismatch",
+    "files": {
+      "ubnf.json": "{\"schemaVersion\": 1, \"dependencies\": {\"team/layout\": {\"version\": \"1.0.0\", \"source\": \"local:layout.json\"}}}",
+      "layout.json": "{\"schemaVersion\": 1, \"id\": \"team/layout\", \"version\": \"2.0.0\", \"entry\": \"layout.ubnf\", \"files\": {\"layout.ubnf\": \"grammar Layout { @ubnf: v2 token GAP ::= '#'; }\"}, \"dependencies\": {}}",
+      "root.ubnf": "grammar RootGrammar { @import layout from 'pkg:team/layout' @ubnf: v2 @whitespace: layout.GAP @root @mapping(Root,params=[value]) Root ::= 'a' @value 'b'; }"
+    }
+  },
+  {
+    "name": "file-escape",
+    "operation": "resolve",
+    "message": "path",
+    "files": {
+      "ubnf.json": "{\"schemaVersion\": 1, \"dependencies\": {\"team/layout\": {\"version\": \"1.0.0\", \"source\": \"local:layout.json\"}}}",
+      "layout.json": "{\"schemaVersion\": 1, \"id\": \"team/layout\", \"version\": \"1.0.0\", \"entry\": \"layout.ubnf\", \"files\": {\"layout.ubnf\": \"grammar Layout { @ubnf: v2 token GAP ::= '#'; }\", \"../outside.ubnf\": \"grammar Outside {}\"}, \"dependencies\": {}}",
+      "root.ubnf": "grammar RootGrammar { @import layout from 'pkg:team/layout' @ubnf: v2 @whitespace: layout.GAP @root @mapping(Root,params=[value]) Root ::= 'a' @value 'b'; }"
+    }
+  },
+  {
+    "name": "not-a-module",
+    "operation": "load",
+    "message": "only declarative token modules",
+    "files": {
+      "ubnf.json": "{\"schemaVersion\": 1, \"dependencies\": {\"team/layout\": {\"version\": \"1.0.0\", \"source\": \"local:layout.json\"}}}",
+      "layout.json": "{\"schemaVersion\": 1, \"id\": \"team/layout\", \"version\": \"1.0.0\", \"entry\": \"layout.ubnf\", \"files\": {\"layout.ubnf\": \"grammar Layout { @ubnf: v2 token GAP ::= '#'; R ::= 'a'; }\"}, \"dependencies\": {}}",
+      "root.ubnf": "grammar RootGrammar { @import layout from 'pkg:team/layout' @ubnf: v2 @whitespace: layout.GAP @root @mapping(Root,params=[value]) Root ::= 'a' @value 'b'; }"
+    }
+  },
+  {
+    "name": "boundary-escape",
+    "operation": "load",
+    "message": "escapes package boundary",
+    "files": {
+      "ubnf.json": "{\"schemaVersion\": 1, \"dependencies\": {\"team/layout\": {\"version\": \"1.0.0\", \"source\": \"local:layout.json\"}}}",
+      "layout.json": "{\"schemaVersion\": 1, \"id\": \"team/layout\", \"version\": \"1.0.0\", \"entry\": \"parts/layout.ubnf\", \"files\": {\"parts/layout.ubnf\": \"grammar Layout { @import external from '../../outside.ubnf' @ubnf: v2 token GAP ::= external.GAP; }\"}, \"dependencies\": {}}",
+      "root.ubnf": "grammar RootGrammar { @import layout from 'pkg:team/layout' @ubnf: v2 @whitespace: layout.GAP @root @mapping(Root,params=[value]) Root ::= 'a' @value 'b'; }"
+    }
+  },
+  {
+    "name": "package-cycle",
+    "operation": "resolve",
+    "message": "cyclic package",
+    "files": {
+      "ubnf.json": "{\"schemaVersion\": 1, \"dependencies\": {\"a/layout\": {\"version\": \"1.0.0\", \"source\": \"local:a.json\"}}}",
+      "a.json": "{\"schemaVersion\": 1, \"id\": \"a/layout\", \"version\": \"1.0.0\", \"entry\": \"layout.ubnf\", \"files\": {\"layout.ubnf\": \"grammar Layout { @ubnf: v2 token GAP ::= '#'; }\"}, \"dependencies\": {\"b/layout\": {\"version\": \"1.0.0\", \"source\": \"local:b.json\"}}}",
+      "b.json": "{\"schemaVersion\": 1, \"id\": \"b/layout\", \"version\": \"1.0.0\", \"entry\": \"layout.ubnf\", \"files\": {\"layout.ubnf\": \"grammar Layout { @ubnf: v2 token GAP ::= '#'; }\"}, \"dependencies\": {\"a/layout\": {\"version\": \"1.0.0\", \"source\": \"local:a.json\"}}}"
+    }
+  },
+  {
+    "name": "version-conflict",
+    "operation": "resolve",
+    "message": "conflicting package",
+    "files": {
+      "ubnf.json": "{\"schemaVersion\": 1, \"dependencies\": {\"a/layout\": {\"version\": \"1.0.0\", \"source\": \"local:a.json\"}, \"b/layout\": {\"version\": \"1.0.0\", \"source\": \"local:b.json\"}}}",
+      "a.json": "{\"schemaVersion\": 1, \"id\": \"a/layout\", \"version\": \"1.0.0\", \"entry\": \"layout.ubnf\", \"files\": {\"layout.ubnf\": \"grammar Layout { @ubnf: v2 token GAP ::= '#'; }\"}, \"dependencies\": {\"common/layout\": {\"version\": \"1.0.0\", \"source\": \"local:c1.json\"}}}",
+      "b.json": "{\"schemaVersion\": 1, \"id\": \"b/layout\", \"version\": \"1.0.0\", \"entry\": \"layout.ubnf\", \"files\": {\"layout.ubnf\": \"grammar Layout { @ubnf: v2 token GAP ::= '#'; }\"}, \"dependencies\": {\"common/layout\": {\"version\": \"2.0.0\", \"source\": \"local:c2.json\"}}}",
+      "c1.json": "{\"schemaVersion\": 1, \"id\": \"common/layout\", \"version\": \"1.0.0\", \"entry\": \"layout.ubnf\", \"files\": {\"layout.ubnf\": \"grammar Layout { @ubnf: v2 token GAP ::= '#'; }\"}, \"dependencies\": {}}",
+      "c2.json": "{\"schemaVersion\": 1, \"id\": \"common/layout\", \"version\": \"2.0.0\", \"entry\": \"layout.ubnf\", \"files\": {\"layout.ubnf\": \"grammar Layout { @ubnf: v2 token GAP ::= '#'; }\"}, \"dependencies\": {}}"
+    }
+  },
+  {
+    "name": "floating-version",
+    "operation": "resolve",
+    "message": "exact package version",
+    "files": {
+      "ubnf.json": "{\"schemaVersion\":1,\"dependencies\":{\"std/layout\":{\"version\":\"latest\",\"source\":\"builtin:std/layout@1.0.0\"}}}"
+    }
+  },
+  {
+    "name": "lenient-json",
+    "operation": "resolve",
+    "message": "invalid JSON",
+    "files": {
+      "ubnf.json": "{schemaVersion:1,dependencies:{}}"
+    }
+  }
+]
