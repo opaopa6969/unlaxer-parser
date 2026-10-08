@@ -1725,6 +1725,7 @@ impl<'a> ParseContext<'a> {
             return None;
         }
         let memo_key = (self.options.memoization == Memoization::SafeFailures
+            && self.lexical_trivia.is_none()
             && self.memo_safe_rules.get(id).copied().unwrap_or(false))
         .then(|| {
             (
@@ -3521,6 +3522,43 @@ mod tests {
             ),
             vec!["frame"]
         );
+    }
+
+    #[test]
+    fn lexical_trivia_cannot_replay_failures_from_another_definition() {
+        fn trivia(text: &'static str) -> lexical::LexicalExpression {
+            lexical::LexicalExpression {
+                op: lexical::Op::LITERAL,
+                text,
+                min: 0,
+                max: 0,
+                children: vec![],
+            }
+        }
+        for memoization in [Memoization::Off, Memoization::SafeFailures] {
+            let rules = vec![
+                Rule {
+                    name: "root",
+                    expression: Expr::Choice(vec![
+                        Expr::Rule(1).lexical_trivia_scope(trivia("#")),
+                        Expr::Rule(1).lexical_trivia_scope(trivia(" ")),
+                    ]),
+                },
+                Rule {
+                    name: "pair",
+                    expression: Expr::Sequence(vec![Expr::Literal("a"), Expr::Literal("b")]),
+                },
+            ];
+            let tree = parse_detailed_with_options(
+                &rules,
+                0,
+                false,
+                "a b",
+                ParseOptions::with_memoization(memoization),
+            )
+            .unwrap();
+            assert_eq!(tree.nodes[tree.root].span, Span { start: 0, end: 3 });
+        }
     }
 
     #[test]
