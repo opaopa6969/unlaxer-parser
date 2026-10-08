@@ -51,6 +51,7 @@ public class EditorPipelineConformanceTest {
                 String fragments=test.has("fragments")?test.getAsJsonArray("fragments").asList().stream().map(value->rustString(value.getAsString())).reduce((left,right)->left+","+right).orElse(""):"\"?\",\")\",\";\",\"}\",\"a\",\":\",\"{\"";
                 probe.append("probe::report(").append(rustString(source)).append(", &[").append(fragments).append("], ").append(test.has("maxAttempts")?test.get("maxAttempts").getAsInt():256).append(", ").append(test.get("cursor").getAsInt()).append(", ").append(rustString(test.get("prefix").getAsString())).append(");\n");
             }
+            probe.append("probe::nested(").append(rustString(fixture.get("prefix").getAsString()+fixture.getAsJsonObject("nested").get("tail").getAsString())).append(");\n");
             Files.writeString(directory.resolve("main.rs"),probe.append("}\n").toString());
             SemanticModelConformanceTest.run(List.of("rustc","--edition=2021","--extern","unlaxer_runtime="+runtime,directory.resolve("main.rs").toString(),"-o",directory.resolve("probe").toString()),directory);
             var rust=SemanticModelConformanceTest.run(List.of(directory.resolve("probe").toString()),directory).lines().map(JsonParser::parseString).toList();
@@ -71,6 +72,7 @@ public class EditorPipelineConformanceTest {
                     assertEquals(id,test.get("completions"),actual.get("completions"));assertEquals(id,test.get("sourceLength").getAsInt(),source.codePointCount(0,source.length()));
                     assertEquals(id,test.get("utf16Length").getAsInt(),result.utf16Span(new SemanticModel.Span(0,source.codePointCount(0,source.length()))).end());
                     if(!id.equals("limit")&&!id.equals("syntax")) {assertEquals(id,fixture.get("expectedSymbols"),actual.get("symbols"));assertEquals(id,fixture.get("expectedTypes"),actual.get("types"));}
+                    if(test.has("defectKinds"))assertEquals(id,test.get("defectKinds"),JSON.toJsonTree(result.nodes().stream().map(node->node.kind().name()).toList()));
                     if(test.has("defectSpan"))assertEquals(id,test.get("defectSpan"),actual.getAsJsonArray("defects").get(0).getAsJsonObject().get("span"));
                     if(test.has("syntheticArgument"))assertTrue(id,cst.nodes().stream().flatMap(node->node.captures().stream()).anyMatch(capture->capture.name().equals("arguments")&&capture.synthetic()&&capture.text().equals("d")));
                     if(test.has("syntheticCapture"))assertTrue(id,cst.nodes().stream().flatMap(node->node.captures().stream()).anyMatch(capture->capture.name().equals("name")&&capture.synthetic()&&capture.text().equals(test.getAsJsonObject("syntheticCapture").get("text").getAsString())));
@@ -98,11 +100,52 @@ public class EditorPipelineConformanceTest {
                     evidence.add(id+"\t"+actual+"\t"+rust.get(index-1));
                 }
             }
+            try(var loader=new URLClassLoader(new java.net.URL[]{java.toUri().toURL()},getClass().getClassLoader())) {
+                JsonObject nested=nested(loader,fixture.get("prefix").getAsString()+fixture.getAsJsonObject("nested").get("tail").getAsString());
+                assertEquals("nested actual parser",fixture.getAsJsonObject("nested").get("expected"),nested);
+                assertEquals("nested runtime parity",nested,rust.get(rust.size()-1));
+                evidence.add("nested\t"+nested+"\t"+rust.get(rust.size()-1));
+            }
             Files.write(Path.of("target/rust-editor-pipeline.tsv"),evidence);
         } finally {try(var paths=Files.walk(directory)){for(var path:paths.sorted(Comparator.reverseOrder()).toList())Files.delete(path);}}
     }
     private static String rustString(String value) {return JSON.toJson(value);}
 
+    private static org.unlaxer.source.SegmentSourceMap copy(org.unlaxer.source.DocumentSnapshot output,org.unlaxer.source.DocumentSnapshot origin,int start) {
+        return new org.unlaxer.source.SegmentSourceMap(output,List.of(new org.unlaxer.source.SegmentSourceMap.Segment(new org.unlaxer.source.DocumentSnapshot.Span(0,output.length()),org.unlaxer.source.SegmentSourceMap.Kind.COPY,new org.unlaxer.source.SegmentSourceMap.Location(origin,new org.unlaxer.source.DocumentSnapshot.Span(start,start+output.length())))));
+    }
+    private static JsonObject nested(ClassLoader loader,String source) throws Exception {
+        var host=new org.unlaxer.source.DocumentSnapshot("memory:host",7,"😀MDX{SQL{MODEL{"+source+"}}}");
+        var outer=new org.unlaxer.source.DocumentSnapshot("memory:outer",7,"SQL{MODEL{"+source+"}}");
+        var middle=new org.unlaxer.source.DocumentSnapshot("memory:middle",7,"MODEL{"+source+"}");
+        var inner=new org.unlaxer.source.DocumentSnapshot("memory:inner",7,source);
+        var outerMap=copy(outer,host,5);var middleMap=copy(middle,outer,4).through(outerMap);var innerMap=copy(inner,middle,6).through(middleMap);
+        var typed=new org.unlaxer.source.LanguageRegions.Language("typed","example","1","TypedModel","Document");
+        var outside=new org.unlaxer.source.LanguageRegions.Language("outer","example","1","Outer","Document");
+        var sql=new org.unlaxer.source.LanguageRegions.Language("sql","example","1","Sql","Document");
+        var outerRegion=new org.unlaxer.source.LanguageRegions.Region("outer",null,outside,new org.unlaxer.source.DocumentSnapshot.Span(0,host.length()),new org.unlaxer.source.DocumentSnapshot.Span(5,host.length()-1),outerMap,org.unlaxer.source.LanguageRegions.State.COMPLETE);
+        var middleRegion=new org.unlaxer.source.LanguageRegions.Region("middle","outer",sql,new org.unlaxer.source.DocumentSnapshot.Span(5,host.length()-1),new org.unlaxer.source.DocumentSnapshot.Span(9,host.length()-2),middleMap,org.unlaxer.source.LanguageRegions.State.COMPLETE);
+        var method=loader.loadClass("example.semantic.TypedModelEditor").getMethod("parse",String.class,long.class,String.class,String.class,EditorCst.Options.class);
+        var provider=new EditorQueryProvider("project",3,request->{
+            var snapshot=request.region().sourceMap().output();
+            try {Object parsed=method.invoke(null,snapshot.uri(),snapshot.version(),snapshot.text(),request.region().id(),EditorCst.Options.defaults());return (EditorParseResult<?>)parsed.getClass().getMethod("result").invoke(parsed);}
+            catch(ReflectiveOperationException error){throw new IllegalStateException(error);}
+        });
+        var project=new org.unlaxer.source.LanguageQueries.Project("project",3,Map.of(host.uri(),host),Map.of());
+        var blocked=new ArrayList<String>();JsonObject result=null;
+        for(var kind:List.of(org.unlaxer.source.SegmentSourceMap.Kind.COPY,org.unlaxer.source.SegmentSourceMap.Kind.TRANSFORMED,org.unlaxer.source.SegmentSourceMap.Kind.GENERATED)) {
+            var map=kind==org.unlaxer.source.SegmentSourceMap.Kind.COPY?innerMap:new org.unlaxer.source.SegmentSourceMap(inner,List.of(new org.unlaxer.source.SegmentSourceMap.Segment(new org.unlaxer.source.DocumentSnapshot.Span(0,inner.length()),kind,kind==org.unlaxer.source.SegmentSourceMap.Kind.GENERATED?null:new org.unlaxer.source.SegmentSourceMap.Location(host,new org.unlaxer.source.DocumentSnapshot.Span(15,15+inner.length())))));
+            var region=new org.unlaxer.source.LanguageRegions.Region("inner","middle",typed,new org.unlaxer.source.DocumentSnapshot.Span(9,host.length()-2),new org.unlaxer.source.DocumentSnapshot.Span(15,15+inner.length()),map,org.unlaxer.source.LanguageRegions.State.PARTIAL);
+            var layer=new org.unlaxer.source.LanguageQueries(new org.unlaxer.source.LanguageRegions(host,List.of(outerRegion,middleRegion,region)),project,Map.of(typed,provider));
+            var response=layer.query(host,project,241,org.unlaxer.source.LanguageRegions.Operation.COMPLETION,Map.of("prefix","d"));
+            if(kind!=org.unlaxer.source.SegmentSourceMap.Kind.COPY){assertTrue(response.items().isEmpty());blocked.add(response.state().name());continue;}
+            result=JSON.toJsonTree(Map.of("state",response.state().name(),"region",response.region(),"items",response.items().stream().map(item->Map.of("label",item.label(),"detail",item.detail(),"locations",item.locations().stream().map(location->List.of(location.location().span().start(),location.location().span().end())).toList(),"edits",item.edits().stream().map(edit->List.of(edit.span().start(),edit.span().end(),edit.replacement())).toList())).toList(),"utf16Cursor",host.utf16(241))).getAsJsonObject();
+            try{layer.query(host,project,241,org.unlaxer.source.LanguageRegions.Operation.COMPLETION,Map.of("prefix","synthetic"));fail("non-source completion prefix accepted");}catch(IllegalArgumentException expected){}
+            for(var item:response.items())for(var edit:item.edits())assertTrue(new org.unlaxer.source.DocumentSnapshot.Span(15,15+inner.length()).contains(edit.span()));
+            try{layer.query(new org.unlaxer.source.DocumentSnapshot(host.uri(),8,host.text()),project,241,org.unlaxer.source.LanguageRegions.Operation.COMPLETION,Map.of("prefix","d"));fail("stale nested snapshot accepted");}catch(IllegalArgumentException expected){}
+        }
+        result.add("blocked",JSON.toJsonTree(blocked));return result;
+    }
     private static JsonObject report(EditorParseResult<?> result,EditorCst cst,int cursor,String prefix) {
         var model=result.semantics().orElseThrow();var output=new LinkedHashMap<String,Object>();
         output.put("status",result.status().name());output.put("reason",cst.reason().name());output.put("strict",result.strictAst().isPresent());

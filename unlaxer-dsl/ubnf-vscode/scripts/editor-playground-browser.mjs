@@ -26,8 +26,15 @@ try {
     assert.deepEqual(result.typed.expectedTypes,row.expectedTypes,row.id);assert.deepEqual(result.typed.completions.map(item=>item.label),row.completions,row.id);assert.equal(result.editor.sourceLength,[...source].length,row.id);
     for(const node of result.editor.nodes)for(const capture of node.captures){assert.ok(capture.span[1]<=[...source].length,row.id);assert.equal(capture.text,[...source].slice(...capture.span).join(''),row.id);}
     for(const item of result.typed.completions)assert.ok([...source].slice(...item.span).join('').trim().startsWith(`let ${item.label}:`),row.id);
-    if(row.status==='PARTIAL'){assert.match(await page.locator('#status').textContent(),/部分結果/,row.id);assert.equal(result.ast??null,null,row.id);assert.equal(result.editor.defects[0].kind,row.id==='broken-sibling'?'ERROR':'MISSING',row.id);}
+    if(row.status==='PARTIAL'){assert.match(await page.locator('#status').textContent(),/部分結果/,row.id);assert.equal(result.ast??null,null,row.id);assert.equal(result.editor.defects[0].kind,['broken-sibling','recovery-crossing-eof'].includes(row.id)?'ERROR':'MISSING',row.id);}
     if(row.completions.length)assert.match(await page.locator('#typed-completions').textContent(),new RegExp(row.completions[0]),row.id);
+    const rawResult=await page.evaluate(async ({source,cursor})=>{
+      const engine=(await WebAssembly.instantiate(await (await fetch('language.wasm')).arrayBuffer(),{})).instance.exports;
+      const bytes=new TextEncoder().encode(source);const pointer=engine.pg_input(bytes.length);new Uint8Array(engine.memory.buffer,pointer,bytes.length).set(bytes);engine.pg_editor(cursor);
+      return JSON.parse(new TextDecoder().decode(new Uint8Array(engine.memory.buffer,engine.pg_output(),engine.pg_output_len())));
+    },{source:raw,cursor:row.cursor});
+    assert.deepEqual(rawResult.typed.expectedTypes,row.expectedTypes,row.id+' raw CRLF');assert.deepEqual(rawResult.typed.completions.map(item=>item.label),row.completions,row.id+' raw CRLF');assert.equal(rawResult.editor.sourceLength,row.sourceLength,row.id+' raw CRLF');
+    for(const node of rawResult.editor.nodes)for(const capture of node.captures)assert.equal(capture.text,[...raw].slice(...capture.span).join(''),row.id+' raw CRLF');
     evidence.push(`${row.id}\t${JSON.stringify(result.typed)}\t${JSON.stringify(result.editor.defects)}`);
   }
   const source=fixture.prefix+'call process(ctx, ';await page.getByLabel('試験入力',{exact:true}).fill(source);await page.locator('#editor-mode').uncheck();
