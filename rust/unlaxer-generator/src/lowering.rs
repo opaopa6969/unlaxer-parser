@@ -38,6 +38,7 @@ struct Shape {
 }
 
 pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
+    crate::embedded::validate(grammar)?;
     Lowering {
         grammar,
         ids: HashMap::new(),
@@ -240,7 +241,10 @@ impl Lowering<'_> {
         let mut settings = HashSet::new();
         let mut memo_safe_tokens = HashSet::new();
         for setting in &self.grammar.settings {
-            if setting.key == "tokenAdapter" || setting.key == "tokenContract" {
+            if matches!(
+                setting.key.as_str(),
+                "tokenAdapter" | "tokenContract" | "embedded" | "embedding"
+            ) {
                 continue;
             }
             if setting.key != "memoSafeToken"

@@ -1,0 +1,8 @@
+# name operation hostCursor parameter value state labels locations edits
+foreign-definition	DEFINITION	11	name	far	COMPLETE	far	library:0:3	-
+local-definition	DEFINITION	15	name	foo	COMPLETE	foo	host:7:10	-
+foreign-hover	HOVER	11	name	far	COMPLETE	far	library:0:3	-
+completion-alternatives	COMPLETION	20	prefix	f	COMPLETE	far,foo	library:0:3,host:7:10	19:20:far,19:20:foo
+unresolved	HOVER	11	name	missing	FAILED	-	-	-
+unsupported	FORMAT	15	name	foo	UNSUPPORTED	-	-	-
+host-delimiter	HOVER	21	name	foo	UNAVAILABLE	-	-	-

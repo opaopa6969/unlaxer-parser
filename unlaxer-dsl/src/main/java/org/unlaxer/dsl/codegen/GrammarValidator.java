@@ -127,6 +127,10 @@ public final class GrammarValidator {
         for (var issue : TokenStreamGrammar.problems(grammar)) {
             errors.add(new ValidationIssue(issue.code(), issue.subject(), "Use the supported @tokenStream:enabled profile."));
         }
+        try { EmbeddedGrammarEmitter.declarations(grammar); }
+        catch (IllegalArgumentException error) {
+            errors.add(new ValidationIssue("E-EMBEDDING", error.getMessage(), "Use one scalar body capture and exact language identity."));
+        }
         validateGlobalWhitespace(grammar, errors);
         validateUbnfFormat(grammar, errors);
         validateMemoSafeTokens(grammar, errors);
