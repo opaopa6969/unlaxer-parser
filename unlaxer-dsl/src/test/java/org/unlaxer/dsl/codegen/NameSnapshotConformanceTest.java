@@ -46,6 +46,8 @@ public class NameSnapshotConformanceTest {
                 Parser name1 = new WordParser(lexeme), name2 = new WordParser(lexeme);
                 Parser declaration = predicate(new Chain(name1, new WordParser("(a);")), name1, "type");
                 Parser expression = predicate(new Chain(name2, new Choice(new WordParser("(a);"), new WordParser("(a)++;"))), name2, "resolved");
+                if (row.has("recovery")) declaration = new SyncPointRecoveryParser(declaration, ";");
+                if (row.has("child")) declaration = new NameResolutionScope(declaration, List.of(REQUIREMENT));
                 var choice = new Choice(declaration, expression, new WordParser(input));
                 var scope = new NameResolutionScope(choice, List.of(REQUIREMENT));
                 try (var context = ParseContext.withBindings(StringSource.createRootSource(input), bindings,
@@ -106,7 +108,8 @@ public class NameSnapshotConformanceTest {
                 for (var value : entry.getValue().getAsJsonArray()) calls.append(owned(value.getAsString())).append(',');
                 calls.append("]);\n");
             }
-            calls.append("observe(&input,lexeme,bindings,").append(row.getAsJsonObject("expected").get("accepted").getAsBoolean() ? "1" : "2").append(");}\n");
+            calls.append("observe(&input,lexeme,bindings,").append(row.getAsJsonObject("expected").get("accepted").getAsBoolean() ? "1" : "2")
+                .append(",").append(row.has("recovery")).append(",").append(row.has("child")).append(");}\n");
         }
         return """
             use std::collections::BTreeMap;
@@ -115,11 +118,13 @@ public class NameSnapshotConformanceTest {
             fn gate(child: Expr, kind: &'static str) -> Expr {
                 Expr::NamePredicate { child:Box::new(child), snapshot:"cxx23", version:"v1", capture:"name", kind }
             }
-            fn observe(input:&str, lexeme:&'static str, bindings:BTreeMap<String,Vec<String>>, count:usize) {
+            fn observe(input:&str, lexeme:&'static str, bindings:BTreeMap<String,Vec<String>>, count:usize, recovery:bool, child:bool) {
                 for memo in [Memoization::Off,Memoization::SafeFailures] {
                     for diagnostics in [Diagnostics::Detailed,Diagnostics::DetailedOnFailure] {
                         let name=|| Expr::Literal(lexeme).capture("name");
-                        let declaration=gate(Expr::sequence([name(),Expr::Literal("(a);")]),"type").capture("declaration");
+                        let mut declaration=gate(Expr::sequence([name(),Expr::Literal("(a);")]),"type").capture("declaration");
+                        if recovery { declaration=declaration.recover(unlaxer_runtime::RecoveryMode::Sync,[";"],"syntax error"); }
+                        if child { declaration=Expr::NameResolutionScope { child:Box::new(declaration), requirements:vec![Requirement::new("cxx23","v1").unwrap()] }; }
                         let expression=gate(Expr::sequence([name(),Expr::choice([Expr::Literal("(a);"),Expr::Literal("(a)++;")])]),"resolved").capture("expression");
                         let fallback=Expr::Literal(Box::leak(input.to_owned().into_boxed_str()));
                         let scope=Expr::NameResolutionScope { child:Box::new(Expr::choice([declaration,expression,fallback])), requirements:vec![Requirement::new("cxx23","v1").unwrap()] };

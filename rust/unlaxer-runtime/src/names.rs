@@ -550,4 +550,42 @@ mod tests {
         assert!(context.nodes.is_empty());
         assert!(context.recoveries.is_empty());
     }
+    #[test]
+    fn recursive_name_entry_reports_existing_limit_on_default_stack() {
+        // No stack-size override: the ordinary test thread must reach the depth guard.
+        for memo in [Memoization::Off, Memoization::SafeFailures] {
+            for body in [
+                Expr::sequence([Expr::Rule(0)]),
+                Expr::NamePredicate {
+                    child: Box::new(Expr::Rule(0)),
+                    snapshot: "names",
+                    version: "v1",
+                    capture: "name",
+                    kind: "type",
+                },
+            ] {
+                let grammar = share_grammar(vec![Rule {
+                    name: "recursive",
+                    expression: scope(body),
+                }]);
+                let mut context = ParseContext::with_name_snapshots(
+                    "",
+                    &[snapshot("T")],
+                    ParseOptions::with_memoization(memo),
+                )
+                .unwrap();
+                let error = context
+                    .parse_shared_grammar(&grammar, 0, false)
+                    .unwrap_err();
+                assert!(error
+                    .expected
+                    .iter()
+                    .any(|hint| hint == "rule nesting below 256"));
+                assert_eq!(error.offset, 0);
+                assert_eq!(context.position(), 0);
+                assert!(context.names_state.frames.is_empty());
+                assert!(context.nodes.is_empty());
+            }
+        }
+    }
 }
