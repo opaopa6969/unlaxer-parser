@@ -175,7 +175,7 @@ public final class GrammarValidator {
                     scopeTreeAnnotations.add(s);
                 } else if (annotation instanceof WhitespaceAnnotation w) {
                     whitespaceAnnotations++;
-                    validateRuleWhitespace(rule, w, errors);
+                    validateRuleWhitespace(grammar, rule, w, errors);
                 }
             }
             if (whitespaceAnnotations > 1) {
@@ -617,15 +617,15 @@ public final class GrammarValidator {
             .forEach(s -> {
                 if (s.value() instanceof StringSettingValue sv) {
                     String style = sv.value().trim();
-                    if (!style.equalsIgnoreCase("javaStyle") && !style.equalsIgnoreCase("none")) {
+                    if (!validWhitespace(grammar, style)) {
                         addError(errors,
-                            "global @whitespace style must be javaStyle or none: " + style,
-                            "Use '@whitespace: javaStyle' or '@whitespace: none'.",
+                            "global @whitespace style must be javaStyle, none, or a non-nullable declarative token: " + style,
+                            "Use javaStyle, none, or the exact name of a non-nullable declarative token.",
                             "E-WHITESPACE-GLOBAL-STYLE");
                     }
                 } else {
                     addError(errors, "global @whitespace requires a style name",
-                        "Use '@whitespace: javaStyle' or '@whitespace: none'.",
+                        "Use javaStyle, none, or the exact name of a non-nullable declarative token.",
                         "E-WHITESPACE-GLOBAL-STYLE");
                 }
             });
@@ -928,13 +928,20 @@ public final class GrammarValidator {
         return false;
     }
 
-    private static void validateRuleWhitespace(RuleDecl rule, WhitespaceAnnotation w, List<ValidationIssue> errors) {
+    private static boolean validWhitespace(GrammarDecl grammar, String style) {
+        try {
+            org.unlaxer.dsl.bootstrap.WhitespaceDefinitions.resolve(style, org.unlaxer.dsl.bootstrap.LexicalCompiler.compile(grammar));
+            return true;
+        } catch (IllegalArgumentException exception) { return false; }
+    }
+
+    private static void validateRuleWhitespace(GrammarDecl grammar, RuleDecl rule, WhitespaceAnnotation w, List<ValidationIssue> errors) {
         String style = w.style().orElse("javaStyle").trim();
-        if (!style.equalsIgnoreCase("javaStyle") && !style.equalsIgnoreCase("none")) {
+        if (!validWhitespace(grammar, style)) {
             addRuleError(errors, rule.name(),
                 "rule " + rule.name() + " uses unsupported @whitespace style: " + style
-                    + " (allowed: javaStyle, none)",
-                "Use @whitespace or @whitespace(none).",
+                    + " (allowed: javaStyle, none, non-nullable declarative token)",
+                "Use @whitespace, @whitespace(none), or @whitespace(TOKEN_NAME).",
                 "E-WHITESPACE-RULE-STYLE");
         }
     }

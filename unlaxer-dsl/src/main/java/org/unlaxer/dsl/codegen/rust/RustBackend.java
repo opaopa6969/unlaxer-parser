@@ -318,6 +318,7 @@ public final class RustBackend {
         if (expression instanceof ValueBoundary boundary) {
             return expression(boundary.child()) + ".value_boundary()";
         }
+        if (expression instanceof LexicalTriviaScope scope) return expression(scope.child()) + ".lexical_trivia_scope(" + lexicalExpression(scope.definition()) + ")";
         if (expression instanceof TriviaScope scope) {
             return expression(scope.child()) + ".trivia_scope(" + scope.javaWhitespace() + ")";
         }

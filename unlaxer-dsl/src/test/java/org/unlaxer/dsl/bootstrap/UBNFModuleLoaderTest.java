@@ -38,8 +38,11 @@ public class UBNFModuleLoaderTest {
             Path directory = temporary.newFolder().toPath();
             for (var file : fixture.getAsJsonObject("files").entrySet())
                 Files.writeString(directory.resolve(file.getKey()), file.getValue().getAsString());
-            assertThrows(fixture.get("name").getAsString(), Exception.class, () ->
-                LexicalCompiler.compile(UBNFModuleLoader.load(directory.resolve("root.ubnf")).grammars().get(0)));
+            assertThrows(fixture.get("name").getAsString(), Exception.class, () -> {
+                var grammar = UBNFModuleLoader.load(directory.resolve("root.ubnf")).grammars().get(0);
+                LexicalCompiler.compile(grammar);
+                new org.unlaxer.dsl.codegen.ParserGenerator().generate(grammar);
+            });
             assertFalse(fixture.get("name").getAsString(), PortabilityCheck.checkFile(directory.resolve("root.ubnf")).portable());
         }
     }

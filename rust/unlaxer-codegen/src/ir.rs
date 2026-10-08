@@ -168,6 +168,10 @@ pub enum Expression {
     /// Scalar/optional capture boundary: retain its full span if all values are text.
     ValueBoundary(Box<Expression>),
     /// Rule-local trivia policy, transparent to captures and semantic values.
+    LexicalTriviaScope {
+        child: Box<Expression>,
+        definition: crate::lexical::LexicalExpression,
+    },
     TriviaScope {
         child: Box<Expression>,
         java_whitespace: bool,

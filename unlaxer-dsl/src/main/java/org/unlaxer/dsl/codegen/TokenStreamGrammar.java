@@ -29,8 +29,9 @@ public final class TokenStreamGrammar {
         if (grammar.settings().stream().noneMatch(s -> s.key().equals("ubnf")
                 && s.value() instanceof StringSettingValue v && v.value().equals("v2")))
             issues.add(new Problem("E-TOKEN-STREAM-VERSION", "tokenStream", settings.get(0)));
-        for (var s : grammar.settings()) if (s.key().equals("comment"))
-            issues.add(new Problem("E-TOKEN-STREAM-TRIVIA", "comment", s));
+        for (var s : grammar.settings()) if (s.key().equals("comment") || s.key().equals("whitespace")
+            && s.value() instanceof StringSettingValue value && !value.value().equalsIgnoreCase("javaStyle") && !value.value().equalsIgnoreCase("none"))
+            issues.add(new Problem("E-TOKEN-STREAM-TRIVIA", s.key(), s));
         Map<String, LexicalExpression> programs;
         try { programs = LexicalCompiler.compile(grammar); }
         catch (IllegalArgumentException error) { return issues; } // the lexical validator reports the underlying error
