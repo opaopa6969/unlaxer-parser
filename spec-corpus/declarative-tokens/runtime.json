@@ -72,5 +72,195 @@
   {"name":"triviaAndShadow","body":"('start' WORD SPACE 'end') @value","whitespace":true,"cases":[
     {"input":"start 😀 x end","prefix":[true,13,13],"value":"start 😀 x end"},
     {"input":"start 😀x end","prefix":[true,12,12],"value":"start 😀x end"}
-  ]}
+  ]},
+  {
+    "name": "cp-escape-supplementary-range",
+    "body": "SCALAR_RANGE @value",
+    "cases": [
+      {
+        "input": "😀",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "value": "😀"
+      },
+      {
+        "input": "😁",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "value": "😁"
+      },
+      {
+        "input": "😂",
+        "prefix": [
+          false,
+          0,
+          0
+        ]
+      },
+      {
+        "input": "😀x",
+        "prefix": [
+          true,
+          1,
+          1
+        ]
+      },
+      {
+        "input": "",
+        "prefix": [
+          false,
+          0,
+          0
+        ]
+      }
+    ]
+  },
+  {
+    "name": "cp-escape-bmp-range",
+    "body": "BMP_ESCAPE @value",
+    "cases": [
+      {
+        "input": "A",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "value": "A"
+      },
+      {
+        "input": "B",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "value": "B"
+      },
+      {
+        "input": "C",
+        "prefix": [
+          false,
+          0,
+          0
+        ]
+      }
+    ]
+  },
+  {
+    "name": "cp-escape-negation",
+    "body": "SAFE_SCALAR @value",
+    "cases": [
+      {
+        "input": "a",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "value": "a"
+      },
+      {
+        "input": "🚀",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "value": "🚀"
+      },
+      {
+        "input": "\u0000",
+        "prefix": [
+          false,
+          0,
+          0
+        ]
+      },
+      {
+        "input": "\t",
+        "prefix": [
+          false,
+          0,
+          0
+        ]
+      },
+      {
+        "input": "\n",
+        "prefix": [
+          false,
+          0,
+          0
+        ]
+      },
+      {
+        "input": "😀",
+        "prefix": [
+          false,
+          0,
+          0
+        ]
+      }
+    ]
+  },
+  {
+    "name": "cp-escape-escaped-backslash",
+    "body": "ESCAPED_BACKSLASH @value",
+    "cases": [
+      {
+        "input": "A",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "value": "A"
+      },
+      {
+        "input": "u",
+        "prefix": [
+          false,
+          0,
+          0
+        ]
+      },
+      {
+        "input": "\\",
+        "prefix": [
+          false,
+          0,
+          0
+        ]
+      }
+    ]
+  },
+  {
+    "name": "cp-escape-literal-untouched",
+    "body": "RAW_ESCAPE @value",
+    "cases": [
+      {
+        "input": "\\u0041",
+        "prefix": [
+          true,
+          6,
+          6
+        ],
+        "value": "\\u0041"
+      },
+      {
+        "input": "A",
+        "prefix": [
+          false,
+          0,
+          0
+        ]
+      }
+    ]
+  }
 ]

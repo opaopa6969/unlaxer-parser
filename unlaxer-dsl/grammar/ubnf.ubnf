@@ -64,7 +64,7 @@ grammar UBNF {
     | BlockSettingValue ;
 
   @mapping(StringSettingValue, params=[value])
-  StringSettingValue ::= DottedIdentifier @value ;
+  StringSettingValue ::= (DottedIdentifier | '2') @value ;
 
   @mapping(BlockSettingValue, params=[entries])
   BlockSettingValue ::= '{' { KeyValuePair } @entries '}' ;

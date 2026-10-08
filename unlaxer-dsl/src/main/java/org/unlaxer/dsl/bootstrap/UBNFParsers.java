@@ -396,7 +396,7 @@ public class UBNFParsers {
         @Override
         public Parsers getLazyParsers() {
             return new Parsers(
-                Parser.get(DottedIdentifierParser.class)
+                new Choice(Parser.get(DottedIdentifierParser.class), new WordParser("2"))
             );
         }
     }

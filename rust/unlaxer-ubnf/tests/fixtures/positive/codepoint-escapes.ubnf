@@ -1,0 +1,9 @@
+grammar ScalarClasses {
+  @ubnf: 2
+  token BMP = CHAR_RANGE('\u0041','\u0042')
+  token SCALAR = CHAR_RANGE('\u{1F600}','\u{1F601}')
+  token SAFE = NEGATION('\u0000\u0009\u000A')
+  token NESTED ::= CHAR_RANGE('\u{1F600}','\u{1F601}') | NEGATION('\u0000');
+  @root @mapping(Value, params=[text])
+  Root ::= SCALAR @text;
+}
