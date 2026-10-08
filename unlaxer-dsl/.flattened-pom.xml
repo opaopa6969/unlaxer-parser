@@ -98,6 +98,13 @@
         </includes>
       </resource>
       <resource>
+        <targetPath>playground/runtime</targetPath>
+        <directory>../spec-corpus/xid-identifier</directory>
+        <includes>
+          <include>UNICODE-LICENSE.txt</include>
+        </includes>
+      </resource>
+      <resource>
         <directory>src/main/resources</directory>
       </resource>
       <resource>

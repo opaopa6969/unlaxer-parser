@@ -100,6 +100,11 @@
 				<includes><include>LICENSE</include></includes>
 				<targetPath>playground/runtime</targetPath>
 			</resource>
+			<resource>
+				<directory>../spec-corpus/xid-identifier</directory>
+				<includes><include>UNICODE-LICENSE.txt</include></includes>
+				<targetPath>playground/runtime</targetPath>
+			</resource>
 			<resource><directory>src/main/resources</directory></resource>
 			<resource>
 				<directory>grammar</directory>

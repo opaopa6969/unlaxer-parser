@@ -545,6 +545,10 @@ public class UBNFMapper {
                 ? firstWord(identifiers.get(1).source.toString())
                 : "";
         }
+        if (parserClass.equals("XID_IDENTIFIER")) {
+            return new TokenDecl.Declarative(name, org.unlaxer.dsl.runtime.LexicalExpression.leaf(
+                org.unlaxer.dsl.runtime.LexicalExpression.Op.XID_IDENTIFIER, ""));
+        }
         return new TokenDecl.Simple(name, parserClass);
     }
 

@@ -26,7 +26,19 @@
     {"id":"assignment","title":"3 · 名前と値を組み合わせる","goal":"price = 12; のような小さな言語を作る。","example":"assignment","steps":["IDENTIFIER は英字または _ で始まり、後ろには数字も使えます。","要素を並べると、その順序で読みます。'=' と ';' も入力の一部です。","@whitespace: javaStyle により、ルールの要素間には空白や改行を置けます。token の内部には入りません。","@name と @value は読み取った部分の名前（capture）。@mapping により AST（必要な値だけをまとめた構造）に取り出します。"],"check":"price = 12; は成功。12 = price; は失敗。文法を読むだけで、使える名前と数の範囲が分かります。"},
     {"id":"list","title":"4 · 複数の値を読む","goal":"カンマ区切りのリストを作る。","example":"list","steps":["'[' と ']' は入力に必要な括弧です。引用符なしの [ … ] は省略可能という文法記号です。","NUMBER { ',' NUMBER } は最初の数に続いて、カンマと数を 0 回以上読みます。","外側を [ … ] で囲むと空のリストも受け入れます。","{ … } は 0 回以上、+ は 1 回以上。区切りだけで終わる入力は受け入れません。"],"check":"[]、[1,2,30] は成功。[1,] は失敗。"},
     {"id":"string","title":"5 · 引用符とエスケープ","goal":"引用符の中の空白やエスケープを文字として読む。","example":"string","steps":["STRING の最初と最後の '\"' は、入力の二重引用符そのものです。","'\\\\' ANY はバックスラッシュと直後の 1 文字を組にして読みます。","NEGATION は指定した文字を除く 1 文字です。この例では二重引用符、バックスラッシュ、改行を除きます。","これは認識の定義です。\\n を実際の改行に変換するデコード処理ではありません。"],"check":"\"hello world\" と \"a\\\"b\" は成功。閉じていない文字列と、文字列中の未エスケープの改行は失敗。"},
-    {"id":"fence","title":"6 · 開始と同じ区切りで閉じる","goal":"context が必要なパターンを宣言的に記述する。","example":"fence","steps":["CAPTURE(mark, '~'+) は、開く区切りを読み、その文字列を token 内に保存します。","NEGATIVE_LOOKAHEAD(SAME_AS(mark)) は、同じ区切りが今あるなら失敗します。先読みは文字を消費しません。","最後の SAME_AS(mark) が開始と同じ区切りを読みます。","この例は仕組みを学ぶための単純な囲みです。Markdown の fenced code block の完全な仕様ではありません。"],"check":"~~~hello~~~ は成功。~~~hello~~ は失敗。@name の AST capture と CAPTURE の字句内 capture は用途が異なります。"}
+    {"id":"fence","title":"6 · 開始と同じ区切りで閉じる","goal":"context が必要なパターンを宣言的に記述する。","example":"fence","steps":["CAPTURE(mark, '~'+) は、開く区切りを読み、その文字列を token 内に保存します。","NEGATIVE_LOOKAHEAD(SAME_AS(mark)) は、同じ区切りが今あるなら失敗します。先読みは文字を消費しません。","最後の SAME_AS(mark) が開始と同じ区切りを読みます。","この例は仕組みを学ぶための単純な囲みです。Markdown の fenced code block の完全な仕様ではありません。"],"check":"~~~hello~~~ は成功。~~~hello~~ は失敗。@name の AST capture と CAPTURE の字句内 capture は用途が異なります。"},
+    {
+      "id": "unicode-xid",
+      "title": "7 · Unicodeの名前を読む",
+      "goal": "実装クラスに依存せずUnicode識別子の受理範囲を指定する。",
+      "example": "unicode-xid",
+      "steps": [
+        "token NAME = XID_IDENTIFIER はUnicode 17.0.0のXID_StartとXID_Continueに基づきます。",
+        "先頭の数字・結合文字・アンダースコアを拒否し、アンダースコアは続きの文字として受理します。",
+        "原文を保存し、正規化や予約語の除外は行いません。"
+      ],
+      "check": "名前2、eと結合アクセント、補助面の文字は成功。_nameと9nameと絵文字の先頭は失敗。"
+    }
   ],
   "entries": [
     {"id":"token-stream","category":"設定","title":"@tokenStream — 字句処理を選択する","syntax":"@tokenStream: enabled","summary":"生成 API で文字列直接解析・trivia cache・遅延 token 化・事前 token 化を選べます。","details":["UBNF v2 と宣言的 token を使います。既定は文字列直接解析です。Java は parseWithLexing、Rust は parse_with_lexing で mode を指定します。","token 化は最長一致で境界を決めます。同じ長さでは構文 literal、宣言順の token の順に優先します。直接解析と受理結果が変わる場合があります。","原文の位置とコメントを保持できます。外部 parser、局所 whitespace/interleave、構文 backref、recovery はこの profile では未対応です。","playground 画面の解析 mode 切替ではなく、生成コードの API を有効にする設定です。詳細は docs/token-stream.md を参照。"],"insertText":"@tokenStream: enabled"},
@@ -68,6 +80,40 @@
     {"id":"assignment","name":"Assignments","source":"grammar Assignments {\n  @ubnf: v2\n  @package: guide.demo\n  @whitespace: javaStyle\n\n  token DIGIT ::= CHAR_RANGE('0', '9');\n  token LETTER ::= CHAR_RANGE('a', 'z') | CHAR_RANGE('A', 'Z') | '_';\n  token IDENTIFIER ::= LETTER (LETTER | DIGIT)*;\n  token NUMBER ::= [ '+' | '-' ] DIGIT+ [ '.' DIGIT+ ];\n\n  @root\n  @mapping(Assignment, params=[name, value])\n  @doc('price = 12; のように、名前と数を = で結んで ; で終えます。')\n  Start ::= IDENTIFIER @name '=' NUMBER @value ';';\n}\n","cases":[{"input":"price = 12;","fields":{"name":"price","value":"12"}},{"input":"_x2=-3.5;","fields":{"name":"_x2","value":"-3.5"}},{"input":"12 = price;"},{"input":"price=1 2;"},{"input":"price=12"}]},
     {"id":"list","name":"Lists","source":"grammar Lists {\n  @ubnf: v2\n  @package: guide.demo\n  @whitespace: javaStyle\n\n  token NUMBER ::= CHAR_RANGE('0', '9')+;\n\n  @root\n  @mapping(NumberList, params=[values])\n  @doc('[] または [1,2,30] のような整数のリストです。末尾カンマは使いません。')\n  Start ::= '[' [ NUMBER @values { ',' NUMBER @values } ] ']';\n}\n","cases":[{"input":"[]","fields":{"values":[]}},{"input":"[1,2,30]","fields":{"values":["1","2","30"]}},{"input":"[1,]"},{"input":"[1 2]"}]},
     {"id":"string","name":"Strings","source":"grammar Strings {\n  @ubnf: v2\n  @package: guide.demo\n\n  token STRING ::= '\"' { '\\\\' ANY | NEGATION('\"\\\\\\n\\r') } '\"';\n\n  @root\n  @mapping(Quoted, params=[text])\n  @doc('二重引用符で囲みます。バックスラッシュで直後の文字をエスケープできます。')\n  Start ::= STRING @text;\n}\n","cases":[{"input":"\"hello world\"","fields":{"text":"\"hello world\""}},{"input":"\"a\\\"b\"","fields":{"text":"\"a\\\"b\""}},{"input":"\"こんにちは😀\"","fields":{"text":"\"こんにちは😀\""}},{"input":"\"unfinished"},{"input":"\"a\nb\""}]},
-    {"id":"fence","name":"Fences","source":"grammar Fences {\n  @ubnf: v2\n  @package: guide.demo\n\n  token FENCE ::= CAPTURE(mark, '~'+)\n    { NEGATIVE_LOOKAHEAD(SAME_AS(mark)) ANY } SAME_AS(mark);\n\n  @root\n  @mapping(Fenced, params=[text])\n  @doc('~~~hello~~~ のように同じ個数の ~ で囲みます。最初の同じ区切りで閉じます。')\n  Start ::= FENCE @text;\n}\n","cases":[{"input":"~~~hello~~~","fields":{"text":"~~~hello~~~"}},{"input":"~こんにちは😀~","fields":{"text":"~こんにちは😀~"}},{"input":"~~~hello~~"},{"input":"~~~hello~~~~"}]}
+    {"id":"fence","name":"Fences","source":"grammar Fences {\n  @ubnf: v2\n  @package: guide.demo\n\n  token FENCE ::= CAPTURE(mark, '~'+)\n    { NEGATIVE_LOOKAHEAD(SAME_AS(mark)) ANY } SAME_AS(mark);\n\n  @root\n  @mapping(Fenced, params=[text])\n  @doc('~~~hello~~~ のように同じ個数の ~ で囲みます。最初の同じ区切りで閉じます。')\n  Start ::= FENCE @text;\n}\n","cases":[{"input":"~~~hello~~~","fields":{"text":"~~~hello~~~"}},{"input":"~こんにちは😀~","fields":{"text":"~こんにちは😀~"}},{"input":"~~~hello~~"},{"input":"~~~hello~~~~"}]},
+    {
+      "id": "unicode-xid",
+      "name": "UnicodeNames",
+      "source": "grammar UnicodeNames {\n  @ubnf: v2\n  @package: guide.demo\n  token NAME = XID_IDENTIFIER\n  @root @mapping(Name, params=[text])\n  @doc('Unicode 17.0.0 の XID 識別子。_ は先頭に使えません。')\n  Start ::= NAME @text;\n}\n",
+      "cases": [
+        {
+          "input": "名前2",
+          "fields": {
+            "text": "名前2"
+          }
+        },
+        {
+          "input": "é",
+          "fields": {
+            "text": "é"
+          }
+        },
+        {
+          "input": "𐐀x",
+          "fields": {
+            "text": "𐐀x"
+          }
+        },
+        {
+          "input": "_name"
+        },
+        {
+          "input": "9name"
+        },
+        {
+          "input": "😀"
+        }
+      ]
+    }
   ]
 }

@@ -3,6 +3,8 @@ grammar LexicalProbe {
   @feature: declarativeTokensV1
   @feature: contextAccessorsV1
   @package: lexical.probe
+  token XID = XID_IDENTIFIER
+  token XID_NESTED ::= XID_IDENTIFIER;
   token DIGIT ::= CHAR_RANGE('0','9');
   token NUMBER ::= ['+'|'-'] (DIGIT+ '.' DIGIT* | '.' DIGIT+ | DIGIT+)
     [('e'|'E') ['+'|'-'] DIGIT+];

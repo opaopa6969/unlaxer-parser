@@ -13,6 +13,7 @@ mod long_code_fence;
 mod memo_retention_tests;
 mod scope;
 pub mod semantic;
+mod unicode_xid;
 #[doc(hidden)]
 pub use first::{set_candidate_exclusion_for_current_thread, CandidateExclusion};
 pub use scope::{
