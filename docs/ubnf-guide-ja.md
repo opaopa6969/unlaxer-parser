@@ -399,6 +399,10 @@ Statement ::= Assignment | Expression ;
 Statement ::= Assignment ';' ;
 ```
 
+Java/Rustの生成rootとrule参照の両方に適用します。回復した領域はCP span/message付きCSTとして
+残り、通常のtyped mapperは回復構文を拒否します。`auto`の後続候補、`skip`の前進規則、
+状態rollback、Java旧版からの変更は[回復の契約](error-recovery.md)を参照してください。
+
 ### `@catalog(context='...')`
 
 ルールにカタログコンテキスト文字列を付与します。LSP ジェネレータがコンテキスト対応補完の駆動に消費します。文字列リテラルを1つ取ります：
