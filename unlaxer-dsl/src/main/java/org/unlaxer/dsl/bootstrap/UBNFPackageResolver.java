@@ -245,8 +245,8 @@ public final class UBNFPackageResolver {
         if (!actual.equals(object(pinned.get("dependencies"), "locked dependencies"))) throw error("artifact dependencies differ from lock");
         for (var entry : actual.entrySet()) if (!entry.getValue().getAsString().equals(string(pinned(entry.getKey()), "version")))
             throw error("locked transitive version mismatch");
-        artifacts.put(name, value);
         for (String dependency : actual.keySet()) loaded(dependency);
+        artifacts.put(name, value); // Publish only after the complete dependency graph was verified.
         return value;
     }
     private String owner(Path path) throws IOException {

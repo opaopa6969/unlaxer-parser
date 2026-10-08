@@ -50,6 +50,20 @@ public class PackageResolverConformanceTest {
         }
         Files.write(Path.of("target/rust-packages.tsv"), report, StandardCharsets.UTF_8);
     }
+    @Test public void failedTransitiveVerificationCannotPublishAParent() throws Exception {
+        JsonObject fixture = JsonParser.parseString(Files.readString(repository.resolve("unlaxer-dsl/src/test/resources/packages/retry.json"))).getAsJsonObject();
+        Path directory = temporary.newFolder().toPath();
+        for (var file : fixture.getAsJsonObject("files").entrySet()) Files.writeString(directory.resolve(file.getKey()), file.getValue().getAsString());
+        UBNFPackageResolver.resolve(directory.resolve("ubnf.json"));
+        byte[] standard = Files.readAllBytes(repository.resolve("unlaxer-dsl/src/main/resources/ubnf-packages/std-layout-1.0.0.json"));
+        Path cached = directory.resolve(".ubnf-cache/packages/" + UBNFPackageResolver.sha256(standard) + ".json");
+        Files.writeString(cached, Files.readString(cached) + " ");
+        Path root = directory.resolve("root.ubnf"); var resolver = new UBNFPackageResolver(root, Files::readString);
+        for (int retry = 0; retry < 2; retry++) assertTrue(assertThrows(IllegalArgumentException.class,
+            () -> resolver.importPath(root, "pkg:team/layout")).getMessage().contains(fixture.get("message").getAsString()));
+        Files.write(cached, standard); assertNotNull(resolver.importPath(root, "pkg:team/layout"));
+    }
+
     @Test public void lockedGenerationNeverConnectsToArtifactOrigin() throws Exception {
         assumeTrue(Boolean.getBoolean("rustConformance"));
         assertEquals(0, run(List.of("cargo", "build", "--locked", "--manifest-path", repository.resolve("rust/Cargo.toml").toString(), "-p", "unlaxer-generator"), false).code());
