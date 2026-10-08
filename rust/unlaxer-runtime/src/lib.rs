@@ -14,6 +14,8 @@ mod long_code_fence;
 #[cfg(test)]
 mod memo_retention_tests;
 pub mod pipeline;
+pub mod provider_process;
+pub mod provider_protocol;
 mod scope;
 pub mod semantic;
 pub mod semantic_project;

@@ -62,6 +62,8 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
     runtime!("source_edits.rs");
     runtime!("source.rs");
     runtime!("embedded.rs");
+    runtime!("provider_protocol.rs");
+    runtime!("provider_process.rs");
     runtime!("pipeline.rs");
     runtime!("lexing.rs");
     runtime!("first.rs");
