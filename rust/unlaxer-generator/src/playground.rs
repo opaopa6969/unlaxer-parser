@@ -56,6 +56,7 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
     runtime!("scope.rs");
     runtime!("semantic.rs");
     runtime!("semantic_project.rs");
+    runtime!("semantic_query_cache.rs");
     runtime!("type_system.rs");
     runtime!("call_inference.rs");
     runtime!("lexing.rs");
