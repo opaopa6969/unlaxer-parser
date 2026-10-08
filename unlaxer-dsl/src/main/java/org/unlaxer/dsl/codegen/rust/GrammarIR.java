@@ -39,6 +39,11 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     public record RuleEffects(Expression child, Effects effects) implements Expression {}
     /** Compares this rule's own completed named captures; differences are semantic diagnostics. */
     public record CaptureEquality(Expression child, String name) implements Expression {}
+    public record NamePredicate(Expression child, String snapshot, String version, String capture, String kind) implements Expression {}
+    public record NameRequirement(String id, String version) {}
+    public record NameResolutionScope(Expression child, List<NameRequirement> requirements) implements Expression {
+        public NameResolutionScope { requirements=List.copyOf(requirements); }
+    }
     public enum RecoveryMode { SYNC, BEFORE_SYNC, SKIP }
     /** Rule-level transactional recovery; a recovered tree must not be mapped as a normal AST. */
     public record Recovery(Expression child, RecoveryMode mode, List<String> tokens, String message)
@@ -55,7 +60,7 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
         OptionalExpr, Repeat, Separated, AnyToken, EofToken, EmptyToken, ErrorExpected, CharRangeToken,
         ExceptToken, UntilToken, LookaheadToken, Delimited, IdentifierToken, QuotedToken,
         CodeStartToken, CodeEndToken, LongCodeBlockToken, CustomToken, TextValue, ValueBoundary, TriviaScope, RuleEffects,
-        CaptureEquality, Recovery, LexicalToken, LexicalTriviaScope, LexicalContextScope {}
+        CaptureEquality, NamePredicate, NameResolutionScope, Recovery, LexicalToken, LexicalTriviaScope, LexicalContextScope {}
     public record LexicalContextScope(Expression child, List<org.unlaxer.dsl.runtime.Lexing.Terminal> terminals) implements Expression {
         public LexicalContextScope { terminals = List.copyOf(terminals); }
     }

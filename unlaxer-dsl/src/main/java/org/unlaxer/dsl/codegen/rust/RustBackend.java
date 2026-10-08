@@ -147,6 +147,21 @@ public final class RustBackend {
         out.append("\npub fn parse_tree_detailed(source: &str) -> Result<Tree, ParseDiagnostic> {\n    parse_tree_detailed_with_options(source, ParseOptions::default())\n}\n")
             .append("\npub fn parse_tree_detailed_with_options(source: &str, options: ParseOptions) -> Result<Tree, ParseDiagnostic> {\n    unlaxer_runtime::parse_detailed_shared_with_options(grammar(), ")
             .append(ir.root()).append(", ").append(ir.javaWhitespace()).append(", source, options)\n}\n");
+        if(ir.rules().stream().anyMatch(rule -> rule.body() instanceof NameResolutionScope)) {
+            out.append("\npub fn parse_tree_detailed_with_name_snapshots(source: &str, snapshots: &[unlaxer_runtime::names::Snapshot], options: ParseOptions) -> Result<Tree, ParseDiagnostic> {\n    let tree = unlaxer_runtime::parse_detailed_shared_with_name_snapshots(grammar(), ")
+                .append(ir.root()).append(", ").append(ir.javaWhitespace()).append(", source, options, snapshots)").append("""
+                ?;
+                    if let Some(first) = tree.recoveries().first() {
+                        return Err(ParseDiagnostic {
+                            kind: "recovery", offset: first.span.start,
+                            expected: vec![first.message.to_owned()],
+                            farthest: unlaxer_runtime::ParseError { offset: first.span.end, expected: vec![] },
+                        });
+                    }
+                    Ok(tree)
+                }
+                """);
+        }
         if (ir.rules().stream().anyMatch(r -> r.operator() != null)) {
             out.append("""
 
@@ -217,6 +232,8 @@ public final class RustBackend {
     }
 
     private String expression(Expression expression) {
+        if(expression instanceof NamePredicate predicate) return "Expr::NamePredicate { child: Box::new("+expression(predicate.child())+"), snapshot: "+quote(predicate.snapshot())+", version: "+quote(predicate.version())+", capture: "+quote(predicate.capture())+", kind: "+quote(predicate.kind())+" }";
+        if(expression instanceof NameResolutionScope scope) return "Expr::NameResolutionScope { child: Box::new("+expression(scope.child())+"), requirements: vec!["+scope.requirements().stream().map(requirement->"unlaxer_runtime::names::Requirement::new("+quote(requirement.id())+", "+quote(requirement.version())+").expect(\"validated name requirement\")").collect(java.util.stream.Collectors.joining(", "))+"] }";
         if (expression instanceof Recovery recovery) {
             String tokens = recovery.tokens().stream().map(RustBackend::quote)
                 .collect(java.util.stream.Collectors.joining(", "));
@@ -557,6 +574,8 @@ public final class RustBackend {
         if (expression instanceof CustomToken) return true;
         if (expression instanceof RuleEffects value) return containsRecovery(value.child());
         if (expression instanceof CaptureEquality value) return containsRecovery(value.child());
+        if (expression instanceof NamePredicate value) return containsRecovery(value.child());
+        if (expression instanceof NameResolutionScope value) return containsRecovery(value.child());
         if (expression instanceof TriviaScope value) return containsRecovery(value.child());
         if (expression instanceof LexicalContextScope value) return containsRecovery(value.child());
         if (expression instanceof TextValue value) return containsRecovery(value.child());

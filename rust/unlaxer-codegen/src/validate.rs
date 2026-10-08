@@ -226,6 +226,40 @@ fn expression(
             expression(child, count, captures)?;
         }
         LexicalToken { expression, .. } => expression.validate().map_err(fail)?,
+        NamePredicate {
+            child,
+            snapshot,
+            version,
+            capture,
+            kind,
+        } => {
+            name_requirement(snapshot, version)?;
+            if !["type", "value", "resolved"].contains(&kind.as_str()) {
+                return Err(fail("invalid name predicate kind"));
+            }
+            let mut local = BTreeSet::new();
+            expression(child, count, &mut local)?;
+            if !local.contains(capture) {
+                return Err(fail("missing name predicate capture"));
+            }
+            captures.extend(local);
+        }
+        NameResolutionScope {
+            child,
+            requirements,
+        } => {
+            if requirements.len() > 64 {
+                return Err(fail("name snapshot limit exceeds 64"));
+            }
+            let mut ids = BTreeSet::new();
+            for (id, version) in requirements {
+                name_requirement(id, version)?;
+                if !ids.insert(id) {
+                    return Err(fail("duplicate name requirement"));
+                }
+            }
+            expression(child, count, captures)?;
+        }
         CaptureEquality { child, name } => {
             let mut local = BTreeSet::new();
             expression(child, count, &mut local)?;
@@ -346,6 +380,23 @@ fn expression(
             }
         }
         _ => {}
+    }
+    Ok(())
+}
+
+fn name_requirement(id: &str, version: &str) -> Result<(), GenerateError> {
+    let bytes = id.as_bytes();
+    if bytes.is_empty()
+        || bytes.len() > 128
+        || !bytes[0].is_ascii_alphabetic()
+        || bytes
+            .iter()
+            .any(|c| !(c.is_ascii_alphanumeric() || b"_./-".contains(c)))
+        || version.is_empty()
+        || version.len() > 128
+        || version.bytes().any(|c| !(33..=126).contains(&c))
+    {
+        return Err(fail("invalid name snapshot identity"));
     }
     Ok(())
 }

@@ -165,6 +165,12 @@ pub enum AnnotationKind {
     RightAssoc,
     LongestChoice,
     UniqueLongestChoice,
+    NamePredicate {
+        snapshot: String,
+        version: String,
+        name: String,
+        kind: String,
+    },
     PredictiveChoice,
     Precedence {
         level: i32,

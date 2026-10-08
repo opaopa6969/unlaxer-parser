@@ -74,6 +74,7 @@ public class ParserGenerator implements CodeGenerator {
             this.grammar = grammar;
             TokenStreamGrammar.requireValid(grammar);
             LexicalContexts.requireValid(grammar);
+            NamePredicates.requireValid(grammar);
             this.tokenStream = TokenStreamGrammar.enabled(grammar) || LexicalContexts.enabled(grammar);
             this.grammarName = grammar.name();
             TokenAdapterRegistry adapters = TokenAdapterRegistry.requireValid(grammar);
@@ -288,6 +289,7 @@ public class ParserGenerator implements CodeGenerator {
                 sb.append(helper);
             }
             sb.append(ParserRuleEmitter.generateRuleClass(ctx, rule));
+            if(NamePredicates.annotation(rule).isPresent()) sb.append(NamePredicates.wrapper(ctx,rule));
             // @recovery: generate recovery wrapper class after the rule class
             ParserRuleEmitter.findRecoveryAnnotation(rule)
                 .ifPresent(ra -> sb.append(ParserRuleEmitter.generateRecoveryWrapper(ctx, rule, ra)));
@@ -295,11 +297,17 @@ public class ParserGenerator implements CodeGenerator {
 
         // ファクトリメソッド
         String rootRuleName = findRootRuleName(grammar);
-        sb.append("    public static Parser getRootParser() {\n");
-        sb.append("        return Parser.get(").append(rootRuleName)
-            .append(ctx.recoveryRules.containsKey(rootRuleName) ? "RecoveryParser.class" : "Parser.class")
-            .append(");\n");
-        sb.append("    }\n");
+        if (NamePredicates.enabled(grammar)) {
+            sb.append("    public static Parser getRootSyntaxParser() {\n        return Parser.get(").append(rootRuleName)
+                .append(ctx.recoveryRules.containsKey(rootRuleName) ? "RecoveryParser.class" : "Parser.class").append(");\n    }\n");
+            sb.append("    public static Parser getRootParser() {\n        return new org.unlaxer.parser.combinator.NameResolutionScope(Parser.get(")
+                .append(ParserRuleEmitter.resolveParserClass(ctx,rootRuleName)).append("), ").append(NamePredicates.javaRequirements(grammar)).append(");\n    }\n");
+        } else {
+            sb.append("    public static Parser getRootParser() {\n");
+            sb.append("        return Parser.get(").append(rootRuleName)
+                .append(ctx.recoveryRules.containsKey(rootRuleName) ? "RecoveryParser.class" : "Parser.class").append(");\n");
+            sb.append("    }\n");
+        }
 
         sb.append("}\n");
 

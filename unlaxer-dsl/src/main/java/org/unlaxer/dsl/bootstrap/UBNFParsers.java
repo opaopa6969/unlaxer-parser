@@ -1042,6 +1042,19 @@ public class UBNFParsers {
         }
     }
 
+    /** Fixed argument order is part of name-predicate v1's minimal syntax. */
+    public static class NamePredicateAnnotationParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+        @Override public Parsers getLazyParsers() {
+            return new Parsers(new WordParser("@namePredicate"), Parser.get(LeftParenthesisParser.class),
+                new WordParser("snapshot"), Parser.get(EqualParser.class), new SingleQuotedParser(),
+                Parser.get(CommaParser.class), new WordParser("version"), Parser.get(EqualParser.class), new SingleQuotedParser(),
+                Parser.get(CommaParser.class), new WordParser("name"), Parser.get(EqualParser.class), new SingleQuotedParser(),
+                Parser.get(CommaParser.class), new WordParser("kind"), Parser.get(EqualParser.class), new SingleQuotedParser(),
+                Parser.get(RightParenthesisParser.class));
+        }
+    }
+
     /** PredictiveChoiceAnnotation: '@predictiveChoice' */
     public static class PredictiveChoiceAnnotationParser extends UBNFLazyChain {
         private static final long serialVersionUID = 1L;
@@ -1236,6 +1249,9 @@ public class UBNFParsers {
         @Override
         public Parsers getLazyParsers() {
             return new Parsers(
+                new org.unlaxer.parser.combinator.Not(new org.unlaxer.parser.combinator.Chain(
+                    new WordParser("@namePredicate"),
+                    new org.unlaxer.parser.combinator.Not(Parser.get(AlphabetNumericUnderScoreParser.class)))),
                 Parser.get(AtSignParser.class),
                 Parser.get(IdentifierParser.class)
             );
@@ -1309,6 +1325,7 @@ public class UBNFParsers {
                 Parser.get(RightAssocAnnotationParser.class),
                 Parser.get(LongestChoiceAnnotationParser.class),
                 Parser.get(UniqueLongestChoiceAnnotationParser.class),
+                Parser.get(NamePredicateAnnotationParser.class),
                 Parser.get(PredictiveChoiceAnnotationParser.class),
                 Parser.get(PrecedenceAnnotationParser.class),
                 Parser.get(DocAnnotationParser.class),

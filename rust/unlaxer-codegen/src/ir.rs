@@ -95,6 +95,17 @@ pub enum RecoveryMode {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression {
+    NamePredicate {
+        child: Box<Expression>,
+        snapshot: String,
+        version: String,
+        capture: String,
+        kind: String,
+    },
+    NameResolutionScope {
+        child: Box<Expression>,
+        requirements: Vec<(String, String)>,
+    },
     LexicalContextScope {
         child: Box<Expression>,
         terminals: Vec<(String, bool, crate::lexical::LexicalExpression)>,
