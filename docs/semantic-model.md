@@ -95,3 +95,6 @@ API の list / String / span 等は非 null。Java の負の位置や孤立 surr
 複数文書・依存ライブラリの import / export、definition、型付き補完は
 [ProjectSymbolIndex](project-symbol-index.md) で、このモデルを不変の
 プロジェクトスナップショットへ束ねる。文法 import と対象言語の import は別契約である。
+
+型引数、union / intersection、nullable、関数型、alias、varargs と overload の制約は
+[TypeSystem / CallInference](type-system.md) で扱う。既存の固定引数 API と観測結果は維持する。
