@@ -20,7 +20,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: learning-pages
+  group: ${{ github.ref == 'refs/heads/master' && 'learning-pages' || format('learning-pages-verify-{0}', github.ref) }}
   cancel-in-progress: false
 
 jobs:
