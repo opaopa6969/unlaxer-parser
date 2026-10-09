@@ -53,6 +53,7 @@ public final class RustGrammarLowering {
         if (!grammar.imports().isEmpty()) throw unsupported("imports");
         var lexical = org.unlaxer.dsl.bootstrap.LexicalCompiler.compile(grammar);
         boolean whitespace = false;
+        String globalStyle = "none";
         Set<String> settings = new HashSet<>();
         Set<String> memoSafeTokens = new HashSet<>();
         for (var setting : grammar.settings()) {
@@ -71,7 +72,9 @@ public final class RustGrammarLowering {
                 throw unsupported("block setting " + setting.key());
             }
             if (setting.key().equals("whitespace")) {
-                whitespace = whitespaceStyle(value.value());
+                globalStyle = value.value();
+                org.unlaxer.dsl.bootstrap.WhitespaceDefinitions.resolve(globalStyle, lexical);
+                whitespace = globalStyle.trim().equalsIgnoreCase("javaStyle");
             } else if (setting.key().equals("memoSafeToken")) {
                 String alias = value.value().trim();
                 if (!memoSafeTokens.add(alias)) {
@@ -165,7 +168,9 @@ public final class RustGrammarLowering {
                     precedence = value.level();
                 } else if (annotation instanceof WhitespaceAnnotation value) {
                     if (localWhitespace != null) throw unsupported("duplicate @whitespace on " + rule.name());
-                    localWhitespace = whitespaceStyle(value.style().orElse("javaStyle"));
+                    String style = value.style().orElse("javaStyle");
+                    org.unlaxer.dsl.bootstrap.WhitespaceDefinitions.resolve(style, lexical);
+                    localWhitespace = style.trim().equalsIgnoreCase("javaStyle");
                 } else if (annotation instanceof InterleaveAnnotation value) {
                     if (interleave) throw unsupported("duplicate @interleave on " + rule.name());
                     String profile = value.profile().trim();
@@ -324,7 +329,13 @@ public final class RustGrammarLowering {
                 expression = rightAssocBody(expression);
             }
             // Every rule resolves against the grammar default, never against its caller.
-            if (hasLocalTrivia) expression = new TriviaScope(expression, ruleWhitespace.get(i));
+            String style = grammar.rules().get(i).annotations().stream().filter(WhitespaceAnnotation.class::isInstance)
+                .map(WhitespaceAnnotation.class::cast).map(a -> a.style().orElse("javaStyle")).findFirst()
+                .orElse(grammar.rules().get(i).annotations().stream().anyMatch(InterleaveAnnotation.class::isInstance) ? "javaStyle" : globalStyle);
+            var definition = org.unlaxer.dsl.bootstrap.WhitespaceDefinitions.resolve(style, lexical);
+            if (definition != null) expression = new LexicalTriviaScope(expression, definition);
+            else if (hasLocalTrivia || !globalStyle.equalsIgnoreCase("none") && !globalStyle.equalsIgnoreCase("javaStyle"))
+                expression = new TriviaScope(expression, ruleWhitespace.get(i));
             if (ruleEffects.get(i) != null) expression = new RuleEffects(expression, ruleEffects.get(i));
             if (comparisons.get(i) != null) expression = new CaptureEquality(expression, comparisons.get(i));
             if (recoveries.get(i) != null) {

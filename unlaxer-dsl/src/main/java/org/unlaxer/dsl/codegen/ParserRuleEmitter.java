@@ -1291,6 +1291,7 @@ class ParserRuleEmitter {
     }
 
     static String getChainClassName(ParserGenerator.GenContext ctx, String ruleName) {
+        if (ctx.namedWhitespaceByRule.containsKey(ruleName)) return ctx.grammarName + ctx.namedWhitespaceByRule.get(ruleName) + "LazyChain";
         boolean useDelimited = ctx.useDelimitedChainByRule.getOrDefault(ruleName, false);
         if (useDelimited && ctx.hasDelimitedChain) {
             return ctx.grammarName + "LazyChain";
@@ -1303,7 +1304,7 @@ class ParserRuleEmitter {
             .filter(a -> a instanceof WhitespaceAnnotation)
             .map(a -> (WhitespaceAnnotation) a)
             .reduce((first, second) -> second)
-            .map(w -> w.style().orElse("javaStyle").trim().toLowerCase())
+            .map(w -> org.unlaxer.dsl.bootstrap.WhitespaceDefinitions.normalize(w.style().orElse("javaStyle")))
             .orElse(null);
     }
 

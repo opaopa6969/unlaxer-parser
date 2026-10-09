@@ -217,7 +217,7 @@ impl Inventory {
                     ) => {}
                 ("tokenAdapter" | "tokenContract", _) => {}
                 ("whitespace", SettingValue::String(value)) => {
-                    if !whitespace(value) {
+                    if !named_whitespace(grammar, value) {
                         self.add("P-WHITESPACE", value, setting.value_span);
                     }
                 }
@@ -258,12 +258,12 @@ impl Inventory {
                 if skip && matches!(annotation.kind, AnnotationKind::Mapping { .. }) {
                     continue;
                 }
-                self.annotation(annotation);
+                self.annotation(grammar, annotation);
             }
             self.body(&rule.body);
         }
     }
-    fn annotation(&mut self, annotation: &Annotation) {
+    fn annotation(&mut self, grammar: &GrammarDecl, annotation: &Annotation) {
         let span = annotation.span;
         match &annotation.kind {
             AnnotationKind::Root
@@ -288,7 +288,7 @@ impl Inventory {
             }
             AnnotationKind::Whitespace { style } => {
                 if let Some(style) = style {
-                    if !whitespace(style) {
+                    if !named_whitespace(grammar, style) {
                         self.add("P-WHITESPACE", style, span);
                     }
                 }
@@ -362,6 +362,13 @@ fn identifier(value: &str) -> bool {
         && !matches!(value, "Self" | "self" | "super" | "crate")
 }
 
+fn named_whitespace(grammar: &GrammarDecl, value: &str) -> bool {
+    whitespace(value)
+        || crate::lexical::compile_syntax(grammar)
+            .ok()
+            .and_then(|definitions| definitions.get(value.trim()).cloned())
+            .is_some_and(|expression| !expression.nullable())
+}
 fn whitespace(value: &str) -> bool {
     value.trim().eq_ignore_ascii_case("javaStyle") || value.trim().eq_ignore_ascii_case("none")
 }
