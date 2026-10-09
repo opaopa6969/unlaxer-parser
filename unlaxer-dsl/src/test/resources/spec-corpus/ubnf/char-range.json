@@ -22,7 +22,7 @@
       "citation": {
         "file": "unlaxer-dsl/specs/ubnf-syntax.md",
         "heading": "#### `CHAR_RANGE('min','max')` — 文字の範囲",
-        "sentence": "境界は両端を含む。補助文字の範囲指定は、この `char` API とは別の将来対応である。"
+        "sentence": "境界は両端を含む。"
       },
       "input": "grammar G { token L=CHAR_RANGE('a','a') R ::= L; }",
       "expectation": {

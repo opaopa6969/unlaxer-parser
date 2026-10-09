@@ -134,6 +134,7 @@ fn convert(e: &Syntax) -> Program {
     let op = match e.op {
         Op::LITERAL => ProgramOp::LITERAL,
         Op::ANY => ProgramOp::ANY,
+        Op::XID_IDENTIFIER => ProgramOp::XID_IDENTIFIER,
         Op::EOF => ProgramOp::EOF,
         Op::BOF => ProgramOp::BOF,
         Op::BOL => ProgramOp::BOL,
