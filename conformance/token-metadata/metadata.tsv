@@ -1,0 +1,4 @@
+# id	input	first	second	generated	original	later	consumedFirst	consumedFinal	kind
+unicode	a😀	a	😀	inserted😀	original😀	later	1	2	virtualTokenConsumed
+crlf	a\r\n😀	a\r\n	😀	missing	raw\r\n	changed	3	4	virtualTokenMatchOnly
+empty-generated	😀x	😀	x	~	kept	updated	1	2	virtualTokenMatchOnly

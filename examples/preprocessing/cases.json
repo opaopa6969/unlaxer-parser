@@ -1,0 +1,1196 @@
+[
+  {
+    "id": "forward-and-mutual-types",
+    "snapshots": {
+      "main": {
+        "uri": "memory:main",
+        "version": 1,
+        "text": "/*日😀*/ let value:A; fn use(A):Int; call use(?);"
+      },
+      "included": {
+        "uri": "memory:included",
+        "version": 1,
+        "text": "/*型😀*/ builtin Int{} record A{next:B;} record B{prev:A;} "
+      }
+    },
+    "configuration": {
+      "extra": "false",
+      "generation": "1",
+      "cursor": "44"
+    },
+    "budget": 4,
+    "expected": {
+      "state": "COMPLETE",
+      "evaluated": [
+        "include",
+        "optional",
+        "expand",
+        "semantic"
+      ],
+      "reused": [],
+      "revision": true,
+      "report": {
+        "optional": "INACTIVE",
+        "types": [
+          "Int",
+          "A",
+          "B"
+        ],
+        "expected": [
+          "A"
+        ],
+        "completion": [
+          "value"
+        ],
+        "edit": [
+          "memory:main",
+          1,
+          44,
+          44
+        ],
+        "diagnostics": [],
+        "generatedEdit": "REJECTED",
+        "expandedLength": 119
+      },
+      "origins": [
+        "memory:main",
+        "memory:main",
+        "memory:included",
+        "memory:main",
+        "memory:main"
+      ]
+    }
+  },
+  {
+    "id": "unchanged",
+    "snapshots": {
+      "main": {
+        "uri": "memory:main",
+        "version": 1,
+        "text": "/*日😀*/ let value:A; fn use(A):Int; call use(?);"
+      },
+      "included": {
+        "uri": "memory:included",
+        "version": 1,
+        "text": "/*型😀*/ builtin Int{} record A{next:B;} record B{prev:A;} "
+      }
+    },
+    "configuration": {
+      "extra": "false",
+      "generation": "1",
+      "cursor": "44"
+    },
+    "budget": 4,
+    "expected": {
+      "state": "COMPLETE",
+      "evaluated": [],
+      "reused": [
+        "include",
+        "optional",
+        "expand",
+        "semantic"
+      ],
+      "revision": true,
+      "report": {
+        "optional": "INACTIVE",
+        "types": [
+          "Int",
+          "A",
+          "B"
+        ],
+        "expected": [
+          "A"
+        ],
+        "completion": [
+          "value"
+        ],
+        "edit": [
+          "memory:main",
+          1,
+          44,
+          44
+        ],
+        "diagnostics": [],
+        "generatedEdit": "REJECTED",
+        "expandedLength": 119
+      },
+      "origins": [
+        "memory:main",
+        "memory:main",
+        "memory:included",
+        "memory:main",
+        "memory:main"
+      ]
+    }
+  },
+  {
+    "id": "cursor-only",
+    "snapshots": {
+      "main": {
+        "uri": "memory:main",
+        "version": 1,
+        "text": "/*日😀*/ let value:A; fn use(A):Int; call use(?);"
+      },
+      "included": {
+        "uri": "memory:included",
+        "version": 1,
+        "text": "/*型😀*/ builtin Int{} record A{next:B;} record B{prev:A;} "
+      }
+    },
+    "configuration": {
+      "extra": "false",
+      "generation": "1",
+      "cursor": "0"
+    },
+    "budget": 4,
+    "expected": {
+      "state": "COMPLETE",
+      "evaluated": [
+        "semantic"
+      ],
+      "reused": [
+        "include",
+        "optional",
+        "expand"
+      ],
+      "revision": true,
+      "report": {
+        "optional": "INACTIVE",
+        "types": [
+          "Int",
+          "A",
+          "B"
+        ],
+        "expected": [],
+        "completion": [],
+        "edit": [],
+        "diagnostics": [],
+        "generatedEdit": "REJECTED",
+        "expandedLength": 119
+      },
+      "origins": [
+        "memory:main",
+        "memory:main",
+        "memory:included",
+        "memory:main",
+        "memory:main"
+      ]
+    }
+  },
+  {
+    "id": "include-update",
+    "snapshots": {
+      "main": {
+        "uri": "memory:main",
+        "version": 1,
+        "text": "/*日😀*/ let value:A; fn use(A):Int; call use(?);"
+      },
+      "included": {
+        "uri": "memory:included",
+        "version": 2,
+        "text": "/*型😀*/ builtin Int{} record A{next:B;} record B{prev:A;} record C{} "
+      }
+    },
+    "configuration": {
+      "extra": "false",
+      "generation": "2",
+      "cursor": "44"
+    },
+    "budget": 4,
+    "expected": {
+      "state": "COMPLETE",
+      "evaluated": [
+        "include",
+        "expand",
+        "semantic"
+      ],
+      "reused": [
+        "optional"
+      ],
+      "revision": true,
+      "report": {
+        "optional": "INACTIVE",
+        "types": [
+          "Int",
+          "A",
+          "B",
+          "C"
+        ],
+        "expected": [
+          "A"
+        ],
+        "completion": [
+          "value"
+        ],
+        "edit": [
+          "memory:main",
+          1,
+          44,
+          44
+        ],
+        "diagnostics": [],
+        "generatedEdit": "REJECTED",
+        "expandedLength": 130
+      },
+      "origins": [
+        "memory:main",
+        "memory:main",
+        "memory:included",
+        "memory:main",
+        "memory:main"
+      ]
+    }
+  },
+  {
+    "id": "inactive-invalid-input",
+    "snapshots": {
+      "main": {
+        "uri": "memory:main",
+        "version": 1,
+        "text": "/*日😀*/ let value:A; fn use(A):Int; call use(?);"
+      },
+      "included": {
+        "uri": "memory:included",
+        "version": 2,
+        "text": "/*型😀*/ builtin Int{} record A{next:B;} record B{prev:A;} record C{} "
+      },
+      "optional": {
+        "uri": "memory:optional",
+        "version": 1,
+        "text": "@@@"
+      }
+    },
+    "configuration": {
+      "extra": "false",
+      "generation": "2",
+      "cursor": "44"
+    },
+    "budget": 4,
+    "expected": {
+      "state": "COMPLETE",
+      "evaluated": [],
+      "reused": [
+        "include",
+        "optional",
+        "expand",
+        "semantic"
+      ],
+      "revision": true,
+      "report": {
+        "optional": "INACTIVE",
+        "types": [
+          "Int",
+          "A",
+          "B",
+          "C"
+        ],
+        "expected": [
+          "A"
+        ],
+        "completion": [
+          "value"
+        ],
+        "edit": [
+          "memory:main",
+          1,
+          44,
+          44
+        ],
+        "diagnostics": [],
+        "generatedEdit": "REJECTED",
+        "expandedLength": 130
+      },
+      "origins": [
+        "memory:main",
+        "memory:main",
+        "memory:included",
+        "memory:main",
+        "memory:main"
+      ]
+    }
+  },
+  {
+    "id": "deferred-include",
+    "snapshots": {
+      "main": {
+        "uri": "memory:main",
+        "version": 1,
+        "text": "/*日😀*/ let value:A; fn use(A):Int; call use(?);"
+      },
+      "included": {
+        "uri": "memory:included",
+        "version": 2,
+        "text": "/*型😀*/ builtin Int{} record A{next:B;} record B{prev:A;} record C{} "
+      }
+    },
+    "configuration": {
+      "extra": "true",
+      "generation": "3",
+      "cursor": "44"
+    },
+    "budget": 4,
+    "expected": {
+      "state": "DEFERRED",
+      "evaluated": [],
+      "reused": [
+        "include"
+      ],
+      "revision": false,
+      "report": null,
+      "origins": []
+    }
+  },
+  {
+    "id": "enabled-include",
+    "snapshots": {
+      "main": {
+        "uri": "memory:main",
+        "version": 1,
+        "text": "/*日😀*/ let value:A; fn use(A):Int; call use(?);"
+      },
+      "included": {
+        "uri": "memory:included",
+        "version": 2,
+        "text": "/*型😀*/ builtin Int{} record A{next:B;} record B{prev:A;} record C{} "
+      },
+      "optional": {
+        "uri": "memory:optional",
+        "version": 1,
+        "text": "record Extra{} "
+      }
+    },
+    "configuration": {
+      "extra": "true",
+      "generation": "3",
+      "cursor": "44"
+    },
+    "budget": 4,
+    "expected": {
+      "state": "COMPLETE",
+      "evaluated": [
+        "optional",
+        "expand",
+        "semantic"
+      ],
+      "reused": [
+        "include"
+      ],
+      "revision": true,
+      "report": {
+        "optional": "COMPLETE",
+        "types": [
+          "Int",
+          "A",
+          "B",
+          "C",
+          "Extra"
+        ],
+        "expected": [
+          "A"
+        ],
+        "completion": [
+          "value"
+        ],
+        "edit": [
+          "memory:main",
+          1,
+          44,
+          44
+        ],
+        "diagnostics": [],
+        "generatedEdit": "REJECTED",
+        "expandedLength": 145
+      },
+      "origins": [
+        "memory:main",
+        "memory:main",
+        "memory:included",
+        "memory:optional",
+        "memory:main",
+        "memory:main"
+      ]
+    }
+  },
+  {
+    "id": "active-syntax-failure",
+    "snapshots": {
+      "main": {
+        "uri": "memory:main",
+        "version": 1,
+        "text": "/*日😀*/ let value:A; fn use(A):Int; call use(?);"
+      },
+      "included": {
+        "uri": "memory:included",
+        "version": 2,
+        "text": "/*型😀*/ builtin Int{} record A{next:B;} record B{prev:A;} record C{} "
+      },
+      "optional": {
+        "uri": "memory:optional",
+        "version": 2,
+        "text": "@@@"
+      }
+    },
+    "configuration": {
+      "extra": "true",
+      "generation": "4",
+      "cursor": "44"
+    },
+    "budget": 4,
+    "expected": {
+      "state": "FAILED",
+      "evaluated": [
+        "optional",
+        "expand",
+        "semantic"
+      ],
+      "reused": [
+        "include"
+      ],
+      "revision": true,
+      "report": {
+        "optional": "COMPLETE",
+        "types": [],
+        "expected": [],
+        "completion": [],
+        "edit": [],
+        "diagnostics": [
+          [
+            "PARSE_SYNTAX",
+            "memory:main",
+            1,
+            0,
+            6,
+            false
+          ],
+          [
+            "PARSE_SYNTAX",
+            "memory:included",
+            2,
+            0,
+            68,
+            true
+          ],
+          [
+            "PARSE_SYNTAX",
+            "memory:optional",
+            2,
+            0,
+            3,
+            true
+          ],
+          [
+            "PARSE_SYNTAX",
+            "memory:main",
+            1,
+            0,
+            6,
+            false
+          ],
+          [
+            "PARSE_SYNTAX",
+            "memory:main",
+            1,
+            0,
+            47,
+            true
+          ]
+        ],
+        "generatedEdit": "REJECTED",
+        "expandedLength": 133
+      },
+      "origins": [
+        "memory:main",
+        "memory:main",
+        "memory:included",
+        "memory:optional",
+        "memory:main",
+        "memory:main"
+      ]
+    }
+  },
+  {
+    "id": "inactive-after-failure",
+    "snapshots": {
+      "main": {
+        "uri": "memory:main",
+        "version": 1,
+        "text": "/*日😀*/ let value:A; fn use(A):Int; call use(?);"
+      },
+      "included": {
+        "uri": "memory:included",
+        "version": 2,
+        "text": "/*型😀*/ builtin Int{} record A{next:B;} record B{prev:A;} record C{} "
+      },
+      "optional": {
+        "uri": "memory:optional",
+        "version": 2,
+        "text": "@@@"
+      }
+    },
+    "configuration": {
+      "extra": "false",
+      "generation": "5",
+      "cursor": "44"
+    },
+    "budget": 4,
+    "expected": {
+      "state": "COMPLETE",
+      "evaluated": [
+        "optional",
+        "expand",
+        "semantic"
+      ],
+      "reused": [
+        "include"
+      ],
+      "revision": true,
+      "report": {
+        "optional": "INACTIVE",
+        "types": [
+          "Int",
+          "A",
+          "B",
+          "C"
+        ],
+        "expected": [
+          "A"
+        ],
+        "completion": [
+          "value"
+        ],
+        "edit": [
+          "memory:main",
+          1,
+          44,
+          44
+        ],
+        "diagnostics": [],
+        "generatedEdit": "REJECTED",
+        "expandedLength": 130
+      },
+      "origins": [
+        "memory:main",
+        "memory:main",
+        "memory:included",
+        "memory:main",
+        "memory:main"
+      ]
+    }
+  },
+  {
+    "id": "forward-callable",
+    "snapshots": {
+      "main": {
+        "uri": "memory:main",
+        "version": 2,
+        "text": "/*日😀*/ let value:A; call use(?); fn use(A):Int;"
+      },
+      "included": {
+        "uri": "memory:included",
+        "version": 2,
+        "text": "/*型😀*/ builtin Int{} record A{next:B;} record B{prev:A;} record C{} "
+      },
+      "optional": {
+        "uri": "memory:optional",
+        "version": 2,
+        "text": "@@@"
+      }
+    },
+    "configuration": {
+      "extra": "false",
+      "generation": "6",
+      "cursor": "29"
+    },
+    "budget": 4,
+    "expected": {
+      "state": "COMPLETE",
+      "evaluated": [
+        "expand",
+        "semantic"
+      ],
+      "reused": [
+        "include",
+        "optional"
+      ],
+      "revision": true,
+      "report": {
+        "optional": "INACTIVE",
+        "types": [
+          "Int",
+          "A",
+          "B",
+          "C"
+        ],
+        "expected": [
+          "A"
+        ],
+        "completion": [
+          "value"
+        ],
+        "edit": [
+          "memory:main",
+          2,
+          29,
+          29
+        ],
+        "diagnostics": [],
+        "generatedEdit": "REJECTED",
+        "expandedLength": 130
+      },
+      "origins": [
+        "memory:main",
+        "memory:main",
+        "memory:included",
+        "memory:main",
+        "memory:main"
+      ]
+    }
+  },
+  {
+    "id": "partial-call",
+    "snapshots": {
+      "main": {
+        "uri": "memory:main",
+        "version": 3,
+        "text": "/*日😀*/ let value:A; fn use(A):Int; call use("
+      },
+      "included": {
+        "uri": "memory:included",
+        "version": 2,
+        "text": "/*型😀*/ builtin Int{} record A{next:B;} record B{prev:A;} record C{} "
+      },
+      "optional": {
+        "uri": "memory:optional",
+        "version": 2,
+        "text": "@@@"
+      }
+    },
+    "configuration": {
+      "extra": "false",
+      "generation": "7",
+      "cursor": "44"
+    },
+    "budget": 4,
+    "expected": {
+      "state": "PARTIAL",
+      "evaluated": [
+        "expand",
+        "semantic"
+      ],
+      "reused": [
+        "include",
+        "optional"
+      ],
+      "revision": true,
+      "report": {
+        "optional": "INACTIVE",
+        "types": [
+          "Int",
+          "A",
+          "B",
+          "C"
+        ],
+        "expected": [
+          "A"
+        ],
+        "completion": [
+          "value"
+        ],
+        "edit": [
+          "memory:main",
+          3,
+          44,
+          44
+        ],
+        "diagnostics": [],
+        "generatedEdit": "REJECTED",
+        "expandedLength": 127
+      },
+      "origins": [
+        "memory:main",
+        "memory:main",
+        "memory:included",
+        "memory:main",
+        "memory:main"
+      ]
+    }
+  },
+  {
+    "id": "repaired-call",
+    "snapshots": {
+      "main": {
+        "uri": "memory:main",
+        "version": 4,
+        "text": "/*日😀*/ let value:A; fn use(A):Int; call use(?);"
+      },
+      "included": {
+        "uri": "memory:included",
+        "version": 2,
+        "text": "/*型😀*/ builtin Int{} record A{next:B;} record B{prev:A;} record C{} "
+      },
+      "optional": {
+        "uri": "memory:optional",
+        "version": 2,
+        "text": "@@@"
+      }
+    },
+    "configuration": {
+      "extra": "false",
+      "generation": "8",
+      "cursor": "44"
+    },
+    "budget": 4,
+    "expected": {
+      "state": "COMPLETE",
+      "evaluated": [
+        "expand",
+        "semantic"
+      ],
+      "reused": [
+        "include",
+        "optional"
+      ],
+      "revision": true,
+      "report": {
+        "optional": "INACTIVE",
+        "types": [
+          "Int",
+          "A",
+          "B",
+          "C"
+        ],
+        "expected": [
+          "A"
+        ],
+        "completion": [
+          "value"
+        ],
+        "edit": [
+          "memory:main",
+          4,
+          44,
+          44
+        ],
+        "diagnostics": [],
+        "generatedEdit": "REJECTED",
+        "expandedLength": 130
+      },
+      "origins": [
+        "memory:main",
+        "memory:main",
+        "memory:included",
+        "memory:main",
+        "memory:main"
+      ]
+    }
+  },
+  {
+    "id": "main-diagnostic-origin",
+    "snapshots": {
+      "main": {
+        "uri": "memory:main",
+        "version": 5,
+        "text": "/*日😀*/ let value:Missing; fn use(A):Int; call use(?);"
+      },
+      "included": {
+        "uri": "memory:included",
+        "version": 2,
+        "text": "/*型😀*/ builtin Int{} record A{next:B;} record B{prev:A;} record C{} "
+      },
+      "optional": {
+        "uri": "memory:optional",
+        "version": 2,
+        "text": "@@@"
+      }
+    },
+    "configuration": {
+      "extra": "false",
+      "generation": "9",
+      "cursor": "50"
+    },
+    "budget": 4,
+    "expected": {
+      "state": "FAILED",
+      "evaluated": [
+        "expand",
+        "semantic"
+      ],
+      "reused": [
+        "include",
+        "optional"
+      ],
+      "revision": true,
+      "report": {
+        "optional": "INACTIVE",
+        "types": [],
+        "expected": [],
+        "completion": [],
+        "edit": [],
+        "diagnostics": [
+          [
+            "UNDEFINED_TYPE",
+            "memory:main",
+            5,
+            7,
+            26,
+            true
+          ]
+        ],
+        "generatedEdit": "REJECTED",
+        "expandedLength": 136
+      },
+      "origins": [
+        "memory:main",
+        "memory:main",
+        "memory:included",
+        "memory:main",
+        "memory:main"
+      ]
+    }
+  },
+  {
+    "id": "include-diagnostic-origin",
+    "snapshots": {
+      "main": {
+        "uri": "memory:main",
+        "version": 6,
+        "text": "/*日😀*/ let value:A; fn use(A):Int; call use(?);"
+      },
+      "included": {
+        "uri": "memory:included",
+        "version": 3,
+        "text": "/*型😀*/ builtin Int{} record A{next:Missing;} record B{} "
+      },
+      "optional": {
+        "uri": "memory:optional",
+        "version": 2,
+        "text": "@@@"
+      }
+    },
+    "configuration": {
+      "extra": "false",
+      "generation": "10",
+      "cursor": "44"
+    },
+    "budget": 4,
+    "expected": {
+      "state": "FAILED",
+      "evaluated": [
+        "include",
+        "expand",
+        "semantic"
+      ],
+      "reused": [
+        "optional"
+      ],
+      "revision": true,
+      "report": {
+        "optional": "INACTIVE",
+        "types": [],
+        "expected": [],
+        "completion": [],
+        "edit": [],
+        "diagnostics": [
+          [
+            "UNDEFINED_TYPE",
+            "memory:included",
+            3,
+            30,
+            43,
+            true
+          ]
+        ],
+        "generatedEdit": "REJECTED",
+        "expandedLength": 118
+      },
+      "origins": [
+        "memory:main",
+        "memory:main",
+        "memory:included",
+        "memory:main",
+        "memory:main"
+      ]
+    }
+  },
+  {
+    "id": "budget",
+    "snapshots": {
+      "main": {
+        "uri": "memory:main",
+        "version": 6,
+        "text": "/*日😀*/ let value:A; fn use(A):Int; call use(?);"
+      },
+      "included": {
+        "uri": "memory:included",
+        "version": 3,
+        "text": "/*型😀*/ builtin Int{} record A{next:Missing;} record B{} "
+      },
+      "optional": {
+        "uri": "memory:optional",
+        "version": 2,
+        "text": "@@@"
+      }
+    },
+    "configuration": {
+      "extra": "false",
+      "generation": "10",
+      "cursor": "44"
+    },
+    "budget": 1,
+    "expected": {
+      "state": "LIMIT",
+      "evaluated": [],
+      "reused": [],
+      "revision": false,
+      "report": null,
+      "origins": []
+    }
+  },
+  {
+    "id": "required-input-deferred",
+    "snapshots": {
+      "main": {
+        "uri": "memory:main",
+        "version": 6,
+        "text": "/*日😀*/ let value:A; fn use(A):Int; call use(?);"
+      },
+      "optional": {
+        "uri": "memory:optional",
+        "version": 2,
+        "text": "@@@"
+      }
+    },
+    "configuration": {
+      "extra": "false",
+      "generation": "10",
+      "cursor": "44"
+    },
+    "budget": 4,
+    "expected": {
+      "state": "DEFERRED",
+      "evaluated": [],
+      "reused": [],
+      "revision": false,
+      "report": null,
+      "origins": []
+    }
+  },
+  {
+    "id": "repair-after-deferred",
+    "snapshots": {
+      "main": {
+        "uri": "memory:main",
+        "version": 6,
+        "text": "/*日😀*/ let value:A; fn use(A):Int; call use(?);"
+      },
+      "optional": {
+        "uri": "memory:optional",
+        "version": 2,
+        "text": "@@@"
+      },
+      "included": {
+        "uri": "memory:included",
+        "version": 4,
+        "text": "/*型😀*/ builtin Int{} record A{next:B;} record B{prev:A;} "
+      }
+    },
+    "configuration": {
+      "extra": "false",
+      "generation": "11",
+      "cursor": "44"
+    },
+    "budget": 4,
+    "expected": {
+      "state": "COMPLETE",
+      "evaluated": [
+        "include",
+        "expand",
+        "semantic"
+      ],
+      "reused": [
+        "optional"
+      ],
+      "revision": true,
+      "report": {
+        "optional": "INACTIVE",
+        "types": [
+          "Int",
+          "A",
+          "B"
+        ],
+        "expected": [
+          "A"
+        ],
+        "completion": [
+          "value"
+        ],
+        "edit": [
+          "memory:main",
+          6,
+          44,
+          44
+        ],
+        "diagnostics": [],
+        "generatedEdit": "REJECTED",
+        "expandedLength": 119
+      },
+      "origins": [
+        "memory:main",
+        "memory:main",
+        "memory:included",
+        "memory:main",
+        "memory:main"
+      ]
+    }
+  },
+  {
+    "id": "negative-cursor",
+    "snapshots": {
+      "main": {
+        "uri": "memory:main",
+        "version": 6,
+        "text": "/*日😀*/ let value:A; fn use(A):Int; call use(?);"
+      },
+      "optional": {
+        "uri": "memory:optional",
+        "version": 2,
+        "text": "@@@"
+      },
+      "included": {
+        "uri": "memory:included",
+        "version": 4,
+        "text": "/*型😀*/ builtin Int{} record A{next:B;} record B{prev:A;} "
+      }
+    },
+    "configuration": {
+      "extra": "false",
+      "generation": "11",
+      "cursor": "-1"
+    },
+    "budget": 4,
+    "expected": {
+      "error": "invalid cursor"
+    },
+    "expectedError": "invalid cursor"
+  },
+  {
+    "id": "outside-main-cursor",
+    "snapshots": {
+      "main": {
+        "uri": "memory:main",
+        "version": 6,
+        "text": "/*日😀*/ let value:A; fn use(A):Int; call use(?);"
+      },
+      "optional": {
+        "uri": "memory:optional",
+        "version": 2,
+        "text": "@@@"
+      },
+      "included": {
+        "uri": "memory:included",
+        "version": 4,
+        "text": "/*型😀*/ builtin Int{} record A{next:B;} record B{prev:A;} "
+      }
+    },
+    "configuration": {
+      "extra": "false",
+      "generation": "11",
+      "cursor": "48"
+    },
+    "budget": 4,
+    "expected": {
+      "error": "invalid cursor"
+    },
+    "expectedError": "invalid cursor"
+  },
+  {
+    "id": "overflow-cursor",
+    "snapshots": {
+      "main": {
+        "uri": "memory:main",
+        "version": 6,
+        "text": "/*日😀*/ let value:A; fn use(A):Int; call use(?);"
+      },
+      "optional": {
+        "uri": "memory:optional",
+        "version": 2,
+        "text": "@@@"
+      },
+      "included": {
+        "uri": "memory:included",
+        "version": 4,
+        "text": "/*型😀*/ builtin Int{} record A{next:B;} record B{prev:A;} "
+      }
+    },
+    "configuration": {
+      "extra": "false",
+      "generation": "11",
+      "cursor": "2147483648"
+    },
+    "budget": 4,
+    "expected": {
+      "error": "invalid cursor"
+    },
+    "expectedError": "invalid cursor"
+  },
+  {
+    "id": "signed-cursor",
+    "snapshots": {
+      "main": {
+        "uri": "memory:main",
+        "version": 6,
+        "text": "/*日😀*/ let value:A; fn use(A):Int; call use(?);"
+      },
+      "optional": {
+        "uri": "memory:optional",
+        "version": 2,
+        "text": "@@@"
+      },
+      "included": {
+        "uri": "memory:included",
+        "version": 4,
+        "text": "/*型😀*/ builtin Int{} record A{next:B;} record B{prev:A;} "
+      }
+    },
+    "configuration": {
+      "extra": "false",
+      "generation": "11",
+      "cursor": "+1"
+    },
+    "budget": 4,
+    "expected": {
+      "error": "invalid cursor"
+    },
+    "expectedError": "invalid cursor"
+  },
+  {
+    "id": "empty-cursor",
+    "snapshots": {
+      "main": {
+        "uri": "memory:main",
+        "version": 6,
+        "text": "/*日😀*/ let value:A; fn use(A):Int; call use(?);"
+      },
+      "optional": {
+        "uri": "memory:optional",
+        "version": 2,
+        "text": "@@@"
+      },
+      "included": {
+        "uri": "memory:included",
+        "version": 4,
+        "text": "/*型😀*/ builtin Int{} record A{next:B;} record B{prev:A;} "
+      }
+    },
+    "configuration": {
+      "extra": "false",
+      "generation": "11",
+      "cursor": ""
+    },
+    "budget": 4,
+    "expected": {
+      "error": "invalid cursor"
+    },
+    "expectedError": "invalid cursor"
+  }
+]

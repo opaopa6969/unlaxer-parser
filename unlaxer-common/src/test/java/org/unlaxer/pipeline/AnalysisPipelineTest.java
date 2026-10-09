@@ -128,4 +128,42 @@ public class AnalysisPipelineTest {
         assertThrows(IllegalArgumentException.class, () -> new AnalysisPipeline(
                 List.of(phase("a", List.of("missing"), List.of(), List.of())), Map.of()));
     }
+    @Test public void conditionalPhasesSkipInputsDependenciesAndUserCode() throws Exception {
+        AtomicInteger guardCalls = new AtomicInteger(), leafCalls = new AtomicInteger();
+        AnalysisPipeline pipeline = new AnalysisPipeline(List.of(
+                phase("root", List.of("guard"), List.of(), List.of()),
+                new Phase("guard", List.of("leaf"), List.of(), List.of(), true),
+                phase("leaf", List.of(), List.of("included"), List.of())), Map.of(
+                "root", request -> request.dependencies().get("guard"),
+                "guard", request -> { assertEquals("true", request.configuration().get("enabled")); guardCalls.incrementAndGet(); return request.dependencies().get("leaf"); },
+                "leaf", request -> { leafCalls.incrementAndGet(); return source(request.inputs().get("included")); }),
+                Map.of("guard", new Condition("enabled", "true")));
+        int expectedCalls = 0;
+        for (String line : Files.readAllLines(fixture().resolveSibling("conditions.tsv"))) {
+            if (line.startsWith("#")) continue;
+            String[] f = line.split("\t");
+            Map<String, DocumentSnapshot> inputs = f[3].equals("-") ? Map.of() : Map.of("included", new DocumentSnapshot("include", Long.parseLong(f[2]), f[3]));
+            Map<String, String> settings = f[1].equals("-") ? Map.of("unrelated", f[0]) : Map.of("enabled", f[1], "unrelated", f[0]);
+            Result result = pipeline.evaluate("root", inputs, settings, Integer.parseInt(f[5]), Boolean.parseBoolean(f[4]));
+            assertEquals(f[0], State.valueOf(f[6]), result.artifact().state());
+            assertEquals(f[0], f[7].equals("-") ? "" : f[7], result.artifact().payload());
+            assertEquals(f[0], f[8].equals("-") ? "" : f[8], String.join(",", result.evaluated()));
+            assertEquals(f[0], f[9].equals("-") ? "" : f[9], String.join(",", result.reused()));
+            if (f[8].contains("leaf")) expectedCalls++;
+            assertEquals(f[0], expectedCalls, guardCalls.get()); assertEquals(f[0], expectedCalls, leafCalls.get());
+        }
+    }
+    @Test public void inactiveConditionsCutCyclesAndDoNotRequireAnExecutor() {
+        Executor executor = request -> request.dependencies().values().iterator().next();
+        AnalysisPipeline cyclic = new AnalysisPipeline(List.of(
+                phase("a", List.of("b"), List.of(), List.of()), phase("b", List.of("a"), List.of(), List.of())),
+                Map.of("a", executor, "b", executor), Map.of("a", new Condition("enabled", "true")));
+        assertEquals(State.INACTIVE, cyclic.evaluate("a", Map.of(), Map.of(), 1, false).artifact().state());
+        assertEquals(State.CYCLE, cyclic.evaluate("a", Map.of(), Map.of("enabled", "true"), 2, false).artifact().state());
+        AnalysisPipeline absent = new AnalysisPipeline(List.of(phase("a", List.of(), List.of("missing"), List.of())), Map.of(), Map.of("a", new Condition("enabled", "true")));
+        assertEquals(State.INACTIVE, absent.evaluate("a", Map.of(), Map.of(), 1, false).artifact().state());
+        assertEquals(State.UNSUPPORTED, absent.evaluate("a", Map.of(), Map.of("enabled", "true"), 1, false).artifact().state());
+        assertThrows(IllegalArgumentException.class, () -> new Condition("", ""));
+        assertThrows(IllegalArgumentException.class, () -> new AnalysisPipeline(List.of(), Map.of(), Map.of("missing", new Condition("enabled", "true"))));
+    }
 }
