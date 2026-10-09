@@ -3,6 +3,13 @@ grammar LexicalProbe {
   @feature: declarativeTokensV1
   @feature: contextAccessorsV1
   @package: lexical.probe
+  token SCALAR_RANGE = CHAR_RANGE('\u{1F600}','\u{1F601}')
+  token BMP_ESCAPE = CHAR_RANGE('\u0041','\u0042')
+  token SAFE_SCALAR = NEGATION('\u0000\u0009\u000A\u{1F600}')
+  token ESCAPED_BACKSLASH = NEGATION('\\u0041')
+  token RAW_ESCAPE ::= '\u0041';
+  token XID = XID_IDENTIFIER
+  token XID_NESTED ::= XID_IDENTIFIER;
   token DIGIT ::= CHAR_RANGE('0','9');
   token NUMBER ::= ['+'|'-'] (DIGIT+ '.' DIGIT* | '.' DIGIT+ | DIGIT+)
     [('e'|'E') ['+'|'-'] DIGIT+];

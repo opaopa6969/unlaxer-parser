@@ -1,0 +1,1 @@
+grammar C { @ubnf: v2 token ID ::= 'a'; @root @lexicalContext(tokens=['ID'], literals=['😀','>']) Root ::= ID; @lexicalContext(tokens=[]) Empty ::= ''; }

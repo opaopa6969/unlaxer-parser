@@ -1,0 +1,255 @@
+[
+  {
+    "name": "cxx23-n4950-primary-current",
+    "grammar": "grammar Cxx23Primary { @package: org.example.uniquelongest token NUMBER=org.unlaxer.parser.elementary.NumberParser @root @mapping(Group,params=[value]) Root ::= '(' NumericLiteral @value ')'; @mapping(Number,params=[value]) NumericLiteral ::= (NUMBER) @value; }",
+    "cases": [
+      {
+        "id": "parenthesized-literal",
+        "input": "(10)",
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Group",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {
+            "value": {
+              "type": "Number",
+              "span": [
+                1,
+                3
+              ],
+              "fields": {
+                "value": "10"
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "cxx23-n4950-additive-rewritten",
+    "grammar": "grammar Cxx23Additive { @package: org.example.uniquelongest token NUMBER=org.unlaxer.parser.elementary.NumberParser @root @leftAssoc @precedence(level=10) @mapping(Binary,params=[left,op,right]) Root ::= NumericLiteral @left { '-' @op NumericLiteral @right }; @mapping(Number,params=[value]) NumericLiteral ::= (NUMBER) @value; }",
+    "cases": [
+      {
+        "id": "left-subtraction-chain",
+        "input": "10-3-2",
+        "prefix": [
+          true,
+          6,
+          6
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Binary",
+          "span": [
+            0,
+            6
+          ],
+          "fields": {
+            "left": {
+              "type": "Number",
+              "span": [
+                0,
+                2
+              ],
+              "fields": {
+                "value": "10"
+              }
+            },
+            "op": [
+              "-",
+              "-"
+            ],
+            "right": [
+              {
+                "type": "Number",
+                "span": [
+                  3,
+                  4
+                ],
+                "fields": {
+                  "value": "3"
+                }
+              },
+              {
+                "type": "Number",
+                "span": [
+                  5,
+                  6
+                ],
+                "fields": {
+                  "value": "2"
+                }
+              }
+            ]
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "cxx23-fixed-type-legacy-ordered",
+    "grammar": "grammar Cxx23Ordered { @package: org.example.uniquelongest @root @mapping(Statement,params=[value]) Root ::= Declaration @value | Expression @value;\n @mapping(Declaration,params=[text]) Declaration ::= 'T(a);' @text;\n @mapping(Expression,params=[text]) Expression ::= ('T(a);' | 'T(a)++;') @text; }",
+    "cases": [
+      {
+        "id": "declaration-by-existing-order",
+        "input": "T(a);",
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Statement",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "value": {
+              "type": "Declaration",
+              "span": [
+                0,
+                5
+              ],
+              "fields": {
+                "text": "T(a);"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "expression-only",
+        "input": "T(a)++;",
+        "prefix": [
+          true,
+          7,
+          7
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Statement",
+          "span": [
+            0,
+            7
+          ],
+          "fields": {
+            "value": {
+              "type": "Expression",
+              "span": [
+                0,
+                7
+              ],
+              "fields": {
+                "text": "T(a)++;"
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "64-candidates-boundary",
+    "grammar": "grammar ChoiceBoundary { @package: org.example.uniquelongest @root @uniqueLongestChoice @mapping(Result,params=[value]) Root ::= 'a' @value | 'aa' @value | 'aaa' @value | 'aaaa' @value | 'aaaaa' @value | 'aaaaaa' @value | 'aaaaaaa' @value | 'aaaaaaaa' @value | 'aaaaaaaaa' @value | 'aaaaaaaaaa' @value | 'aaaaaaaaaaa' @value | 'aaaaaaaaaaaa' @value | 'aaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value | 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' @value; }",
+    "cases": [
+      {
+        "id": "max-unique",
+        "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "prefix": [
+          true,
+          64,
+          64
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Result",
+          "span": [
+            0,
+            64
+          ],
+          "fields": {
+            "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        }
+      },
+      {
+        "id": "short-unique",
+        "input": "a",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Result",
+          "span": [
+            0,
+            1
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "nested-12-levels-unique-max",
+    "grammar": "grammar NestedUnique { @package: org.example.uniquelongest @root @mapping(Result,params=[value]) Root ::= N0 @value; @uniqueLongestChoice N0 ::= 'a' N1 | 'aa' N1; @uniqueLongestChoice N1 ::= 'a' N2 | 'aa' N2; @uniqueLongestChoice N2 ::= 'a' N3 | 'aa' N3; @uniqueLongestChoice N3 ::= 'a' N4 | 'aa' N4; @uniqueLongestChoice N4 ::= 'a' N5 | 'aa' N5; @uniqueLongestChoice N5 ::= 'a' N6 | 'aa' N6; @uniqueLongestChoice N6 ::= 'a' N7 | 'aa' N7; @uniqueLongestChoice N7 ::= 'a' N8 | 'aa' N8; @uniqueLongestChoice N8 ::= 'a' N9 | 'aa' N9; @uniqueLongestChoice N9 ::= 'a' N10 | 'aa' N10; @uniqueLongestChoice N10 ::= 'a' N11 | 'aa' N11; @uniqueLongestChoice N11 ::= 'a' N12 | 'aa' N12; N12 ::= 'a'; }",
+    "cases": [
+      {
+        "id": "max-at-every-level",
+        "input": "aaaaaaaaaaaaaaaaaaaaaaaaa",
+        "prefix": [
+          true,
+          25,
+          25
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Result",
+          "span": [
+            0,
+            25
+          ],
+          "fields": {
+            "value": "aaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "nested-12-levels-ambiguity",
+    "grammar": "grammar NestedTie { @package: org.example.uniquelongest @root @mapping(Result,params=[value]) Root ::= N0 @value; @uniqueLongestChoice N0 ::= 'a' N1 | 'a' N1 'z'; @uniqueLongestChoice N1 ::= 'a' N2 | 'a' N2 'z'; @uniqueLongestChoice N2 ::= 'a' N3 | 'a' N3 'z'; @uniqueLongestChoice N3 ::= 'a' N4 | 'a' N4 'z'; @uniqueLongestChoice N4 ::= 'a' N5 | 'a' N5 'z'; @uniqueLongestChoice N5 ::= 'a' N6 | 'a' N6 'z'; @uniqueLongestChoice N6 ::= 'a' N7 | 'a' N7 'z'; @uniqueLongestChoice N7 ::= 'a' N8 | 'a' N8 'z'; @uniqueLongestChoice N8 ::= 'a' N9 | 'a' N9 'z'; @uniqueLongestChoice N9 ::= 'a' N10 | 'a' N10 'z'; @uniqueLongestChoice N10 ::= 'a' N11 | 'a' N11 'z'; @uniqueLongestChoice N11 ::= 'a' N12 | 'a' N12 'z'; @uniqueLongestChoice N12 ::= '😀' | '😀'; }",
+    "cases": [
+      {
+        "id": "unicode-deep-tie",
+        "input": "aaaaaaaaaaaa😀",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": {
+          "kind": "ambiguity",
+          "offset": 13,
+          "expected": "unique longest alternative"
+        }
+      }
+    ]
+  }
+]
