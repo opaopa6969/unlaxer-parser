@@ -30,7 +30,7 @@ public class PlaygroundQueryConformanceTest {
         }
         Files.copy(fixtures.resolve("query_adapter.rs"),output.resolve("src/query_adapter.rs"),StandardCopyOption.REPLACE_EXISTING);
         run(List.of("node",output.resolve("build.mjs").toString()));
-        run(List.of("node",fixtures.resolve("probe.mjs").toString(),output.resolve("public/language.wasm").toString()));
+        run(List.of("node",fixtures.resolve("probe.mjs").toString(),output.resolve("public/language.wasm").toString(),output.resolve("public/worker.js").toString()));
     }
     private void run(List<String> args) throws Exception {
         Path log=temporary.newFile().toPath();var builder=new ProcessBuilder(args).redirectErrorStream(true).redirectOutput(log.toFile());builder.environment().put("CARGO_INCREMENTAL","0");

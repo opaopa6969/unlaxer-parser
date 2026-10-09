@@ -29,3 +29,13 @@ console.log('Playground query ABI: actual registry/providers, six capabilities, 
 // The byte-count split must never decode half a Unicode scalar or read outside the input buffer.
 const encoded=encode.encode('😀'),pointer=engine.pg_input(encoded.length);new Uint8Array(engine.memory.buffer,pointer,encoded.length).set(encoded);
 for(const length of [1,99]) { engine.pg_query(0,34,1,length);const result=JSON.parse(decode.decode(new Uint8Array(engine.memory.buffer,engine.pg_output(),engine.pg_output_len())));assert.ok(result.runtimeError); }
+
+// Source and argument are encoded separately: surrogate halves cannot form a pair across buffers.
+const {runInNewContext}=await import('node:vm');
+const messages=[],self={postMessage:message=>messages.push(message)};
+runInNewContext(fs.readFileSync(process.argv[3],'utf8'),{self,WebAssembly,TextEncoder,TextDecoder,Uint8Array,Number,Error,String});
+await self.onmessage({data:{id:40,type:'init',bytes:fs.readFileSync(process.argv[2])}});
+for(const [input,argument] of [['\ud800','\udc00'],['ok','\udc00'],['\ud800','ok']]) {
+  await self.onmessage({data:{id:41,type:'query',input,argument,cursor:0,operation:4}});
+  assert.match(messages.at(-1).error,/Unicode/);
+}
