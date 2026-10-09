@@ -1,0 +1,7 @@
+grammar FormulaInfo {
+  @package: org.example.embedded
+  @embedded: { rule: 'Formula' body: 'body' language: 'tiny' package: 'example' version: '1' grammar: 'TinyExpression' entry: 'Expression' }
+  token BODY = UNTIL('}F')
+  @root @mapping(Document) Document ::= '😀' { Formula };
+  @mapping(Formula, params=[body]) Formula ::= 'F{' BODY @body '}F';
+}

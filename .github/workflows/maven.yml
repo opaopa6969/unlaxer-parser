@@ -48,10 +48,12 @@ jobs:
     - uses: actions/setup-node@v4
       with:
         node-version: '20'
+    - name: Check pinned Unicode XID tables
+      run: python3 scripts/generate-xid-tables.py --check
     - name: Cross-language fixtures, compile failures, and generated-file drift
       run: >
         mvn -B -pl unlaxer-common,unlaxer-dsl -am test
-        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,RustPortabilityConformanceTest,TokenAdapterConformanceTest,ParseBindingsConformanceTest,DeclarativeTokenConformanceTest,ApiImpactConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest,SkipMappingConformanceTest,CaptureEqualityConformanceTest,ErrorElementConformanceTest,RecoveryConformanceTest,SemanticModelConformanceTest,EditorParseResultConformanceTest,ProjectSymbolIndexConformanceTest,TypeSystemConformanceTest,CallInferenceConformanceTest,SemanticQueriesConformanceTest,SemanticQueryEditsTest,SemanticModelUbnfTest,TokenStreamConformanceTest,PackageResolverConformanceTest,HttpsPackageConformanceTest,VocabularyOriginsConformanceTest -DrustConformance=true -DtokenStreamBench=true
+        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,RustPortabilityConformanceTest,TokenAdapterConformanceTest,ParseBindingsConformanceTest,DeclarativeTokenConformanceTest,ApiImpactConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest,SkipMappingConformanceTest,CaptureEqualityConformanceTest,ErrorElementConformanceTest,RecoveryConformanceTest,SemanticModelConformanceTest,EditorParseResultConformanceTest,ProjectSymbolIndexConformanceTest,TypeSystemConformanceTest,CallInferenceConformanceTest,SemanticQueriesConformanceTest,SemanticQueryEditsTest,SemanticModelUbnfTest,TokenStreamConformanceTest,PackageResolverConformanceTest,HttpsPackageConformanceTest,VocabularyOriginsConformanceTest,CodePointEscapeConformanceTest -DrustConformance=true -DtokenStreamBench=true
         -Dsurefire.failIfNoSpecifiedTests=false
     - name: Resolver tutorial (Java and Rust)
       run: |
@@ -175,7 +177,8 @@ jobs:
       run: |
         cargo build --release --locked --manifest-path rust/Cargo.toml -p unlaxer-evolution-example
         printf '%s\n' 'if(0,neg(2*3),4+5)' | rust/target/release/unlaxer-evolution-example | python3 -c 'import json,sys; r=json.load(sys.stdin); assert r["ok"] and r["value"] == 9'
-        tar -czf rust/target/unlaxer-evolution-linux-x86_64.tar.gz -C rust/target/release unlaxer-evolution-example
+        cp spec-corpus/xid-identifier/UNICODE-LICENSE.txt rust/target/release/UNICODE-LICENSE.txt
+        tar -czf rust/target/unlaxer-evolution-linux-x86_64.tar.gz -C rust/target/release unlaxer-evolution-example UNICODE-LICENSE.txt
     - name: Build and smoke-test the JVM-free generator
       run: |
         cargo build --release --locked --manifest-path rust/Cargo.toml -p unlaxer-generator
@@ -186,7 +189,7 @@ jobs:
         PATH='' JAVA_HOME=/nonexistent-java rust/target/release/unlaxer generate --grammar spec-corpus/error-elements/expected.ubnf --output "$error_generated_dir"
         for module in mod.rs ast.rs parser.rs mapper.rs evaluator.rs; do test -s "$error_generated_dir/$module"; done
         PATH='' JAVA_HOME=/nonexistent-java rust/target/release/unlaxer impact --target rust --before spec-corpus/api-impact/node-add/before.ubnf --after spec-corpus/api-impact/node-add/after.ubnf | python3 -c 'import json,sys; r=json.load(sys.stdin); assert r["ok"] and [(c["kind"], c["subject"]) for c in r["changes"]] == [("METHOD_ADDED", "eval_extra"), ("NODE_ADDED", "Extra")]'
-        tar -czf rust/target/unlaxer-generator-linux-x86_64.tar.gz -C rust/target/release unlaxer
+        tar -czf rust/target/unlaxer-generator-linux-x86_64.tar.gz -C rust/target/release unlaxer UNICODE-LICENSE.txt
     - uses: actions/upload-artifact@v4
       with:
         name: unlaxer-generator-linux-x86_64

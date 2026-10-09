@@ -1,0 +1,10 @@
+# name	grammar
+missing-field	grammar G { @embedded: { rule: 'Root' body: 'body' language: 'x' package: 'example' grammar: 'X' entry: 'Document' } @root Root ::= '[' 'x' @body ']'; }
+duplicate-field	grammar G { @embedded: { rule: 'Root' body: 'body' language: 'x' package: 'example' version: '1' version: '2' grammar: 'X' entry: 'Document' } @root Root ::= '[' 'x' @body ']'; }
+unknown-rule	grammar G { @embedded: { rule: 'Missing' body: 'body' language: 'x' package: 'example' version: '1' grammar: 'X' entry: 'Document' } @root Root ::= '[' 'x' @body ']'; }
+missing-capture	grammar G { @embedded: { rule: 'Root' body: 'missing' language: 'x' package: 'example' version: '1' grammar: 'X' entry: 'Document' } @root Root ::= '[' 'x' @body ']'; }
+optional-capture	grammar G { @embedded: { rule: 'Root' body: 'body' language: 'x' package: 'example' version: '1' grammar: 'X' entry: 'Document' } @root Root ::= '[' ['x'] @body ']'; }
+choice-rule	grammar G { @embedded: { rule: 'Root' body: 'body' language: 'x' package: 'example' version: '1' grammar: 'X' entry: 'Document' } @root Root ::= 'x' @body | 'y' @body; }
+duplicate-rule	grammar G { @embedded: { rule: 'Root' body: 'body' language: 'x' package: 'example' version: '1' grammar: 'X' entry: 'Document' } @embedded: { rule: 'Root' body: 'body' language: 'x' package: 'example' version: '1' grammar: 'X' entry: 'Document' } @root Root ::= '[' 'x' @body ']'; }
+unknown-profile	grammar G { @embedding: unknown @root Root ::= 'x'; }
+recovered-boundary	grammar G { @embedded: { rule: 'Root' body: 'body' language: 'x' package: 'example' version: '1' grammar: 'X' entry: 'Document' } @root @recovery(sync=';') Root ::= '[' 'x' @body ']'; }
