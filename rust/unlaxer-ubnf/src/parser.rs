@@ -238,6 +238,12 @@ impl Parser<'_> {
         let value = self.dotted()?;
         let kind = match value.as_str() {
             "ANY" => TokenKind::Any,
+            "XID_IDENTIFIER" => TokenKind::Declarative {
+                expression: crate::lexical::LexicalExpression::leaf(
+                    crate::lexical::Op::XID_IDENTIFIER,
+                    String::new(),
+                ),
+            },
             "EOF" => TokenKind::Eof,
             "EMPTY" => TokenKind::Empty,
             "UNTIL" | "NEGATION" | "LOOKAHEAD" | "NEGATIVE_LOOKAHEAD" | "CI" | "REGEX"
@@ -484,6 +490,7 @@ impl Parser<'_> {
         }
         let op = match name.as_str() {
             "ANY" => Some(Op::ANY),
+            "XID_IDENTIFIER" => Some(Op::XID_IDENTIFIER),
             "EOF" => Some(Op::EOF),
             "BOF" => Some(Op::BOF),
             "BOL" => Some(Op::BOL),

@@ -29,6 +29,25 @@ public class DeclarativeTokenTest {
         }
     }
 
+    @Test public void xidRejectsIsolatedSurrogatesAndKeepsOriginalNormalization() {
+        for (String declarations : List.of("token T = XID_IDENTIFIER", "token T ::= XID_IDENTIFIER;")) {
+            LexicalTokenParser parser = parser(declarations);
+            for (String input : List.of(String.valueOf((char) 0xd800), String.valueOf((char) 0xdfff), "_x", "9x", "\u037a")) {
+                try (ParseContext context = new ParseContext(StringSource.createRootSource(input))) {
+                    assertTrue(input, parser.parse(context).isFailed());
+                    assertEquals(0, context.position());
+                    assertEquals(0, context.matchedPosition());
+                }
+            }
+            for (String input : List.of("é", "e\u0301", "𐐀x", "名前")) {
+                try (ParseContext context = new ParseContext(StringSource.createRootSource(input))) {
+                    assertTrue(input, parser.parse(context).isSucceeded());
+                    assertEquals(input.codePointCount(0, input.length()), context.position());
+                }
+            }
+        }
+    }
+
     @Test public void commentedSettingsRetainTheirSemanticValues() throws Exception {
         var path = java.nio.file.Path.of("../rust/unlaxer-ubnf/tests/fixtures/positive/settings-comments.ubnf");
         var grammar = UBNFMapper.parse(java.nio.file.Files.readString(path)).grammars().get(0);

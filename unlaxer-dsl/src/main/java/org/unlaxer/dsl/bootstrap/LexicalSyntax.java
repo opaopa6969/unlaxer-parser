@@ -12,7 +12,7 @@ public final class LexicalSyntax {
         return switch (e.op()) {
             case LITERAL -> quote(e.text());
             case REF -> e.text();
-            case ANY, EOF, BOF, BOL, EOL -> e.op().name();
+            case ANY, XID_IDENTIFIER, EOF, BOF, BOL, EOL -> e.op().name();
             case RANGE -> "CHAR_RANGE(" + quote(new String(Character.toChars(e.min()))) + ", "
                 + quote(new String(Character.toChars(e.max()))) + ")";
             case EXCEPT -> "NEGATION(" + quote(e.text()) + ")";
@@ -166,7 +166,7 @@ public final class LexicalSyntax {
             };
             require(')'); return result;
         }
-        if (List.of("ANY", "EOF", "BOF", "BOL", "EOL").contains(name)) return LexicalExpression.leaf(Op.valueOf(name), "");
+        if (List.of("ANY", "XID_IDENTIFIER", "EOF", "BOF", "BOL", "EOL").contains(name)) return LexicalExpression.leaf(Op.valueOf(name), "");
         while (eat('.')) name += "." + identifier();
         return LexicalExpression.leaf(Op.REF, name);
     }
