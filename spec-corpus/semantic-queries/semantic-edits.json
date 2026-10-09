@@ -1,0 +1,2048 @@
+{
+  "schemaVersion": 1,
+  "states": [
+    {
+      "name": "initial",
+      "project": {
+        "id": "query-project",
+        "version": 1,
+        "modules": [
+          {
+            "id": "main",
+            "model": {
+              "uri": "file:main",
+              "version": 1,
+              "source": "😀 ac ",
+              "types": [
+                {
+                  "id": "IAccessor",
+                  "kind": "INTERFACE",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "DbAccessor",
+                  "kind": "RECORD",
+                  "supertypes": [
+                    "IAccessor"
+                  ],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "Int",
+                  "kind": "BUILTIN",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "scopes": [
+                {
+                  "id": "root",
+                  "parent": null,
+                  "span": [
+                    0,
+                    5
+                  ]
+                }
+              ],
+              "symbols": [
+                {
+                  "id": "local",
+                  "name": "acLocal",
+                  "type": "DbAccessor",
+                  "scope": "root",
+                  "declaration": [
+                    0,
+                    0
+                  ],
+                  "visibleFrom": 0
+                }
+              ],
+              "signatures": [],
+              "calls": []
+            },
+            "exports": [],
+            "imports": [
+              {
+                "name": "acRemote",
+                "target": {
+                  "dependency": "",
+                  "module": "lib"
+                },
+                "symbol": "accessor",
+                "scope": "root",
+                "span": [
+                  0,
+                  0
+                ],
+                "visibleFrom": 0
+              }
+            ]
+          },
+          {
+            "id": "lib",
+            "model": {
+              "uri": "file:lib",
+              "version": 1,
+              "source": "accessor",
+              "types": [
+                {
+                  "id": "IAccessor",
+                  "kind": "INTERFACE",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "DbAccessor",
+                  "kind": "RECORD",
+                  "supertypes": [
+                    "IAccessor"
+                  ],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "Int",
+                  "kind": "BUILTIN",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "scopes": [
+                {
+                  "id": "root",
+                  "parent": null,
+                  "span": [
+                    0,
+                    8
+                  ]
+                }
+              ],
+              "symbols": [
+                {
+                  "id": "db",
+                  "name": "accessor",
+                  "type": "DbAccessor",
+                  "scope": "root",
+                  "declaration": [
+                    0,
+                    0
+                  ],
+                  "visibleFrom": 0
+                }
+              ],
+              "signatures": [],
+              "calls": []
+            },
+            "exports": [
+              "db"
+            ],
+            "imports": []
+          }
+        ],
+        "dependencies": []
+      },
+      "origin": 10,
+      "expected": "acLocal:YES:file:main:2-4:host:12-14;acRemote:YES:file:main:2-4:host:12-14"
+    },
+    {
+      "name": "type-parent-removed",
+      "project": {
+        "id": "query-project",
+        "version": 2,
+        "modules": [
+          {
+            "id": "main",
+            "model": {
+              "uri": "file:main",
+              "version": 2,
+              "source": "😀 ac ",
+              "types": [
+                {
+                  "id": "IAccessor",
+                  "kind": "INTERFACE",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "DbAccessor",
+                  "kind": "RECORD",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "Int",
+                  "kind": "BUILTIN",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "scopes": [
+                {
+                  "id": "root",
+                  "parent": null,
+                  "span": [
+                    0,
+                    5
+                  ]
+                }
+              ],
+              "symbols": [
+                {
+                  "id": "local",
+                  "name": "acLocal",
+                  "type": "DbAccessor",
+                  "scope": "root",
+                  "declaration": [
+                    0,
+                    0
+                  ],
+                  "visibleFrom": 0
+                }
+              ],
+              "signatures": [],
+              "calls": []
+            },
+            "exports": [],
+            "imports": [
+              {
+                "name": "acRemote",
+                "target": {
+                  "dependency": "",
+                  "module": "lib"
+                },
+                "symbol": "accessor",
+                "scope": "root",
+                "span": [
+                  0,
+                  0
+                ],
+                "visibleFrom": 0
+              }
+            ]
+          },
+          {
+            "id": "lib",
+            "model": {
+              "uri": "file:lib",
+              "version": 2,
+              "source": "accessor",
+              "types": [
+                {
+                  "id": "IAccessor",
+                  "kind": "INTERFACE",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "DbAccessor",
+                  "kind": "RECORD",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "Int",
+                  "kind": "BUILTIN",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "scopes": [
+                {
+                  "id": "root",
+                  "parent": null,
+                  "span": [
+                    0,
+                    8
+                  ]
+                }
+              ],
+              "symbols": [
+                {
+                  "id": "db",
+                  "name": "accessor",
+                  "type": "DbAccessor",
+                  "scope": "root",
+                  "declaration": [
+                    0,
+                    0
+                  ],
+                  "visibleFrom": 0
+                }
+              ],
+              "signatures": [],
+              "calls": []
+            },
+            "exports": [
+              "db"
+            ],
+            "imports": []
+          }
+        ],
+        "dependencies": []
+      },
+      "origin": 10,
+      "expected": ""
+    },
+    {
+      "name": "type-parent-restored",
+      "project": {
+        "id": "query-project",
+        "version": 3,
+        "modules": [
+          {
+            "id": "main",
+            "model": {
+              "uri": "file:main",
+              "version": 3,
+              "source": "😀 ac ",
+              "types": [
+                {
+                  "id": "IAccessor",
+                  "kind": "INTERFACE",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "DbAccessor",
+                  "kind": "RECORD",
+                  "supertypes": [
+                    "IAccessor"
+                  ],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "Int",
+                  "kind": "BUILTIN",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "scopes": [
+                {
+                  "id": "root",
+                  "parent": null,
+                  "span": [
+                    0,
+                    5
+                  ]
+                }
+              ],
+              "symbols": [
+                {
+                  "id": "local",
+                  "name": "acLocal",
+                  "type": "DbAccessor",
+                  "scope": "root",
+                  "declaration": [
+                    0,
+                    0
+                  ],
+                  "visibleFrom": 0
+                }
+              ],
+              "signatures": [],
+              "calls": []
+            },
+            "exports": [],
+            "imports": [
+              {
+                "name": "acRemote",
+                "target": {
+                  "dependency": "",
+                  "module": "lib"
+                },
+                "symbol": "accessor",
+                "scope": "root",
+                "span": [
+                  0,
+                  0
+                ],
+                "visibleFrom": 0
+              }
+            ]
+          },
+          {
+            "id": "lib",
+            "model": {
+              "uri": "file:lib",
+              "version": 3,
+              "source": "accessor",
+              "types": [
+                {
+                  "id": "IAccessor",
+                  "kind": "INTERFACE",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "DbAccessor",
+                  "kind": "RECORD",
+                  "supertypes": [
+                    "IAccessor"
+                  ],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "Int",
+                  "kind": "BUILTIN",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "scopes": [
+                {
+                  "id": "root",
+                  "parent": null,
+                  "span": [
+                    0,
+                    8
+                  ]
+                }
+              ],
+              "symbols": [
+                {
+                  "id": "db",
+                  "name": "accessor",
+                  "type": "DbAccessor",
+                  "scope": "root",
+                  "declaration": [
+                    0,
+                    0
+                  ],
+                  "visibleFrom": 0
+                }
+              ],
+              "signatures": [],
+              "calls": []
+            },
+            "exports": [
+              "db"
+            ],
+            "imports": []
+          }
+        ],
+        "dependencies": []
+      },
+      "origin": 10,
+      "expected": "acLocal:YES:file:main:2-4:host:12-14;acRemote:YES:file:main:2-4:host:12-14"
+    },
+    {
+      "name": "type-added",
+      "project": {
+        "id": "query-project",
+        "version": 4,
+        "modules": [
+          {
+            "id": "main",
+            "model": {
+              "uri": "file:main",
+              "version": 4,
+              "source": "😀 ac ",
+              "types": [
+                {
+                  "id": "IAccessor",
+                  "kind": "INTERFACE",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "DbAccessor",
+                  "kind": "RECORD",
+                  "supertypes": [
+                    "IAccessor"
+                  ],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "Int",
+                  "kind": "BUILTIN",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "OtherAccessor",
+                  "kind": "RECORD",
+                  "supertypes": [
+                    "IAccessor"
+                  ],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "scopes": [
+                {
+                  "id": "root",
+                  "parent": null,
+                  "span": [
+                    0,
+                    5
+                  ]
+                }
+              ],
+              "symbols": [
+                {
+                  "id": "local",
+                  "name": "acLocal",
+                  "type": "DbAccessor",
+                  "scope": "root",
+                  "declaration": [
+                    0,
+                    0
+                  ],
+                  "visibleFrom": 0
+                },
+                {
+                  "id": "new",
+                  "name": "acNew",
+                  "type": "OtherAccessor",
+                  "scope": "root",
+                  "declaration": [
+                    0,
+                    0
+                  ],
+                  "visibleFrom": 0
+                }
+              ],
+              "signatures": [],
+              "calls": []
+            },
+            "exports": [],
+            "imports": [
+              {
+                "name": "acRemote",
+                "target": {
+                  "dependency": "",
+                  "module": "lib"
+                },
+                "symbol": "accessor",
+                "scope": "root",
+                "span": [
+                  0,
+                  0
+                ],
+                "visibleFrom": 0
+              }
+            ]
+          },
+          {
+            "id": "lib",
+            "model": {
+              "uri": "file:lib",
+              "version": 4,
+              "source": "accessor",
+              "types": [
+                {
+                  "id": "IAccessor",
+                  "kind": "INTERFACE",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "DbAccessor",
+                  "kind": "RECORD",
+                  "supertypes": [
+                    "IAccessor"
+                  ],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "Int",
+                  "kind": "BUILTIN",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "OtherAccessor",
+                  "kind": "RECORD",
+                  "supertypes": [
+                    "IAccessor"
+                  ],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "scopes": [
+                {
+                  "id": "root",
+                  "parent": null,
+                  "span": [
+                    0,
+                    8
+                  ]
+                }
+              ],
+              "symbols": [
+                {
+                  "id": "db",
+                  "name": "accessor",
+                  "type": "DbAccessor",
+                  "scope": "root",
+                  "declaration": [
+                    0,
+                    0
+                  ],
+                  "visibleFrom": 0
+                }
+              ],
+              "signatures": [],
+              "calls": []
+            },
+            "exports": [
+              "db"
+            ],
+            "imports": []
+          }
+        ],
+        "dependencies": []
+      },
+      "origin": 10,
+      "expected": "acLocal:YES:file:main:2-4:host:12-14;acNew:YES:file:main:2-4:host:12-14;acRemote:YES:file:main:2-4:host:12-14"
+    },
+    {
+      "name": "type-and-symbol-deleted",
+      "project": {
+        "id": "query-project",
+        "version": 5,
+        "modules": [
+          {
+            "id": "main",
+            "model": {
+              "uri": "file:main",
+              "version": 5,
+              "source": "😀 ac ",
+              "types": [
+                {
+                  "id": "IAccessor",
+                  "kind": "INTERFACE",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "DbAccessor",
+                  "kind": "RECORD",
+                  "supertypes": [
+                    "IAccessor"
+                  ],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "Int",
+                  "kind": "BUILTIN",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "scopes": [
+                {
+                  "id": "root",
+                  "parent": null,
+                  "span": [
+                    0,
+                    5
+                  ]
+                }
+              ],
+              "symbols": [
+                {
+                  "id": "local",
+                  "name": "acLocal",
+                  "type": "DbAccessor",
+                  "scope": "root",
+                  "declaration": [
+                    0,
+                    0
+                  ],
+                  "visibleFrom": 0
+                }
+              ],
+              "signatures": [],
+              "calls": []
+            },
+            "exports": [],
+            "imports": [
+              {
+                "name": "acRemote",
+                "target": {
+                  "dependency": "",
+                  "module": "lib"
+                },
+                "symbol": "accessor",
+                "scope": "root",
+                "span": [
+                  0,
+                  0
+                ],
+                "visibleFrom": 0
+              }
+            ]
+          },
+          {
+            "id": "lib",
+            "model": {
+              "uri": "file:lib",
+              "version": 5,
+              "source": "accessor",
+              "types": [
+                {
+                  "id": "IAccessor",
+                  "kind": "INTERFACE",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "DbAccessor",
+                  "kind": "RECORD",
+                  "supertypes": [
+                    "IAccessor"
+                  ],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "Int",
+                  "kind": "BUILTIN",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "scopes": [
+                {
+                  "id": "root",
+                  "parent": null,
+                  "span": [
+                    0,
+                    8
+                  ]
+                }
+              ],
+              "symbols": [
+                {
+                  "id": "db",
+                  "name": "accessor",
+                  "type": "DbAccessor",
+                  "scope": "root",
+                  "declaration": [
+                    0,
+                    0
+                  ],
+                  "visibleFrom": 0
+                }
+              ],
+              "signatures": [],
+              "calls": []
+            },
+            "exports": [
+              "db"
+            ],
+            "imports": []
+          }
+        ],
+        "dependencies": []
+      },
+      "origin": 10,
+      "expected": "acLocal:YES:file:main:2-4:host:12-14;acRemote:YES:file:main:2-4:host:12-14"
+    },
+    {
+      "name": "import-alias-changed",
+      "project": {
+        "id": "query-project",
+        "version": 6,
+        "modules": [
+          {
+            "id": "main",
+            "model": {
+              "uri": "file:main",
+              "version": 6,
+              "source": "😀 ac ",
+              "types": [
+                {
+                  "id": "IAccessor",
+                  "kind": "INTERFACE",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "DbAccessor",
+                  "kind": "RECORD",
+                  "supertypes": [
+                    "IAccessor"
+                  ],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "Int",
+                  "kind": "BUILTIN",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "scopes": [
+                {
+                  "id": "root",
+                  "parent": null,
+                  "span": [
+                    0,
+                    5
+                  ]
+                }
+              ],
+              "symbols": [
+                {
+                  "id": "local",
+                  "name": "acLocal",
+                  "type": "DbAccessor",
+                  "scope": "root",
+                  "declaration": [
+                    0,
+                    0
+                  ],
+                  "visibleFrom": 0
+                }
+              ],
+              "signatures": [],
+              "calls": []
+            },
+            "exports": [],
+            "imports": [
+              {
+                "name": "acOther",
+                "target": {
+                  "dependency": "",
+                  "module": "lib"
+                },
+                "symbol": "accessor",
+                "scope": "root",
+                "span": [
+                  0,
+                  0
+                ],
+                "visibleFrom": 0
+              }
+            ]
+          },
+          {
+            "id": "lib",
+            "model": {
+              "uri": "file:lib",
+              "version": 6,
+              "source": "accessor",
+              "types": [
+                {
+                  "id": "IAccessor",
+                  "kind": "INTERFACE",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "DbAccessor",
+                  "kind": "RECORD",
+                  "supertypes": [
+                    "IAccessor"
+                  ],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "Int",
+                  "kind": "BUILTIN",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "scopes": [
+                {
+                  "id": "root",
+                  "parent": null,
+                  "span": [
+                    0,
+                    8
+                  ]
+                }
+              ],
+              "symbols": [
+                {
+                  "id": "db",
+                  "name": "accessor",
+                  "type": "DbAccessor",
+                  "scope": "root",
+                  "declaration": [
+                    0,
+                    0
+                  ],
+                  "visibleFrom": 0
+                }
+              ],
+              "signatures": [],
+              "calls": []
+            },
+            "exports": [
+              "db"
+            ],
+            "imports": []
+          }
+        ],
+        "dependencies": []
+      },
+      "origin": 10,
+      "expected": "acLocal:YES:file:main:2-4:host:12-14;acOther:YES:file:main:2-4:host:12-14"
+    },
+    {
+      "name": "scope-moved-away-from-cursor",
+      "project": {
+        "id": "query-project",
+        "version": 7,
+        "modules": [
+          {
+            "id": "main",
+            "model": {
+              "uri": "file:main",
+              "version": 7,
+              "source": "😀 ac ",
+              "types": [
+                {
+                  "id": "IAccessor",
+                  "kind": "INTERFACE",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "DbAccessor",
+                  "kind": "RECORD",
+                  "supertypes": [
+                    "IAccessor"
+                  ],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "Int",
+                  "kind": "BUILTIN",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "scopes": [
+                {
+                  "id": "root",
+                  "parent": null,
+                  "span": [
+                    0,
+                    5
+                  ]
+                },
+                {
+                  "id": "inner",
+                  "parent": "root",
+                  "span": [
+                    0,
+                    2
+                  ]
+                }
+              ],
+              "symbols": [
+                {
+                  "id": "local",
+                  "name": "acLocal",
+                  "type": "DbAccessor",
+                  "scope": "inner",
+                  "declaration": [
+                    0,
+                    0
+                  ],
+                  "visibleFrom": 0
+                }
+              ],
+              "signatures": [],
+              "calls": []
+            },
+            "exports": [],
+            "imports": [
+              {
+                "name": "acRemote",
+                "target": {
+                  "dependency": "",
+                  "module": "lib"
+                },
+                "symbol": "accessor",
+                "scope": "root",
+                "span": [
+                  0,
+                  0
+                ],
+                "visibleFrom": 0
+              }
+            ]
+          },
+          {
+            "id": "lib",
+            "model": {
+              "uri": "file:lib",
+              "version": 7,
+              "source": "accessor",
+              "types": [
+                {
+                  "id": "IAccessor",
+                  "kind": "INTERFACE",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "DbAccessor",
+                  "kind": "RECORD",
+                  "supertypes": [
+                    "IAccessor"
+                  ],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "Int",
+                  "kind": "BUILTIN",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "scopes": [
+                {
+                  "id": "root",
+                  "parent": null,
+                  "span": [
+                    0,
+                    8
+                  ]
+                }
+              ],
+              "symbols": [
+                {
+                  "id": "db",
+                  "name": "accessor",
+                  "type": "DbAccessor",
+                  "scope": "root",
+                  "declaration": [
+                    0,
+                    0
+                  ],
+                  "visibleFrom": 0
+                }
+              ],
+              "signatures": [],
+              "calls": []
+            },
+            "exports": [
+              "db"
+            ],
+            "imports": []
+          }
+        ],
+        "dependencies": []
+      },
+      "origin": 10,
+      "expected": "acRemote:YES:file:main:2-4:host:12-14"
+    },
+    {
+      "name": "failed-symbol-type",
+      "project": {
+        "id": "query-project",
+        "version": 8,
+        "modules": [
+          {
+            "id": "main",
+            "model": {
+              "uri": "file:main",
+              "version": 8,
+              "source": "😀 ac ",
+              "types": [
+                {
+                  "id": "IAccessor",
+                  "kind": "INTERFACE",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "DbAccessor",
+                  "kind": "RECORD",
+                  "supertypes": [
+                    "IAccessor"
+                  ],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "Int",
+                  "kind": "BUILTIN",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "scopes": [
+                {
+                  "id": "root",
+                  "parent": null,
+                  "span": [
+                    0,
+                    5
+                  ]
+                }
+              ],
+              "symbols": [
+                {
+                  "id": "local",
+                  "name": "acLocal",
+                  "type": "Missing",
+                  "scope": "root",
+                  "declaration": [
+                    0,
+                    0
+                  ],
+                  "visibleFrom": 0
+                }
+              ],
+              "signatures": [],
+              "calls": []
+            },
+            "exports": [],
+            "imports": [
+              {
+                "name": "acRemote",
+                "target": {
+                  "dependency": "",
+                  "module": "lib"
+                },
+                "symbol": "accessor",
+                "scope": "root",
+                "span": [
+                  0,
+                  0
+                ],
+                "visibleFrom": 0
+              }
+            ]
+          },
+          {
+            "id": "lib",
+            "model": {
+              "uri": "file:lib",
+              "version": 8,
+              "source": "accessor",
+              "types": [
+                {
+                  "id": "IAccessor",
+                  "kind": "INTERFACE",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "DbAccessor",
+                  "kind": "RECORD",
+                  "supertypes": [
+                    "IAccessor"
+                  ],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "Int",
+                  "kind": "BUILTIN",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "scopes": [
+                {
+                  "id": "root",
+                  "parent": null,
+                  "span": [
+                    0,
+                    8
+                  ]
+                }
+              ],
+              "symbols": [
+                {
+                  "id": "db",
+                  "name": "accessor",
+                  "type": "DbAccessor",
+                  "scope": "root",
+                  "declaration": [
+                    0,
+                    0
+                  ],
+                  "visibleFrom": 0
+                }
+              ],
+              "signatures": [],
+              "calls": []
+            },
+            "exports": [
+              "db"
+            ],
+            "imports": []
+          }
+        ],
+        "dependencies": []
+      },
+      "origin": 10,
+      "expected": "UNDEFINED_TYPE@0-0"
+    },
+    {
+      "name": "failure-repaired",
+      "project": {
+        "id": "query-project",
+        "version": 9,
+        "modules": [
+          {
+            "id": "main",
+            "model": {
+              "uri": "file:main",
+              "version": 9,
+              "source": "😀 ac ",
+              "types": [
+                {
+                  "id": "IAccessor",
+                  "kind": "INTERFACE",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "DbAccessor",
+                  "kind": "RECORD",
+                  "supertypes": [
+                    "IAccessor"
+                  ],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "Int",
+                  "kind": "BUILTIN",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "scopes": [
+                {
+                  "id": "root",
+                  "parent": null,
+                  "span": [
+                    0,
+                    5
+                  ]
+                }
+              ],
+              "symbols": [
+                {
+                  "id": "local",
+                  "name": "acLocal",
+                  "type": "DbAccessor",
+                  "scope": "root",
+                  "declaration": [
+                    0,
+                    0
+                  ],
+                  "visibleFrom": 0
+                }
+              ],
+              "signatures": [],
+              "calls": []
+            },
+            "exports": [],
+            "imports": [
+              {
+                "name": "acRemote",
+                "target": {
+                  "dependency": "",
+                  "module": "lib"
+                },
+                "symbol": "accessor",
+                "scope": "root",
+                "span": [
+                  0,
+                  0
+                ],
+                "visibleFrom": 0
+              }
+            ]
+          },
+          {
+            "id": "lib",
+            "model": {
+              "uri": "file:lib",
+              "version": 9,
+              "source": "accessor",
+              "types": [
+                {
+                  "id": "IAccessor",
+                  "kind": "INTERFACE",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "DbAccessor",
+                  "kind": "RECORD",
+                  "supertypes": [
+                    "IAccessor"
+                  ],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "Int",
+                  "kind": "BUILTIN",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "scopes": [
+                {
+                  "id": "root",
+                  "parent": null,
+                  "span": [
+                    0,
+                    8
+                  ]
+                }
+              ],
+              "symbols": [
+                {
+                  "id": "db",
+                  "name": "accessor",
+                  "type": "DbAccessor",
+                  "scope": "root",
+                  "declaration": [
+                    0,
+                    0
+                  ],
+                  "visibleFrom": 0
+                }
+              ],
+              "signatures": [],
+              "calls": []
+            },
+            "exports": [
+              "db"
+            ],
+            "imports": []
+          }
+        ],
+        "dependencies": []
+      },
+      "origin": 10,
+      "expected": "acLocal:YES:file:main:2-4:host:12-14;acRemote:YES:file:main:2-4:host:12-14"
+    },
+    {
+      "name": "language-region-moved",
+      "project": {
+        "id": "query-project",
+        "version": 10,
+        "modules": [
+          {
+            "id": "main",
+            "model": {
+              "uri": "file:main",
+              "version": 10,
+              "source": "😀 ac ",
+              "types": [
+                {
+                  "id": "IAccessor",
+                  "kind": "INTERFACE",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "DbAccessor",
+                  "kind": "RECORD",
+                  "supertypes": [
+                    "IAccessor"
+                  ],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "Int",
+                  "kind": "BUILTIN",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "scopes": [
+                {
+                  "id": "root",
+                  "parent": null,
+                  "span": [
+                    0,
+                    5
+                  ]
+                }
+              ],
+              "symbols": [
+                {
+                  "id": "local",
+                  "name": "acLocal",
+                  "type": "DbAccessor",
+                  "scope": "root",
+                  "declaration": [
+                    0,
+                    0
+                  ],
+                  "visibleFrom": 0
+                }
+              ],
+              "signatures": [],
+              "calls": []
+            },
+            "exports": [],
+            "imports": [
+              {
+                "name": "acRemote",
+                "target": {
+                  "dependency": "",
+                  "module": "lib"
+                },
+                "symbol": "accessor",
+                "scope": "root",
+                "span": [
+                  0,
+                  0
+                ],
+                "visibleFrom": 0
+              }
+            ]
+          },
+          {
+            "id": "lib",
+            "model": {
+              "uri": "file:lib",
+              "version": 10,
+              "source": "accessor",
+              "types": [
+                {
+                  "id": "IAccessor",
+                  "kind": "INTERFACE",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "DbAccessor",
+                  "kind": "RECORD",
+                  "supertypes": [
+                    "IAccessor"
+                  ],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "Int",
+                  "kind": "BUILTIN",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "scopes": [
+                {
+                  "id": "root",
+                  "parent": null,
+                  "span": [
+                    0,
+                    8
+                  ]
+                }
+              ],
+              "symbols": [
+                {
+                  "id": "db",
+                  "name": "accessor",
+                  "type": "DbAccessor",
+                  "scope": "root",
+                  "declaration": [
+                    0,
+                    0
+                  ],
+                  "visibleFrom": 0
+                }
+              ],
+              "signatures": [],
+              "calls": []
+            },
+            "exports": [
+              "db"
+            ],
+            "imports": []
+          }
+        ],
+        "dependencies": []
+      },
+      "origin": 20,
+      "expected": "acLocal:YES:file:main:2-4:host:22-24;acRemote:YES:file:main:2-4:host:22-24"
+    },
+    {
+      "name": "partial-symbol-type",
+      "project": {
+        "id": "query-project",
+        "version": 11,
+        "modules": [
+          {
+            "id": "main",
+            "model": {
+              "uri": "file:main",
+              "version": 11,
+              "source": "😀 ac ",
+              "types": [
+                {
+                  "id": "IAccessor",
+                  "kind": "INTERFACE",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "DbAccessor",
+                  "kind": "RECORD",
+                  "supertypes": [
+                    "IAccessor"
+                  ],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "Int",
+                  "kind": "BUILTIN",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "scopes": [
+                {
+                  "id": "root",
+                  "parent": null,
+                  "span": [
+                    0,
+                    5
+                  ]
+                }
+              ],
+              "symbols": [
+                {
+                  "id": "local",
+                  "name": "acLocal",
+                  "type": "?",
+                  "scope": "root",
+                  "declaration": [
+                    0,
+                    0
+                  ],
+                  "visibleFrom": 0
+                }
+              ],
+              "signatures": [],
+              "calls": []
+            },
+            "exports": [],
+            "imports": [
+              {
+                "name": "acRemote",
+                "target": {
+                  "dependency": "",
+                  "module": "lib"
+                },
+                "symbol": "accessor",
+                "scope": "root",
+                "span": [
+                  0,
+                  0
+                ],
+                "visibleFrom": 0
+              }
+            ]
+          },
+          {
+            "id": "lib",
+            "model": {
+              "uri": "file:lib",
+              "version": 11,
+              "source": "accessor",
+              "types": [
+                {
+                  "id": "IAccessor",
+                  "kind": "INTERFACE",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "DbAccessor",
+                  "kind": "RECORD",
+                  "supertypes": [
+                    "IAccessor"
+                  ],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "Int",
+                  "kind": "BUILTIN",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "scopes": [
+                {
+                  "id": "root",
+                  "parent": null,
+                  "span": [
+                    0,
+                    8
+                  ]
+                }
+              ],
+              "symbols": [
+                {
+                  "id": "db",
+                  "name": "accessor",
+                  "type": "DbAccessor",
+                  "scope": "root",
+                  "declaration": [
+                    0,
+                    0
+                  ],
+                  "visibleFrom": 0
+                }
+              ],
+              "signatures": [],
+              "calls": []
+            },
+            "exports": [
+              "db"
+            ],
+            "imports": []
+          }
+        ],
+        "dependencies": []
+      },
+      "origin": 20,
+      "expected": "acRemote:YES:file:main:2-4:host:22-24;acLocal:UNKNOWN:file:main:2-4:host:22-24"
+    },
+    {
+      "name": "partial-repaired",
+      "project": {
+        "id": "query-project",
+        "version": 12,
+        "modules": [
+          {
+            "id": "main",
+            "model": {
+              "uri": "file:main",
+              "version": 12,
+              "source": "😀 ac ",
+              "types": [
+                {
+                  "id": "IAccessor",
+                  "kind": "INTERFACE",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "DbAccessor",
+                  "kind": "RECORD",
+                  "supertypes": [
+                    "IAccessor"
+                  ],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "Int",
+                  "kind": "BUILTIN",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "scopes": [
+                {
+                  "id": "root",
+                  "parent": null,
+                  "span": [
+                    0,
+                    5
+                  ]
+                }
+              ],
+              "symbols": [
+                {
+                  "id": "local",
+                  "name": "acLocal",
+                  "type": "DbAccessor",
+                  "scope": "root",
+                  "declaration": [
+                    0,
+                    0
+                  ],
+                  "visibleFrom": 0
+                }
+              ],
+              "signatures": [],
+              "calls": []
+            },
+            "exports": [],
+            "imports": [
+              {
+                "name": "acRemote",
+                "target": {
+                  "dependency": "",
+                  "module": "lib"
+                },
+                "symbol": "accessor",
+                "scope": "root",
+                "span": [
+                  0,
+                  0
+                ],
+                "visibleFrom": 0
+              }
+            ]
+          },
+          {
+            "id": "lib",
+            "model": {
+              "uri": "file:lib",
+              "version": 12,
+              "source": "accessor",
+              "types": [
+                {
+                  "id": "IAccessor",
+                  "kind": "INTERFACE",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "DbAccessor",
+                  "kind": "RECORD",
+                  "supertypes": [
+                    "IAccessor"
+                  ],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "Int",
+                  "kind": "BUILTIN",
+                  "supertypes": [],
+                  "fields": [],
+                  "span": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "scopes": [
+                {
+                  "id": "root",
+                  "parent": null,
+                  "span": [
+                    0,
+                    8
+                  ]
+                }
+              ],
+              "symbols": [
+                {
+                  "id": "db",
+                  "name": "accessor",
+                  "type": "DbAccessor",
+                  "scope": "root",
+                  "declaration": [
+                    0,
+                    0
+                  ],
+                  "visibleFrom": 0
+                }
+              ],
+              "signatures": [],
+              "calls": []
+            },
+            "exports": [
+              "db"
+            ],
+            "imports": []
+          }
+        ],
+        "dependencies": []
+      },
+      "origin": 20,
+      "expected": "acLocal:YES:file:main:2-4:host:22-24;acRemote:YES:file:main:2-4:host:22-24"
+    }
+  ]
+}

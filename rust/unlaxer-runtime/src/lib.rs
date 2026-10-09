@@ -5,6 +5,7 @@ use std::hash::{BuildHasher, Hasher};
 use std::rc::Rc;
 use std::sync::Arc;
 
+pub mod call_inference;
 pub mod editor;
 pub mod editor_cst;
 pub mod editor_queries;
@@ -20,9 +21,11 @@ mod scope;
 pub mod semantic;
 pub mod semantic_project;
 pub mod semantic_queries;
+pub mod semantic_query_cache;
 pub mod semantic_rename;
 pub mod source;
 pub mod source_edits;
+pub mod type_system;
 #[doc(hidden)]
 pub use first::{set_candidate_exclusion_for_current_thread, CandidateExclusion};
 pub use scope::{
