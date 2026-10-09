@@ -247,7 +247,9 @@ public class LanguageEvolutionTest {
                     var frames = adapter.stackTrace(args).get().getStackFrames();
                     assertTrue(frames.length > 0);
                     assertTrue(frames[0].getName().contains(mapped.ast().getClass().getSimpleName()));
-                    adapter.next(new org.eclipse.lsp4j.debug.NextArguments()).get();
+                    var next = new org.eclipse.lsp4j.debug.NextArguments();
+                    next.setThreadId(1);
+                    adapter.next(next).get();
                     assertTrue(reasons.contains("step"));
                 } finally {
                     java.nio.file.Files.deleteIfExists(program);
