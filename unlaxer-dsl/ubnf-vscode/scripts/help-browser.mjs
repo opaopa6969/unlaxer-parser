@@ -26,7 +26,7 @@ try {
   await page.locator('#lesson pre').waitFor();
   assert.equal(await page.locator('#generate').isVisible(), false, 'standalone help cannot launch host tools');
   assert.match(await page.locator('#setup').textContent(), /wasm32-unknown-unknown/);
-  assert.equal(await page.locator('#lessons button').count(), 6);
+  assert.equal(await page.locator('#lessons button').count(), catalog.lessons.length);
   for (const lesson of catalog.lessons) {
     await page.locator(`[data-lesson="${lesson.id}"]`).click();
     const example = catalog.examples.find(item => item.id === lesson.example);
@@ -61,7 +61,7 @@ try {
   assert.deepEqual(await page.evaluate(() => window.messages.at(-1)), {type: 'generatePlayground'});
   assert.deepEqual(errors, []);
   await context.close();
-  console.log('UBNF help browser: 6 lessons, examples, search, troubleshooting, download, mobile, webview bridge passed');
+  console.log(`UBNF help browser: ${catalog.lessons.length} lessons, examples, search, troubleshooting, download, mobile, webview bridge passed`);
 } finally {
   await browser?.close();
   await new Promise(resolve => server.close(resolve));
