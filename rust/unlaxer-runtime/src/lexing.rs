@@ -385,6 +385,7 @@ pub fn parse_with_trivia<'a>(
         byte_offsets: std::mem::take(&mut context.byte_offsets),
         scopes: std::mem::take(&mut context.scopes),
         recoveries,
+        tokens: (*context.tokens).clone(),
     });
     Ok(Outcome {
         tree,
