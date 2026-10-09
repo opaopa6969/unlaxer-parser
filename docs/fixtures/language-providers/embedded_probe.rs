@@ -124,6 +124,19 @@ fn main() {
                 assert_eq!(mapped[0].locations[0].location, anchor);
                 assert!(map.edit(response.diagnostics[0].locations[0].span).is_err());
             }
+            let queries = LanguageQueries::new(result.tree().unwrap(), project.clone(),
+                HashMap::from([(java_language, Box::new(process) as Box<dyn Provider>)]),).unwrap();
+            let typed = queries.diagnostics_all(&host, &project, &BTreeMap::new()).unwrap();
+            let typed = typed.iter().find(|r|r.region == region.id).unwrap();
+            assert_eq!(typed.state, State::Partial); assert_eq!(typed.diagnostics.len(),1);
+            assert_eq!(typed.diagnostics[0].code, response.diagnostics[0].code);
+            assert_eq!(typed.diagnostics[0].message, response.diagnostics[0].message);
+            assert_eq!(typed.diagnostics[0].severity, "ERROR");
+            assert_eq!(typed.diagnostics[0].locations[0].location.snapshot, host);
+            assert_eq!(typed.diagnostics[0].locations[0].location.span, Span{start:35,end:36});
+            let generic = queries.query(&host,&project,region.body.start,Operation::Validate,&BTreeMap::new()).unwrap();
+            assert_eq!(generic.items.len(),1); assert_eq!(generic.items[0].label,response.diagnostics[0].code);
+            assert_eq!(generic.items[0].locations[0].location.span, Span{start:35,end:36});
         } else {
             let queries = LanguageQueries::new(
                 result.tree().unwrap(),

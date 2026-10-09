@@ -88,6 +88,15 @@ public final class ProviderProcess implements LanguageQueries.Provider {
     @Override public LanguageQueries.Response query(LanguageQueries.Request request) {
         Response response = invoke(new Request(request.region().id(), identity, request.region().language(), request.region().id(), request.region().sourceMap().output(), request.project(), request.operation(), request.cursor(), request.parameters(), false));
         LanguageRegions.State state = state(response.status());
-        return new LanguageQueries.Response(request.region().sourceMap().output(), request.project().id(), request.project().version(), state, response.items());
+        var items = new java.util.ArrayList<>(response.items());
+        if (request.operation() == Operation.VALIDATE) for (var diagnostic : response.diagnostics())
+            items.add(new LanguageQueries.Item(diagnostic.code(), diagnostic.message(), diagnostic.locations(), List.of()));
+        return new LanguageQueries.Response(request.region().sourceMap().output(), request.project().id(), request.project().version(), state, items);
     }
+    @Override public LanguageQueries.DiagnosticResponse diagnostics(LanguageQueries.Request request) {
+        if (request.operation() != Operation.VALIDATE) throw new IllegalArgumentException("diagnostics require VALIDATE");
+        var response = invoke(new Request(request.region().id(), identity, request.region().language(), request.region().id(), request.region().sourceMap().output(), request.project(), Operation.VALIDATE, 0, request.parameters(), false));
+        return new LanguageQueries.DiagnosticResponse(request.region().sourceMap().output(), request.project().id(), request.project().version(), state(response.status()), response.diagnostics());
+    }
+
 }

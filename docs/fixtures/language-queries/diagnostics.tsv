@@ -1,0 +1,13 @@
+# mode state code severity locations
+valid	PARTIAL	TYPE	ERROR	host:19:20:true
+foreign	PARTIAL	TYPE	WARNING	library:0:3:true
+multiple	PARTIAL	TYPE	ERROR	host:19:20:true,library:0:3:true
+note	PARTIAL	TYPE	NOTE	host:19:20:true
+timeout	TIMEOUT	-	-	-
+unsupported	UNSUPPORTED	-	-	-
+stale-response	REJECTED	-	-	-
+stale-project	REJECTED	-	-	-
+stale-location	REJECTED	-	-	-
+unknown-document	REJECTED	-	-	-
+failed-payload	REJECTED	-	-	-
+unknown-severity	REJECTED	-	-	-

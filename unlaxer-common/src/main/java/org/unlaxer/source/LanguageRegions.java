@@ -96,6 +96,11 @@ public final class LanguageRegions {
             }
         }
     }
+    /** Stable scalar-order region inventory for document-wide validation. */
+    public List<Region> regions() {
+        return regions.values().stream().sorted((a,b) -> java.util.Arrays.compareUnsigned(
+            a.id().getBytes(java.nio.charset.StandardCharsets.UTF_8), b.id().getBytes(java.nio.charset.StandardCharsets.UTF_8))).toList();
+    }
     public DocumentSnapshot host() { return host; }
     /** Half-open ownership, plus the host EOF for a uniquely deepest explicitly open body. */
     public Region at(int point) {
