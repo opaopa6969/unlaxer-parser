@@ -1,0 +1,74 @@
+[
+  {
+    "name": "duplicate",
+    "grammar": "grammar NameStatement {\n  @ubnf: v2\n  @package: org.example.namepredicate\n  @whitespace: javaStyle\n  token ID ::= (CHAR_RANGE('A','Z') | CHAR_RANGE('a','z') | '𠮷')+;\n  @root @mapping(Statement, params=[value])\n  Start ::= Declaration @value | Expression @value;\n  @namePredicate(snapshot='cxx23', version='v1', name='name', kind='type')\n @namePredicate(snapshot='cxx23', version='v1', name='name', kind='type')\n  @mapping(Declaration, params=[name,argument])\n  Declaration ::= ID @name '(' ID @argument ')' ';';\n  @namePredicate(snapshot='cxx23', version='v1', name='name', kind='resolved')\n  @mapping(Expression, params=[name,argument])\n  Expression ::= ID @name '(' ID @argument ')' ['++'] ';';\n}\n",
+    "code": "E-NAME-PREDICATE-DUPLICATE",
+    "nativeMessage": "E-NAME-PREDICATE-DUPLICATE"
+  },
+  {
+    "name": "invalid-id",
+    "grammar": "grammar NameStatement {\n  @ubnf: v2\n  @package: org.example.namepredicate\n  @whitespace: javaStyle\n  token ID ::= (CHAR_RANGE('A','Z') | CHAR_RANGE('a','z') | '𠮷')+;\n  @root @mapping(Statement, params=[value])\n  Start ::= Declaration @value | Expression @value;\n  @namePredicate(snapshot='1bad', version='v1', name='name', kind='type')\n  @mapping(Declaration, params=[name,argument])\n  Declaration ::= ID @name '(' ID @argument ')' ';';\n  @namePredicate(snapshot='1bad', version='v1', name='name', kind='resolved')\n  @mapping(Expression, params=[name,argument])\n  Expression ::= ID @name '(' ID @argument ')' ['++'] ';';\n}\n",
+    "code": "E-NAME-PREDICATE-IDENTITY",
+    "nativeMessage": "E-NAME-PREDICATE-IDENTITY"
+  },
+  {
+    "name": "invalid-version",
+    "grammar": "grammar NameStatement {\n  @ubnf: v2\n  @package: org.example.namepredicate\n  @whitespace: javaStyle\n  token ID ::= (CHAR_RANGE('A','Z') | CHAR_RANGE('a','z') | '𠮷')+;\n  @root @mapping(Statement, params=[value])\n  Start ::= Declaration @value | Expression @value;\n  @namePredicate(snapshot='cxx23', version='v 1', name='name', kind='type')\n  @mapping(Declaration, params=[name,argument])\n  Declaration ::= ID @name '(' ID @argument ')' ';';\n  @namePredicate(snapshot='cxx23', version='v 1', name='name', kind='resolved')\n  @mapping(Expression, params=[name,argument])\n  Expression ::= ID @name '(' ID @argument ')' ['++'] ';';\n}\n",
+    "code": "E-NAME-PREDICATE-IDENTITY",
+    "nativeMessage": "E-NAME-PREDICATE-IDENTITY"
+  },
+  {
+    "name": "unknown-kind",
+    "grammar": "grammar NameStatement {\n  @ubnf: v2\n  @package: org.example.namepredicate\n  @whitespace: javaStyle\n  token ID ::= (CHAR_RANGE('A','Z') | CHAR_RANGE('a','z') | '𠮷')+;\n  @root @mapping(Statement, params=[value])\n  Start ::= Declaration @value | Expression @value;\n  @namePredicate(snapshot='cxx23', version='v1', name='name', kind='Type')\n  @mapping(Declaration, params=[name,argument])\n  Declaration ::= ID @name '(' ID @argument ')' ';';\n  @namePredicate(snapshot='cxx23', version='v1', name='name', kind='resolved')\n  @mapping(Expression, params=[name,argument])\n  Expression ::= ID @name '(' ID @argument ')' ['++'] ';';\n}\n",
+    "code": "E-NAME-PREDICATE-KIND",
+    "nativeMessage": "E-NAME-PREDICATE-KIND"
+  },
+  {
+    "name": "missing-capture",
+    "grammar": "grammar NameStatement {\n  @ubnf: v2\n  @package: org.example.namepredicate\n  @whitespace: javaStyle\n  token ID ::= (CHAR_RANGE('A','Z') | CHAR_RANGE('a','z') | '𠮷')+;\n  @root @mapping(Statement, params=[value])\n  Start ::= Declaration @value | Expression @value;\n  @namePredicate(snapshot='cxx23', version='v1', name='missing', kind='type')\n  @mapping(Declaration, params=[name,argument])\n  Declaration ::= ID @name '(' ID @argument ')' ';';\n  @namePredicate(snapshot='cxx23', version='v1', name='missing', kind='resolved')\n  @mapping(Expression, params=[name,argument])\n  Expression ::= ID @name '(' ID @argument ')' ['++'] ';';\n}\n",
+    "code": "E-NAME-PREDICATE-CAPTURE",
+    "nativeMessage": "E-NAME-PREDICATE-CAPTURE"
+  },
+  {
+    "name": "optional-capture",
+    "grammar": "grammar NameStatement {\n  @ubnf: v2\n  @package: org.example.namepredicate\n  @whitespace: javaStyle\n  token ID ::= (CHAR_RANGE('A','Z') | CHAR_RANGE('a','z') | '𠮷')+;\n  @root @mapping(Statement, params=[value])\n  Start ::= Declaration @value | Expression @value;\n  @namePredicate(snapshot='cxx23', version='v1', name='name', kind='type')\n  @mapping(Declaration, params=[name,argument])\n  Declaration ::= [ID] @name '(' ID @argument ')' ';';\n  @namePredicate(snapshot='cxx23', version='v1', name='name', kind='resolved')\n  @mapping(Expression, params=[name,argument])\n  Expression ::= ID @name '(' ID @argument ')' ['++'] ';';\n}\n",
+    "code": "E-NAME-PREDICATE-CAPTURE",
+    "nativeMessage": "E-NAME-PREDICATE-CAPTURE"
+  },
+  {
+    "name": "multiple-capture",
+    "grammar": "grammar NameStatement {\n  @ubnf: v2\n  @package: org.example.namepredicate\n  @whitespace: javaStyle\n  token ID ::= (CHAR_RANGE('A','Z') | CHAR_RANGE('a','z') | '𠮷')+;\n  @root @mapping(Statement, params=[value])\n  Start ::= Declaration @value | Expression @value;\n  @namePredicate(snapshot='cxx23', version='v1', name='name', kind='type')\n  @mapping(Declaration, params=[name,argument])\n  Declaration ::= ID @name '(' ID @name ')' ';';\n  @namePredicate(snapshot='cxx23', version='v1', name='name', kind='resolved')\n  @mapping(Expression, params=[name,argument])\n  Expression ::= ID @name '(' ID @argument ')' ['++'] ';';\n}\n",
+    "code": "E-NAME-PREDICATE-CAPTURE",
+    "nativeMessage": "E-NAME-PREDICATE-CAPTURE"
+  },
+  {
+    "name": "node-capture",
+    "grammar": "grammar NameStatement {\n  @ubnf: v2\n  @package: org.example.namepredicate\n  @whitespace: javaStyle\n  token ID ::= (CHAR_RANGE('A','Z') | CHAR_RANGE('a','z') | '𠮷')+;\n  @mapping(HelperValue, params=[text]) Helper ::= ID @text;\n  @root @mapping(Statement, params=[value])\n  Start ::= Declaration @value | Expression @value;\n  @namePredicate(snapshot='cxx23', version='v1', name='argument', kind='type')\n  @mapping(Declaration, params=[name,argument])\n  Declaration ::= ID @name '(' Helper @argument ')' ';';\n  @namePredicate(snapshot='cxx23', version='v1', name='name', kind='resolved')\n  @mapping(Expression, params=[name,argument])\n  Expression ::= ID @name '(' ID @argument ')' ['++'] ';';\n}\n",
+    "code": "E-NAME-PREDICATE-CAPTURE",
+    "nativeMessage": "E-NAME-PREDICATE-CAPTURE"
+  },
+  {
+    "name": "version-conflict",
+    "grammar": "grammar NameStatement {\n  @ubnf: v2\n  @package: org.example.namepredicate\n  @whitespace: javaStyle\n  token ID ::= (CHAR_RANGE('A','Z') | CHAR_RANGE('a','z') | '𠮷')+;\n  @root @mapping(Statement, params=[value])\n  Start ::= Declaration @value | Expression @value;\n  @namePredicate(snapshot='cxx23', version='v1', name='name', kind='type')\n  @mapping(Declaration, params=[name,argument])\n  Declaration ::= ID @name '(' ID @argument ')' ';';\n  @namePredicate(snapshot='cxx23', version='v2', name='name', kind='resolved')\n  @mapping(Expression, params=[name,argument])\n  Expression ::= ID @name '(' ID @argument ')' ['++'] ';';\n}\n",
+    "code": "E-NAME-PREDICATE-VERSION",
+    "nativeMessage": "E-NAME-PREDICATE-VERSION"
+  },
+  {
+    "name": "recovery-conflict",
+    "grammar": "grammar NameStatement {\n  @ubnf: v2\n  @package: org.example.namepredicate\n  @whitespace: javaStyle\n  token ID ::= (CHAR_RANGE('A','Z') | CHAR_RANGE('a','z') | '𠮷')+;\n  @root @mapping(Statement, params=[value])\n  Start ::= Declaration @value | Expression @value;\n  @namePredicate(snapshot='cxx23', version='v1', name='name', kind='type') @recovery(sync=';')\n  @mapping(Declaration, params=[name,argument])\n  Declaration ::= ID @name '(' ID @argument ')' ';';\n  @namePredicate(snapshot='cxx23', version='v1', name='name', kind='resolved')\n  @mapping(Expression, params=[name,argument])\n  Expression ::= ID @name '(' ID @argument ')' ['++'] ';';\n}\n",
+    "code": "E-NAME-PREDICATE-CONFLICT",
+    "nativeMessage": "E-NAME-PREDICATE-CONFLICT"
+  },
+  {
+    "name": "assoc-conflict",
+    "grammar": "grammar NameStatement {\n  @ubnf: v2\n  @package: org.example.namepredicate\n  @whitespace: javaStyle\n  token ID ::= (CHAR_RANGE('A','Z') | CHAR_RANGE('a','z') | '𠮷')+;\n  @root @mapping(Statement, params=[value])\n  Start ::= Declaration @value | Expression @value;\n  @namePredicate(snapshot='cxx23', version='v1', name='name', kind='type') @leftAssoc\n  @mapping(Declaration, params=[name,argument])\n  Declaration ::= ID @name '(' ID @argument ')' ';';\n  @namePredicate(snapshot='cxx23', version='v1', name='name', kind='resolved')\n  @mapping(Expression, params=[name,argument])\n  Expression ::= ID @name '(' ID @argument ')' ['++'] ';';\n}\n",
+    "code": "E-NAME-PREDICATE-CONFLICT",
+    "nativeMessage": "associativity"
+  },
+  {
+    "name": "left-recursion",
+    "grammar": "grammar NameStatement {\n  @ubnf: v2\n  @package: org.example.namepredicate\n  @whitespace: javaStyle\n  token ID ::= (CHAR_RANGE('A','Z') | CHAR_RANGE('a','z') | '𠮷')+;\n  @root @mapping(Statement, params=[value])\n  Start ::= Declaration @value | Expression @value;\n  @namePredicate(snapshot='cxx23', version='v1', name='name', kind='type')\n  @mapping(Declaration, params=[name,argument])\n  Declaration ::= Declaration ID @name '(' ID @argument ')' ';';\n  @namePredicate(snapshot='cxx23', version='v1', name='name', kind='resolved')\n  @mapping(Expression, params=[name,argument])\n  Expression ::= ID @name '(' ID @argument ')' ['++'] ';';\n}\n",
+    "code": "E-NAME-PREDICATE-LEFT-RECURSION",
+    "nativeMessage": "left recursion"
+  }
+]

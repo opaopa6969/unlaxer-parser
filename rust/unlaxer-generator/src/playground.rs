@@ -78,6 +78,14 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
         relative_path: "runtime/LICENSE".into(),
         content: include_str!("../../../LICENSE").into(),
     });
+    files.push(GeneratedFile {
+        relative_path: "runtime/UNICODE-LICENSE.txt".into(),
+        content: include_str!("../../../spec-corpus/xid-identifier/UNICODE-LICENSE.txt").into(),
+    });
+    files.push(GeneratedFile {
+        relative_path: "public/UNICODE-LICENSE.txt".into(),
+        content: include_str!("../../../spec-corpus/xid-identifier/UNICODE-LICENSE.txt").into(),
+    });
     macro_rules! runtime {
         ($name:literal) => {
             files.push(GeneratedFile {
@@ -88,6 +96,7 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
     }
     runtime!("lib.rs");
     runtime!("scope.rs");
+    runtime!("names.rs");
     runtime!("semantic.rs");
     runtime!("editor.rs");
     runtime!("editor_cst.rs");
@@ -109,6 +118,7 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
     runtime!("lexing.rs");
     runtime!("first.rs");
     runtime!("lexical.rs");
+    runtime!("unicode_xid.rs");
     runtime!("long_code_fence.rs");
     runtime!("memo_retention_tests.rs");
     let wrapper = include_str!("../../../unlaxer-dsl/src/main/resources/playground/lib.rs")

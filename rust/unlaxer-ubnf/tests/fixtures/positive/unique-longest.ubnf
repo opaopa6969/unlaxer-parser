@@ -1,0 +1,1 @@
+grammar UniqueMax { @package: org.example.uniquelongest @root @mapping(Root, params=[value]) @uniqueLongestChoice Root ::= 'a' @value | 'ab' @value; }
