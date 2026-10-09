@@ -17,6 +17,8 @@ jobs:
         with:
           node-version: '20.20.0'
       - uses: dtolnay/rust-toolchain@1.85.0
+      - name: Prepare locked dependencies for the offline LSP diagnostic probe
+        run: cargo fetch --locked --manifest-path rust/Cargo.toml
       - name: Install the locked TypeScript 5.9.3 compiler without package scripts
         run: npm ci --ignore-scripts --no-audit --no-fund
         working-directory: unlaxer-dsl/ubnf-vscode
