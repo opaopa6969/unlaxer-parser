@@ -75,7 +75,11 @@ export function complete(source, cursor, words) {
   let items;
   const scope = grammarAt(code, cursor);
   if (/@whitespace\s*(?::|\()\s*$/.test(before)) {
-    items = words.whitespace;
+    const local = scope ? code.slice(scope.start, scope.end) : '';
+    const definitions = [...local.matchAll(/\btoken\s+([A-Za-z_]\w*)\s*::=/g)].map(match => ({
+      label: match[1], insertText: match[1], kind: 'token', detail: 'この grammar 内の宣言的 token を連接境界で繰り返し読み飛ばします。non-nullable が必要です。'
+    }));
+    items = words.whitespace.concat(definitions);
   } else if (!scope) {
     items = words.grammar;
   } else {
