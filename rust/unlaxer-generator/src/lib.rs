@@ -9,6 +9,7 @@ pub mod packaged_profiles;
 pub mod packages;
 pub mod playground;
 pub mod portability;
+pub mod semantic_rules;
 mod token_stream;
 
 /// Parse and validate the complete grammar before producing any artifacts.
