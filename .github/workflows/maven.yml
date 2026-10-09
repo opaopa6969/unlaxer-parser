@@ -51,7 +51,7 @@ jobs:
     - name: Cross-language fixtures, compile failures, and generated-file drift
       run: >
         mvn -B -pl unlaxer-common,unlaxer-dsl -am test
-        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,RustPortabilityConformanceTest,TokenAdapterConformanceTest,ParseBindingsConformanceTest,DeclarativeTokenConformanceTest,ApiImpactConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,PackageResolverConformanceTest,HttpsPackageConformanceTest,VocabularyOriginsConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest,SkipMappingConformanceTest,CaptureEqualityConformanceTest,ErrorElementConformanceTest,RecoveryConformanceTest,SemanticModelConformanceTest,ProjectSymbolIndexConformanceTest,SemanticModelUbnfTest,TokenStreamConformanceTest,TypeSystemConformanceTest,CallInferenceConformanceTest,SemanticQueriesConformanceTest,SemanticQueryEditsTest -DrustConformance=true -DtokenStreamBench=true
+        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,RustPortabilityConformanceTest,TokenAdapterConformanceTest,ParseBindingsConformanceTest,DeclarativeTokenConformanceTest,ApiImpactConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,PackageResolverConformanceTest,HttpsPackageConformanceTest,VocabularyOriginsConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest,SkipMappingConformanceTest,CaptureEqualityConformanceTest,ErrorElementConformanceTest,RecoveryConformanceTest,SemanticModelConformanceTest,ProjectSymbolIndexConformanceTest,SemanticModelUbnfTest,TokenStreamConformanceTest,TypeSystemConformanceTest,CallInferenceConformanceTest,SemanticQueriesConformanceTest,SemanticQueryEditsTest,UniqueLongestConformanceTest,NameSnapshotConformanceTest,NamePredicateConformanceTest,ContextualLexingConformanceTest -DrustConformance=true -DtokenStreamBench=true
         -Dsurefire.failIfNoSpecifiedTests=false
     - name: Resolver tutorial (Java and Rust)
       run: |
@@ -65,6 +65,8 @@ jobs:
       run: |
         npm ci
         npx playwright install --with-deps chromium
+        node scripts/contextual-lexing-reference.mjs
+        node scripts/contextual-lexing-wasm.mjs
         node scripts/playground-browser.mjs
         node --test scripts/completion.test.mjs
         node scripts/learning-browser.mjs
@@ -72,6 +74,11 @@ jobs:
       run: |
         test -s unlaxer-dsl/target/rust-token-stream.tsv
         test -s unlaxer-dsl/target/token-stream-benchmark.tsv
+        test -s unlaxer-dsl/target/rust-contextual-lexing.tsv
+        test -s unlaxer-dsl/target/rust-contextual-lexing-invalid.tsv
+        test -s unlaxer-dsl/target/rust-contextual-lexing-boundaries.tsv
+        test -s unlaxer-dsl/ubnf-vscode/target/contextual-lexing-reference.tsv
+        test -s unlaxer-dsl/ubnf-vscode/target/contextual-lexing-wasm.tsv
     - name: Require semantic model and generated UBNF evidence
       run: |
         test -s unlaxer-dsl/target/rust-semantic-model.tsv
@@ -99,7 +106,11 @@ jobs:
         test -s unlaxer-dsl/target/api-impact-conformance.tsv
         test -s unlaxer-dsl/target/api-impact-compile.tsv
     - name: Require rule trivia conformance evidence
-      run: test -s unlaxer-dsl/target/rust-rule-trivia.tsv
+      run: |
+        test -s unlaxer-dsl/target/rust-rule-trivia.tsv
+        test -s unlaxer-dsl/target/rust-unique-longest.tsv
+        test -s unlaxer-dsl/target/rust-name-snapshots.tsv
+        test -s unlaxer-dsl/target/rust-name-predicate.tsv
     - name: Require pinned package conformance evidence
       run: |
         test -s unlaxer-dsl/target/rust-packages.tsv
@@ -127,6 +138,11 @@ jobs:
         path: |
           unlaxer-dsl/target/rust-token-stream.tsv
           unlaxer-dsl/target/token-stream-benchmark.tsv
+          unlaxer-dsl/target/rust-contextual-lexing.tsv
+          unlaxer-dsl/target/rust-contextual-lexing-invalid.tsv
+          unlaxer-dsl/target/rust-contextual-lexing-boundaries.tsv
+          unlaxer-dsl/ubnf-vscode/target/contextual-lexing-reference.tsv
+          unlaxer-dsl/ubnf-vscode/target/contextual-lexing-wasm.tsv
           unlaxer-dsl/target/rust-semantic-model.tsv
           unlaxer-dsl/target/rust-project-symbols.tsv
           unlaxer-dsl/target/rust-type-relations.tsv
@@ -165,6 +181,9 @@ jobs:
           unlaxer-dsl/target/rust-packages.tsv
           unlaxer-dsl/target/rust-package-https.tsv
           unlaxer-dsl/target/rust-vocabulary-origins.tsv
+          unlaxer-dsl/target/rust-unique-longest.tsv
+          unlaxer-dsl/target/rust-name-snapshots.tsv
+          unlaxer-dsl/target/rust-name-predicate.tsv
           unlaxer-dsl/target/rust-scope-store.tsv
           unlaxer-dsl/target/rust-scope-annotations.tsv
           unlaxer-dsl/target/rust-nested-captures.tsv

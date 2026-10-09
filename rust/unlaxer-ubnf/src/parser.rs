@@ -502,6 +502,28 @@ impl Parser<'_> {
             "leftAssoc" => AnnotationKind::LeftAssoc,
             "rightAssoc" => AnnotationKind::RightAssoc,
             "longestChoice" => AnnotationKind::LongestChoice,
+            "uniqueLongestChoice" => AnnotationKind::UniqueLongestChoice,
+            "namePredicate" => {
+                self.expect('(')?;
+                self.named_arg("snapshot")?;
+                let snapshot = self.quoted()?;
+                self.expect(',')?;
+                self.named_arg("version")?;
+                let version = self.quoted()?;
+                self.expect(',')?;
+                self.named_arg("name")?;
+                let name = self.quoted()?;
+                self.expect(',')?;
+                self.named_arg("kind")?;
+                let kind = self.quoted()?;
+                self.expect(')')?;
+                AnnotationKind::NamePredicate {
+                    snapshot,
+                    version,
+                    name,
+                    kind,
+                }
+            }
             "predictiveChoice" => AnnotationKind::PredictiveChoice,
             "skip" => AnnotationKind::Skip,
             "enum" => AnnotationKind::Enum,
@@ -565,6 +587,19 @@ impl Parser<'_> {
                     None
                 };
                 AnnotationKind::Whitespace { style }
+            }
+            "lexicalContext" => {
+                self.expect('(')?;
+                self.named_arg("tokens")?;
+                let tokens = self.lexical_context_list()?;
+                let literals = if self.eat(',') {
+                    self.named_arg("literals")?;
+                    self.lexical_context_list()?
+                } else {
+                    vec![]
+                };
+                self.expect(')')?;
+                AnnotationKind::LexicalContext { tokens, literals }
             }
             "interleave" | "backref" | "scopeTree" => {
                 self.expect('(')?;
@@ -818,6 +853,19 @@ impl Parser<'_> {
             span: self.span_from(start),
         })
     }
+    fn lexical_context_list(&mut self) -> Result<Vec<String>> {
+        self.expect('[')?;
+        let mut values = vec![];
+        if !self.is(']') {
+            values.push(self.quoted()?);
+            while self.eat(',') {
+                values.push(self.quoted()?);
+            }
+        }
+        self.expect(']')?;
+        Ok(values)
+    }
+
     fn atomic(&mut self) -> Result<AtomicElement> {
         let start = self.current().span;
         let kind = if self.eat('(') {

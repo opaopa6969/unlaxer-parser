@@ -178,6 +178,7 @@ grammar UBNF {
     | EvalAnnotation
     | WhitespaceAnnotation
     | InterleaveAnnotation
+    | LexicalContextAnnotation
     | BackrefAnnotation
     | ScopeTreeAnnotation
     | DeclaresAnnotation
@@ -185,6 +186,8 @@ grammar UBNF {
     | LeftAssocAnnotation
     | RightAssocAnnotation
     | LongestChoiceAnnotation
+    | UniqueLongestChoiceAnnotation
+    | NamePredicateAnnotation
     | PredictiveChoiceAnnotation
     | PrecedenceAnnotation
     | DocAnnotation
@@ -210,6 +213,9 @@ grammar UBNF {
   @mapping(WhitespaceAnnotation, params=[style])
   WhitespaceAnnotation ::= '@whitespace' [ '(' IDENTIFIER @style ')' ] ;
 
+  @mapping(LexicalContextAnnotation, params=[tokens,literals])
+  LexicalContextAnnotation ::= '@lexicalContext' '(' 'tokens' '=' '[' [ STRING @tokens { ',' STRING @tokens } ] ']' [ ',' 'literals' '=' '[' [ STRING @literals { ',' STRING @literals } ] ']' ] ')' ;
+
   @mapping(InterleaveAnnotation, params=[profile])
   InterleaveAnnotation ::= '@interleave' '(' 'profile' '=' IDENTIFIER @profile ')' ;
 
@@ -233,6 +239,12 @@ grammar UBNF {
 
   @mapping(LongestChoiceAnnotation)
   LongestChoiceAnnotation ::= '@longestChoice' ;
+
+  @mapping(UniqueLongestChoiceAnnotation)
+  UniqueLongestChoiceAnnotation ::= '@uniqueLongestChoice' ;
+
+  @mapping(NamePredicateAnnotation, params=[snapshot, version, name, kind])
+  NamePredicateAnnotation ::= '@namePredicate' '(' 'snapshot' '=' STRING @snapshot ',' 'version' '=' STRING @version ',' 'name' '=' STRING @name ',' 'kind' '=' STRING @kind ')' ;
 
   @mapping(PredictiveChoiceAnnotation)
   PredictiveChoiceAnnotation ::= '@predictiveChoice' ;

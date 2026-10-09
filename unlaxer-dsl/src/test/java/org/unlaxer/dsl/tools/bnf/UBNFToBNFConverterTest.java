@@ -18,6 +18,13 @@ import org.unlaxer.dsl.bootstrap.UBNFAST;
  */
 public class UBNFToBNFConverterTest {
 
+    @Test public void contextualGoalMetadataIsPreserved() {
+        UBNFAST.UBNFFile grammar=UBNFMapper.parse("grammar G { @ubnf: v2 token T ::= 'x'; @lexicalContext(tokens=['T'], literals=['>']) R ::= T; }");
+        String result=UBNFToBNFConverter.convert(grammar,true);
+        assertTrue(result,result.contains("@lexicalContext(tokens=['T'], literals=['>'])"));
+        assertFalse(UBNFToBNFConverter.convert(grammar,false).contains("@lexicalContext"));
+    }
+
     /**
      * UBNF ファイルを読み込んで EBNF に変換し、
      * アノテーション除外（デフォルト動作）で期待される構文が含まれていることを検証。

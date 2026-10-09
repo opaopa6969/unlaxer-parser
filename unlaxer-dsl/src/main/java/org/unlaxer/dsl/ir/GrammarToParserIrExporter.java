@@ -116,6 +116,10 @@ public final class GrammarToParserIrExporter {
         } else if (annotation instanceof WhitespaceAnnotation whitespace) {
             name = "whitespace";
             payload.put("style", whitespace.style().orElse("javaStyle"));
+        } else if (annotation instanceof org.unlaxer.dsl.bootstrap.UBNFAST.LexicalContextAnnotation context) {
+            name = "lexical-context";
+            payload.put("tokens", context.tokens());
+            payload.put("literals", context.literals());
         } else if (annotation instanceof InterleaveAnnotation interleave) {
             name = "interleave";
             payload.put("profile", interleave.profile());

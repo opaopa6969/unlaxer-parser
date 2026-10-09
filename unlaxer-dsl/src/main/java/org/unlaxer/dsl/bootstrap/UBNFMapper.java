@@ -30,6 +30,8 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.KeyValuePair;
 import org.unlaxer.dsl.bootstrap.UBNFAST.LeftAssocAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.LongestChoiceAnnotation;
+import org.unlaxer.dsl.bootstrap.UBNFAST.UniqueLongestChoiceAnnotation;
+import org.unlaxer.dsl.bootstrap.UBNFAST.NamePredicateAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.PredictiveChoiceAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.BoundedRepeatElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ErrorElement;
@@ -600,6 +602,13 @@ public class UBNFMapper {
                 result.add(toEvalAnnotation(child));
             } else if (child.parser.getClass() == UBNFParsers.WhitespaceAnnotationParser.class) {
                 result.add(toWhitespaceAnnotation(child));
+            } else if (child.parser.getClass() == UBNFParsers.LexicalContextAnnotationParser.class) {
+                List<Token> lists = findDescendants(child, UBNFParsers.LexicalContextListParser.class);
+                List<String> tokens = findDescendants(lists.get(0), org.unlaxer.parser.elementary.SingleQuotedParser.class).stream()
+                    .map(value -> stripQuotes(value.source.toString().trim())).toList();
+                List<String> literals = lists.size() < 2 ? List.of() : findDescendants(lists.get(1), org.unlaxer.parser.elementary.SingleQuotedParser.class).stream()
+                    .map(value -> stripQuotes(value.source.toString().trim())).toList();
+                result.add(bind(new UBNFAST.LexicalContextAnnotation(tokens, literals), child));
             } else if (child.parser.getClass() == UBNFParsers.InterleaveAnnotationParser.class) {
                 result.add(toInterleaveAnnotation(child));
             } else if (child.parser.getClass() == UBNFParsers.BackrefAnnotationParser.class) {
@@ -618,6 +627,13 @@ public class UBNFMapper {
                 result.add(bind(new RightAssocAnnotation(), child));
             } else if (child.parser.getClass() == UBNFParsers.LongestChoiceAnnotationParser.class) {
                 result.add(bind(new LongestChoiceAnnotation(), child));
+            } else if (child.parser.getClass() == UBNFParsers.UniqueLongestChoiceAnnotationParser.class) {
+                result.add(bind(new UniqueLongestChoiceAnnotation(), child));
+            } else if (child.parser.getClass() == UBNFParsers.NamePredicateAnnotationParser.class) {
+                var values = findDescendants(child, org.unlaxer.parser.elementary.SingleQuotedParser.class)
+                    .stream().map(value -> stripQuotes(value.source.toString().trim())).toList();
+                if (values.size() != 4) throw new IllegalArgumentException("invalid @namePredicate arguments");
+                result.add(bind(new NamePredicateAnnotation(values.get(0), values.get(1), values.get(2), values.get(3)), child));
             } else if (child.parser.getClass() == UBNFParsers.PredictiveChoiceAnnotationParser.class) {
                 result.add(bind(new PredictiveChoiceAnnotation(), child));
             } else if (child.parser.getClass() == UBNFParsers.PrecedenceAnnotationParser.class) {
