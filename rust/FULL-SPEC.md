@@ -70,6 +70,8 @@ annotation、`ParseContext` API、consume/invert伝播、incremental、IDE proto
 | Rust製UBNF frontend・native generator | syntax frontend全18annotation/12token/9element種、対応範囲のlowering/CLI/5module emitterを実装 | Java/nativeの既存・混在値文法で全5file一致、空PATHの生成/check、手書き/symlink保護。全backend機能の生成完了とは区別。frontend既知差と構造分析上限を文書化 |
 | 入力DSLの機械語生成 | DSL全式の専用machine-code loweringは未対応 | 下流AOTはRust本文をcompile/linkするが、固定したDSLソースは実行時にparseしtyped-AST評価器で評価する。generator/評価CLI/native本文のバイナリ化とは区別する |
 
+実本番 FormulaInfo → P4 → Java の native 接続は [production bridge](../docs/tinyexpression-production-bridge.md) で両 host の独立 parser / 原文位置 / 実 javac query を検証する。旧 Tiny 拡張の consumer 移行と未閉鎖 production fence の補完は別の残作業であり、全言語対応の根拠には含めない。
+
 ## 下流TinyExpressionの現状監査（2026-09-30）
 
 以下は上記の固定revisionに対する証拠であり、初期基準の全機能が移植されたという宣言ではない。
