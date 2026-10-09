@@ -1,0 +1,77 @@
+[
+  {
+    "name": "positive-lookahead",
+    "input": ">>",
+    "sourceLength": 2,
+    "utf16Length": 2,
+    "accepted": true,
+    "consumed": 2,
+    "matched": 2,
+    "span": [
+      0,
+      2
+    ]
+  },
+  {
+    "name": "negative-lookahead",
+    "input": ">>",
+    "sourceLength": 2,
+    "utf16Length": 2,
+    "accepted": true,
+    "consumed": 2,
+    "matched": 2,
+    "span": [
+      0,
+      2
+    ]
+  },
+  {
+    "name": "child-entry",
+    "input": ">>>",
+    "sourceLength": 3,
+    "utf16Length": 3,
+    "accepted": true,
+    "consumed": 3,
+    "matched": 3,
+    "span": [
+      0,
+      3
+    ]
+  },
+  {
+    "name": "child-failure-choice",
+    "input": ">>>",
+    "sourceLength": 3,
+    "utf16Length": 3,
+    "accepted": true,
+    "consumed": 3,
+    "matched": 3,
+    "span": [
+      0,
+      3
+    ]
+  },
+  {
+    "name": "unicode-child",
+    "input": "😀>>",
+    "sourceLength": 3,
+    "utf16Length": 4,
+    "accepted": true,
+    "consumed": 3,
+    "matched": 3,
+    "span": [
+      0,
+      3
+    ]
+  },
+  {
+    "name": "child-failure",
+    "input": "><",
+    "sourceLength": 2,
+    "utf16Length": 2,
+    "accepted": false,
+    "consumed": 0,
+    "matched": 0,
+    "farthest": 1
+  }
+]

@@ -39,6 +39,11 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     public record RuleEffects(Expression child, Effects effects) implements Expression {}
     /** Compares this rule's own completed named captures; differences are semantic diagnostics. */
     public record CaptureEquality(Expression child, String name) implements Expression {}
+    public record NamePredicate(Expression child, String snapshot, String version, String capture, String kind) implements Expression {}
+    public record NameRequirement(String id, String version) {}
+    public record NameResolutionScope(Expression child, List<NameRequirement> requirements) implements Expression {
+        public NameResolutionScope { requirements=List.copyOf(requirements); }
+    }
     public enum RecoveryMode { SYNC, BEFORE_SYNC, SKIP }
     /** Rule-level transactional recovery; a recovered tree must not be mapped as a normal AST. */
     public record Recovery(Expression child, RecoveryMode mode, List<String> tokens, String message)
@@ -51,11 +56,14 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
             }
         }
     }
-    public sealed interface Expression permits Literal, NumberToken, Reference, Sequence, Choice, LongestChoice, PredictiveChoice, Capture,
+    public sealed interface Expression permits Literal, NumberToken, Reference, Sequence, Choice, LongestChoice, UniqueLongestChoice, PredictiveChoice, Capture,
         OptionalExpr, Repeat, Separated, AnyToken, EofToken, EmptyToken, ErrorExpected, CharRangeToken,
         ExceptToken, UntilToken, LookaheadToken, Delimited, IdentifierToken, QuotedToken,
         CodeStartToken, CodeEndToken, LongCodeBlockToken, CustomToken, TextValue, ValueBoundary, TriviaScope, RuleEffects,
-        CaptureEquality, Recovery, LexicalToken, LexicalTriviaScope {}
+        CaptureEquality, NamePredicate, NameResolutionScope, Recovery, LexicalToken, LexicalTriviaScope, LexicalContextScope {}
+    public record LexicalContextScope(Expression child, List<org.unlaxer.dsl.runtime.Lexing.Terminal> terminals) implements Expression {
+        public LexicalContextScope { terminals = List.copyOf(terminals); }
+    }
     public record LexicalToken(String name, org.unlaxer.dsl.runtime.LexicalExpression expression) implements Expression {}
     /** Rule-local trivia policy, transparent to captures and semantic values. */
     public record LexicalTriviaScope(Expression child, org.unlaxer.dsl.runtime.LexicalExpression definition) implements Expression {}
@@ -96,6 +104,9 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     }
     public record LongestChoice(List<Expression> alternatives) implements Expression {
         public LongestChoice { alternatives = List.copyOf(alternatives); }
+    }
+    public record UniqueLongestChoice(List<Expression> alternatives) implements Expression {
+        public UniqueLongestChoice { alternatives = List.copyOf(alternatives); }
     }
     public sealed interface Predictor permits AnyPredictor, LiteralPredictor, NumberPredictor,
         IdentifierPredictor, QuotedPredictor, AnyOfPredictor {}

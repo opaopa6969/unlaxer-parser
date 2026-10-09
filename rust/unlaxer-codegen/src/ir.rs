@@ -95,6 +95,21 @@ pub enum RecoveryMode {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression {
+    NamePredicate {
+        child: Box<Expression>,
+        snapshot: String,
+        version: String,
+        capture: String,
+        kind: String,
+    },
+    NameResolutionScope {
+        child: Box<Expression>,
+        requirements: Vec<(String, String)>,
+    },
+    LexicalContextScope {
+        child: Box<Expression>,
+        terminals: Vec<(String, bool, crate::lexical::LexicalExpression)>,
+    },
     LexicalToken {
         name: String,
         expression: crate::lexical::LexicalExpression,
@@ -142,6 +157,7 @@ pub enum Expression {
     Sequence(Vec<Expression>),
     Choice(Vec<Expression>),
     LongestChoice(Vec<Expression>),
+    UniqueLongestChoice(Vec<Expression>),
     PredictiveChoice {
         alternatives: Vec<Expression>,
         predictors: Vec<Predictor>,
