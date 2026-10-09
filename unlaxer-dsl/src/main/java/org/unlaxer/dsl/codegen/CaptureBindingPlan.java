@@ -92,6 +92,12 @@ final class CaptureBindingPlan {
         return sites.getOrDefault(capture, List.of());
     }
 
+    Map<String, String> namesBySite() {
+        Map<String, String> result = new LinkedHashMap<>();
+        sites.forEach((name, occurrences) -> occurrences.forEach(site -> result.put(site.id(), name)));
+        return result;
+    }
+
     List<Site> allSites() { return sites.values().stream().flatMap(List::stream).toList(); }
 
     private void visit(RuleBody body) {

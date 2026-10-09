@@ -44,6 +44,14 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
         relative_path: "runtime/LICENSE".into(),
         content: include_str!("../../../LICENSE").into(),
     });
+    files.push(GeneratedFile {
+        relative_path: "runtime/UNICODE-LICENSE.txt".into(),
+        content: include_str!("../../../spec-corpus/xid-identifier/UNICODE-LICENSE.txt").into(),
+    });
+    files.push(GeneratedFile {
+        relative_path: "public/UNICODE-LICENSE.txt".into(),
+        content: include_str!("../../../spec-corpus/xid-identifier/UNICODE-LICENSE.txt").into(),
+    });
     macro_rules! runtime {
         ($name:literal) => {
             files.push(GeneratedFile {
@@ -55,12 +63,18 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
     runtime!("lib.rs");
     runtime!("scope.rs");
     runtime!("semantic.rs");
+    runtime!("editor.rs");
+    runtime!("editor_cst.rs");
+    runtime!("editor_queries.rs");
     runtime!("language_queries.rs");
     runtime!("semantic_queries.rs");
     runtime!("semantic_project.rs");
     runtime!("semantic_rename.rs");
     runtime!("source_edits.rs");
     runtime!("source.rs");
+    runtime!("embedded.rs");
+    runtime!("provider_protocol.rs");
+    runtime!("provider_process.rs");
     runtime!("pipeline.rs");
     runtime!("semantic_query_cache.rs");
     runtime!("type_system.rs");
@@ -68,6 +82,7 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
     runtime!("lexing.rs");
     runtime!("first.rs");
     runtime!("lexical.rs");
+    runtime!("unicode_xid.rs");
     runtime!("long_code_fence.rs");
     runtime!("memo_retention_tests.rs");
     let wrapper = include_str!("../../../unlaxer-dsl/src/main/resources/playground/lib.rs")
@@ -85,6 +100,8 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
         relative_path: "src/lib.rs".into(),
         content: wrapper,
     });
+    asset!("src/editor_adapter.rs", "playground/editor_adapter.rs");
+    asset!("src/region_adapter.rs", "playground/region_adapter.rs");
     asset!("public/index.html", "playground/index.html");
     asset!("public/playground.css", "playground/playground.css");
     asset!("public/playground.js", "playground/playground.js");

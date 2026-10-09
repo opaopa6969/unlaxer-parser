@@ -105,8 +105,8 @@ public final class PortabilityCheck {
             add(out, issue.code(), snapshot, issue.node(), issue.subject());
         for (ImportDecl decl : grammar.imports()) add(out, "P-IMPORT", snapshot, decl, decl.path());
         for (GlobalSetting setting : grammar.settings()) {
-            if (!Set.of("whitespace", "package", "memoSafeToken", "tokenAdapter", "tokenContract", "ubnf", "feature", "tokenStream").contains(setting.key())
-                || (setting.value() instanceof BlockSettingValue && !Set.of("tokenAdapter", "tokenContract").contains(setting.key()))) {
+            if (!Set.of("whitespace", "package", "memoSafeToken", "tokenAdapter", "tokenContract", "ubnf", "feature", "tokenStream", "embedded", "embedding").contains(setting.key())
+                || (setting.value() instanceof BlockSettingValue && !Set.of("tokenAdapter", "tokenContract", "embedded").contains(setting.key()))) {
                 add(out, "P-SETTING", snapshot, setting, setting.key());
             }
             if (setting.key().equals("whitespace") && setting.value() instanceof StringSettingValue value
