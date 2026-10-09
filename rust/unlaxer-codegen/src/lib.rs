@@ -2,6 +2,7 @@
 //!
 //! This crate accepts normalized IR, not UBNF source. Frontends must validate
 //! grammar semantics (including capture shapes, nullability and left recursion).
+pub mod dap;
 pub mod ir;
 pub mod lexical;
 pub mod lsp;

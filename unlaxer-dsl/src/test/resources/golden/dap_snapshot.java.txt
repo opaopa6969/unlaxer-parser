@@ -24,6 +24,8 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
     protected String runtimeMode = "token";
     protected String steppingMode = "token";
     protected boolean stopOnEntry;
+    private boolean terminated;
+    private int lineBase = 1, columnBase = 1;
     protected Map<String, Object> launchArguments = Map.of();
     protected String sourceContent = "";
     protected int sourceLineOffset = 0;
@@ -42,6 +44,8 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
 
     @Override
     public CompletableFuture<Capabilities> initialize(InitializeRequestArguments args) {
+        lineBase = args != null && Boolean.FALSE.equals(args.getLinesStartAt1()) ? 0 : 1;
+        columnBase = args != null && Boolean.FALSE.equals(args.getColumnsStartAt1()) ? 0 : 1;
         Capabilities cap = new Capabilities();
         cap.setSupportsConfigurationDoneRequest(true);
         return CompletableFuture.completedFuture(cap);
@@ -49,10 +53,14 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
 
     @Override
     public CompletableFuture<Void> launch(Map<String, Object> args) {
-        launchArguments = args == null ? Map.of() : new java.util.LinkedHashMap<>(args);
-        pendingProgram = firstNonBlankLaunchArgument(launchArguments, "program", "formulaSource");
-        runtimeMode = String.valueOf(launchArguments.getOrDefault("runtimeMode", "token"));
-        steppingMode = String.valueOf(launchArguments.getOrDefault("steppingMode", inferSteppingMode(runtimeMode)));
+        Map<String, Object> proposed = args == null ? Map.of() : new java.util.LinkedHashMap<>(args);
+        String program = firstNonBlankLaunchArgument(proposed, "program", "formulaSource");
+        String runtime = String.valueOf(proposed.getOrDefault("runtimeMode", "token"));
+        String stepping = String.valueOf(proposed.getOrDefault("steppingMode", inferSteppingMode(runtime)));
+        if (program.isBlank() || !("ast".equalsIgnoreCase(stepping) || "token".equalsIgnoreCase(stepping))) return CompletableFuture.failedFuture(new IllegalArgumentException("invalid program or stepping mode"));
+        terminated = false;
+        stepPoints = List.of(); astNodeTypes = List.of(); astNodeSpans = List.of(); astNodeCount = 0; stepIndex = 0;
+        launchArguments = proposed; pendingProgram = program; runtimeMode = runtime; steppingMode = stepping;
         stopOnEntry = Boolean.TRUE.equals(launchArguments.get("stopOnEntry"));
         client.initialized();
         return CompletableFuture.completedFuture(null);
@@ -111,6 +119,7 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
 
     @Override
     public CompletableFuture<Void> next(NextArguments args) {
+        if (args == null || args.getThreadId() != 1 || !hasCurrentStep()) return CompletableFuture.failedFuture(new IllegalArgumentException("invalid or unavailable debug request"));
         onBeforeStep(stepIndex + 1, currentStepLabel());
         stepIndex++;
         onAfterStep(stepIndex, currentStepLabel());
@@ -129,6 +138,7 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
 
     @Override
     public CompletableFuture<ContinueResponse> continue_(ContinueArguments args) {
+        if (args == null || args.getThreadId() != 1 || !hasCurrentStep()) return CompletableFuture.failedFuture(new IllegalArgumentException("invalid or unavailable debug request"));
         ContinueResponse response = new ContinueResponse();
         response.setAllThreadsContinued(true);
         int bp = findBreakpointIndex(stepIndex);
@@ -158,6 +168,7 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
 
     @Override
     public CompletableFuture<StackTraceResponse> stackTrace(StackTraceArguments args) {
+        if (args == null || args.getThreadId() != 1) return CompletableFuture.failedFuture(new IllegalArgumentException("invalid or unavailable debug request"));
         StackTraceResponse response = new StackTraceResponse();
         if (hasCurrentStep()) {
             Token current = currentStepToken();
@@ -166,33 +177,34 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
                 return CompletableFuture.completedFuture(response);
             }
             int charOffset = current.source.offsetFromRoot().value();
+            int endOffset = charOffset + current.source.codePointLength().value();
             if (isAstRuntimeMode()) {
                 int[] span = currentAstSpan();
                 if (span != null) {
-                    charOffset = span[0];
+                    charOffset = span[0]; endOffset = span[1];
                 }
             }
-            int line = 0, col = 0;
-            for (int i = 0; i < charOffset && i < sourceContent.length(); i++) {
-                if (sourceContent.charAt(i) == '\n') { line++; col = 0; }
-                else { col++; }
-            }
+            var position = new org.unlaxer.source.DocumentSnapshot("dap:source", 0, sourceContent).lsp(charOffset);
+            int line = position.line(), col = position.character();
             StackFrame frame = new StackFrame();
             frame.setId(0);
             frame.setName(currentStepLabel() + " (" + (stepIndex + 1) + "/" + stepLimit() + ")");
-            frame.setLine(line + sourceLineOffset + 1);   // DAP is 1-based
-            frame.setColumn(col + 1);
+            frame.setLine(line + sourceLineOffset + lineBase);
+            frame.setColumn(col + columnBase);
+            var endPosition = new org.unlaxer.source.DocumentSnapshot("dap:source", 0, sourceContent).lsp(endOffset);
+            frame.setEndLine(endPosition.line() + sourceLineOffset + lineBase);
+            frame.setEndColumn(endPosition.character() + columnBase);
             Source source = new Source();
             source.setPath(pendingProgram);
             source.setName(Path.of(pendingProgram).getFileName().toString());
             frame.setSource(source);
             response.setStackFrames(new StackFrame[]{frame});
-        } else if (pendingProgram != null && !pendingProgram.isEmpty()) {
+        } else if (!isAstRuntimeMode() && !terminated && pendingProgram != null && !pendingProgram.isEmpty()) {
             StackFrame frame = new StackFrame();
             frame.setId(0);
             frame.setName("<program>");
-            frame.setLine(sourceLineOffset + 1);
-            frame.setColumn(0);
+            frame.setLine(sourceLineOffset + lineBase);
+            frame.setColumn(columnBase);
             Source source = new Source();
             source.setPath(pendingProgram);
             frame.setSource(source);
@@ -205,6 +217,7 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
 
     @Override
     public CompletableFuture<ScopesResponse> scopes(ScopesArguments args) {
+        if (args == null || args.getFrameId() != 0) return CompletableFuture.failedFuture(new IllegalArgumentException("invalid or unavailable debug request"));
         ScopesResponse response = new ScopesResponse();
         if (hasCurrentStep()) {
             Scope scope = new Scope();
@@ -220,6 +233,7 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
 
     @Override
     public CompletableFuture<VariablesResponse> variables(VariablesArguments args) {
+        if (args == null || args.getVariablesReference() != 1) return CompletableFuture.failedFuture(new IllegalArgumentException("invalid or unavailable debug request"));
         VariablesResponse response = new VariablesResponse();
         if (hasCurrentStep()) {
             Token current = currentStepToken();
@@ -294,7 +308,7 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
 
     @Override
     public CompletableFuture<Void> disconnect(DisconnectArguments args) {
-        System.exit(0);
+        terminated = true; stepPoints = List.of(); astNodeTypes = List.of(); astNodeSpans = List.of(); runtimeProbeVariables = Map.of();
         return CompletableFuture.completedFuture(null);
     }
 
@@ -401,7 +415,7 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
     private void collectAstSteps() {
         astStepError = "";
         try {
-            Object ast = SnapshotMapper.parse(sourceContent);
+            Object ast = parseDebugAst(sourceContent);
             List<String> types = new ArrayList<>();
             List<int[]> spans = new ArrayList<>();
             collectAstNodeMeta(ast, types, spans);
@@ -415,40 +429,30 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
         }
     }
 
+    protected Object parseDebugAst(String source) { return SnapshotMapper.parse(source); }
+
     private void collectAstNodeMeta(Object node, List<String> types, List<int[]> spans) {
         if (node == null) {
             return;
         }
         types.add(node.getClass().getSimpleName());
-        spans.add(sourceSpanOfAstNode(node));
-        java.lang.reflect.Method[] methods = node.getClass().getMethods();
-        for (java.lang.reflect.Method method : methods) {
-            if (method.getParameterCount() != 0) {
-                continue;
-            }
-            String name = method.getName();
-            if ("getClass".equals(name) || "hashCode".equals(name) || "toString".equals(name)) {
-                continue;
-            }
-            try {
-                Object value = method.invoke(node);
-                if (value == null) {
-                    continue;
-                }
-                if (value instanceof List<?> list) {
-                    for (Object element : list) {
-                        if (isAstNodeCandidate(element)) {
-                            collectAstNodeMeta(element, types, spans);
-                        }
-                    }
-                    continue;
-                }
-                if (isAstNodeCandidate(value)) {
-                    collectAstNodeMeta(value, types, spans);
-                }
-            } catch (Throwable ignored) {}
+        int[] span = sourceSpanOfAstNode(node);
+        if (span == null) throw new IllegalStateException("AST source span unavailable");
+        var snapshot = new org.unlaxer.source.DocumentSnapshot("dap:source", 0, sourceContent);
+        snapshot.lsp(span[0]); snapshot.lsp(span[1]);
+        spans.add(span);
+        if (!node.getClass().isRecord()) return;
+        for (java.lang.reflect.RecordComponent component : node.getClass().getRecordComponents()) {
+            try { collectAstValueMeta(component.getAccessor().invoke(node), types, spans); }
+            catch (ReflectiveOperationException error) { throw new IllegalStateException("AST field unavailable", error); }
         }
-    }
+        }
+
+        private void collectAstValueMeta(Object value, List<String> types, List<int[]> spans) {
+            if (value instanceof java.util.Optional<?> optional) { optional.ifPresent(child -> collectAstValueMeta(child, types, spans)); }
+            else if (value instanceof List<?> list) { for (Object child : list) collectAstValueMeta(child, types, spans); }
+            else if (isAstNodeCandidate(value)) { collectAstNodeMeta(value, types, spans); }
+        }
 
     private int[] sourceSpanOfAstNode(Object node) {
         try {
@@ -487,7 +491,7 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
     }
 
     private boolean hasCurrentStep() {
-        return stepLimit() > 0 && stepIndex < stepLimit();
+        return !terminated && stepLimit() > 0 && stepIndex < stepLimit();
     }
 
     private Token currentStepToken() {
@@ -584,12 +588,7 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
     }
 
     private int getLineForToken(Token t) {
-        int charOffset = codePointOffsetToStringOffset(t.source.offsetFromRoot().value());
-        int line = 1;
-        for (int i = 0; i < charOffset && i < sourceContent.length(); i++) {
-            if (sourceContent.charAt(i) == '\n') { line++; }
-        }
-        return line + sourceLineOffset;
+        return getLineForOffset(t.source.offsetFromRoot().value());
     }
 
     private int findBreakpointIndex(int fromIndex) {
@@ -617,14 +616,7 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
     }
 
     private int getLineForOffset(int codePointOffset) {
-        int charOffset = codePointOffsetToStringOffset(codePointOffset);
-        int line = 1;
-        for (int i = 0; i < charOffset && i < sourceContent.length(); i++) {
-            if (sourceContent.charAt(i) == '\n') {
-                line++;
-            }
-        }
-        return line + sourceLineOffset;
+        return new org.unlaxer.source.DocumentSnapshot("dap:source", 0, sourceContent).lsp(codePointOffset).line() + sourceLineOffset + lineBase;
     }
 
     /** Selected source slice and its zero-based line offset in the original document. */
@@ -671,6 +663,7 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
     }
 
     private void sendTerminated() {
+        terminated = true;
         if (client == null) return;
         client.terminated(new TerminatedEventArguments());
         ExitedEventArguments exited = new ExitedEventArguments();

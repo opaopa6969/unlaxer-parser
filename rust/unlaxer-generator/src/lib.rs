@@ -78,11 +78,31 @@ mod package_fetch {
 pub fn generate_file_with_lsp(
     path: &std::path::Path,
 ) -> Result<Vec<unlaxer_codegen::GeneratedFile>, String> {
+    generate_file_with_protocols(path, true, false)
+}
+/// Additional strict typed AST DAP module.
+pub fn generate_file_with_dap(
+    path: &std::path::Path,
+) -> Result<Vec<unlaxer_codegen::GeneratedFile>, String> {
+    generate_file_with_protocols(path, false, true)
+}
+/// Explicit protocol modules in canonical LSP/DAP order; default emission remains five files.
+pub fn generate_file_with_protocols(
+    path: &std::path::Path,
+    lsp: bool,
+    dap: bool,
+) -> Result<Vec<unlaxer_codegen::GeneratedFile>, String> {
     let file = modules::load(path)?;
     let mut files = generate_ast(&file)?;
     let grammar = &file.grammars[0];
     let ir = lowering::lower(grammar)?;
-    files[0].content.push_str("pub mod lsp;\n");
-    files.push(unlaxer_codegen::lsp::generate(&ir, &grammar.name));
+    if lsp {
+        files[0].content.push_str("pub mod lsp;\n");
+        files.push(unlaxer_codegen::lsp::generate(&ir, &grammar.name));
+    }
+    if dap {
+        files[0].content.push_str("pub mod dap;\n");
+        files.push(unlaxer_codegen::dap::generate(&ir));
+    }
     Ok(files)
 }

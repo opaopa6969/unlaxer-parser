@@ -42,6 +42,21 @@ public final class RustBackend {
         return List.copyOf(files);
     }
 
+    public List<GeneratedFile> generateWithDap(GrammarDecl grammar) {
+        return generateWithProtocols(grammar, false, true);
+    }
+
+    /** Protocol modules are opt-in and emitted in canonical LSP/DAP order. */
+    public List<GeneratedFile> generateWithProtocols(GrammarDecl grammar, boolean lsp, boolean dap) {
+        var files = new ArrayList<>(lsp ? generateWithLsp(grammar) : generate(grammar));
+        if (dap) {
+            var first = files.get(0);
+            files.set(0, new GeneratedFile(first.relativePath(), first.content() + "pub mod dap;\n"));
+            files.add(RustDapEmitter.generate(RustGrammarLowering.lower(grammar)));
+        }
+        return List.copyOf(files);
+    }
+
     private static void collectLspKeywords(Expression expression, java.util.Set<String> keywords) {
         if (expression instanceof Literal v) keywords.add(v.text());
         else if (expression instanceof Sequence v) v.elements().forEach(e -> collectLspKeywords(e, keywords));
