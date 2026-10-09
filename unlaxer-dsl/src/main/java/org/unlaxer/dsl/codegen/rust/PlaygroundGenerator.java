@@ -36,7 +36,7 @@ public final class PlaygroundGenerator {
         files.put("runtime/LICENSE", resource("playground/runtime/LICENSE"));
         files.put("runtime/UNICODE-LICENSE.txt", resource("playground/runtime/UNICODE-LICENSE.txt"));
         files.put("public/UNICODE-LICENSE.txt", resource("playground/runtime/UNICODE-LICENSE.txt"));
-        for (String name : new String[] {"lib.rs", "scope.rs", "semantic.rs", "semantic_project.rs", "semantic_query_cache.rs", "type_system.rs", "call_inference.rs", "lexing.rs", "first.rs", "lexical.rs", "unicode_xid.rs", "long_code_fence.rs", "memo_retention_tests.rs", "language_queries.rs", "semantic_queries.rs", "semantic_rename.rs", "source_edits.rs", "source.rs", "pipeline.rs", "embedded.rs", "provider_protocol.rs", "provider_process.rs"}) {
+        for (String name : new String[] {"lib.rs", "scope.rs", "semantic.rs", "editor.rs", "semantic_project.rs", "semantic_query_cache.rs", "type_system.rs", "call_inference.rs", "lexing.rs", "first.rs", "lexical.rs", "long_code_fence.rs", "memo_retention_tests.rs", "source.rs", "pipeline.rs", "language_queries.rs", "semantic_queries.rs", "semantic_rename.rs", "source_edits.rs", "unicode_xid.rs", "embedded.rs", "provider_protocol.rs", "provider_process.rs"}) {
             files.put("runtime/src/" + name, resource("playground/runtime/src/" + name));
         }
         files.put("src/lib.rs", resource("playground/lib.rs")
