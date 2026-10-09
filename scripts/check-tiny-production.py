@@ -34,6 +34,13 @@ for language,command in [('java',['java','-cp',str(out)+os.pathsep+cp,'Probe']),
     (out/(language+'.tsv')).write_text(actual)
     if actual!=expected:
         print(''.join(difflib.unified_diff(expected.splitlines(True),actual.splitlines(True),fromfile='independent expected',tofile=language)));raise SystemExit(1)
+run(['rustup','run','1.85.0','rustc','--edition=2021','--extern','unlaxer_runtime='+str(out/'libunlaxer_runtime.rlib'),'--extern','tinyexpression_rs='+str(out/'libtinyexpression_rs.rlib'),root/'examples/tinyexpression-production/partial_probe.rs','-o',out/'partial-probe'])
+partial_expected=(fixture/'partial/expected.tsv').read_text()
+for language,command in [('java',['java','-cp',str(out)+os.pathsep+cp,'PartialProbe']),('rust',[out/'partial-probe'])]:
+    actual=run(command+[fixture,pathlib.Path(os.environ.get('JAVA_HOME','/usr')).joinpath('bin/java'),cp],timeout=180)
+    (out/('partial-'+language+'.tsv')).write_text(actual)
+    if actual!=partial_expected:
+        print(''.join(difflib.unified_diff(partial_expected.splitlines(True),actual.splitlines(True),fromfile='independent partial expected',tofile=language)));raise SystemExit(1)
 compat=run(['java','-cp',str(out)+os.pathsep+cp,'Compatibility',fixture/'original.txt'])
 if compat!='UBNFC\t10\tPASS\nCLASSIC\t10\tPASS\n':raise SystemExit('public P4 facade mismatch: '+compat)
 (out/'compatibility.tsv').write_text(compat)

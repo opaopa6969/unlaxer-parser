@@ -1,0 +1,4 @@
+formula:
+# 😀日本語
+```java:Main
+class Main { int target; int f(){ return tar

@@ -1,0 +1,10 @@
+formula:
+```java:Main
+class Main { int target; int f(){ return tar
+---END_OF_PART---
+formula:
+```java:Other
+class Other{}
+```
+1
+---END_OF_PART---

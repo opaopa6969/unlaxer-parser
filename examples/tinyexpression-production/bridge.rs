@@ -39,10 +39,15 @@ pub struct Binding {
     pub host: Snapshot,
     pub regions: Vec<Region>,
     pub java_files: BTreeMap<String, String>,
+    pub open_ends: HashSet<String>,
 }
 impl Binding {
     pub fn tree(&self) -> Result<LanguageRegions> {
-        LanguageRegions::with_open_ends(self.host.clone(), self.regions.clone(), HashSet::new())
+        LanguageRegions::with_open_ends(
+            self.host.clone(),
+            self.regions.clone(),
+            self.open_ends.clone(),
+        )
     }
     pub fn queries(&self, project: Project, java: Box<dyn Provider>) -> Result<LanguageQueries> {
         LanguageQueries::new(
@@ -114,6 +119,12 @@ impl JavaProvider {
     }
 }
 pub fn parse(host: &Snapshot) -> Result<Binding> {
+    parse_mode(host, false)
+}
+pub fn parse_editor(host: &Snapshot) -> Result<Binding> {
+    parse_mode(host, true)
+}
+fn parse_mode(host: &Snapshot, editor: bool) -> Result<Binding> {
     if host.len() > 1_048_576 {
         return Err("production document limit");
     }
@@ -133,6 +144,7 @@ pub fn parse(host: &Snapshot) -> Result<Binding> {
         State::Complete,
     )?];
     let mut files = BTreeMap::new();
+    let mut open_ends = HashSet::new();
     let mut index = 0;
     for block in document.blocks {
         if block.entries.iter().any(|entry| entry.value().is_none()) {
@@ -202,6 +214,21 @@ pub fn parse(host: &Snapshot) -> Result<Binding> {
             },
         )?);
         if !p4.ok {
+            if editor {
+                let parent_index = regions.len() - 1;
+                recover_prefix(
+                    host,
+                    &id,
+                    start,
+                    &input,
+                    &mut regions,
+                    &mut files,
+                    &mut open_ends,
+                )?;
+                if regions.len() > parent_index + 1 {
+                    regions[parent_index].parse_state = State::Partial;
+                }
+            }
             continue;
         }
         let tokens: Vec<_> = p4
@@ -263,9 +290,133 @@ pub fn parse(host: &Snapshot) -> Result<Binding> {
         host: host.clone(),
         regions,
         java_files: files,
+        open_ends,
     };
     result.tree()?;
     Ok(result)
+}
+fn recover_prefix(
+    host: &Snapshot,
+    parent: &str,
+    start: usize,
+    input: &str,
+    regions: &mut Vec<Region>,
+    files: &mut BTreeMap<String, String>,
+    open_ends: &mut HashSet<String>,
+) -> Result<()> {
+    let mut from = 0;
+    let mut number = 0;
+    while from < input.len() {
+        if number >= 256 {
+            return Err("production code block limit");
+        }
+        let remaining = &input[from..];
+        let options = ubnfc::ParseOptions {
+            require_eof: false,
+            build_ast: false,
+            lexical: true,
+            occurrences: true,
+            max_depth: 512,
+            ..Default::default()
+        };
+        let mut parsed = ubnfc::parse_entry_with_scanner(
+            "TinyExpressionP4",
+            Some("CodeBlock"),
+            remaining,
+            options,
+            &mut scanners::registry(),
+        )?;
+        let partial = !parsed.ok;
+        if partial {
+            parsed = ubnfc::parse_entry_with_scanner(
+                "TinyExpressionP4",
+                Some("CodeBlock"),
+                &format!("{remaining}\n```\n"),
+                options,
+                &mut scanners::registry(),
+            )?;
+        }
+        if !parsed.ok {
+            break;
+        }
+        let tokens: Vec<_> = parsed
+            .tokens
+            .iter()
+            .filter(|token| token.rule_id == "TinyExpressionP4::CodeBlock")
+            .collect();
+        if tokens.len() != 2 {
+            return Err("P4 CodeBlock lexical contract changed");
+        }
+        let open = tokens[0];
+        let close = tokens[1];
+        let chars: Vec<_> = remaining.chars().collect();
+        let size = chars.len();
+        if partial && (close.span[0] < size || open.span[1] > size) {
+            break;
+        }
+        let mut body_start = open.span[1];
+        if chars.get(body_start) == Some(&'\r') {
+            body_start += 1;
+        }
+        if chars.get(body_start) == Some(&'\n') {
+            body_start += 1;
+        }
+        if partial && body_start == size && !remaining.ends_with('\n') {
+            break;
+        }
+        let mut consumed = if partial { size } else { close.span[1] };
+        if !partial {
+            if chars.get(consumed) == Some(&'\r') {
+                consumed += 1;
+            }
+            if chars.get(consumed) == Some(&'\n') {
+                consumed += 1;
+            }
+        }
+        if consumed == 0 || consumed > size {
+            break;
+        }
+        let header: String = chars[open.span[0]..open.span[1]].iter().collect();
+        number += 1;
+        if let Some(class) = header.trim().strip_prefix("```java:") {
+            let offset = start + input[..from].chars().count();
+            let child = format!("{parent}/java/{number}");
+            regions.push(region(
+                host,
+                &child,
+                Some(parent),
+                "java",
+                Span {
+                    start: offset + open.span[0],
+                    end: offset + consumed,
+                },
+                Span {
+                    start: offset + body_start,
+                    end: offset + if partial { size } else { close.span[0] },
+                },
+                if partial {
+                    State::Partial
+                } else {
+                    State::Complete
+                },
+            )?);
+            files.insert(
+                child.clone(),
+                format!("{}.java", class.rsplit('.').next().unwrap()),
+            );
+            if partial {
+                open_ends.insert(child);
+            }
+        }
+        if partial {
+            break;
+        }
+        from += remaining
+            .char_indices()
+            .nth(consumed)
+            .map_or(remaining.len(), |(byte, _)| byte);
+    }
+    Ok(())
 }
 // Match Character.isWhitespace used by the production Java editor view (NBSP is excluded).
 fn java_whitespace(c: char) -> bool {

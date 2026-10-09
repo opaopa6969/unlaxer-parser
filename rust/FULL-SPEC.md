@@ -70,7 +70,7 @@ annotation、`ParseContext` API、consume/invert伝播、incremental、IDE proto
 | Rust製UBNF frontend・native generator | syntax frontend全18annotation/12token/9element種、対応範囲のlowering/CLI/5module emitterを実装 | Java/nativeの既存・混在値文法で全5file一致、空PATHの生成/check、手書き/symlink保護。全backend機能の生成完了とは区別。frontend既知差と構造分析上限を文書化 |
 | 入力DSLの機械語生成 | DSL全式の専用machine-code loweringは未対応 | 下流AOTはRust本文をcompile/linkするが、固定したDSLソースは実行時にparseしtyped-AST評価器で評価する。generator/評価CLI/native本文のバイナリ化とは区別する |
 
-実本番 FormulaInfo → P4 → Java の native 接続は [production bridge](../docs/tinyexpression-production-bridge.md) で両 host の独立 parser / 原文位置 / 実 javac query を検証する。旧 Tiny 拡張の consumer 移行と未閉鎖 production fence の補完は別の残作業であり、全言語対応の根拠には含めない。
+実本番 FormulaInfo → P4 → Java の native 接続は [production bridge](../docs/tinyexpression-production-bridge.md) で Tiny `f86ce8a5` 固定の両 host 独立 parser / 原文位置 / 実 javac query を検証する（strict 16入力177観測、editor partial 9入力29観測）。初版 #470 では未接続だった既存 Java Tiny LSP consumer の opt-in 診断・EOF 補完は [Tiny #252](https://github.com/opaopa6969/tinyexpression/pull/252) / [#254](https://github.com/opaopa6969/tinyexpression/pull/254) に実装され、`0d84f0dc` の長い fence も追加検証する。この現行 Java consumer の証拠を固定 pin の共通 corpus と混同せず、現行 Rust Tiny LSP consumer の同等性や全言語対応は主張しない。
 
 ## 下流TinyExpressionの現状監査（2026-09-30）
 
