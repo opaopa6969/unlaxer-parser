@@ -51,7 +51,7 @@ jobs:
     - name: Cross-language fixtures, compile failures, and generated-file drift
       run: >
         mvn -B -pl unlaxer-common,unlaxer-dsl -am test
-        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,RustPortabilityConformanceTest,TokenAdapterConformanceTest,ParseBindingsConformanceTest,DeclarativeTokenConformanceTest,ApiImpactConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,PackageResolverConformanceTest,HttpsPackageConformanceTest,VocabularyOriginsConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest,SkipMappingConformanceTest,CaptureEqualityConformanceTest,ErrorElementConformanceTest,RecoveryConformanceTest,SemanticModelConformanceTest,ProjectSymbolIndexConformanceTest,SemanticModelUbnfTest,TokenStreamConformanceTest,TypeSystemConformanceTest,CallInferenceConformanceTest,SemanticQueriesConformanceTest,SemanticQueryEditsTest,UniqueLongestConformanceTest,NameSnapshotConformanceTest,NamePredicateConformanceTest,ContextualLexingConformanceTest -DrustConformance=true -DtokenStreamBench=true
+        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,RustPortabilityConformanceTest,TokenAdapterConformanceTest,ParseBindingsConformanceTest,DeclarativeTokenConformanceTest,ApiImpactConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,UniqueLongestConformanceTest,NameSnapshotConformanceTest,NamePredicateConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest,SkipMappingConformanceTest,CaptureEqualityConformanceTest,ErrorElementConformanceTest,RecoveryConformanceTest,SemanticModelConformanceTest,ProjectSymbolIndexConformanceTest,SemanticModelUbnfTest,TokenStreamConformanceTest,ContextualLexingConformanceTest,TypeSystemConformanceTest,CallInferenceConformanceTest,SemanticQueriesConformanceTest,SemanticQueryEditsTest,PackageResolverConformanceTest,HttpsPackageConformanceTest,VocabularyOriginsConformanceTest -DrustConformance=true -DtokenStreamBench=true
         -Dsurefire.failIfNoSpecifiedTests=false
     - name: Resolver tutorial (Java and Rust)
       run: |
@@ -178,12 +178,12 @@ jobs:
           unlaxer-dsl/target/semantic-cardinality-both.tsv
           unlaxer-dsl/target/rust-native-generator.tsv
           unlaxer-dsl/target/rust-rule-trivia.tsv
-          unlaxer-dsl/target/rust-packages.tsv
-          unlaxer-dsl/target/rust-package-https.tsv
-          unlaxer-dsl/target/rust-vocabulary-origins.tsv
           unlaxer-dsl/target/rust-unique-longest.tsv
           unlaxer-dsl/target/rust-name-snapshots.tsv
           unlaxer-dsl/target/rust-name-predicate.tsv
+          unlaxer-dsl/target/rust-packages.tsv
+          unlaxer-dsl/target/rust-package-https.tsv
+          unlaxer-dsl/target/rust-vocabulary-origins.tsv
           unlaxer-dsl/target/rust-scope-store.tsv
           unlaxer-dsl/target/rust-scope-annotations.tsv
           unlaxer-dsl/target/rust-nested-captures.tsv
