@@ -12,7 +12,7 @@ import org.unlaxer.dsl.runtime.LexicalTokenParser;
 public class DeclarativeTokenTest {
     @Test public void unicodePrimitivesRejectIsolatedSurrogatesButAcceptPairs() {
         // Rust str cannot contain isolated UTF-16 surrogates; Java String can.
-        for (String expression : List.of("ANY", "CHAR_RANGE('a','🙏')", "NEGATION('x')")) {
+        for (String expression : List.of("ANY", "CHAR_RANGE('😀','🙏')", "NEGATION('x')")) {
             var parser = parser("token T ::= " + expression + ";");
             for (String source : List.of(String.valueOf((char) 0xd800), String.valueOf((char) 0xdfff))) {
                 try (var context = new ParseContext(StringSource.createRootSource(source))) {
@@ -25,6 +25,25 @@ public class DeclarativeTokenTest {
                 assertTrue(expression, parser.parse(context).isSucceeded());
                 assertEquals(1, context.position());
                 assertEquals(1, context.matchedPosition());
+            }
+        }
+    }
+
+    @Test public void xidRejectsIsolatedSurrogatesAndKeepsOriginalNormalization() {
+        for (String declarations : List.of("token T = XID_IDENTIFIER", "token T ::= XID_IDENTIFIER;")) {
+            LexicalTokenParser parser = parser(declarations);
+            for (String input : List.of(String.valueOf((char) 0xd800), String.valueOf((char) 0xdfff), "_x", "9x", "\u037a")) {
+                try (ParseContext context = new ParseContext(StringSource.createRootSource(input))) {
+                    assertTrue(input, parser.parse(context).isFailed());
+                    assertEquals(0, context.position());
+                    assertEquals(0, context.matchedPosition());
+                }
+            }
+            for (String input : List.of("é", "e\u0301", "𐐀x", "名前")) {
+                try (ParseContext context = new ParseContext(StringSource.createRootSource(input))) {
+                    assertTrue(input, parser.parse(context).isSucceeded());
+                    assertEquals(input.codePointCount(0, input.length()), context.position());
+                }
             }
         }
     }

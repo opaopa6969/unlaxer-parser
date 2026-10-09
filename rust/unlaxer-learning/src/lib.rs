@@ -17,6 +17,7 @@ fn lexical(
     let op = match e.op {
         A::LITERAL => B::LITERAL,
         A::ANY => B::ANY,
+        A::XID_IDENTIFIER => B::XID_IDENTIFIER,
         A::EOF => B::EOF,
         A::BOF => B::BOF,
         A::BOL => B::BOL,
