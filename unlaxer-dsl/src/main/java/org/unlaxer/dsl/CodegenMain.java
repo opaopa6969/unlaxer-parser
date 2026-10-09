@@ -38,6 +38,7 @@ public class CodegenMain {
         if (args.length > 0 && "profile".equals(args[0])) {
             return LanguageProfileCommand.run(args, out, err);
         }
+        if (args.length > 0 && "deps".equals(args[0])) return PackageCommand.run(args, out, err);
         if (args.length > 0 && "playground".equals(args[0])) {
             return PlaygroundCommand.run(args, out, err);
         }
