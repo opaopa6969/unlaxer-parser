@@ -194,10 +194,10 @@ capability は文法revision・生成target・出力profileに属する。エン
 | 要求 | Classic Java | Classic Rust | ubnfc Java / Rust を選べる条件 |
 |---|---|---|---|
 | typed AST と元ソース位置 | mapper と owned source map | typed AST と CP span | 同じ文法の独立oracleで全field・元text・CP/UTF-16位置が一致し、明示AST adapterがある |
-| 完全なCST、virtual token、任意metadata | Token木とparser固有契約 | owned TreeはあるがJava virtual/metadata全互換は未完了 | 完全CSTを持たないので不適格。typed ASTや字句列で代用しない |
+| 完全なCST、virtual token、任意metadata | Token木とparser固有契約、任意Object metadataを維持 | owned Treeと明示APIの4種token・portable metadata / 関連IDは実装済み。全combinator/UBNF接続とJava任意Object互換は未完了（[対応範囲](portable-token-metadata.md)） | 完全CSTを持たないので不適格。typed ASTや字句列で代用しない |
 | 動的parser合成、transactional user state、capture/replay | ParseContext上の公開API | 公開ParseContext/combinator。生成replay等の未対応は対応表に残る | parserを純粋と仮定せず、要求した状態の同等性を実証できなければ不適格 |
 | 詳細な失敗診断 | DETAILED / AUTOの既存契約 | Detailed / Autoの既存契約 | 主位置/expectedと全試行履歴は異なる要求。rich診断が必要なら安全な再解析または最初からClassic |
-| trace / LSP / DAP | Java生成・protocol実装の対応範囲 | Classic Rustサーバーの実protocolは未対応 | 別engineのIDE生成をClassic Rust対応と数えず、要求したprotocolをその生成targetで検証する |
+| trace / LSP / DAP | Java生成・protocol実装の対応範囲 | opt-in生成stdio [LSP](classic-rust-lsp.md)と[DAP typed AST inspection](classic-rust-dap.md)は実装・共通protocol検証済み。token leaf trace・live evaluator制御・Rust下流VSIX起動は未対応 | 別engineのIDE生成をClassic Rust対応と数えず、要求したprotocolをその生成targetで検証する |
 | incremental、memo方針の実行時選択 | 既存Java APIの対応範囲 | incremental未対応、SafeFailuresの既存範囲 | 全文再解析・静的memo選択との違いを要求として扱う |
 | 未知のcustom parser / provider | 既存rich経路で宣言された契約を使う | 同左。Java任意classの自動翻訳はしない | 副作用・状態依存・再実行安全性が不明なら自動選択しない |
 
