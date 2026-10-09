@@ -12,7 +12,7 @@ public final class LexicalSyntax {
         return switch (e.op()) {
             case LITERAL -> quote(e.text());
             case REF -> e.text();
-            case ANY, EOF, BOF, BOL, EOL -> e.op().name();
+            case ANY, XID_IDENTIFIER, EOF, BOF, BOL, EOL -> e.op().name();
             case RANGE -> "CHAR_RANGE(" + quote(new String(Character.toChars(e.min()))) + ", "
                 + quote(new String(Character.toChars(e.max()))) + ")";
             case EXCEPT -> "NEGATION(" + quote(e.text()) + ")";
@@ -32,11 +32,22 @@ public final class LexicalSyntax {
             .replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t") + "'";
     }
     public record Result(LexicalExpression expression, int end) {}
+    static final class ClassLiteralException extends IllegalArgumentException {
+        final int start, end;
+        ClassLiteralException(IllegalArgumentException cause, int start, int end) {
+            super(cause.getMessage(), cause); this.start = start; this.end = end;
+        }
+    }
     private final String source;
+    private final boolean validateClasses;
     private int position, depth;
-    private LexicalSyntax(String source) { this.source = source; }
+    private LexicalSyntax(String source, boolean validateClasses) { this.source = source; this.validateClasses = validateClasses; }
     public static Result parse(String source) {
-        var parser = new LexicalSyntax(source);
+        return parse(source, true);
+    }
+    static Result parseSyntax(String source) { return parse(source, false); }
+    private static Result parse(String source, boolean validateClasses) {
+        var parser = new LexicalSyntax(source, validateClasses);
         var expression = parser.expression();
         parser.require(';');
         return new Result(expression, parser.position);
@@ -74,11 +85,26 @@ public final class LexicalSyntax {
         try { return Integer.parseInt(source.substring(start, position)); }
         catch (NumberFormatException e) { throw error("repeat bound exceeds 2147483647"); }
     }
-    private String quoted() {
+    private String quoted() { return UBNFMapper.stripQuotes(rawQuoted()); }
+    private String classQuoted() {
+        space(); int start = position;
+        String raw = rawQuoted();
+        if (false == validateClasses) { return raw; }
+        try { return CodePointEscapes.decode(raw); }
+        catch (IllegalArgumentException error) { throw new ClassLiteralException(error, start, position); }
+    }
+    private int classBoundary() {
+        space(); int start = position;
+        String value = classQuoted();
+        if (false == validateClasses) { return 0; }
+        try { return CodePointEscapes.boundary(value); }
+        catch (IllegalArgumentException error) { throw new ClassLiteralException(error, start, position); }
+    }
+    private String rawQuoted() {
         require('\''); int start = position - 1;
         while (position < source.length()) {
             char c = source.charAt(position++);
-            if (c == '\'') return UBNFMapper.stripQuotes(source.substring(start, position));
+            if (c == '\'') return source.substring(start, position);
             if (c == '\\' && position < source.length()) position++;
         }
         throw error("unclosed literal");
@@ -127,21 +153,20 @@ public final class LexicalSyntax {
                     yield new LexicalExpression(Op.CAPTURE, binding, 0, 0, List.of(expression()));
                 }
                 case "SAME_AS" -> LexicalExpression.leaf(Op.BACKREF, identifier());
-                case "NEGATION" -> LexicalExpression.leaf(Op.EXCEPT, quoted());
+                case "NEGATION" -> LexicalExpression.leaf(Op.EXCEPT, classQuoted());
                 case "CHAR_RANGE" -> {
-                    String from = quoted(); require(','); String to = quoted();
-                    if (from.codePointCount(0, from.length()) != 1 || to.codePointCount(0, to.length()) != 1)
-                        throw error("range requires scalar boundaries");
-                    int min = from.codePointAt(0), max = to.codePointAt(0);
-                    if (min > max || min >= 0xd800 && min <= 0xdfff || max >= 0xd800 && max <= 0xdfff)
-                        throw error("invalid scalar range");
+                    space(); int start = position;
+                    int min = classBoundary(); int end = position;
+                    require(','); int max = classBoundary();
+                    try { CodePointEscapes.validateRange(min, max); }
+                    catch (IllegalArgumentException error) { throw new ClassLiteralException(error, start, end); }
                     yield new LexicalExpression(Op.RANGE, "", min, max, List.of());
                 }
                 default -> throw error("unknown lexical constructor " + name);
             };
             require(')'); return result;
         }
-        if (List.of("ANY", "EOF", "BOF", "BOL", "EOL").contains(name)) return LexicalExpression.leaf(Op.valueOf(name), "");
+        if (List.of("ANY", "XID_IDENTIFIER", "EOF", "BOF", "BOL", "EOL").contains(name)) return LexicalExpression.leaf(Op.valueOf(name), "");
         while (eat('.')) name += "." + identifier();
         return LexicalExpression.leaf(Op.REF, name);
     }

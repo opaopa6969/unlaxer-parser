@@ -264,6 +264,12 @@ public final class UBNFToBNFConverter {
             builder.append("@rightAssoc");
         } else if (annotation instanceof UBNFAST.LongestChoiceAnnotation) {
             builder.append("@longestChoice");
+        } else if (annotation instanceof UBNFAST.LexicalContextAnnotation lexicalContext) {
+            builder.append("@lexicalContext(tokens=[");
+            builder.append(lexicalContext.tokens().stream().map(value -> "'" + value.replace("'", "\\'") + "'").collect(java.util.stream.Collectors.joining(",")));
+            builder.append("], literals=[");
+            builder.append(lexicalContext.literals().stream().map(value -> "'" + value.replace("'", "\\'") + "'").collect(java.util.stream.Collectors.joining(",")));
+            builder.append("])");
         } else if (annotation instanceof UBNFAST.PredictiveChoiceAnnotation) {
             builder.append("@predictiveChoice");
         } else if (annotation instanceof UBNFAST.PrecedenceAnnotation precedenceAnnotation) {

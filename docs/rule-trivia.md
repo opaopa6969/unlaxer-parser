@@ -98,7 +98,10 @@ grammar Example {
 優先順位、CST / AST の既存位置契約、token 内部が原子的なことは上記と同じ。
 
 名前付きglobal空白は通常の文字入力と `@tokenStream: enabled` の全4modeで使える。
-tokenStreamのrule-local whitespace/interleave制限は維持する。token一覧に単一global定義を使い、
+tokenStream の通常 profile は rule-local whitespace/interleave を拒否する。
+[文脈付き goal](contextual-lexing.md) の profile は global 名前付き定義と rule-local
+`javaStyle` / `none`・interleave を組み合わせられるが、rule-local 名前付き定義は拒否する。
+token一覧に単一global定義を使い、
 名前付き定義の一致は汎用 `trivia` として原文spanを保持する。
 package / lock / HTTPS / 出典表示は [package仕様](ubnf-packages.md) を参照する。
 
