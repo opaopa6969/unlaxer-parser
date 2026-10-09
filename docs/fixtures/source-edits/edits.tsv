@@ -1,0 +1,8 @@
+# name operation start end replacement expected text (- means rejection)
+rename-token	RENAME	5	8	bar	#日😀\r\nbar  "foo" { foo foo } foo\r\n
+rename-partial	RENAME	6	8	bar	-
+format-space	FORMAT	8	10	\t	#日😀\r\nfoo\t"foo" { foo foo } foo\r\n
+format-token	FORMAT	11	14	 	-
+format-comment	FORMAT	0	3	 	-
+format-content	FORMAT	8	10	/*x*/	-
+action-target	CODE_ACTION	16	17	(	#日😀\r\nfoo  "foo" ( foo foo } foo\r\n

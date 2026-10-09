@@ -1,0 +1,10 @@
+# case mainVersion main includeVersion include active unrelated state payload evaluated reused
+initial	1	日😀	1	abc	true	one	COMPLETE	日😀|abc	include,collect,resolve	-
+unchanged	1	日😀	1	abc	true	one	COMPLETE	日😀|abc	-	include,collect,resolve
+include-update	1	日😀	2	def	true	one	COMPLETE	日😀|def	include,collect,resolve	-
+main-update	2	日😀x	2	def	true	one	COMPLETE	日😀x|def	collect,resolve	include
+inactive	2	日😀x	2	def	false	one	INACTIVE	-	collect,resolve	include
+unrelated-config	2	日😀x	2	def	false	two	INACTIVE	-	-	include,collect,resolve
+partial	3	日?😀	2	def	true	two	PARTIAL	日?😀|def	collect,resolve	include
+failure	4	bad	2	def	true	two	FAILED	bad|def	collect,resolve	include
+same-version-changed-text	4	good	2	def	true	two	COMPLETE	good|def	collect,resolve	include
