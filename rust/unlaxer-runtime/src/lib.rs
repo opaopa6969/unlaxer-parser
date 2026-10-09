@@ -5,6 +5,7 @@ use std::hash::{BuildHasher, Hasher};
 use std::rc::Rc;
 use std::sync::Arc;
 
+pub mod call_inference;
 pub mod embedded;
 mod first;
 pub mod language_queries;
@@ -18,9 +19,11 @@ mod scope;
 pub mod semantic;
 pub mod semantic_project;
 pub mod semantic_queries;
+pub mod semantic_query_cache;
 pub mod semantic_rename;
 pub mod source;
 pub mod source_edits;
+pub mod type_system;
 #[doc(hidden)]
 pub use first::{set_candidate_exclusion_for_current_thread, CandidateExclusion};
 pub use scope::{
@@ -111,6 +114,10 @@ pub enum Expr {
         name: &'static str,
     },
     /// Apply a local trivia policy to sequence boundaries, restoring the caller afterwards.
+    LexicalTriviaScope {
+        child: Box<Expr>,
+        definition: lexical::LexicalExpression,
+    },
     TriviaScope {
         child: Box<Expr>,
         whitespace: bool,
@@ -290,6 +297,12 @@ impl Expr {
     /// Preserve a mixed scalar/optional capture boundary; parsing remains transparent.
     pub fn value_boundary(self) -> Self {
         Self::ValueBoundary(Box::new(self))
+    }
+    pub fn lexical_trivia_scope(self, definition: lexical::LexicalExpression) -> Self {
+        Self::LexicalTriviaScope {
+            child: Box::new(self),
+            definition,
+        }
     }
     pub fn trivia_scope(self, whitespace: bool) -> Self {
         Self::TriviaScope {
@@ -1039,6 +1052,7 @@ pub struct ParseContext<'a> {
     lexing: Option<lexing::Session<'a>>,
     rules: Arc<[Rule]>,
     whitespace: bool,
+    lexical_trivia: Option<lexical::LexicalExpression>,
     position: usize,
     matched_position: usize,
     nodes: Vec<Node>,
@@ -1282,6 +1296,7 @@ impl<'a> ParseContext<'a> {
             lexing: None,
             rules: Arc::from([]),
             whitespace: false,
+            lexical_trivia: None,
             position: 0,
             matched_position: 0,
             nodes: vec![],
@@ -1566,6 +1581,7 @@ impl<'a> ParseContext<'a> {
         root: usize,
         whitespace: bool,
     ) -> ParseResult {
+        let previous_definition = self.lexical_trivia.take();
         let previous_rules = std::mem::replace(&mut self.rules, Arc::clone(grammar));
         let previous_whitespace = std::mem::replace(&mut self.whitespace, whitespace);
         let safe_rules = if self.options.memoization == Memoization::SafeFailures {
@@ -1585,6 +1601,7 @@ impl<'a> ParseContext<'a> {
         self.failure_memo = previous_failure_memo;
         self.rules = previous_rules;
         self.whitespace = previous_whitespace;
+        self.lexical_trivia = previous_definition;
         self.memo_safe_rules = previous_safe_rules;
         self.first_sets = previous_first_sets;
         self.grammar_session = previous_session;
@@ -1598,9 +1615,11 @@ impl<'a> ParseContext<'a> {
         whitespace: bool,
         operation: impl FnOnce(&mut Self) -> T,
     ) -> T {
+        let previous_definition = self.lexical_trivia.take();
         let previous = std::mem::replace(&mut self.whitespace, whitespace);
         let result = operation(self);
         self.whitespace = previous;
+        self.lexical_trivia = previous_definition;
         result
     }
 
@@ -1801,6 +1820,7 @@ impl<'a> ParseContext<'a> {
             return None;
         }
         let memo_key = (self.options.memoization == Memoization::SafeFailures
+            && self.lexical_trivia.is_none()
             && self.memo_safe_rules.get(id).copied().unwrap_or(false))
         .then(|| {
             (
@@ -1870,13 +1890,67 @@ impl<'a> ParseContext<'a> {
 
     fn expression(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
         let checkpoint = self.checkpoint();
-        let result = self.expression_inner(expression, depth);
+        // Recursive combinators bypass the large general dispatch frame.
+        let result = match expression {
+            Expr::Rule(rule) => self.rule(*rule, depth).map(|id| Fragment {
+                nodes: vec![id],
+                captures: Vec::new(),
+            }),
+            Expr::LexicalTriviaScope { child, definition } => {
+                self.expression_with_lexical_trivia(child, definition, depth)
+            }
+            Expr::TriviaScope { child, whitespace } => {
+                self.with_trivia(*whitespace, |context| context.expression(child, depth))
+            }
+            Expr::Sequence(elements) => self.sequence(elements, depth),
+            Expr::Choice(alternatives) => self.ordered_choice(alternatives.iter(), depth),
+            Expr::LongestChoice(alternatives) => self.longest_choice(alternatives, depth),
+            Expr::PredictiveChoice {
+                alternatives,
+                predictors,
+            } => self.predictive_choice(alternatives, predictors, depth),
+            _ => self.expression_inner(expression, depth),
+        };
         if result.is_none() {
             self.restore(checkpoint);
         } else {
             self.commit_checkpoint(checkpoint);
         }
         result
+    }
+
+    // Keep the saved lexical expression out of the recursive dispatch frame.
+    // Otherwise its stack storage is reserved even for plain Rule references,
+    // which can exhaust a test thread's stack before the depth-256 diagnostic.
+    #[inline(never)]
+    fn expression_with_lexical_trivia(
+        &mut self,
+        child: &Expr,
+        definition: &lexical::LexicalExpression,
+        depth: usize,
+    ) -> Option<Fragment> {
+        let previous = self.lexical_trivia.replace(definition.clone());
+        let previous_whitespace = std::mem::replace(&mut self.whitespace, false);
+        let result = self.expression(child, depth);
+        self.whitespace = previous_whitespace;
+        self.lexical_trivia = previous;
+        result
+    }
+
+    #[inline(never)]
+    fn sequence(&mut self, elements: &[Expr], depth: usize) -> Option<Fragment> {
+        let mut result = Fragment::default();
+        self.skip();
+        for element in elements {
+            if self.excludes(element, depth) {
+                return None;
+            }
+            let mut fragment = self.expression(element, depth)?;
+            result.nodes.append(&mut fragment.nodes);
+            result.captures.append(&mut fragment.captures);
+            self.skip();
+        }
+        Some(result)
     }
 
     fn expression_inner(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
@@ -2229,30 +2303,13 @@ impl<'a> ParseContext<'a> {
                     }
                 }
             }
-            Expr::Rule(rule) => self.rule(*rule, depth).map(|id| Fragment {
-                nodes: vec![id],
-                captures: vec![],
-            }),
-            Expr::Sequence(elements) => {
-                let mut result = Fragment::default();
-                self.skip();
-                for element in elements {
-                    if self.excludes(element, depth) {
-                        return None;
-                    }
-                    let mut fragment = self.expression(element, depth)?;
-                    result.nodes.append(&mut fragment.nodes);
-                    result.captures.append(&mut fragment.captures);
-                    self.skip();
-                }
-                Some(result)
+            Expr::Rule(_) => unreachable!("rule references are dispatched by expression"),
+            Expr::Sequence(_)
+            | Expr::Choice(_)
+            | Expr::LongestChoice(_)
+            | Expr::PredictiveChoice { .. } => {
+                unreachable!("combinators are dispatched by expression")
             }
-            Expr::Choice(alternatives) => self.ordered_choice(alternatives.iter(), depth),
-            Expr::LongestChoice(alternatives) => self.longest_choice(alternatives, depth),
-            Expr::PredictiveChoice {
-                alternatives,
-                predictors,
-            } => self.predictive_choice(alternatives, predictors, depth),
             Expr::Capture(name, expression) => {
                 let start = self.position;
                 let mut fragment = self.expression(expression, depth)?;
@@ -2332,8 +2389,8 @@ impl<'a> ParseContext<'a> {
                 }
                 Some(fragment)
             }
-            Expr::TriviaScope { child, whitespace } => {
-                self.with_trivia(*whitespace, |context| context.expression(child, depth))
+            Expr::LexicalTriviaScope { .. } | Expr::TriviaScope { .. } => {
+                unreachable!("trivia scopes are dispatched by expression")
             }
             Expr::TextValue(child) | Expr::ValueBoundary(child) => {
                 let start = self.position;
@@ -2572,6 +2629,9 @@ impl<'a> ParseContext<'a> {
         let Some(table) = &self.first_sets else {
             return false;
         };
+        if self.lexical_trivia.is_some() {
+            return false;
+        }
         if first::of(candidate, table).may_start(&self.input[self.position..], self.whitespace) {
             return false;
         }
@@ -2591,6 +2651,16 @@ impl<'a> ParseContext<'a> {
     }
 
     fn prediction_after_trivia<'b>(&self, raw: &'b str) -> &'b str {
+        if let Some(definition) = &self.lexical_trivia {
+            let mut position = 0;
+            while let Some(end) = definition.match_at(raw, position) {
+                if end <= position {
+                    break;
+                }
+                position = end;
+            }
+            return &raw[position..];
+        }
         if !self.whitespace {
             return raw;
         }
@@ -2640,6 +2710,16 @@ impl<'a> ParseContext<'a> {
     }
 
     fn skip(&mut self) {
+        if let Some(definition) = &self.lexical_trivia {
+            while let Some(end) = definition.match_at(self.input, self.position) {
+                if end <= self.position {
+                    break;
+                }
+                self.position = end;
+                self.matched_position = end;
+            }
+            return;
+        }
         if !self.whitespace {
             return;
         }
@@ -2683,7 +2763,8 @@ impl<'a> ParseContext<'a> {
     fn java_failed_atom(&mut self, child: &Expr) {
         if let Expr::TextValue(child)
         | Expr::ValueBoundary(child)
-        | Expr::TriviaScope { child, .. } = child
+        | Expr::TriviaScope { child, .. }
+        | Expr::LexicalTriviaScope { child, .. } = child
         {
             self.java_failed_atom(child);
             return;
@@ -2789,7 +2870,8 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
         | Expr::RuleEffects { child, .. }
         | Expr::CaptureEquality { child, .. }
         | Expr::Recovery { child, .. }
-        | Expr::TriviaScope { child, .. } => expression_allows_deferred_diagnostics(child),
+        | Expr::TriviaScope { child, .. }
+        | Expr::LexicalTriviaScope { child, .. } => expression_allows_deferred_diagnostics(child),
         Expr::Lexical(_, _)
         | Expr::Literal(_)
         | Expr::Number
@@ -2874,7 +2956,8 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>) -> bo
         | Expr::JavaRepeat { child, .. }
         | Expr::Lookahead { child, .. }
         | Expr::RuleEffects { child, .. }
-        | Expr::TriviaScope { child, .. } => expression_is_memo_safe(child, references),
+        | Expr::TriviaScope { child, .. }
+        | Expr::LexicalTriviaScope { child, .. } => expression_is_memo_safe(child, references),
         _ => true,
     }
 }
@@ -3173,6 +3256,30 @@ mod tests {
             expression: Expr::Rule(0),
         }];
         assert!(parse(&rules, 0, false, "").unwrap_err().expected[0].contains("256"));
+        let rules = vec![Rule {
+            name: "named_cycle",
+            expression: Expr::Sequence(vec![Expr::Rule(0)]).lexical_trivia_scope(
+                lexical::LexicalExpression {
+                    op: lexical::Op::LITERAL,
+                    text: " ",
+                    min: 0,
+                    max: 0,
+                    children: vec![],
+                },
+            ),
+        }];
+        for memoization in [Memoization::Off, Memoization::SafeFailures] {
+            let diagnostic = parse_detailed_with_options(
+                &rules,
+                0,
+                false,
+                "",
+                ParseOptions::with_memoization(memoization),
+            )
+            .unwrap_err();
+            assert_eq!(diagnostic.farthest.offset, 0);
+            assert_eq!(diagnostic.farthest.expected, vec!["rule nesting below 256"]);
+        }
     }
 
     #[test]
@@ -3634,6 +3741,43 @@ mod tests {
             ),
             vec!["frame"]
         );
+    }
+
+    #[test]
+    fn lexical_trivia_cannot_replay_failures_from_another_definition() {
+        fn trivia(text: &'static str) -> lexical::LexicalExpression {
+            lexical::LexicalExpression {
+                op: lexical::Op::LITERAL,
+                text,
+                min: 0,
+                max: 0,
+                children: vec![],
+            }
+        }
+        for memoization in [Memoization::Off, Memoization::SafeFailures] {
+            let rules = vec![
+                Rule {
+                    name: "root",
+                    expression: Expr::Choice(vec![
+                        Expr::Rule(1).lexical_trivia_scope(trivia("#")),
+                        Expr::Rule(1).lexical_trivia_scope(trivia(" ")),
+                    ]),
+                },
+                Rule {
+                    name: "pair",
+                    expression: Expr::Sequence(vec![Expr::Literal("a"), Expr::Literal("b")]),
+                },
+            ];
+            let tree = parse_detailed_with_options(
+                &rules,
+                0,
+                false,
+                "a b",
+                ParseOptions::with_memoization(memoization),
+            )
+            .unwrap();
+            assert_eq!(tree.nodes[tree.root].span, Span { start: 0, end: 3 });
+        }
     }
 
     #[test]
