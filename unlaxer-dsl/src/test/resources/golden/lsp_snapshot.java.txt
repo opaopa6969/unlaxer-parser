@@ -21,10 +21,16 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
     protected final Map<String, DocumentState> documents = new HashMap<>();
     protected final Map<String, Long> documentVersions = new HashMap<>();
 
+    private volatile org.unlaxer.source.LanguageProfile.Selection selectedLanguageProfile;
     public SnapshotLanguageServer() {}
 
     @Override
     public CompletableFuture<InitializeResult> initialize(InitializeParams params) {
+        try { selectedLanguageProfile = readLanguageProfile(params); }
+        catch (IllegalArgumentException error) {
+            return CompletableFuture.failedFuture(new org.eclipse.lsp4j.jsonrpc.ResponseErrorException(
+                new org.eclipse.lsp4j.jsonrpc.messages.ResponseError(org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode.InvalidParams, error.getMessage(), null)));
+        }
         ServerCapabilities capabilities = new ServerCapabilities();
         capabilities.setTextDocumentSync(TextDocumentSyncKind.Full);
         CompletionOptions completionOptions = new CompletionOptions();
@@ -38,6 +44,8 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
             List.of("valid", "invalid"), List.of()));
         capabilities.setSemanticTokensProvider(semanticTokensOptions);
         configureAdditionalCapabilities(capabilities);
+        configureLanguageQueryCapabilities(capabilities);
+        applyLanguageProfile(capabilities);
         return CompletableFuture.completedFuture(new InitializeResult(capabilities));
     }
 
@@ -65,6 +73,134 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
     @Override
     public WorkspaceService getWorkspaceService() {
         return new SnapshotLanguageServerWorkspaceService();
+    }
+
+    public java.util.Optional<org.unlaxer.source.LanguageProfile.Selection> languageProfile() {
+        return java.util.Optional.ofNullable(selectedLanguageProfile);
+    }
+    protected final boolean profileAllows(String capability) {
+        return selectedLanguageProfile == null || selectedLanguageProfile.allows(capability, languageQueryCapabilities().stream().anyMatch(value -> value.name().equals(capability)));
+    }
+    private org.unlaxer.source.LanguageProfile.Selection readLanguageProfile(InitializeParams params) {
+        com.google.gson.JsonElement options = new com.google.gson.Gson().toJsonTree(params.getInitializationOptions());
+        if (!options.isJsonObject() || !options.getAsJsonObject().has("languageProfile")) return null;
+        com.google.gson.JsonElement value = options.getAsJsonObject().get("languageProfile");
+        if (!value.isJsonObject()) throw new IllegalArgumentException("languageProfile must contain tsv and entry");
+        com.google.gson.JsonObject object = value.getAsJsonObject();
+        if (!object.keySet().equals(java.util.Set.of("tsv", "entry")))
+            throw new IllegalArgumentException("languageProfile must contain only tsv and entry");
+        for (String key : java.util.List.of("tsv", "entry")) {
+            if (!object.get(key).isJsonPrimitive() || !object.get(key).getAsJsonPrimitive().isString())
+                throw new IllegalArgumentException("languageProfile fields must be strings");
+        }
+        if (!object.get("entry").getAsString().equals("Expr"))
+            throw new IllegalArgumentException("languageProfile entry must match generated root");
+        return org.unlaxer.source.LanguageProfile.parse(object.get("tsv").getAsString()).select("Snapshot", "Expr");
+    }
+    private void applyLanguageProfile(ServerCapabilities capabilities) {
+        if (selectedLanguageProfile == null) return;
+        if (!profileAllows("COMPLETION")) capabilities.setCompletionProvider(null);
+        if (!profileAllows("HOVER")) capabilities.setHoverProvider(false);
+        if (!profileAllows("DEFINITION")) capabilities.setDefinitionProvider(false);
+        if (!profileAllows("RENAME")) capabilities.setRenameProvider(false);
+        if (!profileAllows("FORMAT")) {
+            capabilities.setDocumentFormattingProvider(false);
+            capabilities.setDocumentRangeFormattingProvider(false);
+            capabilities.setDocumentOnTypeFormattingProvider(null);
+        }
+        if (!profileAllows("CODE_ACTION")) capabilities.setCodeActionProvider(false);
+        if (!profileAllows("EXECUTE")) capabilities.setExecuteCommandProvider(null);
+        var gson = new com.google.gson.Gson();
+        var previous = gson.toJsonTree(capabilities.getExperimental());
+        var extensions = previous.isJsonObject() ? previous.getAsJsonObject() : new com.google.gson.JsonObject();
+        if (!previous.isJsonNull() && !previous.isJsonObject()) extensions.add("additional", previous);
+        var language = selectedLanguageProfile.language();
+        extensions.add("languageProfile", gson.toJsonTree(java.util.Map.of(
+            "schemaVersion", 1, "tsv", selectedLanguageProfile.profile().canonicalTsv(),
+            "entry", language.entry(), "grammar", language.grammar(),
+            "language", language.id(), "package", language.packageId(), "version", language.version())));
+        capabilities.setExperimental(extensions);
+    }
+
+    /** Return a fresh immutable project/region/provider binding for this exact document, or null. */
+    protected org.unlaxer.source.LanguageQueries languageQueries(org.unlaxer.source.DocumentSnapshot host) { return null; }
+    /** Operations whose providers the host explicitly registers; profile metadata alone cannot enable them. */
+    protected java.util.Set<org.unlaxer.source.LanguageRegions.Operation> languageQueryCapabilities() { return java.util.Set.of(); }
+    private void configureLanguageQueryCapabilities(ServerCapabilities capabilities) {
+        if (languageQueryCapabilities().contains(org.unlaxer.source.LanguageRegions.Operation.DEFINITION)) capabilities.setDefinitionProvider(true);
+    }
+    private org.unlaxer.source.LanguageQueryView languageQuery(TextDocumentPositionParams params, org.unlaxer.source.LanguageRegions.Operation operation) {
+        if (params == null || params.getTextDocument() == null) return null;
+        String uri = params.getTextDocument().getUri();
+        DocumentState state = documents.get(uri);
+        if (state == null) return null;
+        long version = documentVersions.getOrDefault(uri, 0L);
+        var host = new org.unlaxer.source.DocumentSnapshot(uri, version, state.content());
+        try {
+            var queries = languageQueries(host);
+            if (queries == null) return languageQueryCapabilities().isEmpty() ? null : new org.unlaxer.source.LanguageQueryView(host, operation, 0, Set.of(),
+                new org.unlaxer.source.LanguageQueries.Result("", org.unlaxer.source.LanguageRegions.State.UNAVAILABLE, List.of()));
+            if (!profileAllows(operation.name())) return new org.unlaxer.source.LanguageQueryView(host, operation, 0, Set.of(),
+                new org.unlaxer.source.LanguageQueries.Result("", org.unlaxer.source.LanguageRegions.State.UNSUPPORTED, List.of()));
+            Position position = params.getPosition();
+            if (position == null) throw new IllegalArgumentException("missing cursor");
+            int cursor = host.fromLsp(new org.unlaxer.source.DocumentSnapshot.Position(position.getLine(), position.getCharacter()));
+            var view = queries.view(host, queries.project(), cursor, operation, languageQueryParameters(host, cursor, operation));
+            if (documentVersions.getOrDefault(uri, 0L) != version || documents.get(uri) == null || !documents.get(uri).content().equals(host.text()))
+                throw new IllegalArgumentException("stale query response");
+            return view;
+        } catch (IllegalArgumentException error) {
+            return new org.unlaxer.source.LanguageQueryView(host, operation, 0, Set.of(),
+                new org.unlaxer.source.LanguageQueries.Result("", org.unlaxer.source.LanguageRegions.State.FAILED, List.of()));
+        }
+    }
+    /** Override when the embedded language uses a different identifier syntax. Coordinates are host code points. */
+    protected Map<String, String> languageQueryParameters(org.unlaxer.source.DocumentSnapshot host, int cursor, org.unlaxer.source.LanguageRegions.Operation operation) {
+        int offset = host.utf16(cursor), start = offset, end = offset;
+        while (start > 0 && Character.isUnicodeIdentifierPart(host.text().codePointBefore(start))) start -= Character.charCount(host.text().codePointBefore(start));
+        while (end < host.text().length() && Character.isUnicodeIdentifierPart(host.text().codePointAt(end))) end += Character.charCount(host.text().codePointAt(end));
+        return Map.of("prefix", host.text().substring(start, offset), "name", host.text().substring(start, end));
+    }
+    private static Range queryRange(org.unlaxer.source.DocumentSnapshot snapshot, org.unlaxer.source.DocumentSnapshot.Span span) {
+        var start = snapshot.lsp(span.start()); var end = snapshot.lsp(span.end());
+        return new Range(new Position(start.line(), start.character()), new Position(end.line(), end.character()));
+    }
+    private List<CompletionItem> languageCompletionItems(CompletionParams params) {
+        var view = languageQuery(params, org.unlaxer.source.LanguageRegions.Operation.COMPLETION);
+        if (view == null) return null;
+        var items = new ArrayList<CompletionItem>();
+        if (view.result().state() != org.unlaxer.source.LanguageRegions.State.COMPLETE && view.result().state() != org.unlaxer.source.LanguageRegions.State.PARTIAL) return items;
+        for (var candidate : view.result().items()) {
+            var item = new CompletionItem(candidate.label()); item.setDetail(candidate.detail()); item.setKind(CompletionItemKind.Variable);
+            item.setData(Map.of("uri", view.host().uri(), "version", Long.toString(view.host().version()), "region", view.result().region(), "state", view.result().state().name()));
+            try {
+                var edits = new ArrayList<TextEdit>();
+                for (var edit : candidate.edits()) edits.add(new TextEdit(queryRange(view.host(), edit.span()), edit.replacement()));
+                if (edits.isEmpty()) item.setInsertText("");
+                else { item.setTextEdit(Either.forLeft(edits.get(0))); if (edits.size() > 1) item.setAdditionalTextEdits(edits.subList(1, edits.size())); }
+            } catch (IllegalArgumentException error) { continue; }
+            items.add(item);
+        }
+        return items;
+    }
+    private Optional<Hover> languageHover(HoverParams params) {
+        var view = languageQuery(params, org.unlaxer.source.LanguageRegions.Operation.HOVER);
+        if (view == null) return null;
+        if ((view.result().state() != org.unlaxer.source.LanguageRegions.State.COMPLETE && view.result().state() != org.unlaxer.source.LanguageRegions.State.PARTIAL) || view.result().items().isEmpty()) return Optional.empty();
+        var content = new MarkupContent("plaintext", view.result().items().stream().map(item -> item.label() + ": " + item.detail()).collect(java.util.stream.Collectors.joining("\n")));
+        return Optional.of(new Hover(content));
+    }
+    private List<Location> languageDefinitions(DefinitionParams params) {
+        var view = languageQuery(params, org.unlaxer.source.LanguageRegions.Operation.DEFINITION);
+        if (view == null) return null;
+        var locations = new ArrayList<Location>();
+        if (view.result().state() != org.unlaxer.source.LanguageRegions.State.COMPLETE && view.result().state() != org.unlaxer.source.LanguageRegions.State.PARTIAL) return locations;
+        for (var item : view.result().items()) for (var mapping : item.locations()) {
+            var location = mapping.location();
+            try { locations.add(new Location(location.snapshot().uri(), queryRange(location.snapshot(), location.span()))); }
+            catch (IllegalArgumentException error) { /* No guessed UTF-16 positions. */ }
+        }
+        return locations;
     }
 
     private ParseResult doParse(String content) {
@@ -364,6 +500,9 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
         @Override
         public CompletableFuture<Either<List<CompletionItem>, CompletionList>> completion(
                 CompletionParams params) {
+            var queryItems = server.languageCompletionItems(params);
+            if (queryItems != null) return CompletableFuture.completedFuture(Either.forLeft(queryItems));
+            if (!server.profileAllows("COMPLETION")) return CompletableFuture.completedFuture(Either.forLeft(List.of()));
             List<CompletionItem> items = new ArrayList<>();
             for (String kw : KEYWORDS) {
                 CompletionItem item = new CompletionItem(kw);
@@ -383,6 +522,9 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
 
         @Override
         public CompletableFuture<Hover> hover(HoverParams params) {
+            var queryHover = server.languageHover(params);
+            if (queryHover != null) return CompletableFuture.completedFuture(queryHover.orElse(null));
+            if (!server.profileAllows("HOVER")) return CompletableFuture.completedFuture(null);
             String uri = params.getTextDocument().getUri();
             DocumentState state = server.documents.get(uri);
             if (state == null) {
@@ -399,6 +541,16 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
             content.setKind("plaintext");
             content.setValue(text);
             return CompletableFuture.completedFuture(new Hover(content));
+        }
+
+        @Override
+        public CompletableFuture<Either<List<? extends Location>, List<? extends LocationLink>>> definition(DefinitionParams params) {
+            if (!server.profileAllows("DEFINITION")) return CompletableFuture.completedFuture(Either.forLeft(List.of()));
+            var locations = server.languageDefinitions(params);
+            if (locations != null) return CompletableFuture.completedFuture(Either.forLeft(locations));
+            var state = server.documents.get(params.getTextDocument().getUri());
+            var custom = server.customDefinition(params, state == null ? "" : state.content());
+            return CompletableFuture.completedFuture(custom == null ? Either.forLeft(List.of()) : Either.forRight(List.of(custom)));
         }
 
         @Override
