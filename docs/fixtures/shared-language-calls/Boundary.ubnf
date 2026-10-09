@@ -1,0 +1,13 @@
+grammar Boundary {
+ @package: example.shared
+ @embedding: enabled
+ @ubnf: v2
+ @tokenAdapter: { id: 'shared.a' version: '1' java: 'example.shared.CallA' rust: 'crate::call_a' }
+ @tokenAdapter: { id: 'shared.recur' version: '1' java: 'example.shared.RecurCall' rust: 'crate::recur_call' }
+ token RECUR_CALL = ADAPTER('shared.recur', version=1)
+ token A = ADAPTER('shared.a', version=1)
+ @root @mapping(Outer, params=[value]) Outer ::= A @value;
+ @mapping(Empty) Empty ::= [ 'z' ];
+ @recovery(sync=';') @mapping(Recovered) Recover ::= 'ok';
+ @mapping(Recursive) Recur ::= 'a' (RECUR_CALL | 'z');
+}

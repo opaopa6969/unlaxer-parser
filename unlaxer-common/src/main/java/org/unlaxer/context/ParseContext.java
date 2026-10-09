@@ -833,6 +833,20 @@ public class ParseContext implements
     if (diagnostic.expected != null) diagnostic.expected.releaseIndexes();
   }
 
+  /** One nested operation's code-point diagnostic, without an automatic reparse.
+   * Deferred-diagnostic contexts return offset zero, matching the existing deferred diagnostic policy. */
+  public record LocalDiagnostic<T>(T value, int offset, List<String> expected) {}
+
+  public <T> LocalDiagnostic<T> withLocalDiagnostic(java.util.function.Supplier<T> operation) {
+    FailureDiagnostic frame = beginMemoDiagnosticFrame();
+    try {
+      T value = operation.get();
+      int offset = deferredDiagnostics ? 0 : Math.max(0,
+          frame.farthestFailureOffset >= 0 ? frame.farthestFailureOffset : frame.maxReachedOffset);
+      return new LocalDiagnostic<>(value, offset, List.copyOf(expectedParsersOf(frame)));
+    } finally { discardMemoDiagnosticFrame(frame); }
+  }
+
   FailureDiagnostic beginMemoDiagnosticFrame() {
     FailureDiagnostic frame = new FailureDiagnostic();
     frame.transactionBaseDepth = tokenStack.size();

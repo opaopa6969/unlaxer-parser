@@ -1,0 +1,9 @@
+grammar ChildA {
+ @package: example.shared
+ @embedding: enabled
+ @whitespace: javaStyle
+ @ubnf: v2
+ @tokenAdapter: { id: 'shared.state' version: '1' java: 'example.shared.StateToken' rust: 'crate::state_token' accepts: 'a' failure: 'no-consume' consumes: 'always' context: 'position' }
+ token MUT = ADAPTER('shared.state', version=1)
+ @root @mapping(AValue, params=[value]) Root ::= MUT @value 'b';
+}

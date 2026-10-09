@@ -17,6 +17,8 @@ grammar TinyExpression {
 
 `rule` は親の境界ルール、`body` はそのルールの直接の scalar capture です。`full` はルール全体、`body` は capture の範囲となり、区切り文字の所有者は親領域です。文字列の trim、quote 除去、エスケープ展開は行いません。本文は同じ原文の正確な切片として渡します。
 
+同じ `ParseContext` の現在位置から子 entry を prefix 解析し、親の後続へ戻る場合は、別契約の [shared-input language call](shared-language-calls.md) を使います。`@embedded` の bounded 本文全消費とは区別します。両方式の確定境界は同じ region/source-map/query 層へ接続できます。
+
 子文法を宣言しない終端文法は `@embedding: enabled` で provider API の生成だけを有効にします。`entry` は任意の宣言済みルールであり、`@root` や `Block` に限定しません。共通 fixture の Java 文法は root が Block ですが、埋め込みでは package / import / class を含む CompilationUnit を解析します。
 
 ## 生成 API と呼出し
@@ -50,7 +52,7 @@ Rust は同じ identity をキーにした `HashMap<Language, &dyn embedded::Gra
 - strict full-input 解析の失敗は `FAILED` です。回復 CST は `PARTIAL` となり、正常 AST と扱いません。子の失敗や未登録で、親が消費済みの境界や正常な sibling は消えません。親自身の strict 解析が失敗したときは、未確定の capture から child を推測しません。
 - 同一ルールに複数宣言、未知ルール、未知/重複フィールド、空 identity、capture 不在、choice ルール、collection / optional capture、境界ルール自身の `@recovery` は `E-EMBEDDING` で拒否します。一般の mapping の制約は引き続き適用されます。
 - grammar call の深さと総領域数に明示的な上限があります。上限超過は全結果を拒否し、不完全な木を成功として返しません。再帰的文法自体は parser runtime が扱い、文法内の backtracking を phase DAG に変換しません。
-- この段階は bounded source slice の呼出しです。共有 cursor を使う無境界 grammar call、外部 process/provider 自動起動、EOF synthetic 修復、変換本文の wrapper 生成は含みません。既存 `SegmentSourceMap` の変換・生成 segment 機能と組み合わせる adapter は別層です。親 issue #369 全体をこの段階だけで完了とは扱いません。
+- この宣言の strict API は bounded source slice の呼出しです。共有 cursor の prefix 呼出しは [別 API](shared-language-calls.md)、EOF synthetic 修復は opt-in editor API の契約です。外部 process/provider 自動起動や変換本文の wrapper 生成は含みません。既存 `SegmentSourceMap` の変換・生成 segment 機能と組み合わせる adapter は別層です。親 issue #369 全体をこの段階だけで完了とは扱いません。
 
 ## 共通の検証
 

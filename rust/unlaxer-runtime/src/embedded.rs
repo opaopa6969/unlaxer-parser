@@ -261,6 +261,15 @@ impl Grammar for CstGrammar {
 }
 impl CstGrammar {
     fn discover(&self, tree: &crate::Tree, index: usize, children: &mut Vec<Child>) -> Result<()> {
+        if let Some(call) = tree.shared_call(index) {
+            children.push(Child {
+                language: call.language.clone(),
+                full: call.span,
+                body: call.span,
+                open_end: false,
+            });
+            return Ok(());
+        }
         let node = &tree.nodes[index];
         for binding in &self.bindings {
             if node.rule == binding.rule {

@@ -1,0 +1,25 @@
+name: shared-language-calls
+on:
+  push:
+    branches: [master]
+  pull_request:
+jobs:
+  shared-language-calls:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21.0.9'
+          cache: maven
+      - uses: dtolnay/rust-toolchain@1.85.0
+      - run: mvn -B -pl unlaxer-common,unlaxer-dsl -am test -Dtest=SharedLanguageCallConformanceTest,RustUbnfFrontendConformanceTest -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
+        env:
+          CARGO_INCREMENTAL: '0'
+      - run: test -s unlaxer-dsl/target/shared-language-calls.tsv
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shared-language-calls
+          path: unlaxer-dsl/target/shared-language-calls.tsv
+          if-no-files-found: error

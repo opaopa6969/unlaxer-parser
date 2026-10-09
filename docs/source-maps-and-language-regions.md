@@ -1,8 +1,13 @@
 # Source snapshots, segment maps and language regions
 
-Status: Java/Rust runtime foundation for #369, #380 and #382. This does **not**
-complete embedded UBNF calls, a preprocessing scheduler, symbol-aware rename,
-formatting, or external Java/TypeScript/Rust language-service adapters.
+Status: Java/Rust runtime foundation for #369, #380 and #382. This page specifies
+snapshot and mapping contracts. Higher-level calls use either
+[bounded captured bodies](embedded-grammar-declarations.md) or
+[same-context shared-input prefixes](shared-language-calls.md). Both discover
+committed child boundaries before constructing a fresh snapshot-bound region tree;
+retained call metadata alone must not be relabelled for a later source/version.
+[Query forwarding and generated consumers](language-query-forwarding.md) describe
+explicit provider registration and the generated LSP/Playground path.
 
 Java APIs live in `org.unlaxer.source`; Rust APIs in `unlaxer_runtime::source`.
 All source spans are half-open Unicode scalar offsets. Java strings must contain

@@ -83,6 +83,7 @@ pub(crate) struct Store {
     owner: u64,
     pub(crate) ids: BTreeMap<usize, NodeId>,
     pub(crate) values: BTreeMap<usize, TokenInfo>,
+    pub(crate) calls: BTreeMap<usize, crate::shared_calls::Call>,
 }
 impl std::fmt::Debug for Store {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -98,6 +99,7 @@ impl Store {
             owner: NEXT_OWNER.fetch_add(1, Ordering::Relaxed),
             ids: BTreeMap::new(),
             values: BTreeMap::new(),
+            calls: BTreeMap::new(),
         }
     }
     fn valid(&self, id: NodeId) -> bool {

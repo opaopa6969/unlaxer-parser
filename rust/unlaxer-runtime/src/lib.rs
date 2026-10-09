@@ -29,6 +29,7 @@ pub mod semantic_queries;
 pub mod semantic_query_cache;
 pub mod semantic_rename;
 pub mod semantic_rules;
+pub mod shared_calls;
 pub mod source;
 pub mod source_edits;
 pub mod token;
@@ -2383,7 +2384,9 @@ impl<'a> ParseContext<'a> {
                 let diagnostic_frames = self.diagnostic_frames.clone();
                 let matched = self.expression(child, depth).is_some();
                 self.restore(checkpoint);
-                if !*positive || matched {
+                // Successful assertions discard speculative diagnostics. A failed
+                // negative assertion retains failures explored inside its matching child.
+                if matched == *positive {
                     self.farthest = farthest;
                     self.expected = expected;
                     self.diagnostic_frames = diagnostic_frames;
