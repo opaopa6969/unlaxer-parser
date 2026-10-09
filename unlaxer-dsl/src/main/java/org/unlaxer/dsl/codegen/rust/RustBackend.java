@@ -25,7 +25,7 @@ public final class RustBackend {
                 pub mod evaluator;
                 """),
             new GeneratedFile("ast.rs", ast(ir)),
-            new GeneratedFile("parser.rs", parser(ir) + lexingApi(grammar, ir)),
+            new GeneratedFile("parser.rs", parser(ir) + lexingApi(grammar, ir) + org.unlaxer.dsl.codegen.EmbeddedGrammarEmitter.rustApi(grammar, ir.rules().stream().map(Rule::name).toList(), ir.javaWhitespace())),
             new GeneratedFile("mapper.rs", mapper(ir)),
             new GeneratedFile("evaluator.rs", evaluator(ir)));
     }

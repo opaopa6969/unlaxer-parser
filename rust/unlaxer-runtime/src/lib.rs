@@ -6,6 +6,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 pub mod call_inference;
+pub mod embedded;
 mod first;
 pub mod language_queries;
 pub mod lexical;
@@ -14,6 +15,8 @@ mod long_code_fence;
 #[cfg(test)]
 mod memo_retention_tests;
 pub mod pipeline;
+pub mod provider_process;
+pub mod provider_protocol;
 mod scope;
 pub mod semantic;
 pub mod semantic_project;
