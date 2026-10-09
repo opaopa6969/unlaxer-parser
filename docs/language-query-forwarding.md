@@ -143,4 +143,40 @@ The LSP integration is verified with generated parsers plus real
 closed delimiters, surrogate boundaries, stale snapshots, imported definitions
 and host/foreign UTF-16 ranges. Rust uses the same runtime envelope and provider
 fixtures. Classic Rust LSP transport is a separate tracked #111 implementation;
-Playground query dispatch and edit controls remain the next #369/#382 slice.
+Playground query dispatch and edit controls use the explicit adapter described below.
+
+## Playground query dispatch and edit controls
+
+Both Playground generators emit `src/query_adapter.rs` with
+`bind(&Snapshot) -> Result<Option<LanguageQueries>>`. The default returns no
+binding. A host explicitly constructs its generated grammar registry and query
+providers for the exact `playground` snapshot. No capabilities are inferred from
+a grammar name, profile description, or successful parse. Only registered query
+operations appear in the browser's language-operation controls.
+
+The shared generated WASM exports `pg_query(cursor, version, operation,
+source_byte_length)`. Its existing input buffer contains UTF-8 source followed
+by one UTF-8 argument. Operations 0–6 are VALIDATE, COMPLETION, HOVER, DEFINITION,
+RENAME, FORMAT and CODE_ACTION. The argument becomes `prefix`, `name`, `newName`
+or `argument` as appropriate. Invalid cursor, operation, UTF-8 split or provider
+context produces an explicit runtime error. Host adapters may use stricter
+language-specific token rules. The default automatic editor completion extracts
+an alphanumeric/underscore prefix; explicit browser requests use Unicode
+identifier continuation characters.
+
+The worker sends original scalar cursor positions and request versions. The UI
+renders the mapped `LanguageQueryView`, keeps each candidate's edit batch
+separate, verifies integer ranges and overlap, and applies selected edits in
+reverse order to the original scalar sequence. It checks both the exact source
+and the editor revision: changing text and then restoring the same text does not
+revive an old edit. Definitions keep their owning URI and original scalar range.
+
+`PlaygroundQueryConformanceTest` compares every Java/native generated file, then
+executes actual WASM using three generated grammar layers, a semantic project
+provider and a checked source-edit provider. Browser coverage exercises
+completion, rename, trivia-only formatting and code actions on a PARTIAL child,
+including emoji, comments, closed delimiters, open EOF, missing providers and
+stale edits. The fixture adapters are explicit test hosts, not automatic semantic
+inference for an arbitrary generated grammar. Browser/WASM cannot run
+process-based Java/TypeScript/Rust compilers; those providers stay in native
+hosts. Multi-document workspace edits use the separate workspace API.

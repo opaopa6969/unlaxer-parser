@@ -6,7 +6,7 @@
     const node = document.createElement(tag); if (text !== undefined) node.textContent = text;
     if (className) node.className = className; return node;
   };
-  let worker, wasm, workerSource, workerUrl, catalog, request = 0, timeout, activeSource = '';
+  let worker, wasm, workerSource, workerUrl, catalog, request = 0, timeout, activeSource = '', inputRevision = 0, activeRevision = 0;
   function stop() { clearTimeout(timeout); worker?.terminate(); worker = null; if (workerUrl) URL.revokeObjectURL(workerUrl); }
   function fail(message) {
     host?.postMessage({type: 'error', error: message});
@@ -45,7 +45,75 @@
     const before = [...source].slice(0, offset).join(''); const lines = before.split('\n');
     return `${lines.length} 行 ${[...lines.at(-1)].length + 1} 列 (code point ${offset})`;
   }
+  const queryPanel = element('section'); queryPanel.id = 'query-panel'; queryPanel.hidden = true;
+  $('typed-completions')?.after(queryPanel);
+  const queryOperations = {VALIDATE: [0, '診断'], COMPLETION: [1, '補完'], HOVER: [2, '型と説明'], DEFINITION: [3, '定義'], RENAME: [4, '名前を変更'], FORMAT: [5, '整形'], CODE_ACTION: [6, '修正候補']};
+  function queryFailure(message) { $('hint').hidden = false; $('hint').textContent = message; }
+  function cursorOffset(source) {
+    const offset = $('input').selectionStart;
+    if (offset > 0 && offset < source.length && /[\uD800-\uDBFF]/.test(source[offset - 1]) && /[\uDC00-\uDFFF]/.test(source[offset])) throw new Error('カーソルを文字の境界へ移動してください。');
+    return [...source.slice(0, offset)].length;
+  }
+  function renderQuery(view) {
+    queryPanel.replaceChildren(); queryPanel.hidden = !view;
+    if (!view) return;
+    queryPanel.append(element('h3', '言語の操作'));
+    if (view.runtimeError) { queryPanel.append(element('p', view.runtimeError)); return; }
+    const snapshot = activeSource, revision = activeRevision, version = String(request);
+    const fresh = () => $('input').value === snapshot && inputRevision === revision && String(request) === version && view.version === version;
+    const capabilities = Array.isArray(view.capabilities) ? view.capabilities.filter(name => queryOperations[name]) : [];
+    queryPanel.append(element('p', `${view.region || 'この位置'} · ${view.state} · ${capabilities.map(name => queryOperations[name][1]).join(' / ') || '利用できる操作がありません'}`));
+    const controls = element('div'); controls.className = 'actions';
+    const renameLabel = element('label', '新しい名前：'), rename = element('input'); rename.type = 'text'; rename.setAttribute('aria-label', '新しい名前'); renameLabel.append(rename);
+    if (capabilities.includes('RENAME')) queryPanel.append(renameLabel);
+    for (const name of capabilities) {
+      const button = element('button', queryOperations[name][1]); button.type = 'button'; button.dataset.operation = name;
+      button.addEventListener('click', () => {
+        if (!fresh()) { queryFailure('入力が変更されています。もう一度解析してください。'); return; }
+        let argument = '';
+        const source = $('input').value, offset = $('input').selectionStart;
+        if (name === 'RENAME') argument = rename.value;
+        if (['COMPLETION', 'HOVER', 'DEFINITION'].includes(name)) {
+          const before = source.slice(0, offset).match(/[\p{ID_Continue}]+$/u)?.[0] || '';
+          const after = source.slice(offset).match(/^[\p{ID_Continue}]+/u)?.[0] || '';
+          argument = name === 'COMPLETION' ? before : before + after;
+        }
+        query(queryOperations[name][0], argument);
+      }); controls.append(button);
+    }
+    queryPanel.append(controls);
+    for (const item of view.items || []) {
+      const row = element('article'); row.append(element('p', `${item.label}${item.detail ? ' · ' + item.detail : ''}`));
+      for (const location of item.locations || []) row.append(element('p', `${location.uri} [${location.span.join(', ')})${location.exact ? '' : ' · おおよその位置'}`, 'small'));
+      if (item.edits?.length && ['COMPLETE', 'PARTIAL'].includes(view.state)) {
+        const apply = element('button', `${item.label} を適用`); apply.type = 'button'; apply.dataset.queryApply = item.label;
+        apply.addEventListener('click', () => {
+          if (!fresh()) { queryFailure('この編集は古い入力の結果です。もう一度解析してください。'); return; }
+          const points = [...snapshot], edits = [...item.edits].sort((a, b) => a.span[0] - b.span[0] || a.span[1] - b.span[1]);
+          let previous = null;
+          for (const edit of edits) {
+            const [start, end] = edit.span || [];
+            if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start || end > points.length || typeof edit.replacement !== 'string' || (previous && (start < previous[1] || start === previous[0]))) {
+              queryFailure('編集範囲が不正か重複しています。適用できません。'); return;
+            }
+            previous = [start, end];
+          }
+          for (const edit of edits.reverse()) points.splice(edit.span[0], edit.span[1] - edit.span[0], ...edit.replacement);
+          $('input').value = points.join(''); ++inputRevision; ++request;
+          $('input').focus(); queryPanel.hidden = true; $('status').textContent = '編集を適用しました。解析するボタンで確認してください。';
+        }); row.append(apply);
+      }
+      queryPanel.append(row);
+    }
+  }
+  function query(operation, argument) {
+    activeSource = $('input').value; activeRevision = inputRevision;
+    let cursor; try { cursor = cursorOffset(activeSource); } catch (error) { queryFailure(error.message); return; }
+    const run = () => { $('parse').disabled = true; send('query', {input: activeSource, cursor, operation, argument}); };
+    if (worker) run(); else startWorker(run);
+  }
   function render(value) {
+    renderQuery(value.query);
     $('result').textContent = JSON.stringify(value, null, 2);
     $('languages-panel').hidden = !value.languages;
     $('languages').replaceChildren();
@@ -111,19 +179,20 @@
         $('engine').textContent = '準備完了：生成 Rust parser を WebAssembly で実行します。入力はブラウザの中だけで処理します。';
         renderCatalog(); $('parse').disabled = false; afterReady?.();
         host?.postMessage({type: 'ready'});
-      } else { $('parse').disabled = false; render(event.data.result); }
+      } else { $('parse').disabled = false; if (event.data.query) renderQuery(event.data.query); else render(event.data.result); }
     };
     send('init', {bytes: wasm});
   }
   function parse() {
-    activeSource = $('input').value;
+    activeSource = $('input').value; activeRevision = inputRevision;
+    let cursor; try { cursor = cursorOffset(activeSource); } catch (error) { queryFailure(error.message); return; }
     if (new TextEncoder().encode(activeSource).length > 65536) { fail('入力は 64 KiB (UTF-8) 以下にしてください。'); return; }
-    const run = () => { $('parse').disabled = true; $('status').textContent = '解析中…'; send('parse', {input: activeSource, editor: $('editor-mode').checked, cursor: [...activeSource.slice(0, $('input').selectionStart)].length}); };
+    const run = () => { $('parse').disabled = true; $('status').textContent = '解析中…'; send('parse', {input: activeSource, editor: $('editor-mode').checked, cursor}); };
     if (worker) run(); else startWorker(run);
   }
   $('parse').addEventListener('click', parse);
-  $('clear').addEventListener('click', () => { $('input').value = ''; $('input').focus(); $('status').textContent = '入力を空にしました。解析するボタンで空入力を確認できます。'; });
-  $('input').addEventListener('input', () => { $('status').textContent = '入力が変更されています。解析するボタンで確認してください。'; });
+  $('clear').addEventListener('click', () => { $('input').value = ''; ++inputRevision; $('input').focus(); $('status').textContent = '入力を空にしました。解析するボタンで空入力を確認できます。'; });
+  $('input').addEventListener('input', () => { ++inputRevision; $('status').textContent = '入力が変更されています。解析するボタンで確認してください。'; });
   $('catalog-search').addEventListener('input', renderCatalog);
   async function load(name, binary = false) {
     const response = await fetch(name); if (!response.ok) throw new Error(`${name}: HTTP ${response.status}`);

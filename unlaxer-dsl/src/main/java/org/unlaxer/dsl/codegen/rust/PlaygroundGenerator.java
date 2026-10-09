@@ -76,6 +76,7 @@ public final class PlaygroundGenerator {
             .replace("@@NAME@@", RustBackend.quote(grammar.name())).replace("@@ROOT@@", Integer.toString(ir.root())));
         files.put("src/editor_adapter.rs", resource("playground/editor_adapter.rs"));
         files.put("src/region_adapter.rs", resource("playground/region_adapter.rs"));
+        files.put("src/query_adapter.rs", resource("playground/query_adapter.rs"));
         for (String name : new String[] {"index.html", "playground.css", "playground.js", "worker.js"}) {
             files.put("public/" + name, resource("playground/" + name));
         }
