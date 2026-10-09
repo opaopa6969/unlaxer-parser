@@ -6,7 +6,7 @@ use std::process::ExitCode;
 use unlaxer_codegen::GeneratedFile;
 
 const HELP: &str =
-    "Usage: unlaxer profile --file <profile.tsv>\n       unlaxer generate [--target rust] --grammar <file.ubnf> --output <module-directory> [--check]\n       unlaxer playground (--grammar <file.ubnf> | --profile <profile.tsv> | --package <id> --manifest <ubnf.json>) --output <new-directory> [--check]\n       unlaxer check --target rust --grammar <file.ubnf> [--format json]\n       unlaxer impact --target rust --before <old.ubnf> --after <new.ubnf> [--format json]";
+    "Usage: unlaxer profile --file <profile.tsv>\n       unlaxer generate [--target rust] --grammar <file.ubnf> --output <module-directory> [--check] [--lsp]\n       unlaxer playground (--grammar <file.ubnf> | --profile <profile.tsv> | --package <id> --manifest <ubnf.json>) --output <new-directory> [--check]\n       unlaxer check --target rust --grammar <file.ubnf> [--format json]\n       unlaxer impact --target rust --before <old.ubnf> --after <new.ubnf> [--format json]";
 const CHECK_HELP: &str = "Usage: unlaxer check --target rust --grammar <file.ubnf> [--format json]";
 const IMPACT_HELP: &str =
     "Usage: unlaxer impact --target rust --before <old.ubnf> --after <new.ubnf> [--format json]";
@@ -171,12 +171,21 @@ fn run(args: Vec<OsString>) -> Result<String, (u8, String)> {
     let mut grammar = None;
     let mut output = None;
     let mut check = false;
+    let mut lsp = false;
     let mut explicit_target = false;
     let mut cursor = 1;
     while cursor < args.len() {
         let option = args[cursor]
             .to_str()
             .ok_or((2, "invalid option encoding".into()))?;
+        if option == "--lsp" {
+            if lsp {
+                return Err((2, "duplicate --lsp".into()));
+            }
+            lsp = true;
+            cursor += 1;
+            continue;
+        }
         if option == "--check" {
             if check {
                 return Err((2, "duplicate --check".into()));
@@ -216,7 +225,12 @@ fn run(args: Vec<OsString>) -> Result<String, (u8, String)> {
     }
     // Keep I/O exit status separate from grammar/link errors for the entry file.
     fs::read_to_string(&grammar).map_err(io_error)?;
-    let files = unlaxer_generator::generate_file(&grammar).map_err(|message| (3, message))?;
+    let files = (if lsp {
+        unlaxer_generator::generate_file_with_lsp(&grammar)
+    } else {
+        unlaxer_generator::generate_file(&grammar)
+    })
+    .map_err(|message| (3, message))?;
     write_artifacts(&output, &files, check).map_err(io_error)?;
     Ok(format!(
         "{} {} Rust module files in {}",
