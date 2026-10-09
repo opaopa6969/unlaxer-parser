@@ -112,6 +112,31 @@ public class LSPQueryConsumerTest {
             assertEquals(new Range(new Position(0, 2), new Position(0, 5)), foreign.get(0).getRange());
             var hover = service.hover(new HoverParams(new TextDocumentIdentifier("file:///symbols"), new Position(0, 8))).join();
             assertEquals("far: T", hover.getContents().getRight().getValue());
+            var queryRows = Files.readAllLines(Path.of("../docs/fixtures/classic-lsp/providers.jsonl"));
+            assertEquals(6, queryRows.size());
+            var gson = new com.google.gson.Gson();
+            for (String row : queryRows) {
+                var oracle = com.google.gson.JsonParser.parseString(row).getAsJsonObject();
+                String method = oracle.get("method").getAsString();
+                var cursor = new Position(0, oracle.get("character").getAsInt());
+                var document = new TextDocumentIdentifier("file:///symbols");
+                com.google.gson.JsonElement observed;
+                if (method.endsWith("completion")) {
+                    var values = service.completion(new CompletionParams(document, cursor)).join().getLeft();
+                    var observedItems = new com.google.gson.JsonArray();
+                    for (var item : values) {
+                        var value = new com.google.gson.JsonObject(); value.addProperty("label", item.getLabel());
+                        value.add("range", gson.toJsonTree(item.getTextEdit().getLeft().getRange())); observedItems.add(value);
+                    }
+                    observed = observedItems;
+                } else if (method.endsWith("hover")) {
+                    observed = new com.google.gson.JsonPrimitive(service.hover(new HoverParams(document, cursor)).join().getContents().getRight().getValue());
+                } else {
+                    observed = gson.toJsonTree(service.definition(new DefinitionParams(document, cursor)).join().getLeft());
+                }
+                assertEquals(method + "@" + cursor, oracle.get("expected"), observed);
+            }
+
         }
     }
     private static LanguageQueries projectBinding(DocumentSnapshot host) {

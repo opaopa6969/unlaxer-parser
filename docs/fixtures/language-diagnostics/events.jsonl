@@ -1,0 +1,8 @@
+{"method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///a.formula","version":1,"languageId":"host","text":"😀{\r\n//😀\r\nclass Main { String x = 1; }\r\n}H"}},"expected":[["file:///Dep.java",5,1],["file:///a.formula",1,1]]}
+{"method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///b.formula","version":1,"languageId":"host","text":"😀{\r\n//😀\r\nclass Main { String x = 1; }\r\n}H"}},"expected":[["file:///Dep.java",5,2],["file:///b.formula",1,1]]}
+{"method":"textDocument/didClose","params":{"textDocument":{"uri":"file:///a.formula"}},"expected":[["file:///Dep.java",5,1],["file:///a.formula",null,0]]}
+{"method":"textDocument/didChange","params":{"textDocument":{"uri":"file:///b.formula","version":2},"contentChanges":[{"text":"😀{\r\n//😀\r\nclass Main { String x = \"\"; }\r\n}H"}]},"expected":[["file:///Dep.java",5,1],["file:///b.formula",2,0]]}
+{"method":"textDocument/didSave","params":{"textDocument":{"uri":"file:///b.formula"}},"expected":[["file:///Dep.java",5,1],["file:///b.formula",2,0]]}
+{"method":"textDocument/didChange","params":{"textDocument":{"uri":"file:///b.formula","version":1},"contentChanges":[{"text":"bad"}]},"expected":[]}
+{"method":"textDocument/didClose","params":{"textDocument":{"uri":"file:///b.formula"}},"expected":[["file:///Dep.java",null,0],["file:///b.formula",null,0]]}
+{"method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///stale.formula","version":7,"languageId":"host","text":"😀{\r\n//😀\r\nclass Main { String x = 1; }\r\n}H"}},"expected":[["file:///stale.formula",7,0]],"warnings":1}

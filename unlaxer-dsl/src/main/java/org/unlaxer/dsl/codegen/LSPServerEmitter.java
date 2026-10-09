@@ -294,10 +294,12 @@ class LSPServerEmitter {
         w.line("private void publishDiagnostics(String uri, String content, ParseResult result) {");
         w.indent();
         w.line("List<Diagnostic> diagnostics = new ArrayList<>();");
-        w.line("if (!result.succeeded() || result.consumedLength() < result.totalLength()) {");
+        w.line("if (profileAllows(\"VALIDATE\") && (!result.succeeded() || result.consumedLength() < result.totalLength())) {");
         w.indent();
         w.line("int errorStart = result.errorOffset();");
-        w.line("int errorEnd = Math.min(result.totalLength(), errorStart + 1);");
+        w.line("int errorEnd = errorStart < content.length() ? content.offsetByCodePoints(errorStart, 1) : errorStart;");
+        w.line("if (errorStart > 0 && errorStart < content.length() && content.charAt(errorStart - 1) == '\\r' && content.charAt(errorStart) == '\\n') errorStart--;");
+        w.line("if (errorEnd > 0 && errorEnd < content.length() && content.charAt(errorEnd - 1) == '\\r' && content.charAt(errorEnd) == '\\n') errorEnd++;");
         w.line("Position startPos = offsetToPosition(content, errorStart);");
         w.line("Position endPos = offsetToPosition(content, errorEnd);");
         w.line("Diagnostic diagnostic = new Diagnostic();");
@@ -327,13 +329,13 @@ class LSPServerEmitter {
         w.line("diagnostics.add(diagnostic);");
         w.dedent();
         w.line("}");
-        w.line("java.util.List<Diagnostic> additional = additionalDiagnostics(uri, content);");
+        w.line("java.util.List<Diagnostic> additional = profileAllows(\"VALIDATE\") ? additionalDiagnostics(uri, content) : List.of();");
         w.line("if (additional != null && !additional.isEmpty()) {");
         w.indent();
         w.line("diagnostics.addAll(additional);");
         w.dedent();
         w.line("}");
-        w.line("client.publishDiagnostics(new PublishDiagnosticsParams(uri, diagnostics));");
+        w.line("publishLanguageDiagnostics(uri, content, diagnostics);");
         w.dedent();
         w.line("}");
         w.blankLine();
@@ -370,23 +372,9 @@ class LSPServerEmitter {
         // offsetToPosition()
         w.line("private Position offsetToPosition(String content, int offset) {");
         w.indent();
-        w.line("int line = 0;");
-        w.line("int column = 0;");
-        w.line("for (int i = 0; i < offset && i < content.length(); i++) {");
-        w.indent();
-        w.line("if (content.charAt(i) == '\\n') {");
-        w.indent();
-        w.line("line++;");
-        w.line("column = 0;");
-        w.dedent();
-        w.line("} else {");
-        w.indent();
-        w.line("column++;");
-        w.dedent();
-        w.line("}");
-        w.dedent();
-        w.line("}");
-        w.line("return new Position(line, column);");
+        w.line("var snapshot = new org.unlaxer.source.DocumentSnapshot(\"lsp:position\", 0, content);");
+        w.line("var position = snapshot.lsp(snapshot.fromUtf16(offset));");
+        w.line("return new Position(position.line(), position.character());");
         w.dedent();
         w.line("}");
         w.blankLine();
@@ -407,21 +395,16 @@ class LSPServerEmitter {
                     if (result == null || !result.uri().equals(uri) || result.version() != version || !result.source().equals(source)) return List.of();
                     Position position = params.getPosition();
                     if (position.getLine() < 0 || position.getCharacter() < 0) return List.of();
-                    int start = 0;
-                    for (int line = 0; line < position.getLine(); line++) {
-                        int next = source.indexOf('\\n', start);
-                        if (next < 0) return List.of();
-                        start = next + 1;
-                    }
-                    int end = source.indexOf('\\n', start);
-                    if (end < 0) end = source.length();
-                    if (end > start && source.charAt(end - 1) == '\\r') end--;
-                    int offset = start + position.getCharacter();
-                    if (offset > end || offset > 0 && offset < source.length() && Character.isHighSurrogate(source.charAt(offset - 1)) && Character.isLowSurrogate(source.charAt(offset))) return List.of();
+                    var snapshot = new org.unlaxer.source.DocumentSnapshot(uri, version, source);
+                    int cursor;
+                    try { cursor = snapshot.fromLsp(new org.unlaxer.source.DocumentSnapshot.Position(position.getLine(), position.getCharacter())); }
+                    catch (IllegalArgumentException invalid) { return List.of(); }
+                    int offset = snapshot.utf16(cursor);
+                    int start = offset;
+                    while (start > 0 && source.charAt(start - 1) != '\\n' && source.charAt(start - 1) != '\\r') start--;
                     int prefixStart = offset;
                     while (prefixStart > start && Character.isUnicodeIdentifierPart(source.codePointBefore(prefixStart))) prefixStart -= Character.charCount(source.codePointBefore(prefixStart));
                     String prefix = source.substring(prefixStart, offset);
-                    int cursor = source.codePointCount(0, offset);
                     java.util.List<CompletionItem> items = new ArrayList<>();
                     for (var completion : result.completeAt(cursor, null, version, prefix)) {
                         CompletionItem item = new CompletionItem(completion.symbol().name());
@@ -493,7 +476,7 @@ class LSPServerEmitter {
                 return selectedLanguageProfile == null || selectedLanguageProfile.allows(capability, languageQueryCapabilities().stream().anyMatch(value -> value.name().equals(capability)));
             }
             private org.unlaxer.source.LanguageProfile.Selection readLanguageProfile(InitializeParams params) {
-                com.google.gson.JsonElement options = new com.google.gson.Gson().toJsonTree(params.getInitializationOptions());
+                com.google.gson.JsonElement options = new com.google.gson.GsonBuilder().serializeNulls().create().toJsonTree(params.getInitializationOptions());
                 if (!options.isJsonObject() || !options.getAsJsonObject().has("languageProfile")) return null;
                 com.google.gson.JsonElement value = options.getAsJsonObject().get("languageProfile");
                 if (!value.isJsonObject()) throw new IllegalArgumentException("languageProfile must contain tsv and entry");
@@ -658,7 +641,11 @@ class LSPServerEmitter {
         w.line("@Override");
         w.line("public void didOpen(DidOpenTextDocumentParams params) {");
         w.indent();
-        w.line("server.documentVersions.put(params.getTextDocument().getUri(), (long) params.getTextDocument().getVersion());");
+        w.line("String uri = params.getTextDocument().getUri();");
+        w.line("long version = params.getTextDocument().getVersion();");
+        w.line("if (version < 0 || server.documentVersions.containsKey(uri) && version <= server.documentVersions.get(uri)) return;");
+        w.line("try { new org.unlaxer.source.DocumentSnapshot(uri, version, params.getTextDocument().getText()); } catch (IllegalArgumentException invalid) { return; }");
+        w.line("server.documentVersions.put(uri, version);");
         w.line("server.parseDocument(");
         w.line("    params.getTextDocument().getUri(),");
         w.line("    params.getTextDocument().getText());");
@@ -669,11 +656,15 @@ class LSPServerEmitter {
         w.line("@Override");
         w.line("public void didChange(DidChangeTextDocumentParams params) {");
         w.indent();
+        w.line("String uri = params.getTextDocument().getUri();");
         w.line("Integer version = params.getTextDocument().getVersion();");
-        w.line("server.documentVersions.put(params.getTextDocument().getUri(), version == null ? server.documentVersions.getOrDefault(params.getTextDocument().getUri(), 0L) + 1 : version.longValue());");
-        w.line("server.parseDocumentIncremental(");
-        w.line("    params.getTextDocument().getUri(),");
-        w.line("    params.getContentChanges().get(0).getText());");
+        w.line("Long previous = server.documentVersions.get(uri);");
+        w.line("if (previous == null || version == null || version <= previous || params.getContentChanges() == null || params.getContentChanges().isEmpty()) return;");
+        w.line("for (var change : params.getContentChanges()) if (change.getRange() != null || change.getText() == null) return;");
+        w.line("String content = params.getContentChanges().get(params.getContentChanges().size() - 1).getText();");
+        w.line("try { new org.unlaxer.source.DocumentSnapshot(uri, version, content); } catch (IllegalArgumentException invalid) { return; }");
+        w.line("server.documentVersions.put(uri, version.longValue());");
+        w.line("server.parseDocumentIncremental(uri, content);");
         w.dedent();
         w.line("}");
         w.blankLine();
@@ -683,12 +674,13 @@ class LSPServerEmitter {
         w.indent();
         w.line("server.documents.remove(params.getTextDocument().getUri());");
         w.line("server.documentVersions.remove(params.getTextDocument().getUri());");
+        w.line("server.clearLanguageDiagnostics(params.getTextDocument().getUri());");
         w.dedent();
         w.line("}");
         w.blankLine();
 
         w.line("@Override");
-        w.line("public void didSave(DidSaveTextDocumentParams params) {}");
+        w.line("public void didSave(DidSaveTextDocumentParams params) { var state = server.documents.get(params.getTextDocument().getUri()); if (state != null) server.parseDocument(state.uri(), state.content()); }");
         w.blankLine();
 
         // completion()
@@ -699,6 +691,13 @@ class LSPServerEmitter {
         w.line("var queryItems = server.languageCompletionItems(params);");
         w.line("if (queryItems != null) return CompletableFuture.completedFuture(Either.forLeft(queryItems));");
         w.line("if (!server.profileAllows(\"COMPLETION\")) return CompletableFuture.completedFuture(Either.forLeft(List.of()));");
+        w.line("DocumentState current = server.documents.get(params.getTextDocument().getUri());");
+        w.line("if (current != null) {");
+        w.indent();
+        w.line("try { new org.unlaxer.source.DocumentSnapshot(current.uri(), server.documentVersions.getOrDefault(current.uri(), 0L), current.content()).fromLsp(new org.unlaxer.source.DocumentSnapshot.Position(params.getPosition().getLine(), params.getPosition().getCharacter())); }");
+        w.line("catch (IllegalArgumentException invalid) { return CompletableFuture.completedFuture(Either.forLeft(List.of())); }");
+        w.dedent();
+        w.line("}");
         w.line("List<CompletionItem> items = new ArrayList<>();");
         w.line("for (String kw : KEYWORDS) {");
         w.indent();

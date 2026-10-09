@@ -1,0 +1,11 @@
+# case flag inputVersion input allow budget state payload evaluated reused
+inactive-first	false	1	-	false	2	INACTIVE	-	guard,root	-
+inactive-cached	false	1	-	false	2	INACTIVE	-	-	guard,root
+enabled-no-permission	true	1	-	false	3	UNSUPPORTED	-	-	-
+enabled-missing	true	1	-	true	3	DEFERRED	-	-	-
+enabled	true	1	日😀	true	3	COMPLETE	日😀	leaf,guard,root	-
+enabled-cached	true	1	日😀	true	3	COMPLETE	日😀	-	leaf,guard,root
+updated	true	2	変更😀	true	3	COMPLETE	変更😀	leaf,guard,root	-
+off-again	false	2	-	false	2	INACTIVE	-	guard,root	-
+missing-flag	-	2	-	false	2	INACTIVE	-	guard,root	-
+no-budget	false	2	-	false	0	LIMIT	-	-	-

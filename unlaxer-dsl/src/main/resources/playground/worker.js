@@ -17,7 +17,8 @@ self.onmessage = async event => {
     } else if (type === 'parse' || type === 'query') {
       if (!engine || typeof input !== 'string') throw new Error('parser が準備できていません。');
       if ((editor || type === 'query') && (!Number.isSafeInteger(cursor) || cursor < 0 || cursor > [...input].length)) throw new Error('カーソル位置が入力の外です。');
-      if (typeof argument !== 'string' || /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(input + argument)) throw new Error('入力に不正な Unicode が含まれています。');
+      const invalidUnicode = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u;
+      if (typeof argument !== 'string' || invalidUnicode.test(input) || invalidUnicode.test(argument)) throw new Error('入力に不正な Unicode が含まれています。');
       const source = encoder.encode(input), parameter = type === 'query' ? encoder.encode(argument) : new Uint8Array();
       const encoded = new Uint8Array(source.length + parameter.length); encoded.set(source); encoded.set(parameter, source.length);
       if (encoded.length > 65536) throw new Error('入力は 64 KiB (UTF-8) 以下にしてください。');
