@@ -6,7 +6,7 @@ use std::process::ExitCode;
 use unlaxer_codegen::GeneratedFile;
 
 const HELP: &str =
-    "Usage: unlaxer generate [--target rust] --grammar <file.ubnf> --output <module-directory> [--check]\n       unlaxer playground (--grammar <file.ubnf> | --profile <profile.tsv>) --output <new-directory> [--check]\n       unlaxer check --target rust --grammar <file.ubnf> [--format json]\n       unlaxer impact --target rust --before <old.ubnf> --after <new.ubnf> [--format json]";
+    "Usage: unlaxer profile --file <profile.tsv>\n       unlaxer generate [--target rust] --grammar <file.ubnf> --output <module-directory> [--check]\n       unlaxer playground (--grammar <file.ubnf> | --profile <profile.tsv>) --output <new-directory> [--check]\n       unlaxer check --target rust --grammar <file.ubnf> [--format json]\n       unlaxer impact --target rust --before <old.ubnf> --after <new.ubnf> [--format json]";
 const CHECK_HELP: &str = "Usage: unlaxer check --target rust --grammar <file.ubnf> [--format json]";
 const IMPACT_HELP: &str =
     "Usage: unlaxer impact --target rust --before <old.ubnf> --after <new.ubnf> [--format json]";

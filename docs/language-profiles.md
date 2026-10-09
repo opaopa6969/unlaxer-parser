@@ -19,7 +19,8 @@ Java preview、TSX、Rust proc macro/build.rs の実行は有効にしない。
 実装を比較対象として参照する。Java corpus の `tiny69-1/2` はユーザー所有の
 `tinyexpression/src/test/resources/formulaInfo-test/69/formulaInfo.txt` にある実Java本文を
 そのまま抽出したもの。依存型の解決を要求しない構文比較で、package/import/class/method
-を使う既存の入口を維持する。
+を使う既存の入口を維持する。抽出元commitは `f86ce8a5ab0ab7d23fdba2cd477187df8aa7607c`、
+元fixtureのSHA-256は `5eeecb314c39cf1bc96378b627126494ff6b0bebc9753dfa2d28d43336aff4ec`。
 
 ## profile 契約
 
