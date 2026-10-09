@@ -31,6 +31,8 @@ annotation、`ParseContext` API、consume/invert伝播、incremental、IDE proto
 | 公開ParseContext・custom parser | runtimeと生成入口を実装。生成grammarは`OnceLock<SharedGrammar>`で1回構築し、並行parseでは不変graphだけを共有（#185） | 共有入力・Unicode位置・typed状態・CST/captureのrollback、先読み、生成parser混在を継続検証。tinyexpressionでsetup/探索を分離して再測定 |
 | literal・参照・sequence・ordered choice・group | 生成済み | optional経由の再帰等も検証し、非消費ループを拒否 |
 | longestChoice/predictiveChoice | 両frontendから生成、Java/Rust runtimeを実装 | 最大消費・同長の宣言順・敗者のrollback、保守的FIRSTと全候補失敗時の診断を検証。最長選択は意味論、予測選択は最適化であり、通常choiceやroot retryの解消とは別（[実践ノート](../docs/performance-tuning-ja.md) ケース1・2） |
+| uniqueLongestChoice・曖昧性境界 | 両frontend・生成器・runtimeで唯一の最大一致を選択し、同率・空一致を明示拒否（#422 / #430） | [方式比較と共通境界corpus](../docs/explicit-ambiguity-profiles.md)。固定C++23の最小例、独立AST/CST/CP診断、12段入れ子、2〜64候補と65拒否を比較。既存choice順は維持。一般左再帰・nullable左cycleは生成前拒否、GLR/Earley/全候補forestは未対応 |
+| namePredicate・version付き名前判定 | immutable snapshot の TYPE/VALUE/resolved gate を両frontend・生成器・runtimeへ接続（#425 / #427） | [名前snapshot契約](../docs/versioned-name-snapshots.md)。UNKNOWN・version不一致を拒否し、rollback・memo・子entry・recovery整合と資源上限を比較。外部I/Oや型推論は行わず、完全なC++意味論は未対応。Java/Rustの再帰guard差は上記境界表に記録 |
 | 診断policy・FIRST候補除外 | Java/RustのDetailed/失敗時詳細化/Auto、候補除外を実装 | 再実行可能性・診断参照・custom parserの宣言に依存。低水準APIと生成入口を区別し、意味診断と失敗位置を保持。任意副作用の安全性や常時高速化は保証しない（同ノート ケース25〜27） |
 | optional・0/1回以上・bounded repeat・separated | UBNF生成・Option/Vec AST・mapper・Semantics実装 | 70ケースの受理一致、20成功ケースのJava/Rust AST全field・全span一致、Rust評価値oracle。外側captureの入れ子container型は両backendとも未完了 |
 | ANY/EOF/EMPTY/CHAR_RANGE/NEGATION/UNTIL/LOOKAHEAD/NEGATIVE_LOOKAHEAD | UBNF生成とJava互換Expr・両cursorを実装 | 48文法・109入力でprefix受理/両cursorと全入力受理が一致、受理56入力のAST/spanも独立fixtureに一致。汎用consume/invert伝播と全CST同値は未完了 |
