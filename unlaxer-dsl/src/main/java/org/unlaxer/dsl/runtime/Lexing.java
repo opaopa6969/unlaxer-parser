@@ -33,10 +33,12 @@ public final class Lexing {
         private final Options options;
         private final List<Terminal> terminals;
         private final boolean whitespace;
+        private final LexicalExpression namedTrivia;
         private final int[] offsets;
         private final int[] codePoints;
         private final Map<Integer, Entry> entries = new LinkedHashMap<>();
-        private final Map<Integer, Integer> triviaCache = new HashMap<>();
+        private record TriviaKey(int position, LexicalExpression definition) {}
+        private final Map<TriviaKey, Integer> triviaCache = new HashMap<>();
         private int frontier;
         private boolean contextual;
         private final Map<GoalKey, Entry> goalEntries = new HashMap<>();
@@ -45,10 +47,15 @@ public final class Lexing {
         private record Entry(String kind, String name, int terminal, int start, int end) {}
 
         public Session(String source, Options options, List<Terminal> terminals, boolean whitespace) {
+            this(source, options, terminals, whitespace, null);
+        }
+        public Session(String source, Options options, List<Terminal> terminals, boolean whitespace, LexicalExpression namedTrivia) {
+            if (namedTrivia != null && namedTrivia.nullable()) throw new IllegalArgumentException("E-LEXING-TRIVIA: nullable definition");
+            this.namedTrivia = namedTrivia;
             this.source = Objects.requireNonNull(source);
             this.options = Objects.requireNonNull(options);
             this.terminals = List.copyOf(terminals);
-            this.whitespace = whitespace;
+            this.whitespace = whitespace || namedTrivia != null;
             if (source.codePoints().anyMatch(c -> c >= 0xd800 && c <= 0xdfff))
                 throw new IllegalArgumentException("E-LEXING-SOURCE: unpaired surrogate");
             offsets = new int[source.codePointCount(0, source.length()) + 1];
@@ -92,9 +99,8 @@ public final class Lexing {
             Terminal terminal = terminals.get(entry.terminal());
             return terminal.literal() == literal && terminal.name().equals(name) ? entry.end() : -1;
         }
-        int skip(int position, boolean scoped) {
-            if (!whitespace && !contextual) return position;
-            if (tokenMode() && !scoped && !contextual) {
+        int skip(int position, boolean scoped, LexicalExpression definition) {
+            if (tokenMode() && !scoped && !contextual && whitespace && Objects.equals(definition, namedTrivia)) {
                 int end = position;
                 while (end < source.length()) {
                     scanThrough(end, false);
@@ -104,15 +110,16 @@ public final class Lexing {
                 }
                 return end;
             }
-            if (options.mode() == Mode.TRIVIA_CACHE && triviaCache.containsKey(position)) return triviaCache.get(position);
+            var key = new TriviaKey(position, definition);
+            if (options.mode() == Mode.TRIVIA_CACHE && triviaCache.containsKey(key)) return triviaCache.get(key);
             int end = position;
             while (end < source.length()) {
                 triviaEvaluations++;
-                Entry entry = trivia(end);
+                Entry entry = trivia(end, definition);
                 if (entry == null) break;
                 end = entry.end();
             }
-            if (options.mode() == Mode.TRIVIA_CACHE) triviaCache.put(position, end);
+            if (options.mode() == Mode.TRIVIA_CACHE) triviaCache.put(key, end);
             return end;
         }
         private void scanThrough(int position, boolean inventory) {
@@ -120,7 +127,7 @@ public final class Lexing {
                 Entry entry = null;
                 if (whitespace) {
                     if (inventory) inventoryEvaluations++; else triviaEvaluations++;
-                    entry = trivia(frontier);
+                    entry = trivia(frontier, namedTrivia);
                 }
                 if (entry == null) {
                     int best = -1, end = frontier;
@@ -145,7 +152,11 @@ public final class Lexing {
             }
             return best < 0 ? null : new Entry("token", active.get(best).name(), best, position, end);
         }
-        private Entry trivia(int p) {
+        private Entry trivia(int p, LexicalExpression definition) {
+            if (definition != null) {
+                int end = definition.match(source, p);
+                return end > p ? new Entry("trivia", "", -1, p, end) : null;
+            }
             int end = p;
             while (end < source.length() && " \t\r\n\u000b\f".indexOf(source.charAt(end)) >= 0) end++;
             if (end > p) return new Entry("space", "", -1, p, end);
@@ -214,11 +225,16 @@ public final class Lexing {
     }
     public static Parsed trivia(Parser parser, ParseContext context, TokenKind kind, boolean invert, Supplier<Parsed> fallback) {
         Session session = attached(context);
+        return trivia(parser, context, kind, invert, session == null ? null : session.namedTrivia, fallback);
+    }
+    /** Active delimiter policy is distinct from the global inventory policy. */
+    public static Parsed trivia(Parser parser, ParseContext context, TokenKind kind, boolean invert, LexicalExpression definition, Supplier<Parsed> fallback) {
+        Session session = attached(context);
         if (session == null) return fallback.get();
         context.startParse(parser, context, kind, invert);
         if (invert) { context.endParse(parser, Parsed.FAILED, context, kind, true); return Parsed.FAILED; }
         int cp = context.getPosition(kind).value();
-        int end = session.skip(session.offsets[cp], goal(context) != null);
+        int end = session.skip(session.offsets[cp], goal(context) != null, definition);
         var length = new CodePointLength(session.codePoints[end] - cp);
         var token = new Token(kind, context.peek(context.getPosition(kind), length), parser);
         context.getCurrent().addToken(token, kind);
@@ -228,10 +244,16 @@ public final class Lexing {
         return parsed;
     }
     public static Outcome parse(Parser root, String source, Options options, List<Terminal> terminals, boolean whitespace) {
-        return parse(root, source, options, terminals, whitespace, false);
+        return parse(root, source, options, terminals, whitespace, null, false);
+    }
+    public static Outcome parse(Parser root, String source, Options options, List<Terminal> terminals, boolean whitespace, LexicalExpression namedTrivia) {
+        return parse(root, source, options, terminals, whitespace, namedTrivia, false);
     }
     public static Outcome parse(Parser root, String source, Options options, List<Terminal> terminals, boolean whitespace, boolean contextual) {
-        Session session = new Session(source, options, terminals, whitespace);
+        return parse(root, source, options, terminals, whitespace, null, contextual);
+    }
+    public static Outcome parse(Parser root, String source, Options options, List<Terminal> terminals, boolean whitespace, LexicalExpression namedTrivia, boolean contextual) {
+        Session session = new Session(source, options, terminals, whitespace, namedTrivia);
         session.contextual = contextual;
         try (ParseContext context = ParseContext.withOptions(StringSource.createRootSource(source),
                 ParseOptions.DEFAULT.withDiagnostics(ParseOptions.Diagnostics.DETAILED))) {

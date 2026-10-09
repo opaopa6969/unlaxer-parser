@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "id": "std/layout",
+  "version": "1.0.0",
+  "entry": "layout.ubnf",
+  "files": {
+    "layout.ubnf": "grammar StandardLayout {\n  @ubnf: v2\n  token SPACES ::= (' ' | CHAR_RANGE('\\t', '\\r'))+;\n  token LINE_COMMENT ::= '//' NEGATION('\\r\\n')*;\n  token BLOCK_COMMENT ::= '/*' (NEGATIVE_LOOKAHEAD('*/') ANY)* '*/';\n  token SPACES_AND_COMMENTS ::= SPACES | LINE_COMMENT | BLOCK_COMMENT;\n}\n"
+  },
+  "dependencies": {}
+}

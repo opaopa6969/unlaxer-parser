@@ -35,6 +35,7 @@ public class CodegenMain {
     }
 
     static int run(String[] args, PrintStream out, PrintStream err) {
+        if (args.length > 0 && "deps".equals(args[0])) return PackageCommand.run(args, out, err);
         if (args.length > 0 && "playground".equals(args[0])) {
             return PlaygroundCommand.run(args, out, err);
         }

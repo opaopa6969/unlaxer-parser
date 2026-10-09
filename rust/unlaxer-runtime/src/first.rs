@@ -235,7 +235,9 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
         | Expr::Custom(_)
         | Expr::CustomWith { .. }
         | Expr::Recovery { .. }
-        | Expr::Backreference(_) => FirstSet::UNKNOWN,
+        | Expr::Backreference(_)
+        | Expr::NamePredicate { .. }
+        | Expr::NameResolutionScope { .. } => FirstSet::UNKNOWN,
     }
 }
 
