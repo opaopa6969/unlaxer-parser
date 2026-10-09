@@ -116,3 +116,11 @@ block insertion/move/deletion, unclosed sibling preservation, masked comments an
 outer documents. Expectations are committed CP spans, compiler codes, item types, UTF-16
 positions and replacement text; one backend's output is never the other's expected result.
 `target/tiny-production/{java,rust,compatibility}.tsv` records the observations.
+
+## Explicit editor recovery
+
+`TinyProductionBridge.parseEditor` / `bridge::parse_editor` retain certified leading CodeBlock regions when the complete Tiny formula fails. Each prefix is recognized by the real production `CodeBlock` entry, with the production scanners and whitespace rules. Only when that entry fails is a synthetic newline and closing fence appended for recognition; a recovered close must lie wholly beyond the original slice. The returned body and source map end at the original FormulaInfo body boundary, and generated characters never enter diagnostics or edits. A malformed original fence, fake header in a string, or incomplete opening line cannot establish a recovered region. Recovery stops after the leading block sequence and is limited to 256 blocks per formula.
+
+The recovered parent is PARTIAL, closed certified children remain COMPLETE, and unfinished children are PARTIAL with explicit open ends. Empty Java bodies retain an exact zero-length source anchor. Only actual host EOF can be owned by an open end; the next FormulaInfo delimiter and sibling formula remain outside it. Strict `parse` is unchanged and still exposes FAILED formulas without speculative Java children.
+
+The shared `partial/expected.tsv` is an independent code-point/state oracle for nine inputs. Both hosts invoke real javac for EOF completion and apply its edit to the untouched original, including emoji and CRLF. The resulting unfinished document still fails strict parsing. Existing production corpus observations and Classic/ubnfc public parser compatibility remain unchanged. Tiny's existing opt-in LSP adopts this editor entry in the paired consumer integration (tinyexpression #253); this API alone does not migrate a consumer.

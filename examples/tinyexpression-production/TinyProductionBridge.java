@@ -13,9 +13,10 @@ public final class TinyProductionBridge {
     public static final Language FORMULA = new Language("formulainfo", "tinyexpression", "f86ce8a5ab0ab7d23fdba2cd477187df8aa7607c", "FormulaInfo", "Document");
     public static final Language TINY = new Language("tinyexpression", "tinyexpression", "f86ce8a5ab0ab7d23fdba2cd477187df8aa7607c", "TinyExpressionP4", "Formula");
     public static final Language JAVA = new Language("java", "lang/java", "0.1.0", "Java21", "CompilationUnit");
-    public record Binding(DocumentSnapshot host, List<Region> regions, Map<String,String> javaFiles) {
-        public Binding { regions = List.copyOf(regions); javaFiles = Map.copyOf(javaFiles); }
-        public LanguageRegions tree() { return new LanguageRegions(host, regions, Set.of()); }
+    public record Binding(DocumentSnapshot host, List<Region> regions, Map<String,String> javaFiles, Set<String> openEnds) {
+        public Binding { regions = List.copyOf(regions); javaFiles = Map.copyOf(javaFiles); openEnds = Set.copyOf(openEnds); }
+        public Binding(DocumentSnapshot host, List<Region> regions, Map<String,String> javaFiles) { this(host,regions,javaFiles,Set.of()); }
+        public LanguageRegions tree() { return new LanguageRegions(host, regions, openEnds); }
         public LanguageQueries queries(LanguageQueries.Project project, LanguageQueries.Provider javaProvider) {
             return new LanguageQueries(tree(), project, Map.of(JAVA, new LanguageQueries.Provider() {
                 public Set<Operation> capabilities() { return javaProvider.capabilities(); }
@@ -32,7 +33,10 @@ public final class TinyProductionBridge {
             return new LanguageQueries.Request(request.region(), request.operation(), request.cursor(), request.project(), parameters);
         }
     }
-    public static Binding parse(DocumentSnapshot host) {
+    public static Binding parse(DocumentSnapshot host) { return parse(host, false); }
+    /** Explicit editor recovery retains only CodeBlock prefixes certified by the production entry parser. */
+    public static Binding parseEditor(DocumentSnapshot host) { return parse(host, true); }
+    private static Binding parse(DocumentSnapshot host, boolean editor) {
         if (host.length() > 1_048_576) throw new IllegalArgumentException("production document limit");
         Parsed parsed;
         try (var context = new ParseContext(StringSource.createRootSource(host.text()))) {
@@ -40,7 +44,7 @@ public final class TinyProductionBridge {
         }
         if (!parsed.isSucceeded() || parsed.getConsumed() == null || !parsed.getConsumed().source.sourceAsString().equals(host.text()))
             throw new IllegalArgumentException("invalid FormulaInfo document");
-        var regions = new ArrayList<Region>(); var files = new LinkedHashMap<String,String>();
+        var regions = new ArrayList<Region>(); var files = new LinkedHashMap<String,String>(); var openEnds = new HashSet<String>();
         regions.add(region(host, "root", null, FORMULA, new Span(0,host.length()), new Span(0,host.length()), State.COMPLETE));
         int index = 0;
         for (var block : parsed.getRootToken().typed(FormulaInfoBlocksParser.class).getChildrenWithParserAsListTyped(FormulaInfoBlockParser.class)) {
@@ -68,7 +72,14 @@ public final class TinyProductionBridge {
             String input = maskComments(raw);
             var p4 = TinyExpressionP4Parser.parse(input, new ParseOptions(true,true,true,true,org.unlaxer.tinyexpression.p4.ubnfc.P4Scanners.ALL,512));
             regions.add(region(host,id,"root",TINY,body,body,p4.ok() ? State.COMPLETE : State.FAILED));
-            if (!p4.ok()) continue; // Never retain children from speculative/failed parses.
+            if (!p4.ok()) {
+                if (editor) {
+                    int parentIndex = regions.size()-1;
+                    recoverPrefix(host, id, start, input, regions, files, openEnds);
+                    if (regions.size() > parentIndex+1) regions.set(parentIndex, region(host,id,"root",TINY,body,body,State.PARTIAL));
+                }
+                continue;
+            }
             var tokens = p4.lexical().stream().filter(t -> t.token() != null && t.ruleId().equals("TinyExpressionP4::CodeBlock")).toList();
             if (tokens.size() % 3 != 0) throw new IllegalArgumentException("P4 lexical contract changed");
             for (int n=0;n<tokens.size();n+=3) {
@@ -83,7 +94,43 @@ public final class TinyProductionBridge {
             }
         }
         if (index==0) throw new IllegalArgumentException("no formula section");
-        var result = new Binding(host,regions,files); result.tree(); return result;
+        var result = new Binding(host,regions,files,openEnds); result.tree(); return result;
+    }
+    private static void recoverPrefix(DocumentSnapshot host, String parent, int start, String input,
+            List<Region> regions, Map<String,String> files, Set<String> openEnds) {
+        int from = 0, number = 0;
+        var options = new ParseOptions(false,false,true,true,org.unlaxer.tinyexpression.p4.ubnfc.P4Scanners.ALL,512);
+        while (from < input.length()) {
+            if (number >= 256) throw new IllegalArgumentException("production code block limit");
+            String remaining = input.substring(from), recognized = remaining;
+            var parsed = TinyExpressionP4Parser.parseEntry("TinyExpressionP4","CodeBlock",recognized,options);
+            boolean partial = !parsed.ok();
+            if (partial) {
+                recognized = remaining + "\n```\n";
+                parsed = TinyExpressionP4Parser.parseEntry("TinyExpressionP4","CodeBlock",recognized,options);
+            }
+            if (!parsed.ok()) break;
+            var tokens = parsed.lexical().stream().filter(t -> t.token()!=null && t.ruleId().equals("TinyExpressionP4::CodeBlock")).toList();
+            if (tokens.size()!=3) throw new IllegalArgumentException("P4 CodeBlock lexical contract changed");
+            var open=tokens.get(0);var close=tokens.get(2);
+            int size=remaining.codePointCount(0,remaining.length());
+            if (partial && (close.span().start()<size || open.span().end()>size)) break;
+            int consumed=partial ? size : close.span().end();
+            if (consumed<=0 || consumed>size) break;
+            String header=recognized.substring(recognized.offsetByCodePoints(0,open.span().start()),recognized.offsetByCodePoints(0,open.span().end())).strip();
+            number++;
+            if (header.startsWith("```java:")) {
+                int offset=start+input.codePointCount(0,from);
+                String child=parent+"/java/"+number;
+                Span full=new Span(offset+open.span().start(),offset+consumed);
+                Span body=new Span(offset+open.span().end(),offset+(partial?size:close.span().start()));
+                regions.add(region(host,child,parent,JAVA,full,body,partial?State.PARTIAL:State.COMPLETE));
+                files.put(child,header.substring(Math.max(8,header.lastIndexOf('.')+1))+".java");
+                if (partial) openEnds.add(child);
+            }
+            if (partial) break;
+            from += remaining.offsetByCodePoints(0,consumed);
+        }
     }
     private static String maskComments(String raw) {
         var out = new StringBuilder();
