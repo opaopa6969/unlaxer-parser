@@ -117,6 +117,14 @@ fn generate_resolved(
         relative_path: "runtime/LICENSE".into(),
         content: include_str!("../../../LICENSE").into(),
     });
+    files.push(GeneratedFile {
+        relative_path: "runtime/UNICODE-LICENSE.txt".into(),
+        content: include_str!("../../../spec-corpus/xid-identifier/UNICODE-LICENSE.txt").into(),
+    });
+    files.push(GeneratedFile {
+        relative_path: "public/UNICODE-LICENSE.txt".into(),
+        content: include_str!("../../../spec-corpus/xid-identifier/UNICODE-LICENSE.txt").into(),
+    });
     macro_rules! runtime {
         ($name:literal) => {
             files.push(GeneratedFile {
@@ -128,6 +136,7 @@ fn generate_resolved(
     runtime!("lib.rs");
     runtime!("token.rs");
     runtime!("scope.rs");
+    runtime!("names.rs");
     runtime!("semantic.rs");
     runtime!("semantic_rules.rs");
     runtime!("editor.rs");
@@ -150,6 +159,7 @@ fn generate_resolved(
     runtime!("lexing.rs");
     runtime!("first.rs");
     runtime!("lexical.rs");
+    runtime!("unicode_xid.rs");
     runtime!("long_code_fence.rs");
     runtime!("memo_retention_tests.rs");
     let wrapper = include_str!("../../../unlaxer-dsl/src/main/resources/playground/lib.rs")
