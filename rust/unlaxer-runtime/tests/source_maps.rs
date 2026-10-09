@@ -683,3 +683,81 @@ fn empty_partial_region_forwards_completion_and_insertion_at_host_eof() {
         .unwrap()
         .is_none());
 }
+
+#[test]
+fn explicit_enclosure_boundaries_are_independent_and_validated() {
+    let host = snapshot("host", "😀ABC");
+    let full = span(0, 4);
+    let partial = Region {
+        id: "x".into(),
+        parent: None,
+        language: java(),
+        full,
+        body: full,
+        source_map: copy(host.clone(), host.clone(), 0),
+        parse_state: State::Partial,
+    };
+    assert!(
+        LanguageRegions::with_open_ends(host.clone(), vec![partial.clone()], HashSet::new())
+            .unwrap()
+            .at(4)
+            .unwrap()
+            .is_none()
+    );
+    let complete = Region {
+        parse_state: State::Complete,
+        ..partial
+    };
+    assert_eq!(
+        LanguageRegions::with_open_ends(host.clone(), vec![complete.clone()], ["x".into()].into())
+            .unwrap()
+            .at(4)
+            .unwrap()
+            .unwrap()
+            .id,
+        "x"
+    );
+    assert!(LanguageRegions::with_open_ends(
+        host.clone(),
+        vec![complete],
+        ["unknown".into()].into()
+    )
+    .is_err());
+    let body = span(1, 3);
+    let child = snapshot("child", host.slice(body).unwrap());
+    let closed = Region {
+        id: "closed".into(),
+        parent: None,
+        language: java(),
+        full,
+        body,
+        source_map: copy(child, host.clone(), 1),
+        parse_state: State::Partial,
+    };
+    assert!(
+        LanguageRegions::with_open_ends(host.clone(), vec![closed], ["closed".into()].into())
+            .is_err()
+    );
+    let point = span(4, 4);
+    let empty = snapshot("empty", "");
+    let a = Region {
+        id: "a".into(),
+        parent: None,
+        language: java(),
+        full: point,
+        body: point,
+        source_map: copy(empty, host.clone(), 4),
+        parse_state: State::Complete,
+    };
+    let b = Region {
+        id: "b".into(),
+        parse_state: State::Failed,
+        ..a.clone()
+    };
+    assert!(
+        LanguageRegions::with_open_ends(host, vec![a, b], ["a".into(), "b".into()].into())
+            .unwrap()
+            .at(4)
+            .is_err()
+    );
+}

@@ -260,4 +260,24 @@ public class SourceMapsTest {
         assertNull(new LanguageRegions(host, List.of(closed)).at(3));
     }
 
+    @Test public void explicitEnclosureBoundariesAreIndependentAndValidated() {
+        var host = new DocumentSnapshot("host", 1, "😀ABC");
+        var full = new Span(0, 4);
+        var partial = new Region("x", null, JAVA, full, full, copy(host, host, 0), State.PARTIAL);
+        assertNull(new LanguageRegions(host, List.of(partial), Set.of()).at(4));
+        var complete = new Region("x", null, JAVA, full, full, copy(host, host, 0), State.COMPLETE);
+        assertEquals("x", new LanguageRegions(host, List.of(complete), Set.of("x")).at(4).id());
+        assertThrows(IllegalArgumentException.class, () -> new LanguageRegions(host, List.of(complete), Set.of("unknown")));
+        var body = new Span(1, 3); var child = new DocumentSnapshot("child", 1, host.slice(body));
+        var closed = new Region("closed", null, JAVA, full, body, copy(child, host, 1), State.PARTIAL);
+        assertThrows(IllegalArgumentException.class, () -> new LanguageRegions(host, List.of(closed), Set.of("closed")));
+        var empty = new DocumentSnapshot("empty", 1, ""); var point = new Span(4, 4);
+        var a = new Region("a", null, JAVA, point, point, copy(empty, host, 4), State.COMPLETE);
+        var b = new Region("b", null, JAVA, point, point, copy(empty, host, 4), State.FAILED);
+        assertThrows(IllegalArgumentException.class, () -> new LanguageRegions(host, List.of(a, b), Set.of("a", "b")).at(4));
+        assertThrows(IllegalArgumentException.class, () -> new EmbeddedLanguages.Child(JAVA, full, body, true));
+        assertThrows(IllegalArgumentException.class, () -> new EmbeddedLanguages.Parsed(host, State.PARTIAL,
+            List.of(new EmbeddedLanguages.Child(JAVA, new Span(0, 3), new Span(1, 3), true))));
+    }
+
 }

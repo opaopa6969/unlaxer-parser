@@ -179,6 +179,7 @@ fn main() {
                 assert_eq!(region.source_map.cursor(&unlaxer_runtime::source::Location::new(host.clone(), unlaxer_runtime::Span { start: region.body.start, end: region.body.start }).unwrap()).unwrap(), Some(0));
             }
         }
+        assert_ownership(fields[0], fields[1], &result);
         if let Some(old) = previous {
             let project = unlaxer_runtime::language_queries::Project {
                 id: "project".into(),
@@ -194,5 +195,45 @@ fn main() {
             .is_err());
         }
         previous = Some(result);
+    }
+}
+
+fn assert_ownership(name: &str, mode: &str, output: &embedded::Output) {
+    use unlaxer_runtime::{language_queries as query, source::{Location, Operation, State}, Span};
+    use std::collections::{BTreeMap, HashSet};
+    struct Completion;
+    impl query::Provider for Completion {
+        fn capabilities(&self) -> HashSet<Operation> { [Operation::Completion].into() }
+        fn query(&self, request: &query::Request<'_>) -> unlaxer_runtime::source::Result<query::Response> {
+            let source = request.region.source_map.output().clone();
+            let point = Location::new(source.clone(), Span { start: request.cursor, end: request.cursor })?;
+            Ok(query::Response { snapshot: source, project: request.project.id.clone(), project_version: request.project.version,
+                state: State::Partial, items: vec![query::Item { label: "x".into(), detail: "boundary".into(), locations: vec![point.clone()],
+                edits: vec![query::TextEdit { location: point, replacement: "x".into() }] }] })
+        }
+    }
+    let host = &output.snapshot; let tree = output.tree().unwrap();
+    let project = query::Project { id: "project".into(), version: host.version, documents: BTreeMap::from([(host.uri.clone(), host.clone())]), configuration: BTreeMap::new() };
+    let mut providers: HashMap<Language, Box<dyn query::Provider>> = HashMap::new();
+    for region in &output.regions {
+        if mode == "missing" && region.language.id == "java" { continue; }
+        providers.insert(region.language.clone(), Box::new(Completion));
+    }
+    let queries = query::LanguageQueries::new(output.tree().unwrap(), project.clone(), providers).unwrap();
+    let fixtures = std::fs::read_to_string(std::env::args().nth(3).unwrap()).unwrap();
+    for row in fixtures.lines() {
+        let fields: Vec<_> = row.split('\t').collect(); if fields[0] != name { continue; }
+        let cursor = fields[1].parse().unwrap();
+        assert_eq!(tree.at(cursor).unwrap().map(|r|r.language.grammar.as_str()).unwrap_or("NONE"), fields[2], "{}:{}", name, cursor);
+        let mut open: Vec<_> = output.open_ends.iter().cloned().collect(); open.sort();
+        assert_eq!(open.join(","), if fields[3] == "-" { "" } else { fields[3] }, "{}", name);
+        let response = queries.query(host, &project, cursor, Operation::Completion, &BTreeMap::new()).unwrap();
+        assert_eq!(format!("{:?}", response.state).to_uppercase(), fields[4], "{}", name);
+        if response.state == State::Partial {
+            assert_eq!(response.items[0].edits[0].span, Span { start: cursor, end: cursor });
+            assert_eq!(response.items[0].locations[0].location.span, Span { start: cursor, end: cursor });
+            assert_eq!(tree.apply(host, host.version + 1, &response.items[0].edits).unwrap().text,
+                format!("{}x{}", host.slice(Span { start: 0, end: cursor }).unwrap(), host.slice(Span { start: cursor, end: host.len() }).unwrap()));
+        }
     }
 }

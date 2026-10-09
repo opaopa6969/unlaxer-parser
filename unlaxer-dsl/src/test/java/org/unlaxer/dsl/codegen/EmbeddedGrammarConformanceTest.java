@@ -117,7 +117,41 @@ public class EmbeddedGrammarConformanceTest {
                     var old = previous; var project = new LanguageQueries.Project("project", version, Map.of(host.uri(), host), Map.of());
                     assertThrows(IllegalArgumentException.class, () -> new LanguageQueries(old.tree(), project, Map.of()));
                 }
+                assertOwnership(fields[0], fields[1], result);
                 previous = result;
+            }
+        }
+    }
+    private void assertOwnership(String name, String mode, EmbeddedLanguages.Result result) throws Exception {
+        var host = result.snapshot(); var tree = result.tree();
+        var project = new LanguageQueries.Project("project", host.version(), Map.of(host.uri(), host), Map.of());
+        var providers = new HashMap<Language, LanguageQueries.Provider>();
+        for (var region : result.regions()) {
+            if (mode.equals("missing") && region.language().id().equals("java")) continue;
+            providers.put(region.language(), new LanguageQueries.Provider() {
+                @Override public Set<Operation> capabilities() { return Set.of(Operation.COMPLETION); }
+                @Override public LanguageQueries.Response query(LanguageQueries.Request request) {
+                    var source = request.region().sourceMap().output();
+                    var point = new SegmentSourceMap.Location(source, new Span(request.cursor(), request.cursor()));
+                    return new LanguageQueries.Response(source, project.id(), project.version(), State.PARTIAL, List.of(
+                        new LanguageQueries.Item("x", "boundary", List.of(point), List.of(new LanguageQueries.TextEdit(point, "x")))));
+                }
+            });
+        }
+        var queries = new LanguageQueries(tree, project, providers);
+        for (String row : Files.readAllLines(fixtures.resolve("ownership.tsv"))) {
+            String[] fields = row.split("\t"); if (!fields[0].equals(name)) continue;
+            int cursor = Integer.parseInt(fields[1]); var owner = tree.at(cursor);
+            assertEquals(name + ":" + cursor, fields[2], owner == null ? "NONE" : owner.language().grammar());
+            String open = result.openEnds().stream().sorted().collect(java.util.stream.Collectors.joining(","));
+            assertEquals(name, fields[3].equals("-") ? "" : fields[3], open);
+            var response = queries.query(host, project, cursor, Operation.COMPLETION, Map.of());
+            assertEquals(name, State.valueOf(fields[4]), response.state());
+            if (response.state() == State.PARTIAL) {
+                assertEquals(new Span(cursor, cursor), response.items().get(0).edits().get(0).span());
+                assertEquals(new Span(cursor, cursor), response.items().get(0).locations().get(0).location().span());
+                assertEquals(host.slice(new Span(0, cursor)) + "x" + host.slice(new Span(cursor, host.length())),
+                    tree.apply(host, host.version() + 1, response.items().get(0).edits()).text());
             }
         }
     }
@@ -136,7 +170,7 @@ public class EmbeddedGrammarConformanceTest {
         run(List.of("rustc", "--edition=2021", "--crate-type=rlib", "--crate-name=unlaxer_runtime", repo.resolve("rust/unlaxer-runtime/src/lib.rs").toString(), "-o", runtime.toString()));
         Files.copy(fixtures.resolve("probe.rs"), output.resolve("main.rs"));
         run(List.of("rustc", "--edition=2021", "--extern", "unlaxer_runtime=" + runtime, output.resolve("main.rs").toString(), "-o", output.resolve("probe").toString()));
-        run(List.of(output.resolve("probe").toString(), fixtures.resolve("cases.tsv").toString(), fixtures.resolve("editor.tsv").toString()));
+        run(List.of(output.resolve("probe").toString(), fixtures.resolve("cases.tsv").toString(), fixtures.resolve("editor.tsv").toString(), fixtures.resolve("ownership.tsv").toString()));
     }
     @Test public void generatedPlaygroundUsesActualPartialRegionRegistry() throws Exception {
         if (!Boolean.getBoolean("rustConformance")) System.out.println("[assumption] embedded Playground requires -DrustConformance=true and wasm32 target");
@@ -153,7 +187,7 @@ public class EmbeddedGrammarConformanceTest {
         }
         Files.copy(fixtures.resolve("region_adapter.rs"), output.resolve("src/region_adapter.rs"), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         run(List.of("node", output.resolve("build.mjs").toString()));
-        run(List.of("node", fixtures.resolve("playground-probe.mjs").toString(), output.resolve("public/language.wasm").toString(), fixtures.resolve("editor.tsv").toString()));
+        run(List.of("node", fixtures.resolve("playground-probe.mjs").toString(), output.resolve("public/language.wasm").toString(), fixtures.resolve("editor.tsv").toString(), fixtures.resolve("ownership.tsv").toString()));
     }
     @Test public void malformedDeclarationsAreRejectedByBothJavaGenerationPaths() throws Exception {
         for (String line : Files.readAllLines(fixtures.resolve("invalid.tsv"))) {
