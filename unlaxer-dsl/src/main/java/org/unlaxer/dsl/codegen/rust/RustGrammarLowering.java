@@ -26,6 +26,7 @@ public final class RustGrammarLowering {
     private final List<Operator> operators = new ArrayList<>();
     private final List<String> catalogs = new ArrayList<>();
     private final List<Boolean> longestChoices = new ArrayList<>();
+    private final List<Boolean> uniqueLongestChoices = new ArrayList<>();
     private final List<Boolean> predictiveChoices = new ArrayList<>();
     private final List<RecoveryAnnotation> recoveries = new ArrayList<>();
     private final Set<Integer> nullableRules = new HashSet<>();
@@ -51,6 +52,8 @@ public final class RustGrammarLowering {
 
     private GrammarIR run() {
         if (!grammar.imports().isEmpty()) throw unsupported("imports");
+        org.unlaxer.dsl.codegen.LexicalContexts.requireValid(grammar);
+        org.unlaxer.dsl.codegen.NamePredicates.requireValid(grammar);
         var lexical = org.unlaxer.dsl.bootstrap.LexicalCompiler.compile(grammar);
         boolean whitespace = false;
         String globalStyle = "none";
@@ -119,6 +122,7 @@ public final class RustGrammarLowering {
             boolean leftAssoc = false;
             boolean rightAssoc = false;
             boolean longestChoice = false;
+            boolean uniqueLongestChoice = false;
             boolean predictiveChoice = false;
             RecoveryAnnotation recovery = null;
             Integer precedence = null;
@@ -140,6 +144,10 @@ public final class RustGrammarLowering {
                         throw unsupported("mapping method collision " + previous + " / " + value.className());
                     }
                     mapping = value;
+                } else if (annotation instanceof NamePredicateAnnotation) {
+                    // Applied around this rule body after structural lowering.
+                } else if (annotation instanceof LexicalContextAnnotation) {
+                    // Applied around this rule body after structural lowering.
                 } else if (annotation instanceof DocAnnotation) {
                     // Preserved as ordered tooling metadata on the lowered rule below.
                 } else if (annotation instanceof SkipAnnotation) {
@@ -153,6 +161,9 @@ public final class RustGrammarLowering {
                 } else if (annotation instanceof LongestChoiceAnnotation) {
                     if (longestChoice) throw unsupported("duplicate @longestChoice on " + rule.name());
                     longestChoice = true;
+                } else if (annotation instanceof UniqueLongestChoiceAnnotation) {
+                    if (uniqueLongestChoice) throw unsupported("duplicate @uniqueLongestChoice on " + rule.name());
+                    uniqueLongestChoice = true;
                 } else if (annotation instanceof PredictiveChoiceAnnotation) {
                     if (predictiveChoice) throw unsupported("duplicate @predictiveChoice on " + rule.name());
                     predictiveChoice = true;
@@ -210,6 +221,14 @@ public final class RustGrammarLowering {
             if (predictiveChoice && (leftAssoc || rightAssoc || longestChoice)) {
                 throw unsupported("@predictiveChoice conflicts with associativity/@longestChoice on " + rule.name());
             }
+            if (uniqueLongestChoice) {
+                if (!(rule.body() instanceof ChoiceBody choice) || choice.alternatives().size() < 2
+                    || choice.alternatives().size() > 64)
+                    throw unsupported("@uniqueLongestChoice requires 2 to 64 alternatives on " + rule.name());
+                if (leftAssoc || rightAssoc || longestChoice || predictiveChoice)
+                    throw unsupported("conflicting @uniqueLongestChoice on " + rule.name());
+            }
+            uniqueLongestChoices.add(uniqueLongestChoice);
             longestChoices.add(longestChoice);
             predictiveChoices.add(predictiveChoice);
             recoveries.add(recovery);
@@ -287,7 +306,9 @@ public final class RustGrammarLowering {
             if (skips.get(i)) mapping = null;
             if (mapping != null) variants.merge(mapping.name(), mapping, this::mergeMappings);
             Expression ruleBody = bodies.get(i);
-            if (longestChoices.get(i)) {
+            if (uniqueLongestChoices.get(i)) {
+                ruleBody = new UniqueLongestChoice(((Choice) ruleBody).alternatives());
+            } else if (longestChoices.get(i)) {
                 ruleBody = new LongestChoice(((Choice) ruleBody).alternatives());
             } else if (predictiveChoices.get(i)) {
                 List<Expression> alternatives = ((Choice) ruleBody).alternatives();
@@ -322,6 +343,8 @@ public final class RustGrammarLowering {
             if (definition != null) expression = new LexicalTriviaScope(expression, definition);
             else if (hasLocalTrivia || !globalStyle.equalsIgnoreCase("none") && !globalStyle.equalsIgnoreCase("javaStyle"))
                 expression = new TriviaScope(expression, ruleWhitespace.get(i));
+            for (var annotation : grammar.rules().get(i).annotations()) if (annotation instanceof LexicalContextAnnotation context)
+                expression = new LexicalContextScope(expression, org.unlaxer.dsl.codegen.LexicalContexts.terminals(grammar, context));
             if (ruleEffects.get(i) != null) expression = new RuleEffects(expression, ruleEffects.get(i));
             if (comparisons.get(i) != null) expression = new CaptureEquality(expression, comparisons.get(i));
             if (recoveries.get(i) != null) {
@@ -340,6 +363,12 @@ public final class RustGrammarLowering {
                 expression = new Recovery(expression, mode, RecoverySupport.validateSyncTokens(tokens),
                     "syntax error: skipped to sync point");
             }
+            var predicate=org.unlaxer.dsl.codegen.NamePredicates.annotation(grammar.rules().get(i));
+            if(predicate.isPresent()) {
+                var value=predicate.get(); expression=new NamePredicate(expression,value.snapshot(),value.version(),value.name(),value.kind());
+            }
+            if(i==root && org.unlaxer.dsl.codegen.NamePredicates.enabled(grammar)) expression=new NameResolutionScope(expression,
+                org.unlaxer.dsl.codegen.NamePredicates.requirements(grammar).stream().map(value->new NameRequirement(value.id(),value.version())).toList());
             rewritten.add(new Rule(rule.name(), expression, mapping, rule.operator(), rule.catalog(), rule.skip(), rule.documentation()));
         }
         return new GrammarIR(rewritten, root, whitespace);
@@ -405,6 +434,14 @@ public final class RustGrammarLowering {
             if (expression instanceof LongestChoice choice) {
                 boolean mixed = shape(new Choice(choice.alternatives()), new HashSet<>()).kind() == Kind.VALUE;
                 return new LongestChoice(choice.alternatives().stream().map(alternative -> {
+                    Expression child = retainTextValues(alternative, mapping);
+                    return mixed && shape(alternative, new HashSet<>()).kind() == Kind.TEXT
+                        ? new TextValue(child) : child;
+                }).toList());
+            }
+            if (expression instanceof UniqueLongestChoice choice) {
+                boolean mixed = shape(new Choice(choice.alternatives()), new HashSet<>()).kind() == Kind.VALUE;
+                return new UniqueLongestChoice(choice.alternatives().stream().map(alternative -> {
                     Expression child = retainTextValues(alternative, mapping);
                     return mixed && shape(alternative, new HashSet<>()).kind() == Kind.TEXT
                         ? new TextValue(child) : child;
@@ -646,6 +683,9 @@ public final class RustGrammarLowering {
             return combinePredictors(choice.alternatives(), visiting, cache);
         }
         if (expression instanceof LongestChoice choice) {
+            return combinePredictors(choice.alternatives(), visiting, cache);
+        }
+        if (expression instanceof UniqueLongestChoice choice) {
             return combinePredictors(choice.alternatives(), visiting, cache);
         }
         if (expression instanceof Capture capture) {

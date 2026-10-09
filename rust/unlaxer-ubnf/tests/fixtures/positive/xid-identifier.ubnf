@@ -1,0 +1,7 @@
+grammar XidNames {
+  @ubnf: v2
+  token NAME = XID_IDENTIFIER
+  token COMPOSED ::= '[' XID_IDENTIFIER ']';
+  @root @mapping(Name, params=[text])
+  Root ::= NAME @text;
+}

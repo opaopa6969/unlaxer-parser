@@ -6,14 +6,14 @@ import org.unlaxer.TokenKind;
 import org.unlaxer.context.ParseContext;
 import org.unlaxer.parser.elementary.AbstractTokenParser;
 
-/** Bootstrap leaf for a validated token body, including its mandatory semicolon. */
+/** Bootstrap leaf for a syntax-validated token body, including its mandatory semicolon. */
 public class LexicalBodyParser extends AbstractTokenParser {
     private static final long serialVersionUID = 1L;
     @Override public Token getToken(ParseContext context, TokenKind kind, boolean invert) {
         String source = context.getSource().sourceAsString();
         int start = source.offsetByCodePoints(0, context.getPosition(kind).value());
         try {
-            var result = LexicalSyntax.parse(source.substring(start));
+            var result = LexicalSyntax.parseSyntax(source.substring(start));
             int length = source.codePointCount(start, start + result.end());
             if (!invert) return new Token(kind, context.peek(kind, new CodePointLength(length)), this);
         } catch (IllegalArgumentException invalid) { /* the outer parser reports the declaration failure */ }

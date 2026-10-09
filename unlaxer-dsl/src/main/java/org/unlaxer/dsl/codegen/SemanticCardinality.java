@@ -158,6 +158,8 @@ final class SemanticCardinality {
         return shape(element);
     }
 
+    Shape captureShape(RuleDecl rule, String name) { return captures(rule.body()).get(name); }
+
     private Map<String, Shape> captures(RuleBody body) {
         if (body instanceof ChoiceBody choice) {
             List<Map<String, Shape>> alternatives = choice.alternatives().stream().map(this::captures).toList();
