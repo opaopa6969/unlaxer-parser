@@ -96,12 +96,17 @@ WASM最大memory256 MiB。profile読込上限とparser全体のメモリ保証�
 `language-profiles` CI は3言語それぞれの実WASMをChromiumで開き、能力表示、成功、拒否、
 mobile表示を検証する。`target/language-profile-*.tsv` を成果物として保存する。
 
-## 親issueの残り
+## 現在の対応境界
 
-このsliceで #370 / #383 をcloseしない。ruleを公開するpackage importは既存のtoken専用
-importと別契約であり、まだ追加していない。生成LSPでのprofile選択、FormulaInfo全体への
-本番登録、言語固有typed completion・editのprofile corpus、より広い構文の実装が残る。
-既存のprovider/region/edit corpusが成功しても、その言語の全機能の根拠へ広げない。
+3言語の表に列挙した構文は部分対応であり、名前・型・scope・実行をこのgrammarから推測しない。
+CLIとPlaygroundの固定package/profile選択、Java/Rust生成LSPのprofile選択と実provider能力表示、
+明示登録したquery/diagnostic consumerは実装済み。実際に選択したprofileと登録operationの交差だけを利用する。
+共通LSP query transportはVALIDATE/COMPLETION/HOVER/DEFINITIONを扱い、
+RENAME/FORMAT/CODE_ACTIONはruntime/Playground側の対応であって共通LSP transportは未対応である。
+
+TinyExpression本番FormulaInfo→Tiny→Java接続は [版別のproduction bridge対応表](tinyexpression-production-bridge.md) を参照する。
+固定f86版の両native hostと現在版の既存Java LSPへのopt-in導入は別の検証単位であり、
+現在版Rust Tiny LSPの対応まで主張しない。#370/#383のcloseは親issue全条件と依存CI/mergeを別途確認する。
 
 ### 固定 package の明示選択
 
@@ -127,11 +132,11 @@ playground --package lang/java --manifest /project/ubnf.json --output /project/j
 この root 選択は `@import alias from 'pkg:…'` と別の API です。`@import` は引き続き宣言的 token のみを公開し、rules を持つ言語 package の import は拒否します。
 選んだ root 自身は lock 内の token package を import でき、その定義元と pinned identity は `public/vocabulary.json` に引き継ぎます。
 `--grammar`、`--profile`、`--package` は排他で、`--manifest` は `--package` と対で指定します。
-生成 LSP への profile 設定、外部 provider の自動配線、language package の typed completion はこの入口とは別の後続作業です。
+生成LSPへのprofile設定と明示登録providerのconsumerは以下と `docs/language-query-forwarding.md` に記載する。外部providerの自動配線やlanguage package自身によるtyped completion生成は行わない。
 
 ### 生成 LSP の初期化 profile
 
-生成した Java LSP は `initializationOptions.languageProfile` の `tsv` と `entry` を受け取ります。
+生成したJava/Rust LSPは `initializationOptions.languageProfile` の `tsv` と `entry` を受け取ります。
 `tsv` は検査済み profile の全文、`entry` は生成時の `@root` と同じ名前です。ファイルパス・URL・classpath の設定はありません。
 package を使う呼出し元は `PackagedLanguageProfile.load(manifest, packageId).profile().canonicalTsv()` から設定を作れます。
 
@@ -143,11 +148,63 @@ profile の grammar 名と entry を生成済み grammar/root に照合し、PAR
 unknown entry、外部のみの PARSE、形の違う設定は JSON-RPC `InvalidParams` (`-32602`) を返し、以前の選択を維持します。
 profile 未指定時は従来の LSP 動作です。
 
-指定時は completion/hover/definition/rename/format/code action/execute のうち EXTERNAL/UNSUPPORTED の能力を広告から除きます。
-生成済み completion/hover handler も未対応の場合は空の結果を返します。SUPPORTED/PARTIAL は既存 handler の能力を残す条件であり、新規 provider や処理を追加する条件ではありません。
-構文解析と syntax diagnostics は選んだ限定 grammar に基づきます。外部 compiler の semantic validation を実行したという意味にはなりません。
+指定時はUNSUPPORTEDを除外し、EXTERNALはホストが該当operationを明示登録した場合だけ許可します。
+`experimental.languageQueryConsumer` はtransport実装・provider登録・profile許可・利用可能性を別々に表示します。
+生成済みcompletion/hover handlerも未対応の場合は空の結果を返します。SUPPORTED/PARTIALは既存handlerを許可する条件であり、新規providerや処理を追加する条件ではありません。
+構文解析は選んだ限定grammarに基づきます。外部compilerの意味診断はVALIDATE providerを実際に登録したconsumerの別経路であり、profile選択だけでは起動しません。
 `capabilities.experimental.languageProfile` は schemaVersion、canonical TSV、language、package、version、grammar、entry を返し、既存の experimental object の他フィールドを保持します。
 サーバー側からも `languageProfile()` で選択を参照できます。初期化後の動的変更はこの契約の対象外です。
 
 共通選択 API は Java `LanguageProfile.select(grammar, entry)`、Rust `LanguageProfile::select(grammar, entry)` です。
-両方に同じ selection/capability fixture を実行します。Classic LSP transport/server generator はこの時点では Java にあり、Rust の同プロトコル配線は #111 の後続作業です。Rust 側の共通 profile 選択 API を実装したことだけで Rust LSP の完了とは扱いません。
+両方に同じ selection/capability fixture を実行します。Classic Rust LSPも同じprofile選択を実装し、両生成serverのstdio比較を行う（[Classic Rust LSP](classic-rust-lsp.md)）。これは #111 全体の完了ではなく、Rustの同期実行・cancellation・未対応edit transport等の制限を同文書に明記する。
+
+### Lock済みpackageを子grammarの公開entryとして使う
+
+packageのruleを親grammarへ展開する必要はない。`@embedded` の exact identity と、
+検証したpackageから生成したgrammarを明示registryで対応付ける。
+`@import` は宣言的token専用のままであり、次の手順はその権限を広げない。
+
+1. `ubnf.json` に `lang/java@0.1.0` を指定し、`deps resolve` でlock/cacheを用意する。
+2. Javaでは `PackagedLanguageProfile.load(manifest, "lang/java")` の `ast()` から
+   `ParserGenerator` / `ASTGenerator` / `MapperGenerator` または `RustBackend` で生成する。
+   native Rustの既存CLIでは `playground --package lang/java --manifest ubnf.json --output generated-java`
+   が同じlockを検証して `packaged_profiles::load` のastから生成する。
+   `generated-java/src/generated/` は通常のRust moduleであり、browserを起動せず利用できる。
+3. 両経路の生成 `embeddedGrammar()` / `embedded_grammar()` を、検証済み
+   `profile.identity("CompilationUnit")` をkeyとして `EmbeddedLanguages.parse` /
+   `embedded::parse` のregistryへ登録する。非rootの公開 `Block` も同じ手順で別keyを登録する。
+   Javaでは `loaded.profile()`、native出力ではlockから同梱された `public/profile.tsv` を読む。
+4. 親grammarのbody captureに以下の宣言を付ける。呼出しごとに現在のhost snapshotを渡す。
+
+```ubnf
+@embedded: {
+  rule: 'JavaSource' body: 'body'
+  language: 'java' package: 'lang/java' version: '0.1.0'
+  grammar: 'Java21' entry: 'CompilationUnit'
+}
+```
+
+親grammar自体も通常の生成grammarとしてregistryへ登録する。公開entryはprofileの
+`identity(entry)` で検証してから登録する。生成された内部rule APIをすべて公開したり、
+名前が似た別package/entryを暗黙に登録したりしない。登録済みpackageが0.1.0のまま
+親が0.2.0を要求した場合、子regionはUNAVAILABLEとなる。未知entryはprofileで拒否し、
+registryにないentryはUNAVAILABLE、低層grammarへの未知entry直接呼出しはUNSUPPORTEDである。
+構文不一致はFAILEDとして区別する。診断やeditの位置は既存region/source-map契約に従う。
+
+`docs/fixtures/language-profiles/package-entries.tsv` の15入力は3言語それぞれのsource-file
+entryと公開Block、構文不一致、誤version、欠entryを固定する。日本語・emoji・CRLFの
+body文字列とCP位置を保持し、親delimiterの所有権とchild全体のCOPY逆写像を確認する。
+`PackagedLanguageProfileConformanceTest.lockedPackagesExposeEntriesToParentRegistries` は
+実際にlockを読み、両生成経路の5filesをbyte比較し、生成Java/Rustをcompileして親から呼ぶ。
+同じ手書きoracleを両実行に使い、native生成・実行はPATH/JAVA_HOMEを空にしても成功する。
+この検証はpackageを取得済みにして行い、実行時のnetwork解決や外部compilerの自動起動はない。
+
+```sh
+mvn -pl unlaxer-common,unlaxer-dsl -am test \
+  -Dtest=PackagedLanguageProfileConformanceTest,RustUbnfFrontendConformanceTest \
+  -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
+```
+
+`target/language-profile-package-entries.tsv` をCI成果物として必須化する。
+この呼出しは各profileの限定構文を解析するもので、外部compilerの意味検証や補完能力を
+追加しない。FormulaInfo/Tiny本番の外部javac登録経路は別のproduction bridge検証に従う。
