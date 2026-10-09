@@ -16,6 +16,7 @@
     <p><a href="../">説明・問い・実習で学ぶ「はじめての言語づくり」</a> · <a href="../playground/">完成した式言語の parser を試す</a></p>
     <p class="notice">この画面で確認するのは UBNF の構文です。成功しても、名前の参照先・左再帰・生成先の対応機能までは検証しません。書いた文法から parser を作るには <a href="help/index.html">CLI / VS Code の生成手順</a>へ進んでください。</p>
     <p id="engine" class="notice" role="status">WASM parser を読み込んでいます…</p>
+    <section id="profile-panel" hidden aria-label="言語の対応範囲"><h2>言語の対応範囲</h2><p>部分文法の拒否は、その言語全体の構文エラーとは限りません。外部解析器は別途登録が必要です。</p><div id="profile"></div></section>
     <div class="playground-layout">
       <section aria-labelledby="input-title">
         <h2 id="input-title">1 · 文法を書いて試す</h2>
@@ -26,6 +27,9 @@
         <div id="completion-panel" class="completion-panel" hidden><ul id="completion-list" role="listbox" aria-label="UBNF の補完候補"></ul><p id="completion-description"></p></div>
         <div class="actions"><button id="parse" class="primary" disabled>解析する</button><button id="complete-input" aria-controls="completion-list" aria-expanded="false" disabled>補完候補</button><button id="clear">入力を空にする</button></div>
         <p id="completion-status" class="small" role="status">入力補完を準備しています…</p>
+        <label><input id="editor-mode" type="checkbox"> 編集途中の構文と補完を表示する</label>
+        <section id="languages-panel" hidden><h3>埋め込まれた言語</h3><div id="languages"></div></section>
+        <p id="typed-completions" class="notice" hidden></p>
         <p class="small">入力はサーバーに送信しません。最大 64 KiB (UTF-8)。3 秒を超える解析は中断します。入力は自動保存しません。</p>
         <h2>2 · 文法の構造を読む</h2>
         <p id="status" role="status" aria-live="polite">まだ解析していません。</p>

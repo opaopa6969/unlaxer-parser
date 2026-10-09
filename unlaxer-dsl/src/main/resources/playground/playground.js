@@ -47,6 +47,20 @@
   }
   function render(value) {
     $('result').textContent = JSON.stringify(value, null, 2);
+    $('languages-panel').hidden = !value.languages;
+    $('languages').replaceChildren();
+    if (value.languages) for (const region of value.languages.regions) {
+      const labels = {COMPLETE: '解析済み', PARTIAL: '編集中', FAILED: '構文エラー', UNAVAILABLE: '解析器が未登録', UNSUPPORTED: '未対応', TIMEOUT: '時間切れ'};
+      const button = element('button', `${region.grammar} · ${labels[region.state] || region.state}`);
+      button.type = 'button'; const snapshot = activeSource;
+      button.addEventListener('click', () => {
+        if ($('input').value !== snapshot) { $('hint').hidden = false; $('hint').textContent = '入力が変更されています。もう一度解析してください。'; return; }
+        const points = [...snapshot]; $('input').focus(); $('input').setSelectionRange(points.slice(0, region.body[0]).join('').length, points.slice(0, region.body[1]).join('').length);
+      });
+      $('languages').append(button);
+    }
+    $('typed-completions').hidden = !value.typed;
+    if (value.typed) $('typed-completions').textContent = `期待型：${value.typed.expectedTypes.join(' / ') || '不明'}。補完：${value.typed.completions.map(item => item.label).join(' / ') || '候補なし'}。`;
     $('hint').hidden = true; $('position').textContent = ''; $('ast').textContent = 'AST はありません。'; $('cst').replaceChildren();
     if (value.runtimeError) { fail(value.runtimeError); return; }
     const stale = $('input').value !== activeSource;
@@ -55,9 +69,13 @@
     if (!value.ok) {
       $('hint').hidden = false;
       $('hint').textContent = `${location(activeSource, value.diagnostic.offset)}：${value.diagnostic.kind}。期待：${value.diagnostic.expected.join(' / ') || '文法の条件を確認してください。'}`;
-      return;
+      if (!value.editor || value.editor.status === 'FAILED') return;
     }
-    $('ast').textContent = value.mappingError ? `AST の投影に失敗：${value.mappingError}` : JSON.stringify(value.ast, null, 2);
+    if (value.editor && value.editor.status === 'PARTIAL') {
+      $('status').textContent = (stale ? '前の入力の結果：' : '') + '部分結果：入力は編集途中です。';
+      value.cst = {root: -1, nodes: value.editor.nodes};
+      $('ast').textContent = '編集途中です。missing / error node は生の解析結果で確認できます。';
+    } else $('ast').textContent = value.mappingError ? `AST の投影に失敗：${value.mappingError}` : JSON.stringify(value.ast, null, 2);
     $('ast-panel').open = true;
     const points = [...activeSource];
     value.cst.nodes.slice(0, 500).forEach((node, index) => {
@@ -100,7 +118,7 @@
   function parse() {
     activeSource = $('input').value;
     if (new TextEncoder().encode(activeSource).length > 65536) { fail('入力は 64 KiB (UTF-8) 以下にしてください。'); return; }
-    const run = () => { $('parse').disabled = true; $('status').textContent = '解析中…'; send('parse', {input: activeSource}); };
+    const run = () => { $('parse').disabled = true; $('status').textContent = '解析中…'; send('parse', {input: activeSource, editor: $('editor-mode').checked, cursor: [...activeSource.slice(0, $('input').selectionStart)].length}); };
     if (worker) run(); else startWorker(run);
   }
   $('parse').addEventListener('click', parse);
@@ -110,6 +128,22 @@
   async function load(name, binary = false) {
     const response = await fetch(name); if (!response.ok) throw new Error(`${name}: HTTP ${response.status}`);
     return binary ? response.arrayBuffer() : response.text();
+  }
+  if (document.body.dataset.profile) {
+    $('profile-panel').hidden = false;
+    load(document.body.dataset.profile).then(text => {
+      const rows = text.trimEnd().split('\n').map(line => line.split('\t'));
+      const value = name => rows.find(row => row[0] === name)?.slice(1).join(' · ') || '';
+      $('profile').append(element('p', `${value('language')} · 対象 ${value('target')} · ${value('package')}`));
+      const labels = {SUPPORTED: '対応', PARTIAL: '部分対応', EXTERNAL: '外部解析器が必要', UNSUPPORTED: '未対応'};
+      const categories = {entry: '入口', capability: '操作', syntax: '構文'};
+      const table = element('table');
+      for (const row of rows.filter(row => categories[row[0]])) {
+        const line = element('tr'); line.append(element('th', categories[row[0]]), element('td', row[1]), element('td', labels[row[2]])); table.append(line);
+      }
+      $('profile').append(table);
+    })
+      .catch(() => { $('profile').textContent = '対応範囲を読み込めません。解析結果から対応能力を推測しないでください。'; });
   }
   if (host) document.querySelector('header a').addEventListener('click', event => { event.preventDefault(); host.postMessage({type: 'openHelp'}); });
   Promise.all([load(document.body.dataset.wasm || 'language.wasm', true), load(document.body.dataset.worker || 'worker.js'), load(document.body.dataset.grammar || 'grammar.ubnf'), load(document.body.dataset.vocabulary || 'vocabulary.json')]).then(([bytes, source, grammar, origins]) => {

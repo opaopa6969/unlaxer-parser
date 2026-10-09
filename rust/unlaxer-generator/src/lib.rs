@@ -1,9 +1,11 @@
 //! Native UBNF -> normalized IR -> Rust modules. No Java process is launched.
 pub mod adapters;
+mod embedded;
 pub mod impact;
 mod lexical;
 pub mod lowering;
 pub mod modules;
+pub mod packaged_profiles;
 pub mod packages;
 pub mod playground;
 pub mod portability;
@@ -48,6 +50,12 @@ pub(crate) fn generate_grammar(
             .content
             .push_str(&api);
     }
+    files
+        .iter_mut()
+        .find(|f| f.relative_path == "parser.rs")
+        .unwrap()
+        .content
+        .push_str(&embedded::api(grammar, &ir)?);
     Ok(files)
 }
 

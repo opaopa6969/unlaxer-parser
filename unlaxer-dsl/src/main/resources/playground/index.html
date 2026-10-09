@@ -15,11 +15,15 @@
     <h1 id="name">言語を試す</h1>
     <p>下の欄には <strong>文法ではなく、その文法が受け入れる入力</strong>を書きます。「解析する」で入力全体を確認します。計算やコード実行は行いません。</p>
     <p id="engine" class="notice" role="status">WASM parser を読み込んでいます…</p>
+    <section id="profile-panel" hidden aria-label="言語の対応範囲"><h2>言語の対応範囲</h2><p>部分文法の拒否は、その言語全体の構文エラーとは限りません。外部解析器は別途登録が必要です。</p><div id="profile"></div></section>
     <div class="playground-layout">
       <section aria-labelledby="input-title">
         <h2 id="input-title">1 · 入力を書いて試す</h2>
         <label for="input">試験入力</label><textarea id="input" spellcheck="false" rows="10" placeholder="この言語の catalog にある説明を参考に入力してください。"></textarea>
         <div class="actions"><button id="parse" class="primary" disabled>解析する</button><button id="clear">入力を空にする</button></div>
+        <label><input id="editor-mode" type="checkbox"> 編集途中の構文と補完を表示する</label>
+        <section id="languages-panel" hidden><h3>埋め込まれた言語</h3><div id="languages"></div></section>
+        <p id="typed-completions" class="notice" hidden></p>
         <p class="small">入力はサーバーに送信しません。最大 64 KiB (UTF-8)。3 秒を超える解析は中断します。入力は自動保存しません。</p>
         <h2>2 · 結果を読む</h2>
         <p id="status" role="status" aria-live="polite">まだ解析していません。</p>

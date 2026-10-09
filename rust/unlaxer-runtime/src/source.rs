@@ -149,7 +149,9 @@ impl SourceMap {
         let mut cursor = 0;
         for segment in &segments {
             output.check(segment.output)?;
-            if segment.output.start != cursor || length(segment.output) == 0 {
+            let empty_anchor =
+                output.is_empty() && segments.len() == 1 && segment.kind == Kind::Copy;
+            if segment.output.start != cursor || (length(segment.output) == 0 && !empty_anchor) {
                 return Err("segments must partition output");
             }
             if segment.kind != Kind::Generated && segment.origin.is_none() {
@@ -269,7 +271,7 @@ impl SourceMap {
                 for (parent_output, parent_origin) in &parent_links {
                     let start = origin.span.start.max(parent_output.start);
                     let end = origin.span.end.min(parent_output.end);
-                    if start >= end {
+                    if start > end || (start == end && length(origin.span) != 0) {
                         continue;
                     }
                     let mapped = parent_origin.span.start + start - parent_output.start;
@@ -511,11 +513,30 @@ impl LanguageRegions {
             start: point,
             end: point,
         })?;
-        Ok(self
-            .regions
-            .values()
-            .filter(|region| region.body.start <= point && point < region.body.end)
-            .max_by_key(|region| self.depth(region)))
+        let mut selected = None;
+        let mut selected_depth = 0;
+        let mut ambiguous = false;
+        for region in self.regions.values() {
+            let owns = region.body.start <= point && point < region.body.end
+                || region.parse_state == State::Partial
+                    && point == self.host.len()
+                    && point == region.body.end;
+            if !owns {
+                continue;
+            }
+            let depth = self.depth(region);
+            if selected.is_none() || depth > selected_depth {
+                selected = Some(region);
+                selected_depth = depth;
+                ambiguous = false;
+            } else if depth == selected_depth {
+                ambiguous = true;
+            }
+        }
+        if ambiguous {
+            return Err("ambiguous cursor ownership");
+        }
+        Ok(selected)
     }
     fn depth<'a>(&'a self, mut region: &'a Region) -> usize {
         let mut depth = 0;

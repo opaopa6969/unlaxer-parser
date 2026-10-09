@@ -11,13 +11,20 @@ pub fn inspect(path: &Path) -> Result<Value, String> {
             .join(path)
     };
     let source = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    let ast = unlaxer_ubnf::parse(&source).map_err(|e| e.to_string())?;
     crate::modules::load(&path)?;
-    let mut resolver = crate::packages::Resolver::new(&path);
+    inspect_resolved(&path, &source, &mut crate::packages::Resolver::new(&path))
+}
+
+pub fn inspect_resolved(
+    path: &Path,
+    source: &str,
+    resolver: &mut crate::packages::Resolver,
+) -> Result<Value, String> {
+    let ast = unlaxer_ubnf::parse(source).map_err(|e| e.to_string())?;
     let mut modules = Vec::new();
     for grammar in &ast.grammars {
         for imported in &grammar.imports {
-            let target = resolver.import_path(&path, &imported.path)?;
+            let target = resolver.import_path(path, &imported.path)?;
             let text = resolver.read(&target)?;
             let module = unlaxer_ubnf::parse(&text).map_err(|e| e.to_string())?;
             let definitions: Vec<Value> = module.grammars[0].tokens.iter().map(|token| {
