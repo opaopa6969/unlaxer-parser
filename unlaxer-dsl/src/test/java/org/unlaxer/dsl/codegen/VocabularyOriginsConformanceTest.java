@@ -65,6 +65,32 @@ public class VocabularyOriginsConformanceTest {
                 report.add("unverified-transitive-origin\trefused\trefused\tpass");
             }
         }
+        JsonObject coexistence = JsonParser.parseString(Files.readString(repository.resolve(
+            "unlaxer-dsl/src/test/resources/rule-trivia/corpus.json"))).getAsJsonArray().asList().stream()
+            .map(JsonElement::getAsJsonObject).filter(value -> value.get("name").getAsString()
+                .equals("public-personal-project-coexistence")).findFirst().orElseThrow();
+        Path directory = temporary.newFolder().toPath(), grammar = directory.resolve("root.ubnf");
+        Files.writeString(grammar, coexistence.get("grammar").getAsString());
+        for (var module : coexistence.getAsJsonObject("modules").entrySet())
+            Files.writeString(directory.resolve(module.getKey()), module.getValue().getAsString());
+        Files.writeString(directory.resolve("ubnf.json"), coexistence.get("manifest").toString());
+        UBNFPackageResolver.resolve(directory.resolve("ubnf.json"));
+        JsonObject snapshot = VocabularyOrigins.inspect(grammar);
+        Process inspect = new ProcessBuilder(repository.resolve("rust/target/debug/unlaxer").toString(),
+            "deps", "inspect", "--grammar", grammar.toString()).redirectErrorStream(true).redirectOutput(log.toFile()).start();
+        assertTrue(inspect.waitFor(20, TimeUnit.SECONDS)); assertEquals(Files.readString(log), 0, inspect.exitValue());
+        assertEquals(snapshot.toString() + "\n", Files.readString(log));
+        JsonArray modules = snapshot.getAsJsonArray("modules"); assertEquals(3, modules.size());
+        assertEquals(List.of("standard", "personal", "project"), modules.asList().stream()
+            .map(value -> value.getAsJsonObject().get("alias").getAsString()).toList());
+        JsonObject standard = modules.get(0).getAsJsonObject().getAsJsonObject("identity");
+        assertEquals("std/layout", standard.get("id").getAsString());
+        assertEquals("2701f6884ea6c712d28c76ec3d340c3b27fca4575846239bd0854933205f4b67", standard.get("sha256").getAsString());
+        assertEquals("alice/layout", modules.get(1).getAsJsonObject().getAsJsonObject("identity").get("id").getAsString());
+        assertEquals(JsonParser.parseString("[{\"end\":55,\"name\":\"GAP\",\"start\":37}]"), modules.get(1).getAsJsonObject().get("definitions"));
+        assertTrue(modules.get(2).getAsJsonObject().get("identity").isJsonNull());
+        assertEquals(JsonParser.parseString("[{\"end\":48,\"name\":\"GAP\",\"start\":30}]"), modules.get(2).getAsJsonObject().get("definitions"));
+        report.add("public-personal-project-coexistence\tpass\tpass\tpass");
         Files.write(Path.of("target/rust-vocabulary-origins.tsv"), report);
     }
 }

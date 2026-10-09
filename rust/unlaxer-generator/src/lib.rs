@@ -58,6 +58,14 @@ pub(crate) fn generate_grammar(
     Ok(files)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 mod package_fetch;
 
 pub mod vocabulary_origins;
+
+#[cfg(target_arch = "wasm32")]
+mod package_fetch {
+    pub fn fetch(_source: &str) -> Result<Vec<u8>, String> {
+        Err("E-PACKAGE: HTTPS retrieval requires the native deps resolve command".into())
+    }
+}
