@@ -1,9 +1,10 @@
 //! Structured lexical expressions, shared in meaning with Java's LexicalExpression.
-#[allow(clippy::upper_case_acronyms)]
+#[allow(clippy::upper_case_acronyms, non_camel_case_types)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Op {
     LITERAL,
     ANY,
+    XID_IDENTIFIER,
     EOF,
     BOF,
     BOL,
@@ -146,7 +147,7 @@ impl LexicalExpression {
     pub fn nullable(&self) -> bool {
         match self.op {
             Op::LITERAL => self.text.is_empty(),
-            Op::ANY | Op::RANGE | Op::EXCEPT => false,
+            Op::ANY | Op::XID_IDENTIFIER | Op::RANGE | Op::EXCEPT => false,
             Op::SEQUENCE => self.children.iter().all(Self::nullable),
             Op::CHOICE => self.children.iter().any(Self::nullable),
             Op::REPEAT => self.min == 0 || self.children[0].nullable(),

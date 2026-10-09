@@ -126,7 +126,10 @@ mvn -pl unlaxer-common,unlaxer-dsl -am test \
 `@whitespace: layout.SPACES_AND_COMMENTS` を全modeで使える。token inventoryの走査にも同じ
 lexical programを使う。定義を1回一致させた範囲が1つのtrivia項目となり、空白を暗黙追加しない。
 Java/Rustとも解析ごとのSessionに定義を固定し、cacheやeager走査の前に空一致を拒否する。
-rule-local whitespace/interleaveは既存どおり拒否する。構文位置によるpolicy変更はこのprofileの範囲外。
+`@lexicalContext` を使わない profile は rule-local whitespace/interleave を拒否する。
+[文脈付き goal](contextual-lexing.md) を使う場合は、global の名前付き定義と rule-local
+`javaStyle` / `none`・interleave を組み合わせられる。active delimiter は規則の方針に従い、
+inventory は global 定義を保持する。rule-local の名前付き定義は引き続き拒否する。
 
 #432 の共通fixtureは標準定義のローカル版/package版、Unicodeを含む独自定義、暗黙空白の拒否、
 未閉鎖コメント、nullable/lookahead定義拒否を検証する。Java既存入口ともAST/source位置を比較し、

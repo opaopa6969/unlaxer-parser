@@ -1,0 +1,18 @@
+grammar Input {
+ @ubnf: v2
+ @package: example.lexing
+ @tokenStream: enabled
+ @whitespace: javaStyle
+ token FIRST ::= '>';
+ token SECOND ::= '>';
+ token E = EMPTY
+ token END = EOF
+ @root @mapping(Value, params=[value])
+ Root ::= 'named' Named @value END | 'literal' Literal @value END | 'empty' Empty @value;
+ @lexicalContext(tokens=['SECOND','FIRST'])
+ Named ::= FIRST;
+ @lexicalContext(tokens=['FIRST'], literals=['>'])
+ Literal ::= '>';
+ @lexicalContext(tokens=[])
+ Empty ::= E;
+}
