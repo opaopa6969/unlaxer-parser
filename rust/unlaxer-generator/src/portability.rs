@@ -207,7 +207,10 @@ impl Inventory {
         }
         for setting in &grammar.settings {
             match (&*setting.key, &setting.value) {
-                ("package" | "memoSafeToken" | "tokenStream", SettingValue::String(_)) => {}
+                (
+                    "package" | "memoSafeToken" | "tokenStream" | "embedding",
+                    SettingValue::String(_),
+                ) => {}
                 ("ubnf", SettingValue::String(value)) if value == "v1" || value == "v2" => {}
                 ("feature", SettingValue::String(value))
                     if matches!(
@@ -218,7 +221,7 @@ impl Inventory {
                             | "tokenProgressContractsV1"
                             | "declarativeTokensV1"
                     ) => {}
-                ("tokenAdapter" | "tokenContract", _) => {}
+                ("tokenAdapter" | "tokenContract" | "embedded", _) => {}
                 ("whitespace", SettingValue::String(value)) => {
                     if !named_whitespace(grammar, value) {
                         self.add("P-WHITESPACE", value, setting.value_span);
