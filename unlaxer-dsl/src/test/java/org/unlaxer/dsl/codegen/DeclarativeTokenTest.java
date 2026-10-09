@@ -12,7 +12,7 @@ import org.unlaxer.dsl.runtime.LexicalTokenParser;
 public class DeclarativeTokenTest {
     @Test public void unicodePrimitivesRejectIsolatedSurrogatesButAcceptPairs() {
         // Rust str cannot contain isolated UTF-16 surrogates; Java String can.
-        for (String expression : List.of("ANY", "CHAR_RANGE('a','🙏')", "NEGATION('x')")) {
+        for (String expression : List.of("ANY", "CHAR_RANGE('😀','🙏')", "NEGATION('x')")) {
             var parser = parser("token T ::= " + expression + ";");
             for (String source : List.of(String.valueOf((char) 0xd800), String.valueOf((char) 0xdfff))) {
                 try (var context = new ParseContext(StringSource.createRootSource(source))) {
