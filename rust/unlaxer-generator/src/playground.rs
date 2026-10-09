@@ -53,6 +53,7 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
         };
     }
     runtime!("lib.rs");
+    runtime!("token.rs");
     runtime!("scope.rs");
     runtime!("semantic.rs");
     runtime!("semantic_project.rs");
