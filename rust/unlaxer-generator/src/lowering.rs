@@ -384,6 +384,7 @@ impl Lowering<'_> {
             let mut comparison = None;
             for annotation in &rule.annotations {
                 match &annotation.kind {
+                    AnnotationKind::NamePredicate { .. } => {}
                     AnnotationKind::Root => {
                         if root.replace(i).is_some() {
                             return Err("multiple @root annotations".into());
@@ -609,6 +610,76 @@ impl Lowering<'_> {
                 })
         {
             return Err("root must resolve to exactly one AST node".into());
+        }
+        let mut name_versions = Vec::<(String, String)>::new();
+        for (i, rule) in self.grammar.rules.iter().enumerate() {
+            let predicates = rule
+                .annotations
+                .iter()
+                .filter_map(|a| {
+                    if let AnnotationKind::NamePredicate {
+                        snapshot,
+                        version,
+                        name,
+                        kind,
+                    } = &a.kind
+                    {
+                        Some((snapshot, version, name, kind))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>();
+            if predicates.len() > 1 {
+                return Err(format!("E-NAME-PREDICATE-DUPLICATE: {}", rule.name));
+            }
+            let Some((snapshot, version, name, kind)) = predicates.first().copied() else {
+                continue;
+            };
+            let bytes = snapshot.as_bytes();
+            if bytes.is_empty()
+                || bytes.len() > 128
+                || !bytes[0].is_ascii_alphabetic()
+                || bytes
+                    .iter()
+                    .any(|c| !(c.is_ascii_alphanumeric() || b"_./-".contains(c)))
+                || version.is_empty()
+                || version.len() > 128
+                || version.bytes().any(|c| !(33..=126).contains(&c))
+            {
+                return Err(format!("E-NAME-PREDICATE-IDENTITY: {}", rule.name));
+            }
+            if !["type", "value", "resolved"].contains(&kind.as_str()) {
+                return Err(format!("E-NAME-PREDICATE-KIND: {}", rule.name));
+            }
+            if rule.annotations.iter().any(|a| {
+                matches!(
+                    a.kind,
+                    AnnotationKind::LeftAssoc
+                        | AnnotationKind::RightAssoc
+                        | AnnotationKind::Recovery { .. }
+                )
+            }) {
+                return Err(format!("E-NAME-PREDICATE-CONFLICT: {}", rule.name));
+            }
+            if self.captures(&self.bodies[i])?.get(name)
+                != Some(&Shape {
+                    kind: Kind::Text,
+                    cardinality: Cardinality::One,
+                })
+            {
+                return Err(format!("E-NAME-PREDICATE-CAPTURE: {}", rule.name));
+            }
+            if let Some((_, previous)) = name_versions.iter().find(|(id, _)| id == snapshot) {
+                if previous != version {
+                    return Err(format!("E-NAME-PREDICATE-VERSION: {}", rule.name));
+                }
+            } else {
+                name_versions.push((snapshot.clone(), version.clone()));
+            }
+        }
+        if name_versions.len() > 64 {
+            return Err("E-NAME-PREDICATE-LIMIT: at most 64 snapshots".into());
         }
         let mut rules = Vec::new();
         for (i, expression) in self.bodies.iter().enumerate() {
@@ -872,6 +943,31 @@ impl Lowering<'_> {
                     message: "syntax error: skipped to sync point".into(),
                 };
             }
+        }
+        for (i, rule) in rules.iter_mut().enumerate() {
+            for annotation in &self.grammar.rules[i].annotations {
+                if let AnnotationKind::NamePredicate {
+                    snapshot,
+                    version,
+                    name,
+                    kind,
+                } = &annotation.kind
+                {
+                    rule.body = Expression::NamePredicate {
+                        child: Box::new(rule.body.clone()),
+                        snapshot: snapshot.clone(),
+                        version: version.clone(),
+                        capture: name.clone(),
+                        kind: kind.clone(),
+                    };
+                }
+            }
+        }
+        if !name_versions.is_empty() {
+            rules[root].body = Expression::NameResolutionScope {
+                child: Box::new(rules[root].body.clone()),
+                requirements: name_versions,
+            };
         }
         Ok(GrammarIr {
             rules,

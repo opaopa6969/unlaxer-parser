@@ -53,6 +53,7 @@ public final class RustGrammarLowering {
     private GrammarIR run() {
         if (!grammar.imports().isEmpty()) throw unsupported("imports");
         org.unlaxer.dsl.codegen.LexicalContexts.requireValid(grammar);
+        org.unlaxer.dsl.codegen.NamePredicates.requireValid(grammar);
         var lexical = org.unlaxer.dsl.bootstrap.LexicalCompiler.compile(grammar);
         boolean whitespace = false;
         String globalStyle = "none";
@@ -143,6 +144,8 @@ public final class RustGrammarLowering {
                         throw unsupported("mapping method collision " + previous + " / " + value.className());
                     }
                     mapping = value;
+                } else if (annotation instanceof NamePredicateAnnotation) {
+                    // Applied around this rule body after structural lowering.
                 } else if (annotation instanceof LexicalContextAnnotation) {
                     // Applied around this rule body after structural lowering.
                 } else if (annotation instanceof DocAnnotation) {
@@ -360,6 +363,12 @@ public final class RustGrammarLowering {
                 expression = new Recovery(expression, mode, RecoverySupport.validateSyncTokens(tokens),
                     "syntax error: skipped to sync point");
             }
+            var predicate=org.unlaxer.dsl.codegen.NamePredicates.annotation(grammar.rules().get(i));
+            if(predicate.isPresent()) {
+                var value=predicate.get(); expression=new NamePredicate(expression,value.snapshot(),value.version(),value.name(),value.kind());
+            }
+            if(i==root && org.unlaxer.dsl.codegen.NamePredicates.enabled(grammar)) expression=new NameResolutionScope(expression,
+                org.unlaxer.dsl.codegen.NamePredicates.requirements(grammar).stream().map(value->new NameRequirement(value.id(),value.version())).toList());
             rewritten.add(new Rule(rule.name(), expression, mapping, rule.operator(), rule.catalog(), rule.skip(), rule.documentation()));
         }
         return new GrammarIR(rewritten, root, whitespace);

@@ -136,6 +136,8 @@ fn contains_recovery(expression: &Expression) -> bool {
     match expression {
         Recovery { .. } | CustomToken(_) => true,
         RuleEffects { child, .. }
+        | NamePredicate { child, .. }
+        | NameResolutionScope { child, .. }
         | CaptureEquality { child, .. }
         | TriviaScope { child, .. }
         | LexicalContextScope { child, .. }
@@ -231,6 +233,32 @@ fn parser(ir: &GrammarIr) -> String {
         ir.root, ir.java_whitespace
     )
     .unwrap();
+    if ir
+        .rules
+        .iter()
+        .any(|rule| matches!(&rule.body, Expression::NameResolutionScope { .. }))
+    {
+        out.push_str("\npub fn parse_tree_detailed_with_name_snapshots(source: &str, snapshots: &[unlaxer_runtime::names::Snapshot], options: ParseOptions) -> Result<Tree, ParseDiagnostic> {\n    let tree = unlaxer_runtime::parse_detailed_shared_with_name_snapshots(grammar(), ");
+        write!(
+            out,
+            "{}, {}, source, options, snapshots)",
+            ir.root, ir.java_whitespace
+        )
+        .unwrap();
+        out.push_str(
+            r#"?;
+    if let Some(first) = tree.recoveries().first() {
+        return Err(ParseDiagnostic {
+            kind: "recovery", offset: first.span.start,
+            expected: vec![first.message.to_owned()],
+            farthest: unlaxer_runtime::ParseError { offset: first.span.end, expected: vec![] },
+        });
+    }
+    Ok(tree)
+}
+"#,
+        );
+    }
     out.push_str("\n/// Bounded editor-only EOF repair; synthetic syntax never becomes a normal AST value.\npub fn parse_editor_cst(source: &str, completions: &[&str], options: unlaxer_runtime::editor_cst::Options) -> Result<unlaxer_runtime::editor_cst::EditorCst, &'static str> {\n    unlaxer_runtime::editor_cst::parse(grammar(), ");
     writeln!(
         out,
@@ -321,6 +349,8 @@ fn expression(expr: &Expression) -> String {
             let declares = effects.declares.as_ref().map_or_else(|| "None".into(), |decl| format!("Some(unlaxer_runtime::Declaration {{ symbol_capture: {}, description: {} }})", quote(&decl.symbol_capture), option_text(decl.description.as_deref())));
             format!("{}.rule_effects(unlaxer_runtime::RuleEffects {{ scope_mode: {scope}, declares: {declares}, backref: {} }})", expression(child), option_text(effects.backref.as_deref()))
         }
+        NamePredicate { child, snapshot, version, capture, kind } => format!("Expr::NamePredicate {{ child: Box::new({}), snapshot: {}, version: {}, capture: {}, kind: {} }}", expression(child), quote(snapshot), quote(version), quote(capture), quote(kind)),
+        NameResolutionScope { child, requirements } => format!("Expr::NameResolutionScope {{ child: Box::new({}), requirements: vec![{}] }}", expression(child), requirements.iter().map(|(id,version)|format!("unlaxer_runtime::names::Requirement::new({}, {}).expect(\"validated name requirement\")",quote(id),quote(version))).collect::<Vec<_>>().join(", ")),
         CaptureEquality { child, name } => {
             format!(
                 "Expr::compare_captures({}, {})",

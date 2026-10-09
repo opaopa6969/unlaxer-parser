@@ -234,6 +234,16 @@ public class MapperGenerator implements CodeGenerator {
                 }
 
                 private static ParseDiagnostic failureDiagnostic(String source, ParseContext context, Parsed parsed) {
+            """);
+        if(NamePredicates.enabled(grammar)) sb.append("""
+                    var nameFailure = org.unlaxer.context.NameResolution.failure(context);
+                    if (nameFailure.isPresent()) {
+                        var failure = nameFailure.get();
+                        return new ParseDiagnostic(failure.kind(), failure.start(), List.of(failure.expected()),
+                            failure.start(), List.of(failure.expected()));
+                    }
+            """);
+        sb.append("""
                     var nativeFailure = context.getParseFailureDiagnostics();
                     List<String> hints = nativeFailure.getExpectedTokens().stream().sorted().toList();
                     int farthest = nativeFailure.getFarthestOffset();
@@ -257,6 +267,7 @@ public class MapperGenerator implements CodeGenerator {
                 }
 
             """);
+        if(NamePredicates.enabled(grammar)) sb.append(nameSnapshotEntryPoints(astClass,rootClassName,parsersClass,mayRecover));
         sb.append("    /** Selected parse-tree token and its generated AST mapping. */\n");
         sb.append("    public record MappedAst(Token token, ").append(astClass).append(" ast) {}\n\n");
         sb.append("    /** Immutable identity-based source map; offsets are code points, end exclusive. */\n");
@@ -499,6 +510,64 @@ public class MapperGenerator implements CodeGenerator {
             sb.append("        return (").append(rootClassName).append(") mapped;\n");
         }
         sb.append("    }\n\n");
+    }
+
+
+    private static String nameSnapshotEntryPoints(String astClass, String rootClassName, String parsersClass, boolean mayRecover) {
+        return """
+                /** Explicit immutable names; every diagnostic retry uses the same snapshot values. */
+                public static synchronized Optional<ParseDiagnostic> diagnoseWithNameSnapshots(String source,
+                        List<org.unlaxer.context.NameSnapshot> snapshots, ParseOptions options) {
+                    var bindings = org.unlaxer.context.NameSnapshot.bindingsOf(snapshots);
+                    options = options.resolveDiagnostics(DEFERRED_DIAGNOSTICS_SAFE);
+                    while (true) {
+                        try (ParseContext context = ParseContext.withBindings(createRootSourceCompat(source), bindings, options)) {
+                            Parsed parsed = %s.getRootParser().parse(context);
+                            if (parsed.isSucceeded() && consumedLengthCompat(parsed.getConsumed()) == source.length()) {
+                                %s
+                                return Optional.empty();
+                            }
+                            if (org.unlaxer.context.NameResolution.failure(context).isPresent()
+                                    || options.diagnostics() == ParseOptions.Diagnostics.DETAILED)
+                                return Optional.of(failureDiagnostic(source, context, parsed));
+                        }
+                        options = options.withDiagnostics(ParseOptions.Diagnostics.DETAILED);
+                    }
+                }
+
+                public static synchronized %s parseWithNameSnapshots(String source,
+                        List<org.unlaxer.context.NameSnapshot> snapshots, ParseOptions options) {
+                    return (%s) parseWithNameSnapshotsAndSourceMap(source, snapshots, options).ast();
+                }
+                public static synchronized SourceMappedAst<%s> parseWithNameSnapshotsAndSourceMap(String source,
+                        List<org.unlaxer.context.NameSnapshot> snapshots, ParseOptions options) {
+                    var bindings = org.unlaxer.context.NameSnapshot.bindingsOf(snapshots);
+                    options = options.resolveDiagnostics(DEFERRED_DIAGNOSTICS_SAFE);
+                    while (true) {
+                        try (ParseContext context = ParseContext.withBindings(createRootSourceCompat(source), bindings, options)) {
+                            Parsed parsed = %s.getRootParser().parse(context);
+                            if (parsed.isSucceeded() && consumedLengthCompat(parsed.getConsumed()) == source.length()) {
+                                Token root = parsed.getRootToken(false);
+                                Parser syntaxRoot = %s.getRootSyntaxParser();
+                                for (Token committed : context.getCurrent().getTokens()) if (committed.parser == syntaxRoot) { root = committed; break; }
+                                return mapParsedTokenWithSourceMap(root);
+                            }
+                            if (org.unlaxer.context.NameResolution.failure(context).isPresent()
+                                    || options.diagnostics() == ParseOptions.Diagnostics.DETAILED)
+                                throw new IllegalArgumentException("Parse failed: " + failureDiagnostic(source, context, parsed));
+                        }
+                        options = options.withDiagnostics(ParseOptions.Diagnostics.DETAILED);
+                    }
+                }
+
+            """.formatted(parsersClass, mayRecover ? """
+                    var recoveries = org.unlaxer.parser.combinator.RecoveryDiagnostic.from(context);
+                    if (!recoveries.isEmpty()) {
+                        var first = recoveries.get(0);
+                        return Optional.of(new ParseDiagnostic("recovery", first.start(),
+                            List.of(first.message()), first.end(), List.of()));
+                    }
+                    """ : "", rootClassName,rootClassName,astClass,parsersClass,parsersClass);
     }
 
     /** External parsers/adapters and imports may recover even without a local annotation. */

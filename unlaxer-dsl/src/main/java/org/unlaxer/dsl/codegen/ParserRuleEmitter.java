@@ -1239,6 +1239,8 @@ class ParserRuleEmitter {
             }
             return tokenClass + ".class";
         }
+        if (ctx.grammar.rules().stream().anyMatch(rule -> rule.name().equals(name) && NamePredicates.annotation(rule).isPresent()))
+            return name + "NamePredicateParser.class";
         // @recovery: return recovery wrapper class if the referenced rule has @recovery
         if (ctx.recoveryRules.containsKey(name)) {
             return name + "RecoveryParser.class";

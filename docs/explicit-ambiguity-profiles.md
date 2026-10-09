@@ -17,7 +17,7 @@ grammar Dispatch {
 | 最大消費長と同率拒否 | 対応 | 対応 |
 | rollback / memo OFF・ON | cursor、選択、capture を復元 | cursor、CST、capture、scope、state を復元 |
 | 2〜64 候補 / profile 混在拒否 | 生成前検証と runtime 上限 | lowering と runtime 上限 |
-| 型名で宣言・式を判別 | 後続 #379 | 後続 #379 |
+| 型名で宣言・式を判別 | 明示version snapshot / `@namePredicate` (#425) | 同じ分類 / rollback / 診断 (#425) |
 | 一般の左再帰を評価 | 非対応を明示拒否 | 非対応を明示拒否 |
 
 full-input diagnostics は失敗候補の最遠地点を code-point offset で報告する。この地点で profile の期待値が残っている場合、同率は `ambiguity` / `unique longest alternative`、空一致は `empty_choice` / `nonempty unique longest alternative`、runtime の候補数違反は `choice_limit` / `2 to 64 unique longest alternatives` になる。より先まで進んだ別の失敗候補があれば、その最遠 syntax failure を優先する。prefix parse は拒否後 cursor を元の位置へ戻す。外側の ordered choice が別の候補で成功することは許す。成功した AST/CST に捨てた候補の選択や capture は残さない。
@@ -26,7 +26,7 @@ full-input diagnostics は失敗候補の最遠地点を code-point offset で�
 
 ## 固定した C++ 例と対応境界
 
-最小 corpus は [WG21 N4950 (2023-05-10, C++23 final working draft)](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/n4950.pdf) の stmt.ambig / temp.res を参照する（版の確認は [N4951 編集報告](https://open-std.org/JTC1/SC22/WG21/docs/papers/2023/n4951.html)）。型名 `T` を固定した `T(a);` は宣言と式の候補が同じ長さで成功するので、この段階では曖昧性を診断する。`T(a)++;` は式側の候補だけで成功する。C++ に規定された宣言優先と型名照会は、version を明示した read-only name snapshot profile の後続段階で扱う。未解決の型名、任意 callback による推測、template instantiation や完全な C++ grammar の対応を主張しない。
+最小 corpus は [WG21 N4950 (2023-05-10, C++23 final working draft)](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/n4950.pdf) の stmt.ambig / temp.res を参照する（版の確認は [N4951 編集報告](https://open-std.org/JTC1/SC22/WG21/docs/papers/2023/n4951.html)）。型名 `T` を固定した `T(a);` は宣言と式の候補が同じ長さで成功するので、この段階では曖昧性を診断する。`T(a)++;` は式側の候補だけで成功する。C++ に規定された宣言優先と型名照会の最小形は、[versionを明示した read-only name snapshot profile](versioned-name-snapshots.md) の ordered declaration/expression candidates で扱う。未解決の型名、任意 callback による推測、template instantiation や完全な C++ grammar の対応を主張しない。
 
 ## 検証
 

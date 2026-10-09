@@ -134,6 +134,12 @@ public final class GrammarValidator {
             String code = error.getMessage().startsWith("E-LEXICAL-CONTEXT-") ? error.getMessage().split(":",2)[0] : "E-LEXICAL-CONTEXT";
             errors.add(new ValidationIssue(code, error.getMessage(), "Select non-nullable declarative tokens and nonempty unique literals."));
         }
+        try { NamePredicates.requireValid(grammar); }
+        catch (IllegalArgumentException error) {
+            String message=error.getMessage();
+            String code=message!=null && message.startsWith("E-NAME-PREDICATE-") ? message.split(":",2)[0] : "E-NAME-PREDICATE-CAPTURE";
+            errors.add(new ValidationIssue(code,message,"Use one versioned name predicate over a required scalar text capture."));
+        }
         try { EmbeddedGrammarEmitter.declarations(grammar); }
         catch (IllegalArgumentException error) {
             errors.add(new ValidationIssue("E-EMBEDDING", error.getMessage(), "Use one scalar body capture and exact language identity."));

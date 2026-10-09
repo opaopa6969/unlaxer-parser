@@ -557,6 +557,27 @@ impl Parser<'_> {
             "rightAssoc" => AnnotationKind::RightAssoc,
             "longestChoice" => AnnotationKind::LongestChoice,
             "uniqueLongestChoice" => AnnotationKind::UniqueLongestChoice,
+            "namePredicate" => {
+                self.expect('(')?;
+                self.named_arg("snapshot")?;
+                let snapshot = self.quoted()?;
+                self.expect(',')?;
+                self.named_arg("version")?;
+                let version = self.quoted()?;
+                self.expect(',')?;
+                self.named_arg("name")?;
+                let name = self.quoted()?;
+                self.expect(',')?;
+                self.named_arg("kind")?;
+                let kind = self.quoted()?;
+                self.expect(')')?;
+                AnnotationKind::NamePredicate {
+                    snapshot,
+                    version,
+                    name,
+                    kind,
+                }
+            }
             "predictiveChoice" => AnnotationKind::PredictiveChoice,
             "skip" => AnnotationKind::Skip,
             "enum" => AnnotationKind::Enum,
