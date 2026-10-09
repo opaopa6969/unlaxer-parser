@@ -1,0 +1,6 @@
+# id parse-state operation start end replacement expected-state mapped-start mapped-end expected-host
+rename	COMPLETE	RENAME	0	1	y	COMPLETE	3	4	F[<y  ?\r\n😀>] tail
+format-partial	PARTIAL	FORMAT	1	3	\t	PARTIAL	4	6	F[<x\t?\r\n😀>] tail
+action-partial	PARTIAL	CODE_ACTION	3	4	z	PARTIAL	6	7	F[<x  z\r\n😀>] tail
+failed	FAILED	FORMAT	1	3	\t	FAILED	-	-	F[<x  ?\r\n😀>] tail
+unsupported	COMPLETE	HOVER	0	0		UNSUPPORTED	-	-	F[<x  ?\r\n😀>] tail
