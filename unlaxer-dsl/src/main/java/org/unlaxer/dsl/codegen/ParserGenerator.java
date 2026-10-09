@@ -53,6 +53,7 @@ public class ParserGenerator implements CodeGenerator {
         final Set<String> explicitlySafeMemoTokens;
         final Map<String, List<String>> helpers = new LinkedHashMap<>(); // rule -> helper codes
         final Map<String, CaptureBindingPlan> captureBindings = new LinkedHashMap<>();
+        final Map<String, String> namedWhitespaceByRule = new LinkedHashMap<>();
         final Map<String, Boolean> useDelimitedChainByRule = new LinkedHashMap<>();
         final Map<String, Boolean> safeFailureMemoByRule = new LinkedHashMap<>();
         final Map<String, Boolean> safeSuccessMemoByRule = new LinkedHashMap<>();
@@ -264,6 +265,8 @@ public class ParserGenerator implements CodeGenerator {
             sb.append(generateDelimitedChainClass(ctx));
         }
 
+        sb.append(generateNamedWhitespaceClasses(ctx));
+
         // Simple / NEGATION / CHAR_RANGE / REGEX トークン用の生成内部クラス
         sb.append(ParserTokenEmitter.generateSimpleTokenWrappers(ctx));
         sb.append(ParserTokenEmitter.generateNegationClasses(ctx));
@@ -344,6 +347,18 @@ public class ParserGenerator implements CodeGenerator {
                     || "commentsandspaces".equals(interleaveProfile))
                 : !"none".equals(style);
             ctx.useDelimitedChainByRule.put(rule.name(), useDelimited);
+        }
+
+        String globalStyle = grammar.settings().stream().filter(s -> s.key().equals("whitespace"))
+            .map(s -> ((StringSettingValue)s.value()).value()).findFirst().orElse("none");
+        var lexical = org.unlaxer.dsl.bootstrap.LexicalCompiler.compile(grammar);
+        for (RuleDecl rule : grammar.rules()) {
+            String style = ParserRuleEmitter.getRuleWhitespaceStyle(rule);
+            if (style == null) style = ParserRuleEmitter.getRuleInterleaveProfile(rule) == null ? globalStyle : "javaStyle";
+            if (org.unlaxer.dsl.bootstrap.WhitespaceDefinitions.resolve(style, lexical) != null) {
+                ctx.namedWhitespaceByRule.put(rule.name(), style);
+                ctx.useDelimitedChainByRule.put(rule.name(), true);
+            }
         }
 
         // Collect @recovery annotations for rules
@@ -478,6 +493,28 @@ public class ParserGenerator implements CodeGenerator {
     // =========================================================================
     // デリミタ・基底チェーン生成
     // =========================================================================
+
+    private String generateNamedWhitespaceClasses(GenContext ctx) {
+        StringBuilder result = new StringBuilder();
+        for (String style : new java.util.LinkedHashSet<>(ctx.namedWhitespaceByRule.values())) {
+            String name = ctx.grammarName + style + "LazyChain";
+            String delimiter = ctx.grammarName + style + "Delimitor";
+            result.append("    public static class ").append(delimiter)
+                .append(" extends LazyZeroOrMore implements org.unlaxer.context.DiagnosticsAgnostic, org.unlaxer.context.SafeSuccessMemoizable {\n")
+                .append("        public Supplier<Parser> getLazyParser() { return () -> Parser.get(")
+                .append(ParserCodegenUtil.toParserClassName(style)).append(".class); }\n")
+                .append("        public java.util.Optional<Parser> getLazyTerminatorParser() { return java.util.Optional.empty(); }\n    }\n");
+            result.append("    public static abstract class ").append(name)
+                .append(" extends LazyChain implements org.unlaxer.context.DiagnosticsAgnostic {\n")
+                .append("        private static final Parser SPACE = space();\n")
+                .append("        private static Parser space() { Parser p = new ").append(delimiter)
+                .append("(); p.addTag(NodeKind.notNode.getTag()); return p; }\n")
+                .append("        public void prepareChildren(Parsers c) { if (!c.isEmpty()) return; c.add(SPACE); for (Parser p : getLazyParsers()) { c.add(p); c.add(SPACE); } }\n")
+                .append("        public abstract Parsers getLazyParsers();\n")
+                .append("        public java.util.Optional<RecursiveMode> getNotAstNodeSpecifier() { return java.util.Optional.empty(); }\n    }\n");
+        }
+        return result.toString();
+    }
 
     private String generateDelimitorClass(GenContext ctx) {
         String gn = ctx.grammarName;
