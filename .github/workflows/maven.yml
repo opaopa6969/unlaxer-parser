@@ -53,7 +53,7 @@ jobs:
     - name: Cross-language fixtures, compile failures, and generated-file drift
       run: >
         mvn -B -pl unlaxer-common,unlaxer-dsl -am test
-        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,RustPortabilityConformanceTest,TokenAdapterConformanceTest,ParseBindingsConformanceTest,DeclarativeTokenConformanceTest,ApiImpactConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest,SkipMappingConformanceTest,CaptureEqualityConformanceTest,ErrorElementConformanceTest,RecoveryConformanceTest,SemanticModelConformanceTest,ProjectSymbolIndexConformanceTest,EditorParseResultConformanceTest,EditorPipelineConformanceTest,EditorCstTest,SemanticModelUbnfTest,TokenStreamConformanceTest,TypeSystemConformanceTest,CallInferenceConformanceTest,SemanticQueriesConformanceTest,SemanticQueryEditsTest,PackageResolverConformanceTest,HttpsPackageConformanceTest,VocabularyOriginsConformanceTest,SemanticRulesConformanceTest,ClassicLspProtocolConformanceTest,ClassicDapProtocolConformanceTest,LSPQueryConsumerTest,LSPNonBmpOffsetTest,LSPProfileInitializationTest,PreprocessingConformanceTest,UniqueLongestConformanceTest,NameSnapshotConformanceTest,NamePredicateConformanceTest,ContextualLexingConformanceTest,CodePointEscapeConformanceTest -DrustConformance=true -DtokenStreamBench=true
+        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,RustPortabilityConformanceTest,TokenAdapterConformanceTest,ParseBindingsConformanceTest,DeclarativeTokenConformanceTest,ApiImpactConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest,SkipMappingConformanceTest,CaptureEqualityConformanceTest,ErrorElementConformanceTest,RecoveryConformanceTest,SemanticModelConformanceTest,ProjectSymbolIndexConformanceTest,EditorParseResultConformanceTest,EditorPipelineConformanceTest,EditorCstTest,SemanticModelUbnfTest,TokenStreamConformanceTest,TypeSystemConformanceTest,CallInferenceConformanceTest,SemanticQueriesConformanceTest,SemanticQueryEditsTest,PackageResolverConformanceTest,HttpsPackageConformanceTest,VocabularyOriginsConformanceTest,SemanticRulesConformanceTest,SemanticDiagnosticConformanceTest,ClassicLspProtocolConformanceTest,LSPQueryConsumerTest,LSPNonBmpOffsetTest,LSPProfileInitializationTest,PreprocessingConformanceTest,UniqueLongestConformanceTest,NameSnapshotConformanceTest,NamePredicateConformanceTest,ContextualLexingConformanceTest,CodePointEscapeConformanceTest,ClassicDapProtocolConformanceTest -DrustConformance=true -DtokenStreamBench=true
         -Dsurefire.failIfNoSpecifiedTests=false
     - name: Require real Java and Rust DAP protocol evidence
       run: test -s unlaxer-dsl/target/classic-dap-protocol.tsv
@@ -88,6 +88,7 @@ jobs:
       run: |
         test -s unlaxer-dsl/target/rust-semantic-model.tsv
         test -s unlaxer-dsl/target/rust-semantic-rules.tsv
+        test -s unlaxer-dsl/target/semantic-diagnostics.tsv
         test -s unlaxer-dsl/target/rust-preprocessing.tsv
         test -s unlaxer-dsl/target/rust-project-symbols.tsv
         test -s unlaxer-dsl/target/rust-type-relations.tsv
@@ -154,6 +155,7 @@ jobs:
           unlaxer-dsl/ubnf-vscode/target/contextual-lexing-wasm.tsv
           unlaxer-dsl/target/rust-semantic-model.tsv
           unlaxer-dsl/target/rust-semantic-rules.tsv
+          unlaxer-dsl/target/semantic-diagnostics.tsv
           unlaxer-dsl/target/rust-preprocessing.tsv
           unlaxer-dsl/target/rust-project-symbols.tsv
           unlaxer-dsl/target/rust-type-relations.tsv

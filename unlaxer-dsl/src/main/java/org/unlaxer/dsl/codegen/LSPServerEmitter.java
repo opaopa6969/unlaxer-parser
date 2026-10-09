@@ -219,17 +219,13 @@ class LSPServerEmitter {
         w.line("DocumentState previous = documents.get(uri);");
         w.line("if (previous != null && previous.content().equals(content)) {");
         w.indent();
+        w.line("if (client != null) publishDiagnostics(uri, content, previous.parseResult());");
         w.line("return previous.parseResult();");
         w.dedent();
         w.line("}");
         w.line("IncrementalParseCache cache = previous != null ? previous.cache() : new IncrementalParseCache();");
         w.line("List<String> chunks = cache.splitIntoChunks(content, \";\");");
-        w.line("boolean anyChanged = chunks.stream().anyMatch(c -> !cache.isCached(c));");
-        w.line("if (!anyChanged && previous != null) {");
-        w.indent();
-        w.line("return previous.parseResult();");
-        w.dedent();
-        w.line("}");
+        // A set of cached chunks does not identify the order, multiplicity or current document.
         w.line("ParseResult parseResult = doParse(content);");
         w.line("int offset = 0;");
         w.line("for (String chunk : chunks) {");

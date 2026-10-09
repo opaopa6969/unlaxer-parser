@@ -141,8 +141,9 @@ their actual capabilities; no provider is registered automatically.
 No provider is automatically registered. An LSP/Playground adapter must advertise
 only operations it actually implements; existing `LanguageRegions` dispatch
 returns UNSUPPORTED for absent capabilities and UNAVAILABLE for absent providers.
-This change does not add a UI capability display or claim integration with a
-particular language server.
+Generated Java and native Rust Playgrounds display registered capabilities and dispatch
+checked edits. Generated Java LSP and Classic Rust LSP expose a capability table
+that intersects transport support, the selected profile and registered providers.
 
 | Capability | Java | Rust |
 |---|---|---|
@@ -153,7 +154,9 @@ particular language server.
 | Import source-name rename / explicit local alias rename | Implemented with complete import metadata | Same |
 | Snapshot-bound edit query policies and partial-state preservation | Implemented | Implemented |
 | Language-specific formatting policy / multi-document UI | Caller-supplied / not provided | Same |
-| LSP/Playground display and request integration | Pending #382 | Pending #382 |
+| Playground rename/format/codeAction display, query and checked host edits | Implemented | Implemented (native-generated WASM) |
+| LSP capability display | Implemented; edit transports advertise false | Same |
+| LSP rename/format/codeAction transport | Not implemented | Not implemented |
 
 Both implementations consume `docs/fixtures/source-edits/`: the same piece
 inventory, seven edit acceptance/expected-text cases, and two independently
