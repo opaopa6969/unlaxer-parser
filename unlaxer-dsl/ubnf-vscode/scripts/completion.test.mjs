@@ -44,3 +44,10 @@ test('edits use UTF-16 textarea positions and replace the complete word without 
   assert.ok(!labels(nested).includes('grammar'));
   assert.deepEqual(complete('x'.repeat(65537), 65537, words).items, []);
 });
+
+test('named whitespace completion uses declarative tokens in the current grammar', () => {
+  const marked = "grammar A { token FOREIGN ::= ' '; } grammar G { @whitespace: G¦ token GAP ::= ' '; Rule ::= 'x'; }";
+  assert.deepEqual(labels(at(marked)), ['GAP']);
+  assert.deepEqual(labels(at("grammar G { token GAP ::= ' '; @whitespace(G¦) Start ::= 'x'; }")), ['GAP']);
+  assert.deepEqual(labels(at("grammar G { token LEGACY = SpaceParser @whitespace(L¦) Start ::= 'x'; }")), []);
+});

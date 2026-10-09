@@ -499,5 +499,769 @@
         ]
       }
     ]
+  },
+  {
+    "name": "standard-layout-global-java-style-case-folded",
+    "grammar": "grammar StandardGlobalJava { @import layout from 'pkg:std/layout' @ubnf: v2 @package: org.example.ruletrivia @whitespace: layout.SPACES_AND_COMMENTS @root @mapping(Root, params=[value]) Root ::= '😀' @value 'b'; }",
+    "cases": [
+      {
+        "id": "whitespace-comments-crlf-non-bmp",
+        "input": " \r\n/*😀*/ 😀 //line\r\n b\t",
+        "prefix": [
+          true,
+          22,
+          22
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            22
+          ],
+          "fields": {
+            "value": "😀"
+          }
+        }
+      },
+      {
+        "id": "unterminated-comment",
+        "input": "😀 /* open b",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      }
+    ],
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "std/layout": {
+          "version": "1.0.0",
+          "source": "builtin:std/layout@1.0.0"
+        }
+      }
+    }
+  },
+  {
+    "name": "standard-layout-rule-whitespace-default",
+    "grammar": "grammar StandardRuleDefault { @import layout from 'pkg:std/layout' @ubnf: v2 @package: org.example.ruletrivia @root @mapping(Root, params=[value]) @whitespace(layout.SPACES_AND_COMMENTS) Root ::= 'a' @value 'b'; }",
+    "cases": [
+      {
+        "id": "default-is-java-style",
+        "input": " /*lead*/ a\r\n b //tail😀",
+        "prefix": [
+          true,
+          23,
+          23
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            23
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "wrong-literal",
+        "input": " a c ",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      }
+    ],
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "std/layout": {
+          "version": "1.0.0",
+          "source": "builtin:std/layout@1.0.0"
+        }
+      }
+    }
+  },
+  {
+    "name": "standard-layout-rule-whitespace-java-style-case-folded",
+    "grammar": "grammar StandardRuleJava { @import layout from 'pkg:std/layout' @ubnf: v2 @package: org.example.ruletrivia @root @mapping(Root, params=[value]) @whitespace(layout.SPACES_AND_COMMENTS) Root ::= 'a' @value 'b'; }",
+    "cases": [
+      {
+        "id": "explicit-java-style",
+        "input": " a\tb ",
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      }
+    ],
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "std/layout": {
+          "version": "1.0.0",
+          "source": "builtin:std/layout@1.0.0"
+        }
+      }
+    }
+  },
+  {
+    "name": "standard-layout-interleave-java-style",
+    "grammar": "grammar StandardInterleaveJava { @import layout from 'pkg:std/layout' @ubnf: v2 @package: org.example.ruletrivia @root @mapping(Root, params=[value]) @whitespace(layout.SPACES_AND_COMMENTS) Root ::= 'a' @value 'b'; }",
+    "cases": [
+      {
+        "id": "block-comment",
+        "input": "a /*j*/ b",
+        "prefix": [
+          true,
+          9,
+          9
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            9
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      }
+    ],
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "std/layout": {
+          "version": "1.0.0",
+          "source": "builtin:std/layout@1.0.0"
+        }
+      }
+    }
+  },
+  {
+    "name": "standard-layout-explicit-none-before-interleave",
+    "grammar": "grammar StandardNoneBefore { @import layout from 'pkg:std/layout' @ubnf: v2 @package: org.example.ruletrivia @whitespace: layout.SPACES_AND_COMMENTS @root @mapping(Root, params=[value]) @whitespace(none) @interleave(profile=javaStyle) Root ::= 'a' @value 'b'; }",
+    "cases": [
+      {
+        "id": "compact",
+        "input": "ab",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            2
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "explicit-none-wins",
+        "input": "a b",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      }
+    ],
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "std/layout": {
+          "version": "1.0.0",
+          "source": "builtin:std/layout@1.0.0"
+        }
+      }
+    }
+  },
+  {
+    "name": "standard-layout-explicit-none-after-interleave",
+    "grammar": "grammar StandardNoneAfter { @import layout from 'pkg:std/layout' @ubnf: v2 @package: org.example.ruletrivia @whitespace: layout.SPACES_AND_COMMENTS @root @mapping(Root, params=[value]) @interleave(profile=commentsAndSpaces) @whitespace(NoNe) Root ::= 'a' @value 'b'; }",
+    "cases": [
+      {
+        "id": "compact",
+        "input": "ab",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            2
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "order-does-not-matter",
+        "input": "a/*x*/b",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      }
+    ],
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "std/layout": {
+          "version": "1.0.0",
+          "source": "builtin:std/layout@1.0.0"
+        }
+      }
+    }
+  },
+  {
+    "name": "standard-layout-enabled-parent-plain-default-child",
+    "grammar": "grammar StandardParentEnabled { @import layout from 'pkg:std/layout' @ubnf: v2 @package: org.example.ruletrivia @root @mapping(Root, params=[child]) @whitespace(layout.SPACES_AND_COMMENTS) Root ::= '(' Child @child ')'; @mapping(Child, params=[left,right]) Child ::= 'a' @left 'b' @right; }",
+    "cases": [
+      {
+        "id": "parent-consumes-outer-trivia",
+        "input": " (ab) ",
+        "prefix": [
+          true,
+          6,
+          6
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            6
+          ],
+          "fields": {
+            "child": {
+              "type": "Child",
+              "span": [
+                2,
+                4
+              ],
+              "fields": {
+                "left": "a",
+                "right": "b"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "child-default-inherits-grammar-not-caller",
+        "input": "(a b)",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      }
+    ],
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "std/layout": {
+          "version": "1.0.0",
+          "source": "builtin:std/layout@1.0.0"
+        }
+      }
+    }
+  },
+  {
+    "name": "standard-layout-plain-parent-enabled-default-child",
+    "grammar": "grammar StandardChildEnabled { @import layout from 'pkg:std/layout' @ubnf: v2 @package: org.example.ruletrivia @whitespace: layout.SPACES_AND_COMMENTS @root @mapping(Root, params=[child]) @whitespace(none) Root ::= '(' Child @child ')'; @mapping(Child, params=[left,right]) Child ::= 'a' @left 'b' @right; }",
+    "cases": [
+      {
+        "id": "child-inherits-grammar",
+        "input": "( a /*😀*/ b )",
+        "prefix": [
+          true,
+          13,
+          13
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            13
+          ],
+          "fields": {
+            "child": {
+              "type": "Child",
+              "span": [
+                1,
+                12
+              ],
+              "fields": {
+                "left": "a",
+                "right": "b"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "parent-does-not-consume-leading-space",
+        "input": " ( a b )",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      },
+      {
+        "id": "parent-does-not-consume-trailing-space",
+        "input": "( a b ) ",
+        "prefix": [
+          true,
+          7,
+          7
+        ],
+        "accepted": false
+      }
+    ],
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "std/layout": {
+          "version": "1.0.0",
+          "source": "builtin:std/layout@1.0.0"
+        }
+      }
+    }
+  },
+  {
+    "name": "standard-layout-root-single-literal-choice",
+    "grammar": "grammar StandardLiteralChoice { @import layout from 'pkg:std/layout' @ubnf: v2 @package: org.example.ruletrivia @whitespace: layout.SPACES_AND_COMMENTS @root @mapping(Root, params=[value]) @whitespace(layout.SPACES_AND_COMMENTS) Root ::= 'a' @value | 'b' @value; }",
+    "cases": [
+      {
+        "id": "first-alternative",
+        "input": "a",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            1
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "second-alternative",
+        "input": "b",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            1
+          ],
+          "fields": {
+            "value": "b"
+          }
+        }
+      },
+      {
+        "id": "single-element-alternative-has-no-chain-trivia",
+        "input": " b ",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      },
+      {
+        "id": "trailing-trivia-is-not-consumed",
+        "input": "a ",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "accepted": false
+      }
+    ],
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "std/layout": {
+          "version": "1.0.0",
+          "source": "builtin:std/layout@1.0.0"
+        }
+      }
+    }
+  },
+  {
+    "name": "standard-layout-nested-constructs-and-rollback",
+    "grammar": "grammar StandardConstructs { @import layout from 'pkg:std/layout' @ubnf: v2 @package: org.example.ruletrivia @whitespace: layout.SPACES_AND_COMMENTS @root @mapping(Root, params=[choice,maybe,repeated,separated,alias]) @whitespace(layout.SPACES_AND_COMMENTS) Root ::= '(' ('a' 'x' | 'a' 'y') @choice [ ('c' 'z') @maybe ] { 'd' @repeated } Items @separated Alias @alias ')'; Items ::= 'e' % ','; Alias ::= Child; @mapping(Child, params=[value]) Child ::= 'f' @value; }",
+    "cases": [
+      {
+        "id": "choice-and-optional-rollback",
+        "input": "(ay dd e, e f)",
+        "prefix": [
+          true,
+          14,
+          14
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            14
+          ],
+          "fields": {
+            "choice": "ay",
+            "maybe": null,
+            "repeated": [
+              "d",
+              "d"
+            ],
+            "separated": "e, e",
+            "alias": {
+              "type": "Child",
+              "span": [
+                12,
+                13
+              ],
+              "fields": {
+                "value": "f"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "optional-present",
+        "input": "(ax cz d e f)",
+        "prefix": [
+          true,
+          13,
+          13
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            13
+          ],
+          "fields": {
+            "choice": "ax",
+            "maybe": "cz",
+            "repeated": [
+              "d"
+            ],
+            "separated": "e",
+            "alias": {
+              "type": "Child",
+              "span": [
+                11,
+                12
+              ],
+              "fields": {
+                "value": "f"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "separated-tail-rolls-back",
+        "input": "(ay d e, f)",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      }
+    ],
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "std/layout": {
+          "version": "1.0.0",
+          "source": "builtin:std/layout@1.0.0"
+        }
+      }
+    }
+  },
+  {
+    "name": "standard-layout-left-associative-local-whitespace",
+    "grammar": "grammar StandardLeftScoped { @import layout from 'pkg:std/layout' @ubnf: v2 @package: org.example.ruletrivia @root @mapping(Binary, params=[left,op,right]) @leftAssoc @precedence(level=10) @whitespace(layout.SPACES_AND_COMMENTS) Expr ::= Atom @left { '+' @op Atom @right }; Atom ::= 'x'; }",
+    "cases": [
+      {
+        "id": "local-policy-survives-left-rewrite",
+        "input": " x + x + x ",
+        "prefix": [
+          true,
+          11,
+          11
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Binary",
+          "span": [
+            0,
+            11
+          ],
+          "fields": {
+            "left": "x",
+            "op": [
+              "+",
+              "+"
+            ],
+            "right": [
+              "x",
+              "x"
+            ]
+          }
+        }
+      },
+      {
+        "id": "wrong-operator",
+        "input": " x * x ",
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "accepted": false
+      }
+    ],
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "std/layout": {
+          "version": "1.0.0",
+          "source": "builtin:std/layout@1.0.0"
+        }
+      }
+    }
+  },
+  {
+    "name": "local-package-layout",
+    "grammar": "grammar ImportedLayout { @import layout from 'pkg:team/layout' @package: org.example.ruletrivia @ubnf: v2 @whitespace: layout.GAP @root @mapping(Root, params=[value]) Root ::= 'a' @value 'b'; }",
+    "modules": {
+      "layout.json": "{\"schemaVersion\": 1, \"id\": \"team/layout\", \"version\": \"1.0.0\", \"entry\": \"layout.ubnf\", \"files\": {\"layout.ubnf\": \"grammar Layout { @import parts from 'parts/gap.ubnf' @ubnf: v2 token GAP ::= parts.GAP; }\", \"parts/gap.ubnf\": \"grammar Parts { @ubnf: v2 token GAP ::= ' ' | '#'; }\"}, \"dependencies\": {}}"
+    },
+    "cases": [
+      {
+        "id": "import-used-as-whitespace",
+        "input": "#a#b ",
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      }
+    ],
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "team/layout": {
+          "version": "1.0.0",
+          "source": "local:layout.json"
+        }
+      }
+    }
+  },
+  {
+    "name": "transitive-package-layout",
+    "grammar": "grammar ImportedLayout { @import layout from 'pkg:team/layout' @package: org.example.ruletrivia @ubnf: v2 @whitespace: layout.GAP @root @mapping(Root, params=[value]) Root ::= 'a' @value 'b'; }",
+    "modules": {
+      "layout.json": "{\"schemaVersion\": 1, \"id\": \"team/layout\", \"version\": \"1.0.0\", \"entry\": \"layout.ubnf\", \"files\": {\"layout.ubnf\": \"grammar Layout { @import base from 'pkg:base/layout' @ubnf: v2 token GAP ::= base.GAP; }\"}, \"dependencies\": {\"base/layout\": {\"version\": \"1.0.0\", \"source\": \"local:base.json\"}}}",
+      "base.json": "{\"schemaVersion\": 1, \"id\": \"base/layout\", \"version\": \"1.0.0\", \"entry\": \"layout.ubnf\", \"files\": {\"layout.ubnf\": \"grammar Base { @ubnf: v2 token GAP ::= ' ' | '#'; }\"}, \"dependencies\": {}}"
+    },
+    "cases": [
+      {
+        "id": "import-used-as-whitespace",
+        "input": "#a#b ",
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      }
+    ],
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "team/layout": {
+          "version": "1.0.0",
+          "source": "local:layout.json"
+        }
+      }
+    }
+  },
+  {
+    "name": "public-personal-project-coexistence",
+    "grammar": "grammar Coexistence { @import standard from 'pkg:std/layout' @import personal from 'pkg:alice/layout' @import project from 'project.ubnf' @ubnf: v2 @package: org.example.ruletrivia @whitespace: GAP token GAP ::= standard.SPACES_AND_COMMENTS | personal.GAP | project.GAP; @root @mapping(Root,params=[value]) Root ::= 'a' @value 'b'; }",
+    "modules": {
+      "project.ubnf": "grammar Project {\n @ubnf: v2\n token GAP ::= '+';\n}\n",
+      "personal.json": "{\"schemaVersion\":1,\"id\":\"alice/layout\",\"version\":\"1.0.0\",\"entry\":\"personal.ubnf\",\"files\":{\"personal.ubnf\":\"grammar Personal {\\n @ubnf: v2\\n // 😀\\n token GAP ::= '#';\\n}\\n\"},\"dependencies\":{}}"
+    },
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "std/layout": {
+          "version": "1.0.0",
+          "source": "builtin:std/layout@1.0.0"
+        },
+        "alice/layout": {
+          "version": "1.0.0",
+          "source": "local:personal.json"
+        }
+      }
+    },
+    "cases": [
+      {
+        "id": "all-three",
+        "input": "a #+ /*😀*/\r\nb",
+        "prefix": [
+          true,
+          13,
+          13
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            13
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "private-project",
+        "input": "+#a+#b+",
+        "prefix": [
+          true,
+          7,
+          7
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            7
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "standard-comment",
+        "input": "a//😀\r\nb",
+        "prefix": [
+          true,
+          7,
+          7
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            7
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "unclosed-standard",
+        "input": "a#+/*x",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      }
+    ]
   }
 ]
