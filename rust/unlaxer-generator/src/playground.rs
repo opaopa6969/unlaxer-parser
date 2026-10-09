@@ -105,5 +105,12 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
         relative_path: "public/grammar.ubnf".into(),
         content: source,
     });
+    files.push(GeneratedFile {
+        relative_path: "public/vocabulary.json".into(),
+        content: format!(
+            "{}\n",
+            crate::vocabulary_origins::to_json(&crate::vocabulary_origins::inspect(path)?)
+        ),
+    });
     Ok(files)
 }

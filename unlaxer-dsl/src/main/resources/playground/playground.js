@@ -27,6 +27,20 @@
     });
     if (!count) $('catalog').append(element('p', '一致するルールがありません。短い語で検索してください。'));
   }
+  function renderVocabulary(snapshot) {
+    const panel = $('vocabulary'); if (!panel) return; panel.replaceChildren();
+    for (const policy of snapshot.whitespace) panel.append(element('p', `${policy.grammar}${policy.rule ? '.' + policy.rule : ' (既定)'}: ${policy.policy}`));
+    for (const module of snapshot.modules) {
+      const identity = module.identity;
+      panel.append(element('h3', module.alias + ' · ' + (identity ? `${identity.id}@${identity.version}` : module.source)));
+      if (identity) panel.append(element('p', `sha256 ${identity.sha256} · ${identity.file}`, 'small'));
+      const codepoints = [...module.text];
+      for (const definition of module.definitions) {
+        const entry = element('details'); entry.append(element('summary', module.alias + '.' + definition.name));
+        entry.append(element('pre', codepoints.slice(definition.start, definition.end).join(''))); panel.append(entry);
+      }
+    }
+  }
   function location(source, offset) {
     const before = [...source].slice(0, offset).join(''); const lines = before.split('\n');
     return `${lines.length} 行 ${[...lines.at(-1)].length + 1} 列 (code point ${offset})`;
@@ -116,8 +130,8 @@
     return binary ? response.arrayBuffer() : response.text();
   }
   if (host) document.querySelector('header a').addEventListener('click', event => { event.preventDefault(); host.postMessage({type: 'openHelp'}); });
-  Promise.all([load(document.body.dataset.wasm || 'language.wasm', true), load(document.body.dataset.worker || 'worker.js'), load(document.body.dataset.grammar || 'grammar.ubnf')]).then(([bytes, source, grammar]) => {
-    wasm = bytes; workerSource = source; $('grammar').textContent = grammar; startWorker();
+  Promise.all([load(document.body.dataset.wasm || 'language.wasm', true), load(document.body.dataset.worker || 'worker.js'), load(document.body.dataset.grammar || 'grammar.ubnf'), load(document.body.dataset.vocabulary || 'vocabulary.json')]).then(([bytes, source, grammar, origins]) => {
+    wasm = bytes; workerSource = source; $('grammar').textContent = grammar; renderVocabulary(JSON.parse(origins)); startWorker();
   }).catch(error => { $('engine').textContent = 'parser を読み込めませんでした。生成 project で npm run build → npm start を実行し、表示された URL を開いてください。'; fail(String(error)); });
   addEventListener('pagehide', stop);
 })();
