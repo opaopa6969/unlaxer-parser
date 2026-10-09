@@ -23,7 +23,7 @@ revisions and acceptance boundaries:
 | Tiny `0d84f0dc` | Existing Java P4 LSP consumer in [Tiny PR #252](https://github.com/opaopa6969/tinyexpression/pull/252) and [#254](https://github.com/opaopa6969/tinyexpression/pull/254) | Opt-in diagnostics and editor completion, including the current long-fence grammar; no equivalent current Rust Tiny LSP consumer is claimed |
 
 The downstream opt-in build and setting are documented in
-[Tiny's consumer guide](https://github.com/opaopa6969/tinyexpression/blob/feat/embedded-editor-regions/tools/tinyexpression-p4-lsp-vscode/EMBEDDED-LANGUAGES.md).
+[Tiny's consumer guide](https://github.com/opaopa6969/tinyexpression/blob/3b971352d1756d3feebe1e9eb19a86e34ca096d9/tools/tinyexpression-p4-lsp-vscode/EMBEDDED-LANGUAGES.md).
 These PRs supply the consumer migration implementation; the native corpus here
 continues to use the exact `f86ce8a5` pin rather than silently changing its oracle.
 
