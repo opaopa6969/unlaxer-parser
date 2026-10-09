@@ -105,9 +105,19 @@ impl Backend for GrammarBackend {
     }
 }
 
+struct StagedLanguageDiagnostics {
+    values: Vec<(Snapshot, Value)>,
+    warnings: Vec<Value>,
+}
+struct DiagnosticDocument {
+    snapshot: Snapshot,
+    diagnostics: Vec<Value>,
+}
+
 pub struct Server<B> {
     backend: B,
     documents: HashMap<String, Snapshot>,
+    diagnostic_contributions: BTreeMap<String, BTreeMap<String, DiagnosticDocument>>,
     profile: Option<Selection>,
     initialized: bool,
     shutdown: bool,
@@ -118,6 +128,7 @@ impl<B: Backend> Server<B> {
         Self {
             backend,
             documents: HashMap::new(),
+            diagnostic_contributions: BTreeMap::new(),
             profile: None,
             initialized: false,
             shutdown: false,
@@ -179,9 +190,28 @@ impl<B: Backend> Server<B> {
                 {
                     caps["definitionProvider"] = json!(true);
                 }
+                let mut operations = serde_json::Map::new();
+                for name in [
+                    "VALIDATE",
+                    "COMPLETION",
+                    "HOVER",
+                    "DEFINITION",
+                    "RENAME",
+                    "FORMAT",
+                    "CODE_ACTION",
+                ] {
+                    let transport =
+                        matches!(name, "VALIDATE" | "COMPLETION" | "HOVER" | "DEFINITION");
+                    let registered = operation(name)
+                        .is_some_and(|op| self.backend.query_capabilities().contains(&op));
+                    let allowed = self.allows(name);
+                    operations.insert(name.into(), json!({"transport":transport,"providerRegistered":registered,"profileAllowed":allowed,"available":transport && registered && allowed}));
+                }
+                caps["experimental"] =
+                    json!({"languageQueryConsumer":{"schemaVersion":1,"operations":operations}});
                 if let Some(p) = &self.profile {
                     let l = &p.language;
-                    caps["experimental"] = json!({"languageProfile":{"schemaVersion":1,"tsv":p.profile.canonical_tsv(),"entry":l.entry,"grammar":l.grammar,"language":l.id,"package":l.package_id,"version":l.version}});
+                    caps["experimental"]["languageProfile"] = json!({"schemaVersion":1,"tsv":p.profile.canonical_tsv(),"entry":l.entry,"grammar":l.grammar,"language":l.id,"package":l.package_id,"version":l.version});
                 }
                 return Ok(
                     json!({"capabilities":caps,"serverInfo":{"name":"unlaxer-classic-rust"}}),
@@ -243,10 +273,18 @@ impl<B: Backend> Server<B> {
                 "textDocument/didClose" => {
                     let uri = string(&params["textDocument"], "uri")?;
                     self.documents.remove(uri);
-                    notifications.push(notification(
-                        "textDocument/publishDiagnostics",
-                        json!({"uri":uri,"diagnostics":[]}),
-                    ));
+                    let mut affected = std::collections::BTreeSet::from([uri.to_owned()]);
+                    if let Some(previous) = self.diagnostic_contributions.remove(uri) {
+                        affected.extend(previous.into_keys());
+                    }
+                    self.publish_diagnostic_contributions(affected, &mut notifications);
+                    Ok(Value::Null)
+                }
+                "textDocument/didSave" => {
+                    let uri = string(&params["textDocument"], "uri")?;
+                    if let Some(snapshot) = self.documents.get(uri).cloned() {
+                        self.diagnostics(&snapshot, &mut notifications);
+                    }
                     Ok(Value::Null)
                 }
                 "textDocument/completion" => {
@@ -438,10 +476,134 @@ impl<B: Backend> Server<B> {
                 diagnostics.push(json!({"range":range,"severity":1,"code":"ULX-PARSE-001","source":"unlaxer","message":diagnostic.message,"data":diagnostic.data}));
             }
         }
-        output.push(notification(
-            "textDocument/publishDiagnostics",
-            json!({"uri":snapshot.uri,"version":snapshot.version,"diagnostics":diagnostics}),
-        ));
+        let mut staged = BTreeMap::from([(
+            snapshot.uri.clone(),
+            DiagnosticDocument {
+                snapshot: snapshot.clone(),
+                diagnostics: diagnostics.clone(),
+            },
+        )]);
+        if self.allows("VALIDATE") {
+            if let Some(queries) = self.backend.language_queries(snapshot) {
+                let collect = || -> Result<StagedLanguageDiagnostics, &'static str> {
+                    for source in queries.project().documents.values() {
+                        if self
+                            .documents
+                            .get(&source.uri)
+                            .is_some_and(|opened| opened != source)
+                        {
+                            return Err("stale project document");
+                        }
+                    }
+                    let mut values = vec![];
+                    let mut warnings = vec![];
+                    for result in
+                        queries.diagnostics_all(snapshot, queries.project(), &BTreeMap::new())?
+                    {
+                        if matches!(result.state, State::Timeout | State::Failed) {
+                            warnings.push(notification("window/logMessage",json!({"type":2,"message":format!("Language diagnostics {} for {}",format!("{:?}",result.state).to_uppercase(),result.region)})));
+                        }
+                        for diagnostic in result.diagnostics {
+                            let mut related = vec![];
+                            for mapping in &diagnostic.locations {
+                                let location = &mapping.location;
+                                related.push(json!({"location":{"uri":location.snapshot.uri,"range":range(&location.snapshot,location.span)?},"message":diagnostic.message}));
+                            }
+                            for mapping in &diagnostic.locations {
+                                let location = &mapping.location;
+                                let severity = match diagnostic.severity.as_str() {
+                                    "ERROR" => 1,
+                                    "WARNING" | "MANDATORY_WARNING" => 2,
+                                    "HINT" | "HELP" | "SUGGESTION" => 4,
+                                    _ => 3,
+                                };
+                                let mut item = json!({"range":range(&location.snapshot,location.span)?,"severity":severity,"code":diagnostic.code,"source":"unlaxer-language","message":diagnostic.message,
+                                    "data":{"region":result.region,"state":format!("{:?}",result.state).to_uppercase(),"exact":mapping.exact,"uri":location.snapshot.uri,"version":location.snapshot.version.to_string(),"severity":diagnostic.severity}});
+                                if related.len() > 1 {
+                                    item["relatedInformation"] = json!(related);
+                                }
+                                values.push((location.snapshot.clone(), item));
+                            }
+                        }
+                    }
+                    Ok(StagedLanguageDiagnostics { values, warnings })
+                };
+                match collect() {
+                    Ok(StagedLanguageDiagnostics { values, warnings }) => {
+                        output.extend(warnings);
+                        for (source, item) in values {
+                            let document = staged.entry(source.uri.clone()).or_insert_with(|| {
+                                DiagnosticDocument {
+                                    snapshot: source.clone(),
+                                    diagnostics: vec![],
+                                }
+                            });
+                            document.diagnostics.push(item);
+                        }
+                    }
+                    Err(error) => {
+                        staged = BTreeMap::from([(
+                            snapshot.uri.clone(),
+                            DiagnosticDocument {
+                                snapshot: snapshot.clone(),
+                                diagnostics,
+                            },
+                        )]);
+                        output.push(notification("window/logMessage",json!({"type":2,"message":format!("Language diagnostics unavailable: {error}")})));
+                    }
+                }
+            }
+        }
+        if self.documents.get(&snapshot.uri) != Some(snapshot) {
+            return;
+        }
+        let mut affected: std::collections::BTreeSet<String> = staged.keys().cloned().collect();
+        if let Some(previous) = self
+            .diagnostic_contributions
+            .insert(snapshot.uri.clone(), staged)
+        {
+            affected.extend(previous.into_keys());
+        }
+        self.publish_diagnostic_contributions(affected, output);
+    }
+    fn publish_diagnostic_contributions(
+        &self,
+        uris: std::collections::BTreeSet<String>,
+        output: &mut Vec<Value>,
+    ) {
+        for uri in uris {
+            let opened = self.documents.get(&uri);
+            let mut expected = opened;
+            let mut ambiguous = false;
+            let mut diagnostics = vec![];
+            for contributions in self.diagnostic_contributions.values() {
+                let Some(contribution) = contributions.get(&uri) else {
+                    continue;
+                };
+                if expected.is_none() {
+                    expected = Some(&contribution.snapshot);
+                }
+                if expected != Some(&contribution.snapshot) {
+                    if opened.is_none() {
+                        ambiguous = true;
+                    }
+                    continue;
+                }
+                diagnostics.extend(contribution.diagnostics.iter().cloned());
+            }
+            if ambiguous {
+                diagnostics.clear();
+            }
+            let mut params = json!({"uri":uri,"diagnostics":diagnostics});
+            if !ambiguous {
+                if let Some(snapshot) = expected {
+                    if snapshot.version <= i32::MAX as u64 {
+                        params["version"] = json!(snapshot.version);
+                    }
+                }
+            }
+            output.push(notification("textDocument/publishDiagnostics", params));
+        }
     }
     /// Serve Content-Length frames until exit/EOF. Framing failures are I/O errors.
     pub fn serve<R: BufRead, W: Write>(&mut self, input: &mut R, output: &mut W) -> io::Result<()> {
@@ -502,6 +664,9 @@ fn operation(capability: &str) -> Option<Operation> {
         "HOVER" => Some(Operation::Hover),
         "DEFINITION" => Some(Operation::Definition),
         "VALIDATE" => Some(Operation::Validate),
+        "RENAME" => Some(Operation::Rename),
+        "FORMAT" => Some(Operation::Format),
+        "CODE_ACTION" => Some(Operation::CodeAction),
         _ => None,
     }
 }

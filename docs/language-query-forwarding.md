@@ -143,4 +143,105 @@ The LSP integration is verified with generated parsers plus real
 closed delimiters, surrogate boundaries, stale snapshots, imported definitions
 and host/foreign UTF-16 ranges. Rust uses the same runtime envelope and provider
 fixtures. Classic Rust LSP transport is a separate tracked #111 implementation;
-Playground query dispatch and edit controls remain the next #369/#382 slice.
+Playground query dispatch and edit controls use the explicit adapter described below.
+
+## Playground query dispatch and edit controls
+
+Both Playground generators emit `src/query_adapter.rs` with
+`bind(&Snapshot) -> Result<Option<LanguageQueries>>`. The default returns no
+binding. A host explicitly constructs its generated grammar registry and query
+providers for the exact `playground` snapshot. No capabilities are inferred from
+a grammar name, profile description, or successful parse. Only registered query
+operations appear in the browser's language-operation controls.
+
+The shared generated WASM exports `pg_query(cursor, version, operation,
+source_byte_length)`. Its existing input buffer contains UTF-8 source followed
+by one UTF-8 argument. Operations 0–6 are VALIDATE, COMPLETION, HOVER, DEFINITION,
+RENAME, FORMAT and CODE_ACTION. The argument becomes `prefix`, `name`, `newName`
+or `argument` as appropriate. Invalid cursor, operation, UTF-8 split or provider
+context produces an explicit runtime error. Host adapters may use stricter
+language-specific token rules. The default automatic editor completion extracts
+an alphanumeric/underscore prefix; explicit browser requests use Unicode
+identifier continuation characters.
+
+The worker sends original scalar cursor positions and request versions. The UI
+renders the mapped `LanguageQueryView`, keeps each candidate's edit batch
+separate, verifies integer ranges and overlap, and applies selected edits in
+reverse order to the original scalar sequence. It checks both the exact source
+and the editor revision: changing text and then restoring the same text does not
+revive an old edit. Definitions keep their owning URI and original scalar range.
+
+`PlaygroundQueryConformanceTest` compares every Java/native generated file, then
+executes actual WASM using three generated grammar layers, a semantic project
+provider and a checked source-edit provider. Browser coverage exercises
+completion, rename, trivia-only formatting and code actions on a PARTIAL child,
+including emoji, comments, closed delimiters, open EOF, missing providers and
+stale edits. The fixture adapters are explicit test hosts, not automatic semantic
+inference for an arbitrary generated grammar. Browser/WASM cannot run
+process-based Java/TypeScript/Rust compilers; those providers stay in native
+hosts. Multi-document workspace edits use the separate workspace API.
+
+## Typed document diagnostics
+
+`Provider.diagnostics(Request)` is a separate, backwards-compatible typed path;
+its default returns UNSUPPORTED. Java/Rust `DiagnosticResponse` retains the exact
+virtual snapshot, project ID/version, operation state and compiler diagnostics
+(code, message, severity, owned locations). `diagnosticsAll` / `diagnostics_all`
+validates every region in deterministic region-ID scalar order, using cursor zero
+and operation VALIDATE. A host decorator may add per-region settings such as a
+Java `fileName`; the dispatcher does not guess filenames from grammar names.
+
+The dispatcher checks the current host/project and every response snapshot. Each
+location is range-checked. Virtual locations follow the region source map;
+foreign locations must belong to the exact Project registry snapshot. Generated
+or transformed origins retain their non-exact anchors. No invertible completion
+cursor is required to report a document diagnostic. Unavailable/unsupported
+regions produce explicit empty states; stale snapshots, unknown documents,
+unknown severity values and failed responses with diagnostic payloads are errors.
+
+`ProviderProcess` implements this path without losing compiler metadata. Its
+existing generic `query(VALIDATE)` also now forwards diagnostics as label/message/
+location items, so old consumers no longer receive an empty success. Consumers
+requiring severity/code distinctions should use the typed API. Existing query
+and item constructors stay unchanged. Shared diagnostic fixtures cover 12
+metadata/ownership/state/failure cases. The real Java compiler conformance test
+also forwards diagnostics through both Java/Rust FormulaInfo -> TinyExpression
+-> Java registries and verifies the independent host span `[35,36)`.
+
+## LSP diagnostic publication
+
+Generated Java LSP and Classic Rust LSP consume typed diagnostics from the same
+explicit `languageQueries` / `language_queries` binding used by other queries.
+Open/change/save validate the exact current document; close removes that host's
+contribution. Hosts must supply a fresh immutable Project, including dependency
+snapshots and per-region provider settings. Any project document currently open
+in the server must also match that document's exact current snapshot.
+
+Each mapped location is published under its owning URI with that snapshot's
+UTF-16 range, compiler code/message/severity and `unlaxer-language` source.
+Diagnostic data retains region, operation state, source-map precision, owning URI
+and string version. Multiple origins are also carried as related information;
+transformed anchors are marked non-exact rather than presented as precise edits.
+Recognized compiler warning/note/help categories map to LSP severities while the
+original category remains in data. Provider timeout/failure and rejected stale
+bindings produce warning log notifications, not fabricated compiler errors.
+
+Contributions are kept per source host and combined for each target URI. Closing
+one formula does not clear dependency diagnostics still reported by another
+formula. Different snapshots of a closed dependency are never combined; an open
+document accepts only contributions matching its current snapshot. Old target
+URIs receive empty notifications after their last contribution disappears.
+The host adapter remains responsible for refreshing dependency contexts when
+workspace files change outside the open source document.
+
+`LSPDiagnosticConformanceTest` calls the real javac provider through both hosts
+and compares eight authored lifecycle events. It checks compiler metadata,
+independent host/foreign UTF-16 ranges with emoji and CRLF, shared dependency
+contributions, source correction, save, stale update rejection, close cleanup and
+stale binding rejection. Existing Classic LSP byte-frame and generated query
+regressions also run; Tiny's production FormulaInfo bridge is a separate
+integration using this same API.
+
+### LSP consumer capability boundary
+
+Both LSP hosts expose `experimental.languageQueryConsumer` (schema version 1) even without a profile. Each operation has separate `transport`, `providerRegistered`, `profileAllowed`, and `available` booleans. Availability is their intersection. The typed runtime supports rename, format, and code actions, and Playground consumes these edits; the common LSP query transport currently consumes only validation, completion, hover, and definition. Registering an edit provider or selecting an EXTERNAL profile does not advertise an edit transport. The existing language profile TSV describes language/runtime support; it is not a transport capability list. Built-in grammar completion and syntax diagnostics retain their standard LSP capabilities independently of this explicit provider table. Custom host extensions may register their own standard LSP edit methods; those are separate from the common query consumer.

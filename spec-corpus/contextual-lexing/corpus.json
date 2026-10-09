@@ -1,0 +1,2082 @@
+[
+  {
+    "name": "generics",
+    "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @tokenStream: enabled\n @whitespace: javaStyle\n token ID ::= (CHAR_RANGE('a','z') | CHAR_RANGE('A','Z') | '𐐀')+;\n token SHIFT ::= '>>';\n token END = EOF\n @root @mapping(Alias, params=[name,value])\n @lexicalContext(tokens=['ID'], literals=['type','=',';'])\n Root ::= 'type' ID @name '=' Type @value ';' END;\n @mapping(TypeExpression, params=[name,arguments])\n @lexicalContext(tokens=['ID'], literals=['<','>',','])\n Type ::= ID @name [ '<' Type @arguments { ',' Type @arguments } '>' ];\n ShiftExpression ::= SHIFT;\n}\n",
+    "cases": [
+      {
+        "name": "nested-generics",
+        "input": "type X = Map<Map<A>>;",
+        "accepted": true,
+        "ast": {
+          "type": "Alias",
+          "span": [
+            0,
+            21
+          ],
+          "fields": {
+            "name": "X",
+            "value": {
+              "type": "TypeExpression",
+              "span": [
+                9,
+                20
+              ],
+              "fields": {
+                "name": "Map",
+                "arguments": [
+                  {
+                    "type": "TypeExpression",
+                    "span": [
+                      13,
+                      19
+                    ],
+                    "fields": {
+                      "name": "Map",
+                      "arguments": [
+                        {
+                          "type": "TypeExpression",
+                          "span": [
+                            17,
+                            18
+                          ],
+                          "fields": {
+                            "name": "A",
+                            "arguments": []
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "captures": [
+          {
+            "name": "name",
+            "span": [
+              5,
+              6
+            ]
+          },
+          {
+            "name": "value",
+            "span": [
+              9,
+              20
+            ]
+          }
+        ],
+        "sourceLength": 21,
+        "utf16Length": 21,
+        "reference": "TS"
+      },
+      {
+        "name": "unicode-generics",
+        "input": "type X = Map<𐐀>;",
+        "accepted": true,
+        "ast": {
+          "type": "Alias",
+          "span": [
+            0,
+            16
+          ],
+          "fields": {
+            "name": "X",
+            "value": {
+              "type": "TypeExpression",
+              "span": [
+                9,
+                15
+              ],
+              "fields": {
+                "name": "Map",
+                "arguments": [
+                  {
+                    "type": "TypeExpression",
+                    "span": [
+                      13,
+                      14
+                    ],
+                    "fields": {
+                      "name": "𐐀",
+                      "arguments": []
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "captures": [
+          {
+            "name": "name",
+            "span": [
+              5,
+              6
+            ]
+          },
+          {
+            "name": "value",
+            "span": [
+              9,
+              15
+            ]
+          }
+        ],
+        "sourceLength": 16,
+        "utf16Length": 17,
+        "reference": "TS"
+      },
+      {
+        "name": "unclosed-type",
+        "input": "type X = Map<Map<A>;",
+        "accepted": false,
+        "farthest": 19,
+        "sourceLength": 20,
+        "utf16Length": 20,
+        "reference": "TS"
+      }
+    ]
+  },
+  {
+    "name": "typescript-subset",
+    "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @tokenStream: enabled\n @whitespace: javaStyle\n token LETTER ::= CHAR_RANGE('a','z') | CHAR_RANGE('A','Z') | '𐐀';\n token ID ::= LETTER+;\n token SHIFT ::= '>>';\n token CONTENT ::= ('\\\\' ANY | NEGATION('\"\\\\'))+;\n token TEXT ::= NEGATION('<')+;\n token REGEX ::= '/' { '\\\\' ANY | NEGATION('/\\\\\\r\\n') } '/' ['u'];\n token END = EOF\n @root @mapping(Value, params=[value])\n Root ::= Declaration @value END;\n @lexicalContext(tokens=['ID'], literals=['const','=',';'])\n Declaration ::= 'const' ID '=' Expression ';';\n Expression ::= ShiftExpression | Division | RegexLiteral | String | Jsx;\n @lexicalContext(tokens=['ID','SHIFT'])\n ShiftExpression ::= ID SHIFT ID;\n @lexicalContext(tokens=['ID'], literals=['/'])\n Division ::= ID '/' ID { '/' ID };\n @lexicalContext(tokens=['REGEX'])\n RegexLiteral ::= REGEX;\n @whitespace(none) @lexicalContext(tokens=['CONTENT'], literals=['\"'])\n String ::= '\"' [CONTENT] '\"';\n @whitespace(none) @lexicalContext(tokens=['ID'], literals=['<','>','</'])\n Jsx ::= '<' ID '>' TextExpression '</' ID '>';\n @whitespace(none) @lexicalContext(tokens=['TEXT'])\n TextExpression ::= TEXT;\n}\n",
+    "cases": [
+      {
+        "name": "shift",
+        "input": "const x = a >> b;",
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            17
+          ],
+          "fields": {
+            "value": "const x = a >> b;"
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              0,
+              17
+            ]
+          }
+        ],
+        "sourceLength": 17,
+        "utf16Length": 17,
+        "reference": "TS"
+      },
+      {
+        "name": "division",
+        "input": "const x = a / b / c;",
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            20
+          ],
+          "fields": {
+            "value": "const x = a / b / c;"
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              0,
+              20
+            ]
+          }
+        ],
+        "sourceLength": 20,
+        "utf16Length": 20,
+        "reference": "TS"
+      },
+      {
+        "name": "unicode-regex",
+        "input": "const x = /😀/u;",
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            15
+          ],
+          "fields": {
+            "value": "const x = /😀/u;"
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              0,
+              15
+            ]
+          }
+        ],
+        "sourceLength": 15,
+        "utf16Length": 16,
+        "reference": "TS"
+      },
+      {
+        "name": "string-leading-space",
+        "input": "const x = \" hi 😀 \";",
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            19
+          ],
+          "fields": {
+            "value": "const x = \" hi 😀 \";"
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              0,
+              19
+            ]
+          }
+        ],
+        "sourceLength": 19,
+        "utf16Length": 20,
+        "reference": "TS"
+      },
+      {
+        "name": "empty-string",
+        "input": "const x = \"\";",
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            13
+          ],
+          "fields": {
+            "value": "const x = \"\";"
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              0,
+              13
+            ]
+          }
+        ],
+        "sourceLength": 13,
+        "utf16Length": 13,
+        "reference": "TS"
+      },
+      {
+        "name": "escaped-quote",
+        "input": "const x = \"a\\\"b\";",
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            17
+          ],
+          "fields": {
+            "value": "const x = \"a\\\"b\";"
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              0,
+              17
+            ]
+          }
+        ],
+        "sourceLength": 17,
+        "utf16Length": 17,
+        "reference": "TS"
+      },
+      {
+        "name": "jsx-body-space",
+        "input": "const x = <A> hello😀 </A>;",
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            26
+          ],
+          "fields": {
+            "value": "const x = <A> hello😀 </A>;"
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              0,
+              26
+            ]
+          }
+        ],
+        "sourceLength": 26,
+        "utf16Length": 27,
+        "reference": "TSX"
+      },
+      {
+        "name": "crlf-and-comments",
+        "input": "//😀\r\nconst x = a /*😀*/ / b;\r\n",
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            29
+          ],
+          "fields": {
+            "value": "const x = a /*😀*/ / b;"
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              5,
+              29
+            ]
+          }
+        ],
+        "sourceLength": 29,
+        "utf16Length": 31
+      },
+      {
+        "name": "unclosed-string",
+        "input": "const x = \"unfinished",
+        "accepted": false,
+        "farthest": 21,
+        "sourceLength": 21,
+        "utf16Length": 21,
+        "reference": "TS"
+      },
+      {
+        "name": "unclosed-regex",
+        "input": "const x = /unfinished",
+        "accepted": false,
+        "farthest": 10,
+        "sourceLength": 21,
+        "utf16Length": 21,
+        "reference": "TS"
+      },
+      {
+        "name": "missing-shift-operand",
+        "input": "const x = a >>;",
+        "accepted": false,
+        "farthest": 14,
+        "sourceLength": 15,
+        "utf16Length": 15,
+        "reference": "TS"
+      },
+      {
+        "name": "unclosed-jsx",
+        "input": "const x = <A>body",
+        "accepted": false,
+        "farthest": 17,
+        "sourceLength": 17,
+        "utf16Length": 17,
+        "reference": "TSX"
+      }
+    ]
+  },
+  {
+    "name": "rollback",
+    "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @tokenStream: enabled\n @whitespace: javaStyle\n token GT ::= '>';\n token SHIFT ::= '>>';\n token END = EOF\n @root @mapping(Value, params=[value])\n Root ::= 'rollback' (Wrong | Right) @value END\n       | 'exit' Single @value GT END\n       | 'nested' Outer @value END\n       | 'memo' (WrongGoal | RightGoal) @value END;\n @lexicalContext(tokens=['SHIFT'], literals=['!'])\n Wrong ::= SHIFT '!';\n @lexicalContext(tokens=['GT'])\n Right ::= GT GT;\n @lexicalContext(tokens=['GT'])\n Single ::= GT;\n @lexicalContext(tokens=['SHIFT'], literals=['(',')'])\n Outer ::= '(' Single SHIFT ')';\n @lexicalContext(tokens=['SHIFT'])\n WrongGoal ::= SharedGreater;\n @lexicalContext(tokens=['GT'])\n RightGoal ::= SharedGreater SharedGreater;\n SharedGreater ::= GT;\n}\n",
+    "cases": [
+      {
+        "name": "failed-goal-is-rolled-back",
+        "input": "rollback >>",
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            11
+          ],
+          "fields": {
+            "value": ">>"
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              9,
+              11
+            ]
+          }
+        ],
+        "sourceLength": 11,
+        "utf16Length": 11
+      },
+      {
+        "name": "exit-inside-base-token",
+        "input": "exit >>",
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            7
+          ],
+          "fields": {
+            "value": ">"
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              5,
+              6
+            ]
+          }
+        ],
+        "sourceLength": 7,
+        "utf16Length": 7
+      },
+      {
+        "name": "nested-enter-exit",
+        "input": "nested (>>>)",
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            12
+          ],
+          "fields": {
+            "value": "(>>>)"
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              7,
+              12
+            ]
+          }
+        ],
+        "sourceLength": 12,
+        "utf16Length": 12
+      },
+      {
+        "name": "nested-failure",
+        "input": "nested (>>)",
+        "accepted": false,
+        "farthest": 9,
+        "sourceLength": 11,
+        "utf16Length": 11
+      },
+      {
+        "name": "failure-memo-goal-key",
+        "input": "memo >>",
+        "sourceLength": 7,
+        "utf16Length": 7,
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            7
+          ],
+          "fields": {
+            "value": ">>"
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              5,
+              7
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "module-goals",
+    "grammarFile": "root-import.ubnf",
+    "grammar": "grammar Input {\n @import lib from 'library.ubnf'\n @ubnf: v2\n @package: example.lexing\n @tokenStream: enabled\n token END = EOF\n @root @mapping(Value, params=[value])\n Root ::= (Wrong | Right | Pair) @value END;\n @lexicalContext(tokens=['lib.SHIFT'], literals=['!'])\n Wrong ::= lib.SHIFT '!';\n @lexicalContext(tokens=['lib.GT'])\n Right ::= lib.GT lib.GT;\n @lexicalContext(tokens=['lib.PAIR'])\n Pair ::= lib.PAIR;\n}\n",
+    "cases": [
+      {
+        "name": "import-rollback",
+        "input": ">>",
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            2
+          ],
+          "fields": {
+            "value": ">>"
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              0,
+              2
+            ]
+          }
+        ],
+        "sourceLength": 2,
+        "utf16Length": 2
+      },
+      {
+        "name": "module-private-capture",
+        "input": "😀😀",
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            2
+          ],
+          "fields": {
+            "value": "😀😀"
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              0,
+              2
+            ]
+          }
+        ],
+        "sourceLength": 2,
+        "utf16Length": 4
+      }
+    ]
+  },
+  {
+    "name": "named-trivia",
+    "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @tokenStream: enabled\n @whitespace: GAP\n token GAP ::= '#'+;\n token ID ::= 'a';\n @root @mapping(Value, params=[value]) @lexicalContext(tokens=['ID'])\n Root ::= ID @value;\n}\n",
+    "cases": [
+      {
+        "name": "raw-trivia-outside-goal",
+        "input": "###a#",
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "value": "a"
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              3,
+              4
+            ]
+          }
+        ],
+        "sourceLength": 5,
+        "utf16Length": 5
+      }
+    ]
+  },
+  {
+    "name": "ties",
+    "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @tokenStream: enabled\n @whitespace: javaStyle\n token FIRST ::= '>';\n token SECOND ::= '>';\n token E = EMPTY\n token END = EOF\n @root @mapping(Value, params=[value])\n Root ::= 'named' Named @value END | 'literal' Literal @value END | 'empty' Empty @value;\n @lexicalContext(tokens=['SECOND','FIRST'])\n Named ::= FIRST;\n @lexicalContext(tokens=['FIRST'], literals=['>'])\n Literal ::= '>';\n @lexicalContext(tokens=[])\n Empty ::= E;\n}\n",
+    "cases": [
+      {
+        "name": "named-declaration-order",
+        "input": "named >",
+        "sourceLength": 7,
+        "utf16Length": 7,
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            7
+          ],
+          "fields": {
+            "value": ">"
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              6,
+              7
+            ]
+          }
+        ]
+      },
+      {
+        "name": "literal-before-named",
+        "input": "literal >",
+        "sourceLength": 9,
+        "utf16Length": 9,
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            9
+          ],
+          "fields": {
+            "value": ">"
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              8,
+              9
+            ]
+          }
+        ]
+      },
+      {
+        "name": "empty-goal-control",
+        "input": "empty",
+        "sourceLength": 5,
+        "utf16Length": 5,
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "value": ""
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              5,
+              5
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "fixed-indent",
+    "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @tokenStream: enabled\n @whitespace: none\n token ID ::= 'a' | 'b' | '𐐀';\n token NEWLINE ::= '\\r\\n' | '\\n';\n token INDENT ::= BOL '  ';\n token END = EOF\n @root @mapping(Value, params=[value])\n @lexicalContext(tokens=['ID','NEWLINE','INDENT'])\n Root ::= (ID NEWLINE INDENT ID) @value END;\n}\n",
+    "cases": [
+      {
+        "name": "lf-fixed-indent",
+        "input": "a\n  b",
+        "sourceLength": 5,
+        "utf16Length": 5,
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "value": "a\n  b"
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              0,
+              5
+            ]
+          }
+        ]
+      },
+      {
+        "name": "crlf-unicode-fixed-indent",
+        "input": "a\r\n  𐐀",
+        "sourceLength": 6,
+        "utf16Length": 7,
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            6
+          ],
+          "fields": {
+            "value": "a\r\n  𐐀"
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              0,
+              6
+            ]
+          }
+        ]
+      },
+      {
+        "name": "wrong-indent",
+        "input": "a\r\n 𐐀",
+        "sourceLength": 5,
+        "utf16Length": 6,
+        "accepted": false,
+        "farthest": 3
+      }
+    ]
+  },
+  {
+    "name": "named-global-scoped-context",
+    "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @tokenStream: enabled\n @whitespace: GAP\n token GAP ::= '#'+;\n token ID ::= 'a' | '😀';\n token END = EOF\n @root @mapping(Value, params=[value])\n @lexicalContext(tokens=['ID'], literals=['ok','retry','flip','raw','nested','!','(',')'])\n Root ::= 'ok' Local @value '!' END\n        | 'retry' (Wrong | Local) @value '!' END\n        | 'flip' (InheritedWrong | Local) @value '!' END\n        | 'raw' Raw @value '!' END\n        | 'nested' Outer @value '!' END;\n @whitespace(javaStyle) @lexicalContext(tokens=['ID'], literals=['(',')'])\n Local ::= '(' ID ')';\n @whitespace(javaStyle) @lexicalContext(tokens=['ID'], literals=['(',')','?'])\n Wrong ::= '(' ID ')' '?';\n @lexicalContext(tokens=['ID'], literals=['(',')','?'])\n InheritedWrong ::= '(' ID ')' '?';\n @whitespace(none)\n Raw ::= '(' ID ')';\n @whitespace(javaStyle)\n Outer ::= '(' Raw ')';\n}\n",
+    "cases": [
+      {
+        "name": "local-java-style",
+        "input": "ok#( a )#!",
+        "sourceLength": 10,
+        "utf16Length": 10,
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            10
+          ],
+          "fields": {
+            "value": "( a )"
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              3,
+              8
+            ]
+          }
+        ],
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ok",
+            "span": [
+              0,
+              2
+            ],
+            "text": "ok"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              2,
+              3
+            ],
+            "text": "#"
+          },
+          {
+            "kind": "token",
+            "name": "(",
+            "span": [
+              3,
+              4
+            ],
+            "text": "("
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              4,
+              5
+            ],
+            "text": " "
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              5,
+              6
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              6,
+              7
+            ],
+            "text": " "
+          },
+          {
+            "kind": "token",
+            "name": ")",
+            "span": [
+              7,
+              8
+            ],
+            "text": ")"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              8,
+              9
+            ],
+            "text": "#"
+          },
+          {
+            "kind": "token",
+            "name": "!",
+            "span": [
+              9,
+              10
+            ],
+            "text": "!"
+          }
+        ]
+      },
+      {
+        "name": "local-without-spaces",
+        "input": "ok#(a)#!",
+        "sourceLength": 8,
+        "utf16Length": 8,
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            8
+          ],
+          "fields": {
+            "value": "(a)"
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              3,
+              6
+            ]
+          }
+        ],
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ok",
+            "span": [
+              0,
+              2
+            ],
+            "text": "ok"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              2,
+              3
+            ],
+            "text": "#"
+          },
+          {
+            "kind": "token",
+            "name": "(",
+            "span": [
+              3,
+              4
+            ],
+            "text": "("
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              4,
+              5
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "token",
+            "name": ")",
+            "span": [
+              5,
+              6
+            ],
+            "text": ")"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              6,
+              7
+            ],
+            "text": "#"
+          },
+          {
+            "kind": "token",
+            "name": "!",
+            "span": [
+              7,
+              8
+            ],
+            "text": "!"
+          }
+        ]
+      },
+      {
+        "name": "unicode-local",
+        "input": "ok#( 😀 )#!",
+        "sourceLength": 10,
+        "utf16Length": 11,
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            10
+          ],
+          "fields": {
+            "value": "( 😀 )"
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              3,
+              8
+            ]
+          }
+        ],
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ok",
+            "span": [
+              0,
+              2
+            ],
+            "text": "ok"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              2,
+              3
+            ],
+            "text": "#"
+          },
+          {
+            "kind": "token",
+            "name": "(",
+            "span": [
+              3,
+              4
+            ],
+            "text": "("
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              4,
+              5
+            ],
+            "text": " "
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              5,
+              6
+            ],
+            "text": "😀"
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              6,
+              7
+            ],
+            "text": " "
+          },
+          {
+            "kind": "token",
+            "name": ")",
+            "span": [
+              7,
+              8
+            ],
+            "text": ")"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              8,
+              9
+            ],
+            "text": "#"
+          },
+          {
+            "kind": "token",
+            "name": "!",
+            "span": [
+              9,
+              10
+            ],
+            "text": "!"
+          }
+        ]
+      },
+      {
+        "name": "CRLF-local",
+        "input": "ok#(\r\n😀\r\n)#!",
+        "sourceLength": 12,
+        "utf16Length": 13,
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            12
+          ],
+          "fields": {
+            "value": "(\r\n😀\r\n)"
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              3,
+              10
+            ]
+          }
+        ],
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ok",
+            "span": [
+              0,
+              2
+            ],
+            "text": "ok"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              2,
+              3
+            ],
+            "text": "#"
+          },
+          {
+            "kind": "token",
+            "name": "(",
+            "span": [
+              3,
+              4
+            ],
+            "text": "("
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              4,
+              5
+            ],
+            "text": "\r"
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              5,
+              6
+            ],
+            "text": "\n"
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              6,
+              7
+            ],
+            "text": "😀"
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              7,
+              8
+            ],
+            "text": "\r"
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              8,
+              9
+            ],
+            "text": "\n"
+          },
+          {
+            "kind": "token",
+            "name": ")",
+            "span": [
+              9,
+              10
+            ],
+            "text": ")"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              10,
+              11
+            ],
+            "text": "#"
+          },
+          {
+            "kind": "token",
+            "name": "!",
+            "span": [
+              11,
+              12
+            ],
+            "text": "!"
+          }
+        ]
+      },
+      {
+        "name": "named-must-not-leak-into-java",
+        "input": "ok#(#a#)#!",
+        "sourceLength": 10,
+        "utf16Length": 10,
+        "accepted": false,
+        "farthest": 4,
+        "consumed": 0,
+        "matched": 0,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ok",
+            "span": [
+              0,
+              2
+            ],
+            "text": "ok"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              2,
+              3
+            ],
+            "text": "#"
+          },
+          {
+            "kind": "token",
+            "name": "(",
+            "span": [
+              3,
+              4
+            ],
+            "text": "("
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              4,
+              5
+            ],
+            "text": "#"
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              5,
+              6
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              6,
+              7
+            ],
+            "text": "#"
+          },
+          {
+            "kind": "token",
+            "name": ")",
+            "span": [
+              7,
+              8
+            ],
+            "text": ")"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              8,
+              9
+            ],
+            "text": "#"
+          },
+          {
+            "kind": "token",
+            "name": "!",
+            "span": [
+              9,
+              10
+            ],
+            "text": "!"
+          }
+        ]
+      },
+      {
+        "name": "java-must-not-leak-after-local",
+        "input": "ok#(a)# !",
+        "sourceLength": 9,
+        "utf16Length": 9,
+        "accepted": false,
+        "farthest": 7,
+        "consumed": 0,
+        "matched": 0,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ok",
+            "span": [
+              0,
+              2
+            ],
+            "text": "ok"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              2,
+              3
+            ],
+            "text": "#"
+          },
+          {
+            "kind": "token",
+            "name": "(",
+            "span": [
+              3,
+              4
+            ],
+            "text": "("
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              4,
+              5
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "token",
+            "name": ")",
+            "span": [
+              5,
+              6
+            ],
+            "text": ")"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              6,
+              7
+            ],
+            "text": "#"
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              7,
+              8
+            ],
+            "text": " "
+          },
+          {
+            "kind": "token",
+            "name": "!",
+            "span": [
+              8,
+              9
+            ],
+            "text": "!"
+          }
+        ]
+      },
+      {
+        "name": "failed-goal-restores-trivia",
+        "input": "retry#( a )#!",
+        "sourceLength": 13,
+        "utf16Length": 13,
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            13
+          ],
+          "fields": {
+            "value": "( a )"
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              6,
+              11
+            ]
+          }
+        ],
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "retry",
+            "span": [
+              0,
+              5
+            ],
+            "text": "retry"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              5,
+              6
+            ],
+            "text": "#"
+          },
+          {
+            "kind": "token",
+            "name": "(",
+            "span": [
+              6,
+              7
+            ],
+            "text": "("
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              7,
+              8
+            ],
+            "text": " "
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              8,
+              9
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              9,
+              10
+            ],
+            "text": " "
+          },
+          {
+            "kind": "token",
+            "name": ")",
+            "span": [
+              10,
+              11
+            ],
+            "text": ")"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              11,
+              12
+            ],
+            "text": "#"
+          },
+          {
+            "kind": "token",
+            "name": "!",
+            "span": [
+              12,
+              13
+            ],
+            "text": "!"
+          }
+        ]
+      },
+      {
+        "name": "none-no-inner-trivia",
+        "input": "raw#(a)#!",
+        "sourceLength": 9,
+        "utf16Length": 9,
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            9
+          ],
+          "fields": {
+            "value": "(a)"
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              4,
+              7
+            ]
+          }
+        ],
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "raw",
+            "span": [
+              0,
+              3
+            ],
+            "text": "raw"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              3,
+              4
+            ],
+            "text": "#"
+          },
+          {
+            "kind": "token",
+            "name": "(",
+            "span": [
+              4,
+              5
+            ],
+            "text": "("
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              5,
+              6
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "token",
+            "name": ")",
+            "span": [
+              6,
+              7
+            ],
+            "text": ")"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              7,
+              8
+            ],
+            "text": "#"
+          },
+          {
+            "kind": "token",
+            "name": "!",
+            "span": [
+              8,
+              9
+            ],
+            "text": "!"
+          }
+        ]
+      },
+      {
+        "name": "none-rejects-space",
+        "input": "raw#( a )#!",
+        "sourceLength": 11,
+        "utf16Length": 11,
+        "accepted": false,
+        "farthest": 5,
+        "consumed": 0,
+        "matched": 0,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "raw",
+            "span": [
+              0,
+              3
+            ],
+            "text": "raw"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              3,
+              4
+            ],
+            "text": "#"
+          },
+          {
+            "kind": "token",
+            "name": "(",
+            "span": [
+              4,
+              5
+            ],
+            "text": "("
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              5,
+              6
+            ],
+            "text": " "
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              6,
+              7
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              7,
+              8
+            ],
+            "text": " "
+          },
+          {
+            "kind": "token",
+            "name": ")",
+            "span": [
+              8,
+              9
+            ],
+            "text": ")"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              9,
+              10
+            ],
+            "text": "#"
+          },
+          {
+            "kind": "token",
+            "name": "!",
+            "span": [
+              10,
+              11
+            ],
+            "text": "!"
+          }
+        ]
+      },
+      {
+        "name": "nested-none-in-java",
+        "input": "nested#((a))#!",
+        "sourceLength": 14,
+        "utf16Length": 14,
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            14
+          ],
+          "fields": {
+            "value": "((a))"
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              7,
+              12
+            ]
+          }
+        ],
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "nested",
+            "span": [
+              0,
+              6
+            ],
+            "text": "nested"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              6,
+              7
+            ],
+            "text": "#"
+          },
+          {
+            "kind": "token",
+            "name": "(",
+            "span": [
+              7,
+              8
+            ],
+            "text": "("
+          },
+          {
+            "kind": "token",
+            "name": "(",
+            "span": [
+              8,
+              9
+            ],
+            "text": "("
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              9,
+              10
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "token",
+            "name": ")",
+            "span": [
+              10,
+              11
+            ],
+            "text": ")"
+          },
+          {
+            "kind": "token",
+            "name": ")",
+            "span": [
+              11,
+              12
+            ],
+            "text": ")"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              12,
+              13
+            ],
+            "text": "#"
+          },
+          {
+            "kind": "token",
+            "name": "!",
+            "span": [
+              13,
+              14
+            ],
+            "text": "!"
+          }
+        ]
+      },
+      {
+        "name": "java-before-and-after-none",
+        "input": "nested#( (a) )#!",
+        "sourceLength": 16,
+        "utf16Length": 16,
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            16
+          ],
+          "fields": {
+            "value": "( (a) )"
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              7,
+              14
+            ]
+          }
+        ],
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "nested",
+            "span": [
+              0,
+              6
+            ],
+            "text": "nested"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              6,
+              7
+            ],
+            "text": "#"
+          },
+          {
+            "kind": "token",
+            "name": "(",
+            "span": [
+              7,
+              8
+            ],
+            "text": "("
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              8,
+              9
+            ],
+            "text": " "
+          },
+          {
+            "kind": "token",
+            "name": "(",
+            "span": [
+              9,
+              10
+            ],
+            "text": "("
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              10,
+              11
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "token",
+            "name": ")",
+            "span": [
+              11,
+              12
+            ],
+            "text": ")"
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              12,
+              13
+            ],
+            "text": " "
+          },
+          {
+            "kind": "token",
+            "name": ")",
+            "span": [
+              13,
+              14
+            ],
+            "text": ")"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              14,
+              15
+            ],
+            "text": "#"
+          },
+          {
+            "kind": "token",
+            "name": "!",
+            "span": [
+              15,
+              16
+            ],
+            "text": "!"
+          }
+        ]
+      },
+      {
+        "name": "EOF-after-local",
+        "input": "ok#(a)#",
+        "sourceLength": 7,
+        "utf16Length": 7,
+        "accepted": false,
+        "farthest": 7,
+        "consumed": 0,
+        "matched": 0,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ok",
+            "span": [
+              0,
+              2
+            ],
+            "text": "ok"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              2,
+              3
+            ],
+            "text": "#"
+          },
+          {
+            "kind": "token",
+            "name": "(",
+            "span": [
+              3,
+              4
+            ],
+            "text": "("
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              4,
+              5
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "token",
+            "name": ")",
+            "span": [
+              5,
+              6
+            ],
+            "text": ")"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              6,
+              7
+            ],
+            "text": "#"
+          }
+        ]
+      },
+      {
+        "name": "same-position-trivia-policy-rollback",
+        "input": "flip#( a )#!",
+        "sourceLength": 12,
+        "utf16Length": 12,
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            12
+          ],
+          "fields": {
+            "value": "( a )"
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              5,
+              10
+            ]
+          }
+        ],
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "flip",
+            "span": [
+              0,
+              4
+            ],
+            "text": "flip"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              4,
+              5
+            ],
+            "text": "#"
+          },
+          {
+            "kind": "token",
+            "name": "(",
+            "span": [
+              5,
+              6
+            ],
+            "text": "("
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              6,
+              7
+            ],
+            "text": " "
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              7,
+              8
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              8,
+              9
+            ],
+            "text": " "
+          },
+          {
+            "kind": "token",
+            "name": ")",
+            "span": [
+              9,
+              10
+            ],
+            "text": ")"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              10,
+              11
+            ],
+            "text": "#"
+          },
+          {
+            "kind": "token",
+            "name": "!",
+            "span": [
+              11,
+              12
+            ],
+            "text": "!"
+          }
+        ]
+      }
+    ]
+  }
+]

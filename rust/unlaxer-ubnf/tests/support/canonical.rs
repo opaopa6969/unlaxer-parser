@@ -140,6 +140,10 @@ fn annotation(a: &Annotation) -> String {
             );
             ("EvalAnnotation", vec![quote(kind), quote(strategy), params])
         }
+        AnnotationKind::LexicalContext { tokens, literals } => (
+            "LexicalContextAnnotation",
+            vec![strings(tokens), strings(literals)],
+        ),
         AnnotationKind::Whitespace { style } => ("WhitespaceAnnotation", vec![optional(style)]),
         AnnotationKind::Interleave { profile } => ("InterleaveAnnotation", vec![quote(profile)]),
         AnnotationKind::Backref { name } => ("BackrefAnnotation", vec![quote(name)]),
@@ -155,6 +159,16 @@ fn annotation(a: &Annotation) -> String {
         AnnotationKind::LeftAssoc => ("LeftAssocAnnotation", vec![]),
         AnnotationKind::RightAssoc => ("RightAssocAnnotation", vec![]),
         AnnotationKind::LongestChoice => ("LongestChoiceAnnotation", vec![]),
+        AnnotationKind::UniqueLongestChoice => ("UniqueLongestChoiceAnnotation", vec![]),
+        AnnotationKind::NamePredicate {
+            snapshot,
+            version,
+            name,
+            kind,
+        } => (
+            "NamePredicateAnnotation",
+            vec![quote(snapshot), quote(version), quote(name), quote(kind)],
+        ),
         AnnotationKind::PredictiveChoice => ("PredictiveChoiceAnnotation", vec![]),
         AnnotationKind::Precedence { level } => ("PrecedenceAnnotation", vec![level.to_string()]),
         AnnotationKind::Doc { text } => ("DocAnnotation", vec![quote(text)]),

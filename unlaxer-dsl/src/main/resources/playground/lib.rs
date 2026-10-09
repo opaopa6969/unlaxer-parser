@@ -3,6 +3,7 @@
 mod generated;
 mod editor_adapter;
 mod region_adapter;
+mod query_adapter;
 use std::cell::RefCell;
 use unlaxer_runtime::{json_string, ParseContext};
 
@@ -76,9 +77,47 @@ pub fn analyze_editor_snapshot(input: &str, cursor: usize, version: u64) -> Stri
     };
     let typed = editor_adapter::analyze(input, cursor).unwrap_or_else(|| "null".into());
     let regions = region_adapter::analyze(input, cursor, version).unwrap_or_else(|| "null".into());
+    let prefix: Vec<char> = input.chars().take(cursor).collect();
+    let prefix: String = prefix.iter().rev().take_while(|c| c.is_alphanumeric() || **c == '_').copied().collect::<Vec<_>>().into_iter().rev().collect();
+    let query = analyze_query(input, cursor, version, 1, &prefix);
     let mut value = analyze(input);
     value.pop();
-    format!(r#"{},"editor":{},"typed":{},"languages":{}}}"#, value, cst.canonical_json(), typed, regions)
+    format!(r#"{},"editor":{},"typed":{},"languages":{},"query":{}}}"#, value, cst.canonical_json(), typed, regions, query)
+}
+
+/// Operations: 0 validate, 1 completion, 2 hover, 3 definition, 4 rename, 5 format, 6 code action.
+/// The one optional argument is prefix/name/newName; hosts may interpret `argument` for code actions.
+pub fn analyze_query(input: &str, cursor: usize, version: u64, operation: u32, argument: &str) -> String {
+    use std::collections::{BTreeMap, HashSet};
+    use unlaxer_runtime::{language_queries::{QueryResult, QueryView}, source::{Operation, Snapshot, State}};
+    let run = || -> unlaxer_runtime::source::Result<String> {
+        let operation = match operation { 0 => Operation::Validate, 1 => Operation::Completion, 2 => Operation::Hover,
+            3 => Operation::Definition, 4 => Operation::Rename, 5 => Operation::Format, 6 => Operation::CodeAction,
+            _ => return Err("unknown query operation") };
+        let host = Snapshot::new("playground", version, input)?;
+        host.check(unlaxer_runtime::Span { start: cursor, end: cursor })?;
+        let Some(queries) = query_adapter::bind(&host)? else {
+            return Ok(QueryView { host, cursor, operation, capabilities: HashSet::new(),
+                result: QueryResult { region: String::new(), state: State::Unavailable, items: vec![] } }.canonical_json());
+        };
+        let key = match operation { Operation::Completion => "prefix", Operation::Hover | Operation::Definition => "name",
+            Operation::Rename => "newName", _ => "argument" };
+        let parameters = BTreeMap::from([(key.into(), argument.into())]);
+        Ok(queries.view(&host, queries.project(), cursor, operation, &parameters)?.canonical_json())
+    };
+    run().unwrap_or_else(|error| format!(r#"{{"runtimeError":{}}}"#, json_string(error)))
+}
+
+/// Input buffer is UTF-8 source followed by the UTF-8 argument, separated by the source byte length.
+#[no_mangle]
+pub extern "C" fn pg_query(cursor: usize, version: u32, operation: u32, source_len: usize) {
+    let bytes = BUFFERS.with(|buffers| buffers.borrow().input.clone());
+    let result = if source_len > bytes.len() { Err("invalid query source length") } else {
+        std::str::from_utf8(&bytes[..source_len]).map_err(|_| "source must be UTF-8").and_then(|source|
+            std::str::from_utf8(&bytes[source_len..]).map_err(|_| "argument must be UTF-8").map(|argument|
+                analyze_query(source, cursor, u64::from(version), operation, argument)))
+    };
+    output(result.unwrap_or_else(|error| format!(r#"{{"runtimeError":{}}}"#, json_string(error))));
 }
 
 #[no_mangle]

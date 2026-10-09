@@ -1,0 +1,7 @@
+# id operation alias replacement expected-exporter expected-importer expected-direct-importer
+export-definition	definition	alias	bar	bar bar	import bar as alias;\r\nalias { alias alias } alias "foo" 😀	import bar;\r\nbar "foo"
+local-alias	alias	alias	renamed	foo foo	import foo as renamed;\r\nrenamed { alias alias } renamed "foo" 😀	import foo;\r\nfoo "foo"
+explicit-same-name	definition	foo	bar	bar bar	import bar as foo;\r\nfoo { foo foo } foo "foo" 😀	import bar;\r\nbar "foo"
+rename-same-name-alias	alias	foo	renamed	foo foo	import foo as renamed;\r\nrenamed { foo foo } renamed "foo" 😀	import foo;\r\nfoo "foo"
+unicode-definition	definition	alias	新名	新名 新名	import 新名 as alias;\r\nalias { alias alias } alias "foo" 😀	import 新名;\r\n新名 "foo"
+shadowed-definition	shadow	foo	bar	foo foo	import foo as foo;\r\nfoo { bar bar } foo "foo" 😀	import foo;\r\nfoo "foo"

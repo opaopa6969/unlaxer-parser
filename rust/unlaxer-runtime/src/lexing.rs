@@ -25,7 +25,7 @@ impl Default for Options {
         }
     }
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Terminal {
     pub name: &'static str,
     pub literal: bool,
@@ -71,8 +71,10 @@ pub struct Session<'a> {
     offsets: Vec<usize>,
     code_points: Vec<usize>,
     entries: BTreeMap<usize, Entry>,
-    trivia_cache: HashMap<usize, usize>,
+    trivia_cache: HashMap<(usize, Option<LexicalExpression>), usize>,
     frontier: usize,
+    contextual: bool,
+    goal_entries: HashMap<(usize, Arc<[Terminal]>), Option<Entry>>,
     terminal_evaluations: u64,
     trivia_evaluations: u64,
     inventory_evaluations: u64,
@@ -122,6 +124,8 @@ impl<'a> Session<'a> {
             entries: BTreeMap::new(),
             trivia_cache: HashMap::new(),
             frontier: 0,
+            contextual: false,
+            goal_entries: HashMap::new(),
             terminal_evaluations: 0,
             trivia_evaluations: 0,
             inventory_evaluations: 0,
@@ -142,7 +146,9 @@ impl<'a> Session<'a> {
             terminal_evaluations: self.terminal_evaluations,
             trivia_evaluations: self.trivia_evaluations,
             inventory_evaluations: self.inventory_evaluations,
-            retained_entries: self.entries.len() + self.trivia_cache.len(),
+            retained_entries: self.entries.len()
+                + self.trivia_cache.len()
+                + self.goal_entries.len(),
             source_code_points: self.offsets.len() - 1,
         }
     }
@@ -155,7 +161,29 @@ impl<'a> Session<'a> {
         literal: bool,
         expression: Option<&LexicalExpression>,
         p: usize,
+        goal: Option<&Arc<[Terminal]>>,
     ) -> Option<usize> {
+        if goal.is_some() || self.contextual && self.token_mode() {
+            if literal && name.is_empty() {
+                return Some(p);
+            }
+            let active = Arc::clone(goal.unwrap_or(&self.terminals));
+            let key = (p, Arc::clone(&active));
+            if !self.goal_entries.contains_key(&key) {
+                self.terminal_evaluations += active.len() as u64;
+                let selected = select_goal(self.source, p, &active).map(|(index, end)| Entry {
+                    kind: "token",
+                    name: active[index].name,
+                    terminal: Some(index),
+                    start: p,
+                    end,
+                });
+                self.goal_entries.insert(key.clone(), selected);
+            }
+            let entry = self.goal_entries.get(&key)?.as_ref()?;
+            return (active[entry.terminal?].literal == literal && entry.name == name)
+                .then_some(entry.end);
+        }
         if !self.token_mode() {
             self.terminal_evaluations += 1;
             return if let Some(expression) = expression {
@@ -172,11 +200,18 @@ impl<'a> Session<'a> {
         let terminal = &self.terminals[entry.terminal?];
         (terminal.literal == literal && terminal.name == name).then_some(entry.end)
     }
-    pub(crate) fn skip(&mut self, position: usize) -> usize {
-        if !self.whitespace {
-            return position;
-        }
-        if self.token_mode() {
+    pub(crate) fn skip(
+        &mut self,
+        position: usize,
+        scoped: bool,
+        definition: Option<&LexicalExpression>,
+    ) -> usize {
+        if self.token_mode()
+            && !scoped
+            && !self.contextual
+            && self.whitespace
+            && definition == self.named_trivia.as_ref()
+        {
             let mut end = position;
             while end < self.source.len() {
                 self.scan_through(end, false);
@@ -187,19 +222,22 @@ impl<'a> Session<'a> {
             }
             return end;
         }
+        let key = (position, definition.cloned());
         if self.options.mode == Mode::TriviaCache {
-            if let Some(end) = self.trivia_cache.get(&position) {
+            if let Some(end) = self.trivia_cache.get(&key) {
                 return *end;
             }
         }
         let mut end = position;
         while end < self.source.len() {
             self.trivia_evaluations += 1;
-            let Some(entry) = self.trivia(end) else { break };
+            let Some(entry) = self.trivia(end, definition) else {
+                break;
+            };
             end = entry.end;
         }
         if self.options.mode == Mode::TriviaCache {
-            self.trivia_cache.insert(position, end);
+            self.trivia_cache.insert(key, end);
         }
         end
     }
@@ -211,7 +249,7 @@ impl<'a> Session<'a> {
                 } else {
                     self.trivia_evaluations += 1
                 }
-                self.trivia(self.frontier)
+                self.trivia(self.frontier, self.named_trivia.as_ref())
             } else {
                 None
             };
@@ -260,8 +298,8 @@ impl<'a> Session<'a> {
             self.entries.insert(entry.start, entry);
         }
     }
-    fn trivia(&self, p: usize) -> Option<Entry> {
-        if let Some(definition) = &self.named_trivia {
+    fn trivia(&self, p: usize, definition: Option<&LexicalExpression>) -> Option<Entry> {
+        if let Some(definition) = definition {
             return definition
                 .match_at(self.source, p)
                 .filter(|end| *end > p)
@@ -329,7 +367,7 @@ fn is_trivia(kind: &str) -> bool {
 fn nullable(e: &LexicalExpression) -> bool {
     match e.op {
         Op::LITERAL => e.text.is_empty(),
-        Op::ANY | Op::RANGE | Op::EXCEPT => false,
+        Op::ANY | Op::XID_IDENTIFIER | Op::RANGE | Op::EXCEPT => false,
         Op::EOF | Op::BOF | Op::BOL | Op::EOL | Op::LOOK | Op::NOT | Op::BACKREF => true,
         Op::SEQUENCE => e.children.iter().all(nullable),
         Op::CHOICE => e.children.iter().any(nullable),
@@ -345,7 +383,9 @@ pub fn parse<'a>(
     options: Options,
     terminals: Arc<[Terminal]>,
 ) -> Result<Outcome<'a>, String> {
-    parse_with_trivia(grammar, root, whitespace, source, options, terminals, None)
+    parse_profile(
+        grammar, root, whitespace, source, options, terminals, None, false,
+    )
 }
 #[allow(clippy::too_many_arguments)]
 pub fn parse_with_trivia<'a>(
@@ -357,17 +397,68 @@ pub fn parse_with_trivia<'a>(
     terminals: Arc<[Terminal]>,
     named_trivia: Option<LexicalExpression>,
 ) -> Result<Outcome<'a>, String> {
+    parse_profile(
+        grammar,
+        root,
+        whitespace,
+        source,
+        options,
+        terminals,
+        named_trivia,
+        false,
+    )
+}
+pub fn parse_contextual<'a>(
+    grammar: &SharedGrammar,
+    root: usize,
+    whitespace: bool,
+    source: &'a str,
+    options: Options,
+    terminals: Arc<[Terminal]>,
+) -> Result<Outcome<'a>, String> {
+    parse_profile(
+        grammar, root, whitespace, source, options, terminals, None, true,
+    )
+}
+#[allow(clippy::too_many_arguments)]
+pub fn parse_contextual_with_trivia<'a>(
+    grammar: &SharedGrammar,
+    root: usize,
+    whitespace: bool,
+    source: &'a str,
+    options: Options,
+    terminals: Arc<[Terminal]>,
+    named_trivia: Option<LexicalExpression>,
+) -> Result<Outcome<'a>, String> {
+    parse_profile(
+        grammar,
+        root,
+        whitespace,
+        source,
+        options,
+        terminals,
+        named_trivia,
+        true,
+    )
+}
+#[allow(clippy::too_many_arguments)]
+fn parse_profile<'a>(
+    grammar: &SharedGrammar,
+    root: usize,
+    whitespace: bool,
+    source: &'a str,
+    options: Options,
+    terminals: Arc<[Terminal]>,
+    named_trivia: Option<LexicalExpression>,
+    contextual: bool,
+) -> Result<Outcome<'a>, String> {
     let mut context = ParseContext::with_options(
         source,
         ParseOptions::default().with_diagnostics(Diagnostics::Detailed),
     );
-    context.lexing = Some(Session::with_trivia(
-        source,
-        options,
-        terminals,
-        whitespace,
-        named_trivia,
-    )?);
+    let mut session = Session::with_trivia(source, options, terminals, whitespace, named_trivia)?;
+    session.contextual = contextual;
+    context.lexing = Some(session);
     let parsed = context.parse_shared_grammar(grammar, root, whitespace);
     let root_node = parsed.as_ref().ok().and_then(|p| p.root_node());
     let consumed = context.position();
@@ -385,6 +476,7 @@ pub fn parse_with_trivia<'a>(
         byte_offsets: std::mem::take(&mut context.byte_offsets),
         scopes: std::mem::take(&mut context.scopes),
         recoveries,
+        tokens: (*context.tokens).clone(),
     });
     Ok(Outcome {
         tree,
@@ -399,4 +491,33 @@ pub fn parse_with_trivia<'a>(
         },
         session: context.lexing.take().unwrap(),
     })
+}
+
+fn select_goal(source: &str, position: usize, terminals: &[Terminal]) -> Option<(usize, usize)> {
+    let mut best = None;
+    let mut end = position;
+    for (index, terminal) in terminals.iter().enumerate() {
+        if let Some(next) = terminal
+            .expression
+            .match_at(source, position)
+            .filter(|next| *next > end)
+        {
+            best = Some(index);
+            end = next;
+        }
+    }
+    best.map(|index| (index, end))
+}
+pub(crate) fn match_goal(
+    source: &str,
+    position: usize,
+    name: &str,
+    literal: bool,
+    terminals: &[Terminal],
+) -> Option<usize> {
+    if literal && name.is_empty() {
+        return Some(position);
+    }
+    let (index, end) = select_goal(source, position, terminals)?;
+    (terminals[index].name == name && terminals[index].literal == literal).then_some(end)
 }

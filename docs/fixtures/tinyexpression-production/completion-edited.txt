@@ -1,0 +1,200 @@
+tags:NORMAL
+description:JavaCodeBlockで呼び出しをします
+periodStartInclusive:2018-05-01_00:00:00
+periodEndExclusive:2037-05-01_00:00:00
+siteId:69
+#
+# calculatorNameが指定できるようになった。この名前はdependsOnで指定できる
+#
+calculatorName:callJavaCodeBlock
+
+#
+# 非標準項目。ResultConsumerでここに指定された名前でCalculationContextの変数に結果を格納する
+#
+var:matchNumber
+
+#
+# ここに他の式名(CalculatorName)を指定する事で指定した式を実行した後にこの式を実行する
+#　複数指定する場合はカンマ区切りで指定する
+# 実際はorder numberで実行順を管理していてdependsOnで指定されたCalculatorのorder numberを
+#　このCalculatorのorder number-1に設定するだけである。このorder numberでsortされて順番に実行される
+#
+dependsOn:
+
+#
+# 式の戻り値を指定する
+#　string,boolean,byte,short,int,long,float,doubleを指定する
+#
+resultType:float
+
+#
+#　JavaCodeBlockを指定できる。　複数記述可能
+#　java:の後にfull package class nameを指定する。この例ではdefault packageを指定している
+# 同一のクラス名でロジックを変更したい場合classのunloadは出来ないのでpackage名にversionを入れてversion管理をする
+#
+formula:
+```java:CheckDigits
+//package sample.v1;//version1. if logic updates then update package.
+import org.unlaxer.tinyexpression.CalculationContext;
+
+public class CheckDigits{
+	public boolean check(CalculationContext calculationContext,String target){
+		return target.matches("\\d+");
+	}
+}
+```
+import CheckDigits#check as checkDigits;
+var $input as string set if not exists 'not number' description='入力値';
+if(external returning as boolean checkDigits($input)){
+  1
+}else{
+  0
+}
+---END_OF_PART---
+tags:NORMAL
+description:JavaCodeBlockで呼び出しをします。packageを使用します
+periodStartInclusive:2018-05-01_00:00:00
+periodEndExclusive:2037-05-01_00:00:00
+siteId:69
+calculatorName:callJavaCodeBlockWithPackage
+var:matchAlphabet
+dependsOn:
+resultType:float
+formula:
+```java:sample.v1.CheckAlphabets
+package sample.v1;//version1. if logic updates then update package.
+import org.unlaxer.tinyexpression.CalculationContext;
+
+public class CheckAlphabets{
+	public boolean check(CalculationContext calculationContext,String target){
+		return target.matches("[a-zA-Z]+");
+	}
+}
+```
+import sample.v1.CheckAlphabets#check as checkAlphabets;
+var $inputName as string set if not exists '1234' description='入力値';
+if(external returning as boolean checkAlphabets($inputName)){
+  1
+}else{
+  0
+}
+---END_OF_PART---
+tags:NORMAL
+description:最終的な点数をcheckKindとして出力します
+periodStartInclusive:2018-05-01_00:00:00
+periodEndExclusive:2037-05-01_00:00:00
+siteId:69
+# outputToでcheckKindやfieldやvarなどをしてするけどいらないかな？
+calculatorName:setFloatToMintia
+checkKind:Mintia
+
+#
+# ここに他の式名(CalculatorName)を指定する事で指定した式を実行した後にこの式を実行する
+# 実際はorder numberで実行順を管理していてdependsOnで指定されたCalculatorのorder numberを
+#　このCalculatorのorder number-1に設定するだけである。このorder numberでsortされて順番に実行される
+#　複数指定する場合はカンマ区切りで指定する
+#　この場合setSqrt2ToVarを実行してからこの式が実行される
+#
+dependsOn:setSqrt2ToVar
+resultType:float
+formula:
+match{
+    $mintia == 2 -> $sqrt ,
+    default -> 3.141592
+}
+---END_OF_PART---
+tags:NORMAL
+description:$sqrtにsqrt(2)を代入します
+periodStartInclusive:2018-05-01_00:00:00
+periodEndExclusive:2037-05-01_00:00:00
+siteId:69
+calculatorName:setSqrt2ToVar
+var:sqrt
+dependsOn:
+resultType:float
+formula:
+sqrt(2)
+---END_OF_PART---
+tags:NORMAL
+description:CheckResultのtheScoreに値をセットします
+periodStartInclusive:2018-05-01_00:00:00
+periodEndExclusive:2037-05-01_00:00:00
+siteId:69
+calculatorName:setTheScore
+field:theScore
+dependsOn:
+resultType:float
+formula:
+6969
+---END_OF_PART---
+tags:NORMAL
+description:$nameに文字列を代入します
+periodStartInclusive:2018-05-01_00:00:00
+periodEndExclusive:2037-05-01_00:00:00
+siteId:69
+
+#
+# 非標準項目。ResultConsumerでここに指定された名前でCheckResultのfieldに結果を格納する
+#
+field:theName
+
+#
+# 非標準項目。ResultConsumerでここに指定された名前でCalculationContextの変数に結果を格納する
+#
+var:name
+dependsOn:
+
+#
+# この式ではstringを返す
+#
+resultType:String
+formula:
+"opaopa"
+---END_OF_PART---
+tags:NORMAL
+description:longで計算します
+periodStartInclusive:2018-05-01_00:00:00
+periodEndExclusive:2037-05-01_00:00:00
+siteId:69
+calculatorName:calcLong
+var:ロング計算結果
+dependsOn:
+resultType:Long
+formula:
+423372036854775807+423372036854775807
+---END_OF_PART---
+tags:NORMAL
+description:doubleで計算します
+periodStartInclusive:2018-05-01_00:00:00
+periodEndExclusive:2037-05-01_00:00:00
+siteId:69
+calculatorName:calcDouble
+var:ダブル計算結果
+dependsOn:
+resultType:double
+formula:
+423372036854775807+423372036854775807
+---END_OF_PART---
+tags:NORMAL
+description:booleanで計算します
+periodStartInclusive:2018-05-01_00:00:00
+periodEndExclusive:2037-05-01_00:00:00
+siteId:69
+calculatorName:calcBoolean
+var:真偽値計算結果
+dependsOn:
+resultType:boolean
+formula:
+(1==1)&true|('肉'!='魚')
+---END_OF_PART---
+var:numberType指定真偽値計算結果
+dependsOn:
+resultType:boolean
+
+#
+# 数値の型を指定できる
+#
+numberType:long
+formula:
+(423372036854775807==423372036854775807)&true|('肉'!='魚')
+---END_OF_PART---

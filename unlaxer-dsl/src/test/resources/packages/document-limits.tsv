@@ -1,0 +1,19 @@
+# name	document	unit	bytes	expected
+manifest-ascii-below	manifest	a	8388607	OK
+manifest-ascii-at	manifest	a	8388608	OK
+manifest-ascii-above	manifest	a	8388609	LIMIT
+manifest-japanese-below	manifest	あ	8388607	OK
+manifest-japanese-at	manifest	あ	8388608	OK
+manifest-japanese-above	manifest	あ	8388609	LIMIT
+manifest-emoji-below	manifest	😀	8388607	OK
+manifest-emoji-at	manifest	😀	8388608	OK
+manifest-emoji-above	manifest	😀	8388609	LIMIT
+lock-ascii-below	lock	a	8388607	OK
+lock-ascii-at	lock	a	8388608	OK
+lock-ascii-above	lock	a	8388609	LIMIT
+lock-japanese-below	lock	あ	8388607	OK
+lock-japanese-at	lock	あ	8388608	OK
+lock-japanese-above	lock	あ	8388609	LIMIT
+lock-emoji-below	lock	😀	8388607	OK
+lock-emoji-at	lock	😀	8388608	OK
+lock-emoji-above	lock	😀	8388609	LIMIT

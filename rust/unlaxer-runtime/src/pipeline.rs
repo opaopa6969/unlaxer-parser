@@ -38,6 +38,12 @@ pub struct Phase {
     pub configuration_keys: Vec<String>,
     pub executes_user_code: bool,
 }
+/// A phase is inactive unless this key has exactly the expected configuration value.
+#[derive(Debug, Clone)]
+pub struct Condition {
+    pub key: String,
+    pub expected: String,
+}
 pub struct Request {
     pub phase: Phase,
     pub inputs: BTreeMap<String, Snapshot>,
@@ -62,6 +68,7 @@ pub struct EvaluationResult {
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Signature {
+    inactive: bool,
     inputs: Vec<Snapshot>,
     configuration: BTreeMap<String, String>,
     dependencies: Vec<u64>,
@@ -88,6 +95,7 @@ impl Value {
 pub struct AnalysisPipeline {
     phases: HashMap<String, Phase>,
     executors: HashMap<String, Box<dyn Executor>>,
+    conditions: HashMap<String, Condition>,
     cache: HashMap<String, Cached>,
     revision: u64,
 }
@@ -95,6 +103,13 @@ impl AnalysisPipeline {
     pub fn new(
         definitions: Vec<Phase>,
         executors: HashMap<String, Box<dyn Executor>>,
+    ) -> Result<Self> {
+        Self::with_conditions(definitions, executors, HashMap::new())
+    }
+    pub fn with_conditions(
+        definitions: Vec<Phase>,
+        executors: HashMap<String, Box<dyn Executor>>,
+        conditions: HashMap<String, Condition>,
     ) -> Result<Self> {
         let mut phases = HashMap::new();
         for phase in definitions {
@@ -124,9 +139,19 @@ impl AnalysisPipeline {
                 return Err("missing phase dependency");
             }
         }
+        if conditions.keys().any(|id| !phases.contains_key(id)) {
+            return Err("missing conditional phase");
+        }
+        if conditions
+            .values()
+            .any(|condition| condition.key.is_empty())
+        {
+            return Err("empty condition key");
+        }
         Ok(Self {
             phases,
             executors,
+            conditions,
             cache: HashMap::new(),
             revision: 0,
         })
@@ -191,6 +216,54 @@ impl Evaluation<'_> {
         }
         self.visited += 1;
         let phase = self.pipeline.phases[id].clone();
+        let condition = self.pipeline.conditions.get(id).cloned();
+        let mut condition_settings = BTreeMap::new();
+        if let Some(condition) = &condition {
+            if let Some(value) = self.configuration.get(&condition.key) {
+                condition_settings.insert(condition.key.clone(), value.clone());
+            }
+            if self.configuration.get(&condition.key) != Some(&condition.expected) {
+                let signature = Signature {
+                    inactive: true,
+                    inputs: vec![],
+                    configuration: condition_settings,
+                    dependencies: vec![],
+                };
+                if let Some(previous) = self.pipeline.cache.get(id) {
+                    if previous.signature == signature {
+                        self.reused.push(id.into());
+                        let value = Value {
+                            artifact: previous.artifact.clone(),
+                            revision: Some(previous.revision),
+                        };
+                        self.finished.insert(id.into(), value.clone());
+                        return Ok(value);
+                    }
+                }
+                let artifact = Artifact::empty(State::Inactive);
+                self.pipeline.revision = self
+                    .pipeline
+                    .revision
+                    .checked_add(1)
+                    .ok_or("revision overflow")?;
+                let revision = self.pipeline.revision;
+                self.pipeline.cache.insert(
+                    id.into(),
+                    Cached {
+                        signature,
+                        artifact: artifact.clone(),
+                        revision,
+                    },
+                );
+                self.evaluated.push(id.into());
+                let value = Value {
+                    artifact,
+                    revision: Some(revision),
+                };
+                self.finished.insert(id.into(), value.clone());
+                return Ok(value);
+            }
+        }
         if (phase.executes_user_code && !self.allow_user_code)
             || !self.pipeline.executors.contains_key(id)
         {
@@ -205,7 +278,7 @@ impl Evaluation<'_> {
             inputs.insert(key.clone(), input.clone());
             input_signature.push(input.clone());
         }
-        let mut settings = BTreeMap::new();
+        let mut settings = condition_settings;
         for key in &phase.configuration_keys {
             if let Some(value) = self.configuration.get(key) {
                 settings.insert(key.clone(), value.clone());
@@ -224,6 +297,7 @@ impl Evaluation<'_> {
                 versions.push(revision);
             }
             let signature = Signature {
+                inactive: false,
                 inputs: input_signature,
                 configuration: settings.clone(),
                 dependencies: versions,

@@ -1,0 +1,17 @@
+# name	action	cursorCP
+original	validate	0
+unicode-crlf	validate	0
+type-error	validate	0
+completion	completion	1074
+moved	topology	0
+deleted	topology	0
+added	topology	0
+unclosed	topology	0
+no-formula	reject	0
+unicode-crlf-error	validate	0
+duplicate	reject	0
+empty-metadata	reject	0
+empty-formula	reject	0
+malformed-outer	reject	0
+comments	topology	0
+nbsp-comment	topology	0

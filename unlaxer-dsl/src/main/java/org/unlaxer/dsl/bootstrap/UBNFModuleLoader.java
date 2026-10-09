@@ -96,8 +96,12 @@ public final class UBNFModuleLoader {
         var rules = new ArrayList<RuleDecl>();
         for (var rule : grammar.rules()) {
             var annotations = new ArrayList<Annotation>();
-            for (var annotation : rule.annotations()) annotations.add(annotation instanceof WhitespaceAnnotation value
-                && value.style().isPresent() ? new WhitespaceAnnotation(java.util.Optional.of(policy(value.style().get(), imported, tokens, used, synthetic))) : annotation);
+            for (var annotation : rule.annotations()) {
+                if (annotation instanceof LexicalContextAnnotation value) {
+                    annotations.add(new LexicalContextAnnotation(value.tokens().stream().map(name -> policy(name, imported, tokens, used, synthetic)).toList(), value.literals()));
+                } else annotations.add(annotation instanceof WhitespaceAnnotation value
+                    && value.style().isPresent() ? new WhitespaceAnnotation(java.util.Optional.of(policy(value.style().get(), imported, tokens, used, synthetic))) : annotation);
+            }
             rules.add(new RuleDecl(annotations, rule.name(), body(rule.body(), imported, tokens, used, synthetic)));
         }
         return new GrammarDecl(grammar.name(), List.of(), settings, tokens, rules);

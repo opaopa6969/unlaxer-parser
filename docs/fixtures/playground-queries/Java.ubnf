@@ -1,0 +1,7 @@
+grammar Java {
+  @ubnf: v2
+  @whitespace: javaStyle
+  @embedding: enabled
+  @root @mapping(Document)
+  CompilationUnit ::= 'foo' 'far' 'foo' 'f' ';';
+}

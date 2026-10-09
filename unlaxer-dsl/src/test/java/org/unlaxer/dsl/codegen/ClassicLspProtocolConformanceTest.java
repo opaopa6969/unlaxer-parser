@@ -76,6 +76,16 @@ public class ClassicLspProtocolConformanceTest {
         JsonObject initialized=wire.request("initialize",Map.of("capabilities",Map.of()));
         assertEquals(1,initialized.getAsJsonObject("capabilities").get("textDocumentSync").getAsInt());
         assertNotNull(initialized.getAsJsonObject("capabilities").get("completionProvider"));
+        var consumer=initialized.getAsJsonObject("capabilities").getAsJsonObject("experimental").getAsJsonObject("languageQueryConsumer");
+        assertEquals(1,consumer.get("schemaVersion").getAsInt());
+        var operations=consumer.getAsJsonObject("operations");assertEquals(7,operations.size());
+        for(String name:List.of("VALIDATE","COMPLETION","HOVER","DEFINITION","RENAME","FORMAT","CODE_ACTION")) {
+            var operation=operations.getAsJsonObject(name);
+            assertEquals(name,Set.of("VALIDATE","COMPLETION","HOVER","DEFINITION").contains(name),operation.get("transport").getAsBoolean());
+            assertFalse(name,operation.get("providerRegistered").getAsBoolean());
+            assertTrue(name,operation.get("profileAllowed").getAsBoolean());
+            assertFalse(name,operation.get("available").getAsBoolean());
+        }
         wire.notify("initialized",Map.of());
         var rows=Files.readAllLines(ROOT.resolve("docs/fixtures/classic-lsp/positions.tsv")).stream().filter(l->!l.startsWith("#")).toList();assertEquals(18,rows.size());
         int version=0;String uri="file:///wire😀";

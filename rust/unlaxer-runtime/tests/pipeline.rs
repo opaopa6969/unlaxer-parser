@@ -382,3 +382,194 @@ fn shared_dependencies_are_evaluated_once_within_budget() {
         AnalysisPipeline::new(vec![phase("a", &["missing"], &[], &[])], HashMap::new()).is_err()
     );
 }
+
+#[test]
+fn conditional_phases_skip_inputs_dependencies_and_user_code() {
+    let guard_calls = Rc::new(Cell::new(0));
+    let leaf_calls = Rc::new(Cell::new(0));
+    let guard_count = guard_calls.clone();
+    let leaf_count = leaf_calls.clone();
+    let mut guarded = phase("guard", &["leaf"], &[], &[]);
+    guarded.executes_user_code = true;
+    let mut executors: HashMap<String, Box<dyn Executor>> = HashMap::new();
+    executors.insert(
+        "root".into(),
+        Box::new(|r: &Request| Ok(r.dependencies["guard"].clone())),
+    );
+    executors.insert(
+        "guard".into(),
+        Box::new(move |r: &Request| {
+            assert_eq!(r.configuration["enabled"], "true");
+            guard_count.set(guard_count.get() + 1);
+            Ok(r.dependencies["leaf"].clone())
+        }),
+    );
+    executors.insert(
+        "leaf".into(),
+        Box::new(move |r: &Request| {
+            leaf_count.set(leaf_count.get() + 1);
+            Ok(source(&r.inputs["included"]))
+        }),
+    );
+    let mut pipeline = AnalysisPipeline::with_conditions(
+        vec![
+            phase("root", &["guard"], &[], &[]),
+            guarded,
+            phase("leaf", &[], &["included"], &[]),
+        ],
+        executors,
+        HashMap::from([(
+            "guard".into(),
+            Condition {
+                key: "enabled".into(),
+                expected: "true".into(),
+            },
+        )]),
+    )
+    .unwrap();
+    let mut expected_calls = 0;
+    for line in include_str!("../../../docs/fixtures/pipeline/conditions.tsv")
+        .lines()
+        .filter(|l| !l.starts_with('#'))
+    {
+        let f: Vec<_> = line.split('\t').collect();
+        let inputs = if f[3] == "-" {
+            BTreeMap::new()
+        } else {
+            BTreeMap::from([(
+                "included".into(),
+                Snapshot::new("include", f[2].parse().unwrap(), f[3]).unwrap(),
+            )])
+        };
+        let mut settings = BTreeMap::from([("unrelated".into(), f[0].into())]);
+        if f[1] != "-" {
+            settings.insert("enabled".into(), f[1].into());
+        }
+        let result = pipeline
+            .evaluate(
+                "root",
+                inputs,
+                settings,
+                f[5].parse().unwrap(),
+                f[4] == "true",
+            )
+            .unwrap();
+        assert_eq!(
+            format!("{:?}", result.artifact.state).to_uppercase(),
+            f[6],
+            "{}",
+            f[0]
+        );
+        assert_eq!(
+            result.artifact.payload,
+            if f[7] == "-" { "" } else { f[7] },
+            "{}",
+            f[0]
+        );
+        assert_eq!(
+            result.evaluated.join(","),
+            if f[8] == "-" { "" } else { f[8] },
+            "{}",
+            f[0]
+        );
+        assert_eq!(
+            result.reused.join(","),
+            if f[9] == "-" { "" } else { f[9] },
+            "{}",
+            f[0]
+        );
+        if f[8].contains("leaf") {
+            expected_calls += 1;
+        }
+        assert_eq!(guard_calls.get(), expected_calls, "{}", f[0]);
+        assert_eq!(leaf_calls.get(), expected_calls, "{}", f[0]);
+    }
+}
+#[test]
+fn inactive_conditions_cut_cycles_and_do_not_require_an_executor() {
+    let mut executors: HashMap<String, Box<dyn Executor>> = HashMap::new();
+    for id in ["a", "b"] {
+        executors.insert(
+            id.into(),
+            Box::new(|r: &Request| Ok(r.dependencies.values().next().unwrap().clone())),
+        );
+    }
+    let condition = Condition {
+        key: "enabled".into(),
+        expected: "true".into(),
+    };
+    let mut cyclic = AnalysisPipeline::with_conditions(
+        vec![phase("a", &["b"], &[], &[]), phase("b", &["a"], &[], &[])],
+        executors,
+        HashMap::from([("a".into(), condition.clone())]),
+    )
+    .unwrap();
+    assert_eq!(
+        cyclic
+            .evaluate("a", BTreeMap::new(), BTreeMap::new(), 1, false)
+            .unwrap()
+            .artifact
+            .state,
+        State::Inactive
+    );
+    assert_eq!(
+        cyclic
+            .evaluate(
+                "a",
+                BTreeMap::new(),
+                BTreeMap::from([("enabled".into(), "true".into())]),
+                2,
+                false
+            )
+            .unwrap()
+            .artifact
+            .state,
+        State::Cycle
+    );
+    let mut absent = AnalysisPipeline::with_conditions(
+        vec![phase("a", &[], &["missing"], &[])],
+        HashMap::new(),
+        HashMap::from([("a".into(), condition.clone())]),
+    )
+    .unwrap();
+    assert_eq!(
+        absent
+            .evaluate("a", BTreeMap::new(), BTreeMap::new(), 1, false)
+            .unwrap()
+            .artifact
+            .state,
+        State::Inactive
+    );
+    assert_eq!(
+        absent
+            .evaluate(
+                "a",
+                BTreeMap::new(),
+                BTreeMap::from([("enabled".into(), "true".into())]),
+                1,
+                false
+            )
+            .unwrap()
+            .artifact
+            .state,
+        State::Unsupported
+    );
+    assert!(AnalysisPipeline::with_conditions(
+        vec![],
+        HashMap::new(),
+        HashMap::from([("missing".into(), condition)])
+    )
+    .is_err());
+    assert!(AnalysisPipeline::with_conditions(
+        vec![phase("a", &[], &[], &[])],
+        HashMap::new(),
+        HashMap::from([(
+            "a".into(),
+            Condition {
+                key: "".into(),
+                expected: "".into()
+            }
+        )])
+    )
+    .is_err());
+}

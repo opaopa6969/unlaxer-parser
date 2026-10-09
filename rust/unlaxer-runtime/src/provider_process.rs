@@ -143,12 +143,58 @@ impl language_queries::Provider for ProviderProcess {
             Status::Timeout => State::Timeout,
             Status::Failed => State::Failed,
         };
+        let mut items = response.items;
+        if request.operation == Operation::Validate {
+            for diagnostic in response.diagnostics {
+                items.push(language_queries::Item {
+                    label: diagnostic.code,
+                    detail: diagnostic.message,
+                    locations: diagnostic.locations,
+                    edits: vec![],
+                });
+            }
+        }
         Ok(language_queries::Response {
             snapshot: request.region.source_map.output().clone(),
             project: request.project.id.clone(),
             project_version: request.project.version,
             state,
-            items: response.items,
+            items,
+        })
+    }
+    fn diagnostics(
+        &self,
+        request: &language_queries::Request<'_>,
+    ) -> Result<language_queries::DiagnosticResponse> {
+        if request.operation != Operation::Validate {
+            return Err("diagnostics require VALIDATE");
+        }
+        let response = self.invoke(&Request {
+            id: &request.region.id,
+            provider: &self.identity,
+            language: &request.region.language,
+            region: &request.region.id,
+            snapshot: request.region.source_map.output(),
+            project: request.project,
+            operation: Operation::Validate,
+            cursor: 0,
+            parameters: request.parameters,
+            execute_user_code: false,
+        })?;
+        let state = match response.status {
+            Status::Ok => State::Complete,
+            Status::Diagnostics => State::Partial,
+            Status::Unavailable => State::Unavailable,
+            Status::Unsupported => State::Unsupported,
+            Status::Timeout => State::Timeout,
+            Status::Failed => State::Failed,
+        };
+        Ok(language_queries::DiagnosticResponse {
+            snapshot: request.region.source_map.output().clone(),
+            project: request.project.id.clone(),
+            project_version: request.project.version,
+            state,
+            diagnostics: response.diagnostics,
         })
     }
 }
