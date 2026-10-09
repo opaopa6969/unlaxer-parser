@@ -168,6 +168,7 @@ fn generate_resolved(
     });
     asset!("src/editor_adapter.rs", "playground/editor_adapter.rs");
     asset!("src/region_adapter.rs", "playground/region_adapter.rs");
+    asset!("src/query_adapter.rs", "playground/query_adapter.rs");
     asset!("public/index.html", "playground/index.html");
     asset!("public/playground.css", "playground/playground.css");
     asset!("public/playground.js", "playground/playground.js");
