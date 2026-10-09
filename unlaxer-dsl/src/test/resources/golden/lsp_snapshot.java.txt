@@ -19,6 +19,7 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
 
     protected LanguageClient client;
     protected final Map<String, DocumentState> documents = new HashMap<>();
+    protected final Map<String, Long> documentVersions = new HashMap<>();
 
     public SnapshotLanguageServer() {}
 
@@ -223,6 +224,46 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
         return new Position(line, column);
     }
 
+    /** Opt-in immutable editor result. Exact URI, version and source must match this request. */
+    protected org.unlaxer.dsl.semantic.EditorParseResult<?> editorParseResult(String uri, long version, String source) {
+        return null;
+    }
+    
+    private java.util.List<CompletionItem> editorCompletionItems(CompletionParams params, String source) {
+        String uri = params.getTextDocument().getUri();
+        long version = documentVersions.getOrDefault(uri, 0L);
+        var result = editorParseResult(uri, version, source);
+        if (result == null || !result.uri().equals(uri) || result.version() != version || !result.source().equals(source)) return List.of();
+        Position position = params.getPosition();
+        if (position.getLine() < 0 || position.getCharacter() < 0) return List.of();
+        int start = 0;
+        for (int line = 0; line < position.getLine(); line++) {
+            int next = source.indexOf('\n', start);
+            if (next < 0) return List.of();
+            start = next + 1;
+        }
+        int end = source.indexOf('\n', start);
+        if (end < 0) end = source.length();
+        if (end > start && source.charAt(end - 1) == '\r') end--;
+        int offset = start + position.getCharacter();
+        if (offset > end || offset > 0 && offset < source.length() && Character.isHighSurrogate(source.charAt(offset - 1)) && Character.isLowSurrogate(source.charAt(offset))) return List.of();
+        int prefixStart = offset;
+        while (prefixStart > start && Character.isUnicodeIdentifierPart(source.codePointBefore(prefixStart))) prefixStart -= Character.charCount(source.codePointBefore(prefixStart));
+        String prefix = source.substring(prefixStart, offset);
+        int cursor = source.codePointCount(0, offset);
+        java.util.List<CompletionItem> items = new ArrayList<>();
+        for (var completion : result.completeAt(cursor, null, version, prefix)) {
+            CompletionItem item = new CompletionItem(completion.symbol().name());
+            item.setKind(CompletionItemKind.Variable);
+            item.setDetail(completion.symbol().type() + " · " + String.join(", ", completion.expectedTypes()));
+            item.setData(Map.of("status", result.status().name(), "version", version, "expectedTypes", completion.expectedTypes()));
+            item.setTextEdit(Either.forLeft(new TextEdit(new Range(offsetToPosition(source, prefixStart), position), completion.symbol().name())));
+            items.add(item);
+        }
+        return items;
+    }
+    
+    
     // Hook: additional completion items (for metadata, language-specific keywords)
     protected java.util.List<CompletionItem> additionalCompletionItems(
             CompletionParams params, String documentContent) {
@@ -296,6 +337,7 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
 
         @Override
         public void didOpen(DidOpenTextDocumentParams params) {
+            server.documentVersions.put(params.getTextDocument().getUri(), (long) params.getTextDocument().getVersion());
             server.parseDocument(
                 params.getTextDocument().getUri(),
                 params.getTextDocument().getText());
@@ -303,6 +345,8 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
 
         @Override
         public void didChange(DidChangeTextDocumentParams params) {
+            Integer version = params.getTextDocument().getVersion();
+            server.documentVersions.put(params.getTextDocument().getUri(), version == null ? server.documentVersions.getOrDefault(params.getTextDocument().getUri(), 0L) + 1 : version.longValue());
             server.parseDocumentIncremental(
                 params.getTextDocument().getUri(),
                 params.getContentChanges().get(0).getText());
@@ -311,6 +355,7 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
         @Override
         public void didClose(DidCloseTextDocumentParams params) {
             server.documents.remove(params.getTextDocument().getUri());
+            server.documentVersions.remove(params.getTextDocument().getUri());
         }
 
         @Override
@@ -328,6 +373,7 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
             String uri = params.getTextDocument().getUri();
             DocumentState state = server.documents.get(uri);
             String content = state != null ? state.content() : "";
+            items.addAll(server.editorCompletionItems(params, content));
             java.util.List<CompletionItem> additional = server.additionalCompletionItems(params, content);
             if (additional != null && !additional.isEmpty()) {
                 items.addAll(additional);
