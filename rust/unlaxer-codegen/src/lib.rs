@@ -330,6 +330,11 @@ fn expression(expr: &Expression) -> String {
         Delimited(child) => format!("Expr::Sequence(vec![{}])", expression(child)),
         TextValue(child) => format!("{}.text_value()", expression(child)),
         ValueBoundary(child) => format!("{}.value_boundary()", expression(child)),
+        LexicalTriviaScope { child, definition } => format!(
+            "{}.lexical_trivia_scope({})",
+            expression(child),
+            lexical_expression(definition)
+        ),
         TriviaScope {
             child,
             java_whitespace,
