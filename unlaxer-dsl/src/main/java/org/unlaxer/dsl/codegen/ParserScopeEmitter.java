@@ -9,7 +9,7 @@ final class ParserScopeEmitter {
 
     static String helpers(GrammarDecl grammar) {
         if (grammar.rules().stream().noneMatch(rule -> rule.annotations().stream().anyMatch(annotation ->
-                annotation instanceof DeclaresAnnotation || annotation instanceof BackrefAnnotation))) {
+                annotation instanceof DeclaresAnnotation || annotation instanceof BackrefAnnotation || annotation instanceof NamePredicateAnnotation))) {
             return "";
         }
         String boundaries = grammar.rules().stream().map(rule -> rule.name() + "Parser.class")
