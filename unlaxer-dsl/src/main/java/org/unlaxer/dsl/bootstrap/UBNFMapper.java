@@ -732,7 +732,7 @@ public class UBNFMapper {
     }
 
     private WhitespaceAnnotation mapWhitespaceAnnotation(Token token) {
-        List<Token> identifiers = findDescendants(token, UBNFParsers.IdentifierParser.class);
+        List<Token> identifiers = findDescendants(token, UBNFParsers.DottedIdentifierParser.class);
         Optional<String> style = identifiers.isEmpty()
             ? Optional.empty()
             : Optional.of(identifiers.get(0).source.toString().trim());

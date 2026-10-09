@@ -834,7 +834,7 @@ public class UBNFParsers {
                         public Parsers getLazyParsers() {
                             return new Parsers(
                                 Parser.get(LeftParenthesisParser.class),
-                                Parser.get(IdentifierParser.class),
+                                Parser.get(DottedIdentifierParser.class),
                                 Parser.get(RightParenthesisParser.class)
                             );
                         }
