@@ -2713,6 +2713,14 @@ impl<'a> ParseContext<'a> {
 
     fn skip(&mut self) {
         if let Some(definition) = &self.lexical_trivia {
+            if let Some(session) = &mut self.lexing {
+                let end = session.skip(self.position);
+                if end != self.position {
+                    self.position = end;
+                    self.matched_position = end;
+                }
+                return;
+            }
             while let Some(end) = definition.match_at(self.input, self.position) {
                 if end <= self.position {
                     break;

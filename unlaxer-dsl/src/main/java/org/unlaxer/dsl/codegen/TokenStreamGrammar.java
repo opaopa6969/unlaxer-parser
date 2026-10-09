@@ -17,6 +17,11 @@ public final class TokenStreamGrammar {
         return grammar.settings().stream().anyMatch(s -> s.key().equals("whitespace")
             && s.value() instanceof StringSettingValue v && v.value().trim().equalsIgnoreCase("javaStyle"));
     }
+    public static LexicalExpression namedTrivia(GrammarDecl grammar) {
+        String style = grammar.settings().stream().filter(s -> s.key().equals("whitespace"))
+            .map(s -> ((StringSettingValue)s.value()).value()).findFirst().orElse("none");
+        return org.unlaxer.dsl.bootstrap.WhitespaceDefinitions.resolve(style, LexicalCompiler.compile(grammar));
+    }
     public static List<Problem> problems(GrammarDecl grammar) {
         if (!enabled(grammar)) return List.of();
         var issues = new ArrayList<Problem>();
@@ -29,8 +34,7 @@ public final class TokenStreamGrammar {
         if (grammar.settings().stream().noneMatch(s -> s.key().equals("ubnf")
                 && s.value() instanceof StringSettingValue v && v.value().equals("v2")))
             issues.add(new Problem("E-TOKEN-STREAM-VERSION", "tokenStream", settings.get(0)));
-        for (var s : grammar.settings()) if (s.key().equals("comment") || s.key().equals("whitespace")
-            && s.value() instanceof StringSettingValue value && !value.value().equalsIgnoreCase("javaStyle") && !value.value().equalsIgnoreCase("none"))
+        for (var s : grammar.settings()) if (s.key().equals("comment"))
             issues.add(new Problem("E-TOKEN-STREAM-TRIVIA", s.key(), s));
         Map<String, LexicalExpression> programs;
         try { programs = LexicalCompiler.compile(grammar); }
@@ -90,7 +94,10 @@ public final class TokenStreamGrammar {
         out.append(String.join(",\n", rows)).append("\n    );\n\n")
             .append("    public static org.unlaxer.dsl.runtime.Lexing.Outcome parseWithLexing(String source, org.unlaxer.dsl.runtime.Lexing.Options options) {\n")
             .append("        return org.unlaxer.dsl.runtime.Lexing.parse(getRootParser(), source, options, __LEXICAL_TERMINALS, ")
-            .append(whitespace(grammar)).append(");\n    }\n\n");
+            .append(whitespace(grammar));
+        var trivia = namedTrivia(grammar);
+        if (trivia != null) out.append(", ").append(LexicalCompiler.javaExpression(trivia));
+        out.append(");\n    }\n\n");
         return out.toString();
     }
 }

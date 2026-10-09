@@ -48,6 +48,7 @@ public final class PlaygroundGenerator {
             files.put("public/help/" + name, resource("ubnf-help/" + name));
         }
         files.put("public/grammar.ubnf", source);
+        files.put("public/vocabulary.json", org.unlaxer.dsl.tooling.VocabularyOrigins.inspect(path).toString() + "\n");
         return java.util.Collections.unmodifiableMap(files);
     }
 

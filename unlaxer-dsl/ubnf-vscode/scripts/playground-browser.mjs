@@ -14,7 +14,12 @@ try {
   const catalog = JSON.parse(await readFile(path.join(repo, 'unlaxer-dsl/src/main/resources/ubnf-help/catalog.json'), 'utf8'));
   const sample = catalog.examples.find(example => example.id === 'assignment');
   const grammar = path.join(scratch, 'language.ubnf'), project = path.join(scratch, 'project');
-  await writeFile(grammar, sample.source.replace("@root", "@root\n  @doc('<img src=x onerror=alert(1)>')"));
+  await writeFile(grammar, sample.source.replace(/grammar\s+\w+\s*\{/, "$&\n  @import layout from 'pkg:std/layout'")
+    .replace('@whitespace: javaStyle', '@whitespace: layout.SPACES_AND_COMMENTS')
+    .replace("@root", "@root\n  @doc('<img src=x onerror=alert(1)>')"));
+  const manifest = path.join(scratch, 'ubnf.json');
+  await writeFile(manifest, JSON.stringify({schemaVersion:1,dependencies:{'std/layout':{version:'1.0.0',source:'builtin:std/layout@1.0.0'}}}));
+  await promisify(execFile)(path.join(repo, 'rust/target/debug/unlaxer'), ['deps', 'resolve', '--manifest', manifest]);
   await promisify(execFile)(path.join(repo, 'rust/target/debug/unlaxer'), ['playground', '--grammar', grammar, '--output', project]);
   await promisify(execFile)(process.execPath, [path.join(project, 'build.mjs')], {timeout: 60000});
   server = spawn(process.execPath, [path.join(project, 'serve.mjs')], {stdio: ['ignore', 'pipe', 'pipe']});
@@ -32,6 +37,14 @@ try {
   await page.goto(url);
   await page.getByRole('button', {name: '解析する', exact: true}).waitFor();
   await page.waitForFunction(() => !document.getElementById('parse').disabled);
+  assert.match(await page.locator('#vocabulary').textContent(), /std\/layout@1\.0\.0/);
+  assert.match(await page.locator('#vocabulary').textContent(), /layout\.SPACES_AND_COMMENTS/);
+  assert.match(await page.locator('#vocabulary').textContent(), /sha256 [0-9a-f]{64}/);
+  assert.equal(await page.locator('#vocabulary img').count(), 0);
+  await page.getByText('空白・コメントの定義と出典', {exact:true}).click();
+  await page.getByText('layout.SPACES', {exact:true}).click();
+  assert.equal(await page.locator('#vocabulary pre').first().isVisible(), true);
+  assert.match(await page.locator('#vocabulary pre').first().textContent(), /token SPACES/);
   assert.match(await page.locator('#catalog').textContent(), /price = 12/);
   assert.equal(await page.locator('#catalog img').count(), 0);
   assert.match(await page.locator('#catalog').textContent(), /<img/);
