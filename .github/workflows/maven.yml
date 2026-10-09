@@ -1,8 +1,8 @@
 name: Java CI with Maven
 
-# Repository-scoped self-hosted runner. The custom label avoids picking up old
-# queued jobs that target only the generic self-hosted label.
-# Maven dependencies persist locally; do not transfer the multi-GB remote cache.
+# Standard hosted runners keep independent jobs off the shared development disk.
+# This is a public repository; standard runners do not incur execution charges.
+# Do not restore or upload the multi-GB local Maven repository as a remote cache.
 
 on:
   push:
@@ -10,10 +10,19 @@ on:
   pull_request:
     branches: [ "master" ]
 
+# Superseded revisions of one PR can stop; other PRs and master runs are independent.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_INCREMENTAL: '0'
+
 jobs:
   rust:
     name: Rust backend and Java conformance
-    runs-on: [unlaxer-parser-ci, Linux, X64]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-java@v4
@@ -55,7 +64,7 @@ jobs:
       working-directory: unlaxer-dsl/ubnf-vscode
       run: |
         npm ci
-        npx playwright install chromium
+        npx playwright install --with-deps chromium
         node scripts/playground-browser.mjs
         node --test scripts/completion.test.mjs
         node scripts/learning-browser.mjs
@@ -189,7 +198,8 @@ jobs:
         if-no-files-found: error
 
   build:
-    runs-on: [unlaxer-parser-ci, Linux, X64]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
 
     steps:
     - uses: actions/checkout@v4
@@ -231,7 +241,8 @@ jobs:
   # class file major 61 in every class of their jars.
   build-jdk17:
     name: "*-jdk17 artifacts on JDK 17"
-    runs-on: [unlaxer-parser-ci, Linux, X64]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
 
     steps:
     - uses: actions/checkout@v4
@@ -255,7 +266,8 @@ jobs:
   # release-vsix.yml を参照。
   vsix:
     name: UBNF VSIX (ubnf-vscode)
-    runs-on: [unlaxer-parser-ci, Linux, X64]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
 
     steps:
     - uses: actions/checkout@v4
@@ -281,7 +293,7 @@ jobs:
     - name: Verify authoring help in Chromium and the webview host
       working-directory: unlaxer-dsl/ubnf-vscode
       run: |
-        npx playwright install chromium
+        npx playwright install --with-deps chromium
         npm run test:help
 
     - name: Activate the packaged VSIX with isolated VS Code profiles
@@ -305,7 +317,8 @@ jobs:
   # ビルド中の unlaxer に対して downstream の smoke を回し、再発を防ぐ。
   downstream:
     name: Downstream smoke (tinyexpression)
-    runs-on: [unlaxer-parser-ci, Linux, X64]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
 
     steps:
     - uses: actions/checkout@v4
