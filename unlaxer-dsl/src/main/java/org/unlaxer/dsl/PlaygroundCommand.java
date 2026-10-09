@@ -13,7 +13,7 @@ import org.unlaxer.dsl.codegen.rust.PlaygroundGenerator;
 /** New-directory-only generation: grammar text cannot overwrite user files. */
 final class PlaygroundCommand {
     private PlaygroundCommand() {}
-    private static final String USAGE = "Usage: playground --grammar <file.ubnf> --output <new-directory> [--check]";
+    private static final String USAGE = "Usage: playground (--grammar <file.ubnf> | --profile <profile.tsv>) --output <new-directory> [--check]";
 
     static int run(String[] args, PrintStream out, PrintStream err) {
         if (args.length == 2 && args[1].equals("--help")) { out.println(USAGE); return 0; }
@@ -26,14 +26,15 @@ final class PlaygroundCommand {
                     if (check) throw new IllegalArgumentException("duplicate --check");
                     check = true; continue;
                 }
-                if ((!option.equals("--grammar") && !option.equals("--output")) || i + 1 == args.length
+                if ((!option.equals("--grammar") && !option.equals("--profile") && !option.equals("--output")) || i + 1 == args.length
                     || args[i + 1].isBlank() || args[i + 1].startsWith("--")) throw new IllegalArgumentException(USAGE);
                 if (options.putIfAbsent(option, args[++i]) != null) throw new IllegalArgumentException("duplicate " + option);
             }
-            if (options.size() != 2) throw new IllegalArgumentException(USAGE);
+            if (options.size() != 2 || !options.containsKey("--output") || options.containsKey("--grammar") == options.containsKey("--profile")) throw new IllegalArgumentException(USAGE);
         } catch (IllegalArgumentException e) { err.println(e.getMessage()); return 2; }
         try {
-            var files = PlaygroundGenerator.generate(Path.of(options.get("--grammar")));
+            var files = options.containsKey("--profile") ? PlaygroundGenerator.generateProfile(Path.of(options.get("--profile")))
+                : PlaygroundGenerator.generate(Path.of(options.get("--grammar")));
             Path given = Path.of(options.get("--output")).toAbsolutePath();
             rejectLinks(given);
             Path output = given.normalize();

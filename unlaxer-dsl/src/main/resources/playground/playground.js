@@ -115,6 +115,22 @@
     const response = await fetch(name); if (!response.ok) throw new Error(`${name}: HTTP ${response.status}`);
     return binary ? response.arrayBuffer() : response.text();
   }
+  if (document.body.dataset.profile) {
+    $('profile-panel').hidden = false;
+    load(document.body.dataset.profile).then(text => {
+      const rows = text.trimEnd().split('\n').map(line => line.split('\t'));
+      const value = name => rows.find(row => row[0] === name)?.slice(1).join(' · ') || '';
+      $('profile').append(element('p', `${value('language')} · 対象 ${value('target')} · ${value('package')}`));
+      const labels = {SUPPORTED: '対応', PARTIAL: '部分対応', EXTERNAL: '外部解析器が必要', UNSUPPORTED: '未対応'};
+      const categories = {entry: '入口', capability: '操作', syntax: '構文'};
+      const table = element('table');
+      for (const row of rows.filter(row => categories[row[0]])) {
+        const line = element('tr'); line.append(element('th', categories[row[0]]), element('td', row[1]), element('td', labels[row[2]])); table.append(line);
+      }
+      $('profile').append(table);
+    })
+      .catch(() => { $('profile').textContent = '対応範囲を読み込めません。解析結果から対応能力を推測しないでください。'; });
+  }
   if (host) document.querySelector('header a').addEventListener('click', event => { event.preventDefault(); host.postMessage({type: 'openHelp'}); });
   Promise.all([load(document.body.dataset.wasm || 'language.wasm', true), load(document.body.dataset.worker || 'worker.js'), load(document.body.dataset.grammar || 'grammar.ubnf')]).then(([bytes, source, grammar]) => {
     wasm = bytes; workerSource = source; $('grammar').textContent = grammar; startWorker();

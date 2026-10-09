@@ -35,6 +35,9 @@ public class CodegenMain {
     }
 
     static int run(String[] args, PrintStream out, PrintStream err) {
+        if (args.length > 0 && "profile".equals(args[0])) {
+            return LanguageProfileCommand.run(args, out, err);
+        }
         if (args.length > 0 && "playground".equals(args[0])) {
             return PlaygroundCommand.run(args, out, err);
         }

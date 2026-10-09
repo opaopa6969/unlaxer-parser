@@ -14,6 +14,21 @@ import org.unlaxer.dsl.bootstrap.UBNFModuleLoader;
 public final class PlaygroundGenerator {
     private PlaygroundGenerator() {}
 
+    public static Map<String, String> generateProfile(Path path) throws IOException {
+        var profile = org.unlaxer.source.LanguageProfile.parse(Files.readString(path));
+        Path grammarPath = path.toAbsolutePath().getParent().resolve(profile.grammarFile());
+        var grammar = UBNFModuleLoader.load(grammarPath).grammars().get(0);
+        for (String entry : profile.entries().keySet()) {
+            if (!profile.identity(entry).grammar().equals(grammar.name()) || grammar.rules().stream().noneMatch(rule -> rule.name().equals(entry))) {
+                throw new IllegalArgumentException("profile grammar/entry mismatch");
+            }
+        }
+        Map<String, String> files = new LinkedHashMap<>(generate(grammarPath));
+        files.put("public/profile.tsv", profile.canonicalTsv());
+        files.put("public/index.html", files.get("public/index.html").replace("<body>", "<body data-profile=\"profile.tsv\">"));
+        return java.util.Collections.unmodifiableMap(files);
+    }
+
     public static Map<String, String> generate(Path path) throws IOException {
         String source = Files.readString(path);
         var readiness = PortabilityCheck.checkFile(path);
@@ -34,7 +49,7 @@ public final class PlaygroundGenerator {
         files.put(".cargo/config.toml", resource("playground/config.toml"));
         files.put("runtime/Cargo.toml", resource("playground/runtime-Cargo.toml"));
         files.put("runtime/LICENSE", resource("playground/runtime/LICENSE"));
-        for (String name : new String[] {"lib.rs", "scope.rs", "semantic.rs", "editor.rs", "editor_cst.rs", "editor_queries.rs", "language_queries.rs", "semantic_queries.rs", "semantic_project.rs", "semantic_rename.rs", "source_edits.rs", "source.rs", "embedded.rs", "provider_protocol.rs", "provider_process.rs", "pipeline.rs", "lexing.rs", "first.rs", "lexical.rs", "long_code_fence.rs", "memo_retention_tests.rs"}) {
+        for (String name : new String[] {"lib.rs", "scope.rs", "semantic.rs", "editor.rs", "editor_cst.rs", "editor_queries.rs", "language_queries.rs", "semantic_queries.rs", "semantic_project.rs", "semantic_rename.rs", "source_edits.rs", "source.rs", "language_profile.rs", "embedded.rs", "provider_protocol.rs", "provider_process.rs", "pipeline.rs", "lexing.rs", "first.rs", "lexical.rs", "long_code_fence.rs", "memo_retention_tests.rs"}) {
             files.put("runtime/src/" + name, resource("playground/runtime/src/" + name));
         }
         files.put("src/lib.rs", resource("playground/lib.rs")
