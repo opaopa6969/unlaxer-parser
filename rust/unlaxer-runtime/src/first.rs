@@ -163,7 +163,9 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
             }
             set
         }
-        Expr::Choice(alternatives) | Expr::LongestChoice(alternatives) => alternatives
+        Expr::Choice(alternatives)
+        | Expr::LongestChoice(alternatives)
+        | Expr::UniqueLongestChoice(alternatives) => alternatives
             .iter()
             .fold(FirstSet::EMPTY, |set, alternative| {
                 set.union(of(alternative, rules))
@@ -178,7 +180,7 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
         | Expr::ValueBoundary(child)
         | Expr::RuleEffects { child, .. }
         | Expr::CaptureEquality { child, .. } => of(child, rules),
-        Expr::LexicalTriviaScope { .. } => FirstSet::UNKNOWN,
+        Expr::LexicalTriviaScope { .. } | Expr::LexicalContextScope { .. } => FirstSet::UNKNOWN,
         Expr::TriviaScope { child, whitespace } => {
             let mut set = of(child, rules);
             set.trivia = match (set.trivia, whitespace) {
@@ -233,7 +235,9 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
         | Expr::Custom(_)
         | Expr::CustomWith { .. }
         | Expr::Recovery { .. }
-        | Expr::Backreference(_) => FirstSet::UNKNOWN,
+        | Expr::Backreference(_)
+        | Expr::NamePredicate { .. }
+        | Expr::NameResolutionScope { .. } => FirstSet::UNKNOWN,
     }
 }
 

@@ -1,0 +1,14 @@
+[
+  {
+    "name": "nullable-left-cycle",
+    "grammar": "grammar Invalid { @package: org.example.uniquelongest @root @mapping(Root) @uniqueLongestChoice Root ::= ['x'] A | 'x'; A ::= [B]; B ::= [A]; }",
+    "code": "E-UNIQUE-LONGEST-LEFT-RECURSION",
+    "nativeMessage": "left recursion"
+  },
+  {
+    "name": "cxx23-direct-additive-left-recursion",
+    "grammar": "grammar Cxx23DirectAdditive { @package: org.example.uniquelongest token NUMBER=org.unlaxer.parser.elementary.NumberParser @root @mapping(Root) @uniqueLongestChoice Root ::= Root '-' NUMBER | NUMBER; }",
+    "code": "E-UNIQUE-LONGEST-LEFT-RECURSION",
+    "nativeMessage": "left recursion"
+  }
+]

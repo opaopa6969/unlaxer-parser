@@ -145,6 +145,12 @@ token NOT_QUOTE = NEGATION('"')     // ダブルクォート以外の1文字
 token NOT_SPACE = NEGATION(' \t\n') // スペース・タブ・改行以外の1文字
 ```
 
+v2では `NEGATION` の引数内にも `\uXXXX` / `\u{X…}` を展開する。
+例えば `NEGATION('\u0000\u0009\u000A\u{1F600}')` はNUL、tab、LF、`😀`を除外する。
+エスケープされたバックスラッシュを再展開しないため、`NEGATION('\\u0041')` は
+文字 `A` を除外せず、原文のバックスラッシュと `u0041` の各文字を除外する。
+単独surrogate、U+10FFFF超、不正な桁数／hexは明示的に拒否する。
+
 除外集合は Unicode codepoint 単位で判定し、成功時に1 codepointを消費する。
 例えば `NEGATION('x😀')` は `x` と `😀` を拒否し、`🚀` は受理する。
 空の除外集合は任意の1 codepointを受理するが、入力末尾では失敗する。
@@ -162,10 +168,30 @@ token DIGIT  = CHAR_RANGE('0','9')   // 0〜9 の1文字
 token HEX    = CHAR_RANGE('0','9')   // ※複数の範囲は NEGATION などと組み合わせる
 ```
 
+v1（版指定なし、または `@ubnf: v1`）は次の既存契約を維持する。
+
 現在の境界型は Java `char`。各境界はエスケープ展開後に1個の非surrogate BMP文字で、
 `min <= max` でなければならない。空文字・複数文字・surrogate・補助文字（例 `😀`）・
 逆順の範囲は `IllegalArgumentException` で明示的に拒否し、先頭文字へ切り捨てない。
-境界は両端を含む。補助文字の範囲指定は、この `char` API とは別の将来対応である。
+
+v2（`@ubnf: v2`、同義の `@ubnf: 2`）では各境界をUnicode scalar 1個として扱い、
+U+0000..U+10FFFFの補助面も指定できる。`\uXXXX`（ASCII hex 4桁ちょうど）と
+`\u{X…}`（ASCII hex 1〜6桁）を1 code pointへ展開する。`min <= max` が必要で、
+surrogate U+D800..U+DFFFを含む範囲は拒否する。境界は両端を含む。
+既存のBMP `TokenDecl.CharRange(char,char)` APIは維持し、補助面の境界は宣言的scalar RANGEとして生成する。
+
+```ubnf
+grammar CodePoints {
+  @ubnf: 2
+  token SAFE_SP = CHAR_RANGE(' ', '!')
+  token FACE = CHAR_RANGE('\u{1F600}', '\u{1F64F}')
+  @root Root ::= FACE;
+}
+```
+
+v1の `\u` は従来の未定義escapeとして扱い、v2へ黙って読み替えない。
+現実装では `CHAR_RANGE('\u0041','z')` は複数文字の境界として拒否し、
+`NEGATION('\u0041')` はバックスラッシュ、`u`、`0`、`4`、`1`を除外する。
 
 両端を含む判定は生成されたパーサーの実行時契約であり、UBNF を読む処理系
 （構文解析・バリデーション）自体の入出力からは観測できない（`scope: runtime`）。
@@ -173,6 +199,34 @@ token HEX    = CHAR_RANGE('0','9')   // ※複数の範囲は NEGATION などと
 > **ユースケース**: 特定の文字クラスを細かく定義したいとき。
 > `IdentifierParser` は「英字・数字・アンダースコア」を読みますが、
 > 「小文字のみ」「16進数の文字」などをピンポイントで定義できます。
+
+#### `XID_IDENTIFIER` — Unicode 識別子
+
+```ubnf
+grammar Names {
+  @ubnf: v2
+  token NAME = XID_IDENTIFIER
+  @root @mapping(Name, params=[text])
+  Root ::= NAME @text;
+}
+```
+
+Unicode 17.0.0 の `XID_Start XID_Continue*` を最長のprefixとして原文どおり読む。
+`名前2`、`e` と結合アクセント、補助面の文字を受理する。数字・結合文字・`_`・`$` は
+先頭として受理せず、`_` は続きでは受理する。空入力や絵文字の先頭は失敗する。
+失敗は消費／照合cursorを動かさない。位置とspanはcode point単位で、CRLF等の後続を消費しない。
+正規化、case folding、予約語除外は行わず、同じUnicode版の固定表をJava/Rust/WASMで使う。
+JDKやRustのUnicodeカテゴリ版に依存しない。
+
+宣言的tokenと同じく `@ubnf: v2` を要求する。`token NAME ::= XID_IDENTIFIER;` として
+字句式の中へ組み込むこともできる。JavaのFQN parser名やtoken adapterを要求しない。
+契約は [UAX #31](https://www.unicode.org/reports/tr31/) と
+[Unicode 17.0.0 XID properties](https://www.unicode.org/Public/17.0.0/ucd/DerivedCoreProperties.txt) に基づく。
+
+TinyExpression等の `token IDENTIFIER = org.unlaxer.parser.clang.IdentifierParser` は、Unicode名を
+採用する文法で `token IDENTIFIER = XID_IDENTIFIER` へ置き換えられる。ただし既存のASCII／`_`先頭
+契約とは受理範囲が異なる。ASCII名と`_`先頭を保存してUnicode名を追加する例は
+[移行文法](../../spec-corpus/xid-identifier/tinyexpression-migration.ubnf) を参照。
 
 #### `ANY` — 任意の1文字
 
@@ -323,6 +377,13 @@ IfKeyword  ::= 'if' ;
 表にないエスケープ列（例 `'\q'`）はエラーにしない（構文としてもバリデーションとしても
 受理する）。展開結果の具体的な文字（バックスラッシュを保持するか、除去して `q` のみに
 するか）は未定義とし、実装依存とする。
+
+Unicode escapeの展開対象はtokenの `CHAR_RANGE` 境界と `NEGATION` 除外集合だけ。
+v2の宣言的字句式 `token T ::= CHAR_RANGE(...) | NEGATION(...);` にも同じ規定が適用される。
+ルール本体のリテラル、字句式の通常リテラル、`UNTIL` / `CI` / `LOOKAHEAD` /
+`NEGATIVE_LOOKAHEAD` / `REGEX` では、既存escape処理を維持する。
+`REGEX` は自身の解析器が読むraw escapeを前段でUnicode展開しない。
+診断コードは [validation.md](validation.md#unicode-code-point-escape) を参照。
 
 ### ルール参照・トークン参照
 
