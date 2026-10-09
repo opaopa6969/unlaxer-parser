@@ -134,4 +134,4 @@ Java/native Rust が生成する language Playground は同じ `vocabulary.json`
 単一文書 authoring Playground は local named token の whitespace 補完も扱う。外部 module
 の取得は authoring UI では行わず、プロジェクトの明示 resolver で用意する。
 
-TinyExpression 移行、名前付き trivia の tokenStream 対応は親 #368 の未完了項目。この段階で親を close しない。
+名前付きglobal triviaはtokenStreamの4modeでも対応する（#432）。共通fixtureはstd/layoutをlock/cacheからオフラインロードして検証する。TinyExpression移行の完了確認は親 #368 で追跡する。

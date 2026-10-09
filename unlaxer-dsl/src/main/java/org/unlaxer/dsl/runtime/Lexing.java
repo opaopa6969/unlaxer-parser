@@ -32,6 +32,7 @@ public final class Lexing {
         private final Options options;
         private final List<Terminal> terminals;
         private final boolean whitespace;
+        private final LexicalExpression namedTrivia;
         private final int[] offsets;
         private final int[] codePoints;
         private final Map<Integer, Entry> entries = new LinkedHashMap<>();
@@ -41,10 +42,15 @@ public final class Lexing {
         private record Entry(String kind, String name, int terminal, int start, int end) {}
 
         public Session(String source, Options options, List<Terminal> terminals, boolean whitespace) {
+            this(source, options, terminals, whitespace, null);
+        }
+        public Session(String source, Options options, List<Terminal> terminals, boolean whitespace, LexicalExpression namedTrivia) {
+            if (namedTrivia != null && namedTrivia.nullable()) throw new IllegalArgumentException("E-LEXING-TRIVIA: nullable definition");
+            this.namedTrivia = namedTrivia;
             this.source = Objects.requireNonNull(source);
             this.options = Objects.requireNonNull(options);
             this.terminals = List.copyOf(terminals);
-            this.whitespace = whitespace;
+            this.whitespace = whitespace || namedTrivia != null;
             if (source.codePoints().anyMatch(c -> c >= 0xd800 && c <= 0xdfff))
                 throw new IllegalArgumentException("E-LEXING-SOURCE: unpaired surrogate");
             offsets = new int[source.codePointCount(0, source.length()) + 1];
@@ -126,6 +132,10 @@ public final class Lexing {
             }
         }
         private Entry trivia(int p) {
+            if (namedTrivia != null) {
+                int end = namedTrivia.match(source, p);
+                return end > p ? new Entry("trivia", "", -1, p, end) : null;
+            }
             int end = p;
             while (end < source.length() && " \t\r\n\u000b\f".indexOf(source.charAt(end)) >= 0) end++;
             if (end > p) return new Entry("space", "", -1, p, end);
@@ -182,7 +192,10 @@ public final class Lexing {
         return parsed;
     }
     public static Outcome parse(Parser root, String source, Options options, List<Terminal> terminals, boolean whitespace) {
-        Session session = new Session(source, options, terminals, whitespace);
+        return parse(root, source, options, terminals, whitespace, null);
+    }
+    public static Outcome parse(Parser root, String source, Options options, List<Terminal> terminals, boolean whitespace, LexicalExpression namedTrivia) {
+        Session session = new Session(source, options, terminals, whitespace, namedTrivia);
         try (ParseContext context = ParseContext.withOptions(StringSource.createRootSource(source),
                 ParseOptions.DEFAULT.withDiagnostics(ParseOptions.Diagnostics.DETAILED))) {
             context.getGlobalScopeTreeMap().put(KEY, session);
