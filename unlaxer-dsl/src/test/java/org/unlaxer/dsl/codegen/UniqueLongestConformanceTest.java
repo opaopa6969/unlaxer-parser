@@ -61,6 +61,8 @@ public class UniqueLongestConformanceTest {
         Path fixtures = repo.resolve("unlaxer-dsl/src/test/resources/unique-longest");
         JsonArray corpus = JsonParser.parseString(
             Files.readString(fixtures.resolve("corpus.json"))).getAsJsonArray();
+        Path boundaries=fixtures.resolveSibling("ambiguity-boundaries");
+        corpus.addAll(JsonParser.parseString(Files.readString(boundaries.resolve("corpus.json"))).getAsJsonArray());
         var report = new ArrayList<>(List.of(
             "fixture\tcase\tinput_json\texpected_prefix\tjava_prefix\texpected_ast\tjava_ast\trust"));
 
@@ -161,6 +163,7 @@ public class UniqueLongestConformanceTest {
         }
 
         JsonArray invalid = JsonParser.parseString(Files.readString(fixtures.resolve("invalid.json"))).getAsJsonArray();
+        invalid.addAll(JsonParser.parseString(Files.readString(boundaries.resolve("invalid.json"))).getAsJsonArray());
         for (var element : invalid) {
             JsonObject row = element.getAsJsonObject();
             var grammar = UBNFMapper.parse(row.get("grammar").getAsString()).grammars().get(0);
@@ -236,7 +239,7 @@ public class UniqueLongestConformanceTest {
         var result = new JsonObject();
         result.addProperty("type", ast.getClass().getSimpleName());
         int[] span = (int[]) ((Optional<?>) mapped.getClass().getMethod("sourceSpanOf", Object.class)
-            .invoke(mapped, ast)).orElseThrow();
+            .invoke(mapped, ast)).orElseThrow(() -> new AssertionError("no source span for "+ast));
         var position = new JsonArray();
         position.add(span[0]);
         position.add(span[1]);
