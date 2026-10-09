@@ -1,0 +1,177 @@
+original	region	root	COMPLETE	0	4492	0	4492	-
+original	region	formula/1	COMPLETE	815	1288	815	1288	-
+original	region	formula/1/java/1	COMPLETE	815	1104	835	1100	CheckDigits.java
+original	region	formula/2	COMPLETE	1556	2069	1556	2069	-
+original	region	formula/2/java/1	COMPLETE	1556	1864	1589	1860	CheckAlphabets.java
+original	region	formula/3	COMPLETE	2628	2689	2628	2689	-
+original	region	formula/4	COMPLETE	2916	2924	2916	2924	-
+original	region	formula/5	COMPLETE	3165	3170	3165	3170	-
+original	region	formula/6	COMPLETE	3535	3544	3535	3544	-
+original	region	formula/7	COMPLETE	3759	3797	3759	3797	-
+original	region	formula/8	COMPLETE	4018	4056	4018	4056	-
+original	region	formula/9	COMPLETE	4280	4303	4280	4303	-
+original	region	formula/10	COMPLETE	4418	4475	4418	4475	-
+original	validate	formula/1/java/1	COMPLETE	0
+original	validate	formula/2/java/1	COMPLETE	0
+original	query	HOVER	COMPLETE	target	java.lang.String	1046	1059
+original	query	DEFINITION	COMPLETE	target	java.lang.String	1046	1059
+original	query	HOVER	COMPLETE	target	java.lang.String	1801	1814
+original	query	DEFINITION	COMPLETE	target	java.lang.String	1801	1814
+original	guards	PASS
+unicode-crlf	region	root	COMPLETE	0	4703	0	4703	-
+unicode-crlf	region	formula/1	COMPLETE	854	1352	854	1352	-
+unicode-crlf	region	formula/1/java/1	COMPLETE	854	1161	875	1156	CheckDigits.java
+unicode-crlf	region	formula/2	COMPLETE	1631	2161	1631	2161	-
+unicode-crlf	region	formula/2/java/1	COMPLETE	1631	1949	1665	1944	CheckAlphabets.java
+unicode-crlf	region	formula/3	COMPLETE	2740	2805	2740	2805	-
+unicode-crlf	region	formula/4	COMPLETE	3043	3052	3043	3052	-
+unicode-crlf	region	formula/5	COMPLETE	3304	3310	3304	3310	-
+unicode-crlf	region	formula/6	COMPLETE	3698	3708	3698	3708	-
+unicode-crlf	region	formula/7	COMPLETE	3934	3973	3934	3973	-
+unicode-crlf	region	formula/8	COMPLETE	4205	4244	4205	4244	-
+unicode-crlf	region	formula/9	COMPLETE	4479	4503	4479	4503	-
+unicode-crlf	region	formula/10	COMPLETE	4628	4686	4628	4686	-
+unicode-crlf	validate	formula/1/java/1	COMPLETE	0
+unicode-crlf	validate	formula/2/java/1	COMPLETE	0
+unicode-crlf	query	HOVER	COMPLETE	target	java.lang.String	1098	1111
+unicode-crlf	query	DEFINITION	COMPLETE	target	java.lang.String	1098	1111
+unicode-crlf	query	HOVER	COMPLETE	target	java.lang.String	1881	1894
+unicode-crlf	query	DEFINITION	COMPLETE	target	java.lang.String	1881	1894
+unicode-crlf	guards	PASS
+type-error	region	root	COMPLETE	0	4445	0	4445	-
+type-error	region	formula/1	COMPLETE	815	1267	815	1267	-
+type-error	region	formula/1/java/1	COMPLETE	815	1083	835	1079	CheckDigits.java
+type-error	region	formula/2	COMPLETE	1535	2022	1535	2022	-
+type-error	region	formula/2/java/1	COMPLETE	1535	1817	1568	1813	CheckAlphabets.java
+type-error	region	formula/3	COMPLETE	2581	2642	2581	2642	-
+type-error	region	formula/4	COMPLETE	2869	2877	2869	2877	-
+type-error	region	formula/5	COMPLETE	3118	3123	3118	3123	-
+type-error	region	formula/6	COMPLETE	3488	3497	3488	3497	-
+type-error	region	formula/7	COMPLETE	3712	3750	3712	3750	-
+type-error	region	formula/8	COMPLETE	3971	4009	3971	4009	-
+type-error	region	formula/9	COMPLETE	4233	4256	4233	4256	-
+type-error	region	formula/10	COMPLETE	4371	4428	4371	4428	-
+type-error	validate	formula/1/java/1	PARTIAL	1
+type-error	diagnostic	formula/1/java/1	compiler.err.prob.found.req	ERROR	1071	1072	41	9
+type-error	validate	formula/2/java/1	PARTIAL	1
+type-error	diagnostic	formula/2/java/1	compiler.err.prob.found.req	ERROR	1805	1806	69	9
+type-error	guards	PASS
+completion	region	root	COMPLETE	0	4489	0	4489	-
+completion	region	formula/1	COMPLETE	815	1285	815	1285	-
+completion	region	formula/1/java/1	COMPLETE	815	1101	835	1097	CheckDigits.java
+completion	region	formula/2	COMPLETE	1553	2066	1553	2066	-
+completion	region	formula/2/java/1	COMPLETE	1553	1861	1586	1857	CheckAlphabets.java
+completion	region	formula/3	COMPLETE	2625	2686	2625	2686	-
+completion	region	formula/4	COMPLETE	2913	2921	2913	2921	-
+completion	region	formula/5	COMPLETE	3162	3167	3162	3167	-
+completion	region	formula/6	COMPLETE	3532	3541	3532	3541	-
+completion	region	formula/7	COMPLETE	3756	3794	3756	3794	-
+completion	region	formula/8	COMPLETE	4015	4053	4015	4053	-
+completion	region	formula/9	COMPLETE	4277	4300	4277	4300	-
+completion	region	formula/10	COMPLETE	4415	4472	4415	4472	-
+completion	completion	PARTIAL	1071	1074	target
+completion	guards	PASS
+moved	region	root	COMPLETE	0	4492	0	4492	-
+moved	region	formula/1	COMPLETE	250	763	250	763	-
+moved	region	formula/1/java/1	COMPLETE	250	558	283	554	CheckAlphabets.java
+moved	region	formula/2	COMPLETE	1596	2069	1596	2069	-
+moved	region	formula/2/java/1	COMPLETE	1596	1885	1616	1881	CheckDigits.java
+moved	region	formula/3	COMPLETE	2628	2689	2628	2689	-
+moved	region	formula/4	COMPLETE	2916	2924	2916	2924	-
+moved	region	formula/5	COMPLETE	3165	3170	3165	3170	-
+moved	region	formula/6	COMPLETE	3535	3544	3535	3544	-
+moved	region	formula/7	COMPLETE	3759	3797	3759	3797	-
+moved	region	formula/8	COMPLETE	4018	4056	4018	4056	-
+moved	region	formula/9	COMPLETE	4280	4303	4280	4303	-
+moved	region	formula/10	COMPLETE	4418	4475	4418	4475	-
+moved	guards	PASS
+deleted	region	root	COMPLETE	0	3186	0	3186	-
+deleted	region	formula/1	COMPLETE	250	763	250	763	-
+deleted	region	formula/1/java/1	COMPLETE	250	558	283	554	CheckAlphabets.java
+deleted	region	formula/2	COMPLETE	1322	1383	1322	1383	-
+deleted	region	formula/3	COMPLETE	1610	1618	1610	1618	-
+deleted	region	formula/4	COMPLETE	1859	1864	1859	1864	-
+deleted	region	formula/5	COMPLETE	2229	2238	2229	2238	-
+deleted	region	formula/6	COMPLETE	2453	2491	2453	2491	-
+deleted	region	formula/7	COMPLETE	2712	2750	2712	2750	-
+deleted	region	formula/8	COMPLETE	2974	2997	2974	2997	-
+deleted	region	formula/9	COMPLETE	3112	3169	3112	3169	-
+deleted	guards	PASS
+added	region	root	COMPLETE	0	5798	0	5798	-
+added	region	formula/1	COMPLETE	815	1288	815	1288	-
+added	region	formula/1/java/1	COMPLETE	815	1104	835	1100	CheckDigits.java
+added	region	formula/2	COMPLETE	2121	2594	2121	2594	-
+added	region	formula/2/java/1	COMPLETE	2121	2410	2141	2406	CheckDigits.java
+added	region	formula/3	COMPLETE	2862	3375	2862	3375	-
+added	region	formula/3/java/1	COMPLETE	2862	3170	2895	3166	CheckAlphabets.java
+added	region	formula/4	COMPLETE	3934	3995	3934	3995	-
+added	region	formula/5	COMPLETE	4222	4230	4222	4230	-
+added	region	formula/6	COMPLETE	4471	4476	4471	4476	-
+added	region	formula/7	COMPLETE	4841	4850	4841	4850	-
+added	region	formula/8	COMPLETE	5065	5103	5065	5103	-
+added	region	formula/9	COMPLETE	5324	5362	5324	5362	-
+added	region	formula/10	COMPLETE	5586	5609	5586	5609	-
+added	region	formula/11	COMPLETE	5724	5781	5724	5781	-
+added	guards	PASS
+unclosed	region	root	COMPLETE	0	4488	0	4488	-
+unclosed	region	formula/1	FAILED	815	1284	815	1284	-
+unclosed	region	formula/2	COMPLETE	1552	2065	1552	2065	-
+unclosed	region	formula/2/java/1	COMPLETE	1552	1860	1585	1856	CheckAlphabets.java
+unclosed	region	formula/3	COMPLETE	2624	2685	2624	2685	-
+unclosed	region	formula/4	COMPLETE	2912	2920	2912	2920	-
+unclosed	region	formula/5	COMPLETE	3161	3166	3161	3166	-
+unclosed	region	formula/6	COMPLETE	3531	3540	3531	3540	-
+unclosed	region	formula/7	COMPLETE	3755	3793	3755	3793	-
+unclosed	region	formula/8	COMPLETE	4014	4052	4014	4052	-
+unclosed	region	formula/9	COMPLETE	4276	4299	4276	4299	-
+unclosed	region	formula/10	COMPLETE	4414	4471	4414	4471	-
+unclosed	guards	PASS
+no-formula	rejected
+unicode-crlf-error	region	root	COMPLETE	0	4682	0	4682	-
+unicode-crlf-error	region	formula/1	COMPLETE	854	1331	854	1331	-
+unicode-crlf-error	region	formula/1/java/1	COMPLETE	854	1140	875	1135	CheckDigits.java
+unicode-crlf-error	region	formula/2	COMPLETE	1610	2140	1610	2140	-
+unicode-crlf-error	region	formula/2/java/1	COMPLETE	1610	1928	1644	1923	CheckAlphabets.java
+unicode-crlf-error	region	formula/3	COMPLETE	2719	2784	2719	2784	-
+unicode-crlf-error	region	formula/4	COMPLETE	3022	3031	3022	3031	-
+unicode-crlf-error	region	formula/5	COMPLETE	3283	3289	3283	3289	-
+unicode-crlf-error	region	formula/6	COMPLETE	3677	3687	3677	3687	-
+unicode-crlf-error	region	formula/7	COMPLETE	3913	3952	3913	3952	-
+unicode-crlf-error	region	formula/8	COMPLETE	4184	4223	4184	4223	-
+unicode-crlf-error	region	formula/9	COMPLETE	4458	4482	4458	4482	-
+unicode-crlf-error	region	formula/10	COMPLETE	4607	4665	4607	4665	-
+unicode-crlf-error	validate	formula/1/java/1	PARTIAL	1
+unicode-crlf-error	diagnostic	formula/1/java/1	compiler.err.prob.found.req	ERROR	1124	1125	42	9
+unicode-crlf-error	validate	formula/2/java/1	COMPLETE	0
+unicode-crlf-error	guards	PASS
+duplicate	rejected
+empty-metadata	rejected
+empty-formula	rejected
+malformed-outer	rejected
+comments	region	root	COMPLETE	0	4507	0	4507	-
+comments	region	formula/1	COMPLETE	815	1303	815	1303	-
+comments	region	formula/1/java/1	COMPLETE	830	1119	850	1115	CheckDigits.java
+comments	region	formula/2	COMPLETE	1571	2084	1571	2084	-
+comments	region	formula/2/java/1	COMPLETE	1571	1879	1604	1875	CheckAlphabets.java
+comments	region	formula/3	COMPLETE	2643	2704	2643	2704	-
+comments	region	formula/4	COMPLETE	2931	2939	2931	2939	-
+comments	region	formula/5	COMPLETE	3180	3185	3180	3185	-
+comments	region	formula/6	COMPLETE	3550	3559	3550	3559	-
+comments	region	formula/7	COMPLETE	3774	3812	3774	3812	-
+comments	region	formula/8	COMPLETE	4033	4071	4033	4071	-
+comments	region	formula/9	COMPLETE	4295	4318	4295	4318	-
+comments	region	formula/10	COMPLETE	4433	4490	4433	4490	-
+comments	guards	PASS
+nbsp-comment	region	root	COMPLETE	0	4503	0	4503	-
+nbsp-comment	region	formula/1	FAILED	815	1299	815	1299	-
+nbsp-comment	region	formula/2	COMPLETE	1567	2080	1567	2080	-
+nbsp-comment	region	formula/2/java/1	COMPLETE	1567	1875	1600	1871	CheckAlphabets.java
+nbsp-comment	region	formula/3	COMPLETE	2639	2700	2639	2700	-
+nbsp-comment	region	formula/4	COMPLETE	2927	2935	2927	2935	-
+nbsp-comment	region	formula/5	COMPLETE	3176	3181	3176	3181	-
+nbsp-comment	region	formula/6	COMPLETE	3546	3555	3546	3555	-
+nbsp-comment	region	formula/7	COMPLETE	3770	3808	3770	3808	-
+nbsp-comment	region	formula/8	COMPLETE	4029	4067	4029	4067	-
+nbsp-comment	region	formula/9	COMPLETE	4291	4314	4291	4314	-
+nbsp-comment	region	formula/10	COMPLETE	4429	4486	4429	4486	-
+nbsp-comment	guards	PASS
