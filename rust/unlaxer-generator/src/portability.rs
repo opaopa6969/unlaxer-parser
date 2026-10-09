@@ -128,7 +128,7 @@ pub fn check_file(path: &std::path::Path) -> Report {
     }
 }
 
-fn check_ast(file: &UbnfFile) -> Report {
+pub fn check_ast(file: &UbnfFile) -> Report {
     let mut inventory = Inventory {
         diagnostics: Vec::new(),
     };

@@ -31,6 +31,17 @@ public final class PlaygroundGenerator {
         return java.util.Collections.unmodifiableMap(files);
     }
 
+    public static Map<String, String> generatePackage(Path manifest, String packageId) throws IOException {
+        var selected = org.unlaxer.dsl.bootstrap.PackagedLanguageProfile.load(manifest, packageId);
+        var readiness = PortabilityCheck.check(org.unlaxer.dsl.bootstrap.UBNFMapper.parseWithSource(selected.source()), selected.ast());
+        if (!readiness.portable()) throw new IllegalArgumentException("Playground requires a Rust-portable grammar: " + readiness.diagnostics());
+        Map<String, String> files = new LinkedHashMap<>(generate(selected.source(), selected.ast(), selected.vocabulary().toString() + "\n"));
+        files.put("public/profile.tsv", selected.profile().canonicalTsv());
+        files.put("public/package.json", selected.identity().toString() + "\n");
+        files.put("public/index.html", files.get("public/index.html").replace("<body>", "<body data-profile=\"profile.tsv\">"));
+        return java.util.Collections.unmodifiableMap(files);
+    }
+
     public static Map<String, String> generate(Path path) throws IOException {
         String source = Files.readString(path);
         var readiness = PortabilityCheck.checkFile(path);
@@ -38,6 +49,10 @@ public final class PlaygroundGenerator {
         UBNFAST.UBNFFile file;
         try { file = UBNFModuleLoader.load(path); }
         catch (IOException e) { throw new IllegalArgumentException("Cannot resolve grammar module: " + e.getMessage(), e); }
+        return generate(source, file, org.unlaxer.dsl.tooling.VocabularyOrigins.inspect(path).toString() + "\n");
+    }
+
+    private static Map<String, String> generate(String source, UBNFAST.UBNFFile file, String vocabulary) {
         var grammar = file.grammars().get(0);
         for (var token : grammar.tokens()) if (!(token instanceof UBNFAST.TokenDecl.Declarative)) {
             throw new IllegalArgumentException("Playground requires declarative token " + token.name() + " ::= expression; (host bindings are not executed)");
@@ -66,7 +81,7 @@ public final class PlaygroundGenerator {
             files.put("public/help/" + name, resource("ubnf-help/" + name));
         }
         files.put("public/grammar.ubnf", source);
-        files.put("public/vocabulary.json", org.unlaxer.dsl.tooling.VocabularyOrigins.inspect(path).toString() + "\n");
+        files.put("public/vocabulary.json", vocabulary);
         return java.util.Collections.unmodifiableMap(files);
     }
 

@@ -261,7 +261,7 @@ public class CodegenMain {
 
     private static void printUsage(PrintStream err) {
         err.println("Profile: CodegenMain profile --file <profile.tsv>");
-        err.println("Playground: CodegenMain playground (--grammar <file.ubnf> | --profile <profile.tsv>) --output <new-directory> [--check]");
+        err.println("Playground: CodegenMain playground (--grammar <file.ubnf> | --profile <profile.tsv> | --package <id> --manifest <ubnf.json>) --output <new-directory> [--check]");
         err.println(
             "Usage: CodegenMain [--help] [--version] --grammar <file.ubnf> --output <dir>"
                 + " [--generators AST,Parser,Mapper,Evaluator,LSP,Launcher,DAP,DAPLauncher]"
