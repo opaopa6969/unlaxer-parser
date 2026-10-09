@@ -85,3 +85,12 @@ Rust incremental parse/cache、semanticTokens、rename/format/code-action の tr
 provider runtime の対応と protocol method の実装は別であり、親 issue は残す。
 TinyExpression/ubnfc の LSP や Java サーバー起動で Classic Rust LSP の完了を代用しない。
 root retry と性能 freeze の方針は変更しない。
+
+Typed language diagnostics use `Backend::language_queries` and the shared
+`Provider::diagnostics` API. The server publishes each mapped diagnostic under
+its owning URI and exact UTF-16 snapshot range, preserving compiler metadata in
+`Diagnostic.data`. Open/change/save refresh the source host's contribution;
+close removes only that host, preserving other formulas' shared dependency
+diagnostics. Invalid/stale project bindings are rejected and logged. See
+`docs/language-query-forwarding.md` for the immutable Project contract and the
+real-javac Java/Rust lifecycle oracle.

@@ -17,10 +17,12 @@ jobs:
         with:
           node-version: '20.20.0'
       - uses: dtolnay/rust-toolchain@1.85.0
+      - name: Prepare locked dependencies for the offline LSP diagnostic probe
+        run: cargo fetch --locked --manifest-path rust/Cargo.toml
       - name: Install the locked TypeScript 5.9.3 compiler without package scripts
         run: npm ci --ignore-scripts --no-audit --no-fund
         working-directory: unlaxer-dsl/ubnf-vscode
-      - run: mvn -B -pl unlaxer-common,unlaxer-dsl -am test -Dtest=ProviderProtocolTest,ExternalProviderConformanceTest,PlaygroundCommandTest -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
+      - run: mvn -B -pl unlaxer-common,unlaxer-dsl -am test -Dtest=ProviderProtocolTest,ExternalProviderConformanceTest,LSPDiagnosticConformanceTest,PlaygroundCommandTest -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
       - run: cargo test --locked --manifest-path rust/Cargo.toml -p unlaxer-runtime --test provider_protocol
       - uses: actions/upload-artifact@v4
         with:
