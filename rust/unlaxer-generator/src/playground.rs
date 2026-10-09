@@ -151,6 +151,7 @@ fn generate_resolved(
     runtime!("semantic_rename.rs");
     runtime!("source_edits.rs");
     runtime!("source.rs");
+    runtime!("shared_calls.rs");
     runtime!("language_profile.rs");
     runtime!("embedded.rs");
     runtime!("provider_protocol.rs");

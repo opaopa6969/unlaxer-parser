@@ -1,0 +1,27 @@
+grammar Parent {
+ @package: example.shared
+ @embedding: enabled
+ @ubnf: v2
+ @tokenAdapter: { id: 'shared.a' version: '1' java: 'example.shared.CallA' rust: 'crate::call_a' }
+ @tokenAdapter: { id: 'shared.b' version: '1' java: 'example.shared.CallB' rust: 'crate::call_b' }
+ @tokenAdapter: { id: 'shared.missing' version: '1' java: 'example.shared.CallMissing' rust: 'crate::call_missing' }
+ @tokenAdapter: { id: 'shared.ahead' version: '1' java: 'example.shared.AheadA' rust: 'crate::ahead_a' }
+ @tokenAdapter: { id: 'shared.not' version: '1' java: 'example.shared.NotA' rust: 'crate::not_a' }
+ token A = ADAPTER('shared.a', version=1)
+ token B = ADAPTER('shared.b', version=1)
+ token MISSING_CALL = ADAPTER('shared.missing', version=1)
+ token AHEAD = ADAPTER('shared.ahead', version=1)
+ token NOT = ADAPTER('shared.not', version=1)
+ token END = EOF
+ @root Root ::= (Direct | Choice | Rollback | Positive | Negative | Missing | Unique | Longest) END;
+ @mapping(Direct, params=[value]) Direct ::= '😀' [ '\r\n' ] 'D:' A @value ';';
+ @mapping(Choice, params=[value]) Choice ::= '😀C:' (A '!' | B) @value ';';
+ @mapping(Rollback, params=[value]) Rollback ::= '😀R:' (A '!' | 'ab') @value ';';
+ @mapping(Positive, params=[value]) Positive ::= '😀P:' AHEAD A @value ';';
+ @mapping(Negative, params=[value]) Negative ::= '😀N:' NOT B @value ';';
+ @mapping(Missing, params=[value]) Missing ::= '😀M:' MISSING_CALL @value ';';
+ @mapping(Unique, params=[value]) Unique ::= '😀U:' UniqueValue @value ';';
+ @uniqueLongestChoice UniqueValue ::= A | (A '!');
+ @mapping(Longest, params=[value]) Longest ::= '😀L:' LongestValue @value ';';
+ @longestChoice LongestValue ::= A | (A '!');
+}

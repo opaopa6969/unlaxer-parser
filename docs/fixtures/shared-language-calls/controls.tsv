@@ -1,0 +1,19 @@
+direct-failure	SYNTAX	4
+local-failure	4	6
+input-limit	LIMIT	0
+not-policy-0	3
+not-policy-1	5
+not-policy-2	3
+nullable	LIMIT	0
+empty-host	LIMIT	0
+recovered	RECOVERY	0
+missing-entry	REJECTED
+deferred	UNSUPPORTED	0
+retention	LIMIT	8
+budget-rollback	8
+nested-retention	LIMIT	4
+depth-32	COMPLETE	33
+depth-33	SYNTAX	32
+retained-tree	AValue	a
+query	COMPLETE	3	4
+stale	REJECTED

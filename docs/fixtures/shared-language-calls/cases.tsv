@@ -1,0 +1,15 @@
+direct	f09f9880443a61623b	true	6	-1	ChildA	3	5	ab	5
+suffix-failure	f09f9880443a616221	false	0	5	-	0	0	-	0
+child-failure	f09f9880443a61583b	false	0	4	-	0	0	-	0
+other-grammar	f09f9880433a61633b	true	6	-1	ChildB	3	5	ac	5
+parent-rollback	f09f9880523a61623b	true	6	-1	-	0	0	ab	0
+positive	f09f9880503a61623b	true	6	-1	ChildA	3	5	ab	5
+negative	f09f98804e3a61633b	true	6	-1	ChildB	3	5	ac	5
+negative-failure	f09f98804e3a61623b	false	0	3	-	0	0	-	0
+missing	f09f98804d3a61623b	false	0	3	-	0	0	-	0
+crlf	f09f98800d0a443a61623b	true	8	-1	ChildA	5	7	ab	7
+child-trivia	f09f9880443a6120623b	true	7	-1	ChildA	3	6	a b	6
+caller-trivia	f09f9880443a6162203b	true	7	-1	ChildA	3	6	ab	6
+unique-winner	f09f9880553a6162213b	true	7	-1	ChildA	3	5	ab!	5
+longest-winner	f09f98804c3a6162213b	true	7	-1	ChildA	3	5	ab!	5
+caller-policy-restored	f09f9880443a61623b20	false	0	6	-	0	0	-	0

@@ -33,6 +33,7 @@ public final class CstGrammar implements EmbeddedLanguages.Grammar {
         this.boundaries = Set.copyOf(boundaries); this.captures = captures; this.whitespace = whitespace;
     }
     @Override public String name() { return name; }
+    Parser sharedEntry(String entry) { return entries.get(entry); }
     @Override public EmbeddedLanguages.Parsed parse(String entry, DocumentSnapshot snapshot) {
         Parser parser = entries.get(entry);
         if (parser == null) { return new EmbeddedLanguages.Parsed(snapshot, State.UNSUPPORTED, List.of()); }
@@ -86,6 +87,11 @@ public final class CstGrammar implements EmbeddedLanguages.Grammar {
         };
     }
     private void discover(Token token, List<EmbeddedLanguages.Child> children) {
+        var call = SharedGrammarCalls.metadata(token);
+        if (call.isPresent()) {
+            children.add(new EmbeddedLanguages.Child(call.get().language(), call.get().span(), call.get().span()));
+            return;
+        }
         for (Binding binding : bindings) {
             if (token.parser.getClass() == binding.rule) {
                 List<Token> bodies = new ArrayList<>();
