@@ -26,6 +26,22 @@ pub struct LanguageProfile {
     pub entries: BTreeMap<String, Support>,
     pub capabilities: BTreeMap<String, Support>,
 }
+#[derive(Clone, Debug)]
+pub struct Selection {
+    pub profile: LanguageProfile,
+    pub language: Language,
+}
+impl Selection {
+    pub fn allows_local(&self, capability: &str) -> bool {
+        matches!(
+            self.profile.capabilities.get(capability),
+            Some(Support::Supported | Support::Partial)
+        )
+    }
+}
+fn local(support: Option<&Support>) -> bool {
+    matches!(support, Some(Support::Supported | Support::Partial))
+}
 fn invalid() -> String {
     "invalid language profile".into()
 }
@@ -191,6 +207,20 @@ impl LanguageProfile {
             version: self.singles["package"][2].clone(),
             grammar: self.singles["grammar"][1].clone(),
             entry: entry.into(),
+        })
+    }
+    /// A profile never installs a provider; only intrinsic parse entries can be selected.
+    pub fn select(&self, grammar: &str, entry: &str) -> Result<Selection, String> {
+        let language = self.identity(entry)?;
+        if language.grammar != grammar
+            || !local(self.entries.get(entry))
+            || !local(self.capabilities.get("PARSE"))
+        {
+            return Err("profile grammar/entry cannot be parsed locally".into());
+        }
+        Ok(Selection {
+            profile: self.clone(),
+            language,
         })
     }
     pub fn canonical_tsv(&self) -> String {

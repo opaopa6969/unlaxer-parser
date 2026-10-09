@@ -72,6 +72,17 @@ public final class LanguageProfile {
         if (!entries.containsKey(entry) || entries.get(entry) == Support.UNSUPPORTED) throw invalid();
         return new LanguageRegions.Language(language(), singles.get("package").get(1), singles.get("package").get(2), singles.get("grammar").get(1), entry);
     }
+    /** Select a locally parsed entry; EXTERNAL is descriptive, never an installed provider. */
+    public Selection select(String grammar, String entry) {
+        var language = identity(entry);
+        if (!language.grammar().equals(grammar) || !local(entries.get(entry)) || !local(capabilities.get("PARSE")))
+            throw new IllegalArgumentException("profile grammar/entry cannot be parsed locally");
+        return new Selection(this, language);
+    }
+    private static boolean local(Support support) { return support == Support.SUPPORTED || support == Support.PARTIAL; }
+    public record Selection(LanguageProfile profile, LanguageRegions.Language language) {
+        public boolean allowsLocal(String capability) { return local(profile.capabilities().get(capability)); }
+    }
     public String canonicalTsv() {
         List<String> result = rows.stream().map(row -> String.join("\t", row)).sorted().toList();
         return String.join("\n", result) + "\n";
