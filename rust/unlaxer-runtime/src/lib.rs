@@ -24,6 +24,7 @@ pub mod semantic_project;
 pub mod semantic_queries;
 pub mod semantic_query_cache;
 pub mod semantic_rename;
+pub mod semantic_rules;
 pub mod source;
 pub mod source_edits;
 pub mod type_system;
