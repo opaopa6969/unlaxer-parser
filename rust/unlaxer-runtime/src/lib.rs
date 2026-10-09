@@ -30,6 +30,7 @@ pub mod semantic_query_cache;
 pub mod semantic_rename;
 pub mod source;
 pub mod source_edits;
+pub mod token;
 pub mod type_system;
 mod unicode_xid;
 #[doc(hidden)]
@@ -484,6 +485,7 @@ pub struct Tree {
     byte_offsets: Vec<usize>,
     scopes: ScopeStore,
     recoveries: Vec<RecoveryDiagnostic>,
+    tokens: token::Store,
 }
 
 impl Tree {
@@ -742,6 +744,7 @@ struct Checkpoint {
     state: Option<Rc<StateMap>>,
     scopes_journal_mark: usize,
     recoveries: usize,
+    tokens: Rc<token::Store>,
 }
 
 struct ChoiceWinner {
@@ -754,6 +757,7 @@ struct ChoiceWinner {
     scopes: ScopeStore,
     recoveries: Vec<RecoveryDiagnostic>,
     fragment: Fragment,
+    tokens: Rc<token::Store>,
 }
 
 /// IDs belong to one context and survive rollback and temporary grammar sessions.
@@ -1119,6 +1123,8 @@ pub struct ParseContext<'a> {
     // with DetailedOnFailure, where a failed candidate records no diagnostics.
     first_sets: Option<Arc<[first::FirstSet]>>,
     exclusion_audit: bool,
+    tokens: Rc<token::Store>,
+    next_token_generation: u64,
     unique_choice_failure_seen: bool,
     names_state: names::State,
 }
@@ -1297,6 +1303,7 @@ fn parse_detailed_owned(
                 byte_offsets: parser.byte_offsets,
                 scopes: parser.scopes,
                 recoveries,
+                tokens: (*parser.tokens).clone(),
             });
         }
         trailing_offset = Some(parser.code_point(parser.position));
@@ -1436,6 +1443,8 @@ impl<'a> ParseContext<'a> {
             checkpoint_metrics_scope_journal_base: 0,
             first_sets: None,
             exclusion_audit: false,
+            tokens: Rc::new(token::Store::new()),
+            next_token_generation: 1,
             unique_choice_failure_seen: false,
             names_state: names::State::default(),
         }
@@ -1516,6 +1525,7 @@ impl<'a> ParseContext<'a> {
             byte_offsets: self.byte_offsets.clone(),
             scopes: self.scopes.clone(),
             recoveries: self.selected_recoveries(root),
+            tokens: (*self.tokens).clone(),
         })
     }
 
@@ -1800,6 +1810,7 @@ impl<'a> ParseContext<'a> {
             captures_journal_mark,
             scopes_journal_mark,
             recoveries: self.recoveries.len(),
+            tokens: Rc::clone(&self.tokens),
             state,
         }
     }
@@ -1823,6 +1834,7 @@ impl<'a> ParseContext<'a> {
         self.position = checkpoint.position;
         self.matched_position = checkpoint.matched_position;
         self.nodes.truncate(checkpoint.nodes);
+        self.tokens = checkpoint.tokens;
         self.recoveries.truncate(checkpoint.recoveries);
         self.captures
             .rollback_checkpoint(checkpoint.captures_journal_mark);
@@ -2748,6 +2760,7 @@ impl<'a> ParseContext<'a> {
                             scopes
                         },
                         recoveries: self.recoveries.clone(),
+                        tokens: Rc::clone(&self.tokens),
                         fragment,
                     });
                 }
@@ -2777,6 +2790,7 @@ impl<'a> ParseContext<'a> {
             self.nodes.extend(winner.nodes);
             self.captures = winner.captures;
             self.state = winner.state;
+            self.tokens = winner.tokens;
             winner
                 .scopes
                 .retain_journal_entry_count(self.scopes.journal_entries_created());
