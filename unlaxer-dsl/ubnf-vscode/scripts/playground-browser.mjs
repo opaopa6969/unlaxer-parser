@@ -67,7 +67,7 @@ try {
   await page.setViewportSize({width: 390, height: 844});
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   const helpPage = await browser.newPage(); await helpPage.goto(url + 'help/index.html'); await helpPage.locator('#lesson pre').waitFor();
-  assert.equal(await helpPage.locator('#lessons button').count(), 6);
+  assert.equal(await helpPage.locator('#lessons button').count(), catalog.lessons.length);
   // Simulate a non-responsive worker to verify the actual timeout and a subsequent retry.
   await page.route('**/worker.js', route => route.fulfill({contentType:'text/javascript', body:'self.onmessage = () => {};'}));
   await page.reload();
