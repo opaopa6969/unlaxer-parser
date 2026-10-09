@@ -33,7 +33,8 @@ public final class SegmentSourceMap {
         int cursor = 0;
         for (Segment segment : segments) {
             output.check(segment.output);
-            if (segment.output.start() != cursor || segment.output.length() == 0) {
+            boolean emptyAnchor = output.length() == 0 && segments.size() == 1 && segment.kind == Kind.COPY;
+            if (segment.output.start() != cursor || (segment.output.length() == 0 && !emptyAnchor)) {
                 throw new IllegalArgumentException("segments must partition output");
             }
             if (segment.kind != Kind.GENERATED && segment.origin == null) {
@@ -109,7 +110,7 @@ public final class SegmentSourceMap {
                 for (ExactLink parentLink : parentLinks) {
                     int start = Math.max(link.origin.span.start(), parentLink.output.start());
                     int end = Math.min(link.origin.span.end(), parentLink.output.end());
-                    if (start >= end) { continue; }
+                    if (start > end || (start == end && link.origin.span.length() != 0)) { continue; }
                     int mapped = parentLink.origin.span.start() + start - parentLink.output.start();
                     next.add(new ExactLink(new Span(link.output.start() + start - link.origin.span.start(),
                             link.output.start() + end - link.origin.span.start()), new Location(parentLink.origin.snapshot,
