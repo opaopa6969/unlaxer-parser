@@ -21,17 +21,18 @@ import org.unlaxer.dsl.runtime.LexicalExpression.Op;
 public final class UBNFModuleLoader {
     @FunctionalInterface public interface SourceReader { String read(Path path) throws IOException; }
     private final SourceReader reader;
+    private final UBNFPackageResolver packages;
     private final Map<Path, Map<String, LexicalExpression>> modules = new LinkedHashMap<>();
     private final Set<Path> stack = new java.util.LinkedHashSet<>();
 
-    private UBNFModuleLoader(SourceReader reader) { this.reader = reader; }
+    private UBNFModuleLoader(SourceReader reader, Path path) { this.packages = new UBNFPackageResolver(path, reader); this.reader = packages::read; }
 
     public static UBNFFile load(Path path) throws IOException {
         return resolve(UBNFMapper.parse(Files.readString(path)), path, Files::readString);
     }
 
     public static UBNFFile resolve(UBNFFile file, Path path, SourceReader reader) throws IOException {
-        var loader = new UBNFModuleLoader(reader);
+        var loader = new UBNFModuleLoader(reader, path);
         path = path.toAbsolutePath().normalize();
         loader.stack.add(path);
         var grammars = new ArrayList<GrammarDecl>();
@@ -69,7 +70,7 @@ public final class UBNFModuleLoader {
         for (var declaration : grammar.imports()) {
             if (!aliases.add(declaration.alias())) throw error("duplicate import alias: " + declaration.alias());
             if (declaration.path().contains("://")) throw error("network imports are unsupported: " + declaration.path());
-            var exports = module(path.getParent().resolve(declaration.path()));
+            var exports = module(packages.importPath(path, declaration.path()));
             for (var entry : exports.entrySet())
                 imported.put(declaration.alias() + "." + entry.getKey(), entry.getValue());
         }

@@ -48,6 +48,17 @@ public class TokenStreamConformanceTest {
     private JsonArray corpus(String file) throws Exception {
         return JsonParser.parseString(Files.readString(repo.resolve("spec-corpus/token-stream/"+file))).getAsJsonArray();
     }
+    private Path fixtureSource(JsonObject fixture) throws Exception {
+        Path directory = temporary.newFolder().toPath();
+        Path source = directory.resolve("input.ubnf");
+        Files.writeString(source, fixture.get("grammar").getAsString());
+        if (fixture.has("package")) {
+            Path manifest = directory.resolve("ubnf.json");
+            Files.writeString(manifest, "{\"schemaVersion\":1,\"dependencies\":{\"std/layout\":{\"version\":\"1.0.0\",\"source\":\"builtin:std/layout@1.0.0\"}}}");
+            org.unlaxer.dsl.bootstrap.UBNFPackageResolver.resolve(manifest);
+        }
+        return source;
+    }
     @Test public void javaModesPreserveAuthoredOracles() throws Exception {
         for (var fixture : corpus("corpus.json")) {
             var f=fixture.getAsJsonObject();
@@ -58,7 +69,7 @@ public class TokenStreamConformanceTest {
             };
             if (example != null) assertEquals("runnable example drift: " + example,
                 f.get("grammar").getAsString().strip(), Files.readString(repo.resolve("examples/parse-composition/" + example)).strip());
-            var grammar=UBNFMapper.parse(f.get("grammar").getAsString()).grammars().get(0);
+            var grammar=org.unlaxer.dsl.bootstrap.UBNFModuleLoader.load(fixtureSource(f)).grammars().get(0);
             GrammarValidator.validateOrThrow(grammar);
             try(var loader=compileJava(grammar)) {
                 for(var c:f.getAsJsonArray("cases")) for(var mode:Lexing.Mode.values()) for(boolean keep:List.of(true,false)) {
@@ -88,7 +99,7 @@ public class TokenStreamConformanceTest {
             assertThrows(IllegalArgumentException.class,()->new ParserGenerator().generate(g));
             assertThrows(IllegalArgumentException.class,()->new RustBackend().generate(g));
             var d=PortabilityCheck.check(f.get("grammar").getAsString()).diagnostics().stream()
-                .filter(i->i.code().equals(f.get("code").getAsString())).findFirst().orElseThrow();
+                .filter(i->i.code().equals(f.get(f.has("portabilityCode")?"portabilityCode":"code").getAsString())).findFirst().orElseThrow();
             assertEquals(f.get("subject").getAsString(),d.subject());assertNotNull(d.span());
         }
     }
@@ -162,8 +173,9 @@ public class TokenStreamConformanceTest {
         Path nativeGenerator=nativeTarget.resolve("debug/unlaxer");
         var report=new ArrayList<>(List.of("fixture\tcase\tmode\tpreserve_trivia\tjava\trust"));
         for(var fixture:corpus("corpus.json")) {
-            var f=fixture.getAsJsonObject();String source=f.get("grammar").getAsString();var grammar=UBNFMapper.parse(source).grammars().get(0);
-            var generated=new RustBackend().generate(grammar);Path folder=temporary.newFolder().toPath();Path ubnf=folder.resolve("input.ubnf");Files.writeString(ubnf,source);
+            var f=fixture.getAsJsonObject();Path ubnf=fixtureSource(f);Path folder=ubnf.getParent();
+            var grammar=org.unlaxer.dsl.bootstrap.UBNFModuleLoader.load(ubnf).grammars().get(0);
+            var generated=new RustBackend().generate(grammar);
             Path nativeOutput=folder.resolve("generated");
             success(run(List.of(nativeGenerator.toString(),"generate","--grammar",ubnf.toString(),"--output",nativeOutput.toString()),"",true));
             for(var file:generated) assertEquals(f.get("name")+" emitted "+file.relativePath(),file.content(),Files.readString(nativeOutput.resolve(file.relativePath())));
@@ -191,8 +203,8 @@ public class TokenStreamConformanceTest {
             var f=entry.getAsJsonObject();Path grammar=temporary.newFile("invalid-"+f.get("name").getAsString()+".ubnf").toPath();Files.writeString(grammar,f.get("grammar").getAsString());
             var output=run(List.of(nativeGenerator.toString(),"check","--target","rust","--grammar",grammar.toString(),"--format","json"),"",true);
             var rust=JsonParser.parseString(output.output()).getAsJsonObject().getAsJsonArray("diagnostics");
-            var java=PortabilityCheck.check(f.get("grammar").getAsString()).diagnostics().stream().filter(d->d.code().startsWith("E-TOKEN-STREAM")).toList();
-            var selected=new JsonArray();for(var d:rust) if(d.getAsJsonObject().get("code").getAsString().startsWith("E-TOKEN-STREAM")) {
+            var java=PortabilityCheck.check(f.get("grammar").getAsString()).diagnostics().stream().filter(d->d.code().startsWith("E-TOKEN-STREAM") || d.code().equals("P-WHITESPACE")).toList();
+            var selected=new JsonArray();for(var d:rust) if(d.getAsJsonObject().get("code").getAsString().startsWith("E-TOKEN-STREAM") || d.getAsJsonObject().get("code").getAsString().equals("P-WHITESPACE")) {
                 var normalized=d.getAsJsonObject().deepCopy();assertEquals("error",normalized.remove("severity").getAsString());selected.add(normalized);
             }
             assertEquals(f.get("name").toString(),new com.google.gson.Gson().toJsonTree(java),selected);

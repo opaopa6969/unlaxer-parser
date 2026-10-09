@@ -1,0 +1,3 @@
+# symbol replacement expected first module (second module remains foo foo)
+outer	bar	#日😀\r\nbar  "foo" { foo foo } bar\r\n
+inner	bar	#日😀\r\nfoo  "foo" { bar bar } foo\r\n
