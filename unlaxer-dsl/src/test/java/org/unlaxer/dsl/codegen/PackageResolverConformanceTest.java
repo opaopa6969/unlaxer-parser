@@ -50,6 +50,36 @@ public class PackageResolverConformanceTest {
         }
         Files.write(Path.of("target/rust-packages.tsv"), report, StandardCharsets.UTF_8);
     }
+    @Test public void documentSizeLimitUsesUtf8Bytes() throws Exception {
+        for (String row : Files.readAllLines(repository.resolve("unlaxer-dsl/src/test/resources/packages/document-limits.tsv"))) {
+            if (row.startsWith("#") || row.isBlank()) continue;
+            String[] fixture = row.split("\t");
+            Path directory = temporary.newFolder().toPath();
+            Path manifest = directory.resolve("ubnf.json"), root = directory.resolve("root.ubnf");
+            Files.writeString(manifest, "{\"schemaVersion\":1,\"dependencies\":{\"std/layout\":{\"version\":\"1.0.0\",\"source\":\"builtin:std/layout@1.0.0\"}}}");
+            UBNFPackageResolver.resolve(manifest);
+            Path document = fixture[1].equals("manifest") ? manifest : directory.resolve("ubnf.lock.json");
+            String base = Files.readString(document).stripTrailing();
+            String prefix = base.substring(0, base.length() - 1) + ",\"padding\":\"", suffix = "\"}";
+            int bytes = Integer.parseInt(fixture[3]);
+            int fill = bytes - (prefix + suffix).getBytes(StandardCharsets.UTF_8).length;
+            int unitBytes = fixture[2].getBytes(StandardCharsets.UTF_8).length;
+            String source = prefix + fixture[2].repeat(fill / unitBytes) + "a".repeat(fill % unitBytes) + suffix;
+            assertEquals(fixture[0], bytes, source.getBytes(StandardCharsets.UTF_8).length);
+            Files.writeString(document, source);
+            var resolver = new UBNFPackageResolver(root, Files::readString);
+            if (fixture[4].equals("LIMIT")) {
+                assertTrue(fixture[0], assertThrows(IllegalArgumentException.class,
+                    () -> resolver.importPath(root, "pkg:std/layout")).getMessage().contains("exceeds 8 MiB"));
+                if (fixture[1].equals("manifest")) assertTrue(fixture[0], assertThrows(IllegalArgumentException.class,
+                    () -> UBNFPackageResolver.resolve(manifest)).getMessage().contains("exceeds 8 MiB"));
+            } else {
+                assertNotNull(fixture[0], resolver.importPath(root, "pkg:std/layout"));
+                if (fixture[1].equals("manifest")) UBNFPackageResolver.resolve(manifest);
+            }
+        }
+    }
+
     @Test public void failedTransitiveVerificationCannotPublishAParent() throws Exception {
         JsonObject fixture = JsonParser.parseString(Files.readString(repository.resolve("unlaxer-dsl/src/test/resources/packages/retry.json"))).getAsJsonObject();
         Path directory = temporary.newFolder().toPath();

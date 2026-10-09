@@ -29,6 +29,7 @@ pub mod semantic_rename;
 pub mod source;
 pub mod source_edits;
 pub mod type_system;
+mod unicode_xid;
 #[doc(hidden)]
 pub use first::{set_candidate_exclusion_for_current_thread, CandidateExclusion};
 pub use scope::{

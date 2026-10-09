@@ -1,11 +1,12 @@
 //! Atomic lexical programs generated from UBNF. Matching has no host-context side effects.
 use std::collections::HashMap;
 
-#[allow(clippy::upper_case_acronyms)]
+#[allow(clippy::upper_case_acronyms, non_camel_case_types)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Op {
     LITERAL,
     ANY,
+    XID_IDENTIFIER,
     EOF,
     BOF,
     BOL,
@@ -56,6 +57,7 @@ impl LexicalExpression {
     ) -> Option<usize> {
         match self.op {
             Op::LITERAL => s[p..].starts_with(self.text).then_some(p + self.text.len()),
+            Op::XID_IDENTIFIER => crate::unicode_xid::identifier_end(s, p),
             Op::ANY => s[p..].chars().next().map(|c| p + c.len_utf8()),
             Op::EOF => (p == s.len()).then_some(p),
             Op::BOF => (p == 0).then_some(p),
