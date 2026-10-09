@@ -448,9 +448,23 @@ pub struct Dispatch {
 pub struct LanguageRegions {
     host: Snapshot,
     regions: HashMap<String, Region>,
+    open_ends: HashSet<String>,
 }
 impl LanguageRegions {
+    /// Compatibility path for callers without explicit enclosure metadata.
     pub fn new(host: Snapshot, input: Vec<Region>) -> Result<Self> {
+        let open_ends = input
+            .iter()
+            .filter(|r| r.parse_state == State::Partial && r.full.end == r.body.end)
+            .map(|r| r.id.clone())
+            .collect();
+        Self::with_open_ends(host, input, open_ends)
+    }
+    pub fn with_open_ends(
+        host: Snapshot,
+        input: Vec<Region>,
+        open_ends: HashSet<String>,
+    ) -> Result<Self> {
         let mut regions = HashMap::new();
         for region in input {
             host.check(region.full)?;
@@ -503,7 +517,17 @@ impl LanguageRegions {
                 }
             }
         }
-        Ok(Self { host, regions })
+        for id in &open_ends {
+            let region = regions.get(id).ok_or("invalid open region boundary")?;
+            if region.full.end != region.body.end {
+                return Err("invalid open region boundary");
+            }
+        }
+        Ok(Self {
+            host,
+            regions,
+            open_ends,
+        })
     }
     pub fn host(&self) -> &Snapshot {
         &self.host
@@ -518,7 +542,7 @@ impl LanguageRegions {
         let mut ambiguous = false;
         for region in self.regions.values() {
             let owns = region.body.start <= point && point < region.body.end
-                || region.parse_state == State::Partial
+                || self.open_ends.contains(&region.id)
                     && point == self.host.len()
                     && point == region.body.end;
             if !owns {

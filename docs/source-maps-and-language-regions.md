@@ -139,3 +139,21 @@ diagnostics、cursor、edit は同じ host 点へ往復でき、親 map の合�
 `PARTIAL` empty region の host EOF が一意に所有される場合は、この map で virtual cursor 0 の補完と挿入を host へ戻せる。
 子 grammar が FAILED/COMPLETE でも enclosure が未閉鎖な場合の所有判定は、parseState と delimiter 状態を分ける後続変更で扱う。
 EOF 所有と source map の一意性は独立した条件であり、片方だけ満たしても query forwarding 完了とはしない。
+
+### enclosure の開閉と parseState の分離
+
+生成 registry は `Result.openEnds` / `Output.open_ends` に、未閉鎖の本文を持つ region ID を保存する。
+`Child.openEnd` / `Child.open_end` は enclosing grammar の editor CST による証拠で、子 grammar の成功・失敗とは別の値である。
+元の opening と body を持ち、binding node が EOF 修復の synthetic node で、`full.end == body.end == input.length` の場合だけ開いた境界とする。
+strict parse の child は閉じた境界として扱い、synthetic body は従来どおり region にしない。
+手書き provider の Java 3引数 Child constructor は `openEnd=false`。Rust Child literal は `open_end` を明示する。
+
+`Result.tree()` / `Output.tree()` は明示境界を用いるため、未閉鎖の Java 本文が COMPLETE、FAILED、UNAVAILABLE でも host EOF の所有者になれる。
+UNAVAILABLE に対応する provider が無ければ query は UNAVAILABLE を返し、別言語の provider へ代替しない。
+closed delimiter は enclosing body に残り、同じ深さの複数 open region が一致する曖昧な EOF は拒否する。
+canonical region JSON の `openEnd` で、Playground などの利用側もこの境界を参照できる。
+
+既存の `LanguageRegions(host, regions)` / `LanguageRegions::new(host, regions)` は PARTIAL からの互換推定を維持する。
+厳密な情報を持つ呼出し元は Java の3引数 constructor / Rust `with_open_ends` に open ID集合を渡す。
+未知 ID と `full.end != body.end` の open指定は拒否する。空集合は PARTIAL region であっても EOF所有を明示的に無効にする。
+共通 `embedded-grammars/ownership.tsv` が完成/失敗/空本文/閉じdelimiter/欠落providerと補完挿入位置を固定し、Java、native Rust、実WASMで検証する。
