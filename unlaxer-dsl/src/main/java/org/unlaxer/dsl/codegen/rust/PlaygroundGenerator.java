@@ -36,12 +36,13 @@ public final class PlaygroundGenerator {
         files.put("runtime/LICENSE", resource("playground/runtime/LICENSE"));
         files.put("runtime/UNICODE-LICENSE.txt", resource("playground/runtime/UNICODE-LICENSE.txt"));
         files.put("public/UNICODE-LICENSE.txt", resource("playground/runtime/UNICODE-LICENSE.txt"));
-        for (String name : new String[] {"lib.rs", "scope.rs", "semantic.rs", "editor.rs", "semantic_project.rs", "semantic_query_cache.rs", "type_system.rs", "call_inference.rs", "lexing.rs", "first.rs", "lexical.rs", "long_code_fence.rs", "memo_retention_tests.rs", "source.rs", "pipeline.rs", "language_queries.rs", "semantic_queries.rs", "semantic_rename.rs", "source_edits.rs", "unicode_xid.rs", "embedded.rs", "provider_protocol.rs", "provider_process.rs"}) {
+        for (String name : new String[] {"lib.rs", "scope.rs", "semantic.rs", "editor.rs", "editor_cst.rs", "editor_queries.rs", "language_queries.rs", "semantic_queries.rs", "semantic_project.rs", "semantic_rename.rs", "source_edits.rs", "source.rs", "pipeline.rs", "semantic_query_cache.rs", "type_system.rs", "call_inference.rs", "lexing.rs", "first.rs", "lexical.rs", "long_code_fence.rs", "memo_retention_tests.rs", "unicode_xid.rs", "embedded.rs", "provider_protocol.rs", "provider_process.rs"}) {
             files.put("runtime/src/" + name, resource("playground/runtime/src/" + name));
         }
         files.put("src/lib.rs", resource("playground/lib.rs")
             .replace("@@DOCS@@", ir.rules().stream().anyMatch(rule -> !rule.documentation().isEmpty()) ? "generated::parser::RULE_DOCS" : "&[]")
             .replace("@@NAME@@", RustBackend.quote(grammar.name())).replace("@@ROOT@@", Integer.toString(ir.root())));
+        files.put("src/editor_adapter.rs", resource("playground/editor_adapter.rs"));
         for (String name : new String[] {"index.html", "playground.css", "playground.js", "worker.js"}) {
             files.put("public/" + name, resource("playground/" + name));
         }
