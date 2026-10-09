@@ -7,3 +7,5 @@
 `benchmark.ubnf` と `benchmark.rs` は同じ成功入力に対する時間・割当量・評価回数の測定。Java harness も同じケースを持つ。`measurement.tsv` は開発時の 1 回の記録で、期待値ファイルではない。再現コマンドと測定の限界は [仕様](../../docs/token-stream.md) を参照。
 
 測定スナップショット: Linux x86_64、Java HotSpot 21.0.9、rustc 1.98.1 (`-O`)、2026-10-06。互換性テストは別途 Rust 1.85.0 / Java 17 でも実行する。8 文法・27 入力・216 組合せと、10 件の拒否 fixture を使用する。
+
+#432 の追加検証はローカル/標準packageの名前付きglobal triviaと独自Unicode定義を含む。現行は 13 文法・57 入力・456 組合せ、nullable/lookaheadを含む12件の拒否fixture。package fixtureは明示resolve後のlock/cacheだけを読む。

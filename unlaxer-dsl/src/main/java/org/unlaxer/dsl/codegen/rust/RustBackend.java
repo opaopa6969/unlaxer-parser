@@ -38,9 +38,13 @@ public final class RustBackend {
                 .append(", literal: ").append(terminal.literal()).append(", expression: ")
                 .append(lexicalExpression(terminal.expression())).append(" },\n");
         }
-        return out.append("    ].into())\n}\n\npub fn parse_with_lexing(source: &str, options: unlaxer_runtime::lexing::Options) -> Result<unlaxer_runtime::lexing::Outcome<'_>, String> {\n    unlaxer_runtime::lexing::parse(grammar(), ")
+        var trivia = org.unlaxer.dsl.codegen.TokenStreamGrammar.namedTrivia(grammar);
+        out.append("    ].into())\n}\n\npub fn parse_with_lexing(source: &str, options: unlaxer_runtime::lexing::Options) -> Result<unlaxer_runtime::lexing::Outcome<'_>, String> {\n    unlaxer_runtime::lexing::")
+            .append(trivia == null ? "parse" : "parse_with_trivia").append("(grammar(), ")
             .append(ir.root()).append(", ").append(ir.javaWhitespace())
-            .append(", source, options, std::sync::Arc::clone(lexical_terminals()))\n}\n").toString();
+            .append(", source, options, std::sync::Arc::clone(lexical_terminals())");
+        if (trivia != null) out.append(", Some(").append(lexicalExpression(trivia)).append(")");
+        return out.append(")\n}\n").toString();
     }
 
     private String ast(GrammarIR ir) {

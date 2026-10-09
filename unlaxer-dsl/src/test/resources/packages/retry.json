@@ -1,0 +1,8 @@
+{
+  "files": {
+    "ubnf.json": "{\"schemaVersion\": 1, \"dependencies\": {\"team/layout\": {\"version\": \"1.0.0\", \"source\": \"local:artifact.json\"}}}",
+    "artifact.json": "{\"schemaVersion\": 1, \"id\": \"team/layout\", \"version\": \"1.0.0\", \"entry\": \"layout.ubnf\", \"files\": {\"layout.ubnf\": \"grammar Layout { @import std from 'pkg:std/layout' @ubnf: v2 token GAP ::= std.SPACES; }\"}, \"dependencies\": {\"std/layout\": {\"version\": \"1.0.0\", \"source\": \"builtin:std/layout@1.0.0\"}}}",
+    "root.ubnf": "grammar G { @import layout from 'pkg:team/layout' @ubnf: v2 @whitespace: layout.GAP @root Start ::= 'a'; }"
+  },
+  "message": "artifact hash mismatch"
+}
