@@ -33,6 +33,7 @@
         <p>文法の <code>@doc</code> に書かれた利用者向け説明です。入口から読み始めます。</p>
         <label for="catalog-search">ルール名・説明を検索</label><input id="catalog-search" type="search" placeholder="名前、数値、区切り…">
         <div id="catalog"></div>
+        <details><summary>空白・コメントの定義と出典</summary><div id="vocabulary"></div></details>
         <details><summary>元の UBNF 文法を見る</summary><p>生成時のスナップショットです。ここを見ても parser は変更されません。文法を直したら、元ファイルから再生成・再 build します。</p><pre id="grammar"></pre></details>
         <details><summary>エラーが出たとき</summary><p>「不一致」は文法が入力を受け入れなかった結果です。表示された行・列で、必要な文字、引用符、区切り、空白を確認します。末尾に余分な文字があっても失敗します。</p><p>「実行エラー」は制限時間、サイズ、WASM trap などで判定できなかった状態です。言語の不一致とは区別してください。入力を短くして試せます。</p><p>成功でも AST がない場合は mapping の条件を確認してください。構文認識と AST 投影は別の工程です。</p></details>
       </aside>

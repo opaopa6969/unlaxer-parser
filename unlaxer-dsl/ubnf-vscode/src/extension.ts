@@ -53,6 +53,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     })
   );
 
+  context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider("ubnf-package", {
+    async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
+      const source = await client?.sendRequest<string | null>("ubnf/packageSource", {uri: uri.toString()});
+      if (source == null) throw new Error("検証済み package source がありません。import 元の文法を開いてください。");
+      return source;
+    }
+  }));
+
   client.start().then(
     () => outputChannel?.appendLine("[ubnf-lsp] language server started"),
     (error: unknown) => {
