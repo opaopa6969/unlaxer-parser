@@ -14,7 +14,11 @@ public final class VocabularyOrigins {
         String source = reader.read(path);
         var ast = UBNFMapper.parse(source);
         UBNFModuleLoader.resolve(ast, path, reader); // Enforce the complete module contract first.
-        var resolver = new UBNFPackageResolver(path, reader);
+        return inspect(path, source, new UBNFPackageResolver(path, reader));
+    }
+    public static JsonObject inspect(Path path, String source, UBNFPackageResolver resolver) throws IOException {
+        var ast = UBNFMapper.parse(source);
+        UBNFModuleLoader.resolve(ast, path, resolver);
         JsonArray modules = new JsonArray();
         for (var declaration : ast.grammars()) for (var imported : declaration.imports()) {
             Path target = resolver.importPath(path, imported.path());

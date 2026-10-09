@@ -7,9 +7,18 @@ use unlaxer_ubnf::*;
 pub fn load(path: &Path) -> Result<UbnfFile, String> {
     let path = normalize(path)?;
     let source = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    let mut file = parse(&source).map_err(|e| e.to_string())?;
+    resolve(&source, &path, &mut crate::packages::Resolver::new(&path))
+}
+
+pub fn resolve(
+    source: &str,
+    path: &Path,
+    packages: &mut crate::packages::Resolver,
+) -> Result<UbnfFile, String> {
+    let path = normalize(path)?;
+    let mut file = parse(source).map_err(|e| e.to_string())?;
     let mut loader = Loader {
-        packages: crate::packages::Resolver::new(&path),
+        packages,
         cache: BTreeMap::new(),
         stack: BTreeSet::from([path.clone()]),
     };
@@ -43,12 +52,12 @@ fn error(message: impl std::fmt::Display) -> String {
     format!("E-MODULE: {message}")
 }
 type Exports = BTreeMap<String, LexicalExpression>;
-struct Loader {
-    packages: crate::packages::Resolver,
+struct Loader<'a> {
+    packages: &'a mut crate::packages::Resolver,
     cache: BTreeMap<PathBuf, Exports>,
     stack: BTreeSet<PathBuf>,
 }
-impl Loader {
+impl Loader<'_> {
     fn module(&mut self, path: &Path) -> Result<Exports, String> {
         let path = normalize(path)?;
         if self.stack.contains(&path) {

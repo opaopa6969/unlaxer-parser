@@ -1,0 +1,37 @@
+// Original, deliberately bounded source grammar. See profile.tsv for coverage.
+grammar Rust185 {
+  @package: org.unlaxer.languages.rust
+  @ubnf: v2
+  @whitespace: javaStyle
+  @embedding: enabled
+  token LETTER ::= CHAR_RANGE('a', 'z') | CHAR_RANGE('A', 'Z') | '_';
+  token DIGIT ::= CHAR_RANGE('0', '9');
+  token ID ::= NEGATIVE_LOOKAHEAD(('as' | 'async' | 'await' | 'break' | 'const' | 'continue' | 'crate' | 'dyn' | 'else' | 'enum' | 'extern' | 'false' | 'for' | 'if' | 'impl' | 'in' | 'loop' | 'match' | 'mod' | 'move' | 'ref' | 'self' | 'Self' | 'static' | 'struct' | 'super' | 'trait' | 'true' | 'type' | 'unsafe' | 'use' | 'where' | 'while' | 'abstract' | 'become' | 'box' | 'do' | 'final' | 'macro' | 'override' | 'priv' | 'typeof' | 'unsized' | 'virtual' | 'yield' | 'try' | '_' | 'pub' | 'fn' | 'let' | 'mut' | 'return' | 'i32' | 'i64' | 'bool' | 'true' | 'false') NEGATIVE_LOOKAHEAD(LETTER | DIGIT)) LETTER (LETTER | DIGIT)*;
+  token INTEGER ::= ('0' | CHAR_RANGE('1', '9') DIGIT*) NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token STRING ::= '"' { '\\' ('"' | '\\' | 'n' | 'r' | 't') | NEGATION('"\\\r\n') } '"';
+  token K_PUB ::= 'pub' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_FN ::= 'fn' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_LET ::= 'let' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_MUT ::= 'mut' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_RETURN ::= 'return' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_I32 ::= 'i32' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_I64 ::= 'i64' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_BOOL ::= 'bool' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_TRUE ::= 'true' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_FALSE ::= 'false' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+
+  @root @mapping(Source)
+  Crate ::= SourceBody;
+  SourceBody ::= { FunctionDeclaration };
+  FunctionDeclaration ::= [ K_PUB ] K_FN ID '(' [ Parameters ] ')' [ '->' Type ] Block;
+  Parameters ::= Parameter { ',' Parameter };
+  Parameter ::= ID ':' Type;
+  Type ::= K_I32 | K_I64 | K_BOOL;
+  Block ::= '{' { Statement } [ Expression ] '}';
+  Statement ::= K_LET [ K_MUT ] ID [ ':' Type ] '=' Expression ';' | K_RETURN [ Expression ] ';' | Expression ';';
+  Expression ::= Unary { ('==' | '!=' | '+' | '-' | '*' | '/') Unary };
+  Unary ::= [ '!' | '-' ] Primary { '(' [ Arguments ] ')' };
+  Primary ::= STRING | INTEGER | K_TRUE | K_FALSE | ID | '(' Expression ')';
+  Arguments ::= Expression { ',' Expression };
+
+}
