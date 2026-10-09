@@ -49,7 +49,7 @@ public final class UBNFPackageResolver {
         if (!value.matches("[0-9]+\\.[0-9]+\\.[0-9]+(?:-[A-Za-z0-9.-]+)?")) throw error("exact package version required");
     }
     private static String file(String value) {
-        if (value.isEmpty() || value.contains("\\") || value.startsWith("/") || value.contains(":"))
+        if (value.isEmpty() || value.codePoints().anyMatch(Character::isISOControl) || value.contains("\\") || value.startsWith("/") || value.contains(":"))
             throw error("invalid package file path");
         for (String part : value.split("/", -1))
             if (part.isEmpty() || part.equals(".") || part.equals("..")) throw error("package file path escapes boundary");
@@ -261,6 +261,22 @@ public final class UBNFPackageResolver {
             if (hash.equals(string(entry.getValue().getAsJsonObject(), "sha256"))) return entry.getKey();
         throw error("unknown package source identity");
     }
+    /** Identity of a verified cached source; null for ordinary project files. */
+    public JsonObject identity(Path path) throws IOException {
+        String name = owner(path);
+        if (name == null) return null;
+        loaded(name); // The public identity is never produced from an unaudited lock alone.
+        JsonObject value = pinned(name), result = new JsonObject();
+        String file = virtualRoot.resolve(string(value, "sha256")).relativize(path).toString().replace('\\', '/');
+        file(file);
+        if (!loaded(name).getAsJsonObject("files").has(file)) throw error("missing package file: " + file);
+        result.addProperty("file", file);
+        result.addProperty("id", name);
+        result.addProperty("sha256", string(value, "sha256"));
+        result.addProperty("version", string(value, "version"));
+        return result;
+    }
+
     public Path importPath(Path current, String reference) throws IOException {
         String owner = owner(current);
         if (reference.startsWith("pkg:")) {

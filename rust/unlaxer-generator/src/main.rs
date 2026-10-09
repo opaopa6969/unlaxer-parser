@@ -40,9 +40,15 @@ fn main() -> ExitCode {
 }
 
 fn run_deps(args: Vec<OsString>) -> Result<(u8, String), (u8, String)> {
-    let help = "Usage: unlaxer deps resolve --manifest <ubnf.json>";
+    let help =
+        "Usage: unlaxer deps resolve --manifest <ubnf.json> | deps inspect --grammar <file.ubnf>";
     if args == [OsString::from("deps"), OsString::from("--help")] {
         return Ok((0, help.into()));
+    }
+    if args.len() == 4 && args[1] == "inspect" && args[2] == "--grammar" && !args[3].is_empty() {
+        return unlaxer_generator::vocabulary_origins::inspect(&PathBuf::from(&args[3]))
+            .map(|snapshot| (0, unlaxer_generator::vocabulary_origins::to_json(&snapshot)))
+            .map_err(|message| (3, message));
     }
     if args.len() != 4 || args[1] != "resolve" || args[2] != "--manifest" || args[3].is_empty() {
         return Err((2, help.into()));

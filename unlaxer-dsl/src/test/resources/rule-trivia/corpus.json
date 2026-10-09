@@ -1170,5 +1170,98 @@
         }
       }
     }
+  },
+  {
+    "name": "public-personal-project-coexistence",
+    "grammar": "grammar Coexistence { @import standard from 'pkg:std/layout' @import personal from 'pkg:alice/layout' @import project from 'project.ubnf' @ubnf: v2 @package: org.example.ruletrivia @whitespace: GAP token GAP ::= standard.SPACES_AND_COMMENTS | personal.GAP | project.GAP; @root @mapping(Root,params=[value]) Root ::= 'a' @value 'b'; }",
+    "modules": {
+      "project.ubnf": "grammar Project {\n @ubnf: v2\n token GAP ::= '+';\n}\n",
+      "personal.json": "{\"schemaVersion\":1,\"id\":\"alice/layout\",\"version\":\"1.0.0\",\"entry\":\"personal.ubnf\",\"files\":{\"personal.ubnf\":\"grammar Personal {\\n @ubnf: v2\\n // 😀\\n token GAP ::= '#';\\n}\\n\"},\"dependencies\":{}}"
+    },
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "std/layout": {
+          "version": "1.0.0",
+          "source": "builtin:std/layout@1.0.0"
+        },
+        "alice/layout": {
+          "version": "1.0.0",
+          "source": "local:personal.json"
+        }
+      }
+    },
+    "cases": [
+      {
+        "id": "all-three",
+        "input": "a #+ /*😀*/\r\nb",
+        "prefix": [
+          true,
+          13,
+          13
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            13
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "private-project",
+        "input": "+#a+#b+",
+        "prefix": [
+          true,
+          7,
+          7
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            7
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "standard-comment",
+        "input": "a//😀\r\nb",
+        "prefix": [
+          true,
+          7,
+          7
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            7
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "unclosed-standard",
+        "input": "a#+/*x",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      }
+    ]
   }
 ]

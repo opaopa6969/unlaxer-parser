@@ -81,7 +81,7 @@ export は `SPACES`、`LINE_COMMENT`、`BLOCK_COMMENT`、`SPACES_AND_COMMENTS`�
 従来の javaStyle 11文法・24入力を明示 import に置き換えた共通 fixture で、受理/拒否、
 consumed/matched cursor、AST 全 field/node span と生成物を比較する。
 
-Java / native Rust の lock bytes と生成物の比較、ローカル・推移的 import、17 の共通
+Java / native Rust の lock bytes と生成物の比較、ローカル・推移的 import、18 の共通
 拒否条件、HTTP 接続を監視したオフライン生成を conformance test で検証する。結果は
 `target/rust-packages.tsv` と既存 `target/rust-rule-trivia.tsv` に保存し、CI が必須にする。
 
@@ -116,5 +116,22 @@ credential / CA 設定ファイルの上限は64 KiB。token は printable beare
 未信頼 TLS/hostname、別 origin、redirect、容量、本文 timeout、remote→local 拒否、
 server 停止後のオフライン生成を両 CLI で照合する。CI は `rust-package-https.tsv` を保存する。
 
-出典/版を見せる補完・hover/定義表示、TinyExpression 移行、
-名前付き trivia の tokenStream 対応は親 #368 の未完了項目。この段階で親を close しない。
+## 定義の出典を確認する
+
+`unlaxer deps inspect --grammar file.ubnf` は、同じ module loader と cache の hash 検証を
+経て、import alias・source・定義の Unicode scalar 範囲と package の ID/版/hash/file を
+JSON で返す。ネットワークや credential を読み込まず、外部ファイルを書かない。
+Java/native Rust の JSON は同じ byte 列になる。package identity を公開する resolver API
+も、実際の cache artifact を hash 検証してから値を返す。
+
+UBNF LSP は global/rule の whitespace 指定で宣言的 token を補完し、hover に出典・固定版・
+hash を表示する。package の定義へ移動すると、読み取り専用 `ubnf-package:` 文書を開く。
+文書内容を返す `ubnf/packageSource` request は import の index が検証して保持する source
+だけを返し、任意のパスや未知の hash を読み込まない。外部定義は rename しない。
+
+Java/native Rust が生成する language Playground は同じ `vocabulary.json` snapshot を含み、
+空白設定と import 定義の出典/版/hash を表示する。定義範囲を開くと元の UBNF を確認できる。
+単一文書 authoring Playground は local named token の whitespace 補完も扱う。外部 module
+の取得は authoring UI では行わず、プロジェクトの明示 resolver で用意する。
+
+TinyExpression 移行、名前付き trivia の tokenStream 対応は親 #368 の未完了項目。この段階で親を close しない。
