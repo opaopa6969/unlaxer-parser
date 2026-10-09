@@ -18,7 +18,7 @@ including document contents and configuration, against the bound context.
 The innermost half-open region body is selected. Its language/package/version/
 grammar/entry identity chooses the provider. Missing providers return UNAVAILABLE;
 missing operation capabilities or an unmappable cursor return UNSUPPORTED.
-Delimiters remain owned by the containing language, and EOF has no owner.
+Delimiters remain owned by the containing language. An explicitly unclosed region may own host EOF; its enclosure state is independent of the child parse result.
 
 A request gives the provider the region, operation, canonical Unicode scalar
 cursor in the virtual document, complete project context and operation parameters.
@@ -102,3 +102,45 @@ cargo test --manifest-path rust/Cargo.toml -p unlaxer-generator --test playgroun
 | LSP/Playground request wiring and capability display | Pending #369/#382 | Pending #369/#382 |
 | External Java/TypeScript/Rust analyzers | Pending #378 | Pending #378 |
 | Workspace-wide edits | Pending #382 | Pending #382 |
+
+
+## Consumer envelope and generated LSP bridge
+
+`LanguageQueries.view` returns Java `LanguageQueryView` / Rust `QueryView` with
+an exact host snapshot, host scalar cursor, operation, selected region, result,
+and that region's actual provider capability set. `canonicalJson` /
+`canonical_json` use the same documented field order; snapshot versions are
+strings to avoid JavaScript integer rounding. Locations retain their owning
+URI/version and scalar span. Edits contain host scalar spans and replacement
+text. `views.jsonl` adds seven independently authored consumer outcomes to the
+shared query fixture, including unavailable providers and unsupported operations.
+
+A generated Java LSP server may override `languageQueries(host)` to construct an
+immutable region/project/provider binding for the supplied exact host snapshot.
+It also overrides `languageQueryCapabilities()` with the operations it registers.
+Completion, hover and definition use this binding, and definition is advertised
+when registered. The default empty registration preserves existing generated LSP
+behavior. Once a host registers providers, a missing binding yields no query
+results rather than unrelated grammar suggestions.
+
+LSP UTF-16 positions are checked before converting to scalar positions. Results
+are checked again against the current document's version and text. Completion
+alternatives carry only their explicit mapped edits; the bridge never invents a
+label replacement. Each definition range is converted using its own snapshot,
+so non-BMP characters in another file do not inherit the host offset. Invalid,
+stale, unsupported, unavailable and failed requests produce no candidates.
+
+`languageQueryParameters(host,cursor,operation)` defaults to a Unicode identifier
+prefix and token name and can be overridden for a language's token syntax. The
+provider still verifies the exact virtual snapshot and prefix. Hosts should use
+parsed token boundaries when their identifier syntax differs from this default.
+
+`LanguageProfile.Selection.allows(capability, providerRegistered)` /
+`Selection::allows` treats EXTERNAL as usable only after explicit registration;
+UNSUPPORTED remains disabled. Local SUPPORTED/PARTIAL behavior is unchanged.
+The LSP integration is verified with generated parsers plus real
+`SemanticRuleQueryProvider` and `ProjectQueryProvider`, including partial EOF,
+closed delimiters, surrogate boundaries, stale snapshots, imported definitions
+and host/foreign UTF-16 ranges. Rust uses the same runtime envelope and provider
+fixtures. Classic Rust LSP transport is a separate tracked #111 implementation;
+Playground query dispatch and edit controls remain the next #369/#382 slice.

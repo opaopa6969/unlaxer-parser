@@ -5,6 +5,7 @@ pub mod impact;
 mod lexical;
 pub mod lowering;
 pub mod modules;
+pub mod packaged_profiles;
 pub mod packages;
 pub mod playground;
 pub mod portability;

@@ -16,6 +16,7 @@
     <p><a href="../">説明・問い・実習で学ぶ「はじめての言語づくり」</a> · <a href="../playground/">完成した式言語の parser を試す</a></p>
     <p class="notice">この画面で確認するのは UBNF の構文です。成功しても、名前の参照先・左再帰・生成先の対応機能までは検証しません。書いた文法から parser を作るには <a href="help/index.html">CLI / VS Code の生成手順</a>へ進んでください。</p>
     <p id="engine" class="notice" role="status">WASM parser を読み込んでいます…</p>
+    <section id="profile-panel" hidden aria-label="言語の対応範囲"><h2>言語の対応範囲</h2><p>部分文法の拒否は、その言語全体の構文エラーとは限りません。外部解析器は別途登録が必要です。</p><div id="profile"></div></section>
     <div class="playground-layout">
       <section aria-labelledby="input-title">
         <h2 id="input-title">1 · 文法を書いて試す</h2>

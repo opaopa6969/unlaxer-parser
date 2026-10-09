@@ -184,6 +184,37 @@ public class SourceMapsTest {
         Region overlap = region("two", null, JAVA, new Span(6, 11), new Span(7, 10));
         assertThrows(IllegalArgumentException.class, () -> new LanguageRegions(HOST, List.of(overlap, overlap)));
     }
+    @Test public void emptyCopyAnchorsComposeAndDoNotInventAmbiguousPositions() {
+        var host = new DocumentSnapshot("host", 1, "日😀[");
+        var middle = new DocumentSnapshot("middle", 1, "😀[");
+        var empty = new DocumentSnapshot("empty", 1, "");
+        var point = new Span(0, 0);
+        var expected = new Location(host, new Span(3, 3));
+        var map = copy(empty, middle, 2).through(copy(middle, host, 1));
+        assertEquals(expected, map.edit(point));
+        assertEquals(0, map.cursor(expected).orElseThrow());
+        assertEquals(new DocumentSnapshot.Position(0, 4), host.lsp(map.edit(point).span().start()));
+        var nested = copy(new DocumentSnapshot("nested", 1, ""), empty, 0).through(map);
+        assertEquals(expected, nested.edit(point)); assertEquals(0, nested.cursor(expected).orElseThrow());
+        assertTrue(nested.cursor(new Location(new DocumentSnapshot("host", 2, host.text()), new Span(3, 3))).isEmpty());
+        assertTrue(new SegmentSourceMap(empty, List.of()).cursor(expected).isEmpty());
+        assertThrows(IllegalArgumentException.class, () -> new SegmentSourceMap(empty, List.of()).edit(point));
+        var anchor = new Segment(point, Kind.COPY, expected);
+        assertThrows(IllegalArgumentException.class, () -> new SegmentSourceMap(empty, List.of(anchor, anchor)));
+        assertThrows(IllegalArgumentException.class, () -> new SegmentSourceMap(empty, List.of(new Segment(point, Kind.GENERATED, expected))));
+        assertThrows(IllegalArgumentException.class, () -> new SegmentSourceMap(empty, List.of(new Segment(point, Kind.TRANSFORMED, expected))));
+        assertThrows(IllegalArgumentException.class, () -> new SegmentSourceMap(middle, List.of(anchor)));
+        var splitHost = new DocumentSnapshot("split-host", 1, "a#a");
+        var split = new DocumentSnapshot("split", 1, "aa");
+        var parent = new SegmentSourceMap(split, List.of(
+            new Segment(new Span(0, 1), Kind.COPY, new Location(splitHost, new Span(0, 1))),
+            new Segment(new Span(1, 2), Kind.COPY, new Location(splitHost, new Span(2, 3)))));
+        var ambiguous = copy(empty, split, 1).through(parent);
+        assertTrue(ambiguous.cursor(new Location(splitHost, new Span(1, 1))).isEmpty());
+        assertTrue(ambiguous.cursor(new Location(splitHost, new Span(2, 2))).isEmpty());
+        assertThrows(IllegalArgumentException.class, () -> ambiguous.edit(point));
+    }
+
     @Test public void sharedPartialEofOwnership() throws Exception {
         DocumentSnapshot host=new DocumentSnapshot("host",1,"😀ABC");
         assertEquals(4,host.length());assertEquals(5,host.utf16(4));
@@ -200,6 +231,53 @@ public class SourceMapsTest {
             if(columns[3].equals("REJECT"))assertThrows(columns[0],IllegalArgumentException.class,()->regions.at(cursor));
             else {Region region=regions.at(cursor);assertEquals(columns[0],columns[3],region==null?"NONE":region.id());}
         }
+    }
+
+    @Test public void emptyPartialRegionForwardsCompletionAndInsertionAtHostEof() {
+        var host = new DocumentSnapshot("host", 1, "日😀[");
+        var child = new DocumentSnapshot("child", 1, "");
+        var language = new Language("empty", "local", "1", "Empty", "Document");
+        var region = new Region("empty", null, language, new Span(2, 3), new Span(3, 3), copy(child, host, 3), State.PARTIAL);
+        var tree = new LanguageRegions(host, List.of(region));
+        var project = new LanguageQueries.Project("project", 1, Map.of(host.uri(), host), Map.of());
+        var provider = new LanguageQueries.Provider() {
+            @Override public Set<Operation> capabilities() { return Set.of(Operation.COMPLETION); }
+            @Override public LanguageQueries.Response query(LanguageQueries.Request request) {
+                assertEquals(0, request.cursor()); assertEquals(child, request.region().sourceMap().output());
+                var location = new Location(child, new Span(0, 0));
+                return new LanguageQueries.Response(child, "project", 1, State.PARTIAL, List.of(
+                    new LanguageQueries.Item("value", "empty input", List.of(location), List.of(new LanguageQueries.TextEdit(location, "value")))));
+            }
+        };
+        var queries = new LanguageQueries(tree, project, Map.of(language, provider));
+        var result = queries.query(host, project, 3, Operation.COMPLETION, Map.of());
+        assertEquals("empty", result.region()); assertEquals(State.PARTIAL, result.state());
+        assertEquals(new Span(3, 3), result.items().get(0).locations().get(0).location().span());
+        assertEquals(new Span(3, 3), result.items().get(0).edits().get(0).span());
+        assertEquals("日😀[value", tree.apply(host, 2, result.items().get(0).edits()).text());
+        assertEquals(State.UNSUPPORTED, queries.query(host, project, 2, Operation.COMPLETION, Map.of()).state());
+        var closed = new Region("closed", null, language, new Span(2, 3), new Span(3, 3), copy(child, host, 3), State.COMPLETE);
+        assertNull(new LanguageRegions(host, List.of(closed)).at(3));
+    }
+
+    @Test public void explicitEnclosureBoundariesAreIndependentAndValidated() {
+        var host = new DocumentSnapshot("host", 1, "😀ABC");
+        var full = new Span(0, 4);
+        var partial = new Region("x", null, JAVA, full, full, copy(host, host, 0), State.PARTIAL);
+        assertNull(new LanguageRegions(host, List.of(partial), Set.of()).at(4));
+        var complete = new Region("x", null, JAVA, full, full, copy(host, host, 0), State.COMPLETE);
+        assertEquals("x", new LanguageRegions(host, List.of(complete), Set.of("x")).at(4).id());
+        assertThrows(IllegalArgumentException.class, () -> new LanguageRegions(host, List.of(complete), Set.of("unknown")));
+        var body = new Span(1, 3); var child = new DocumentSnapshot("child", 1, host.slice(body));
+        var closed = new Region("closed", null, JAVA, full, body, copy(child, host, 1), State.PARTIAL);
+        assertThrows(IllegalArgumentException.class, () -> new LanguageRegions(host, List.of(closed), Set.of("closed")));
+        var empty = new DocumentSnapshot("empty", 1, ""); var point = new Span(4, 4);
+        var a = new Region("a", null, JAVA, point, point, copy(empty, host, 4), State.COMPLETE);
+        var b = new Region("b", null, JAVA, point, point, copy(empty, host, 4), State.FAILED);
+        assertThrows(IllegalArgumentException.class, () -> new LanguageRegions(host, List.of(a, b), Set.of("a", "b")).at(4));
+        assertThrows(IllegalArgumentException.class, () -> new EmbeddedLanguages.Child(JAVA, full, body, true));
+        assertThrows(IllegalArgumentException.class, () -> new EmbeddedLanguages.Parsed(host, State.PARTIAL,
+            List.of(new EmbeddedLanguages.Child(JAVA, new Span(0, 3), new Span(1, 3), true))));
     }
 
 }

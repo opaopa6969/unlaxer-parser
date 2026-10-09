@@ -149,7 +149,9 @@ impl SourceMap {
         let mut cursor = 0;
         for segment in &segments {
             output.check(segment.output)?;
-            if segment.output.start != cursor || length(segment.output) == 0 {
+            let empty_anchor =
+                output.is_empty() && segments.len() == 1 && segment.kind == Kind::Copy;
+            if segment.output.start != cursor || (length(segment.output) == 0 && !empty_anchor) {
                 return Err("segments must partition output");
             }
             if segment.kind != Kind::Generated && segment.origin.is_none() {
@@ -269,7 +271,7 @@ impl SourceMap {
                 for (parent_output, parent_origin) in &parent_links {
                     let start = origin.span.start.max(parent_output.start);
                     let end = origin.span.end.min(parent_output.end);
-                    if start >= end {
+                    if start > end || (start == end && length(origin.span) != 0) {
                         continue;
                     }
                     let mapped = parent_origin.span.start + start - parent_output.start;
@@ -446,9 +448,23 @@ pub struct Dispatch {
 pub struct LanguageRegions {
     host: Snapshot,
     regions: HashMap<String, Region>,
+    open_ends: HashSet<String>,
 }
 impl LanguageRegions {
+    /// Compatibility path for callers without explicit enclosure metadata.
     pub fn new(host: Snapshot, input: Vec<Region>) -> Result<Self> {
+        let open_ends = input
+            .iter()
+            .filter(|r| r.parse_state == State::Partial && r.full.end == r.body.end)
+            .map(|r| r.id.clone())
+            .collect();
+        Self::with_open_ends(host, input, open_ends)
+    }
+    pub fn with_open_ends(
+        host: Snapshot,
+        input: Vec<Region>,
+        open_ends: HashSet<String>,
+    ) -> Result<Self> {
         let mut regions = HashMap::new();
         for region in input {
             host.check(region.full)?;
@@ -501,7 +517,17 @@ impl LanguageRegions {
                 }
             }
         }
-        Ok(Self { host, regions })
+        for id in &open_ends {
+            let region = regions.get(id).ok_or("invalid open region boundary")?;
+            if region.full.end != region.body.end {
+                return Err("invalid open region boundary");
+            }
+        }
+        Ok(Self {
+            host,
+            regions,
+            open_ends,
+        })
     }
     pub fn host(&self) -> &Snapshot {
         &self.host
@@ -516,7 +542,7 @@ impl LanguageRegions {
         let mut ambiguous = false;
         for region in self.regions.values() {
             let owns = region.body.start <= point && point < region.body.end
-                || region.parse_state == State::Partial
+                || self.open_ends.contains(&region.id)
                     && point == self.host.len()
                     && point == region.body.end;
             if !owns {

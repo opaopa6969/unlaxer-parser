@@ -27,8 +27,15 @@ impl Grammar for Provider {
         }
         let child = Child {
             language: language(),
-            full: Span { start: 0, end: 3 },
-            body: Span { start: 0, end: 3 },
+            full: Span {
+                start: 0,
+                end: if self.0 == "open-middle" { 2 } else { 3 },
+            },
+            body: Span {
+                start: 0,
+                end: if self.0 == "open-middle" { 2 } else { 3 },
+            },
+            open_end: self.0 == "open-middle",
         };
         Ok(Parsed {
             snapshot: source,
@@ -40,7 +47,7 @@ impl Grammar for Provider {
                 State::Complete
             },
             children: match self.0 {
-                "cycle" | "failed-children" => vec![child],
+                "cycle" | "failed-children" | "open-middle" => vec![child],
                 "siblings" => vec![child.clone(), child],
                 _ => vec![],
             },
@@ -56,6 +63,7 @@ fn rejects_stale_identity_overlapping_and_unbounded_provider_results() {
         "cycle",
         "failed-children",
         "siblings",
+        "open-middle",
     ] {
         let provider = Provider(mode);
         assert!(

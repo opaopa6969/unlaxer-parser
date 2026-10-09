@@ -1,0 +1,30 @@
+profile	1
+language	typescript
+package	lang/typescript	0.1.0
+target	5.9.3	TS
+tool	typescript	5.9.3
+grammar	TypeScript59	TypeScript59.ubnf
+source	https://github.com/microsoft/TypeScript/tree/v5.9.3/src/compiler	5.9.3	original-repository-grammar
+fixture	corpus.tsv
+entry	SourceFile	PARTIAL
+entry	Type	PARTIAL
+entry	Expression	PARTIAL
+entry	Statement	PARTIAL
+entry	Block	PARTIAL
+capability	PARSE	PARTIAL
+capability	AST	PARTIAL
+capability	CST	SUPPORTED
+capability	VALIDATE	EXTERNAL
+capability	COMPLETION	EXTERNAL
+capability	HOVER	EXTERNAL
+capability	DEFINITION	EXTERNAL
+capability	RENAME	UNSUPPORTED
+capability	FORMAT	UNSUPPORTED
+capability	CODE_ACTION	UNSUPPORTED
+capability	EXECUTE	UNSUPPORTED
+syntax	functions-typed-variables	PARTIAL
+syntax	asi-tsx-template-literals	UNSUPPORTED
+syntax	unicode-identifiers	UNSUPPORTED
+difference	ast	AST retains the source root span; use CST for syntactic structure.
+difference	scope	Names, types, execution and project scope are not inferred by this grammar.
+difference	coverage	Unsupported syntax can require the pinned external provider; partial grammar rejection is not an official language error.

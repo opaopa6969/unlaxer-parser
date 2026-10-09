@@ -14,6 +14,6 @@ jobs:
           java-version: '21'
           cache: maven
       - uses: dtolnay/rust-toolchain@stable
-      - run: mvn -B -pl unlaxer-common,unlaxer-dsl -am test -Dtest=LanguageQueriesTest,PlaygroundCommandTest -Dsurefire.failIfNoSpecifiedTests=false
+      - run: mvn -B -pl unlaxer-common,unlaxer-dsl -am test -Dtest=LanguageQueriesTest,LanguageProfileSelectionTest,LSPQueryConsumerTest,LSPProfileInitializationTest,LSPCompileVerificationTest,LSPNonBmpOffsetTest,PlaygroundCommandTest -Dsurefire.failIfNoSpecifiedTests=false
       - run: cargo test --manifest-path rust/Cargo.toml -p unlaxer-runtime --test language_queries
       - run: cargo test --manifest-path rust/Cargo.toml -p unlaxer-generator --test playground
