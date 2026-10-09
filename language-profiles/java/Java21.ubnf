@@ -1,0 +1,51 @@
+// Original, deliberately bounded source grammar. See profile.tsv for coverage.
+grammar Java21 {
+  @package: org.unlaxer.languages.java
+  @ubnf: v2
+  @whitespace: javaStyle
+  @embedding: enabled
+  token LETTER ::= CHAR_RANGE('a', 'z') | CHAR_RANGE('A', 'Z') | '_';
+  token DIGIT ::= CHAR_RANGE('0', '9');
+  token ID ::= NEGATIVE_LOOKAHEAD(('abstract' | 'assert' | 'break' | 'byte' | 'case' | 'catch' | 'char' | 'const' | 'continue' | 'default' | 'do' | 'double' | 'else' | 'enum' | 'extends' | 'finally' | 'float' | 'for' | 'goto' | 'if' | 'implements' | 'instanceof' | 'interface' | 'native' | 'new' | 'short' | 'strictfp' | 'super' | 'switch' | 'synchronized' | 'this' | 'throw' | 'throws' | 'transient' | 'try' | 'volatile' | 'while' | '_' | 'record' | 'sealed' | 'permits' | 'var' | 'yield' | 'package' | 'import' | 'class' | 'public' | 'private' | 'protected' | 'static' | 'final' | 'void' | 'boolean' | 'int' | 'long' | 'String' | 'return' | 'true' | 'false' | 'null') NEGATIVE_LOOKAHEAD(LETTER | DIGIT)) LETTER (LETTER | DIGIT)*;
+  token INTEGER ::= ('0' | CHAR_RANGE('1', '9') DIGIT*) NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token STRING ::= '"' { '\\' ('"' | '\\' | 'n' | 'r' | 't') | NEGATION('"\\\r\n') } '"';
+  token K_PACKAGE ::= 'package' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_IMPORT ::= 'import' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_CLASS ::= 'class' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_PUBLIC ::= 'public' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_PRIVATE ::= 'private' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_PROTECTED ::= 'protected' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_STATIC ::= 'static' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_FINAL ::= 'final' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_VOID ::= 'void' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_BOOLEAN ::= 'boolean' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_INT ::= 'int' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_LONG ::= 'long' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_STRING ::= 'String' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_RETURN ::= 'return' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_TRUE ::= 'true' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_FALSE ::= 'false' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_NULL ::= 'null' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+
+  @root @mapping(Source)
+  CompilationUnit ::= CompilationBody;
+  CompilationBody ::= [ PackageDeclaration ] { ImportDeclaration } { ClassDeclaration };
+  PackageDeclaration ::= K_PACKAGE QualifiedName ';';
+  ImportDeclaration ::= K_IMPORT QualifiedName [ '.' '*' ] ';';
+  QualifiedName ::= ID { '.' ID };
+  ClassDeclaration ::= { Modifier } K_CLASS ID '{' { MethodDeclaration | FieldDeclaration } '}';
+  Modifier ::= K_PUBLIC | K_PRIVATE | K_PROTECTED | K_STATIC | K_FINAL;
+  MethodDeclaration ::= { Modifier } (K_VOID | Type) ID '(' [ Parameters ] ')' Block;
+  FieldDeclaration ::= { Modifier } Type ID [ '=' Expression ] ';';
+  Parameters ::= Parameter { ',' Parameter };
+  Parameter ::= Type ID;
+  Type ::= (K_BOOLEAN | K_INT | K_LONG | K_STRING | QualifiedName) { '[' ']' };
+  Block ::= '{' { Statement } '}';
+  Statement ::= K_RETURN [ Expression ] ';' | Type ID [ '=' Expression ] ';' | InvocationStatement | Block;
+  InvocationStatement ::= QualifiedName '(' [ Arguments ] ')' ';';
+  Expression ::= Unary { ('==' | '!=' | '+' | '-' | '*' | '/') Unary };
+  Unary ::= [ '!' | '-' | '+' ] Primary { '.' ID | '(' [ Arguments ] ')' };
+  Primary ::= STRING | INTEGER | K_TRUE | K_FALSE | K_NULL | ID | '(' Expression ')';
+  Arguments ::= Expression { ',' Expression };
+
+}

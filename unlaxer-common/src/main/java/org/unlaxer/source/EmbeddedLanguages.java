@@ -96,8 +96,7 @@ public final class EmbeddedLanguages {
             parsed = grammar.parse(language.entry(), input);
             if (false == input.equals(parsed.snapshot)) { throw new IllegalArgumentException("stale grammar response"); }
         }
-        SegmentSourceMap map = new SegmentSourceMap(input, input.length() == 0 ? List.of()
-            : List.of(new Segment(new Span(0, input.length()), Kind.COPY, new Location(host, body))));
+        SegmentSourceMap map = new SegmentSourceMap(input, List.of(new Segment(new Span(0, input.length()), Kind.COPY, new Location(host, body))));
         regions.add(new Region(id, parent, language, full, body, map, parsed.state));
         int index = 0;
         for (Child child : parsed.children) {

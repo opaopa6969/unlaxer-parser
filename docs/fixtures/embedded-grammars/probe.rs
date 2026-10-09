@@ -164,7 +164,7 @@ fn main() {
                 region.source_map.output().text
             );
             assert_eq!(host.version, region.source_map.output().version);
-            if !region.source_map.output().is_empty() {
+            {
                 assert_eq!(
                     region
                         .source_map
@@ -176,6 +176,7 @@ fn main() {
                         .span,
                     region.body
                 );
+                assert_eq!(region.source_map.cursor(&unlaxer_runtime::source::Location::new(host.clone(), unlaxer_runtime::Span { start: region.body.start, end: region.body.start }).unwrap()).unwrap(), Some(0));
             }
         }
         if let Some(old) = previous {

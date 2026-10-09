@@ -136,18 +136,14 @@ impl Traversal<'_> {
                 return Err("overlapping embedded siblings");
             }
         }
-        let segments = if input.is_empty() {
-            vec![]
-        } else {
-            vec![Segment {
-                output: Span {
-                    start: 0,
-                    end: input.len(),
-                },
-                kind: Kind::Copy,
-                origin: Some(Location::new(self.host.clone(), body)?),
-            }]
-        };
+        let segments = vec![Segment {
+            output: Span {
+                start: 0,
+                end: input.len(),
+            },
+            kind: Kind::Copy,
+            origin: Some(Location::new(self.host.clone(), body)?),
+        }];
         self.regions.push(Region {
             id: id.clone(),
             parent,

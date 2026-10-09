@@ -110,7 +110,8 @@ public class EmbeddedGrammarConformanceTest {
                 for (var region : result.regions()) {
                     assertEquals(host.slice(region.body()), region.sourceMap().output().text());
                     assertEquals(version, region.sourceMap().output().version());
-                    if (region.body().start() < region.body().end()) assertEquals(region.body(), region.sourceMap().edit(new Span(0, region.sourceMap().output().length())).span());
+                    assertEquals(region.body(), region.sourceMap().edit(new Span(0, region.sourceMap().output().length())).span());
+                    assertEquals(0, region.sourceMap().cursor(new SegmentSourceMap.Location(host, new Span(region.body().start(), region.body().start()))).orElseThrow());
                 }
                 if (previous != null) {
                     var old = previous; var project = new LanguageQueries.Project("project", version, Map.of(host.uri(), host), Map.of());
