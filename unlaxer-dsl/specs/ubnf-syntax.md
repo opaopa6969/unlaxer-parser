@@ -174,6 +174,34 @@ token HEX    = CHAR_RANGE('0','9')   // ※複数の範囲は NEGATION などと
 > `IdentifierParser` は「英字・数字・アンダースコア」を読みますが、
 > 「小文字のみ」「16進数の文字」などをピンポイントで定義できます。
 
+#### `XID_IDENTIFIER` — Unicode 識別子
+
+```ubnf
+grammar Names {
+  @ubnf: v2
+  token NAME = XID_IDENTIFIER
+  @root @mapping(Name, params=[text])
+  Root ::= NAME @text;
+}
+```
+
+Unicode 17.0.0 の `XID_Start XID_Continue*` を最長のprefixとして原文どおり読む。
+`名前2`、`e` と結合アクセント、補助面の文字を受理する。数字・結合文字・`_`・`$` は
+先頭として受理せず、`_` は続きでは受理する。空入力や絵文字の先頭は失敗する。
+失敗は消費／照合cursorを動かさない。位置とspanはcode point単位で、CRLF等の後続を消費しない。
+正規化、case folding、予約語除外は行わず、同じUnicode版の固定表をJava/Rust/WASMで使う。
+JDKやRustのUnicodeカテゴリ版に依存しない。
+
+宣言的tokenと同じく `@ubnf: v2` を要求する。`token NAME ::= XID_IDENTIFIER;` として
+字句式の中へ組み込むこともできる。JavaのFQN parser名やtoken adapterを要求しない。
+契約は [UAX #31](https://www.unicode.org/reports/tr31/) と
+[Unicode 17.0.0 XID properties](https://www.unicode.org/Public/17.0.0/ucd/DerivedCoreProperties.txt) に基づく。
+
+TinyExpression等の `token IDENTIFIER = org.unlaxer.parser.clang.IdentifierParser` は、Unicode名を
+採用する文法で `token IDENTIFIER = XID_IDENTIFIER` へ置き換えられる。ただし既存のASCII／`_`先頭
+契約とは受理範囲が異なる。ASCII名と`_`先頭を保存してUnicode名を追加する例は
+[移行文法](../../spec-corpus/xid-identifier/tinyexpression-migration.ubnf) を参照。
+
 #### `ANY` — 任意の1文字
 
 ```ubnf
