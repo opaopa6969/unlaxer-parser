@@ -51,6 +51,40 @@ public final class CstGrammar implements EmbeddedLanguages.Grammar {
             return new EmbeddedLanguages.Parsed(snapshot, state, children);
         }
     }
+    /** Opt-in EOF repair. Only regions with an original opening and original body escape. */
+    public EmbeddedLanguages.Grammar editor(List<String> completions, Function<Parser, String> ruleName,
+            Function<Parser, List<String>> captureBindings, org.unlaxer.editor.EditorCst.Options options) {
+        List<String> suffixes = List.copyOf(completions);
+        return new EmbeddedLanguages.Grammar() {
+            @Override public String name() { return name; }
+            @Override public EmbeddedLanguages.Parsed parse(String entry, DocumentSnapshot snapshot) {
+                EmbeddedLanguages.Parsed strict = CstGrammar.this.parse(entry, snapshot);
+                if (strict.state() != State.FAILED) { return strict; }
+                var cst = org.unlaxer.editor.EditorCst.parse(snapshot.text(), entries.get(entry), suffixes, ruleName, captureBindings, options);
+                if (cst.status() == org.unlaxer.editor.EditorCst.Status.FAILED) { return strict; }
+                List<EmbeddedLanguages.Child> children = new ArrayList<>();
+                for (var node : cst.nodes()) {
+                    for (Binding binding : bindings) {
+                        if (false == node.rule().equals(ruleName.apply(Parser.get(binding.rule)))) { continue; }
+                        var bodies = node.captures().stream().filter(capture -> binding.captures.contains(capture.name())).toList();
+                        if (bodies.size() != 1) { throw new IllegalArgumentException("embedding needs exactly one body capture"); }
+                        var body = bodies.get(0);
+                        // No synthetic-only opening, no inserted body text, no guessed inverse edit.
+                        if (node.span().start() >= body.span().start() || body.synthetic()) { continue; }
+                        children.add(new EmbeddedLanguages.Child(binding.language, new Span(node.span().start(), node.span().end()), new Span(body.span().start(), body.span().end())));
+                    }
+                }
+                children.sort(java.util.Comparator.comparingInt((EmbeddedLanguages.Child child) -> child.full().start())
+                    .thenComparing(java.util.Comparator.comparingInt((EmbeddedLanguages.Child child) -> child.full().end()).reversed()));
+                List<EmbeddedLanguages.Child> owned = new ArrayList<>();
+                for (var child : children) {
+                    if (owned.stream().anyMatch(parent -> parent.body().contains(child.full()))) { continue; }
+                    owned.add(child);
+                }
+                return new EmbeddedLanguages.Parsed(snapshot, State.PARTIAL, owned);
+            }
+        };
+    }
     private void discover(Token token, List<EmbeddedLanguages.Child> children) {
         for (Binding binding : bindings) {
             if (token.parser.getClass() == binding.rule) {

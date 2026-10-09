@@ -178,6 +178,6 @@ pub fn api(grammar: &GrammarDecl, ir: &unlaxer_codegen::GrammarIr) -> Result<Str
     for d in declarations {
         writeln!(out, "        unlaxer_runtime::embedded::Binding {{ rule: {}, capture: {}.into(), language: unlaxer_runtime::source::Language {{ id: {}.into(), package_id: {}.into(), version: {}.into(), grammar: {}.into(), entry: {}.into() }} }},", index(&d.rule), quote(&d.body), quote(&d.language), quote(&d.package), quote(&d.version), quote(&d.grammar), quote(&d.entry)).unwrap();
     }
-    out.push_str("    ] }\n}\n");
+    out.push_str("    ] }\n}\npub fn embedded_editor_grammar(completions: Vec<String>, options: unlaxer_runtime::editor_cst::Options) -> unlaxer_runtime::embedded::EditorGrammar {\n    embedded_grammar().editor(completions, options)\n}\n");
     Ok(out)
 }

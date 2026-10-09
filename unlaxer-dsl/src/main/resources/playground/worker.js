@@ -21,7 +21,7 @@ self.onmessage = async event => {
       const pointer = engine.pg_input(encoded.length);
       if (!pointer) throw new Error('入力用メモリを確保できませんでした。');
       new Uint8Array(engine.memory.buffer, pointer, encoded.length).set(encoded);
-      if (editor && typeof engine.pg_editor === 'function') engine.pg_editor(cursor); else engine.pg_parse(); self.postMessage({id, result: result()});
+      if (editor && typeof engine.pg_editor_snapshot === 'function' && Number.isSafeInteger(id) && id >= 0 && id <= 0xffffffff) engine.pg_editor_snapshot(cursor, id); else if (editor && typeof engine.pg_editor === 'function') engine.pg_editor(cursor); else engine.pg_parse(); self.postMessage({id, result: result()});
     } else throw new Error('不明な操作です。');
   } catch (error) { self.postMessage({id, error: String(error)}); }
 };
