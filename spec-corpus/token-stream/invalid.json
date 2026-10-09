@@ -58,5 +58,19 @@
     "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @comment: { line: '#' }\n @tokenStream: enabled\n token ID ::= 'a';\n @root @mapping(Value, params=[value])\n Root ::= ID @value;\n}",
     "code": "E-TOKEN-STREAM-TRIVIA",
     "subject": "comment"
+  },
+  {
+    "name": "nullable-named-trivia",
+    "grammar": "grammar Input { @ubnf: v2 @package: example.lexing @tokenStream: enabled @whitespace: GAP token GAP ::= ''; token ID ::= 'a'; @root @mapping(Value, params=[value]) Root ::= ID @value; }",
+    "code": "E-WHITESPACE-GLOBAL-STYLE",
+    "portabilityCode": "P-WHITESPACE",
+    "subject": "GAP"
+  },
+  {
+    "name": "lookahead-named-trivia",
+    "grammar": "grammar Input { @ubnf: v2 @package: example.lexing @tokenStream: enabled @whitespace: GAP token GAP ::= LOOKAHEAD('a'); token ID ::= 'a'; @root @mapping(Value, params=[value]) Root ::= ID @value; }",
+    "code": "E-WHITESPACE-GLOBAL-STYLE",
+    "portabilityCode": "P-WHITESPACE",
+    "subject": "GAP"
   }
 ]

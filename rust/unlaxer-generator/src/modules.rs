@@ -9,6 +9,7 @@ pub fn load(path: &Path) -> Result<UbnfFile, String> {
     let source = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
     let mut file = parse(&source).map_err(|e| e.to_string())?;
     let mut loader = Loader {
+        packages: crate::packages::Resolver::new(&path),
         cache: BTreeMap::new(),
         stack: BTreeSet::from([path.clone()]),
     };
@@ -43,6 +44,7 @@ fn error(message: impl std::fmt::Display) -> String {
 }
 type Exports = BTreeMap<String, LexicalExpression>;
 struct Loader {
+    packages: crate::packages::Resolver,
     cache: BTreeMap<PathBuf, Exports>,
     stack: BTreeSet<PathBuf>,
 }
@@ -60,7 +62,7 @@ impl Loader {
         }
         self.stack.insert(path.clone());
         let result = (|| {
-            let source = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+            let source = self.packages.read(&path)?;
             let mut file = parse(&source).map_err(|e| e.to_string())?;
             if file.grammars.len() != 1 {
                 return Err(error("import requires exactly one grammar"));
@@ -103,9 +105,8 @@ impl Loader {
             if declaration.path.contains("://") {
                 return Err(error("network imports are unsupported"));
             }
-            for (name, expression) in
-                self.module(&path.parent().unwrap().join(&declaration.path))?
-            {
+            let target = self.packages.import_path(path, &declaration.path)?;
+            for (name, expression) in self.module(&target)? {
                 imported.insert(format!("{}.{name}", declaration.alias), expression);
             }
         }
