@@ -85,5 +85,36 @@ Java / native Rust の lock bytes と生成物の比較、ローカル・推移�
 拒否条件、HTTP 接続を監視したオフライン生成を conformance test で検証する。結果は
 `target/rust-packages.tsv` と既存 `target/rust-rule-trivia.tsv` に保存し、CI が必須にする。
 
-HTTPS と認証分離、出典/版を見せる補完・hover/定義表示、TinyExpression 移行、
+## 明示した HTTPS 取得と認証
+
+`source` に固定した `https://host/path` を指定できる。ASCII DNS host を使い、HTTP、
+userinfo、query、fragment と redirect は拒否する。TLS の証明書と hostname を検証し、
+接続5秒・本文を含む全体20秒・artifact 8 MiB の上限を Java/native Rust で適用する。
+リモート artifact の推移的依存に `local:` を指定できない。取得後は同じ ID/版/hash
+検証を行い、生成時は固定 cache を使う。生成/check/Playground が取得や認証を行うことはない。
+
+HTTPS client と TLS は native target のみに含める。ブラウザー向け WASM での依存取得は
+明示エラーとし、native `deps resolve` で準備した package の明示ロードを利用する。
+
+認証は `UBNF_CREDENTIALS_FILE`、未指定時は `~/.config/unlaxer/credentials.json` の
+ユーザー/CI 設定だけから読む。プロジェクトの grammar・manifest・lock に token を
+書かない。credential の key は `https://` + lower-case host + 非443 port の exact origin。
+別 origin へ認証を送り直すことはなく、失敗ログに credential や server body を出さない。
+
+```json
+{
+  "https://packages.example": {"bearerToken": "user-provided-token"}
+}
+```
+
+必要な場合は同じ entry に `caCertificate`（ユーザー/CI が管理する PEM CA bundle の
+絶対パス）を追加できる。明示 CA の trust store を使って TLS/hostname 検証を続ける。
+credential / CA 設定ファイルの上限は64 KiB。token は printable bearer 文字に限定する。
+設定ファイルと取得済み private artifact はユーザーが管理し、公開操作は行わない。
+
+`HttpsPackageConformanceTest` はローカル TLS server を使い、認証、lock/hash と生成物、
+未信頼 TLS/hostname、別 origin、redirect、容量、本文 timeout、remote→local 拒否、
+server 停止後のオフライン生成を両 CLI で照合する。CI は `rust-package-https.tsv` を保存する。
+
+出典/版を見せる補完・hover/定義表示、TinyExpression 移行、
 名前付き trivia の tokenStream 対応は親 #368 の未完了項目。この段階で親を close しない。
