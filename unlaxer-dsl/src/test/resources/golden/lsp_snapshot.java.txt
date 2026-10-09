@@ -332,14 +332,11 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
     public ParseResult parseDocumentIncremental(String uri, String content) {
         DocumentState previous = documents.get(uri);
         if (previous != null && previous.content().equals(content)) {
+            if (client != null) publishDiagnostics(uri, content, previous.parseResult());
             return previous.parseResult();
         }
         IncrementalParseCache cache = previous != null ? previous.cache() : new IncrementalParseCache();
         List<String> chunks = cache.splitIntoChunks(content, ";");
-        boolean anyChanged = chunks.stream().anyMatch(c -> !cache.isCached(c));
-        if (!anyChanged && previous != null) {
-            return previous.parseResult();
-        }
         ParseResult parseResult = doParse(content);
         int offset = 0;
         for (String chunk : chunks) {

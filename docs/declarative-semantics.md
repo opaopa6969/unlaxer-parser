@@ -217,6 +217,34 @@ edit は現在の host の region body 内に収まる必要があり、曖昧�
 古い host/project/provider 応答は拒否する。未登録 provider は `UNAVAILABLE`、
 FORMAT など未対応の操作は `UNSUPPORTED` となる。
 
+## 型付き診断と生成 LSP
+
+同じ provider の `diagnostics(VALIDATE)` は `ProviderProtocol.Diagnostic` を返す。
+code と原文 CP span を保持し、message は `CODE: rule [analysis=STATE]`、severity は
+`ERROR` である。`LanguageQueries.diagnosticsAll` が各 region の source map を通して
+host に写像し、生成 Java LSP / Classic Rust LSP が host の UTF-16 range と現在の
+文書 version を付けて `textDocument/publishDiagnostics` へ転送する。
+
+意味モデルの状態と診断収集の状態は区別する。model が `FAILED` でも位置付き診断が
+得られた場合、型付き応答は `PARTIAL`、message の `analysis` は `FAILED` とする。
+model や既存 item query の状態を成功に変えるものではない。診断のない失敗は
+`FAILED` のまま、診断のない正常・途中入力は `COMPLETE` / `PARTIAL` のまま返す。
+検証以外の typed request は `UNSUPPORTED`。package/project 不一致、古い parser 原文を拒否する。
+
+登録は明示的である。Java の生成 LSP subclass は `languageQueries(snapshot)` と
+`languageQueryCapabilities()`、Rust の `Backend` は `language_queries(snapshot)` と
+`query_capabilities()` に、この provider を含む最新 binding と `VALIDATE` を渡す。
+能力表示は transport・選択 profile・登録 provider の交差で決まる。
+open/change/save で再検証し、修復と close で古い診断を消去する。同じ本文でも新しい
+version には再通知し、以前の本文へ戻る編集も再解析する。chunk 集合の一致だけで
+別の全文の解析結果を再利用しない。古い文書 version や
+binding を現在の結果として通知しない。
+
+[共通 lifecycle fixture](../spec-corpus/semantic-diagnostics/events.jsonl) の独立期待値と
+`SemanticDiagnosticConformanceTest` が、実 UBNF 生成 Java/Rust parser、意味規則、
+両 LSP consumer を接続してこの契約を検証する。Unicode/CRLF、型不一致、未定義型、
+構文失敗、途中入力、修復、保存、close、古い更新、stale host/project を含む。
+
 ## 型システムの拡張境界
 
 schema v1 が受理する profile は **`portableNominal/1` のみ**。
@@ -239,7 +267,7 @@ repository root で JDK 21、`rustc`、`cargo` を用意して実行する。
 
 ```sh
 mvn -pl unlaxer-common,unlaxer-dsl -am test \
-  -Dtest=SemanticRulesConformanceTest \
+  -Dtest=SemanticRulesConformanceTest,SemanticDiagnosticConformanceTest \
   -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
 ```
 
