@@ -192,9 +192,28 @@ impl<B: Backend> Server<B> {
                 {
                     caps["definitionProvider"] = json!(true);
                 }
+                let mut operations = serde_json::Map::new();
+                for name in [
+                    "VALIDATE",
+                    "COMPLETION",
+                    "HOVER",
+                    "DEFINITION",
+                    "RENAME",
+                    "FORMAT",
+                    "CODE_ACTION",
+                ] {
+                    let transport =
+                        matches!(name, "VALIDATE" | "COMPLETION" | "HOVER" | "DEFINITION");
+                    let registered = operation(name)
+                        .is_some_and(|op| self.backend.query_capabilities().contains(&op));
+                    let allowed = self.allows(name);
+                    operations.insert(name.into(), json!({"transport":transport,"providerRegistered":registered,"profileAllowed":allowed,"available":transport && registered && allowed}));
+                }
+                caps["experimental"] =
+                    json!({"languageQueryConsumer":{"schemaVersion":1,"operations":operations}});
                 if let Some(p) = &self.profile {
                     let l = &p.language;
-                    caps["experimental"] = json!({"languageProfile":{"schemaVersion":1,"tsv":p.profile.canonical_tsv(),"entry":l.entry,"grammar":l.grammar,"language":l.id,"package":l.package_id,"version":l.version}});
+                    caps["experimental"]["languageProfile"] = json!({"schemaVersion":1,"tsv":p.profile.canonical_tsv(),"entry":l.entry,"grammar":l.grammar,"language":l.id,"package":l.package_id,"version":l.version});
                 }
                 return Ok(
                     json!({"capabilities":caps,"serverInfo":{"name":"unlaxer-classic-rust"}}),
@@ -714,6 +733,9 @@ fn operation(capability: &str) -> Option<Operation> {
         "HOVER" => Some(Operation::Hover),
         "DEFINITION" => Some(Operation::Definition),
         "VALIDATE" => Some(Operation::Validate),
+        "RENAME" => Some(Operation::Rename),
+        "FORMAT" => Some(Operation::Format),
+        "CODE_ACTION" => Some(Operation::CodeAction),
         _ => None,
     }
 }

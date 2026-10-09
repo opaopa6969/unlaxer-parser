@@ -11,6 +11,22 @@ final class LSPQueryEmitter {
             protected java.util.Set<org.unlaxer.source.LanguageRegions.Operation> languageQueryCapabilities() { return java.util.Set.of(); }
             private void configureLanguageQueryCapabilities(ServerCapabilities capabilities) {
                 if (languageQueryCapabilities().contains(org.unlaxer.source.LanguageRegions.Operation.DEFINITION)) capabilities.setDefinitionProvider(true);
+                var operations = new java.util.TreeMap<String, Object>();
+                var transport = java.util.Set.of("VALIDATE", "COMPLETION", "HOVER", "DEFINITION");
+                for (var operation : org.unlaxer.source.LanguageRegions.Operation.values()) {
+                    if (operation == org.unlaxer.source.LanguageRegions.Operation.PARSE) continue;
+                    boolean supported = transport.contains(operation.name());
+                    boolean registered = languageQueryCapabilities().contains(operation);
+                    boolean allowed = profileAllows(operation.name());
+                    operations.put(operation.name(), java.util.Map.of("transport", supported, "providerRegistered", registered,
+                        "profileAllowed", allowed, "available", supported && registered && allowed));
+                }
+                var gson = new com.google.gson.Gson();
+                var previous = gson.toJsonTree(capabilities.getExperimental());
+                var extensions = previous.isJsonObject() ? previous.getAsJsonObject() : new com.google.gson.JsonObject();
+                if (!previous.isJsonNull() && !previous.isJsonObject()) extensions.add("additional", previous);
+                extensions.add("languageQueryConsumer", gson.toJsonTree(java.util.Map.of("schemaVersion", 1, "operations", operations)));
+                capabilities.setExperimental(extensions);
             }
             private org.unlaxer.source.LanguageQueryView languageQuery(TextDocumentPositionParams params, org.unlaxer.source.LanguageRegions.Operation operation) {
                 if (params == null || params.getTextDocument() == null) return null;
