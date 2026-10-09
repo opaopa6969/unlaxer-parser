@@ -20,12 +20,15 @@ permissions:
   contents: read
 
 concurrency:
-  group: learning-pages
+  group: ${{ github.ref == 'refs/heads/master' && 'learning-pages' || format('learning-pages-verify-{0}', github.ref) }}
   cancel-in-progress: false
 
 jobs:
   build:
-    runs-on: [unlaxer-parser-ci, Linux, X64]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CARGO_INCREMENTAL: '0'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -41,7 +44,7 @@ jobs:
         working-directory: unlaxer-dsl/ubnf-vscode
         run: |
           npm ci
-          npx playwright install chromium
+          npx playwright install --with-deps chromium
           node --test scripts/completion.test.mjs
           node scripts/learning-browser.mjs
       - uses: actions/upload-pages-artifact@v3
