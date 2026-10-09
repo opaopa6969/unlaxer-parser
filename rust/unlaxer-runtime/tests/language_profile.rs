@@ -68,6 +68,18 @@ fn shared_selection_and_capability_fixtures() {
                 "{}",
                 fields[0]
             );
+            assert_eq!(
+                selected.allows("COMPLETION", true),
+                fields[8] == "true",
+                "{}",
+                fields[0]
+            );
+            assert_eq!(
+                selected.allows("DEFINITION", true),
+                fields[9] == "true",
+                "{}",
+                fields[0]
+            );
             assert!(selected.allows_local("PARSE"));
             assert!(!selected.allows_local("UNKNOWN"));
             assert_eq!(selected.language.package_id, "lang/java");

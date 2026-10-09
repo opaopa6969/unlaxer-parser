@@ -33,10 +33,11 @@ pub struct Selection {
 }
 impl Selection {
     pub fn allows_local(&self, capability: &str) -> bool {
-        matches!(
-            self.profile.capabilities.get(capability),
-            Some(Support::Supported | Support::Partial)
-        )
+        self.allows(capability, false)
+    }
+    pub fn allows(&self, capability: &str, provider_registered: bool) -> bool {
+        let support = self.profile.capabilities.get(capability);
+        local(support) || provider_registered && support == Some(&Support::External)
     }
 }
 fn local(support: Option<&Support>) -> bool {
