@@ -268,7 +268,7 @@ fn nested_dispatch_and_source_preserving_edits() {
     assert_eq!(regions.at(13).unwrap().unwrap().id, "java2");
     assert_eq!(regions.at(10).unwrap().unwrap().id, "tiny");
     assert_eq!(regions.at(5).unwrap().unwrap().id, "formula");
-    assert!(regions.at(19).unwrap().is_none());
+    assert_eq!(regions.at(19).unwrap().unwrap().id, "formula");
     assert_eq!(
         regions
             .dispatch("java1", Operation::Parse, &HashMap::new(), &host())
@@ -453,4 +453,60 @@ fn actual_parser_callback_is_bounded_and_sibling_failure_is_isolated() {
             .state,
         State::Complete
     );
+}
+
+#[test]
+fn shared_partial_eof_ownership() {
+    let host = snapshot("host", "😀ABC");
+    assert_eq!(host.len(), 4);
+    assert_eq!(host.utf16(4).unwrap(), 5);
+    for line in include_str!("../../../docs/fixtures/source-maps/partial-eof.tsv")
+        .lines()
+        .filter(|line| !line.starts_with('#'))
+    {
+        let columns: Vec<_> = line.split('\t').collect();
+        let mut input = vec![];
+        for encoded in columns[2].split(';') {
+            let f: Vec<_> = encoded.split(',').collect();
+            let full = span(f[2].parse().unwrap(), f[3].parse().unwrap());
+            let body = span(f[4].parse().unwrap(), f[5].parse().unwrap());
+            let child = snapshot(f[0], host.slice(body).unwrap());
+            let map = if child.is_empty() {
+                SourceMap::new(child, vec![]).unwrap()
+            } else {
+                copy(child, host.clone(), body.start)
+            };
+            input.push(Region {
+                id: f[0].into(),
+                parent: if f[1] == "-" { None } else { Some(f[1].into()) },
+                language: Language {
+                    id: "x".into(),
+                    package_id: "local".into(),
+                    version: "1".into(),
+                    grammar: "X".into(),
+                    entry: "Document".into(),
+                },
+                full,
+                body,
+                source_map: map,
+                parse_state: match f[6] {
+                    "PARTIAL" => State::Partial,
+                    "COMPLETE" => State::Complete,
+                    _ => State::Failed,
+                },
+            });
+        }
+        let regions = LanguageRegions::new(host.clone(), input).unwrap();
+        let result = regions.at(columns[1].parse().unwrap());
+        if columns[3] == "REJECT" {
+            assert!(result.is_err(), "{}", columns[0]);
+        } else {
+            assert_eq!(
+                result.unwrap().map(|r| r.id.as_str()).unwrap_or("NONE"),
+                columns[3],
+                "{}",
+                columns[0]
+            );
+        }
+    }
 }

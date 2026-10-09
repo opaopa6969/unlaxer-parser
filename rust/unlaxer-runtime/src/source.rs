@@ -511,11 +511,30 @@ impl LanguageRegions {
             start: point,
             end: point,
         })?;
-        Ok(self
-            .regions
-            .values()
-            .filter(|region| region.body.start <= point && point < region.body.end)
-            .max_by_key(|region| self.depth(region)))
+        let mut selected = None;
+        let mut selected_depth = 0;
+        let mut ambiguous = false;
+        for region in self.regions.values() {
+            let owns = region.body.start <= point && point < region.body.end
+                || region.parse_state == State::Partial
+                    && point == self.host.len()
+                    && point == region.body.end;
+            if !owns {
+                continue;
+            }
+            let depth = self.depth(region);
+            if selected.is_none() || depth > selected_depth {
+                selected = Some(region);
+                selected_depth = depth;
+                ambiguous = false;
+            } else if depth == selected_depth {
+                ambiguous = true;
+            }
+        }
+        if ambiguous {
+            return Err("ambiguous cursor ownership");
+        }
+        Ok(selected)
     }
     fn depth<'a>(&'a self, mut region: &'a Region) -> usize {
         let mut depth = 0;

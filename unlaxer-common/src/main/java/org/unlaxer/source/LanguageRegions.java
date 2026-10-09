@@ -85,14 +85,19 @@ public final class LanguageRegions {
         }
     }
     public DocumentSnapshot host() { return host; }
-    /** Half-open cursor ownership: delimiters belong to the enclosing body, never the child. */
+    /** Half-open ownership, plus the host EOF for a uniquely deepest PARTIAL body. */
     public Region at(int point) {
         host.check(new Span(point, point));
-        Region selected = null;
+        Region selected = null; int selectedDepth = -1; boolean ambiguous = false;
         for (Region region : regions.values()) {
-            if (region.body.start() <= point && point < region.body.end()
-                    && (selected == null || depth(region) > depth(selected))) { selected = region; }
+            boolean owns = region.body.start() <= point && point < region.body.end()
+                || region.parseState == State.PARTIAL && point == host.length() && point == region.body.end();
+            if (!owns) { continue; }
+            int candidateDepth = depth(region);
+            if (candidateDepth > selectedDepth) { selected = region; selectedDepth = candidateDepth; ambiguous = false; }
+            else if (candidateDepth == selectedDepth) { ambiguous = true; }
         }
+        if (ambiguous) { throw new IllegalArgumentException("ambiguous cursor ownership"); }
         return selected;
     }
     private int depth(Region region) {
