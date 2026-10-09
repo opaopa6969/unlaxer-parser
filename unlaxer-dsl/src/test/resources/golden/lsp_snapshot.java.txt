@@ -21,10 +21,16 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
     protected final Map<String, DocumentState> documents = new HashMap<>();
     protected final Map<String, Long> documentVersions = new HashMap<>();
 
+    private volatile org.unlaxer.source.LanguageProfile.Selection selectedLanguageProfile;
     public SnapshotLanguageServer() {}
 
     @Override
     public CompletableFuture<InitializeResult> initialize(InitializeParams params) {
+        try { selectedLanguageProfile = readLanguageProfile(params); }
+        catch (IllegalArgumentException error) {
+            return CompletableFuture.failedFuture(new org.eclipse.lsp4j.jsonrpc.ResponseErrorException(
+                new org.eclipse.lsp4j.jsonrpc.messages.ResponseError(org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode.InvalidParams, error.getMessage(), null)));
+        }
         ServerCapabilities capabilities = new ServerCapabilities();
         capabilities.setTextDocumentSync(TextDocumentSyncKind.Full);
         CompletionOptions completionOptions = new CompletionOptions();
@@ -38,6 +44,7 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
             List.of("valid", "invalid"), List.of()));
         capabilities.setSemanticTokensProvider(semanticTokensOptions);
         configureAdditionalCapabilities(capabilities);
+        applyLanguageProfile(capabilities);
         return CompletableFuture.completedFuture(new InitializeResult(capabilities));
     }
 
@@ -65,6 +72,53 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
     @Override
     public WorkspaceService getWorkspaceService() {
         return new SnapshotLanguageServerWorkspaceService();
+    }
+
+    public java.util.Optional<org.unlaxer.source.LanguageProfile.Selection> languageProfile() {
+        return java.util.Optional.ofNullable(selectedLanguageProfile);
+    }
+    protected final boolean profileAllows(String capability) {
+        return selectedLanguageProfile == null || selectedLanguageProfile.allowsLocal(capability);
+    }
+    private org.unlaxer.source.LanguageProfile.Selection readLanguageProfile(InitializeParams params) {
+        com.google.gson.JsonElement options = new com.google.gson.Gson().toJsonTree(params.getInitializationOptions());
+        if (!options.isJsonObject() || !options.getAsJsonObject().has("languageProfile")) return null;
+        com.google.gson.JsonElement value = options.getAsJsonObject().get("languageProfile");
+        if (!value.isJsonObject()) throw new IllegalArgumentException("languageProfile must contain tsv and entry");
+        com.google.gson.JsonObject object = value.getAsJsonObject();
+        if (!object.keySet().equals(java.util.Set.of("tsv", "entry")))
+            throw new IllegalArgumentException("languageProfile must contain only tsv and entry");
+        for (String key : java.util.List.of("tsv", "entry")) {
+            if (!object.get(key).isJsonPrimitive() || !object.get(key).getAsJsonPrimitive().isString())
+                throw new IllegalArgumentException("languageProfile fields must be strings");
+        }
+        if (!object.get("entry").getAsString().equals("Expr"))
+            throw new IllegalArgumentException("languageProfile entry must match generated root");
+        return org.unlaxer.source.LanguageProfile.parse(object.get("tsv").getAsString()).select("Snapshot", "Expr");
+    }
+    private void applyLanguageProfile(ServerCapabilities capabilities) {
+        if (selectedLanguageProfile == null) return;
+        if (!profileAllows("COMPLETION")) capabilities.setCompletionProvider(null);
+        if (!profileAllows("HOVER")) capabilities.setHoverProvider(false);
+        if (!profileAllows("DEFINITION")) capabilities.setDefinitionProvider(false);
+        if (!profileAllows("RENAME")) capabilities.setRenameProvider(false);
+        if (!profileAllows("FORMAT")) {
+            capabilities.setDocumentFormattingProvider(false);
+            capabilities.setDocumentRangeFormattingProvider(false);
+            capabilities.setDocumentOnTypeFormattingProvider(null);
+        }
+        if (!profileAllows("CODE_ACTION")) capabilities.setCodeActionProvider(false);
+        if (!profileAllows("EXECUTE")) capabilities.setExecuteCommandProvider(null);
+        var gson = new com.google.gson.Gson();
+        var previous = gson.toJsonTree(capabilities.getExperimental());
+        var extensions = previous.isJsonObject() ? previous.getAsJsonObject() : new com.google.gson.JsonObject();
+        if (!previous.isJsonNull() && !previous.isJsonObject()) extensions.add("additional", previous);
+        var language = selectedLanguageProfile.language();
+        extensions.add("languageProfile", gson.toJsonTree(java.util.Map.of(
+            "schemaVersion", 1, "tsv", selectedLanguageProfile.profile().canonicalTsv(),
+            "entry", language.entry(), "grammar", language.grammar(),
+            "language", language.id(), "package", language.packageId(), "version", language.version())));
+        capabilities.setExperimental(extensions);
     }
 
     private ParseResult doParse(String content) {
@@ -364,6 +418,7 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
         @Override
         public CompletableFuture<Either<List<CompletionItem>, CompletionList>> completion(
                 CompletionParams params) {
+            if (!server.profileAllows("COMPLETION")) return CompletableFuture.completedFuture(Either.forLeft(List.of()));
             List<CompletionItem> items = new ArrayList<>();
             for (String kw : KEYWORDS) {
                 CompletionItem item = new CompletionItem(kw);
@@ -383,6 +438,7 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
 
         @Override
         public CompletableFuture<Hover> hover(HoverParams params) {
+            if (!server.profileAllows("HOVER")) return CompletableFuture.completedFuture(null);
             String uri = params.getTextDocument().getUri();
             DocumentState state = server.documents.get(uri);
             if (state == null) {
