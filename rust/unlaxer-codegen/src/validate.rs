@@ -172,7 +172,10 @@ fn root_reaches_projection_boundary(ir: &GrammarIr) -> bool {
             match expression {
                 CaptureEquality { .. } => return true,
                 Reference(id) => pending_rules.push(*id),
-                Sequence(children) | Choice(children) | LongestChoice(children) => {
+                Sequence(children)
+                | Choice(children)
+                | LongestChoice(children)
+                | UniqueLongestChoice(children) => {
                     pending.extend(children);
                 }
                 PredictiveChoice { alternatives, .. } => pending.extend(alternatives),
@@ -188,6 +191,9 @@ fn root_reaches_projection_boundary(ir: &GrammarIr) -> bool {
                     child: expression, ..
                 }
                 | TriviaScope {
+                    child: expression, ..
+                }
+                | LexicalContextScope {
                     child: expression, ..
                 }
                 | LexicalTriviaScope {
@@ -220,6 +226,40 @@ fn expression(
             expression(child, count, captures)?;
         }
         LexicalToken { expression, .. } => expression.validate().map_err(fail)?,
+        NamePredicate {
+            child,
+            snapshot,
+            version,
+            capture,
+            kind,
+        } => {
+            name_requirement(snapshot, version)?;
+            if !["type", "value", "resolved"].contains(&kind.as_str()) {
+                return Err(fail("invalid name predicate kind"));
+            }
+            let mut local = BTreeSet::new();
+            expression(child, count, &mut local)?;
+            if !local.contains(capture) {
+                return Err(fail("missing name predicate capture"));
+            }
+            captures.extend(local);
+        }
+        NameResolutionScope {
+            child,
+            requirements,
+        } => {
+            if requirements.len() > 64 {
+                return Err(fail("name snapshot limit exceeds 64"));
+            }
+            let mut ids = BTreeSet::new();
+            for (id, version) in requirements {
+                name_requirement(id, version)?;
+                if !ids.insert(id) {
+                    return Err(fail("duplicate name requirement"));
+                }
+            }
+            expression(child, count, captures)?;
+        }
         CaptureEquality { child, name } => {
             let mut local = BTreeSet::new();
             expression(child, count, &mut local)?;
@@ -273,7 +313,10 @@ fn expression(
             captures.insert(name.clone());
             expression(child, count, captures)?;
         }
-        Sequence(children) | Choice(children) | LongestChoice(children) => {
+        Sequence(children)
+        | Choice(children)
+        | LongestChoice(children)
+        | UniqueLongestChoice(children) => {
             if children.is_empty() {
                 return Err(fail("empty sequence/choice"));
             }
@@ -297,6 +340,22 @@ fn expression(
         | TextValue(child)
         | ValueBoundary(child)
         | TriviaScope { child, .. } => expression(child, count, captures)?,
+        LexicalContextScope { child, terminals } => {
+            if terminals.len() > 256 {
+                return Err(fail("lexical context exceeds 256 terminals"));
+            }
+            let mut seen = std::collections::HashSet::new();
+            for (name, literal, definition) in terminals {
+                definition.validate().map_err(fail)?;
+                if definition.nullable()
+                    || !seen.insert((name, literal))
+                    || *literal && name.is_empty()
+                {
+                    return Err(fail("duplicate or nullable lexical context terminal"));
+                }
+            }
+            expression(child, count, captures)?;
+        }
         LexicalTriviaScope { child, definition } => {
             definition.validate().map_err(fail)?;
             if definition.nullable() {
@@ -321,6 +380,23 @@ fn expression(
             }
         }
         _ => {}
+    }
+    Ok(())
+}
+
+fn name_requirement(id: &str, version: &str) -> Result<(), GenerateError> {
+    let bytes = id.as_bytes();
+    if bytes.is_empty()
+        || bytes.len() > 128
+        || !bytes[0].is_ascii_alphabetic()
+        || bytes
+            .iter()
+            .any(|c| !(c.is_ascii_alphanumeric() || b"_./-".contains(c)))
+        || version.is_empty()
+        || version.len() > 128
+        || version.bytes().any(|c| !(33..=126).contains(&c))
+    {
+        return Err(fail("invalid name snapshot identity"));
     }
     Ok(())
 }
