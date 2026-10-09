@@ -120,6 +120,13 @@ public class ExternalProviderConformanceTest {
                     assertEquals(1, mapped.size()); assertEquals(1, mapped.get(0).locations().size());
                     var location = mapped.get(0).locations().get(0); assertTrue(location.exact()); assertEquals(host, location.location().snapshot());
                     assertEquals(new DocumentSnapshot.Span(35, 36), location.location().span()); assertEquals("1", host.slice(location.location().span()));
+                    var queries = new LanguageQueries(result.tree(), project, Map.of(javaLanguage, process));
+                    var typed = queries.diagnosticsAll(host, project, Map.of()).stream().filter(r -> r.region().equals(region.id())).findFirst().orElseThrow();
+                    assertEquals(LanguageRegions.State.PARTIAL, typed.state()); assertEquals(mapped, typed.diagnostics());
+                    assertEquals("ERROR", typed.diagnostics().get(0).severity());
+                    var generic = queries.query(host, project, region.body().start(), Operation.VALIDATE, Map.of());
+                    assertEquals(1, generic.items().size()); assertEquals(mapped.get(0).code(), generic.items().get(0).label());
+                    assertEquals(mapped.get(0).locations(), generic.items().get(0).locations());
                     var anchor = new SegmentSourceMap.Location(host, new DocumentSnapshot.Span(0, 1));
                     for (var kind : List.of(SegmentSourceMap.Kind.GENERATED, SegmentSourceMap.Kind.TRANSFORMED)) {
                         var map = new SegmentSourceMap(request.snapshot(), List.of(new SegmentSourceMap.Segment(new DocumentSnapshot.Span(0, request.snapshot().length()), kind, anchor)));

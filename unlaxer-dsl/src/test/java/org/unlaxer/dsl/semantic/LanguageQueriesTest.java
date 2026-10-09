@@ -118,4 +118,47 @@ public class LanguageQueriesTest {
         SegmentSourceMap transformed = new SegmentSourceMap(output, List.of(new Segment(new Span(0, 2), Kind.TRANSFORMED, new Location(origin, new Span(0, 3)))));
         assertTrue(transformed.cursor(new Location(origin, new Span(1, 1))).isEmpty());
     }
+    private static LanguageQueries.Provider diagnosticProvider(String mode) {
+        return new LanguageQueries.Provider() {
+            public Set<Operation> capabilities() { return Set.of(Operation.VALIDATE); }
+            public LanguageQueries.Response query(LanguageQueries.Request request) { throw new AssertionError("typed validation must use diagnostics()"); }
+            public LanguageQueries.DiagnosticResponse diagnostics(LanguageQueries.Request request) {
+                assertEquals(Operation.VALIDATE, request.operation()); assertEquals(0, request.cursor());
+                var snapshot = mode.equals("stale-response") ? new DocumentSnapshot(CHILD.uri(), 0, CHILD.text()) : CHILD;
+                var local = new Location(CHILD, new Span(12,13));
+                var foreign = new Location(LIBRARY, new Span(0,3));
+                List<Location> locations = switch(mode) {
+                    case "foreign" -> List.of(foreign);
+                    case "multiple" -> List.of(local, foreign);
+                    case "stale-location" -> List.of(new Location(new DocumentSnapshot(LIBRARY.uri(),1,LIBRARY.text()),new Span(0,3)));
+                    case "unknown-document" -> List.of(new Location(new DocumentSnapshot("unknown",1,"x"),new Span(0,1)));
+                    default -> List.of(local);
+                };
+                String severity = switch(mode) { case "foreign" -> "WARNING"; case "note" -> "NOTE"; case "unknown-severity" -> "GUESS"; default -> "ERROR"; };
+                State state = switch(mode) { case "timeout" -> State.TIMEOUT; case "unsupported" -> State.UNSUPPORTED; case "failed-payload" -> State.FAILED; default -> State.PARTIAL; };
+                var diagnostics = Set.of("timeout","unsupported").contains(mode) ? List.<ProviderProtocol.Diagnostic>of() : List.of(new ProviderProtocol.Diagnostic("TYPE","incompatible type",severity,locations));
+                return new LanguageQueries.DiagnosticResponse(snapshot,"project",mode.equals("stale-project")?3:4,state,diagnostics);
+            }
+        };
+    }
+    @Test public void typedDiagnosticsPreserveMetadataAndOwningSnapshots() throws Exception {
+        for (String line : Files.readAllLines(fixture().resolveSibling("diagnostics.tsv"))) {
+            if (line.startsWith("#")) continue;
+            var fields = line.split("\t");
+            var queries = new LanguageQueries(regions(),project(),Map.of(LANGUAGE,diagnosticProvider(fields[0])));
+            if (fields[1].equals("REJECTED")) { assertThrows(fields[0], IllegalArgumentException.class, () -> queries.diagnosticsAll(HOST,project(),Map.of())); continue; }
+            var results = queries.diagnosticsAll(HOST,project(),Map.of());
+            assertEquals(List.of("child","formula","tiny"),results.stream().map(LanguageQueries.DiagnosticResult::region).toList());
+            var result = results.get(0); assertEquals(fields[0],fields[1],result.state().name());
+            assertEquals(State.UNAVAILABLE,results.get(1).state());assertEquals(State.UNAVAILABLE,results.get(2).state());
+            if(fields[2].equals("-")) { assertTrue(result.diagnostics().isEmpty()); continue; }
+            assertEquals(1,result.diagnostics().size());var diagnostic=result.diagnostics().get(0);
+            assertEquals(fields[2],diagnostic.code()); assertEquals("incompatible type",diagnostic.message());assertEquals(fields[3],diagnostic.severity());
+            assertEquals(fields[4],diagnostic.locations().stream().map(m->m.location().snapshot().uri()+":"+m.location().span().start()+":"+m.location().span().end()+":"+m.exact()).collect(Collectors.joining(",")));
+        }
+        var queries = new LanguageQueries(regions(),project(),Map.of(LANGUAGE,diagnosticProvider("valid")));
+        assertThrows(IllegalArgumentException.class,()->queries.diagnosticsAll(new DocumentSnapshot("host",2,HOST.text()),project(),Map.of()));
+        assertThrows(IllegalArgumentException.class,()->queries.diagnosticsAll(HOST,new Project("project",5,project().documents(),project().configuration()),Map.of()));
+    }
+
 }

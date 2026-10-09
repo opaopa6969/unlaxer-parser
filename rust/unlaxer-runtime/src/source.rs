@@ -451,6 +451,12 @@ pub struct LanguageRegions {
     open_ends: HashSet<String>,
 }
 impl LanguageRegions {
+    pub fn regions(&self) -> Vec<&Region> {
+        let mut regions: Vec<_> = self.regions.values().collect();
+        regions.sort_by(|a, b| a.id.cmp(&b.id));
+        regions
+    }
+
     /// Compatibility path for callers without explicit enclosure metadata.
     pub fn new(host: Snapshot, input: Vec<Region>) -> Result<Self> {
         let open_ends = input

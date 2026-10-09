@@ -41,6 +41,27 @@ pub struct Response {
 pub trait Provider {
     fn capabilities(&self) -> HashSet<Operation>;
     fn query(&self, request: &Request<'_>) -> Result<Response>;
+    fn diagnostics(&self, request: &Request<'_>) -> Result<DiagnosticResponse> {
+        Ok(DiagnosticResponse {
+            snapshot: request.region.source_map.output().clone(),
+            project: request.project.id.clone(),
+            project_version: request.project.version,
+            state: State::Unsupported,
+            diagnostics: vec![],
+        })
+    }
+}
+pub struct DiagnosticResponse {
+    pub snapshot: Snapshot,
+    pub project: String,
+    pub project_version: u64,
+    pub state: State,
+    pub diagnostics: Vec<crate::provider_protocol::Diagnostic>,
+}
+pub struct DiagnosticResult {
+    pub region: String,
+    pub state: State,
+    pub diagnostics: Vec<crate::provider_protocol::MappedDiagnostic>,
 }
 #[derive(Debug)]
 pub struct MappedItem {
@@ -110,6 +131,97 @@ impl LanguageQueries {
             capabilities,
             result,
         })
+    }
+    pub fn diagnostics_all(
+        &self,
+        host: &Snapshot,
+        project: &Project,
+        parameters: &BTreeMap<String, String>,
+    ) -> Result<Vec<DiagnosticResult>> {
+        if self.regions.host() != host || &self.project != project {
+            return Err("stale diagnostic context");
+        }
+        let mut results = vec![];
+        for region in self.regions.regions() {
+            let Some(provider) = self.providers.get(&region.language) else {
+                results.push(DiagnosticResult {
+                    region: region.id.clone(),
+                    state: State::Unavailable,
+                    diagnostics: vec![],
+                });
+                continue;
+            };
+            if !provider.capabilities().contains(&Operation::Validate) {
+                results.push(DiagnosticResult {
+                    region: region.id.clone(),
+                    state: State::Unsupported,
+                    diagnostics: vec![],
+                });
+                continue;
+            }
+            let response = provider.diagnostics(&Request {
+                region,
+                operation: Operation::Validate,
+                cursor: 0,
+                project: &self.project,
+                parameters,
+            })?;
+            if &response.snapshot != region.source_map.output()
+                || response.project != project.id
+                || response.project_version != project.version
+            {
+                return Err("stale diagnostic response");
+            }
+            if !matches!(response.state, State::Complete | State::Partial)
+                && !response.diagnostics.is_empty()
+            {
+                return Err("failed response contains diagnostics");
+            }
+            let mut diagnostics = vec![];
+            for diagnostic in response.diagnostics {
+                if !matches!(
+                    diagnostic.severity.as_str(),
+                    "ERROR"
+                        | "WARNING"
+                        | "MANDATORY_WARNING"
+                        | "INFORMATION"
+                        | "HINT"
+                        | "NOTE"
+                        | "OTHER"
+                        | "SUGGESTION"
+                        | "MESSAGE"
+                        | "HELP"
+                        | "FAILURE_NOTE"
+                ) {
+                    return Err("unknown diagnostic severity");
+                }
+                let mut locations = vec![];
+                for location in diagnostic.locations {
+                    location.snapshot.check(location.span)?;
+                    if &location.snapshot == region.source_map.output() {
+                        locations.extend(region.source_map.diagnostics(location.span)?);
+                    } else {
+                        self.check_known(&location.snapshot, region)?;
+                        locations.push(Mapping {
+                            location,
+                            exact: true,
+                        });
+                    }
+                }
+                diagnostics.push(crate::provider_protocol::MappedDiagnostic {
+                    code: diagnostic.code,
+                    message: diagnostic.message,
+                    severity: diagnostic.severity,
+                    locations,
+                });
+            }
+            results.push(DiagnosticResult {
+                region: region.id.clone(),
+                state: response.state,
+                diagnostics,
+            });
+        }
+        Ok(results)
     }
     pub fn query(
         &self,
