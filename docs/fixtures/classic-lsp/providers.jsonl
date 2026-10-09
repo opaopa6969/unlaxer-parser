@@ -1,0 +1,6 @@
+{"method":"textDocument/definition","character":12,"expected":[{"uri":"file:///symbols","range":{"start":{"line":0,"character":3},"end":{"line":0,"character":6}}}]}
+{"method":"textDocument/definition","character":8,"expected":[{"uri":"file:///library","range":{"start":{"line":0,"character":2},"end":{"line":0,"character":5}}}]}
+{"method":"textDocument/hover","character":8,"expected":"far: T"}
+{"method":"textDocument/completion","character":16,"expected":[{"label":"far","range":{"start":{"line":0,"character":15},"end":{"line":0,"character":16}}},{"label":"foo","range":{"start":{"line":0,"character":15},"end":{"line":0,"character":16}}}]}
+{"method":"textDocument/completion","character":1,"expected":[]}
+{"method":"textDocument/completion","character":17,"expected":[]}

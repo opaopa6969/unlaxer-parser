@@ -207,3 +207,41 @@ and item constructors stay unchanged. Shared diagnostic fixtures cover 12
 metadata/ownership/state/failure cases. The real Java compiler conformance test
 also forwards diagnostics through both Java/Rust FormulaInfo -> TinyExpression
 -> Java registries and verifies the independent host span `[35,36)`.
+
+## LSP diagnostic publication
+
+Generated Java LSP and Classic Rust LSP consume typed diagnostics from the same
+explicit `languageQueries` / `language_queries` binding used by other queries.
+Open/change/save validate the exact current document; close removes that host's
+contribution. Hosts must supply a fresh immutable Project, including dependency
+snapshots and per-region provider settings. Any project document currently open
+in the server must also match that document's exact current snapshot.
+
+Each mapped location is published under its owning URI with that snapshot's
+UTF-16 range, compiler code/message/severity and `unlaxer-language` source.
+Diagnostic data retains region, operation state, source-map precision, owning URI
+and string version. Multiple origins are also carried as related information;
+transformed anchors are marked non-exact rather than presented as precise edits.
+Recognized compiler warning/note/help categories map to LSP severities while the
+original category remains in data. Provider timeout/failure and rejected stale
+bindings produce warning log notifications, not fabricated compiler errors.
+
+Contributions are kept per source host and combined for each target URI. Closing
+one formula does not clear dependency diagnostics still reported by another
+formula. Different snapshots of a closed dependency are never combined; an open
+document accepts only contributions matching its current snapshot. Old target
+URIs receive empty notifications after their last contribution disappears.
+The host adapter remains responsible for refreshing dependency contexts when
+workspace files change outside the open source document.
+
+`LSPDiagnosticConformanceTest` calls the real javac provider through both hosts
+and compares eight authored lifecycle events. It checks compiler metadata,
+independent host/foreign UTF-16 ranges with emoji and CRLF, shared dependency
+contributions, source correction, save, stale update rejection, close cleanup and
+stale binding rejection. Existing Classic LSP byte-frame and generated query
+regressions also run; Tiny's production FormulaInfo bridge is a separate
+integration using this same API.
+
+### LSP consumer capability boundary
+
+Both LSP hosts expose `experimental.languageQueryConsumer` (schema version 1) even without a profile. Each operation has separate `transport`, `providerRegistered`, `profileAllowed`, and `available` booleans. Availability is their intersection. The typed runtime supports rename, format, and code actions, and Playground consumes these edits; the common LSP query transport currently consumes only validation, completion, hover, and definition. Registering an edit provider or selecting an EXTERNAL profile does not advertise an edit transport. The existing language profile TSV describes language/runtime support; it is not a transport capability list. Built-in grammar completion and syntax diagnostics retain their standard LSP capabilities independently of this explicit provider table. Custom host extensions may register their own standard LSP edit methods; those are separate from the common query consumer.

@@ -37,6 +37,10 @@ public final class AnalysisPipeline {
             return result;
         }
     }
+    /** A phase is inactive unless this configuration key has exactly the expected value. */
+    public record Condition(String key, String expected) {
+        public Condition { if (Objects.requireNonNull(key).isEmpty()) throw new IllegalArgumentException("empty condition key"); Objects.requireNonNull(expected); }
+    }
     public record Request(Phase phase, Map<String, DocumentSnapshot> inputs, Map<String, String> configuration,
                           Map<String, Artifact> dependencies) {
         public Request {
@@ -47,17 +51,22 @@ public final class AnalysisPipeline {
     public record Result(Artifact artifact, OptionalLong revision, List<String> evaluated, List<String> reused) {
         public Result { evaluated = List.copyOf(evaluated); reused = List.copyOf(reused); }
     }
-    private record Signature(List<DocumentSnapshot> inputs, Map<String, String> configuration, List<Long> dependencies) {}
+    private record Signature(boolean inactive, List<DocumentSnapshot> inputs, Map<String, String> configuration, List<Long> dependencies) {}
     private record Cached(Signature signature, Artifact artifact, long revision) {}
     private record Value(Artifact artifact, long revision) {}
     private final Map<String, Phase> phases = new LinkedHashMap<>();
     private final Map<String, Executor> executors;
+    private final Map<String, Condition> conditions;
     private final Map<String, Cached> cache = new HashMap<>();
     private long revision;
 
     /** Executors are fixed for this pipeline's lifetime and must be deterministic over their request. */
     public AnalysisPipeline(List<Phase> definitions, Map<String, Executor> executors) {
+        this(definitions, executors, Map.of());
+    }
+    public AnalysisPipeline(List<Phase> definitions, Map<String, Executor> executors, Map<String, Condition> conditions) {
         this.executors = Map.copyOf(executors);
+        this.conditions = Map.copyOf(conditions);
         for (Phase phase : definitions) {
             if (phases.put(phase.id, phase) != null) { throw new IllegalArgumentException("duplicate phase"); }
         }
@@ -66,6 +75,7 @@ public final class AnalysisPipeline {
                 if (false == phases.containsKey(dependency)) { throw new IllegalArgumentException("missing phase dependency"); }
             }
         }
+        if (!phases.keySet().containsAll(conditions.keySet())) throw new IllegalArgumentException("missing conditional phase");
     }
     public Result evaluate(String id, Map<String, DocumentSnapshot> snapshots, Map<String, String> configuration,
                            int maximumPhases, boolean allowUserCode) {
@@ -95,6 +105,19 @@ public final class AnalysisPipeline {
             if (finished.containsKey(id)) { return finished.get(id); }
             if (visited++ >= maximum) { return incomplete(State.LIMIT); }
             Phase phase = phases.get(id);
+            Condition condition = conditions.get(id);
+            Map<String, String> conditionSettings = new LinkedHashMap<>();
+            if (condition != null && configuration.containsKey(condition.key)) conditionSettings.put(condition.key, configuration.get(condition.key));
+            if (condition != null && !condition.expected.equals(configuration.get(condition.key))) {
+                Signature signature = new Signature(true, List.of(), conditionSettings, List.of());
+                Cached previous = cache.get(id);
+                if (previous != null && previous.signature.equals(signature)) {
+                    reused.add(id); Value value = new Value(previous.artifact, previous.revision); finished.put(id, value); return value;
+                }
+                Artifact artifact = Artifact.empty(State.INACTIVE);
+                Cached next = new Cached(signature, artifact, Math.incrementExact(revision)); revision = next.revision;
+                cache.put(id, next); evaluated.add(id); Value value = new Value(artifact, next.revision); finished.put(id, value); return value;
+            }
             if (phase.executesUserCode && false == allowUserCode) { return incomplete(State.UNSUPPORTED); }
             Executor executor = executors.get(id);
             if (executor == null) { return incomplete(State.UNSUPPORTED); }
@@ -104,7 +127,7 @@ public final class AnalysisPipeline {
                 if (input == null) { return incomplete(State.DEFERRED); }
                 inputs.put(key, input);
             }
-            Map<String, String> settings = new LinkedHashMap<>();
+            Map<String, String> settings = new LinkedHashMap<>(conditionSettings);
             for (String key : phase.configurationKeys) {
                 if (configuration.containsKey(key)) { settings.put(key, configuration.get(key)); }
             }
@@ -118,7 +141,7 @@ public final class AnalysisPipeline {
                     dependencies.put(dependency, value.artifact);
                     versions.add(value.revision);
                 }
-                Signature signature = new Signature(List.copyOf(inputs.values()), Map.copyOf(settings), List.copyOf(versions));
+                Signature signature = new Signature(false, List.copyOf(inputs.values()), Map.copyOf(settings), List.copyOf(versions));
                 Cached previous = cache.get(id);
                 if (previous != null && previous.signature.equals(signature)) {
                     reused.add(id);
@@ -130,7 +153,7 @@ public final class AnalysisPipeline {
                 evaluated.add(id);
                 if (artifact.state == State.DEFERRED || artifact.state == State.CYCLE || artifact.state == State.LIMIT
                         || artifact.state == State.UNSUPPORTED) { return new Value(artifact, -1); }
-                Cached next = new Cached(signature, artifact, ++revision);
+                Cached next = new Cached(signature, artifact, Math.incrementExact(revision)); revision = next.revision;
                 cache.put(id, next);
                 Value value = new Value(artifact, next.revision);
                 finished.put(id, value);
