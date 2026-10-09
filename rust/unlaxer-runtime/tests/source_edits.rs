@@ -481,3 +481,508 @@ fn capturing_another_binding_and_changed_source_are_rejected() {
             .is_err()
     );
 }
+
+fn lexical(uri: &str, text: &str) -> SourceEdits {
+    let cp = text.chars().collect::<Vec<_>>();
+    let mut pieces = vec![];
+    let mut i = 0;
+    while i < cp.len() {
+        let start = i;
+        let ws = " \t\r\n".contains(cp[i]);
+        if ws {
+            while i < cp.len() && " \t\r\n".contains(cp[i]) {
+                i += 1;
+            }
+        } else if cp[i].is_alphabetic() {
+            while i < cp.len() && cp[i].is_alphabetic() {
+                i += 1;
+            }
+        } else if cp[i] == '"' {
+            i += 1;
+            while i < cp.len() && cp[i] != '"' {
+                i += 1;
+            }
+            if i < cp.len() {
+                i += 1;
+            }
+        } else {
+            i += 1;
+        }
+        pieces.push(Piece {
+            id: format!("p{start}"),
+            span: span(start, i),
+            kind: if ws { Kind::Whitespace } else { Kind::Token },
+            owner: String::new(),
+        });
+    }
+    SourceEdits::new(snapshot(uri, text), pieces).unwrap()
+}
+fn imported_fixture(
+    alias: &str,
+) -> (
+    ProjectSymbolIndex,
+    Vec<Inventory>,
+    Vec<semantic_rename::ImportSite>,
+    Definition,
+) {
+    let a = "foo foo";
+    let b = format!("import foo as {alias};\r\n{alias} {{ {alias} {alias} }} {alias} \"foo\" 😀");
+    let c = "import foo;\r\nfoo \"foo\"";
+    let open = b.find('{').unwrap();
+    let close = b.find('}').unwrap();
+    let first = b.find('\n').unwrap() + 1;
+    let decl = open + 2;
+    let inner = decl + alias.len() + 1;
+    let last = close + 2;
+    let types = || {
+        vec![Type {
+            id: "T".into(),
+            kind: TypeKind::Builtin,
+            supertypes: vec![],
+            fields: vec![],
+            span: span(0, 0),
+        }]
+    };
+    let model = |uri: &str, source: &str, scopes, symbols| {
+        SemanticModel::new(
+            uri.into(),
+            1,
+            source.into(),
+            ModelData {
+                types: types(),
+                scopes,
+                symbols,
+                signatures: vec![],
+                calls: vec![],
+            },
+        )
+        .unwrap()
+    };
+    let root = |len| Scope {
+        id: "root".into(),
+        parent: None,
+        span: span(0, len),
+    };
+    let am = model(
+        "a",
+        a,
+        vec![root(7)],
+        vec![Symbol {
+            id: "exported".into(),
+            name: "foo".into(),
+            type_id: "T".into(),
+            scope: "root".into(),
+            declaration: span(0, 3),
+            visible_from: 3,
+        }],
+    );
+    let bm = model(
+        "b",
+        &b,
+        vec![
+            root(b.chars().count()),
+            Scope {
+                id: "inner".into(),
+                parent: Some("root".into()),
+                span: span(open, close + 1),
+            },
+        ],
+        vec![Symbol {
+            id: "shadow".into(),
+            name: alias.into(),
+            type_id: "T".into(),
+            scope: "inner".into(),
+            declaration: span(decl, decl + alias.len()),
+            visible_from: decl + alias.len(),
+        }],
+    );
+    let cm = model("c", c, vec![root(c.len())], vec![]);
+    let import = |name: &str, end| Import {
+        name: name.into(),
+        target: ModuleRef {
+            dependency: String::new(),
+            module: "a".into(),
+        },
+        symbol: "foo".into(),
+        scope: "root".into(),
+        span: span(0, end),
+        visible_from: end,
+    };
+    let modules = vec![
+        Module {
+            id: "a".into(),
+            model: am,
+            exports: BTreeSet::from(["exported".into()]),
+            imports: vec![],
+        },
+        Module {
+            id: "b".into(),
+            model: bm,
+            exports: BTreeSet::new(),
+            imports: vec![import(alias, first)],
+        },
+        Module {
+            id: "c".into(),
+            model: cm,
+            exports: BTreeSet::new(),
+            imports: vec![import("foo", 13)],
+        },
+        second(),
+    ];
+    let inventory = |module: &str, source: &str, reference_tokens| Inventory {
+        module: module.into(),
+        source: lexical(module, source),
+        reference_tokens,
+        complete: true,
+    };
+    let inventories = vec![
+        inventory("a", a, vec!["p4".into()]),
+        inventory(
+            "b",
+            &b,
+            vec![format!("p{first}"), format!("p{inner}"), format!("p{last}")],
+        ),
+        inventory("c", c, vec!["p13".into()]),
+        inventory("second", "foo foo", vec!["p4".into()]),
+    ];
+    let sites = vec![
+        semantic_rename::ImportSite {
+            module: "b".into(),
+            import_index: 0,
+            source_token: "p7".into(),
+            alias_token: "p14".into(),
+        },
+        semantic_rename::ImportSite {
+            module: "c".into(),
+            import_index: 0,
+            source_token: "p7".into(),
+            alias_token: String::new(),
+        },
+    ];
+    let target = Definition {
+        identity: Identity {
+            project: "project".into(),
+            dependency: String::new(),
+            dependency_version: String::new(),
+            module: "a".into(),
+            symbol: "exported".into(),
+        },
+        uri: "a".into(),
+        version: 1,
+        span: span(0, 3),
+    };
+    (
+        ProjectSymbolIndex::new("project".into(), 1, modules, vec![]).unwrap(),
+        inventories,
+        sites,
+        target,
+    )
+}
+#[test]
+fn shared_import_and_alias_renames_use_different_identities() {
+    for line in include_str!("../../../docs/fixtures/source-edits/import-rename.tsv")
+        .lines()
+        .filter(|l| !l.starts_with('#'))
+    {
+        let f = line.split('\t').collect::<Vec<_>>();
+        let (index, inventories, sites, target) = imported_fixture(f[2]);
+        let mut plans = if f[1] == "definition" {
+            semantic_rename::prepare_with_imports(
+                &index,
+                &target,
+                f[3],
+                Some(&|name: &str| !name.is_empty() && name.chars().all(char::is_alphabetic)),
+                &inventories,
+                &sites,
+            )
+            .unwrap()
+        } else {
+            vec![semantic_rename::prepare_alias(
+                &index,
+                &sites[0],
+                f[3],
+                Some(&|name: &str| !name.is_empty() && name.chars().all(char::is_alphabetic)),
+                &inventories,
+                &sites,
+            )
+            .unwrap()]
+        };
+        if f[1] == "shadow" {
+            let symbol = &index.modules()[1].model.data().symbols[0];
+            let shadow_target = Definition {
+                identity: Identity {
+                    project: "project".into(),
+                    dependency: String::new(),
+                    dependency_version: String::new(),
+                    module: "b".into(),
+                    symbol: "shadow".into(),
+                },
+                uri: "b".into(),
+                version: 1,
+                span: symbol.declaration,
+            };
+            plans = semantic_rename::prepare_with_imports(
+                &index,
+                &shadow_target,
+                f[3],
+                Some(&identifier),
+                &inventories,
+                &sites,
+            )
+            .unwrap();
+        }
+        let current = inventories
+            .iter()
+            .map(|i| (i.source.snapshot().uri.clone(), i.source.snapshot().clone()))
+            .collect::<HashMap<_, _>>();
+        let versions = current.keys().map(|uri| (uri.clone(), 2)).collect();
+        if plans.len() > 1 {
+            assert!(single_document(plans.clone()).is_err());
+        } else {
+            assert_eq!(
+                single_document(plans.clone()).unwrap().edits().len(),
+                plans[0].edits().len()
+            );
+        }
+        let modified = apply_all(&plans, &current, &versions).unwrap();
+        for (i, uri) in ["a", "b", "c"].iter().enumerate() {
+            assert_eq!(
+                modified.get(*uri).unwrap_or(&current[*uri]).text,
+                decode(f[4 + i]),
+                "{} {uri}",
+                f[0]
+            );
+        }
+        assert!(!modified.contains_key("second"));
+        assert!(
+            semantic_rename::prepare(&index, &target, "bar", Some(&identifier), &inventories)
+                .is_err()
+        );
+        assert!(semantic_rename::prepare_alias(
+            &index,
+            &sites[1],
+            "bar",
+            Some(&identifier),
+            &inventories,
+            &sites
+        )
+        .is_err());
+        assert!(semantic_rename::prepare_with_imports(
+            &index,
+            &target,
+            "bar",
+            Some(&identifier),
+            &inventories,
+            &[sites[0].clone(), sites[0].clone()]
+        )
+        .is_err());
+        let mut invalid = sites.clone();
+        invalid[0].alias_token = "p7".into();
+        assert!(semantic_rename::prepare_alias(
+            &index,
+            &sites[0],
+            "foo",
+            Some(&identifier),
+            &inventories,
+            &invalid
+        )
+        .is_err());
+    }
+}
+
+fn partial_source() -> SourceEdits {
+    let child = snapshot("java", "x  ?\r\n😀");
+    let pieces = [
+        ("x", 0, 1, Kind::Token, ""),
+        ("space", 1, 3, Kind::Whitespace, "x"),
+        ("unknown", 3, 4, Kind::Unparsed, ""),
+        ("line", 4, 6, Kind::Whitespace, ""),
+        ("emoji", 6, 7, Kind::Unparsed, ""),
+    ]
+    .into_iter()
+    .map(|(id, start, end, kind, owner)| Piece {
+        id: id.into(),
+        span: span(start, end),
+        kind,
+        owner: owner.into(),
+    })
+    .collect();
+    SourceEdits::new(child, pieces).unwrap()
+}
+#[test]
+fn shared_edit_provider_maps_nested_regions_and_preserves_partial_text() {
+    use std::collections::BTreeMap;
+    use unlaxer_runtime::language_queries::{LanguageQueries, Project, Provider, Request};
+    use unlaxer_runtime::source::{
+        Language, LanguageRegions, Operation as QueryOperation, Region, State,
+    };
+    let child = partial_source().snapshot().clone();
+    let tiny = snapshot("tiny", &format!("<{}>", child.text));
+    let host = snapshot("formula", &format!("F[{}] tail", tiny.text));
+    let map = copy(child.clone(), tiny.clone(), 1)
+        .through(copy(tiny, host.clone(), 2))
+        .unwrap();
+    let language = Language {
+        id: "java".into(),
+        package_id: "example/java".into(),
+        version: "1".into(),
+        grammar: "Java".into(),
+        entry: "Root".into(),
+    };
+    let project = Project {
+        id: "p".into(),
+        version: 1,
+        documents: BTreeMap::from([(host.uri.clone(), host.clone())]),
+        configuration: BTreeMap::new(),
+    };
+    let state = |name| match name {
+        "COMPLETE" => State::Complete,
+        "PARTIAL" => State::Partial,
+        "FAILED" => State::Failed,
+        _ => panic!("state"),
+    };
+    let region = |parse_state| Region {
+        id: "java".into(),
+        parent: None,
+        language: language.clone(),
+        full: span(2, 11),
+        body: span(3, 10),
+        source_map: map.clone(),
+        parse_state,
+    };
+    for line in include_str!("../../../docs/fixtures/source-edits/provider.tsv")
+        .lines()
+        .filter(|l| !l.starts_with('#'))
+    {
+        let f = line.split('\t').collect::<Vec<_>>();
+        let operation = match f[2] {
+            "RENAME" => QueryOperation::Rename,
+            "FORMAT" => QueryOperation::Format,
+            "CODE_ACTION" => QueryOperation::CodeAction,
+            _ => QueryOperation::Hover,
+        };
+        let mut policies: HashMap<Operation, EditPolicy> = HashMap::new();
+        if operation != QueryOperation::Hover {
+            let op = match operation {
+                QueryOperation::Rename => Operation::Rename,
+                QueryOperation::Format => Operation::Format,
+                _ => Operation::CodeAction,
+            };
+            let edit = Edit {
+                span: span(f[3].parse().unwrap(), f[4].parse().unwrap()),
+                replacement: decode(f[5]),
+            };
+            policies.insert(
+                op,
+                Box::new(move |_| partial_source().plan(op, span(0, 7), vec![edit.clone()])),
+            );
+        }
+        let count = policies.len();
+        let provider = QueryProvider::new(
+            partial_source(),
+            language.clone(),
+            project.clone(),
+            policies,
+        );
+        assert_eq!(provider.capabilities().len(), count);
+        let layer = LanguageQueries::new(
+            LanguageRegions::new(host.clone(), vec![region(state(f[1]))]).unwrap(),
+            project.clone(),
+            HashMap::from([(language.clone(), Box::new(provider) as Box<dyn Provider>)]),
+        )
+        .unwrap();
+        let result = layer
+            .query(&host, &project, 3, operation, &BTreeMap::new())
+            .unwrap();
+        assert_eq!(format!("{:?}", result.state).to_uppercase(), f[6]);
+        let edits = result
+            .items
+            .first()
+            .map(|item| item.edits.clone())
+            .unwrap_or_default();
+        if f[7] != "-" {
+            assert_eq!(
+                edits[0].span,
+                span(f[7].parse().unwrap(), f[8].parse().unwrap())
+            );
+        } else {
+            assert!(edits.is_empty());
+        }
+        assert_eq!(
+            LanguageRegions::new(host.clone(), vec![])
+                .unwrap()
+                .apply(&host, 2, &edits)
+                .unwrap()
+                .text,
+            decode(f[9])
+        );
+    }
+    let region = region(State::Partial);
+    let parameters = BTreeMap::new();
+    let request = Request {
+        region: &region,
+        operation: QueryOperation::Format,
+        cursor: 1,
+        project: &project,
+        parameters: &parameters,
+    };
+    let wrong = QueryProvider::new(
+        partial_source(),
+        language.clone(),
+        project.clone(),
+        HashMap::from([(
+            Operation::Format,
+            Box::new(|_: &Request<'_>| {
+                partial_source().plan(
+                    Operation::CodeAction,
+                    span(0, 7),
+                    vec![Edit {
+                        span: span(0, 1),
+                        replacement: "z".into(),
+                    }],
+                )
+            }) as EditPolicy,
+        )]),
+    );
+    assert!(wrong.query(&request).is_err());
+    let foreign = QueryProvider::new(
+        partial_source(),
+        language.clone(),
+        project.clone(),
+        HashMap::from([(
+            Operation::Format,
+            Box::new(|_: &Request<'_>| {
+                let source = partial_source();
+                let other = SourceEdits::new(
+                    snapshot("other", &source.snapshot().text),
+                    source.pieces().to_vec(),
+                )?;
+                other.plan(
+                    Operation::Format,
+                    span(0, 7),
+                    vec![Edit {
+                        span: span(1, 3),
+                        replacement: " ".into(),
+                    }],
+                )
+            }) as EditPolicy,
+        )]),
+    );
+    assert!(foreign.query(&request).is_err());
+    let mut stale = project.clone();
+    stale.version = 0;
+    assert!(wrong
+        .query(&Request {
+            project: &stale,
+            ..request
+        })
+        .is_err());
+    let mut other = region.clone();
+    other.language.version = "2".into();
+    assert!(wrong
+        .query(&Request {
+            region: &other,
+            ..request
+        })
+        .is_err());
+}
