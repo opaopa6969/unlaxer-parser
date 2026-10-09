@@ -52,6 +52,7 @@ public final class RustGrammarLowering {
 
     private GrammarIR run() {
         if (!grammar.imports().isEmpty()) throw unsupported("imports");
+        org.unlaxer.dsl.codegen.LexicalContexts.requireValid(grammar);
         var lexical = org.unlaxer.dsl.bootstrap.LexicalCompiler.compile(grammar);
         boolean whitespace = false;
         String globalStyle = "none";
@@ -142,6 +143,8 @@ public final class RustGrammarLowering {
                         throw unsupported("mapping method collision " + previous + " / " + value.className());
                     }
                     mapping = value;
+                } else if (annotation instanceof LexicalContextAnnotation) {
+                    // Applied around this rule body after structural lowering.
                 } else if (annotation instanceof DocAnnotation) {
                     // Preserved as ordered tooling metadata on the lowered rule below.
                 } else if (annotation instanceof SkipAnnotation) {
@@ -337,6 +340,8 @@ public final class RustGrammarLowering {
             if (definition != null) expression = new LexicalTriviaScope(expression, definition);
             else if (hasLocalTrivia || !globalStyle.equalsIgnoreCase("none") && !globalStyle.equalsIgnoreCase("javaStyle"))
                 expression = new TriviaScope(expression, ruleWhitespace.get(i));
+            for (var annotation : grammar.rules().get(i).annotations()) if (annotation instanceof LexicalContextAnnotation context)
+                expression = new LexicalContextScope(expression, org.unlaxer.dsl.codegen.LexicalContexts.terminals(grammar, context));
             if (ruleEffects.get(i) != null) expression = new RuleEffects(expression, ruleEffects.get(i));
             if (comparisons.get(i) != null) expression = new CaptureEquality(expression, comparisons.get(i));
             if (recoveries.get(i) != null) {

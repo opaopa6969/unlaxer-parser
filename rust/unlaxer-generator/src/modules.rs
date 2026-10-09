@@ -138,6 +138,18 @@ impl Loader {
         }
         for rule in &mut grammar.rules {
             for annotation in &mut rule.annotations {
+                if let AnnotationKind::LexicalContext { tokens, .. } = &mut annotation.kind {
+                    for name in tokens {
+                        policy(
+                            name,
+                            annotation.span,
+                            &imported,
+                            &mut grammar.tokens,
+                            &mut used,
+                            &mut synthetic,
+                        )?;
+                    }
+                }
                 if let AnnotationKind::Whitespace { style: Some(style) } = &mut annotation.kind {
                     policy(
                         style,

@@ -73,7 +73,8 @@ public class ParserGenerator implements CodeGenerator {
         GenContext(GrammarDecl grammar) {
             this.grammar = grammar;
             TokenStreamGrammar.requireValid(grammar);
-            this.tokenStream = TokenStreamGrammar.enabled(grammar);
+            LexicalContexts.requireValid(grammar);
+            this.tokenStream = TokenStreamGrammar.enabled(grammar) || LexicalContexts.enabled(grammar);
             this.grammarName = grammar.name();
             TokenAdapterRegistry adapters = TokenAdapterRegistry.requireValid(grammar);
             this.adapterShadowsWordParser = grammar.tokens().stream()
@@ -511,8 +512,13 @@ public class ParserGenerator implements CodeGenerator {
                 .append("        public Supplier<Parser> getLazyParser() { return () -> Parser.get(")
                 .append(ParserCodegenUtil.toParserClassName(style)).append(".class); }\n")
                 .append("        public java.util.Optional<Parser> getLazyTerminatorParser() { return java.util.Optional.empty(); }\n");
-            if (ctx.tokenStream) result.append("        @Override public org.unlaxer.Parsed parse(org.unlaxer.context.ParseContext context, org.unlaxer.TokenKind kind, boolean invert) {\n")
-                .append("            return org.unlaxer.dsl.runtime.Lexing.trivia(this, context, kind, invert, () -> super.parse(context, kind, invert));\n        }\n");
+            if (ctx.tokenStream) {
+                var definition = org.unlaxer.dsl.bootstrap.WhitespaceDefinitions.resolve(style, org.unlaxer.dsl.bootstrap.LexicalCompiler.compile(ctx.grammar));
+                String fallback = LexicalContexts.enabled(ctx.grammar) ? "org.unlaxer.dsl.runtime.Lexing.withIndependentLexing(context, () -> super.parse(context, kind, invert))" : "super.parse(context, kind, invert)";
+                result.append("        @Override public org.unlaxer.Parsed parse(org.unlaxer.context.ParseContext context, org.unlaxer.TokenKind kind, boolean invert) {\n")
+                    .append("            return org.unlaxer.dsl.runtime.Lexing.trivia(this, context, kind, invert, ")
+                    .append(org.unlaxer.dsl.bootstrap.LexicalCompiler.javaExpression(definition)).append(", () -> ").append(fallback).append(");\n        }\n");
+            } else if (LexicalContexts.enabled(ctx.grammar)) result.append("        @Override public org.unlaxer.Parsed parse(org.unlaxer.context.ParseContext context, org.unlaxer.TokenKind kind, boolean invert) { return org.unlaxer.dsl.runtime.Lexing.withIndependentLexing(context, () -> super.parse(context, kind, invert)); }\n");
             result.append("    }\n");
             result.append("    public static abstract class ").append(name)
                 .append(" extends LazyChain implements org.unlaxer.context.DiagnosticsAgnostic {\n")
@@ -552,7 +558,7 @@ public class ParserGenerator implements CodeGenerator {
         sb.append("        @Override\n");
         sb.append("        public java.util.Optional<Parser> getLazyTerminatorParser() { return java.util.Optional.empty(); }\n");
         if (ctx.tokenStream) sb.append("        @Override public org.unlaxer.Parsed parse(org.unlaxer.context.ParseContext context, org.unlaxer.TokenKind kind, boolean invert) {\n")
-            .append("            return org.unlaxer.dsl.runtime.Lexing.trivia(this, context, kind, invert, () -> super.parse(context, kind, invert));\n        }\n");
+            .append("            return org.unlaxer.dsl.runtime.Lexing.trivia(this, context, kind, invert, null, () -> super.parse(context, kind, invert));\n        }\n");
         sb.append("    }\n\n");
 
         return sb.toString();

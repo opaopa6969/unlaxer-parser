@@ -144,6 +144,10 @@ pub enum AnnotationKind {
     Interleave {
         profile: String,
     },
+    LexicalContext {
+        tokens: Vec<String>,
+        literals: Vec<String>,
+    },
     Backref {
         name: String,
     },

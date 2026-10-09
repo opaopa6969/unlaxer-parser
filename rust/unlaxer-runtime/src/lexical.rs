@@ -2,7 +2,7 @@
 use std::collections::HashMap;
 
 #[allow(clippy::upper_case_acronyms, non_camel_case_types)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Op {
     LITERAL,
     ANY,
@@ -23,7 +23,7 @@ pub enum Op {
     SCOPE,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct LexicalExpression {
     pub op: Op,
     pub text: &'static str,

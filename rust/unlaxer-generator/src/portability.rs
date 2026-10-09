@@ -196,6 +196,9 @@ impl Inventory {
         for issue in feature_diagnostics(grammar) {
             self.add(issue.code, issue.subject, issue.span);
         }
+        for issue in crate::lexical_contexts::problems(grammar) {
+            self.diagnostics.push(issue);
+        }
         for issue in crate::token_stream::problems(grammar) {
             self.add(issue.code, issue.subject, issue.span);
         }
@@ -278,7 +281,8 @@ impl Inventory {
             | AnnotationKind::Precedence { .. }
             | AnnotationKind::Declares { .. }
             | AnnotationKind::Backref { .. }
-            | AnnotationKind::Catalog { .. } => {}
+            | AnnotationKind::Catalog { .. }
+            | AnnotationKind::LexicalContext { .. } => {}
             AnnotationKind::Mapping { class_name, params } => {
                 if !identifier(class_name) {
                     self.add("P-MAPPING-TYPE", class_name, span);

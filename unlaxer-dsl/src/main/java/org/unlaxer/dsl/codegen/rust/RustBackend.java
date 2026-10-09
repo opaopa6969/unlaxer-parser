@@ -40,7 +40,7 @@ public final class RustBackend {
         }
         var trivia = org.unlaxer.dsl.codegen.TokenStreamGrammar.namedTrivia(grammar);
         out.append("    ].into())\n}\n\npub fn parse_with_lexing(source: &str, options: unlaxer_runtime::lexing::Options) -> Result<unlaxer_runtime::lexing::Outcome<'_>, String> {\n    unlaxer_runtime::lexing::")
-            .append(trivia == null ? "parse" : "parse_with_trivia").append("(grammar(), ")
+            .append(org.unlaxer.dsl.codegen.LexicalContexts.enabled(grammar) ? (trivia == null ? "parse_contextual" : "parse_contextual_with_trivia") : (trivia == null ? "parse" : "parse_with_trivia")).append("(grammar(), ")
             .append(ir.root()).append(", ").append(ir.javaWhitespace())
             .append(", source, options, std::sync::Arc::clone(lexical_terminals())");
         if (trivia != null) out.append(", Some(").append(lexicalExpression(trivia)).append(")");
@@ -324,6 +324,9 @@ public final class RustBackend {
         if (expression instanceof ValueBoundary boundary) {
             return expression(boundary.child()) + ".value_boundary()";
         }
+        if (expression instanceof LexicalContextScope scope) return expression(scope.child()) + ".lexical_context_scope(vec![" + scope.terminals().stream().map(terminal ->
+            "unlaxer_runtime::lexing::Terminal { name: " + quote(terminal.name()) + ", literal: " + terminal.literal() + ", expression: " + lexicalExpression(terminal.expression()) + " }")
+            .collect(java.util.stream.Collectors.joining(", ")) + "])";
         if (expression instanceof LexicalTriviaScope scope) return expression(scope.child()) + ".lexical_trivia_scope(" + lexicalExpression(scope.definition()) + ")";
         if (expression instanceof TriviaScope scope) {
             return expression(scope.child()) + ".trivia_scope(" + scope.javaWhitespace() + ")";
@@ -560,6 +563,7 @@ public final class RustBackend {
         if (expression instanceof RuleEffects value) return containsRecovery(value.child());
         if (expression instanceof CaptureEquality value) return containsRecovery(value.child());
         if (expression instanceof TriviaScope value) return containsRecovery(value.child());
+        if (expression instanceof LexicalContextScope value) return containsRecovery(value.child());
         if (expression instanceof TextValue value) return containsRecovery(value.child());
         if (expression instanceof ValueBoundary value) return containsRecovery(value.child());
         if (expression instanceof Delimited value) return containsRecovery(value.child());

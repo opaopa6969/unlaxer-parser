@@ -1,0 +1,15 @@
+grammar Input {
+ @import lib from 'library.ubnf'
+ @ubnf: v2
+ @package: example.lexing
+ @tokenStream: enabled
+ token END = EOF
+ @root @mapping(Value, params=[value])
+ Root ::= (Wrong | Right | Pair) @value END;
+ @lexicalContext(tokens=['lib.SHIFT'], literals=['!'])
+ Wrong ::= lib.SHIFT '!';
+ @lexicalContext(tokens=['lib.GT'])
+ Right ::= lib.GT lib.GT;
+ @lexicalContext(tokens=['lib.PAIR'])
+ Pair ::= lib.PAIR;
+}

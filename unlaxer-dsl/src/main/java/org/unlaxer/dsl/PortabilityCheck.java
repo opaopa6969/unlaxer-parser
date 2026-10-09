@@ -101,6 +101,8 @@ public final class PortabilityCheck {
         for (TokenContractRegistry.Diagnostic issue : TokenContractRegistry.build(grammar, snapshot).diagnostics()) {
             out.add(new Diagnostic(issue.code(), issue.span(), issue.subject()));
         }
+        for (var issue : org.unlaxer.dsl.codegen.LexicalContexts.problems(grammar))
+            add(out, issue.code(), snapshot, issue.node(), issue.subject());
         for (var issue : org.unlaxer.dsl.codegen.TokenStreamGrammar.problems(grammar))
             add(out, issue.code(), snapshot, issue.node(), issue.subject());
         for (ImportDecl decl : grammar.imports()) add(out, "P-IMPORT", snapshot, decl, decl.path());

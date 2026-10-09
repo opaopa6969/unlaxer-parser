@@ -129,6 +129,11 @@ public final class GrammarValidator {
         for (var issue : TokenStreamGrammar.problems(grammar)) {
             errors.add(new ValidationIssue(issue.code(), issue.subject(), "Use the supported @tokenStream:enabled profile."));
         }
+        try { LexicalContexts.requireValid(grammar); }
+        catch (IllegalArgumentException error) {
+            String code = error.getMessage().startsWith("E-LEXICAL-CONTEXT-") ? error.getMessage().split(":",2)[0] : "E-LEXICAL-CONTEXT";
+            errors.add(new ValidationIssue(code, error.getMessage(), "Select non-nullable declarative tokens and nonempty unique literals."));
+        }
         try { EmbeddedGrammarEmitter.declarations(grammar); }
         catch (IllegalArgumentException error) {
             errors.add(new ValidationIssue("E-EMBEDDING", error.getMessage(), "Use one scalar body capture and exact language identity."));
