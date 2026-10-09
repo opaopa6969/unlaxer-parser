@@ -565,7 +565,7 @@ impl Parser<'_> {
             }
             "whitespace" => {
                 let style = if self.eat('(') {
-                    let value = self.identifier()?;
+                    let value = self.dotted()?;
                     self.expect(')')?;
                     Some(value)
                 } else {

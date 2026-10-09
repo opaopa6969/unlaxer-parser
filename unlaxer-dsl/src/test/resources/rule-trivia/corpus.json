@@ -138,5 +138,366 @@
        "ast":{"type":"Power","span":[0,13],"fields":{"left":"x","op":["^"],"right":[{"type":"Power","span":[11,12],"fields":{"left":"x","op":[],"right":[]}}]}}},
       {"id":"missing-right", "input":"x^", "prefix":[true,1,1], "accepted":false}
     ]
+  },
+  {
+    "name": "NamedGlobal",
+    "grammar": "grammar NamedGlobal { @package: org.example.ruletrivia @ubnf: v2 @whitespace: GAP token GAP ::= (' ' | '#'+ | '\\n'); @root @mapping(Root, params=[value])  Root ::= 'a' @value 'b'; }",
+    "cases": [
+      {
+        "id": "custom-trivia",
+        "input": "# a###\nb #",
+        "prefix": [
+          true,
+          10,
+          10
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            10
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "ordinary-java-comments-rejected",
+        "diagnostic": ["syntax", 1],
+        "input": "a/*x*/b",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      },
+      {
+        "id": "prefix",
+        "diagnostic": ["trailing_input", 3],
+        "input": "a#b!",
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "accepted": false
+      }
+    ]
+  },
+  {
+    "name": "NamedRule",
+    "grammar": "grammar NamedRule { @package: org.example.ruletrivia @ubnf: v2  token GAP ::= (' ' | '#'+ | '\\n'); @root @mapping(Root, params=[value]) @whitespace(GAP) Root ::= 'a' @value 'b'; }",
+    "cases": [
+      {
+        "id": "custom-trivia",
+        "input": "# a###\nb #",
+        "prefix": [
+          true,
+          10,
+          10
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            10
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "ordinary-java-comments-rejected",
+        "diagnostic": ["syntax", 1],
+        "input": "a/*x*/b",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      },
+      {
+        "id": "prefix",
+        "diagnostic": ["trailing_input", 3],
+        "input": "a#b!",
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "accepted": false
+      }
+    ]
+  },
+  {
+    "name": "imported-layout",
+    "grammar": "grammar ImportedLayout { @import layout from 'layout.ubnf' @package: org.example.ruletrivia @ubnf: v2 @whitespace: layout.GAP @root @mapping(Root, params=[value]) Root ::= 'a' @value 'b'; }",
+    "modules": {
+      "layout.ubnf": "grammar Layout { @ubnf: v2 token GAP ::= (' ' | '#'); }"
+    },
+    "cases": [
+      {
+        "id": "import-used-as-whitespace",
+        "input": "#a#b ",
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "imported-rule-layout",
+    "grammar": "grammar ImportedRuleLayout { @import layout from 'layout.ubnf' @package: org.example.ruletrivia @ubnf: v2 @root @mapping(Root, params=[value]) @whitespace(layout.GAP) Root ::= 'a' @value 'b'; }",
+    "modules": {
+      "layout.ubnf": "grammar Layout { @ubnf: v2 token GAP ::= (' ' | '#'); }"
+    },
+    "cases": [
+      {
+        "id": "qualified-annotation",
+        "input": "#a#b ",
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "named-token-atomic",
+    "grammar": "grammar NamedTokenAtomic { @package: org.example.ruletrivia @ubnf: v2 @whitespace: GAP token GAP ::= '#'; token PAIR ::= 'a' 'b'; @root @mapping(Root, params=[value]) Root ::= PAIR @value 'c'; }",
+    "cases": [
+      {
+        "id": "skip-between-tokens",
+        "input": "#ab#c#",
+        "prefix": [
+          true,
+          6,
+          6
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            6
+          ],
+          "fields": {
+            "value": "ab"
+          }
+        }
+      },
+      {
+        "id": "no-skip-inside-token",
+        "diagnostic": ["syntax", 0],
+        "input": "a#b#c",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      }
+    ]
+  },
+  {
+    "name": "named-child-policy-restoration",
+    "grammar": "grammar NamedChildScope { @package: org.example.ruletrivia @ubnf: v2 @whitespace: GAP token GAP ::= '#'; @root @mapping(Root,params=[child]) @whitespace(none) Root ::= '(' Child @child ')'; @mapping(Child,params=[left,right]) Child ::= 'a' @left 'b' @right; }",
+    "cases": [
+      {
+        "id": "child-inherits-named-global",
+        "input": "(#a#b#)",
+        "prefix": [
+          true,
+          7,
+          7
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            7
+          ],
+          "fields": {
+            "child": {
+              "type": "Child",
+              "span": [
+                1,
+                6
+              ],
+              "fields": {
+                "left": "a",
+                "right": "b"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "none-restored-for-parent",
+        "input": "(#a#b#)#",
+        "prefix": [
+          true,
+          7,
+          7
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "trailing_input",
+          7
+        ]
+      }
+    ]
+  },
+  {
+    "name": "named-overrides-interleave",
+    "grammar": "grammar NamedPriority { @package: org.example.ruletrivia @ubnf: v2 @whitespace: javaStyle token GAP ::= '#'; @root @mapping(Root,params=[value]) @interleave(profile=javaStyle) @whitespace(GAP) Root ::= 'a' @value 'b'; }",
+    "cases": [
+      {
+        "id": "named-rule-wins",
+        "input": "#a#b#",
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "no-java-space-implicit-union",
+        "input": "a b",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          1
+        ]
+      }
+    ]
+  },
+  {
+    "name": "BuiltinJavaReserved",
+    "grammar": "grammar BuiltinJavaReserved { @package: org.example.ruletrivia @ubnf: v2 @whitespace: javaStyle token javaStyle ::= '#'; @root @mapping(Root,params=[value]) Root ::= 'a' @value 'b'; }",
+    "cases": [
+      {
+        "id": "reserved-alias-wins",
+        "input": " a b ",
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "token-does-not-shadow-builtin",
+        "input": "a#b",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          1
+        ]
+      }
+    ]
+  },
+  {
+    "name": "BuiltinNoneReserved",
+    "grammar": "grammar BuiltinNoneReserved { @package: org.example.ruletrivia @ubnf: v2 @whitespace: none token none ::= '#'; @root @mapping(Root,params=[value]) Root ::= 'a' @value 'b'; }",
+    "cases": [
+      {
+        "id": "reserved-alias-wins",
+        "input": "ab",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            2
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "token-does-not-shadow-builtin",
+        "input": "a#b",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          1
+        ]
+      }
+    ]
   }
 ]
