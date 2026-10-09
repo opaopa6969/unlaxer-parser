@@ -65,7 +65,7 @@ public final class SharedGrammarCalls {
                 if (!language.grammar().equals(grammar.name()) || grammar.sharedEntry(language.entry()) == null) throw new IllegalArgumentException("shared call grammar/entry mismatch");
             });
         }
-        /** Runs the real entry on this context; always restores caller cursors/state before returning. */
+        /** Runs the real entry on this context; restores caller cursors/user state before returning. */
         public Result probe(ParseContext context, Language language, Parser boundary, TokenKind kind) {
             int start = context.getPosition(kind).value();
             CstGrammar grammar = entries.get(language);

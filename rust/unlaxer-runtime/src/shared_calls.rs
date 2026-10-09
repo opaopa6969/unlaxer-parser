@@ -111,6 +111,9 @@ impl Registry {
         let recoveries = std::mem::take(&mut context.recoveries);
         let tokens = std::mem::replace(&mut context.tokens, Rc::new(token::Store::new()));
         let names = std::mem::take(&mut context.names_state);
+        // The primitive keeps a lexical session for an outermost grammar parse.
+        // A shared boundary must isolate it even when the caller has no rules.
+        let lexing = context.lexing.take();
         context.set_state(DEPTH, depth + 1);
         context.set_state(BUDGET, retained + source_length);
         // Local diagnostics must not report a farther failure from an earlier caller alternative.
@@ -153,6 +156,7 @@ impl Registry {
         context.recoveries = recoveries;
         context.tokens = tokens;
         context.names_state = names;
+        context.lexing = lexing;
         context.position = cursor.0;
         context.matched_position = cursor.1;
         if parsed.is_err() {
@@ -207,5 +211,82 @@ impl Tree {
     /// Metadata is owned by this retained tree and follows the selected opaque CST node.
     pub fn shared_call(&self, node: usize) -> Option<&Call> {
         self.tokens.calls.get(&node)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lexical::{LexicalExpression, Op};
+    use crate::lexing::{Mode, Options, Session, Terminal};
+    use crate::{Expr, Rule};
+    use std::sync::Arc;
+
+    #[test]
+    fn direct_entry_isolates_and_restores_existing_lexical_session_without_outer_rules() {
+        let language = Language {
+            id: "child".into(),
+            package_id: "example/child".into(),
+            version: "1".into(),
+            grammar: "Child".into(),
+            entry: "Root".into(),
+        };
+        let registry = Registry::new(HashMap::from([(
+            language.clone(),
+            CstGrammar {
+                name: "Child".into(),
+                grammar: Arc::from(vec![Rule {
+                    name: "Root",
+                    expression: Expr::literal("ab"),
+                }]),
+                entries: HashMap::from([("Root".into(), 0)]),
+                bindings: vec![],
+                whitespace: false,
+            },
+        )]))
+        .unwrap();
+        for mode in [
+            Mode::Direct,
+            Mode::TriviaCache,
+            Mode::TokensLazy,
+            Mode::TokensEager,
+        ] {
+            for source in ["ab!", "ax!"] {
+                let mut context = ParseContext::new(source);
+                context.lexing = Some(
+                    Session::new(
+                        source,
+                        Options {
+                            mode,
+                            preserve_trivia: true,
+                        },
+                        Arc::from(vec![Terminal {
+                            name: "!",
+                            literal: true,
+                            expression: LexicalExpression {
+                                op: Op::LITERAL,
+                                text: "!",
+                                min: 0,
+                                max: 0,
+                                children: vec![],
+                            },
+                        }]),
+                        false,
+                    )
+                    .unwrap(),
+                );
+                let before = context.lexing.as_ref().unwrap().metrics();
+                let result = registry.call(&mut context, &language);
+                assert_eq!(result.is_ok(), source == "ab!");
+                let after = context.lexing.as_ref().unwrap().metrics();
+                assert_eq!(after.terminal_evaluations, before.terminal_evaluations);
+                assert_eq!(after.inventory_evaluations, before.inventory_evaluations);
+                assert_eq!(context.position(), if source == "ab!" { 2 } else { 0 });
+                if result.is_ok() {
+                    context.parse(&Expr::literal("!")).unwrap();
+                    assert_eq!(context.position(), 3);
+                }
+            }
+        }
     }
 }
