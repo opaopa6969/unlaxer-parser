@@ -128,12 +128,16 @@ fn generate_resolved(
     runtime!("lib.rs");
     runtime!("scope.rs");
     runtime!("semantic.rs");
+    runtime!("semantic_rules.rs");
     runtime!("editor.rs");
     runtime!("editor_cst.rs");
     runtime!("editor_queries.rs");
     runtime!("language_queries.rs");
     runtime!("semantic_queries.rs");
     runtime!("semantic_project.rs");
+    runtime!("semantic_query_cache.rs");
+    runtime!("type_system.rs");
+    runtime!("call_inference.rs");
     runtime!("semantic_rename.rs");
     runtime!("source_edits.rs");
     runtime!("source.rs");
@@ -142,9 +146,6 @@ fn generate_resolved(
     runtime!("provider_protocol.rs");
     runtime!("provider_process.rs");
     runtime!("pipeline.rs");
-    runtime!("semantic_query_cache.rs");
-    runtime!("type_system.rs");
-    runtime!("call_inference.rs");
     runtime!("lexing.rs");
     runtime!("first.rs");
     runtime!("lexical.rs");
