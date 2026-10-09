@@ -13,6 +13,20 @@ for both Tiny language identities. `original.txt` is the byte-identical MIT-lice
 number, not the number of examples.** It contains ten formulas, two with embedded Java.
 The two `tiny69-*` entries in the language-profile corpus cover only those Java bodies.
 
+The shared native corpus and the current downstream consumer have different source
+revisions and acceptance boundaries:
+
+| Source revision | Implementation and evidence | Scope |
+| --- | --- | --- |
+| Tiny `f86ce8a5` | Java/Rust strict production bridge: 16 inputs, 177 independent observations | FormulaInfo/P4 regions and real javac queries; original production corpus |
+| Tiny `f86ce8a5` | Java/Rust explicit editor bridge: 9 inputs, 29 independent observations | Certified partial regions and original-source EOF completion; strict parsing still fails on unfinished input |
+| Tiny `0d84f0dc` | Existing Java P4 LSP consumer in [Tiny PR #252](https://github.com/opaopa6969/tinyexpression/pull/252) and [#254](https://github.com/opaopa6969/tinyexpression/pull/254) | Opt-in diagnostics and editor completion, including the current long-fence grammar; no equivalent current Rust Tiny LSP consumer is claimed |
+
+The downstream opt-in build and setting are documented in
+[Tiny's consumer guide](https://github.com/opaopa6969/tinyexpression/blob/feat/embedded-editor-regions/tools/tinyexpression-p4-lsp-vscode/EMBEDDED-LANGUAGES.md).
+These PRs supply the consumer migration implementation; the native corpus here
+continues to use the exact `f86ce8a5` pin rather than silently changing its oracle.
+
 | Layer | Java host | Rust host | Boundary |
 | --- | --- | --- | --- |
 | FormulaInfo | Actual `FormulaInfoBlocksParser` and value tokens | Actual `tinyexpression_rs::formula_info::parse_document` | Full document consumption, all formula fields; no calculator construction |
@@ -76,10 +90,10 @@ the bridge explicitly normalizes that boundary and verifies the resulting exact 
   graphs and execution semantics are not loaded or validated. The lexical bridge always uses
   the pinned ubnfc parser; `p4Engine` execution metadata does not switch this extraction route.
   Classic is checked through its public facade as a separate compatibility observation.
-* An unsuccessful P4 formula is FAILED and contributes **no speculative Java children**.
-  Complete sibling formulas remain. An unclosed Java fence is consequently visible as a
-  failed Tiny formula, not a successful or editable Java body. Retaining completion inside
-  that unfinished production fence requires an additional production recovery contract.
+* Under strict `parse`, an unsuccessful P4 formula is FAILED and contributes **no
+  speculative Java children**. Complete sibling formulas remain. This was also the
+  initial PR #470 boundary. The explicit editor entry described below adds certified
+  partial regions and EOF completion without changing strict acceptance.
 * The native example limits input to 1,048,576 code points, 256 formulas and P4 depth 512.
   The provider's bounded request/response and 30-second process timeout still apply.
   Full-document reparsing is used; this is not an incremental parser or performance claim.
@@ -87,12 +101,14 @@ the bridge explicitly normalizes that boundary and verifies the resulting exact 
   cross-language type sharing, formatter, rename, code actions, evaluation, arbitrary
   language schemes and browser process execution are not implemented here. Missing
   providers and unsupported operations remain explicit query statuses.
-* The old Tiny `DocumentFilter`/`TinyExpressionP4LanguageServerExt` still select the first
-  formula and use their legacy line-offset route. Their behavior is regression-tested,
-  not silently replaced. The new binding is the opt-in source/query adapter to attach to
-  generated consumer hooks; installing that adapter in the shipped Tiny extension and
-  supplying partial production fence recovery remain parent #369 work. This slice does
-  not close #369/#370/#383 by itself.
+* Initial PR #470 tested the legacy Tiny `DocumentFilter`/`TinyExpressionP4LanguageServerExt`
+  first-formula path separately. Tiny PRs #252/#254 now implement an explicit opt-in
+  full-document diagnostics/editor route in that existing Java consumer, retaining its
+  default behavior. Its `0d84f0dc` long-fence cases are additional Java consumer evidence,
+  not a Java/Rust consumer equivalence claim. The native shared fixtures here remain
+  pinned to `f86ce8a5`; current Rust Tiny LSP integration is not established by this
+  example. Merge/CI status and the remaining roadmap acceptance conditions must be
+  checked separately before closing #369/#370/#383.
 
 ## Reproduce and independently check
 
@@ -123,4 +139,4 @@ positions and replacement text; one backend's output is never the other's expect
 
 The recovered parent is PARTIAL, closed certified children remain COMPLETE, and unfinished children are PARTIAL with explicit open ends. Empty Java bodies retain an exact zero-length source anchor. Only actual host EOF can be owned by an open end; the next FormulaInfo delimiter and sibling formula remain outside it. Strict `parse` is unchanged and still exposes FAILED formulas without speculative Java children.
 
-The shared `partial/expected.tsv` is an independent code-point/state oracle for nine inputs. Both hosts invoke real javac for EOF completion and apply its edit to the untouched original, including emoji and CRLF. The resulting unfinished document still fails strict parsing. Existing production corpus observations and Classic/ubnfc public parser compatibility remain unchanged. Tiny's existing opt-in LSP adopts this editor entry in the paired consumer integration (tinyexpression #253); this API alone does not migrate a consumer.
+The shared `partial/expected.tsv` is an independent code-point/state oracle for nine inputs. Both hosts invoke real javac for EOF completion and apply its edit to the untouched original, including emoji and CRLF. The resulting unfinished document still fails strict parsing. Existing production corpus observations and Classic/ubnfc public parser compatibility remain unchanged. Tiny PR #254 wires this editor entry into its existing opt-in Java LSP updates and completion requests; the API example alone does not migrate a consumer. That downstream adaptation and the fixed-pin shared native evidence are separated in the revision table above.
