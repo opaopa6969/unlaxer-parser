@@ -126,6 +126,7 @@ fn generate_resolved(
         };
     }
     runtime!("lib.rs");
+    runtime!("token.rs");
     runtime!("scope.rs");
     runtime!("semantic.rs");
     runtime!("semantic_rules.rs");

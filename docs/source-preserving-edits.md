@@ -3,8 +3,8 @@
 Java `org.unlaxer.source.SourceEdits` / Rust `source_edits` adds checked edit plans
 to the snapshot/region/source-map foundation. Java DSL `ProjectRename` / Rust
 `semantic_rename` connects those plans to `ProjectSymbolIndex` identities.
-This is a bounded first implementation for #382, not complete language formatting
-or LSP/Playground edit support.
+This provides checked source edits and explicit query-provider policies for #382.
+Language-specific formatting and LSP/Playground registration remain adapter responsibilities.
 
 ## Original pieces and ownership
 
@@ -71,11 +71,70 @@ name, read-only dependency targets, duplicate references, and possible capture b
 an existing symbol/import/reference. Capture checks may reject safe renames in
 disjoint scopes; that restriction can be relaxed with stronger scope proofs.
 
-The current project import model does not retain separate source-name and alias
-spans. If the target is imported, the adapter therefore rejects the operation
-explicitly. It does not silently rename uses while leaving an import broken.
-Cross-module/alias rename awaits that metadata. A complete inventory is a trusted
-parser contract; this layer cannot discover omitted references from opaque ASTs.
+Import metadata is supplied separately as `ProjectRename.ImportSite` /
+`semantic_rename::ImportSite`: module ID, index in the immutable module import
+list, source-name token ID, and explicit alias token ID (empty for an unaliased
+import). Both tokens must be complete tokens inside the import span, with the
+exact source-name/alias text. Duplicate metadata, reused tokens and import tokens
+misclassified as references are rejected. This is a trusted parser inventory,
+not an inference from all matching text.
+
+`prepare(..., importSites)` / `prepare_with_imports` updates the target
+declaration, its resolved references and imported source-name tokens. Explicit
+alias tokens and their uses remain unchanged, including `import foo as foo`.
+Unaliased imports and their resolved uses change with the definition. Shadowed
+local symbols, quoted strings and unrelated modules retain their original bytes.
+An imported name only targets an exported root symbol: renaming a same-named
+inner declaration never changes imports of the outer definition.
+
+`prepareAlias` / `prepare_alias` instead renames one explicit local alias and
+references resolved through that import, leaving the original definition and
+imported source name untouched. The original definition may belong to a locked
+dependency; changing that read-only definition remains forbidden. Alias
+resolution follows scope and visibility before matching target identity.
+Missing metadata, implicit-alias targets, unresolved/ambiguous imports and name
+capture are rejected. Repeated imports with the same local name are conservatively
+rejected even in disjoint scopes; no arbitrary import is selected. The old
+`prepare` API remains available and rejects affected imports without metadata.
+A complete inventory is a trusted parser contract; this layer cannot discover
+omitted references from opaque ASTs.
+
+## Explicit edit query providers
+
+Java `SourceEdits.QueryProvider` takes a source inventory, exact language identity,
+immutable `LanguageQueries.Project` and a map from `SourceEdits.Operation` to
+`Function<LanguageQueries.Request, SourceEdits.Plan>`. Rust
+`source_edits::QueryProvider::new` accepts the corresponding values and
+`HashMap<Operation, EditPolicy>`, where `EditPolicy` is a boxed callback returning
+a checked `Plan`. Only registered RENAME/FORMAT/CODE_ACTION operations are
+advertised. An absent operation returns UNSUPPORTED; it is not an empty success.
+
+Each request checks the complete project, package/language identity and virtual
+snapshot. The policy's plan must match that snapshot and requested operation;
+its edits are rechecked against the bound token/trivia inventory. COMPLETE and
+PARTIAL regions retain their state, including untouched UNPARSED pieces. Failed
+parses return FAILED without calling the editing policy. Policies must explicitly
+choose valid target ranges and language identifier/formatting rules; this layer
+does not invent a universal formatter.
+
+The provider returns virtual CP edits in one item. `LanguageQueries` maps the
+selected item through the source map and checks the current host body before
+exposing edits. Apply still requires the exact snapshot and a newer version.
+`singleDocument` / `single_document` rejects zero/multiple workspace plans at
+this boundary: never take the first plan from a multi-document rename. Use
+`prepare` plus `applyAll` / `apply_all` for a workspace batch instead. The query
+API intentionally cannot present workspace-wide edits as a single-host success.
+
+```java
+var provider = new SourceEdits.QueryProvider(source, language, project,
+    Map.of(SourceEdits.Operation.RENAME, request -> SourceEdits.singleDocument(
+        ProjectRename.prepare(index, target, request.parameters().get("newName"),
+            identifierValidator, inventories, importSites))));
+```
+
+Register this provider under its exact `Language` in `LanguageQueries`. An
+application combining it with completion/definition providers must dispatch by
+their actual capabilities; no provider is registered automatically.
 
 ## Capabilities, scope and verification
 
@@ -91,16 +150,22 @@ particular language server.
 | Atomic checked plans, whitespace format edits, targeted actions | Implemented | Implemented |
 | Identity rename with shadowing/string/module isolation | Implemented | Implemented |
 | Child plan mapping and delimiter preservation | Implemented | Implemented |
-| Import source-name/alias rename and language formatting policy | Pending #382 | Pending #382 |
+| Import source-name rename / explicit local alias rename | Implemented with complete import metadata | Same |
+| Snapshot-bound edit query policies and partial-state preservation | Implemented | Implemented |
+| Language-specific formatting policy / multi-document UI | Caller-supplied / not provided | Same |
 | LSP/Playground display and request integration | Pending #382 | Pending #382 |
 
 Both implementations consume `docs/fixtures/source-edits/`: the same piece
 inventory, seven edit acceptance/expected-text cases, and two independently
 specified shadowing rename results. Matching negative tests cover stale targets,
 changed source under a reused version, missing validators, incomplete inventories,
-imported targets, scope capture, overlapping edits, invalid ownership and body
+missing import metadata, scope capture, overlapping edits, invalid ownership and body
 escapes. Mapping tests preserve FormulaInfo/TinyExpression/Java-style delimiters
-through three snapshot layers. Dedicated CI also checks Playground generation so
+through three snapshot layers. `import-rename.tsv` adds six independent expected
+workspace results (definition versus alias, including same-name aliases, a shadowed definition and Unicode replacements), and
+`provider.tsv` adds nested rename/format/action, partial retention, FAILED and
+UNSUPPORTED outcomes with independent host text and CP spans. Both languages
+reject foreign/stale/mismatched plans and multi-document query plans. Dedicated CI also checks Playground generation so
 all new Rust runtime modules remain included in generated projects.
 
 ```sh

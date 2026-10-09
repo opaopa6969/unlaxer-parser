@@ -5,6 +5,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
 import org.unlaxer.source.DocumentSnapshot.Span;
 import org.unlaxer.source.LanguageRegions.Edit;
 
@@ -12,6 +14,43 @@ import org.unlaxer.source.LanguageRegions.Edit;
 public final class SourceEdits {
     public enum Kind { TOKEN, WHITESPACE, COMMENT, UNPARSED }
     public enum Operation { RENAME, FORMAT, CODE_ACTION }
+    /** A single-host query must never silently return only part of a workspace rename. */
+    public static Plan singleDocument(List<Plan> plans) {
+        if(plans.size()!=1)throw new IllegalArgumentException("single-document edit plan required");
+        return Objects.requireNonNull(plans.get(0));
+    }
+    /** Explicit language policies produce checked single-document plans, never implicit workspace edits. */
+    public static final class QueryProvider implements LanguageQueries.Provider {
+        private final SourceEdits source;
+        private final LanguageRegions.Language language;
+        private final LanguageQueries.Project project;
+        private final Map<Operation, Function<LanguageQueries.Request, Plan>> policies;
+        public QueryProvider(SourceEdits source, LanguageRegions.Language language, LanguageQueries.Project project,
+                Map<Operation, Function<LanguageQueries.Request, Plan>> policies) {
+            this.source=Objects.requireNonNull(source);this.language=Objects.requireNonNull(language);
+            this.project=Objects.requireNonNull(project);this.policies=Map.copyOf(policies);
+        }
+        @Override public Set<LanguageRegions.Operation> capabilities() {
+            return policies.keySet().stream().map(op->LanguageRegions.Operation.valueOf(op.name())).collect(java.util.stream.Collectors.toUnmodifiableSet());
+        }
+        @Override public LanguageQueries.Response query(LanguageQueries.Request request) {
+            var snapshot=source.snapshot();
+            if(!project.equals(request.project())||!language.equals(request.region().language())||!snapshot.equals(request.region().sourceMap().output()))
+                throw new IllegalArgumentException("stale edit provider binding");
+            if(!capabilities().contains(request.operation()))return response(LanguageRegions.State.UNSUPPORTED,List.of());
+            if(request.region().parseState()!=LanguageRegions.State.COMPLETE&&request.region().parseState()!=LanguageRegions.State.PARTIAL)
+                return response(LanguageRegions.State.FAILED,List.of());
+            Operation operation=Operation.valueOf(request.operation().name());
+            Plan plan=Objects.requireNonNull(policies.get(operation).apply(request));
+            if(!plan.snapshot().equals(snapshot)||plan.operation()!=operation)throw new IllegalArgumentException("stale or mismatched edit plan");
+            source.plan(operation,plan.allowed(),plan.edits());
+            var edits=plan.edits().stream().map(edit->new LanguageQueries.TextEdit(new SegmentSourceMap.Location(snapshot,edit.span()),edit.replacement())).toList();
+            return response(request.region().parseState(),List.of(new LanguageQueries.Item(operation.name(),"source-preserving",List.of(),edits)));
+        }
+        private LanguageQueries.Response response(LanguageRegions.State state,List<LanguageQueries.Item> items) {
+            return new LanguageQueries.Response(source.snapshot(),project.id(),project.version(),state,items);
+        }
+    }
     /** Empty owner means document-owned trivia. Token and unparsed pieces have no owner. */
     public record Piece(String id, Span span, Kind kind, String owner) {
         public Piece {
