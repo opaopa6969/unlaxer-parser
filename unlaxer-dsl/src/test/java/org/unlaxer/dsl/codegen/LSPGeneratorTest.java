@@ -144,8 +144,9 @@ public class LSPGeneratorTest {
         assertTrue(src.contains("data.put(\"expectedHints\""));
         assertTrue(src.contains("data.put(\"expectedParsers\""));
         assertTrue(src.contains("data.put(\"deepestMatchedRule\""));
-        assertTrue(src.contains("int errorEnd = Math.min(result.totalLength(), errorStart + 1)"));
-        assertTrue(src.contains("if (!result.succeeded() || result.consumedLength() < result.totalLength())"));
+        // Advance by a scalar so a diagnostic never ends inside a surrogate pair.
+        assertTrue(src.contains("int errorEnd = errorStart < content.length() ? content.offsetByCodePoints(errorStart, 1) : errorStart"));
+        assertTrue(src.contains("if (profileAllows(\"VALIDATE\") && (!result.succeeded() || result.consumedLength() < result.totalLength()))"));
         assertTrue(src.contains("codePointOffsetToStringOffset(content, failure.getFarthestOffset())"));
         assertTrue(src.contains("content.offsetByCodePoints(0, safeCodePointOffset)"));
     }
