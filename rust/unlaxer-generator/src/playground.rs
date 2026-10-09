@@ -61,6 +61,7 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
     runtime!("semantic_rename.rs");
     runtime!("source_edits.rs");
     runtime!("source.rs");
+    runtime!("embedded.rs");
     runtime!("pipeline.rs");
     runtime!("semantic_query_cache.rs");
     runtime!("type_system.rs");
