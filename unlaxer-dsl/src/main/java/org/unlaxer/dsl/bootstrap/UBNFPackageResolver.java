@@ -56,7 +56,8 @@ public final class UBNFPackageResolver {
         return value;
     }
     private static JsonObject parse(String source) {
-        if (source.length() > MAX_BYTES) throw error("document exceeds 8 MiB");
+        if (source.length() > MAX_BYTES || source.getBytes(StandardCharsets.UTF_8).length > MAX_BYTES)
+            throw error("document exceeds 8 MiB");
         try { return object(JSON.fromJson(source, JsonObject.class), "document"); }
         catch (JsonParseException exception) { throw error("invalid JSON"); }
     }

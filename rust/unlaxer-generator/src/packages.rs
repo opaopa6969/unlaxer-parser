@@ -526,6 +526,74 @@ impl Resolver {
 mod tests {
     use super::*;
     #[test]
+    fn document_size_limit_uses_utf8_bytes() {
+        let cases =
+            include_str!("../../../unlaxer-dsl/src/test/resources/packages/document-limits.tsv");
+        let directory = std::env::temp_dir().join(format!(
+            "ubnf-document-limits-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir(&directory).unwrap();
+        for row in cases
+            .lines()
+            .filter(|row| !row.starts_with('#') && !row.is_empty())
+        {
+            let fixture: Vec<_> = row.split('\t').collect();
+            let case = directory.join(fixture[0]);
+            std::fs::create_dir(&case).unwrap();
+            let manifest = case.join("ubnf.json");
+            let root = case.join("root.ubnf");
+            std::fs::write(&manifest, r#"{"schemaVersion":1,"dependencies":{"std/layout":{"version":"1.0.0","source":"builtin:std/layout@1.0.0"}}}"#).unwrap();
+            resolve(&manifest).unwrap();
+            let document = if fixture[1] == "manifest" {
+                manifest.clone()
+            } else {
+                case.join("ubnf.lock.json")
+            };
+            let base = std::fs::read_to_string(&document).unwrap();
+            let base = base.trim_end();
+            let prefix = format!("{},\"padding\":\"", &base[..base.len() - 1]);
+            let suffix = "\"}";
+            let bytes: usize = fixture[3].parse().unwrap();
+            let fill = bytes - prefix.len() - suffix.len();
+            let source = format!(
+                "{prefix}{}{suffix}",
+                fixture[2].repeat(fill / fixture[2].len()) + &"a".repeat(fill % fixture[2].len())
+            );
+            assert_eq!(source.len(), bytes, "{}", fixture[0]);
+            std::fs::write(document, source).unwrap();
+            let mut resolver = Resolver::new(&root);
+            if fixture[4] == "LIMIT" {
+                assert!(
+                    resolver
+                        .import_path(&root, "pkg:std/layout")
+                        .unwrap_err()
+                        .contains("exceeds 8 MiB"),
+                    "{}",
+                    fixture[0]
+                );
+                if fixture[1] == "manifest" {
+                    assert!(
+                        resolve(&manifest).unwrap_err().contains("exceeds 8 MiB"),
+                        "{}",
+                        fixture[0]
+                    );
+                }
+            } else {
+                resolver.import_path(&root, "pkg:std/layout").unwrap();
+                if fixture[1] == "manifest" {
+                    resolve(&manifest).unwrap();
+                }
+            }
+        }
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
     fn failed_transitive_verification_cannot_publish_a_parent() {
         let fixture: Value = serde_json::from_str(include_str!(
             "../../../unlaxer-dsl/src/test/resources/packages/retry.json"
