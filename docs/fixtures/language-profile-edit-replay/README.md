@@ -39,8 +39,12 @@ CP 長、成功時の root AST/CST span は `[0, cp_length)` と比較する。
 同一 version に異なる source を与えた query と非増加 version の edit も拒否する。
 過去 binding が自身の過去 snapshot を解析できる immutable 契約は維持する。
 
-全3 profile の `CODE_ACTION=UNSUPPORTED` を確認し、query 状態も独立期待値の
+fixture の `unsupported_operations` は言語ごとの未対応操作を明示する。
+Java は completion/hover/rename/format/code action、TypeScript は rename/format/code action、
+Rust は completion/hover/definition/rename/format/code action。その `UNSUPPORTED` 宣言と
+毎ステップの query 状態を独立期待値の
 `UNSUPPORTED` と一致させる。登録した空能力 provider が実行されるとテストは失敗する。
+query 操作にない `EXECUTE` は profile の未対応宣言を確認する。
 文書への明示的な edit API と、言語 provider が提案する code action の対応能力は別である。
 `VALIDATE=EXTERNAL` を変更せず、未登録外部 provider を局所対応として広告しない。
 

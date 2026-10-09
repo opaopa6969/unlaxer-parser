@@ -197,6 +197,31 @@ fn main() {
             assert_eq!(query.state, State::Unsupported);
             assert_eq!(f[13], "UNSUPPORTED");
             assert!(query.items.is_empty());
+            for name in f[15].split(',') {
+                let operation = match name {
+                    "COMPLETION" => Operation::Completion,
+                    "HOVER" => Operation::Hover,
+                    "DEFINITION" => Operation::Definition,
+                    "RENAME" => Operation::Rename,
+                    "FORMAT" => Operation::Format,
+                    "CODE_ACTION" => Operation::CodeAction,
+                    _ => panic!("unknown unsupported operation"),
+                };
+                assert_eq!(
+                    profile.capabilities[name],
+                    unlaxer_runtime::language_profile::Support::Unsupported
+                );
+                let result = current
+                    .queries
+                    .query(&next, &current.project, 0, operation, &BTreeMap::new())
+                    .unwrap();
+                assert_eq!(result.state, State::Unsupported);
+                assert!(result.items.is_empty());
+            }
+            assert_eq!(
+                profile.capabilities["EXECUTE"],
+                unlaxer_runtime::language_profile::Support::Unsupported
+            );
             for old in &history {
                 assert!(old
                     .queries

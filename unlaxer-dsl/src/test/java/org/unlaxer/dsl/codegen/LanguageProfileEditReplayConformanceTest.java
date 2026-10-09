@@ -110,6 +110,13 @@ public class LanguageProfileEditReplayConformanceTest {
                     }
                     var unsupported = current.queries().query(next, current.project(), 0, Operation.CODE_ACTION, Map.of());
                     assertEquals(State.valueOf(fields[13]), unsupported.state()); assertTrue(unsupported.items().isEmpty());
+                    for (String name : fields[15].split(",")) {
+                        Operation operation = Operation.valueOf(name);
+                        assertEquals(LanguageProfile.Support.UNSUPPORTED, profile.capabilities().get(operation.name()));
+                        var result = current.queries().query(next, current.project(), 0, operation, Map.of());
+                        assertEquals(State.valueOf(fields[13]), result.state()); assertTrue(result.items().isEmpty());
+                    }
+                    assertEquals(LanguageProfile.Support.UNSUPPORTED, profile.capabilities().get("EXECUTE"));
                     // Every past query/edit/source identity is checked against the current
                     // state, including older versions whose text happens to recur.
                     final Retained latest = current;

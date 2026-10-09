@@ -11,6 +11,11 @@ TEMPLATES = {
     'rust': 'fn f0()->i32 { let s = "日😀"; 1 }',
 }
 ENTRIES = {'java': 'CompilationUnit', 'typescript': 'SourceFile', 'rust': 'Crate'}
+UNSUPPORTED = {
+    'java': 'COMPLETION,HOVER,RENAME,FORMAT,CODE_ACTION',
+    'typescript': 'RENAME,FORMAT,CODE_ACTION',
+    'rust': 'COMPLETION,HOVER,DEFINITION,RENAME,FORMAT,CODE_ACTION',
+}
 
 
 def hex_text(text):
@@ -18,7 +23,7 @@ def hex_text(text):
 
 
 def author():
-    rows = ['# language\tstep\tentry\tstart_cp\tend_cp\treplacement_utf8\texpected_utf8\taccepted\tcp_length\tutf16_length\teof_line\teof_character\trejected_history\tquery_state\tkind']
+    rows = ['# language\tstep\tentry\tstart_cp\tend_cp\treplacement_utf8\texpected_utf8\taccepted\tcp_length\tutf16_length\teof_line\teof_character\trejected_history\tquery_state\tkind\tunsupported_operations']
     for language, template in TEMPLATES.items():
         source, number, word = '', '1', '日😀'
         state = SEED
@@ -66,7 +71,7 @@ def author():
             rows.append('\t'.join(map(str, [language, step, ENTRIES[language], start, end,
                 hex_text(replacement), hex_text(source), str(accepted).lower(), len(source),
                 len(source.encode('utf-16-le')) // 2, source.count('\n'),
-                len(tail.encode('utf-16-le')) // 2, step, 'UNSUPPORTED', kind])))
+                len(tail.encode('utf-16-le')) // 2, step, 'UNSUPPORTED', kind, UNSUPPORTED[language]])))
     return '\n'.join(rows) + '\n'
 
 
