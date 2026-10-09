@@ -1,0 +1,56 @@
+[
+  {
+    "name": "single",
+    "grammar": "grammar Invalid { @package: org.example.uniquelongest @root @mapping(Root) @uniqueLongestChoice Root ::= 'a'; }",
+    "code": "E-UNIQUE-LONGEST-SHAPE",
+    "nativeMessage": "2 to 64 alternatives"
+  },
+  {
+    "name": "duplicate",
+    "grammar": "grammar Invalid { @package: org.example.uniquelongest @root @mapping(Root) @uniqueLongestChoice @uniqueLongestChoice Root ::= 'a' | 'b'; }",
+    "code": "E-UNIQUE-LONGEST-DUPLICATE",
+    "nativeMessage": "duplicate @uniqueLongestChoice"
+  },
+  {
+    "name": "conflict-longestChoice",
+    "grammar": "grammar Invalid { @package: org.example.uniquelongest @root @mapping(Root) @uniqueLongestChoice @longestChoice Root ::= 'a' | 'b'; }",
+    "code": "E-UNIQUE-LONGEST-CONFLICT",
+    "nativeMessage": "conflicting @uniqueLongestChoice"
+  },
+  {
+    "name": "conflict-predictiveChoice",
+    "grammar": "grammar Invalid { @package: org.example.uniquelongest @root @mapping(Root) @uniqueLongestChoice @predictiveChoice Root ::= 'a' | 'b'; }",
+    "code": "E-UNIQUE-LONGEST-CONFLICT",
+    "nativeMessage": "conflicting @uniqueLongestChoice"
+  },
+  {
+    "name": "conflict-leftAssoc",
+    "grammar": "grammar Invalid { @package: org.example.uniquelongest @root @mapping(Root) @uniqueLongestChoice @leftAssoc Root ::= 'a' | 'b'; }",
+    "code": "E-UNIQUE-LONGEST-CONFLICT",
+    "nativeMessage": "conflicting @uniqueLongestChoice"
+  },
+  {
+    "name": "conflict-rightAssoc",
+    "grammar": "grammar Invalid { @package: org.example.uniquelongest @root @mapping(Root) @uniqueLongestChoice @rightAssoc Root ::= 'a' | 'b'; }",
+    "code": "E-UNIQUE-LONGEST-CONFLICT",
+    "nativeMessage": "conflicting @uniqueLongestChoice"
+  },
+  {
+    "name": "limit",
+    "grammar": "grammar Invalid { @package: org.example.uniquelongest @root @mapping(Root) @uniqueLongestChoice Root ::= 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a' | 'a'; }",
+    "code": "E-UNIQUE-LONGEST-LIMIT",
+    "nativeMessage": "2 to 64 alternatives"
+  },
+  {
+    "name": "direct-left-recursion",
+    "grammar": "grammar Invalid { @package: org.example.uniquelongest @root @mapping(Root) @uniqueLongestChoice Root ::= Root 'a' | 'b'; }",
+    "code": "E-UNIQUE-LONGEST-LEFT-RECURSION",
+    "nativeMessage": "left recursion"
+  },
+  {
+    "name": "indirect-left-recursion",
+    "grammar": "grammar Invalid { @package: org.example.uniquelongest @root @mapping(Root) @uniqueLongestChoice Root ::= A 'a' | 'b'; A ::= Root; }",
+    "code": "E-UNIQUE-LONGEST-LEFT-RECURSION",
+    "nativeMessage": "left recursion"
+  }
+]

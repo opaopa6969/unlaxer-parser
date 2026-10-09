@@ -1,0 +1,13 @@
+grammar Input {
+ @ubnf: v2
+ @package: example.lexing
+ @tokenStream: enabled
+ @whitespace: none
+ token ID ::= 'a' | 'b' | '𐐀';
+ token NEWLINE ::= '\r\n' | '\n';
+ token INDENT ::= BOL '  ';
+ token END = EOF
+ @root @mapping(Value, params=[value])
+ @lexicalContext(tokens=['ID','NEWLINE','INDENT'])
+ Root ::= (ID NEWLINE INDENT ID) @value END;
+}

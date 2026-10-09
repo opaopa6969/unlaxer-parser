@@ -1,0 +1,6 @@
+grammar Library {
+ @ubnf: v2
+ token GT ::= '>';
+ token SHIFT ::= '>>';
+ token PAIR ::= CAPTURE(x,'😀') SAME_AS(x);
+}
