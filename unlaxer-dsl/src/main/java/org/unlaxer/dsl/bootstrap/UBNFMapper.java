@@ -345,7 +345,8 @@ public class UBNFMapper {
 
         List<TokenDecl> tokens = findDescendants(token, UBNFParsers.TokenDeclParser.class)
             .stream()
-            .map(this::toTokenDecl)
+            .map(value -> toTokenDecl(value, settings.stream().anyMatch(setting -> setting.key().equals("ubnf")
+                && setting.value() instanceof StringSettingValue version && version.value().equals("v2"))))
             .toList();
 
         List<RuleDecl> rules = findDescendants(token, UBNFParsers.RuleDeclParser.class)
@@ -380,6 +381,9 @@ public class UBNFMapper {
         List<Token> identifiers = findDescendants(token, UBNFParsers.IdentifierParser.class);
         String key = identifiers.isEmpty() ? "" : identifiers.get(0).source.toString().trim();
         SettingValue value = toSettingValue(token);
+        if (key.equals("ubnf") && value instanceof StringSettingValue version && version.value().equals("2")) {
+            value = synthetic(new StringSettingValue("v2"), value);
+        }
         return new GlobalSetting(key, value);
     }
 
@@ -407,7 +411,7 @@ public class UBNFMapper {
         List<Token> dottedTokens = findDescendants(token, UBNFParsers.DottedIdentifierParser.class);
         // A composite token's source includes delimiter comments; only identifier
         // leaves belong to the setting value (including comments between dots).
-        String value = dottedTokens.isEmpty() ? "" : findDescendants(dottedTokens.get(0), UBNFParsers.IdentifierParser.class)
+        String value = dottedTokens.isEmpty() ? token.source.toString().trim() : findDescendants(dottedTokens.get(0), UBNFParsers.IdentifierParser.class)
             .stream().map(identifier -> identifier.source.toString().trim())
             .collect(java.util.stream.Collectors.joining("."));
         return new StringSettingValue(value);
@@ -442,16 +446,27 @@ public class UBNFMapper {
     // =========================================================================
 
     TokenDecl toTokenDecl(Token token) {
-        return bind(mapTokenDecl(token), token);
+        return toTokenDecl(token, false);
     }
 
-    private TokenDecl mapTokenDecl(Token token) {
+    private TokenDecl toTokenDecl(Token token, boolean formatTwo) {
+        return bind(mapTokenDecl(token, formatTwo), token);
+    }
+
+    private TokenDecl mapTokenDecl(Token token, boolean formatTwo) {
         List<Token> identifiers = findDescendants(token, UBNFParsers.IdentifierParser.class);
         String name = identifiers.size() > 0 ? identifiers.get(0).source.toString().trim() : "";
 
         var lexical = findDescendants(token, LexicalBodyParser.class);
         if (!lexical.isEmpty()) {
-            return new TokenDecl.Declarative(name, LexicalSyntax.parse(lexical.get(0).source.toString()).expression());
+            Token body = lexical.get(0);
+            String source = body.source.toString();
+            try { return new TokenDecl.Declarative(name, LexicalSyntax.parse(source).expression()); }
+            catch (LexicalSyntax.ClassLiteralException error) {
+                int base = body.source.offsetFromRoot().value();
+                throw classLiteralError(error, body.source.root().toString(),
+                    base + source.codePointCount(0, error.start), base + source.codePointCount(0, error.end));
+            }
         }
 
         List<Token> adapterTokens = findDescendants(token, UBNFParsers.AdapterExpressionParser.class);
@@ -473,7 +488,9 @@ public class UBNFMapper {
         // NEGATION('chars') 形式のチェック
         List<Token> negTokens = findDescendants(token, UBNFParsers.NegationExpressionParser.class);
         if (!negTokens.isEmpty()) {
-            String excludedChars = extractQuotedValue(negTokens.get(0));
+            String excludedChars = formatTwo
+                ? decodeClassLiteral(findDescendants(negTokens.get(0), org.unlaxer.parser.elementary.SingleQuotedParser.class).get(0))
+                : extractQuotedValue(negTokens.get(0));
             return new TokenDecl.Negation(name, excludedChars);
         }
 
@@ -500,6 +517,17 @@ public class UBNFMapper {
             );
             if (quoted.size() != 2) {
                 throw new IllegalArgumentException("CHAR_RANGE token " + name + " requires two boundaries");
+            }
+            if (formatTwo) {
+                int min = classBoundary(quoted.get(0));
+                int max = classBoundary(quoted.get(1));
+                try { CodePointEscapes.validateRange(min, max); }
+                catch (IllegalArgumentException error) { throw classLiteralError(error, quoted.get(0)); }
+                if (min > 0xffff || max > 0xffff) {
+                    return new TokenDecl.Declarative(name, new org.unlaxer.dsl.runtime.LexicalExpression(
+                        org.unlaxer.dsl.runtime.LexicalExpression.Op.RANGE, "", min, max, List.of()));
+                }
+                return new TokenDecl.CharRange(name, (char) min, (char) max);
             }
             char min = charRangeBoundary(name, "minimum", stripQuotes(quoted.get(0).source.toString().trim()));
             char max = charRangeBoundary(name, "maximum", stripQuotes(quoted.get(1).source.toString().trim()));
@@ -545,6 +573,10 @@ public class UBNFMapper {
             parserClass = identifiers.size() > 1
                 ? firstWord(identifiers.get(1).source.toString())
                 : "";
+        }
+        if (parserClass.equals("XID_IDENTIFIER")) {
+            return new TokenDecl.Declarative(name, org.unlaxer.dsl.runtime.LexicalExpression.leaf(
+                org.unlaxer.dsl.runtime.LexicalExpression.Op.XID_IDENTIFIER, ""));
         }
         return new TokenDecl.Simple(name, parserClass);
     }
@@ -1294,6 +1326,39 @@ public class UBNFMapper {
     /**
      * CHAR_RANGE の境界を、切り捨てずに現行の BMP char 型へ変換する。
      */
+    private static int classBoundary(Token literal) {
+        try { return CodePointEscapes.boundary(decodeClassLiteral(literal)); }
+        catch (IllegalArgumentException error) {
+            if (error.getMessage().contains(" at code points [")) { throw error; }
+            throw classLiteralError(error, literal);
+        }
+    }
+
+    private static String decodeClassLiteral(Token literal) {
+        try { return CodePointEscapes.decode(literal.source.toString()); }
+        catch (IllegalArgumentException error) { throw classLiteralError(error, literal); }
+    }
+
+    private static IllegalArgumentException classLiteralError(IllegalArgumentException error, Token literal) {
+        int start = literal.source.offsetFromRoot().value();
+        int end = start + literal.source.codePointLength().value();
+        return classLiteralError(error, literal.source.root().toString(), start, end);
+    }
+
+    private static IllegalArgumentException classLiteralError(IllegalArgumentException error, String source, int start, int end) {
+        String prefix = source.substring(0, source.offsetByCodePoints(0, start));
+        int line = 1, column = 1;
+        boolean carriageReturn = false;
+        for (int codePoint : prefix.codePoints().toArray()) {
+            if (codePoint == '\r') { line++; column = 1; }
+            else if (codePoint == '\n') { if (false == carriageReturn) { line++; } column = 1; }
+            else { column++; }
+            carriageReturn = codePoint == '\r';
+        }
+        return new IllegalArgumentException(error.getMessage() + " at code points [" + start + "," + end
+            + "), line " + line + ", column " + column, error);
+    }
+
     private static char charRangeBoundary(String name, String side, String value) {
         if (value.length() != 1 || Character.isSurrogate(value.charAt(0))) {
             throw new IllegalArgumentException("CHAR_RANGE token " + name + " " + side

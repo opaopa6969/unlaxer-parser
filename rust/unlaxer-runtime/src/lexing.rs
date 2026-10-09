@@ -367,7 +367,7 @@ fn is_trivia(kind: &str) -> bool {
 fn nullable(e: &LexicalExpression) -> bool {
     match e.op {
         Op::LITERAL => e.text.is_empty(),
-        Op::ANY | Op::RANGE | Op::EXCEPT => false,
+        Op::ANY | Op::XID_IDENTIFIER | Op::RANGE | Op::EXCEPT => false,
         Op::EOF | Op::BOF | Op::BOL | Op::EOL | Op::LOOK | Op::NOT | Op::BACKREF => true,
         Op::SEQUENCE => e.children.iter().all(nullable),
         Op::CHOICE => e.children.iter().any(nullable),

@@ -100,6 +100,12 @@ impl Parser<'_> {
             Err(self.error("expected single-quoted literal"))
         }
     }
+    fn class_quoted(&mut self) -> Result<String> {
+        let span = self.current().span;
+        self.quoted()?;
+        crate::codepoint_escapes::decode(&self.source[span.byte_start..span.byte_end])
+            .map_err(|error| self.invalid(span, error))
+    }
     fn integer(&mut self) -> Result<u32> {
         if let Kind::Number(value) = &self.current().kind {
             let number = value
@@ -173,6 +179,9 @@ impl Parser<'_> {
                 }
                 self.expect('}')?;
                 SettingValue::Block(entries)
+            } else if self.current().kind == Kind::Number("2".into()) {
+                self.pos += 1;
+                SettingValue::String(if key == "ubnf" { "v2" } else { "2" }.into())
             } else {
                 SettingValue::String(self.dotted()?)
             };
@@ -191,7 +200,10 @@ impl Parser<'_> {
                 .get(self.pos + 1)
                 .is_some_and(|t| matches!(t.kind, Kind::Identifier(_)))
         {
-            tokens.push(self.token_decl()?);
+            tokens.push(self.token_decl(settings.iter().any(|setting| {
+                setting.key == "ubnf"
+                    && matches!(&setting.value, SettingValue::String(value) if value == "v2")
+            }))?);
         }
         let mut rules = Vec::new();
         while !self.is('}') && self.current().kind != Kind::Eof {
@@ -207,7 +219,7 @@ impl Parser<'_> {
             span: self.span_from(start),
         })
     }
-    fn token_decl(&mut self) -> Result<TokenDecl> {
+    fn token_decl(&mut self, format_two: bool) -> Result<TokenDecl> {
         let start = self.current().span;
         self.word("token")?;
         let name = self.identifier()?;
@@ -226,13 +238,23 @@ impl Parser<'_> {
         let value = self.dotted()?;
         let kind = match value.as_str() {
             "ANY" => TokenKind::Any,
+            "XID_IDENTIFIER" => TokenKind::Declarative {
+                expression: crate::lexical::LexicalExpression::leaf(
+                    crate::lexical::Op::XID_IDENTIFIER,
+                    String::new(),
+                ),
+            },
             "EOF" => TokenKind::Eof,
             "EMPTY" => TokenKind::Empty,
             "UNTIL" | "NEGATION" | "LOOKAHEAD" | "NEGATIVE_LOOKAHEAD" | "CI" | "REGEX"
                 if self.is('(') =>
             {
                 self.expect('(')?;
-                let arg = self.quoted()?;
+                let arg = if format_two && value == "NEGATION" {
+                    self.class_quoted()?
+                } else {
+                    self.quoted()?
+                };
                 self.expect(')')?;
                 match value.as_str() {
                     "UNTIL" => TokenKind::Until { terminator: arg },
@@ -248,17 +270,48 @@ impl Parser<'_> {
             "CHAR_RANGE" if self.is('(') => {
                 self.expect('(')?;
                 let a = self.current().span;
-                let min = self.quoted()?;
+                let min = if format_two {
+                    self.class_quoted()?
+                } else {
+                    self.quoted()?
+                };
                 self.expect(',')?;
                 let b = self.current().span;
-                let max = self.quoted()?;
+                let max = if format_two {
+                    self.class_quoted()?
+                } else {
+                    self.quoted()?
+                };
                 self.expect(')')?;
-                let min = self.bmp(&min, a)?;
-                let max = self.bmp(&max, b)?;
-                if min > max {
+                let min = if format_two {
+                    crate::codepoint_escapes::boundary(&min)
+                        .map_err(|error| self.invalid(a, error))?
+                } else {
+                    self.bmp(&min, a)?
+                };
+                let max = if format_two {
+                    crate::codepoint_escapes::boundary(&max)
+                        .map_err(|error| self.invalid(b, error))?
+                } else {
+                    self.bmp(&max, b)?
+                };
+                if format_two {
+                    crate::codepoint_escapes::validate_range(min, max)
+                        .map_err(|error| self.invalid(a, error))?;
+                } else if min > max {
                     return Err(self.invalid(value_start, "CHAR_RANGE minimum exceeds maximum"));
                 }
-                TokenKind::CharRange { min, max }
+                if min as u32 > 0xffff || max as u32 > 0xffff {
+                    TokenKind::Declarative {
+                        expression: Lex {
+                            min: min as i32,
+                            max: max as i32,
+                            ..Lex::leaf(Op::RANGE, String::new())
+                        },
+                    }
+                } else {
+                    TokenKind::CharRange { min, max }
+                }
             }
             "ADAPTER" if self.is('(') => {
                 self.expect('(')?;
@@ -411,22 +464,22 @@ impl Parser<'_> {
                     }
                 }
                 "SAME_AS" => Lex::leaf(Op::BACKREF, self.identifier()?),
-                "NEGATION" => Lex::leaf(Op::EXCEPT, self.quoted()?),
+                "NEGATION" => Lex::leaf(Op::EXCEPT, self.class_quoted()?),
                 "CHAR_RANGE" => {
-                    let a = self.quoted()?;
+                    let span = self.current().span;
+                    let a = self.class_quoted()?;
+                    let min = crate::codepoint_escapes::boundary(&a)
+                        .map_err(|error| self.invalid(span, error))?;
                     self.expect(',')?;
-                    let b = self.quoted()?;
-                    if a.chars().count() != 1 || b.chars().count() != 1 {
-                        return Err(self.error("range requires scalar boundaries"));
-                    }
-                    let min = a.chars().next().unwrap() as i32;
-                    let max = b.chars().next().unwrap() as i32;
-                    if min > max {
-                        return Err(self.error("invalid scalar range"));
-                    }
+                    let max_span = self.current().span;
+                    let b = self.class_quoted()?;
+                    let max = crate::codepoint_escapes::boundary(&b)
+                        .map_err(|error| self.invalid(max_span, error))?;
+                    crate::codepoint_escapes::validate_range(min, max)
+                        .map_err(|error| self.invalid(span, error))?;
                     Lex {
-                        min,
-                        max,
+                        min: min as i32,
+                        max: max as i32,
                         ..Lex::leaf(Op::RANGE, String::new())
                     }
                 }
@@ -437,6 +490,7 @@ impl Parser<'_> {
         }
         let op = match name.as_str() {
             "ANY" => Some(Op::ANY),
+            "XID_IDENTIFIER" => Some(Op::XID_IDENTIFIER),
             "EOF" => Some(Op::EOF),
             "BOF" => Some(Op::BOF),
             "BOL" => Some(Op::BOL),

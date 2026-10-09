@@ -106,6 +106,7 @@ public final class GrammarValidator {
 
     private static List<ValidationIssue> validate(GrammarDecl grammar, boolean resolveParserClasses) {
         List<ValidationIssue> errors = new ArrayList<>();
+        validateScalarRanges(grammar, errors);
 
         try { org.unlaxer.dsl.bootstrap.LexicalCompiler.compile(grammar); }
         catch (IllegalArgumentException error) {
@@ -132,6 +133,10 @@ public final class GrammarValidator {
         catch (IllegalArgumentException error) {
             String code = error.getMessage().startsWith("E-LEXICAL-CONTEXT-") ? error.getMessage().split(":",2)[0] : "E-LEXICAL-CONTEXT";
             errors.add(new ValidationIssue(code, error.getMessage(), "Select non-nullable declarative tokens and nonempty unique literals."));
+        }
+        try { EmbeddedGrammarEmitter.declarations(grammar); }
+        catch (IllegalArgumentException error) {
+            errors.add(new ValidationIssue("E-EMBEDDING", error.getMessage(), "Use one scalar body capture and exact language identity."));
         }
         validateGlobalWhitespace(grammar, errors);
         validateUbnfFormat(grammar, errors);
@@ -723,6 +728,18 @@ public final class GrammarValidator {
                 "Add @root to at least one entry rule.",
                 "W-GENERAL-NO-ROOT"
             );
+        }
+    }
+
+    private static void validateScalarRanges(GrammarDecl grammar, List<ValidationIssue> errors) {
+        boolean formatTwo = grammar.settings().stream().anyMatch(setting -> setting.key().equals("ubnf")
+            && setting.value() instanceof StringSettingValue version && version.value().equals("v2"));
+        for (TokenDecl token : grammar.tokens()) {
+            if (formatTwo && token instanceof TokenDecl.CharRange range
+                    && range.min() <= 0xdfff && range.max() >= 0xd800) {
+                addError(errors, "range must not contain surrogates", "Split the scalar range around the surrogate block.",
+                    "E-TOKEN-RANGE-SURROGATE");
+            }
         }
     }
 
