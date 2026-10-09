@@ -61,6 +61,8 @@ class LSPServerEmitter {
         w.line("protected final Map<String, Long> documentVersions = new HashMap<>();");
         w.blankLine();
 
+        w.line("private volatile org.unlaxer.source.LanguageProfile.Selection selectedLanguageProfile;");
+
         // Catalog infrastructure fields (when @catalog annotation present)
         if (hasCatalog) {
             w.line("protected volatile CatalogResolver catalogResolver = null;");
@@ -80,6 +82,11 @@ class LSPServerEmitter {
         w.line("@Override");
         w.line("public CompletableFuture<InitializeResult> initialize(InitializeParams params) {");
         w.indent();
+        w.line("try { selectedLanguageProfile = readLanguageProfile(params); }");
+        w.line("catch (IllegalArgumentException error) {");
+        w.line("    return CompletableFuture.failedFuture(new org.eclipse.lsp4j.jsonrpc.ResponseErrorException(");
+        w.line("        new org.eclipse.lsp4j.jsonrpc.messages.ResponseError(org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode.InvalidParams, error.getMessage(), null)));");
+        w.line("}");
         if (hasCatalog) {
             w.line("initCatalogResolver(params);");
         }
@@ -96,6 +103,7 @@ class LSPServerEmitter {
         w.line("    List.of(\"valid\", \"invalid\"), List.of()));");
         w.line("capabilities.setSemanticTokensProvider(semanticTokensOptions);");
         w.line("configureAdditionalCapabilities(capabilities);");
+        w.line("applyLanguageProfile(capabilities);");
         w.line("return CompletableFuture.completedFuture(new InitializeResult(capabilities));");
         w.dedent();
         w.line("}");
@@ -471,6 +479,63 @@ class LSPServerEmitter {
         w.blankLine();
     }
 
+    /** Explicit initialization metadata, with no filesystem/classpath/provider loading. */
+    static void emitProfileMethods(IndentedWriter w, GrammarDecl grammar) {
+        String root = grammar.rules().stream()
+            .filter(rule -> rule.annotations().stream().anyMatch(annotation -> annotation instanceof org.unlaxer.dsl.bootstrap.UBNFAST.RootAnnotation))
+            .map(RuleDecl::name).findFirst().orElse(grammar.rules().isEmpty() ? "Root" : grammar.rules().get(0).name());
+        String code = """
+            public java.util.Optional<org.unlaxer.source.LanguageProfile.Selection> languageProfile() {
+                return java.util.Optional.ofNullable(selectedLanguageProfile);
+            }
+            protected final boolean profileAllows(String capability) {
+                return selectedLanguageProfile == null || selectedLanguageProfile.allowsLocal(capability);
+            }
+            private org.unlaxer.source.LanguageProfile.Selection readLanguageProfile(InitializeParams params) {
+                com.google.gson.JsonElement options = new com.google.gson.Gson().toJsonTree(params.getInitializationOptions());
+                if (!options.isJsonObject() || !options.getAsJsonObject().has("languageProfile")) return null;
+                com.google.gson.JsonElement value = options.getAsJsonObject().get("languageProfile");
+                if (!value.isJsonObject()) throw new IllegalArgumentException("languageProfile must contain tsv and entry");
+                com.google.gson.JsonObject object = value.getAsJsonObject();
+                if (!object.keySet().equals(java.util.Set.of("tsv", "entry")))
+                    throw new IllegalArgumentException("languageProfile must contain only tsv and entry");
+                for (String key : java.util.List.of("tsv", "entry")) {
+                    if (!object.get(key).isJsonPrimitive() || !object.get(key).getAsJsonPrimitive().isString())
+                        throw new IllegalArgumentException("languageProfile fields must be strings");
+                }
+                if (!object.get("entry").getAsString().equals("@@ROOT@@"))
+                    throw new IllegalArgumentException("languageProfile entry must match generated root");
+                return org.unlaxer.source.LanguageProfile.parse(object.get("tsv").getAsString()).select("@@GRAMMAR@@", "@@ROOT@@");
+            }
+            private void applyLanguageProfile(ServerCapabilities capabilities) {
+                if (selectedLanguageProfile == null) return;
+                if (!profileAllows("COMPLETION")) capabilities.setCompletionProvider(null);
+                if (!profileAllows("HOVER")) capabilities.setHoverProvider(false);
+                if (!profileAllows("DEFINITION")) capabilities.setDefinitionProvider(false);
+                if (!profileAllows("RENAME")) capabilities.setRenameProvider(false);
+                if (!profileAllows("FORMAT")) {
+                    capabilities.setDocumentFormattingProvider(false);
+                    capabilities.setDocumentRangeFormattingProvider(false);
+                    capabilities.setDocumentOnTypeFormattingProvider(null);
+                }
+                if (!profileAllows("CODE_ACTION")) capabilities.setCodeActionProvider(false);
+                if (!profileAllows("EXECUTE")) capabilities.setExecuteCommandProvider(null);
+                var gson = new com.google.gson.Gson();
+                var previous = gson.toJsonTree(capabilities.getExperimental());
+                var extensions = previous.isJsonObject() ? previous.getAsJsonObject() : new com.google.gson.JsonObject();
+                if (!previous.isJsonNull() && !previous.isJsonObject()) extensions.add("additional", previous);
+                var language = selectedLanguageProfile.language();
+                extensions.add("languageProfile", gson.toJsonTree(java.util.Map.of(
+                    "schemaVersion", 1, "tsv", selectedLanguageProfile.profile().canonicalTsv(),
+                    "entry", language.entry(), "grammar", language.grammar(),
+                    "language", language.id(), "package", language.packageId(), "version", language.version())));
+                capabilities.setExperimental(extensions);
+            }
+            """.replace("@@GRAMMAR@@", grammar.name()).replace("@@ROOT@@", root);
+        code.lines().forEach(w::line);
+        w.blankLine();
+    }
+
     /** @catalog アノテーション関連のインフラメソッドを出力する。 */
     static void emitCatalogMethods(IndentedWriter w, String grammarName) {
         String lowerName = grammarName.toLowerCase();
@@ -630,6 +695,7 @@ class LSPServerEmitter {
         w.line("public CompletableFuture<Either<List<CompletionItem>, CompletionList>> completion(");
         w.line("        CompletionParams params) {");
         w.indent();
+        w.line("if (!server.profileAllows(\"COMPLETION\")) return CompletableFuture.completedFuture(Either.forLeft(List.of()));");
         w.line("List<CompletionItem> items = new ArrayList<>();");
         w.line("for (String kw : KEYWORDS) {");
         w.indent();
@@ -657,6 +723,7 @@ class LSPServerEmitter {
         w.line("@Override");
         w.line("public CompletableFuture<Hover> hover(HoverParams params) {");
         w.indent();
+        w.line("if (!server.profileAllows(\"HOVER\")) return CompletableFuture.completedFuture(null);");
         w.line("String uri = params.getTextDocument().getUri();");
         w.line("DocumentState state = server.documents.get(uri);");
         w.line("if (state == null) {");

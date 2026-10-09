@@ -128,3 +128,26 @@ playground --package lang/java --manifest /project/ubnf.json --output /project/j
 選んだ root 自身は lock 内の token package を import でき、その定義元と pinned identity は `public/vocabulary.json` に引き継ぎます。
 `--grammar`、`--profile`、`--package` は排他で、`--manifest` は `--package` と対で指定します。
 生成 LSP への profile 設定、外部 provider の自動配線、language package の typed completion はこの入口とは別の後続作業です。
+
+### 生成 LSP の初期化 profile
+
+生成した Java LSP は `initializationOptions.languageProfile` の `tsv` と `entry` を受け取ります。
+`tsv` は検査済み profile の全文、`entry` は生成時の `@root` と同じ名前です。ファイルパス・URL・classpath の設定はありません。
+package を使う呼出し元は `PackagedLanguageProfile.load(manifest, packageId).profile().canonicalTsv()` から設定を作れます。
+
+```json
+{"languageProfile":{"tsv":"profile\t1\n…","entry":"CompilationUnit"}}
+```
+
+profile の grammar 名と entry を生成済み grammar/root に照合し、PARSE と entry が SUPPORTED または PARTIAL の場合だけ選択します。
+unknown entry、外部のみの PARSE、形の違う設定は JSON-RPC `InvalidParams` (`-32602`) を返し、以前の選択を維持します。
+profile 未指定時は従来の LSP 動作です。
+
+指定時は completion/hover/definition/rename/format/code action/execute のうち EXTERNAL/UNSUPPORTED の能力を広告から除きます。
+生成済み completion/hover handler も未対応の場合は空の結果を返します。SUPPORTED/PARTIAL は既存 handler の能力を残す条件であり、新規 provider や処理を追加する条件ではありません。
+構文解析と syntax diagnostics は選んだ限定 grammar に基づきます。外部 compiler の semantic validation を実行したという意味にはなりません。
+`capabilities.experimental.languageProfile` は schemaVersion、canonical TSV、language、package、version、grammar、entry を返し、既存の experimental object の他フィールドを保持します。
+サーバー側からも `languageProfile()` で選択を参照できます。初期化後の動的変更はこの契約の対象外です。
+
+共通選択 API は Java `LanguageProfile.select(grammar, entry)`、Rust `LanguageProfile::select(grammar, entry)` です。
+両方に同じ selection/capability fixture を実行します。Classic LSP transport/server generator はこの時点では Java にあり、Rust の同プロトコル配線は #111 の後続作業です。Rust 側の共通 profile 選択 API を実装したことだけで Rust LSP の完了とは扱いません。
