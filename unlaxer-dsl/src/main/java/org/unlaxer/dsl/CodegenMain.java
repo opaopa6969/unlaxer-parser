@@ -35,6 +35,9 @@ public class CodegenMain {
     }
 
     static int run(String[] args, PrintStream out, PrintStream err) {
+        if (args.length > 0 && "profile".equals(args[0])) {
+            return LanguageProfileCommand.run(args, out, err);
+        }
         if (args.length > 0 && "deps".equals(args[0])) return PackageCommand.run(args, out, err);
         if (args.length > 0 && "playground".equals(args[0])) {
             return PlaygroundCommand.run(args, out, err);
@@ -257,7 +260,8 @@ public class CodegenMain {
     }
 
     private static void printUsage(PrintStream err) {
-        err.println("Playground: CodegenMain playground --grammar <file.ubnf> --output <new-directory> [--check]");
+        err.println("Profile: CodegenMain profile --file <profile.tsv>");
+        err.println("Playground: CodegenMain playground (--grammar <file.ubnf> | --profile <profile.tsv>) --output <new-directory> [--check]");
         err.println(
             "Usage: CodegenMain [--help] [--version] --grammar <file.ubnf> --output <dir>"
                 + " [--generators AST,Parser,Mapper,Evaluator,LSP,Launcher,DAP,DAPLauncher]"

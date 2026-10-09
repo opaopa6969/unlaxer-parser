@@ -3,6 +3,40 @@ use std::path::Path;
 use unlaxer_codegen::GeneratedFile;
 use unlaxer_ubnf::ast::TokenKind;
 
+pub fn generate_profile(path: &Path) -> Result<Vec<GeneratedFile>, String> {
+    let text = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+    let profile = unlaxer_runtime::language_profile::LanguageProfile::parse(&text)?;
+    let grammar_path = path
+        .parent()
+        .unwrap_or(Path::new("."))
+        .join(profile.grammar_file());
+    let ast = crate::modules::load(&grammar_path)?;
+    if ast.grammars.len() != 1 {
+        return Err("profile requires exactly one grammar".into());
+    }
+    let grammar = &ast.grammars[0];
+    for entry in profile.entries.keys() {
+        if profile.identity(entry)?.grammar != grammar.name
+            || !grammar.rules.iter().any(|rule| rule.name == *entry)
+        {
+            return Err("profile grammar/entry mismatch".into());
+        }
+    }
+    let mut files = generate_file(&grammar_path)?;
+    files.push(GeneratedFile {
+        relative_path: "public/profile.tsv".into(),
+        content: profile.canonical_tsv(),
+    });
+    let index = files
+        .iter_mut()
+        .find(|file| file.relative_path == "public/index.html")
+        .unwrap();
+    index.content = index
+        .content
+        .replace("<body>", "<body data-profile=\"profile.tsv\">");
+    Ok(files)
+}
+
 pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
     let source = std::fs::read_to_string(path).map_err(|error| error.to_string())?;
     let readiness = crate::portability::check_file(path);
@@ -73,6 +107,7 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
     runtime!("semantic_rename.rs");
     runtime!("source_edits.rs");
     runtime!("source.rs");
+    runtime!("language_profile.rs");
     runtime!("embedded.rs");
     runtime!("provider_protocol.rs");
     runtime!("provider_process.rs");

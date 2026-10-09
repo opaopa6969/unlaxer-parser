@@ -1,0 +1,31 @@
+profile	1
+language	java
+package	lang/java	0.1.0
+target	21	source
+tool	javac	21.0.9
+grammar	Java21	Java21.ubnf
+source	https://docs.oracle.com/javase/specs/jls/se21/html/index.html	21.0.9	original-repository-grammar
+fixture	corpus.tsv
+entry	CompilationUnit	PARTIAL
+entry	Type	PARTIAL
+entry	Expression	PARTIAL
+entry	Statement	PARTIAL
+entry	Block	PARTIAL
+capability	PARSE	PARTIAL
+capability	AST	PARTIAL
+capability	CST	SUPPORTED
+capability	VALIDATE	EXTERNAL
+capability	COMPLETION	UNSUPPORTED
+capability	HOVER	UNSUPPORTED
+capability	DEFINITION	EXTERNAL
+capability	RENAME	UNSUPPORTED
+capability	FORMAT	UNSUPPORTED
+capability	CODE_ACTION	UNSUPPORTED
+capability	EXECUTE	UNSUPPORTED
+syntax	classes-methods-fields	PARTIAL
+syntax	package-import	PARTIAL
+syntax	generics-records-enums	UNSUPPORTED
+syntax	unicode-identifiers-escapes	UNSUPPORTED
+difference	ast	AST retains the source root span; use CST for syntactic structure.
+difference	scope	Names, types, execution and project scope are not inferred by this grammar.
+difference	coverage	Unsupported syntax can require the pinned external provider; partial grammar rejection is not an official language error.

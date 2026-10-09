@@ -11,6 +11,7 @@ pub mod editor_cst;
 pub mod editor_queries;
 pub mod embedded;
 mod first;
+pub mod language_profile;
 pub mod language_queries;
 pub mod lexical;
 pub mod lexing;
