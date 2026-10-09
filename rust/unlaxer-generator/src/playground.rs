@@ -37,6 +37,37 @@ pub fn generate_profile(path: &Path) -> Result<Vec<GeneratedFile>, String> {
     Ok(files)
 }
 
+pub fn generate_package(manifest: &Path, package_id: &str) -> Result<Vec<GeneratedFile>, String> {
+    let selected = crate::packaged_profiles::load(manifest, package_id)?;
+    let readiness = crate::portability::check_ast(&selected.ast);
+    if !readiness.portable {
+        return Err(format!(
+            "Playground requires a Rust-portable grammar: {}",
+            readiness.to_json()
+        ));
+    }
+    let mut files = generate_resolved(selected.source, &selected.ast, &selected.vocabulary)?;
+    files.push(GeneratedFile {
+        relative_path: "public/profile.tsv".into(),
+        content: selected.profile.canonical_tsv(),
+    });
+    files.push(GeneratedFile {
+        relative_path: "public/package.json".into(),
+        content: format!(
+            "{}\n",
+            crate::vocabulary_origins::to_json(&selected.identity)
+        ),
+    });
+    let index = files
+        .iter_mut()
+        .find(|file| file.relative_path == "public/index.html")
+        .unwrap();
+    index.content = index
+        .content
+        .replace("<body>", "<body data-profile=\"profile.tsv\">");
+    Ok(files)
+}
+
 pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
     let source = std::fs::read_to_string(path).map_err(|error| error.to_string())?;
     let readiness = crate::portability::check_file(path);
@@ -47,6 +78,14 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
         ));
     }
     let file = crate::modules::load(path)?;
+    generate_resolved(source, &file, &crate::vocabulary_origins::inspect(path)?)
+}
+
+fn generate_resolved(
+    source: String,
+    file: &unlaxer_ubnf::UbnfFile,
+    vocabulary: &serde_json::Value,
+) -> Result<Vec<GeneratedFile>, String> {
     let grammar = &file.grammars[0];
     for token in &grammar.tokens {
         if !matches!(token.kind, TokenKind::Declarative { .. }) {
@@ -152,10 +191,7 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
     });
     files.push(GeneratedFile {
         relative_path: "public/vocabulary.json".into(),
-        content: format!(
-            "{}\n",
-            crate::vocabulary_origins::to_json(&crate::vocabulary_origins::inspect(path)?)
-        ),
+        content: format!("{}\n", crate::vocabulary_origins::to_json(vocabulary)),
     });
     Ok(files)
 }

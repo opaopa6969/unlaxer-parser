@@ -29,4 +29,16 @@ public class LanguageProfileCommandTest {
         }
     }
 
+    @Test public void packageSelectorRequiresManifestAndSupportsVerifiedCheck() throws Exception {
+        Path directory = temporary.newFolder().toPath(), manifest = directory.resolve("ubnf.json");
+        Files.writeString(manifest, "{\"schemaVersion\":1,\"dependencies\":{\"lang/java\":{\"version\":\"0.1.0\",\"source\":\"builtin:lang/java@0.1.0\"}}}");
+        org.unlaxer.dsl.bootstrap.UBNFPackageResolver.resolve(manifest);
+        var bytes = new ByteArrayOutputStream(); var out = new PrintStream(bytes);
+        Path output = directory.resolve("generated");
+        assertEquals(bytes.toString(), 0, CodegenMain.run(new String[]{"playground", "--package", "lang/java", "--manifest", manifest.toString(), "--output", output.toString()}, out, out));
+        assertEquals(bytes.toString(), 0, CodegenMain.run(new String[]{"playground", "--package", "lang/java", "--manifest", manifest.toString(), "--output", output.toString(), "--check"}, out, out));
+        assertEquals(2, CodegenMain.run(new String[]{"playground", "--package", "lang/java", "--output", "unused"}, out, out));
+        assertEquals(2, CodegenMain.run(new String[]{"playground", "--profile", "unused", "--manifest", manifest.toString(), "--output", "unused"}, out, out));
+    }
+
 }

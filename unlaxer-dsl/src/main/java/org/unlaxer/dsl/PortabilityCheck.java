@@ -56,7 +56,7 @@ public final class PortabilityCheck {
         }
     }
 
-    private static Result check(UBNFSourceSnapshot snapshot, org.unlaxer.dsl.bootstrap.UBNFAST.UBNFFile file) {
+    public static Result check(UBNFSourceSnapshot snapshot, org.unlaxer.dsl.bootstrap.UBNFAST.UBNFFile file) {
         List<Diagnostic> diagnostics = new ArrayList<>();
         List<GrammarDecl> grammars = file.grammars();
         if (grammars.size() != 1) add(diagnostics, "P-GRAMMAR-COUNT", snapshot, snapshot.ast(), "expected one grammar");

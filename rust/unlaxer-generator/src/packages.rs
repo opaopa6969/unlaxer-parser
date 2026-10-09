@@ -214,8 +214,21 @@ fn resolve_one(
         return Err(error("package count exceeds 128"));
     }
     let source = string(dependency, "source")?;
-    let (bytes, child_directory) = if source == "builtin:std/layout@1.0.0" {
-        (STANDARD.to_vec(), directory.to_owned())
+    let builtin: Option<&[u8]> = match source {
+        "builtin:std/layout@1.0.0" => Some(STANDARD),
+        "builtin:lang/java@0.1.0" => Some(include_bytes!(
+            "../../../unlaxer-dsl/src/main/resources/ubnf-packages/lang-java-0.1.0.json"
+        )),
+        "builtin:lang/typescript@0.1.0" => Some(include_bytes!(
+            "../../../unlaxer-dsl/src/main/resources/ubnf-packages/lang-typescript-0.1.0.json"
+        )),
+        "builtin:lang/rust@0.1.0" => Some(include_bytes!(
+            "../../../unlaxer-dsl/src/main/resources/ubnf-packages/lang-rust-0.1.0.json"
+        )),
+        _ => None,
+    };
+    let (bytes, child_directory) = if let Some(bytes) = builtin {
+        (bytes.to_vec(), directory.to_owned())
     } else if let Some(relative) = source.strip_prefix("local:") {
         if remote {
             return Err(error("remote artifact cannot use local dependencies"));

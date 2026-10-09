@@ -25,14 +25,19 @@ public final class UBNFModuleLoader {
     private final Map<Path, Map<String, LexicalExpression>> modules = new LinkedHashMap<>();
     private final Set<Path> stack = new java.util.LinkedHashSet<>();
 
-    private UBNFModuleLoader(SourceReader reader, Path path) { this.packages = new UBNFPackageResolver(path, reader); this.reader = packages::read; }
+    private UBNFModuleLoader(UBNFPackageResolver packages) { this.packages = packages; this.reader = packages::read; }
 
     public static UBNFFile load(Path path) throws IOException {
         return resolve(UBNFMapper.parse(Files.readString(path)), path, Files::readString);
     }
 
     public static UBNFFile resolve(UBNFFile file, Path path, SourceReader reader) throws IOException {
-        var loader = new UBNFModuleLoader(reader, path);
+        return resolve(file, path, new UBNFPackageResolver(path, reader));
+    }
+
+    /** Explicit root selection; imported modules still export declarative tokens only. */
+    public static UBNFFile resolve(UBNFFile file, Path path, UBNFPackageResolver packages) throws IOException {
+        var loader = new UBNFModuleLoader(packages);
         path = path.toAbsolutePath().normalize();
         loader.stack.add(path);
         var grammars = new ArrayList<GrammarDecl>();

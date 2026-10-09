@@ -102,3 +102,29 @@ mobile表示を検証する。`target/language-profile-*.tsv` を成果物とし
 importと別契約であり、まだ追加していない。生成LSPでのprofile選択、FormulaInfo全体への
 本番登録、言語固有typed completion・editのprofile corpus、より広い構文の実装が残る。
 既存のprovider/region/edit corpusが成功しても、その言語の全機能の根拠へ広げない。
+
+### 固定 package の明示選択
+
+`lang/java@0.1.0`、`lang/typescript@0.1.0`、`lang/rust@0.1.0` は、上記の原著限定文法・profile・corpus を同梱した source-only artifact です。
+artifact の再生成は `python3 scripts/language-profile-packages.py`、一致検査は `--check` を使用します。
+依存 manifest には通常の exact version を指定します。
+
+```json
+{"schemaVersion":1,"dependencies":{"lang/java":{"version":"0.1.0","source":"builtin:lang/java@0.1.0"}}}
+```
+
+Java `CodegenMain` と native `unlaxer` に共通の手順です。
+
+```text
+deps resolve --manifest /project/ubnf.json
+playground --package lang/java --manifest /project/ubnf.json --output /project/java-playground
+```
+
+`deps resolve` だけが取得・lock/cache 更新を行います。Playground 生成は既存 lock/hash と artifact の ID/版・依存 graph を検査し、artifact の `entry` を root 文法として選択します。
+`entry` と同じディレクトリの `profile.tsv`、profile の grammar/公開 entry/fixture、package identity が一致しなければ生成しません。profile は capability の説明であり provider の登録や host code の実行を行いません。
+ローカル配布物や HTTPS で取得済みの artifact も同じ契約です。生成物の `public/package.json` には検証した ID、版、SHA-256、entry file を保存します。
+
+この root 選択は `@import alias from 'pkg:…'` と別の API です。`@import` は引き続き宣言的 token のみを公開し、rules を持つ言語 package の import は拒否します。
+選んだ root 自身は lock 内の token package を import でき、その定義元と pinned identity は `public/vocabulary.json` に引き継ぎます。
+`--grammar`、`--profile`、`--package` は排他で、`--manifest` は `--package` と対で指定します。
+生成 LSP への profile 設定、外部 provider の自動配線、language package の typed completion はこの入口とは別の後続作業です。

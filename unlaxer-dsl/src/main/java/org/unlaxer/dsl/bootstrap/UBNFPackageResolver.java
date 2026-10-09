@@ -137,8 +137,9 @@ public final class UBNFPackageResolver {
         String source = string(dependency, "source");
         byte[] bytes;
         Path childDirectory = sourceDirectory;
-        if (source.equals("builtin:std/layout@1.0.0")) {
-            try (var stream = UBNFPackageResolver.class.getResourceAsStream("/ubnf-packages/std-layout-1.0.0.json")) {
+        if (source.equals("builtin:std/layout@1.0.0") || source.matches("builtin:lang/(java|typescript|rust)@0\\.1\\.0")) {
+            String resource = source.substring("builtin:".length()).replace('/', '-').replace('@', '-');
+            try (var stream = UBNFPackageResolver.class.getResourceAsStream("/ubnf-packages/" + resource + ".json")) {
                 if (stream == null) throw error("missing bundled std/layout@1.0.0");
                 bytes = stream.readNBytes(MAX_BYTES + 1);
             }
