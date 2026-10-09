@@ -81,7 +81,11 @@ public final class LanguageProfile {
     }
     private static boolean local(Support support) { return support == Support.SUPPORTED || support == Support.PARTIAL; }
     public record Selection(LanguageProfile profile, LanguageRegions.Language language) {
-        public boolean allowsLocal(String capability) { return local(profile.capabilities().get(capability)); }
+        public boolean allowsLocal(String capability) { return allows(capability, false); }
+        public boolean allows(String capability, boolean providerRegistered) {
+            Support support = profile.capabilities().get(capability);
+            return local(support) || providerRegistered && support == Support.EXTERNAL;
+        }
     }
     public String canonicalTsv() {
         List<String> result = rows.stream().map(row -> String.join("\t", row)).sorted().toList();

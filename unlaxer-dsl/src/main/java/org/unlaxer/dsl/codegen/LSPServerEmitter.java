@@ -103,6 +103,7 @@ class LSPServerEmitter {
         w.line("    List.of(\"valid\", \"invalid\"), List.of()));");
         w.line("capabilities.setSemanticTokensProvider(semanticTokensOptions);");
         w.line("configureAdditionalCapabilities(capabilities);");
+        w.line("configureLanguageQueryCapabilities(capabilities);");
         w.line("applyLanguageProfile(capabilities);");
         w.line("return CompletableFuture.completedFuture(new InitializeResult(capabilities));");
         w.dedent();
@@ -489,7 +490,7 @@ class LSPServerEmitter {
                 return java.util.Optional.ofNullable(selectedLanguageProfile);
             }
             protected final boolean profileAllows(String capability) {
-                return selectedLanguageProfile == null || selectedLanguageProfile.allowsLocal(capability);
+                return selectedLanguageProfile == null || selectedLanguageProfile.allows(capability, languageQueryCapabilities().stream().anyMatch(value -> value.name().equals(capability)));
             }
             private org.unlaxer.source.LanguageProfile.Selection readLanguageProfile(InitializeParams params) {
                 com.google.gson.JsonElement options = new com.google.gson.Gson().toJsonTree(params.getInitializationOptions());
@@ -695,6 +696,8 @@ class LSPServerEmitter {
         w.line("public CompletableFuture<Either<List<CompletionItem>, CompletionList>> completion(");
         w.line("        CompletionParams params) {");
         w.indent();
+        w.line("var queryItems = server.languageCompletionItems(params);");
+        w.line("if (queryItems != null) return CompletableFuture.completedFuture(Either.forLeft(queryItems));");
         w.line("if (!server.profileAllows(\"COMPLETION\")) return CompletableFuture.completedFuture(Either.forLeft(List.of()));");
         w.line("List<CompletionItem> items = new ArrayList<>();");
         w.line("for (String kw : KEYWORDS) {");
@@ -723,6 +726,8 @@ class LSPServerEmitter {
         w.line("@Override");
         w.line("public CompletableFuture<Hover> hover(HoverParams params) {");
         w.indent();
+        w.line("var queryHover = server.languageHover(params);");
+        w.line("if (queryHover != null) return CompletableFuture.completedFuture(queryHover.orElse(null));");
         w.line("if (!server.profileAllows(\"HOVER\")) return CompletableFuture.completedFuture(null);");
         w.line("String uri = params.getTextDocument().getUri();");
         w.line("DocumentState state = server.documents.get(uri);");
@@ -749,6 +754,8 @@ class LSPServerEmitter {
         w.dedent();
         w.line("}");
         w.blankLine();
+
+        LSPQueryEmitter.emitDefinition(w);
 
         // semanticTokensFull()
         w.line("@Override");

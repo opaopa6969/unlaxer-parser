@@ -163,6 +163,7 @@ fn shared_semantic_queries_map_only_their_owning_document() {
         providers(Box::new(ProjectQueryProvider::new(index()))),
     )
     .unwrap();
+    let mut views = include_str!("../../../docs/fixtures/language-queries/views.jsonl").lines();
     for line in include_str!("../../../docs/fixtures/language-queries/queries.tsv")
         .lines()
         .filter(|line| !line.starts_with('#'))
@@ -187,6 +188,23 @@ fn shared_semantic_queries_map_only_their_owning_document() {
                 &parameters,
             )
             .unwrap();
+        let view = queries
+            .view(
+                &host(),
+                &project(),
+                fields[2].parse().unwrap(),
+                operation,
+                &parameters,
+            )
+            .unwrap();
+        assert_eq!(
+            view.canonical_json(),
+            views.next().unwrap(),
+            "{}",
+            fields[0]
+        );
+        assert_eq!(queries.host(), &host());
+        assert_eq!(queries.project(), &project());
         assert_eq!(
             format!("{:?}", result.state).to_uppercase(),
             fields[5],

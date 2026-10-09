@@ -83,6 +83,34 @@ impl LanguageQueries {
             providers,
         })
     }
+    pub fn host(&self) -> &Snapshot {
+        self.regions.host()
+    }
+    pub fn project(&self) -> &Project {
+        &self.project
+    }
+    pub fn view(
+        &self,
+        host: &Snapshot,
+        project: &Project,
+        cursor: usize,
+        operation: Operation,
+        parameters: &BTreeMap<String, String>,
+    ) -> Result<QueryView> {
+        let result = self.query(host, project, cursor, operation, parameters)?;
+        let capabilities = self
+            .regions
+            .at(cursor)?
+            .and_then(|region| self.providers.get(&region.language))
+            .map_or_else(HashSet::new, |provider| provider.capabilities());
+        Ok(QueryView {
+            host: host.clone(),
+            operation,
+            cursor,
+            capabilities,
+            result,
+        })
+    }
     pub fn query(
         &self,
         current_host: &Snapshot,
@@ -199,5 +227,84 @@ impl LanguageQueries {
             return Err("unknown or stale result document");
         }
         Ok(())
+    }
+}
+
+/// Snapshot-bound consumer envelope; all edits use original host code-point offsets.
+pub struct QueryView {
+    pub host: Snapshot,
+    pub operation: Operation,
+    pub cursor: usize,
+    pub capabilities: HashSet<Operation>,
+    pub result: QueryResult,
+}
+pub fn operation_name(operation: Operation) -> &'static str {
+    match operation {
+        Operation::Parse => "PARSE",
+        Operation::Validate => "VALIDATE",
+        Operation::Completion => "COMPLETION",
+        Operation::Hover => "HOVER",
+        Operation::Definition => "DEFINITION",
+        Operation::Rename => "RENAME",
+        Operation::Format => "FORMAT",
+        Operation::CodeAction => "CODE_ACTION",
+    }
+}
+impl QueryView {
+    pub fn canonical_json(&self) -> String {
+        use crate::json_string as q;
+        let items = self
+            .result
+            .items
+            .iter()
+            .map(|item| {
+                let locations = item
+                    .locations
+                    .iter()
+                    .map(|mapping| {
+                        let location = &mapping.location;
+                        format!(
+                            "{{\"uri\":{},\"version\":{},\"span\":[{},{}],\"exact\":{}}}",
+                            q(&location.snapshot.uri),
+                            q(&location.snapshot.version.to_string()),
+                            location.span.start,
+                            location.span.end,
+                            mapping.exact
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join(",");
+                let edits = item
+                    .edits
+                    .iter()
+                    .map(|edit| {
+                        format!(
+                            "{{\"span\":[{},{}],\"replacement\":{}}}",
+                            edit.span.start,
+                            edit.span.end,
+                            q(&edit.replacement)
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join(",");
+                format!(
+                    "{{\"label\":{},\"detail\":{},\"locations\":[{}],\"edits\":[{}]}}",
+                    q(&item.label),
+                    q(&item.detail),
+                    locations,
+                    edits
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(",");
+        let mut capabilities: Vec<_> = self
+            .capabilities
+            .iter()
+            .map(|op| operation_name(*op))
+            .collect();
+        capabilities.sort();
+        format!("{{\"uri\":{},\"version\":{},\"operation\":{},\"cursor\":{},\"region\":{},\"state\":{},\"capabilities\":[{}],\"items\":[{}]}}",
+            q(&self.host.uri), q(&self.host.version.to_string()), q(operation_name(self.operation)), self.cursor, q(&self.result.region),
+            q(&format!("{:?}", self.result.state).to_uppercase()), capabilities.iter().map(|name|q(name)).collect::<Vec<_>>().join(","), items)
     }
 }
