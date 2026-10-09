@@ -233,4 +233,31 @@ public class SourceMapsTest {
         }
     }
 
+    @Test public void emptyPartialRegionForwardsCompletionAndInsertionAtHostEof() {
+        var host = new DocumentSnapshot("host", 1, "日😀[");
+        var child = new DocumentSnapshot("child", 1, "");
+        var language = new Language("empty", "local", "1", "Empty", "Document");
+        var region = new Region("empty", null, language, new Span(2, 3), new Span(3, 3), copy(child, host, 3), State.PARTIAL);
+        var tree = new LanguageRegions(host, List.of(region));
+        var project = new LanguageQueries.Project("project", 1, Map.of(host.uri(), host), Map.of());
+        var provider = new LanguageQueries.Provider() {
+            @Override public Set<Operation> capabilities() { return Set.of(Operation.COMPLETION); }
+            @Override public LanguageQueries.Response query(LanguageQueries.Request request) {
+                assertEquals(0, request.cursor()); assertEquals(child, request.region().sourceMap().output());
+                var location = new Location(child, new Span(0, 0));
+                return new LanguageQueries.Response(child, "project", 1, State.PARTIAL, List.of(
+                    new LanguageQueries.Item("value", "empty input", List.of(location), List.of(new LanguageQueries.TextEdit(location, "value")))));
+            }
+        };
+        var queries = new LanguageQueries(tree, project, Map.of(language, provider));
+        var result = queries.query(host, project, 3, Operation.COMPLETION, Map.of());
+        assertEquals("empty", result.region()); assertEquals(State.PARTIAL, result.state());
+        assertEquals(new Span(3, 3), result.items().get(0).locations().get(0).location().span());
+        assertEquals(new Span(3, 3), result.items().get(0).edits().get(0).span());
+        assertEquals("日😀[value", tree.apply(host, 2, result.items().get(0).edits()).text());
+        assertEquals(State.UNSUPPORTED, queries.query(host, project, 2, Operation.COMPLETION, Map.of()).state());
+        var closed = new Region("closed", null, language, new Span(2, 3), new Span(3, 3), copy(child, host, 3), State.COMPLETE);
+        assertNull(new LanguageRegions(host, List.of(closed)).at(3));
+    }
+
 }

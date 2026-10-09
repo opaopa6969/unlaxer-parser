@@ -553,7 +553,7 @@ fn shared_partial_eof_ownership() {
             let full = span(f[2].parse().unwrap(), f[3].parse().unwrap());
             let body = span(f[4].parse().unwrap(), f[5].parse().unwrap());
             let child = snapshot(f[0], host.slice(body).unwrap());
-            let map = if child.len() == 0 {
+            let map = if child.is_empty() {
                 SourceMap::new(child, vec![]).unwrap()
             } else {
                 copy(child, host.clone(), body.start)
@@ -591,4 +591,95 @@ fn shared_partial_eof_ownership() {
             );
         }
     }
+}
+
+#[test]
+fn empty_partial_region_forwards_completion_and_insertion_at_host_eof() {
+    use std::collections::BTreeMap;
+    use unlaxer_runtime::language_queries as query;
+    struct Completion;
+    impl query::Provider for Completion {
+        fn capabilities(&self) -> HashSet<Operation> {
+            [Operation::Completion].into()
+        }
+        fn query(&self, request: &query::Request<'_>) -> Result<query::Response> {
+            assert_eq!(request.cursor, 0);
+            assert_eq!(request.region.source_map.output().text, "");
+            let child = request.region.source_map.output().clone();
+            let location = Location::new(child.clone(), span(0, 0))?;
+            Ok(query::Response {
+                snapshot: child,
+                project: "project".into(),
+                project_version: 1,
+                state: State::Partial,
+                items: vec![query::Item {
+                    label: "value".into(),
+                    detail: "empty input".into(),
+                    locations: vec![location.clone()],
+                    edits: vec![query::TextEdit {
+                        location,
+                        replacement: "value".into(),
+                    }],
+                }],
+            })
+        }
+    }
+    let host = snapshot("host", "日😀[");
+    let child = snapshot("child", "");
+    let language = Language {
+        id: "empty".into(),
+        package_id: "local".into(),
+        version: "1".into(),
+        grammar: "Empty".into(),
+        entry: "Document".into(),
+    };
+    let region = Region {
+        id: "empty".into(),
+        parent: None,
+        language: language.clone(),
+        full: span(2, 3),
+        body: span(3, 3),
+        source_map: copy(child.clone(), host.clone(), 3),
+        parse_state: State::Partial,
+    };
+    let tree = LanguageRegions::new(host.clone(), vec![region.clone()]).unwrap();
+    let project = query::Project {
+        id: "project".into(),
+        version: 1,
+        documents: BTreeMap::from([(host.uri.clone(), host.clone())]),
+        configuration: BTreeMap::new(),
+    };
+    let queries = query::LanguageQueries::new(
+        LanguageRegions::new(host.clone(), vec![region.clone()]).unwrap(),
+        project.clone(),
+        HashMap::from([(language, Box::new(Completion) as Box<dyn query::Provider>)]),
+    )
+    .unwrap();
+    let result = queries
+        .query(&host, &project, 3, Operation::Completion, &BTreeMap::new())
+        .unwrap();
+    assert_eq!(result.region, "empty");
+    assert_eq!(result.state, State::Partial);
+    assert_eq!(result.items[0].locations[0].location.span, span(3, 3));
+    assert_eq!(result.items[0].edits[0].span, span(3, 3));
+    assert_eq!(
+        tree.apply(&host, 2, &result.items[0].edits).unwrap().text,
+        "日😀[value"
+    );
+    assert_eq!(
+        queries
+            .query(&host, &project, 2, Operation::Completion, &BTreeMap::new())
+            .unwrap()
+            .state,
+        State::Unsupported
+    );
+    let closed = Region {
+        parse_state: State::Complete,
+        ..region
+    };
+    assert!(LanguageRegions::new(host, vec![closed])
+        .unwrap()
+        .at(3)
+        .unwrap()
+        .is_none());
 }
