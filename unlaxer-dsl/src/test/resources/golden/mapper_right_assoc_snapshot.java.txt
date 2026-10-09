@@ -414,6 +414,26 @@ public class SnapshotRightAssocMapper {
         }
     }
 
+    /** Bounded editor-only EOF repair. Captures crossing inserted syntax stay synthetic. */
+    public static synchronized org.unlaxer.editor.EditorCst parseEditorCst(String source, List<String> completions, org.unlaxer.editor.EditorCst.Options options) {
+        return org.unlaxer.editor.EditorCst.parse(source, SnapshotRightAssocParsers.getRootParser(), completions,
+            parser -> {
+                if (parser instanceof SnapshotRightAssocParsers.ExprParser) return "Expr";
+                if (parser instanceof SnapshotRightAssocParsers.AtomParser) return "Atom";
+                return null;
+            },
+            parser -> parser instanceof SnapshotRightAssocParsers.__CaptureBinding binding ? binding.captureBindings().stream().map(SnapshotRightAssocMapper::editorCaptureName).filter(java.util.Objects::nonNull).toList() : List.of(), options);
+    }
+
+    private static String editorCaptureName(String binding) {
+        return switch (binding) {
+            case "Expr:0" -> "left";
+            case "Expr:1" -> "op";
+            case "Expr:2" -> "right";
+            default -> null;
+        };
+    }
+
     private static SnapshotRightAssocAST mapToken(Token token) {
         if (token == null) {
             return null;

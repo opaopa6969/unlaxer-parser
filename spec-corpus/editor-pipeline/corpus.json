@@ -1,0 +1,427 @@
+{
+  "prefix": "//😀\r\nbuiltin Context {}\r\ninterface IAccessor {}\r\nrecord DbAccessor : IAccessor {}\r\nbuiltin Result {}\r\nlet ctx: Context;\r\nlet db: DbAccessor;\r\nlet cached: IAccessor;\r\nfn process(Context, IAccessor): Result;\r\n",
+  "expectedSymbols": [
+    {
+      "name": "cached",
+      "type": "IAccessor",
+      "span": [
+        142,
+        166
+      ]
+    },
+    {
+      "name": "ctx",
+      "type": "Context",
+      "span": [
+        102,
+        121
+      ]
+    },
+    {
+      "name": "db",
+      "type": "DbAccessor",
+      "span": [
+        121,
+        142
+      ]
+    }
+  ],
+  "expectedTypes": [
+    "Context",
+    "DbAccessor",
+    "IAccessor",
+    "Result"
+  ],
+  "cases": [
+    {
+      "id": "complete",
+      "tail": "call process(ctx, ?);",
+      "cursor": 225,
+      "status": "COMPLETE",
+      "reason": "NONE",
+      "strict": true,
+      "completions": [
+        "cached",
+        "db"
+      ],
+      "prefix": "",
+      "sourceLength": 228,
+      "utf16Length": 229,
+      "expectedTypes": [
+        "IAccessor"
+      ],
+      "arguments": [
+        {
+          "type": "Context",
+          "span": [
+            220,
+            223
+          ]
+        },
+        {
+          "type": "?",
+          "span": [
+            225,
+            226
+          ]
+        }
+      ]
+    },
+    {
+      "id": "unclosed-call",
+      "tail": "call process(ctx, ",
+      "cursor": 225,
+      "status": "PARTIAL",
+      "reason": "REPAIRED",
+      "strict": false,
+      "completions": [
+        "cached",
+        "db"
+      ],
+      "prefix": "",
+      "sourceLength": 225,
+      "utf16Length": 226,
+      "defectSpan": [
+        225,
+        225
+      ],
+      "expectedTypes": [
+        "IAccessor"
+      ],
+      "arguments": [
+        {
+          "type": "Context",
+          "span": [
+            220,
+            223
+          ]
+        },
+        {
+          "type": "?",
+          "span": [
+            225,
+            225
+          ]
+        }
+      ]
+    },
+    {
+      "id": "unfinished-identifier",
+      "tail": "call process(ctx, d",
+      "cursor": 226,
+      "status": "PARTIAL",
+      "reason": "REPAIRED",
+      "strict": false,
+      "completions": [
+        "db"
+      ],
+      "prefix": "d",
+      "sourceLength": 226,
+      "utf16Length": 227,
+      "defectSpan": [
+        226,
+        226
+      ],
+      "expectedTypes": [
+        "IAccessor"
+      ],
+      "arguments": [
+        {
+          "type": "Context",
+          "span": [
+            220,
+            223
+          ]
+        },
+        {
+          "type": "?",
+          "span": [
+            225,
+            226
+          ]
+        }
+      ]
+    },
+    {
+      "id": "inserted-identifier",
+      "tail": "call process(ctx, d",
+      "cursor": 226,
+      "status": "PARTIAL",
+      "reason": "REPAIRED",
+      "strict": false,
+      "completions": [
+        "db"
+      ],
+      "prefix": "d",
+      "sourceLength": 226,
+      "utf16Length": 227,
+      "fragments": [
+        "b);"
+      ],
+      "syntheticArgument": true,
+      "defectSpan": [
+        226,
+        226
+      ],
+      "expectedTypes": [
+        "IAccessor"
+      ],
+      "arguments": [
+        {
+          "type": "Context",
+          "span": [
+            220,
+            223
+          ]
+        },
+        {
+          "type": "?",
+          "span": [
+            225,
+            226
+          ]
+        }
+      ]
+    },
+    {
+      "id": "empty-argument",
+      "tail": "call process(",
+      "cursor": 220,
+      "status": "PARTIAL",
+      "reason": "REPAIRED",
+      "strict": false,
+      "completions": [
+        "ctx"
+      ],
+      "prefix": "",
+      "sourceLength": 220,
+      "utf16Length": 221,
+      "defectSpan": [
+        220,
+        220
+      ],
+      "expectedTypes": [
+        "Context"
+      ],
+      "arguments": [
+        {
+          "type": "?",
+          "span": [
+            220,
+            220
+          ]
+        }
+      ]
+    },
+    {
+      "id": "unclosed-type",
+      "tail": "record Draft {",
+      "cursor": 221,
+      "status": "PARTIAL",
+      "reason": "REPAIRED",
+      "strict": false,
+      "completions": [],
+      "prefix": "",
+      "sourceLength": 221,
+      "utf16Length": 222,
+      "defectSpan": [
+        221,
+        221
+      ],
+      "expectedTypes": [],
+      "arguments": []
+    },
+    {
+      "id": "incomplete-declaration",
+      "tail": "let phantom: IAccessor",
+      "cursor": 229,
+      "status": "PARTIAL",
+      "reason": "REPAIRED",
+      "strict": false,
+      "completions": [],
+      "prefix": "",
+      "sourceLength": 229,
+      "utf16Length": 230,
+      "defectSpan": [
+        229,
+        229
+      ],
+      "expectedTypes": [],
+      "arguments": []
+    },
+    {
+      "id": "crossing-name",
+      "tail": "let phantom",
+      "cursor": 218,
+      "status": "PARTIAL",
+      "reason": "REPAIRED",
+      "strict": false,
+      "completions": [],
+      "prefix": "",
+      "sourceLength": 218,
+      "utf16Length": 219,
+      "fragments": [
+        "a:Context;"
+      ],
+      "syntheticCapture": {
+        "name": "name",
+        "text": "phantom"
+      },
+      "defectSpan": [
+        218,
+        218
+      ],
+      "expectedTypes": [],
+      "arguments": []
+    },
+    {
+      "id": "limit",
+      "tail": "call process(ctx, ",
+      "cursor": 225,
+      "status": "FAILED",
+      "reason": "LIMIT",
+      "strict": false,
+      "completions": [],
+      "prefix": "",
+      "sourceLength": 225,
+      "utf16Length": 226,
+      "maxAttempts": 0,
+      "expectedTypes": [],
+      "arguments": []
+    },
+    {
+      "id": "syntax",
+      "tail": "call process(ctx, @);",
+      "cursor": 228,
+      "status": "FAILED",
+      "reason": "SYNTAX",
+      "strict": false,
+      "completions": [],
+      "prefix": "",
+      "sourceLength": 228,
+      "utf16Length": 229,
+      "expectedTypes": [],
+      "arguments": []
+    },
+    {
+      "id": "broken-sibling",
+      "tail": "broken invalid;\r\ncall process(ctx, ?);",
+      "cursor": 242,
+      "status": "PARTIAL",
+      "reason": "NONE",
+      "strict": false,
+      "completions": [
+        "cached",
+        "db"
+      ],
+      "prefix": "",
+      "sourceLength": 245,
+      "utf16Length": 246,
+      "defectSpan": [
+        214,
+        222
+      ],
+      "expectedTypes": [
+        "IAccessor"
+      ],
+      "arguments": [
+        {
+          "type": "Context",
+          "span": [
+            237,
+            240
+          ]
+        },
+        {
+          "type": "?",
+          "span": [
+            242,
+            243
+          ]
+        }
+      ]
+    },
+    {
+      "id": "keyword-fragment",
+      "tail": "call pro",
+      "cursor": 215,
+      "status": "PARTIAL",
+      "reason": "REPAIRED",
+      "strict": false,
+      "completions": [],
+      "prefix": "",
+      "sourceLength": 215,
+      "utf16Length": 216,
+      "defectSpan": [
+        215,
+        215
+      ],
+      "fragments": [
+        "cess(ctx,?);"
+      ],
+      "syntheticCapture": {
+        "name": "name",
+        "text": "pro"
+      },
+      "expectedTypes": [],
+      "arguments": []
+    },
+    {
+      "id": "recovery-crossing-eof",
+      "tail": "broken invalid",
+      "cursor": 221,
+      "status": "PARTIAL",
+      "reason": "REPAIRED",
+      "strict": false,
+      "completions": [],
+      "prefix": "",
+      "sourceLength": 221,
+      "utf16Length": 222,
+      "defectSpan": [
+        214,
+        221
+      ],
+      "defectKinds": [
+        "ERROR",
+        "MISSING"
+      ],
+      "expectedTypes": [],
+      "arguments": []
+    }
+  ],
+  "nested": {
+    "tail": "call process(ctx, d ",
+    "cursor": 226,
+    "hostCursor": 241,
+    "hostUtf16Cursor": 243,
+    "offset": 15,
+    "expected": {
+      "state": "PARTIAL",
+      "region": "inner",
+      "items": [
+        {
+          "label": "db",
+          "detail": "DbAccessor; expected=IAccessor",
+          "locations": [
+            [
+              136,
+              157
+            ]
+          ],
+          "edits": [
+            [
+              240,
+              241,
+              "db"
+            ]
+          ]
+        }
+      ],
+      "utf16Cursor": 243,
+      "blocked": [
+        "UNSUPPORTED",
+        "UNSUPPORTED"
+      ]
+    }
+  }
+}

@@ -46,6 +46,7 @@ public final class RustGrammarLowering {
     private void leaveAnalysis() { analysisDepth--; }
 
     public static GrammarIR lower(GrammarDecl grammar) {
+        org.unlaxer.dsl.codegen.EmbeddedGrammarEmitter.declarations(grammar);
         return new RustGrammarLowering(grammar).run();
     }
 
@@ -59,7 +60,7 @@ public final class RustGrammarLowering {
         Set<String> settings = new HashSet<>();
         Set<String> memoSafeTokens = new HashSet<>();
         for (var setting : grammar.settings()) {
-            if (setting.key().equals("tokenAdapter") || setting.key().equals("tokenContract")) continue;
+            if (Set.of("tokenAdapter", "tokenContract", "embedded", "embedding").contains(setting.key())) continue;
             if (setting.key().equals("feature")) {
                 if (!org.unlaxer.dsl.bootstrap.UBNFFeatures.validate(grammar).isEmpty()) throw unsupported("invalid feature");
                 continue;

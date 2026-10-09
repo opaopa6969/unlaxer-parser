@@ -58,6 +58,7 @@ class LSPServerEmitter {
 
         w.line("protected LanguageClient client;");
         w.line("protected final Map<String, DocumentState> documents = new HashMap<>();");
+        w.line("protected final Map<String, Long> documentVersions = new HashMap<>();");
         w.blankLine();
 
         // Catalog infrastructure fields (when @catalog annotation present)
@@ -384,6 +385,47 @@ class LSPServerEmitter {
 
     /** GGP フックメソッドを出力する。 */
     static void emitHookMethods(IndentedWriter w) {
+        for (String line : """
+                /** Opt-in immutable editor result. Exact URI, version and source must match this request. */
+                protected org.unlaxer.dsl.semantic.EditorParseResult<?> editorParseResult(String uri, long version, String source) {
+                    return null;
+                }
+
+                private java.util.List<CompletionItem> editorCompletionItems(CompletionParams params, String source) {
+                    String uri = params.getTextDocument().getUri();
+                    long version = documentVersions.getOrDefault(uri, 0L);
+                    var result = editorParseResult(uri, version, source);
+                    if (result == null || !result.uri().equals(uri) || result.version() != version || !result.source().equals(source)) return List.of();
+                    Position position = params.getPosition();
+                    if (position.getLine() < 0 || position.getCharacter() < 0) return List.of();
+                    int start = 0;
+                    for (int line = 0; line < position.getLine(); line++) {
+                        int next = source.indexOf('\\n', start);
+                        if (next < 0) return List.of();
+                        start = next + 1;
+                    }
+                    int end = source.indexOf('\\n', start);
+                    if (end < 0) end = source.length();
+                    if (end > start && source.charAt(end - 1) == '\\r') end--;
+                    int offset = start + position.getCharacter();
+                    if (offset > end || offset > 0 && offset < source.length() && Character.isHighSurrogate(source.charAt(offset - 1)) && Character.isLowSurrogate(source.charAt(offset))) return List.of();
+                    int prefixStart = offset;
+                    while (prefixStart > start && Character.isUnicodeIdentifierPart(source.codePointBefore(prefixStart))) prefixStart -= Character.charCount(source.codePointBefore(prefixStart));
+                    String prefix = source.substring(prefixStart, offset);
+                    int cursor = source.codePointCount(0, offset);
+                    java.util.List<CompletionItem> items = new ArrayList<>();
+                    for (var completion : result.completeAt(cursor, null, version, prefix)) {
+                        CompletionItem item = new CompletionItem(completion.symbol().name());
+                        item.setKind(CompletionItemKind.Variable);
+                        item.setDetail(completion.symbol().type() + " · " + String.join(", ", completion.expectedTypes()));
+                        item.setData(Map.of("status", result.status().name(), "version", version, "expectedTypes", completion.expectedTypes()));
+                        item.setTextEdit(Either.forLeft(new TextEdit(new Range(offsetToPosition(source, prefixStart), position), completion.symbol().name())));
+                        items.add(item);
+                    }
+                    return items;
+                }
+
+                """.split("\\n", -1)) { w.line(line); }
         w.line("// Hook: additional completion items (for metadata, language-specific keywords)");
         w.line("protected java.util.List<CompletionItem> additionalCompletionItems(");
         w.line("        CompletionParams params, String documentContent) {");
@@ -550,6 +592,7 @@ class LSPServerEmitter {
         w.line("@Override");
         w.line("public void didOpen(DidOpenTextDocumentParams params) {");
         w.indent();
+        w.line("server.documentVersions.put(params.getTextDocument().getUri(), (long) params.getTextDocument().getVersion());");
         w.line("server.parseDocument(");
         w.line("    params.getTextDocument().getUri(),");
         w.line("    params.getTextDocument().getText());");
@@ -560,6 +603,8 @@ class LSPServerEmitter {
         w.line("@Override");
         w.line("public void didChange(DidChangeTextDocumentParams params) {");
         w.indent();
+        w.line("Integer version = params.getTextDocument().getVersion();");
+        w.line("server.documentVersions.put(params.getTextDocument().getUri(), version == null ? server.documentVersions.getOrDefault(params.getTextDocument().getUri(), 0L) + 1 : version.longValue());");
         w.line("server.parseDocumentIncremental(");
         w.line("    params.getTextDocument().getUri(),");
         w.line("    params.getContentChanges().get(0).getText());");
@@ -571,6 +616,7 @@ class LSPServerEmitter {
         w.line("public void didClose(DidCloseTextDocumentParams params) {");
         w.indent();
         w.line("server.documents.remove(params.getTextDocument().getUri());");
+        w.line("server.documentVersions.remove(params.getTextDocument().getUri());");
         w.dedent();
         w.line("}");
         w.blankLine();
@@ -595,6 +641,7 @@ class LSPServerEmitter {
         w.line("String uri = params.getTextDocument().getUri();");
         w.line("DocumentState state = server.documents.get(uri);");
         w.line("String content = state != null ? state.content() : \"\";");
+        w.line("items.addAll(server.editorCompletionItems(params, content));");
         w.line("java.util.List<CompletionItem> additional = server.additionalCompletionItems(params, content);");
         w.line("if (additional != null && !additional.isEmpty()) {");
         w.indent();
