@@ -1,0 +1,17 @@
+# id start end kind owner (- means document-owned)
+comment	0	3	COMMENT	outer
+newline	3	5	WHITESPACE	outer
+outer	5	8	TOKEN	-
+space1	8	10	WHITESPACE	outer
+string	10	15	TOKEN	-
+space2	15	16	WHITESPACE	string
+open	16	17	TOKEN	-
+space3	17	18	WHITESPACE	inner
+inner	18	21	TOKEN	-
+space4	21	22	WHITESPACE	inner
+innerRef	22	25	TOKEN	-
+space5	25	26	WHITESPACE	innerRef
+close	26	27	TOKEN	-
+space6	27	28	WHITESPACE	outerRef
+outerRef	28	31	TOKEN	-
+endline	31	33	WHITESPACE	outerRef
