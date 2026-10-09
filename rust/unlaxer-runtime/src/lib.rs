@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 pub mod call_inference;
 mod first;
+pub mod language_queries;
 pub mod lexical;
 pub mod lexing;
 mod long_code_fence;
@@ -16,6 +17,7 @@ pub mod pipeline;
 mod scope;
 pub mod semantic;
 pub mod semantic_project;
+pub mod semantic_queries;
 pub mod semantic_query_cache;
 pub mod semantic_rename;
 pub mod source;
