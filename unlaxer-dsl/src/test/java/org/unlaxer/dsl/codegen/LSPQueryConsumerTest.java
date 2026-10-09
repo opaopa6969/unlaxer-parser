@@ -43,7 +43,7 @@ public class LSPQueryConsumerTest {
         Path output = temporary.newFolder().toPath(); var compiler = ToolProvider.getSystemJavaCompiler(); var errors = new StringWriter();
         try (var manager = compiler.getStandardFileManager(null, null, null)) {
             assertTrue(errors.toString(), compiler.getTask(new PrintWriter(errors), manager, null,
-                List.of("--release", "21", "-classpath", System.getProperty("java.class.path"), "-d", output.toString()), null, sources).call());
+                List.of("--release", "17", "-classpath", System.getProperty("java.class.path"), "-d", output.toString()), null, sources).call());
         }
         try (var loader = new URLClassLoader(new URL[]{output.toUri().toURL()}, getClass().getClassLoader())) {
             Class<?> type = loader.loadClass("query.fixture.Server");
