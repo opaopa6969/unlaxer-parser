@@ -37,8 +37,11 @@ pub fn problems(grammar: &GrammarDecl) -> Vec<AdapterDiagnostic> {
         add("E-TOKEN-STREAM-VERSION", "tokenStream", settings[0].span);
     }
     for s in &grammar.settings {
-        if s.key == "comment" {
-            add("E-TOKEN-STREAM-TRIVIA", "comment", s.span);
+        if s.key == "comment"
+            || s.key == "whitespace"
+                && matches!(&s.value, SettingValue::String(value) if !value.eq_ignore_ascii_case("javaStyle") && !value.eq_ignore_ascii_case("none"))
+        {
+            add("E-TOKEN-STREAM-TRIVIA", &s.key, s.span);
         }
     }
     let Ok(programs) = crate::lexical::compile(grammar) else {
