@@ -1,0 +1,1 @@
+grammar NameGrammar { @namePredicate(snapshot='cxx23', version='v1', name='name', kind='type') @root R ::= 'T' @name; }

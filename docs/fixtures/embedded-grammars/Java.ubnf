@@ -1,0 +1,7 @@
+grammar Java {
+  @package: org.example.embedded
+  @embedding: enabled
+  @root @mapping(Block) Block ::= '{}';
+  @recovery(sync=';') @mapping(RecoveredUnit) RecoverableUnit ::= 'ok';
+  CompilationUnit ::= 'package p; import q; class C {}';
+}

@@ -353,6 +353,12 @@ public class ParseContext implements
 		return new ParseContext(source, options, bindings, effectors);
 	}
 
+	/** Validates and fixes all name snapshots before effectors and listeners run. */
+	public static ParseContext withNameSnapshots(Source source, List<NameSnapshot> snapshots,
+			ParseOptions options, ParseContextEffector... effectors) {
+		return withBindings(source, NameSnapshot.bindingsOf(snapshots), options, effectors);
+	}
+
 	/** Read-only external data, independent of captures and transactional state. */
 	public List<String> bindingValues(String name) {
 		return bindings.getOrDefault(java.util.Objects.requireNonNull(name), List.of());
@@ -402,6 +408,13 @@ public class ParseContext implements
 		return false;
 	}
 
+    private boolean semanticCandidateObserver;
+    /** Context-dependent semantic predicates may observe candidates discarded by memo/FIRST. */
+    public void disableSpeculativeOptimizations() {
+        semanticCandidateObserver = true;
+        disableMemoizationPermanently();
+    }
+
 	private void disableMemoizationPermanently() {
 		memoizationPermanentlyDisabled = true;
 	}
@@ -418,7 +431,7 @@ public class ParseContext implements
 
 	/** Whether a choice or repetition may skip a candidate whose FIRST set excludes the next input. */
 	public boolean isCandidateExclusionEnabled() {
-		if (false == CANDIDATE_EXCLUSION_AVAILABLE || false == deferredDiagnostics || recordingTrials) {
+		if (semanticCandidateObserver || false == CANDIDATE_EXCLUSION_AVAILABLE || false == deferredDiagnostics || recordingTrials) {
 			return false;
 		}
 		return parserListenerByName.isEmpty() && actions.isEmpty()

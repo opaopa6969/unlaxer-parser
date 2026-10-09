@@ -128,7 +128,7 @@ pub fn check_file(path: &std::path::Path) -> Report {
     }
 }
 
-fn check_ast(file: &UbnfFile) -> Report {
+pub fn check_ast(file: &UbnfFile) -> Report {
     let mut inventory = Inventory {
         diagnostics: Vec::new(),
     };
@@ -196,6 +196,9 @@ impl Inventory {
         for issue in feature_diagnostics(grammar) {
             self.add(issue.code, issue.subject, issue.span);
         }
+        for issue in crate::lexical_contexts::problems(grammar) {
+            self.diagnostics.push(issue);
+        }
         for issue in crate::token_stream::problems(grammar) {
             self.add(issue.code, issue.subject, issue.span);
         }
@@ -204,7 +207,10 @@ impl Inventory {
         }
         for setting in &grammar.settings {
             match (&*setting.key, &setting.value) {
-                ("package" | "memoSafeToken" | "tokenStream", SettingValue::String(_)) => {}
+                (
+                    "package" | "memoSafeToken" | "tokenStream" | "embedding",
+                    SettingValue::String(_),
+                ) => {}
                 ("ubnf", SettingValue::String(value)) if value == "v1" || value == "v2" => {}
                 ("feature", SettingValue::String(value))
                     if matches!(
@@ -215,7 +221,7 @@ impl Inventory {
                             | "tokenProgressContractsV1"
                             | "declarativeTokensV1"
                     ) => {}
-                ("tokenAdapter" | "tokenContract", _) => {}
+                ("tokenAdapter" | "tokenContract" | "embedded", _) => {}
                 ("whitespace", SettingValue::String(value)) => {
                     if !named_whitespace(grammar, value) {
                         self.add("P-WHITESPACE", value, setting.value_span);
@@ -270,11 +276,14 @@ impl Inventory {
             | AnnotationKind::LeftAssoc
             | AnnotationKind::RightAssoc
             | AnnotationKind::LongestChoice
+            | AnnotationKind::UniqueLongestChoice
+            | AnnotationKind::NamePredicate { .. }
             | AnnotationKind::PredictiveChoice
             | AnnotationKind::Precedence { .. }
             | AnnotationKind::Declares { .. }
             | AnnotationKind::Backref { .. }
-            | AnnotationKind::Catalog { .. } => {}
+            | AnnotationKind::Catalog { .. }
+            | AnnotationKind::LexicalContext { .. } => {}
             AnnotationKind::Mapping { class_name, params } => {
                 if !identifier(class_name) {
                     self.add("P-MAPPING-TYPE", class_name, span);

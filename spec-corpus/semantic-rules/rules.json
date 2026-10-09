@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "grammar": "TypedModel",
+  "profile": "portableNominal/1",
+  "unknownLiterals": [
+    "?"
+  ],
+  "rules": [
+    {
+      "id": "types",
+      "node": "TypeDecl",
+      "emit": "type",
+      "name": {
+        "capture": "name"
+      },
+      "kind": {
+        "capture": "kind"
+      },
+      "parents": {
+        "capture": "parents"
+      }
+    },
+    {
+      "id": "fields",
+      "node": "Field",
+      "emit": "field",
+      "owner": "types",
+      "name": {
+        "field": "name"
+      },
+      "type": {
+        "capture": "type"
+      }
+    },
+    {
+      "id": "values",
+      "node": "ValueDecl",
+      "emit": "symbol",
+      "name": {
+        "capture": "name"
+      },
+      "type": {
+        "capture": "type"
+      },
+      "visibility": "after"
+    },
+    {
+      "id": "functions",
+      "node": "FunctionDecl",
+      "emit": "signature",
+      "name": {
+        "capture": "name"
+      },
+      "parameters": {
+        "capture": "parameters"
+      },
+      "result": {
+        "capture": "result"
+      }
+    },
+    {
+      "id": "calls",
+      "node": "Call",
+      "emit": "call",
+      "name": {
+        "capture": "name"
+      },
+      "arguments": {
+        "capture": "arguments"
+      }
+    },
+    {
+      "id": "blocks",
+      "node": "Block",
+      "emit": "scope"
+    },
+    {
+      "id": "integer",
+      "node": "Integer",
+      "emit": "expression",
+      "type": {
+        "literal": "Int"
+      }
+    },
+    {
+      "id": "references",
+      "node": "Reference",
+      "emit": "reference",
+      "name": {
+        "capture": "name"
+      }
+    },
+    {
+      "id": "holes",
+      "node": "Hole",
+      "emit": "expression",
+      "type": {
+        "literal": "?"
+      }
+    }
+  ]
+}

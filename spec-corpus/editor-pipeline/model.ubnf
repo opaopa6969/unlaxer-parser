@@ -1,0 +1,26 @@
+grammar TypedModel {
+  @ubnf: v2
+  @whitespace: javaStyle
+  token ID ::= (CHAR_RANGE('a', 'z') | CHAR_RANGE('A', 'Z') | '_')
+               { CHAR_RANGE('a', 'z') | CHAR_RANGE('A', 'Z') | CHAR_RANGE('0', '9') | '_' };
+  @root
+  @mapping(Document, params=[items])
+  Document ::= { Item @items };
+  Item ::= TypeDecl | ValueDecl | FunctionDecl | Call | ErrorItem;
+  @mapping(TypeDecl, params=[kind, name, parents, fields])
+  TypeDecl ::= Kind @kind ID @name [ ':' ID @parents { ',' ID @parents } ] '{' { Field @fields } '}';
+  Kind ::= 'interface' | 'record' | 'builtin';
+  @mapping(Field, params=[name, type])
+  Field ::= ID @name ':' ID @type ';';
+  @mapping(ValueDecl, params=[name, type])
+  ValueDecl ::= 'let' ID @name ':' ID @type ';';
+  @mapping(FunctionDecl, params=[name, parameters, result])
+  FunctionDecl ::= 'fn' ID @name '(' [ ID @parameters { ',' ID @parameters } ] ')' ':' ID @result ';';
+  @mapping(Call, params=[name, arguments])
+  Call ::= 'call' ID @name '(' Argument @arguments { ',' Argument @arguments } ')' ';';
+  @mapping(Argument, params=[value])
+  Argument ::= ( ID | '?' ) @value;
+  ErrorItem ::= 'broken' RecoverBroken;
+  @recovery(sync=';')
+  RecoverBroken ::= 'healthy';
+}

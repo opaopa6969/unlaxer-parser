@@ -1,11 +1,16 @@
 //! Native UBNF -> normalized IR -> Rust modules. No Java process is launched.
 pub mod adapters;
+mod embedded;
 pub mod impact;
 mod lexical;
+mod lexical_contexts;
 pub mod lowering;
 pub mod modules;
+pub mod packaged_profiles;
+pub mod packages;
 pub mod playground;
 pub mod portability;
+pub mod semantic_rules;
 mod token_stream;
 
 /// Parse and validate the complete grammar before producing any artifacts.
@@ -34,10 +39,12 @@ pub(crate) fn generate_grammar(
     let ir = lowering::lower(grammar)?;
     let mut files = unlaxer_codegen::generate(&ir).map_err(|error| error.to_string())?;
     if token_stream::enabled(grammar) {
-        let api = unlaxer_codegen::lexing_api(
+        let api = unlaxer_codegen::lexing_api_with_profile(
             &token_stream::terminals(grammar)?,
             ir.root,
             ir.java_whitespace,
+            token_stream::named_trivia(grammar)?.as_ref(),
+            lexical_contexts::enabled(grammar),
         );
         files
             .iter_mut()
@@ -45,6 +52,57 @@ pub(crate) fn generate_grammar(
             .unwrap()
             .content
             .push_str(&api);
+    }
+    files
+        .iter_mut()
+        .find(|f| f.relative_path == "parser.rs")
+        .unwrap()
+        .content
+        .push_str(&embedded::api(grammar, &ir)?);
+    Ok(files)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+mod package_fetch;
+
+pub mod vocabulary_origins;
+
+#[cfg(target_arch = "wasm32")]
+mod package_fetch {
+    pub fn fetch(_source: &str) -> Result<Vec<u8>, String> {
+        Err("E-PACKAGE: HTTPS retrieval requires the native deps resolve command".into())
+    }
+}
+
+/// Additional LSP module for an explicitly requested stdio server.
+pub fn generate_file_with_lsp(
+    path: &std::path::Path,
+) -> Result<Vec<unlaxer_codegen::GeneratedFile>, String> {
+    generate_file_with_protocols(path, true, false)
+}
+/// Additional strict typed AST DAP module.
+pub fn generate_file_with_dap(
+    path: &std::path::Path,
+) -> Result<Vec<unlaxer_codegen::GeneratedFile>, String> {
+    generate_file_with_protocols(path, false, true)
+}
+/// Explicit protocol modules in canonical LSP/DAP order; default emission remains five files.
+pub fn generate_file_with_protocols(
+    path: &std::path::Path,
+    lsp: bool,
+    dap: bool,
+) -> Result<Vec<unlaxer_codegen::GeneratedFile>, String> {
+    let file = modules::load(path)?;
+    let mut files = generate_ast(&file)?;
+    let grammar = &file.grammars[0];
+    let ir = lowering::lower(grammar)?;
+    if lsp {
+        files[0].content.push_str("pub mod lsp;\n");
+        files.push(unlaxer_codegen::lsp::generate(&ir, &grammar.name));
+    }
+    if dap {
+        files[0].content.push_str("pub mod dap;\n");
+        files.push(unlaxer_codegen::dap::generate(&ir));
     }
     Ok(files)
 }

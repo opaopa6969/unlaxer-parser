@@ -48,11 +48,15 @@ jobs:
     - uses: actions/setup-node@v4
       with:
         node-version: '20'
+    - name: Check pinned Unicode XID tables
+      run: python3 scripts/generate-xid-tables.py --check
     - name: Cross-language fixtures, compile failures, and generated-file drift
       run: >
         mvn -B -pl unlaxer-common,unlaxer-dsl -am test
-        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,RustPortabilityConformanceTest,TokenAdapterConformanceTest,ParseBindingsConformanceTest,DeclarativeTokenConformanceTest,ApiImpactConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest,SkipMappingConformanceTest,CaptureEqualityConformanceTest,ErrorElementConformanceTest,RecoveryConformanceTest,SemanticModelConformanceTest,ProjectSymbolIndexConformanceTest,TypeSystemConformanceTest,CallInferenceConformanceTest,SemanticQueriesConformanceTest,SemanticQueryEditsTest,SemanticModelUbnfTest,TokenStreamConformanceTest -DrustConformance=true -DtokenStreamBench=true
+        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,RustPortabilityConformanceTest,TokenAdapterConformanceTest,ParseBindingsConformanceTest,DeclarativeTokenConformanceTest,ApiImpactConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest,SkipMappingConformanceTest,CaptureEqualityConformanceTest,ErrorElementConformanceTest,RecoveryConformanceTest,SemanticModelConformanceTest,ProjectSymbolIndexConformanceTest,EditorParseResultConformanceTest,EditorPipelineConformanceTest,EditorCstTest,SemanticModelUbnfTest,TokenStreamConformanceTest,TypeSystemConformanceTest,CallInferenceConformanceTest,SemanticQueriesConformanceTest,SemanticQueryEditsTest,PackageResolverConformanceTest,HttpsPackageConformanceTest,VocabularyOriginsConformanceTest,SemanticRulesConformanceTest,SemanticDiagnosticConformanceTest,ClassicLspProtocolConformanceTest,LSPQueryConsumerTest,LSPNonBmpOffsetTest,LSPProfileInitializationTest,PreprocessingConformanceTest,UniqueLongestConformanceTest,NameSnapshotConformanceTest,NamePredicateConformanceTest,ContextualLexingConformanceTest,CodePointEscapeConformanceTest,ClassicDapProtocolConformanceTest -DrustConformance=true -DtokenStreamBench=true
         -Dsurefire.failIfNoSpecifiedTests=false
+    - name: Require real Java and Rust DAP protocol evidence
+      run: test -s unlaxer-dsl/target/classic-dap-protocol.tsv
     - name: Resolver tutorial (Java and Rust)
       run: |
         python3 examples/resolver-tutorial/run.py build
@@ -65,16 +69,27 @@ jobs:
       run: |
         npm ci
         npx playwright install --with-deps chromium
+        node scripts/contextual-lexing-reference.mjs
+        node scripts/contextual-lexing-wasm.mjs
         node scripts/playground-browser.mjs
+        node scripts/editor-playground-browser.mjs
         node --test scripts/completion.test.mjs
         node scripts/learning-browser.mjs
     - name: Require selectable lexing conformance and measurement evidence
       run: |
         test -s unlaxer-dsl/target/rust-token-stream.tsv
         test -s unlaxer-dsl/target/token-stream-benchmark.tsv
+        test -s unlaxer-dsl/target/rust-contextual-lexing.tsv
+        test -s unlaxer-dsl/target/rust-contextual-lexing-invalid.tsv
+        test -s unlaxer-dsl/target/rust-contextual-lexing-boundaries.tsv
+        test -s unlaxer-dsl/ubnf-vscode/target/contextual-lexing-reference.tsv
+        test -s unlaxer-dsl/ubnf-vscode/target/contextual-lexing-wasm.tsv
     - name: Require semantic model and generated UBNF evidence
       run: |
         test -s unlaxer-dsl/target/rust-semantic-model.tsv
+        test -s unlaxer-dsl/target/rust-semantic-rules.tsv
+        test -s unlaxer-dsl/target/semantic-diagnostics.tsv
+        test -s unlaxer-dsl/target/rust-preprocessing.tsv
         test -s unlaxer-dsl/target/rust-project-symbols.tsv
         test -s unlaxer-dsl/target/rust-type-relations.tsv
         test -s unlaxer-dsl/target/rust-call-inference.tsv
@@ -83,6 +98,8 @@ jobs:
         test -s unlaxer-dsl/target/java-query-retention-metrics.tsv
         test -s unlaxer-dsl/target/rust-query-retention-metrics.tsv
         test -s unlaxer-dsl/target/rust-semantic-ubnf.tsv
+        test -s unlaxer-dsl/target/rust-editor-pipeline.tsv
+        test -s unlaxer-dsl/ubnf-vscode/target/editor-playground.tsv
     - name: Require UBNF source position conformance evidence
       run: test -s unlaxer-dsl/target/rust-ubnf-source.tsv
     - name: Require portability check conformance evidence
@@ -99,7 +116,16 @@ jobs:
         test -s unlaxer-dsl/target/api-impact-conformance.tsv
         test -s unlaxer-dsl/target/api-impact-compile.tsv
     - name: Require rule trivia conformance evidence
-      run: test -s unlaxer-dsl/target/rust-rule-trivia.tsv
+      run: |
+        test -s unlaxer-dsl/target/rust-rule-trivia.tsv
+        test -s unlaxer-dsl/target/rust-unique-longest.tsv
+        test -s unlaxer-dsl/target/rust-name-snapshots.tsv
+        test -s unlaxer-dsl/target/rust-name-predicate.tsv
+    - name: Require pinned package conformance evidence
+      run: |
+        test -s unlaxer-dsl/target/rust-packages.tsv
+        test -s unlaxer-dsl/target/rust-package-https.tsv
+        test -s unlaxer-dsl/target/rust-vocabulary-origins.tsv
     - name: Require transactional scope conformance evidence
       run: test -s unlaxer-dsl/target/rust-scope-store.tsv
     - name: Require generated scope annotation conformance evidence
@@ -122,7 +148,15 @@ jobs:
         path: |
           unlaxer-dsl/target/rust-token-stream.tsv
           unlaxer-dsl/target/token-stream-benchmark.tsv
+          unlaxer-dsl/target/rust-contextual-lexing.tsv
+          unlaxer-dsl/target/rust-contextual-lexing-invalid.tsv
+          unlaxer-dsl/target/rust-contextual-lexing-boundaries.tsv
+          unlaxer-dsl/ubnf-vscode/target/contextual-lexing-reference.tsv
+          unlaxer-dsl/ubnf-vscode/target/contextual-lexing-wasm.tsv
           unlaxer-dsl/target/rust-semantic-model.tsv
+          unlaxer-dsl/target/rust-semantic-rules.tsv
+          unlaxer-dsl/target/semantic-diagnostics.tsv
+          unlaxer-dsl/target/rust-preprocessing.tsv
           unlaxer-dsl/target/rust-project-symbols.tsv
           unlaxer-dsl/target/rust-type-relations.tsv
           unlaxer-dsl/target/rust-call-inference.tsv
@@ -131,6 +165,8 @@ jobs:
           unlaxer-dsl/target/java-query-retention-metrics.tsv
           unlaxer-dsl/target/rust-query-retention-metrics.tsv
           unlaxer-dsl/target/rust-semantic-ubnf.tsv
+          unlaxer-dsl/target/rust-editor-pipeline.tsv
+          unlaxer-dsl/ubnf-vscode/target/editor-playground.tsv
           unlaxer-dsl/target/rust-conformance.tsv
           unlaxer-dsl/target/rust-diagnostics.tsv
           unlaxer-dsl/target/rust-diagnostics-edge.tsv
@@ -157,6 +193,12 @@ jobs:
           unlaxer-dsl/target/semantic-cardinality-both.tsv
           unlaxer-dsl/target/rust-native-generator.tsv
           unlaxer-dsl/target/rust-rule-trivia.tsv
+          unlaxer-dsl/target/rust-unique-longest.tsv
+          unlaxer-dsl/target/rust-name-snapshots.tsv
+          unlaxer-dsl/target/rust-name-predicate.tsv
+          unlaxer-dsl/target/rust-packages.tsv
+          unlaxer-dsl/target/rust-package-https.tsv
+          unlaxer-dsl/target/rust-vocabulary-origins.tsv
           unlaxer-dsl/target/rust-scope-store.tsv
           unlaxer-dsl/target/rust-scope-annotations.tsv
           unlaxer-dsl/target/rust-nested-captures.tsv
@@ -170,7 +212,8 @@ jobs:
       run: |
         cargo build --release --locked --manifest-path rust/Cargo.toml -p unlaxer-evolution-example
         printf '%s\n' 'if(0,neg(2*3),4+5)' | rust/target/release/unlaxer-evolution-example | python3 -c 'import json,sys; r=json.load(sys.stdin); assert r["ok"] and r["value"] == 9'
-        tar -czf rust/target/unlaxer-evolution-linux-x86_64.tar.gz -C rust/target/release unlaxer-evolution-example
+        cp spec-corpus/xid-identifier/UNICODE-LICENSE.txt rust/target/release/UNICODE-LICENSE.txt
+        tar -czf rust/target/unlaxer-evolution-linux-x86_64.tar.gz -C rust/target/release unlaxer-evolution-example UNICODE-LICENSE.txt
     - name: Build and smoke-test the JVM-free generator
       run: |
         cargo build --release --locked --manifest-path rust/Cargo.toml -p unlaxer-generator
@@ -185,7 +228,7 @@ jobs:
         PATH='' JAVA_HOME=/nonexistent-java rust/target/release/unlaxer generate --grammar spec-corpus/recovery/example.ubnf --output "$recovery_generated_dir"
         for module in mod.rs ast.rs parser.rs mapper.rs evaluator.rs; do test -s "$recovery_generated_dir/$module"; done
         PATH='' JAVA_HOME=/nonexistent-java rust/target/release/unlaxer impact --target rust --before spec-corpus/api-impact/node-add/before.ubnf --after spec-corpus/api-impact/node-add/after.ubnf | python3 -c 'import json,sys; r=json.load(sys.stdin); assert r["ok"] and [(c["kind"], c["subject"]) for c in r["changes"]] == [("METHOD_ADDED", "eval_extra"), ("NODE_ADDED", "Extra")]'
-        tar -czf rust/target/unlaxer-generator-linux-x86_64.tar.gz -C rust/target/release unlaxer
+        tar -czf rust/target/unlaxer-generator-linux-x86_64.tar.gz -C rust/target/release unlaxer UNICODE-LICENSE.txt
     - uses: actions/upload-artifact@v4
       with:
         name: unlaxer-generator-linux-x86_64

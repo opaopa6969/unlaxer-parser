@@ -415,6 +415,30 @@ public class SnapshotMapper {
         }
     }
 
+    /** Bounded editor-only EOF repair. Captures crossing inserted syntax stay synthetic. */
+    public static synchronized org.unlaxer.editor.EditorCst parseEditorCst(String source, List<String> completions, org.unlaxer.editor.EditorCst.Options options) {
+        return org.unlaxer.editor.EditorCst.parse(source, SnapshotParsers.getRootParser(), completions,
+            parser -> {
+                if (parser instanceof SnapshotParsers.ExprParser) return "Expr";
+                if (parser instanceof SnapshotParsers.TermParser) return "Term";
+                if (parser instanceof SnapshotParsers.FactorParser) return "Factor";
+                return null;
+            },
+            parser -> parser instanceof SnapshotParsers.__CaptureBinding binding ? binding.captureBindings().stream().map(SnapshotMapper::editorCaptureName).filter(java.util.Objects::nonNull).toList() : List.of(), options);
+    }
+
+    private static String editorCaptureName(String binding) {
+        return switch (binding) {
+            case "Expr:0" -> "left";
+            case "Expr:1" -> "op";
+            case "Expr:2" -> "right";
+            case "Term:0" -> "left";
+            case "Term:1" -> "op";
+            case "Term:2" -> "right";
+            default -> null;
+        };
+    }
+
     private static SnapshotAST mapToken(Token token) {
         if (token == null) {
             return null;

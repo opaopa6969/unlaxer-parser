@@ -168,3 +168,24 @@ style の比較は trim 後、大文字小文字を区別しない。rule の引
   `E-PRECEDENCE-WITHOUT-ASSOC` → `E-PRECEDENCE-NO-ASSOC`、
   `E-PRECEDENCE-MIXED-LEVEL` → `E-PRECEDENCE-MIXED-ASSOC`）。検出条件自体は変えず、
   仕様書の表記のみ実装と一致させた（issue #277）。
+
+## Unicode code point escape
+
+`@ubnf: v2` / `@ubnf: 2` の `CHAR_RANGE` / `NEGATION` 引数は、frontendで
+raw quoteを一度だけdecodeして検証する。Javaはコード付き`IllegalArgumentException`、
+Rustは同じコード付き`InvalidValue`診断を返す。CP spanは失敗した引数のquoted literal全体で、
+半開区間。line/columnは1始まりのcode point単位、CRLFは1改行である。
+補助面の文字が手前にあってもUTF-16/UTF-8 offsetを混同しない。
+
+| コード | 拒否する条件 |
+|---|---|
+| `E-TOKEN-ESCAPE-LENGTH` | fixed形式が4桁に不足、braced形式が閉じていない／0桁／7桁以上 |
+| `E-TOKEN-ESCAPE-HEX` | ASCIIの0-9/a-f/A-F以外を含む |
+| `E-TOKEN-ESCAPE-RANGE` | U+10FFFF超 |
+| `E-TOKEN-ESCAPE-SURROGATE` | U+D800..U+DFFFの単独code point |
+| `E-TOKEN-RANGE-BOUNDARY` | 展開後の境界がscalar 1個ではない |
+| `E-TOKEN-RANGE-ORDER` | minimum > maximum |
+| `E-TOKEN-RANGE-SURROGATE` | 境界間にsurrogate区間を含む |
+
+v1のescape処理とBMP境界制約を維持する。不正なv2 escapeをv1へfallbackしない。
+`GrammarValidator`もv2のプログラム的に構築されたBMP範囲がsurrogate区間を含む場合を拒否する。

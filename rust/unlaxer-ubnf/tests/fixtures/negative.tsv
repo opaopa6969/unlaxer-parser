@@ -21,3 +21,9 @@ supplementary-range	grammar G { token T=CHAR_RANGE('😀','😇') R ::= T; }
 reversed-range	grammar G { token T=CHAR_RANGE('z','a') R ::= T; }
 late-token	grammar G { R ::= 'x'; token T=ANY }
 late-import	grammar G { R ::= 'x'; @import a from 'b' }
+lexical-context-missing-tokens	grammar G { @lexicalContext(literals=['x']) R ::= 'x'; }
+lexical-context-trailing-comma	grammar G { @lexicalContext(tokens=['T',]) R ::= 'x'; }
+lexical-context-wrong-order	grammar G { @lexicalContext(literals=['x'], tokens=[]) R ::= 'x'; }
+name-predicate-bare	grammar G { @namePredicate R ::= 'x'; }
+name-predicate-order	grammar G { @namePredicate(version='v1',snapshot='s',name='n',kind='type') R ::= 'x'; }
+name-predicate-missing-kind	grammar G { @namePredicate(snapshot='s',version='v1',name='n') R ::= 'x'; }

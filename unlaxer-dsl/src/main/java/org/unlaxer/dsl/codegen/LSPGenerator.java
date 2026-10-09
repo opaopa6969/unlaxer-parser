@@ -49,6 +49,9 @@ public class LSPGenerator implements CodeGenerator {
 
         // ----- Lifecycle methods -----
         LSPServerEmitter.emitLifecycleMethods(w, serverClass, hasCatalog);
+        LSPServerEmitter.emitProfileMethods(w, grammar);
+        LSPQueryEmitter.emit(w);
+        LSPDiagnosticEmitter.emit(w);
 
         // ----- parseDocument & utilities -----
         LSPServerEmitter.emitParseDocument(w, parsersClass, hasScopeStore);

@@ -76,7 +76,7 @@ token mode は、構文 rule に書かれた非空 literal と、構文 rule か
 | 条件 | Java | Rust |
 |---|---|---|
 | UBNF v2、宣言的 token、構文 literal、既存の分岐・反復・capture・mapping | 対応 | 対応 |
-| 全体の `@whitespace: javaStyle` / `none` | 対応 | 対応 |
+| 全体の `@whitespace: javaStyle` / `none` / non-nullable宣言token名 | 対応 | 対応 |
 | token 内部の先読み・BOL・EOF・CAPTURE・SAME_AS・SCOPE | 対応 | 対応 |
 | 構文の `token END = EOF` / `token E = EMPTY` | ゼロ幅 | ゼロ幅 |
 | 外部 Java parser、adapter、旧形式の ANY 等 | 明示拒否 | 明示拒否 |
@@ -93,7 +93,7 @@ token mode は、構文 rule に書かれた非空 literal と、構文 rule か
 ## 原文、trivia、診断の契約
 
 - 公開する span は Unicode code point の半開区間 `[start, end)`。Java の UTF-16 index、Rust の byte index を呼出側で換算する必要はない。CRLF は 2 code point。Java は孤立 surrogate を `E-LEXING-SOURCE` で拒否する。Rust の `&str` は有効な Unicode 入力を前提にする。
-- `lexemes()` は token / error / space / lineComment / blockComment の一覧。`text()` は原文を切り出す。`preserveTrivia=true` なら連結すると原文に戻る。AST の文字列変換は従来の mapper の契約に従い、raw text の完全保存にはこの一覧を使う。
+- `lexemes()` は token / error / space / lineComment / blockComment / trivia の一覧。名前付き定義の一致は `trivia` とし、任意の定義をコメント種別へ推測分類しない。`text()` は原文を切り出す。`preserveTrivia=true` なら連結すると原文に戻る。AST の文字列変換は従来の mapper の契約に従い、raw text の完全保存にはこの一覧を使う。
 - `preserveTrivia=false` は公開一覧から trivia を除く選択。原文と内部の解析用境界は保持するため、メモリからコメントを消す指定ではない。
 - Java Session は不変の String を保持する。Rust Session は入力 `&str` を借用し、返される Outcome の寿命も入力に従う。Rust の Tree は自身の原文を所有する。Session は各解析に独立し、共有 parser / grammar にキャッシュを置かない。Java Session を複数 thread から同時変更する用途は対象外。コメントの span から原文を編集し、新しい文字列を再解析できる。既存 Session の原文を直接変更する API は設けない。
 - `lexemes()` は失敗位置より後も含め、残る一覧を遅延構築する。直接解析でも得られる一覧は同じ優先順位による字句的な見方であり、その parser が実際に選んだ分岐の記録ではない。
@@ -119,3 +119,18 @@ mvn -pl unlaxer-common,unlaxer-dsl -am test \
 `terminalEvaluations` は外側の候補 matcher 呼出回数で、matcher 内部の文字検査数ではない。token mode は全候補を評価するため、この回数が増える場合もある。`inventoryEvaluations` は `lexemes()` で追加した一覧作成の評価数。測定には一覧作成を含めない。`retainedEntries` は token / trivia 境界と trivia-cache 項目の合計で、bytes や GC 後の保持量ではない。
 
 短い入力、trivia のない反復入力、コメントが長い反復入力を比べる。token 化はコメントの再走査を減らす一方、一覧と index の構築・保持を要する。短い入力や trivia の少ない入力で速くなるとは限らない。[測定スナップショット](../spec-corpus/token-stream/measurement.tsv)は動作確認用であり、速度保証や Java / Rust 間の性能順位ではない。新しい API の 4 mode 同士を比較しており、従来入口の絶対性能との比較ではない。JIT・GC・実行順・host 負荷の影響を含む少数回の計測なので、時間の閾値を CI の成功条件にはしない。
+
+## 名前付きglobal空白
+
+`@whitespace: GAP` とnon-nullable宣言token、または `@import layout from 'pkg:std/layout'` と
+`@whitespace: layout.SPACES_AND_COMMENTS` を全modeで使える。token inventoryの走査にも同じ
+lexical programを使う。定義を1回一致させた範囲が1つのtrivia項目となり、空白を暗黙追加しない。
+Java/Rustとも解析ごとのSessionに定義を固定し、cacheやeager走査の前に空一致を拒否する。
+`@lexicalContext` を使わない profile は rule-local whitespace/interleave を拒否する。
+[文脈付き goal](contextual-lexing.md) を使う場合は、global の名前付き定義と rule-local
+`javaStyle` / `none`・interleave を組み合わせられる。active delimiter は規則の方針に従い、
+inventory は global 定義を保持する。rule-local の名前付き定義は引き続き拒否する。
+
+#432 の共通fixtureは標準定義のローカル版/package版、Unicodeを含む独自定義、暗黙空白の拒否、
+未閉鎖コメント、nullable/lookahead定義拒否を検証する。Java既存入口ともAST/source位置を比較し、
+Java frontendとnative frontendのRust生成物のbyte一致を要求する。

@@ -8,7 +8,7 @@ import java.util.Map;
 /** Immutable lexical program. Offsets used internally are UTF-16 boundaries; no context is mutated. */
 public record LexicalExpression(Op op, String text, int min, int max,
         List<LexicalExpression> children) implements Serializable {
-    public enum Op { LITERAL, ANY, EOF, BOF, BOL, EOL, RANGE, EXCEPT,
+    public enum Op { LITERAL, ANY, XID_IDENTIFIER, EOF, BOF, BOL, EOL, RANGE, EXCEPT,
         SEQUENCE, CHOICE, REPEAT, LOOK, NOT, CAPTURE, BACKREF, REF, SCOPE }
 
     public LexicalExpression {
@@ -50,6 +50,7 @@ public record LexicalExpression(Op op, String text, int min, int max,
     private int eval(String s, int p, Map<String, String> bindings) {
         return switch (op) {
             case LITERAL -> s.startsWith(text, p) ? p + text.length() : -1;
+            case XID_IDENTIFIER -> UnicodeXid.identifierEnd(s, p);
             case ANY -> scalarAt(s, p) >= 0 ? p + Character.charCount(s.codePointAt(p)) : -1;
             case EOF -> p == s.length() ? p : -1;
             case BOF -> p == 0 ? p : -1;
@@ -108,7 +109,7 @@ public record LexicalExpression(Op op, String text, int min, int max,
     public boolean nullable() {
         return switch (op) {
             case LITERAL -> text.isEmpty();
-            case ANY, RANGE, EXCEPT -> false;
+            case ANY, XID_IDENTIFIER, RANGE, EXCEPT -> false;
             case EOF, BOF, BOL, EOL, LOOK, NOT, BACKREF, REF -> true;
             case SEQUENCE -> children.stream().allMatch(LexicalExpression::nullable);
             case CHOICE -> children.stream().anyMatch(LexicalExpression::nullable);

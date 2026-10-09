@@ -1,0 +1,7 @@
+grammar TinyExpression {
+  @package: org.example.embedded
+  @embedded: { rule: 'JavaSource' body: 'body' language: 'java' package: 'example' version: '1' grammar: 'Java' entry: 'CompilationUnit' }
+  token BODY = UNTIL(']T')
+  @root @mapping(Expression) Expression ::= JavaSource;
+  @mapping(JavaSource, params=[body]) JavaSource ::= 'T[' BODY @body ']T';
+}

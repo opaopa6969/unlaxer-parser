@@ -73,7 +73,9 @@ public class ParserGenerator implements CodeGenerator {
         GenContext(GrammarDecl grammar) {
             this.grammar = grammar;
             TokenStreamGrammar.requireValid(grammar);
-            this.tokenStream = TokenStreamGrammar.enabled(grammar);
+            LexicalContexts.requireValid(grammar);
+            NamePredicates.requireValid(grammar);
+            this.tokenStream = TokenStreamGrammar.enabled(grammar) || LexicalContexts.enabled(grammar);
             this.grammarName = grammar.name();
             TokenAdapterRegistry adapters = TokenAdapterRegistry.requireValid(grammar);
             this.adapterShadowsWordParser = grammar.tokens().stream()
@@ -184,6 +186,12 @@ public class ParserGenerator implements CodeGenerator {
 
     @Override
     public GeneratedSource generate(GrammarDecl grammar) {
+        if (grammar.rules().stream().anyMatch(rule -> rule.annotations().stream().anyMatch(
+                org.unlaxer.dsl.bootstrap.UBNFAST.UniqueLongestChoiceAnnotation.class::isInstance))) {
+            var profileErrors = GrammarValidator.validateWithoutClassLoading(grammar).stream()
+                .filter(issue -> issue.code().startsWith("E-UNIQUE-LONGEST-")).toList();
+            if (!profileErrors.isEmpty()) throw new IllegalArgumentException(profileErrors.toString());
+        }
         String packageName = ParserCodegenUtil.getPackageName(grammar);
         String grammarName = grammar.name();
         String className = grammarName + "Parsers";
@@ -257,6 +265,7 @@ public class ParserGenerator implements CodeGenerator {
 
         sb.append(ParserScopeEmitter.helpers(grammar));
         sb.append(TokenStreamGrammar.javaApi(grammar));
+        sb.append(EmbeddedGrammarEmitter.javaApi(grammar));
 
         // チェーンクラス
         sb.append(generatePlainChainClass(ctx));
@@ -281,6 +290,7 @@ public class ParserGenerator implements CodeGenerator {
                 sb.append(helper);
             }
             sb.append(ParserRuleEmitter.generateRuleClass(ctx, rule));
+            if(NamePredicates.annotation(rule).isPresent()) sb.append(NamePredicates.wrapper(ctx,rule));
             // @recovery: generate recovery wrapper class after the rule class
             ParserRuleEmitter.findRecoveryAnnotation(rule)
                 .ifPresent(ra -> sb.append(ParserRuleEmitter.generateRecoveryWrapper(ctx, rule, ra)));
@@ -288,11 +298,17 @@ public class ParserGenerator implements CodeGenerator {
 
         // ファクトリメソッド
         String rootRuleName = findRootRuleName(grammar);
-        sb.append("    public static Parser getRootParser() {\n");
-        sb.append("        return Parser.get(").append(rootRuleName)
-            .append(ctx.recoveryRules.containsKey(rootRuleName) ? "RecoveryParser.class" : "Parser.class")
-            .append(");\n");
-        sb.append("    }\n");
+        if (NamePredicates.enabled(grammar)) {
+            sb.append("    public static Parser getRootSyntaxParser() {\n        return Parser.get(").append(rootRuleName)
+                .append(ctx.recoveryRules.containsKey(rootRuleName) ? "RecoveryParser.class" : "Parser.class").append(");\n    }\n");
+            sb.append("    public static Parser getRootParser() {\n        return new org.unlaxer.parser.combinator.NameResolutionScope(Parser.get(")
+                .append(ParserRuleEmitter.resolveParserClass(ctx,rootRuleName)).append("), ").append(NamePredicates.javaRequirements(grammar)).append(");\n    }\n");
+        } else {
+            sb.append("    public static Parser getRootParser() {\n");
+            sb.append("        return Parser.get(").append(rootRuleName)
+                .append(ctx.recoveryRules.containsKey(rootRuleName) ? "RecoveryParser.class" : "Parser.class").append(");\n");
+            sb.append("    }\n");
+        }
 
         sb.append("}\n");
 
@@ -503,7 +519,15 @@ public class ParserGenerator implements CodeGenerator {
                 .append(" extends LazyZeroOrMore implements org.unlaxer.context.DiagnosticsAgnostic, org.unlaxer.context.SafeSuccessMemoizable {\n")
                 .append("        public Supplier<Parser> getLazyParser() { return () -> Parser.get(")
                 .append(ParserCodegenUtil.toParserClassName(style)).append(".class); }\n")
-                .append("        public java.util.Optional<Parser> getLazyTerminatorParser() { return java.util.Optional.empty(); }\n    }\n");
+                .append("        public java.util.Optional<Parser> getLazyTerminatorParser() { return java.util.Optional.empty(); }\n");
+            if (ctx.tokenStream) {
+                var definition = org.unlaxer.dsl.bootstrap.WhitespaceDefinitions.resolve(style, org.unlaxer.dsl.bootstrap.LexicalCompiler.compile(ctx.grammar));
+                String fallback = LexicalContexts.enabled(ctx.grammar) ? "org.unlaxer.dsl.runtime.Lexing.withIndependentLexing(context, () -> super.parse(context, kind, invert))" : "super.parse(context, kind, invert)";
+                result.append("        @Override public org.unlaxer.Parsed parse(org.unlaxer.context.ParseContext context, org.unlaxer.TokenKind kind, boolean invert) {\n")
+                    .append("            return org.unlaxer.dsl.runtime.Lexing.trivia(this, context, kind, invert, ")
+                    .append(org.unlaxer.dsl.bootstrap.LexicalCompiler.javaExpression(definition)).append(", () -> ").append(fallback).append(");\n        }\n");
+            } else if (LexicalContexts.enabled(ctx.grammar)) result.append("        @Override public org.unlaxer.Parsed parse(org.unlaxer.context.ParseContext context, org.unlaxer.TokenKind kind, boolean invert) { return org.unlaxer.dsl.runtime.Lexing.withIndependentLexing(context, () -> super.parse(context, kind, invert)); }\n");
+            result.append("    }\n");
             result.append("    public static abstract class ").append(name)
                 .append(" extends LazyChain implements org.unlaxer.context.DiagnosticsAgnostic {\n")
                 .append("        private static final Parser SPACE = space();\n")
@@ -542,7 +566,7 @@ public class ParserGenerator implements CodeGenerator {
         sb.append("        @Override\n");
         sb.append("        public java.util.Optional<Parser> getLazyTerminatorParser() { return java.util.Optional.empty(); }\n");
         if (ctx.tokenStream) sb.append("        @Override public org.unlaxer.Parsed parse(org.unlaxer.context.ParseContext context, org.unlaxer.TokenKind kind, boolean invert) {\n")
-            .append("            return org.unlaxer.dsl.runtime.Lexing.trivia(this, context, kind, invert, () -> super.parse(context, kind, invert));\n        }\n");
+            .append("            return org.unlaxer.dsl.runtime.Lexing.trivia(this, context, kind, invert, null, () -> super.parse(context, kind, invert));\n        }\n");
         sb.append("    }\n\n");
 
         return sb.toString();

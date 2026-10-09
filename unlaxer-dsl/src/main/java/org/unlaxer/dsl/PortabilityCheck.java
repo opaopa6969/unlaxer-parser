@@ -56,7 +56,7 @@ public final class PortabilityCheck {
         }
     }
 
-    private static Result check(UBNFSourceSnapshot snapshot, org.unlaxer.dsl.bootstrap.UBNFAST.UBNFFile file) {
+    public static Result check(UBNFSourceSnapshot snapshot, org.unlaxer.dsl.bootstrap.UBNFAST.UBNFFile file) {
         List<Diagnostic> diagnostics = new ArrayList<>();
         List<GrammarDecl> grammars = file.grammars();
         if (grammars.size() != 1) add(diagnostics, "P-GRAMMAR-COUNT", snapshot, snapshot.ast(), "expected one grammar");
@@ -101,12 +101,14 @@ public final class PortabilityCheck {
         for (TokenContractRegistry.Diagnostic issue : TokenContractRegistry.build(grammar, snapshot).diagnostics()) {
             out.add(new Diagnostic(issue.code(), issue.span(), issue.subject()));
         }
+        for (var issue : org.unlaxer.dsl.codegen.LexicalContexts.problems(grammar))
+            add(out, issue.code(), snapshot, issue.node(), issue.subject());
         for (var issue : org.unlaxer.dsl.codegen.TokenStreamGrammar.problems(grammar))
             add(out, issue.code(), snapshot, issue.node(), issue.subject());
         for (ImportDecl decl : grammar.imports()) add(out, "P-IMPORT", snapshot, decl, decl.path());
         for (GlobalSetting setting : grammar.settings()) {
-            if (!Set.of("whitespace", "package", "memoSafeToken", "tokenAdapter", "tokenContract", "ubnf", "feature", "tokenStream").contains(setting.key())
-                || (setting.value() instanceof BlockSettingValue && !Set.of("tokenAdapter", "tokenContract").contains(setting.key()))) {
+            if (!Set.of("whitespace", "package", "memoSafeToken", "tokenAdapter", "tokenContract", "ubnf", "feature", "tokenStream", "embedded", "embedding").contains(setting.key())
+                || (setting.value() instanceof BlockSettingValue && !Set.of("tokenAdapter", "tokenContract", "embedded").contains(setting.key()))) {
                 add(out, "P-SETTING", snapshot, setting, setting.key());
             }
             if (setting.key().equals("whitespace") && setting.value() instanceof StringSettingValue value

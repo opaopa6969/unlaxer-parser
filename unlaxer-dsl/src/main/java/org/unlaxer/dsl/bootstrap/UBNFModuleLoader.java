@@ -21,17 +21,23 @@ import org.unlaxer.dsl.runtime.LexicalExpression.Op;
 public final class UBNFModuleLoader {
     @FunctionalInterface public interface SourceReader { String read(Path path) throws IOException; }
     private final SourceReader reader;
+    private final UBNFPackageResolver packages;
     private final Map<Path, Map<String, LexicalExpression>> modules = new LinkedHashMap<>();
     private final Set<Path> stack = new java.util.LinkedHashSet<>();
 
-    private UBNFModuleLoader(SourceReader reader) { this.reader = reader; }
+    private UBNFModuleLoader(UBNFPackageResolver packages) { this.packages = packages; this.reader = packages::read; }
 
     public static UBNFFile load(Path path) throws IOException {
         return resolve(UBNFMapper.parse(Files.readString(path)), path, Files::readString);
     }
 
     public static UBNFFile resolve(UBNFFile file, Path path, SourceReader reader) throws IOException {
-        var loader = new UBNFModuleLoader(reader);
+        return resolve(file, path, new UBNFPackageResolver(path, reader));
+    }
+
+    /** Explicit root selection; imported modules still export declarative tokens only. */
+    public static UBNFFile resolve(UBNFFile file, Path path, UBNFPackageResolver packages) throws IOException {
+        var loader = new UBNFModuleLoader(packages);
         path = path.toAbsolutePath().normalize();
         loader.stack.add(path);
         var grammars = new ArrayList<GrammarDecl>();
@@ -69,7 +75,7 @@ public final class UBNFModuleLoader {
         for (var declaration : grammar.imports()) {
             if (!aliases.add(declaration.alias())) throw error("duplicate import alias: " + declaration.alias());
             if (declaration.path().contains("://")) throw error("network imports are unsupported: " + declaration.path());
-            var exports = module(path.getParent().resolve(declaration.path()));
+            var exports = module(packages.importPath(path, declaration.path()));
             for (var entry : exports.entrySet())
                 imported.put(declaration.alias() + "." + entry.getKey(), entry.getValue());
         }
@@ -90,8 +96,12 @@ public final class UBNFModuleLoader {
         var rules = new ArrayList<RuleDecl>();
         for (var rule : grammar.rules()) {
             var annotations = new ArrayList<Annotation>();
-            for (var annotation : rule.annotations()) annotations.add(annotation instanceof WhitespaceAnnotation value
-                && value.style().isPresent() ? new WhitespaceAnnotation(java.util.Optional.of(policy(value.style().get(), imported, tokens, used, synthetic))) : annotation);
+            for (var annotation : rule.annotations()) {
+                if (annotation instanceof LexicalContextAnnotation value) {
+                    annotations.add(new LexicalContextAnnotation(value.tokens().stream().map(name -> policy(name, imported, tokens, used, synthetic)).toList(), value.literals()));
+                } else annotations.add(annotation instanceof WhitespaceAnnotation value
+                    && value.style().isPresent() ? new WhitespaceAnnotation(java.util.Optional.of(policy(value.style().get(), imported, tokens, used, synthetic))) : annotation);
+            }
             rules.add(new RuleDecl(annotations, rule.name(), body(rule.body(), imported, tokens, used, synthetic)));
         }
         return new GrammarDecl(grammar.name(), List.of(), settings, tokens, rules);

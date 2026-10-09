@@ -1,0 +1,24 @@
+name: analysis-pipeline
+on:
+  push:
+    branches: [master]
+  pull_request:
+jobs:
+  analysis-pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - uses: dtolnay/rust-toolchain@1.85.0
+      - run: mvn -B -pl unlaxer-common -am test -Dtest=AnalysisPipelineTest -Dsurefire.failIfNoSpecifiedTests=false
+      - run: cargo test --manifest-path rust/Cargo.toml -p unlaxer-runtime --test pipeline
+      - run: mvn -B -pl unlaxer-common,unlaxer-dsl -am test -Dtest=PreprocessingConformanceTest -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
+      - run: test -s unlaxer-dsl/target/rust-preprocessing.tsv
+      - uses: actions/upload-artifact@v4
+        with:
+          name: preprocessing-conformance
+          path: unlaxer-dsl/target/rust-preprocessing.tsv

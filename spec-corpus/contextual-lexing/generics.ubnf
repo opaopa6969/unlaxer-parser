@@ -1,0 +1,16 @@
+grammar Input {
+ @ubnf: v2
+ @package: example.lexing
+ @tokenStream: enabled
+ @whitespace: javaStyle
+ token ID ::= (CHAR_RANGE('a','z') | CHAR_RANGE('A','Z') | '𐐀')+;
+ token SHIFT ::= '>>';
+ token END = EOF
+ @root @mapping(Alias, params=[name,value])
+ @lexicalContext(tokens=['ID'], literals=['type','=',';'])
+ Root ::= 'type' ID @name '=' Type @value ';' END;
+ @mapping(TypeExpression, params=[name,arguments])
+ @lexicalContext(tokens=['ID'], literals=['<','>',','])
+ Type ::= ID @name [ '<' Type @arguments { ',' Type @arguments } '>' ];
+ ShiftExpression ::= SHIFT;
+}

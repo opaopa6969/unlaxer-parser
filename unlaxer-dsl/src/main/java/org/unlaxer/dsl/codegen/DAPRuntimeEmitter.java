@@ -169,7 +169,7 @@ class DAPRuntimeEmitter {
         w.line("astStepError = \"\";");
         w.line("try {");
         w.indent();
-        w.line("Object ast = " + mapperClass + ".parse(sourceContent);");
+        w.line("Object ast = parseDebugAst(sourceContent);");
         w.line("List<String> types = new ArrayList<>();");
         w.line("List<int[]> spans = new ArrayList<>();");
         w.line("collectAstNodeMeta(ast, types, spans);");
@@ -188,6 +188,9 @@ class DAPRuntimeEmitter {
         w.line("}");
         w.blankLine();
 
+        w.line("protected Object parseDebugAst(String source) { return " + mapperClass + ".parse(source); }");
+        w.blankLine();
+
         w.line("private void collectAstNodeMeta(Object node, List<String> types, List<int[]> spans) {");
         w.indent();
         w.line("if (node == null) {");
@@ -196,54 +199,24 @@ class DAPRuntimeEmitter {
         w.dedent();
         w.line("}");
         w.line("types.add(node.getClass().getSimpleName());");
-        w.line("spans.add(sourceSpanOfAstNode(node));");
-        w.line("java.lang.reflect.Method[] methods = node.getClass().getMethods();");
-        w.line("for (java.lang.reflect.Method method : methods) {");
-        w.indent();
-        w.line("if (method.getParameterCount() != 0) {");
-        w.indent();
-        w.line("continue;");
-        w.dedent();
+        w.line("int[] span = sourceSpanOfAstNode(node);");
+        w.line("if (span == null) throw new IllegalStateException(\"AST source span unavailable\");");
+        w.line("var snapshot = new org.unlaxer.source.DocumentSnapshot(\"dap:source\", 0, sourceContent);");
+        w.line("snapshot.lsp(span[0]); snapshot.lsp(span[1]);");
+        w.line("spans.add(span);");
+        w.line("if (!node.getClass().isRecord()) return;");
+        w.line("for (java.lang.reflect.RecordComponent component : node.getClass().getRecordComponents()) {");
+        w.line("    try { collectAstValueMeta(component.getAccessor().invoke(node), types, spans); }");
+        w.line("    catch (ReflectiveOperationException error) { throw new IllegalStateException(\"AST field unavailable\", error); }");
         w.line("}");
-        w.line("String name = method.getName();");
-        w.line("if (\"getClass\".equals(name) || \"hashCode\".equals(name) || \"toString\".equals(name)) {");
-        w.indent();
-        w.line("continue;");
-        w.dedent();
         w.line("}");
-        w.line("try {");
-        w.indent();
-        w.line("Object value = method.invoke(node);");
-        w.line("if (value == null) {");
-        w.indent();
-        w.line("continue;");
-        w.dedent();
-        w.line("}");
-        w.line("if (value instanceof List<?> list) {");
-        w.indent();
-        w.line("for (Object element : list) {");
-        w.indent();
-        w.line("if (isAstNodeCandidate(element)) {");
-        w.indent();
-        w.line("collectAstNodeMeta(element, types, spans);");
-        w.dedent();
+        w.blankLine();
+        w.line("private void collectAstValueMeta(Object value, List<String> types, List<int[]> spans) {");
+        w.line("    if (value instanceof java.util.Optional<?> optional) { optional.ifPresent(child -> collectAstValueMeta(child, types, spans)); }");
+        w.line("    else if (value instanceof List<?> list) { for (Object child : list) collectAstValueMeta(child, types, spans); }");
+        w.line("    else if (isAstNodeCandidate(value)) { collectAstNodeMeta(value, types, spans); }");
         w.line("}");
         w.dedent();
-        w.line("}");
-        w.line("continue;");
-        w.dedent();
-        w.line("}");
-        w.line("if (isAstNodeCandidate(value)) {");
-        w.indent();
-        w.line("collectAstNodeMeta(value, types, spans);");
-        w.dedent();
-        w.line("}");
-        w.dedent();
-        w.line("} catch (Throwable ignored) {}");
-        w.dedent();
-        w.line("}");
-        w.dedent();
-        w.line("}");
         w.blankLine();
 
         w.line("private int[] sourceSpanOfAstNode(Object node) {");
@@ -308,7 +281,7 @@ class DAPRuntimeEmitter {
 
         w.line("private boolean hasCurrentStep() {");
         w.indent();
-        w.line("return stepLimit() > 0 && stepIndex < stepLimit();");
+        w.line("return !terminated && stepLimit() > 0 && stepIndex < stepLimit();");
         w.dedent();
         w.line("}");
         w.blankLine();
@@ -470,14 +443,7 @@ class DAPRuntimeEmitter {
 
         w.line("private int getLineForToken(Token t) {");
         w.indent();
-        w.line("int charOffset = codePointOffsetToStringOffset(t.source.offsetFromRoot().value());");
-        w.line("int line = 1;");
-        w.line("for (int i = 0; i < charOffset && i < sourceContent.length(); i++) {");
-        w.indent();
-        w.line("if (sourceContent.charAt(i) == '\\n') { line++; }");
-        w.dedent();
-        w.line("}");
-        w.line("return line + sourceLineOffset;");
+        w.line("return getLineForOffset(t.source.offsetFromRoot().value());");
         w.dedent();
         w.line("}");
         w.blankLine();
@@ -524,18 +490,7 @@ class DAPRuntimeEmitter {
 
         w.line("private int getLineForOffset(int codePointOffset) {");
         w.indent();
-        w.line("int charOffset = codePointOffsetToStringOffset(codePointOffset);");
-        w.line("int line = 1;");
-        w.line("for (int i = 0; i < charOffset && i < sourceContent.length(); i++) {");
-        w.indent();
-        w.line("if (sourceContent.charAt(i) == '\\n') {");
-        w.indent();
-        w.line("line++;");
-        w.dedent();
-        w.line("}");
-        w.dedent();
-        w.line("}");
-        w.line("return line + sourceLineOffset;");
+        w.line("return new org.unlaxer.source.DocumentSnapshot(\"dap:source\", 0, sourceContent).lsp(codePointOffset).line() + sourceLineOffset + lineBase;");
         w.dedent();
         w.line("}");
         w.blankLine();
@@ -613,6 +568,7 @@ class DAPRuntimeEmitter {
 
         w.line("private void sendTerminated() {");
         w.indent();
+        w.line("terminated = true;");
         w.line("if (client == null) return;");
         w.line("client.terminated(new TerminatedEventArguments());");
         w.line("ExitedEventArguments exited = new ExitedEventArguments();");

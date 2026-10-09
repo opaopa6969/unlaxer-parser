@@ -97,10 +97,13 @@ grammar Example {
 閉じるため、呼出し側の同名 token で上書きされない。読み飛ばしの適用位置、rule の
 優先順位、CST / AST の既存位置契約、token 内部が原子的なことは上記と同じ。
 
-この段階では通常の文字入力 runtime を対象にする。既存 `@tokenStream: enabled` の
-rule-local whitespace 制限を維持し、名前付き global 空白も
-`E-TOKEN-STREAM-TRIVIA` で明示拒否する。`pkg:` 参照、標準定義、manifest / lock /
-cache、HTTPS、編集支援の出典表示と TinyExpression 移行は親 #368 の未完了項目。
+名前付きglobal空白は通常の文字入力と `@tokenStream: enabled` の全4modeで使える。
+tokenStream の通常 profile は rule-local whitespace/interleave を拒否する。
+[文脈付き goal](contextual-lexing.md) の profile は global 名前付き定義と rule-local
+`javaStyle` / `none`・interleave を組み合わせられるが、rule-local 名前付き定義は拒否する。
+token一覧に単一global定義を使い、
+名前付き定義の一致は汎用 `trivia` として原文spanを保持する。
+package / lock / HTTPS / 出典表示は [package仕様](ubnf-packages.md) を参照する。
 
 共通 trivia corpus は名前付き global/rule、相対 import の global/rule、token 内部の
 原子性を追加し、Java / Rust の受理・拒否、consumed/matched cursor、AST の全 field /

@@ -17,12 +17,24 @@ final class RustGenerateCommand {
     static int run(String[] args, PrintStream out, PrintStream err) {
         Map<String, String> options = new HashMap<>();
         boolean check = false;
+        boolean lsp = false;
+        boolean dap = false;
         try {
             for (int i = 1; i < args.length; i++) {
                 String option = args[i];
                 if (option.equals("--help")) {
-                    out.println("Usage: generate --target rust --grammar <file.ubnf> --output <module-directory> [--check]");
+                    out.println("Usage: generate --target rust --grammar <file.ubnf> --output <module-directory> [--check] [--lsp] [--dap]");
                     return 0;
+                }
+                if (option.equals("--dap")) {
+                    if (dap) throw new IllegalArgumentException("duplicate --dap");
+                    dap = true;
+                    continue;
+                }
+                if (option.equals("--lsp")) {
+                    if (lsp) throw new IllegalArgumentException("duplicate --lsp");
+                    lsp = true;
+                    continue;
                 }
                 if (option.equals("--check")) {
                     if (check) throw new IllegalArgumentException("duplicate --check");
@@ -59,7 +71,7 @@ final class RustGenerateCommand {
             var errors = GrammarValidator.validate(validationGrammar).stream()
                 .filter(issue -> "ERROR".equals(issue.severity())).map(GrammarValidator.ValidationIssue::format).toList();
             if (!errors.isEmpty()) throw new IllegalArgumentException("Grammar validation failed:\n - " + String.join("\n - ", errors));
-            var generated = new RustBackend().generate(file.grammars().get(0));
+            var generated = new RustBackend().generateWithProtocols(grammar, lsp, dap);
             Path output = Path.of(options.get("--output"));
             if (Files.isSymbolicLink(output)) throw new IOException("output directory must not be a symbolic link");
             // Preflight every file before writing: never replace handwritten code or follow file symlinks.

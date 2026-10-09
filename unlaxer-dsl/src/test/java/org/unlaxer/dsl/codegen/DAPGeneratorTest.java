@@ -69,7 +69,7 @@ public class DAPGeneratorTest {
     @Test
     public void testAdapterAcceptsProgramAndLegacyFormulaSourceLaunchKeys() {
         assertTrue(adapterResult.source().contains(
-            "firstNonBlankLaunchArgument(launchArguments, \"program\", \"formulaSource\")"));
+            "firstNonBlankLaunchArgument(proposed, \"program\", \"formulaSource\")"));
     }
 
     @Test
@@ -180,8 +180,8 @@ public class DAPGeneratorTest {
     public void testAdapterMapsSelectedSourceLinesBackToOriginalDocument() {
         assertTrue(adapterResult.source().contains("protected int sourceLineOffset = 0"));
         assertTrue(adapterResult.source().contains("sourceLineOffset = Math.max(0, debugSource.lineOffset())"));
-        assertTrue(adapterResult.source().contains("frame.setLine(line + sourceLineOffset + 1)"));
-        assertTrue(adapterResult.source().contains("return line + sourceLineOffset"));
+        assertTrue(adapterResult.source().contains("frame.setLine(line + sourceLineOffset + lineBase)"));
+        assertTrue(adapterResult.source().contains(".line() + sourceLineOffset + lineBase"));
     }
 
     @Test

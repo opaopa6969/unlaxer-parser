@@ -1,0 +1,11 @@
+base	-	-	Java21	CompilationUnit	true	false	false	false	true
+wrong-grammar	-	-	Java22	CompilationUnit	false	false	false	false	true
+unknown-entry	-	-	Java21	Missing	false	false	false	false	true
+external-entry	entry\tCompilationUnit\tPARTIAL	entry\tCompilationUnit\tEXTERNAL	Java21	CompilationUnit	false	false	false	false	true
+unsupported-entry	entry\tCompilationUnit\tPARTIAL	entry\tCompilationUnit\tUNSUPPORTED	Java21	CompilationUnit	false	false	false	false	true
+external-parse	capability\tPARSE\tPARTIAL	capability\tPARSE\tEXTERNAL	Java21	CompilationUnit	false	false	false	false	true
+unsupported-parse	capability\tPARSE\tPARTIAL	capability\tPARSE\tUNSUPPORTED	Java21	CompilationUnit	false	false	false	false	true
+local-completion	COMPLETION\tUNSUPPORTED	COMPLETION\tSUPPORTED	Java21	CompilationUnit	true	true	false	true	true
+partial-completion	COMPLETION\tUNSUPPORTED	COMPLETION\tPARTIAL	Java21	CompilationUnit	true	true	false	true	true
+external-completion	COMPLETION\tUNSUPPORTED	COMPLETION\tEXTERNAL	Java21	CompilationUnit	true	false	false	true	true
+local-definition	DEFINITION\tEXTERNAL	DEFINITION\tSUPPORTED	Java21	CompilationUnit	true	false	true	false	true

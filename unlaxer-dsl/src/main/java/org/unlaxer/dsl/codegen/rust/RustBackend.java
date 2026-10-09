@@ -25,9 +25,56 @@ public final class RustBackend {
                 pub mod evaluator;
                 """),
             new GeneratedFile("ast.rs", ast(ir)),
-            new GeneratedFile("parser.rs", parser(ir) + lexingApi(grammar, ir)),
+            new GeneratedFile("parser.rs", parser(ir) + lexingApi(grammar, ir) + org.unlaxer.dsl.codegen.EmbeddedGrammarEmitter.rustApi(grammar, ir.rules().stream().map(Rule::name).toList(), ir.javaWhitespace())),
             new GeneratedFile("mapper.rs", mapper(ir)),
             new GeneratedFile("evaluator.rs", evaluator(ir)));
+    }
+
+    /** Opt-in stdio LSP module, leaving ordinary generation unchanged. */
+    public List<GeneratedFile> generateWithLsp(GrammarDecl grammar) {
+        var ir = RustGrammarLowering.lower(grammar);
+        var files = new ArrayList<>(generate(grammar));
+        var first = files.get(0);
+        files.set(0, new GeneratedFile(first.relativePath(), first.content() + "pub mod lsp;\n"));
+        var keywords = new java.util.LinkedHashSet<String>(List.of("grammar token @root @mapping @whitespace @interleave @backref @typeof @scopeTree @leftAssoc @rightAssoc @longestChoice @predictiveChoice @precedence @declares @catalog params level profile name mode symbol context description".split(" ")));
+        for (var rule : ir.rules()) collectLspKeywords(rule.body(), keywords);
+        files.add(new GeneratedFile("lsp.rs", HEADER + "\n/// Intrinsic Classic grammar adapter; implement Backend for additional typed/provider queries.\npub fn backend() -> unlaxer_lsp::GrammarBackend {\n    unlaxer_lsp::GrammarBackend {\n        name: " + quote(grammar.name()) + ".into(), entry: " + quote(ir.rules().get(ir.root()).name()) + ".into(),\n        grammar: std::sync::Arc::clone(super::parser::grammar()),\n        root: " + ir.root() + ", whitespace: " + ir.javaWhitespace() + ",\n        keywords: vec![" + keywords.stream().map(k -> quote(k) + ".into()").collect(Collectors.joining(", ")) + "],\n    }\n}\n\npub fn serve_stdio() -> std::io::Result<()> {\n    unlaxer_lsp::Server::new(backend()).serve_stdio()\n}\n"));
+        return List.copyOf(files);
+    }
+
+    public List<GeneratedFile> generateWithDap(GrammarDecl grammar) {
+        return generateWithProtocols(grammar, false, true);
+    }
+
+    /** Protocol modules are opt-in and emitted in canonical LSP/DAP order. */
+    public List<GeneratedFile> generateWithProtocols(GrammarDecl grammar, boolean lsp, boolean dap) {
+        var files = new ArrayList<>(lsp ? generateWithLsp(grammar) : generate(grammar));
+        if (dap) {
+            var first = files.get(0);
+            files.set(0, new GeneratedFile(first.relativePath(), first.content() + "pub mod dap;\n"));
+            files.add(RustDapEmitter.generate(RustGrammarLowering.lower(grammar)));
+        }
+        return List.copyOf(files);
+    }
+
+    private static void collectLspKeywords(Expression expression, java.util.Set<String> keywords) {
+        if (expression instanceof Literal v) keywords.add(v.text());
+        else if (expression instanceof Sequence v) v.elements().forEach(e -> collectLspKeywords(e, keywords));
+        else if (expression instanceof Choice v) v.alternatives().forEach(e -> collectLspKeywords(e, keywords));
+        else if (expression instanceof LongestChoice v) v.alternatives().forEach(e -> collectLspKeywords(e, keywords));
+        else if (expression instanceof PredictiveChoice v) v.alternatives().forEach(e -> collectLspKeywords(e, keywords));
+        else if (expression instanceof RuleEffects v) collectLspKeywords(v.child(), keywords);
+        else if (expression instanceof CaptureEquality v) collectLspKeywords(v.child(), keywords);
+        else if (expression instanceof Recovery v) collectLspKeywords(v.child(), keywords);
+        else if (expression instanceof Capture v) collectLspKeywords(v.expression(), keywords);
+        else if (expression instanceof OptionalExpr v) collectLspKeywords(v.child(), keywords);
+        else if (expression instanceof Repeat v) collectLspKeywords(v.child(), keywords);
+        else if (expression instanceof Delimited v) collectLspKeywords(v.child(), keywords);
+        else if (expression instanceof TextValue v) collectLspKeywords(v.child(), keywords);
+        else if (expression instanceof ValueBoundary v) collectLspKeywords(v.child(), keywords);
+        else if (expression instanceof TriviaScope v) collectLspKeywords(v.child(), keywords);
+        else if (expression instanceof LexicalTriviaScope v) collectLspKeywords(v.child(), keywords);
+        else if (expression instanceof Separated v) { collectLspKeywords(v.child(), keywords); collectLspKeywords(v.separator(), keywords); }
     }
 
     private String lexingApi(GrammarDecl grammar, GrammarIR ir) {
@@ -38,9 +85,13 @@ public final class RustBackend {
                 .append(", literal: ").append(terminal.literal()).append(", expression: ")
                 .append(lexicalExpression(terminal.expression())).append(" },\n");
         }
-        return out.append("    ].into())\n}\n\npub fn parse_with_lexing(source: &str, options: unlaxer_runtime::lexing::Options) -> Result<unlaxer_runtime::lexing::Outcome<'_>, String> {\n    unlaxer_runtime::lexing::parse(grammar(), ")
+        var trivia = org.unlaxer.dsl.codegen.TokenStreamGrammar.namedTrivia(grammar);
+        out.append("    ].into())\n}\n\npub fn parse_with_lexing(source: &str, options: unlaxer_runtime::lexing::Options) -> Result<unlaxer_runtime::lexing::Outcome<'_>, String> {\n    unlaxer_runtime::lexing::")
+            .append(org.unlaxer.dsl.codegen.LexicalContexts.enabled(grammar) ? (trivia == null ? "parse_contextual" : "parse_contextual_with_trivia") : (trivia == null ? "parse" : "parse_with_trivia")).append("(grammar(), ")
             .append(ir.root()).append(", ").append(ir.javaWhitespace())
-            .append(", source, options, std::sync::Arc::clone(lexical_terminals()))\n}\n").toString();
+            .append(", source, options, std::sync::Arc::clone(lexical_terminals())");
+        if (trivia != null) out.append(", Some(").append(lexicalExpression(trivia)).append(")");
+        return out.append(")\n}\n").toString();
     }
 
     private String ast(GrammarIR ir) {
@@ -146,6 +197,23 @@ public final class RustBackend {
         out.append("\npub fn parse_tree_detailed(source: &str) -> Result<Tree, ParseDiagnostic> {\n    parse_tree_detailed_with_options(source, ParseOptions::default())\n}\n")
             .append("\npub fn parse_tree_detailed_with_options(source: &str, options: ParseOptions) -> Result<Tree, ParseDiagnostic> {\n    unlaxer_runtime::parse_detailed_shared_with_options(grammar(), ")
             .append(ir.root()).append(", ").append(ir.javaWhitespace()).append(", source, options)\n}\n");
+        if(ir.rules().stream().anyMatch(rule -> rule.body() instanceof NameResolutionScope)) {
+            out.append("\npub fn parse_tree_detailed_with_name_snapshots(source: &str, snapshots: &[unlaxer_runtime::names::Snapshot], options: ParseOptions) -> Result<Tree, ParseDiagnostic> {\n    let tree = unlaxer_runtime::parse_detailed_shared_with_name_snapshots(grammar(), ")
+                .append(ir.root()).append(", ").append(ir.javaWhitespace()).append(", source, options, snapshots)").append("""
+                ?;
+                    if let Some(first) = tree.recoveries().first() {
+                        return Err(ParseDiagnostic {
+                            kind: "recovery", offset: first.span.start,
+                            expected: vec![first.message.to_owned()],
+                            farthest: unlaxer_runtime::ParseError { offset: first.span.end, expected: vec![] },
+                        });
+                    }
+                    Ok(tree)
+                }
+                """);
+        }
+        out.append("\n/// Bounded editor-only EOF repair; synthetic syntax never becomes a normal AST value.\npub fn parse_editor_cst(source: &str, completions: &[&str], options: unlaxer_runtime::editor_cst::Options) -> Result<unlaxer_runtime::editor_cst::EditorCst, &'static str> {\n    unlaxer_runtime::editor_cst::parse(grammar(), ")
+            .append(ir.root()).append(", ").append(ir.javaWhitespace()).append(", source, completions, options)\n}\n");
         if (ir.rules().stream().anyMatch(r -> r.operator() != null)) {
             out.append("""
 
@@ -216,6 +284,8 @@ public final class RustBackend {
     }
 
     private String expression(Expression expression) {
+        if(expression instanceof NamePredicate predicate) return "Expr::NamePredicate { child: Box::new("+expression(predicate.child())+"), snapshot: "+quote(predicate.snapshot())+", version: "+quote(predicate.version())+", capture: "+quote(predicate.capture())+", kind: "+quote(predicate.kind())+" }";
+        if(expression instanceof NameResolutionScope scope) return "Expr::NameResolutionScope { child: Box::new("+expression(scope.child())+"), requirements: vec!["+scope.requirements().stream().map(requirement->"unlaxer_runtime::names::Requirement::new("+quote(requirement.id())+", "+quote(requirement.version())+").expect(\"validated name requirement\")").collect(java.util.stream.Collectors.joining(", "))+"] }";
         if (expression instanceof Recovery recovery) {
             String tokens = recovery.tokens().stream().map(RustBackend::quote)
                 .collect(java.util.stream.Collectors.joining(", "));
@@ -297,6 +367,9 @@ public final class RustBackend {
         if (expression instanceof Choice choice) {
             return "Expr::Choice(vec![" + expressions(choice.alternatives()) + "])";
         }
+        if (expression instanceof UniqueLongestChoice choice) {
+            return "Expr::UniqueLongestChoice(vec![" + expressions(choice.alternatives()) + "])";
+        }
         if (expression instanceof LongestChoice choice) {
             return "Expr::LongestChoice(vec![" + expressions(choice.alternatives()) + "])";
         }
@@ -315,6 +388,9 @@ public final class RustBackend {
         if (expression instanceof ValueBoundary boundary) {
             return expression(boundary.child()) + ".value_boundary()";
         }
+        if (expression instanceof LexicalContextScope scope) return expression(scope.child()) + ".lexical_context_scope(vec![" + scope.terminals().stream().map(terminal ->
+            "unlaxer_runtime::lexing::Terminal { name: " + quote(terminal.name()) + ", literal: " + terminal.literal() + ", expression: " + lexicalExpression(terminal.expression()) + " }")
+            .collect(java.util.stream.Collectors.joining(", ")) + "])";
         if (expression instanceof LexicalTriviaScope scope) return expression(scope.child()) + ".lexical_trivia_scope(" + lexicalExpression(scope.definition()) + ")";
         if (expression instanceof TriviaScope scope) {
             return expression(scope.child()) + ".trivia_scope(" + scope.javaWhitespace() + ")";
@@ -550,7 +626,10 @@ public final class RustBackend {
         if (expression instanceof CustomToken) return true;
         if (expression instanceof RuleEffects value) return containsRecovery(value.child());
         if (expression instanceof CaptureEquality value) return containsRecovery(value.child());
+        if (expression instanceof NamePredicate value) return containsRecovery(value.child());
+        if (expression instanceof NameResolutionScope value) return containsRecovery(value.child());
         if (expression instanceof TriviaScope value) return containsRecovery(value.child());
+        if (expression instanceof LexicalContextScope value) return containsRecovery(value.child());
         if (expression instanceof TextValue value) return containsRecovery(value.child());
         if (expression instanceof ValueBoundary value) return containsRecovery(value.child());
         if (expression instanceof Delimited value) return containsRecovery(value.child());
@@ -560,6 +639,7 @@ public final class RustBackend {
         if (expression instanceof Separated value) return containsRecovery(value.child()) || containsRecovery(value.separator());
         if (expression instanceof Sequence value) return value.elements().stream().anyMatch(RustBackend::containsRecovery);
         if (expression instanceof Choice value) return value.alternatives().stream().anyMatch(RustBackend::containsRecovery);
+        if (expression instanceof UniqueLongestChoice value) return value.alternatives().stream().anyMatch(RustBackend::containsRecovery);
         if (expression instanceof LongestChoice value) return value.alternatives().stream().anyMatch(RustBackend::containsRecovery);
         if (expression instanceof PredictiveChoice value) return value.alternatives().stream().anyMatch(RustBackend::containsRecovery);
         return false;

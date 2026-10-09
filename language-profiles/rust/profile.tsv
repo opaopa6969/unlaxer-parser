@@ -1,0 +1,30 @@
+profile	1
+language	rust
+package	lang/rust	0.1.0
+target	1.85.0	edition2021
+tool	rustc	1.85.0
+grammar	Rust185	Rust185.ubnf
+source	https://github.com/rust-lang/rust/tree/1.85.0/compiler/rustc_parse	1.85.0	original-repository-grammar
+fixture	corpus.tsv
+entry	Crate	PARTIAL
+entry	Type	PARTIAL
+entry	Expression	PARTIAL
+entry	Statement	PARTIAL
+entry	Block	PARTIAL
+capability	PARSE	PARTIAL
+capability	AST	PARTIAL
+capability	CST	SUPPORTED
+capability	VALIDATE	EXTERNAL
+capability	COMPLETION	UNSUPPORTED
+capability	HOVER	UNSUPPORTED
+capability	DEFINITION	UNSUPPORTED
+capability	RENAME	UNSUPPORTED
+capability	FORMAT	UNSUPPORTED
+capability	CODE_ACTION	UNSUPPORTED
+capability	EXECUTE	UNSUPPORTED
+syntax	functions-let-expressions	PARTIAL
+syntax	macros-ownership	UNSUPPORTED
+syntax	unicode-identifiers-raw-strings	UNSUPPORTED
+difference	ast	AST retains the source root span; use CST for syntactic structure.
+difference	scope	Names, types, execution and project scope are not inferred by this grammar.
+difference	coverage	Unsupported syntax can require the pinned external provider; partial grammar rejection is not an official language error.

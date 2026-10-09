@@ -3,6 +3,71 @@ use std::path::Path;
 use unlaxer_codegen::GeneratedFile;
 use unlaxer_ubnf::ast::TokenKind;
 
+pub fn generate_profile(path: &Path) -> Result<Vec<GeneratedFile>, String> {
+    let text = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+    let profile = unlaxer_runtime::language_profile::LanguageProfile::parse(&text)?;
+    let grammar_path = path
+        .parent()
+        .unwrap_or(Path::new("."))
+        .join(profile.grammar_file());
+    let ast = crate::modules::load(&grammar_path)?;
+    if ast.grammars.len() != 1 {
+        return Err("profile requires exactly one grammar".into());
+    }
+    let grammar = &ast.grammars[0];
+    for entry in profile.entries.keys() {
+        if profile.identity(entry)?.grammar != grammar.name
+            || !grammar.rules.iter().any(|rule| rule.name == *entry)
+        {
+            return Err("profile grammar/entry mismatch".into());
+        }
+    }
+    let mut files = generate_file(&grammar_path)?;
+    files.push(GeneratedFile {
+        relative_path: "public/profile.tsv".into(),
+        content: profile.canonical_tsv(),
+    });
+    let index = files
+        .iter_mut()
+        .find(|file| file.relative_path == "public/index.html")
+        .unwrap();
+    index.content = index
+        .content
+        .replace("<body>", "<body data-profile=\"profile.tsv\">");
+    Ok(files)
+}
+
+pub fn generate_package(manifest: &Path, package_id: &str) -> Result<Vec<GeneratedFile>, String> {
+    let selected = crate::packaged_profiles::load(manifest, package_id)?;
+    let readiness = crate::portability::check_ast(&selected.ast);
+    if !readiness.portable {
+        return Err(format!(
+            "Playground requires a Rust-portable grammar: {}",
+            readiness.to_json()
+        ));
+    }
+    let mut files = generate_resolved(selected.source, &selected.ast, &selected.vocabulary)?;
+    files.push(GeneratedFile {
+        relative_path: "public/profile.tsv".into(),
+        content: selected.profile.canonical_tsv(),
+    });
+    files.push(GeneratedFile {
+        relative_path: "public/package.json".into(),
+        content: format!(
+            "{}\n",
+            crate::vocabulary_origins::to_json(&selected.identity)
+        ),
+    });
+    let index = files
+        .iter_mut()
+        .find(|file| file.relative_path == "public/index.html")
+        .unwrap();
+    index.content = index
+        .content
+        .replace("<body>", "<body data-profile=\"profile.tsv\">");
+    Ok(files)
+}
+
 pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
     let source = std::fs::read_to_string(path).map_err(|error| error.to_string())?;
     let readiness = crate::portability::check_file(path);
@@ -13,6 +78,14 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
         ));
     }
     let file = crate::modules::load(path)?;
+    generate_resolved(source, &file, &crate::vocabulary_origins::inspect(path)?)
+}
+
+fn generate_resolved(
+    source: String,
+    file: &unlaxer_ubnf::UbnfFile,
+    vocabulary: &serde_json::Value,
+) -> Result<Vec<GeneratedFile>, String> {
     let grammar = &file.grammars[0];
     for token in &grammar.tokens {
         if !matches!(token.kind, TokenKind::Declarative { .. }) {
@@ -44,6 +117,14 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
         relative_path: "runtime/LICENSE".into(),
         content: include_str!("../../../LICENSE").into(),
     });
+    files.push(GeneratedFile {
+        relative_path: "runtime/UNICODE-LICENSE.txt".into(),
+        content: include_str!("../../../spec-corpus/xid-identifier/UNICODE-LICENSE.txt").into(),
+    });
+    files.push(GeneratedFile {
+        relative_path: "public/UNICODE-LICENSE.txt".into(),
+        content: include_str!("../../../spec-corpus/xid-identifier/UNICODE-LICENSE.txt").into(),
+    });
     macro_rules! runtime {
         ($name:literal) => {
             files.push(GeneratedFile {
@@ -53,15 +134,32 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
         };
     }
     runtime!("lib.rs");
+    runtime!("token.rs");
     runtime!("scope.rs");
+    runtime!("names.rs");
     runtime!("semantic.rs");
+    runtime!("semantic_rules.rs");
+    runtime!("editor.rs");
+    runtime!("editor_cst.rs");
+    runtime!("editor_queries.rs");
+    runtime!("language_queries.rs");
+    runtime!("semantic_queries.rs");
     runtime!("semantic_project.rs");
     runtime!("semantic_query_cache.rs");
     runtime!("type_system.rs");
     runtime!("call_inference.rs");
+    runtime!("semantic_rename.rs");
+    runtime!("source_edits.rs");
+    runtime!("source.rs");
+    runtime!("language_profile.rs");
+    runtime!("embedded.rs");
+    runtime!("provider_protocol.rs");
+    runtime!("provider_process.rs");
+    runtime!("pipeline.rs");
     runtime!("lexing.rs");
     runtime!("first.rs");
     runtime!("lexical.rs");
+    runtime!("unicode_xid.rs");
     runtime!("long_code_fence.rs");
     runtime!("memo_retention_tests.rs");
     let wrapper = include_str!("../../../unlaxer-dsl/src/main/resources/playground/lib.rs")
@@ -79,6 +177,9 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
         relative_path: "src/lib.rs".into(),
         content: wrapper,
     });
+    asset!("src/editor_adapter.rs", "playground/editor_adapter.rs");
+    asset!("src/region_adapter.rs", "playground/region_adapter.rs");
+    asset!("src/query_adapter.rs", "playground/query_adapter.rs");
     asset!("public/index.html", "playground/index.html");
     asset!("public/playground.css", "playground/playground.css");
     asset!("public/playground.js", "playground/playground.js");
@@ -90,6 +191,10 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
     files.push(GeneratedFile {
         relative_path: "public/grammar.ubnf".into(),
         content: source,
+    });
+    files.push(GeneratedFile {
+        relative_path: "public/vocabulary.json".into(),
+        content: format!("{}\n", crate::vocabulary_origins::to_json(vocabulary)),
     });
     Ok(files)
 }

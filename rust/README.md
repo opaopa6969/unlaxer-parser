@@ -8,6 +8,8 @@ full-specの進捗は[対応表と受け入れ条件](FULL-SPEC.md)で追跡す�
 
 3.3.0-SNAPSHOT の `unlaxer_runtime::semantic` は、Java と共通の[型・scope・期待型モデル](../docs/semantic-model.md)を提供する。ユーザー定義型と引数補完の[UBNF 接続例](../examples/semantic-model/README.md)がある。LSP の自動生成や TinyExpression の新しい型構文はこの API の対象外。
 
+[宣言的な意味規則](../docs/declarative-semantics.md)では、同じ version 付き JSON を Java / Rust で検証し、生成 `EditorCst` から型・scope・参照・call-site と期待型補完を構築する。Rust の JSON loader は `unlaxer_generator::semantic_rules`、実行 IR は `unlaxer_runtime::semantic_rules`。`portableNominal/1` の対応範囲と独自 provider の境界を仕様に記載している。
+
 ## すぐ動かす
 
 3.3.0-SNAPSHOT では `unlaxer playground --grammar ... --output ...` により、
@@ -419,3 +421,5 @@ TSVは`unlaxer-dsl/target/`配下で、CI artifact `rust-conformance`にも添�
 
 文字種境界は既存 token の合成で表せる。実行時辞書には Java と共通の immutable parse bindings を使う。
 [仕様と実行例](../docs/parse-composition.md)を参照。
+
+Classic の opt-in stdio LSP は [利用方法・Java/Rust共通契約](../docs/classic-rust-lsp.md) を参照。`generate --lsp` は通常の5-file契約を保持してLSP moduleを追加する。DAP等の残差は [full-spec対応表](FULL-SPEC.md) に残す。

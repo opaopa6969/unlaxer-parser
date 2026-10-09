@@ -1,0 +1,310 @@
+[
+  {
+    "name": "short",
+    "grammar": "// 😀\r\ngrammar Invalid {\r\n  @ubnf: 2\r\n  token T = NEGATION('\\u123')\r\n  @root Root ::= T;\r\n}",
+    "code": "E-TOKEN-ESCAPE-LENGTH",
+    "span": [
+      58,
+      65
+    ],
+    "line": 4,
+    "column": 22
+  },
+  {
+    "name": "hex",
+    "grammar": "// 😀\r\ngrammar Invalid {\r\n  @ubnf: 2\r\n  token T = NEGATION('\\u00G0')\r\n  @root Root ::= T;\r\n}",
+    "code": "E-TOKEN-ESCAPE-HEX",
+    "span": [
+      58,
+      66
+    ],
+    "line": 4,
+    "column": 22
+  },
+  {
+    "name": "empty-braced",
+    "grammar": "// 😀\r\ngrammar Invalid {\r\n  @ubnf: 2\r\n  token T = NEGATION('\\u{}')\r\n  @root Root ::= T;\r\n}",
+    "code": "E-TOKEN-ESCAPE-LENGTH",
+    "span": [
+      58,
+      64
+    ],
+    "line": 4,
+    "column": 22
+  },
+  {
+    "name": "long-braced",
+    "grammar": "// 😀\r\ngrammar Invalid {\r\n  @ubnf: 2\r\n  token T = NEGATION('\\u{1234567}')\r\n  @root Root ::= T;\r\n}",
+    "code": "E-TOKEN-ESCAPE-LENGTH",
+    "span": [
+      58,
+      71
+    ],
+    "line": 4,
+    "column": 22
+  },
+  {
+    "name": "overflow",
+    "grammar": "// 😀\r\ngrammar Invalid {\r\n  @ubnf: 2\r\n  token T = NEGATION('\\u{110000}')\r\n  @root Root ::= T;\r\n}",
+    "code": "E-TOKEN-ESCAPE-RANGE",
+    "span": [
+      58,
+      70
+    ],
+    "line": 4,
+    "column": 22
+  },
+  {
+    "name": "surrogate",
+    "grammar": "// 😀\r\ngrammar Invalid {\r\n  @ubnf: 2\r\n  token T = NEGATION('\\uD800')\r\n  @root Root ::= T;\r\n}",
+    "code": "E-TOKEN-ESCAPE-SURROGATE",
+    "span": [
+      58,
+      66
+    ],
+    "line": 4,
+    "column": 22
+  },
+  {
+    "name": "surrogate-braced",
+    "grammar": "// 😀\r\ngrammar Invalid {\r\n  @ubnf: 2\r\n  token T = NEGATION('\\u{DFFF}')\r\n  @root Root ::= T;\r\n}",
+    "code": "E-TOKEN-ESCAPE-SURROGATE",
+    "span": [
+      58,
+      68
+    ],
+    "line": 4,
+    "column": 22
+  },
+  {
+    "name": "range-order",
+    "grammar": "// 😀\r\ngrammar Invalid {\r\n  @ubnf: 2\r\n  token T = CHAR_RANGE('z','a')\r\n  @root Root ::= T;\r\n}",
+    "code": "E-TOKEN-RANGE-ORDER",
+    "span": [
+      60,
+      63
+    ],
+    "line": 4,
+    "column": 24
+  },
+  {
+    "name": "range-surrogate",
+    "grammar": "// 😀\r\ngrammar Invalid {\r\n  @ubnf: 2\r\n  token T = CHAR_RANGE('\\uD7FF','\\uE000')\r\n  @root Root ::= T;\r\n}",
+    "code": "E-TOKEN-RANGE-SURROGATE",
+    "span": [
+      60,
+      68
+    ],
+    "line": 4,
+    "column": 24
+  },
+  {
+    "name": "empty-boundary",
+    "grammar": "// 😀\r\ngrammar Invalid {\r\n  @ubnf: 2\r\n  token T = CHAR_RANGE('','z')\r\n  @root Root ::= T;\r\n}",
+    "code": "E-TOKEN-RANGE-BOUNDARY",
+    "span": [
+      60,
+      62
+    ],
+    "line": 4,
+    "column": 24
+  },
+  {
+    "name": "many-boundary",
+    "grammar": "// 😀\r\ngrammar Invalid {\r\n  @ubnf: 2\r\n  token T = CHAR_RANGE('AB','z')\r\n  @root Root ::= T;\r\n}",
+    "code": "E-TOKEN-RANGE-BOUNDARY",
+    "span": [
+      60,
+      64
+    ],
+    "line": 4,
+    "column": 24
+  },
+  {
+    "name": "unicode-hex-braced",
+    "grammar": "// 😀\r\ngrammar Invalid {\r\n  @ubnf: 2\r\n  token T = NEGATION('\\u{😀😀😀😀}')\r\n  @root Root ::= T;\r\n}",
+    "code": "E-TOKEN-ESCAPE-HEX",
+    "span": [
+      58,
+      68
+    ],
+    "line": 4,
+    "column": 22
+  },
+  {
+    "name": "unicode-hex-fixed",
+    "grammar": "// 😀\r\ngrammar Invalid {\r\n  @ubnf: 2\r\n  token T = NEGATION('\\u😀abc')\r\n  @root Root ::= T;\r\n}",
+    "code": "E-TOKEN-ESCAPE-HEX",
+    "span": [
+      58,
+      66
+    ],
+    "line": 4,
+    "column": 22
+  },
+  {
+    "name": "unicode-short-fixed",
+    "grammar": "// 😀\r\ngrammar Invalid {\r\n  @ubnf: 2\r\n  token T = NEGATION('\\u😀ab')\r\n  @root Root ::= T;\r\n}",
+    "code": "E-TOKEN-ESCAPE-LENGTH",
+    "span": [
+      58,
+      65
+    ],
+    "line": 4,
+    "column": 22
+  },
+  {
+    "name": "nested-short",
+    "grammar": "// 😀\r\ngrammar Invalid {\r\n  @ubnf: 2\r\n  token T ::= (NEGATION('\\u123'));\r\n  @root Root ::= T;\r\n}",
+    "code": "E-TOKEN-ESCAPE-LENGTH",
+    "span": [
+      61,
+      68
+    ],
+    "line": 4,
+    "column": 25
+  },
+  {
+    "name": "nested-hex",
+    "grammar": "// 😀\r\ngrammar Invalid {\r\n  @ubnf: 2\r\n  token T ::= (NEGATION('\\u00G0'));\r\n  @root Root ::= T;\r\n}",
+    "code": "E-TOKEN-ESCAPE-HEX",
+    "span": [
+      61,
+      69
+    ],
+    "line": 4,
+    "column": 25
+  },
+  {
+    "name": "nested-empty-braced",
+    "grammar": "// 😀\r\ngrammar Invalid {\r\n  @ubnf: 2\r\n  token T ::= (NEGATION('\\u{}'));\r\n  @root Root ::= T;\r\n}",
+    "code": "E-TOKEN-ESCAPE-LENGTH",
+    "span": [
+      61,
+      67
+    ],
+    "line": 4,
+    "column": 25
+  },
+  {
+    "name": "nested-long-braced",
+    "grammar": "// 😀\r\ngrammar Invalid {\r\n  @ubnf: 2\r\n  token T ::= (NEGATION('\\u{1234567}'));\r\n  @root Root ::= T;\r\n}",
+    "code": "E-TOKEN-ESCAPE-LENGTH",
+    "span": [
+      61,
+      74
+    ],
+    "line": 4,
+    "column": 25
+  },
+  {
+    "name": "nested-overflow",
+    "grammar": "// 😀\r\ngrammar Invalid {\r\n  @ubnf: 2\r\n  token T ::= (NEGATION('\\u{110000}'));\r\n  @root Root ::= T;\r\n}",
+    "code": "E-TOKEN-ESCAPE-RANGE",
+    "span": [
+      61,
+      73
+    ],
+    "line": 4,
+    "column": 25
+  },
+  {
+    "name": "nested-surrogate",
+    "grammar": "// 😀\r\ngrammar Invalid {\r\n  @ubnf: 2\r\n  token T ::= (NEGATION('\\uD800'));\r\n  @root Root ::= T;\r\n}",
+    "code": "E-TOKEN-ESCAPE-SURROGATE",
+    "span": [
+      61,
+      69
+    ],
+    "line": 4,
+    "column": 25
+  },
+  {
+    "name": "nested-surrogate-braced",
+    "grammar": "// 😀\r\ngrammar Invalid {\r\n  @ubnf: 2\r\n  token T ::= (NEGATION('\\u{DFFF}'));\r\n  @root Root ::= T;\r\n}",
+    "code": "E-TOKEN-ESCAPE-SURROGATE",
+    "span": [
+      61,
+      71
+    ],
+    "line": 4,
+    "column": 25
+  },
+  {
+    "name": "nested-range-order",
+    "grammar": "// 😀\r\ngrammar Invalid {\r\n  @ubnf: 2\r\n  token T ::= (CHAR_RANGE('z','a'));\r\n  @root Root ::= T;\r\n}",
+    "code": "E-TOKEN-RANGE-ORDER",
+    "span": [
+      63,
+      66
+    ],
+    "line": 4,
+    "column": 27
+  },
+  {
+    "name": "nested-range-surrogate",
+    "grammar": "// 😀\r\ngrammar Invalid {\r\n  @ubnf: 2\r\n  token T ::= (CHAR_RANGE('\\uD7FF','\\uE000'));\r\n  @root Root ::= T;\r\n}",
+    "code": "E-TOKEN-RANGE-SURROGATE",
+    "span": [
+      63,
+      71
+    ],
+    "line": 4,
+    "column": 27
+  },
+  {
+    "name": "nested-empty-boundary",
+    "grammar": "// 😀\r\ngrammar Invalid {\r\n  @ubnf: 2\r\n  token T ::= (CHAR_RANGE('','z'));\r\n  @root Root ::= T;\r\n}",
+    "code": "E-TOKEN-RANGE-BOUNDARY",
+    "span": [
+      63,
+      65
+    ],
+    "line": 4,
+    "column": 27
+  },
+  {
+    "name": "nested-many-boundary",
+    "grammar": "// 😀\r\ngrammar Invalid {\r\n  @ubnf: 2\r\n  token T ::= (CHAR_RANGE('AB','z'));\r\n  @root Root ::= T;\r\n}",
+    "code": "E-TOKEN-RANGE-BOUNDARY",
+    "span": [
+      63,
+      67
+    ],
+    "line": 4,
+    "column": 27
+  },
+  {
+    "name": "nested-unicode-hex-braced",
+    "grammar": "// 😀\r\ngrammar Invalid {\r\n  @ubnf: 2\r\n  token T ::= (NEGATION('\\u{😀😀😀😀}'));\r\n  @root Root ::= T;\r\n}",
+    "code": "E-TOKEN-ESCAPE-HEX",
+    "span": [
+      61,
+      71
+    ],
+    "line": 4,
+    "column": 25
+  },
+  {
+    "name": "nested-unicode-hex-fixed",
+    "grammar": "// 😀\r\ngrammar Invalid {\r\n  @ubnf: 2\r\n  token T ::= (NEGATION('\\u😀abc'));\r\n  @root Root ::= T;\r\n}",
+    "code": "E-TOKEN-ESCAPE-HEX",
+    "span": [
+      61,
+      69
+    ],
+    "line": 4,
+    "column": 25
+  },
+  {
+    "name": "nested-unicode-short-fixed",
+    "grammar": "// 😀\r\ngrammar Invalid {\r\n  @ubnf: 2\r\n  token T ::= (NEGATION('\\u😀ab'));\r\n  @root Root ::= T;\r\n}",
+    "code": "E-TOKEN-ESCAPE-LENGTH",
+    "span": [
+      61,
+      68
+    ],
+    "line": 4,
+    "column": 25
+  }
+]

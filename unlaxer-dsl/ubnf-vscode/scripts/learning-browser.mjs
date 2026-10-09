@@ -170,6 +170,13 @@ try {
     assert.equal(result.ast.type, 'UBNFFile');
     assert.ok(result.cst.nodes.length > 0);
   }
+  // The authoring page shares the generated parser controls, including editor mode.
+  await meta.locator('#editor-mode').check();
+  const editedMeta = await parseMeta();
+  assert.equal(editedMeta.ok, true);
+  assert.equal(editedMeta.editor.status, 'COMPLETE');
+  assert.equal(await meta.locator('#languages-panel').isHidden(), true);
+  await meta.locator('#editor-mode').uncheck();
   await meta.locator('#example').selectOption('ubnf');
   await meta.locator('#load-example').click();
   const original = await readFile(path.join(root, 'ubnf/grammar.ubnf'), 'utf8');

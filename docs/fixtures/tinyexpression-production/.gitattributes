@@ -1,0 +1,2 @@
+# Exact production bytes and CRLF are part of the source-map oracle.
+*.txt -text whitespace=cr-at-eol

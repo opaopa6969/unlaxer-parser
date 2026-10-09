@@ -1,0 +1,29 @@
+eof	strict	0	1
+eof	java	formula/1/java/1	PARTIAL	9	66	22	66	true
+eof	completion	PARTIAL	63	66	target
+eof	eof	formula/1/java/1
+empty	strict	0	1
+empty	java	formula/1/java/1	PARTIAL	9	22	22	22	true
+empty	eof	formula/1/java/1
+closed-invalid	strict	0	1
+closed-invalid	java	formula/1/java/1	COMPLETE	9	39	22	35	false
+closed-invalid	eof	none
+fake-string	strict	0	0
+fake-string	eof	none
+bad-fence	strict	0	1
+bad-fence	eof	none
+multiple	strict	0	1
+multiple	java	formula/1/java/1	COMPLETE	9	37	21	33	false
+multiple	java	formula/1/java/2	PARTIAL	37	92	49	92	true
+multiple	completion	PARTIAL	89	92	target
+multiple	eof	formula/1/java/2
+comments-crlf	strict	0	1
+comments-crlf	java	formula/1/java/1	PARTIAL	18	76	32	76	true
+comments-crlf	completion	PARTIAL	73	76	target
+comments-crlf	eof	formula/1/java/1
+sibling	strict	1	1
+sibling	java	formula/1/java/1	PARTIAL	9	67	22	67	true
+sibling	java	formula/2/java/1	COMPLETE	94	126	108	122	false
+sibling	eof	none
+header-eof	strict	0	1
+header-eof	eof	none

@@ -1,5 +1,5 @@
 [workspace]
-members = ["unlaxer-runtime", "unlaxer-codegen", "unlaxer-ubnf", "unlaxer-generator", "unlaxer-learning", "unlaxer-alloc-audit", "examples/evolution"]
+members = ["unlaxer-runtime", "unlaxer-lsp", "unlaxer-protocol", "unlaxer-dap", "unlaxer-codegen", "unlaxer-ubnf", "unlaxer-generator", "unlaxer-learning", "unlaxer-alloc-audit", "examples/evolution"]
 resolver = "2"
 
 [workspace.package]

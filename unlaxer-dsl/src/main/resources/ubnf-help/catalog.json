@@ -26,7 +26,19 @@
     {"id":"assignment","title":"3 · 名前と値を組み合わせる","goal":"price = 12; のような小さな言語を作る。","example":"assignment","steps":["IDENTIFIER は英字または _ で始まり、後ろには数字も使えます。","要素を並べると、その順序で読みます。'=' と ';' も入力の一部です。","@whitespace: javaStyle により、ルールの要素間には空白や改行を置けます。token の内部には入りません。","@name と @value は読み取った部分の名前（capture）。@mapping により AST（必要な値だけをまとめた構造）に取り出します。"],"check":"price = 12; は成功。12 = price; は失敗。文法を読むだけで、使える名前と数の範囲が分かります。"},
     {"id":"list","title":"4 · 複数の値を読む","goal":"カンマ区切りのリストを作る。","example":"list","steps":["'[' と ']' は入力に必要な括弧です。引用符なしの [ … ] は省略可能という文法記号です。","NUMBER { ',' NUMBER } は最初の数に続いて、カンマと数を 0 回以上読みます。","外側を [ … ] で囲むと空のリストも受け入れます。","{ … } は 0 回以上、+ は 1 回以上。区切りだけで終わる入力は受け入れません。"],"check":"[]、[1,2,30] は成功。[1,] は失敗。"},
     {"id":"string","title":"5 · 引用符とエスケープ","goal":"引用符の中の空白やエスケープを文字として読む。","example":"string","steps":["STRING の最初と最後の '\"' は、入力の二重引用符そのものです。","'\\\\' ANY はバックスラッシュと直後の 1 文字を組にして読みます。","NEGATION は指定した文字を除く 1 文字です。この例では二重引用符、バックスラッシュ、改行を除きます。","これは認識の定義です。\\n を実際の改行に変換するデコード処理ではありません。"],"check":"\"hello world\" と \"a\\\"b\" は成功。閉じていない文字列と、文字列中の未エスケープの改行は失敗。"},
-    {"id":"fence","title":"6 · 開始と同じ区切りで閉じる","goal":"context が必要なパターンを宣言的に記述する。","example":"fence","steps":["CAPTURE(mark, '~'+) は、開く区切りを読み、その文字列を token 内に保存します。","NEGATIVE_LOOKAHEAD(SAME_AS(mark)) は、同じ区切りが今あるなら失敗します。先読みは文字を消費しません。","最後の SAME_AS(mark) が開始と同じ区切りを読みます。","この例は仕組みを学ぶための単純な囲みです。Markdown の fenced code block の完全な仕様ではありません。"],"check":"~~~hello~~~ は成功。~~~hello~~ は失敗。@name の AST capture と CAPTURE の字句内 capture は用途が異なります。"}
+    {"id":"fence","title":"6 · 開始と同じ区切りで閉じる","goal":"context が必要なパターンを宣言的に記述する。","example":"fence","steps":["CAPTURE(mark, '~'+) は、開く区切りを読み、その文字列を token 内に保存します。","NEGATIVE_LOOKAHEAD(SAME_AS(mark)) は、同じ区切りが今あるなら失敗します。先読みは文字を消費しません。","最後の SAME_AS(mark) が開始と同じ区切りを読みます。","この例は仕組みを学ぶための単純な囲みです。Markdown の fenced code block の完全な仕様ではありません。"],"check":"~~~hello~~~ は成功。~~~hello~~ は失敗。@name の AST capture と CAPTURE の字句内 capture は用途が異なります。"},
+    {
+      "id": "unicode-xid",
+      "title": "7 · Unicodeの名前を読む",
+      "goal": "実装クラスに依存せずUnicode識別子の受理範囲を指定する。",
+      "example": "unicode-xid",
+      "steps": [
+        "token NAME = XID_IDENTIFIER はUnicode 17.0.0のXID_StartとXID_Continueに基づきます。",
+        "先頭の数字・結合文字・アンダースコアを拒否し、アンダースコアは続きの文字として受理します。",
+        "原文を保存し、正規化や予約語の除外は行いません。"
+      ],
+      "check": "名前2、eと結合アクセント、補助面の文字は成功。_nameと9nameと絵文字の先頭は失敗。"
+    }
   ],
   "entries": [
     {"id":"token-stream","category":"設定","title":"@tokenStream — 字句処理を選択する","syntax":"@tokenStream: enabled","summary":"生成 API で文字列直接解析・trivia cache・遅延 token 化・事前 token 化を選べます。","details":["UBNF v2 と宣言的 token を使います。既定は文字列直接解析です。Java は parseWithLexing、Rust は parse_with_lexing で mode を指定します。","token 化は最長一致で境界を決めます。同じ長さでは構文 literal、宣言順の token の順に優先します。直接解析と受理結果が変わる場合があります。","原文の位置とコメントを保持できます。外部 parser、局所 whitespace/interleave、構文 backref、recovery はこの profile では未対応です。","playground 画面の解析 mode 切替ではなく、生成コードの API を有効にする設定です。詳細は docs/token-stream.md を参照。"],"insertText":"@tokenStream: enabled"},
@@ -45,7 +57,8 @@
     {"id":"CAPTURE","category":"context","title":"CAPTURE / SAME_AS — 同じ文字列を再利用","syntax":"CAPTURE(mark, '~'+) … SAME_AS(mark)","summary":"同じ token の実行内で、読み取った区切りを保存して再利用します。","details":["選択肢が失敗すると、その選択肢の capture は巻き戻されます。別の試験入力に状態が漏れません。","SAME_AS は名前が未設定なら失敗します。Java の任意の ParseContext メソッド呼び出しではありません。"],"insertText":"CAPTURE(mark, '~'+)"},
     {"id":"capture","category":"AST","title":"@name — 読み取った部分に名前を付ける","syntax":"NUMBER @value","summary":"token またはルールの後ろに名前を付けます。","details":["@mapping の params にその名前を並べると生成 AST のフィールドになります。","ここでの @value は任意に付ける名前で、CAPTURE(value, …) とは異なります。"]},
     {"id":"mapping","category":"AST","title":"@mapping — 必要な値を AST にする","syntax":"@mapping(Assignment, params=[name, value])","summary":"CST は読み取り構造、AST はプログラムで使う形に整理した構造です。","details":["params の各名前にはルール本体の capture が必要です。Java は record、Rust は enum の AST を生成します。","mapping は認識の代わりではありません。token の認識仕様は ::= の右側に書きます。","Java では @mapping なしでも文法と CST は作れます。現行 Rust 生成経路は通常、入口から 1 つの AST node を要求するため、入門の例では @mapping も付けています。評価（計算）の実装は認識とは別です。"],"insertText":"@mapping(Value, params=[text])"},
-    {"id":"whitespace","category":"設定","title":"@whitespace — 空白の扱い","syntax":"@whitespace: javaStyle","summary":"ルール要素の間で Java 形式の空白・コメントを読み飛ばします。","details":["javaStyle は // から行末までのコメントと /* … */ のコメントも含みます。","token の内部には影響しません。NUMBER 内の 1 2 を 12 としては受け入れません。","空白を言語の一部として厳密に扱う場合は設定を省き、必要な空白を文法で書きます。"]},
+    {"id":"whitespace","category":"設定","title":"@whitespace — 空白の扱い","syntax":"@whitespace: javaStyle","summary":"ルール要素の間で Java 形式の空白・コメントを読み飛ばします。","details":["javaStyle は // から行末までのコメントと /* … */ のコメントも含みます。",
+        "@ubnf: v2 では token GAP ::= expression; を @whitespace: GAP または @whitespace(GAP) に指定できます。import alias の alias.GAP と pkg:std/layout の標準定義も使えます。空文字に一致する定義は使えません。","token の内部には影響しません。NUMBER 内の 1 2 を 12 としては受け入れません。","空白を言語の一部として厳密に扱う場合は設定を省き、必要な空白を文法で書きます。"]},
     {"id":"import","category":"部品化","title":"@import — 別ファイルの字句を使う","syntax":"@import num from 'numbers.ubnf'\n…\nStart ::= num.NUMBER;","summary":"宣言的 token の文法部品を alias（ここでは num）で区別して参照します。","details":["import は grammar の直後、@ubnf などの設定より前に置きます。","パスは import 元ファイルからの相対パスです。両方のファイルを保存してください。","現行の共通 loader は宣言的 token の部品を扱います。任意のルール import やインターネット URL の取得はしません。","VS Code では num. で候補を出し、num.NUMBER にマウスを置くと定義が見えます。右クリックの『定義へ移動』で元ファイルを開けます。","編集中の診断・補完は開いている import 元の未保存の変更も見ます。playground 生成は保存済みファイルを使うので、生成前には全部保存してください。"],"insertText":"@import num from 'numbers.ubnf'"},
     {"id":"editor","category":"編集","title":"補完・定義への移動・名前の変更","syntax":"num.NUMBER → 定義へ移動\nローカルな Rule → シンボルの名前変更","summary":"VS Code の右クリックから使えます。文字列の一括置換とは異なります。","details":["補完は宣言的 token とルールの位置に応じた候補を示します。FQN の旧 parser binding 候補は token NAME = のときだけです。","名前変更は完成した文法で、同じ宣言を参照するローカルの名前だけを変えます。コメント・文字列・@capture・mapping の型名は変えません。","token だけの部品 grammar は、まだ開いていない他の利用元があるかもしれません。この公開 token、外部 module の参照、import alias、capture は一括 rename の対象外です。定義へ移動して、利用元も確認しながら変更してください。","同じ grammar 内の重複名、予約語、壊れた文法は安全に変更できないため拒否します。まず赤い下線を直してください。参照一覧は現在の文書内が対象で、workspace 全体の索引ではありません。"]},
     {"id":"doc","category":"ヘルプ","title":"@doc — 作った言語の説明","syntax":"@doc('名前と値を = で結び、; で終えます。')","summary":"ルールの利用者に伝える説明を書きます。文法そのもののコメントとは別です。","details":["文法内の // コメントは文法を編集する人向けです。@doc は生成した言語のヘルプに渡すために使えます。"],"insertText":"@doc('このルールが受け入れる入力の説明')"},
@@ -68,6 +81,40 @@
     {"id":"assignment","name":"Assignments","source":"grammar Assignments {\n  @ubnf: v2\n  @package: guide.demo\n  @whitespace: javaStyle\n\n  token DIGIT ::= CHAR_RANGE('0', '9');\n  token LETTER ::= CHAR_RANGE('a', 'z') | CHAR_RANGE('A', 'Z') | '_';\n  token IDENTIFIER ::= LETTER (LETTER | DIGIT)*;\n  token NUMBER ::= [ '+' | '-' ] DIGIT+ [ '.' DIGIT+ ];\n\n  @root\n  @mapping(Assignment, params=[name, value])\n  @doc('price = 12; のように、名前と数を = で結んで ; で終えます。')\n  Start ::= IDENTIFIER @name '=' NUMBER @value ';';\n}\n","cases":[{"input":"price = 12;","fields":{"name":"price","value":"12"}},{"input":"_x2=-3.5;","fields":{"name":"_x2","value":"-3.5"}},{"input":"12 = price;"},{"input":"price=1 2;"},{"input":"price=12"}]},
     {"id":"list","name":"Lists","source":"grammar Lists {\n  @ubnf: v2\n  @package: guide.demo\n  @whitespace: javaStyle\n\n  token NUMBER ::= CHAR_RANGE('0', '9')+;\n\n  @root\n  @mapping(NumberList, params=[values])\n  @doc('[] または [1,2,30] のような整数のリストです。末尾カンマは使いません。')\n  Start ::= '[' [ NUMBER @values { ',' NUMBER @values } ] ']';\n}\n","cases":[{"input":"[]","fields":{"values":[]}},{"input":"[1,2,30]","fields":{"values":["1","2","30"]}},{"input":"[1,]"},{"input":"[1 2]"}]},
     {"id":"string","name":"Strings","source":"grammar Strings {\n  @ubnf: v2\n  @package: guide.demo\n\n  token STRING ::= '\"' { '\\\\' ANY | NEGATION('\"\\\\\\n\\r') } '\"';\n\n  @root\n  @mapping(Quoted, params=[text])\n  @doc('二重引用符で囲みます。バックスラッシュで直後の文字をエスケープできます。')\n  Start ::= STRING @text;\n}\n","cases":[{"input":"\"hello world\"","fields":{"text":"\"hello world\""}},{"input":"\"a\\\"b\"","fields":{"text":"\"a\\\"b\""}},{"input":"\"こんにちは😀\"","fields":{"text":"\"こんにちは😀\""}},{"input":"\"unfinished"},{"input":"\"a\nb\""}]},
-    {"id":"fence","name":"Fences","source":"grammar Fences {\n  @ubnf: v2\n  @package: guide.demo\n\n  token FENCE ::= CAPTURE(mark, '~'+)\n    { NEGATIVE_LOOKAHEAD(SAME_AS(mark)) ANY } SAME_AS(mark);\n\n  @root\n  @mapping(Fenced, params=[text])\n  @doc('~~~hello~~~ のように同じ個数の ~ で囲みます。最初の同じ区切りで閉じます。')\n  Start ::= FENCE @text;\n}\n","cases":[{"input":"~~~hello~~~","fields":{"text":"~~~hello~~~"}},{"input":"~こんにちは😀~","fields":{"text":"~こんにちは😀~"}},{"input":"~~~hello~~"},{"input":"~~~hello~~~~"}]}
+    {"id":"fence","name":"Fences","source":"grammar Fences {\n  @ubnf: v2\n  @package: guide.demo\n\n  token FENCE ::= CAPTURE(mark, '~'+)\n    { NEGATIVE_LOOKAHEAD(SAME_AS(mark)) ANY } SAME_AS(mark);\n\n  @root\n  @mapping(Fenced, params=[text])\n  @doc('~~~hello~~~ のように同じ個数の ~ で囲みます。最初の同じ区切りで閉じます。')\n  Start ::= FENCE @text;\n}\n","cases":[{"input":"~~~hello~~~","fields":{"text":"~~~hello~~~"}},{"input":"~こんにちは😀~","fields":{"text":"~こんにちは😀~"}},{"input":"~~~hello~~"},{"input":"~~~hello~~~~"}]},
+    {
+      "id": "unicode-xid",
+      "name": "UnicodeNames",
+      "source": "grammar UnicodeNames {\n  @ubnf: v2\n  @package: guide.demo\n  token NAME = XID_IDENTIFIER\n  @root @mapping(Name, params=[text])\n  @doc('Unicode 17.0.0 の XID 識別子。_ は先頭に使えません。')\n  Start ::= NAME @text;\n}\n",
+      "cases": [
+        {
+          "input": "名前2",
+          "fields": {
+            "text": "名前2"
+          }
+        },
+        {
+          "input": "é",
+          "fields": {
+            "text": "é"
+          }
+        },
+        {
+          "input": "𐐀x",
+          "fields": {
+            "text": "𐐀x"
+          }
+        },
+        {
+          "input": "_name"
+        },
+        {
+          "input": "9name"
+        },
+        {
+          "input": "😀"
+        }
+      ]
+    }
   ]
 }

@@ -13,6 +13,7 @@ import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.unlaxer.dsl.bootstrap.UBNFAST.*;
 import org.unlaxer.dsl.bootstrap.UBNFMapper;
+import org.unlaxer.dsl.bootstrap.UBNFPackageResolver;
 import org.unlaxer.dsl.bootstrap.UBNFModuleLoader;
 import org.unlaxer.dsl.bootstrap.UBNFSourceSnapshot;
 import org.unlaxer.dsl.runtime.LexicalExpression;
@@ -20,7 +21,10 @@ import org.unlaxer.dsl.runtime.LexicalExpression;
 /** Read-only editor bindings. AST origins authorize edits; recovery never does. */
 final class UbnfEditorIndex {
     record Symbol(String name, String kind, String uri, String source, int start, int end, String detail,
-                  boolean exported) {
+                  boolean exported, String origin) {
+        Symbol(String name, String kind, String uri, String source, int start, int end, String detail, boolean exported) {
+            this(name, kind, uri, source, start, end, detail, exported, uri);
+        }
         Range range() { return rangeOf(source, start, end); }
         Location location() { return new Location(uri, range()); }
     }
@@ -39,6 +43,7 @@ final class UbnfEditorIndex {
     final List<Symbol> declarations = new ArrayList<>();
     final List<Use> uses = new ArrayList<>();
     final List<Problem> problems = new ArrayList<>();
+    final Map<String, String> virtualSources = new LinkedHashMap<>();
     final UBNFSourceSnapshot snapshot;
     List<GrammarDecl> linked;
     boolean safe = true;
@@ -57,7 +62,13 @@ final class UbnfEditorIndex {
                 for (var token : grammar.tokens()) declare(scope, token, token.name(), "token", grammar.rules().isEmpty());
                 for (var rule : grammar.rules()) declare(scope, rule, rule.name(), "rule", false);
                 for (var token : grammar.tokens()) if (token instanceof TokenDecl.Declarative lexical) lexicalUses(scope, lexical);
-                for (var rule : grammar.rules()) bodyUses(scope, rule.body());
+                for (var setting : grammar.settings()) if (setting.key().equals("whitespace") && setting.value() instanceof StringSettingValue value)
+                    policyUse(scope, setting, value.value());
+                for (var rule : grammar.rules()) {
+                    bodyUses(scope, rule.body());
+                    for (var annotation : rule.annotations()) if (annotation instanceof WhitespaceAnnotation value && value.style().isPresent())
+                        policyUse(scope, annotation, value.style().get());
+                }
             }
             linked = parsed.ast().grammars();
         } else {
@@ -83,6 +94,7 @@ final class UbnfEditorIndex {
                 if (!sources.containsKey(path)) sources.put(path, reader.read(path));
                 return sources.get(path);
             };
+            var packages = new UBNFPackageResolver(file, stable);
             for (Scope scope : scopes) {
                 List<ImportDecl> imports = snapshot != null ? scope.grammar.imports() : recoveredImports();
                 for (var declaration : imports) {
@@ -90,12 +102,19 @@ final class UbnfEditorIndex {
                         // Use the real module loader to enforce cycles, token-only exports and features.
                         var probe = new UBNFFile(List.of(new GrammarDecl("Editor", List.of(declaration), List.of(), List.of(), List.of())));
                         UBNFModuleLoader.resolve(probe, file, stable);
-                        Path module = file.getParent().resolve(declaration.path()).normalize();
-                        String text = stable.read(module);
+                        Path module = packages.importPath(file, declaration.path());
+                        String text = packages.read(module);
+                        var identity = packages.identity(module);
+                        String moduleUri = identity == null ? module.toUri().toString()
+                            : packageUri(identity.get("sha256").getAsString(), identity.get("file").getAsString());
+                        String origin = identity == null ? moduleUri : identity.get("id").getAsString() + "@" + identity.get("version").getAsString()
+                            + " · sha256 " + identity.get("sha256").getAsString() + " · " + identity.get("file").getAsString();
+                        if (identity != null) virtualSources.put(moduleUri, text);
                         var moduleSnapshot = UBNFMapper.parseWithSource(text);
                         for (var token : moduleSnapshot.ast().grammars().get(0).tokens()) {
-                            var symbol = symbol(moduleSnapshot, token, token.name(), "token", module.toUri().toString(), true);
-                            if (symbol != null) scope.add(declaration.alias() + "." + token.name(), symbol);
+                            var symbol = symbol(moduleSnapshot, token, token.name(), "token", moduleUri, true);
+                            if (symbol != null) scope.add(declaration.alias() + "." + token.name(), new Symbol(symbol.name(), symbol.kind(), symbol.uri(),
+                                symbol.source(), symbol.start(), symbol.end(), symbol.detail(), true, origin));
                         }
                     } catch (IOException | RuntimeException error) {
                         problems.add(new Problem("import " + declaration.alias() + ": " + error.getMessage(), importRange(declaration)));
@@ -167,6 +186,20 @@ final class UbnfEditorIndex {
     private static void lexicalRefs(LexicalExpression expression, List<String> result) {
         if (expression.op() == LexicalExpression.Op.REF) result.add(expression.text());
         for (var child : expression.children()) lexicalRefs(child, result);
+    }
+
+    private static String packageUri(String hash, String file) {
+        try { return new URI("ubnf-package", null, "/" + hash + "/" + file, null).toASCIIString(); }
+        catch (java.net.URISyntaxException invalid) { throw new IllegalArgumentException("invalid package source URI"); }
+    }
+
+    private void policyUse(Scope scope, Object node, String policy) {
+        if (policy.equalsIgnoreCase("none") || policy.equalsIgnoreCase("javaStyle")) return;
+        var bounds = bounds(snapshot, node);
+        var matcher = WORD.matcher(code).region(bounds[0], bounds[1]);
+        while (matcher.find()) if (matcher.group().replaceAll("\\s", "").equals(policy)) {
+            uses.add(new Use(policy, matcher.start(), matcher.end(), false, scope)); return;
+        }
     }
 
     private void bodyUses(Scope scope, RuleBody body) {

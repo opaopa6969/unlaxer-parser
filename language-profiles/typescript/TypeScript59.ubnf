@@ -1,0 +1,38 @@
+// Original, deliberately bounded source grammar. See profile.tsv for coverage.
+grammar TypeScript59 {
+  @package: org.unlaxer.languages.typescript
+  @ubnf: v2
+  @whitespace: javaStyle
+  @embedding: enabled
+  token LETTER ::= CHAR_RANGE('a', 'z') | CHAR_RANGE('A', 'Z') | '_';
+  token DIGIT ::= CHAR_RANGE('0', '9');
+  token ID ::= NEGATIVE_LOOKAHEAD(('break' | 'case' | 'catch' | 'class' | 'continue' | 'debugger' | 'default' | 'delete' | 'do' | 'else' | 'enum' | 'extends' | 'finally' | 'for' | 'if' | 'import' | 'in' | 'instanceof' | 'new' | 'super' | 'switch' | 'this' | 'throw' | 'try' | 'typeof' | 'var' | 'void' | 'while' | 'with' | 'as' | 'implements' | 'interface' | 'package' | 'private' | 'protected' | 'public' | 'static' | 'yield' | 'any' | 'constructor' | 'declare' | 'get' | 'module' | 'require' | 'set' | 'symbol' | 'type' | 'from' | 'of' | 'export' | 'function' | 'let' | 'const' | 'return' | 'number' | 'string' | 'boolean' | 'true' | 'false' | 'null') NEGATIVE_LOOKAHEAD(LETTER | DIGIT)) LETTER (LETTER | DIGIT)*;
+  token INTEGER ::= ('0' | CHAR_RANGE('1', '9') DIGIT*) NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token STRING ::= '"' { '\\' ('"' | '\\' | 'n' | 'r' | 't') | NEGATION('"\\\r\n') } '"';
+  token K_EXPORT ::= 'export' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_FUNCTION ::= 'function' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_LET ::= 'let' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_CONST ::= 'const' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_RETURN ::= 'return' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_NUMBER ::= 'number' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_STRING ::= 'string' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_BOOLEAN ::= 'boolean' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_TRUE ::= 'true' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_FALSE ::= 'false' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+  token K_NULL ::= 'null' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+
+  @root @mapping(Source)
+  SourceFile ::= SourceBody;
+  SourceBody ::= { FunctionDeclaration | Statement };
+  FunctionDeclaration ::= [ K_EXPORT ] K_FUNCTION ID '(' [ Parameters ] ')' [ ':' Type ] Block;
+  Parameters ::= Parameter { ',' Parameter };
+  Parameter ::= ID ':' Type;
+  Type ::= (K_NUMBER | K_STRING | K_BOOLEAN | ID) { '[' ']' };
+  Block ::= '{' { Statement } '}';
+  Statement ::= (K_LET | K_CONST) ID [ ':' Type ] '=' Expression ';' | K_RETURN [ Expression ] ';' | Expression ';' | Block;
+  Expression ::= Unary { ('===' | '!==' | '+' | '-' | '*' | '/') Unary };
+  Unary ::= [ '!' | '-' | '+' ] Primary { '.' ID | '(' [ Arguments ] ')' };
+  Primary ::= STRING | INTEGER | K_TRUE | K_FALSE | K_NULL | ID | '(' Expression ')';
+  Arguments ::= Expression { ',' Expression };
+
+}

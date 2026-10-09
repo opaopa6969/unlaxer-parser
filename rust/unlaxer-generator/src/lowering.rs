@@ -53,6 +53,20 @@ struct Shape {
 }
 
 pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
+    crate::lexical_contexts::validate(grammar)?;
+    let format_two = grammar.settings.iter().any(|setting| {
+        setting.key == "ubnf"
+            && matches!(&setting.value, ast::SettingValue::String(value) if value == "v2")
+    });
+    if format_two
+        && grammar.tokens.iter().any(|token| {
+            matches!(token.kind,
+        ast::TokenKind::CharRange { min, max } if (min as u32) <= 0xdfff && (max as u32) >= 0xd800)
+        })
+    {
+        return Err("E-TOKEN-RANGE-SURROGATE: range must not contain surrogates".into());
+    }
+    crate::embedded::validate(grammar)?;
     Lowering {
         grammar,
         ids: HashMap::new(),
@@ -64,6 +78,7 @@ pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
         operators: Vec::new(),
         catalogs: Vec::new(),
         longest_choices: Vec::new(),
+        unique_longest_choices: Vec::new(),
         predictive_choices: Vec::new(),
         recoveries: Vec::new(),
         nullable: HashSet::new(),
@@ -83,6 +98,7 @@ struct Lowering<'a> {
     operators: Vec<Option<Operator>>,
     catalogs: Vec<Option<String>>,
     longest_choices: Vec<bool>,
+    unique_longest_choices: Vec<bool>,
     predictive_choices: Vec<bool>,
     recoveries: Vec<Option<(ast::RecoveryMode, Vec<String>)>>,
     nullable: HashSet<usize>,
@@ -159,11 +175,11 @@ impl Lowering<'_> {
                         self.follow_body(inner, target, tokens);
                     }
                     ElementKind::OneOrMore(inner)
-                    | ElementKind::BoundedRepeat { element: inner, .. } => {
-                        if direct_ref(inner, target) {
-                            if let Some(next) = next {
-                                self.first_atom(next, tokens, &mut HashSet::new());
-                            }
+                    | ElementKind::BoundedRepeat { element: inner, .. }
+                        if direct_ref(inner, target) =>
+                    {
+                        if let Some(next) = next {
+                            self.first_atom(next, tokens, &mut HashSet::new());
                         }
                         // Java's AtomicElement overload has no internal sequence.
                     }
@@ -257,7 +273,10 @@ impl Lowering<'_> {
         let mut settings = HashSet::new();
         let mut memo_safe_tokens = HashSet::new();
         for setting in &self.grammar.settings {
-            if setting.key == "tokenAdapter" || setting.key == "tokenContract" {
+            if matches!(
+                setting.key.as_str(),
+                "tokenAdapter" | "tokenContract" | "embedded" | "embedding"
+            ) {
                 continue;
             }
             if setting.key != "memoSafeToken"
@@ -354,6 +373,7 @@ impl Lowering<'_> {
                 .any(|annotation| matches!(annotation.kind, AnnotationKind::Skip));
             let mut associativity = None;
             let mut longest_choice = false;
+            let mut unique_longest_choice = false;
             let mut predictive_choice = false;
             let mut recovery = None;
             let mut precedence = None;
@@ -364,6 +384,7 @@ impl Lowering<'_> {
             let mut comparison = None;
             for annotation in &rule.annotations {
                 match &annotation.kind {
+                    AnnotationKind::NamePredicate { .. } => {}
                     AnnotationKind::Root => {
                         if root.replace(i).is_some() {
                             return Err("multiple @root annotations".into());
@@ -408,6 +429,12 @@ impl Lowering<'_> {
                         }
                         longest_choice = true;
                     }
+                    AnnotationKind::UniqueLongestChoice => {
+                        if unique_longest_choice {
+                            return Err(format!("duplicate @uniqueLongestChoice on {}", rule.name));
+                        }
+                        unique_longest_choice = true;
+                    }
                     AnnotationKind::PredictiveChoice => {
                         if predictive_choice {
                             return Err(format!("duplicate @predictiveChoice on {}", rule.name));
@@ -427,6 +454,7 @@ impl Lowering<'_> {
                             return Err("precedence must be non-negative".into());
                         }
                     }
+                    AnnotationKind::LexicalContext { .. } => {}
                     AnnotationKind::Whitespace { style } => {
                         let enabled = named_whitespace_style(
                             style.as_deref().unwrap_or("javaStyle"),
@@ -513,6 +541,18 @@ impl Lowering<'_> {
                     rule.name
                 ));
             }
+            if unique_longest_choice {
+                if !(2..=64).contains(&rule.body.alternatives.len()) {
+                    return Err(format!(
+                        "@uniqueLongestChoice requires 2 to 64 alternatives on {}",
+                        rule.name
+                    ));
+                }
+                if associativity.is_some() || longest_choice || predictive_choice {
+                    return Err(format!("conflicting @uniqueLongestChoice on {}", rule.name));
+                }
+            }
+            self.unique_longest_choices.push(unique_longest_choice);
             self.longest_choices.push(longest_choice);
             self.predictive_choices.push(predictive_choice);
             self.recoveries.push(recovery);
@@ -570,6 +610,76 @@ impl Lowering<'_> {
                 })
         {
             return Err("root must resolve to exactly one AST node".into());
+        }
+        let mut name_versions = Vec::<(String, String)>::new();
+        for (i, rule) in self.grammar.rules.iter().enumerate() {
+            let predicates = rule
+                .annotations
+                .iter()
+                .filter_map(|a| {
+                    if let AnnotationKind::NamePredicate {
+                        snapshot,
+                        version,
+                        name,
+                        kind,
+                    } = &a.kind
+                    {
+                        Some((snapshot, version, name, kind))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>();
+            if predicates.len() > 1 {
+                return Err(format!("E-NAME-PREDICATE-DUPLICATE: {}", rule.name));
+            }
+            let Some((snapshot, version, name, kind)) = predicates.first().copied() else {
+                continue;
+            };
+            let bytes = snapshot.as_bytes();
+            if bytes.is_empty()
+                || bytes.len() > 128
+                || !bytes[0].is_ascii_alphabetic()
+                || bytes
+                    .iter()
+                    .any(|c| !(c.is_ascii_alphanumeric() || b"_./-".contains(c)))
+                || version.is_empty()
+                || version.len() > 128
+                || version.bytes().any(|c| !(33..=126).contains(&c))
+            {
+                return Err(format!("E-NAME-PREDICATE-IDENTITY: {}", rule.name));
+            }
+            if !["type", "value", "resolved"].contains(&kind.as_str()) {
+                return Err(format!("E-NAME-PREDICATE-KIND: {}", rule.name));
+            }
+            if rule.annotations.iter().any(|a| {
+                matches!(
+                    a.kind,
+                    AnnotationKind::LeftAssoc
+                        | AnnotationKind::RightAssoc
+                        | AnnotationKind::Recovery { .. }
+                )
+            }) {
+                return Err(format!("E-NAME-PREDICATE-CONFLICT: {}", rule.name));
+            }
+            if self.captures(&self.bodies[i])?.get(name)
+                != Some(&Shape {
+                    kind: Kind::Text,
+                    cardinality: Cardinality::One,
+                })
+            {
+                return Err(format!("E-NAME-PREDICATE-CAPTURE: {}", rule.name));
+            }
+            if let Some((_, previous)) = name_versions.iter().find(|(id, _)| id == snapshot) {
+                if previous != version {
+                    return Err(format!("E-NAME-PREDICATE-VERSION: {}", rule.name));
+                }
+            } else {
+                name_versions.push((snapshot.clone(), version.clone()));
+            }
+        }
+        if name_versions.len() > 64 {
+            return Err("E-NAME-PREDICATE-LIMIT: at most 64 snapshots".into());
         }
         let mut rules = Vec::new();
         for (i, expression) in self.bodies.iter().enumerate() {
@@ -669,7 +779,12 @@ impl Lowering<'_> {
                     }
                 }
             }
-            let body = if self.longest_choices[i] {
+            let body = if self.unique_longest_choices[i] {
+                let Expression::Choice(alternatives) = expression else {
+                    unreachable!("validated unique longest choice shape")
+                };
+                Expression::UniqueLongestChoice(alternatives.clone())
+            } else if self.longest_choices[i] {
                 let Expression::Choice(alternatives) = expression else {
                     unreachable!("validated longest choice shape")
                 };
@@ -795,6 +910,18 @@ impl Lowering<'_> {
                     java_whitespace: rule_whitespace[i],
                 };
             }
+            for annotation in &self.grammar.rules[i].annotations {
+                if let AnnotationKind::LexicalContext { tokens, literals } = &annotation.kind {
+                    rule.body = Expression::LexicalContextScope {
+                        child: Box::new(rule.body.clone()),
+                        terminals: crate::lexical_contexts::terminals(
+                            self.grammar,
+                            tokens,
+                            literals,
+                        )?,
+                    };
+                }
+            }
             if rule_effects[i] != RuleEffects::default() {
                 rule.body = Expression::RuleEffects {
                     child: Box::new(rule.body.clone()),
@@ -816,6 +943,31 @@ impl Lowering<'_> {
                     message: "syntax error: skipped to sync point".into(),
                 };
             }
+        }
+        for (i, rule) in rules.iter_mut().enumerate() {
+            for annotation in &self.grammar.rules[i].annotations {
+                if let AnnotationKind::NamePredicate {
+                    snapshot,
+                    version,
+                    name,
+                    kind,
+                } = &annotation.kind
+                {
+                    rule.body = Expression::NamePredicate {
+                        child: Box::new(rule.body.clone()),
+                        snapshot: snapshot.clone(),
+                        version: version.clone(),
+                        capture: name.clone(),
+                        kind: kind.clone(),
+                    };
+                }
+            }
+        }
+        if !name_versions.is_empty() {
+            rules[root].body = Expression::NameResolutionScope {
+                child: Box::new(rules[root].body.clone()),
+                requirements: name_versions,
+            };
         }
         Ok(GrammarIr {
             rules,
@@ -1280,7 +1432,9 @@ impl Lowering<'_> {
                     self.first_predictor(first, visiting, cache)
                 }
             }
-            Expression::Choice(alternatives) | Expression::LongestChoice(alternatives) => {
+            Expression::Choice(alternatives)
+            | Expression::LongestChoice(alternatives)
+            | Expression::UniqueLongestChoice(alternatives) => {
                 let mut values = Vec::new();
                 for alternative in alternatives {
                     let predictor = self.first_predictor(alternative, visiting, cache);
@@ -1346,6 +1500,28 @@ impl Lowering<'_> {
                 let ordinary = Expression::Choice(alternatives.clone());
                 let mixed = self.shape(&ordinary, &mut HashSet::new())?.kind == Kind::Value;
                 Expression::LongestChoice(
+                    alternatives
+                        .iter()
+                        .map(|alternative| {
+                            let projected = self.project_text_values(alternative, mapping)?;
+                            Ok(
+                                if mixed
+                                    && self.shape(alternative, &mut HashSet::new())?.kind
+                                        == Kind::Text
+                                {
+                                    Expression::TextValue(Box::new(projected))
+                                } else {
+                                    projected
+                                },
+                            )
+                        })
+                        .collect::<Result<_>>()?,
+                )
+            }
+            Expression::UniqueLongestChoice(alternatives) => {
+                let ordinary = Expression::Choice(alternatives.clone());
+                let mixed = self.shape(&ordinary, &mut HashSet::new())?.kind == Kind::Value;
+                Expression::UniqueLongestChoice(
                     alternatives
                         .iter()
                         .map(|alternative| {

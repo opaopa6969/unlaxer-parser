@@ -1,0 +1,15 @@
+[package]
+name = "unlaxer-lsp"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+unlaxer-runtime = { path = "../unlaxer-runtime" }
+serde_json = "1"
+unlaxer-protocol = { path = "../unlaxer-protocol" }
+
+[lints]
+workspace = true
