@@ -63,3 +63,8 @@ pub fn parse_tree_detailed(source: &str) -> Result<Tree, ParseDiagnostic> {
 pub fn parse_tree_detailed_with_options(source: &str, options: ParseOptions) -> Result<Tree, ParseDiagnostic> {
     unlaxer_runtime::parse_detailed_shared_with_options(grammar(), 0, true, source, options)
 }
+
+/// Bounded editor-only EOF repair; synthetic syntax never becomes a normal AST value.
+pub fn parse_editor_cst(source: &str, completions: &[&str], options: unlaxer_runtime::editor_cst::Options) -> Result<unlaxer_runtime::editor_cst::EditorCst, &'static str> {
+    unlaxer_runtime::editor_cst::parse(grammar(), 0, true, source, completions, options)
+}
