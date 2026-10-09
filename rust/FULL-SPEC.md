@@ -50,7 +50,8 @@ annotation、`ParseContext` API、consume/invert伝播、incremental、IDE proto
 | 文法進化の API 影響レポート | Java / Rust target の AST / evaluator schema と read-only `impact` JSON（#159） | [契約と再現手順](../docs/api-impact-report.md)。13変更×LF/CRLF、Rust target の両host一致、実 javac/rustc の旧・新利用者検証。全API/ABIや意味的互換性の保証ではない |
 | leftAssoc/rightAssoc/precedence | canonical leftAssocとrightAssoc、precedence metadata、schemaを統合したshared mapping、混在factorを生成 | 左辺＋op/right列と右再帰、文法階層による優先順位を検証。非canonical右結合形、Javaの特殊null/literal leafとRust AstValueの構造互換は未完了。Java raw CST反復欠落 #138・右結合 #139 は独立修正 |
 | backref・MatchedToken相当 | context-wide replay、scope付き文法の参照検証、scopeなしUBNFのrule-local capture比較（#325）を区別して対応 | [比較の契約・移行・共通corpus](../docs/generated-scope-effects.md)。capture比較は構文認識ではなく意味診断。replayのUBNF接続、名前の寿命・入れ子・伝播の全互換、コピー言語のpositive/negative testは未完了 |
-| PropagationStopper・consume/invert・virtual token・metadata | 未対応 | 有限状態の全合成検査、8元モデルとの対応、実parserとの統合試験 |
+| PropagationStopper・consume/invert・virtual token・metadata | 明示 runtime API の word / sequence / choice / invert / consume-invert stopper と4種 token、portable string metadata / 関連 ID を追加（#438）。Java 任意 Object / 関連 Token の既存 API は維持 | [契約・独立共通 fixture](../docs/portable-token-metadata.md)。Java/Rust 実 parser の source / 両 cursor / CP span / 失敗と rollback / owned retention / 失効 ID を検証。任意 custom parser の全伝播、全 combinator / annotation / UBNF 接続と stateful memo parity は未完了 |
+| 多段階解析と前処理 | Java / Rust の bounded phase pipeline、条件付き phase、source map を運ぶ実生成 parser の共通例（#380） | [契約](../docs/analysis-pipeline.md)と[実行例](../examples/preprocessing/README.md)。前方参照・相互 field・include/設定変更・遅延/循環/打切り/修復・元文書 CP 診断を比較。任意 macro/C preprocessor 構文や無制限の固定点 solver は含まない |
 | 宣言的な意味規則 | Java / Rust の同じ JSON loader・IR・generated CST 実行と region query provider（#381） | [契約・API・共通 corpus](../docs/declarative-semantics.md)。型・scope・宣言・参照・引数期待型・補完・診断、部分入力、文法進化、CP span と package/project identity を照合。portableNominal/1 のみで、完全な各言語意味論や任意 AST の自動解釈は含まない |
 | lexical scope store・宣言/参照/semantic diagnostics | Java rollback修正とRust公開ParseContextへのtransactional store接続（#174）、owned Treeへのsnapshot | scope depth/lookup/shadowing/イベント履歴/失敗時復元を共通operation corpusで比較。AST/IDEへのmetadata搬送は未完了 |
 | scopeTree/declares/スコープ参照 | 両frontendから生成、Java capture-site選択も修正（#176）。mode/description metadata保持、CP位置、nested/repeated captureとrollbackを比較 | 両modeは解析時stack。評価時dynamic環境やclosure、LSP/DAP利用は未対応 |
@@ -65,6 +66,8 @@ annotation、`ParseContext` API、consume/invert伝播、incremental、IDE proto
 | ネイティブ配布 | 本repoはgeneratorと縮小文法CLI。下流は`tinyexpression` / `tinyexpression-aot`、C ABI、wasmのbuild・smoke・配布経路を持つ | 下流CLIのstdin/file/JSON/終了コードを検証。確認したnative archiveはLinux x86_64用であり、全OS・完全static・全tagの配布実績は主張しない |
 | Rust製UBNF frontend・native generator | syntax frontend全18annotation/12token/9element種、対応範囲のlowering/CLI/5module emitterを実装 | Java/nativeの既存・混在値文法で全5file一致、空PATHの生成/check、手書き/symlink保護。全backend機能の生成完了とは区別。frontend既知差と構造分析上限を文書化 |
 | 入力DSLの機械語生成 | DSL全式の専用machine-code loweringは未対応 | 下流AOTはRust本文をcompile/linkするが、固定したDSLソースは実行時にparseしtyped-AST評価器で評価する。generator/評価CLI/native本文のバイナリ化とは区別する |
+
+実本番 FormulaInfo → P4 → Java の native 接続は [production bridge](../docs/tinyexpression-production-bridge.md) で両 host の独立 parser / 原文位置 / 実 javac query を検証する。旧 Tiny 拡張の consumer 移行と未閉鎖 production fence の補完は別の残作業であり、全言語対応の根拠には含めない。
 
 ## 下流TinyExpressionの現状監査（2026-09-30）
 
