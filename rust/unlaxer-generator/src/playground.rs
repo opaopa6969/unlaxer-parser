@@ -62,6 +62,7 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
     }
     runtime!("lib.rs");
     runtime!("scope.rs");
+    runtime!("names.rs");
     runtime!("semantic.rs");
     runtime!("editor.rs");
     runtime!("editor_cst.rs");
