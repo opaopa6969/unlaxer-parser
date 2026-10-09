@@ -44,6 +44,44 @@ public final class LanguageQueries {
     public interface Provider {
         Set<Operation> capabilities();
         Response query(Request request);
+        default DiagnosticResponse diagnostics(Request request) {
+            return new DiagnosticResponse(request.region().sourceMap().output(), request.project().id(), request.project().version(), State.UNSUPPORTED, List.of());
+        }
+    }
+    public record DiagnosticResponse(DocumentSnapshot snapshot, String project, long projectVersion, State state, List<ProviderProtocol.Diagnostic> diagnostics) {
+        public DiagnosticResponse { diagnostics = List.copyOf(diagnostics); }
+    }
+    public record DiagnosticResult(String region, State state, List<ProviderProtocol.MappedDiagnostic> diagnostics) {
+        public DiagnosticResult { diagnostics = List.copyOf(diagnostics); }
+    }
+    /** Validate every registered region; validation does not require an invertible cursor boundary. */
+    public List<DiagnosticResult> diagnosticsAll(DocumentSnapshot currentHost, Project currentProject, Map<String,String> parameters) {
+        if (!regions.host().equals(currentHost) || !project.equals(currentProject)) throw new IllegalArgumentException("stale diagnostic context");
+        var results = new ArrayList<DiagnosticResult>();
+        for (Region region : regions.regions()) {
+            Provider provider = providers.get(region.language());
+            if (provider == null || !provider.capabilities().contains(Operation.VALIDATE)) {
+                results.add(new DiagnosticResult(region.id(), provider == null ? State.UNAVAILABLE : State.UNSUPPORTED, List.of())); continue;
+            }
+            var response = provider.diagnostics(new Request(region, Operation.VALIDATE, 0, project, parameters));
+            if (!response.snapshot().equals(region.sourceMap().output()) || !response.project().equals(project.id()) || response.projectVersion() != project.version())
+                throw new IllegalArgumentException("stale diagnostic response");
+            if (response.state() != State.COMPLETE && response.state() != State.PARTIAL && !response.diagnostics().isEmpty())
+                throw new IllegalArgumentException("failed response contains diagnostics");
+            var diagnostics = new ArrayList<ProviderProtocol.MappedDiagnostic>();
+            for (var diagnostic : response.diagnostics()) {
+                if (!Set.of("ERROR","WARNING","MANDATORY_WARNING","INFORMATION","HINT","NOTE","OTHER","SUGGESTION","MESSAGE","HELP","FAILURE_NOTE").contains(diagnostic.severity())) throw new IllegalArgumentException("unknown diagnostic severity");
+                var locations = new ArrayList<Mapping>();
+                for (Location location : diagnostic.locations()) {
+                    location.snapshot().check(location.span());
+                    if (location.snapshot().equals(region.sourceMap().output())) locations.addAll(region.sourceMap().diagnostics(location.span()));
+                    else { checkKnown(location.snapshot(), region); locations.add(new Mapping(location, true)); }
+                }
+                diagnostics.add(new ProviderProtocol.MappedDiagnostic(diagnostic.code(), diagnostic.message(), diagnostic.severity(), locations));
+            }
+            results.add(new DiagnosticResult(region.id(), response.state(), diagnostics));
+        }
+        return List.copyOf(results);
     }
     /** Completion items are alternatives; their edits are checked per item, never combined. */
     public record MappedItem(String label, String detail, List<Mapping> locations, List<Edit> edits) {

@@ -421,3 +421,138 @@ fn cursor_mapping_rejects_deleted_transformed_and_duplicate_origins() {
         .unwrap()
         .is_none());
 }
+
+struct DiagnosticProvider(String);
+impl Provider for DiagnosticProvider {
+    fn capabilities(&self) -> HashSet<Operation> {
+        HashSet::from([Operation::Validate])
+    }
+    fn query(&self, _: &Request<'_>) -> unlaxer_runtime::source::Result<Response> {
+        panic!("typed validation must use diagnostics()")
+    }
+    fn diagnostics(
+        &self,
+        request: &Request<'_>,
+    ) -> unlaxer_runtime::source::Result<DiagnosticResponse> {
+        use unlaxer_runtime::provider_protocol::Diagnostic;
+        assert_eq!(request.operation, Operation::Validate);
+        assert_eq!(request.cursor, 0);
+        let mut snapshot = child();
+        if self.0 == "stale-response" {
+            snapshot.version = 0;
+        }
+        let local = Location::new(child(), span(12, 13))?;
+        let foreign = Location::new(library(), span(0, 3))?;
+        let locations = match self.0.as_str() {
+            "foreign" => vec![foreign],
+            "multiple" => vec![local, foreign],
+            "stale-location" => vec![Location::new(
+                Snapshot::new("library", 1, "bar")?,
+                span(0, 3),
+            )?],
+            "unknown-document" => vec![Location::new(
+                Snapshot::new("unknown", 1, "x")?,
+                span(0, 1),
+            )?],
+            _ => vec![local],
+        };
+        let severity = match self.0.as_str() {
+            "foreign" => "WARNING",
+            "note" => "NOTE",
+            "unknown-severity" => "GUESS",
+            _ => "ERROR",
+        };
+        let state = match self.0.as_str() {
+            "timeout" => State::Timeout,
+            "unsupported" => State::Unsupported,
+            "failed-payload" => State::Failed,
+            _ => State::Partial,
+        };
+        let diagnostics = if matches!(self.0.as_str(), "timeout" | "unsupported") {
+            vec![]
+        } else {
+            vec![Diagnostic {
+                code: "TYPE".into(),
+                message: "incompatible type".into(),
+                severity: severity.into(),
+                locations,
+            }]
+        };
+        Ok(DiagnosticResponse {
+            snapshot,
+            project: "project".into(),
+            project_version: if self.0 == "stale-project" { 3 } else { 4 },
+            state,
+            diagnostics,
+        })
+    }
+}
+#[test]
+fn typed_diagnostics_preserve_metadata_and_owning_snapshots() {
+    for line in include_str!("../../../docs/fixtures/language-queries/diagnostics.tsv")
+        .lines()
+        .filter(|l| !l.starts_with('#'))
+    {
+        let fields: Vec<_> = line.split('\t').collect();
+        let queries = LanguageQueries::new(
+            regions(),
+            project(),
+            providers(Box::new(DiagnosticProvider(fields[0].into()))),
+        )
+        .unwrap();
+        let results = queries.diagnostics_all(&host(), &project(), &BTreeMap::new());
+        if fields[1] == "REJECTED" {
+            assert!(results.is_err(), "{}", fields[0]);
+            continue;
+        }
+        let results = results.unwrap();
+        assert_eq!(
+            results
+                .iter()
+                .map(|r| r.region.as_str())
+                .collect::<Vec<_>>(),
+            ["child", "formula", "tiny"]
+        );
+        let result = &results[0];
+        assert_eq!(format!("{:?}", result.state).to_uppercase(), fields[1]);
+        assert_eq!(results[1].state, State::Unavailable);
+        assert_eq!(results[2].state, State::Unavailable);
+        if fields[2] == "-" {
+            assert!(result.diagnostics.is_empty());
+            continue;
+        }
+        assert_eq!(result.diagnostics.len(), 1);
+        let diagnostic = &result.diagnostics[0];
+        assert_eq!(diagnostic.code, fields[2]);
+        assert_eq!(diagnostic.message, "incompatible type");
+        assert_eq!(diagnostic.severity, fields[3]);
+        assert_eq!(
+            diagnostic
+                .locations
+                .iter()
+                .map(|m| format!(
+                    "{}:{}:{}:{}",
+                    m.location.snapshot.uri, m.location.span.start, m.location.span.end, m.exact
+                ))
+                .collect::<Vec<_>>()
+                .join(","),
+            fields[4]
+        );
+    }
+    let queries = LanguageQueries::new(
+        regions(),
+        project(),
+        providers(Box::new(DiagnosticProvider("valid".into()))),
+    )
+    .unwrap();
+    let mut old_host = host();
+    old_host.version = 2;
+    assert!(queries
+        .diagnostics_all(&old_host, &project(), &BTreeMap::new())
+        .is_err());
+    let mut old_project = project();
+    old_project.version = 5;
+    assert!(queries
+        .diagnostics_all(&host(), &old_project, &BTreeMap::new())
+        .is_err());
+}

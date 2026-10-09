@@ -180,3 +180,30 @@ stale edits. The fixture adapters are explicit test hosts, not automatic semanti
 inference for an arbitrary generated grammar. Browser/WASM cannot run
 process-based Java/TypeScript/Rust compilers; those providers stay in native
 hosts. Multi-document workspace edits use the separate workspace API.
+
+## Typed document diagnostics
+
+`Provider.diagnostics(Request)` is a separate, backwards-compatible typed path;
+its default returns UNSUPPORTED. Java/Rust `DiagnosticResponse` retains the exact
+virtual snapshot, project ID/version, operation state and compiler diagnostics
+(code, message, severity, owned locations). `diagnosticsAll` / `diagnostics_all`
+validates every region in deterministic region-ID scalar order, using cursor zero
+and operation VALIDATE. A host decorator may add per-region settings such as a
+Java `fileName`; the dispatcher does not guess filenames from grammar names.
+
+The dispatcher checks the current host/project and every response snapshot. Each
+location is range-checked. Virtual locations follow the region source map;
+foreign locations must belong to the exact Project registry snapshot. Generated
+or transformed origins retain their non-exact anchors. No invertible completion
+cursor is required to report a document diagnostic. Unavailable/unsupported
+regions produce explicit empty states; stale snapshots, unknown documents,
+unknown severity values and failed responses with diagnostic payloads are errors.
+
+`ProviderProcess` implements this path without losing compiler metadata. Its
+existing generic `query(VALIDATE)` also now forwards diagnostics as label/message/
+location items, so old consumers no longer receive an empty success. Consumers
+requiring severity/code distinctions should use the typed API. Existing query
+and item constructors stay unchanged. Shared diagnostic fixtures cover 12
+metadata/ownership/state/failure cases. The real Java compiler conformance test
+also forwards diagnostics through both Java/Rust FormulaInfo -> TinyExpression
+-> Java registries and verifies the independent host span `[35,36)`.
