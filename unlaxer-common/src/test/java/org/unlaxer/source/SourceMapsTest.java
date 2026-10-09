@@ -132,7 +132,7 @@ public class SourceMapsTest {
         LanguageRegions regions = regions();
         assertEquals("java1", regions.at(8).id()); assertEquals("java2", regions.at(13).id());
         assertEquals("tiny", regions.at(10).id()); assertEquals("formula", regions.at(5).id());
-        assertNull(regions.at(19));
+        assertEquals("formula",regions.at(19).id());
         assertEquals(State.UNAVAILABLE, regions.dispatch("java1", Operation.PARSE, Map.of(), HOST).state());
         Map<Language, Provider> providers = Map.of(JAVA, provider(State.PARTIAL, false, List.of(new Edit(new Span(1, 2), "名前😀"))));
         assertEquals(State.UNSUPPORTED, regions.dispatch("java1", Operation.FORMAT, providers, HOST).state());
@@ -213,6 +213,24 @@ public class SourceMapsTest {
         assertTrue(ambiguous.cursor(new Location(splitHost, new Span(1, 1))).isEmpty());
         assertTrue(ambiguous.cursor(new Location(splitHost, new Span(2, 2))).isEmpty());
         assertThrows(IllegalArgumentException.class, () -> ambiguous.edit(point));
+    }
+
+    @Test public void sharedPartialEofOwnership() throws Exception {
+        DocumentSnapshot host=new DocumentSnapshot("host",1,"😀ABC");
+        assertEquals(4,host.length());assertEquals(5,host.utf16(4));
+        for(String line:Files.readAllLines(fixture("partial-eof.tsv"))) {
+            if(line.startsWith("#"))continue;
+            String[] columns=line.split("\t");List<Region> input=new ArrayList<>();
+            for(String encoded:columns[2].split(";")) {
+                String[] f=encoded.split(",");Span full=new Span(Integer.parseInt(f[2]),Integer.parseInt(f[3]));Span body=new Span(Integer.parseInt(f[4]),Integer.parseInt(f[5]));
+                DocumentSnapshot child=new DocumentSnapshot(f[0],1,host.slice(body));
+                SegmentSourceMap map=child.length()==0?new SegmentSourceMap(child,List.of()):copy(child,host,body.start());
+                input.add(new Region(f[0],f[1].equals("-")?null:f[1],new Language("x","local","1","X","Document"),full,body,map,State.valueOf(f[6])));
+            }
+            LanguageRegions regions=new LanguageRegions(host,input);int cursor=Integer.parseInt(columns[1]);
+            if(columns[3].equals("REJECT"))assertThrows(columns[0],IllegalArgumentException.class,()->regions.at(cursor));
+            else {Region region=regions.at(cursor);assertEquals(columns[0],columns[3],region==null?"NONE":region.id());}
+        }
     }
 
 }
