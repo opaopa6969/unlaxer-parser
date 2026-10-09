@@ -72,3 +72,37 @@ full tinyexpression-rs、rustcodeblock、LSP/DAP は別の未完了項目とし�
 実 tinyexpression `2a2db7c` の P4 文法を native generator へ渡すと、この変更で
 `Formula` の `@interleave` を通過し、次の未対応 `@scopeTree(mode=lexical)` を
 exit 3 で明示拒否する。P4 全体の生成成功や full-spec 完了を意味しない。
+
+## 名前付き lexical 空白定義（#393、親 #368）
+
+UBNF v2 の宣言的 token を、同じファイルで `@whitespace: GAP` または rule の
+`@whitespace(GAP)` から参照できる。`GAP` の lexical expression は空文字で成功しては
+ならない。undefined、nullable、循環 lexical reference は生成前に拒否する。
+名前付き定義の名前は大文字小文字を区別する。`javaStyle` / `none` は従来の固定互換
+別名として予約し、これらの大小文字を無視する契約は変えない。
+
+```ubnf
+grammar Example {
+  @ubnf: v2
+  @whitespace: GAP
+  token GAP ::= (' ' | '#');
+  @root @mapping(Root, params=[value])
+  Root ::= 'a' @value 'b';
+}
+```
+
+既存の相対 module import の export（全 declarative token）も利用できる。
+`@import layout from 'layout.ubnf'` と `@whitespace: layout.GAP`、または rule の
+`@whitespace(layout.GAP)` を組み合わせる。import 先の lexical references は定義元で
+閉じるため、呼出し側の同名 token で上書きされない。読み飛ばしの適用位置、rule の
+優先順位、CST / AST の既存位置契約、token 内部が原子的なことは上記と同じ。
+
+この段階では通常の文字入力 runtime を対象にする。既存 `@tokenStream: enabled` の
+rule-local whitespace 制限を維持し、名前付き global 空白も
+`E-TOKEN-STREAM-TRIVIA` で明示拒否する。`pkg:` 参照、標準定義、manifest / lock /
+cache、HTTPS、編集支援の出典表示と TinyExpression 移行は親 #368 の未完了項目。
+
+共通 trivia corpus は名前付き global/rule、相対 import の global/rule、token 内部の
+原子性を追加し、Java / Rust の受理・拒否、consumed/matched cursor、AST の全 field /
+node span、native frontend の生成物を比較する。既存 lexical module invalid corpus は
+未定義、空文字、名前の大文字小文字違いも両生成経路と portability report で検証する。

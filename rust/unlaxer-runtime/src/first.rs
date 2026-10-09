@@ -178,6 +178,7 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
         | Expr::ValueBoundary(child)
         | Expr::RuleEffects { child, .. }
         | Expr::CaptureEquality { child, .. } => of(child, rules),
+        Expr::LexicalTriviaScope { .. } => FirstSet::UNKNOWN,
         Expr::TriviaScope { child, whitespace } => {
             let mut set = of(child, rules);
             set.trivia = match (set.trivia, whitespace) {

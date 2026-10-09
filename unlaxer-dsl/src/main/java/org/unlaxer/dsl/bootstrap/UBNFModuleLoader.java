@@ -82,11 +82,28 @@ public final class UBNFModuleLoader {
         grammar.tokens().forEach(t -> used.add(t.name()));
         grammar.rules().forEach(r -> used.add(r.name()));
         var synthetic = new LinkedHashMap<String, String>();
+        var settings = new ArrayList<GlobalSetting>();
+        for (var setting : grammar.settings()) {
+            settings.add(setting.key().equals("whitespace") && setting.value() instanceof StringSettingValue value
+                ? new GlobalSetting(setting.key(), new StringSettingValue(policy(value.value(), imported, tokens, used, synthetic))) : setting);
+        }
         var rules = new ArrayList<RuleDecl>();
         for (var rule : grammar.rules()) {
-            rules.add(new RuleDecl(rule.annotations(), rule.name(), body(rule.body(), imported, tokens, used, synthetic)));
+            var annotations = new ArrayList<Annotation>();
+            for (var annotation : rule.annotations()) annotations.add(annotation instanceof WhitespaceAnnotation value
+                && value.style().isPresent() ? new WhitespaceAnnotation(java.util.Optional.of(policy(value.style().get(), imported, tokens, used, synthetic))) : annotation);
+            rules.add(new RuleDecl(annotations, rule.name(), body(rule.body(), imported, tokens, used, synthetic)));
         }
-        return new GrammarDecl(grammar.name(), List.of(), grammar.settings(), tokens, rules);
+        return new GrammarDecl(grammar.name(), List.of(), settings, tokens, rules);
+    }
+
+    private String policy(String style, Map<String, LexicalExpression> imported, List<TokenDecl> tokens,
+            Set<String> used, Map<String, String> synthetic) {
+        if (!style.contains(".")) return style;
+        int dot = style.indexOf('.');
+        RuleRefElement resolved = (RuleRefElement) atom(new RuleRefElement(java.util.Optional.of(style.substring(0, dot)),
+            style.substring(dot + 1)), imported, tokens, used, synthetic);
+        return resolved.name();
     }
 
     private LexicalExpression externalRefs(LexicalExpression expression, Map<String, LexicalExpression> imported) {
