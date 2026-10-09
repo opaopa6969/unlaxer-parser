@@ -11,6 +11,9 @@ pub fn generate_profile(path: &Path) -> Result<Vec<GeneratedFile>, String> {
         .unwrap_or(Path::new("."))
         .join(profile.grammar_file());
     let ast = crate::modules::load(&grammar_path)?;
+    if ast.grammars.len() != 1 {
+        return Err("profile requires exactly one grammar".into());
+    }
     let grammar = &ast.grammars[0];
     for entry in profile.entries.keys() {
         if profile.identity(entry)?.grammar != grammar.name

@@ -17,7 +17,9 @@ public final class PlaygroundGenerator {
     public static Map<String, String> generateProfile(Path path) throws IOException {
         var profile = org.unlaxer.source.LanguageProfile.parse(Files.readString(path));
         Path grammarPath = path.toAbsolutePath().getParent().resolve(profile.grammarFile());
-        var grammar = UBNFModuleLoader.load(grammarPath).grammars().get(0);
+        var file = UBNFModuleLoader.load(grammarPath);
+        if (file.grammars().size() != 1) throw new IllegalArgumentException("profile requires exactly one grammar");
+        var grammar = file.grammars().get(0);
         for (String entry : profile.entries().keySet()) {
             if (!profile.identity(entry).grammar().equals(grammar.name()) || grammar.rules().stream().noneMatch(rule -> rule.name().equals(entry))) {
                 throw new IllegalArgumentException("profile grammar/entry mismatch");
