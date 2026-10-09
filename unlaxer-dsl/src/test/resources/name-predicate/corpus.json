@@ -1,0 +1,712 @@
+[
+  {
+    "name": "cxx23-n4950-name-dependent-statements",
+    "grammar": "grammar NameStatement {\n  @ubnf: v2\n  @package: org.example.namepredicate\n  @whitespace: javaStyle\n  token ID ::= (CHAR_RANGE('A','Z') | CHAR_RANGE('a','z') | '𠮷')+;\n  @root @mapping(Statement, params=[value])\n  Start ::= Declaration @value | Expression @value;\n  @namePredicate(snapshot='cxx23', version='v1', name='name', kind='type')\n  @mapping(Declaration, params=[name,argument])\n  Declaration ::= ID @name '(' ID @argument ')' ';';\n  @namePredicate(snapshot='cxx23', version='v1', name='name', kind='resolved')\n  @mapping(Expression, params=[name,argument])\n  Expression ::= ID @name '(' ID @argument ')' ['++'] ';';\n}\n",
+    "cases": [
+      {
+        "id": "type-declaration",
+        "input": "T(a);",
+        "snapshot": {
+          "version": "v1",
+          "types": [
+            "T"
+          ],
+          "values": []
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "ast": {
+          "type": "Statement",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "value": {
+              "type": "Declaration",
+              "span": [
+                0,
+                5
+              ],
+              "fields": {
+                "name": "T",
+                "argument": "a"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "value-expression",
+        "input": "T(a);",
+        "snapshot": {
+          "version": "v1",
+          "types": [],
+          "values": [
+            "T"
+          ]
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "ast": {
+          "type": "Statement",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "value": {
+              "type": "Expression",
+              "span": [
+                0,
+                5
+              ],
+              "fields": {
+                "name": "T",
+                "argument": "a"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "type-expression-only",
+        "input": "T(a)++;",
+        "snapshot": {
+          "version": "v1",
+          "types": [
+            "T"
+          ],
+          "values": []
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          7,
+          7
+        ],
+        "ast": {
+          "type": "Statement",
+          "span": [
+            0,
+            7
+          ],
+          "fields": {
+            "value": {
+              "type": "Expression",
+              "span": [
+                0,
+                7
+              ],
+              "fields": {
+                "name": "T",
+                "argument": "a"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "value-expression-only",
+        "input": "T(a)++;",
+        "snapshot": {
+          "version": "v1",
+          "types": [],
+          "values": [
+            "T"
+          ]
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          7,
+          7
+        ],
+        "ast": {
+          "type": "Statement",
+          "span": [
+            0,
+            7
+          ],
+          "fields": {
+            "value": {
+              "type": "Expression",
+              "span": [
+                0,
+                7
+              ],
+              "fields": {
+                "name": "T",
+                "argument": "a"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "unicode-leading-trivia",
+        "input": " 𠮷(a);",
+        "snapshot": {
+          "version": "v1",
+          "types": [
+            "𠮷"
+          ],
+          "values": []
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          6,
+          6
+        ],
+        "ast": {
+          "type": "Statement",
+          "span": [
+            0,
+            6
+          ],
+          "fields": {
+            "value": {
+              "type": "Declaration",
+              "span": [
+                0,
+                6
+              ],
+              "fields": {
+                "name": "𠮷",
+                "argument": "a"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "crlf-leading-trivia",
+        "input": "\r\nT(a);",
+        "snapshot": {
+          "version": "v1",
+          "types": [
+            "T"
+          ],
+          "values": []
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          7,
+          7
+        ],
+        "ast": {
+          "type": "Statement",
+          "span": [
+            0,
+            7
+          ],
+          "fields": {
+            "value": {
+              "type": "Declaration",
+              "span": [
+                0,
+                7
+              ],
+              "fields": {
+                "name": "T",
+                "argument": "a"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "unknown-declaration",
+        "input": "U(a);",
+        "snapshot": {
+          "version": "v1",
+          "types": [],
+          "values": []
+        },
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "nameSpan": [
+          0,
+          1
+        ],
+        "diagnostic": {
+          "kind": "unresolved_name",
+          "offset": 0,
+          "expected": "resolved name in snapshot cxx23@v1"
+        }
+      },
+      {
+        "id": "unknown-expression-only",
+        "input": "U(a)++;",
+        "snapshot": {
+          "version": "v1",
+          "types": [],
+          "values": []
+        },
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "nameSpan": [
+          0,
+          1
+        ],
+        "diagnostic": {
+          "kind": "unresolved_name",
+          "offset": 0,
+          "expected": "resolved name in snapshot cxx23@v1"
+        }
+      },
+      {
+        "id": "unicode-unknown-span",
+        "input": " 𠮷(a);",
+        "snapshot": {
+          "version": "v1",
+          "types": [],
+          "values": []
+        },
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "nameSpan": [
+          1,
+          2
+        ],
+        "diagnostic": {
+          "kind": "unresolved_name",
+          "offset": 1,
+          "expected": "resolved name in snapshot cxx23@v1"
+        }
+      },
+      {
+        "id": "missing-snapshot",
+        "input": "T(a);",
+        "snapshot": null,
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "nameSpan": [
+          0,
+          0
+        ],
+        "diagnostic": {
+          "kind": "name_snapshot_missing",
+          "offset": 0,
+          "expected": "name snapshot cxx23@v1"
+        }
+      },
+      {
+        "id": "version-mismatch",
+        "input": "T(a);",
+        "snapshot": {
+          "version": "v2",
+          "types": [
+            "T"
+          ],
+          "values": []
+        },
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "nameSpan": [
+          0,
+          0
+        ],
+        "diagnostic": {
+          "kind": "name_snapshot_version",
+          "offset": 0,
+          "expected": "name snapshot cxx23@v1"
+        }
+      },
+      {
+        "id": "trailing-input",
+        "input": "T(a);junk",
+        "snapshot": {
+          "version": "v1",
+          "types": [
+            "T"
+          ],
+          "values": []
+        },
+        "accepted": false,
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "diagnostic": {
+          "kind": "trailing_input",
+          "offset": 5,
+          "expected": "end of input"
+        }
+      }
+    ]
+  },
+  {
+    "name": "unknown-name-cannot-use-unguarded-fallback",
+    "grammar": "grammar NameStatement {\n  @ubnf: v2\n  @package: org.example.namepredicate\n  @whitespace: javaStyle\n  token ID ::= (CHAR_RANGE('A','Z') | CHAR_RANGE('a','z') | '𠮷')+;\n  @root @mapping(Statement, params=[value])\n  Start ::= Declaration @value | Expression @value | Fallback @value;\n  @namePredicate(snapshot='cxx23', version='v1', name='name', kind='type')\n  @mapping(Declaration, params=[name,argument])\n  Declaration ::= ID @name '(' ID @argument ')' ';';\n  @namePredicate(snapshot='cxx23', version='v1', name='name', kind='resolved')\n  @mapping(Expression, params=[name,argument])\n  Expression ::= ID @name '(' ID @argument ')' ['++'] ';';\n @mapping(FallbackValue, params=[name,argument]) Fallback ::= ID @name '(' ID @argument ')' ';';\n}\n",
+    "cases": [
+      {
+        "id": "type-declaration",
+        "input": "T(a);",
+        "snapshot": {
+          "version": "v1",
+          "types": [
+            "T"
+          ],
+          "values": []
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "ast": {
+          "type": "Statement",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "value": {
+              "type": "Declaration",
+              "span": [
+                0,
+                5
+              ],
+              "fields": {
+                "name": "T",
+                "argument": "a"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "value-expression",
+        "input": "T(a);",
+        "snapshot": {
+          "version": "v1",
+          "types": [],
+          "values": [
+            "T"
+          ]
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "ast": {
+          "type": "Statement",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "value": {
+              "type": "Expression",
+              "span": [
+                0,
+                5
+              ],
+              "fields": {
+                "name": "T",
+                "argument": "a"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "unknown-declaration",
+        "input": "U(a);",
+        "snapshot": {
+          "version": "v1",
+          "types": [],
+          "values": []
+        },
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "nameSpan": [
+          0,
+          1
+        ],
+        "diagnostic": {
+          "kind": "unresolved_name",
+          "offset": 0,
+          "expected": "resolved name in snapshot cxx23@v1"
+        }
+      },
+      {
+        "id": "unicode-unknown-span",
+        "input": " 𠮷(a);",
+        "snapshot": {
+          "version": "v1",
+          "types": [],
+          "values": []
+        },
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "nameSpan": [
+          1,
+          2
+        ],
+        "diagnostic": {
+          "kind": "unresolved_name",
+          "offset": 1,
+          "expected": "resolved name in snapshot cxx23@v1"
+        }
+      }
+    ]
+  },
+  {
+    "name": "unknown-name-cannot-use-root-recovery",
+    "grammar": "grammar NameStatement {\n  @ubnf: v2\n  @package: org.example.namepredicate\n  @whitespace: javaStyle\n  token ID ::= (CHAR_RANGE('A','Z') | CHAR_RANGE('a','z') | '𠮷')+;\n  @root @recovery(sync=';') @mapping(Statement, params=[value])\n  Start ::= Declaration @value | Expression @value;\n  @namePredicate(snapshot='cxx23', version='v1', name='name', kind='type')\n  @mapping(Declaration, params=[name,argument])\n  Declaration ::= ID @name '(' ID @argument ')' ';';\n  @namePredicate(snapshot='cxx23', version='v1', name='name', kind='resolved')\n  @mapping(Expression, params=[name,argument])\n  Expression ::= ID @name '(' ID @argument ')' ['++'] ';';\n}\n",
+    "cases": [
+      {
+        "id": "type-declaration",
+        "input": "T(a);",
+        "snapshot": {
+          "version": "v1",
+          "types": [
+            "T"
+          ],
+          "values": []
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "ast": {
+          "type": "Statement",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "value": {
+              "type": "Declaration",
+              "span": [
+                0,
+                5
+              ],
+              "fields": {
+                "name": "T",
+                "argument": "a"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "unknown-declaration",
+        "input": "U(a);",
+        "snapshot": {
+          "version": "v1",
+          "types": [],
+          "values": []
+        },
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "nameSpan": [
+          0,
+          1
+        ],
+        "diagnostic": {
+          "kind": "unresolved_name",
+          "offset": 0,
+          "expected": "resolved name in snapshot cxx23@v1"
+        }
+      },
+      {
+        "id": "missing-snapshot",
+        "input": "T(a);",
+        "snapshot": null,
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "nameSpan": [
+          0,
+          0
+        ],
+        "diagnostic": {
+          "kind": "name_snapshot_missing",
+          "offset": 0,
+          "expected": "name snapshot cxx23@v1"
+        }
+      },
+      {
+        "id": "version-mismatch",
+        "input": "T(a);",
+        "snapshot": {
+          "version": "v2",
+          "types": [
+            "T"
+          ],
+          "values": []
+        },
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "nameSpan": [
+          0,
+          0
+        ],
+        "diagnostic": {
+          "kind": "name_snapshot_version",
+          "offset": 0,
+          "expected": "name snapshot cxx23@v1"
+        }
+      },
+      {
+        "id": "known-name-syntax-recovery",
+        "input": "T(;",
+        "snapshot": {
+          "version": "v1",
+          "types": [
+            "T"
+          ],
+          "values": []
+        },
+        "accepted": false,
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "diagnostic": {
+          "kind": "recovery",
+          "offset": 0,
+          "expected": "syntax error: skipped to sync point"
+        }
+      }
+    ]
+  },
+  {
+    "name": "root-rule-name-predicate",
+    "grammar": "grammar RootName { @ubnf: v2 @package: org.example.namepredicate token ID ::= CHAR_RANGE('A','Z')+; @root @namePredicate(snapshot='cxx23',version='v1',name='name',kind='type') @mapping(Result,params=[name]) Root ::= ID @name; }",
+    "cases": [
+      {
+        "id": "type-root",
+        "input": "T",
+        "snapshot": {
+          "version": "v1",
+          "types": [
+            "T"
+          ],
+          "values": []
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "ast": {
+          "type": "Result",
+          "span": [
+            0,
+            1
+          ],
+          "fields": {
+            "name": "T"
+          }
+        }
+      },
+      {
+        "id": "value-root-rejected",
+        "input": "T",
+        "snapshot": {
+          "version": "v1",
+          "types": [],
+          "values": [
+            "T"
+          ]
+        },
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 1,
+          "expected": "type name in snapshot cxx23@v1"
+        }
+      },
+      {
+        "id": "unknown-root",
+        "input": "U",
+        "snapshot": {
+          "version": "v1",
+          "types": [],
+          "values": []
+        },
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "nameSpan": [
+          0,
+          1
+        ],
+        "diagnostic": {
+          "kind": "unresolved_name",
+          "offset": 0,
+          "expected": "resolved name in snapshot cxx23@v1"
+        }
+      }
+    ]
+  }
+]
