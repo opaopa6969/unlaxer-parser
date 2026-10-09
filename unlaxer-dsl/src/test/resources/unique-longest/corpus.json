@@ -1,0 +1,291 @@
+[
+  {
+    "name": "unique-max",
+    "grammar": "grammar UniqueMax { @package: org.example.uniquelongest @root @mapping(Root, params=[value]) @uniqueLongestChoice Root ::= 'a' @value | 'ab' @value; }",
+    "cases": [
+      {
+        "id": "long",
+        "input": "ab",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            2
+          ],
+          "fields": {
+            "value": "ab"
+          }
+        }
+      },
+      {
+        "id": "short",
+        "input": "a",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            1
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "trailing",
+        "input": "ab!",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "accepted": false,
+        "diagnostic": {
+          "kind": "trailing_input",
+          "offset": 2,
+          "expected": "end of input"
+        }
+      }
+    ]
+  },
+  {
+    "name": "unicode-tie-reset",
+    "grammar": "grammar UnicodeTie { @package: org.example.uniquelongest @root @mapping(Root, params=[value]) @uniqueLongestChoice Root ::= '😀' @value | '😀' @value | '😀x' @value; }",
+    "cases": [
+      {
+        "id": "tie",
+        "input": "😀",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": {
+          "kind": "ambiguity",
+          "offset": 1,
+          "expected": "unique longest alternative"
+        }
+      },
+      {
+        "id": "longer-clears-tie",
+        "input": "😀x",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            2
+          ],
+          "fields": {
+            "value": "😀x"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "empty-winner",
+    "grammar": "grammar EmptyWinner { @package: org.example.uniquelongest @root @mapping(Root, params=[value]) @uniqueLongestChoice Root ::= ['a'] @value | ['b'] @value; }",
+    "cases": [
+      {
+        "id": "empty",
+        "input": "",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": {
+          "kind": "empty_choice",
+          "offset": 0,
+          "expected": "nonempty unique longest alternative"
+        }
+      },
+      {
+        "id": "progress",
+        "input": "a",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            1
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "outer-rollback",
+    "grammar": "grammar OuterRollback { @package: org.example.uniquelongest @root @mapping(Root) Root ::= Check | 'ab'; @uniqueLongestChoice Check ::= 'a' | 'a'; }",
+    "cases": [
+      {
+        "id": "fallback-after-tie",
+        "input": "ab",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            2
+          ],
+          "fields": {}
+        }
+      }
+    ]
+  },
+  {
+    "name": "legacy-longest-order",
+    "grammar": "grammar LegacyTie { @package: org.example.uniquelongest @root @mapping(Root, params=[value]) @longestChoice Root ::= '😀' @value | '😀' @value; }",
+    "cases": [
+      {
+        "id": "old-tie-preserved",
+        "input": "😀",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            1
+          ],
+          "fields": {
+            "value": "😀"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "cxx23-fixed-type-T",
+    "grammar": "grammar Cxx23FixedType { @package: org.example.uniquelongest @root @mapping(Root, params=[value]) @uniqueLongestChoice Root ::= 'T(a);' @value | 'T(a);' @value | 'T(a)++;' @value; }",
+    "cases": [
+      {
+        "id": "declaration-expression-requires-name-profile",
+        "input": "T(a);",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": {
+          "kind": "ambiguity",
+          "offset": 5,
+          "expected": "unique longest alternative"
+        }
+      },
+      {
+        "id": "expression-only",
+        "input": "T(a)++;",
+        "prefix": [
+          true,
+          7,
+          7
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            7
+          ],
+          "fields": {
+            "value": "T(a)++;"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "mixed-value-subtree",
+    "grammar": "grammar MixedSubtree { @package: org.example.uniquelongest @root @mapping(Root, params=[value]) @uniqueLongestChoice Root ::= 'a' @value | Long @value; @mapping(Leaf, params=[body]) Long ::= 'ab' @body; }",
+    "cases": [
+      {
+        "id": "node-wins",
+        "input": "ab",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            2
+          ],
+          "fields": {
+            "value": {
+              "type": "Leaf",
+              "span": [
+                0,
+                2
+              ],
+              "fields": {
+                "body": "ab"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "text-wins",
+        "input": "a",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            1
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      }
+    ]
+  }
+]

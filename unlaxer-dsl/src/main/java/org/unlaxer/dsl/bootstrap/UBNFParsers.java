@@ -1000,6 +1000,16 @@ public class UBNFParsers {
         }
     }
 
+    /** UniqueLongestChoiceAnnotation: '@uniqueLongestChoice' */
+    public static class UniqueLongestChoiceAnnotationParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(new WordParser("@uniqueLongestChoice"));
+        }
+    }
+
     /** PredictiveChoiceAnnotation: '@predictiveChoice' */
     public static class PredictiveChoiceAnnotationParser extends UBNFLazyChain {
         private static final long serialVersionUID = 1L;
@@ -1265,6 +1275,7 @@ public class UBNFParsers {
                 Parser.get(LeftAssocAnnotationParser.class),
                 Parser.get(RightAssocAnnotationParser.class),
                 Parser.get(LongestChoiceAnnotationParser.class),
+                Parser.get(UniqueLongestChoiceAnnotationParser.class),
                 Parser.get(PredictiveChoiceAnnotationParser.class),
                 Parser.get(PrecedenceAnnotationParser.class),
                 Parser.get(DocAnnotationParser.class),

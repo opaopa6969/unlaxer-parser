@@ -51,7 +51,7 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
             }
         }
     }
-    public sealed interface Expression permits Literal, NumberToken, Reference, Sequence, Choice, LongestChoice, PredictiveChoice, Capture,
+    public sealed interface Expression permits Literal, NumberToken, Reference, Sequence, Choice, LongestChoice, UniqueLongestChoice, PredictiveChoice, Capture,
         OptionalExpr, Repeat, Separated, AnyToken, EofToken, EmptyToken, ErrorExpected, CharRangeToken,
         ExceptToken, UntilToken, LookaheadToken, Delimited, IdentifierToken, QuotedToken,
         CodeStartToken, CodeEndToken, LongCodeBlockToken, CustomToken, TextValue, ValueBoundary, TriviaScope, RuleEffects,
@@ -96,6 +96,9 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     }
     public record LongestChoice(List<Expression> alternatives) implements Expression {
         public LongestChoice { alternatives = List.copyOf(alternatives); }
+    }
+    public record UniqueLongestChoice(List<Expression> alternatives) implements Expression {
+        public UniqueLongestChoice { alternatives = List.copyOf(alternatives); }
     }
     public sealed interface Predictor permits AnyPredictor, LiteralPredictor, NumberPredictor,
         IdentifierPredictor, QuotedPredictor, AnyOfPredictor {}

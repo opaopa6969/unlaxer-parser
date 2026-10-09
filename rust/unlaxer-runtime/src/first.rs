@@ -163,7 +163,9 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
             }
             set
         }
-        Expr::Choice(alternatives) | Expr::LongestChoice(alternatives) => alternatives
+        Expr::Choice(alternatives)
+        | Expr::LongestChoice(alternatives)
+        | Expr::UniqueLongestChoice(alternatives) => alternatives
             .iter()
             .fold(FirstSet::EMPTY, |set, alternative| {
                 set.union(of(alternative, rules))

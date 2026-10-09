@@ -98,6 +98,8 @@ pub enum Expr {
     /// Try every alternative from the same transactional state and commit the
     /// one that consumes the most input. Equal-length matches keep declaration order.
     LongestChoice(Vec<Expr>),
+    /// Choose a nonempty unique maximum; reject ties and counts outside 2..=64.
+    UniqueLongestChoice(Vec<Expr>),
     /// Ordered choice that skips alternatives whose conservative FIRST
     /// predictor proves they cannot match. `Any` preserves ordinary choice.
     PredictiveChoice {
@@ -240,6 +242,9 @@ impl Expr {
     }
     pub fn longest_choice(alternatives: impl IntoIterator<Item = Self>) -> Self {
         Self::LongestChoice(alternatives.into_iter().collect())
+    }
+    pub fn unique_longest_choice(alternatives: impl IntoIterator<Item = Self>) -> Self {
+        Self::UniqueLongestChoice(alternatives.into_iter().collect())
     }
     pub fn predictive_choice(alternatives: impl IntoIterator<Item = (Predictor, Self)>) -> Self {
         let (predictors, alternatives) = alternatives.into_iter().unzip();
@@ -1087,6 +1092,7 @@ pub struct ParseContext<'a> {
     // with DetailedOnFailure, where a failed candidate records no diagnostics.
     first_sets: Option<Arc<[first::FirstSet]>>,
     exclusion_audit: bool,
+    unique_choice_failure_seen: bool,
 }
 
 /// Ordered choice with rollback and full-input acceptance. Rule nesting is bounded at 256.
@@ -1244,6 +1250,27 @@ fn parse_detailed_owned(
     Err(ParseDiagnostic {
         kind: if trailing_offset.is_some() {
             "trailing_input"
+        } else if parser.unique_choice_failure_seen
+            && farthest
+                .expected
+                .iter()
+                .any(|hint| hint == "unique longest alternative")
+        {
+            "ambiguity"
+        } else if parser.unique_choice_failure_seen
+            && farthest
+                .expected
+                .iter()
+                .any(|hint| hint == "nonempty unique longest alternative")
+        {
+            "empty_choice"
+        } else if parser.unique_choice_failure_seen
+            && farthest
+                .expected
+                .iter()
+                .any(|hint| hint == "2 to 64 unique longest alternatives")
+        {
+            "choice_limit"
         } else {
             "syntax"
         },
@@ -1327,6 +1354,7 @@ impl<'a> ParseContext<'a> {
             checkpoint_metrics_scope_journal_base: 0,
             first_sets: None,
             exclusion_audit: false,
+            unique_choice_failure_seen: false,
         }
         .with_candidate_exclusion()
     }
@@ -1910,7 +1938,10 @@ impl<'a> ParseContext<'a> {
             }
             Expr::Sequence(elements) => self.sequence(elements, depth),
             Expr::Choice(alternatives) => self.ordered_choice(alternatives.iter(), depth),
-            Expr::LongestChoice(alternatives) => self.longest_choice(alternatives, depth),
+            Expr::LongestChoice(alternatives) => self.longest_choice(alternatives, depth, false),
+            Expr::UniqueLongestChoice(alternatives) => {
+                self.longest_choice(alternatives, depth, true)
+            }
             Expr::PredictiveChoice {
                 alternatives,
                 predictors,
@@ -2313,6 +2344,7 @@ impl<'a> ParseContext<'a> {
             Expr::Sequence(_)
             | Expr::Choice(_)
             | Expr::LongestChoice(_)
+            | Expr::UniqueLongestChoice(_)
             | Expr::PredictiveChoice { .. } => {
                 unreachable!("combinators are dispatched by expression")
             }
@@ -2511,10 +2543,21 @@ impl<'a> ParseContext<'a> {
         true
     }
 
-    fn longest_choice(&mut self, alternatives: &[Expr], depth: usize) -> Option<Fragment> {
+    fn longest_choice(
+        &mut self,
+        alternatives: &[Expr],
+        depth: usize,
+        unique: bool,
+    ) -> Option<Fragment> {
+        if unique && !(2..=64).contains(&alternatives.len()) {
+            self.unique_choice_failure_seen = true;
+            self.fail("2 to 64 unique longest alternatives");
+            return None;
+        }
         let start = self.position;
         let node_start = self.nodes.len();
         let mut winner: Option<ChoiceWinner> = None;
+        let mut ties = 0;
         for alternative in alternatives {
             if self.excludes(alternative, depth) {
                 continue;
@@ -2525,7 +2568,14 @@ impl<'a> ParseContext<'a> {
                 let replaces = winner
                     .as_ref()
                     .is_none_or(|current| consumed > current.position - start);
+                if winner
+                    .as_ref()
+                    .is_some_and(|current| current.position == self.position)
+                {
+                    ties += 1;
+                }
                 if replaces {
+                    ties = 1;
                     winner = Some(ChoiceWinner {
                         position: self.position,
                         matched_position: self.matched_position,
@@ -2548,6 +2598,22 @@ impl<'a> ParseContext<'a> {
                 }
             }
             self.restore(checkpoint);
+        }
+        if unique {
+            if let Some(winner) = &winner {
+                if winner.position == start || ties > 1 {
+                    self.unique_choice_failure_seen = true;
+                    self.fail_at(
+                        winner.position,
+                        if winner.position == start {
+                            "nonempty unique longest alternative"
+                        } else {
+                            "unique longest alternative"
+                        },
+                    );
+                    return None;
+                }
+            }
         }
         winner.map(|mut winner| {
             debug_assert_eq!(self.nodes.len(), winner.node_start);
@@ -2867,7 +2933,10 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
             replayable,
             ..
         } => !reads_diagnostics && *replayable,
-        Expr::Sequence(children) | Expr::Choice(children) | Expr::LongestChoice(children) => {
+        Expr::Sequence(children)
+        | Expr::Choice(children)
+        | Expr::LongestChoice(children)
+        | Expr::UniqueLongestChoice(children) => {
             children.iter().all(expression_allows_deferred_diagnostics)
         }
         Expr::PredictiveChoice { alternatives, .. } => alternatives
@@ -2953,11 +3022,12 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>) -> bo
             references.push(*id);
             true
         }
-        Expr::Sequence(children) | Expr::Choice(children) | Expr::LongestChoice(children) => {
-            children
-                .iter()
-                .all(|child| expression_is_memo_safe(child, references))
-        }
+        Expr::Sequence(children)
+        | Expr::Choice(children)
+        | Expr::LongestChoice(children)
+        | Expr::UniqueLongestChoice(children) => children
+            .iter()
+            .all(|child| expression_is_memo_safe(child, references)),
         Expr::PredictiveChoice { alternatives, .. } => alternatives
             .iter()
             .all(|child| expression_is_memo_safe(child, references)),

@@ -273,6 +273,7 @@ impl Inventory {
             | AnnotationKind::LeftAssoc
             | AnnotationKind::RightAssoc
             | AnnotationKind::LongestChoice
+            | AnnotationKind::UniqueLongestChoice
             | AnnotationKind::PredictiveChoice
             | AnnotationKind::Precedence { .. }
             | AnnotationKind::Declares { .. }

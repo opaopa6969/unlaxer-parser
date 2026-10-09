@@ -13,6 +13,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.InterleaveAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.LeftAssocAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.LongestChoiceAnnotation;
+import org.unlaxer.dsl.bootstrap.UBNFAST.UniqueLongestChoiceAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OptionalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.PrecedenceAnnotation;
@@ -148,6 +149,7 @@ public final class GrammarValidator {
             boolean hasLeftAssoc = false;
             boolean hasRightAssoc = false;
             int longestChoiceAnnotations = 0;
+            int uniqueLongestChoiceAnnotations = 0;
             int predictiveChoiceAnnotations = 0;
             List<PrecedenceAnnotation> precedenceAnnotations = new ArrayList<>();
             List<InterleaveAnnotation> interleaveAnnotations = new ArrayList<>();
@@ -164,6 +166,8 @@ public final class GrammarValidator {
                     hasRightAssoc = true;
                 } else if (annotation instanceof LongestChoiceAnnotation) {
                     longestChoiceAnnotations++;
+                } else if (annotation instanceof UniqueLongestChoiceAnnotation) {
+                    uniqueLongestChoiceAnnotations++;
                 } else if (annotation instanceof PredictiveChoiceAnnotation) {
                     predictiveChoiceAnnotations++;
                 } else if (annotation instanceof PrecedenceAnnotation p) {
@@ -192,6 +196,8 @@ public final class GrammarValidator {
             if (hasLeftAssoc || hasRightAssoc) {
                 validateAssoc(rule, mapping, hasLeftAssoc, hasRightAssoc, errors);
             }
+            validateUniqueLongestChoice(rule, hasLeftAssoc || hasRightAssoc || longestChoiceAnnotations > 0
+                || predictiveChoiceAnnotations > 0, uniqueLongestChoiceAnnotations, errors);
             validateLongestChoice(rule, hasLeftAssoc, hasRightAssoc, longestChoiceAnnotations, errors);
             validatePredictiveChoice(rule, hasLeftAssoc, hasRightAssoc, longestChoiceAnnotations,
                 predictiveChoiceAnnotations, errors);
@@ -204,8 +210,30 @@ public final class GrammarValidator {
         validatePrecedenceTopology(grammar, errors);
         validateAssociativityConsistency(grammar, errors);
         validateUndefinedRuleRefs(grammar, errors);
+        if (grammar.rules().stream().anyMatch(rule -> rule.annotations().stream()
+                .anyMatch(UniqueLongestChoiceAnnotation.class::isInstance))) {
+            for (var cycle : detectLeftRecursionIssues(grammar)) {
+                errors.add(new ValidationIssue("E-UNIQUE-LONGEST-LEFT-RECURSION", cycle.message(),
+                    "The unique-longest profile supports acyclic left edges; rewrite the cycle.", cycle.rule()));
+            }
+        }
 
         return List.copyOf(errors);
+    }
+
+    private static void validateUniqueLongestChoice(RuleDecl rule, boolean conflict, int count,
+            List<ValidationIssue> errors) {
+        if (count == 0) return;
+        if (count > 1) addRuleError(errors, rule.name(), "duplicate @uniqueLongestChoice",
+            "Keep a single profile.", "E-UNIQUE-LONGEST-DUPLICATE");
+        if (!(rule.body() instanceof ChoiceBody choice) || choice.alternatives().size() < 2)
+            addRuleError(errors, rule.name(), "@uniqueLongestChoice requires multiple alternatives",
+                "Use 2 to 64 alternatives.", "E-UNIQUE-LONGEST-SHAPE");
+        else if (choice.alternatives().size() > 64)
+            addRuleError(errors, rule.name(), "@uniqueLongestChoice exceeds 64 alternatives",
+                "Split the dispatch rule.", "E-UNIQUE-LONGEST-LIMIT");
+        if (conflict) addRuleError(errors, rule.name(), "conflicting @uniqueLongestChoice profiles",
+            "Use one choice profile and no associativity rewriting.", "E-UNIQUE-LONGEST-CONFLICT");
     }
 
     private static void validateLongestChoice(
