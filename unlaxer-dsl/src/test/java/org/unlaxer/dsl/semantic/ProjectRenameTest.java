@@ -97,4 +97,52 @@ public class ProjectRenameTest {
                 new SourceEdits(new DocumentSnapshot("first", 1, changedSource), original.get(0).source().pieces()), List.of("innerRef", "outerRef"), true), original.get(1));
         assertThrows(IllegalArgumentException.class, () -> ProjectRename.prepare(index, target("outer"), "bar", ProjectRenameTest::identifier, current));
     }
+    private static SourceEdits lexical(String uri,String text) {
+        var pieces=new ArrayList<SourceEdits.Piece>();int[] cp=text.codePoints().toArray();int i=0;
+        while(i<cp.length) {
+            int start=i;boolean ws=" \t\r\n".indexOf(cp[i])>=0;
+            if(ws) {while(i<cp.length&&" \t\r\n".indexOf(cp[i])>=0)i++;}
+            else if(Character.isLetter(cp[i])) {while(i<cp.length&&Character.isLetter(cp[i]))i++;}
+            else if(cp[i]=='"') {i++;while(i<cp.length&&cp[i]!='"')i++;if(i<cp.length)i++;}
+            else i++;
+            pieces.add(new SourceEdits.Piece("p"+start,new DocumentSnapshot.Span(start,i),ws?SourceEdits.Kind.WHITESPACE:SourceEdits.Kind.TOKEN,""));
+        }
+        return new SourceEdits(new DocumentSnapshot(uri,1,text),pieces);
+    }
+    private record ImportFixture(ProjectSymbolIndex index,List<ProjectRename.Inventory> inventories,List<ProjectRename.ImportSite> sites,Definition target) {}
+    private static ImportFixture importedFixture(String alias) {
+        String a="foo foo",b="import foo as "+alias+";\r\n"+alias+" { "+alias+" "+alias+" } "+alias+" \"foo\" 😀",c="import foo;\r\nfoo \"foo\"";
+        int open=b.indexOf('{'),close=b.indexOf('}'),first=b.indexOf('\n')+1,decl=open+2,inner=decl+alias.length()+1,last=close+2;
+        var type=List.of(new SemanticModel.Type("T",SemanticModel.TypeKind.BUILTIN,List.of(),List.of(),span(0,0)));
+        var am=new SemanticModel("a",1,a,type,List.of(new SemanticModel.Scope("root",null,span(0,7))),List.of(new SemanticModel.Symbol("exported","foo","T","root",span(0,3),3)),List.of(),List.of());
+        var bm=new SemanticModel("b",1,b,type,List.of(new SemanticModel.Scope("root",null,span(0,b.codePointCount(0,b.length()))),new SemanticModel.Scope("inner","root",span(open,close+1))),List.of(new SemanticModel.Symbol("shadow",alias,"T","inner",span(decl,decl+alias.length()),decl+alias.length())),List.of(),List.of());
+        var cm=new SemanticModel("c",1,c,type,List.of(new SemanticModel.Scope("root",null,span(0,c.length()))),List.of(),List.of(),List.of());
+        var modules=List.of(new Module("a",am,Set.of("exported"),List.of()),new Module("b",bm,Set.of(),List.of(new Import(alias,new ModuleRef("","a"),"foo","root",span(0,first),first))),new Module("c",cm,Set.of(),List.of(new Import("foo",new ModuleRef("","a"),"foo","root",span(0,13),13))),second());
+        var inventories=List.of(new ProjectRename.Inventory("a",lexical("a",a),List.of("p4"),true),new ProjectRename.Inventory("b",lexical("b",b),List.of("p"+first,"p"+inner,"p"+last),true),new ProjectRename.Inventory("c",lexical("c",c),List.of("p13"),true),new ProjectRename.Inventory("second",lexical("second","foo foo"),List.of("p4"),true));
+        var sites=List.of(new ProjectRename.ImportSite("b",0,"p7","p14"),new ProjectRename.ImportSite("c",0,"p7",""));
+        return new ImportFixture(new ProjectSymbolIndex("project",1,modules,List.of()),inventories,sites,new Definition(new Identity("project","","","a","exported"),"a",1,span(0,3)));
+    }
+    @Test public void sharedImportAndAliasRenamesUseDifferentIdentities() throws Exception {
+        for(String line:Files.readAllLines(fixture("import-rename.tsv"))) {
+            if(line.startsWith("#"))continue;String[] f=line.split("\t");var data=importedFixture(f[2]);
+            var plans=f[1].equals("definition")?ProjectRename.prepare(data.index,data.target,f[3],name->!name.isEmpty()&&name.codePoints().allMatch(Character::isLetter),data.inventories,data.sites):List.of(ProjectRename.prepareAlias(data.index,data.sites.get(0),f[3],name->!name.isEmpty()&&name.codePoints().allMatch(Character::isLetter),data.inventories,data.sites));
+            if(f[1].equals("shadow")) {
+                var symbol=data.index.modules().get(1).model().symbols().get("shadow");
+                var shadowTarget=new Definition(new Identity("project","","","b","shadow"),"b",1,symbol.declaration());
+                plans=ProjectRename.prepare(data.index,shadowTarget,f[3],ProjectRenameTest::identifier,data.inventories,data.sites);
+            }
+            Map<String,DocumentSnapshot> current=new java.util.HashMap<>();Map<String,Long> versions=new java.util.HashMap<>();
+            for(var inv:data.inventories){current.put(inv.source().snapshot().uri(),inv.source().snapshot());versions.put(inv.source().snapshot().uri(),2L);}
+            var finalPlans=plans;if(plans.size()>1)assertThrows(IllegalArgumentException.class,()->SourceEdits.singleDocument(finalPlans));
+            else assertSame(plans.get(0),SourceEdits.singleDocument(plans));
+            var modified=SourceEdits.applyAll(plans,current,versions);
+            for(int i=0;i<3;i++){String uri=List.of("a","b","c").get(i);assertEquals(f[0]+" "+uri,f[4+i].replace("\\r","\r").replace("\\n","\n"),modified.getOrDefault(uri,current.get(uri)).text());}
+            assertFalse(modified.containsKey("second"));
+            assertThrows(IllegalArgumentException.class,()->ProjectRename.prepare(data.index,data.target,"bar",ProjectRenameTest::identifier,data.inventories));
+            assertThrows(IllegalArgumentException.class,()->ProjectRename.prepareAlias(data.index,data.sites.get(1),"bar",ProjectRenameTest::identifier,data.inventories,data.sites));
+            assertThrows(IllegalArgumentException.class,()->ProjectRename.prepare(data.index,data.target,"bar",ProjectRenameTest::identifier,data.inventories,List.of(data.sites.get(0),data.sites.get(0))));
+            assertThrows(IllegalArgumentException.class,()->ProjectRename.prepareAlias(data.index,data.sites.get(0),"foo",ProjectRenameTest::identifier,data.inventories,List.of(new ProjectRename.ImportSite("b",0,"p7","p7"),data.sites.get(1))));
+        }
+    }
+
 }

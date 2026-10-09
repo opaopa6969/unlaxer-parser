@@ -83,4 +83,42 @@ public class SourceEditsTest {
         assertThrows(IllegalArgumentException.class, () -> new SourceEdits(snapshot, List.of(
                 new Piece("x", new Span(0, 1), Kind.TOKEN, ""), new Piece("space", new Span(1, 2), Kind.WHITESPACE, "missing"), pieces.get(2))));
     }
+    @Test public void sharedEditProviderMapsNestedRegionsAndPreservesPartialText() throws Exception {
+        var child=new DocumentSnapshot("java",1,"x  ?\r\n😀");var tiny=new DocumentSnapshot("tiny",1,"<"+child.text()+">");var host=new DocumentSnapshot("formula",1,"F["+tiny.text()+"] tail");
+        var source=new SourceEdits(child,List.of(new Piece("x",new Span(0,1),Kind.TOKEN,""),new Piece("space",new Span(1,3),Kind.WHITESPACE,"x"),new Piece("unknown",new Span(3,4),Kind.UNPARSED,""),new Piece("line",new Span(4,6),Kind.WHITESPACE,""),new Piece("emoji",new Span(6,7),Kind.UNPARSED,"")));
+        var map=copy(child,tiny,1).through(copy(tiny,host,2));
+        var language=new LanguageRegions.Language("java","example/java","1","Java","Root");
+        var project=new LanguageQueries.Project("p",1,Map.of(host.uri(),host),Map.of());
+        for(String line:Files.readAllLines(fixture("provider.tsv"))) {
+            if(line.startsWith("#"))continue;String[] f=line.split("\t",-1);
+            var operation=LanguageRegions.Operation.valueOf(f[2]);
+            var region=new LanguageRegions.Region("java",null,language,new Span(2,11),new Span(3,10),map,LanguageRegions.State.valueOf(f[1]));
+            Map<Operation,java.util.function.Function<LanguageQueries.Request,Plan>> policies=new java.util.HashMap<>();
+            if(operation!=LanguageRegions.Operation.HOVER) {
+                Operation editOperation=Operation.valueOf(f[2]);
+                policies.put(editOperation,request->source.plan(editOperation,new Span(0,7),List.of(new Edit(new Span(Integer.parseInt(f[3]),Integer.parseInt(f[4])),decode(f[5])))));
+            }
+            var provider=new SourceEdits.QueryProvider(source,language,project,policies);
+            var layer=new LanguageQueries(new LanguageRegions(host,List.of(region)),project,Map.of(language,provider));
+            var result=layer.query(host,project,3,operation,Map.of());assertEquals(f[0],f[6],result.state().name());
+            List<Edit> edits=result.items().isEmpty()?List.of():result.items().get(0).edits();
+            if(!f[7].equals("-"))assertEquals(new Span(Integer.parseInt(f[7]),Integer.parseInt(f[8])),edits.get(0).span());else assertTrue(edits.isEmpty());
+            assertEquals(f[0],decode(f[9]),new LanguageRegions(host,List.of()).apply(host,2,edits).text());
+            assertEquals(policies.size(),provider.capabilities().size());
+        }
+        var region=new LanguageRegions.Region("java",null,language,new Span(2,11),new Span(3,10),map,LanguageRegions.State.PARTIAL);
+        var request=new LanguageQueries.Request(region,LanguageRegions.Operation.FORMAT,1,project,Map.of());
+        var wrongOperation=new SourceEdits.QueryProvider(source,language,project,Map.of(Operation.FORMAT,r->source.plan(Operation.CODE_ACTION,new Span(0,7),List.of(new Edit(new Span(0,1),"z")))));
+        assertThrows(IllegalArgumentException.class,()->wrongOperation.query(request));
+        var other=new SourceEdits(new DocumentSnapshot("other",1,child.text()),source.pieces());
+        var foreign=new SourceEdits.QueryProvider(source,language,project,Map.of(Operation.FORMAT,r->other.plan(Operation.FORMAT,new Span(0,7),List.of(new Edit(new Span(1,3)," ")))));
+        assertThrows(IllegalArgumentException.class,()->foreign.query(request));
+        var oldProject=new LanguageQueries.Project("p",0,project.documents(),Map.of());
+        assertThrows(IllegalArgumentException.class,()->wrongOperation.query(new LanguageQueries.Request(region,request.operation(),1,oldProject,Map.of())));
+        var otherLanguage=new LanguageRegions.Language("java","example/java","2","Java","Root");
+        var wrongIdentity=new LanguageRegions.Region("java",null,otherLanguage,region.full(),region.body(),map,region.parseState());
+        assertThrows(IllegalArgumentException.class,()->wrongOperation.query(new LanguageQueries.Request(wrongIdentity,request.operation(),1,project,Map.of())));
+
+    }
+
 }

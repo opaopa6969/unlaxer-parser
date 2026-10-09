@@ -11,11 +11,18 @@ pub enum Kind {
     Comment,
     Unparsed,
 }
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Operation {
     Rename,
     Format,
     CodeAction,
+}
+/// Reject workspace batches at the single-host query boundary instead of returning partial edits.
+pub fn single_document(mut plans: Vec<Plan>) -> Result<Plan> {
+    if plans.len() != 1 {
+        return Err("single-document edit plan required");
+    }
+    Ok(plans.remove(0))
 }
 #[derive(Debug, Clone)]
 pub struct Piece {
@@ -209,4 +216,102 @@ pub fn apply_all(
         result.insert(uri.clone(), plan.apply(current, version)?);
     }
     Ok(result)
+}
+
+/// Explicit language policies produce single-document plans; workspace plans use `apply_all`.
+pub type EditPolicy = Box<dyn Fn(&crate::language_queries::Request<'_>) -> Result<Plan>>;
+pub struct QueryProvider {
+    source: SourceEdits,
+    language: crate::source::Language,
+    project: crate::language_queries::Project,
+    policies: HashMap<Operation, EditPolicy>,
+}
+impl QueryProvider {
+    pub fn new(
+        source: SourceEdits,
+        language: crate::source::Language,
+        project: crate::language_queries::Project,
+        policies: HashMap<Operation, EditPolicy>,
+    ) -> Self {
+        Self {
+            source,
+            language,
+            project,
+            policies,
+        }
+    }
+}
+impl crate::language_queries::Provider for QueryProvider {
+    fn capabilities(&self) -> std::collections::HashSet<crate::source::Operation> {
+        self.policies
+            .keys()
+            .map(|operation| match operation {
+                Operation::Rename => crate::source::Operation::Rename,
+                Operation::Format => crate::source::Operation::Format,
+                Operation::CodeAction => crate::source::Operation::CodeAction,
+            })
+            .collect()
+    }
+    fn query(
+        &self,
+        request: &crate::language_queries::Request<'_>,
+    ) -> Result<crate::language_queries::Response> {
+        use crate::language_queries::{Item, Response, TextEdit};
+        use crate::source::{Location, State};
+        let snapshot = self.source.snapshot();
+        if request.project != &self.project
+            || request.region.language != self.language
+            || request.region.source_map.output() != snapshot
+        {
+            return Err("stale edit provider binding");
+        }
+        snapshot.check(Span {
+            start: request.cursor,
+            end: request.cursor,
+        })?;
+        let response = |state, items| Response {
+            snapshot: snapshot.clone(),
+            project: self.project.id.clone(),
+            project_version: self.project.version,
+            state,
+            items,
+        };
+        if !self.capabilities().contains(&request.operation) {
+            return Ok(response(State::Unsupported, vec![]));
+        }
+        if !matches!(request.region.parse_state, State::Complete | State::Partial) {
+            return Ok(response(State::Failed, vec![]));
+        }
+        let (operation, label) = match request.operation {
+            crate::source::Operation::Rename => (Operation::Rename, "RENAME"),
+            crate::source::Operation::Format => (Operation::Format, "FORMAT"),
+            crate::source::Operation::CodeAction => (Operation::CodeAction, "CODE_ACTION"),
+            _ => unreachable!("capabilities checked"),
+        };
+        let plan = self.policies[&operation](request)?;
+        if plan.snapshot() != snapshot || plan.operation() != operation {
+            return Err("stale or mismatched edit plan");
+        }
+        self.source
+            .plan(operation, plan.allowed(), plan.edits().to_vec())?;
+        let edits = plan
+            .edits()
+            .iter()
+            .map(|edit| {
+                Ok(TextEdit {
+                    location: Location::new(snapshot.clone(), edit.span)?,
+                    replacement: edit.replacement.clone(),
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        Ok(response(
+            request.region.parse_state,
+            vec![Item {
+                label: label.into(),
+                detail: "source-preserving".into(),
+                locations: vec![],
+                edits,
+            }],
+        ))
+    }
 }
