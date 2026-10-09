@@ -1,0 +1,720 @@
+{
+  "schemaVersion": 1,
+  "signatures": [
+    {"id": "process","parameters": ["Object","Accessor"],"result": "Int","variables": [],"varargs": false,"span": [1,8],"uri": "file:signatures","version": 2},
+    {
+      "id": "id",
+      "parameters": [{"var": "T"}],
+      "result": {"var": "T"},
+      "variables": [{"id": "T","bound": "Object"}],
+      "varargs": false,
+      "span": [1,8],
+      "uri": "file:signatures",
+      "version": 2
+    },
+    {
+      "id": "box",
+      "parameters": [{"named": "ReadBox","args": [{"var": "T"}]}],
+      "result": {"var": "T"},
+      "variables": [{"id": "T","bound": "Accessor"}],
+      "varargs": false,
+      "span": [1,8],
+      "uri": "file:signatures",
+      "version": 2
+    },
+    {"id": "acc","parameters": ["Accessor"],"result": "Int","variables": [],"varargs": false,"span": [1,8],"uri": "file:signatures","version": 2},
+    {"id": "text","parameters": ["Text"],"result": "Text","variables": [],"varargs": false,"span": [1,8],"uri": "file:signatures","version": 2},
+    {"id": "broad","parameters": ["Object"],"result": "Int","variables": [],"varargs": false,"span": [1,8],"uri": "file:signatures","version": 2},
+    {
+      "id": "varargs",
+      "parameters": [{"var": "T"}],
+      "result": {"var": "T"},
+      "variables": [{"id": "T","bound": "Object"}],
+      "varargs": true,
+      "span": [1,8],
+      "uri": "file:signatures",
+      "version": 2
+    },
+    {"id": "make","parameters": [],"result": {"var": "T"},"variables": [{"id": "T","bound": "Object"}],"varargs": false,"span": [1,8],"uri": "file:signatures","version": 2},
+    {
+      "id": "lambda",
+      "parameters": [{"function": ["Text",{"var": "T"}]}],
+      "result": {"var": "T"},
+      "variables": [{"id": "T","bound": "Object"}],
+      "varargs": false,
+      "span": [1,8],
+      "uri": "file:signatures",
+      "version": 2
+    },
+    {
+      "id": "contra",
+      "parameters": [{"named": "Sink","args": [{"var": "T"}]}],
+      "result": {"var": "T"},
+      "variables": [{"id": "T","bound": "Object"}],
+      "varargs": false,
+      "span": [1,8],
+      "uri": "file:signatures",
+      "version": 2
+    },
+    {
+      "id": "bound",
+      "parameters": [{"var": "T"}],
+      "result": {"var": "T"},
+      "variables": [{"id": "T","bound": "Accessor"}],
+      "varargs": false,
+      "span": [1,8],
+      "uri": "file:signatures",
+      "version": 2
+    },
+    {
+      "id": "pair",
+      "parameters": [{"var": "T"},{"var": "T"}],
+      "result": {"var": "T"},
+      "variables": [{"id": "T","bound": "Object"}],
+      "varargs": false,
+      "span": [1,8],
+      "uri": "file:signatures",
+      "version": 2
+    },
+    {"id": "invalid","parameters": [],"result": "Missing","variables": [],"varargs": false,"span": [1,8],"uri": "file:signatures","version": 2},
+    {"id": "cycle","parameters": [],"result": {"alias": "Loop","args": []},"variables": [],"varargs": false,"span": [1,8],"uri": "file:signatures","version": 2}
+  ],
+  "cases": [
+    {
+      "name": "accessor-second-argument",
+      "signatures": ["process"],
+      "call": {"uri": "file:𠮷main","version": 7,"span": [0,40],"arguments": [{"type": "Object","span": [3,5]},{"type": "Db","span": [7,9]}],"expectedReturn": "?"},
+      "expected": {
+        "state": "RESOLVED",
+        "uri": "file:𠮷main",
+        "version": 7,
+        "candidates": [
+          {
+            "signature": "process",
+            "status": "YES",
+            "substitution": {},
+            "parameters": ["NAMED(Object)","NAMED(Accessor)"],
+            "result": "NAMED(Int)",
+            "varargs": false,
+            "span": [1,8],
+            "constraints": [{"role": "argument:0","status": "YES","span": [3,5],"uri": "file:𠮷main","version": 7},{"role": "argument:1","status": "YES","span": [7,9],"uri": "file:𠮷main","version": 7},{"role": "result","status": "YES","span": [0,40],"uri": "file:𠮷main","version": 7}],
+            "uri": "file:signatures",
+            "version": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "infer-generic-identity",
+      "signatures": ["id"],
+      "call": {"uri": "file:𠮷main","version": 7,"span": [0,40],"arguments": [{"type": "Db","span": [3,5]}],"expectedReturn": "?"},
+      "expected": {
+        "state": "RESOLVED",
+        "uri": "file:𠮷main",
+        "version": 7,
+        "candidates": [
+          {
+            "signature": "id",
+            "status": "YES",
+            "substitution": {"T": "NAMED(Db)"},
+            "parameters": ["NAMED(Db)"],
+            "result": "NAMED(Db)",
+            "varargs": false,
+            "span": [1,8],
+            "constraints": [{"role": "argument:0","status": "YES","span": [3,5],"uri": "file:𠮷main","version": 7},{"role": "bound:T","status": "YES","span": [1,8],"uri": "file:signatures","version": 2},{"role": "result","status": "YES","span": [0,40],"uri": "file:𠮷main","version": 7}],
+            "uri": "file:signatures",
+            "version": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "infer-container",
+      "signatures": ["box"],
+      "call": {"uri": "file:𠮷main","version": 7,"span": [0,40],"arguments": [{"type": {"named": "ReadBox","args": ["Db"]},"span": [3,5]}],"expectedReturn": "?"},
+      "expected": {
+        "state": "RESOLVED",
+        "uri": "file:𠮷main",
+        "version": 7,
+        "candidates": [
+          {
+            "signature": "box",
+            "status": "YES",
+            "substitution": {"T": "NAMED(Db)"},
+            "parameters": ["NAMED(ReadBox,NAMED(Db))"],
+            "result": "NAMED(Db)",
+            "varargs": false,
+            "span": [1,8],
+            "constraints": [{"role": "argument:0","status": "YES","span": [3,5],"uri": "file:𠮷main","version": 7},{"role": "bound:T","status": "YES","span": [1,8],"uri": "file:signatures","version": 2},{"role": "result","status": "YES","span": [0,40],"uri": "file:𠮷main","version": 7}],
+            "uri": "file:signatures",
+            "version": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "bound-rejection",
+      "signatures": ["bound"],
+      "call": {"uri": "file:𠮷main","version": 7,"span": [0,40],"arguments": [{"type": "Int","span": [3,5]}],"expectedReturn": "?"},
+      "expected": {
+        "state": "INCOMPATIBLE",
+        "uri": "file:𠮷main",
+        "version": 7,
+        "candidates": [
+          {
+            "signature": "bound",
+            "status": "NO",
+            "substitution": {"T": "NAMED(Int)"},
+            "parameters": ["NAMED(Int)"],
+            "result": "NAMED(Int)",
+            "varargs": false,
+            "span": [1,8],
+            "constraints": [{"role": "argument:0","status": "YES","span": [3,5],"uri": "file:𠮷main","version": 7},{"role": "bound:T","status": "NO","span": [1,8],"uri": "file:signatures","version": 2},{"role": "result","status": "YES","span": [0,40],"uri": "file:𠮷main","version": 7}],
+            "uri": "file:signatures",
+            "version": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "overload-filter",
+      "signatures": ["acc","text"],
+      "call": {"uri": "file:𠮷main","version": 7,"span": [0,40],"arguments": [{"type": "Db","span": [3,5]}],"expectedReturn": "?"},
+      "expected": {
+        "state": "RESOLVED",
+        "uri": "file:𠮷main",
+        "version": 7,
+        "candidates": [
+          {
+            "signature": "acc",
+            "status": "YES",
+            "substitution": {},
+            "parameters": ["NAMED(Accessor)"],
+            "result": "NAMED(Int)",
+            "varargs": false,
+            "span": [1,8],
+            "constraints": [{"role": "argument:0","status": "YES","span": [3,5],"uri": "file:𠮷main","version": 7},{"role": "result","status": "YES","span": [0,40],"uri": "file:𠮷main","version": 7}],
+            "uri": "file:signatures",
+            "version": 2
+          },
+          {
+            "signature": "text",
+            "status": "NO",
+            "substitution": {},
+            "parameters": ["NAMED(Text)"],
+            "result": "NAMED(Text)",
+            "varargs": false,
+            "span": [1,8],
+            "constraints": [{"role": "argument:0","status": "NO","span": [3,5],"uri": "file:𠮷main","version": 7},{"role": "result","status": "YES","span": [0,40],"uri": "file:𠮷main","version": 7}],
+            "uri": "file:signatures",
+            "version": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "overload-remains-ambiguous",
+      "signatures": ["acc","broad"],
+      "call": {"uri": "file:𠮷main","version": 7,"span": [0,40],"arguments": [{"type": "Db","span": [3,5]}],"expectedReturn": "?"},
+      "expected": {
+        "state": "AMBIGUOUS",
+        "uri": "file:𠮷main",
+        "version": 7,
+        "candidates": [
+          {
+            "signature": "acc",
+            "status": "YES",
+            "substitution": {},
+            "parameters": ["NAMED(Accessor)"],
+            "result": "NAMED(Int)",
+            "varargs": false,
+            "span": [1,8],
+            "constraints": [{"role": "argument:0","status": "YES","span": [3,5],"uri": "file:𠮷main","version": 7},{"role": "result","status": "YES","span": [0,40],"uri": "file:𠮷main","version": 7}],
+            "uri": "file:signatures",
+            "version": 2
+          },
+          {
+            "signature": "broad",
+            "status": "YES",
+            "substitution": {},
+            "parameters": ["NAMED(Object)"],
+            "result": "NAMED(Int)",
+            "varargs": false,
+            "span": [1,8],
+            "constraints": [{"role": "argument:0","status": "YES","span": [3,5],"uri": "file:𠮷main","version": 7},{"role": "result","status": "YES","span": [0,40],"uri": "file:𠮷main","version": 7}],
+            "uri": "file:signatures",
+            "version": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "unknown-overload-not-first-match",
+      "signatures": ["acc","text"],
+      "call": {"uri": "file:𠮷main","version": 7,"span": [0,40],"arguments": [{"type": "?","span": [3,5]}],"expectedReturn": "?"},
+      "expected": {
+        "state": "AMBIGUOUS",
+        "uri": "file:𠮷main",
+        "version": 7,
+        "candidates": [
+          {
+            "signature": "acc",
+            "status": "UNKNOWN",
+            "substitution": {},
+            "parameters": ["NAMED(Accessor)"],
+            "result": "NAMED(Int)",
+            "varargs": false,
+            "span": [1,8],
+            "constraints": [{"role": "argument:0","status": "UNKNOWN","span": [3,5],"uri": "file:𠮷main","version": 7},{"role": "result","status": "YES","span": [0,40],"uri": "file:𠮷main","version": 7}],
+            "uri": "file:signatures",
+            "version": 2
+          },
+          {
+            "signature": "text",
+            "status": "UNKNOWN",
+            "substitution": {},
+            "parameters": ["NAMED(Text)"],
+            "result": "NAMED(Text)",
+            "varargs": false,
+            "span": [1,8],
+            "constraints": [{"role": "argument:0","status": "UNKNOWN","span": [3,5],"uri": "file:𠮷main","version": 7},{"role": "result","status": "YES","span": [0,40],"uri": "file:𠮷main","version": 7}],
+            "uri": "file:signatures",
+            "version": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "incompatible-overloads",
+      "signatures": ["acc","text"],
+      "call": {"uri": "file:𠮷main","version": 7,"span": [0,40],"arguments": [{"type": "Int","span": [3,5]}],"expectedReturn": "?"},
+      "expected": {
+        "state": "INCOMPATIBLE",
+        "uri": "file:𠮷main",
+        "version": 7,
+        "candidates": [
+          {
+            "signature": "acc",
+            "status": "NO",
+            "substitution": {},
+            "parameters": ["NAMED(Accessor)"],
+            "result": "NAMED(Int)",
+            "varargs": false,
+            "span": [1,8],
+            "constraints": [{"role": "argument:0","status": "NO","span": [3,5],"uri": "file:𠮷main","version": 7},{"role": "result","status": "YES","span": [0,40],"uri": "file:𠮷main","version": 7}],
+            "uri": "file:signatures",
+            "version": 2
+          },
+          {
+            "signature": "text",
+            "status": "NO",
+            "substitution": {},
+            "parameters": ["NAMED(Text)"],
+            "result": "NAMED(Text)",
+            "varargs": false,
+            "span": [1,8],
+            "constraints": [{"role": "argument:0","status": "NO","span": [3,5],"uri": "file:𠮷main","version": 7},{"role": "result","status": "YES","span": [0,40],"uri": "file:𠮷main","version": 7}],
+            "uri": "file:signatures",
+            "version": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "varargs-widen-lower-bounds",
+      "signatures": ["varargs"],
+      "call": {"uri": "file:𠮷main","version": 7,"span": [0,40],"arguments": [{"type": "Int","span": [3,5]},{"type": "Number","span": [7,9]}],"expectedReturn": "?"},
+      "expected": {
+        "state": "RESOLVED",
+        "uri": "file:𠮷main",
+        "version": 7,
+        "candidates": [
+          {
+            "signature": "varargs",
+            "status": "YES",
+            "substitution": {"T": "NAMED(Number)"},
+            "parameters": ["NAMED(Number)"],
+            "result": "NAMED(Number)",
+            "varargs": true,
+            "span": [1,8],
+            "constraints": [{"role": "argument:0","status": "YES","span": [3,5],"uri": "file:𠮷main","version": 7},{"role": "argument:1","status": "YES","span": [7,9],"uri": "file:𠮷main","version": 7},{"role": "bound:T","status": "YES","span": [1,8],"uri": "file:signatures","version": 2},{"role": "result","status": "YES","span": [0,40],"uri": "file:𠮷main","version": 7}],
+            "uri": "file:signatures",
+            "version": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "zero-varargs-keeps-unbound",
+      "signatures": ["varargs"],
+      "call": {"uri": "file:𠮷main","version": 7,"span": [0,40],"arguments": [],"expectedReturn": "?"},
+      "expected": {
+        "state": "UNKNOWN",
+        "uri": "file:𠮷main",
+        "version": 7,
+        "candidates": [
+          {
+            "signature": "varargs",
+            "status": "UNKNOWN",
+            "substitution": {},
+            "parameters": ["VARIABLE(T)"],
+            "result": "VARIABLE(T)",
+            "varargs": true,
+            "span": [1,8],
+            "constraints": [{"role": "bound:T","status": "UNKNOWN","span": [1,8],"uri": "file:signatures","version": 2},{"role": "result","status": "UNKNOWN","span": [0,40],"uri": "file:𠮷main","version": 7},{"role": "unbound","status": "UNKNOWN","span": [0,40],"uri": "file:𠮷main","version": 7}],
+            "uri": "file:signatures",
+            "version": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "return-expected-type",
+      "signatures": ["make"],
+      "call": {"uri": "file:𠮷main","version": 7,"span": [0,40],"arguments": [],"expectedReturn": "Db"},
+      "expected": {
+        "state": "RESOLVED",
+        "uri": "file:𠮷main",
+        "version": 7,
+        "candidates": [
+          {
+            "signature": "make",
+            "status": "YES",
+            "substitution": {"T": "NAMED(Db)"},
+            "parameters": [],
+            "result": "NAMED(Db)",
+            "varargs": false,
+            "span": [1,8],
+            "constraints": [{"role": "bound:T","status": "YES","span": [1,8],"uri": "file:signatures","version": 2},{"role": "return","status": "YES","span": [0,40],"uri": "file:𠮷main","version": 7},{"role": "result","status": "YES","span": [0,40],"uri": "file:𠮷main","version": 7}],
+            "uri": "file:signatures",
+            "version": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "contextual-lambda-result",
+      "signatures": ["lambda"],
+      "call": {"uri": "file:𠮷main","version": 7,"span": [0,40],"arguments": [{"type": {"function": ["?","Int"]},"span": [3,5]}],"expectedReturn": "?"},
+      "expected": {
+        "state": "UNKNOWN",
+        "uri": "file:𠮷main",
+        "version": 7,
+        "candidates": [
+          {
+            "signature": "lambda",
+            "status": "UNKNOWN",
+            "substitution": {"T": "NAMED(Int)"},
+            "parameters": ["FUNCTION(,NAMED(Text),NAMED(Int))"],
+            "result": "NAMED(Int)",
+            "varargs": false,
+            "span": [1,8],
+            "constraints": [{"role": "argument:0","status": "UNKNOWN","span": [3,5],"uri": "file:𠮷main","version": 7},{"role": "bound:T","status": "YES","span": [1,8],"uri": "file:signatures","version": 2},{"role": "result","status": "YES","span": [0,40],"uri": "file:𠮷main","version": 7}],
+            "uri": "file:signatures",
+            "version": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "contravariance-and-return-upper-bounds",
+      "signatures": ["contra"],
+      "call": {"uri": "file:𠮷main","version": 7,"span": [0,40],"arguments": [{"type": {"named": "Sink","args": ["Object"]},"span": [3,5]}],"expectedReturn": "Int"},
+      "expected": {
+        "state": "RESOLVED",
+        "uri": "file:𠮷main",
+        "version": 7,
+        "candidates": [
+          {
+            "signature": "contra",
+            "status": "YES",
+            "substitution": {"T": "NAMED(Int)"},
+            "parameters": ["NAMED(Sink,NAMED(Int))"],
+            "result": "NAMED(Int)",
+            "varargs": false,
+            "span": [1,8],
+            "constraints": [{"role": "argument:0","status": "YES","span": [3,5],"uri": "file:𠮷main","version": 7},{"role": "bound:T","status": "YES","span": [1,8],"uri": "file:signatures","version": 2},{"role": "return","status": "YES","span": [0,40],"uri": "file:𠮷main","version": 7},{"role": "result","status": "YES","span": [0,40],"uri": "file:𠮷main","version": 7}],
+            "uri": "file:signatures",
+            "version": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "return-constraint-conflict",
+      "signatures": ["id"],
+      "call": {"uri": "file:𠮷main","version": 7,"span": [0,40],"arguments": [{"type": "Object","span": [3,5]}],"expectedReturn": "Int"},
+      "expected": {
+        "state": "INCOMPATIBLE",
+        "uri": "file:𠮷main",
+        "version": 7,
+        "candidates": [
+          {
+            "signature": "id",
+            "status": "NO",
+            "substitution": {"T": "NAMED(Object)"},
+            "parameters": ["NAMED(Object)"],
+            "result": "NAMED(Object)",
+            "varargs": false,
+            "span": [1,8],
+            "constraints": [{"role": "argument:0","status": "YES","span": [3,5],"uri": "file:𠮷main","version": 7},{"role": "bound:T","status": "YES","span": [1,8],"uri": "file:signatures","version": 2},{"role": "return","status": "NO","span": [0,40],"uri": "file:𠮷main","version": 7},{"role": "result","status": "YES","span": [0,40],"uri": "file:𠮷main","version": 7}],
+            "uri": "file:signatures",
+            "version": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "union-lower-bound",
+      "signatures": ["pair"],
+      "call": {"uri": "file:𠮷main","version": 7,"span": [0,40],"arguments": [{"type": "Int","span": [3,5]},{"type": "Text","span": [7,9]}],"expectedReturn": "?"},
+      "expected": {
+        "state": "RESOLVED",
+        "uri": "file:𠮷main",
+        "version": 7,
+        "candidates": [
+          {
+            "signature": "pair",
+            "status": "YES",
+            "substitution": {"T": "UNION(,NAMED(Int),NAMED(Text))"},
+            "parameters": ["UNION(,NAMED(Int),NAMED(Text))","UNION(,NAMED(Int),NAMED(Text))"],
+            "result": "UNION(,NAMED(Int),NAMED(Text))",
+            "varargs": false,
+            "span": [1,8],
+            "constraints": [{"role": "argument:0","status": "YES","span": [3,5],"uri": "file:𠮷main","version": 7},{"role": "argument:1","status": "YES","span": [7,9],"uri": "file:𠮷main","version": 7},{"role": "bound:T","status": "YES","span": [1,8],"uri": "file:signatures","version": 2},{"role": "result","status": "YES","span": [0,40],"uri": "file:𠮷main","version": 7}],
+            "uri": "file:signatures",
+            "version": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "unsupported-union-inference",
+      "signatures": ["pair"],
+      "call": {"uri": "file:𠮷main","version": 7,"span": [0,40],"arguments": [{"type": "Int","span": [3,5]},{"type": "Text","span": [7,9]}],"expectedReturn": "?"},
+      "expected": {
+        "state": "UNSUPPORTED",
+        "uri": "file:𠮷main",
+        "version": 7,
+        "candidates": [
+          {
+            "signature": "pair",
+            "status": "UNSUPPORTED",
+            "substitution": {},
+            "parameters": ["VARIABLE(T)","VARIABLE(T)"],
+            "result": "VARIABLE(T)",
+            "varargs": false,
+            "span": [1,8],
+            "constraints": [{"role": "solver","status": "UNSUPPORTED","span": [0,40],"uri": "file:𠮷main","version": 7}],
+            "uri": "file:signatures",
+            "version": 2
+          }
+        ]
+      },
+      "omit": ["UNION"],
+      "values": [{"id":"probe","name":"probe","type":"Int","uri":"file:value","version":9,"span":[1,2]}],
+      "completionExpected": [],
+      "assessmentExpected": ["UNSUPPORTED"]
+    },
+    {
+      "name": "argument-being-edited-is-ignored",
+      "signatures": ["process"],
+      "call": {"uri": "file:𠮷main","version": 7,"span": [0,40],"arguments": [{"type": "Object","span": [3,5]},{"type": "Int","span": [7,9]}],"expectedReturn": "?"},
+      "expected": {
+        "state": "UNKNOWN",
+        "uri": "file:𠮷main",
+        "version": 7,
+        "candidates": [
+          {
+            "signature": "process",
+            "status": "UNKNOWN",
+            "substitution": {},
+            "parameters": ["NAMED(Object)","NAMED(Accessor)"],
+            "result": "NAMED(Int)",
+            "varargs": false,
+            "span": [1,8],
+            "constraints": [{"role": "argument:0","status": "YES","span": [3,5],"uri": "file:𠮷main","version": 7},{"role": "argument:1","status": "UNKNOWN","span": [7,9],"uri": "file:𠮷main","version": 7},{"role": "result","status": "YES","span": [0,40],"uri": "file:𠮷main","version": 7}],
+            "uri": "file:signatures",
+            "version": 2
+          }
+        ]
+      },
+      "index": 1,
+      "op": "expected",
+      "expectedTypes": ["NAMED(Accessor)"]
+    },
+    {
+      "name": "unbound-generic",
+      "signatures": ["id"],
+      "call": {"uri": "file:𠮷main","version": 7,"span": [0,40],"arguments": [{"type": "?","span": [3,5]}],"expectedReturn": "?"},
+      "expected": {
+        "state": "UNKNOWN",
+        "uri": "file:𠮷main",
+        "version": 7,
+        "candidates": [
+          {
+            "signature": "id",
+            "status": "UNKNOWN",
+            "substitution": {},
+            "parameters": ["VARIABLE(T)"],
+            "result": "VARIABLE(T)",
+            "varargs": false,
+            "span": [1,8],
+            "constraints": [{"role": "argument:0","status": "UNKNOWN","span": [3,5],"uri": "file:𠮷main","version": 7},{"role": "bound:T","status": "UNKNOWN","span": [1,8],"uri": "file:signatures","version": 2},{"role": "result","status": "UNKNOWN","span": [0,40],"uri": "file:𠮷main","version": 7},{"role": "unbound","status": "UNKNOWN","span": [0,40],"uri": "file:𠮷main","version": 7}],
+            "uri": "file:signatures",
+            "version": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "no-signatures-is-unknown",
+      "signatures": [],
+      "call": {"uri": "file:𠮷main","version": 7,"span": [0,40],"arguments": [],"expectedReturn": "?"},
+      "expected": {"state": "UNKNOWN","uri": "file:𠮷main","version": 7,"candidates": []}
+    },
+    {
+      "name": "arity-failure",
+      "signatures": ["process"],
+      "call": {"uri": "file:𠮷main","version": 7,"span": [0,40],"arguments": [{"type": "Db","span": [3,5]}],"expectedReturn": "?"},
+      "expected": {
+        "state": "INCOMPATIBLE",
+        "uri": "file:𠮷main",
+        "version": 7,
+        "candidates": [
+          {
+            "signature": "process",
+            "status": "NO",
+            "substitution": {},
+            "parameters": ["NAMED(Object)","NAMED(Accessor)"],
+            "result": "NAMED(Int)",
+            "varargs": false,
+            "span": [1,8],
+            "constraints": [{"role": "arity","status": "NO","span": [0,40],"uri": "file:𠮷main","version": 7}],
+            "uri": "file:signatures",
+            "version": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "solver-limit",
+      "signatures": ["id"],
+      "call": {"uri": "file:𠮷main","version": 7,"span": [0,40],"arguments": [{"type": "Db","span": [3,5]}],"expectedReturn": "?"},
+      "expected": {
+        "state": "LIMIT",
+        "uri": "file:𠮷main",
+        "version": 7,
+        "candidates": [
+          {
+            "signature": "id",
+            "status": "LIMIT",
+            "substitution": {},
+            "parameters": ["VARIABLE(T)"],
+            "result": "VARIABLE(T)",
+            "varargs": false,
+            "span": [1,8],
+            "constraints": [{"role": "solver","status": "LIMIT","span": [0,40],"uri": "file:𠮷main","version": 7}],
+            "uri": "file:signatures",
+            "version": 2
+          }
+        ]
+      },
+      "inferLimit": 1,
+      "values": [{"id":"probe","name":"probe","type":"Int","uri":"file:value","version":9,"span":[1,2]}],
+      "completionExpected": [],
+      "assessmentExpected": ["LIMIT"]
+    },
+    {
+      "name": "invalid-result-is-not-success",
+      "signatures": ["invalid"],
+      "call": {"uri": "file:𠮷main","version": 7,"span": [0,40],"arguments": [],"expectedReturn": "?"},
+      "expected": {
+        "state": "INVALID",
+        "uri": "file:𠮷main",
+        "version": 7,
+        "candidates": [
+          {
+            "signature": "invalid",
+            "status": "INVALID",
+            "substitution": {},
+            "parameters": [],
+            "result": "NAMED(Missing)",
+            "varargs": false,
+            "span": [1,8],
+            "constraints": [{"role": "result","status": "INVALID","span": [0,40],"uri": "file:𠮷main","version": 7}],
+            "uri": "file:signatures",
+            "version": 2
+          }
+        ]
+      },
+      "values": [{"id":"probe","name":"probe","type":"Int","uri":"file:value","version":9,"span":[1,2]}],
+      "completionExpected": [],
+      "assessmentExpected": ["INVALID"]
+    },
+    {
+      "name": "cycle-result-is-not-unknown",
+      "signatures": ["cycle"],
+      "call": {"uri": "file:𠮷main","version": 7,"span": [0,40],"arguments": [],"expectedReturn": "?"},
+      "expected": {
+        "state": "CYCLE",
+        "uri": "file:𠮷main",
+        "version": 7,
+        "candidates": [
+          {
+            "signature": "cycle",
+            "status": "CYCLE",
+            "substitution": {},
+            "parameters": [],
+            "result": "ALIAS(Loop)",
+            "varargs": false,
+            "span": [1,8],
+            "constraints": [{"role": "result","status": "CYCLE","span": [0,40],"uri": "file:𠮷main","version": 7}],
+            "uri": "file:signatures",
+            "version": 2
+          }
+        ]
+      },
+      "values": [{"id":"probe","name":"probe","type":"Int","uri":"file:value","version":9,"span":[1,2]}],
+      "completionExpected": [],
+      "assessmentExpected": ["CYCLE"]
+    },
+    {
+      "name": "completion-reuses-type-decisions",
+      "signatures": ["process"],
+      "call": {"uri": "file:𠮷main","version": 7,"span": [0,40],"arguments": [{"type": "Object","span": [3,5]},{"type": "Int","span": [7,9]}],"expectedReturn": "?"},
+      "expected": {
+        "state": "UNKNOWN",
+        "uri": "file:𠮷main",
+        "version": 7,
+        "candidates": [
+          {
+            "signature": "process",
+            "status": "UNKNOWN",
+            "substitution": {},
+            "parameters": ["NAMED(Object)","NAMED(Accessor)"],
+            "result": "NAMED(Int)",
+            "varargs": false,
+            "span": [1,8],
+            "constraints": [{"role": "argument:0","status": "YES","span": [3,5],"uri": "file:𠮷main","version": 7},{"role": "argument:1","status": "UNKNOWN","span": [7,9],"uri": "file:𠮷main","version": 7},{"role": "result","status": "YES","span": [0,40],"uri": "file:𠮷main","version": 7}],
+            "uri": "file:signatures",
+            "version": 2
+          }
+        ]
+      },
+      "index": 1,
+      "op": "complete",
+      "expectedTypes": ["NAMED(Accessor)"],
+      "values": [
+        {"id": "db","name": "𠮷db","type": "Db","uri": "file:values","version": 4,"span": [1,4]},
+        {"id": "count","name": "count","type": "Int","uri": "file:values","version": 4,"span": [5,10]},
+        {"id": "unknown","name": "maybe","type": "?","uri": "file:values","version": 4,"span": [11,16]}
+      ],
+      "completionExpected": [
+        {"id": "db","name": "𠮷db","type": "NAMED(Db)","uri": "file:values","version": 4,"span": [1,4],"status": "YES","rule": "EXPECTED_ARGUMENT"},
+        {"id": "unknown","name": "maybe","type": "UNKNOWN()","uri": "file:values","version": 4,"span": [11,16],"status": "UNKNOWN","rule": "EXPECTED_ARGUMENT"}
+      ],
+      "assessmentExpected": ["YES","NO","UNKNOWN"]
+    }
+  ]
+}
