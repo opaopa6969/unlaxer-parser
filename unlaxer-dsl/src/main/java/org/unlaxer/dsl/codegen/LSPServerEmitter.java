@@ -335,7 +335,7 @@ class LSPServerEmitter {
         w.line("diagnostics.addAll(additional);");
         w.dedent();
         w.line("}");
-        w.line("client.publishDiagnostics(new PublishDiagnosticsParams(uri, diagnostics, documentVersions.containsKey(uri) ? Math.toIntExact(documentVersions.get(uri)) : null));");
+        w.line("publishLanguageDiagnostics(uri, content, diagnostics);");
         w.dedent();
         w.line("}");
         w.blankLine();
@@ -674,13 +674,13 @@ class LSPServerEmitter {
         w.indent();
         w.line("server.documents.remove(params.getTextDocument().getUri());");
         w.line("server.documentVersions.remove(params.getTextDocument().getUri());");
-        w.line("if (server.client != null) server.client.publishDiagnostics(new PublishDiagnosticsParams(params.getTextDocument().getUri(), List.of()));");
+        w.line("server.clearLanguageDiagnostics(params.getTextDocument().getUri());");
         w.dedent();
         w.line("}");
         w.blankLine();
 
         w.line("@Override");
-        w.line("public void didSave(DidSaveTextDocumentParams params) {}");
+        w.line("public void didSave(DidSaveTextDocumentParams params) { var state = server.documents.get(params.getTextDocument().getUri()); if (state != null) server.parseDocument(state.uri(), state.content()); }");
         w.blankLine();
 
         // completion()
