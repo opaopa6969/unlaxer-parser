@@ -314,6 +314,15 @@ name = "unlaxer-codegen"
 version = "0.1.0"
 
 [[package]]
+name = "unlaxer-dap"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "unlaxer-protocol",
+ "unlaxer-runtime",
+]
+
+[[package]]
 name = "unlaxer-evolution-example"
 version = "0.1.0"
 dependencies = [
@@ -348,8 +357,13 @@ name = "unlaxer-lsp"
 version = "0.1.0"
 dependencies = [
  "serde_json",
+ "unlaxer-protocol",
  "unlaxer-runtime",
 ]
+
+[[package]]
+name = "unlaxer-protocol"
+version = "0.1.0"
 
 [[package]]
 name = "unlaxer-runtime"

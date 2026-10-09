@@ -1,0 +1,375 @@
+[
+  {
+    "name": "ascii-empty-containers",
+    "input": "p<a><b>[]x!",
+    "length": 11,
+    "steps": [
+      {
+        "label": "Program",
+        "span": [
+          0,
+          11
+        ],
+        "line": 1,
+        "column": 1,
+        "text": "p<a><b>[]x!",
+        "endLine": 1,
+        "endColumn": 12
+      },
+      {
+        "label": "Atom",
+        "span": [
+          1,
+          4
+        ],
+        "line": 1,
+        "column": 2,
+        "text": "<a>",
+        "endLine": 1,
+        "endColumn": 5
+      },
+      {
+        "label": "Atom",
+        "span": [
+          4,
+          7
+        ],
+        "line": 1,
+        "column": 5,
+        "text": "<b>",
+        "endLine": 1,
+        "endColumn": 8
+      }
+    ]
+  },
+  {
+    "name": "unicode-list-value-node",
+    "input": "p<😀><b>[<c>]<d>!",
+    "length": 16,
+    "steps": [
+      {
+        "label": "Program",
+        "span": [
+          0,
+          16
+        ],
+        "line": 1,
+        "column": 1,
+        "text": "p<😀><b>[<c>]<d>!",
+        "endLine": 1,
+        "endColumn": 18
+      },
+      {
+        "label": "Atom",
+        "span": [
+          1,
+          4
+        ],
+        "line": 1,
+        "column": 2,
+        "text": "<😀>",
+        "endLine": 1,
+        "endColumn": 6
+      },
+      {
+        "label": "Atom",
+        "span": [
+          4,
+          7
+        ],
+        "line": 1,
+        "column": 6,
+        "text": "<b>",
+        "endLine": 1,
+        "endColumn": 9
+      },
+      {
+        "label": "Atom",
+        "span": [
+          8,
+          11
+        ],
+        "line": 1,
+        "column": 10,
+        "text": "<c>",
+        "endLine": 1,
+        "endColumn": 13
+      },
+      {
+        "label": "Atom",
+        "span": [
+          12,
+          15
+        ],
+        "line": 1,
+        "column": 14,
+        "text": "<d>",
+        "endLine": 1,
+        "endColumn": 17
+      }
+    ]
+  },
+  {
+    "name": "CRLF-optional-node",
+    "input": "p<😀\r\n><b>[<c>]?<d>x!",
+    "length": 20,
+    "steps": [
+      {
+        "label": "Program",
+        "span": [
+          0,
+          20
+        ],
+        "line": 1,
+        "column": 1,
+        "text": "p<😀\r\n><b>[<c>]?<d>x!",
+        "endLine": 2,
+        "endColumn": 16
+      },
+      {
+        "label": "Atom",
+        "span": [
+          1,
+          6
+        ],
+        "line": 1,
+        "column": 2,
+        "text": "<😀\r\n>",
+        "endLine": 2,
+        "endColumn": 2
+      },
+      {
+        "label": "Atom",
+        "span": [
+          6,
+          9
+        ],
+        "line": 2,
+        "column": 2,
+        "text": "<b>",
+        "endLine": 2,
+        "endColumn": 5
+      },
+      {
+        "label": "Atom",
+        "span": [
+          10,
+          13
+        ],
+        "line": 2,
+        "column": 6,
+        "text": "<c>",
+        "endLine": 2,
+        "endColumn": 9
+      },
+      {
+        "label": "Atom",
+        "span": [
+          15,
+          18
+        ],
+        "line": 2,
+        "column": 11,
+        "text": "<d>",
+        "endLine": 2,
+        "endColumn": 14
+      }
+    ]
+  },
+  {
+    "name": "CR-only",
+    "input": "p<😀\r><b>[]x!",
+    "length": 12,
+    "steps": [
+      {
+        "label": "Program",
+        "span": [
+          0,
+          12
+        ],
+        "line": 1,
+        "column": 1,
+        "text": "p<😀\r><b>[]x!",
+        "endLine": 2,
+        "endColumn": 9
+      },
+      {
+        "label": "Atom",
+        "span": [
+          1,
+          5
+        ],
+        "line": 1,
+        "column": 2,
+        "text": "<😀\r>",
+        "endLine": 2,
+        "endColumn": 2
+      },
+      {
+        "label": "Atom",
+        "span": [
+          5,
+          8
+        ],
+        "line": 2,
+        "column": 2,
+        "text": "<b>",
+        "endLine": 2,
+        "endColumn": 5
+      }
+    ]
+  },
+  {
+    "name": "LF-only",
+    "input": "p<😀\n><b>[]x!",
+    "length": 12,
+    "steps": [
+      {
+        "label": "Program",
+        "span": [
+          0,
+          12
+        ],
+        "line": 1,
+        "column": 1,
+        "text": "p<😀\n><b>[]x!",
+        "endLine": 2,
+        "endColumn": 9
+      },
+      {
+        "label": "Atom",
+        "span": [
+          1,
+          5
+        ],
+        "line": 1,
+        "column": 2,
+        "text": "<😀\n>",
+        "endLine": 2,
+        "endColumn": 2
+      },
+      {
+        "label": "Atom",
+        "span": [
+          5,
+          8
+        ],
+        "line": 2,
+        "column": 2,
+        "text": "<b>",
+        "endLine": 2,
+        "endColumn": 5
+      }
+    ]
+  },
+  {
+    "name": "multiple-list-nodes",
+    "input": "p<a><b>[<c><d>]?<e><f>!",
+    "length": 23,
+    "steps": [
+      {
+        "label": "Program",
+        "span": [
+          0,
+          23
+        ],
+        "line": 1,
+        "column": 1,
+        "text": "p<a><b>[<c><d>]?<e><f>!",
+        "endLine": 1,
+        "endColumn": 24
+      },
+      {
+        "label": "Atom",
+        "span": [
+          1,
+          4
+        ],
+        "line": 1,
+        "column": 2,
+        "text": "<a>",
+        "endLine": 1,
+        "endColumn": 5
+      },
+      {
+        "label": "Atom",
+        "span": [
+          4,
+          7
+        ],
+        "line": 1,
+        "column": 5,
+        "text": "<b>",
+        "endLine": 1,
+        "endColumn": 8
+      },
+      {
+        "label": "Atom",
+        "span": [
+          8,
+          11
+        ],
+        "line": 1,
+        "column": 9,
+        "text": "<c>",
+        "endLine": 1,
+        "endColumn": 12
+      },
+      {
+        "label": "Atom",
+        "span": [
+          11,
+          14
+        ],
+        "line": 1,
+        "column": 12,
+        "text": "<d>",
+        "endLine": 1,
+        "endColumn": 15
+      },
+      {
+        "label": "Atom",
+        "span": [
+          16,
+          19
+        ],
+        "line": 1,
+        "column": 17,
+        "text": "<e>",
+        "endLine": 1,
+        "endColumn": 20
+      },
+      {
+        "label": "Atom",
+        "span": [
+          19,
+          22
+        ],
+        "line": 1,
+        "column": 20,
+        "text": "<f>",
+        "endLine": 1,
+        "endColumn": 23
+      }
+    ]
+  },
+  {
+    "name": "partial-input",
+    "input": "p<a><b>[]x",
+    "length": 10,
+    "steps": []
+  },
+  {
+    "name": "parse-failure",
+    "input": "bad😀",
+    "length": 4,
+    "steps": []
+  },
+  {
+    "name": "map-failure",
+    "input": "p<m><b>[]x!",
+    "length": 11,
+    "steps": [],
+    "mapperFailure": true
+  }
+]

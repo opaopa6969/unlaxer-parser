@@ -1,0 +1,10 @@
+grammar Inspection {
+ @package: wire.dap
+ token INNER = NEGATION('>')
+ @root
+ Root ::= Program;
+ @mapping(Program, params=[zeta,alpha,others,maybe,mixed])
+ Program ::= 'p' Item @zeta Item @alpha '[' { Item } @others ']' [ '?' Item @maybe ] (Item | 'x') @mixed '!';
+ @mapping(Atom, params=[value])
+ Item ::= '<' { INNER } @value '>';
+}
