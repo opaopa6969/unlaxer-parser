@@ -130,13 +130,22 @@ No production dependency is added to the Rust runtime. Process invocation is a n
 host capability; a browser/WASM editor requires an explicit native bridge and cannot
 claim that the compiler is installed merely because these modules are bundled.
 
-## Remaining parent work
+## Consumer integration and limits
 
-This slice implements #416, part of #378 and #369. It does not complete generated
-LSP/Playground registration UI, automatic provider discovery, full rust-analyzer or
-procedural-macro analysis, or language-profile package configuration. #369 also retains
-shared-input parser calls, unclosed-delimiter partial-region updates and the existing
-TinyExpression editor compatibility audit. These remain explicit parent requirements.
+| Consumer or contract | Current support |
+|---|---|
+| Generated Java LSP / Classic Rust LSP | Explicit provider registration, profile capability intersection, typed diagnostics with exact snapshot versions; completion/hover/definition hooks |
+| Generated Java/native Rust Playground | Registered capability display and source-mapped query/edit dispatch; native compiler processes require an explicit bridge outside the browser |
+| Language profiles and packages | Explicit profile selection and locked package entry loading; no automatic provider discovery |
+| Partial embedded regions | Delimiter state, empty-body anchors, updates and EOF ownership are implemented; strict parsing remains distinct from editor recovery |
+| TinyExpression | Shared Java/Rust bridge corpus uses pinned `f86ce8a5`; the existing Java LSP consumer additionally covers `0d84f0dc` long fences and EOF completion. See the [production bridge](tinyexpression-production-bridge.md) for exact versions and limits |
+
+`LSPDiagnosticConformanceTest` exercises real javac diagnostics through both LSP
+consumers. `SemanticDiagnosticConformanceTest` exercises the same typed diagnostic
+contract with generated parsers and declarative semantic rules. The explicit
+compiler profiles above remain limited: no automatic discovery, Cargo/build.rs,
+procedural-macro execution or full rust-analyzer language service is implied.
+Shared-input grammar calls are a separate parser API from bounded region dispatch.
 
 Implementation references: [JavaCompiler API](https://docs.oracle.com/en/java/javase/21/docs/api/java.compiler/javax/tools/JavaCompiler.html),
 [TypeScript Language Service API](https://github.com/Microsoft/TypeScript/wiki/Using-the-Language-Service-API),

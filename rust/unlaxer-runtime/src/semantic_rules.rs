@@ -1094,6 +1094,60 @@ where
         ]
         .into()
     }
+    fn diagnostics(
+        &self,
+        request: &crate::language_queries::Request<'_>,
+    ) -> crate::source::Result<crate::language_queries::DiagnosticResponse> {
+        use crate::{
+            language_queries::DiagnosticResponse,
+            provider_protocol::Diagnostic,
+            source::{Operation, State},
+        };
+        if request.project.id != self.project
+            || request.project.version != self.version
+            || request.region.language != self.language
+        {
+            return Err("stale semantic provider binding");
+        }
+        if request.operation != Operation::Validate {
+            return Ok(DiagnosticResponse {
+                snapshot: request.region.source_map.output().clone(),
+                project: self.project.clone(),
+                project_version: self.version,
+                state: State::Unsupported,
+                diagnostics: vec![],
+            });
+        }
+        let response = self.query(request)?;
+        let diagnostics: Vec<_> = response
+            .items
+            .into_iter()
+            .map(|item| Diagnostic {
+                message: format!(
+                    "{}: {} [analysis={}]",
+                    item.label,
+                    item.detail,
+                    format!("{:?}", response.state).to_uppercase()
+                ),
+                code: item.label,
+                severity: "ERROR".into(),
+                locations: item.locations,
+            })
+            .collect();
+        // The model may fail while its diagnostic collection remains usable and partial.
+        let state = if response.state == State::Failed && !diagnostics.is_empty() {
+            State::Partial
+        } else {
+            response.state
+        };
+        Ok(DiagnosticResponse {
+            snapshot: response.snapshot,
+            project: response.project,
+            project_version: response.project_version,
+            state,
+            diagnostics,
+        })
+    }
     fn query(
         &self,
         request: &crate::language_queries::Request<'_>,

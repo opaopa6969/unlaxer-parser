@@ -26,6 +26,17 @@ public final class SemanticRuleQueryProvider implements LanguageQueries.Provider
         if(project.isEmpty()||version<0||!language.grammar().equals(inventory.grammar())||!inventory.nodes().containsKey(language.entry())||!program.inventory().equals(inventory))throw new IllegalArgumentException("invalid semantic provider binding");
     }
     @Override public Set<Operation> capabilities() {return Set.of(Operation.VALIDATE,Operation.COMPLETION);}
+    /** Diagnostic collection can retain errors even when no complete semantic model exists. */
+    @Override public DiagnosticResponse diagnostics(Request request) {
+        if(!request.project().id().equals(project)||request.project().version()!=version||!request.region().language().equals(language))throw new IllegalArgumentException("stale semantic provider binding");
+        if(request.operation()!=Operation.VALIDATE)return LanguageQueries.Provider.super.diagnostics(request);
+        var response=query(request);
+        var diagnostics=response.items().stream().map(item->new org.unlaxer.source.ProviderProtocol.Diagnostic(
+            item.label(),item.label()+": "+item.detail()+" [analysis="+response.state().name()+"]","ERROR",item.locations())).toList();
+        // FAILED describes the semantic model; PARTIAL describes a usable collection of its errors.
+        var state=response.state()==State.FAILED&&!diagnostics.isEmpty()?State.PARTIAL:response.state();
+        return new DiagnosticResponse(response.snapshot(),response.project(),response.projectVersion(),state,diagnostics);
+    }
     @Override public Response query(Request request) {
         if(!request.project().id().equals(project)||request.project().version()!=version||!request.region().language().equals(language))throw new IllegalArgumentException("stale semantic provider binding");
         DocumentSnapshot snapshot=request.region().sourceMap().output();
