@@ -58,7 +58,11 @@ fn generated_nested_grammars_execute_shared_source_position_corpus() {
             .arg("-o")
             .arg(output.join("probe")),
     );
-    success(Command::new(output.join("probe")).arg(fixtures().join("cases.tsv")));
+    success(
+        Command::new(output.join("probe"))
+            .arg(fixtures().join("cases.tsv"))
+            .arg(fixtures().join("editor.tsv")),
+    );
 }
 #[test]
 fn malformed_declarations_share_rejection_corpus() {

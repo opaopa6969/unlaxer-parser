@@ -14,6 +14,21 @@ jobs:
           java-version: '21'
           cache: maven
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
       - run: mvn -B -pl unlaxer-common,unlaxer-dsl -am test -Dtest=EmbeddedLanguagesTest,EmbeddedGrammarConformanceTest,PlaygroundCommandTest -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
       - run: cargo test --manifest-path rust/Cargo.toml -p unlaxer-runtime --test embedded
       - run: cargo test --manifest-path rust/Cargo.toml -p unlaxer-generator --test embedded --test playground
+      - name: Browser language-region editing
+        working-directory: unlaxer-dsl/ubnf-vscode
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          node scripts/embedded-regions-browser.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: embedded-region-browser-observations
+          path: unlaxer-dsl/ubnf-vscode/target/embedded-regions.tsv

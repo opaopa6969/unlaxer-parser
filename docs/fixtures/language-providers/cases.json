@@ -1,0 +1,504 @@
+[
+  {
+    "name": "java-parse-only",
+    "provider": "javac",
+    "source": "//日😀\r\nclass Main { String s = 1; }",
+    "uri": "file:///Main.java",
+    "operation": "PARSE",
+    "cursor": 0,
+    "documents": [],
+    "configuration": {},
+    "parameters": {},
+    "status": "OK",
+    "diagnostics": [],
+    "items": [],
+    "snapshotVersion": 7,
+    "projectVersion": 12
+  },
+  {
+    "name": "java-type",
+    "provider": "javac",
+    "source": "//日😀\r\nclass Main { String s = 1; }",
+    "uri": "file:///Main.java",
+    "operation": "VALIDATE",
+    "cursor": 0,
+    "documents": [],
+    "configuration": {},
+    "parameters": {},
+    "status": "DIAGNOSTICS",
+    "diagnostics": [
+      {
+        "code": "compiler.err.prob.found.req",
+        "uri": "file:///Main.java",
+        "start": 30,
+        "end": 31,
+        "severity": "ERROR"
+      }
+    ],
+    "items": [],
+    "snapshotVersion": 7,
+    "projectVersion": 12
+  },
+  {
+    "name": "java-dependency",
+    "provider": "javac",
+    "source": "class Main { int x = Dep.value; }",
+    "uri": "file:///Main.java",
+    "operation": "VALIDATE",
+    "cursor": 0,
+    "documents": [
+      {
+        "uri": "file:///Dep.java",
+        "version": 3,
+        "text": "class Dep { static String value = \"x\"; }"
+      }
+    ],
+    "configuration": {},
+    "parameters": {},
+    "status": "DIAGNOSTICS",
+    "diagnostics": [
+      {
+        "code": "compiler.err.prob.found.req",
+        "uri": "file:///Main.java",
+        "start": 21,
+        "end": 30,
+        "severity": "ERROR"
+      }
+    ],
+    "items": [],
+    "snapshotVersion": 7,
+    "projectVersion": 12
+  },
+  {
+    "name": "java-definition",
+    "provider": "javac",
+    "source": "class Main { Dep x; }",
+    "uri": "file:///Main.java",
+    "operation": "DEFINITION",
+    "cursor": 14,
+    "documents": [
+      {
+        "uri": "file:///Dep.java",
+        "version": 3,
+        "text": "class Dep {}"
+      }
+    ],
+    "configuration": {},
+    "parameters": {},
+    "status": "OK",
+    "diagnostics": [],
+    "items": [
+      {
+        "label": "Dep",
+        "detail": "Dep",
+        "locations": [
+          {
+            "uri": "file:///Dep.java",
+            "start": 0,
+            "end": 12
+          }
+        ],
+        "edits": []
+      }
+    ],
+    "snapshotVersion": 7,
+    "projectVersion": 12
+  },
+  {
+    "name": "java-wrong-entry",
+    "provider": "javac",
+    "source": "{}",
+    "uri": "file:///Main.java",
+    "operation": "PARSE",
+    "cursor": 0,
+    "documents": [],
+    "configuration": {},
+    "parameters": {},
+    "status": "UNSUPPORTED",
+    "diagnostics": [],
+    "items": [],
+    "snapshotVersion": 7,
+    "projectVersion": 12,
+    "entry": "Block"
+  },
+  {
+    "name": "java-execution",
+    "provider": "javac",
+    "source": "class Main {}",
+    "uri": "file:///Main.java",
+    "operation": "VALIDATE",
+    "cursor": 0,
+    "documents": [],
+    "configuration": {},
+    "parameters": {},
+    "status": "UNSUPPORTED",
+    "diagnostics": [],
+    "items": [],
+    "snapshotVersion": 7,
+    "projectVersion": 12,
+    "execute": true
+  },
+  {
+    "name": "java-version",
+    "provider": "javac",
+    "source": "class Main {}",
+    "uri": "file:///Main.java",
+    "operation": "VALIDATE",
+    "cursor": 0,
+    "documents": [],
+    "configuration": {},
+    "parameters": {},
+    "status": "UNAVAILABLE",
+    "diagnostics": [],
+    "items": [],
+    "snapshotVersion": 7,
+    "projectVersion": 12,
+    "version": "21.0.8"
+  },
+  {
+    "name": "ts-flow",
+    "provider": "typescript",
+    "source": "let x: string | number = \"ok\"; if (typeof x === \"string\") { x.toUpperCase(); }",
+    "uri": "file:///main.ts",
+    "operation": "HOVER",
+    "cursor": 60,
+    "documents": [],
+    "configuration": {},
+    "parameters": {},
+    "status": "OK",
+    "diagnostics": [],
+    "items": [
+      {
+        "label": "x",
+        "detail": "let x: string",
+        "locations": [
+          {
+            "uri": "file:///main.ts",
+            "start": 4,
+            "end": 5
+          }
+        ],
+        "edits": []
+      }
+    ],
+    "snapshotVersion": 7,
+    "projectVersion": 12
+  },
+  {
+    "name": "ts-dependency",
+    "provider": "typescript",
+    "source": "//日😀\r\nimport { value } from \"./dep\"; const x: string = value;",
+    "uri": "file:///main.ts",
+    "operation": "VALIDATE",
+    "cursor": 0,
+    "documents": [
+      {
+        "uri": "file:///dep.ts",
+        "version": 3,
+        "text": "export const value: number = 1;"
+      }
+    ],
+    "configuration": {},
+    "parameters": {},
+    "status": "DIAGNOSTICS",
+    "diagnostics": [
+      {
+        "code": "TS2322",
+        "uri": "file:///main.ts",
+        "start": 43,
+        "end": 44,
+        "severity": "ERROR"
+      }
+    ],
+    "items": [],
+    "snapshotVersion": 7,
+    "projectVersion": 12
+  },
+  {
+    "name": "ts-completion",
+    "provider": "typescript",
+    "source": "const alpha = 1; alp",
+    "uri": "file:///main.ts",
+    "operation": "COMPLETION",
+    "cursor": 20,
+    "documents": [],
+    "configuration": {},
+    "parameters": {
+      "prefix": "alp"
+    },
+    "status": "DIAGNOSTICS",
+    "diagnostics": [
+      {
+        "code": "TS2304",
+        "uri": "file:///main.ts",
+        "start": 17,
+        "end": 20,
+        "severity": "ERROR"
+      }
+    ],
+    "items": [
+      {
+        "label": "alpha",
+        "detail": "const",
+        "locations": [],
+        "edits": [
+          {
+            "uri": "file:///main.ts",
+            "start": 17,
+            "end": 20,
+            "text": "alpha"
+          }
+        ]
+      }
+    ],
+    "snapshotVersion": 7,
+    "projectVersion": 12
+  },
+  {
+    "name": "ts-max-version",
+    "provider": "typescript",
+    "source": "const x: string = 1;",
+    "uri": "file:///main.ts",
+    "operation": "VALIDATE",
+    "cursor": 0,
+    "documents": [],
+    "configuration": {},
+    "parameters": {},
+    "status": "DIAGNOSTICS",
+    "diagnostics": [
+      {
+        "code": "TS2322",
+        "uri": "file:///main.ts",
+        "start": 6,
+        "end": 7,
+        "severity": "ERROR"
+      }
+    ],
+    "items": [],
+    "snapshotVersion": 9223372036854775807,
+    "projectVersion": 9223372036854775807
+  },
+  {
+    "name": "ts-timeout",
+    "provider": "typescript",
+    "source": "const x = 1;",
+    "uri": "file:///main.ts",
+    "operation": "VALIDATE",
+    "cursor": 0,
+    "documents": [],
+    "configuration": {},
+    "parameters": {
+      "timeoutMs": "1"
+    },
+    "status": "TIMEOUT",
+    "diagnostics": [],
+    "items": [],
+    "snapshotVersion": 7,
+    "projectVersion": 12
+  },
+  {
+    "name": "rust-ownership",
+    "provider": "rustc",
+    "source": "pub fn f() { let x = String::new(); let _y = x; let _z = x; }",
+    "uri": "file:///main.rs",
+    "operation": "VALIDATE",
+    "cursor": 0,
+    "documents": [],
+    "configuration": {},
+    "parameters": {},
+    "status": "DIAGNOSTICS",
+    "diagnostics": [
+      {
+        "code": "E0382",
+        "uri": "file:///main.rs",
+        "start": 57,
+        "end": 58,
+        "severity": "ERROR"
+      }
+    ],
+    "items": [],
+    "snapshotVersion": 7,
+    "projectVersion": 12
+  },
+  {
+    "name": "rust-match",
+    "provider": "rustc",
+    "source": "pub fn f(x: bool) -> i32 { match x { true => 1 } }",
+    "uri": "file:///main.rs",
+    "operation": "VALIDATE",
+    "cursor": 0,
+    "documents": [],
+    "configuration": {},
+    "parameters": {},
+    "status": "DIAGNOSTICS",
+    "diagnostics": [
+      {
+        "code": "E0004",
+        "uri": "file:///main.rs",
+        "start": 33,
+        "end": 34,
+        "severity": "ERROR"
+      }
+    ],
+    "items": [],
+    "snapshotVersion": 7,
+    "projectVersion": 12
+  },
+  {
+    "name": "rust-macro-origin",
+    "provider": "rustc",
+    "source": "macro_rules! bad { () => { let _x: String = 1; }; } pub fn f() { bad!(); }",
+    "uri": "file:///main.rs",
+    "operation": "VALIDATE",
+    "cursor": 0,
+    "documents": [],
+    "configuration": {},
+    "parameters": {},
+    "status": "DIAGNOSTICS",
+    "diagnostics": [
+      {
+        "code": "E0308",
+        "uri": "file:///main.rs",
+        "start": 44,
+        "end": 45,
+        "severity": "ERROR"
+      },
+      {
+        "code": "E0308",
+        "uri": "file:///main.rs",
+        "start": 65,
+        "end": 71,
+        "severity": "ERROR"
+      }
+    ],
+    "items": [],
+    "snapshotVersion": 7,
+    "projectVersion": 12
+  },
+  {
+    "name": "rust-parser-unsupported",
+    "provider": "rustc",
+    "source": "pub fn f() {}",
+    "uri": "file:///main.rs",
+    "operation": "PARSE",
+    "cursor": 0,
+    "documents": [],
+    "configuration": {},
+    "parameters": {},
+    "status": "UNSUPPORTED",
+    "diagnostics": [],
+    "items": [],
+    "snapshotVersion": 7,
+    "projectVersion": 12
+  },
+  {
+    "name": "rust-external-input",
+    "provider": "rustc",
+    "source": "pub const X: &str = include_str!(\"secret\");",
+    "uri": "file:///main.rs",
+    "operation": "VALIDATE",
+    "cursor": 0,
+    "documents": [],
+    "configuration": {},
+    "parameters": {},
+    "status": "UNSUPPORTED",
+    "diagnostics": [],
+    "items": [],
+    "snapshotVersion": 7,
+    "projectVersion": 12
+  },
+  {
+    "name": "rust-valid",
+    "provider": "rustc",
+    "source": "pub fn f() -> i32 { 1 }",
+    "uri": "file:///main.rs",
+    "operation": "VALIDATE",
+    "cursor": 0,
+    "documents": [],
+    "configuration": {},
+    "parameters": {},
+    "status": "OK",
+    "diagnostics": [],
+    "items": [],
+    "snapshotVersion": 7,
+    "projectVersion": 12
+  },
+  {
+    "name": "ts-plugin-unsupported",
+    "provider": "typescript",
+    "source": "let x: string | number = \"ok\"; if (typeof x === \"string\") { x.toUpperCase(); }",
+    "uri": "file:///main.ts",
+    "operation": "HOVER",
+    "cursor": 60,
+    "documents": [],
+    "configuration": {
+      "plugins": "workspace-plugin"
+    },
+    "parameters": {},
+    "status": "UNSUPPORTED",
+    "diagnostics": [],
+    "items": [],
+    "snapshotVersion": 7,
+    "projectVersion": 12
+  },
+  {
+    "name": "rust-cargo-unsupported",
+    "provider": "rustc",
+    "source": "pub fn f() -> i32 { 1 }",
+    "uri": "file:///main.rs",
+    "operation": "VALIDATE",
+    "cursor": 0,
+    "documents": [],
+    "configuration": {
+      "cargoManifest": "Cargo.toml"
+    },
+    "parameters": {},
+    "status": "UNSUPPORTED",
+    "diagnostics": [],
+    "items": [],
+    "snapshotVersion": 7,
+    "projectVersion": 12
+  },
+  {
+    "name": "java-processor-option-unsupported",
+    "provider": "javac",
+    "source": "//日😀\r\nclass Main { String s = 1; }",
+    "uri": "file:///Main.java",
+    "operation": "PARSE",
+    "cursor": 0,
+    "documents": [],
+    "configuration": {
+      "processors": "Sentinel"
+    },
+    "parameters": {},
+    "status": "UNSUPPORTED",
+    "diagnostics": [],
+    "items": [],
+    "snapshotVersion": 7,
+    "projectVersion": 12
+  },
+  {
+    "name": "java-package-import",
+    "provider": "javac",
+    "source": "//日😀\r\npackage p; import java.util.List; class Main { String s = 1; }",
+    "uri": "file:///Main.java",
+    "operation": "VALIDATE",
+    "cursor": 0,
+    "documents": [],
+    "configuration": {},
+    "parameters": {},
+    "status": "DIAGNOSTICS",
+    "diagnostics": [
+      {
+        "code": "compiler.err.prob.found.req",
+        "uri": "file:///Main.java",
+        "start": 64,
+        "end": 65,
+        "severity": "ERROR"
+      }
+    ],
+    "items": [],
+    "snapshotVersion": 7,
+    "projectVersion": 12
+  }
+]

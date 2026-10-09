@@ -2,6 +2,7 @@
 #![allow(dead_code)]
 mod generated;
 mod editor_adapter;
+mod region_adapter;
 use std::cell::RefCell;
 use unlaxer_runtime::{json_string, ParseContext};
 
@@ -64,7 +65,9 @@ pub fn analyze(input: &str) -> String {
 }
 
 /// Cursor is an original-source code-point offset, never a synthetic suffix location.
-pub fn analyze_editor(input: &str, cursor: usize) -> String {
+pub fn analyze_editor(input: &str, cursor: usize) -> String { analyze_editor_snapshot(input, cursor, 0) }
+
+pub fn analyze_editor_snapshot(input: &str, cursor: usize, version: u64) -> String {
     if cursor > input.chars().count() { return r#"{"runtimeError":"カーソル位置が入力の外です。"}"#.into(); }
     let completions = unlaxer_runtime::editor_cst::literal_completions(generated::parser::grammar());
     let cst = match generated::parser::parse_editor_cst(input, &completions, unlaxer_runtime::editor_cst::Options::default()) {
@@ -72,16 +75,20 @@ pub fn analyze_editor(input: &str, cursor: usize) -> String {
         Err(error) => return format!(r#"{{"runtimeError":{}}}"#, json_string(error)),
     };
     let typed = editor_adapter::analyze(input, cursor).unwrap_or_else(|| "null".into());
+    let regions = region_adapter::analyze(input, cursor, version).unwrap_or_else(|| "null".into());
     let mut value = analyze(input);
     value.pop();
-    format!(r#"{},"editor":{},"typed":{}}}"#, value, cst.canonical_json(), typed)
+    format!(r#"{},"editor":{},"typed":{},"languages":{}}}"#, value, cst.canonical_json(), typed, regions)
 }
 
 #[no_mangle]
-pub extern "C" fn pg_editor(cursor: usize) {
+pub extern "C" fn pg_editor(cursor: usize) { pg_editor_snapshot(cursor, 0); }
+
+#[no_mangle]
+pub extern "C" fn pg_editor_snapshot(cursor: usize, version: u32) {
     let input = BUFFERS.with(|buffers| String::from_utf8(buffers.borrow().input.clone()));
     output(match input {
-        Ok(input) => analyze_editor(&input, cursor),
+        Ok(input) => analyze_editor_snapshot(&input, cursor, u64::from(version)),
         Err(_) => r#"{"runtimeError":"入力は UTF-8 である必要があります。"}"#.into(),
     });
 }

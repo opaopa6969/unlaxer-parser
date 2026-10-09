@@ -30,6 +30,16 @@ impl Output {
     pub fn tree(&self) -> Result<LanguageRegions> {
         LanguageRegions::new(self.snapshot.clone(), self.regions.clone())
     }
+    pub fn canonical_json(&self) -> String {
+        use crate::json_string as q;
+        let regions = self.regions.iter().map(|r| format!("{{\"id\":{},\"parent\":{},\"language\":{},\"grammar\":{},\"entry\":{},\"state\":{},\"full\":[{},{}],\"body\":[{},{}]}}", q(&r.id), r.parent.as_ref().map(|p|q(p)).unwrap_or_else(|| "null".into()), q(&r.language.id), q(&r.language.grammar), q(&r.language.entry), q(&format!("{:?}", r.parse_state).to_uppercase()), r.full.start, r.full.end, r.body.start, r.body.end)).collect::<Vec<_>>().join(",");
+        format!(
+            "{{\"uri\":{},\"version\":{},\"regions\":[{}]}}",
+            q(&self.snapshot.uri),
+            q(&self.snapshot.version.to_string()),
+            regions
+        )
+    }
 }
 pub fn parse(
     snapshot: &Snapshot,
@@ -247,5 +257,91 @@ impl CstGrammar {
             self.discover(tree, child, children)?;
         }
         Ok(())
+    }
+}
+
+/// Opt-in adapter around a generated grammar; the strict API is unchanged.
+pub struct EditorGrammar {
+    grammar: CstGrammar,
+    completions: Vec<String>,
+    options: crate::editor_cst::Options,
+}
+impl CstGrammar {
+    pub fn editor(
+        self,
+        completions: Vec<String>,
+        options: crate::editor_cst::Options,
+    ) -> EditorGrammar {
+        EditorGrammar {
+            grammar: self,
+            completions,
+            options,
+        }
+    }
+}
+impl Grammar for EditorGrammar {
+    fn name(&self) -> &str {
+        &self.grammar.name
+    }
+    fn parse(&self, entry: &str, snapshot: &Snapshot) -> Result<Parsed> {
+        if self.options.max_fragments > 8 || self.options.max_attempts > 4096 {
+            return Err("invalid editor completion limit");
+        }
+        let strict = self.grammar.parse(entry, snapshot)?;
+        if strict.state != State::Failed {
+            return Ok(strict);
+        }
+        let completions: Vec<_> = self.completions.iter().map(String::as_str).collect();
+        let cst = crate::editor_cst::parse(
+            &self.grammar.grammar,
+            self.grammar.entries[entry],
+            self.grammar.whitespace,
+            &snapshot.text,
+            &completions,
+            self.options,
+        )?;
+        if cst.status() == crate::editor_cst::Status::Failed {
+            return Ok(strict);
+        }
+        let mut children = vec![];
+        for node in cst.nodes() {
+            for binding in &self.grammar.bindings {
+                if node.rule != self.grammar.grammar[binding.rule].name {
+                    continue;
+                }
+                let bodies: Vec<_> = node
+                    .captures
+                    .iter()
+                    .filter(|capture| capture.name == binding.capture)
+                    .collect();
+                if bodies.len() != 1 {
+                    return Err("embedding needs exactly one body capture");
+                }
+                let body = bodies[0];
+                if node.span.start >= body.span.start || body.synthetic {
+                    continue;
+                }
+                children.push(Child {
+                    language: binding.language.clone(),
+                    full: node.span,
+                    body: body.span,
+                });
+            }
+        }
+        children.sort_by_key(|child| (child.full.start, std::cmp::Reverse(child.full.end)));
+        let mut owned: Vec<Child> = vec![];
+        for child in children {
+            if owned.iter().any(|parent| {
+                parent.body.start <= child.full.start && child.full.end <= parent.body.end
+            }) {
+                continue;
+            }
+            owned.push(child);
+        }
+        Ok(Parsed {
+            snapshot: snapshot.clone(),
+            state: State::Partial,
+            children: owned,
+        })
     }
 }

@@ -90,6 +90,36 @@ public class EmbeddedGrammarConformanceTest {
             assertEquals(State.COMPLETE, grammars.get(2).parse("Block", child).state());
         }
     }
+    @Test public void generatedEditorRegionsFollowOriginalSnapshotEdits() throws Exception {
+        try (var loader = compile()) {
+            var javaGrammar = (EmbeddedLanguages.Grammar) loader.loadClass("org.example.embedded.JavaParsers").getMethod("embeddedGrammar").invoke(null);
+            var root = language("formula", "FormulaInfo", "Document");
+            int version = 0; EmbeddedLanguages.Result previous = null;
+            for (String line : Files.readAllLines(fixtures.resolve("editor.tsv"))) {
+                String[] fields = line.split("\t", -1);
+                var options = fields[1].equals("limit") ? new org.unlaxer.editor.EditorCst.Options(0, 0) : org.unlaxer.editor.EditorCst.Options.defaults();
+                var formula = (EmbeddedLanguages.Grammar) loader.loadClass("org.example.embedded.FormulaInfoParsers").getMethod("embeddedEditorGrammar", List.class, org.unlaxer.editor.EditorCst.Options.class).invoke(null, List.of(fields[1].equals("synthetic") ? "x}F" : "}F"), options);
+                var tiny = (EmbeddedLanguages.Grammar) loader.loadClass("org.example.embedded.TinyExpressionParsers").getMethod("embeddedEditorGrammar", List.class, org.unlaxer.editor.EditorCst.Options.class).invoke(null, List.of("]T"), options);
+                var providers = new HashMap<Language, EmbeddedLanguages.Grammar>();
+                providers.put(root, formula); providers.put(language("tiny", "TinyExpression", "Expression"), tiny);
+                if (!fields[1].equals("missing")) providers.put(language("java", "Java", "CompilationUnit"), javaGrammar);
+                var host = new DocumentSnapshot("host", ++version, fields[2]);
+                var result = EmbeddedLanguages.parse(host, root, providers, 8, 32);
+                String actual = result.regions().stream().map(r -> r.language().grammar() + ":" + r.parseState() + ":" + r.full().start() + ":" + r.full().end() + ":" + r.body().start() + ":" + r.body().end()).collect(java.util.stream.Collectors.joining(","));
+                assertEquals(fields[0], fields[3], actual);
+                for (var region : result.regions()) {
+                    assertEquals(host.slice(region.body()), region.sourceMap().output().text());
+                    assertEquals(version, region.sourceMap().output().version());
+                    if (region.body().start() < region.body().end()) assertEquals(region.body(), region.sourceMap().edit(new Span(0, region.sourceMap().output().length())).span());
+                }
+                if (previous != null) {
+                    var old = previous; var project = new LanguageQueries.Project("project", version, Map.of(host.uri(), host), Map.of());
+                    assertThrows(IllegalArgumentException.class, () -> new LanguageQueries(old.tree(), project, Map.of()));
+                }
+                previous = result;
+            }
+        }
+    }
     @Test public void nativeAndJavaRustEmissionMatchAndExecuteTheSameIndependentCorpus() throws Exception {
         if (!Boolean.getBoolean("rustConformance")) System.out.println("[assumption] EmbeddedGrammarConformanceTest requires -DrustConformance=true");
         assumeTrue(Boolean.getBoolean("rustConformance"));
@@ -105,7 +135,24 @@ public class EmbeddedGrammarConformanceTest {
         run(List.of("rustc", "--edition=2021", "--crate-type=rlib", "--crate-name=unlaxer_runtime", repo.resolve("rust/unlaxer-runtime/src/lib.rs").toString(), "-o", runtime.toString()));
         Files.copy(fixtures.resolve("probe.rs"), output.resolve("main.rs"));
         run(List.of("rustc", "--edition=2021", "--extern", "unlaxer_runtime=" + runtime, output.resolve("main.rs").toString(), "-o", output.resolve("probe").toString()));
-        run(List.of(output.resolve("probe").toString(), fixtures.resolve("cases.tsv").toString()));
+        run(List.of(output.resolve("probe").toString(), fixtures.resolve("cases.tsv").toString(), fixtures.resolve("editor.tsv").toString()));
+    }
+    @Test public void generatedPlaygroundUsesActualPartialRegionRegistry() throws Exception {
+        if (!Boolean.getBoolean("rustConformance")) System.out.println("[assumption] embedded Playground requires -DrustConformance=true and wasm32 target");
+        assumeTrue(Boolean.getBoolean("rustConformance"));
+        Path output = temporary.newFolder().toPath();
+        for (var file : org.unlaxer.dsl.codegen.rust.PlaygroundGenerator.generate(fixtures.resolve("FormulaInfoPlayground.ubnf")).entrySet()) {
+            Path target = output.resolve(file.getKey()); Files.createDirectories(target.getParent()); Files.writeString(target, file.getValue());
+        }
+        for (String name : List.of("TinyExpression", "Java")) {
+            Path module = output.resolve(name.equals("Java") ? "src/java" : "src/tiny");
+            for (var file : new RustBackend().generate(grammar(name))) {
+                Path target = module.resolve(file.relativePath()); Files.createDirectories(target.getParent()); Files.writeString(target, file.content());
+            }
+        }
+        Files.copy(fixtures.resolve("region_adapter.rs"), output.resolve("src/region_adapter.rs"), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        run(List.of("node", output.resolve("build.mjs").toString()));
+        run(List.of("node", fixtures.resolve("playground-probe.mjs").toString(), output.resolve("public/language.wasm").toString(), fixtures.resolve("editor.tsv").toString()));
     }
     @Test public void malformedDeclarationsAreRejectedByBothJavaGenerationPaths() throws Exception {
         for (String line : Files.readAllLines(fixtures.resolve("invalid.tsv"))) {

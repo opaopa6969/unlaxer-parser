@@ -69,6 +69,8 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
     runtime!("source_edits.rs");
     runtime!("source.rs");
     runtime!("embedded.rs");
+    runtime!("provider_protocol.rs");
+    runtime!("provider_process.rs");
     runtime!("pipeline.rs");
     runtime!("lexing.rs");
     runtime!("first.rs");
@@ -91,6 +93,7 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
         content: wrapper,
     });
     asset!("src/editor_adapter.rs", "playground/editor_adapter.rs");
+    asset!("src/region_adapter.rs", "playground/region_adapter.rs");
     asset!("public/index.html", "playground/index.html");
     asset!("public/playground.css", "playground/playground.css");
     asset!("public/playground.js", "playground/playground.js");
