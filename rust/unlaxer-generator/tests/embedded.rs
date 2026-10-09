@@ -61,7 +61,8 @@ fn generated_nested_grammars_execute_shared_source_position_corpus() {
     success(
         Command::new(output.join("probe"))
             .arg(fixtures().join("cases.tsv"))
-            .arg(fixtures().join("editor.tsv")),
+            .arg(fixtures().join("editor.tsv"))
+            .arg(fixtures().join("ownership.tsv")),
     );
 }
 #[test]
