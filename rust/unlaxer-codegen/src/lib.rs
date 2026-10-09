@@ -16,16 +16,31 @@ pub fn lexing_api(
     root: usize,
     whitespace: bool,
 ) -> String {
+    lexing_api_with_trivia(terminals, root, whitespace, None)
+}
+
+/// Token-stream entry using a fixed, non-nullable named global trivia definition.
+pub fn lexing_api_with_trivia(
+    terminals: &[(String, bool, lexical::LexicalExpression)],
+    root: usize,
+    whitespace: bool,
+    named_trivia: Option<&lexical::LexicalExpression>,
+) -> String {
     let mut out = String::from("\npub fn lexical_terminals() -> &'static std::sync::Arc<[unlaxer_runtime::lexing::Terminal]> {\n    static TERMINALS: OnceLock<std::sync::Arc<[unlaxer_runtime::lexing::Terminal]>> = OnceLock::new();\n    TERMINALS.get_or_init(|| vec![\n");
     for (name, literal, expression) in terminals {
         writeln!(out, "        unlaxer_runtime::lexing::Terminal {{ name: {}, literal: {}, expression: {} }},", quote(name), literal, lexical_expression(expression)).unwrap();
     }
-    out.push_str("    ].into())\n}\n\npub fn parse_with_lexing(source: &str, options: unlaxer_runtime::lexing::Options) -> Result<unlaxer_runtime::lexing::Outcome<'_>, String> {\n    unlaxer_runtime::lexing::parse(grammar(), ");
-    writeln!(
-        out,
-        "{root}, {whitespace}, source, options, std::sync::Arc::clone(lexical_terminals()))\n}}"
-    )
-    .unwrap();
+    out.push_str("    ].into())\n}\n\npub fn parse_with_lexing(source: &str, options: unlaxer_runtime::lexing::Options) -> Result<unlaxer_runtime::lexing::Outcome<'_>, String> {\n    unlaxer_runtime::lexing::");
+    out.push_str(if named_trivia.is_some() {
+        "parse_with_trivia(grammar(), "
+    } else {
+        "parse(grammar(), "
+    });
+    if let Some(trivia) = named_trivia {
+        writeln!(out, "{root}, {whitespace}, source, options, std::sync::Arc::clone(lexical_terminals()), Some({}))\n}}", lexical_expression(trivia)).unwrap();
+    } else {
+        writeln!(out, "{root}, {whitespace}, source, options, std::sync::Arc::clone(lexical_terminals()))\n}}").unwrap();
+    }
     out
 }
 

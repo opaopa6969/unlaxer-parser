@@ -12,7 +12,7 @@ export function playgroundHtml(source: string, cspSource: string, uri: (file: st
     .replace('href="playground.css"', `href="${attribute(uri("playground.css"))}"`)
     .replace('src="playground.js"', `src="${attribute(uri("playground.js"))}"`)
     .replace('href="help/index.html"', 'href="#"')
-    .replace("<body>", `<body data-wasm="${attribute(uri("language.wasm"))}" data-worker="${attribute(uri("worker.js"))}" data-grammar="${attribute(uri("grammar.ubnf"))}">`);
+    .replace("<body>", `<body data-wasm="${attribute(uri("language.wasm"))}" data-worker="${attribute(uri("worker.js"))}" data-grammar="${attribute(uri("grammar.ubnf"))}" data-vocabulary="${attribute(uri("vocabulary.json"))}">`);
 }
 
 export function registerPlayground(context: vscode.ExtensionContext, tools: Tools): void {
