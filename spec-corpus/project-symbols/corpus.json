@@ -1,0 +1,805 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "id": "P",
+    "version": 10,
+    "modules": [
+      {
+        "id": "main",
+        "model": {
+          "uri": "file:main",
+          "version": 7,
+          "source": "use\n{\n local\n  𠮷ac\n}\n",
+          "types": [
+            {"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},
+            {"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},
+            {"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}
+          ],
+          "scopes": [{"id": "root","parent": null,"span": [0,21]},{"id": "inner","parent": "root","span": [4,20]}],
+          "symbols": [
+            {"id": "local","name": "a","type": "Int","scope": "inner","declaration": [7,12],"visibleFrom": 12},
+            {"id": "unknown","name": "maybe","type": "?","scope": "inner","declaration": [5,6],"visibleFrom": 6},
+            {"id": "rootValue","name": "rootValue","type": "Int","scope": "root","declaration": [0,3],"visibleFrom": 0}
+          ],
+          "signatures": [],
+          "calls": []
+        },
+        "exports": ["rootValue"],
+        "imports": [
+          {"name": "a","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},
+          {"name": "𠮷accessor","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},
+          {"name": "remote","target": {"dependency": "std/access","module": "api"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},
+          {"name": "hidden","target": {"dependency": "","module": "lib"},"symbol": "hidden","scope": "root","span": [0,3],"visibleFrom": 0},
+          {"name": "missing","target": {"dependency": "","module": "absent"},"symbol": "anything","scope": "root","span": [0,3],"visibleFrom": 0}
+        ]
+      },
+      {
+        "id": "lib",
+        "model": {
+          "uri": "file:lib",
+          "version": 3,
+          "source": "𠮷accessor hidden counter",
+          "types": [
+            {"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},
+            {"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},
+            {"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}
+          ],
+          "scopes": [{"id": "root","parent": null,"span": [0,24]}],
+          "symbols": [
+            {"id": "db","name": "accessor","type": "DbAccessor","scope": "root","declaration": [1,9],"visibleFrom": 0},
+            {"id": "private","name": "hidden","type": "DbAccessor","scope": "root","declaration": [10,16],"visibleFrom": 0},
+            {"id": "counter","name": "counter","type": "Int","scope": "root","declaration": [17,24],"visibleFrom": 0}
+          ],
+          "signatures": [],
+          "calls": []
+        },
+        "exports": ["db","counter"],
+        "imports": [{"name": "back","target": {"dependency": "","module": "main"},"symbol": "rootValue","scope": "root","span": [0,3],"visibleFrom": 0}]
+      }
+    ],
+    "dependencies": [
+      {
+        "id": "std/access",
+        "version": "1.2.0",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "modules": [
+          {
+            "id": "api",
+            "model": {"uri": "lock:api","version": 2,"source": "accessor","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,8]}],"symbols": [{"id": "apiDb","name": "accessor","type": "DbAccessor","scope": "root","declaration": [0,8],"visibleFrom": 0}],"signatures": [],"calls": []},
+            "exports": ["apiDb"],
+            "imports": []
+          }
+        ]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "imports-alias-shadow-private-missing-cycle",
+      "queries": [
+        {
+          "op": "resolve",
+          "expected": {
+            "name": "a",
+            "status": "RESOLVED",
+            "candidates": [{"name": "a","type": "DbAccessor","definition": {"identity": {"project": "P","dependency": "","dependencyVersion": "","module": "lib","symbol": "db"},"uri": "file:lib","version": 3,"span": [1,9]}}],
+            "diagnostics": []
+          },
+          "module": "main",
+          "projectVersion": 10,
+          "documentVersion": 7,
+          "cursor": 3,
+          "name": "a"
+        },
+        {
+          "op": "resolve",
+          "expected": {
+            "name": "a",
+            "status": "RESOLVED",
+            "candidates": [{"name": "a","type": "Int","definition": {"identity": {"project": "P","dependency": "","dependencyVersion": "","module": "main","symbol": "local"},"uri": "file:main","version": 7,"span": [7,12]}}],
+            "diagnostics": []
+          },
+          "module": "main",
+          "projectVersion": 10,
+          "documentVersion": 7,
+          "cursor": 18,
+          "name": "a"
+        },
+        {
+          "op": "resolve",
+          "expected": {
+            "name": "a",
+            "status": "RESOLVED",
+            "candidates": [{"name": "a","type": "DbAccessor","definition": {"identity": {"project": "P","dependency": "","dependencyVersion": "","module": "lib","symbol": "db"},"uri": "file:lib","version": 3,"span": [1,9]}}],
+            "diagnostics": []
+          },
+          "module": "main",
+          "projectVersion": 10,
+          "documentVersion": 7,
+          "cursor": 8,
+          "name": "a"
+        },
+        {
+          "op": "resolve",
+          "expected": {
+            "name": "a",
+            "status": "RESOLVED",
+            "candidates": [{"name": "a","type": "DbAccessor","definition": {"identity": {"project": "P","dependency": "","dependencyVersion": "","module": "lib","symbol": "db"},"uri": "file:lib","version": 3,"span": [1,9]}}],
+            "diagnostics": []
+          },
+          "module": "main",
+          "projectVersion": 10,
+          "documentVersion": 7,
+          "cursor": 21,
+          "name": "a"
+        },
+        {
+          "op": "resolve",
+          "expected": {
+            "name": "𠮷accessor",
+            "status": "RESOLVED",
+            "candidates": [{"name": "𠮷accessor","type": "DbAccessor","definition": {"identity": {"project": "P","dependency": "","dependencyVersion": "","module": "lib","symbol": "db"},"uri": "file:lib","version": 3,"span": [1,9]}}],
+            "diagnostics": []
+          },
+          "module": "main",
+          "projectVersion": 10,
+          "documentVersion": 7,
+          "cursor": 18,
+          "name": "𠮷accessor"
+        },
+        {
+          "op": "resolve",
+          "expected": {
+            "name": "remote",
+            "status": "RESOLVED",
+            "candidates": [{"name": "remote","type": "DbAccessor","definition": {"identity": {"project": "P","dependency": "std/access","dependencyVersion": "1.2.0","module": "api","symbol": "apiDb"},"uri": "lock:api","version": 2,"span": [0,8]}}],
+            "diagnostics": []
+          },
+          "module": "main",
+          "projectVersion": 10,
+          "documentVersion": 7,
+          "cursor": 18,
+          "name": "remote"
+        },
+        {
+          "op": "resolve",
+          "expected": {"name": "hidden","status": "UNRESOLVED","candidates": [],"diagnostics": [{"code": "PRIVATE_SYMBOL","uri": "file:main","span": [0,3]}]},
+          "module": "main",
+          "projectVersion": 10,
+          "documentVersion": 7,
+          "cursor": 18,
+          "name": "hidden"
+        },
+        {
+          "op": "resolve",
+          "expected": {"name": "missing","status": "UNRESOLVED","candidates": [],"diagnostics": [{"code": "UNRESOLVED_IMPORT","uri": "file:main","span": [0,3]}]},
+          "module": "main",
+          "projectVersion": 10,
+          "documentVersion": 7,
+          "cursor": 18,
+          "name": "missing"
+        },
+        {
+          "op": "resolve",
+          "expected": {"name": "notDeclared","status": "UNRESOLVED","candidates": [],"diagnostics": []},
+          "module": "main",
+          "projectVersion": 10,
+          "documentVersion": 7,
+          "cursor": 18,
+          "name": "notDeclared"
+        },
+        {
+          "op": "resolve",
+          "expected": {
+            "name": "back",
+            "status": "RESOLVED",
+            "candidates": [{"name": "back","type": "Int","definition": {"identity": {"project": "P","dependency": "","dependencyVersion": "","module": "main","symbol": "rootValue"},"uri": "file:main","version": 7,"span": [0,3]}}],
+            "diagnostics": []
+          },
+          "module": "lib",
+          "projectVersion": 10,
+          "documentVersion": 3,
+          "cursor": 20,
+          "name": "back"
+        },
+        {"op": "diagnostics","expected": [{"code": "PRIVATE_SYMBOL","uri": "file:main","span": [0,3]},{"code": "UNRESOLVED_IMPORT","uri": "file:main","span": [0,3]}]},
+        {"op": "assign","expected": "YES","actual": "DbAccessor","expectedType": "IAccessor"},
+        {"op": "assign","expected": "NO","actual": "Int","expectedType": "IAccessor"},
+        {"op": "assign","expected": "UNKNOWN","actual": "?","expectedType": "IAccessor"},
+        {
+          "op": "complete",
+          "expected": [
+            {"candidate": {"name": "remote","type": "DbAccessor","definition": {"identity": {"project": "P","dependency": "std/access","dependencyVersion": "1.2.0","module": "api","symbol": "apiDb"},"uri": "lock:api","version": 2,"span": [0,8]}},"compatibility": "YES","reason": "DbAccessor -> IAccessor: YES","edit": {"uri": "file:main","version": 7,"span": [18,18],"text": "remote"}},
+            {"candidate": {"name": "𠮷accessor","type": "DbAccessor","definition": {"identity": {"project": "P","dependency": "","dependencyVersion": "","module": "lib","symbol": "db"},"uri": "file:lib","version": 3,"span": [1,9]}},"compatibility": "YES","reason": "DbAccessor -> IAccessor: YES","edit": {"uri": "file:main","version": 7,"span": [18,18],"text": "𠮷accessor"}},
+            {"candidate": {"name": "maybe","type": "?","definition": {"identity": {"project": "P","dependency": "","dependencyVersion": "","module": "main","symbol": "unknown"},"uri": "file:main","version": 7,"span": [5,6]}},"compatibility": "UNKNOWN","reason": "? -> IAccessor: UNKNOWN","edit": {"uri": "file:main","version": 7,"span": [18,18],"text": "maybe"}}
+          ],
+          "module": "main",
+          "projectVersion": 10,
+          "documentVersion": 7,
+          "cursor": 18,
+          "prefix": "",
+          "expectedType": "IAccessor"
+        },
+        {
+          "op": "complete",
+          "expected": [
+            {"candidate": {"name": "𠮷accessor","type": "DbAccessor","definition": {"identity": {"project": "P","dependency": "","dependencyVersion": "","module": "lib","symbol": "db"},"uri": "file:lib","version": 3,"span": [1,9]}},"compatibility": "YES","reason": "DbAccessor -> IAccessor: YES","edit": {"uri": "file:main","version": 7,"span": [15,18],"text": "𠮷accessor"}}
+          ],
+          "module": "main",
+          "projectVersion": 10,
+          "documentVersion": 7,
+          "cursor": 18,
+          "prefix": "𠮷ac",
+          "expectedType": "IAccessor"
+        },
+        {
+          "op": "complete",
+          "expected": {"error": {"code": "PREFIX_MISMATCH","uri": "file:main","span": [18,18]}},
+          "module": "main",
+          "projectVersion": 10,
+          "documentVersion": 7,
+          "cursor": 18,
+          "prefix": "bad",
+          "expectedType": "IAccessor"
+        },
+        {
+          "op": "resolve",
+          "expected": {"error": {"code": "STALE_SNAPSHOT","uri": "file:main","span": [0,0]}},
+          "module": "main",
+          "projectVersion": 9,
+          "documentVersion": 7,
+          "cursor": 18,
+          "name": "a"
+        },
+        {
+          "op": "resolve",
+          "expected": {"error": {"code": "STALE_SNAPSHOT","uri": "file:main","span": [0,0]}},
+          "module": "main",
+          "projectVersion": 10,
+          "documentVersion": 6,
+          "cursor": 18,
+          "name": "a"
+        },
+        {
+          "op": "resolve",
+          "expected": {"error": {"code": "INVALID_CURSOR","uri": "file:main","span": [22,22]}},
+          "module": "main",
+          "projectVersion": 10,
+          "documentVersion": 7,
+          "cursor": 22,
+          "name": "a"
+        },
+        {"op": "resolve","expected": {"error": {"code": "UNDEFINED_MODULE","uri": "","span": [0,0]}},"module": "absent","projectVersion": 10,"documentVersion": 7,"cursor": 0,"name": "a"},
+        {"op": "assign","expected": {"error": {"code": "UNDEFINED_TYPE","uri": "","span": [0,0]}},"actual": "?","expectedType": "Missing"}
+      ]
+    },
+    {
+      "name": "ambiguous-imports-excluded",
+      "queries": [
+        {
+          "op": "resolve",
+          "expected": {
+            "name": "dup",
+            "status": "AMBIGUOUS",
+            "candidates": [{"name": "dup","type": "DbAccessor","definition": {"identity": {"project": "P","dependency": "","dependencyVersion": "","module": "lib","symbol": "db"},"uri": "file:lib","version": 3,"span": [1,9]}},{"name": "dup","type": "DbAccessor","definition": {"identity": {"project": "P","dependency": "std/access","dependencyVersion": "1.2.0","module": "api","symbol": "apiDb"},"uri": "lock:api","version": 2,"span": [0,8]}}],
+            "diagnostics": [{"code": "AMBIGUOUS_IMPORT","uri": "file:main","span": [0,3]}]
+          },
+          "module": "main",
+          "projectVersion": 10,
+          "documentVersion": 7,
+          "cursor": 18,
+          "name": "dup"
+        }
+      ],
+      "overrides": {
+        "modules": [
+          {
+            "id": "main",
+            "model": {"uri": "file:main","version": 7,"source": "use\n{\n local\n  𠮷ac\n}\n","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,21]},{"id": "inner","parent": "root","span": [4,20]}],"symbols": [{"id": "local","name": "a","type": "Int","scope": "inner","declaration": [7,12],"visibleFrom": 12},{"id": "unknown","name": "maybe","type": "?","scope": "inner","declaration": [5,6],"visibleFrom": 6},{"id": "rootValue","name": "rootValue","type": "Int","scope": "root","declaration": [0,3],"visibleFrom": 0}],"signatures": [],"calls": []},
+            "exports": ["rootValue"],
+            "imports": [{"name": "a","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "𠮷accessor","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "remote","target": {"dependency": "std/access","module": "api"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "hidden","target": {"dependency": "","module": "lib"},"symbol": "hidden","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "missing","target": {"dependency": "","module": "absent"},"symbol": "anything","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "dup","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "dup","target": {"dependency": "std/access","module": "api"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0}]
+          },
+          {
+            "id": "lib",
+            "model": {"uri": "file:lib","version": 3,"source": "𠮷accessor hidden counter","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,24]}],"symbols": [{"id": "db","name": "accessor","type": "DbAccessor","scope": "root","declaration": [1,9],"visibleFrom": 0},{"id": "private","name": "hidden","type": "DbAccessor","scope": "root","declaration": [10,16],"visibleFrom": 0},{"id": "counter","name": "counter","type": "Int","scope": "root","declaration": [17,24],"visibleFrom": 0}],"signatures": [],"calls": []},
+            "exports": ["db","counter"],
+            "imports": [{"name": "back","target": {"dependency": "","module": "main"},"symbol": "rootValue","scope": "root","span": [0,3],"visibleFrom": 0}]
+          }
+        ]
+      }
+    },
+    {
+      "name": "ambiguous-even-with-unresolved",
+      "queries": [
+        {
+          "op": "resolve",
+          "expected": {
+            "name": "dup",
+            "status": "AMBIGUOUS",
+            "candidates": [{"name": "dup","type": "DbAccessor","definition": {"identity": {"project": "P","dependency": "","dependencyVersion": "","module": "lib","symbol": "db"},"uri": "file:lib","version": 3,"span": [1,9]}}],
+            "diagnostics": [{"code": "UNRESOLVED_IMPORT","uri": "file:main","span": [0,3]},{"code": "AMBIGUOUS_IMPORT","uri": "file:main","span": [0,3]}]
+          },
+          "module": "main",
+          "projectVersion": 10,
+          "documentVersion": 7,
+          "cursor": 18,
+          "name": "dup"
+        }
+      ],
+      "overrides": {
+        "modules": [
+          {
+            "id": "main",
+            "model": {"uri": "file:main","version": 7,"source": "use\n{\n local\n  𠮷ac\n}\n","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,21]},{"id": "inner","parent": "root","span": [4,20]}],"symbols": [{"id": "local","name": "a","type": "Int","scope": "inner","declaration": [7,12],"visibleFrom": 12},{"id": "unknown","name": "maybe","type": "?","scope": "inner","declaration": [5,6],"visibleFrom": 6},{"id": "rootValue","name": "rootValue","type": "Int","scope": "root","declaration": [0,3],"visibleFrom": 0}],"signatures": [],"calls": []},
+            "exports": ["rootValue"],
+            "imports": [{"name": "a","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "𠮷accessor","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "remote","target": {"dependency": "std/access","module": "api"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "hidden","target": {"dependency": "","module": "lib"},"symbol": "hidden","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "missing","target": {"dependency": "","module": "absent"},"symbol": "anything","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "dup","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "dup","target": {"dependency": "","module": "absent"},"symbol": "none","scope": "root","span": [0,3],"visibleFrom": 0}]
+          },
+          {
+            "id": "lib",
+            "model": {"uri": "file:lib","version": 3,"source": "𠮷accessor hidden counter","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,24]}],"symbols": [{"id": "db","name": "accessor","type": "DbAccessor","scope": "root","declaration": [1,9],"visibleFrom": 0},{"id": "private","name": "hidden","type": "DbAccessor","scope": "root","declaration": [10,16],"visibleFrom": 0},{"id": "counter","name": "counter","type": "Int","scope": "root","declaration": [17,24],"visibleFrom": 0}],"signatures": [],"calls": []},
+            "exports": ["db","counter"],
+            "imports": [{"name": "back","target": {"dependency": "","module": "main"},"symbol": "rootValue","scope": "root","span": [0,3],"visibleFrom": 0}]
+          }
+        ]
+      }
+    },
+    {
+      "name": "import-visibility",
+      "queries": [
+        {
+          "op": "resolve",
+          "expected": {"name": "later","status": "UNRESOLVED","candidates": [],"diagnostics": []},
+          "module": "main",
+          "projectVersion": 10,
+          "documentVersion": 7,
+          "cursor": 18,
+          "name": "later"
+        },
+        {
+          "op": "resolve",
+          "expected": {
+            "name": "later",
+            "status": "RESOLVED",
+            "candidates": [{"name": "later","type": "DbAccessor","definition": {"identity": {"project": "P","dependency": "","dependencyVersion": "","module": "lib","symbol": "db"},"uri": "file:lib","version": 3,"span": [1,9]}}],
+            "diagnostics": []
+          },
+          "module": "main",
+          "projectVersion": 10,
+          "documentVersion": 7,
+          "cursor": 19,
+          "name": "later"
+        }
+      ],
+      "overrides": {
+        "modules": [
+          {
+            "id": "main",
+            "model": {"uri": "file:main","version": 7,"source": "use\n{\n local\n  𠮷ac\n}\n","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,21]},{"id": "inner","parent": "root","span": [4,20]}],"symbols": [{"id": "local","name": "a","type": "Int","scope": "inner","declaration": [7,12],"visibleFrom": 12},{"id": "unknown","name": "maybe","type": "?","scope": "inner","declaration": [5,6],"visibleFrom": 6},{"id": "rootValue","name": "rootValue","type": "Int","scope": "root","declaration": [0,3],"visibleFrom": 0}],"signatures": [],"calls": []},
+            "exports": ["rootValue"],
+            "imports": [{"name": "a","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "𠮷accessor","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "remote","target": {"dependency": "std/access","module": "api"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "hidden","target": {"dependency": "","module": "lib"},"symbol": "hidden","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "missing","target": {"dependency": "","module": "absent"},"symbol": "anything","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "later","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 19}]
+          },
+          {
+            "id": "lib",
+            "model": {"uri": "file:lib","version": 3,"source": "𠮷accessor hidden counter","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,24]}],"symbols": [{"id": "db","name": "accessor","type": "DbAccessor","scope": "root","declaration": [1,9],"visibleFrom": 0},{"id": "private","name": "hidden","type": "DbAccessor","scope": "root","declaration": [10,16],"visibleFrom": 0},{"id": "counter","name": "counter","type": "Int","scope": "root","declaration": [17,24],"visibleFrom": 0}],"signatures": [],"calls": []},
+            "exports": ["db","counter"],
+            "imports": [{"name": "back","target": {"dependency": "","module": "main"},"symbol": "rootValue","scope": "root","span": [0,3],"visibleFrom": 0}]
+          }
+        ]
+      }
+    },
+    {
+      "name": "project-identity-isolation",
+      "queries": [
+        {
+          "op": "resolve",
+          "expected": {
+            "name": "𠮷accessor",
+            "status": "RESOLVED",
+            "candidates": [{"name": "𠮷accessor","type": "DbAccessor","definition": {"identity": {"project": "Other","dependency": "","dependencyVersion": "","module": "lib","symbol": "db"},"uri": "file:lib","version": 3,"span": [1,9]}}],
+            "diagnostics": []
+          },
+          "module": "main",
+          "projectVersion": 10,
+          "documentVersion": 7,
+          "cursor": 18,
+          "name": "𠮷accessor"
+        }
+      ],
+      "overrides": {"id": "Other"}
+    },
+    {
+      "name": "edit-delete-move-and-old-snapshot",
+      "queries": [
+        {
+          "op": "replace",
+          "expected": 11,
+          "version": 11,
+          "modules": [
+            {"id": "main","model": {"uri": "file:main","version": 7,"source": "use\n{\n local\n  𠮷ac\n}\n","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,21]},{"id": "inner","parent": "root","span": [4,20]}],"symbols": [{"id": "local","name": "a","type": "Int","scope": "inner","declaration": [7,12],"visibleFrom": 12},{"id": "unknown","name": "maybe","type": "?","scope": "inner","declaration": [5,6],"visibleFrom": 6},{"id": "rootValue","name": "rootValue","type": "Int","scope": "root","declaration": [0,3],"visibleFrom": 0}],"signatures": [],"calls": []},"exports": ["rootValue"],"imports": [{"name": "a","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "𠮷accessor","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "remote","target": {"dependency": "std/access","module": "api"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "hidden","target": {"dependency": "","module": "lib"},"symbol": "hidden","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "missing","target": {"dependency": "","module": "absent"},"symbol": "anything","scope": "root","span": [0,3],"visibleFrom": 0}]},
+            {"id": "lib","model": {"uri": "file:lib","version": 4,"source": "𠮷accessor hidden counter","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,24]}],"symbols": [{"id": "db","name": "accessor","type": "Int","scope": "root","declaration": [1,9],"visibleFrom": 0},{"id": "private","name": "hidden","type": "DbAccessor","scope": "root","declaration": [10,16],"visibleFrom": 0},{"id": "counter","name": "counter","type": "Int","scope": "root","declaration": [17,24],"visibleFrom": 0}],"signatures": [],"calls": []},"exports": ["db","counter"],"imports": [{"name": "back","target": {"dependency": "","module": "main"},"symbol": "rootValue","scope": "root","span": [0,3],"visibleFrom": 0}]}
+          ]
+        },
+        {"op": "complete","expected": [],"module": "main","projectVersion": 11,"documentVersion": 7,"cursor": 18,"prefix": "𠮷ac","expectedType": "IAccessor"},
+        {
+          "op": "resolve",
+          "expected": {
+            "name": "𠮷accessor",
+            "status": "RESOLVED",
+            "candidates": [{"name": "𠮷accessor","type": "Int","definition": {"identity": {"project": "P","dependency": "","dependencyVersion": "","module": "lib","symbol": "db"},"uri": "file:lib","version": 4,"span": [1,9]}}],
+            "diagnostics": []
+          },
+          "module": "main",
+          "projectVersion": 11,
+          "documentVersion": 7,
+          "cursor": 18,
+          "name": "𠮷accessor"
+        },
+        {
+          "op": "replace",
+          "expected": 12,
+          "version": 12,
+          "modules": [
+            {"id": "main","model": {"uri": "file:main","version": 7,"source": "use\n{\n local\n  𠮷ac\n}\n","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,21]},{"id": "inner","parent": "root","span": [4,20]}],"symbols": [{"id": "local","name": "a","type": "Int","scope": "inner","declaration": [7,12],"visibleFrom": 12},{"id": "unknown","name": "maybe","type": "?","scope": "inner","declaration": [5,6],"visibleFrom": 6},{"id": "rootValue","name": "rootValue","type": "Int","scope": "root","declaration": [0,3],"visibleFrom": 0}],"signatures": [],"calls": []},"exports": ["rootValue"],"imports": [{"name": "a","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "𠮷accessor","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "remote","target": {"dependency": "std/access","module": "api"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "hidden","target": {"dependency": "","module": "lib"},"symbol": "hidden","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "missing","target": {"dependency": "","module": "absent"},"symbol": "anything","scope": "root","span": [0,3],"visibleFrom": 0}]},
+            {"id": "lib","model": {"uri": "file:moved","version": 5,"source": "𠮷accessor hidden counter","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,24]}],"symbols": [{"id": "db","name": "accessor","type": "Int","scope": "root","declaration": [1,9],"visibleFrom": 0},{"id": "private","name": "hidden","type": "DbAccessor","scope": "root","declaration": [10,16],"visibleFrom": 0},{"id": "counter","name": "counter","type": "Int","scope": "root","declaration": [17,24],"visibleFrom": 0}],"signatures": [],"calls": []},"exports": ["db","counter"],"imports": [{"name": "back","target": {"dependency": "","module": "main"},"symbol": "rootValue","scope": "root","span": [0,3],"visibleFrom": 0}]}
+          ]
+        },
+        {
+          "op": "resolve",
+          "expected": {
+            "name": "𠮷accessor",
+            "status": "RESOLVED",
+            "candidates": [{"name": "𠮷accessor","type": "Int","definition": {"identity": {"project": "P","dependency": "","dependencyVersion": "","module": "lib","symbol": "db"},"uri": "file:moved","version": 5,"span": [1,9]}}],
+            "diagnostics": []
+          },
+          "module": "main",
+          "projectVersion": 12,
+          "documentVersion": 7,
+          "cursor": 18,
+          "name": "𠮷accessor"
+        },
+        {
+          "op": "replace",
+          "expected": 13,
+          "version": 13,
+          "modules": [
+            {"id": "main","model": {"uri": "file:main","version": 7,"source": "use\n{\n local\n  𠮷ac\n}\n","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,21]},{"id": "inner","parent": "root","span": [4,20]}],"symbols": [{"id": "local","name": "a","type": "Int","scope": "inner","declaration": [7,12],"visibleFrom": 12},{"id": "unknown","name": "maybe","type": "?","scope": "inner","declaration": [5,6],"visibleFrom": 6},{"id": "rootValue","name": "rootValue","type": "Int","scope": "root","declaration": [0,3],"visibleFrom": 0}],"signatures": [],"calls": []},"exports": ["rootValue"],"imports": [{"name": "a","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "𠮷accessor","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "remote","target": {"dependency": "std/access","module": "api"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "hidden","target": {"dependency": "","module": "lib"},"symbol": "hidden","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "missing","target": {"dependency": "","module": "absent"},"symbol": "anything","scope": "root","span": [0,3],"visibleFrom": 0}]}
+          ]
+        },
+        {
+          "op": "resolve",
+          "expected": {"name": "𠮷accessor","status": "UNRESOLVED","candidates": [],"diagnostics": [{"code": "UNRESOLVED_IMPORT","uri": "file:main","span": [0,3]}]},
+          "module": "main",
+          "projectVersion": 13,
+          "documentVersion": 7,
+          "cursor": 18,
+          "name": "𠮷accessor"
+        },
+        {
+          "op": "resolve",
+          "expected": {
+            "name": "𠮷accessor",
+            "status": "RESOLVED",
+            "candidates": [{"name": "𠮷accessor","type": "DbAccessor","definition": {"identity": {"project": "P","dependency": "","dependencyVersion": "","module": "lib","symbol": "db"},"uri": "file:lib","version": 3,"span": [1,9]}}],
+            "diagnostics": []
+          },
+          "module": "main",
+          "projectVersion": 10,
+          "documentVersion": 7,
+          "cursor": 18,
+          "name": "𠮷accessor",
+          "original": true
+        },
+        {
+          "op": "replace",
+          "expected": {"error": {"code": "NON_INCREASING_VERSION","uri": "","span": [0,0]}},
+          "version": 13,
+          "modules": [
+            {"id": "main","model": {"uri": "file:main","version": 7,"source": "use\n{\n local\n  𠮷ac\n}\n","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,21]},{"id": "inner","parent": "root","span": [4,20]}],"symbols": [{"id": "local","name": "a","type": "Int","scope": "inner","declaration": [7,12],"visibleFrom": 12},{"id": "unknown","name": "maybe","type": "?","scope": "inner","declaration": [5,6],"visibleFrom": 6},{"id": "rootValue","name": "rootValue","type": "Int","scope": "root","declaration": [0,3],"visibleFrom": 0}],"signatures": [],"calls": []},"exports": ["rootValue"],"imports": [{"name": "a","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "𠮷accessor","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "remote","target": {"dependency": "std/access","module": "api"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "hidden","target": {"dependency": "","module": "lib"},"symbol": "hidden","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "missing","target": {"dependency": "","module": "absent"},"symbol": "anything","scope": "root","span": [0,3],"visibleFrom": 0}]}
+          ]
+        }
+      ]
+    },
+    {"name": "invalid-project","queries": [],"overrides": {"id": ""},"error": {"error": {"code": "INVALID_PROJECT","uri": "","span": [0,0]}}},
+    {"name": "invalid-version","queries": [],"overrides": {"version": -1},"error": {"error": {"code": "INVALID_PROJECT","uri": "","span": [0,0]}}},
+    {
+      "name": "duplicate-module",
+      "queries": [],
+      "overrides": {
+        "modules": [
+          {
+            "id": "main",
+            "model": {"uri": "file:main","version": 7,"source": "use\n{\n local\n  𠮷ac\n}\n","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,21]},{"id": "inner","parent": "root","span": [4,20]}],"symbols": [{"id": "local","name": "a","type": "Int","scope": "inner","declaration": [7,12],"visibleFrom": 12},{"id": "unknown","name": "maybe","type": "?","scope": "inner","declaration": [5,6],"visibleFrom": 6},{"id": "rootValue","name": "rootValue","type": "Int","scope": "root","declaration": [0,3],"visibleFrom": 0}],"signatures": [],"calls": []},
+            "exports": ["rootValue"],
+            "imports": [{"name": "a","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "𠮷accessor","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "remote","target": {"dependency": "std/access","module": "api"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "hidden","target": {"dependency": "","module": "lib"},"symbol": "hidden","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "missing","target": {"dependency": "","module": "absent"},"symbol": "anything","scope": "root","span": [0,3],"visibleFrom": 0}]
+          },
+          {
+            "id": "main",
+            "model": {"uri": "file:main","version": 7,"source": "use\n{\n local\n  𠮷ac\n}\n","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,21]},{"id": "inner","parent": "root","span": [4,20]}],"symbols": [{"id": "local","name": "a","type": "Int","scope": "inner","declaration": [7,12],"visibleFrom": 12},{"id": "unknown","name": "maybe","type": "?","scope": "inner","declaration": [5,6],"visibleFrom": 6},{"id": "rootValue","name": "rootValue","type": "Int","scope": "root","declaration": [0,3],"visibleFrom": 0}],"signatures": [],"calls": []},
+            "exports": ["rootValue"],
+            "imports": [{"name": "a","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "𠮷accessor","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "remote","target": {"dependency": "std/access","module": "api"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "hidden","target": {"dependency": "","module": "lib"},"symbol": "hidden","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "missing","target": {"dependency": "","module": "absent"},"symbol": "anything","scope": "root","span": [0,3],"visibleFrom": 0}]
+          }
+        ]
+      },
+      "error": {"error": {"code": "DUPLICATE_MODULE","uri": "file:main","span": [0,0]}}
+    },
+    {
+      "name": "duplicate-dependency",
+      "queries": [],
+      "overrides": {
+        "dependencies": [
+          {
+            "id": "std/access",
+            "version": "1.2.0",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "modules": [{"id": "api","model": {"uri": "lock:api","version": 2,"source": "accessor","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,8]}],"symbols": [{"id": "apiDb","name": "accessor","type": "DbAccessor","scope": "root","declaration": [0,8],"visibleFrom": 0}],"signatures": [],"calls": []},"exports": ["apiDb"],"imports": []}]
+          },
+          {
+            "id": "std/access",
+            "version": "1.2.0",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "modules": [{"id": "api","model": {"uri": "lock:api","version": 2,"source": "accessor","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,8]}],"symbols": [{"id": "apiDb","name": "accessor","type": "DbAccessor","scope": "root","declaration": [0,8],"visibleFrom": 0}],"signatures": [],"calls": []},"exports": ["apiDb"],"imports": []}]
+          }
+        ]
+      },
+      "error": {"error": {"code": "DUPLICATE_DEPENDENCY","uri": "","span": [0,0]}}
+    },
+    {
+      "name": "empty-module",
+      "queries": [],
+      "overrides": {
+        "modules": [
+          {
+            "id": "",
+            "model": {"uri": "file:main","version": 7,"source": "use\n{\n local\n  𠮷ac\n}\n","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,21]},{"id": "inner","parent": "root","span": [4,20]}],"symbols": [{"id": "local","name": "a","type": "Int","scope": "inner","declaration": [7,12],"visibleFrom": 12},{"id": "unknown","name": "maybe","type": "?","scope": "inner","declaration": [5,6],"visibleFrom": 6},{"id": "rootValue","name": "rootValue","type": "Int","scope": "root","declaration": [0,3],"visibleFrom": 0}],"signatures": [],"calls": []},
+            "exports": ["rootValue"],
+            "imports": [{"name": "a","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "𠮷accessor","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "remote","target": {"dependency": "std/access","module": "api"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "hidden","target": {"dependency": "","module": "lib"},"symbol": "hidden","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "missing","target": {"dependency": "","module": "absent"},"symbol": "anything","scope": "root","span": [0,3],"visibleFrom": 0}]
+          },
+          {
+            "id": "lib",
+            "model": {"uri": "file:lib","version": 3,"source": "𠮷accessor hidden counter","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,24]}],"symbols": [{"id": "db","name": "accessor","type": "DbAccessor","scope": "root","declaration": [1,9],"visibleFrom": 0},{"id": "private","name": "hidden","type": "DbAccessor","scope": "root","declaration": [10,16],"visibleFrom": 0},{"id": "counter","name": "counter","type": "Int","scope": "root","declaration": [17,24],"visibleFrom": 0}],"signatures": [],"calls": []},
+            "exports": ["db","counter"],
+            "imports": [{"name": "back","target": {"dependency": "","module": "main"},"symbol": "rootValue","scope": "root","span": [0,3],"visibleFrom": 0}]
+          }
+        ]
+      },
+      "error": {"error": {"code": "EMPTY_MODULE_ID","uri": "file:main","span": [0,0]}}
+    },
+    {
+      "name": "duplicate-document",
+      "queries": [],
+      "overrides": {
+        "modules": [
+          {
+            "id": "main",
+            "model": {"uri": "file:main","version": 7,"source": "use\n{\n local\n  𠮷ac\n}\n","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,21]},{"id": "inner","parent": "root","span": [4,20]}],"symbols": [{"id": "local","name": "a","type": "Int","scope": "inner","declaration": [7,12],"visibleFrom": 12},{"id": "unknown","name": "maybe","type": "?","scope": "inner","declaration": [5,6],"visibleFrom": 6},{"id": "rootValue","name": "rootValue","type": "Int","scope": "root","declaration": [0,3],"visibleFrom": 0}],"signatures": [],"calls": []},
+            "exports": ["rootValue"],
+            "imports": [{"name": "a","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "𠮷accessor","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "remote","target": {"dependency": "std/access","module": "api"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "hidden","target": {"dependency": "","module": "lib"},"symbol": "hidden","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "missing","target": {"dependency": "","module": "absent"},"symbol": "anything","scope": "root","span": [0,3],"visibleFrom": 0}]
+          },
+          {
+            "id": "lib",
+            "model": {"uri": "file:main","version": 3,"source": "𠮷accessor hidden counter","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,24]}],"symbols": [{"id": "db","name": "accessor","type": "DbAccessor","scope": "root","declaration": [1,9],"visibleFrom": 0},{"id": "private","name": "hidden","type": "DbAccessor","scope": "root","declaration": [10,16],"visibleFrom": 0},{"id": "counter","name": "counter","type": "Int","scope": "root","declaration": [17,24],"visibleFrom": 0}],"signatures": [],"calls": []},
+            "exports": ["db","counter"],
+            "imports": [{"name": "back","target": {"dependency": "","module": "main"},"symbol": "rootValue","scope": "root","span": [0,3],"visibleFrom": 0}]
+          }
+        ]
+      },
+      "error": {"error": {"code": "DUPLICATE_DOCUMENT","uri": "file:main","span": [0,0]}}
+    },
+    {
+      "name": "missing-export",
+      "queries": [],
+      "overrides": {
+        "modules": [
+          {
+            "id": "main",
+            "model": {"uri": "file:main","version": 7,"source": "use\n{\n local\n  𠮷ac\n}\n","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,21]},{"id": "inner","parent": "root","span": [4,20]}],"symbols": [{"id": "local","name": "a","type": "Int","scope": "inner","declaration": [7,12],"visibleFrom": 12},{"id": "unknown","name": "maybe","type": "?","scope": "inner","declaration": [5,6],"visibleFrom": 6},{"id": "rootValue","name": "rootValue","type": "Int","scope": "root","declaration": [0,3],"visibleFrom": 0}],"signatures": [],"calls": []},
+            "exports": ["rootValue","absent"],
+            "imports": [{"name": "a","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "𠮷accessor","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "remote","target": {"dependency": "std/access","module": "api"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "hidden","target": {"dependency": "","module": "lib"},"symbol": "hidden","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "missing","target": {"dependency": "","module": "absent"},"symbol": "anything","scope": "root","span": [0,3],"visibleFrom": 0}]
+          },
+          {
+            "id": "lib",
+            "model": {"uri": "file:lib","version": 3,"source": "𠮷accessor hidden counter","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,24]}],"symbols": [{"id": "db","name": "accessor","type": "DbAccessor","scope": "root","declaration": [1,9],"visibleFrom": 0},{"id": "private","name": "hidden","type": "DbAccessor","scope": "root","declaration": [10,16],"visibleFrom": 0},{"id": "counter","name": "counter","type": "Int","scope": "root","declaration": [17,24],"visibleFrom": 0}],"signatures": [],"calls": []},
+            "exports": ["db","counter"],
+            "imports": [{"name": "back","target": {"dependency": "","module": "main"},"symbol": "rootValue","scope": "root","span": [0,3],"visibleFrom": 0}]
+          }
+        ]
+      },
+      "error": {"error": {"code": "UNDEFINED_EXPORT","uri": "file:main","span": [0,0]}}
+    },
+    {
+      "name": "local-export",
+      "queries": [],
+      "overrides": {
+        "modules": [
+          {
+            "id": "main",
+            "model": {"uri": "file:main","version": 7,"source": "use\n{\n local\n  𠮷ac\n}\n","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,21]},{"id": "inner","parent": "root","span": [4,20]}],"symbols": [{"id": "local","name": "a","type": "Int","scope": "inner","declaration": [7,12],"visibleFrom": 12},{"id": "unknown","name": "maybe","type": "?","scope": "inner","declaration": [5,6],"visibleFrom": 6},{"id": "rootValue","name": "rootValue","type": "Int","scope": "root","declaration": [0,3],"visibleFrom": 0}],"signatures": [],"calls": []},
+            "exports": ["rootValue","local"],
+            "imports": [{"name": "a","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "𠮷accessor","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "remote","target": {"dependency": "std/access","module": "api"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "hidden","target": {"dependency": "","module": "lib"},"symbol": "hidden","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "missing","target": {"dependency": "","module": "absent"},"symbol": "anything","scope": "root","span": [0,3],"visibleFrom": 0}]
+          },
+          {
+            "id": "lib",
+            "model": {"uri": "file:lib","version": 3,"source": "𠮷accessor hidden counter","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,24]}],"symbols": [{"id": "db","name": "accessor","type": "DbAccessor","scope": "root","declaration": [1,9],"visibleFrom": 0},{"id": "private","name": "hidden","type": "DbAccessor","scope": "root","declaration": [10,16],"visibleFrom": 0},{"id": "counter","name": "counter","type": "Int","scope": "root","declaration": [17,24],"visibleFrom": 0}],"signatures": [],"calls": []},
+            "exports": ["db","counter"],
+            "imports": [{"name": "back","target": {"dependency": "","module": "main"},"symbol": "rootValue","scope": "root","span": [0,3],"visibleFrom": 0}]
+          }
+        ]
+      },
+      "error": {"error": {"code": "NON_ROOT_EXPORT","uri": "file:main","span": [7,12]}}
+    },
+    {
+      "name": "bad-import",
+      "queries": [],
+      "overrides": {
+        "modules": [
+          {
+            "id": "main",
+            "model": {"uri": "file:main","version": 7,"source": "use\n{\n local\n  𠮷ac\n}\n","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,21]},{"id": "inner","parent": "root","span": [4,20]}],"symbols": [{"id": "local","name": "a","type": "Int","scope": "inner","declaration": [7,12],"visibleFrom": 12},{"id": "unknown","name": "maybe","type": "?","scope": "inner","declaration": [5,6],"visibleFrom": 6},{"id": "rootValue","name": "rootValue","type": "Int","scope": "root","declaration": [0,3],"visibleFrom": 0}],"signatures": [],"calls": []},
+            "exports": ["rootValue"],
+            "imports": [{"name": "","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "𠮷accessor","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "remote","target": {"dependency": "std/access","module": "api"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "hidden","target": {"dependency": "","module": "lib"},"symbol": "hidden","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "missing","target": {"dependency": "","module": "absent"},"symbol": "anything","scope": "root","span": [0,3],"visibleFrom": 0}]
+          },
+          {
+            "id": "lib",
+            "model": {"uri": "file:lib","version": 3,"source": "𠮷accessor hidden counter","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,24]}],"symbols": [{"id": "db","name": "accessor","type": "DbAccessor","scope": "root","declaration": [1,9],"visibleFrom": 0},{"id": "private","name": "hidden","type": "DbAccessor","scope": "root","declaration": [10,16],"visibleFrom": 0},{"id": "counter","name": "counter","type": "Int","scope": "root","declaration": [17,24],"visibleFrom": 0}],"signatures": [],"calls": []},
+            "exports": ["db","counter"],
+            "imports": [{"name": "back","target": {"dependency": "","module": "main"},"symbol": "rootValue","scope": "root","span": [0,3],"visibleFrom": 0}]
+          }
+        ]
+      },
+      "error": {"error": {"code": "INVALID_IMPORT","uri": "file:main","span": [0,3]}}
+    },
+    {
+      "name": "import-outside-scope",
+      "queries": [],
+      "overrides": {
+        "modules": [
+          {
+            "id": "main",
+            "model": {"uri": "file:main","version": 7,"source": "use\n{\n local\n  𠮷ac\n}\n","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,21]},{"id": "inner","parent": "root","span": [4,20]}],"symbols": [{"id": "local","name": "a","type": "Int","scope": "inner","declaration": [7,12],"visibleFrom": 12},{"id": "unknown","name": "maybe","type": "?","scope": "inner","declaration": [5,6],"visibleFrom": 6},{"id": "rootValue","name": "rootValue","type": "Int","scope": "root","declaration": [0,3],"visibleFrom": 0}],"signatures": [],"calls": []},
+            "exports": ["rootValue"],
+            "imports": [{"name": "a","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "inner","span": [0,3],"visibleFrom": 0},{"name": "𠮷accessor","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "remote","target": {"dependency": "std/access","module": "api"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "hidden","target": {"dependency": "","module": "lib"},"symbol": "hidden","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "missing","target": {"dependency": "","module": "absent"},"symbol": "anything","scope": "root","span": [0,3],"visibleFrom": 0}]
+          },
+          {
+            "id": "lib",
+            "model": {"uri": "file:lib","version": 3,"source": "𠮷accessor hidden counter","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,24]}],"symbols": [{"id": "db","name": "accessor","type": "DbAccessor","scope": "root","declaration": [1,9],"visibleFrom": 0},{"id": "private","name": "hidden","type": "DbAccessor","scope": "root","declaration": [10,16],"visibleFrom": 0},{"id": "counter","name": "counter","type": "Int","scope": "root","declaration": [17,24],"visibleFrom": 0}],"signatures": [],"calls": []},
+            "exports": ["db","counter"],
+            "imports": [{"name": "back","target": {"dependency": "","module": "main"},"symbol": "rootValue","scope": "root","span": [0,3],"visibleFrom": 0}]
+          }
+        ]
+      },
+      "error": {"error": {"code": "IMPORT_OUTSIDE_SCOPE","uri": "file:main","span": [0,3]}}
+    },
+    {
+      "name": "conflicting-type",
+      "queries": [],
+      "overrides": {
+        "modules": [
+          {
+            "id": "main",
+            "model": {"uri": "file:main","version": 7,"source": "use\n{\n local\n  𠮷ac\n}\n","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,21]},{"id": "inner","parent": "root","span": [4,20]}],"symbols": [{"id": "local","name": "a","type": "Int","scope": "inner","declaration": [7,12],"visibleFrom": 12},{"id": "unknown","name": "maybe","type": "?","scope": "inner","declaration": [5,6],"visibleFrom": 6},{"id": "rootValue","name": "rootValue","type": "Int","scope": "root","declaration": [0,3],"visibleFrom": 0}],"signatures": [],"calls": []},
+            "exports": ["rootValue"],
+            "imports": [{"name": "a","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "𠮷accessor","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "remote","target": {"dependency": "std/access","module": "api"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "hidden","target": {"dependency": "","module": "lib"},"symbol": "hidden","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "missing","target": {"dependency": "","module": "absent"},"symbol": "anything","scope": "root","span": [0,3],"visibleFrom": 0}]
+          },
+          {
+            "id": "lib",
+            "model": {"uri": "file:lib","version": 3,"source": "𠮷accessor hidden counter","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": [],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,24]}],"symbols": [{"id": "db","name": "accessor","type": "DbAccessor","scope": "root","declaration": [1,9],"visibleFrom": 0},{"id": "private","name": "hidden","type": "DbAccessor","scope": "root","declaration": [10,16],"visibleFrom": 0},{"id": "counter","name": "counter","type": "Int","scope": "root","declaration": [17,24],"visibleFrom": 0}],"signatures": [],"calls": []},
+            "exports": ["db","counter"],
+            "imports": [{"name": "back","target": {"dependency": "","module": "main"},"symbol": "rootValue","scope": "root","span": [0,3],"visibleFrom": 0}]
+          }
+        ]
+      },
+      "error": {"error": {"code": "CONFLICTING_TYPE","uri": "file:lib","span": [0,0]}}
+    },
+    {
+      "name": "floating-version",
+      "queries": [],
+      "overrides": {
+        "dependencies": [
+          {
+            "id": "std/access",
+            "version": "latest",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "modules": [{"id": "api","model": {"uri": "lock:api","version": 2,"source": "accessor","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,8]}],"symbols": [{"id": "apiDb","name": "accessor","type": "DbAccessor","scope": "root","declaration": [0,8],"visibleFrom": 0}],"signatures": [],"calls": []},"exports": ["apiDb"],"imports": []}]
+          }
+        ]
+      },
+      "error": {"error": {"code": "INVALID_DEPENDENCY_LOCK","uri": "","span": [0,0]}}
+    },
+    {
+      "name": "range-version",
+      "queries": [],
+      "overrides": {
+        "dependencies": [
+          {
+            "id": "std/access",
+            "version": "^1.2",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "modules": [{"id": "api","model": {"uri": "lock:api","version": 2,"source": "accessor","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,8]}],"symbols": [{"id": "apiDb","name": "accessor","type": "DbAccessor","scope": "root","declaration": [0,8],"visibleFrom": 0}],"signatures": [],"calls": []},"exports": ["apiDb"],"imports": []}]
+          }
+        ]
+      },
+      "error": {"error": {"code": "INVALID_DEPENDENCY_LOCK","uri": "","span": [0,0]}}
+    },
+    {
+      "name": "invalid-hash",
+      "queries": [],
+      "overrides": {
+        "dependencies": [
+          {
+            "id": "std/access",
+            "version": "1.2.0",
+            "sha256": "abc",
+            "modules": [{"id": "api","model": {"uri": "lock:api","version": 2,"source": "accessor","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,8]}],"symbols": [{"id": "apiDb","name": "accessor","type": "DbAccessor","scope": "root","declaration": [0,8],"visibleFrom": 0}],"signatures": [],"calls": []},"exports": ["apiDb"],"imports": []}]
+          }
+        ]
+      },
+      "error": {"error": {"code": "INVALID_DEPENDENCY_LOCK","uri": "","span": [0,0]}}
+    },
+    {
+      "name": "dependency-cannot-implicitly-see-project",
+      "queries": [
+        {
+          "op": "diagnostics",
+          "expected": [
+            {"code": "PRIVATE_SYMBOL","uri": "file:main","span": [0,3]},
+            {"code": "UNRESOLVED_IMPORT","uri": "file:main","span": [0,3]},
+            {"code": "UNRESOLVED_IMPORT","uri": "lock:api","span": [0,3]}
+          ]
+        }
+      ],
+      "overrides": {
+        "dependencies": [
+          {
+            "id": "std/access",
+            "version": "1.2.0",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "modules": [{"id": "api","model": {"uri": "lock:api","version": 2,"source": "accessor","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,8]}],"symbols": [{"id": "apiDb","name": "accessor","type": "DbAccessor","scope": "root","declaration": [0,8],"visibleFrom": 0}],"signatures": [],"calls": []},"exports": ["apiDb"],"imports": [{"name": "outside","target": {"dependency": "","module": "main"},"symbol": "rootValue","scope": "root","span": [0,3],"visibleFrom": 0}]}]
+          }
+        ]
+      }
+    },
+    {
+      "name": "type-declaration-change-updates-dependent-completion",
+      "overrides": {"dependencies": []},
+      "queries": [
+        {
+          "op": "complete",
+          "module": "main",
+          "projectVersion": 10,
+          "documentVersion": 7,
+          "cursor": 18,
+          "prefix": "𠮷ac",
+          "expectedType": "IAccessor",
+          "expected": [
+            {"candidate": {"name": "𠮷accessor","type": "DbAccessor","definition": {"identity": {"project": "P","dependency": "","dependencyVersion": "","module": "lib","symbol": "db"},"uri": "file:lib","version": 3,"span": [1,9]}},"compatibility": "YES","reason": "DbAccessor -> IAccessor: YES","edit": {"uri": "file:main","version": 7,"span": [15,18],"text": "𠮷accessor"}}
+          ]
+        },
+        {
+          "op": "replace",
+          "version": 11,
+          "modules": [
+            {"id": "main","model": {"uri": "file:main","version": 7,"source": "use\n{\n local\n  𠮷ac\n}\n","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": [],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,21]},{"id": "inner","parent": "root","span": [4,20]}],"symbols": [{"id": "local","name": "a","type": "Int","scope": "inner","declaration": [7,12],"visibleFrom": 12},{"id": "unknown","name": "maybe","type": "?","scope": "inner","declaration": [5,6],"visibleFrom": 6},{"id": "rootValue","name": "rootValue","type": "Int","scope": "root","declaration": [0,3],"visibleFrom": 0}],"signatures": [],"calls": []},"exports": ["rootValue"],"imports": [{"name": "a","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "𠮷accessor","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "remote","target": {"dependency": "std/access","module": "api"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "hidden","target": {"dependency": "","module": "lib"},"symbol": "hidden","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "missing","target": {"dependency": "","module": "absent"},"symbol": "anything","scope": "root","span": [0,3],"visibleFrom": 0}]},
+            {"id": "lib","model": {"uri": "file:lib","version": 3,"source": "𠮷accessor hidden counter","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": [],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,24]}],"symbols": [{"id": "db","name": "accessor","type": "DbAccessor","scope": "root","declaration": [1,9],"visibleFrom": 0},{"id": "private","name": "hidden","type": "DbAccessor","scope": "root","declaration": [10,16],"visibleFrom": 0},{"id": "counter","name": "counter","type": "Int","scope": "root","declaration": [17,24],"visibleFrom": 0}],"signatures": [],"calls": []},"exports": ["db","counter"],"imports": [{"name": "back","target": {"dependency": "","module": "main"},"symbol": "rootValue","scope": "root","span": [0,3],"visibleFrom": 0}]}
+          ],
+          "expected": 11
+        },
+        {"op": "complete","module": "main","projectVersion": 11,"documentVersion": 7,"cursor": 18,"prefix": "𠮷ac","expectedType": "IAccessor","expected": []},
+        {"op": "assign","actual": "DbAccessor","expectedType": "IAccessor","expected": "NO"}
+      ]
+    },
+    {
+      "name": "changed-source-requires-new-document-version",
+      "queries": [
+        {
+          "op": "replace",
+          "version": 11,
+          "modules": [
+            {"id": "main","model": {"uri": "file:main","version": 7,"source": "USE\n{\n local\n  𠮷ac\n}\n","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,21]},{"id": "inner","parent": "root","span": [4,20]}],"symbols": [{"id": "local","name": "a","type": "Int","scope": "inner","declaration": [7,12],"visibleFrom": 12},{"id": "unknown","name": "maybe","type": "?","scope": "inner","declaration": [5,6],"visibleFrom": 6},{"id": "rootValue","name": "rootValue","type": "Int","scope": "root","declaration": [0,3],"visibleFrom": 0}],"signatures": [],"calls": []},"exports": ["rootValue"],"imports": [{"name": "a","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "𠮷accessor","target": {"dependency": "","module": "lib"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "remote","target": {"dependency": "std/access","module": "api"},"symbol": "accessor","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "hidden","target": {"dependency": "","module": "lib"},"symbol": "hidden","scope": "root","span": [0,3],"visibleFrom": 0},{"name": "missing","target": {"dependency": "","module": "absent"},"symbol": "anything","scope": "root","span": [0,3],"visibleFrom": 0}]},
+            {"id": "lib","model": {"uri": "file:lib","version": 3,"source": "𠮷accessor hidden counter","types": [{"id": "IAccessor","kind": "INTERFACE","supertypes": [],"fields": [],"span": [0,0]},{"id": "DbAccessor","kind": "RECORD","supertypes": ["IAccessor"],"fields": [],"span": [0,0]},{"id": "Int","kind": "BUILTIN","supertypes": [],"fields": [],"span": [0,0]}],"scopes": [{"id": "root","parent": null,"span": [0,24]}],"symbols": [{"id": "db","name": "accessor","type": "DbAccessor","scope": "root","declaration": [1,9],"visibleFrom": 0},{"id": "private","name": "hidden","type": "DbAccessor","scope": "root","declaration": [10,16],"visibleFrom": 0},{"id": "counter","name": "counter","type": "Int","scope": "root","declaration": [17,24],"visibleFrom": 0}],"signatures": [],"calls": []},"exports": ["db","counter"],"imports": [{"name": "back","target": {"dependency": "","module": "main"},"symbol": "rootValue","scope": "root","span": [0,3],"visibleFrom": 0}]}
+          ],
+          "expected": {"error": {"code": "STALE_DOCUMENT","uri": "file:main","span": [0,0]}}
+        }
+      ]
+    }
+  ]
+}

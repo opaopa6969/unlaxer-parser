@@ -1,0 +1,372 @@
+{
+  "schemaVersion": 1,
+  "definitions": [
+    {"name": "Object","parameters": [],"variance": [],"parents": [],"fields": {},"structural": false},
+    {"name": "Number","parameters": [],"variance": [],"parents": ["Object"],"fields": {},"structural": false},
+    {"name": "Int","parameters": [],"variance": [],"parents": ["Number"],"fields": {},"structural": false},
+    {"name": "Text","parameters": [],"variance": [],"parents": ["Object"],"fields": {},"structural": false},
+    {"name": "Accessor","parameters": [],"variance": [],"parents": ["Object"],"fields": {},"structural": false},
+    {"name": "Db","parameters": [],"variance": [],"parents": ["Accessor"],"fields": {},"structural": false},
+    {"name": "Box","parameters": ["T"],"variance": ["INVARIANT"],"parents": [],"fields": {},"structural": false},
+    {"name": "ReadBox","parameters": ["T"],"variance": ["COVARIANT"],"parents": [],"fields": {},"structural": false},
+    {"name": "Sink","parameters": ["T"],"variance": ["CONTRAVARIANT"],"parents": [],"fields": {},"structural": false},
+    {"name": "Derived","parameters": ["T"],"variance": ["COVARIANT"],"parents": [{"named": "ReadBox","args": [{"var": "T"}]}],"fields": {},"structural": false},
+    {"name": "Row","parameters": [],"variance": [],"parents": [],"fields": {"value": "Int","extra": "Text"},"structural": false},
+    {"name": "Shape","parameters": [],"variance": [],"parents": [],"fields": {"value": "Number"},"structural": true},
+    {"name": "MissingShape","parameters": [],"variance": [],"parents": [],"fields": {"missing": "Number"},"structural": true},
+    {"name": "RecursiveA","parameters": [],"variance": [],"parents": [],"fields": {"next": "RecursiveA"},"structural": false},
+    {"name": "RecursiveB","parameters": [],"variance": [],"parents": [],"fields": {"next": "RecursiveB"},"structural": true},
+    {"name": "CycleA","parameters": [],"variance": [],"parents": ["CycleB"],"fields": {},"structural": false},
+    {"name": "CycleB","parameters": [],"variance": [],"parents": ["CycleA"],"fields": {},"structural": false}
+  ],
+  "aliases": [
+    {"name": "Read","parameters": ["T"],"body": {"named": "ReadBox","args": [{"var": "T"}]}},
+    {"name": "Loop","parameters": [],"body": {"alias": "Loop","args": []}},
+    {"name": "LoopUnion","parameters": [],"body": {"union": ["Int",{"alias": "LoopUnion","args": []}]}},
+    {"name": "Id","parameters": ["T"],"body": {"var": "T"}},
+    {"name": "Bad","parameters": [],"body": "Missing"},
+    {"name": "Grow","parameters": ["T"],"body": {"alias": "Grow","args": [{"named": "ReadBox","args": [{"var": "T"}]}]}}
+  ],
+  "cases": [
+    {"name": "same-name","op": "compare","actual": "Int","expectedType": "Int","expected": {"status": "YES","rule": "NAMED_ARGUMENTS","leaves": ["NAMED_ARGUMENTS"]}},
+    {
+      "name": "nominal-transitive",
+      "op": "compare",
+      "actual": "Int",
+      "expectedType": "Object",
+      "expected": {"status": "YES","rule": "NOMINAL_PARENTS","leaves": ["NAMED_ARGUMENTS"]}
+    },
+    {"name": "incompatible","op": "compare","actual": "Text","expectedType": "Number","expected": {"status": "NO","rule": "NOMINAL_PARENTS","leaves": ["NOMINAL_PARENTS"]}},
+    {"name": "unknown","op": "compare","actual": "?","expectedType": "Accessor","expected": {"status": "UNKNOWN","rule": "UNRESOLVED_TYPE","leaves": ["UNRESOLVED_TYPE"]}},
+    {
+      "name": "unbound-variable",
+      "op": "compare",
+      "actual": {"var": "T"},
+      "expectedType": "Int",
+      "expected": {"status": "UNKNOWN","rule": "UNRESOLVED_TYPE","leaves": ["UNRESOLVED_TYPE"]}
+    },
+    {
+      "name": "undefined-type-not-unknown",
+      "op": "compare",
+      "actual": "?",
+      "expectedType": "Missing",
+      "expected": {"status": "INVALID","rule": "UNDEFINED_TYPE","leaves": ["UNDEFINED_TYPE"]}
+    },
+    {
+      "name": "type-arity",
+      "op": "compare",
+      "actual": {"named": "Box","args": []},
+      "expectedType": "Object",
+      "expected": {"status": "INVALID","rule": "TYPE_ARITY","leaves": ["TYPE_ARITY"]}
+    },
+    {
+      "name": "covariant",
+      "op": "compare",
+      "actual": {"named": "ReadBox","args": ["Db"]},
+      "expectedType": {"named": "ReadBox","args": ["Accessor"]},
+      "expected": {"status": "YES","rule": "NAMED_ARGUMENTS","leaves": ["NAMED_ARGUMENTS"]}
+    },
+    {
+      "name": "invariant-rejects-widening",
+      "op": "compare",
+      "actual": {"named": "Box","args": ["Db"]},
+      "expectedType": {"named": "Box","args": ["Accessor"]},
+      "expected": {"status": "NO","rule": "NAMED_ARGUMENTS","leaves": ["NAMED_ARGUMENTS","NOMINAL_PARENTS"]}
+    },
+    {
+      "name": "contravariant",
+      "op": "compare",
+      "actual": {"named": "Sink","args": ["Accessor"]},
+      "expectedType": {"named": "Sink","args": ["Db"]},
+      "expected": {"status": "YES","rule": "NAMED_ARGUMENTS","leaves": ["NAMED_ARGUMENTS"]}
+    },
+    {
+      "name": "generic-parent-substitution",
+      "op": "compare",
+      "actual": {"named": "Derived","args": ["Db"]},
+      "expectedType": {"named": "ReadBox","args": ["Accessor"]},
+      "expected": {"status": "YES","rule": "NOMINAL_PARENTS","leaves": ["NAMED_ARGUMENTS"]}
+    },
+    {
+      "name": "unknown-generic-argument",
+      "op": "compare",
+      "actual": {"named": "ReadBox","args": ["?"]},
+      "expectedType": {"named": "ReadBox","args": ["Accessor"]},
+      "expected": {"status": "UNKNOWN","rule": "NAMED_ARGUMENTS","leaves": ["UNRESOLVED_TYPE"]}
+    },
+    {
+      "name": "actual-union",
+      "op": "compare",
+      "actual": {"union": ["Int","Text"]},
+      "expectedType": "Object",
+      "expected": {"status": "YES","rule": "ACTUAL_UNION","leaves": ["NAMED_ARGUMENTS","NAMED_ARGUMENTS"]}
+    },
+    {
+      "name": "actual-union-not-all",
+      "op": "compare",
+      "actual": {"union": ["Int","Text"]},
+      "expectedType": "Number",
+      "expected": {"status": "NO","rule": "ACTUAL_UNION","leaves": ["NAMED_ARGUMENTS","NOMINAL_PARENTS"]}
+    },
+    {
+      "name": "expected-union",
+      "op": "compare",
+      "actual": "Int",
+      "expectedType": {"union": ["Number","Text"]},
+      "expected": {"status": "YES","rule": "EXPECTED_UNION","leaves": ["NAMED_ARGUMENTS","NOMINAL_PARENTS"]}
+    },
+    {
+      "name": "expected-intersection",
+      "op": "compare",
+      "actual": "Int",
+      "expectedType": {"intersection": ["Number","Object"]},
+      "expected": {"status": "YES","rule": "EXPECTED_INTERSECTION","leaves": ["NAMED_ARGUMENTS","NAMED_ARGUMENTS"]}
+    },
+    {
+      "name": "actual-intersection-sufficient-member",
+      "op": "compare",
+      "actual": {"intersection": ["Int","Text"]},
+      "expectedType": "Number",
+      "expected": {"status": "YES","rule": "ACTUAL_INTERSECTION","leaves": ["NAMED_ARGUMENTS","NOMINAL_PARENTS"]}
+    },
+    {
+      "name": "null-to-nullable",
+      "op": "compare",
+      "actual": "null",
+      "expectedType": {"nullable": "Int"},
+      "expected": {"status": "YES","rule": "EXPECTED_NULLABLE","leaves": ["NULL","NULL"]}
+    },
+    {
+      "name": "nullable-to-nonnull",
+      "op": "compare",
+      "actual": {"nullable": "Int"},
+      "expectedType": "Number",
+      "expected": {"status": "NO","rule": "ACTUAL_NULLABLE","leaves": ["NAMED_ARGUMENTS","NULL"]}
+    },
+    {
+      "name": "nullable-to-nullable",
+      "op": "compare",
+      "actual": {"nullable": "Int"},
+      "expectedType": {"nullable": "Number"},
+      "expected": {"status": "YES","rule": "ACTUAL_NULLABLE","leaves": ["NAMED_ARGUMENTS","NULL","NULL","NULL"]}
+    },
+    {
+      "name": "function-variance",
+      "op": "compare",
+      "actual": {"function": ["Object","Int"]},
+      "expectedType": {"function": ["Int","Number"]},
+      "expected": {"status": "YES","rule": "FUNCTION","leaves": ["NAMED_ARGUMENTS","NAMED_ARGUMENTS"]}
+    },
+    {
+      "name": "function-wrong-parameter",
+      "op": "compare",
+      "actual": {"function": ["Int","Int"]},
+      "expectedType": {"function": ["Object","Number"]},
+      "expected": {"status": "NO","rule": "FUNCTION","leaves": ["NOMINAL_PARENTS","NAMED_ARGUMENTS"]}
+    },
+    {
+      "name": "function-arity",
+      "op": "compare",
+      "actual": {"function": ["Int"]},
+      "expectedType": {"function": ["Int","Int"]},
+      "expected": {"status": "NO","rule": "FUNCTION_ARITY","leaves": ["FUNCTION_ARITY"]}
+    },
+    {
+      "name": "function-unknown-lambda",
+      "op": "compare",
+      "actual": {"function": ["?","Int"]},
+      "expectedType": {"function": ["Text","Number"]},
+      "expected": {"status": "UNKNOWN","rule": "FUNCTION","leaves": ["UNRESOLVED_TYPE","NAMED_ARGUMENTS"]}
+    },
+    {
+      "name": "generic-alias",
+      "op": "compare",
+      "actual": {"alias": "Read","args": ["Db"]},
+      "expectedType": {"named": "ReadBox","args": ["Accessor"]},
+      "expected": {"status": "YES","rule": "ALIAS:Read","leaves": ["NAMED_ARGUMENTS"]}
+    },
+    {
+      "name": "expected-alias",
+      "op": "compare",
+      "actual": {"named": "ReadBox","args": ["Db"]},
+      "expectedType": {"alias": "Read","args": ["Accessor"]},
+      "expected": {"status": "YES","rule": "ALIAS:Read","leaves": ["NAMED_ARGUMENTS"]}
+    },
+    {
+      "name": "alias-cycle",
+      "op": "compare",
+      "actual": {"alias": "Loop","args": []},
+      "expectedType": "Int",
+      "expected": {"status": "CYCLE","rule": "ALIAS:Loop","leaves": ["ALIAS_CYCLE:Loop"]}
+    },
+    {
+      "name": "cyclic-member-not-hidden-by-success",
+      "op": "compare",
+      "actual": {"alias": "LoopUnion","args": []},
+      "expectedType": "Int",
+      "expected": {"status": "CYCLE","rule": "ALIAS:LoopUnion","leaves": ["NAMED_ARGUMENTS","ALIAS_CYCLE:LoopUnion"]}
+    },
+    {
+      "name": "undefined-alias",
+      "op": "compare",
+      "actual": {"alias": "Nope","args": []},
+      "expectedType": "Int",
+      "expected": {"status": "INVALID","rule": "UNDEFINED_ALIAS:Nope","leaves": ["UNDEFINED_ALIAS:Nope"]}
+    },
+    {
+      "name": "alias-arity",
+      "op": "compare",
+      "actual": {"alias": "Read","args": []},
+      "expectedType": "Int",
+      "expected": {"status": "INVALID","rule": "ALIAS_ARITY:Read","leaves": ["ALIAS_ARITY:Read"]}
+    },
+    {
+      "name": "inheritance-cycle",
+      "op": "compare",
+      "actual": "CycleA",
+      "expectedType": "Object",
+      "expected": {"status": "CYCLE","rule": "NOMINAL_PARENTS","leaves": ["RELATION_CYCLE"]}
+    },
+    {
+      "name": "bounded-relation",
+      "op": "compare",
+      "actual": {"named": "ReadBox","args": ["Db"]},
+      "expectedType": {"named": "ReadBox","args": ["Accessor"]},
+      "expected": {"status": "LIMIT","rule": "NAMED_ARGUMENTS","leaves": ["TYPE_LIMIT"]},
+      "limit": 1
+    },
+    {
+      "name": "nominal-records-stay-distinct",
+      "op": "compare",
+      "actual": "Row",
+      "expectedType": "Shape",
+      "expected": {"status": "NO","rule": "NOMINAL_PARENTS","leaves": ["NOMINAL_PARENTS"]}
+    },
+    {
+      "name": "structural-width-and-field-subtype",
+      "op": "compare",
+      "actual": "Row",
+      "expectedType": "Shape",
+      "expected": {"status": "YES","rule": "STRUCTURAL_FIELDS","leaves": ["NAMED_ARGUMENTS"]},
+      "policy": "STRUCTURAL"
+    },
+    {
+      "name": "structural-missing-field",
+      "op": "compare",
+      "actual": "Row",
+      "expectedType": "MissingShape",
+      "expected": {"status": "NO","rule": "STRUCTURAL_FIELDS","leaves": ["MISSING_FIELD:missing"]},
+      "policy": "STRUCTURAL"
+    },
+    {
+      "name": "recursive-structural-limit-explicit",
+      "op": "compare",
+      "actual": "RecursiveA",
+      "expectedType": "RecursiveB",
+      "expected": {"status": "CYCLE","rule": "STRUCTURAL_FIELDS","leaves": ["RELATION_CYCLE"]},
+      "policy": "STRUCTURAL"
+    },
+    {
+      "name": "declared-trait-edges",
+      "op": "compare",
+      "actual": "Db",
+      "expectedType": "Accessor",
+      "expected": {"status": "YES","rule": "DECLARED_TRAIT_EDGES","leaves": ["NAMED_ARGUMENTS"]},
+      "policy": "TRAIT"
+    },
+    {
+      "name": "unsupported-structural-not-success",
+      "op": "compare",
+      "actual": "Row",
+      "expectedType": "Shape",
+      "expected": {"status": "UNSUPPORTED","rule": "STRUCTURAL","leaves": ["STRUCTURAL"]},
+      "policy": "STRUCTURAL",
+      "omit": ["STRUCTURAL"]
+    },
+    {
+      "name": "unsupported-trait-not-success",
+      "op": "compare",
+      "actual": "Db",
+      "expectedType": "Accessor",
+      "expected": {"status": "UNSUPPORTED","rule": "TRAIT","leaves": ["TRAIT"]},
+      "policy": "TRAIT",
+      "omit": ["TRAIT"]
+    },
+    {
+      "name": "unsupported-union-even-with-unknown",
+      "op": "compare",
+      "actual": "?",
+      "expectedType": {"union": ["Int","Text"]},
+      "expected": {"status": "UNSUPPORTED","rule": "UNION","leaves": ["UNION"]},
+      "omit": ["UNION"]
+    },
+    {
+      "name": "unsupported-generics",
+      "op": "compare",
+      "actual": {"named": "Box","args": ["Int"]},
+      "expectedType": {"named": "Box","args": ["Int"]},
+      "expected": {"status": "UNSUPPORTED","rule": "GENERICS","leaves": ["GENERICS"]},
+      "omit": ["GENERICS"]
+    },
+    {
+      "name": "nullable-is-independent-capability",
+      "op": "compare",
+      "actual": "null",
+      "expectedType": {"nullable": "Int"},
+      "expected": {"status": "YES","rule": "EXPECTED_NULLABLE","leaves": ["NULL","NULL"]},
+      "omit": ["UNION"]
+    },
+    {
+      "name": "recursive-substitution",
+      "op": "substitute",
+      "type": {"function": [{"var": "U"},{"nullable": {"var": "T"}}]},
+      "bindings": {"T": "Int","U": {"named": "ReadBox","args": ["Text"]}},
+      "expected": "FUNCTION(,NAMED(ReadBox,NAMED(Text)),NULLABLE(,NAMED(Int)))"
+    },
+    {"name": "unbound-substitution-retained","op": "substitute","type": {"var": "T"},"bindings": {},"expected": "VARIABLE(T)"},
+    {"name": "identity-substitution","op": "substitute","type": {"var": "T"},"bindings": {"T": {"var": "T"}},"expected": "VARIABLE(T)"},
+    {
+      "name": "substitution-cycle",
+      "op": "substitute",
+      "type": {"var": "T"},
+      "bindings": {"T": {"var": "U"},"U": {"var": "T"}},
+      "expected": {"status": "CYCLE","rule": "SUBSTITUTION_CYCLE:T","leaves": ["SUBSTITUTION_CYCLE:T"]}
+    },
+    {
+      "name": "expanding-substitution-cycle",
+      "op": "substitute",
+      "type": {"var": "T"},
+      "bindings": {"T": {"named": "Box","args": [{"var": "T"}]}},
+      "expected": {"status": "CYCLE","rule": "SUBSTITUTION_CYCLE:T","leaves": ["SUBSTITUTION_CYCLE:T"]}
+    },
+    {
+      "name": "substitution-limit",
+      "op": "substitute",
+      "type": {"var": "T"},
+      "bindings": {"T": {"named": "Box","args": ["Int"]}},
+      "limit": 1,
+      "expected": {"status": "LIMIT","rule": "TYPE_LIMIT","leaves": ["TYPE_LIMIT"]}
+    },
+    {
+      "name": "finite-nested-alias-is-not-a-cycle",
+      "op": "compare",
+      "actual": {"alias": "Id","args": [{"alias": "Id","args": ["Int"]}]},
+      "expectedType": "Number",
+      "expected": {"status": "YES","rule": "ALIAS:Id","leaves": ["NAMED_ARGUMENTS"]}
+    },
+    {
+      "name": "invalid-alias-body-is-not-unknown",
+      "op": "compare",
+      "actual": {"alias": "Bad","args": []},
+      "expectedType": "?",
+      "expected": {"status": "INVALID","rule": "UNDEFINED_TYPE","leaves": ["UNDEFINED_TYPE"]}
+    },
+    {
+      "name": "growing-alias-is-limited",
+      "op": "compare",
+      "actual": {"alias": "Grow","args": ["Int"]},
+      "expectedType": "Int",
+      "expected": {"status": "LIMIT","rule": "ALIAS:Grow","leaves": ["TYPE_LIMIT"]}
+    }
+  ]
+}
