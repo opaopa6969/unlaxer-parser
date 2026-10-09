@@ -121,7 +121,33 @@ impl Loader {
             .chain(grammar.rules.iter().map(|r| r.name.clone()))
             .collect();
         let mut synthetic = BTreeMap::new();
+        for setting in &mut grammar.settings {
+            if setting.key == "whitespace" {
+                if let SettingValue::String(style) = &mut setting.value {
+                    policy(
+                        style,
+                        setting.span,
+                        &imported,
+                        &mut grammar.tokens,
+                        &mut used,
+                        &mut synthetic,
+                    )?;
+                }
+            }
+        }
         for rule in &mut grammar.rules {
+            for annotation in &mut rule.annotations {
+                if let AnnotationKind::Whitespace { style: Some(style) } = &mut annotation.kind {
+                    policy(
+                        style,
+                        annotation.span,
+                        &imported,
+                        &mut grammar.tokens,
+                        &mut used,
+                        &mut synthetic,
+                    )?;
+                }
+            }
             body(
                 &mut rule.body,
                 &imported,
@@ -133,6 +159,29 @@ impl Loader {
         grammar.imports.clear();
         Ok(())
     }
+}
+fn policy(
+    style: &mut String,
+    span: Span,
+    imported: &Exports,
+    tokens: &mut Vec<TokenDecl>,
+    used: &mut BTreeSet<String>,
+    synthetic: &mut BTreeMap<String, String>,
+) -> Result<(), String> {
+    if let Some((namespace, name)) = style.split_once('.') {
+        let mut value = AtomicElement {
+            span,
+            kind: ElementKind::RuleRef {
+                namespace: Some(namespace.into()),
+                name: name.into(),
+            },
+        };
+        atom(&mut value, imported, tokens, used, synthetic)?;
+        if let ElementKind::RuleRef { name, .. } = value.kind {
+            *style = name;
+        }
+    }
+    Ok(())
 }
 fn external_refs(expression: &mut LexicalExpression, imported: &Exports) -> Result<(), String> {
     if expression.op == Op::REF && expression.text.contains('.') {
