@@ -36,7 +36,7 @@ public class LSPQueryConsumerTest {
                 public java.util.function.Function<org.unlaxer.source.DocumentSnapshot, org.unlaxer.source.LanguageQueries> binding;
                 @Override protected org.unlaxer.source.LanguageQueries languageQueries(org.unlaxer.source.DocumentSnapshot host) { return binding.apply(host); }
                 @Override protected java.util.Set<org.unlaxer.source.LanguageRegions.Operation> languageQueryCapabilities() {
-                    return java.util.Set.of(org.unlaxer.source.LanguageRegions.Operation.COMPLETION, org.unlaxer.source.LanguageRegions.Operation.HOVER, org.unlaxer.source.LanguageRegions.Operation.DEFINITION);
+                    return java.util.EnumSet.allOf(org.unlaxer.source.LanguageRegions.Operation.class);
                 }
             }
             """));
@@ -102,7 +102,17 @@ public class LSPQueryConsumerTest {
             assertTrue(service.completion(request).join().getLeft().isEmpty());
             // The same consumer routes a different concrete provider and keeps foreign-document coordinates.
             type.getField("binding").set(server, (Function<DocumentSnapshot, LanguageQueries>) LSPQueryConsumerTest::projectBinding);
-            assertEquals(Boolean.TRUE, server.initialize(new InitializeParams()).join().getCapabilities().getDefinitionProvider().getLeft());
+            var capabilities = server.initialize(new InitializeParams()).join().getCapabilities();
+            assertEquals(Boolean.TRUE, capabilities.getDefinitionProvider().getLeft());
+            var table = new com.google.gson.Gson().toJsonTree(capabilities.getExperimental()).getAsJsonObject().getAsJsonObject("languageQueryConsumer").getAsJsonObject("operations");
+            for (String operation : List.of("RENAME", "FORMAT", "CODE_ACTION")) {
+                var value = table.getAsJsonObject(operation);
+                assertTrue(value.get("providerRegistered").getAsBoolean());
+                assertTrue(value.get("profileAllowed").getAsBoolean());
+                assertFalse(value.get("transport").getAsBoolean());
+                assertFalse(value.get("available").getAsBoolean());
+            }
+            assertNull(capabilities.getRenameProvider());assertNull(capabilities.getDocumentFormattingProvider());assertNull(capabilities.getCodeActionProvider());
             service.didOpen(new DidOpenTextDocumentParams(new TextDocumentItem("file:///symbols", "typed", 1, "😀{foo far foo f }H")));
             var local = service.definition(new DefinitionParams(new TextDocumentIdentifier("file:///symbols"), new Position(0, 12))).join().getLeft();
             assertEquals(1, local.size()); assertEquals("file:///symbols", local.get(0).getUri());

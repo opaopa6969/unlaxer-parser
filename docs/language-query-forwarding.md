@@ -241,3 +241,7 @@ contributions, source correction, save, stale update rejection, close cleanup an
 stale binding rejection. Existing Classic LSP byte-frame and generated query
 regressions also run; Tiny's production FormulaInfo bridge is a separate
 integration using this same API.
+
+### LSP consumer capability boundary
+
+Both LSP hosts expose `experimental.languageQueryConsumer` (schema version 1) even without a profile. Each operation has separate `transport`, `providerRegistered`, `profileAllowed`, and `available` booleans. Availability is their intersection. The typed runtime supports rename, format, and code actions, and Playground consumes these edits; the common LSP query transport currently consumes only validation, completion, hover, and definition. Registering an edit provider or selecting an EXTERNAL profile does not advertise an edit transport. The existing language profile TSV describes language/runtime support; it is not a transport capability list. Built-in grammar completion and syntax diagnostics retain their standard LSP capabilities independently of this explicit provider table. Custom host extensions may register their own standard LSP edit methods; those are separate from the common query consumer.

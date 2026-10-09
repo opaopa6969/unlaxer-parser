@@ -150,6 +150,9 @@ impl Backend for Queries {
             Operation::Completion,
             Operation::Hover,
             Operation::Definition,
+            Operation::Rename,
+            Operation::Format,
+            Operation::CodeAction,
         ])
     }
     fn language_queries(&mut self, snapshot: &Snapshot) -> Option<LanguageQueries> {
@@ -197,6 +200,21 @@ fn real_project_provider_owns_utf16_definition_hover_completion_and_rejects_stal
         missing: false,
     });
     let caps = server.handle(request("initialize", json!({})));
+    for operation in ["RENAME", "FORMAT", "CODE_ACTION"] {
+        let value = &caps[0]["result"]["capabilities"]["experimental"]["languageQueryConsumer"]
+            ["operations"][operation];
+        assert_eq!(value["providerRegistered"], true);
+        assert_eq!(value["profileAllowed"], true);
+        assert_eq!(value["transport"], false);
+        assert_eq!(value["available"], false);
+    }
+    for field in [
+        "renameProvider",
+        "documentFormattingProvider",
+        "codeActionProvider",
+    ] {
+        assert!(caps[0]["result"]["capabilities"].get(field).is_none());
+    }
     assert_eq!(
         true,
         caps[0]["result"]["capabilities"]["definitionProvider"]
