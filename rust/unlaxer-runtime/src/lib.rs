@@ -12,6 +12,7 @@ pub mod lexing;
 mod long_code_fence;
 #[cfg(test)]
 mod memo_retention_tests;
+pub mod pipeline;
 mod scope;
 pub mod semantic;
 pub mod semantic_project;
