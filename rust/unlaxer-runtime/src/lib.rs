@@ -7,15 +7,21 @@ use std::sync::Arc;
 
 pub mod call_inference;
 mod first;
+pub mod language_queries;
 pub mod lexical;
 pub mod lexing;
 mod long_code_fence;
 #[cfg(test)]
 mod memo_retention_tests;
+pub mod pipeline;
 mod scope;
 pub mod semantic;
 pub mod semantic_project;
+pub mod semantic_queries;
 pub mod semantic_query_cache;
+pub mod semantic_rename;
+pub mod source;
+pub mod source_edits;
 pub mod type_system;
 mod unicode_xid;
 #[doc(hidden)]
@@ -2705,6 +2711,14 @@ impl<'a> ParseContext<'a> {
 
     fn skip(&mut self) {
         if let Some(definition) = &self.lexical_trivia {
+            if let Some(session) = &mut self.lexing {
+                let end = session.skip(self.position);
+                if end != self.position {
+                    self.position = end;
+                    self.matched_position = end;
+                }
+                return;
+            }
             while let Some(end) = definition.match_at(self.input, self.position) {
                 if end <= self.position {
                     break;

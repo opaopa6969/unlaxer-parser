@@ -63,7 +63,13 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
     runtime!("lib.rs");
     runtime!("scope.rs");
     runtime!("semantic.rs");
+    runtime!("language_queries.rs");
+    runtime!("semantic_queries.rs");
     runtime!("semantic_project.rs");
+    runtime!("semantic_rename.rs");
+    runtime!("source_edits.rs");
+    runtime!("source.rs");
+    runtime!("pipeline.rs");
     runtime!("semantic_query_cache.rs");
     runtime!("type_system.rs");
     runtime!("call_inference.rs");
@@ -99,6 +105,13 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
     files.push(GeneratedFile {
         relative_path: "public/grammar.ubnf".into(),
         content: source,
+    });
+    files.push(GeneratedFile {
+        relative_path: "public/vocabulary.json".into(),
+        content: format!(
+            "{}\n",
+            crate::vocabulary_origins::to_json(&crate::vocabulary_origins::inspect(path)?)
+        ),
     });
     Ok(files)
 }

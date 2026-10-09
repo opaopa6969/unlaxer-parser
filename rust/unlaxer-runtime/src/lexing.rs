@@ -67,6 +67,7 @@ pub struct Session<'a> {
     options: Options,
     terminals: Arc<[Terminal]>,
     whitespace: bool,
+    named_trivia: Option<LexicalExpression>,
     offsets: Vec<usize>,
     code_points: Vec<usize>,
     entries: BTreeMap<usize, Entry>,
@@ -83,6 +84,18 @@ impl<'a> Session<'a> {
         terminals: Arc<[Terminal]>,
         whitespace: bool,
     ) -> Result<Self, String> {
+        Self::with_trivia(source, options, terminals, whitespace, None)
+    }
+    pub fn with_trivia(
+        source: &'a str,
+        options: Options,
+        terminals: Arc<[Terminal]>,
+        whitespace: bool,
+        named_trivia: Option<LexicalExpression>,
+    ) -> Result<Self, String> {
+        if named_trivia.as_ref().is_some_and(nullable) {
+            return Err("E-LEXING-TRIVIA: nullable definition".into());
+        }
         let mut names = HashSet::new();
         for t in terminals.iter() {
             if !names.insert((t.literal, t.name)) || nullable(&t.expression) {
@@ -102,7 +115,8 @@ impl<'a> Session<'a> {
             source,
             options,
             terminals,
-            whitespace,
+            whitespace: whitespace || named_trivia.is_some(),
+            named_trivia,
             offsets,
             code_points,
             entries: BTreeMap::new(),
@@ -247,6 +261,18 @@ impl<'a> Session<'a> {
         }
     }
     fn trivia(&self, p: usize) -> Option<Entry> {
+        if let Some(definition) = &self.named_trivia {
+            return definition
+                .match_at(self.source, p)
+                .filter(|end| *end > p)
+                .map(|end| Entry {
+                    kind: "trivia",
+                    name: "",
+                    terminal: None,
+                    start: p,
+                    end,
+                });
+        }
         let mut end = p;
         while self
             .source
@@ -319,11 +345,29 @@ pub fn parse<'a>(
     options: Options,
     terminals: Arc<[Terminal]>,
 ) -> Result<Outcome<'a>, String> {
+    parse_with_trivia(grammar, root, whitespace, source, options, terminals, None)
+}
+#[allow(clippy::too_many_arguments)]
+pub fn parse_with_trivia<'a>(
+    grammar: &SharedGrammar,
+    root: usize,
+    whitespace: bool,
+    source: &'a str,
+    options: Options,
+    terminals: Arc<[Terminal]>,
+    named_trivia: Option<LexicalExpression>,
+) -> Result<Outcome<'a>, String> {
     let mut context = ParseContext::with_options(
         source,
         ParseOptions::default().with_diagnostics(Diagnostics::Detailed),
     );
-    context.lexing = Some(Session::new(source, options, terminals, whitespace)?);
+    context.lexing = Some(Session::with_trivia(
+        source,
+        options,
+        terminals,
+        whitespace,
+        named_trivia,
+    )?);
     let parsed = context.parse_shared_grammar(grammar, root, whitespace);
     let root_node = parsed.as_ref().ok().and_then(|p| p.root_node());
     let consumed = context.position();

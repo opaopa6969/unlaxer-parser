@@ -1,0 +1,15 @@
+# name\toutput\torigin\tsegments(start:end:kind:originStart:originEnd)\tqueryStart\tqueryEnd\tdiagnostics(start:end:exact,...)\tedit(start:end or REJECT)
+unicode	日😀x	<日😀x>	0:3:C:1:4	1	2	2:3:true	2:3
+copy-start	日😀x	<日😀x>	0:3:C:1:4	0	0	1:1:true	1:1
+copy-end	日😀x	<日😀x>	0:3:C:1:4	3	3	4:4:true	4:4
+wrapper	[abc]	abc	0:1:G:0:0,1:4:C:0:3,4:5:G:3:3	2	3	1:2:true	1:2
+wrapper-generated	[abc]	abc	0:1:G:0:0,1:4:C:0:3,4:5:G:3:3	0	1	0:0:false	REJECT
+wrapper-boundary	[abc]	abc	0:1:G:0:0,1:4:C:0:3,4:5:G:3:3	1	1	0:0:false,0:0:true	REJECT
+unanchored	[abc]	abc	0:1:G:-:-,1:4:C:0:3,4:5:G:-:-	0	1	-	REJECT
+unanchored-crossing	[abc]	abc	0:1:G:-:-,1:4:C:0:3,4:5:G:-:-	0	2	0:1:true	REJECT
+newline-transform	a\nb	a\r\nb	0:1:C:0:1,1:2:T:1:3,2:3:C:3:4	1	2	1:3:false	REJECT
+newline-copy	a\nb	a\r\nb	0:1:C:0:1,1:2:T:1:3,2:3:C:3:4	2	3	3:4:true	3:4
+deleted-line	ab	a#b	0:1:C:0:1,1:2:C:2:3	0	2	0:1:true,2:3:true	REJECT
+deleted-boundary	ab	a#b	0:1:C:0:1,1:2:C:2:3	1	1	1:1:true,2:2:true	REJECT
+duplicate-origin	aa	a	0:1:C:0:1,1:2:C:0:1	0	1	0:1:true	REJECT
+escape-transform	😀	\\u{1F600}	0:1:T:0:9	0	1	0:9:false	REJECT
