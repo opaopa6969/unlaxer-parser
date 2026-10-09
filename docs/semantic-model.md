@@ -91,3 +91,12 @@ let candidates = model.complete_argument(call_id, 1, cursor_code_point, document
 API の list / String / span 等は非 null。Java の負の位置や孤立 surrogate は拒否する。Rust の位置は usize、String は有効な UTF-8 のため、これらは型の時点で表現できない。共通の有効入力とモデル検証の失敗条件は同じ corpus で比較する。空文書の root scope は許す。
 
 `SemanticModelConformanceTest` は [共有 corpus](../spec-corpus/semantic-model/corpus.json) の独立期待値と Java / Rust を比較する。`SemanticModelUbnfTest` は実際の文法生成・javac/rustc・native generator の出力一致・元ソース変更による補完結果の変化を検証する。CI は `rust-semantic-model.tsv` / `rust-semantic-ubnf.tsv` を必須 artifact とする。
+
+複数文書・依存ライブラリの import / export、definition、型付き補完は
+[ProjectSymbolIndex](project-symbol-index.md) で、このモデルを不変の
+プロジェクトスナップショットへ束ねる。文法 import と対象言語の import は別契約である。
+
+型引数、union / intersection、nullable、関数型、alias、varargs と overload の制約は
+[TypeSystem / CallInference](type-system.md) で扱う。既存の固定引数 API と観測結果は維持する。
+
+意味 query の編集跨ぎ再利用とキャンセルは [SemanticQueries](semantic-queries.md) を参照。
