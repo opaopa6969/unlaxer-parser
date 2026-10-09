@@ -48,6 +48,20 @@ fn project_is_self_contained_deterministic_and_never_overwrites() {
         String::from_utf8_lossy(&result.stderr)
     );
     assert!(output.join("runtime/src/lib.rs").is_file());
+    for line in fs::read_to_string(output.join("runtime/src/lib.rs"))
+        .unwrap()
+        .lines()
+    {
+        let module = line
+            .strip_prefix("pub mod ")
+            .or_else(|| line.strip_prefix("mod "));
+        if let Some(name) = module.and_then(|name| name.strip_suffix(';')) {
+            assert!(
+                output.join(format!("runtime/src/{name}.rs")).is_file(),
+                "missing runtime module: {name}"
+            );
+        }
+    }
     assert!(fs::read_to_string(output.join("src/lib.rs"))
         .unwrap()
         .contains("generated::parser::RULE_DOCS"));
