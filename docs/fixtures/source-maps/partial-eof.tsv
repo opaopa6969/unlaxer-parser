@@ -1,0 +1,12 @@
+# id	CP cursor	id,parent,fullStart,fullEnd,bodyStart,bodyEnd,state;...	expected deepest owner
+open-eof	4	r,-,0,4,1,4,PARTIAL	r
+closed-eof	4	r,-,0,4,1,4,COMPLETE	NONE
+failed-eof	4	r,-,0,4,1,4,FAILED	NONE
+closing-delimiter	3	r,-,0,4,1,3,PARTIAL	NONE
+nested-open	4	outer,-,0,4,1,4,PARTIAL;inner,outer,2,4,3,4,PARTIAL	inner
+nested-closed	4	outer,-,0,4,1,4,PARTIAL;inner,outer,2,4,3,4,COMPLETE	outer
+adjacent-boundary	2	left,-,0,2,0,2,PARTIAL;right,-,2,4,2,4,PARTIAL	right
+adjacent-eof	4	left,-,0,2,0,2,PARTIAL;right,-,2,4,2,4,PARTIAL	right
+empty-owner	4	empty,-,4,4,4,4,PARTIAL	empty
+ambiguous-empty	4	a,-,4,4,4,4,PARTIAL;b,-,4,4,4,4,PARTIAL	REJECT
+nested-ambiguous	4	outer,-,0,4,1,4,PARTIAL;a,outer,4,4,4,4,PARTIAL;b,outer,4,4,4,4,PARTIAL	REJECT
