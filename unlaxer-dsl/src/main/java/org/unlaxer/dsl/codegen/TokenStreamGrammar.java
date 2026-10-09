@@ -47,8 +47,11 @@ public final class TokenStreamGrammar {
                 issues.add(new Problem("E-TOKEN-STREAM-TOKEN", token.name(), token));
         }
         for (var rule : grammar.rules()) for (var annotation : rule.annotations()) {
-            String name = annotation instanceof WhitespaceAnnotation ? "whitespace"
-                : annotation instanceof InterleaveAnnotation ? "interleave"
+            boolean contextualTrivia = LexicalContexts.enabled(grammar) &&
+                (annotation instanceof WhitespaceAnnotation value && (value.style().isEmpty() || value.style().get().equalsIgnoreCase("none") || value.style().get().equalsIgnoreCase("javaStyle"))
+                 || annotation instanceof InterleaveAnnotation);
+            String name = annotation instanceof WhitespaceAnnotation && !contextualTrivia ? "whitespace"
+                : annotation instanceof InterleaveAnnotation && !contextualTrivia ? "interleave"
                 : annotation instanceof BackrefAnnotation ? "backref"
                 : annotation instanceof RecoveryAnnotation ? "recovery" : null;
             if (name != null) issues.add(new Problem("E-TOKEN-STREAM-ANNOTATION", name, annotation));
@@ -97,6 +100,7 @@ public final class TokenStreamGrammar {
             .append(whitespace(grammar));
         var trivia = namedTrivia(grammar);
         if (trivia != null) out.append(", ").append(LexicalCompiler.javaExpression(trivia));
+        if (LexicalContexts.enabled(grammar)) out.append(", true");
         out.append(");\n    }\n\n");
         return out.toString();
     }

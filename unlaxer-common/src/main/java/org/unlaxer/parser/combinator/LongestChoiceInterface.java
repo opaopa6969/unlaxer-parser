@@ -18,6 +18,8 @@ import org.unlaxer.parser.Parser;
  */
 public interface LongestChoiceInterface extends ChoiceInterface {
 
+    default boolean requiresUniqueLongestChoice() { return false; }
+
     @Override
     default Parsed parse(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
         PackratMemoTable.Entry memo =
@@ -30,6 +32,16 @@ public interface LongestChoiceInterface extends ChoiceInterface {
         List<Parser> children = getChildren();
         Parser winner = null;
         int winnerEnd = -1;
+        int start = tokenKind.isConsumed() ? parseContext.getConsumedPosition().value()
+            : parseContext.getMatchedPosition().value();
+        int ties = 0;
+        if (requiresUniqueLongestChoice() && (children.size() < 2 || children.size() > 64)) {
+            org.unlaxer.parser.ErrorMessageParser.expected("2 to 64 unique longest alternatives")
+                .parse(parseContext, tokenKind, invertMatch);
+            parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);
+            PackratMemoTable.memoizeFailure(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
+            return Parsed.FAILED;
+        }
 
         for (Parser parser : children) {
             parseContext.begin(this);
@@ -41,9 +53,26 @@ public interface LongestChoiceInterface extends ChoiceInterface {
                 if (candidateEnd > winnerEnd) {
                     winner = parser;
                     winnerEnd = candidateEnd;
+                    ties = 1;
+                } else if (candidateEnd == winnerEnd) {
+                    ties++;
                 }
             }
             parseContext.rollback(this);
+        }
+
+        if (winner != null && requiresUniqueLongestChoice() && (ties > 1 || winnerEnd == start)) {
+            parseContext.begin(this);
+            var length = new org.unlaxer.CodePointLength(winnerEnd - start);
+            if (tokenKind.isConsumed()) parseContext.consume(length);
+            else parseContext.matchOnly(length);
+            org.unlaxer.parser.ErrorMessageParser.expected(winnerEnd == start
+                ? "nonempty unique longest alternative" : "unique longest alternative")
+                .parse(parseContext, tokenKind, invertMatch);
+            parseContext.rollback(this);
+            parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);
+            PackratMemoTable.memoizeFailure(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
+            return Parsed.FAILED;
         }
 
         if (winner == null) {

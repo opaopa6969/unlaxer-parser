@@ -3,6 +3,7 @@ pub mod adapters;
 mod embedded;
 pub mod impact;
 mod lexical;
+mod lexical_contexts;
 pub mod lowering;
 pub mod modules;
 pub mod packaged_profiles;
@@ -38,11 +39,12 @@ pub(crate) fn generate_grammar(
     let ir = lowering::lower(grammar)?;
     let mut files = unlaxer_codegen::generate(&ir).map_err(|error| error.to_string())?;
     if token_stream::enabled(grammar) {
-        let api = unlaxer_codegen::lexing_api_with_trivia(
+        let api = unlaxer_codegen::lexing_api_with_profile(
             &token_stream::terminals(grammar)?,
             ir.root,
             ir.java_whitespace,
             token_stream::named_trivia(grammar)?.as_ref(),
+            lexical_contexts::enabled(grammar),
         );
         files
             .iter_mut()

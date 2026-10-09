@@ -66,7 +66,8 @@ package のファイル群で解決し、境界外へ抜ける参照を拒否す
 
 共有する module の entry は従来どおり declarative token だけを持ち、rule / evaluator /
 host parser code を import できない。自動 skip の対象は non-nullable な lexical program
-でなければならない。上限は artifact 8 MiB、artifact 内 128 ファイル、package graph
+でなければならない。manifest / lock / artifact は UTF-8 byte 数で各 8 MiB まで
+（ちょうどは受理、1 byte 超過は拒否）。artifact 内 128 ファイル、package graph
 128 package / 64 MiB、依存深さ64。生成時は解決した cache のファイルを仮想 source と
 して読むため、任意パスへファイルを展開しない。
 

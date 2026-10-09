@@ -172,6 +172,7 @@ public sealed interface UBNFAST permits
         UBNFAST.EvalAnnotation,
         UBNFAST.WhitespaceAnnotation,
         UBNFAST.InterleaveAnnotation,
+        UBNFAST.LexicalContextAnnotation,
         UBNFAST.BackrefAnnotation,
         UBNFAST.ScopeTreeAnnotation,
         UBNFAST.DeclaresAnnotation,
@@ -179,6 +180,8 @@ public sealed interface UBNFAST permits
         UBNFAST.LeftAssocAnnotation,
         UBNFAST.RightAssocAnnotation,
         UBNFAST.LongestChoiceAnnotation,
+        UBNFAST.UniqueLongestChoiceAnnotation,
+        UBNFAST.NamePredicateAnnotation,
         UBNFAST.PredictiveChoiceAnnotation,
         UBNFAST.PrecedenceAnnotation,
         UBNFAST.DocAnnotation,
@@ -187,6 +190,11 @@ public sealed interface UBNFAST permits
         UBNFAST.SimpleAnnotation,
         UBNFAST.CommonFieldAnnotation,
         UBNFAST.EnumAnnotation {}
+
+    /** Scoped, explicitly selected lexical goal; literals win equal-length ties. */
+    record LexicalContextAnnotation(List<String> tokens, List<String> literals) implements Annotation {
+        public LexicalContextAnnotation { tokens = List.copyOf(tokens); literals = List.copyOf(literals); }
+    }
 
     /** @root */
     record RootAnnotation() implements Annotation {}
@@ -239,6 +247,12 @@ public sealed interface UBNFAST permits
 
     /** @longestChoice — choose the successful alternative consuming the most input. */
     record LongestChoiceAnnotation() implements Annotation {}
+
+    /** @uniqueLongestChoice — reject ties and empty winners. */
+    record UniqueLongestChoiceAnnotation() implements Annotation {}
+
+    /** Pure lookup in an explicit immutable, versioned snapshot. */
+    record NamePredicateAnnotation(String snapshot, String version, String name, String kind) implements Annotation {}
 
     /** @predictiveChoice — conservatively prune alternatives by their FIRST prefix. */
     record PredictiveChoiceAnnotation() implements Annotation {}
