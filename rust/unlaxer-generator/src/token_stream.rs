@@ -37,10 +37,7 @@ pub fn problems(grammar: &GrammarDecl) -> Vec<AdapterDiagnostic> {
         add("E-TOKEN-STREAM-VERSION", "tokenStream", settings[0].span);
     }
     for s in &grammar.settings {
-        if s.key == "comment"
-            || s.key == "whitespace"
-                && matches!(&s.value, SettingValue::String(value) if !value.eq_ignore_ascii_case("javaStyle") && !value.eq_ignore_ascii_case("none"))
-        {
+        if s.key == "comment" {
             add("E-TOKEN-STREAM-TRIVIA", &s.key, s.span);
         }
     }
@@ -88,6 +85,27 @@ pub fn problems(grammar: &GrammarDecl) -> Vec<AdapterDiagnostic> {
         }
     }
     issues
+}
+pub fn named_trivia(grammar: &GrammarDecl) -> Result<Option<LexicalExpression>, String> {
+    let style = grammar
+        .settings
+        .iter()
+        .find(|s| s.key == "whitespace")
+        .and_then(|s| match &s.value {
+            SettingValue::String(v) => Some(v.trim()),
+            _ => None,
+        })
+        .unwrap_or("none");
+    if style.eq_ignore_ascii_case("none") || style.eq_ignore_ascii_case("javaStyle") {
+        return Ok(None);
+    }
+    let program = crate::lexical::compile(grammar)?
+        .remove(style)
+        .ok_or_else(|| format!("E-WHITESPACE: undefined declarative whitespace {style}"))?;
+    if program.nullable() {
+        return Err(format!("E-WHITESPACE: nullable whitespace {style}"));
+    }
+    Ok(Some(program))
 }
 pub fn terminals(grammar: &GrammarDecl) -> Result<Vec<(String, bool, LexicalExpression)>, String> {
     let mut literals = vec![];

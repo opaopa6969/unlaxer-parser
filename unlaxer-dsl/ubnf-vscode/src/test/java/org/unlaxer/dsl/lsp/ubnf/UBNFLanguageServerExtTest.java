@@ -72,6 +72,37 @@ public class UBNFLanguageServerExtTest {
         assertFalse(UBNFLanguageServerExt.BLOCK_SNIPPETS.get(0).body().contains("NumberParser"));
     }
 
+    @Test public void pinnedWhitespaceHasCompletionHoverAndReadOnlyDefinition() throws Exception {
+        var directory = java.nio.file.Files.createTempDirectory("ubnf-origin-lsp-");
+        String module = "grammar Layout {\n @ubnf: v2\n // 😀\n token GAP ::= ' ' | '#';\n}\n";
+        var artifact = new com.google.gson.Gson().toJson(java.util.Map.of("schemaVersion", 1, "id", "team/layout", "version", "1.2.3", "entry", "layout.ubnf", "files", java.util.Map.of("layout.ubnf", module), "dependencies", java.util.Map.of()));
+        java.nio.file.Files.writeString(directory.resolve("artifact.json"), artifact);
+        java.nio.file.Files.writeString(directory.resolve("ubnf.json"), "{\"schemaVersion\":1,\"dependencies\":{\"team/layout\":{\"version\":\"1.2.3\",\"source\":\"local:artifact.json\"}}}");
+        org.unlaxer.dsl.bootstrap.UBNFPackageResolver.resolve(directory.resolve("ubnf.json"));
+        String content = "grammar G {\n @import layout from 'pkg:team/layout'\n @ubnf: v2\n @whitespace: layout.GAP\n @root\n Start ::= 'a';\n}\n";
+        String uri = directory.resolve("root.ubnf").toUri().toString();
+        service.didOpen(new DidOpenTextDocumentParams(new TextDocumentItem(uri, "ubnf", 1, content)));
+        Position position = new Position(3, 22);
+        var hover = service.hover(new HoverParams(new TextDocumentIdentifier(uri), position)).get();
+        assertNotNull(hover); String documentation = hover.getContents().getRight().getValue();
+        assertTrue(documentation, documentation.contains("team/layout@1.2.3"));
+        assertTrue(documentation, documentation.contains("sha256"));
+        var target = service.definition(new DefinitionParams(new TextDocumentIdentifier(uri), position)).get().getLeft().get(0);
+        assertTrue(target.getUri(), target.getUri().startsWith("ubnf-package:/"));
+        assertEquals(new Position(3, 7), target.getRange().getStart());
+        assertEquals(new Position(3, 10), target.getRange().getEnd());
+        var extended = (UBNFLanguageServerExt.ExtTextDocumentService)service;
+        assertEquals(module, extended.packageSource(new UBNFLanguageServerExt.PackageSourceRequest(target.getUri())).get());
+        assertTrue(org.eclipse.lsp4j.jsonrpc.services.ServiceEndpoints.getSupportedMethods(server.getClass()).containsKey("ubnf/packageSource"));
+        var endpoint = org.eclipse.lsp4j.jsonrpc.services.ServiceEndpoints.toEndpoint(server);
+        assertEquals(module, endpoint.request("ubnf/packageSource", new UBNFLanguageServerExt.PackageSourceRequest(target.getUri())).get());
+        assertEquals(null, extended.packageSource(new UBNFLanguageServerExt.PackageSourceRequest("file:///etc/passwd")).get());
+        assertEquals(null, extended.packageSource(new UBNFLanguageServerExt.PackageSourceRequest("ubnf-package:/unknown/layout.ubnf")).get());
+        var completion = service.completion(new CompletionParams(new TextDocumentIdentifier(uri), new Position(3, 21))).get().getLeft();
+        assertTrue(completion.stream().anyMatch(item -> item.getLabel().equals("layout.GAP") && item.getDetail().contains("team/layout@1.2.3")));
+        org.junit.Assert.assertThrows(ExecutionException.class, () -> service.rename(new RenameParams(new TextDocumentIdentifier(uri), position, "RENAMED")).get());
+    }
+
     private static final String URI = "file:///sample.ubnf";
 
     private static final String VALID_UBNF = """
