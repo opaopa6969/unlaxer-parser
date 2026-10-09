@@ -61,6 +61,18 @@ pub fn problems(grammar: &GrammarDecl) -> Vec<AdapterDiagnostic> {
     for rule in &grammar.rules {
         for a in &rule.annotations {
             let name = match a.kind {
+                AnnotationKind::Whitespace { ref style }
+                    if crate::lexical_contexts::enabled(grammar)
+                        && style.as_ref().is_none_or(|value| {
+                            value.eq_ignore_ascii_case("none")
+                                || value.eq_ignore_ascii_case("javaStyle")
+                        }) =>
+                {
+                    None
+                }
+                AnnotationKind::Interleave { .. } if crate::lexical_contexts::enabled(grammar) => {
+                    None
+                }
                 AnnotationKind::Whitespace { .. } => Some("whitespace"),
                 AnnotationKind::Interleave { .. } => Some("interleave"),
                 AnnotationKind::Backref { .. } => Some("backref"),

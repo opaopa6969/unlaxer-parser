@@ -26,15 +26,33 @@ pub fn lexing_api_with_trivia(
     whitespace: bool,
     named_trivia: Option<&lexical::LexicalExpression>,
 ) -> String {
+    lexing_api_with_profile(terminals, root, whitespace, named_trivia, false)
+}
+pub fn lexing_api_with_context(
+    terminals: &[(String, bool, lexical::LexicalExpression)],
+    root: usize,
+    whitespace: bool,
+    contextual: bool,
+) -> String {
+    lexing_api_with_profile(terminals, root, whitespace, None, contextual)
+}
+pub fn lexing_api_with_profile(
+    terminals: &[(String, bool, lexical::LexicalExpression)],
+    root: usize,
+    whitespace: bool,
+    named_trivia: Option<&lexical::LexicalExpression>,
+    contextual: bool,
+) -> String {
     let mut out = String::from("\npub fn lexical_terminals() -> &'static std::sync::Arc<[unlaxer_runtime::lexing::Terminal]> {\n    static TERMINALS: OnceLock<std::sync::Arc<[unlaxer_runtime::lexing::Terminal]>> = OnceLock::new();\n    TERMINALS.get_or_init(|| vec![\n");
     for (name, literal, expression) in terminals {
         writeln!(out, "        unlaxer_runtime::lexing::Terminal {{ name: {}, literal: {}, expression: {} }},", quote(name), literal, lexical_expression(expression)).unwrap();
     }
     out.push_str("    ].into())\n}\n\npub fn parse_with_lexing(source: &str, options: unlaxer_runtime::lexing::Options) -> Result<unlaxer_runtime::lexing::Outcome<'_>, String> {\n    unlaxer_runtime::lexing::");
-    out.push_str(if named_trivia.is_some() {
-        "parse_with_trivia(grammar(), "
-    } else {
-        "parse(grammar(), "
+    out.push_str(match (contextual, named_trivia.is_some()) {
+        (true, true) => "parse_contextual_with_trivia(grammar(), ",
+        (true, false) => "parse_contextual(grammar(), ",
+        (false, true) => "parse_with_trivia(grammar(), ",
+        (false, false) => "parse(grammar(), ",
     });
     if let Some(trivia) = named_trivia {
         writeln!(out, "{root}, {whitespace}, source, options, std::sync::Arc::clone(lexical_terminals()), Some({}))\n}}", lexical_expression(trivia)).unwrap();
@@ -118,8 +136,11 @@ fn contains_recovery(expression: &Expression) -> bool {
     match expression {
         Recovery { .. } | CustomToken(_) => true,
         RuleEffects { child, .. }
+        | NamePredicate { child, .. }
+        | NameResolutionScope { child, .. }
         | CaptureEquality { child, .. }
         | TriviaScope { child, .. }
+        | LexicalContextScope { child, .. }
         | TextValue(child)
         | ValueBoundary(child)
         | Delimited(child)
@@ -127,7 +148,7 @@ fn contains_recovery(expression: &Expression) -> bool {
         | Repeat { child, .. } => contains_recovery(child),
         Capture { expression, .. } => contains_recovery(expression),
         Separated { child, separator } => contains_recovery(child) || contains_recovery(separator),
-        Sequence(values) | Choice(values) | LongestChoice(values) => {
+        Sequence(values) | Choice(values) | LongestChoice(values) | UniqueLongestChoice(values) => {
             values.iter().any(contains_recovery)
         }
         PredictiveChoice { alternatives, .. } => alternatives.iter().any(contains_recovery),
@@ -212,6 +233,32 @@ fn parser(ir: &GrammarIr) -> String {
         ir.root, ir.java_whitespace
     )
     .unwrap();
+    if ir
+        .rules
+        .iter()
+        .any(|rule| matches!(&rule.body, Expression::NameResolutionScope { .. }))
+    {
+        out.push_str("\npub fn parse_tree_detailed_with_name_snapshots(source: &str, snapshots: &[unlaxer_runtime::names::Snapshot], options: ParseOptions) -> Result<Tree, ParseDiagnostic> {\n    let tree = unlaxer_runtime::parse_detailed_shared_with_name_snapshots(grammar(), ");
+        write!(
+            out,
+            "{}, {}, source, options, snapshots)",
+            ir.root, ir.java_whitespace
+        )
+        .unwrap();
+        out.push_str(
+            r#"?;
+    if let Some(first) = tree.recoveries().first() {
+        return Err(ParseDiagnostic {
+            kind: "recovery", offset: first.span.start,
+            expected: vec![first.message.to_owned()],
+            farthest: unlaxer_runtime::ParseError { offset: first.span.end, expected: vec![] },
+        });
+    }
+    Ok(tree)
+}
+"#,
+        );
+    }
     out.push_str("\n/// Bounded editor-only EOF repair; synthetic syntax never becomes a normal AST value.\npub fn parse_editor_cst(source: &str, completions: &[&str], options: unlaxer_runtime::editor_cst::Options) -> Result<unlaxer_runtime::editor_cst::EditorCst, &'static str> {\n    unlaxer_runtime::editor_cst::parse(grammar(), ");
     writeln!(
         out,
@@ -302,6 +349,8 @@ fn expression(expr: &Expression) -> String {
             let declares = effects.declares.as_ref().map_or_else(|| "None".into(), |decl| format!("Some(unlaxer_runtime::Declaration {{ symbol_capture: {}, description: {} }})", quote(&decl.symbol_capture), option_text(decl.description.as_deref())));
             format!("{}.rule_effects(unlaxer_runtime::RuleEffects {{ scope_mode: {scope}, declares: {declares}, backref: {} }})", expression(child), option_text(effects.backref.as_deref()))
         }
+        NamePredicate { child, snapshot, version, capture, kind } => format!("Expr::NamePredicate {{ child: Box::new({}), snapshot: {}, version: {}, capture: {}, kind: {} }}", expression(child), quote(snapshot), quote(version), quote(capture), quote(kind)),
+        NameResolutionScope { child, requirements } => format!("Expr::NameResolutionScope {{ child: Box::new({}), requirements: vec![{}] }}", expression(child), requirements.iter().map(|(id,version)|format!("unlaxer_runtime::names::Requirement::new({}, {}).expect(\"validated name requirement\")",quote(id),quote(version))).collect::<Vec<_>>().join(", ")),
         CaptureEquality { child, name } => {
             format!(
                 "Expr::compare_captures({}, {})",
@@ -345,6 +394,12 @@ fn expression(expr: &Expression) -> String {
         Delimited(child) => format!("Expr::Sequence(vec![{}])", expression(child)),
         TextValue(child) => format!("{}.text_value()", expression(child)),
         ValueBoundary(child) => format!("{}.value_boundary()", expression(child)),
+        LexicalContextScope { child, terminals } => format!(
+            "{}.lexical_context_scope(vec![{}])", expression(child),
+            terminals.iter().map(|(name, literal, definition)| format!(
+                "unlaxer_runtime::lexing::Terminal {{ name: {}, literal: {}, expression: {} }}",
+                quote(name), literal, lexical_expression(definition))).collect::<Vec<_>>().join(", ")
+        ),
         LexicalTriviaScope { child, definition } => format!(
             "{}.lexical_trivia_scope({})",
             expression(child),
@@ -357,6 +412,7 @@ fn expression(expr: &Expression) -> String {
             format!("{}.trivia_scope({java_whitespace})", expression(child))
         }
         Choice(items) => format!("Expr::Choice(vec![{}])", expressions(items)),
+        UniqueLongestChoice(items) => format!("Expr::UniqueLongestChoice(vec![{}])", expressions(items)),
         LongestChoice(items) => format!("Expr::LongestChoice(vec![{}])", expressions(items)),
         PredictiveChoice {
             alternatives,

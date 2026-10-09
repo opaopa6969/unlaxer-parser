@@ -11,6 +11,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.ErrorElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.InterleaveAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.LongestChoiceAnnotation;
+import org.unlaxer.dsl.bootstrap.UBNFAST.UniqueLongestChoiceAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.PredictiveChoiceAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OneOrMoreElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OptionalElement;
@@ -580,7 +581,9 @@ class ParserRuleEmitter {
         String implSuffix = interfaces.isEmpty() ? "" : " implements " + String.join(", ", interfaces);
         boolean longestChoice = rule.annotations().stream().anyMatch(a -> a instanceof LongestChoiceAnnotation);
         boolean predictiveChoice = rule.annotations().stream().anyMatch(a -> a instanceof PredictiveChoiceAnnotation);
-        String baseClass = longestChoice ? "LazyLongestChoice"
+        boolean uniqueLongestChoice = rule.annotations().stream().anyMatch(a -> a instanceof UniqueLongestChoiceAnnotation);
+        String baseClass = uniqueLongestChoice ? "LazyUniqueLongestChoice"
+            : longestChoice ? "LazyLongestChoice"
             : predictiveChoice ? "LazyPredictiveChoice"
             : isChoice ? "LazyChoice" : getChainClassName(ctx, ruleName);
         w.line("public static class " + className + " extends " + baseClass + implSuffix + " {");
@@ -589,6 +592,12 @@ class ParserRuleEmitter {
         boolean hasSkip = rule.annotations().stream().anyMatch(a -> a instanceof SkipAnnotation);
         if (hasSkip) {
             w.line("public " + className + "() { addTag(org.unlaxer.reducer.TagBasedReducer.NodeKind.notNode.getTag()); }");
+        }
+        for (var annotation : rule.annotations()) if (annotation instanceof org.unlaxer.dsl.bootstrap.UBNFAST.LexicalContextAnnotation lexicalContext) {
+            w.line("private static final java.util.List<org.unlaxer.dsl.runtime.Lexing.Terminal> __LEXICAL_CONTEXT = " + LexicalContexts.javaTerminals(ctx.grammar, lexicalContext) + ";");
+            w.line("@Override public org.unlaxer.Parsed parse(org.unlaxer.context.ParseContext context, org.unlaxer.TokenKind kind, boolean invert) {");
+            w.line("    return org.unlaxer.dsl.runtime.Lexing.withContext(context, __LEXICAL_CONTEXT, () -> super.parse(context, kind, invert));");
+            w.line("}");
         }
         if (predictiveChoice) {
             w.line("private static final java.util.List<ChoicePredictor> __CHOICE_PREDICTORS = java.util.List.of("
@@ -1230,6 +1239,8 @@ class ParserRuleEmitter {
             }
             return tokenClass + ".class";
         }
+        if (ctx.grammar.rules().stream().anyMatch(rule -> rule.name().equals(name) && NamePredicates.annotation(rule).isPresent()))
+            return name + "NamePredicateParser.class";
         // @recovery: return recovery wrapper class if the referenced rule has @recovery
         if (ctx.recoveryRules.containsKey(name)) {
             return name + "RecoveryParser.class";

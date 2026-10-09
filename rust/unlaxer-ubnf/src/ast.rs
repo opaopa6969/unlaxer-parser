@@ -144,6 +144,10 @@ pub enum AnnotationKind {
     Interleave {
         profile: String,
     },
+    LexicalContext {
+        tokens: Vec<String>,
+        literals: Vec<String>,
+    },
     Backref {
         name: String,
     },
@@ -160,6 +164,13 @@ pub enum AnnotationKind {
     LeftAssoc,
     RightAssoc,
     LongestChoice,
+    UniqueLongestChoice,
+    NamePredicate {
+        snapshot: String,
+        version: String,
+        name: String,
+        kind: String,
+    },
     PredictiveChoice,
     Precedence {
         level: i32,
