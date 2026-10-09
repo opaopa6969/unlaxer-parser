@@ -1,6 +1,7 @@
 grammar Input {
  @ubnf: v2
  @package: example.lexing
+ @tokenStream: enabled
  @whitespace: GAP
  token GAP ::= '#'+;
  token ID ::= 'a';

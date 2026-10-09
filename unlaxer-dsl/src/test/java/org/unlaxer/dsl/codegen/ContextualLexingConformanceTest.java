@@ -65,6 +65,13 @@ public class ContextualLexingConformanceTest {
             };
             if (example != null) assertEquals("runnable example drift: " + example,
                 f.get("grammar").getAsString().strip(), Files.readString(repo.resolve("examples/parse-composition/" + example)).strip());
+            String contextualExample = switch (f.get("name").getAsString()) {
+                case "named-trivia" -> "named-trivia.ubnf";
+                case "named-global-scoped-context" -> "named-global-scoped.ubnf";
+                default -> null;
+            };
+            if (contextualExample != null) assertEquals("runnable contextual example drift: " + contextualExample,
+                f.get("grammar").getAsString().strip(), Files.readString(repo.resolve("spec-corpus/contextual-lexing/" + contextualExample)).strip());
             var grammar=grammar(f);
             GrammarValidator.validateOrThrow(grammar);
             try(var loader=compileJava(grammar)) {
