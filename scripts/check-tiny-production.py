@@ -16,7 +16,7 @@ if original.read_bytes()!=(fixture/'original.txt').read_bytes():raise SystemExit
 if not args.skip_build:
     run(mvn+['-pl','unlaxer-common,unlaxer-dsl','-am','-DskipTests','package'])
     tests='FormulaInfoSourceDocumentTest,FormulaInfoParserTest,P4EngineModeMatrixTest,P4ParserEngineTest,P4SourceMappingTest,P4OwnedSliceSourceTest,P4JavaCodeEmitterSourceTextTest'
-    run(mvn+['-Dtinyexpression.skipRailroad=true','-Dtest='+tests,'install'],tiny,600)
+    run(mvn+['-Dgpg.skip=true','-Dtinyexpression.skipRailroad=true','-Dtest='+tests,'install'],tiny,600)
     run(mvn+['-Dtest=TinyExpressionP4LanguageServerExtTest,TinyExpressionP4DebugAdapterExtTest','test'],tiny/'tools/tinyexpression-p4-lsp-vscode',600)
     for directory in [tiny/'target/surefire-reports',tiny/'tools/tinyexpression-p4-lsp-vscode/target/surefire-reports']:
         reports=[ET.parse(file).getroot() for file in directory.glob('TEST-*.xml')]
