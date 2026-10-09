@@ -17,7 +17,9 @@ mod scope;
 pub mod semantic;
 pub mod semantic_project;
 pub mod semantic_query_cache;
+pub mod semantic_rename;
 pub mod source;
+pub mod source_edits;
 pub mod type_system;
 #[doc(hidden)]
 pub use first::{set_candidate_exclusion_for_current_thread, CandidateExclusion};
