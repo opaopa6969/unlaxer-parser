@@ -23,7 +23,9 @@ jobs:
         working-directory: unlaxer-dsl/ubnf-vscode
       - run: python3 scripts/language-profile-corpus.py --check
       - run: python3 scripts/language-profile-packages.py --check
-      - run: mvn -B -pl unlaxer-common,unlaxer-dsl -am test -Dtest=LanguageProfileSelectionTest,LSPProfileInitializationTest,LSPCompileVerificationTest,LSPNonBmpOffsetTest,PackagedLanguageProfileConformanceTest,LanguageProfileConformanceTest,LanguageProfileCommandTest,PlaygroundCommandTest,RustUbnfFrontendConformanceTest -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
+      - run: python3 scripts/language-profile-edit-replay.py --check
+      - run: mvn -B -pl unlaxer-common,unlaxer-dsl -am test -Dtest=LanguageProfileSelectionTest,LSPProfileInitializationTest,LSPCompileVerificationTest,LSPNonBmpOffsetTest,PackagedLanguageProfileConformanceTest,LanguageProfileConformanceTest,LanguageProfileEditReplayConformanceTest,LanguageProfileCommandTest,PlaygroundCommandTest,RustUbnfFrontendConformanceTest -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
+      - run: test -s unlaxer-dsl/target/language-profile-edit-replay.tsv
       - run: cargo test --locked --manifest-path rust/Cargo.toml -p unlaxer-runtime --test language_profile
       - run: cargo test --locked --manifest-path rust/Cargo.toml -p unlaxer-generator --test language_profiles
       - uses: actions/upload-artifact@v4

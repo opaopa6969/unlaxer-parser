@@ -151,3 +151,15 @@ profile 未指定時は従来の LSP 動作です。
 
 共通選択 API は Java `LanguageProfile.select(grammar, entry)`、Rust `LanguageProfile::select(grammar, entry)` です。
 両方に同じ selection/capability fixture を実行します。Classic LSP transport/server generator はこの時点では Java にあり、Rust の同プロトコル配線は #111 の後続作業です。Rust 側の共通 profile 選択 API を実装したことだけで Rust LSP の完了とは扱いません。
+
+### 持続 session の長い編集系列
+
+[#486 の共通 fixture](fixtures/language-profile-edit-replay/README.md) は、3 profile に
+各48回、計144回の部分編集を同じ URI へ適用する。実 edit API、固定した文法レジストリ、
+累積 source と全 snapshot/query 履歴を保持し、未閉鎖からの復帰、Unicode、CRLF/LF、
+過去 binding の拒否を Java/Rust で独立期待値と比較する。既存 `mutations.tsv` の204件は
+独立入力の解析であり、この持続 session とは別の検証である。
+
+対象は共通 runtime の長系列であり、生成 LSP の `didChange` 通信の長系列や incremental
+解析性能を検証したとは表示しない。公開 profile の `VALIDATE=EXTERNAL` と
+`CODE_ACTION=UNSUPPORTED` は維持し、外部 provider を登録せずに対応能力を増やさない。
