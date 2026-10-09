@@ -268,7 +268,7 @@ fn nested_dispatch_and_source_preserving_edits() {
     assert_eq!(regions.at(13).unwrap().unwrap().id, "java2");
     assert_eq!(regions.at(10).unwrap().unwrap().id, "tiny");
     assert_eq!(regions.at(5).unwrap().unwrap().id, "formula");
-    assert!(regions.at(19).unwrap().is_none());
+    assert_eq!(regions.at(19).unwrap().unwrap().id, "formula");
     assert_eq!(
         regions
             .dispatch("java1", Operation::Parse, &HashMap::new(), &host())
@@ -452,5 +452,312 @@ fn actual_parser_callback_is_bounded_and_sibling_failure_is_isolated() {
             .unwrap()
             .state,
         State::Complete
+    );
+}
+
+#[test]
+fn empty_copy_anchors_compose_without_inventing_ambiguous_positions() {
+    let host = snapshot("host", "日😀[");
+    let middle = snapshot("middle", "😀[");
+    let empty = snapshot("empty", "");
+    let point = span(0, 0);
+    let expected = Location::new(host.clone(), span(3, 3)).unwrap();
+    let map = copy(empty.clone(), middle.clone(), 2)
+        .through(copy(middle.clone(), host.clone(), 1))
+        .unwrap();
+    assert_eq!(map.edit(point).unwrap(), expected);
+    assert_eq!(map.cursor(&expected).unwrap(), Some(0));
+    assert_eq!(
+        host.lsp(3).unwrap(),
+        Position {
+            line: 0,
+            character: 4
+        }
+    );
+    let nested = copy(snapshot("nested", ""), empty.clone(), 0)
+        .through(map)
+        .unwrap();
+    assert_eq!(nested.edit(point).unwrap(), expected);
+    assert_eq!(nested.cursor(&expected).unwrap(), Some(0));
+    let stale = Snapshot::new("host", host.version + 1, &host.text).unwrap();
+    assert_eq!(
+        nested
+            .cursor(&Location::new(stale, span(3, 3)).unwrap())
+            .unwrap(),
+        None
+    );
+    let unanchored = SourceMap::new(empty.clone(), vec![]).unwrap();
+    assert_eq!(unanchored.cursor(&expected).unwrap(), None);
+    assert!(unanchored.edit(point).is_err());
+    let anchor = Segment {
+        output: point,
+        kind: Kind::Copy,
+        origin: Some(expected.clone()),
+    };
+    assert!(SourceMap::new(empty.clone(), vec![anchor.clone(), anchor.clone()]).is_err());
+    for kind in [Kind::Generated, Kind::Transformed] {
+        assert!(SourceMap::new(
+            empty.clone(),
+            vec![Segment {
+                output: point,
+                kind,
+                origin: Some(expected.clone())
+            }]
+        )
+        .is_err());
+    }
+    assert!(SourceMap::new(middle, vec![anchor]).is_err());
+    let split_host = snapshot("split-host", "a#a");
+    let split = snapshot("split", "aa");
+    let parent = SourceMap::new(
+        split.clone(),
+        vec![
+            Segment {
+                output: span(0, 1),
+                kind: Kind::Copy,
+                origin: Some(Location::new(split_host.clone(), span(0, 1)).unwrap()),
+            },
+            Segment {
+                output: span(1, 2),
+                kind: Kind::Copy,
+                origin: Some(Location::new(split_host.clone(), span(2, 3)).unwrap()),
+            },
+        ],
+    )
+    .unwrap();
+    let ambiguous = copy(empty, split, 1).through(parent).unwrap();
+    for offset in [1, 2] {
+        assert_eq!(
+            ambiguous
+                .cursor(&Location::new(split_host.clone(), span(offset, offset)).unwrap())
+                .unwrap(),
+            None
+        );
+    }
+    assert!(ambiguous.edit(point).is_err());
+}
+
+#[test]
+fn shared_partial_eof_ownership() {
+    let host = snapshot("host", "😀ABC");
+    assert_eq!(host.len(), 4);
+    assert_eq!(host.utf16(4).unwrap(), 5);
+    for line in include_str!("../../../docs/fixtures/source-maps/partial-eof.tsv")
+        .lines()
+        .filter(|line| !line.starts_with('#'))
+    {
+        let columns: Vec<_> = line.split('\t').collect();
+        let mut input = vec![];
+        for encoded in columns[2].split(';') {
+            let f: Vec<_> = encoded.split(',').collect();
+            let full = span(f[2].parse().unwrap(), f[3].parse().unwrap());
+            let body = span(f[4].parse().unwrap(), f[5].parse().unwrap());
+            let child = snapshot(f[0], host.slice(body).unwrap());
+            let map = if child.is_empty() {
+                SourceMap::new(child, vec![]).unwrap()
+            } else {
+                copy(child, host.clone(), body.start)
+            };
+            input.push(Region {
+                id: f[0].into(),
+                parent: if f[1] == "-" { None } else { Some(f[1].into()) },
+                language: Language {
+                    id: "x".into(),
+                    package_id: "local".into(),
+                    version: "1".into(),
+                    grammar: "X".into(),
+                    entry: "Document".into(),
+                },
+                full,
+                body,
+                source_map: map,
+                parse_state: match f[6] {
+                    "PARTIAL" => State::Partial,
+                    "COMPLETE" => State::Complete,
+                    _ => State::Failed,
+                },
+            });
+        }
+        let regions = LanguageRegions::new(host.clone(), input).unwrap();
+        let result = regions.at(columns[1].parse().unwrap());
+        if columns[3] == "REJECT" {
+            assert!(result.is_err(), "{}", columns[0]);
+        } else {
+            assert_eq!(
+                result.unwrap().map(|r| r.id.as_str()).unwrap_or("NONE"),
+                columns[3],
+                "{}",
+                columns[0]
+            );
+        }
+    }
+}
+
+#[test]
+fn empty_partial_region_forwards_completion_and_insertion_at_host_eof() {
+    use std::collections::BTreeMap;
+    use unlaxer_runtime::language_queries as query;
+    struct Completion;
+    impl query::Provider for Completion {
+        fn capabilities(&self) -> HashSet<Operation> {
+            [Operation::Completion].into()
+        }
+        fn query(&self, request: &query::Request<'_>) -> Result<query::Response> {
+            assert_eq!(request.cursor, 0);
+            assert_eq!(request.region.source_map.output().text, "");
+            let child = request.region.source_map.output().clone();
+            let location = Location::new(child.clone(), span(0, 0))?;
+            Ok(query::Response {
+                snapshot: child,
+                project: "project".into(),
+                project_version: 1,
+                state: State::Partial,
+                items: vec![query::Item {
+                    label: "value".into(),
+                    detail: "empty input".into(),
+                    locations: vec![location.clone()],
+                    edits: vec![query::TextEdit {
+                        location,
+                        replacement: "value".into(),
+                    }],
+                }],
+            })
+        }
+    }
+    let host = snapshot("host", "日😀[");
+    let child = snapshot("child", "");
+    let language = Language {
+        id: "empty".into(),
+        package_id: "local".into(),
+        version: "1".into(),
+        grammar: "Empty".into(),
+        entry: "Document".into(),
+    };
+    let region = Region {
+        id: "empty".into(),
+        parent: None,
+        language: language.clone(),
+        full: span(2, 3),
+        body: span(3, 3),
+        source_map: copy(child.clone(), host.clone(), 3),
+        parse_state: State::Partial,
+    };
+    let tree = LanguageRegions::new(host.clone(), vec![region.clone()]).unwrap();
+    let project = query::Project {
+        id: "project".into(),
+        version: 1,
+        documents: BTreeMap::from([(host.uri.clone(), host.clone())]),
+        configuration: BTreeMap::new(),
+    };
+    let queries = query::LanguageQueries::new(
+        LanguageRegions::new(host.clone(), vec![region.clone()]).unwrap(),
+        project.clone(),
+        HashMap::from([(language, Box::new(Completion) as Box<dyn query::Provider>)]),
+    )
+    .unwrap();
+    let result = queries
+        .query(&host, &project, 3, Operation::Completion, &BTreeMap::new())
+        .unwrap();
+    assert_eq!(result.region, "empty");
+    assert_eq!(result.state, State::Partial);
+    assert_eq!(result.items[0].locations[0].location.span, span(3, 3));
+    assert_eq!(result.items[0].edits[0].span, span(3, 3));
+    assert_eq!(
+        tree.apply(&host, 2, &result.items[0].edits).unwrap().text,
+        "日😀[value"
+    );
+    assert_eq!(
+        queries
+            .query(&host, &project, 2, Operation::Completion, &BTreeMap::new())
+            .unwrap()
+            .state,
+        State::Unsupported
+    );
+    let closed = Region {
+        parse_state: State::Complete,
+        ..region
+    };
+    assert!(LanguageRegions::new(host, vec![closed])
+        .unwrap()
+        .at(3)
+        .unwrap()
+        .is_none());
+}
+
+#[test]
+fn explicit_enclosure_boundaries_are_independent_and_validated() {
+    let host = snapshot("host", "😀ABC");
+    let full = span(0, 4);
+    let partial = Region {
+        id: "x".into(),
+        parent: None,
+        language: java(),
+        full,
+        body: full,
+        source_map: copy(host.clone(), host.clone(), 0),
+        parse_state: State::Partial,
+    };
+    assert!(
+        LanguageRegions::with_open_ends(host.clone(), vec![partial.clone()], HashSet::new())
+            .unwrap()
+            .at(4)
+            .unwrap()
+            .is_none()
+    );
+    let complete = Region {
+        parse_state: State::Complete,
+        ..partial
+    };
+    assert_eq!(
+        LanguageRegions::with_open_ends(host.clone(), vec![complete.clone()], ["x".into()].into())
+            .unwrap()
+            .at(4)
+            .unwrap()
+            .unwrap()
+            .id,
+        "x"
+    );
+    assert!(LanguageRegions::with_open_ends(
+        host.clone(),
+        vec![complete],
+        ["unknown".into()].into()
+    )
+    .is_err());
+    let body = span(1, 3);
+    let child = snapshot("child", host.slice(body).unwrap());
+    let closed = Region {
+        id: "closed".into(),
+        parent: None,
+        language: java(),
+        full,
+        body,
+        source_map: copy(child, host.clone(), 1),
+        parse_state: State::Partial,
+    };
+    assert!(
+        LanguageRegions::with_open_ends(host.clone(), vec![closed], ["closed".into()].into())
+            .is_err()
+    );
+    let point = span(4, 4);
+    let empty = snapshot("empty", "");
+    let a = Region {
+        id: "a".into(),
+        parent: None,
+        language: java(),
+        full: point,
+        body: point,
+        source_map: copy(empty, host.clone(), 4),
+        parse_state: State::Complete,
+    };
+    let b = Region {
+        id: "b".into(),
+        parse_state: State::Failed,
+        ..a.clone()
+    };
+    assert!(
+        LanguageRegions::with_open_ends(host, vec![a, b], ["a".into(), "b".into()].into())
+            .unwrap()
+            .at(4)
+            .is_err()
     );
 }

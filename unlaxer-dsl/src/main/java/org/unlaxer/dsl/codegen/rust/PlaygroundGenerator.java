@@ -66,7 +66,7 @@ public final class PlaygroundGenerator {
         files.put(".cargo/config.toml", resource("playground/config.toml"));
         files.put("runtime/Cargo.toml", resource("playground/runtime-Cargo.toml"));
         files.put("runtime/LICENSE", resource("playground/runtime/LICENSE"));
-        for (String name : new String[] {"lib.rs", "scope.rs", "semantic.rs", "editor.rs", "editor_cst.rs", "editor_queries.rs", "language_queries.rs", "semantic_queries.rs", "semantic_project.rs", "semantic_rename.rs", "source_edits.rs", "source.rs", "language_profile.rs", "embedded.rs", "provider_protocol.rs", "provider_process.rs", "pipeline.rs", "lexing.rs", "first.rs", "lexical.rs", "long_code_fence.rs", "memo_retention_tests.rs", "semantic_query_cache.rs", "type_system.rs", "call_inference.rs"}) {
+        for (String name : new String[] {"lib.rs", "scope.rs", "semantic.rs", "editor.rs", "editor_cst.rs", "editor_queries.rs", "language_queries.rs", "semantic_queries.rs", "semantic_project.rs", "semantic_rename.rs", "source_edits.rs", "source.rs", "language_profile.rs", "embedded.rs", "provider_protocol.rs", "provider_process.rs", "pipeline.rs", "lexing.rs", "first.rs", "lexical.rs", "long_code_fence.rs", "memo_retention_tests.rs", "semantic_query_cache.rs", "type_system.rs", "call_inference.rs", "semantic_rules.rs"}) {
             files.put("runtime/src/" + name, resource("playground/runtime/src/" + name));
         }
         files.put("src/lib.rs", resource("playground/lib.rs")

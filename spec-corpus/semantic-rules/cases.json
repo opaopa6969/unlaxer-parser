@@ -1,0 +1,873 @@
+{
+  "cases": [
+    {
+      "id": "unknown",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; call process(?);",
+      "cursor": 151,
+      "prefix": "",
+      "expected": {
+        "status": "COMPLETE",
+        "expected": [
+          "Accessor"
+        ],
+        "completions": [
+          "db"
+        ],
+        "diagnostics": [],
+        "types": [
+          [
+            "Int",
+            6,
+            20,
+            []
+          ],
+          [
+            "Accessor",
+            20,
+            41,
+            []
+          ],
+          [
+            "Db",
+            41,
+            69,
+            [
+              [
+                "id",
+                "Int",
+                60,
+                67
+              ]
+            ]
+          ],
+          [
+            "Wrong",
+            69,
+            84,
+            []
+          ]
+        ],
+        "symbols": [
+          [
+            "db",
+            "Db",
+            84,
+            95,
+            "$root",
+            95
+          ],
+          [
+            "wrong",
+            "Wrong",
+            95,
+            112,
+            "$root",
+            112
+          ]
+        ],
+        "edit": [
+          151,
+          151
+        ],
+        "region": {
+          "completion": [
+            [
+              "db",
+              "Db; expected=Accessor; YES:EXPECTED_ARGUMENT",
+              [
+                [
+                  "memory:host",
+                  7,
+                  86,
+                  97,
+                  true
+                ]
+              ],
+              [
+                [
+                  153,
+                  153,
+                  "db"
+                ]
+              ]
+            ]
+          ],
+          "state": "COMPLETE",
+          "validation": [],
+          "wrongIdentity": "REJECTED",
+          "oldProject": "REJECTED",
+          "format": "UNSUPPORTED"
+        }
+      },
+      "sourceLength": 154,
+      "utf16Length": 155
+    },
+    {
+      "id": "partial-argument",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; call process(",
+      "cursor": 151,
+      "prefix": "",
+      "expected": {
+        "status": "PARTIAL",
+        "expected": [
+          "Accessor"
+        ],
+        "completions": [
+          "db"
+        ],
+        "diagnostics": [],
+        "edit": [
+          151,
+          151
+        ],
+        "region": {
+          "completion": [
+            [
+              "db",
+              "Db; expected=Accessor; YES:EXPECTED_ARGUMENT",
+              [
+                [
+                  "memory:host",
+                  7,
+                  86,
+                  97,
+                  true
+                ]
+              ],
+              [
+                [
+                  153,
+                  153,
+                  "db"
+                ]
+              ]
+            ]
+          ],
+          "state": "PARTIAL",
+          "validation": [],
+          "wrongIdentity": "REJECTED",
+          "oldProject": "REJECTED",
+          "format": "UNSUPPORTED"
+        }
+      },
+      "sourceLength": 151,
+      "utf16Length": 152
+    },
+    {
+      "id": "partial-close",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; call process(db",
+      "cursor": 153,
+      "prefix": "",
+      "expected": {
+        "status": "PARTIAL",
+        "expected": [
+          "Accessor"
+        ],
+        "completions": [
+          "db"
+        ],
+        "diagnostics": [],
+        "edit": [
+          153,
+          153
+        ]
+      },
+      "sourceLength": 153,
+      "utf16Length": 154
+    },
+    {
+      "id": "wrong-argument",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; call process(wrong);",
+      "cursor": 156,
+      "prefix": "",
+      "expected": {
+        "status": "COMPLETE",
+        "expected": [
+          "Accessor"
+        ],
+        "completions": [
+          "db"
+        ],
+        "diagnostics": [
+          "INCOMPATIBLE_CALL"
+        ],
+        "edit": [
+          156,
+          156
+        ],
+        "region": {
+          "completion": [
+            [
+              "db",
+              "Db; expected=Accessor; YES:EXPECTED_ARGUMENT",
+              [
+                [
+                  "memory:host",
+                  7,
+                  86,
+                  97,
+                  true
+                ]
+              ],
+              [
+                [
+                  158,
+                  158,
+                  "db"
+                ]
+              ]
+            ]
+          ],
+          "state": "COMPLETE",
+          "validation": [
+            [
+              "INCOMPATIBLE_CALL",
+              "calls@138:158",
+              [
+                [
+                  "memory:host",
+                  7,
+                  140,
+                  160,
+                  true
+                ]
+              ],
+              []
+            ]
+          ],
+          "wrongIdentity": "REJECTED",
+          "oldProject": "REJECTED",
+          "format": "UNSUPPORTED"
+        }
+      },
+      "sourceLength": 158,
+      "utf16Length": 159
+    },
+    {
+      "id": "unresolved",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; call process(missing);",
+      "cursor": 158,
+      "prefix": "",
+      "expected": {
+        "status": "COMPLETE",
+        "expected": [
+          "Accessor"
+        ],
+        "completions": [
+          "db"
+        ],
+        "diagnostics": [
+          "UNRESOLVED_REFERENCE"
+        ],
+        "edit": [
+          158,
+          158
+        ]
+      },
+      "sourceLength": 160,
+      "utf16Length": 161
+    },
+    {
+      "id": "integer-expression",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; call process(1);",
+      "cursor": 152,
+      "prefix": "",
+      "expected": {
+        "status": "COMPLETE",
+        "expected": [
+          "Accessor"
+        ],
+        "completions": [
+          "db"
+        ],
+        "diagnostics": [
+          "INCOMPATIBLE_CALL"
+        ],
+        "edit": [
+          152,
+          152
+        ]
+      },
+      "sourceLength": 154,
+      "utf16Length": 155
+    },
+    {
+      "id": "integer-good",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; let one:Int; fn number(Int):Int; call number(1);",
+      "cursor": 184,
+      "prefix": "",
+      "expected": {
+        "status": "COMPLETE",
+        "expected": [
+          "Int"
+        ],
+        "completions": [
+          "one"
+        ],
+        "diagnostics": [],
+        "edit": [
+          184,
+          184
+        ]
+      },
+      "sourceLength": 186,
+      "utf16Length": 187
+    },
+    {
+      "id": "nested-shadow",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; block {let db:Wrong; call process(?);}",
+      "cursor": 172,
+      "prefix": "",
+      "expected": {
+        "status": "COMPLETE",
+        "expected": [
+          "Accessor"
+        ],
+        "completions": [],
+        "diagnostics": [],
+        "edit": [
+          172,
+          172
+        ]
+      },
+      "sourceLength": 176,
+      "utf16Length": 177
+    },
+    {
+      "id": "partial-nested",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; block {let db:Wrong; call process(",
+      "cursor": 172,
+      "prefix": "",
+      "expected": {
+        "status": "PARTIAL",
+        "expected": [
+          "Accessor"
+        ],
+        "completions": [],
+        "diagnostics": [],
+        "edit": [
+          172,
+          172
+        ]
+      },
+      "sourceLength": 172,
+      "utf16Length": 173
+    },
+    {
+      "id": "block-no-leak",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; block {let local:Db;} call process(?);",
+      "cursor": 173,
+      "prefix": "",
+      "expected": {
+        "status": "COMPLETE",
+        "expected": [
+          "Accessor"
+        ],
+        "completions": [
+          "db"
+        ],
+        "diagnostics": [],
+        "edit": [
+          173,
+          173
+        ]
+      },
+      "sourceLength": 176,
+      "utf16Length": 177
+    },
+    {
+      "id": "forward-value-hidden",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; call process(?); let later:Db;",
+      "cursor": 151,
+      "prefix": "",
+      "expected": {
+        "status": "COMPLETE",
+        "expected": [
+          "Accessor"
+        ],
+        "completions": [
+          "db"
+        ],
+        "diagnostics": [],
+        "edit": [
+          151,
+          151
+        ]
+      },
+      "sourceLength": 168,
+      "utf16Length": 169
+    },
+    {
+      "id": "forward-value-visible",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; call process(?); let later:Db;",
+      "cursor": 151,
+      "prefix": "",
+      "expected": {
+        "status": "COMPLETE",
+        "expected": [
+          "Accessor"
+        ],
+        "completions": [
+          "db",
+          "later"
+        ],
+        "diagnostics": [],
+        "edit": [
+          151,
+          151
+        ]
+      },
+      "variant": "scopeStart",
+      "sourceLength": 168,
+      "utf16Length": 169
+    },
+    {
+      "id": "changed-symbol-rule",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; call process(?);",
+      "cursor": 151,
+      "prefix": "",
+      "expected": {
+        "status": "COMPLETE",
+        "expected": [
+          "Accessor"
+        ],
+        "completions": [],
+        "diagnostics": [],
+        "edit": [
+          151,
+          151
+        ]
+      },
+      "variant": "symbolWrong",
+      "sourceLength": 154,
+      "utf16Length": 155
+    },
+    {
+      "id": "changed-parameter-rule",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; call process(?);",
+      "cursor": 151,
+      "prefix": "",
+      "expected": {
+        "status": "COMPLETE",
+        "expected": [
+          "Wrong"
+        ],
+        "completions": [
+          "wrong"
+        ],
+        "diagnostics": [],
+        "edit": [
+          151,
+          151
+        ]
+      },
+      "variant": "parameterWrong",
+      "sourceLength": 154,
+      "utf16Length": 155
+    },
+    {
+      "id": "overload",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; fn process(Wrong):Int; call process(?);",
+      "cursor": 174,
+      "prefix": "",
+      "expected": {
+        "status": "COMPLETE",
+        "expected": [
+          "Accessor",
+          "Wrong"
+        ],
+        "completions": [
+          "db",
+          "wrong"
+        ],
+        "diagnostics": [
+          "AMBIGUOUS_CALL"
+        ],
+        "edit": [
+          174,
+          174
+        ]
+      },
+      "sourceLength": 177,
+      "utf16Length": 178
+    },
+    {
+      "id": "call-shadow",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; block {fn process(Wrong):Int; call process(?);}",
+      "cursor": 181,
+      "prefix": "",
+      "expected": {
+        "status": "COMPLETE",
+        "expected": [
+          "Wrong"
+        ],
+        "completions": [
+          "wrong"
+        ],
+        "diagnostics": [],
+        "edit": [
+          181,
+          181
+        ]
+      },
+      "sourceLength": 185,
+      "utf16Length": 186
+    },
+    {
+      "id": "unresolved-call",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; call missing(?);",
+      "cursor": 151,
+      "prefix": "",
+      "expected": {
+        "status": "COMPLETE",
+        "expected": [],
+        "completions": [],
+        "diagnostics": [
+          "UNRESOLVED_CALL"
+        ]
+      },
+      "sourceLength": 154,
+      "utf16Length": 155
+    },
+    {
+      "id": "duplicate-binding",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; let db:Db; call process(?);",
+      "cursor": 162,
+      "prefix": "",
+      "expected": {
+        "status": "FAILED",
+        "expected": [],
+        "completions": [],
+        "diagnostics": [
+          "DUPLICATE_SYMBOL_NAME"
+        ]
+      },
+      "sourceLength": 165,
+      "utf16Length": 166
+    },
+    {
+      "id": "undefined-type",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; let missing:Missing; call process(?);",
+      "cursor": 172,
+      "prefix": "",
+      "expected": {
+        "status": "FAILED",
+        "expected": [],
+        "completions": [],
+        "diagnostics": [
+          "UNDEFINED_TYPE"
+        ]
+      },
+      "sourceLength": 175,
+      "utf16Length": 176
+    },
+    {
+      "id": "cyclic-type",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; interface A:B{} interface B:A{} call process(?);",
+      "cursor": 183,
+      "prefix": "",
+      "expected": {
+        "status": "FAILED",
+        "expected": [],
+        "completions": [],
+        "diagnostics": [
+          "CYCLIC_TYPE"
+        ]
+      },
+      "sourceLength": 186,
+      "utf16Length": 187
+    },
+    {
+      "id": "unsupported-local-type",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; block {record Local{}} call process(?);",
+      "cursor": 174,
+      "prefix": "",
+      "expected": {
+        "status": "FAILED",
+        "expected": [],
+        "completions": [],
+        "diagnostics": [
+          "TYPE_SCOPE_UNSUPPORTED"
+        ]
+      },
+      "sourceLength": 177,
+      "utf16Length": 178
+    },
+    {
+      "id": "partial-declaration",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; let unfinished:",
+      "cursor": 153,
+      "prefix": "",
+      "expected": {
+        "status": "PARTIAL",
+        "expected": [],
+        "completions": [],
+        "diagnostics": []
+      },
+      "fragments": [
+        "Int",
+        ";"
+      ],
+      "sourceLength": 153,
+      "utf16Length": 154
+    },
+    {
+      "id": "partial-type",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; record Last{id:Int;",
+      "cursor": 157,
+      "prefix": "",
+      "expected": {
+        "status": "PARTIAL",
+        "expected": [],
+        "completions": [],
+        "diagnostics": [
+          "INCOMPLETE_OWNER"
+        ]
+      },
+      "fragments": [
+        "}"
+      ],
+      "sourceLength": 157,
+      "utf16Length": 158
+    },
+    {
+      "id": "recovery",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; broken junk; call process(?);",
+      "cursor": 164,
+      "prefix": "",
+      "expected": {
+        "status": "PARTIAL",
+        "expected": [
+          "Accessor"
+        ],
+        "completions": [
+          "db"
+        ],
+        "diagnostics": [],
+        "edit": [
+          164,
+          164
+        ]
+      },
+      "sourceLength": 167,
+      "utf16Length": 168
+    },
+    {
+      "id": "syntax",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; @@@",
+      "cursor": 141,
+      "prefix": "",
+      "expected": {
+        "status": "FAILED",
+        "expected": [],
+        "completions": [],
+        "diagnostics": [
+          "PARSE_SYNTAX"
+        ]
+      },
+      "sourceLength": 141,
+      "utf16Length": 142
+    },
+    {
+      "id": "inventory-drift",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; call process(?);",
+      "cursor": 151,
+      "prefix": "",
+      "expected": {
+        "status": "FAILED",
+        "expected": [],
+        "completions": [],
+        "diagnostics": [
+          "INVENTORY_MISMATCH"
+        ]
+      },
+      "variant": "inventoryDrift",
+      "sourceLength": 154,
+      "utf16Length": 155
+    },
+    {
+      "id": "cardinality",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; call process(?);",
+      "cursor": 151,
+      "prefix": "",
+      "expected": {
+        "status": "FAILED",
+        "expected": [],
+        "completions": [],
+        "diagnostics": [
+          "SELECTOR_CARDINALITY"
+        ]
+      },
+      "variant": "nameParents",
+      "sourceLength": 154,
+      "utf16Length": 155
+    },
+    {
+      "id": "prefix",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; call process(d",
+      "cursor": 152,
+      "prefix": "d",
+      "expected": {
+        "status": "PARTIAL",
+        "expected": [
+          "Accessor"
+        ],
+        "completions": [
+          "db"
+        ],
+        "diagnostics": [
+          "UNRESOLVED_REFERENCE"
+        ],
+        "edit": [
+          151,
+          152
+        ]
+      },
+      "sourceLength": 152,
+      "utf16Length": 153
+    },
+    {
+      "id": "inference-limit",
+      "source": "interface I0 {}\ninterface I1:I0 {}\ninterface I2:I1 {}\ninterface I3:I2 {}\ninterface I4:I3 {}\ninterface I5:I4 {}\ninterface I6:I5 {}\ninterface I7:I6 {}\ninterface I8:I7 {}\ninterface I9:I8 {}\ninterface I10:I9 {}\ninterface I11:I10 {}\ninterface I12:I11 {}\ninterface I13:I12 {}\ninterface I14:I13 {}\ninterface I15:I14 {}\ninterface I16:I15 {}\ninterface I17:I16 {}\ninterface I18:I17 {}\ninterface I19:I18 {}\ninterface I20:I19 {}\ninterface I21:I20 {}\ninterface I22:I21 {}\ninterface I23:I22 {}\ninterface I24:I23 {}\ninterface I25:I24 {}\ninterface I26:I25 {}\ninterface I27:I26 {}\ninterface I28:I27 {}\ninterface I29:I28 {}\ninterface I30:I29 {}\ninterface I31:I30 {}\ninterface I32:I31 {}\ninterface I33:I32 {}\ninterface I34:I33 {}\ninterface I35:I34 {}\ninterface I36:I35 {}\ninterface I37:I36 {}\ninterface I38:I37 {}\ninterface I39:I38 {}\ninterface I40:I39 {}\ninterface I41:I40 {}\ninterface I42:I41 {}\ninterface I43:I42 {}\ninterface I44:I43 {}\ninterface I45:I44 {}\ninterface I46:I45 {}\ninterface I47:I46 {}\ninterface I48:I47 {}\ninterface I49:I48 {}\ninterface I50:I49 {}\ninterface I51:I50 {}\ninterface I52:I51 {}\ninterface I53:I52 {}\ninterface I54:I53 {}\ninterface I55:I54 {}\ninterface I56:I55 {}\ninterface I57:I56 {}\ninterface I58:I57 {}\ninterface I59:I58 {}\ninterface I60:I59 {}\ninterface I61:I60 {}\ninterface I62:I61 {}\ninterface I63:I62 {}\ninterface I64:I63 {}\ninterface I65:I64 {}\ninterface I66:I65 {}\ninterface I67:I66 {}\ninterface I68:I67 {}\ninterface I69:I68 {}\ninterface I70:I69 {}\ninterface I71:I70 {}\ninterface I72:I71 {}\ninterface I73:I72 {}\ninterface I74:I73 {}\ninterface I75:I74 {}\ninterface I76:I75 {}\ninterface I77:I76 {}\ninterface I78:I77 {}\ninterface I79:I78 {}\ninterface I80:I79 {}\ninterface I81:I80 {}\ninterface I82:I81 {}\ninterface I83:I82 {}\ninterface I84:I83 {}\ninterface I85:I84 {}\ninterface I86:I85 {}\ninterface I87:I86 {}\ninterface I88:I87 {}\ninterface I89:I88 {}\ninterface I90:I89 {}\ninterface I91:I90 {}\ninterface I92:I91 {}\ninterface I93:I92 {}\ninterface I94:I93 {}\ninterface I95:I94 {}\ninterface I96:I95 {}\ninterface I97:I96 {}\ninterface I98:I97 {}\ninterface I99:I98 {}\ninterface I100:I99 {}\ninterface I101:I100 {}\ninterface I102:I101 {}\ninterface I103:I102 {}\ninterface I104:I103 {}\ninterface I105:I104 {}\ninterface I106:I105 {}\ninterface I107:I106 {}\ninterface I108:I107 {}\ninterface I109:I108 {}\ninterface I110:I109 {}\ninterface I111:I110 {}\ninterface I112:I111 {}\ninterface I113:I112 {}\ninterface I114:I113 {}\ninterface I115:I114 {}\ninterface I116:I115 {}\ninterface I117:I116 {}\ninterface I118:I117 {}\ninterface I119:I118 {}\ninterface I120:I119 {}\ninterface I121:I120 {}\ninterface I122:I121 {}\ninterface I123:I122 {}\ninterface I124:I123 {}\ninterface I125:I124 {}\ninterface I126:I125 {}\ninterface I127:I126 {}\ninterface I128:I127 {}\ninterface I129:I128 {}\nrecord R:I129 {}\nlet v:R;\nfn f(I0):I0;\ncall f(v);",
+      "cursor": 2812,
+      "prefix": "",
+      "sourceLength": 2814,
+      "utf16Length": 2814,
+      "expected": {
+        "status": "PARTIAL",
+        "expected": [
+          "I0"
+        ],
+        "completions": [],
+        "diagnostics": [
+          "INFERENCE_LIMIT"
+        ],
+        "diagnosticSpans": [
+          [
+            2804,
+            2814,
+            "calls@2804:2814",
+            "memory:rules",
+            7
+          ]
+        ]
+      }
+    },
+    {
+      "id": "capture-comments",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; let /*a*/ newDb /*b*/ : /*c*/ Db /*d*/ ; call process(newDb /*😀*/);",
+      "cursor": 197,
+      "prefix": "",
+      "sourceLength": 205,
+      "utf16Length": 207,
+      "expected": {
+        "status": "COMPLETE",
+        "expected": [
+          "Accessor"
+        ],
+        "completions": [
+          "db",
+          "newDb"
+        ],
+        "diagnostics": []
+      }
+    },
+    {
+      "id": "ordered-expression-errors",
+      "source": "builtin Bool{} fn f(Bool,Bool):Bool; call f(10,2);",
+      "cursor": 48,
+      "prefix": "",
+      "sourceLength": 50,
+      "utf16Length": 50,
+      "expected": {
+        "status": "FAILED",
+        "expected": [],
+        "completions": [],
+        "diagnostics": [
+          "UNDEFINED_TYPE"
+        ],
+        "diagnosticSpans": [
+          [
+            44,
+            46,
+            "",
+            "memory:rules",
+            7
+          ]
+        ]
+      }
+    },
+    {
+      "id": "unknown-comments",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; call process(? /*😀*/);",
+      "cursor": 151,
+      "prefix": "",
+      "sourceLength": 160,
+      "utf16Length": 162,
+      "expected": {
+        "status": "COMPLETE",
+        "expected": [
+          "Accessor"
+        ],
+        "completions": [
+          "db"
+        ],
+        "diagnostics": []
+      }
+    },
+    {
+      "id": "integer-comments",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; fn number(Int):Int; call number(10 /*😀*/);",
+      "cursor": 170,
+      "prefix": "",
+      "sourceLength": 180,
+      "utf16Length": 182,
+      "expected": {
+        "status": "COMPLETE",
+        "expected": [
+          "Int"
+        ],
+        "completions": [],
+        "diagnostics": []
+      }
+    },
+    {
+      "id": "reference-rule-change",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; call process(db /*😀*/);",
+      "cursor": 151,
+      "prefix": "",
+      "sourceLength": 161,
+      "utf16Length": 163,
+      "expected": {
+        "status": "COMPLETE",
+        "expected": [
+          "Accessor"
+        ],
+        "completions": [
+          "db"
+        ],
+        "diagnostics": [
+          "INCOMPATIBLE_CALL"
+        ]
+      },
+      "variant": "referenceWrong"
+    },
+    {
+      "id": "ambiguous-expression-reference",
+      "source": "/*😀*/ builtin Int{} interface Accessor{} record Db:Accessor{id:Int;} record Wrong{} let db:Db; let wrong:Wrong; fn process(Accessor):Int; call process(db);",
+      "cursor": 151,
+      "prefix": "",
+      "sourceLength": 155,
+      "utf16Length": 156,
+      "expected": {
+        "status": "FAILED",
+        "expected": [],
+        "completions": [],
+        "diagnostics": [
+          "AMBIGUOUS_EXPRESSION"
+        ]
+      },
+      "variant": "referenceExpression"
+    }
+  ]
+}

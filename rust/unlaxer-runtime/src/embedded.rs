@@ -3,13 +3,14 @@ use crate::source::{
     Kind, Language, LanguageRegions, Location, Region, Result, Segment, Snapshot, SourceMap, State,
 };
 use crate::{SharedGrammar, Span};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone)]
 pub struct Child {
     pub language: Language,
     pub full: Span,
     pub body: Span,
+    pub open_end: bool,
 }
 #[derive(Debug, Clone)]
 pub struct Parsed {
@@ -25,14 +26,19 @@ pub trait Grammar {
 pub struct Output {
     pub snapshot: Snapshot,
     pub regions: Vec<Region>,
+    pub open_ends: HashSet<String>,
 }
 impl Output {
     pub fn tree(&self) -> Result<LanguageRegions> {
-        LanguageRegions::new(self.snapshot.clone(), self.regions.clone())
+        LanguageRegions::with_open_ends(
+            self.snapshot.clone(),
+            self.regions.clone(),
+            self.open_ends.clone(),
+        )
     }
     pub fn canonical_json(&self) -> String {
         use crate::json_string as q;
-        let regions = self.regions.iter().map(|r| format!("{{\"id\":{},\"parent\":{},\"language\":{},\"grammar\":{},\"entry\":{},\"state\":{},\"full\":[{},{}],\"body\":[{},{}]}}", q(&r.id), r.parent.as_ref().map(|p|q(p)).unwrap_or_else(|| "null".into()), q(&r.language.id), q(&r.language.grammar), q(&r.language.entry), q(&format!("{:?}", r.parse_state).to_uppercase()), r.full.start, r.full.end, r.body.start, r.body.end)).collect::<Vec<_>>().join(",");
+        let regions = self.regions.iter().map(|r| format!("{{\"id\":{},\"parent\":{},\"language\":{},\"grammar\":{},\"entry\":{},\"state\":{},\"openEnd\":{},\"full\":[{},{}],\"body\":[{},{}]}}", q(&r.id), r.parent.as_ref().map(|p|q(p)).unwrap_or_else(|| "null".into()), q(&r.language.id), q(&r.language.grammar), q(&r.language.entry), q(&format!("{:?}", r.parse_state).to_uppercase()), self.open_ends.contains(&r.id), r.full.start, r.full.end, r.body.start, r.body.end)).collect::<Vec<_>>().join(",");
         format!(
             "{{\"uri\":{},\"version\":{},\"regions\":[{}]}}",
             q(&self.snapshot.uri),
@@ -54,6 +60,7 @@ pub fn parse(
     let mut output = Output {
         snapshot: snapshot.clone(),
         regions: vec![],
+        open_ends: HashSet::new(),
     };
     let span = Span {
         start: 0,
@@ -65,8 +72,18 @@ pub fn parse(
         maximum_depth,
         maximum_regions,
         regions: &mut output.regions,
+        open_ends: &mut output.open_ends,
     };
-    traversal.visit(snapshot, language, "root".into(), None, span, span, 1)?;
+    traversal.visit(
+        snapshot,
+        language,
+        "root".into(),
+        None,
+        span,
+        span,
+        1,
+        false,
+    )?;
     output.tree()?;
     Ok(output)
 }
@@ -76,6 +93,7 @@ struct Traversal<'a> {
     maximum_depth: usize,
     maximum_regions: usize,
     regions: &'a mut Vec<Region>,
+    open_ends: &'a mut HashSet<String>,
 }
 impl Traversal<'_> {
     #[allow(clippy::too_many_arguments)]
@@ -88,6 +106,7 @@ impl Traversal<'_> {
         full: Span,
         body: Span,
         depth: usize,
+        open_end: bool,
     ) -> Result<()> {
         if depth > self.maximum_depth || self.regions.len() >= self.maximum_regions {
             return Err("embedding budget exceeded");
@@ -126,6 +145,10 @@ impl Traversal<'_> {
         for (index, child) in parsed.children.iter().enumerate() {
             input.check(child.full)?;
             input.check(child.body)?;
+            if child.open_end && (child.full.end != child.body.end || child.body.end != input.len())
+            {
+                return Err("invalid open child boundary");
+            }
             if child.full.start > child.body.start || child.body.end > child.full.end {
                 return Err("body outside embedding");
             }
@@ -136,18 +159,17 @@ impl Traversal<'_> {
                 return Err("overlapping embedded siblings");
             }
         }
-        let segments = if input.is_empty() {
-            vec![]
-        } else {
-            vec![Segment {
-                output: Span {
-                    start: 0,
-                    end: input.len(),
-                },
-                kind: Kind::Copy,
-                origin: Some(Location::new(self.host.clone(), body)?),
-            }]
-        };
+        let segments = vec![Segment {
+            output: Span {
+                start: 0,
+                end: input.len(),
+            },
+            kind: Kind::Copy,
+            origin: Some(Location::new(self.host.clone(), body)?),
+        }];
+        if open_end || parent.is_none() && parsed.state == State::Partial {
+            self.open_ends.insert(id.clone());
+        }
         self.regions.push(Region {
             id: id.clone(),
             parent,
@@ -160,6 +182,10 @@ impl Traversal<'_> {
         for (index, child) in parsed.children.iter().enumerate() {
             input.check(child.full)?;
             input.check(child.body)?;
+            if child.open_end && (child.full.end != child.body.end || child.body.end != input.len())
+            {
+                return Err("invalid open child boundary");
+            }
             if child.full.start > child.body.start || child.body.end > child.full.end {
                 return Err("body outside embedding");
             }
@@ -181,6 +207,7 @@ impl Traversal<'_> {
                 shift(child.full),
                 shift(child.body),
                 depth + 1,
+                child.open_end,
             )?;
         }
         Ok(())
@@ -249,6 +276,7 @@ impl CstGrammar {
                     language: binding.language.clone(),
                     full: node.span,
                     body: bodies[0].span,
+                    open_end: false,
                 });
                 return Ok(());
             }
@@ -325,6 +353,9 @@ impl Grammar for EditorGrammar {
                     language: binding.language.clone(),
                     full: node.span,
                     body: body.span,
+                    open_end: node.synthetic
+                        && node.span.end == body.span.end
+                        && body.span.end == snapshot.len(),
                 });
             }
         }

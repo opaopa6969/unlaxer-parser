@@ -54,8 +54,16 @@ public final class LanguageRegions {
     }
     private final DocumentSnapshot host;
     private final Map<String, Region> regions = new HashMap<>();
-    public LanguageRegions(DocumentSnapshot host, List<Region> input) {
+    private final Set<String> openEnds;
+    static Set<String> partialOpenEnds(List<Region> input) {
+        return input.stream().filter(region -> region.parseState == State.PARTIAL && region.full.end() == region.body.end())
+            .map(Region::id).collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+    /** Compatibility path for callers without enclosure metadata. */
+    public LanguageRegions(DocumentSnapshot host, List<Region> input) { this(host, input, partialOpenEnds(input)); }
+    public LanguageRegions(DocumentSnapshot host, List<Region> input, Set<String> openEnds) {
         this.host = Objects.requireNonNull(host);
+        this.openEnds = Set.copyOf(openEnds);
         for (Region region : input) {
             host.check(region.full);
             if (regions.put(region.id, region) != null) { throw new IllegalArgumentException("duplicate region"); }
@@ -64,6 +72,10 @@ public final class LanguageRegions {
                     throw new IllegalArgumentException("origin outside region body");
                 }
             }
+        }
+        for (String id : this.openEnds) {
+            Region region = regions.get(id);
+            if (region == null || region.full.end() != region.body.end()) throw new IllegalArgumentException("invalid open region boundary");
         }
         for (Region region : input) {
             Set<String> ancestors = new HashSet<>();
@@ -85,14 +97,19 @@ public final class LanguageRegions {
         }
     }
     public DocumentSnapshot host() { return host; }
-    /** Half-open cursor ownership: delimiters belong to the enclosing body, never the child. */
+    /** Half-open ownership, plus the host EOF for a uniquely deepest explicitly open body. */
     public Region at(int point) {
         host.check(new Span(point, point));
-        Region selected = null;
+        Region selected = null; int selectedDepth = -1; boolean ambiguous = false;
         for (Region region : regions.values()) {
-            if (region.body.start() <= point && point < region.body.end()
-                    && (selected == null || depth(region) > depth(selected))) { selected = region; }
+            boolean owns = region.body.start() <= point && point < region.body.end()
+                || openEnds.contains(region.id) && point == host.length() && point == region.body.end();
+            if (!owns) { continue; }
+            int candidateDepth = depth(region);
+            if (candidateDepth > selectedDepth) { selected = region; selectedDepth = candidateDepth; ambiguous = false; }
+            else if (candidateDepth == selectedDepth) { ambiguous = true; }
         }
+        if (ambiguous) { throw new IllegalArgumentException("ambiguous cursor ownership"); }
         return selected;
     }
     private int depth(Region region) {

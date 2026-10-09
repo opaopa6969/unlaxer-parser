@@ -71,7 +71,7 @@ public final class CstGrammar implements EmbeddedLanguages.Grammar {
                         var body = bodies.get(0);
                         // No synthetic-only opening, no inserted body text, no guessed inverse edit.
                         if (node.span().start() >= body.span().start() || body.synthetic()) { continue; }
-                        children.add(new EmbeddedLanguages.Child(binding.language, new Span(node.span().start(), node.span().end()), new Span(body.span().start(), body.span().end())));
+                        children.add(new EmbeddedLanguages.Child(binding.language, new Span(node.span().start(), node.span().end()), new Span(body.span().start(), body.span().end()), node.synthetic() && node.span().end() == body.span().end() && body.span().end() == snapshot.length()));
                     }
                 }
                 children.sort(java.util.Comparator.comparingInt((EmbeddedLanguages.Child child) -> child.full().start())

@@ -111,3 +111,49 @@ cargo test --manifest-path rust/Cargo.toml -p unlaxer-runtime --test source_maps
 Both implementations read the checked-in, manually specified position/map
 expectations in `docs/fixtures/source-maps/`. The dedicated `source-maps` CI job
 runs both commands. This change does not alter UBNF frontend acceptance.
+
+
+### 編集途中の EOF
+
+通常の cursor 所有は半開区間 `[body.start, body.end)` であり、子言語の閉じ delimiter は
+その子の補完先にしない。例外として `PARTIAL` な body の末尾が host EOF と一致するときは、
+その EOF cursor を所有する候補に含める。最深の候補が一意でなければ
+`ambiguous cursor ownership` として拒否する。`COMPLETE` / `FAILED` の末尾や、host EOF 以外の
+body 境界をこの例外で受理しない。
+
+`at()` で所有が決まっても、補完 edit には従来どおり一意な COPY 逆写像が必要。
+空の virtual document で origin anchor を持たない map は、所有可能でも edit 対応を主張しない。
+共有の `docs/fixtures/source-maps/partial-eof.tsv` が Unicode CP / UTF-16、入れ子、隣接、
+閉じ delimiter、空領域と曖昧な EOF の期待値を固定する。
+
+### 空本文の exact anchor
+
+空の出力 snapshot は、segments が空の未対応 map に加え、単一の `COPY 0..0` segment で元 snapshot の一点を示せる。
+この例外は空出力・COPY・単一 segment に限定し、COPY の本文一致検査と元 snapshot の位置検査は従来どおり行う。
+複数 anchor、空の TRANSFORMED/GENERATED segment、非空出力に差し込む zero-length segment は拒否する。
+
+埋め込み本文が空でも実在する opening delimiter が確認できた場合、registry は body の開始点を anchor として保存する。
+diagnostics、cursor、edit は同じ host 点へ往復でき、親 map の合成でもその点を保持する。
+親 map の削除境界などで二つの異なる元位置が候補になる場合は cursor/edit を拒否し、未指定の origin を推測しない。
+
+`PARTIAL` empty region の host EOF が一意に所有される場合は、この map で virtual cursor 0 の補完と挿入を host へ戻せる。
+子 grammar が FAILED/COMPLETE でも enclosure が未閉鎖な場合の所有判定は、parseState と delimiter 状態を分ける後続変更で扱う。
+EOF 所有と source map の一意性は独立した条件であり、片方だけ満たしても query forwarding 完了とはしない。
+
+### enclosure の開閉と parseState の分離
+
+生成 registry は `Result.openEnds` / `Output.open_ends` に、未閉鎖の本文を持つ region ID を保存する。
+`Child.openEnd` / `Child.open_end` は enclosing grammar の editor CST による証拠で、子 grammar の成功・失敗とは別の値である。
+元の opening と body を持ち、binding node が EOF 修復の synthetic node で、`full.end == body.end == input.length` の場合だけ開いた境界とする。
+strict parse の child は閉じた境界として扱い、synthetic body は従来どおり region にしない。
+手書き provider の Java 3引数 Child constructor は `openEnd=false`。Rust Child literal は `open_end` を明示する。
+
+`Result.tree()` / `Output.tree()` は明示境界を用いるため、未閉鎖の Java 本文が COMPLETE、FAILED、UNAVAILABLE でも host EOF の所有者になれる。
+UNAVAILABLE に対応する provider が無ければ query は UNAVAILABLE を返し、別言語の provider へ代替しない。
+closed delimiter は enclosing body に残り、同じ深さの複数 open region が一致する曖昧な EOF は拒否する。
+canonical region JSON の `openEnd` で、Playground などの利用側もこの境界を参照できる。
+
+既存の `LanguageRegions(host, regions)` / `LanguageRegions::new(host, regions)` は PARTIAL からの互換推定を維持する。
+厳密な情報を持つ呼出し元は Java の3引数 constructor / Rust `with_open_ends` に open ID集合を渡す。
+未知 ID と `full.end != body.end` の open指定は拒否する。空集合は PARTIAL region であっても EOF所有を明示的に無効にする。
+共通 `embedded-grammars/ownership.tsv` が完成/失敗/空本文/閉じdelimiter/欠落providerと補完挿入位置を固定し、Java、native Rust、実WASMで検証する。

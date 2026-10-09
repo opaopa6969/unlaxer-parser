@@ -18,6 +18,8 @@ public class LanguageProfileSelectionTest {
             var selection = profile.select(fields[3], fields[4]);
             assertEquals(fields[0], Boolean.parseBoolean(fields[6]), selection.allowsLocal("COMPLETION"));
             assertEquals(fields[0], Boolean.parseBoolean(fields[7]), selection.allowsLocal("DEFINITION"));
+            assertEquals(fields[0], Boolean.parseBoolean(fields[8]), selection.allows("COMPLETION", true));
+            assertEquals(fields[0], Boolean.parseBoolean(fields[9]), selection.allows("DEFINITION", true));
             assertTrue(selection.allowsLocal("PARSE")); assertFalse(selection.allowsLocal("UNKNOWN"));
             assertEquals("lang/java", selection.language().packageId());
             assertEquals("0.1.0", selection.language().version());

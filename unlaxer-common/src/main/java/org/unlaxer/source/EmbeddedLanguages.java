@@ -16,10 +16,11 @@ import org.unlaxer.source.SegmentSourceMap.Segment;
 public final class EmbeddedLanguages {
     private EmbeddedLanguages() {}
     /** Ranges belong to the provider input, including delimiters only in full. */
-    public record Child(Language language, Span full, Span body) {
+    public record Child(Language language, Span full, Span body, boolean openEnd) {
+        public Child(Language language, Span full, Span body) { this(language, full, body, false); }
         public Child {
             Objects.requireNonNull(language);
-            if (false == full.contains(body)) { throw new IllegalArgumentException("body outside embedding"); }
+            if (false == full.contains(body) || openEnd && full.end() != body.end()) { throw new IllegalArgumentException("body outside embedding"); }
         }
     }
     public record Parsed(DocumentSnapshot snapshot, State state, List<Child> children) {
@@ -32,6 +33,7 @@ public final class EmbeddedLanguages {
             for (int index = 0; index < children.size(); index++) {
                 Child child = children.get(index);
                 snapshot.check(child.full);
+                if (child.openEnd && child.body.end() != snapshot.length()) throw new IllegalArgumentException("open child must end at input EOF");
                 for (int otherIndex = 0; otherIndex < index; otherIndex++) {
                     Span other = children.get(otherIndex).full;
                     if (child.full.start() < other.end() && other.start() < child.full.end()) {
@@ -45,15 +47,17 @@ public final class EmbeddedLanguages {
         String name();
         Parsed parse(String entry, DocumentSnapshot snapshot);
     }
-    public record Result(DocumentSnapshot snapshot, List<Region> regions) {
-        public Result { regions = List.copyOf(regions); new LanguageRegions(snapshot, regions); }
-        public LanguageRegions tree() { return new LanguageRegions(snapshot, regions); }
+    public record Result(DocumentSnapshot snapshot, List<Region> regions, java.util.Set<String> openEnds) {
+        public Result(DocumentSnapshot snapshot, List<Region> regions) { this(snapshot, regions, LanguageRegions.partialOpenEnds(regions)); }
+        public Result { regions = List.copyOf(regions); openEnds = java.util.Set.copyOf(openEnds); new LanguageRegions(snapshot, regions, openEnds); }
+        public LanguageRegions tree() { return new LanguageRegions(snapshot, regions, openEnds); }
         public String canonicalJson() {
             List<String> rows = new ArrayList<>();
             for (Region region : regions) {
                 rows.add("{\"id\":" + quote(region.id()) + ",\"parent\":" + (region.parent() == null ? "null" : quote(region.parent()))
                     + ",\"language\":" + quote(region.language().id()) + ",\"grammar\":" + quote(region.language().grammar())
                     + ",\"entry\":" + quote(region.language().entry()) + ",\"state\":" + quote(region.parseState().name())
+                    + ",\"openEnd\":" + openEnds.contains(region.id())
                     + ",\"full\":[" + region.full().start() + "," + region.full().end() + "],\"body\":[" + region.body().start() + "," + region.body().end() + "]}");
             }
             return "{\"uri\":" + quote(snapshot.uri()) + ",\"version\":" + quote(Long.toString(snapshot.version())) + ",\"regions\":[" + String.join(",", rows) + "]}";
@@ -77,14 +81,15 @@ public final class EmbeddedLanguages {
             throw new IllegalArgumentException("invalid embedding budget");
         }
         List<Region> regions = new ArrayList<>();
+        var openEnds = new java.util.HashSet<String>();
         visit(snapshot, snapshot, language, Map.copyOf(providers), "root", null,
             new Span(0, snapshot.length()), new Span(0, snapshot.length()), 1,
-            maximumDepth, maximumRegions, regions);
-        return new Result(snapshot, regions);
+            maximumDepth, maximumRegions, regions, false, openEnds);
+        return new Result(snapshot, regions, openEnds);
     }
     private static void visit(DocumentSnapshot host, DocumentSnapshot input, Language language,
             Map<Language, Grammar> providers, String id, String parent, Span full, Span body,
-            int depth, int maximumDepth, int maximumRegions, List<Region> regions) {
+            int depth, int maximumDepth, int maximumRegions, List<Region> regions, boolean openEnd, java.util.Set<String> openEnds) {
         if (depth > maximumDepth || regions.size() >= maximumRegions) {
             throw new IllegalArgumentException("embedding budget exceeded");
         }
@@ -96,9 +101,9 @@ public final class EmbeddedLanguages {
             parsed = grammar.parse(language.entry(), input);
             if (false == input.equals(parsed.snapshot)) { throw new IllegalArgumentException("stale grammar response"); }
         }
-        SegmentSourceMap map = new SegmentSourceMap(input, input.length() == 0 ? List.of()
-            : List.of(new Segment(new Span(0, input.length()), Kind.COPY, new Location(host, body))));
+        SegmentSourceMap map = new SegmentSourceMap(input, List.of(new Segment(new Span(0, input.length()), Kind.COPY, new Location(host, body))));
         regions.add(new Region(id, parent, language, full, body, map, parsed.state));
+        if (openEnd || parent == null && parsed.state == State.PARTIAL) openEnds.add(id);
         int index = 0;
         for (Child child : parsed.children) {
             String childId = id + "/" + index++;
@@ -106,7 +111,7 @@ public final class EmbeddedLanguages {
                 host.version(), input.slice(child.body));
             visit(host, childInput, child.language, providers, childId, id,
                 shift(child.full, body.start()), shift(child.body, body.start()), depth + 1,
-                maximumDepth, maximumRegions, regions);
+                maximumDepth, maximumRegions, regions, child.openEnd, openEnds);
         }
     }
     private static Span shift(Span span, int offset) { return new Span(span.start() + offset, span.end() + offset); }

@@ -61,6 +61,16 @@ public final class LanguageQueries {
             throw new IllegalArgumentException("project host snapshot missing or stale");
         }
     }
+    public DocumentSnapshot host() { return regions.host(); }
+    public Project project() { return project; }
+    public LanguageQueryView view(DocumentSnapshot currentHost, Project currentProject, int hostCursor,
+                                  Operation operation, Map<String, String> parameters) {
+        Result result = query(currentHost, currentProject, hostCursor, operation, parameters);
+        Region region = regions.at(hostCursor);
+        Provider provider = region == null ? null : providers.get(region.language());
+        return new LanguageQueryView(currentHost, operation, hostCursor,
+            provider == null ? Set.of() : provider.capabilities(), result);
+    }
     public Result query(DocumentSnapshot currentHost, Project currentProject, int hostCursor,
                         Operation operation, Map<String, String> parameters) {
         if (false == regions.host().equals(currentHost) || false == project.equals(currentProject)) {

@@ -55,10 +55,15 @@ public class LanguageQueriesTest {
     }
     @Test public void sharedSemanticQueriesMapOnlyTheirOwningDocument() throws Exception {
         LanguageQueries queries = new LanguageQueries(regions(), project(), Map.of(LANGUAGE, new ProjectQueryProvider(index())));
+        var views = Files.readAllLines(fixture().resolveSibling("views.jsonl"));
+        int viewIndex = 0;
         for (String line : Files.readAllLines(fixture())) {
             if (line.startsWith("#")) { continue; }
             String[] fields = line.split("\t");
             LanguageQueries.Result result = queries.query(HOST, project(), Integer.parseInt(fields[2]), Operation.valueOf(fields[1]), Map.of(fields[3], fields[4], "expectedType", "T"));
+            var view = queries.view(HOST, project(), Integer.parseInt(fields[2]), Operation.valueOf(fields[1]), Map.of(fields[3], fields[4], "expectedType", "T"));
+            assertEquals(fields[0], views.get(viewIndex++), view.canonicalJson());
+            assertEquals(HOST, queries.host()); assertEquals(project(), queries.project());
             assertEquals(fields[0], fields[5], result.state().name());
             String labels = result.items().stream().map(LanguageQueries.MappedItem::label).collect(Collectors.joining(","));
             String locations = result.items().stream().flatMap(item -> item.locations().stream()).map(mapping -> mapping.location().snapshot().uri()
