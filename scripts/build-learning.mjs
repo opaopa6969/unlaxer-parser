@@ -15,6 +15,7 @@ run('cargo', ['build', '--locked', '--manifest-path', 'rust/Cargo.toml', '-p', '
 run('cargo', ['build', '--locked', '--offline', '--manifest-path', 'rust/Cargo.toml', '-p', 'unlaxer-learning', '--release', '--target', 'wasm32-unknown-unknown'],
   {...process.env, CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: '-C link-arg=--max-memory=268435456'});
 await mkdir(output, {recursive: true});
+await cp(path.join(repo, 'spec-corpus/xid-identifier/UNICODE-LICENSE.txt'), path.join(output, 'UNICODE-LICENSE.txt'));
 await cp(path.join(resources, 'learning'), output, {recursive: true});
 await cp(path.join(resources, 'ubnf-help'), path.join(output, 'help'), {recursive: true});
 await cp(path.join(repo, 'rust/target/wasm32-unknown-unknown/release/unlaxer_learning.wasm'), path.join(output, 'learning.wasm'));

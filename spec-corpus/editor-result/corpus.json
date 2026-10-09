@@ -1,0 +1,2335 @@
+{
+  "modelDefaults": {
+    "uri": "memory:editor",
+    "version": 7,
+    "types": [
+      {
+        "id": "Context",
+        "kind": "BUILTIN",
+        "supertypes": [],
+        "fields": [],
+        "span": [
+          0,
+          0
+        ]
+      },
+      {
+        "id": "Item",
+        "kind": "BUILTIN",
+        "supertypes": [],
+        "fields": [],
+        "span": [
+          0,
+          0
+        ]
+      },
+      {
+        "id": "Text",
+        "kind": "BUILTIN",
+        "supertypes": [],
+        "fields": [],
+        "span": [
+          0,
+          0
+        ]
+      },
+      {
+        "id": "Void",
+        "kind": "BUILTIN",
+        "supertypes": [],
+        "fields": [],
+        "span": [
+          0,
+          0
+        ]
+      }
+    ],
+    "symbols": [
+      {
+        "id": "ctx",
+        "name": "ctx",
+        "type": "Context",
+        "scope": "root",
+        "declaration": [
+          1,
+          4
+        ],
+        "visibleFrom": 0
+      },
+      {
+        "id": "item",
+        "name": "item",
+        "type": "Item",
+        "scope": "root",
+        "declaration": [
+          5,
+          9
+        ],
+        "visibleFrom": 0
+      },
+      {
+        "id": "other",
+        "name": "other",
+        "type": "Text",
+        "scope": "root",
+        "declaration": [
+          10,
+          15
+        ],
+        "visibleFrom": 0
+      }
+    ],
+    "signatures": [
+      {
+        "id": "process",
+        "name": "process",
+        "parameters": [
+          "Context",
+          "Item"
+        ],
+        "result": "Void",
+        "span": [
+          0,
+          0
+        ]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "unclosed-parenthesis",
+      "uri": "memory:editor",
+      "version": 7,
+      "source": "😀ctx item other;\r\nprocess(ctx, ",
+      "status": "PARTIAL",
+      "ast": null,
+      "nodes": [
+        {
+          "kind": "MISSING",
+          "span": [
+            31,
+            31
+          ],
+          "candidates": [
+            "Argument",
+            "CloseParen"
+          ],
+          "region": null
+        }
+      ],
+      "calls": [
+        {
+          "call": "call",
+          "index": 1,
+          "region": null
+        }
+      ],
+      "model": {
+        "source": "😀ctx item other;\r\nprocess(ctx, ",
+        "scopes": [
+          {
+            "id": "root",
+            "parent": null,
+            "span": [
+              0,
+              31
+            ]
+          }
+        ],
+        "calls": [
+          {
+            "id": "call",
+            "signatures": [
+              "process"
+            ],
+            "span": [
+              18,
+              31
+            ],
+            "arguments": [
+              {
+                "type": "Context",
+                "span": [
+                  26,
+                  29
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  31,
+                  31
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "cursor": 31,
+      "region": null,
+      "prefix": "it",
+      "expected": {
+        "status": "PARTIAL",
+        "strictAst": null,
+        "nodes": [
+          {
+            "kind": "MISSING",
+            "span": [
+              31,
+              31
+            ],
+            "utf16Span": [
+              32,
+              32
+            ],
+            "candidates": [
+              "Argument",
+              "CloseParen"
+            ],
+            "region": null
+          }
+        ],
+        "visible": [
+          "ctx",
+          "item",
+          "other"
+        ],
+        "call": {
+          "call": "call",
+          "index": 1,
+          "region": null
+        },
+        "expectedTypes": [
+          "Item"
+        ],
+        "completions": [
+          "item"
+        ]
+      }
+    },
+    {
+      "name": "unfinished-identifier",
+      "uri": "memory:editor",
+      "version": 7,
+      "source": "😀ctx item other;\r\nprocess(ctx, it",
+      "status": "PARTIAL",
+      "ast": null,
+      "nodes": [
+        {
+          "kind": "MISSING",
+          "span": [
+            33,
+            33
+          ],
+          "candidates": [
+            "Identifier",
+            "CloseParen"
+          ],
+          "region": null
+        }
+      ],
+      "calls": [
+        {
+          "call": "call",
+          "index": 1,
+          "region": null
+        }
+      ],
+      "model": {
+        "source": "😀ctx item other;\r\nprocess(ctx, it",
+        "scopes": [
+          {
+            "id": "root",
+            "parent": null,
+            "span": [
+              0,
+              33
+            ]
+          }
+        ],
+        "calls": [
+          {
+            "id": "call",
+            "signatures": [
+              "process"
+            ],
+            "span": [
+              18,
+              33
+            ],
+            "arguments": [
+              {
+                "type": "Context",
+                "span": [
+                  26,
+                  29
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  31,
+                  33
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "cursor": 33,
+      "region": null,
+      "prefix": "it",
+      "expected": {
+        "status": "PARTIAL",
+        "strictAst": null,
+        "nodes": [
+          {
+            "kind": "MISSING",
+            "span": [
+              33,
+              33
+            ],
+            "utf16Span": [
+              34,
+              34
+            ],
+            "candidates": [
+              "Identifier",
+              "CloseParen"
+            ],
+            "region": null
+          }
+        ],
+        "visible": [
+          "ctx",
+          "item",
+          "other"
+        ],
+        "call": {
+          "call": "call",
+          "index": 1,
+          "region": null
+        },
+        "expectedTypes": [
+          "Item"
+        ],
+        "completions": [
+          "item"
+        ]
+      }
+    },
+    {
+      "name": "empty-argument",
+      "uri": "memory:editor",
+      "version": 7,
+      "source": "😀ctx item other;\r\nprocess(ctx,,)",
+      "status": "PARTIAL",
+      "ast": null,
+      "nodes": [
+        {
+          "kind": "MISSING",
+          "span": [
+            30,
+            30
+          ],
+          "candidates": [
+            "Argument"
+          ],
+          "region": null
+        },
+        {
+          "kind": "ERROR",
+          "span": [
+            30,
+            31
+          ],
+          "candidates": [
+            "Argument"
+          ],
+          "region": null
+        }
+      ],
+      "calls": [
+        {
+          "call": "call",
+          "index": 1,
+          "region": null
+        }
+      ],
+      "model": {
+        "source": "😀ctx item other;\r\nprocess(ctx,,)",
+        "scopes": [
+          {
+            "id": "root",
+            "parent": null,
+            "span": [
+              0,
+              32
+            ]
+          }
+        ],
+        "calls": [
+          {
+            "id": "call",
+            "signatures": [
+              "process"
+            ],
+            "span": [
+              18,
+              32
+            ],
+            "arguments": [
+              {
+                "type": "Context",
+                "span": [
+                  26,
+                  29
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  30,
+                  30
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "cursor": 30,
+      "region": null,
+      "prefix": "it",
+      "expected": {
+        "status": "PARTIAL",
+        "strictAst": null,
+        "nodes": [
+          {
+            "kind": "MISSING",
+            "span": [
+              30,
+              30
+            ],
+            "utf16Span": [
+              31,
+              31
+            ],
+            "candidates": [
+              "Argument"
+            ],
+            "region": null
+          },
+          {
+            "kind": "ERROR",
+            "span": [
+              30,
+              31
+            ],
+            "utf16Span": [
+              31,
+              32
+            ],
+            "candidates": [
+              "Argument"
+            ],
+            "region": null
+          }
+        ],
+        "visible": [
+          "ctx",
+          "item",
+          "other"
+        ],
+        "call": {
+          "call": "call",
+          "index": 1,
+          "region": null
+        },
+        "expectedTypes": [
+          "Item"
+        ],
+        "completions": [
+          "item"
+        ]
+      }
+    },
+    {
+      "name": "complete-input",
+      "uri": "memory:editor",
+      "version": 7,
+      "source": "😀ctx item other;\r\nprocess(ctx, item)",
+      "status": "COMPLETE",
+      "ast": "typed",
+      "nodes": [],
+      "calls": [
+        {
+          "call": "call",
+          "index": 1,
+          "region": null
+        }
+      ],
+      "model": {
+        "source": "😀ctx item other;\r\nprocess(ctx, item)",
+        "scopes": [
+          {
+            "id": "root",
+            "parent": null,
+            "span": [
+              0,
+              36
+            ]
+          }
+        ],
+        "calls": [
+          {
+            "id": "call",
+            "signatures": [
+              "process"
+            ],
+            "span": [
+              18,
+              36
+            ],
+            "arguments": [
+              {
+                "type": "Context",
+                "span": [
+                  26,
+                  29
+                ]
+              },
+              {
+                "type": "Item",
+                "span": [
+                  31,
+                  35
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "cursor": 35,
+      "region": null,
+      "prefix": "it",
+      "expected": {
+        "status": "COMPLETE",
+        "strictAst": "typed",
+        "nodes": [],
+        "visible": [
+          "ctx",
+          "item",
+          "other"
+        ],
+        "call": {
+          "call": "call",
+          "index": 1,
+          "region": null
+        },
+        "expectedTypes": [
+          "Item"
+        ],
+        "completions": [
+          "item"
+        ]
+      }
+    },
+    {
+      "name": "broken-sibling",
+      "uri": "memory:editor",
+      "version": 7,
+      "source": "😀ctx item other;\r\nbroken ???;\r\nprocess(ctx, ",
+      "status": "PARTIAL",
+      "ast": null,
+      "nodes": [
+        {
+          "kind": "ERROR",
+          "span": [
+            18,
+            29
+          ],
+          "candidates": [
+            "Declaration"
+          ],
+          "region": null
+        },
+        {
+          "kind": "MISSING",
+          "span": [
+            44,
+            44
+          ],
+          "candidates": [
+            "Argument",
+            "CloseParen"
+          ],
+          "region": null
+        }
+      ],
+      "calls": [
+        {
+          "call": "call",
+          "index": 1,
+          "region": null
+        }
+      ],
+      "model": {
+        "source": "😀ctx item other;\r\nbroken ???;\r\nprocess(ctx, ",
+        "scopes": [
+          {
+            "id": "root",
+            "parent": null,
+            "span": [
+              0,
+              44
+            ]
+          }
+        ],
+        "calls": [
+          {
+            "id": "call",
+            "signatures": [
+              "process"
+            ],
+            "span": [
+              31,
+              44
+            ],
+            "arguments": [
+              {
+                "type": "Context",
+                "span": [
+                  39,
+                  42
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  44,
+                  44
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "cursor": 44,
+      "region": null,
+      "prefix": "it",
+      "expected": {
+        "status": "PARTIAL",
+        "strictAst": null,
+        "nodes": [
+          {
+            "kind": "ERROR",
+            "span": [
+              18,
+              29
+            ],
+            "utf16Span": [
+              19,
+              30
+            ],
+            "candidates": [
+              "Declaration"
+            ],
+            "region": null
+          },
+          {
+            "kind": "MISSING",
+            "span": [
+              44,
+              44
+            ],
+            "utf16Span": [
+              45,
+              45
+            ],
+            "candidates": [
+              "Argument",
+              "CloseParen"
+            ],
+            "region": null
+          }
+        ],
+        "visible": [
+          "ctx",
+          "item",
+          "other"
+        ],
+        "call": {
+          "call": "call",
+          "index": 1,
+          "region": null
+        },
+        "expectedTypes": [
+          "Item"
+        ],
+        "completions": [
+          "item"
+        ]
+      }
+    },
+    {
+      "name": "embedded-region",
+      "uri": "memory:editor",
+      "version": 7,
+      "source": "😀ctx item other;\r\n<foreign>\r\nprocess(ctx, it",
+      "status": "PARTIAL",
+      "ast": null,
+      "nodes": [
+        {
+          "kind": "MISSING",
+          "span": [
+            44,
+            44
+          ],
+          "candidates": [
+            "Identifier",
+            "CloseParen"
+          ],
+          "region": "embedded-1"
+        }
+      ],
+      "calls": [
+        {
+          "call": "call",
+          "index": 1,
+          "region": "embedded-1"
+        }
+      ],
+      "model": {
+        "source": "😀ctx item other;\r\n<foreign>\r\nprocess(ctx, it",
+        "scopes": [
+          {
+            "id": "root",
+            "parent": null,
+            "span": [
+              0,
+              44
+            ]
+          }
+        ],
+        "calls": [
+          {
+            "id": "call",
+            "signatures": [
+              "process"
+            ],
+            "span": [
+              29,
+              44
+            ],
+            "arguments": [
+              {
+                "type": "Context",
+                "span": [
+                  37,
+                  40
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  42,
+                  44
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "cursor": 44,
+      "region": "embedded-1",
+      "prefix": "it",
+      "expected": {
+        "status": "PARTIAL",
+        "strictAst": null,
+        "nodes": [
+          {
+            "kind": "MISSING",
+            "span": [
+              44,
+              44
+            ],
+            "utf16Span": [
+              45,
+              45
+            ],
+            "candidates": [
+              "Identifier",
+              "CloseParen"
+            ],
+            "region": "embedded-1"
+          }
+        ],
+        "visible": [
+          "ctx",
+          "item",
+          "other"
+        ],
+        "call": {
+          "call": "call",
+          "index": 1,
+          "region": "embedded-1"
+        },
+        "expectedTypes": [
+          "Item"
+        ],
+        "completions": [
+          "item"
+        ]
+      }
+    },
+    {
+      "name": "unclosed-type",
+      "uri": "memory:editor",
+      "version": 7,
+      "source": "😀ctx item other;\r\ntype Draft {",
+      "status": "PARTIAL",
+      "ast": null,
+      "nodes": [
+        {
+          "kind": "MISSING",
+          "span": [
+            30,
+            30
+          ],
+          "candidates": [
+            "Field",
+            "CloseBrace"
+          ],
+          "region": null
+        }
+      ],
+      "calls": [],
+      "model": {
+        "source": "😀ctx item other;\r\ntype Draft {",
+        "scopes": [
+          {
+            "id": "root",
+            "parent": null,
+            "span": [
+              0,
+              30
+            ]
+          }
+        ],
+        "calls": []
+      },
+      "cursor": 30,
+      "region": null,
+      "prefix": "it",
+      "expected": {
+        "status": "PARTIAL",
+        "strictAst": null,
+        "nodes": [
+          {
+            "kind": "MISSING",
+            "span": [
+              30,
+              30
+            ],
+            "utf16Span": [
+              31,
+              31
+            ],
+            "candidates": [
+              "Field",
+              "CloseBrace"
+            ],
+            "region": null
+          }
+        ],
+        "visible": [
+          "ctx",
+          "item",
+          "other"
+        ],
+        "call": null,
+        "expectedTypes": [],
+        "completions": []
+      }
+    },
+    {
+      "name": "failed-keeps-sibling-model",
+      "uri": "memory:editor",
+      "version": 7,
+      "source": "😀ctx item other;\r\n???",
+      "status": "FAILED",
+      "ast": null,
+      "nodes": [
+        {
+          "kind": "ERROR",
+          "span": [
+            18,
+            21
+          ],
+          "candidates": [
+            "Declaration"
+          ],
+          "region": null
+        }
+      ],
+      "calls": [],
+      "model": {
+        "source": "😀ctx item other;\r\n???",
+        "scopes": [
+          {
+            "id": "root",
+            "parent": null,
+            "span": [
+              0,
+              21
+            ]
+          }
+        ],
+        "calls": []
+      },
+      "cursor": 21,
+      "region": null,
+      "prefix": "it",
+      "expected": {
+        "status": "FAILED",
+        "strictAst": null,
+        "nodes": [
+          {
+            "kind": "ERROR",
+            "span": [
+              18,
+              21
+            ],
+            "utf16Span": [
+              19,
+              22
+            ],
+            "candidates": [
+              "Declaration"
+            ],
+            "region": null
+          }
+        ],
+        "visible": [
+          "ctx",
+          "item",
+          "other"
+        ],
+        "call": null,
+        "expectedTypes": [],
+        "completions": []
+      }
+    },
+    {
+      "name": "missing-has-width",
+      "uri": "memory:editor",
+      "version": 7,
+      "source": "😀ctx item other;\r\nprocess(ctx, ",
+      "status": "PARTIAL",
+      "ast": null,
+      "nodes": [
+        {
+          "kind": "MISSING",
+          "span": [
+            30,
+            31
+          ],
+          "candidates": [
+            "Argument"
+          ],
+          "region": null
+        }
+      ],
+      "calls": [
+        {
+          "call": "call",
+          "index": 1,
+          "region": null
+        }
+      ],
+      "model": {
+        "source": "😀ctx item other;\r\nprocess(ctx, ",
+        "scopes": [
+          {
+            "id": "root",
+            "parent": null,
+            "span": [
+              0,
+              31
+            ]
+          }
+        ],
+        "calls": [
+          {
+            "id": "call",
+            "signatures": [
+              "process"
+            ],
+            "span": [
+              18,
+              31
+            ],
+            "arguments": [
+              {
+                "type": "Context",
+                "span": [
+                  26,
+                  29
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  31,
+                  31
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "cursor": 31,
+      "region": null,
+      "prefix": "it",
+      "expected": {
+        "error": "EDITOR_INVALID_NODE",
+        "span": [
+          30,
+          31
+        ]
+      }
+    },
+    {
+      "name": "error-is-empty",
+      "uri": "memory:editor",
+      "version": 7,
+      "source": "😀ctx item other;\r\nprocess(ctx, ",
+      "status": "PARTIAL",
+      "ast": null,
+      "nodes": [
+        {
+          "kind": "ERROR",
+          "span": [
+            31,
+            31
+          ],
+          "candidates": [
+            "Argument"
+          ],
+          "region": null
+        }
+      ],
+      "calls": [
+        {
+          "call": "call",
+          "index": 1,
+          "region": null
+        }
+      ],
+      "model": {
+        "source": "😀ctx item other;\r\nprocess(ctx, ",
+        "scopes": [
+          {
+            "id": "root",
+            "parent": null,
+            "span": [
+              0,
+              31
+            ]
+          }
+        ],
+        "calls": [
+          {
+            "id": "call",
+            "signatures": [
+              "process"
+            ],
+            "span": [
+              18,
+              31
+            ],
+            "arguments": [
+              {
+                "type": "Context",
+                "span": [
+                  26,
+                  29
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  31,
+                  31
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "cursor": 31,
+      "region": null,
+      "prefix": "it",
+      "expected": {
+        "error": "EDITOR_INVALID_NODE",
+        "span": [
+          31,
+          31
+        ]
+      }
+    },
+    {
+      "name": "outside-source",
+      "uri": "memory:editor",
+      "version": 7,
+      "source": "😀ctx item other;\r\nprocess(ctx, ",
+      "status": "PARTIAL",
+      "ast": null,
+      "nodes": [
+        {
+          "kind": "MISSING",
+          "span": [
+            32,
+            32
+          ],
+          "candidates": [
+            "Argument"
+          ],
+          "region": null
+        }
+      ],
+      "calls": [
+        {
+          "call": "call",
+          "index": 1,
+          "region": null
+        }
+      ],
+      "model": {
+        "source": "😀ctx item other;\r\nprocess(ctx, ",
+        "scopes": [
+          {
+            "id": "root",
+            "parent": null,
+            "span": [
+              0,
+              31
+            ]
+          }
+        ],
+        "calls": [
+          {
+            "id": "call",
+            "signatures": [
+              "process"
+            ],
+            "span": [
+              18,
+              31
+            ],
+            "arguments": [
+              {
+                "type": "Context",
+                "span": [
+                  26,
+                  29
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  31,
+                  31
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "cursor": 31,
+      "region": null,
+      "prefix": "it",
+      "expected": {
+        "error": "EDITOR_SPAN_OUTSIDE_DOCUMENT",
+        "span": [
+          32,
+          32
+        ]
+      }
+    },
+    {
+      "name": "duplicate-candidate",
+      "uri": "memory:editor",
+      "version": 7,
+      "source": "😀ctx item other;\r\nprocess(ctx, ",
+      "status": "PARTIAL",
+      "ast": null,
+      "nodes": [
+        {
+          "kind": "MISSING",
+          "span": [
+            31,
+            31
+          ],
+          "candidates": [
+            "Argument",
+            "Argument"
+          ],
+          "region": null
+        }
+      ],
+      "calls": [
+        {
+          "call": "call",
+          "index": 1,
+          "region": null
+        }
+      ],
+      "model": {
+        "source": "😀ctx item other;\r\nprocess(ctx, ",
+        "scopes": [
+          {
+            "id": "root",
+            "parent": null,
+            "span": [
+              0,
+              31
+            ]
+          }
+        ],
+        "calls": [
+          {
+            "id": "call",
+            "signatures": [
+              "process"
+            ],
+            "span": [
+              18,
+              31
+            ],
+            "arguments": [
+              {
+                "type": "Context",
+                "span": [
+                  26,
+                  29
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  31,
+                  31
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "cursor": 31,
+      "region": null,
+      "prefix": "it",
+      "expected": {
+        "error": "EDITOR_INVALID_CANDIDATE",
+        "span": [
+          31,
+          31
+        ]
+      }
+    },
+    {
+      "name": "empty-candidate",
+      "uri": "memory:editor",
+      "version": 7,
+      "source": "😀ctx item other;\r\nprocess(ctx, ",
+      "status": "PARTIAL",
+      "ast": null,
+      "nodes": [
+        {
+          "kind": "MISSING",
+          "span": [
+            31,
+            31
+          ],
+          "candidates": [
+            ""
+          ],
+          "region": null
+        }
+      ],
+      "calls": [
+        {
+          "call": "call",
+          "index": 1,
+          "region": null
+        }
+      ],
+      "model": {
+        "source": "😀ctx item other;\r\nprocess(ctx, ",
+        "scopes": [
+          {
+            "id": "root",
+            "parent": null,
+            "span": [
+              0,
+              31
+            ]
+          }
+        ],
+        "calls": [
+          {
+            "id": "call",
+            "signatures": [
+              "process"
+            ],
+            "span": [
+              18,
+              31
+            ],
+            "arguments": [
+              {
+                "type": "Context",
+                "span": [
+                  26,
+                  29
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  31,
+                  31
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "cursor": 31,
+      "region": null,
+      "prefix": "it",
+      "expected": {
+        "error": "EDITOR_INVALID_CANDIDATE",
+        "span": [
+          31,
+          31
+        ]
+      }
+    },
+    {
+      "name": "empty-region",
+      "uri": "memory:editor",
+      "version": 7,
+      "source": "😀ctx item other;\r\nprocess(ctx, ",
+      "status": "PARTIAL",
+      "ast": null,
+      "nodes": [
+        {
+          "kind": "MISSING",
+          "span": [
+            31,
+            31
+          ],
+          "candidates": [
+            "Argument"
+          ],
+          "region": ""
+        }
+      ],
+      "calls": [
+        {
+          "call": "call",
+          "index": 1,
+          "region": null
+        }
+      ],
+      "model": {
+        "source": "😀ctx item other;\r\nprocess(ctx, ",
+        "scopes": [
+          {
+            "id": "root",
+            "parent": null,
+            "span": [
+              0,
+              31
+            ]
+          }
+        ],
+        "calls": [
+          {
+            "id": "call",
+            "signatures": [
+              "process"
+            ],
+            "span": [
+              18,
+              31
+            ],
+            "arguments": [
+              {
+                "type": "Context",
+                "span": [
+                  26,
+                  29
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  31,
+                  31
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "cursor": 31,
+      "region": null,
+      "prefix": "it",
+      "expected": {
+        "error": "EDITOR_INVALID_REGION",
+        "span": [
+          31,
+          31
+        ]
+      }
+    },
+    {
+      "name": "partial-with-ast",
+      "uri": "memory:editor",
+      "version": 7,
+      "source": "😀ctx item other;\r\nprocess(ctx, ",
+      "status": "PARTIAL",
+      "ast": "fake",
+      "nodes": [
+        {
+          "kind": "MISSING",
+          "span": [
+            31,
+            31
+          ],
+          "candidates": [
+            "Argument",
+            "CloseParen"
+          ],
+          "region": null
+        }
+      ],
+      "calls": [
+        {
+          "call": "call",
+          "index": 1,
+          "region": null
+        }
+      ],
+      "model": {
+        "source": "😀ctx item other;\r\nprocess(ctx, ",
+        "scopes": [
+          {
+            "id": "root",
+            "parent": null,
+            "span": [
+              0,
+              31
+            ]
+          }
+        ],
+        "calls": [
+          {
+            "id": "call",
+            "signatures": [
+              "process"
+            ],
+            "span": [
+              18,
+              31
+            ],
+            "arguments": [
+              {
+                "type": "Context",
+                "span": [
+                  26,
+                  29
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  31,
+                  31
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "cursor": 31,
+      "region": null,
+      "prefix": "it",
+      "expected": {
+        "error": "EDITOR_INVALID_STATUS",
+        "span": [
+          0,
+          31
+        ]
+      }
+    },
+    {
+      "name": "complete-with-defect",
+      "uri": "memory:editor",
+      "version": 7,
+      "source": "😀ctx item other;\r\nprocess(ctx, ",
+      "status": "COMPLETE",
+      "ast": "fake",
+      "nodes": [
+        {
+          "kind": "MISSING",
+          "span": [
+            31,
+            31
+          ],
+          "candidates": [
+            "Argument",
+            "CloseParen"
+          ],
+          "region": null
+        }
+      ],
+      "calls": [
+        {
+          "call": "call",
+          "index": 1,
+          "region": null
+        }
+      ],
+      "model": {
+        "source": "😀ctx item other;\r\nprocess(ctx, ",
+        "scopes": [
+          {
+            "id": "root",
+            "parent": null,
+            "span": [
+              0,
+              31
+            ]
+          }
+        ],
+        "calls": [
+          {
+            "id": "call",
+            "signatures": [
+              "process"
+            ],
+            "span": [
+              18,
+              31
+            ],
+            "arguments": [
+              {
+                "type": "Context",
+                "span": [
+                  26,
+                  29
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  31,
+                  31
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "cursor": 31,
+      "region": null,
+      "prefix": "it",
+      "expected": {
+        "error": "EDITOR_INVALID_STATUS",
+        "span": [
+          0,
+          31
+        ]
+      }
+    },
+    {
+      "name": "partial-without-defect",
+      "uri": "memory:editor",
+      "version": 7,
+      "source": "😀ctx item other;\r\nprocess(ctx, ",
+      "status": "PARTIAL",
+      "ast": null,
+      "nodes": [],
+      "calls": [
+        {
+          "call": "call",
+          "index": 1,
+          "region": null
+        }
+      ],
+      "model": {
+        "source": "😀ctx item other;\r\nprocess(ctx, ",
+        "scopes": [
+          {
+            "id": "root",
+            "parent": null,
+            "span": [
+              0,
+              31
+            ]
+          }
+        ],
+        "calls": [
+          {
+            "id": "call",
+            "signatures": [
+              "process"
+            ],
+            "span": [
+              18,
+              31
+            ],
+            "arguments": [
+              {
+                "type": "Context",
+                "span": [
+                  26,
+                  29
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  31,
+                  31
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "cursor": 31,
+      "region": null,
+      "prefix": "it",
+      "expected": {
+        "error": "EDITOR_INVALID_STATUS",
+        "span": [
+          0,
+          31
+        ]
+      }
+    },
+    {
+      "name": "invalid-call-slot",
+      "uri": "memory:editor",
+      "version": 7,
+      "source": "😀ctx item other;\r\nprocess(ctx, ",
+      "status": "PARTIAL",
+      "ast": null,
+      "nodes": [
+        {
+          "kind": "MISSING",
+          "span": [
+            31,
+            31
+          ],
+          "candidates": [
+            "Argument",
+            "CloseParen"
+          ],
+          "region": null
+        }
+      ],
+      "calls": [
+        {
+          "call": "call",
+          "index": 2,
+          "region": null
+        }
+      ],
+      "model": {
+        "source": "😀ctx item other;\r\nprocess(ctx, ",
+        "scopes": [
+          {
+            "id": "root",
+            "parent": null,
+            "span": [
+              0,
+              31
+            ]
+          }
+        ],
+        "calls": [
+          {
+            "id": "call",
+            "signatures": [
+              "process"
+            ],
+            "span": [
+              18,
+              31
+            ],
+            "arguments": [
+              {
+                "type": "Context",
+                "span": [
+                  26,
+                  29
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  31,
+                  31
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "cursor": 31,
+      "region": null,
+      "prefix": "it",
+      "expected": {
+        "error": "EDITOR_INVALID_CALL_SITE",
+        "span": [
+          0,
+          31
+        ]
+      }
+    },
+    {
+      "name": "duplicate-call-slot",
+      "uri": "memory:editor",
+      "version": 7,
+      "source": "😀ctx item other;\r\nprocess(ctx, ",
+      "status": "PARTIAL",
+      "ast": null,
+      "nodes": [
+        {
+          "kind": "MISSING",
+          "span": [
+            31,
+            31
+          ],
+          "candidates": [
+            "Argument",
+            "CloseParen"
+          ],
+          "region": null
+        }
+      ],
+      "calls": [
+        {
+          "call": "call",
+          "index": 1,
+          "region": null
+        },
+        {
+          "call": "call",
+          "index": 1,
+          "region": null
+        }
+      ],
+      "model": {
+        "source": "😀ctx item other;\r\nprocess(ctx, ",
+        "scopes": [
+          {
+            "id": "root",
+            "parent": null,
+            "span": [
+              0,
+              31
+            ]
+          }
+        ],
+        "calls": [
+          {
+            "id": "call",
+            "signatures": [
+              "process"
+            ],
+            "span": [
+              18,
+              31
+            ],
+            "arguments": [
+              {
+                "type": "Context",
+                "span": [
+                  26,
+                  29
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  31,
+                  31
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "cursor": 31,
+      "region": null,
+      "prefix": "it",
+      "expected": {
+        "error": "EDITOR_DUPLICATE_CALL_SITE",
+        "span": [
+          31,
+          31
+        ]
+      }
+    },
+    {
+      "name": "missing-semantic-model",
+      "uri": "memory:editor",
+      "version": 7,
+      "source": "😀ctx item other;\r\nprocess(ctx, ",
+      "status": "PARTIAL",
+      "ast": null,
+      "nodes": [
+        {
+          "kind": "MISSING",
+          "span": [
+            31,
+            31
+          ],
+          "candidates": [
+            "Argument",
+            "CloseParen"
+          ],
+          "region": null
+        }
+      ],
+      "calls": [
+        {
+          "call": "call",
+          "index": 1,
+          "region": null
+        }
+      ],
+      "model": null,
+      "cursor": 31,
+      "region": null,
+      "prefix": "it",
+      "expected": {
+        "error": "EDITOR_INVALID_CALL_SITE",
+        "span": [
+          0,
+          31
+        ]
+      }
+    },
+    {
+      "name": "snapshot-version",
+      "uri": "memory:editor",
+      "version": 8,
+      "source": "😀ctx item other;\r\nprocess(ctx, ",
+      "status": "PARTIAL",
+      "ast": null,
+      "nodes": [
+        {
+          "kind": "MISSING",
+          "span": [
+            31,
+            31
+          ],
+          "candidates": [
+            "Argument",
+            "CloseParen"
+          ],
+          "region": null
+        }
+      ],
+      "calls": [
+        {
+          "call": "call",
+          "index": 1,
+          "region": null
+        }
+      ],
+      "model": {
+        "source": "😀ctx item other;\r\nprocess(ctx, ",
+        "scopes": [
+          {
+            "id": "root",
+            "parent": null,
+            "span": [
+              0,
+              31
+            ]
+          }
+        ],
+        "calls": [
+          {
+            "id": "call",
+            "signatures": [
+              "process"
+            ],
+            "span": [
+              18,
+              31
+            ],
+            "arguments": [
+              {
+                "type": "Context",
+                "span": [
+                  26,
+                  29
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  31,
+                  31
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "cursor": 31,
+      "region": null,
+      "prefix": "it",
+      "expected": {
+        "error": "EDITOR_SNAPSHOT_MISMATCH",
+        "span": [
+          0,
+          31
+        ]
+      }
+    },
+    {
+      "name": "snapshot-uri",
+      "uri": "memory:different",
+      "version": 7,
+      "source": "😀ctx item other;\r\nprocess(ctx, ",
+      "status": "PARTIAL",
+      "ast": null,
+      "nodes": [
+        {
+          "kind": "MISSING",
+          "span": [
+            31,
+            31
+          ],
+          "candidates": [
+            "Argument",
+            "CloseParen"
+          ],
+          "region": null
+        }
+      ],
+      "calls": [
+        {
+          "call": "call",
+          "index": 1,
+          "region": null
+        }
+      ],
+      "model": {
+        "source": "😀ctx item other;\r\nprocess(ctx, ",
+        "scopes": [
+          {
+            "id": "root",
+            "parent": null,
+            "span": [
+              0,
+              31
+            ]
+          }
+        ],
+        "calls": [
+          {
+            "id": "call",
+            "signatures": [
+              "process"
+            ],
+            "span": [
+              18,
+              31
+            ],
+            "arguments": [
+              {
+                "type": "Context",
+                "span": [
+                  26,
+                  29
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  31,
+                  31
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "cursor": 31,
+      "region": null,
+      "prefix": "it",
+      "expected": {
+        "error": "EDITOR_SNAPSHOT_MISMATCH",
+        "span": [
+          0,
+          31
+        ]
+      }
+    },
+    {
+      "name": "snapshot-source",
+      "uri": "memory:editor",
+      "version": 7,
+      "source": "😀ctx item other;\r\nPROCESS(ctx, ",
+      "status": "PARTIAL",
+      "ast": null,
+      "nodes": [
+        {
+          "kind": "MISSING",
+          "span": [
+            31,
+            31
+          ],
+          "candidates": [
+            "Argument",
+            "CloseParen"
+          ],
+          "region": null
+        }
+      ],
+      "calls": [
+        {
+          "call": "call",
+          "index": 1,
+          "region": null
+        }
+      ],
+      "model": {
+        "source": "😀ctx item other;\r\nprocess(ctx, ",
+        "scopes": [
+          {
+            "id": "root",
+            "parent": null,
+            "span": [
+              0,
+              31
+            ]
+          }
+        ],
+        "calls": [
+          {
+            "id": "call",
+            "signatures": [
+              "process"
+            ],
+            "span": [
+              18,
+              31
+            ],
+            "arguments": [
+              {
+                "type": "Context",
+                "span": [
+                  26,
+                  29
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  31,
+                  31
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "cursor": 31,
+      "region": null,
+      "prefix": "it",
+      "expected": {
+        "error": "EDITOR_SNAPSHOT_MISMATCH",
+        "span": [
+          0,
+          31
+        ]
+      }
+    },
+    {
+      "name": "stale-completion-snapshot",
+      "uri": "memory:editor",
+      "version": 7,
+      "source": "😀ctx item other;\r\nprocess(ctx, ",
+      "status": "PARTIAL",
+      "ast": null,
+      "nodes": [
+        {
+          "kind": "MISSING",
+          "span": [
+            31,
+            31
+          ],
+          "candidates": [
+            "Argument",
+            "CloseParen"
+          ],
+          "region": null
+        }
+      ],
+      "calls": [
+        {
+          "call": "call",
+          "index": 1,
+          "region": null
+        }
+      ],
+      "model": {
+        "source": "😀ctx item other;\r\nprocess(ctx, ",
+        "scopes": [
+          {
+            "id": "root",
+            "parent": null,
+            "span": [
+              0,
+              31
+            ]
+          }
+        ],
+        "calls": [
+          {
+            "id": "call",
+            "signatures": [
+              "process"
+            ],
+            "span": [
+              18,
+              31
+            ],
+            "arguments": [
+              {
+                "type": "Context",
+                "span": [
+                  26,
+                  29
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  31,
+                  31
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "cursor": 31,
+      "region": null,
+      "prefix": "it",
+      "expected": {
+        "error": "EDITOR_STALE_SNAPSHOT",
+        "span": [
+          0,
+          31
+        ]
+      },
+      "snapshotVersion": 8
+    },
+    {
+      "name": "cursor-outside-source",
+      "uri": "memory:editor",
+      "version": 7,
+      "source": "😀ctx item other;\r\nprocess(ctx, ",
+      "status": "PARTIAL",
+      "ast": null,
+      "nodes": [
+        {
+          "kind": "MISSING",
+          "span": [
+            31,
+            31
+          ],
+          "candidates": [
+            "Argument",
+            "CloseParen"
+          ],
+          "region": null
+        }
+      ],
+      "calls": [
+        {
+          "call": "call",
+          "index": 1,
+          "region": null
+        }
+      ],
+      "model": {
+        "source": "😀ctx item other;\r\nprocess(ctx, ",
+        "scopes": [
+          {
+            "id": "root",
+            "parent": null,
+            "span": [
+              0,
+              31
+            ]
+          }
+        ],
+        "calls": [
+          {
+            "id": "call",
+            "signatures": [
+              "process"
+            ],
+            "span": [
+              18,
+              31
+            ],
+            "arguments": [
+              {
+                "type": "Context",
+                "span": [
+                  26,
+                  29
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  31,
+                  31
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "cursor": 32,
+      "region": null,
+      "prefix": "it",
+      "expected": {
+        "error": "EDITOR_INVALID_CURSOR",
+        "span": [
+          32,
+          32
+        ]
+      }
+    },
+    {
+      "name": "different-region-keeps-symbols",
+      "uri": "memory:editor",
+      "version": 7,
+      "source": "😀ctx item other;\r\n<foreign>\r\nprocess(ctx, it",
+      "status": "PARTIAL",
+      "ast": null,
+      "nodes": [
+        {
+          "kind": "MISSING",
+          "span": [
+            44,
+            44
+          ],
+          "candidates": [
+            "Identifier",
+            "CloseParen"
+          ],
+          "region": "embedded-1"
+        }
+      ],
+      "calls": [
+        {
+          "call": "call",
+          "index": 1,
+          "region": "embedded-1"
+        }
+      ],
+      "model": {
+        "source": "😀ctx item other;\r\n<foreign>\r\nprocess(ctx, it",
+        "scopes": [
+          {
+            "id": "root",
+            "parent": null,
+            "span": [
+              0,
+              44
+            ]
+          }
+        ],
+        "calls": [
+          {
+            "id": "call",
+            "signatures": [
+              "process"
+            ],
+            "span": [
+              29,
+              44
+            ],
+            "arguments": [
+              {
+                "type": "Context",
+                "span": [
+                  37,
+                  40
+                ]
+              },
+              {
+                "type": "?",
+                "span": [
+                  42,
+                  44
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "cursor": 44,
+      "region": "other-region",
+      "prefix": "it",
+      "expected": {
+        "status": "PARTIAL",
+        "strictAst": null,
+        "nodes": [
+          {
+            "kind": "MISSING",
+            "span": [
+              44,
+              44
+            ],
+            "utf16Span": [
+              45,
+              45
+            ],
+            "candidates": [
+              "Identifier",
+              "CloseParen"
+            ],
+            "region": "embedded-1"
+          }
+        ],
+        "visible": [
+          "ctx",
+          "item",
+          "other"
+        ],
+        "call": null,
+        "expectedTypes": [],
+        "completions": []
+      }
+    }
+  ]
+}

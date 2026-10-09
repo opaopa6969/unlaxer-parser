@@ -1,0 +1,6 @@
+# name\tmode\tinput\texpected region grammar:state:full:body list
+complete	all	😀F{T[package p; import q; class C {}]T}F	FormulaInfo:COMPLETE:0:40:0:40,TinyExpression:COMPLETE:1:40:3:38,Java:COMPLETE:3:38:5:36
+child-failed	all	😀F{T[bad]T}F	FormulaInfo:COMPLETE:0:12:0:12,TinyExpression:COMPLETE:1:12:3:10,Java:FAILED:3:10:5:8
+sibling	all	😀F{T[bad]T}FF{T[package p; import q; class C {}]T}F	FormulaInfo:COMPLETE:0:51:0:51,TinyExpression:COMPLETE:1:12:3:10,Java:FAILED:3:10:5:8,TinyExpression:COMPLETE:12:51:14:49,Java:COMPLETE:14:49:16:47
+provider-missing	missing	😀F{T[package p; import q; class C {}]T}F	FormulaInfo:COMPLETE:0:40:0:40,TinyExpression:COMPLETE:1:40:3:38,Java:UNAVAILABLE:3:38:5:36
+host-failed	all	?	FormulaInfo:FAILED:0:1:0:1

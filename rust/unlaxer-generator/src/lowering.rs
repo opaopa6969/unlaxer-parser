@@ -53,6 +53,19 @@ struct Shape {
 }
 
 pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
+    let format_two = grammar.settings.iter().any(|setting| {
+        setting.key == "ubnf"
+            && matches!(&setting.value, ast::SettingValue::String(value) if value == "v2")
+    });
+    if format_two
+        && grammar.tokens.iter().any(|token| {
+            matches!(token.kind,
+        ast::TokenKind::CharRange { min, max } if (min as u32) <= 0xdfff && (max as u32) >= 0xd800)
+        })
+    {
+        return Err("E-TOKEN-RANGE-SURROGATE: range must not contain surrogates".into());
+    }
+    crate::embedded::validate(grammar)?;
     Lowering {
         grammar,
         ids: HashMap::new(),
@@ -259,7 +272,10 @@ impl Lowering<'_> {
         let mut settings = HashSet::new();
         let mut memo_safe_tokens = HashSet::new();
         for setting in &self.grammar.settings {
-            if setting.key == "tokenAdapter" || setting.key == "tokenContract" {
+            if matches!(
+                setting.key.as_str(),
+                "tokenAdapter" | "tokenContract" | "embedded" | "embedding"
+            ) {
                 continue;
             }
             if setting.key != "memoSafeToken"

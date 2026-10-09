@@ -115,6 +115,28 @@ public class MapperGenerator implements CodeGenerator {
         sb.append(MapperRuleEmitter.emitMappedTree(astClass,
             grammar.rules().stream().anyMatch(MapperElementUtil::isSkipped)));
 
+        sb.append("    /** Bounded editor-only EOF repair. Captures crossing inserted syntax stay synthetic. */\n");
+        sb.append("    public static synchronized org.unlaxer.editor.EditorCst parseEditorCst(String source, List<String> completions, org.unlaxer.editor.EditorCst.Options options) {\n");
+        sb.append("        return org.unlaxer.editor.EditorCst.parse(source, ").append(parsersClass).append(".getRootParser(), completions,\n");
+        sb.append("            parser -> {\n");
+        for (RuleDecl rule : grammar.rules()) {
+            sb.append("                if (parser instanceof ").append(parsersClass).append(".").append(rule.name()).append("Parser) return \"").append(rule.name()).append("\";\n");
+        }
+        for (RuleDecl rule : grammar.rules()) {
+            if (ParserRuleEmitter.findRecoveryAnnotation(rule).isPresent()) {
+                sb.append("                if (parser instanceof ").append(parsersClass).append(".").append(rule.name()).append("RecoveryParser) return \"").append(rule.name()).append("\";\n");
+            }
+        }
+        sb.append("                return null;\n            },\n");
+        sb.append("            parser -> parser instanceof ").append(parsersClass).append(".__CaptureBinding binding ? binding.captureBindings().stream().map(" + mapperClass + "::editorCaptureName).filter(java.util.Objects::nonNull).toList() : List.of(), options);\n    }\n\n");
+
+        sb.append("    private static String editorCaptureName(String binding) {\n        return switch (binding) {\n");
+        for (RuleDecl rule : grammar.rules()) {
+            new CaptureBindingPlan(rule).namesBySite().forEach((identity, name) ->
+                sb.append("            case \"").append(identity).append("\" -> \"").append(name).append("\";\n"));
+        }
+        sb.append("            default -> null;\n        };\n    }\n\n");
+
         // ----- mapToken -----
         sb.append(MapperRuleEmitter.emitMapTokenMethod(astClass, parsersClass, allMappingRules));
 

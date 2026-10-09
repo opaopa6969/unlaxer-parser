@@ -263,6 +263,7 @@ public class ParserGenerator implements CodeGenerator {
 
         sb.append(ParserScopeEmitter.helpers(grammar));
         sb.append(TokenStreamGrammar.javaApi(grammar));
+        sb.append(EmbeddedGrammarEmitter.javaApi(grammar));
 
         // チェーンクラス
         sb.append(generatePlainChainClass(ctx));
