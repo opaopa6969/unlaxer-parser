@@ -237,7 +237,7 @@ mod tests {
                 name: "Child".into(),
                 grammar: Arc::from(vec![Rule {
                     name: "Root",
-                    expression: Expr::literal("ab"),
+                    expression: Expr::literal("a").then(Expr::literal("b")),
                 }]),
                 entries: HashMap::from([("Root".into(), 0)]),
                 bindings: vec![],
@@ -282,10 +282,24 @@ mod tests {
                 assert_eq!(after.terminal_evaluations, before.terminal_evaluations);
                 assert_eq!(after.inventory_evaluations, before.inventory_evaluations);
                 assert_eq!(context.position(), if source == "ab!" { 2 } else { 0 });
+                let consumed = context.position();
                 if result.is_ok() {
                     context.parse(&Expr::literal("!")).unwrap();
                     assert_eq!(context.position(), 3);
                 }
+                let label = match mode {
+                    Mode::Direct => "DIRECT",
+                    Mode::TriviaCache => "TRIVIA_CACHE",
+                    Mode::TokensLazy => "TOKENS_LAZY",
+                    Mode::TokensEager => "TOKENS_EAGER",
+                };
+                println!(
+                    "SHARED_SESSION\t{label}\t{source}\t{}\t{consumed}\t{}\t{}\t{}",
+                    result.is_ok(),
+                    context.position(),
+                    after.terminal_evaluations - before.terminal_evaluations,
+                    after.inventory_evaluations - before.inventory_evaluations
+                );
             }
         }
     }

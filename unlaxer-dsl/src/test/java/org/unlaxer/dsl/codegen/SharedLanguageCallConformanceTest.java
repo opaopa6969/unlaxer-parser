@@ -58,6 +58,7 @@ public class SharedLanguageCallConformanceTest {
         var expected = new ArrayList<String>(controlExpected);
         expected.addAll(controlExpected);
         try (var loader = new URLClassLoader(new URL[]{classes.toUri().toURL()}, getClass().getClassLoader())) {
+            assertEquals(Files.readAllLines(fixture.resolve("lexical-sessions.tsv")), loader.loadClass("example.shared.Checks").getMethod("lexicalSessions").invoke(null));
             for (Memoization memo : List.of(Memoization.OFF, Memoization.SAFE_FAILURES))
                 assertEquals(controlExpected, loader.loadClass("example.shared.Checks").getMethod("run", Memoization.class).invoke(null, memo));
             var parser = (Parser) loader.loadClass("example.shared.ParentParsers").getMethod("getRootParser").invoke(null);
@@ -100,6 +101,10 @@ public class SharedLanguageCallConformanceTest {
         Path probe = directory.resolve("probe.rs"); Files.copy(fixture.resolve("probe.rs"), probe);
         run(List.of(rustc, "--edition=2021", "--extern", "unlaxer_runtime=" + runtime, probe.toString(), "-o", directory.resolve("probe").toString()));
         assertEquals(expected, run(List.of(directory.resolve("probe").toString(), fixture.resolve("cases.tsv").toString())).lines().toList());
+        var sessions = Files.readAllLines(fixture.resolve("lexical-sessions.tsv"));
+        String unitOutput = run(List.of("cargo", "test", "--quiet", "--manifest-path", repo.resolve("rust/Cargo.toml").toString(), "-p", "unlaxer-runtime", "--lib", "direct_entry_isolates_and_restores", "--", "--nocapture", "--test-threads=1"));
+        assertEquals(sessions, unitOutput.lines().filter(line -> line.contains("SHARED_SESSION\t")).map(line -> line.substring(line.indexOf("SHARED_SESSION\t") + "SHARED_SESSION\t".length())).toList());
+        for (String row : sessions) expected.add("lexical-session\t" + row);
         Files.write(Path.of("target/shared-language-calls.tsv"), expected);
     }
     private void collect(Token token, List<SharedGrammarCalls.Call> calls) {

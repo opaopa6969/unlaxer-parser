@@ -87,7 +87,7 @@ may be mapped after their parse context is closed, but must not be relabelled as
 results for a later snapshot. Rebuild through `CstGrammar.parse` and
 `EmbeddedLanguages.parse` for each current source/version. This API does not add
 an editor registration automatically; use the existing explicit generated
-LSP/Playground provider hooks. It does not implement whole-language semantics,
+[LSP/Playground provider hooks](language-query-forwarding.md). It does not implement whole-language semantics,
 implicit recursive package discovery, or a general context-sensitive parser.
 
 ## Verification
@@ -126,5 +126,8 @@ The dedicated CI job also requires `target/shared-language-calls.tsv` to exist a
 uploads it. A skipped opt-in test is not completion evidence.
 
 The observation TSV records the 19 controls once per memo mode, followed by one
-row per input after both modes agree (53 rows). These counts describe this bounded
+row per input after both modes agree, plus 8 direct lexical-session observations
+(61 rows). `lexical-sessions.tsv` fixes success/failure × four lexical modes; Java
+and Rust compare the same consumed/suffix positions and zero child contribution
+to caller lexical evaluation counters. These counts describe this bounded
 fixture corpus, not complete language support or a new parsing engine.

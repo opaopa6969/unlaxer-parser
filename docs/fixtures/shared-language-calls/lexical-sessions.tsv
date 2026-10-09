@@ -1,0 +1,8 @@
+DIRECT	ab!	true	2	3	0	0
+DIRECT	ax!	false	0	0	0	0
+TRIVIA_CACHE	ab!	true	2	3	0	0
+TRIVIA_CACHE	ax!	false	0	0	0	0
+TOKENS_LAZY	ab!	true	2	3	0	0
+TOKENS_LAZY	ax!	false	0	0	0	0
+TOKENS_EAGER	ab!	true	2	3	0	0
+TOKENS_EAGER	ax!	false	0	0	0	0

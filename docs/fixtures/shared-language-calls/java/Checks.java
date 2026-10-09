@@ -22,6 +22,21 @@ public final class Checks {
    return result.failure().kind()+"\t"+result.failure().offset();
   }
  }
+ public static List<String> lexicalSessions() {
+  var rows=new ArrayList<String>();
+  for(var mode:org.unlaxer.dsl.runtime.Lexing.Mode.values()) for(String source:List.of("ab!","ax!")) {
+   var session=new org.unlaxer.dsl.runtime.Lexing.Session(source,new org.unlaxer.dsl.runtime.Lexing.Options(mode,true),List.of(new org.unlaxer.dsl.runtime.Lexing.Terminal("!",true,org.unlaxer.dsl.runtime.LexicalExpression.leaf(org.unlaxer.dsl.runtime.LexicalExpression.Op.LITERAL,"!"))),false);
+   try(var context=new ParseContext(StringSource.createRootSource(source))) {
+    context.getGlobalScopeTreeMap().put(Name.of(org.unlaxer.dsl.runtime.Lexing.class),session);
+    var before=session.metrics(); boolean accepted=new CallA().parse(context).isSucceeded();
+    check(context.getGlobalScopeTreeMap().get(Name.of(org.unlaxer.dsl.runtime.Lexing.class))==session);
+    var after=session.metrics();int consumed=context.getPosition(TokenKind.consumed).value();
+    if(accepted) check(new org.unlaxer.dsl.runtime.Lexing.LiteralParser("!").parse(context).isSucceeded());
+    rows.add(mode+"\t"+source+"\t"+accepted+"\t"+consumed+"\t"+context.getPosition(TokenKind.consumed).value()+"\t"+(after.terminalEvaluations()-before.terminalEvaluations())+"\t"+(after.inventoryEvaluations()-before.inventoryEvaluations()));
+   }
+  }
+  return rows;
+ }
  public static List<String> run(Memoization selected) {
   memo=selected;
   var result=new ArrayList<String>();
