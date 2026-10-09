@@ -4,6 +4,7 @@
 //! grammar semantics (including capture shapes, nullability and left recursion).
 pub mod ir;
 pub mod lexical;
+pub mod lsp;
 mod validate;
 pub use ir::*;
 use std::fmt::Write;

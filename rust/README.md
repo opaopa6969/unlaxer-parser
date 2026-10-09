@@ -421,3 +421,5 @@ TSVは`unlaxer-dsl/target/`配下で、CI artifact `rust-conformance`にも添�
 
 文字種境界は既存 token の合成で表せる。実行時辞書には Java と共通の immutable parse bindings を使う。
 [仕様と実行例](../docs/parse-composition.md)を参照。
+
+Classic の opt-in stdio LSP は [利用方法・Java/Rust共通契約](../docs/classic-rust-lsp.md) を参照。`generate --lsp` は通常の5-file契約を保持してLSP moduleを追加する。DAP等の残差は [full-spec対応表](FULL-SPEC.md) に残す。

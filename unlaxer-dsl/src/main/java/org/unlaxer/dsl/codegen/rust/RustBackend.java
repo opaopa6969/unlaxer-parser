@@ -30,6 +30,38 @@ public final class RustBackend {
             new GeneratedFile("evaluator.rs", evaluator(ir)));
     }
 
+    /** Opt-in stdio LSP module, leaving ordinary generation unchanged. */
+    public List<GeneratedFile> generateWithLsp(GrammarDecl grammar) {
+        var ir = RustGrammarLowering.lower(grammar);
+        var files = new ArrayList<>(generate(grammar));
+        var first = files.get(0);
+        files.set(0, new GeneratedFile(first.relativePath(), first.content() + "pub mod lsp;\n"));
+        var keywords = new java.util.LinkedHashSet<String>(List.of("grammar token @root @mapping @whitespace @interleave @backref @typeof @scopeTree @leftAssoc @rightAssoc @longestChoice @predictiveChoice @precedence @declares @catalog params level profile name mode symbol context description".split(" ")));
+        for (var rule : ir.rules()) collectLspKeywords(rule.body(), keywords);
+        files.add(new GeneratedFile("lsp.rs", HEADER + "\n/// Intrinsic Classic grammar adapter; implement Backend for additional typed/provider queries.\npub fn backend() -> unlaxer_lsp::GrammarBackend {\n    unlaxer_lsp::GrammarBackend {\n        name: " + quote(grammar.name()) + ".into(), entry: " + quote(ir.rules().get(ir.root()).name()) + ".into(),\n        grammar: std::sync::Arc::clone(super::parser::grammar()),\n        root: " + ir.root() + ", whitespace: " + ir.javaWhitespace() + ",\n        keywords: vec![" + keywords.stream().map(k -> quote(k) + ".into()").collect(Collectors.joining(", ")) + "],\n    }\n}\n\npub fn serve_stdio() -> std::io::Result<()> {\n    unlaxer_lsp::Server::new(backend()).serve_stdio()\n}\n"));
+        return List.copyOf(files);
+    }
+
+    private static void collectLspKeywords(Expression expression, java.util.Set<String> keywords) {
+        if (expression instanceof Literal v) keywords.add(v.text());
+        else if (expression instanceof Sequence v) v.elements().forEach(e -> collectLspKeywords(e, keywords));
+        else if (expression instanceof Choice v) v.alternatives().forEach(e -> collectLspKeywords(e, keywords));
+        else if (expression instanceof LongestChoice v) v.alternatives().forEach(e -> collectLspKeywords(e, keywords));
+        else if (expression instanceof PredictiveChoice v) v.alternatives().forEach(e -> collectLspKeywords(e, keywords));
+        else if (expression instanceof RuleEffects v) collectLspKeywords(v.child(), keywords);
+        else if (expression instanceof CaptureEquality v) collectLspKeywords(v.child(), keywords);
+        else if (expression instanceof Recovery v) collectLspKeywords(v.child(), keywords);
+        else if (expression instanceof Capture v) collectLspKeywords(v.expression(), keywords);
+        else if (expression instanceof OptionalExpr v) collectLspKeywords(v.child(), keywords);
+        else if (expression instanceof Repeat v) collectLspKeywords(v.child(), keywords);
+        else if (expression instanceof Delimited v) collectLspKeywords(v.child(), keywords);
+        else if (expression instanceof TextValue v) collectLspKeywords(v.child(), keywords);
+        else if (expression instanceof ValueBoundary v) collectLspKeywords(v.child(), keywords);
+        else if (expression instanceof TriviaScope v) collectLspKeywords(v.child(), keywords);
+        else if (expression instanceof LexicalTriviaScope v) collectLspKeywords(v.child(), keywords);
+        else if (expression instanceof Separated v) { collectLspKeywords(v.child(), keywords); collectLspKeywords(v.separator(), keywords); }
+    }
+
     private String lexingApi(GrammarDecl grammar, GrammarIR ir) {
         if (!org.unlaxer.dsl.codegen.TokenStreamGrammar.enabled(grammar)) return "";
         var out = new StringBuilder("\npub fn lexical_terminals() -> &'static std::sync::Arc<[unlaxer_runtime::lexing::Terminal]> {\n    static TERMINALS: OnceLock<std::sync::Arc<[unlaxer_runtime::lexing::Terminal]>> = OnceLock::new();\n    TERMINALS.get_or_init(|| vec![\n");

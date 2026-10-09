@@ -73,3 +73,16 @@ mod package_fetch {
         Err("E-PACKAGE: HTTPS retrieval requires the native deps resolve command".into())
     }
 }
+
+/// Additional LSP module for an explicitly requested stdio server.
+pub fn generate_file_with_lsp(
+    path: &std::path::Path,
+) -> Result<Vec<unlaxer_codegen::GeneratedFile>, String> {
+    let file = modules::load(path)?;
+    let mut files = generate_ast(&file)?;
+    let grammar = &file.grammars[0];
+    let ir = lowering::lower(grammar)?;
+    files[0].content.push_str("pub mod lsp;\n");
+    files.push(unlaxer_codegen::lsp::generate(&ir, &grammar.name));
+    Ok(files)
+}
