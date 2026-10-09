@@ -149,7 +149,9 @@ impl SourceMap {
         let mut cursor = 0;
         for segment in &segments {
             output.check(segment.output)?;
-            if segment.output.start != cursor || length(segment.output) == 0 {
+            let empty_anchor =
+                output.is_empty() && segments.len() == 1 && segment.kind == Kind::Copy;
+            if segment.output.start != cursor || (length(segment.output) == 0 && !empty_anchor) {
                 return Err("segments must partition output");
             }
             if segment.kind != Kind::Generated && segment.origin.is_none() {
@@ -269,7 +271,7 @@ impl SourceMap {
                 for (parent_output, parent_origin) in &parent_links {
                     let start = origin.span.start.max(parent_output.start);
                     let end = origin.span.end.min(parent_output.end);
-                    if start >= end {
+                    if start > end || (start == end && length(origin.span) != 0) {
                         continue;
                     }
                     let mapped = parent_origin.span.start + start - parent_output.start;

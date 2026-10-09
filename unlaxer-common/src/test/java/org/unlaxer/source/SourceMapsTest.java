@@ -184,4 +184,35 @@ public class SourceMapsTest {
         Region overlap = region("two", null, JAVA, new Span(6, 11), new Span(7, 10));
         assertThrows(IllegalArgumentException.class, () -> new LanguageRegions(HOST, List.of(overlap, overlap)));
     }
+    @Test public void emptyCopyAnchorsComposeAndDoNotInventAmbiguousPositions() {
+        var host = new DocumentSnapshot("host", 1, "日😀[");
+        var middle = new DocumentSnapshot("middle", 1, "😀[");
+        var empty = new DocumentSnapshot("empty", 1, "");
+        var point = new Span(0, 0);
+        var expected = new Location(host, new Span(3, 3));
+        var map = copy(empty, middle, 2).through(copy(middle, host, 1));
+        assertEquals(expected, map.edit(point));
+        assertEquals(0, map.cursor(expected).orElseThrow());
+        assertEquals(new DocumentSnapshot.Position(0, 4), host.lsp(map.edit(point).span().start()));
+        var nested = copy(new DocumentSnapshot("nested", 1, ""), empty, 0).through(map);
+        assertEquals(expected, nested.edit(point)); assertEquals(0, nested.cursor(expected).orElseThrow());
+        assertTrue(nested.cursor(new Location(new DocumentSnapshot("host", 2, host.text()), new Span(3, 3))).isEmpty());
+        assertTrue(new SegmentSourceMap(empty, List.of()).cursor(expected).isEmpty());
+        assertThrows(IllegalArgumentException.class, () -> new SegmentSourceMap(empty, List.of()).edit(point));
+        var anchor = new Segment(point, Kind.COPY, expected);
+        assertThrows(IllegalArgumentException.class, () -> new SegmentSourceMap(empty, List.of(anchor, anchor)));
+        assertThrows(IllegalArgumentException.class, () -> new SegmentSourceMap(empty, List.of(new Segment(point, Kind.GENERATED, expected))));
+        assertThrows(IllegalArgumentException.class, () -> new SegmentSourceMap(empty, List.of(new Segment(point, Kind.TRANSFORMED, expected))));
+        assertThrows(IllegalArgumentException.class, () -> new SegmentSourceMap(middle, List.of(anchor)));
+        var splitHost = new DocumentSnapshot("split-host", 1, "a#a");
+        var split = new DocumentSnapshot("split", 1, "aa");
+        var parent = new SegmentSourceMap(split, List.of(
+            new Segment(new Span(0, 1), Kind.COPY, new Location(splitHost, new Span(0, 1))),
+            new Segment(new Span(1, 2), Kind.COPY, new Location(splitHost, new Span(2, 3)))));
+        var ambiguous = copy(empty, split, 1).through(parent);
+        assertTrue(ambiguous.cursor(new Location(splitHost, new Span(1, 1))).isEmpty());
+        assertTrue(ambiguous.cursor(new Location(splitHost, new Span(2, 2))).isEmpty());
+        assertThrows(IllegalArgumentException.class, () -> ambiguous.edit(point));
+    }
+
 }

@@ -454,3 +454,85 @@ fn actual_parser_callback_is_bounded_and_sibling_failure_is_isolated() {
         State::Complete
     );
 }
+
+#[test]
+fn empty_copy_anchors_compose_without_inventing_ambiguous_positions() {
+    let host = snapshot("host", "日😀[");
+    let middle = snapshot("middle", "😀[");
+    let empty = snapshot("empty", "");
+    let point = span(0, 0);
+    let expected = Location::new(host.clone(), span(3, 3)).unwrap();
+    let map = copy(empty.clone(), middle.clone(), 2)
+        .through(copy(middle.clone(), host.clone(), 1))
+        .unwrap();
+    assert_eq!(map.edit(point).unwrap(), expected);
+    assert_eq!(map.cursor(&expected).unwrap(), Some(0));
+    assert_eq!(
+        host.lsp(3).unwrap(),
+        Position {
+            line: 0,
+            character: 4
+        }
+    );
+    let nested = copy(snapshot("nested", ""), empty.clone(), 0)
+        .through(map)
+        .unwrap();
+    assert_eq!(nested.edit(point).unwrap(), expected);
+    assert_eq!(nested.cursor(&expected).unwrap(), Some(0));
+    let stale = Snapshot::new("host", host.version + 1, &host.text).unwrap();
+    assert_eq!(
+        nested
+            .cursor(&Location::new(stale, span(3, 3)).unwrap())
+            .unwrap(),
+        None
+    );
+    let unanchored = SourceMap::new(empty.clone(), vec![]).unwrap();
+    assert_eq!(unanchored.cursor(&expected).unwrap(), None);
+    assert!(unanchored.edit(point).is_err());
+    let anchor = Segment {
+        output: point,
+        kind: Kind::Copy,
+        origin: Some(expected.clone()),
+    };
+    assert!(SourceMap::new(empty.clone(), vec![anchor.clone(), anchor.clone()]).is_err());
+    for kind in [Kind::Generated, Kind::Transformed] {
+        assert!(SourceMap::new(
+            empty.clone(),
+            vec![Segment {
+                output: point,
+                kind,
+                origin: Some(expected.clone())
+            }]
+        )
+        .is_err());
+    }
+    assert!(SourceMap::new(middle, vec![anchor]).is_err());
+    let split_host = snapshot("split-host", "a#a");
+    let split = snapshot("split", "aa");
+    let parent = SourceMap::new(
+        split.clone(),
+        vec![
+            Segment {
+                output: span(0, 1),
+                kind: Kind::Copy,
+                origin: Some(Location::new(split_host.clone(), span(0, 1)).unwrap()),
+            },
+            Segment {
+                output: span(1, 2),
+                kind: Kind::Copy,
+                origin: Some(Location::new(split_host.clone(), span(2, 3)).unwrap()),
+            },
+        ],
+    )
+    .unwrap();
+    let ambiguous = copy(empty, split, 1).through(parent).unwrap();
+    for offset in [1, 2] {
+        assert_eq!(
+            ambiguous
+                .cursor(&Location::new(split_host.clone(), span(offset, offset)).unwrap())
+                .unwrap(),
+            None
+        );
+    }
+    assert!(ambiguous.edit(point).is_err());
+}
