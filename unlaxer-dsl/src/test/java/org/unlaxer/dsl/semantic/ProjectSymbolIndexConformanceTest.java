@@ -23,12 +23,12 @@ public class ProjectSymbolIndexConformanceTest {
         }
         return cases;
     }
-    private static Module module(JsonObject o) {
+    static Module module(JsonObject o) {
         return new Module(text(o,"id"),model(o.getAsJsonObject("model")),new HashSet<>(strings(o.getAsJsonArray("exports"))),
             list(o,"imports",i -> new Import(text(i,"name"),new ModuleRef(text(i.getAsJsonObject("target"),"dependency"),text(i.getAsJsonObject("target"),"module")),
                 text(i,"symbol"),text(i,"scope"),span(i.get("span")),i.get("visibleFrom").getAsInt())));
     }
-    private static ProjectSymbolIndex project(JsonObject o) {
+    static ProjectSymbolIndex project(JsonObject o) {
         return new ProjectSymbolIndex(text(o,"id"),o.get("version").getAsLong(),list(o,"modules",ProjectSymbolIndexConformanceTest::module),
             list(o,"dependencies",d -> new Dependency(text(d,"id"),text(d,"version"),text(d,"sha256"),list(d,"modules",ProjectSymbolIndexConformanceTest::module))));
     }
@@ -113,7 +113,7 @@ public class ProjectSymbolIndexConformanceTest {
         return code.append("]}").toString();
     }
     private static String rustModules(JsonObject o) { return "vec!["+String.join(",",o.getAsJsonArray("modules").asList().stream().map(e->rustModule(e.getAsJsonObject())).toList())+"]"; }
-    private static String rustProject(JsonObject o) {
+    static String rustProject(JsonObject o) {
         StringBuilder code=new StringBuilder("p::ProjectSymbolIndex::new("+rs(o,"id")+","+o.get("version")+","+rustModules(o)+",vec![");
         for(JsonElement e:o.getAsJsonArray("dependencies")) { JsonObject d=e.getAsJsonObject(); code.append("p::Dependency {id:").append(rs(d,"id")).append(",version:").append(rs(d,"version")).append(",sha256:").append(rs(d,"sha256")).append(",modules:").append(rustModules(d)).append("},"); }
         return code.append("])").toString();
