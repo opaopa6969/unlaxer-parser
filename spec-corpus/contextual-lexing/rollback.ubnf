@@ -1,0 +1,27 @@
+grammar Input {
+ @ubnf: v2
+ @package: example.lexing
+ @tokenStream: enabled
+ @whitespace: javaStyle
+ token GT ::= '>';
+ token SHIFT ::= '>>';
+ token END = EOF
+ @root @mapping(Value, params=[value])
+ Root ::= 'rollback' (Wrong | Right) @value END
+       | 'exit' Single @value GT END
+       | 'nested' Outer @value END
+       | 'memo' (WrongGoal | RightGoal) @value END;
+ @lexicalContext(tokens=['SHIFT'], literals=['!'])
+ Wrong ::= SHIFT '!';
+ @lexicalContext(tokens=['GT'])
+ Right ::= GT GT;
+ @lexicalContext(tokens=['GT'])
+ Single ::= GT;
+ @lexicalContext(tokens=['SHIFT'], literals=['(',')'])
+ Outer ::= '(' Single SHIFT ')';
+ @lexicalContext(tokens=['SHIFT'])
+ WrongGoal ::= SharedGreater;
+ @lexicalContext(tokens=['GT'])
+ RightGoal ::= SharedGreater SharedGreater;
+ SharedGreater ::= GT;
+}

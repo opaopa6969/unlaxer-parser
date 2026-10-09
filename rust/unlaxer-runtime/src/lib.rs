@@ -18,6 +18,7 @@ pub mod lexing;
 mod long_code_fence;
 #[cfg(test)]
 mod memo_retention_tests;
+pub mod names;
 pub mod pipeline;
 pub mod provider_process;
 pub mod provider_protocol;
@@ -32,6 +33,7 @@ pub mod source;
 pub mod source_edits;
 pub mod token;
 pub mod type_system;
+mod unicode_xid;
 #[doc(hidden)]
 pub use first::{set_candidate_exclusion_for_current_thread, CandidateExclusion};
 pub use scope::{
@@ -100,6 +102,8 @@ pub enum Expr {
     /// Try every alternative from the same transactional state and commit the
     /// one that consumes the most input. Equal-length matches keep declaration order.
     LongestChoice(Vec<Expr>),
+    /// Choose a nonempty unique maximum; reject ties and counts outside 2..=64.
+    UniqueLongestChoice(Vec<Expr>),
     /// Ordered choice that skips alternatives whose conservative FIRST
     /// predictor proves they cannot match. `Any` preserves ordinary choice.
     PredictiveChoice {
@@ -117,6 +121,19 @@ pub enum Expr {
         effects: RuleEffects,
     },
     /// Compare completed captures from this child, without changing syntax acceptance.
+    /// Syntax predicate over an explicit immutable name snapshot.
+    NamePredicate {
+        child: Box<Expr>,
+        snapshot: &'static str,
+        version: &'static str,
+        capture: &'static str,
+        kind: &'static str,
+    },
+    /// Entry boundary: unresolved names cannot become discarded-alternative success.
+    NameResolutionScope {
+        child: Box<Expr>,
+        requirements: Vec<names::Requirement>,
+    },
     CaptureEquality {
         child: Box<Expr>,
         name: &'static str,
@@ -125,6 +142,10 @@ pub enum Expr {
     LexicalTriviaScope {
         child: Box<Expr>,
         definition: lexical::LexicalExpression,
+    },
+    LexicalContextScope {
+        child: Box<Expr>,
+        terminals: Arc<[lexing::Terminal]>,
     },
     TriviaScope {
         child: Box<Expr>,
@@ -243,6 +264,9 @@ impl Expr {
     pub fn longest_choice(alternatives: impl IntoIterator<Item = Self>) -> Self {
         Self::LongestChoice(alternatives.into_iter().collect())
     }
+    pub fn unique_longest_choice(alternatives: impl IntoIterator<Item = Self>) -> Self {
+        Self::UniqueLongestChoice(alternatives.into_iter().collect())
+    }
     pub fn predictive_choice(alternatives: impl IntoIterator<Item = (Predictor, Self)>) -> Self {
         let (predictors, alternatives) = alternatives.into_iter().unzip();
         Self::PredictiveChoice {
@@ -306,6 +330,13 @@ impl Expr {
     pub fn value_boundary(self) -> Self {
         Self::ValueBoundary(Box::new(self))
     }
+    pub fn lexical_context_scope(self, terminals: Vec<lexing::Terminal>) -> Self {
+        Self::LexicalContextScope {
+            child: Box::new(self),
+            terminals: terminals.into(),
+        }
+    }
+
     pub fn lexical_trivia_scope(self, definition: lexical::LexicalExpression) -> Self {
         Self::LexicalTriviaScope {
             child: Box::new(self),
@@ -1064,6 +1095,7 @@ pub struct ParseContext<'a> {
     rules: Arc<[Rule]>,
     whitespace: bool,
     lexical_trivia: Option<lexical::LexicalExpression>,
+    lexical_context: Option<Arc<[lexing::Terminal]>>,
     position: usize,
     matched_position: usize,
     nodes: Vec<Node>,
@@ -1094,6 +1126,8 @@ pub struct ParseContext<'a> {
     exclusion_audit: bool,
     tokens: Rc<token::Store>,
     next_token_generation: u64,
+    unique_choice_failure_seen: bool,
+    names_state: names::State,
 }
 
 /// Ordered choice with rollback and full-input acceptance. Rule nesting is bounded at 256.
@@ -1166,7 +1200,14 @@ pub fn parse_detailed_with_options(
     input: &str,
     options: ParseOptions,
 ) -> Result<Tree, ParseDiagnostic> {
-    parse_detailed_owned(Arc::from(rules), root, whitespace, input, options)
+    parse_detailed_owned(
+        Arc::from(rules),
+        root,
+        whitespace,
+        input,
+        options,
+        BTreeMap::new(),
+    )
 }
 
 /// Detailed full-input parsing over an immutable grammar graph shared across calls.
@@ -1188,7 +1229,42 @@ pub fn parse_detailed_shared_with_options(
     input: &str,
     options: ParseOptions,
 ) -> Result<Tree, ParseDiagnostic> {
-    parse_detailed_owned(Arc::clone(grammar), root, whitespace, input, options)
+    parse_detailed_owned(
+        Arc::clone(grammar),
+        root,
+        whitespace,
+        input,
+        options,
+        BTreeMap::new(),
+    )
+}
+
+/// Full-input parsing with caller-owned immutable name snapshots; no external name provider.
+pub fn parse_detailed_shared_with_name_snapshots(
+    grammar: &SharedGrammar,
+    root: usize,
+    whitespace: bool,
+    input: &str,
+    options: ParseOptions,
+    snapshots: &[names::Snapshot],
+) -> Result<Tree, ParseDiagnostic> {
+    let bindings = names::bindings_of(snapshots).map_err(|_| ParseDiagnostic {
+        kind: "name_snapshot_invalid",
+        offset: 0,
+        expected: vec!["valid immutable name snapshots".into()],
+        farthest: ParseError {
+            offset: 0,
+            expected: vec!["valid immutable name snapshots".into()],
+        },
+    })?;
+    parse_detailed_owned(
+        Arc::clone(grammar),
+        root,
+        whitespace,
+        input,
+        options,
+        bindings,
+    )
 }
 
 fn parse_detailed_owned(
@@ -1197,6 +1273,7 @@ fn parse_detailed_owned(
     whitespace: bool,
     input: &str,
     options: ParseOptions,
+    bindings: BTreeMap<String, Vec<String>>,
 ) -> Result<Tree, ParseDiagnostic> {
     let options = if options.diagnostics == Diagnostics::Auto {
         options.with_diagnostics(if grammar_allows_deferred_diagnostics(&rules) {
@@ -1207,7 +1284,7 @@ fn parse_detailed_owned(
     } else {
         options
     };
-    let mut parser = ParseContext::with_options(input, options);
+    let mut parser = ParseContext::with_bindings(input, bindings, options);
     parser.rules = rules;
     parser.whitespace = whitespace;
     if parser.first_sets.is_some() {
@@ -1233,7 +1310,16 @@ fn parse_detailed_owned(
         trailing_offset = Some(parser.code_point(parser.position));
         parser.fail("end of input");
     }
+    if let Some(failure) = parser.name_failure() {
+        return Err(ParseDiagnostic {
+            kind: failure.kind,
+            offset: failure.span.start,
+            expected: vec![failure.expected.clone()],
+            farthest: failure.error(),
+        });
+    }
     if options.diagnostics == Diagnostics::DetailedOnFailure {
+        let bindings = parser.bindings.clone();
         let rules = Arc::clone(&parser.rules);
         // Release the first pass, including its empty-diagnostic memo entries.
         drop(parser);
@@ -1243,6 +1329,7 @@ fn parse_detailed_owned(
             whitespace,
             input,
             options.with_diagnostics(Diagnostics::Detailed),
+            bindings,
         );
     }
     let farthest = ParseError {
@@ -1252,6 +1339,27 @@ fn parse_detailed_owned(
     Err(ParseDiagnostic {
         kind: if trailing_offset.is_some() {
             "trailing_input"
+        } else if parser.unique_choice_failure_seen
+            && farthest
+                .expected
+                .iter()
+                .any(|hint| hint == "unique longest alternative")
+        {
+            "ambiguity"
+        } else if parser.unique_choice_failure_seen
+            && farthest
+                .expected
+                .iter()
+                .any(|hint| hint == "nonempty unique longest alternative")
+        {
+            "empty_choice"
+        } else if parser.unique_choice_failure_seen
+            && farthest
+                .expected
+                .iter()
+                .any(|hint| hint == "2 to 64 unique longest alternatives")
+        {
+            "choice_limit"
         } else {
             "syntax"
         },
@@ -1311,6 +1419,7 @@ impl<'a> ParseContext<'a> {
             rules: Arc::from([]),
             whitespace: false,
             lexical_trivia: None,
+            lexical_context: None,
             position: 0,
             matched_position: 0,
             nodes: vec![],
@@ -1337,6 +1446,8 @@ impl<'a> ParseContext<'a> {
             exclusion_audit: false,
             tokens: Rc::new(token::Store::new()),
             next_token_generation: 1,
+            unique_choice_failure_seen: false,
+            names_state: names::State::default(),
         }
         .with_candidate_exclusion()
     }
@@ -1526,7 +1637,14 @@ impl<'a> ParseContext<'a> {
     }
     /// Current syntax diagnostic; offset zero and no expected names with
     /// [`Diagnostics::DetailedOnFailure`]. Does not trigger a detailed retry.
+    pub fn name_failure(&self) -> Option<&names::Failure> {
+        self.names_state.failure()
+    }
+
     pub fn failure(&self) -> ParseError {
+        if let Some(failure) = self.name_failure() {
+            return failure.error();
+        }
         ParseError {
             offset: self.code_point(self.farthest),
             expected: self.expected_names.strings(&self.expected),
@@ -1599,6 +1717,13 @@ impl<'a> ParseContext<'a> {
         whitespace: bool,
     ) -> ParseResult {
         let previous_definition = self.lexical_trivia.take();
+        let previous_goal = self.lexical_context.take();
+        let outer_entry = self.rules.is_empty();
+        let previous_lexing = if outer_entry {
+            None
+        } else {
+            self.lexing.take()
+        };
         let previous_rules = std::mem::replace(&mut self.rules, Arc::clone(grammar));
         let previous_whitespace = std::mem::replace(&mut self.whitespace, whitespace);
         let safe_rules = if self.options.memoization == Memoization::SafeFailures {
@@ -1617,6 +1742,10 @@ impl<'a> ParseContext<'a> {
         let result = self.parse_expression(&Expr::Rule(root));
         self.failure_memo = previous_failure_memo;
         self.rules = previous_rules;
+        self.lexical_context = previous_goal;
+        if !outer_entry {
+            self.lexing = previous_lexing;
+        }
         self.whitespace = previous_whitespace;
         self.lexical_trivia = previous_definition;
         self.memo_safe_rules = previous_safe_rules;
@@ -1839,7 +1968,9 @@ impl<'a> ParseContext<'a> {
             return None;
         }
         let memo_key = (self.options.memoization == Memoization::SafeFailures
+            && self.names_state.frames.is_empty()
             && self.lexical_trivia.is_none()
+            && self.lexical_context.is_none()
             && self.memo_safe_rules.get(id).copied().unwrap_or(false))
         .then(|| {
             (
@@ -1915,6 +2046,9 @@ impl<'a> ParseContext<'a> {
                 nodes: vec![id],
                 captures: Vec::new(),
             }),
+            Expr::LexicalContextScope { child, terminals } => {
+                self.expression_with_lexical_context(child, terminals, depth)
+            }
             Expr::LexicalTriviaScope { child, definition } => {
                 self.expression_with_lexical_trivia(child, definition, depth)
             }
@@ -1923,11 +2057,25 @@ impl<'a> ParseContext<'a> {
             }
             Expr::Sequence(elements) => self.sequence(elements, depth),
             Expr::Choice(alternatives) => self.ordered_choice(alternatives.iter(), depth),
-            Expr::LongestChoice(alternatives) => self.longest_choice(alternatives, depth),
+            Expr::LongestChoice(alternatives) => self.longest_choice(alternatives, depth, false),
+            Expr::UniqueLongestChoice(alternatives) => {
+                self.longest_choice(alternatives, depth, true)
+            }
             Expr::PredictiveChoice {
                 alternatives,
                 predictors,
             } => self.predictive_choice(alternatives, predictors, depth),
+            Expr::NameResolutionScope {
+                child,
+                requirements,
+            } => self.name_scope(child, requirements, depth),
+            Expr::NamePredicate {
+                child,
+                snapshot,
+                version,
+                capture,
+                kind,
+            } => self.name_predicate(child, snapshot, version, capture, kind, depth),
             _ => self.expression_inner(expression, depth),
         };
         if result.is_none() {
@@ -1935,6 +2083,19 @@ impl<'a> ParseContext<'a> {
         } else {
             self.commit_checkpoint(checkpoint);
         }
+        result
+    }
+
+    #[inline(never)]
+    fn expression_with_lexical_context(
+        &mut self,
+        child: &Expr,
+        terminals: &Arc<[lexing::Terminal]>,
+        depth: usize,
+    ) -> Option<Fragment> {
+        let previous = self.lexical_context.replace(Arc::clone(terminals));
+        let result = self.expression(child, depth);
+        self.lexical_context = previous;
         result
     }
 
@@ -1983,10 +2144,19 @@ impl<'a> ParseContext<'a> {
                 }),
             Expr::Lexical(label, expression) => {
                 let end = match &mut self.lexing {
-                    Some(session) => {
-                        session.match_at(label, false, Some(expression), self.position)
-                    }
-                    None => expression.match_at(self.input, self.position),
+                    Some(session) => session.match_at(
+                        label,
+                        false,
+                        Some(expression),
+                        self.position,
+                        self.lexical_context.as_ref(),
+                    ),
+                    None => match &self.lexical_context {
+                        Some(goal) => {
+                            lexing::match_goal(self.input, self.position, label, false, goal)
+                        }
+                        None => expression.match_at(self.input, self.position),
+                    },
                 };
                 if let Some(end) = end {
                     if end != self.position {
@@ -2229,10 +2399,21 @@ impl<'a> ParseContext<'a> {
             }
             Expr::Literal(literal) => {
                 let end = match &mut self.lexing {
-                    Some(session) => session.match_at(literal, true, None, self.position),
-                    None => self.input[self.position..]
-                        .starts_with(literal)
-                        .then_some(self.position + literal.len()),
+                    Some(session) => session.match_at(
+                        literal,
+                        true,
+                        None,
+                        self.position,
+                        self.lexical_context.as_ref(),
+                    ),
+                    None => match &self.lexical_context {
+                        Some(goal) => {
+                            lexing::match_goal(self.input, self.position, literal, true, goal)
+                        }
+                        None => self.input[self.position..]
+                            .starts_with(literal)
+                            .then_some(self.position + literal.len()),
+                    },
                 };
                 if let Some(end) = end {
                     self.position = end;
@@ -2326,9 +2507,13 @@ impl<'a> ParseContext<'a> {
             Expr::Sequence(_)
             | Expr::Choice(_)
             | Expr::LongestChoice(_)
+            | Expr::UniqueLongestChoice(_)
+            | Expr::NameResolutionScope { .. }
+            | Expr::NamePredicate { .. }
             | Expr::PredictiveChoice { .. } => {
                 unreachable!("combinators are dispatched by expression")
             }
+
             Expr::Capture(name, expression) => {
                 let start = self.position;
                 let mut fragment = self.expression(expression, depth)?;
@@ -2408,7 +2593,9 @@ impl<'a> ParseContext<'a> {
                 }
                 Some(fragment)
             }
-            Expr::LexicalTriviaScope { .. } | Expr::TriviaScope { .. } => {
+            Expr::LexicalContextScope { .. }
+            | Expr::LexicalTriviaScope { .. }
+            | Expr::TriviaScope { .. } => {
                 unreachable!("trivia scopes are dispatched by expression")
             }
             Expr::TextValue(child) | Expr::ValueBoundary(child) => {
@@ -2524,10 +2711,21 @@ impl<'a> ParseContext<'a> {
         true
     }
 
-    fn longest_choice(&mut self, alternatives: &[Expr], depth: usize) -> Option<Fragment> {
+    fn longest_choice(
+        &mut self,
+        alternatives: &[Expr],
+        depth: usize,
+        unique: bool,
+    ) -> Option<Fragment> {
+        if unique && !(2..=64).contains(&alternatives.len()) {
+            self.unique_choice_failure_seen = true;
+            self.fail("2 to 64 unique longest alternatives");
+            return None;
+        }
         let start = self.position;
         let node_start = self.nodes.len();
         let mut winner: Option<ChoiceWinner> = None;
+        let mut ties = 0;
         for alternative in alternatives {
             if self.excludes(alternative, depth) {
                 continue;
@@ -2538,7 +2736,14 @@ impl<'a> ParseContext<'a> {
                 let replaces = winner
                     .as_ref()
                     .is_none_or(|current| consumed > current.position - start);
+                if winner
+                    .as_ref()
+                    .is_some_and(|current| current.position == self.position)
+                {
+                    ties += 1;
+                }
                 if replaces {
+                    ties = 1;
                     winner = Some(ChoiceWinner {
                         position: self.position,
                         matched_position: self.matched_position,
@@ -2562,6 +2767,22 @@ impl<'a> ParseContext<'a> {
                 }
             }
             self.restore(checkpoint);
+        }
+        if unique {
+            if let Some(winner) = &winner {
+                if winner.position == start || ties > 1 {
+                    self.unique_choice_failure_seen = true;
+                    self.fail_at(
+                        winner.position,
+                        if winner.position == start {
+                            "nonempty unique longest alternative"
+                        } else {
+                            "unique longest alternative"
+                        },
+                    );
+                    return None;
+                }
+            }
         }
         winner.map(|mut winner| {
             debug_assert_eq!(self.nodes.len(), winner.node_start);
@@ -2733,7 +2954,11 @@ impl<'a> ParseContext<'a> {
     fn skip(&mut self) {
         if let Some(definition) = &self.lexical_trivia {
             if let Some(session) = &mut self.lexing {
-                let end = session.skip(self.position);
+                let end = session.skip(
+                    self.position,
+                    self.lexical_context.is_some(),
+                    Some(definition),
+                );
                 if end != self.position {
                     self.position = end;
                     self.matched_position = end;
@@ -2753,7 +2978,7 @@ impl<'a> ParseContext<'a> {
             return;
         }
         if let Some(session) = &mut self.lexing {
-            let end = session.skip(self.position);
+            let end = session.skip(self.position, self.lexical_context.is_some(), None);
             if end != self.position {
                 self.position = end;
                 self.matched_position = end;
@@ -2793,7 +3018,8 @@ impl<'a> ParseContext<'a> {
         if let Expr::TextValue(child)
         | Expr::ValueBoundary(child)
         | Expr::TriviaScope { child, .. }
-        | Expr::LexicalTriviaScope { child, .. } = child
+        | Expr::LexicalTriviaScope { child, .. }
+        | Expr::LexicalContextScope { child, .. } = child
         {
             self.java_failed_atom(child);
             return;
@@ -2882,7 +3108,10 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
             replayable,
             ..
         } => !reads_diagnostics && *replayable,
-        Expr::Sequence(children) | Expr::Choice(children) | Expr::LongestChoice(children) => {
+        Expr::Sequence(children)
+        | Expr::Choice(children)
+        | Expr::LongestChoice(children)
+        | Expr::UniqueLongestChoice(children) => {
             children.iter().all(expression_allows_deferred_diagnostics)
         }
         Expr::PredictiveChoice { alternatives, .. } => alternatives
@@ -2898,9 +3127,12 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
         | Expr::Lookahead { child, .. }
         | Expr::RuleEffects { child, .. }
         | Expr::CaptureEquality { child, .. }
+        | Expr::NamePredicate { child, .. }
+        | Expr::NameResolutionScope { child, .. }
         | Expr::Recovery { child, .. }
         | Expr::TriviaScope { child, .. }
-        | Expr::LexicalTriviaScope { child, .. } => expression_allows_deferred_diagnostics(child),
+        | Expr::LexicalTriviaScope { child, .. }
+        | Expr::LexicalContextScope { child, .. } => expression_allows_deferred_diagnostics(child),
         Expr::Lexical(_, _)
         | Expr::Literal(_)
         | Expr::Number
@@ -2963,16 +3195,19 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>) -> bo
         | Expr::CustomWith { .. }
         | Expr::Backreference(_)
         | Expr::CaptureEquality { .. }
+        | Expr::NamePredicate { .. }
+        | Expr::NameResolutionScope { .. }
         | Expr::Recovery { .. } => false,
         Expr::Rule(id) => {
             references.push(*id);
             true
         }
-        Expr::Sequence(children) | Expr::Choice(children) | Expr::LongestChoice(children) => {
-            children
-                .iter()
-                .all(|child| expression_is_memo_safe(child, references))
-        }
+        Expr::Sequence(children)
+        | Expr::Choice(children)
+        | Expr::LongestChoice(children)
+        | Expr::UniqueLongestChoice(children) => children
+            .iter()
+            .all(|child| expression_is_memo_safe(child, references)),
         Expr::PredictiveChoice { alternatives, .. } => alternatives
             .iter()
             .all(|child| expression_is_memo_safe(child, references)),
@@ -2986,7 +3221,8 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>) -> bo
         | Expr::Lookahead { child, .. }
         | Expr::RuleEffects { child, .. }
         | Expr::TriviaScope { child, .. }
-        | Expr::LexicalTriviaScope { child, .. } => expression_is_memo_safe(child, references),
+        | Expr::LexicalTriviaScope { child, .. }
+        | Expr::LexicalContextScope { child, .. } => expression_is_memo_safe(child, references),
         _ => true,
     }
 }

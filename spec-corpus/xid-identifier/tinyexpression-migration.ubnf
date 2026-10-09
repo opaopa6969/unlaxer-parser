@@ -1,0 +1,10 @@
+grammar TinyIdentifiers {
+  @ubnf: v2
+  @package: xid.migration
+  token ASCII_LETTER ::= CHAR_RANGE('a','z') | CHAR_RANGE('A','Z') | '_';
+  token ASCII_DIGIT ::= CHAR_RANGE('0','9');
+  // ASCII and underscore behavior is retained; XID names are an explicit addition.
+  token IDENTIFIER ::= XID_IDENTIFIER | ASCII_LETTER (ASCII_LETTER | ASCII_DIGIT)*;
+  @root @mapping(Identifier, params=[text])
+  Root ::= IDENTIFIER @text;
+}
