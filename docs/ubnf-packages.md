@@ -93,6 +93,9 @@ userinfo、query、fragment と redirect は拒否する。TLS の証明書と h
 リモート artifact の推移的依存に `local:` を指定できない。取得後は同じ ID/版/hash
 検証を行い、生成時は固定 cache を使う。生成/check/Playground が取得や認証を行うことはない。
 
+HTTPS client と TLS は native target のみに含める。ブラウザー向け WASM での依存取得は
+明示エラーとし、native `deps resolve` で準備した package の明示ロードを利用する。
+
 認証は `UBNF_CREDENTIALS_FILE`、未指定時は `~/.config/unlaxer/credentials.json` の
 ユーザー/CI 設定だけから読む。プロジェクトの grammar・manifest・lock に token を
 書かない。credential の key は `https://` + lower-case host + 非443 port の exact origin。
