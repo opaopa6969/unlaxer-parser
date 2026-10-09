@@ -2169,5 +2169,838 @@
         ]
       }
     ]
+  },
+  {
+    "name": "named-local-layout",
+    "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @tokenStream: enabled\n @whitespace: SPACES_AND_COMMENTS\n  token SPACES ::= (' ' | CHAR_RANGE('\\t', '\\r'))+;\n  token LINE_COMMENT ::= '//' NEGATION('\\r\\n')*;\n  token BLOCK_COMMENT ::= '/*' (NEGATIVE_LOOKAHEAD('*/') ANY)* '*/';\n  token SPACES_AND_COMMENTS ::= SPACES | LINE_COMMENT | BLOCK_COMMENT;\n token LETTER ::= CHAR_RANGE('a','z') | '😀';\n token GUARD ::= NEGATIVE_LOOKAHEAD('!');\n token ID ::= GUARD LETTER {LETTER};\n @root @mapping(Pair, params=[left,right])\n Root ::= ID @left ID @right;\n}",
+    "cases": [
+      {
+        "name": "space",
+        "input": "a b",
+        "accepted": true,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              0,
+              1
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              1,
+              2
+            ],
+            "text": " "
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              2,
+              3
+            ],
+            "text": "b"
+          }
+        ],
+        "ast": {
+          "type": "Pair",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {
+            "left": "a",
+            "right": "b"
+          }
+        },
+        "captures": [
+          {
+            "name": "left",
+            "span": [
+              0,
+              1
+            ]
+          },
+          {
+            "name": "right",
+            "span": [
+              2,
+              3
+            ]
+          }
+        ]
+      },
+      {
+        "name": "comment-boundary",
+        "input": "a/**/b",
+        "accepted": true,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              0,
+              1
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              1,
+              5
+            ],
+            "text": "/**/"
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              5,
+              6
+            ],
+            "text": "b"
+          }
+        ],
+        "ast": {
+          "type": "Pair",
+          "span": [
+            0,
+            6
+          ],
+          "fields": {
+            "left": "a",
+            "right": "b"
+          }
+        },
+        "captures": [
+          {
+            "name": "left",
+            "span": [
+              0,
+              1
+            ]
+          },
+          {
+            "name": "right",
+            "span": [
+              5,
+              6
+            ]
+          }
+        ]
+      },
+      {
+        "name": "unicode-crlf",
+        "input": "\t😀\r\n// c\r\nb ",
+        "accepted": true,
+        "lexemes": [
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              0,
+              1
+            ],
+            "text": "\t"
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              1,
+              2
+            ],
+            "text": "😀"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              2,
+              4
+            ],
+            "text": "\r\n"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              4,
+              8
+            ],
+            "text": "// c"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              8,
+              10
+            ],
+            "text": "\r\n"
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              10,
+              11
+            ],
+            "text": "b"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              11,
+              12
+            ],
+            "text": " "
+          }
+        ],
+        "ast": {
+          "type": "Pair",
+          "span": [
+            0,
+            12
+          ],
+          "fields": {
+            "left": "😀",
+            "right": "b"
+          }
+        },
+        "captures": [
+          {
+            "name": "left",
+            "span": [
+              1,
+              2
+            ]
+          },
+          {
+            "name": "right",
+            "span": [
+              10,
+              11
+            ]
+          }
+        ]
+      },
+      {
+        "name": "merged-word",
+        "input": "ab",
+        "accepted": false,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              0,
+              2
+            ],
+            "text": "ab"
+          }
+        ],
+        "farthest": 2
+      },
+      {
+        "name": "empty",
+        "input": "",
+        "accepted": false,
+        "lexemes": [],
+        "farthest": 0
+      },
+      {
+        "name": "unclosed-comment",
+        "input": "a/*unfinished",
+        "accepted": false,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              0,
+              1
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              1,
+              2
+            ],
+            "text": "/"
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              2,
+              3
+            ],
+            "text": "*"
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              3,
+              13
+            ],
+            "text": "unfinished"
+          }
+        ],
+        "farthest": 1
+      },
+      {
+        "name": "line-to-eof",
+        "input": "a// b",
+        "accepted": false,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              0,
+              1
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              1,
+              5
+            ],
+            "text": "// b"
+          }
+        ],
+        "farthest": 5
+      },
+      {
+        "name": "trailing-input",
+        "input": "a b!",
+        "accepted": false,
+        "consumed": 3,
+        "matched": 3,
+        "farthest": 3,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              0,
+              1
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              1,
+              2
+            ],
+            "text": " "
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              2,
+              3
+            ],
+            "text": "b"
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              3,
+              4
+            ],
+            "text": "!"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "named-package-layout",
+    "grammar": "grammar Input {\n @import layout from 'pkg:std/layout'\n @ubnf: v2\n @package: example.lexing\n @tokenStream: enabled\n @whitespace: layout.SPACES_AND_COMMENTS\n token LETTER ::= CHAR_RANGE('a','z') | '😀';\n token GUARD ::= NEGATIVE_LOOKAHEAD('!');\n token ID ::= GUARD LETTER {LETTER};\n @root @mapping(Pair, params=[left,right])\n Root ::= ID @left ID @right;\n}",
+    "cases": [
+      {
+        "name": "space",
+        "input": "a b",
+        "accepted": true,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              0,
+              1
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              1,
+              2
+            ],
+            "text": " "
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              2,
+              3
+            ],
+            "text": "b"
+          }
+        ],
+        "ast": {
+          "type": "Pair",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {
+            "left": "a",
+            "right": "b"
+          }
+        },
+        "captures": [
+          {
+            "name": "left",
+            "span": [
+              0,
+              1
+            ]
+          },
+          {
+            "name": "right",
+            "span": [
+              2,
+              3
+            ]
+          }
+        ]
+      },
+      {
+        "name": "comment-boundary",
+        "input": "a/**/b",
+        "accepted": true,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              0,
+              1
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              1,
+              5
+            ],
+            "text": "/**/"
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              5,
+              6
+            ],
+            "text": "b"
+          }
+        ],
+        "ast": {
+          "type": "Pair",
+          "span": [
+            0,
+            6
+          ],
+          "fields": {
+            "left": "a",
+            "right": "b"
+          }
+        },
+        "captures": [
+          {
+            "name": "left",
+            "span": [
+              0,
+              1
+            ]
+          },
+          {
+            "name": "right",
+            "span": [
+              5,
+              6
+            ]
+          }
+        ]
+      },
+      {
+        "name": "unicode-crlf",
+        "input": "\t😀\r\n// c\r\nb ",
+        "accepted": true,
+        "lexemes": [
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              0,
+              1
+            ],
+            "text": "\t"
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              1,
+              2
+            ],
+            "text": "😀"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              2,
+              4
+            ],
+            "text": "\r\n"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              4,
+              8
+            ],
+            "text": "// c"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              8,
+              10
+            ],
+            "text": "\r\n"
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              10,
+              11
+            ],
+            "text": "b"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              11,
+              12
+            ],
+            "text": " "
+          }
+        ],
+        "ast": {
+          "type": "Pair",
+          "span": [
+            0,
+            12
+          ],
+          "fields": {
+            "left": "😀",
+            "right": "b"
+          }
+        },
+        "captures": [
+          {
+            "name": "left",
+            "span": [
+              1,
+              2
+            ]
+          },
+          {
+            "name": "right",
+            "span": [
+              10,
+              11
+            ]
+          }
+        ]
+      },
+      {
+        "name": "merged-word",
+        "input": "ab",
+        "accepted": false,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              0,
+              2
+            ],
+            "text": "ab"
+          }
+        ],
+        "farthest": 2
+      },
+      {
+        "name": "empty",
+        "input": "",
+        "accepted": false,
+        "lexemes": [],
+        "farthest": 0
+      },
+      {
+        "name": "unclosed-comment",
+        "input": "a/*unfinished",
+        "accepted": false,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              0,
+              1
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              1,
+              2
+            ],
+            "text": "/"
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              2,
+              3
+            ],
+            "text": "*"
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              3,
+              13
+            ],
+            "text": "unfinished"
+          }
+        ],
+        "farthest": 1
+      },
+      {
+        "name": "line-to-eof",
+        "input": "a// b",
+        "accepted": false,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              0,
+              1
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              1,
+              5
+            ],
+            "text": "// b"
+          }
+        ],
+        "farthest": 5
+      },
+      {
+        "name": "trailing-input",
+        "input": "a b!",
+        "accepted": false,
+        "consumed": 3,
+        "matched": 3,
+        "farthest": 3,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              0,
+              1
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              1,
+              2
+            ],
+            "text": " "
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              2,
+              3
+            ],
+            "text": "b"
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              3,
+              4
+            ],
+            "text": "!"
+          }
+        ]
+      }
+    ],
+    "package": true
+  },
+  {
+    "name": "named-custom-unicode",
+    "grammar": "grammar Input {\n @ubnf: v2\n @package: example.lexing\n @tokenStream: enabled\n @whitespace: GAP\n token GAP ::= '#😀';\n token LETTER ::= CHAR_RANGE('a','z') | '😀';\n token GUARD ::= NEGATIVE_LOOKAHEAD('!');\n token ID ::= GUARD LETTER {LETTER};\n @root @mapping(Pair, params=[left,right])\n Root ::= ID @left ID @right;\n}",
+    "cases": [
+      {
+        "name": "custom-skip",
+        "input": "a#😀b",
+        "accepted": true,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              0,
+              1
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "trivia",
+            "name": "",
+            "span": [
+              1,
+              3
+            ],
+            "text": "#😀"
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              3,
+              4
+            ],
+            "text": "b"
+          }
+        ],
+        "ast": {
+          "type": "Pair",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {
+            "left": "a",
+            "right": "b"
+          }
+        },
+        "captures": [
+          {
+            "name": "left",
+            "span": [
+              0,
+              1
+            ]
+          },
+          {
+            "name": "right",
+            "span": [
+              3,
+              4
+            ]
+          }
+        ]
+      },
+      {
+        "name": "no-implicit-space",
+        "input": "a b",
+        "accepted": false,
+        "farthest": 1,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              0,
+              1
+            ],
+            "text": "a"
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              1,
+              2
+            ],
+            "text": " "
+          },
+          {
+            "kind": "token",
+            "name": "ID",
+            "span": [
+              2,
+              3
+            ],
+            "text": "b"
+          }
+        ]
+      }
+    ]
   }
 ]

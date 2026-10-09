@@ -504,7 +504,10 @@ public class ParserGenerator implements CodeGenerator {
                 .append(" extends LazyZeroOrMore implements org.unlaxer.context.DiagnosticsAgnostic, org.unlaxer.context.SafeSuccessMemoizable {\n")
                 .append("        public Supplier<Parser> getLazyParser() { return () -> Parser.get(")
                 .append(ParserCodegenUtil.toParserClassName(style)).append(".class); }\n")
-                .append("        public java.util.Optional<Parser> getLazyTerminatorParser() { return java.util.Optional.empty(); }\n    }\n");
+                .append("        public java.util.Optional<Parser> getLazyTerminatorParser() { return java.util.Optional.empty(); }\n");
+            if (ctx.tokenStream) result.append("        @Override public org.unlaxer.Parsed parse(org.unlaxer.context.ParseContext context, org.unlaxer.TokenKind kind, boolean invert) {\n")
+                .append("            return org.unlaxer.dsl.runtime.Lexing.trivia(this, context, kind, invert, () -> super.parse(context, kind, invert));\n        }\n");
+            result.append("    }\n");
             result.append("    public static abstract class ").append(name)
                 .append(" extends LazyChain implements org.unlaxer.context.DiagnosticsAgnostic {\n")
                 .append("        private static final Parser SPACE = space();\n")
