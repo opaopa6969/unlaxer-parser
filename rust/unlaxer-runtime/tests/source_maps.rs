@@ -471,7 +471,7 @@ fn shared_partial_eof_ownership() {
             let full = span(f[2].parse().unwrap(), f[3].parse().unwrap());
             let body = span(f[4].parse().unwrap(), f[5].parse().unwrap());
             let child = snapshot(f[0], host.slice(body).unwrap());
-            let map = if child.len() == 0 {
+            let map = if child.is_empty() {
                 SourceMap::new(child, vec![]).unwrap()
             } else {
                 copy(child, host.clone(), body.start)
