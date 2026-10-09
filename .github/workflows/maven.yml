@@ -217,6 +217,13 @@ jobs:
         distribution: 'temurin'
         overwrite-settings: false
 
+    # Maven's native emitter comparison intentionally runs Cargo offline.
+    - name: Prepare locked Rust dependencies for offline generator tests
+      run: |
+        rustup toolchain install 1.85.0 --profile minimal
+        echo "RUSTUP_TOOLCHAIN=1.85.0" >> "$GITHUB_ENV"
+        cargo +1.85.0 fetch --locked --manifest-path rust/Cargo.toml
+
     - name: Validate Central release guard
       run: |
         python3 scripts/tests/test_central_release_guard.py
@@ -259,6 +266,13 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
         overwrite-settings: false
+
+    # Maven's native emitter comparison intentionally runs Cargo offline.
+    - name: Prepare locked Rust dependencies for offline generator tests
+      run: |
+        rustup toolchain install 1.85.0 --profile minimal
+        echo "RUSTUP_TOOLCHAIN=1.85.0" >> "$GITHUB_ENV"
+        cargo +1.85.0 fetch --locked --manifest-path rust/Cargo.toml
 
     - name: Build and test the -jdk17 modules on JDK 17
       run: mvn -B -pl unlaxer-common-jdk17,unlaxer-dsl-jdk17 -am clean package -Dgpg.skip=true
