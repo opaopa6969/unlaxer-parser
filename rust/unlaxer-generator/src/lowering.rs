@@ -11,6 +11,21 @@ use unlaxer_ubnf::ast::{self, AnnotationKind, ElementKind, SettingValue, TokenKi
 type Result<T> = std::result::Result<T, String>;
 const MAX_PREDICTOR_ATOMS: usize = 64;
 
+fn named_whitespace_style(
+    style: &str,
+    definitions: &HashMap<String, unlaxer_codegen::lexical::LexicalExpression>,
+) -> Result<bool> {
+    if let Ok(value) = whitespace_style(style) {
+        return Ok(value);
+    }
+    let expression = definitions
+        .get(style.trim())
+        .ok_or_else(|| format!("E-WHITESPACE: undefined declarative whitespace {style}"))?;
+    if expression.nullable() {
+        return Err(format!("E-WHITESPACE: nullable whitespace {style}"));
+    }
+    Ok(false)
+}
 fn whitespace_style(style: &str) -> Result<bool> {
     match style.trim() {
         value if value.eq_ignore_ascii_case("javaStyle") => Ok(true),
@@ -237,7 +252,9 @@ impl Lowering<'_> {
         if let Some(issue) = crate::token_stream::problems(self.grammar).first() {
             return Err(format!("{}: {}", issue.code, issue.subject));
         }
+        let whitespace_definitions = lexical.clone();
         let mut whitespace = false;
+        let mut global_style = "none".to_owned();
         let mut settings = HashSet::new();
         let mut memo_safe_tokens = HashSet::new();
         for setting in &self.grammar.settings {
@@ -271,7 +288,8 @@ impl Lowering<'_> {
                             | "declarativeTokensV1"
                     ) => {}
                 "whitespace" => {
-                    whitespace = whitespace_style(value)
+                    global_style = value.clone();
+                    whitespace = named_whitespace_style(value, &whitespace_definitions)
                         .map_err(|_| format!("unsupported setting whitespace: {value}"))?
                 }
                 "package" | "tokenStream" => {}
@@ -414,7 +432,10 @@ impl Lowering<'_> {
                         }
                     }
                     AnnotationKind::Whitespace { style } => {
-                        let enabled = whitespace_style(style.as_deref().unwrap_or("javaStyle"))?;
+                        let enabled = named_whitespace_style(
+                            style.as_deref().unwrap_or("javaStyle"),
+                            &whitespace_definitions,
+                        )?;
                         if local_whitespace.replace(enabled).is_some() {
                             return Err(format!("duplicate @whitespace on {}", rule.name));
                         }
@@ -744,7 +765,35 @@ impl Lowering<'_> {
                 rule.body = right_associative_body(&rule.body);
             }
             // Resolve unannotated callees against the grammar, not a caller's local mode.
-            if has_local_trivia {
+            let style = self.grammar.rules[i]
+                .annotations
+                .iter()
+                .find_map(|a| match &a.kind {
+                    AnnotationKind::Whitespace { style } => {
+                        Some(style.as_deref().unwrap_or("javaStyle"))
+                    }
+                    _ => None,
+                })
+                .unwrap_or_else(|| {
+                    if self.grammar.rules[i]
+                        .annotations
+                        .iter()
+                        .any(|a| matches!(a.kind, AnnotationKind::Interleave { .. }))
+                    {
+                        "javaStyle"
+                    } else {
+                        &global_style
+                    }
+                });
+            if let Some(definition) = whitespace_definitions
+                .get(style.trim())
+                .filter(|_| whitespace_style(style).is_err())
+            {
+                rule.body = Expression::LexicalTriviaScope {
+                    child: Box::new(rule.body.clone()),
+                    definition: definition.clone(),
+                };
+            } else if has_local_trivia || whitespace_style(&global_style).is_err() {
                 rule.body = Expression::TriviaScope {
                     child: Box::new(rule.body.clone()),
                     java_whitespace: rule_whitespace[i],

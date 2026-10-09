@@ -65,6 +65,9 @@ pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
     runtime!("provider_protocol.rs");
     runtime!("provider_process.rs");
     runtime!("pipeline.rs");
+    runtime!("semantic_query_cache.rs");
+    runtime!("type_system.rs");
+    runtime!("call_inference.rs");
     runtime!("lexing.rs");
     runtime!("first.rs");
     runtime!("lexical.rs");
