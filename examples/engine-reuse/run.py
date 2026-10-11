@@ -70,8 +70,10 @@ def compile_probes(private):
 
 
 def build(private):
-    run(['mvn', '-B', '-pl', 'unlaxer-common,unlaxer-dsl', '-am', '-DskipTests', 'test-compile'], timeout=600)
-    run(['mvn', '-q', '-pl', 'unlaxer-dsl', 'dependency:build-classpath', '-Dmdep.outputFile='+str(OUT/'classpath')])
+    # Resolve the classpath in the same reactor; a clean CI runner has no locally
+    # installed unlaxer-common SNAPSHOT and must not download one instead.
+    run(['mvn', '-B', '-pl', 'unlaxer-common,unlaxer-dsl', '-am', '-DskipTests', 'test-compile',
+         'dependency:build-classpath', '-Dmdep.outputFile='+str(OUT/'classpath')], timeout=600)
     cp = os.pathsep.join([str(ROOT/'unlaxer-common/target/classes'), str(ROOT/'unlaxer-dsl/target/classes'), (OUT/'classpath').read_text().strip()])
     (OUT/'classpath').write_text(cp)
     run(['java', '-cp', cp, 'org.unlaxer.dsl.CodegenMain', '--grammar', FIX/'Reuse.ubnf',
@@ -80,7 +82,9 @@ def build(private):
     if (OUT/'classic-rust').exists(): shutil.rmtree(OUT/'classic-rust')
     run([OUT/'cargo/debug/unlaxer', 'generate', '--grammar', FIX/'Reuse.ubnf', '--output', OUT/'classic-rust'])
     if private:
-        run(rust('cargo', 'build', '--locked', '-p', 'ubnfc-front', '-p', 'ubnfc-rust'), private, timeout=600)
+        run(rust('cargo', 'build', '--locked', '-p', 'ubnfc-front', '-p', 'ubnfc-rust', '--target-dir', private/'target'), private, timeout=600)
+        ENV['UBNFC_RUST_BIN']=str(private/'target/debug/ubnfc-rust')
+        ENV['UBNFC_JAVA_JAR']=str(private/'ubnfc-java/target/ubnfc-java-0.1.0-SNAPSHOT.jar')
         run(['mvn', '-B', '-f', private/'ubnfc-java/pom.xml', '-DskipTests', 'package'], private, timeout=600)
         for language in ['java','rust']:
             directory = OUT/('ubnfc-'+language)

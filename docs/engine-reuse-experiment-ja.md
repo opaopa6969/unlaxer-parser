@@ -99,6 +99,9 @@ custom / state` に対する保守的検査であり、UBNF frontend ではな�
 解析中の source 変更、前後の期限、共通期限、入力/出力/oracleの上限、不正な数値引数、process失敗、callback/providerの
 呼び出し回数を検証する。故障した probe は実 engine のバグを装うための独立 fixture である。
 
+callback/providerのfixtureはengine境界での再呼び出し禁止を検証する。実際の外部provider登録や
+stateful grammarのadapterは追加しておらず、その内部の作用を含む安全性は未認定である。
+
 呼び出し回数は **probe process の起動回数**。認識・mapping・保持結果検査など、probe 内の
 parser 実行回数と同一ではない。直接起動して制御できる既知の probe が対象で、任意の
 外部 provider や子process群を安全に強制停止する汎用 sandbox は実装していない。
