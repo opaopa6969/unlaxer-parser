@@ -1,0 +1,5 @@
+[
+  {"id":"success","source":"😀P:ab;","java":{"accepted":true,"farthest":-1,"expected":[]},"rust":{"accepted":true,"farthest":-1,"expected":[]}},
+  {"id":"suffix-failure","source":"😀P:ab?","java":{"accepted":false,"farthest":5,"expected":["'!'","'ab;'"]},"rust":{"accepted":false,"farthest":3,"expected":["ab;"]}},
+  {"id":"child-failure","source":"😀P:ax;","java":{"accepted":false,"farthest":4,"expected":["'b'"]},"rust":{"accepted":false,"farthest":4,"expected":["b"]}}
+]

@@ -1,0 +1,6 @@
+grammar Retry {
+  @package: example.assertions
+  token ASSERT = org.unlaxer.dsl.codegen.AssertionContractConformanceTest.RetryAssertion
+  @root @mapping(Value, params=[value])
+  Root ::= '😀P:' ASSERT 'ab;' @value ;
+}
