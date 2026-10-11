@@ -1,0 +1,44 @@
+name: assertion-contracts
+on:
+  push:
+    branches: [master]
+  pull_request:
+jobs:
+  assertion-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21.0.9'
+          overwrite-settings: false
+      - uses: dtolnay/rust-toolchain@1.85.0
+        with:
+          components: rustfmt
+      - run: rustfmt --edition 2021 --check docs/fixtures/assertion-contracts/probe.rs
+      - run: >
+          mvn -B -pl unlaxer-common,unlaxer-dsl -am test
+          -Dtest=AssertionContractConformanceTest,MatchOnlyTest,NotTest,TransactionalStateTest,MemoDiagnosticFrameTest,DetailedOnFailureTest,PackratMemoizationTest,ScopeStoreTransactionTest,JavaDetailedOnFailureRuntimeTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,CaptureEqualityConformanceTest,TokenAdapterConformanceTest,RustUbnfFrontendConformanceTest,SharedLanguageCallConformanceTest
+          -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
+        env:
+          RUSTUP_TOOLCHAIN: '1.85.0'
+          CARGO_INCREMENTAL: '0'
+      - run: cargo test --locked --manifest-path rust/Cargo.toml -p unlaxer-runtime --lib --test scopes --test diagnostics_policy --test capture_equality
+      - run: |
+          test -s unlaxer-dsl/target/assertion-contracts.tsv
+          test -s unlaxer-dsl/target/assertion-retries.tsv
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          suites = [ET.parse(p).getroot() for p in Path('unlaxer-dsl/target/surefire-reports').glob('TEST-*.xml')]
+          assert suites and all(int(s.attrib.get('skipped', 0)) == 0 for s in suites), 'conformance tests must execute without skips'
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: assertion-contracts
+          path: |
+            unlaxer-dsl/target/assertion-contracts.tsv
+            unlaxer-dsl/target/assertion-retries.tsv
+          if-no-files-found: error

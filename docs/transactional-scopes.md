@@ -92,6 +92,8 @@ CI は `rust-scope-store.tsv` を必須 artifact とする。
 Rust の choice/optional/repeat/PEG lookahead と nested grammar、Java 生成 parser の
 scope annotation についても、失敗した枝の変更が漏れないことを別途検証する。
 Java match-only cursor と Rust PEG lookahead の位置の違いは、この変更では統一しない。
+現在の対応表・独立 fixture・診断方針の監査は
+[positive assertion / match-only 契約](positive-assertion-contracts.md)（#490）を参照。
 
 Rust UBNF の annotation lowering/emitter、正確な capture binding、symbol metadata の
 AST/IDE 搬送、全 tinyexpression、rustcodeblock、LSP/DAP は引き続き未完了である。

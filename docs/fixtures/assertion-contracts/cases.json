@@ -1,0 +1,164 @@
+[
+  {
+    "id": "literal",
+    "source": "😀P:ab;",
+    "prefix": "😀P:",
+    "child": "literal",
+    "suffix": null,
+    "java": {"accepted":true,"consumed":3,"matched":5,"tokens":[["consumed",0,3,"😀P:"]],"captures":[],"assertion":{"accepted":true,"consumed":3,"matched":5,"tokens":[["matchOnly",3,5,"ab"]],"captures":[],"span":["matchOnly",3,5,"ab"]},"farthest":5,"expected":[],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1},
+    "rust": {"accepted":true,"consumed":3,"matched":3,"tokens":[],"captures":[],"assertion":{"accepted":true,"consumed":3,"matched":3,"tokens":[],"captures":[],"span":["consumed",3,3,""]},"farthest":0,"expected":[],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1}
+  },
+  {
+    "id": "literal-parent",
+    "source": "😀P:ab;",
+    "prefix": "😀P:",
+    "child": "literal",
+    "suffix": "Z",
+    "java": {"accepted":false,"consumed":0,"matched":0,"tokens":[],"captures":[],"assertion":{"accepted":true,"consumed":3,"matched":5,"tokens":[["matchOnly",3,5,"ab"]],"captures":[],"span":["matchOnly",3,5,"ab"]},"farthest":5,"expected":["'Z'"],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1},
+    "rust": {"accepted":false,"consumed":0,"matched":0,"tokens":[],"captures":[],"assertion":{"accepted":true,"consumed":3,"matched":3,"tokens":[],"captures":[],"span":["consumed",3,3,""]},"farthest":3,"expected":["Z"],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1}
+  },
+  {
+    "id": "optional",
+    "source": "😀P:ab;",
+    "prefix": "😀P:",
+    "child": "optional",
+    "suffix": null,
+    "java": {"accepted":true,"consumed":3,"matched":5,"tokens":[["consumed",0,3,"😀P:"]],"captures":[],"assertion":{"accepted":true,"consumed":3,"matched":5,"tokens":[["matchOnly",3,4,"a"],["matchOnly",4,5,"b"]],"captures":[],"span":["matchOnly",3,5,"ab"]},"farthest":5,"expected":["'!'"],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1},
+    "rust": {"accepted":true,"consumed":3,"matched":3,"tokens":[],"captures":[],"assertion":{"accepted":true,"consumed":3,"matched":3,"tokens":[],"captures":[],"span":["consumed",3,3,""]},"farthest":0,"expected":[],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1}
+  },
+  {
+    "id": "optional-parent",
+    "source": "😀P:ab;",
+    "prefix": "😀P:",
+    "child": "optional",
+    "suffix": "Z",
+    "java": {"accepted":false,"consumed":0,"matched":0,"tokens":[],"captures":[],"assertion":{"accepted":true,"consumed":3,"matched":5,"tokens":[["matchOnly",3,4,"a"],["matchOnly",4,5,"b"]],"captures":[],"span":["matchOnly",3,5,"ab"]},"farthest":5,"expected":["'!'","'Z'"],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1},
+    "rust": {"accepted":false,"consumed":0,"matched":0,"tokens":[],"captures":[],"assertion":{"accepted":true,"consumed":3,"matched":3,"tokens":[],"captures":[],"span":["consumed",3,3,""]},"farthest":3,"expected":["Z"],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1}
+  },
+  {
+    "id": "choice",
+    "source": "😀P:ab;",
+    "prefix": "😀P:",
+    "child": "choice",
+    "suffix": null,
+    "java": {"accepted":true,"consumed":3,"matched":5,"tokens":[["consumed",0,3,"😀P:"]],"captures":[],"assertion":{"accepted":true,"consumed":3,"matched":5,"tokens":[["matchOnly",3,5,"ab"]],"captures":[],"span":["matchOnly",3,5,"ab"]},"farthest":5,"expected":["'!'"],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1},
+    "rust": {"accepted":true,"consumed":3,"matched":3,"tokens":[],"captures":[],"assertion":{"accepted":true,"consumed":3,"matched":3,"tokens":[],"captures":[],"span":["consumed",3,3,""]},"farthest":0,"expected":[],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1}
+  },
+  {
+    "id": "choice-parent",
+    "source": "😀P:ab;",
+    "prefix": "😀P:",
+    "child": "choice",
+    "suffix": "Z",
+    "java": {"accepted":false,"consumed":0,"matched":0,"tokens":[],"captures":[],"assertion":{"accepted":true,"consumed":3,"matched":5,"tokens":[["matchOnly",3,5,"ab"]],"captures":[],"span":["matchOnly",3,5,"ab"]},"farthest":5,"expected":["'!'","'Z'"],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1},
+    "rust": {"accepted":false,"consumed":0,"matched":0,"tokens":[],"captures":[],"assertion":{"accepted":true,"consumed":3,"matched":3,"tokens":[],"captures":[],"span":["consumed",3,3,""]},"farthest":3,"expected":["Z"],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1}
+  },
+  {
+    "id": "child-failure",
+    "source": "😀P:ab;",
+    "prefix": "😀P:",
+    "child": "failure",
+    "suffix": null,
+    "java": {"accepted":false,"consumed":0,"matched":0,"tokens":[],"captures":[],"assertion":{"accepted":false,"consumed":3,"matched":3,"tokens":[],"captures":[],"span":null},"farthest":5,"expected":["'!'"],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1},
+    "rust": {"accepted":false,"consumed":0,"matched":0,"tokens":[],"captures":[],"assertion":{"accepted":false,"consumed":3,"matched":3,"tokens":[],"captures":[],"span":null},"farthest":5,"expected":["!"],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1}
+  },
+  {
+    "id": "nested",
+    "source": "😀P:ab;",
+    "prefix": "😀P:",
+    "child": "nested",
+    "suffix": null,
+    "java": {"accepted":true,"consumed":3,"matched":5,"tokens":[["consumed",0,3,"😀P:"]],"captures":[],"assertion":{"accepted":true,"consumed":3,"matched":5,"tokens":[["matchOnly",3,5,"ab"]],"captures":[],"span":["matchOnly",3,5,"ab"]},"farthest":5,"expected":[],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1},
+    "rust": {"accepted":true,"consumed":3,"matched":3,"tokens":[],"captures":[],"assertion":{"accepted":true,"consumed":3,"matched":3,"tokens":[],"captures":[],"span":["consumed",3,3,""]},"farthest":0,"expected":[],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1}
+  },
+  {
+    "id": "nested-sibling",
+    "source": "😀P:ab;",
+    "prefix": "😀P:",
+    "child": "nested-sibling",
+    "suffix": null,
+    "java": {"accepted":true,"consumed":3,"matched":5,"tokens":[["consumed",0,3,"😀P:"]],"captures":[],"assertion":{"accepted":true,"consumed":3,"matched":5,"tokens":[["matchOnly",3,4,"a"],["matchOnly",4,5,"b"]],"captures":[],"span":["matchOnly",3,5,"ab"]},"farthest":5,"expected":[],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1},
+    "rust": {"accepted":false,"consumed":0,"matched":0,"tokens":[],"captures":[],"assertion":{"accepted":false,"consumed":3,"matched":3,"tokens":[],"captures":[],"span":null},"farthest":3,"expected":["b"],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1}
+  },
+  {
+    "id": "state",
+    "source": "😀P:ab;",
+    "prefix": "😀P:",
+    "child": "state",
+    "suffix": null,
+    "java": {"accepted":true,"consumed":3,"matched":5,"tokens":[["consumed",0,3,"😀P:"]],"captures":[],"assertion":{"accepted":true,"consumed":3,"matched":5,"tokens":[["matchOnly",3,4,"a"],["matchOnly",4,5,"b"]],"captures":[["matchOnly",3,4,"a"]],"span":["matchOnly",3,5,"ab"]},"farthest":5,"expected":[],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1},
+    "rust": {"accepted":true,"consumed":3,"matched":3,"tokens":[],"captures":[],"assertion":{"accepted":true,"consumed":3,"matched":3,"tokens":[],"captures":[],"span":["consumed",3,3,""]},"farthest":0,"expected":[],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1}
+  },
+  {
+    "id": "state-parent",
+    "source": "😀P:ab;",
+    "prefix": "😀P:",
+    "child": "state",
+    "suffix": "Z",
+    "java": {"accepted":false,"consumed":0,"matched":0,"tokens":[],"captures":[],"assertion":{"accepted":true,"consumed":3,"matched":5,"tokens":[["matchOnly",3,4,"a"],["matchOnly",4,5,"b"]],"captures":[["matchOnly",3,4,"a"]],"span":["matchOnly",3,5,"ab"]},"farthest":5,"expected":["'Z'"],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1},
+    "rust": {"accepted":false,"consumed":0,"matched":0,"tokens":[],"captures":[],"assertion":{"accepted":true,"consumed":3,"matched":3,"tokens":[],"captures":[],"span":["consumed",3,3,""]},"farthest":3,"expected":["Z"],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1}
+  },
+  {
+    "id": "state-failure",
+    "source": "😀P:ab;",
+    "prefix": "😀P:",
+    "child": "state-failure",
+    "suffix": null,
+    "java": {"accepted":false,"consumed":0,"matched":0,"tokens":[],"captures":[],"assertion":{"accepted":false,"consumed":3,"matched":3,"tokens":[],"captures":[],"span":null},"farthest":5,"expected":["'!'"],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1},
+    "rust": {"accepted":false,"consumed":0,"matched":0,"tokens":[],"captures":[],"assertion":{"accepted":false,"consumed":3,"matched":3,"tokens":[],"captures":[],"span":null},"farthest":5,"expected":["!"],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1}
+  },
+  {
+    "id": "crlf-parent",
+    "source": "😀\r\nab;",
+    "prefix": "😀\r\n",
+    "child": "optional",
+    "suffix": "Z",
+    "java": {"accepted":false,"consumed":0,"matched":0,"tokens":[],"captures":[],"assertion":{"accepted":true,"consumed":3,"matched":5,"tokens":[["matchOnly",3,4,"a"],["matchOnly",4,5,"b"]],"captures":[],"span":["matchOnly",3,5,"ab"]},"farthest":5,"expected":["'!'","'Z'"],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1},
+    "rust": {"accepted":false,"consumed":0,"matched":0,"tokens":[],"captures":[],"assertion":{"accepted":true,"consumed":3,"matched":3,"tokens":[],"captures":[],"span":["consumed",3,3,""]},"farthest":3,"expected":["Z"],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1}
+  },
+  {
+    "id": "consume-after",
+    "source": "😀P:ab;",
+    "prefix": "😀P:",
+    "child": "optional",
+    "suffix": "ab;",
+    "java": {"accepted":true,"consumed":6,"matched":6,"tokens":[["consumed",0,3,"😀P:"],["consumed",3,6,"ab;"]],"captures":[],"assertion":{"accepted":true,"consumed":3,"matched":5,"tokens":[["matchOnly",3,4,"a"],["matchOnly",4,5,"b"]],"captures":[],"span":["matchOnly",3,5,"ab"]},"farthest":5,"expected":["'!'"],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1},
+    "rust": {"accepted":true,"consumed":6,"matched":6,"tokens":[],"captures":[],"assertion":{"accepted":true,"consumed":3,"matched":3,"tokens":[],"captures":[],"span":["consumed",3,3,""]},"farthest":0,"expected":[],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1}
+  },
+  {
+    "id": "unicode-span",
+    "source": "P:😀\r\n界;",
+    "prefix": "P:",
+    "child": "unicode",
+    "suffix": null,
+    "java": {"accepted":true,"consumed":2,"matched":6,"tokens":[["consumed",0,2,"P:"]],"captures":[],"assertion":{"accepted":true,"consumed":2,"matched":6,"tokens":[["matchOnly",2,6,"😀\r\n界"]],"captures":[],"span":["matchOnly",2,6,"😀\r\n界"]},"farthest":6,"expected":[],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1},
+    "rust": {"accepted":true,"consumed":2,"matched":2,"tokens":[],"captures":[],"assertion":{"accepted":true,"consumed":2,"matched":2,"tokens":[],"captures":[],"span":["consumed",2,2,""]},"farthest":0,"expected":[],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1}
+  },
+  {
+    "id": "literal-rejected",
+    "source": "😀P:ax;",
+    "prefix": "😀P:",
+    "child": "literal",
+    "suffix": null,
+    "java": {"accepted":false,"consumed":0,"matched":0,"tokens":[],"captures":[],"assertion":{"accepted":false,"consumed":3,"matched":3,"tokens":[],"captures":[],"span":null},"farthest":3,"expected":["'ab'"],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1},
+    "rust": {"accepted":false,"consumed":0,"matched":0,"tokens":[],"captures":[],"assertion":{"accepted":false,"consumed":3,"matched":3,"tokens":[],"captures":[],"span":null},"farthest":3,"expected":["ab"],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1}
+  },
+  {
+    "id": "java-literal-cursor",
+    "source": "😀P:ab;",
+    "prefix": "😀P:",
+    "child": "java-literal",
+    "suffix": null,
+    "java": {"accepted":true,"consumed":3,"matched":5,"tokens":[["consumed",0,3,"😀P:"]],"captures":[],"assertion":{"accepted":true,"consumed":3,"matched":5,"tokens":[["matchOnly",3,5,"ab"]],"captures":[],"span":["matchOnly",3,5,"ab"]},"farthest":5,"expected":[],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1},
+    "rust": {"accepted":true,"consumed":3,"matched":5,"tokens":[],"captures":[],"assertion":{"accepted":true,"consumed":3,"matched":5,"tokens":[],"captures":[],"span":["consumed",3,3,""]},"farthest":0,"expected":[],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1}
+  },
+  {
+    "id": "java-literal-parent",
+    "source": "😀P:ab;",
+    "prefix": "😀P:",
+    "child": "java-literal",
+    "suffix": "Z",
+    "java": {"accepted":false,"consumed":0,"matched":0,"tokens":[],"captures":[],"assertion":{"accepted":true,"consumed":3,"matched":5,"tokens":[["matchOnly",3,5,"ab"]],"captures":[],"span":["matchOnly",3,5,"ab"]},"farthest":5,"expected":["'Z'"],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1},
+    "rust": {"accepted":false,"consumed":0,"matched":0,"tokens":[],"captures":[],"assertion":{"accepted":true,"consumed":3,"matched":5,"tokens":[],"captures":[],"span":["consumed",3,3,""]},"farthest":3,"expected":["Z"],"state":7,"scopeDepth":0,"declarations":1,"references":1,"semanticDiagnostics":1}
+  }
+]
