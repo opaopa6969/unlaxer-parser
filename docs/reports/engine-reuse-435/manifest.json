@@ -1,0 +1,49 @@
+{
+  "classic": "875144631d932d7fe31e66a3b68045ecaf77928e",
+  "ubnfc": "95fd2a54e0769949d88f5be11d86eeae66a1ce25",
+  "grammar_sha256": "93461623ea7d69af4c587caa045588a1364e6a7bd3cd7a79d44f88f7e341af6c",
+  "adapter_revision": "engine-reuse-435-v1",
+  "adapter_sha256": {
+    "Canonical.java": "bc156ae21adef0527d33071054b8aaaca26f4a292f1a37f9b823d234010648a1",
+    "ClassicProbe.java": "524d9091367b3a5e6cac5b86e0c5bef42ed2b4d28bb5355e5c8385126de2c1e9",
+    "Policy.java": "3875a602da4ad7244331434ff5d9bcc15da34a5d6ed217ff31ab34b61ad072ad",
+    "UbnfcProbe.java": "514209a8a8b48b1c222928e229306f7e2e3b17f09c4e952099b94b1712b4c1b9",
+    "canonical.rs": "3c80ca6033b3d8327ff1a73633c48d855a97aa9c114041344d234b6568c71f7e",
+    "classic_probe.rs": "6b34ab2f6eeb9edb8282d76eec6831edcabef4abe2ac65d1f078f5a8205dd862",
+    "driver.rs": "aa6a3093ed8752329cc7e9646b766973bd951d2938e9c74751921239d88846e1",
+    "oracle.py": "f3cc7c03aa24deb6bbad2e9944d27d88b104e454396f8e4c29f51615cdcef165",
+    "policy.rs": "275c70e74f58b3235fe9f57d48458a37f70c0290d9395bcbf2e4ad92dfaa9b0f",
+    "run.py": "f4f9d099397586b3fc5d830e42c1f56806e57d7debd44a69182f9c35aa3ae50a",
+    "ubnfc_probe.rs": "2d94dca944fc4967d1fa25cde36f469c8a9e76e3850f24bbd9905f9ac9a16b0a"
+  },
+  "routes": [
+    "classic-java",
+    "classic-rust",
+    "ubnfc-java",
+    "ubnfc-rust"
+  ],
+  "counts": {
+    "proof": 19,
+    "capability": 34,
+    "inputs": 18,
+    "driver": 59
+  },
+  "requested_profile": "typed-ast+source+cp+utf16; full-input; owned-snapshot; fixed-grammar; memo-preserved",
+  "bounds": {
+    "input_bytes": 4096,
+    "reply_bytes": 65536,
+    "engine_calls": 2,
+    "deadline_ms": 5000,
+    "java_heap": "256 MiB"
+  },
+  "performance": {
+    "generation": "not measured",
+    "preparation": "not measured",
+    "recognition": "not measured",
+    "adapter": "not measured",
+    "failure_diagnostics": "not measured",
+    "heap": "not measured",
+    "allocations": "not measured"
+  },
+  "conclusion": "fixed-fixture reuse feasible; production adoption evidence insufficient; no new engine"
+}

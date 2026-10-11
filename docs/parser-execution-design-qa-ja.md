@@ -238,6 +238,10 @@ Java側facadeの未実装範囲を明記する。片側の試作を共通APIの�
 結論は採用可能・不採用・証拠不足を記録できる形とし、既存生成経路で足りれば新engineを作らない。
 この設計PRや追跡issueの作成は、凍結したClassic性能作業やprototype実装の開始を意味しない。
 
+2026-10-12 の [固定文法による隔離評価](engine-reuse-experiment-ja.md)では、既存 ubnfc と
+明示 adapter の再利用を4経路で検証した。固定 profile の正確性は確認できたが、
+production 採用は証拠不足という結論であり、Java lean facade・既定engine・性能凍結は変更していない。
+
 ### Java / Rustで検証する観測
 
 同じ文法・元入力・snapshotに対して、次を各実装の独立期待値へ照合する。
