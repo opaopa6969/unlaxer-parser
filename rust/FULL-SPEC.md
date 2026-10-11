@@ -36,6 +36,7 @@ annotation、`ParseContext` API、consume/invert伝播、incremental、IDE proto
 | 診断policy・FIRST候補除外 | Java/RustのDetailed/失敗時詳細化/Auto、候補除外を実装 | 再実行可能性・診断参照・custom parserの宣言に依存。低水準APIと生成入口を区別し、意味診断と失敗位置を保持。任意副作用の安全性や常時高速化は保証しない（同ノート ケース25〜27） |
 | optional・0/1回以上・bounded repeat・separated | UBNF生成・Option/Vec AST・mapper・Semantics実装 | 70ケースの受理一致、20成功ケースのJava/Rust AST全field・全span一致、Rust評価値oracle。外側captureの入れ子container型は両backendとも未完了 |
 | ANY/EOF/EMPTY/CHAR_RANGE/NEGATION/UNTIL/LOOKAHEAD/NEGATIVE_LOOKAHEAD | UBNF生成とJava互換Expr・両cursorを実装 | 48文法・109入力でprefix受理/両cursorと全入力受理が一致、受理56入力のAST/spanも独立fixtureに一致。汎用consume/invert伝播と全CST同値は未完了 |
+| positive assertion / match-only | Java `MatchOnly` と Rust PEG `ahead()` を別契約として監査（#490）。runtime の置換なし | [API 対応表と独立 fixture](../docs/positive-assertion-contracts.md)。18 入力×6設定で cursor/token/CP span/capture/scope/診断、3入力×6設定で実 full-input retry を検証。Rust `JavaLookahead` は literal の受理・cursor のみ対応、任意 child の完全互換 wrapper は両方向とも未提供 |
 | error | `ERROR(...)`をJava/native Rust両hostから生成（#329）。非消費で必ず失敗し、expected候補を提示 | [12文法19入力の契約・corpus・再現手順](../docs/error-elements.md)。受理/両cursor、CP位置と明示hint、AST/span、状態rollback、診断/memo modeを比較。native候補の表示差は個別oracleで保持。下記の回復とは別 |
 | Number token | 限定生成済み | 不完全指数の診断差を記録済み。数値型・overflow・triviaを実言語仕様に合わせる |
 | Identifier・Single/DoubleQuoted・EndOfSource token binding | UBNF生成・runtime実装 | 22文法78入力の受理/両cursor比較と受理48 AST/spanのfixture。ASCII identifier、生escape、single quoteだけ除去するJava mapper契約。tinyexpression文字列評価は別途検証 |
