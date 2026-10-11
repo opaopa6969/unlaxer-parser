@@ -1,0 +1,4 @@
+# input\tanchor\tgenerated text\tkind\tconsumed\tmatched
+ab	2	😀repair	virtualTokenConsumed	2	2
+😀\r\n	3	~	virtualTokenConsumed	3	3
+x	1	virtual	virtualTokenMatchOnly	1	1

@@ -15,6 +15,10 @@ pub struct DebugSource {
     pub line_offset: usize,
 }
 pub trait Backend {
+    /// Advertise only a real bounded parser-terminal trace, never CST leaves.
+    fn supports_token_trace(&self) -> bool {
+        false
+    }
     /// Return strict, mapped AST nodes in field declaration order. Partial ASTs are not steps.
     fn steps(&mut self, snapshot: &Snapshot, arguments: &Value) -> Result<Vec<Step>, String>;
     fn resolve_source(
@@ -48,6 +52,57 @@ impl Backend for AstBackend {
         (self.mapper)(&snapshot.text)
     }
 }
+/// Generated AST mapping plus committed parser-terminal trace.
+pub struct ParserBackend {
+    pub mapper: fn(&str) -> Result<Vec<Step>, String>,
+    pub tokens: fn(&str) -> Result<Vec<Step>, String>,
+}
+impl Backend for ParserBackend {
+    fn supports_token_trace(&self) -> bool {
+        true
+    }
+    fn steps(&mut self, snapshot: &Snapshot, arguments: &Value) -> Result<Vec<Step>, String> {
+        if stepping_mode(arguments).eq_ignore_ascii_case("ast") {
+            (self.mapper)(&snapshot.text)
+        } else {
+            (self.tokens)(&snapshot.text)
+        }
+    }
+}
+pub fn stepping_mode(arguments: &Value) -> &str {
+    arguments["steppingMode"].as_str().unwrap_or_else(|| {
+        let runtime = arguments["runtimeMode"]
+            .as_str()
+            .unwrap_or("token")
+            .trim()
+            .to_lowercase()
+            .replace('_', "-");
+        if runtime == "ast" || runtime.ends_with("-ast") || runtime.contains("ast-evaluator") {
+            "ast"
+        } else {
+            "token"
+        }
+    })
+}
+/// Converts only input-backed committed leaves. Detached generated text has no
+/// corresponding source slice and is explicitly rejected by this source DAP.
+pub fn token_steps(tree: &unlaxer_runtime::Tree) -> Result<Vec<Step>, String> {
+    let trace = tree
+        .token_trace()
+        .ok_or("token trace unavailable")?
+        .map_err(|error| error.to_string())?;
+    let mut steps = Vec::new();
+    for leaf in trace.iter().filter(|leaf| leaf.kind.is_consumed()) {
+        if !matches!(leaf.source, unlaxer_runtime::token::TokenSource::Input(_)) {
+            return Err("detached generated token source is not supported by source DAP".into());
+        }
+        steps.push(Step {
+            label: leaf.label.into(),
+            span: leaf.span(),
+        });
+    }
+    Ok(steps)
+}
 pub struct Server<B> {
     backend: B,
     seq: i64,
@@ -58,6 +113,7 @@ pub struct Server<B> {
     program: String,
     arguments: Value,
     runtime_mode: String,
+    ast_mode: bool,
     stop_on_entry: bool,
     snapshot: Option<Snapshot>,
     line_offset: usize,
@@ -80,6 +136,7 @@ impl<B: Backend> Server<B> {
             program: String::new(),
             arguments: Value::Null,
             runtime_mode: "token".into(),
+            ast_mode: false,
             stop_on_entry: false,
             snapshot: None,
             line_offset: 0,
@@ -130,22 +187,14 @@ impl<B: Backend> Server<B> {
                         .find(|s| !s.trim().is_empty())
                         .ok_or("no program specified")?;
                     let runtime = arguments["runtimeMode"].as_str().unwrap_or("token");
-                    let normalized = runtime.trim().to_lowercase().replace('_', "-");
-                    let inferred = if normalized == "ast"
-                        || normalized.ends_with("-ast")
-                        || normalized.contains("ast-evaluator")
-                    {
-                        "ast"
-                    } else {
-                        "token"
-                    };
-                    let mode = arguments["steppingMode"].as_str().unwrap_or(inferred);
-                    if !mode.eq_ignore_ascii_case("ast") {
-                        return Err(
-                            "AST stepping required; token leaf tracing is not implemented (#463)"
-                                .into(),
-                        );
+                    let mode = stepping_mode(&arguments);
+                    if !mode.eq_ignore_ascii_case("ast") && !mode.eq_ignore_ascii_case("token") {
+                        return Err("unsupported stepping mode".into());
                     }
+                    if mode.eq_ignore_ascii_case("token") && !self.backend.supports_token_trace() {
+                        return Err("backend does not provide parser token tracing".into());
+                    }
+                    self.ast_mode = mode.eq_ignore_ascii_case("ast");
                     self.program = program.into();
                     self.runtime_mode = runtime.into();
                     self.stop_on_entry = arguments["stopOnEntry"] == true;
@@ -197,7 +246,7 @@ impl<B: Backend> Server<B> {
                             }
                         }
                         Err(error) => {
-                            events.push(("output",json!({"category":"stderr","output":format!("AST stepping unavailable: {error}\n")})));
+                            events.push(("output",json!({"category":"stderr","output":format!("{} stepping unavailable: {error}\n",if self.ast_mode {"AST"}else{"Token"})})));
                             self.finish_events(&mut events);
                         }
                     }
@@ -224,7 +273,7 @@ impl<B: Backend> Server<B> {
                         return Err("invalid frame".into());
                     }
                     Ok(
-                        json!({"scopes":if self.current().is_some(){vec![json!({"name":"Current AST Node","variablesReference":1,"expensive":false})]}else{vec![]}}),
+                        json!({"scopes":if self.current().is_some(){vec![json!({"name":if self.ast_mode {"Current AST Node"}else{"Current Token"},"variablesReference":1,"expensive":false})]}else{vec![]}}),
                     )
                 }
                 "variables" => {
@@ -240,15 +289,19 @@ impl<B: Backend> Server<B> {
                         variables.push(variable(
                             &step.label,
                             &format!("\"{}\"", text.replace('"', "\\\"")),
-                            "ASTNode",
+                            if self.ast_mode { "ASTNode" } else { "Token" },
                         ));
                         variables.push(variable("runtimeMode", &self.runtime_mode, "String"));
                         variables.push(variable(
                             "astNodeCount",
-                            &self.steps.len().to_string(),
+                            &(if self.ast_mode { self.steps.len() } else { 0 }).to_string(),
                             "int",
                         ));
-                        variables.push(variable("astCurrentNode", &step.label, "String"));
+                        variables.push(variable(
+                            "astCurrentNode",
+                            if self.ast_mode { &step.label } else { "" },
+                            "String",
+                        ));
                     }
                     for (name, value) in &self.variables {
                         if name != "runtimeMode" {
@@ -363,14 +416,24 @@ impl<B: Backend> Server<B> {
             Snapshot::new(self.program.clone(), 0, source.text).map_err(str::to_owned)?;
         let steps = self.backend.steps(&snapshot, &self.arguments)?;
         if steps.is_empty() {
-            return Err("no mapped AST nodes".into());
+            return Err(if self.ast_mode {
+                "no mapped AST nodes"
+            } else {
+                "no parser steps"
+            }
+            .into());
         }
         for step in &steps {
             snapshot.check(step.span).map_err(str::to_owned)?;
             snapshot.lsp(step.span.start).map_err(str::to_owned)?;
             snapshot.lsp(step.span.end).map_err(str::to_owned)?;
             if step.label.is_empty() {
-                return Err("empty AST label".into());
+                return Err(if self.ast_mode {
+                    "empty AST label"
+                } else {
+                    "empty step label"
+                }
+                .into());
             }
         }
         let mut variables = self
@@ -378,7 +441,10 @@ impl<B: Backend> Server<B> {
             .runtime_variables(&snapshot, &self.runtime_mode, &self.arguments)
             .unwrap_or_else(|error| BTreeMap::from([("debugRuntimeError".into(), error)]));
         variables.insert("runtimeMode".into(), self.runtime_mode.clone());
-        variables.insert("steppingMode".into(), "ast".into());
+        variables.insert(
+            "steppingMode".into(),
+            if self.ast_mode { "ast" } else { "token" }.into(),
+        );
         self.line_offset = source.line_offset;
         self.snapshot = Some(snapshot);
         self.steps = steps;
