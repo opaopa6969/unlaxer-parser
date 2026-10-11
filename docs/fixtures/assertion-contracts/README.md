@@ -32,7 +32,8 @@ Java assertion の返す match-only tree と、親の consumed tree は分けて
 Rust の literal expression は node を作らず、assertion も child node / capture を破棄するので空配列。
 `assertion.span` は Java の root Token と Rust の ParseMatch の範囲。
 Rust の `consumed` ラベルは ParseMatch が消費範囲を返すことを表す観測用ラベルで、
-Rust に Java の TokenKind が存在するという意味ではない。`JavaLookahead` の matched が進んでも
+この ParseMatch span のラベルであり、`token::TokenKind` や token metadata を観測した値ではない。
+`JavaLookahead` の matched が進んでも
 ParseMatch の span は `[start,start)` である。失敗した assertion の span は null。
 
 原文位置は Unicode code points の半開区間。特に `P:😀\r\n界;` の
