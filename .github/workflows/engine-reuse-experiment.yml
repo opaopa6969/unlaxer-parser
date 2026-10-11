@@ -1,0 +1,40 @@
+name: engine-reuse-experiment
+on:
+  push:
+    branches: [master]
+  pull_request:
+jobs:
+  public-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21.0.9'
+          overwrite-settings: false
+      - uses: dtolnay/rust-toolchain@1.85.0
+      - name: Classic Java and Rust, shared proof/capability fixtures, bounded Rust driver
+        run: python3 examples/engine-reuse/run.py
+      - name: Require both languages and the real experiment evidence
+        run: |
+          test -s target/engine-reuse/correctness.tsv
+          test -s target/engine-reuse/proof-java.tsv
+          test -s target/engine-reuse/proof-rust.tsv
+          test -s target/engine-reuse/capability-java.tsv
+          test -s target/engine-reuse/capability-rust.tsv
+          test -s target/engine-reuse/driver.tsv
+      # The private ubnfc generator is deliberately absent from public CI.
+      # Only newly authored fixture outputs are uploaded, never generated sources.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: public-engine-reuse-evidence
+          path: |
+            target/engine-reuse/manifest.json
+            target/engine-reuse/correctness.tsv
+            target/engine-reuse/oracle.tsv
+            target/engine-reuse/proof-*.tsv
+            target/engine-reuse/capability-*.tsv
+            target/engine-reuse/driver.tsv
+          if-no-files-found: error

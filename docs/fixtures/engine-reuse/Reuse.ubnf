@@ -1,0 +1,10 @@
+grammar Reuse {
+ @package: experiment.reuse
+ token INNER = NEGATION('>')
+ @root
+ Root ::= Packet;
+ @mapping(Packet, params=[first,second,others])
+ Packet ::= 'p' Atom @first Atom @second '[' { Atom } @others ']' '!';
+ @mapping(Atom, params=[value])
+ Atom ::= '<' { INNER } @value '>';
+}
