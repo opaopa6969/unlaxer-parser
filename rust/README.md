@@ -161,11 +161,11 @@ user state を変えず、再実行による外部作用が問題にならない
 これらは offset 0・空の expected を返し、custom parser が直接返したエラーはそのまま返す。
 checkpoint / memo hit のカウンタはその context の解析だけを数え、別 context の再解析分を含めない。
 
-Java の `DETAILED_ON_FAILURE` は issue #259 で実装済み。Auto は issue #261 で同じ解決規則を
-別作業として実装するため、この Rust 変更だけで Java 側も完了したとは扱わない。
+Java の `DETAILED_ON_FAILURE` は issue #259、`AUTO` は issue #261 で実装済み。
+Java側の生成 entry point と低水準 API の解決規則・検証は
 [Java の診断ポリシーと対応表](../docs/java-diagnostics-policy.md)を参照。
 Rust の既存の生成文字列が変わらないことを `RustNativeEmitterTest` で検証する。
-[Auto の facade 前後計測と検証結果](diagnostics-auto-measurement.md)も参照。
+過去の比較結果は[性能改善の実践ノート](../docs/performance-tuning-ja.md)のケース27に記録している。
 
 ### FIRST 集合による候補除外（#300、Java #292 / ケース37 と対称）
 
@@ -206,7 +206,9 @@ ASCII bitset・非 ASCII フラグ・nullable・unknown・「sequence が先に 
 - `@skip`。構文・CST・capture・scope/rollback は保持し、その規則と子の AST 投影を省く。明示 capture は text として保持する。[root・型・移行と検証の契約](../docs/skip-ast-projection.md)を参照。
 - `@scopeTree` / `@declares` / `@backref`。scopeのある文法では宣言への参照、ない文法では同一rule内のcapture比較を行う。構文の受理は変えず意味診断を保持する。[capture選択・空text・CP位置・rollbackの契約](../docs/generated-scope-effects.md)を参照。
 
-imports、上記以外の外部token parser、`@typeof`、`@eval`等の他のannotation、左再帰などは明示的に拒否する。生成するmapping名・field名はASCII識別子に制限し、Rustのraw identifierで出力する。`self`/`Self`/`super`/`crate`、fieldの`span`/`semantics`、shared mappingのschema不一致・異なるmappingからの生成method名衝突は拒否する（投影しないskipped mappingはこの生成名制約の対象外）。通常のrootはちょうど1つのAST nodeへ解決される必要がある。rootの投影経路に`@skip`またはmappingのないscopeなしcapture比較ruleがある場合はASTなしの構文解析も許すが、mapperは投影結果が1 nodeでなければ明示失敗する。optionalの先にある参照も左再帰検査に含め、空一致の可能性がある無限反復は生成前に拒否する。
+[宣言的 lexical module](../docs/declarative-tokens.md) と[固定package](../docs/ubnf-packages.md) の import は、両hostのファイル入力で解決してから生成する。低水準 lowering へ未解決 import を渡すことや、一般の rule/evaluator/host-code import は対応しない。
+
+上記以外の外部token parser、`@typeof`、`@eval`等の他のannotation、左再帰などは明示的に拒否する。生成するmapping名・field名はASCII識別子に制限し、Rustのraw identifierで出力する。`self`/`Self`/`super`/`crate`、fieldの`span`/`semantics`、shared mappingのschema不一致・異なるmappingからの生成method名衝突は拒否する（投影しないskipped mappingはこの生成名制約の対象外）。通常のrootはちょうど1つのAST nodeへ解決される必要がある。rootの投影経路に`@skip`またはmappingのないscopeなしcapture比較ruleがある場合はASTなしの構文解析も許すが、mapperは投影結果が1 nodeでなければ明示失敗する。optionalの先にある参照も左再帰検査に含め、空一致の可能性がある無限反復は生成前に拒否する。
 
 ### 演算子の列と優先順位
 

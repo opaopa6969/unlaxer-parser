@@ -60,7 +60,7 @@ annotation、`ParseContext` API、consume/invert伝播、incremental、IDE proto
 | lexical scope store・宣言/参照/semantic diagnostics | Java rollback修正とRust公開ParseContextへのtransactional store接続（#174）、owned Treeへのsnapshot | scope depth/lookup/shadowing/イベント履歴/失敗時復元を共通operation corpusで比較。AST/IDEへのmetadata搬送は未完了 |
 | scopeTree/declares/スコープ参照 | 両frontendから生成、Java capture-site選択も修正（#176）。mode/description metadata保持、CP位置、nested/repeated captureとrollbackを比較 | 両modeは解析時stack。評価時dynamic環境やclosure、LSP/DAP利用は未対応 |
 | skip | Java の存在しない AST 型参照を修正し、両hostの Rust 生成に AST subtree 投影境界を実装（#323） | [契約・移行・共通corpus](../docs/skip-ast-projection.md)。構文・capture・scope/rollback は保持し、明示captureはtext。rootのsyntax成功とASTなしのmapping失敗を区別 |
-| catalog/doc/simple等 | `@catalog` は両frontendから静的 `CatalogSpec` を生成（#180）。parser/AST/evaluatorには作用しない。doc/simpleは未対応 | catalog resolver・context別LSP利用とprotocol test、残るannotationのJava実動作を検証 |
+| catalog/doc/simple等 | `@catalog` は両frontendから静的 `CatalogSpec` を生成（#180）。`@doc` も両Rust emitterが順序付き `RULE_DOCS` を保持。parser/AST/evaluatorには作用しない。任意のSimple annotationは未対応 | [metadata契約](../docs/catalog-metadata.md)。catalog metadataからresolver・context別LSP利用への自動接続と、残るannotationのJava実動作を検証。一般のtyped/provider query対応とは区別 |
 | recovery | Java/Rust runtimeと両hostの`@recovery(sync/auto/skip)`生成、CP span/message付きCST marker（#331） | [契約・共通corpus・再現手順](../docs/error-recovery.md)。18文法43入力×6設定で回復情報、両cursor、rollback、正常ASTと回復時mapping拒否を比較。部分/error AST型と汎用伝播は未対応 |
 | incremental cache | Rust未対応 | 編集差分と全再解析の一致、位置・診断・利用者状態・回復情報の無効化 |
 | SafeFailures memoの保持窓 | Javaの保持窓に対応するRustのbucket解放と、両言語の遠距離backtrack後の再保存を実装（#290） | 共通6入力で受理・consumed/farthest位置を照合、各言語で窓OFF/ONの診断・hit数一致、32,000 CP人工負荷の追加heap peak約95.5%削減。任意文法のhit不変・時間計算量保証・stateful memo parityの完了は含まない |
@@ -154,7 +154,9 @@ transactional scope store（#174）の[rollback契約とruntime API](../docs/tra
 [cardinality契約とJava API移行](../docs/nested-capture-migration.md)を参照。
 共存するcaptureはlist、排他的choiceはscalar、欠損枝はoptionalとして両言語で比較する。
 `@catalog`（#180）の[静的metadata契約と既存Java LSPの限界](../docs/catalog-metadata.md)も参照。
-Rustのcontext-aware completion/hoverはまだ未実装であり、metadata生成とLSP対応を区別する。
+Rustのtyped/provider completion・provider hoverは[Classic LSP](../docs/classic-rust-lsp.md)で対応済み。
+`CATALOGS` の `(context, name)` からresolverを自動選択する接続は未対応であり、
+静的metadataの生成と、明示provider登録によるquery対応を区別する。
 
 Classicのparser生成は`Expr`combinator定義を生成し、共通runtimeで実行する。直接コードを出す別engineの存在は、この状態付きruntimeを移植し終えた証拠ではない。Rustでビルドされた実行ファイルであることは、入力式を機械語にコンパイルしていることを意味しない。
 

@@ -116,7 +116,7 @@ JSON 値と配列順を両 host で比較する。空白や `\n` / `\u000a` 等�
 | `P-ADAPTER-DUPLICATE` | 同じ ID/version の重複登録 / ID（後出 setting の範囲） |
 | `P-ADAPTER-UNKNOWN` | 未登録 adapter 参照 / ID（token 全体） |
 | `P-ADAPTER-VERSION` | 既知 ID の未登録 version / ID（token 全体） |
-| `P-ANNOTATION` | `eval` / `doc` / `commonField` / `enum` / Simple annotation 名（`@skip` と `@recovery` は対応済み） |
+| `P-ANNOTATION` | `eval` / `commonField` / `enum` / Simple annotation 名（`@doc`・`@skip`・`@recovery` は対応済み） |
 | `P-MAPPING-TYPE` | 対応しない mapping 型名 / class 名（投影しない skipped mapping を除く） |
 | `P-FIELD-NAME` | 対応しない field 名 / param 名（投影しない skipped mapping を除く） |
 | `P-INTERLEAVE` | 未対応 profile / profile 名 |
