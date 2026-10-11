@@ -1,0 +1,20 @@
+[
+ {"id":"ascii", "source":"p<a><b>[]!"},
+ {"id":"unicode", "source":"p<𠮷><😀>[<é><カ>]!"},
+ {"id":"crlf", "source":"p<\r\n><>[]!"},
+ {"id":"empty-atoms", "source":"p<><>[<>]!"},
+ {"id":"equal-values-distinct-spans", "source":"p<x><x>[<x><x>]!"},
+ {"id":"several-values", "source":"p<abc><日本語>[<12><34>]!"},
+ {"id":"ascii-whitespace", "source":"p< a ><\t>[]!"},
+ {"id":"unicode-space-contract", "source":"p< ><　>[]!"},
+ {"id":"empty-input", "source":""},
+ {"id":"bad-prefix", "source":"q<a><b>[]!"},
+ {"id":"missing-first-atom", "source":"p!"},
+ {"id":"missing-second-atom", "source":"p<a>[]!"},
+ {"id":"unterminated-first-atom", "source":"p<𠮷"},
+ {"id":"unterminated-list-atom", "source":"p<a><b>[<!"},
+ {"id":"missing-list-close", "source":"p<a><b>[<x>"},
+ {"id":"missing-final-marker", "source":"p<a><b>[]"},
+ {"id":"trailing", "source":"p<𠮷><😀>[<x>]!="},
+ {"id":"trailing-newline", "source":"p<a><b>[]!\n"}
+]

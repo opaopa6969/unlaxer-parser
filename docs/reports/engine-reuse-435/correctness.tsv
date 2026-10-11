@@ -1,0 +1,72 @@
+ascii	classic-java	ACCEPT	Packet(cp=0:10,utf16=0:10,text=703c613e3c623e5b5d21,first=Atom(cp=1:4,utf16=1:4,text=3c613e,value=[s61]),second=Atom(cp=4:7,utf16=4:7,text=3c623e,value=[s62]),others=[])
+ascii	classic-rust	ACCEPT	Packet(cp=0:10,utf16=0:10,text=703c613e3c623e5b5d21,first=Atom(cp=1:4,utf16=1:4,text=3c613e,value=[s61]),second=Atom(cp=4:7,utf16=4:7,text=3c623e,value=[s62]),others=[])
+ascii	ubnfc-java	ACCEPT	Packet(cp=0:10,utf16=0:10,text=703c613e3c623e5b5d21,first=Atom(cp=1:4,utf16=1:4,text=3c613e,value=[s61]),second=Atom(cp=4:7,utf16=4:7,text=3c623e,value=[s62]),others=[])
+ascii	ubnfc-rust	ACCEPT	Packet(cp=0:10,utf16=0:10,text=703c613e3c623e5b5d21,first=Atom(cp=1:4,utf16=1:4,text=3c613e,value=[s61]),second=Atom(cp=4:7,utf16=4:7,text=3c623e,value=[s62]),others=[])
+unicode	classic-java	ACCEPT	Packet(cp=0:16,utf16=0:18,text=703cf0a0aeb73e3cf09f98803e5b3cc3a93e3ce382ab3e5d21,first=Atom(cp=1:4,utf16=1:5,text=3cf0a0aeb73e,value=[sf0a0aeb7]),second=Atom(cp=4:7,utf16=5:9,text=3cf09f98803e,value=[sf09f9880]),others=[Atom(cp=8:11,utf16=10:13,text=3cc3a93e,value=[sc3a9]),Atom(cp=11:14,utf16=13:16,text=3ce382ab3e,value=[se382ab])])
+unicode	classic-rust	ACCEPT	Packet(cp=0:16,utf16=0:18,text=703cf0a0aeb73e3cf09f98803e5b3cc3a93e3ce382ab3e5d21,first=Atom(cp=1:4,utf16=1:5,text=3cf0a0aeb73e,value=[sf0a0aeb7]),second=Atom(cp=4:7,utf16=5:9,text=3cf09f98803e,value=[sf09f9880]),others=[Atom(cp=8:11,utf16=10:13,text=3cc3a93e,value=[sc3a9]),Atom(cp=11:14,utf16=13:16,text=3ce382ab3e,value=[se382ab])])
+unicode	ubnfc-java	ACCEPT	Packet(cp=0:16,utf16=0:18,text=703cf0a0aeb73e3cf09f98803e5b3cc3a93e3ce382ab3e5d21,first=Atom(cp=1:4,utf16=1:5,text=3cf0a0aeb73e,value=[sf0a0aeb7]),second=Atom(cp=4:7,utf16=5:9,text=3cf09f98803e,value=[sf09f9880]),others=[Atom(cp=8:11,utf16=10:13,text=3cc3a93e,value=[sc3a9]),Atom(cp=11:14,utf16=13:16,text=3ce382ab3e,value=[se382ab])])
+unicode	ubnfc-rust	ACCEPT	Packet(cp=0:16,utf16=0:18,text=703cf0a0aeb73e3cf09f98803e5b3cc3a93e3ce382ab3e5d21,first=Atom(cp=1:4,utf16=1:5,text=3cf0a0aeb73e,value=[sf0a0aeb7]),second=Atom(cp=4:7,utf16=5:9,text=3cf09f98803e,value=[sf09f9880]),others=[Atom(cp=8:11,utf16=10:13,text=3cc3a93e,value=[sc3a9]),Atom(cp=11:14,utf16=13:16,text=3ce382ab3e,value=[se382ab])])
+crlf	classic-java	ACCEPT	Packet(cp=0:10,utf16=0:10,text=703c0d0a3e3c3e5b5d21,first=Atom(cp=1:5,utf16=1:5,text=3c0d0a3e,value=[s,s]),second=Atom(cp=5:7,utf16=5:7,text=3c3e,value=[]),others=[])
+crlf	classic-rust	ACCEPT	Packet(cp=0:10,utf16=0:10,text=703c0d0a3e3c3e5b5d21,first=Atom(cp=1:5,utf16=1:5,text=3c0d0a3e,value=[s,s]),second=Atom(cp=5:7,utf16=5:7,text=3c3e,value=[]),others=[])
+crlf	ubnfc-java	ACCEPT	Packet(cp=0:10,utf16=0:10,text=703c0d0a3e3c3e5b5d21,first=Atom(cp=1:5,utf16=1:5,text=3c0d0a3e,value=[s,s]),second=Atom(cp=5:7,utf16=5:7,text=3c3e,value=[]),others=[])
+crlf	ubnfc-rust	ACCEPT	Packet(cp=0:10,utf16=0:10,text=703c0d0a3e3c3e5b5d21,first=Atom(cp=1:5,utf16=1:5,text=3c0d0a3e,value=[s,s]),second=Atom(cp=5:7,utf16=5:7,text=3c3e,value=[]),others=[])
+empty-atoms	classic-java	ACCEPT	Packet(cp=0:10,utf16=0:10,text=703c3e3c3e5b3c3e5d21,first=Atom(cp=1:3,utf16=1:3,text=3c3e,value=[]),second=Atom(cp=3:5,utf16=3:5,text=3c3e,value=[]),others=[Atom(cp=6:8,utf16=6:8,text=3c3e,value=[])])
+empty-atoms	classic-rust	ACCEPT	Packet(cp=0:10,utf16=0:10,text=703c3e3c3e5b3c3e5d21,first=Atom(cp=1:3,utf16=1:3,text=3c3e,value=[]),second=Atom(cp=3:5,utf16=3:5,text=3c3e,value=[]),others=[Atom(cp=6:8,utf16=6:8,text=3c3e,value=[])])
+empty-atoms	ubnfc-java	ACCEPT	Packet(cp=0:10,utf16=0:10,text=703c3e3c3e5b3c3e5d21,first=Atom(cp=1:3,utf16=1:3,text=3c3e,value=[]),second=Atom(cp=3:5,utf16=3:5,text=3c3e,value=[]),others=[Atom(cp=6:8,utf16=6:8,text=3c3e,value=[])])
+empty-atoms	ubnfc-rust	ACCEPT	Packet(cp=0:10,utf16=0:10,text=703c3e3c3e5b3c3e5d21,first=Atom(cp=1:3,utf16=1:3,text=3c3e,value=[]),second=Atom(cp=3:5,utf16=3:5,text=3c3e,value=[]),others=[Atom(cp=6:8,utf16=6:8,text=3c3e,value=[])])
+equal-values-distinct-spans	classic-java	ACCEPT	Packet(cp=0:16,utf16=0:16,text=703c783e3c783e5b3c783e3c783e5d21,first=Atom(cp=1:4,utf16=1:4,text=3c783e,value=[s78]),second=Atom(cp=4:7,utf16=4:7,text=3c783e,value=[s78]),others=[Atom(cp=8:11,utf16=8:11,text=3c783e,value=[s78]),Atom(cp=11:14,utf16=11:14,text=3c783e,value=[s78])])
+equal-values-distinct-spans	classic-rust	ACCEPT	Packet(cp=0:16,utf16=0:16,text=703c783e3c783e5b3c783e3c783e5d21,first=Atom(cp=1:4,utf16=1:4,text=3c783e,value=[s78]),second=Atom(cp=4:7,utf16=4:7,text=3c783e,value=[s78]),others=[Atom(cp=8:11,utf16=8:11,text=3c783e,value=[s78]),Atom(cp=11:14,utf16=11:14,text=3c783e,value=[s78])])
+equal-values-distinct-spans	ubnfc-java	ACCEPT	Packet(cp=0:16,utf16=0:16,text=703c783e3c783e5b3c783e3c783e5d21,first=Atom(cp=1:4,utf16=1:4,text=3c783e,value=[s78]),second=Atom(cp=4:7,utf16=4:7,text=3c783e,value=[s78]),others=[Atom(cp=8:11,utf16=8:11,text=3c783e,value=[s78]),Atom(cp=11:14,utf16=11:14,text=3c783e,value=[s78])])
+equal-values-distinct-spans	ubnfc-rust	ACCEPT	Packet(cp=0:16,utf16=0:16,text=703c783e3c783e5b3c783e3c783e5d21,first=Atom(cp=1:4,utf16=1:4,text=3c783e,value=[s78]),second=Atom(cp=4:7,utf16=4:7,text=3c783e,value=[s78]),others=[Atom(cp=8:11,utf16=8:11,text=3c783e,value=[s78]),Atom(cp=11:14,utf16=11:14,text=3c783e,value=[s78])])
+several-values	classic-java	ACCEPT	Packet(cp=0:22,utf16=0:22,text=703c6162633e3ce697a5e69cace8aa9e3e5b3c31323e3c33343e5d21,first=Atom(cp=1:6,utf16=1:6,text=3c6162633e,value=[s61,s62,s63]),second=Atom(cp=6:11,utf16=6:11,text=3ce697a5e69cace8aa9e3e,value=[se697a5,se69cac,se8aa9e]),others=[Atom(cp=12:16,utf16=12:16,text=3c31323e,value=[s31,s32]),Atom(cp=16:20,utf16=16:20,text=3c33343e,value=[s33,s34])])
+several-values	classic-rust	ACCEPT	Packet(cp=0:22,utf16=0:22,text=703c6162633e3ce697a5e69cace8aa9e3e5b3c31323e3c33343e5d21,first=Atom(cp=1:6,utf16=1:6,text=3c6162633e,value=[s61,s62,s63]),second=Atom(cp=6:11,utf16=6:11,text=3ce697a5e69cace8aa9e3e,value=[se697a5,se69cac,se8aa9e]),others=[Atom(cp=12:16,utf16=12:16,text=3c31323e,value=[s31,s32]),Atom(cp=16:20,utf16=16:20,text=3c33343e,value=[s33,s34])])
+several-values	ubnfc-java	ACCEPT	Packet(cp=0:22,utf16=0:22,text=703c6162633e3ce697a5e69cace8aa9e3e5b3c31323e3c33343e5d21,first=Atom(cp=1:6,utf16=1:6,text=3c6162633e,value=[s61,s62,s63]),second=Atom(cp=6:11,utf16=6:11,text=3ce697a5e69cace8aa9e3e,value=[se697a5,se69cac,se8aa9e]),others=[Atom(cp=12:16,utf16=12:16,text=3c31323e,value=[s31,s32]),Atom(cp=16:20,utf16=16:20,text=3c33343e,value=[s33,s34])])
+several-values	ubnfc-rust	ACCEPT	Packet(cp=0:22,utf16=0:22,text=703c6162633e3ce697a5e69cace8aa9e3e5b3c31323e3c33343e5d21,first=Atom(cp=1:6,utf16=1:6,text=3c6162633e,value=[s61,s62,s63]),second=Atom(cp=6:11,utf16=6:11,text=3ce697a5e69cace8aa9e3e,value=[se697a5,se69cac,se8aa9e]),others=[Atom(cp=12:16,utf16=12:16,text=3c31323e,value=[s31,s32]),Atom(cp=16:20,utf16=16:20,text=3c33343e,value=[s33,s34])])
+ascii-whitespace	classic-java	ACCEPT	Packet(cp=0:12,utf16=0:12,text=703c2061203e3c093e5b5d21,first=Atom(cp=1:6,utf16=1:6,text=3c2061203e,value=[s,s61,s]),second=Atom(cp=6:9,utf16=6:9,text=3c093e,value=[s]),others=[])
+ascii-whitespace	classic-rust	ACCEPT	Packet(cp=0:12,utf16=0:12,text=703c2061203e3c093e5b5d21,first=Atom(cp=1:6,utf16=1:6,text=3c2061203e,value=[s,s61,s]),second=Atom(cp=6:9,utf16=6:9,text=3c093e,value=[s]),others=[])
+ascii-whitespace	ubnfc-java	ACCEPT	Packet(cp=0:12,utf16=0:12,text=703c2061203e3c093e5b5d21,first=Atom(cp=1:6,utf16=1:6,text=3c2061203e,value=[s,s61,s]),second=Atom(cp=6:9,utf16=6:9,text=3c093e,value=[s]),others=[])
+ascii-whitespace	ubnfc-rust	ACCEPT	Packet(cp=0:12,utf16=0:12,text=703c2061203e3c093e5b5d21,first=Atom(cp=1:6,utf16=1:6,text=3c2061203e,value=[s,s61,s]),second=Atom(cp=6:9,utf16=6:9,text=3c093e,value=[s]),others=[])
+unicode-space-contract	classic-java	ACCEPT	Packet(cp=0:10,utf16=0:10,text=703cc2a03e3ce380803e5b5d21,first=Atom(cp=1:4,utf16=1:4,text=3cc2a03e,value=[sc2a0]),second=Atom(cp=4:7,utf16=4:7,text=3ce380803e,value=[s]),others=[])
+unicode-space-contract	classic-rust	ACCEPT	Packet(cp=0:10,utf16=0:10,text=703cc2a03e3ce380803e5b5d21,first=Atom(cp=1:4,utf16=1:4,text=3cc2a03e,value=[sc2a0]),second=Atom(cp=4:7,utf16=4:7,text=3ce380803e,value=[s]),others=[])
+unicode-space-contract	ubnfc-java	ACCEPT	Packet(cp=0:10,utf16=0:10,text=703cc2a03e3ce380803e5b5d21,first=Atom(cp=1:4,utf16=1:4,text=3cc2a03e,value=[sc2a0]),second=Atom(cp=4:7,utf16=4:7,text=3ce380803e,value=[s]),others=[])
+unicode-space-contract	ubnfc-rust	ACCEPT	Packet(cp=0:10,utf16=0:10,text=703cc2a03e3ce380803e5b5d21,first=Atom(cp=1:4,utf16=1:4,text=3cc2a03e,value=[sc2a0]),second=Atom(cp=4:7,utf16=4:7,text=3ce380803e,value=[s]),others=[])
+empty-input	classic-java	REJECT	0	0	2721277c275b277c275d277c277027	2721277c275b277c275d277c277027
+empty-input	classic-rust	REJECT	0	0	70	70
+empty-input	ubnfc-java	REJECT	0	0	2721277c275b277c275d277c277027	2721277c275b277c275d277c277027
+empty-input	ubnfc-rust	REJECT	0	0	70	2721277c275b277c275d277c277027
+bad-prefix	classic-java	REJECT	0	0	2721277c275b277c275d277c277027	2721277c275b277c275d277c277027
+bad-prefix	classic-rust	REJECT	0	0	70	70
+bad-prefix	ubnfc-java	REJECT	0	0	2721277c275b277c275d277c277027	2721277c275b277c275d277c277027
+bad-prefix	ubnfc-rust	REJECT	0	0	70	2721277c275b277c275d277c277027
+missing-first-atom	classic-java	REJECT	1	1	273c277c273e27	273c277c273e27
+missing-first-atom	classic-rust	REJECT	1	1	3c	3c
+missing-first-atom	ubnfc-java	REJECT	1	1	273c277c273e27	273c277c273e27
+missing-first-atom	ubnfc-rust	REJECT	1	1	3c	273c277c273e27
+missing-second-atom	classic-java	REJECT	4	4	273c277c273e27	273c277c273e27
+missing-second-atom	classic-rust	REJECT	4	4	3c	3c
+missing-second-atom	ubnfc-java	REJECT	4	4	273c277c273e27	273c277c273e27
+missing-second-atom	ubnfc-rust	REJECT	4	4	3c	273c277c273e27
+unterminated-first-atom	classic-java	REJECT	3	3	273e277c496e6e65725061727365727c5f5f4361707475726553697465	273e277c496e6e65725061727365727c5f5f4361707475726553697465
+unterminated-first-atom	classic-rust	REJECT	3	3	3e7c636861726163746572	3e7c636861726163746572
+unterminated-first-atom	ubnfc-java	REJECT	3	3	273e277c494e4e4552506172736572	273e277c494e4e4552506172736572
+unterminated-first-atom	ubnfc-rust	REJECT	3	3	494e4e45527c3e	273e277c494e4e4552506172736572
+unterminated-list-atom	classic-java	REJECT	10	10	273e277c496e6e65725061727365727c5f5f4361707475726553697465	273e277c496e6e65725061727365727c5f5f4361707475726553697465
+unterminated-list-atom	classic-rust	REJECT	10	10	3e7c636861726163746572	3e7c636861726163746572
+unterminated-list-atom	ubnfc-java	REJECT	10	10	273e277c494e4e4552506172736572	273e277c494e4e4552506172736572
+unterminated-list-atom	ubnfc-rust	REJECT	10	10	494e4e45527c3e	273e277c494e4e4552506172736572
+missing-list-close	classic-java	REJECT	11	11	273c277c273e277c275d27	273c277c273e277c275d27
+missing-list-close	classic-rust	REJECT	11	11	3c7c5d	3c7c5d
+missing-list-close	ubnfc-java	REJECT	11	11	273c277c273e277c275d27	273c277c273e277c275d27
+missing-list-close	ubnfc-rust	REJECT	11	11	3c7c5d	273c277c273e277c275d27
+missing-final-marker	classic-java	REJECT	9	9	272127	272127
+missing-final-marker	classic-rust	REJECT	9	9	21	21
+missing-final-marker	ubnfc-java	REJECT	9	9	272127	272127
+missing-final-marker	ubnfc-rust	REJECT	9	9	21	272127
+trailing	classic-java	REJECT	13	11	656e64206f6620696e707574	273c277c273e27
+trailing	classic-rust	REJECT	13	13	656e64206f6620696e707574	656e64206f6620696e707574
+trailing	ubnfc-java	REJECT	13	11	656e64206f6620696e707574	273c277c273e27
+trailing	ubnfc-rust	REJECT	13	11	656e64206f6620696e707574	273c277c273e27
+trailing-newline	classic-java	REJECT	10	8	656e64206f6620696e707574	273c277c273e27
+trailing-newline	classic-rust	REJECT	10	10	656e64206f6620696e707574	656e64206f6620696e707574
+trailing-newline	ubnfc-java	REJECT	10	8	656e64206f6620696e707574	273c277c273e27
+trailing-newline	ubnfc-rust	REJECT	10	8	656e64206f6620696e707574	273c277c273e27

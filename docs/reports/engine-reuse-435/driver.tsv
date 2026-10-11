@@ -1,0 +1,59 @@
+native-java-ascii	OK	1	LEAN	ACCEPT	Packet(cp=0:10,utf16=0:10,text=703c613e3c623e5b5d21,first=Atom(cp=1:4,utf16=1:4,text=3c613e,value=[s61]),second=Atom(cp=4:7,utf16=4:7,text=3c623e,value=[s62]),others=[])
+native-java-unicode	OK	1	LEAN	ACCEPT	Packet(cp=0:16,utf16=0:18,text=703cf0a0aeb73e3cf09f98803e5b3cc3a93e3ce382ab3e5d21,first=Atom(cp=1:4,utf16=1:5,text=3cf0a0aeb73e,value=[sf0a0aeb7]),second=Atom(cp=4:7,utf16=5:9,text=3cf09f98803e,value=[sf09f9880]),others=[Atom(cp=8:11,utf16=10:13,text=3cc3a93e,value=[sc3a9]),Atom(cp=11:14,utf16=13:16,text=3ce382ab3e,value=[se382ab])])
+native-java-crlf	OK	1	LEAN	ACCEPT	Packet(cp=0:10,utf16=0:10,text=703c0d0a3e3c3e5b5d21,first=Atom(cp=1:5,utf16=1:5,text=3c0d0a3e,value=[s,s]),second=Atom(cp=5:7,utf16=5:7,text=3c3e,value=[]),others=[])
+native-java-empty-atoms	OK	1	LEAN	ACCEPT	Packet(cp=0:10,utf16=0:10,text=703c3e3c3e5b3c3e5d21,first=Atom(cp=1:3,utf16=1:3,text=3c3e,value=[]),second=Atom(cp=3:5,utf16=3:5,text=3c3e,value=[]),others=[Atom(cp=6:8,utf16=6:8,text=3c3e,value=[])])
+native-java-equal-values-distinct-spans	OK	1	LEAN	ACCEPT	Packet(cp=0:16,utf16=0:16,text=703c783e3c783e5b3c783e3c783e5d21,first=Atom(cp=1:4,utf16=1:4,text=3c783e,value=[s78]),second=Atom(cp=4:7,utf16=4:7,text=3c783e,value=[s78]),others=[Atom(cp=8:11,utf16=8:11,text=3c783e,value=[s78]),Atom(cp=11:14,utf16=11:14,text=3c783e,value=[s78])])
+native-java-several-values	OK	1	LEAN	ACCEPT	Packet(cp=0:22,utf16=0:22,text=703c6162633e3ce697a5e69cace8aa9e3e5b3c31323e3c33343e5d21,first=Atom(cp=1:6,utf16=1:6,text=3c6162633e,value=[s61,s62,s63]),second=Atom(cp=6:11,utf16=6:11,text=3ce697a5e69cace8aa9e3e,value=[se697a5,se69cac,se8aa9e]),others=[Atom(cp=12:16,utf16=12:16,text=3c31323e,value=[s31,s32]),Atom(cp=16:20,utf16=16:20,text=3c33343e,value=[s33,s34])])
+native-java-ascii-whitespace	OK	1	LEAN	ACCEPT	Packet(cp=0:12,utf16=0:12,text=703c2061203e3c093e5b5d21,first=Atom(cp=1:6,utf16=1:6,text=3c2061203e,value=[s,s61,s]),second=Atom(cp=6:9,utf16=6:9,text=3c093e,value=[s]),others=[])
+native-java-unicode-space-contract	OK	1	LEAN	ACCEPT	Packet(cp=0:10,utf16=0:10,text=703cc2a03e3ce380803e5b5d21,first=Atom(cp=1:4,utf16=1:4,text=3cc2a03e,value=[sc2a0]),second=Atom(cp=4:7,utf16=4:7,text=3ce380803e,value=[s]),others=[])
+native-java-empty-input	OK	2	RICH_FAILURE	REJECT	0	0	2721277c275b277c275d277c277027	2721277c275b277c275d277c277027
+native-java-bad-prefix	OK	2	RICH_FAILURE	REJECT	0	0	2721277c275b277c275d277c277027	2721277c275b277c275d277c277027
+native-java-missing-first-atom	OK	2	RICH_FAILURE	REJECT	1	1	273c277c273e27	273c277c273e27
+native-java-missing-second-atom	OK	2	RICH_FAILURE	REJECT	4	4	273c277c273e27	273c277c273e27
+native-java-unterminated-first-atom	OK	2	RICH_FAILURE	REJECT	3	3	273e277c496e6e65725061727365727c5f5f4361707475726553697465	273e277c496e6e65725061727365727c5f5f4361707475726553697465
+native-java-unterminated-list-atom	OK	2	RICH_FAILURE	REJECT	10	10	273e277c496e6e65725061727365727c5f5f4361707475726553697465	273e277c496e6e65725061727365727c5f5f4361707475726553697465
+native-java-missing-list-close	OK	2	RICH_FAILURE	REJECT	11	11	273c277c273e277c275d27	273c277c273e277c275d27
+native-java-missing-final-marker	OK	2	RICH_FAILURE	REJECT	9	9	272127	272127
+native-java-trailing	OK	2	RICH_FAILURE	REJECT	13	11	656e64206f6620696e707574	273c277c273e27
+native-java-trailing-newline	OK	2	RICH_FAILURE	REJECT	10	8	656e64206f6620696e707574	273c277c273e27
+native-rust-ascii	OK	1	LEAN	ACCEPT	Packet(cp=0:10,utf16=0:10,text=703c613e3c623e5b5d21,first=Atom(cp=1:4,utf16=1:4,text=3c613e,value=[s61]),second=Atom(cp=4:7,utf16=4:7,text=3c623e,value=[s62]),others=[])
+native-rust-unicode	OK	1	LEAN	ACCEPT	Packet(cp=0:16,utf16=0:18,text=703cf0a0aeb73e3cf09f98803e5b3cc3a93e3ce382ab3e5d21,first=Atom(cp=1:4,utf16=1:5,text=3cf0a0aeb73e,value=[sf0a0aeb7]),second=Atom(cp=4:7,utf16=5:9,text=3cf09f98803e,value=[sf09f9880]),others=[Atom(cp=8:11,utf16=10:13,text=3cc3a93e,value=[sc3a9]),Atom(cp=11:14,utf16=13:16,text=3ce382ab3e,value=[se382ab])])
+native-rust-crlf	OK	1	LEAN	ACCEPT	Packet(cp=0:10,utf16=0:10,text=703c0d0a3e3c3e5b5d21,first=Atom(cp=1:5,utf16=1:5,text=3c0d0a3e,value=[s,s]),second=Atom(cp=5:7,utf16=5:7,text=3c3e,value=[]),others=[])
+native-rust-empty-atoms	OK	1	LEAN	ACCEPT	Packet(cp=0:10,utf16=0:10,text=703c3e3c3e5b3c3e5d21,first=Atom(cp=1:3,utf16=1:3,text=3c3e,value=[]),second=Atom(cp=3:5,utf16=3:5,text=3c3e,value=[]),others=[Atom(cp=6:8,utf16=6:8,text=3c3e,value=[])])
+native-rust-equal-values-distinct-spans	OK	1	LEAN	ACCEPT	Packet(cp=0:16,utf16=0:16,text=703c783e3c783e5b3c783e3c783e5d21,first=Atom(cp=1:4,utf16=1:4,text=3c783e,value=[s78]),second=Atom(cp=4:7,utf16=4:7,text=3c783e,value=[s78]),others=[Atom(cp=8:11,utf16=8:11,text=3c783e,value=[s78]),Atom(cp=11:14,utf16=11:14,text=3c783e,value=[s78])])
+native-rust-several-values	OK	1	LEAN	ACCEPT	Packet(cp=0:22,utf16=0:22,text=703c6162633e3ce697a5e69cace8aa9e3e5b3c31323e3c33343e5d21,first=Atom(cp=1:6,utf16=1:6,text=3c6162633e,value=[s61,s62,s63]),second=Atom(cp=6:11,utf16=6:11,text=3ce697a5e69cace8aa9e3e,value=[se697a5,se69cac,se8aa9e]),others=[Atom(cp=12:16,utf16=12:16,text=3c31323e,value=[s31,s32]),Atom(cp=16:20,utf16=16:20,text=3c33343e,value=[s33,s34])])
+native-rust-ascii-whitespace	OK	1	LEAN	ACCEPT	Packet(cp=0:12,utf16=0:12,text=703c2061203e3c093e5b5d21,first=Atom(cp=1:6,utf16=1:6,text=3c2061203e,value=[s,s61,s]),second=Atom(cp=6:9,utf16=6:9,text=3c093e,value=[s]),others=[])
+native-rust-unicode-space-contract	OK	1	LEAN	ACCEPT	Packet(cp=0:10,utf16=0:10,text=703cc2a03e3ce380803e5b5d21,first=Atom(cp=1:4,utf16=1:4,text=3cc2a03e,value=[sc2a0]),second=Atom(cp=4:7,utf16=4:7,text=3ce380803e,value=[s]),others=[])
+native-rust-empty-input	OK	2	RICH_FAILURE	REJECT	0	0	70	70
+native-rust-bad-prefix	OK	2	RICH_FAILURE	REJECT	0	0	70	70
+native-rust-missing-first-atom	OK	2	RICH_FAILURE	REJECT	1	1	3c	3c
+native-rust-missing-second-atom	OK	2	RICH_FAILURE	REJECT	4	4	3c	3c
+native-rust-unterminated-first-atom	OK	2	RICH_FAILURE	REJECT	3	3	3e7c636861726163746572	3e7c636861726163746572
+native-rust-unterminated-list-atom	OK	2	RICH_FAILURE	REJECT	10	10	3e7c636861726163746572	3e7c636861726163746572
+native-rust-missing-list-close	OK	2	RICH_FAILURE	REJECT	11	11	3c7c5d	3c7c5d
+native-rust-missing-final-marker	OK	2	RICH_FAILURE	REJECT	9	9	21	21
+native-rust-trailing	OK	2	RICH_FAILURE	REJECT	13	13	656e64206f6620696e707574	656e64206f6620696e707574
+native-rust-trailing-newline	OK	2	RICH_FAILURE	REJECT	10	10	656e64206f6620696e707574	656e64206f6620696e707574
+reject-then-accept	ERROR	2	LEAN_REJECT_RICH_ACCEPT
+ast-field-difference	ERROR	1	AST_OR_ACCEPTANCE_MISMATCH
+ast-span-difference	ERROR	1	AST_OR_ACCEPTANCE_MISMATCH
+utf16-span-difference	ERROR	1	AST_OR_ACCEPTANCE_MISMATCH
+source-text-difference	ERROR	1	AST_OR_ACCEPTANCE_MISMATCH
+wrong-grammar	ERROR	1	BINDING_MISMATCH
+wrong-snapshot	ERROR	1	BINDING_MISMATCH
+wrong-source	ERROR	1	BINDING_MISMATCH
+mutated-source	ERROR	1	SNAPSHOT_MISMATCH
+grown-source	ERROR	1	INPUT_LIMIT
+deadline-before-start	ERROR	0	DEADLINE
+deadline-in-engine	ERROR	1	DEADLINE
+shared-deadline	ERROR	2	DEADLINE
+input-limit	ERROR	0	INPUT_LIMIT
+output-limit	ERROR	1	OUTPUT_LIMIT
+engine-resource-exit	ERROR	1	ENGINE_ERROR
+rich-process-failure	ERROR	2	ENGINE_ERROR
+unsafe-provider	OK	1	RICH_ONCE	ACCEPT	Packet(cp=0:10,utf16=0:10,text=703c613e3c623e5b5d21,first=Atom(cp=1:4,utf16=1:4,text=3c613e,value=[s61]),second=Atom(cp=4:7,utf16=4:7,text=3c623e,value=[s62]),others=[])
+unsafe-callback	OK	1	RICH_ONCE	ACCEPT	Packet(cp=0:10,utf16=0:10,text=703c613e3c623e5b5d21,first=Atom(cp=1:4,utf16=1:4,text=3c613e,value=[s61]),second=Atom(cp=4:7,utf16=4:7,text=3c623e,value=[s62]),others=[])
+oracle-limit	ERROR	0	ORACLE_LIMIT
+invalid-deadline	ARGUMENT_ERROR	2
+negative-limit	ARGUMENT_ERROR	2
+overflow-limit	ARGUMENT_ERROR	2
