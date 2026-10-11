@@ -33,6 +33,7 @@ pub mod shared_calls;
 pub mod source;
 pub mod source_edits;
 pub mod token;
+pub mod token_trace;
 pub mod type_system;
 mod unicode_xid;
 #[doc(hidden)]
@@ -439,6 +440,8 @@ pub enum Diagnostics {
 pub struct ParseOptions {
     pub memoization: Memoization,
     pub diagnostics: Diagnostics,
+    /// Explicit debugging metadata; ordinary parsing retains no terminal trace.
+    pub token_trace: Option<token_trace::Limits>,
 }
 
 impl ParseOptions {
@@ -446,7 +449,14 @@ impl ParseOptions {
         Self {
             memoization,
             diagnostics: Diagnostics::Auto,
+            token_trace: None,
         }
+    }
+
+    /// Opts into bounded committed terminal metadata without changing the CST.
+    pub const fn with_token_trace(mut self, limits: token_trace::Limits) -> Self {
+        self.token_trace = Some(limits);
+        self
     }
 
     /// Selects syntax diagnostics without changing the memoization policy.
@@ -747,6 +757,7 @@ struct Checkpoint {
     scopes_journal_mark: usize,
     recoveries: usize,
     tokens: Rc<token::Store>,
+    token_trace: token_trace::Mark,
 }
 
 struct ChoiceWinner {
@@ -760,6 +771,7 @@ struct ChoiceWinner {
     recoveries: Vec<RecoveryDiagnostic>,
     fragment: Fragment,
     tokens: Rc<token::Store>,
+    token_trace: Option<token_trace::Trace>,
 }
 
 /// IDs belong to one context and survive rollback and temporary grammar sessions.
@@ -1129,6 +1141,8 @@ pub struct ParseContext<'a> {
     next_token_generation: u64,
     unique_choice_failure_seen: bool,
     names_state: names::State,
+    token_trace: Option<token_trace::Trace>,
+    trace_custom_contracts: Vec<bool>,
 }
 
 /// Ordered choice with rollback and full-input acceptance. Rule nesting is bounded at 256.
@@ -1298,6 +1312,7 @@ fn parse_detailed_owned(
     if let Some(root) = parser.rule(root, 0) {
         if parser.position == input.len() {
             let recoveries = parser.selected_recoveries(root);
+            let tokens = parser.retained_tokens();
             return Ok(Tree {
                 source: input.to_owned(),
                 nodes: parser.nodes,
@@ -1305,7 +1320,7 @@ fn parse_detailed_owned(
                 byte_offsets: parser.byte_offsets,
                 scopes: parser.scopes,
                 recoveries,
-                tokens: (*parser.tokens).clone(),
+                tokens,
             });
         }
         trailing_offset = Some(parser.code_point(parser.position));
@@ -1449,6 +1464,8 @@ impl<'a> ParseContext<'a> {
             next_token_generation: 1,
             unique_choice_failure_seen: false,
             names_state: names::State::default(),
+            token_trace: options.token_trace.map(token_trace::Trace::new),
+            trace_custom_contracts: Vec::new(),
         }
         .with_candidate_exclusion()
     }
@@ -1489,9 +1506,8 @@ impl<'a> ParseContext<'a> {
         metrics
     }
 
-    #[cfg(test)]
     /// Hits in this context's pass only; excludes any separate detailed retry.
-    fn memoized_failure_hits(&self) -> usize {
+    pub fn memoized_failure_hits(&self) -> usize {
         self.memoized_failure_hits
     }
 
@@ -1527,7 +1543,7 @@ impl<'a> ParseContext<'a> {
             byte_offsets: self.byte_offsets.clone(),
             scopes: self.scopes.clone(),
             recoveries: self.selected_recoveries(root),
-            tokens: (*self.tokens).clone(),
+            tokens: self.retained_tokens(),
         })
     }
 
@@ -1813,6 +1829,7 @@ impl<'a> ParseContext<'a> {
             scopes_journal_mark,
             recoveries: self.recoveries.len(),
             tokens: Rc::clone(&self.tokens),
+            token_trace: token_trace::Mark::of(self.token_trace.as_ref()),
             state,
         }
     }
@@ -1837,6 +1854,7 @@ impl<'a> ParseContext<'a> {
         self.matched_position = checkpoint.matched_position;
         self.nodes.truncate(checkpoint.nodes);
         self.tokens = checkpoint.tokens;
+        checkpoint.token_trace.restore(self.token_trace.as_mut());
         self.recoveries.truncate(checkpoint.recoveries);
         self.captures
             .rollback_checkpoint(checkpoint.captures_journal_mark);
@@ -2082,6 +2100,7 @@ impl<'a> ParseContext<'a> {
         if result.is_none() {
             self.restore(checkpoint);
         } else {
+            self.trace_expression(expression, checkpoint.position);
             self.commit_checkpoint(checkpoint);
         }
         result
@@ -2136,13 +2155,22 @@ impl<'a> ParseContext<'a> {
 
     fn expression_inner(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
         match expression {
-            Expr::Custom(parser) | Expr::CustomWith { parser, .. } => self
-                .transaction(|context| parser(context))
-                .ok()
-                .map(|matched| Fragment {
+            Expr::Custom(parser) | Expr::CustomWith { parser, .. } => {
+                let tracing = self.token_trace.is_some();
+                if tracing {
+                    self.trace_custom_contracts.push(false);
+                }
+                let result = self.transaction(|context| parser(context));
+                if tracing && !self.trace_custom_contracts.pop().unwrap() && result.is_ok() {
+                    self.unsupported_trace(
+                        "custom parser without explicit terminal trace contract",
+                    );
+                }
+                result.ok().map(|matched| Fragment {
                     nodes: matched.nodes,
                     captures: matched.captures,
-                }),
+                })
+            }
             Expr::Lexical(label, expression) => {
                 let end = match &mut self.lexing {
                     Some(session) => session.match_at(
@@ -2328,6 +2356,7 @@ impl<'a> ParseContext<'a> {
                         self.nodes.truncate(count);
                         if matches!(expression, Expr::JavaOptional(_)) {
                             self.java_failed_atom(child);
+                            self.trace_empty("Optional");
                         }
                         Some(Fragment::default())
                     }
@@ -2374,6 +2403,9 @@ impl<'a> ParseContext<'a> {
                             break;
                         }
                     }
+                }
+                if java && iterations == 0 && *min == 0 {
+                    self.trace_empty("ZeroOrMore");
                 }
                 (iterations >= *min && max.is_none_or(|max| iterations <= max)).then_some(result)
             }
@@ -2443,12 +2475,20 @@ impl<'a> ParseContext<'a> {
                     self.fail("identifier");
                     return None;
                 }
+                let first = self.position;
                 self.position += 1;
+                self.trace_atom("AlphabetUnderScoreParser", first);
+                let rest = self.position;
                 while bytes
                     .get(self.position)
                     .is_some_and(|c| c.is_ascii_alphanumeric() || *c == b'_')
                 {
+                    let start = self.position;
                     self.position += 1;
+                    self.trace_atom("AlphabetNumericUnderScoreParser", start);
+                }
+                if rest == self.position {
+                    self.trace_atom("ZeroOrMore", rest);
                 }
                 self.matched_position = self.position;
                 Some(Fragment::default())
@@ -2486,13 +2526,33 @@ impl<'a> ParseContext<'a> {
                     self.fail("opening quote");
                     return None;
                 }
+                let label = if *quote == '\'' {
+                    "SingleQuoteParser"
+                } else {
+                    "DoubleQuoteParser"
+                };
+                let start = self.position;
                 self.position += quote.len_utf8();
+                self.trace_atom(label, start);
+                let body = self.position;
                 loop {
                     let Some(next) = self.remaining().chars().next() else {
                         self.fail("closing quote");
                         return None;
                     };
+                    let start = self.position;
+                    if next == *quote && start == body {
+                        self.trace_atom("ZeroOrMore", body);
+                    }
                     self.position += next.len_utf8();
+                    self.trace_atom(
+                        if next == '\\' {
+                            "BackSlashParser"
+                        } else {
+                            label
+                        },
+                        start,
+                    );
                     if next == *quote {
                         self.matched_position = self.position;
                         return Some(Fragment::default());
@@ -2502,7 +2562,9 @@ impl<'a> ParseContext<'a> {
                             self.fail("closing quote");
                             return None;
                         };
+                        let start = self.position;
                         self.position += escaped.len_utf8();
+                        self.trace_atom("WildCardStringParser", start);
                     }
                 }
             }
@@ -2765,6 +2827,7 @@ impl<'a> ParseContext<'a> {
                         },
                         recoveries: self.recoveries.clone(),
                         tokens: Rc::clone(&self.tokens),
+                        token_trace: self.token_trace.clone(),
                         fragment,
                     });
                 }
@@ -2795,6 +2858,7 @@ impl<'a> ParseContext<'a> {
             self.captures = winner.captures;
             self.state = winner.state;
             self.tokens = winner.tokens;
+            self.token_trace = winner.token_trace;
             winner
                 .scopes
                 .retain_journal_entry_count(self.scopes.journal_entries_created());
@@ -3042,7 +3106,9 @@ impl<'a> ParseContext<'a> {
         let before = self.digits();
         let mut after = false;
         if self.input.as_bytes().get(self.position) == Some(&b'.') {
+            let point = self.position;
             self.position += 1;
+            self.trace_atom("PointParser", point);
             after = self.digits();
         }
         if !before && !after {
@@ -3051,6 +3117,7 @@ impl<'a> ParseContext<'a> {
             return false;
         }
         let exponent = self.position;
+        let trace = token_trace::Mark::of(self.token_trace.as_ref());
         if self
             .input
             .as_bytes()
@@ -3058,15 +3125,21 @@ impl<'a> ParseContext<'a> {
             .is_some_and(|c| matches!(c, b'e' | b'E'))
         {
             self.position += 1;
+            self.trace_atom("EParser", exponent);
             self.sign();
             if !self.digits() {
                 self.position = exponent;
+                trace.restore(self.token_trace.as_mut());
+                self.trace_atom("Optional", exponent);
             }
+        } else {
+            self.trace_atom("Optional", exponent);
         }
         true
     }
 
     fn sign(&mut self) {
+        let start = self.position;
         if self
             .input
             .as_bytes()
@@ -3074,6 +3147,9 @@ impl<'a> ParseContext<'a> {
             .is_some_and(|c| matches!(c, b'+' | b'-'))
         {
             self.position += 1;
+            self.trace_atom("SignParser", start);
+        } else {
+            self.trace_atom("Optional", start);
         }
     }
 
@@ -3085,7 +3161,9 @@ impl<'a> ParseContext<'a> {
             .get(self.position)
             .is_some_and(u8::is_ascii_digit)
         {
+            let digit = self.position;
             self.position += 1;
+            self.trace_atom("DigitParser", digit);
         }
         self.position > start
     }

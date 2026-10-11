@@ -1,0 +1,11 @@
+grammar TokenInspection {
+ @package: wire.tokens
+ token NUM = org.unlaxer.parser.elementary.NumberParser
+ token ID = org.unlaxer.parser.clang.IdentifierParser
+ token SINGLE = org.unlaxer.parser.elementary.SingleQuotedParser
+ token DOUBLE = org.unlaxer.parser.elementary.DoubleQuotedParser
+ token END = EOF
+ @root
+ @mapping(Program, params=[number,name,value])
+ Root ::= '😀' NUM @number '|' ID @name '|' (SINGLE | DOUBLE) @value '\r\n' END;
+}

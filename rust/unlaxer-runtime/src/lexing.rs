@@ -469,6 +469,7 @@ fn parse_profile<'a>(
     let recoveries = root_node
         .map(|root| context.selected_recoveries(root))
         .unwrap_or_default();
+    let tokens = context.retained_tokens();
     let tree = root_node.map(|root| Tree {
         source: source.to_owned(),
         nodes: std::mem::take(&mut context.nodes),
@@ -476,7 +477,7 @@ fn parse_profile<'a>(
         byte_offsets: std::mem::take(&mut context.byte_offsets),
         scopes: std::mem::take(&mut context.scopes),
         recoveries,
-        tokens: (*context.tokens).clone(),
+        tokens,
     });
     Ok(Outcome {
         tree,

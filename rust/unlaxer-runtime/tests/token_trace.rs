@@ -1,0 +1,574 @@
+use unlaxer_runtime::{
+    token::{TokenExpr, TokenKind},
+    token_trace::{Error, Limits},
+    *,
+};
+fn decode(s: &str) -> String {
+    if s == "~" {
+        String::new()
+    } else {
+        s.replace("\\\\", "\0")
+            .replace("\\r", "\r")
+            .replace("\\n", "\n")
+            .replace('\0', "\\")
+    }
+}
+fn kind(s: &str) -> TokenKind {
+    match s {
+        "consumed" => TokenKind::Consumed,
+        "matchOnly" => TokenKind::MatchOnly,
+        "virtualTokenConsumed" => TokenKind::VirtualConsumed,
+        "virtualTokenMatchOnly" => TokenKind::VirtualMatchOnly,
+        _ => panic!("{s}"),
+    }
+}
+fn kind_name(k: TokenKind) -> &'static str {
+    match k {
+        TokenKind::Consumed => "consumed",
+        TokenKind::MatchOnly => "matchOnly",
+        TokenKind::VirtualConsumed => "virtualTokenConsumed",
+        TokenKind::VirtualMatchOnly => "virtualTokenMatchOnly",
+    }
+}
+fn word(s: &'static str) -> Expr {
+    Expr::Literal(s)
+}
+fn grammar(op: &str, input: &str) -> Vec<Rule> {
+    let seq = || Expr::Sequence(vec![word("a"), word("b")]);
+    let e = match op {
+        "word" => word(Box::leak(input.to_owned().into_boxed_str())),
+        "a" => word("a"),
+        "sequence" => seq(),
+        "choice" => Expr::Choice(vec![Expr::Sequence(vec![word("a"), word("x")]), word("ab")]),
+        "longest" => Expr::LongestChoice(vec![word("a"), word("ab"), seq()]),
+        "longest-tie" => Expr::LongestChoice(vec![seq(), word("ab"), word("a")]),
+        "predictive" => Expr::PredictiveChoice {
+            alternatives: vec![word("x"), word("ab")],
+            predictors: vec![Predictor::Literal("x"), Predictor::Literal("ab")],
+        },
+        "predictive-fallback" => Expr::PredictiveChoice {
+            alternatives: vec![word("x"), word("ab")],
+            predictors: vec![Predictor::Literal("a"), Predictor::Literal("x")],
+        },
+        "lookahead" => Expr::Sequence(vec![
+            Expr::JavaLookahead {
+                pattern: "a",
+                positive: true,
+            },
+            word("a"),
+        ]),
+        "lookahead-empty" => Expr::Sequence(vec![
+            Expr::JavaLookahead {
+                pattern: "ab",
+                positive: true,
+            },
+            Expr::JavaOptional(Box::new(Expr::Sequence(vec![word("x")]))),
+            word("ab"),
+        ]),
+        "negative-lookahead" => Expr::Sequence(vec![
+            Expr::Lookahead {
+                child: Box::new(word("b")),
+                positive: false,
+            },
+            word("a"),
+        ]),
+        "eof" => Expr::Sequence(vec![word("a"), Expr::Eof]),
+        "eof-empty" => Expr::Eof,
+        "optional" => Expr::Sequence(vec![Expr::JavaOptional(Box::new(word("b"))), word("a")]),
+        "repeat" => Expr::Sequence(vec![
+            Expr::JavaRepeat {
+                child: Box::new(word("b")),
+                min: 0,
+                max: None,
+            },
+            word("a"),
+        ]),
+        "number" => Expr::Number,
+        "identifier" => Expr::Identifier,
+        "quoted" => Expr::Quoted('\''),
+        "double-quoted" => Expr::Quoted('"'),
+        "memo" => Expr::Choice(vec![Expr::Rule(1), Expr::Rule(1), word("ab")]),
+        _ => word("a"),
+    };
+    vec![
+        Rule {
+            name: "Root",
+            expression: e,
+        },
+        Rule {
+            name: "Miss",
+            expression: Expr::Sequence(vec![word("a"), word("x")]),
+        },
+    ]
+}
+fn leaves(context: &ParseContext<'_>) -> String {
+    let leaves = context.token_trace().unwrap().unwrap();
+    if leaves.is_empty() {
+        return "~".into();
+    }
+    leaves
+        .iter()
+        .map(|leaf| {
+            let span = leaf.span();
+            let raw = leaf.text(context.source()).unwrap();
+            let text = if raw.is_empty() {
+                "~".into()
+            } else {
+                raw.replace('\\', "\\\\")
+                    .replace('\r', "\\r")
+                    .replace('\n', "\\n")
+            };
+            format!(
+                "{},{},{},{},{}",
+                leaf.label,
+                kind_name(leaf.kind),
+                span.start,
+                span.end,
+                text
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(";")
+}
+#[test]
+fn independent_java_rust_terminal_oracle() {
+    for memo in [Memoization::Off, Memoization::SafeFailures] {
+        for repeat in 0..2 {
+            for line in include_str!("../../../conformance/token-trace/leaves.tsv")
+                .lines()
+                .filter(|l| !l.starts_with('#'))
+            {
+                let c: Vec<_> = line.split('\t').collect();
+                let input = decode(c[1]);
+                let options =
+                    ParseOptions::with_memoization(memo).with_token_trace(Limits::default());
+                let mut context = ParseContext::with_options(&input, options);
+                if c[2] == "prefix-virtual" {
+                    context
+                        .parse_token(
+                            &TokenExpr::Word { rule: 0, text: "a" },
+                            TokenKind::MatchOnly,
+                            false,
+                        )
+                        .unwrap();
+                }
+                let result = if c[3] != "consumed"
+                    || c[4] == "true"
+                    || matches!(c[2], "consume" | "stop-invert" | "invert")
+                {
+                    let atom = TokenExpr::Word {
+                        rule: 0,
+                        text: if c[2] == "prefix-virtual" { "b" } else { "a" },
+                    };
+                    let atom = match c[2] {
+                        "consume" => TokenExpr::StopConsume(Box::new(atom)),
+                        "stop-invert" => TokenExpr::StopInvert(Box::new(atom)),
+                        "invert" => TokenExpr::Invert(Box::new(atom)),
+                        _ => atom,
+                    };
+                    context.parse_token(&atom, kind(c[3]), c[4] == "true")
+                } else {
+                    context.parse_grammar(grammar(c[2], &input), 0, false)
+                };
+                assert_eq!(result.is_ok(), c[5] == "true", "{}", c[0]);
+                assert_eq!(
+                    context.position(),
+                    c[6].parse::<usize>().unwrap(),
+                    "{}",
+                    c[0]
+                );
+                assert_eq!(
+                    context.matched_position(),
+                    c[7].parse::<usize>().unwrap(),
+                    "{}",
+                    c[0]
+                );
+                // Compare raw text after fixture escaping, not a backend-generated expected tree.
+                let actual = leaves(&context);
+                let expected = c[8]
+                    .split(';')
+                    .map(|leaf| {
+                        let mut fields = leaf.splitn(5, ',').map(str::to_owned).collect::<Vec<_>>();
+                        if fields.len() == 5 {
+                            let raw = decode(&fields[4]);
+                            fields[4] = if raw.is_empty() {
+                                "~".into()
+                            } else {
+                                raw.replace('\\', "\\\\")
+                                    .replace('\r', "\\r")
+                                    .replace('\n', "\\n")
+                            };
+                        }
+                        fields.join(",")
+                    })
+                    .collect::<Vec<_>>()
+                    .join(";");
+                let cursors = context
+                    .token_trace()
+                    .unwrap()
+                    .unwrap()
+                    .iter()
+                    .map(|leaf| format!("{}:{}", leaf.consumed, leaf.matched))
+                    .collect::<Vec<_>>()
+                    .join(";");
+                assert_eq!(
+                    if cursors.is_empty() { "~" } else { &cursors },
+                    c[9],
+                    "{} leaf cursors",
+                    c[0]
+                );
+                if c[2] == "memo" {
+                    assert_eq!(
+                        context.memoized_failure_hits(),
+                        usize::from(memo == Memoization::SafeFailures)
+                    );
+                }
+                assert_eq!(actual, expected, "{} {memo:?} rerun {repeat}", c[0]);
+                if repeat == 0 {
+                    println!(
+                        "TRACE\trust\t{}\t{memo:?}\t{}\t{}\t{}\t{}",
+                        c[0],
+                        result.is_ok(),
+                        context.position(),
+                        context.matched_position(),
+                        actual
+                    );
+                }
+            }
+        }
+    }
+}
+#[test]
+fn trace_is_opt_in_bounded_transactional_owned_and_cst_neutral() {
+    let rules = grammar("longest", "ab");
+    let normal = parse(&rules, 0, false, "ab").unwrap();
+    assert!(normal.token_trace().is_none());
+    let traced = parse_with_options(
+        &rules,
+        0,
+        false,
+        "ab",
+        ParseOptions::default().with_token_trace(Limits::default()),
+    )
+    .unwrap();
+    assert_eq!(normal.nodes.len(), traced.nodes.len());
+    assert_eq!(format!("{normal:?}"), format!("{traced:?}"));
+    assert_eq!(format!("{:?}", normal.nodes), format!("{:?}", traced.nodes));
+    assert_eq!(traced.token_trace().unwrap().unwrap().len(), 1);
+    let mut context = ParseContext::with_options(
+        "ab",
+        ParseOptions::default().with_token_trace(Limits {
+            leaves: 1,
+            source_bytes: 2,
+        }),
+    );
+    let r = context
+        .parse_grammar(
+            vec![Rule {
+                name: "Root",
+                expression: Expr::Choice(vec![
+                    Expr::Sequence(vec![word("a"), word("b"), word("x")]),
+                    word("ab"),
+                ]),
+            }],
+            0,
+            false,
+        )
+        .unwrap();
+    let tree = context.tree(r.root_node().unwrap()).unwrap();
+    assert_eq!(tree.token_trace().unwrap().unwrap().len(), 1);
+    assert!(context
+        .transaction::<()>(|c| {
+            c.parse(&Expr::Eof)?;
+            Err(c.error("rollback"))
+        })
+        .is_err());
+    assert_eq!(context.token_trace().unwrap().unwrap().len(), 1);
+    context.parse(&Expr::Eof).unwrap();
+    assert_eq!(context.token_trace().unwrap(), Err(Error::Limit));
+    assert_eq!(tree.token_trace().unwrap().unwrap().len(), 1);
+    let mut too_small = ParseContext::with_options(
+        "😀",
+        ParseOptions::default().with_token_trace(Limits {
+            leaves: 9,
+            source_bytes: 3,
+        }),
+    );
+    assert!(too_small.parse(&word("😀")).is_ok());
+    assert_eq!(too_small.token_trace().unwrap(), Err(Error::Limit));
+    let mut peek = ParseContext::with_options(
+        "ab",
+        ParseOptions::default().with_token_trace(Limits::default()),
+    );
+    peek.parse(&Expr::Lookahead {
+        child: Box::new(word("a")),
+        positive: true,
+    })
+    .unwrap();
+    assert!(peek.token_trace().unwrap().unwrap().is_empty());
+}
+
+#[test]
+fn longest_choice_and_lookahead_keep_only_the_selected_trace_budget() {
+    for (first_split, limited) in [(false, false), (true, true)] {
+        let split = Expr::Sequence(vec![word("a"), word("b")]);
+        let whole = word("ab");
+        let alternatives = if first_split {
+            vec![split, whole]
+        } else {
+            vec![whole, split]
+        };
+        let mut context = ParseContext::with_options(
+            "ab",
+            ParseOptions::default().with_token_trace(Limits {
+                leaves: 1,
+                source_bytes: 2,
+            }),
+        );
+        context.parse(&Expr::LongestChoice(alternatives)).unwrap();
+        assert_eq!(context.token_trace().unwrap().is_err(), limited);
+        if limited {
+            assert_eq!(context.token_trace().unwrap(), Err(Error::Limit));
+        } else {
+            assert_eq!(
+                context.token_trace().unwrap().unwrap()[0].text("ab"),
+                Some("ab")
+            );
+        }
+    }
+    let mut context = ParseContext::with_options(
+        "ab",
+        ParseOptions::default().with_token_trace(Limits {
+            leaves: 1,
+            source_bytes: 2,
+        }),
+    );
+    context
+        .parse(&Expr::Sequence(vec![word("a"), word("b")]).ahead())
+        .unwrap();
+    context.parse(&word("ab")).unwrap();
+    assert_eq!(context.token_trace().unwrap().unwrap().len(), 1);
+}
+
+#[test]
+fn explicit_custom_contract_and_generated_sources_never_hide_missing_trace() {
+    fn partial(context: &mut ParseContext<'_>) -> ParseResult {
+        let matched = context.parse(&Expr::Literal("a"))?;
+        assert!(context.advance(1));
+        Ok(matched)
+    }
+    fn complete(context: &mut ParseContext<'_>) -> ParseResult {
+        assert!(context.declare_complete_token_trace());
+        context.parse(&Expr::Sequence(vec![word("a"), word("b")]))
+    }
+    fn outer(context: &mut ParseContext<'_>) -> ParseResult {
+        assert!(context.declare_complete_token_trace());
+        context.parse(&Expr::Custom(partial))
+    }
+    for parser in [partial as fn(&mut ParseContext<'_>) -> ParseResult, outer] {
+        let mut context = ParseContext::with_options(
+            "ab",
+            ParseOptions::default().with_token_trace(Limits::default()),
+        );
+        assert!(context.parse(&Expr::Custom(parser)).is_ok());
+        assert!(matches!(
+            context.token_trace().unwrap(),
+            Err(Error::Unsupported(_))
+        ));
+    }
+    let mut context = ParseContext::with_options(
+        "ab",
+        ParseOptions::default().with_token_trace(Limits::default()),
+    );
+    assert!(context.parse(&Expr::Custom(complete)).is_ok());
+    assert_eq!(context.token_trace().unwrap().unwrap().len(), 2);
+    let retained = context.token_trace().unwrap().unwrap().to_vec();
+    let root = context
+        .add_token_node(
+            0,
+            TokenKind::VirtualConsumed,
+            unlaxer_runtime::token::TokenSource::Generated {
+                anchor: 2,
+                text: "😀repair".into(),
+            },
+        )
+        .unwrap();
+    let tree = context.tree(root.index()).unwrap();
+    let generated = &tree.token_trace().unwrap().unwrap()[2];
+    assert_eq!(
+        generated.source,
+        unlaxer_runtime::token::TokenSource::Generated {
+            anchor: 2,
+            text: "😀repair".into()
+        }
+    );
+    assert_eq!(generated.kind, TokenKind::VirtualConsumed);
+    assert_eq!(generated.span(), Span { start: 2, end: 2 });
+    assert_eq!(generated.text("ab"), Some("😀repair"));
+    assert_eq!((generated.consumed, generated.matched), (2, 2));
+    assert_eq!(retained.len(), 2);
+    fn send_sync<T: Send + Sync>() {}
+    send_sync::<Tree>();
+}
+
+#[test]
+fn generated_sources_share_java_oracle() {
+    use unlaxer_runtime::token::TokenSource;
+    for line in include_str!("../../../conformance/token-trace/generated.tsv")
+        .lines()
+        .filter(|line| !line.starts_with('#'))
+    {
+        let c: Vec<_> = line.split('\t').collect();
+        let input = decode(c[0]);
+        let text = decode(c[2]);
+        let anchor = c[1].parse().unwrap();
+        let mut context = ParseContext::with_options(
+            &input,
+            ParseOptions::default().with_token_trace(Limits::default()),
+        );
+        context
+            .parse(&Expr::Literal(Box::leak(input.clone().into_boxed_str())))
+            .unwrap();
+        context
+            .add_token_node(
+                0,
+                kind(c[3]),
+                TokenSource::Generated {
+                    anchor,
+                    text: text.clone(),
+                },
+            )
+            .unwrap();
+        let trace = context.token_trace().unwrap().unwrap();
+        let leaf = trace.last().unwrap();
+        assert_eq!(
+            leaf.span(),
+            Span {
+                start: anchor,
+                end: anchor
+            }
+        );
+        assert_eq!(leaf.text(&input), Some(text.as_str()));
+        assert_eq!(leaf.source, TokenSource::Generated { anchor, text });
+        assert_eq!(leaf.kind, kind(c[3]));
+        assert_eq!(leaf.consumed, c[4].parse::<usize>().unwrap());
+        assert_eq!(leaf.matched, c[5].parse::<usize>().unwrap());
+    }
+}
+
+#[test]
+fn trace_and_semantic_payloads_share_choice_and_lookahead_transactions() {
+    fn record(context: &mut ParseContext<'_>, text: &'static str, value: u32) -> ParseResult {
+        context.declare_complete_token_trace();
+        let matched = context.parse(&Expr::Literal(text).capture("value"))?;
+        context.set_state("count", value);
+        context.scopes_mut().declare("chosen", 0);
+        context.scopes_mut().add_reference("chosen", 0, text.len());
+        context
+            .scopes_mut()
+            .add_diagnostic(text, 0, text.len(), Severity::Info);
+        Ok(matched)
+    }
+    fn a(context: &mut ParseContext<'_>) -> ParseResult {
+        record(context, "a", 1)
+    }
+    fn ab(context: &mut ParseContext<'_>) -> ParseResult {
+        record(context, "ab", 2)
+    }
+    let cases = [
+        (
+            "failed choice",
+            Expr::Custom(a).then(word("x")).or(word("ab")),
+            false,
+        ),
+        (
+            "longest winner",
+            Expr::LongestChoice(vec![Expr::Custom(a), Expr::Custom(ab)]),
+            true,
+        ),
+        (
+            "longest loser",
+            Expr::LongestChoice(vec![Expr::Custom(a), word("ab")]),
+            false,
+        ),
+        (
+            "lookahead",
+            Expr::Custom(ab).ahead().then(word("ab")),
+            false,
+        ),
+    ];
+    for memo in [Memoization::Off, Memoization::SafeFailures] {
+        for (name, expression, committed) in &cases {
+            let mut normal = None;
+            for trace in [false, true] {
+                let mut options = ParseOptions::with_memoization(memo);
+                if trace {
+                    options = options.with_token_trace(Limits::default());
+                }
+                let mut context = ParseContext::with_options("ab", options);
+                context.set_state("count", 7u32);
+                context.scopes_mut().declare("before", 0);
+                context.scopes_mut().add_reference("before", 0, 1);
+                context
+                    .scopes_mut()
+                    .add_diagnostic("before", 0, 1, Severity::Warning);
+                let result = context
+                    .parse_grammar(
+                        vec![Rule {
+                            name: "Root",
+                            expression: expression.clone(),
+                        }],
+                        0,
+                        false,
+                    )
+                    .unwrap();
+                assert_eq!(
+                    (context.position(), context.matched_position()),
+                    (2, 2),
+                    "{name}"
+                );
+                assert_eq!(
+                    context.state::<u32>("count"),
+                    Some(if *committed { &2 } else { &7 }),
+                    "{name}"
+                );
+                assert_eq!(
+                    context.captured("value"),
+                    if *committed { Some("ab") } else { None },
+                    "{name}"
+                );
+                assert_eq!(
+                    context.scopes().all_declarations().len(),
+                    1 + usize::from(*committed),
+                    "{name}"
+                );
+                assert_eq!(
+                    context.scopes().all_references().len(),
+                    1 + usize::from(*committed),
+                    "{name}"
+                );
+                assert_eq!(
+                    context.scopes().diagnostics().len(),
+                    1 + usize::from(*committed),
+                    "{name}"
+                );
+                let tree = context.tree(result.root_node().unwrap()).unwrap();
+                let snapshot = (
+                    format!("{tree:?}"),
+                    context.scopes().clone(),
+                    context.failure(),
+                );
+                if trace {
+                    assert_eq!(normal.as_ref(), Some(&snapshot), "{name}");
+                    let leaves = context.token_trace().unwrap().unwrap();
+                    assert_eq!(leaves.len(), 1, "{name}");
+                    assert_eq!(leaves[0].text("ab"), Some("ab"));
+                    assert_eq!(leaves[0].span(), Span { start: 0, end: 2 });
+                } else {
+                    assert!(tree.token_trace().is_none());
+                    normal = Some(snapshot);
+                }
+            }
+        }
+    }
+}

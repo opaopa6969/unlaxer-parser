@@ -1,0 +1,686 @@
+[
+  {
+    "name": "decimal-unicode",
+    "input": "😀12.3|foo|'😀'\r\n",
+    "steps": [
+      {
+        "label": "WordParser",
+        "text": "😀",
+        "start": 0,
+        "end": 1,
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 3
+      },
+      {
+        "label": "Optional",
+        "text": "",
+        "start": 1,
+        "end": 1,
+        "line": 1,
+        "column": 3,
+        "endLine": 1,
+        "endColumn": 3
+      },
+      {
+        "label": "DigitParser",
+        "text": "1",
+        "start": 1,
+        "end": 2,
+        "line": 1,
+        "column": 3,
+        "endLine": 1,
+        "endColumn": 4
+      },
+      {
+        "label": "DigitParser",
+        "text": "2",
+        "start": 2,
+        "end": 3,
+        "line": 1,
+        "column": 4,
+        "endLine": 1,
+        "endColumn": 5
+      },
+      {
+        "label": "PointParser",
+        "text": ".",
+        "start": 3,
+        "end": 4,
+        "line": 1,
+        "column": 5,
+        "endLine": 1,
+        "endColumn": 6
+      },
+      {
+        "label": "DigitParser",
+        "text": "3",
+        "start": 4,
+        "end": 5,
+        "line": 1,
+        "column": 6,
+        "endLine": 1,
+        "endColumn": 7
+      },
+      {
+        "label": "Optional",
+        "text": "",
+        "start": 5,
+        "end": 5,
+        "line": 1,
+        "column": 7,
+        "endLine": 1,
+        "endColumn": 7
+      },
+      {
+        "label": "WordParser",
+        "text": "|",
+        "start": 5,
+        "end": 6,
+        "line": 1,
+        "column": 7,
+        "endLine": 1,
+        "endColumn": 8
+      },
+      {
+        "label": "AlphabetUnderScoreParser",
+        "text": "f",
+        "start": 6,
+        "end": 7,
+        "line": 1,
+        "column": 8,
+        "endLine": 1,
+        "endColumn": 9
+      },
+      {
+        "label": "AlphabetNumericUnderScoreParser",
+        "text": "o",
+        "start": 7,
+        "end": 8,
+        "line": 1,
+        "column": 9,
+        "endLine": 1,
+        "endColumn": 10
+      },
+      {
+        "label": "AlphabetNumericUnderScoreParser",
+        "text": "o",
+        "start": 8,
+        "end": 9,
+        "line": 1,
+        "column": 10,
+        "endLine": 1,
+        "endColumn": 11
+      },
+      {
+        "label": "WordParser",
+        "text": "|",
+        "start": 9,
+        "end": 10,
+        "line": 1,
+        "column": 11,
+        "endLine": 1,
+        "endColumn": 12
+      },
+      {
+        "label": "SingleQuoteParser",
+        "text": "'",
+        "start": 10,
+        "end": 11,
+        "line": 1,
+        "column": 12,
+        "endLine": 1,
+        "endColumn": 13
+      },
+      {
+        "label": "SingleQuoteParser",
+        "text": "😀",
+        "start": 11,
+        "end": 12,
+        "line": 1,
+        "column": 13,
+        "endLine": 1,
+        "endColumn": 15
+      },
+      {
+        "label": "SingleQuoteParser",
+        "text": "'",
+        "start": 12,
+        "end": 13,
+        "line": 1,
+        "column": 15,
+        "endLine": 1,
+        "endColumn": 16
+      },
+      {
+        "label": "WordParser",
+        "text": "\r\n",
+        "start": 13,
+        "end": 15,
+        "line": 1,
+        "column": 16,
+        "endLine": 2,
+        "endColumn": 1
+      },
+      {
+        "label": "EndOfSourceParser",
+        "text": "",
+        "start": 15,
+        "end": 15,
+        "line": 2,
+        "column": 1,
+        "endLine": 2,
+        "endColumn": 1
+      }
+    ]
+  },
+  {
+    "name": "exponent-empty",
+    "input": "😀1e3|x|''\r\n",
+    "steps": [
+      {
+        "label": "WordParser",
+        "text": "😀",
+        "start": 0,
+        "end": 1,
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 3
+      },
+      {
+        "label": "Optional",
+        "text": "",
+        "start": 1,
+        "end": 1,
+        "line": 1,
+        "column": 3,
+        "endLine": 1,
+        "endColumn": 3
+      },
+      {
+        "label": "DigitParser",
+        "text": "1",
+        "start": 1,
+        "end": 2,
+        "line": 1,
+        "column": 3,
+        "endLine": 1,
+        "endColumn": 4
+      },
+      {
+        "label": "EParser",
+        "text": "e",
+        "start": 2,
+        "end": 3,
+        "line": 1,
+        "column": 4,
+        "endLine": 1,
+        "endColumn": 5
+      },
+      {
+        "label": "Optional",
+        "text": "",
+        "start": 3,
+        "end": 3,
+        "line": 1,
+        "column": 5,
+        "endLine": 1,
+        "endColumn": 5
+      },
+      {
+        "label": "DigitParser",
+        "text": "3",
+        "start": 3,
+        "end": 4,
+        "line": 1,
+        "column": 5,
+        "endLine": 1,
+        "endColumn": 6
+      },
+      {
+        "label": "WordParser",
+        "text": "|",
+        "start": 4,
+        "end": 5,
+        "line": 1,
+        "column": 6,
+        "endLine": 1,
+        "endColumn": 7
+      },
+      {
+        "label": "AlphabetUnderScoreParser",
+        "text": "x",
+        "start": 5,
+        "end": 6,
+        "line": 1,
+        "column": 7,
+        "endLine": 1,
+        "endColumn": 8
+      },
+      {
+        "label": "ZeroOrMore",
+        "text": "",
+        "start": 6,
+        "end": 6,
+        "line": 1,
+        "column": 8,
+        "endLine": 1,
+        "endColumn": 8
+      },
+      {
+        "label": "WordParser",
+        "text": "|",
+        "start": 6,
+        "end": 7,
+        "line": 1,
+        "column": 8,
+        "endLine": 1,
+        "endColumn": 9
+      },
+      {
+        "label": "SingleQuoteParser",
+        "text": "'",
+        "start": 7,
+        "end": 8,
+        "line": 1,
+        "column": 9,
+        "endLine": 1,
+        "endColumn": 10
+      },
+      {
+        "label": "ZeroOrMore",
+        "text": "",
+        "start": 8,
+        "end": 8,
+        "line": 1,
+        "column": 10,
+        "endLine": 1,
+        "endColumn": 10
+      },
+      {
+        "label": "SingleQuoteParser",
+        "text": "'",
+        "start": 8,
+        "end": 9,
+        "line": 1,
+        "column": 10,
+        "endLine": 1,
+        "endColumn": 11
+      },
+      {
+        "label": "WordParser",
+        "text": "\r\n",
+        "start": 9,
+        "end": 11,
+        "line": 1,
+        "column": 11,
+        "endLine": 2,
+        "endColumn": 1
+      },
+      {
+        "label": "EndOfSourceParser",
+        "text": "",
+        "start": 11,
+        "end": 11,
+        "line": 2,
+        "column": 1,
+        "endLine": 2,
+        "endColumn": 1
+      }
+    ]
+  },
+  {
+    "name": "trailing-dot-double",
+    "input": "😀-2.|_a|\"😀\"\r\n",
+    "steps": [
+      {
+        "label": "WordParser",
+        "text": "😀",
+        "start": 0,
+        "end": 1,
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 3
+      },
+      {
+        "label": "SignParser",
+        "text": "-",
+        "start": 1,
+        "end": 2,
+        "line": 1,
+        "column": 3,
+        "endLine": 1,
+        "endColumn": 4
+      },
+      {
+        "label": "DigitParser",
+        "text": "2",
+        "start": 2,
+        "end": 3,
+        "line": 1,
+        "column": 4,
+        "endLine": 1,
+        "endColumn": 5
+      },
+      {
+        "label": "PointParser",
+        "text": ".",
+        "start": 3,
+        "end": 4,
+        "line": 1,
+        "column": 5,
+        "endLine": 1,
+        "endColumn": 6
+      },
+      {
+        "label": "Optional",
+        "text": "",
+        "start": 4,
+        "end": 4,
+        "line": 1,
+        "column": 6,
+        "endLine": 1,
+        "endColumn": 6
+      },
+      {
+        "label": "WordParser",
+        "text": "|",
+        "start": 4,
+        "end": 5,
+        "line": 1,
+        "column": 6,
+        "endLine": 1,
+        "endColumn": 7
+      },
+      {
+        "label": "AlphabetUnderScoreParser",
+        "text": "_",
+        "start": 5,
+        "end": 6,
+        "line": 1,
+        "column": 7,
+        "endLine": 1,
+        "endColumn": 8
+      },
+      {
+        "label": "AlphabetNumericUnderScoreParser",
+        "text": "a",
+        "start": 6,
+        "end": 7,
+        "line": 1,
+        "column": 8,
+        "endLine": 1,
+        "endColumn": 9
+      },
+      {
+        "label": "WordParser",
+        "text": "|",
+        "start": 7,
+        "end": 8,
+        "line": 1,
+        "column": 9,
+        "endLine": 1,
+        "endColumn": 10
+      },
+      {
+        "label": "DoubleQuoteParser",
+        "text": "\"",
+        "start": 8,
+        "end": 9,
+        "line": 1,
+        "column": 10,
+        "endLine": 1,
+        "endColumn": 11
+      },
+      {
+        "label": "DoubleQuoteParser",
+        "text": "😀",
+        "start": 9,
+        "end": 10,
+        "line": 1,
+        "column": 11,
+        "endLine": 1,
+        "endColumn": 13
+      },
+      {
+        "label": "DoubleQuoteParser",
+        "text": "\"",
+        "start": 10,
+        "end": 11,
+        "line": 1,
+        "column": 13,
+        "endLine": 1,
+        "endColumn": 14
+      },
+      {
+        "label": "WordParser",
+        "text": "\r\n",
+        "start": 11,
+        "end": 13,
+        "line": 1,
+        "column": 14,
+        "endLine": 2,
+        "endColumn": 1
+      },
+      {
+        "label": "EndOfSourceParser",
+        "text": "",
+        "start": 13,
+        "end": 13,
+        "line": 2,
+        "column": 1,
+        "endLine": 2,
+        "endColumn": 1
+      }
+    ]
+  },
+  {
+    "name": "escaped-quote",
+    "input": "😀+1E-3|z|'a\\nb'\r\n",
+    "steps": [
+      {
+        "label": "WordParser",
+        "text": "😀",
+        "start": 0,
+        "end": 1,
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 3
+      },
+      {
+        "label": "SignParser",
+        "text": "+",
+        "start": 1,
+        "end": 2,
+        "line": 1,
+        "column": 3,
+        "endLine": 1,
+        "endColumn": 4
+      },
+      {
+        "label": "DigitParser",
+        "text": "1",
+        "start": 2,
+        "end": 3,
+        "line": 1,
+        "column": 4,
+        "endLine": 1,
+        "endColumn": 5
+      },
+      {
+        "label": "EParser",
+        "text": "E",
+        "start": 3,
+        "end": 4,
+        "line": 1,
+        "column": 5,
+        "endLine": 1,
+        "endColumn": 6
+      },
+      {
+        "label": "SignParser",
+        "text": "-",
+        "start": 4,
+        "end": 5,
+        "line": 1,
+        "column": 6,
+        "endLine": 1,
+        "endColumn": 7
+      },
+      {
+        "label": "DigitParser",
+        "text": "3",
+        "start": 5,
+        "end": 6,
+        "line": 1,
+        "column": 7,
+        "endLine": 1,
+        "endColumn": 8
+      },
+      {
+        "label": "WordParser",
+        "text": "|",
+        "start": 6,
+        "end": 7,
+        "line": 1,
+        "column": 8,
+        "endLine": 1,
+        "endColumn": 9
+      },
+      {
+        "label": "AlphabetUnderScoreParser",
+        "text": "z",
+        "start": 7,
+        "end": 8,
+        "line": 1,
+        "column": 9,
+        "endLine": 1,
+        "endColumn": 10
+      },
+      {
+        "label": "ZeroOrMore",
+        "text": "",
+        "start": 8,
+        "end": 8,
+        "line": 1,
+        "column": 10,
+        "endLine": 1,
+        "endColumn": 10
+      },
+      {
+        "label": "WordParser",
+        "text": "|",
+        "start": 8,
+        "end": 9,
+        "line": 1,
+        "column": 10,
+        "endLine": 1,
+        "endColumn": 11
+      },
+      {
+        "label": "SingleQuoteParser",
+        "text": "'",
+        "start": 9,
+        "end": 10,
+        "line": 1,
+        "column": 11,
+        "endLine": 1,
+        "endColumn": 12
+      },
+      {
+        "label": "SingleQuoteParser",
+        "text": "a",
+        "start": 10,
+        "end": 11,
+        "line": 1,
+        "column": 12,
+        "endLine": 1,
+        "endColumn": 13
+      },
+      {
+        "label": "BackSlashParser",
+        "text": "\\",
+        "start": 11,
+        "end": 12,
+        "line": 1,
+        "column": 13,
+        "endLine": 1,
+        "endColumn": 14
+      },
+      {
+        "label": "WildCardStringParser",
+        "text": "n",
+        "start": 12,
+        "end": 13,
+        "line": 1,
+        "column": 14,
+        "endLine": 1,
+        "endColumn": 15
+      },
+      {
+        "label": "SingleQuoteParser",
+        "text": "b",
+        "start": 13,
+        "end": 14,
+        "line": 1,
+        "column": 15,
+        "endLine": 1,
+        "endColumn": 16
+      },
+      {
+        "label": "SingleQuoteParser",
+        "text": "'",
+        "start": 14,
+        "end": 15,
+        "line": 1,
+        "column": 16,
+        "endLine": 1,
+        "endColumn": 17
+      },
+      {
+        "label": "WordParser",
+        "text": "\r\n",
+        "start": 15,
+        "end": 17,
+        "line": 1,
+        "column": 17,
+        "endLine": 2,
+        "endColumn": 1
+      },
+      {
+        "label": "EndOfSourceParser",
+        "text": "",
+        "start": 17,
+        "end": 17,
+        "line": 2,
+        "column": 1,
+        "endLine": 2,
+        "endColumn": 1
+      }
+    ]
+  },
+  {
+    "name": "partial-exponent",
+    "input": "😀1e+|x|''\r\n",
+    "steps": []
+  },
+  {
+    "name": "partial-quote",
+    "input": "😀1|x|'a",
+    "steps": []
+  },
+  {
+    "name": "trailing-input",
+    "input": "😀1|x|''\r\n!",
+    "steps": []
+  },
+  {
+    "name": "empty",
+    "input": "",
+    "steps": []
+  }
+]

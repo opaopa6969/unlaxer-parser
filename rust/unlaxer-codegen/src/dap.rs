@@ -50,7 +50,7 @@ pub fn generate(ir: &GrammarIr) -> GeneratedFile {
         }
         out.push_str("    }\n}\n");
     }
-    out.push_str("\npub fn backend() -> unlaxer_dap::AstBackend {\n    unlaxer_dap::AstBackend { mapper: steps }\n}\n\npub fn serve_stdio() -> std::io::Result<()> {\n    unlaxer_dap::Server::new(backend()).serve_stdio()\n}\n");
+    out.push_str("\n/// Real committed terminal trace; a bounded metadata failure is never a CST fallback.\npub fn token_steps(source: &str) -> Result<Vec<unlaxer_dap::Step>, String> {\n    let options = unlaxer_runtime::ParseOptions::default().with_token_trace(unlaxer_runtime::token_trace::Limits::default());\n    let tree = super::parser::parse_tree_with_options(source, options).map_err(|error| format!(\"{error:?}\"))?;\n    unlaxer_dap::token_steps(&tree)\n}\n\npub fn backend() -> unlaxer_dap::ParserBackend {\n    unlaxer_dap::ParserBackend { mapper: steps, tokens: token_steps }\n}\n\npub fn serve_stdio() -> std::io::Result<()> {\n    unlaxer_dap::Server::new(backend()).serve_stdio()\n}\n");
     GeneratedFile {
         relative_path: "dap.rs".into(),
         content: out,

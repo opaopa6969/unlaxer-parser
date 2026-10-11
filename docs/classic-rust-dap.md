@@ -1,4 +1,4 @@
-# Classic typed AST DAP
+# Classic AST / token DAP
 
 Classic の生成 grammar で実typed ASTをinspectionする stdio DAP 経路を提供する（#462、親 #111 / #384）。これは入力をstrict parse/mapした後のAST traversalである。applicationの実評価は `runtimeVariables` / `runtime_variables` などの明示hookに委ね、ASTのnext操作をlive evaluatorの実行停止と呼ばない。
 
@@ -32,9 +32,9 @@ clientはinitialize後、`launch` に `program`（旧Java互換の `formulaSourc
 
 [DAP公式schema](https://raw.githubusercontent.com/microsoft/debug-adapter-protocol/main/debugAdapterProtocol.json) はcolumnをUTF-16と定義し、基底をclient初期化へ委ねる。今回JavaのstackTraceも、既存breakpoint helperと同じ `DocumentSnapshot` の変換へ統一した。disconnectではresponse前にprocessを終了せず、stepを解放してclient側のstdio終了を待つ。Rustはdisconnect responseを送ってserver loopを終える。
 
-Rustの `generated::dap::steps` はstrictな既存 `parser::parse_tree` と `mapper::map` を使う。`AstBackend` はこの関数を受け取る。独自 `Backend` は `steps(snapshot, arguments)`、`resolve_source`、`runtime_variables`、`before_step`、`after_step` を実装できる。Javaは既存 `resolveDebugSource`、`runtimeVariables`、step hooksを保持し、`parseDebugAst` hookでapplicationのmapperを選べる。両言語ともhookによる評価の意味はapplicationの責任である。Rustのhook値は文字列のBTreeMap、Javaは既存String値Mapを保持する。
+Rustの `generated::dap::steps` はstrictな既存 `parser::parse_tree` と `mapper::map` を使う。生成 `ParserBackend` のAST経路と、AST専用の `AstBackend` はこの関数を使う。独自 `Backend` は `steps(snapshot, arguments)`、`resolve_source`、`runtime_variables`、`before_step`、`after_step` を実装できる。Javaは既存 `resolveDebugSource`、`runtimeVariables`、step hooksを保持し、`parseDebugAst` hookでapplicationのmapperを選べる。両言語ともhookによる評価の意味はapplicationの責任である。Rustのhook値は文字列のBTreeMap、Javaは既存String値Mapを保持する。
 
-Rustはtoken steppingを明示拒否する。現行Rust CSTのrule/capture nodeはJava literal leafではなく、代用しない。Javaの既存token modeを維持し、実parser leaf traceの対応と共通oracleは後続 #463 へ分離した。Javaの任意additionalVariables/subclassの再現、conditional/function/data breakpoints、pause/stepIn/stepOut、evaluate、変数変更、ソース取得、live evaluator制御、既存下流VSIXのRust起動はこのsliceの完了範囲に含めない。initializeはConfigurationDoneだけを広告する。Java固有の追加hookや高度なrequestは削除しない。
+Rustのtoken steppingは、明示opt-in・上限付きの実parser leaf traceを使用する（#463）。CSTのrule/capture nodeで代用しない。Number/Identifier/quotedの内部leaf、rollbackとwinner保持、memo、実token DAPの契約と対応境界は [token trace](token-trace.md) を参照。Javaの任意additionalVariables/subclassの再現、conditional/function/data breakpoints、pause/stepIn/stepOut、evaluate、変数変更、ソース取得、live evaluator制御、既存下流VSIXのRust起動はこのsliceの完了範囲に含めない。initializeはConfigurationDoneだけを広告する。Java固有の追加hookや高度なrequestは削除しない。
 
 Rustの入力frameはContent-Length byte数、CRLFのASCII header、最大4MiBのbody、最大8KiB/32項目のheaderを検証する。元program fileは4MiBまでである。Javaは既存LSP4J transportとfile読込契約を維持する。標準source/AST corpusの観測値は共通とし、このRust側の入力上限は言語固有の制約として残す。共有frame処理はstd-only `unlaxer-protocol` に置き、LSPの従来framing契約を保持する。
 
@@ -50,4 +50,4 @@ cargo +1.85.0 test --locked --manifest-path rust/Cargo.toml \
  -p unlaxer-dap -p unlaxer-lsp -p unlaxer-codegen -p unlaxer-generator
 ```
 
-Rust protocol比較にはopt-inが必要である。証跡は `unlaxer-dsl/target/classic-dap-protocol.tsv`、CIはこの生成を必須とする。親 #111 / #384 はこのsliceだけではcloseしない。root-retryの性能凍結やClassic/ubnfc engine境界は維持する。
+Rust protocol比較にはopt-inが必要である。証跡は `unlaxer-dsl/target/classic-dap-protocol.tsv`、CIはこの生成を必須とする。ロードマップ #384 は完了済み。全仕様の親 #111 は引き続き未完了である。root-retryの性能凍結やClassic/ubnfc engine境界は維持する。

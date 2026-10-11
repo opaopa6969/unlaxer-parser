@@ -81,6 +81,7 @@ impl TokenInfo {
 #[derive(Clone)]
 pub(crate) struct Store {
     owner: u64,
+    pub(crate) trace: Option<crate::token_trace::Trace>,
     pub(crate) ids: BTreeMap<usize, NodeId>,
     pub(crate) values: BTreeMap<usize, TokenInfo>,
     pub(crate) calls: BTreeMap<usize, crate::shared_calls::Call>,
@@ -97,6 +98,7 @@ impl Store {
         static NEXT_OWNER: AtomicU64 = AtomicU64::new(1);
         Self {
             owner: NEXT_OWNER.fetch_add(1, Ordering::Relaxed),
+            trace: None,
             ids: BTreeMap::new(),
             values: BTreeMap::new(),
             calls: BTreeMap::new(),
@@ -232,6 +234,9 @@ impl ParseContext<'_> {
             captures: vec![],
         });
         let id = self.token_node_id(index)?;
+        if matches!(source, TokenSource::Generated { .. }) {
+            self.record_trace("GeneratedToken", kind, &source);
+        }
         let info = Rc::make_mut(&mut self.tokens)
             .values
             .get_mut(&index)
@@ -319,6 +324,7 @@ impl TokenExpr {
                 } else {
                     context.matched_position = context.byte_offsets[end];
                 }
+                context.record_trace("WordParser", kind, &TokenSource::Input(span));
                 let id = context
                     .add_token_node(*rule, kind, TokenSource::Input(span))
                     .unwrap();

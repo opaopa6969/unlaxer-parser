@@ -135,6 +135,7 @@ fn generate_resolved(
     }
     runtime!("lib.rs");
     runtime!("token.rs");
+    runtime!("token_trace.rs");
     runtime!("scope.rs");
     runtime!("names.rs");
     runtime!("semantic.rs");

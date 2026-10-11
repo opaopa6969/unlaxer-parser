@@ -223,3 +223,63 @@ fn malformed_frames_and_requests_fail_with_bounded_transport() {
         false
     );
 }
+
+#[test]
+fn token_backend_requires_complete_real_trace_and_rejects_detached_source() {
+    use unlaxer_runtime::{
+        token::{TokenKind, TokenSource},
+        token_trace::Limits,
+        Expr, ParseContext, ParseOptions, Rule,
+    };
+    let rule = vec![Rule {
+        name: "Root",
+        expression: Expr::Literal("😀"),
+    }];
+    let plain = unlaxer_runtime::parse(&rule, 0, false, "😀").unwrap();
+    assert!(unlaxer_dap::token_steps(&plain).is_err());
+    let traced = unlaxer_runtime::parse_with_options(
+        &rule,
+        0,
+        false,
+        "😀",
+        ParseOptions::default().with_token_trace(Limits::default()),
+    )
+    .unwrap();
+    let steps = unlaxer_dap::token_steps(&traced).unwrap();
+    assert_eq!(steps.len(), 1);
+    assert_eq!(steps[0].span, Span { start: 0, end: 1 });
+    let limited = unlaxer_runtime::parse_with_options(
+        &rule,
+        0,
+        false,
+        "😀",
+        ParseOptions::default().with_token_trace(Limits {
+            leaves: 0,
+            source_bytes: 0,
+        }),
+    )
+    .unwrap();
+    assert!(unlaxer_dap::token_steps(&limited)
+        .unwrap_err()
+        .contains("Limit"));
+    let mut context = ParseContext::with_options(
+        "😀",
+        ParseOptions::default().with_token_trace(Limits::default()),
+    );
+    context.parse(&Expr::Literal("😀")).unwrap();
+    let token = context
+        .add_token_node(
+            0,
+            TokenKind::VirtualConsumed,
+            TokenSource::Generated {
+                anchor: 1,
+                text: "generated".into(),
+            },
+        )
+        .unwrap();
+    assert!(
+        unlaxer_dap::token_steps(&context.tree(token.index()).unwrap())
+            .unwrap_err()
+            .contains("detached generated")
+    );
+}
