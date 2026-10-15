@@ -5,7 +5,7 @@ on:
   pull_request:
 jobs:
   shared-language-calls:
-    runs-on: ubuntu-24.04
+    runs-on: [unlaxer-parser-ci, Linux, X64]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4

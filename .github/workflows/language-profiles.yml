@@ -5,7 +5,7 @@ on:
   pull_request:
 jobs:
   language-profiles:
-    runs-on: ubuntu-latest
+    runs-on: [unlaxer-parser-ci, Linux, X64]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -19,7 +19,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.85.0
         with:
           targets: wasm32-unknown-unknown
-      - run: npm ci --ignore-scripts --no-audit --no-fund && npx playwright install --with-deps chromium
+      - run: npm ci --ignore-scripts --no-audit --no-fund && npx playwright install chromium
         working-directory: unlaxer-dsl/ubnf-vscode
       - run: python3 scripts/language-profile-corpus.py --check
       - run: python3 scripts/language-profile-packages.py --check

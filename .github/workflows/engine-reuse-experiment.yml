@@ -5,7 +5,7 @@ on:
   pull_request:
 jobs:
   public-contract:
-    runs-on: ubuntu-24.04
+    runs-on: [unlaxer-parser-ci, Linux, X64]
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4

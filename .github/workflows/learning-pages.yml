@@ -25,7 +25,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: [unlaxer-parser-ci, Linux, X64]
     timeout-minutes: 30
     env:
       CARGO_INCREMENTAL: '0'
@@ -44,7 +44,7 @@ jobs:
         working-directory: unlaxer-dsl/ubnf-vscode
         run: |
           npm ci
-          npx playwright install --with-deps chromium
+          npx playwright install chromium
           node --test scripts/completion.test.mjs
           node scripts/learning-browser.mjs
       - uses: actions/upload-pages-artifact@v3
@@ -55,7 +55,7 @@ jobs:
     needs: build
     # The local runner's DNS lookup can exceed the Pages action's connect timeout.
     # Standard hosted runners are free for this public repository.
-    runs-on: ubuntu-latest
+    runs-on: [unlaxer-parser-ci, Linux, X64]
     permissions:
       pages: write
       id-token: write
