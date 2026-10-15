@@ -1,7 +1,7 @@
 name: Java CI with Maven
 
-# Standard hosted runners keep independent jobs off the shared development disk.
-# This is a public repository; standard runners do not incur execution charges.
+# Repository-scoped self-hosted runner (hosted minutes are billed against the
+# account quota even for this public repository; 2026-10 ran out at ~6,400 min).
 # Do not restore or upload the multi-GB local Maven repository as a remote cache.
 
 on:
@@ -21,7 +21,7 @@ env:
 jobs:
   rust:
     name: Rust backend and Java conformance
-    runs-on: ubuntu-24.04
+    runs-on: [unlaxer-parser-ci, Linux, X64]
     timeout-minutes: 60
     steps:
     - uses: actions/checkout@v4
@@ -71,7 +71,7 @@ jobs:
       working-directory: unlaxer-dsl/ubnf-vscode
       run: |
         npm ci
-        npx playwright install --with-deps chromium
+        npx playwright install chromium
         node scripts/contextual-lexing-reference.mjs
         node scripts/contextual-lexing-wasm.mjs
         node scripts/playground-browser.mjs
@@ -244,7 +244,7 @@ jobs:
         if-no-files-found: error
 
   build:
-    runs-on: ubuntu-24.04
+    runs-on: [unlaxer-parser-ci, Linux, X64]
     timeout-minutes: 60
 
     steps:
@@ -294,7 +294,7 @@ jobs:
   # class file major 61 in every class of their jars.
   build-jdk17:
     name: "*-jdk17 artifacts on JDK 17"
-    runs-on: ubuntu-24.04
+    runs-on: [unlaxer-parser-ci, Linux, X64]
     timeout-minutes: 60
 
     steps:
@@ -326,7 +326,7 @@ jobs:
   # release-vsix.yml を参照。
   vsix:
     name: UBNF VSIX (ubnf-vscode)
-    runs-on: ubuntu-24.04
+    runs-on: [unlaxer-parser-ci, Linux, X64]
     timeout-minutes: 60
 
     steps:
@@ -353,7 +353,7 @@ jobs:
     - name: Verify authoring help in Chromium and the webview host
       working-directory: unlaxer-dsl/ubnf-vscode
       run: |
-        npx playwright install --with-deps chromium
+        npx playwright install chromium
         npm run test:help
 
     - name: Activate the packaged VSIX with isolated VS Code profiles
@@ -377,7 +377,7 @@ jobs:
   # ビルド中の unlaxer に対して downstream の smoke を回し、再発を防ぐ。
   downstream:
     name: Downstream smoke (tinyexpression)
-    runs-on: ubuntu-24.04
+    runs-on: [unlaxer-parser-ci, Linux, X64]
     timeout-minutes: 60
 
     steps:
