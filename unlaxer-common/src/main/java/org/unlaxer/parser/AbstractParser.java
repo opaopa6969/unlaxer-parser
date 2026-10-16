@@ -68,30 +68,37 @@ public abstract class AbstractParser implements Parser {
 	
 	@Override
 	public Parsed parse(ParseContext parseContext , TokenKind tokenKind ,boolean invertMatch) {
+		parseContext.enterParserCall();
+		try {
+			// Opt-in safe failure memoization. Generated exact-class markers keep state-dependent
+			// parsers out; safe successes also replay their token trees. Off by default.
+			PackratMemoTable.Entry memo = PackratMemoTable.lookup(parseContext, this, tokenKind, invertMatch);
+			if (memo != null) {
+				return PackratMemoTable.replay(parseContext, this, tokenKind, invertMatch, memo);
+			}
+			var memoDiagnostic = PackratMemoTable.beginFailure(parseContext, this);
+			var memoStart = PackratMemoTable.successKey(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
 
-		// Opt-in safe failure memoization. Generated exact-class markers keep state-dependent
-		// parsers out; safe successes also replay their token trees. Off by default.
-		PackratMemoTable.Entry memo = PackratMemoTable.lookup(parseContext, this, tokenKind, invertMatch);
-		if (memo != null) {
-			return PackratMemoTable.replay(parseContext, this, tokenKind, invertMatch, memo);
+			parseContext.startParse(this, parseContext, tokenKind, invertMatch);
+
+			parseContext.begin(this);
+			Parsed parsed = getParser().parse(parseContext,tokenKind,invertMatch);
+
+			if(parsed.isSucceeded()){
+				return PackratMemoTable.commitSuccess(parseContext, this, tokenKind, invertMatch,
+					memoStart, memoDiagnostic, null, null);
+			}
+
+			parseContext.rollback(this);
+			parseContext.endParse(this, Parsed.FAILED , parseContext, tokenKind, invertMatch);
+			PackratMemoTable.memoizeFailure(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
+			return Parsed.FAILED;
+		} catch (RuntimeException | Error failure) {
+			parseContext.failParserCall(failure);
+			throw failure;
+		} finally {
+			parseContext.leaveParserCall();
 		}
-		var memoDiagnostic = PackratMemoTable.beginFailure(parseContext, this);
-		var memoStart = PackratMemoTable.successKey(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
-
-		parseContext.startParse(this, parseContext, tokenKind, invertMatch);
-
-		parseContext.begin(this);
-		Parsed parsed = getParser().parse(parseContext,tokenKind,invertMatch);
-
-		if(parsed.isSucceeded()){
-			return PackratMemoTable.commitSuccess(parseContext, this, tokenKind, invertMatch,
-				memoStart, memoDiagnostic, null, null);
-		}
-
-		parseContext.rollback(this);
-		parseContext.endParse(this, Parsed.FAILED , parseContext, tokenKind, invertMatch);
-		PackratMemoTable.memoizeFailure(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
-		return Parsed.FAILED;
 	}
 
 	public Parser getParser() {

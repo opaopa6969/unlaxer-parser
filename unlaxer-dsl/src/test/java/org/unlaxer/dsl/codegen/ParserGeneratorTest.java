@@ -892,17 +892,15 @@ public class ParserGeneratorTest {
         "}";
 
     @Test
-    public void testRegexGeneratesRegexTokenParser() {
-        String source = generate(REGEX_GRAMMAR);
-        assertTrue("REGEX should generate RegexTokenParser subclass",
-            source.contains("org.unlaxer.dsl.runtime.RegexTokenParser"));
+    public void testRemovedRegexIsRejectedBeforeParserEmission() {
+        assertTrue(org.junit.Assert.assertThrows(IllegalArgumentException.class, () -> generate(REGEX_GRAMMAR))
+            .getMessage().startsWith("E-REGEX-RETIRED:"));
     }
 
     @Test
-    public void testRegexGeneratesPatternInConstructor() {
-        String source = generate(REGEX_GRAMMAR);
-        assertTrue("REGEX should generate pattern string in constructor",
-            source.contains("[a-zA-Z_][a-zA-Z0-9_]*"));
+    public void testRemovedRegexCannotEmitAConstructor() {
+        assertTrue(org.junit.Assert.assertThrows(IllegalArgumentException.class, () -> generate(REGEX_GRAMMAR))
+            .getMessage().startsWith("E-REGEX-RETIRED:"));
     }
 
     // =========================================================================
@@ -919,14 +917,9 @@ public class ParserGeneratorTest {
         "}";
 
     @Test
-    public void testRegexTokenSkipsClassWhenCollidingWithRule() {
-        String source = generate(REGEX_COLLISION_GRAMMAR);
-        long idParserCount = java.util.regex.Pattern.compile("class IdParser\\b")
-            .matcher(source).results().count();
-        assertEquals("IdParser must be emitted exactly once (rule side only); duplicate class would fail to compile",
-            1L, idParserCount);
-        assertFalse("REGEX wrapper for colliding token ID must not be emitted",
-            source.contains("REGEX parser for token ID"));
+    public void testRemovedRegexIsRejectedEvenWhenCollidingWithRule() {
+        assertTrue(org.junit.Assert.assertThrows(IllegalArgumentException.class, () -> generate(REGEX_COLLISION_GRAMMAR))
+            .getMessage().startsWith("E-REGEX-RETIRED:"));
     }
 
     private static final String NEGATION_COLLISION_GRAMMAR =

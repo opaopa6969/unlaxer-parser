@@ -158,7 +158,7 @@ public class CaptureBindingRuntimeTest {
         record Case(String token, String body, String input, String expected) {}
         for (var example : List.of(
                 new Case("SingleQuotedParser", "':' VALUE @value ':'", ":'abc':", "abc"),
-                new Case("REGEX('[a-z]+')", "':' VALUE @value ':'", ":abc:", "abc"),
+                new Case("CI('abc')", "':' VALUE @value ':'", ":abc:", "abc"),
                 new Case("CHAR_RANGE('a','z')", "':' VALUE @value ':'", ":a:", "a"),
                 new Case("ANY", "':' VALUE @value ':'", ":a:", "a"),
                 new Case("UNTIL('!')", "':' VALUE @value '!'", ":abc!", "abc"))) {

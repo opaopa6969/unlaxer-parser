@@ -1,0 +1,51 @@
+[
+  {
+    "name": "container-choice",
+    "grammar": "grammar Invalid { @package: invalid @whitespace: none @root @nestedCaptures @mapping(Root,params=[values]) Root ::= { (Mode | [Leaf]) } @values; @enum Mode ::= 'sync' | 'auto'; @mapping(Leaf,params=[text]) Leaf ::= 'a' @text;  }",
+    "rule": "Root",
+    "startCP": 54,
+    "endCP": 144
+  },
+  {
+    "name": "mixed-sequence",
+    "grammar": "grammar Invalid { @package: invalid @whitespace: none @root @nestedCaptures @mapping(Root,params=[values]) Root ::= { ((Mode | Leaf) 'x') } @values; @enum Mode ::= 'sync' | 'auto'; @mapping(Leaf,params=[text]) Leaf ::= 'a' @text;  }",
+    "rule": "Root",
+    "startCP": 54,
+    "endCP": 148
+  },
+  {
+    "name": "reserved-mapping",
+    "grammar": "grammar Invalid { @package: invalid @whitespace: none @root @nestedCaptures @mapping(Root,params=[values]) Root ::= { (Mode | Leaf) } @values; @enum Mode ::= 'sync' | 'auto'; @mapping(Leaf,params=[text]) Leaf ::= 'a' @text; @mapping(NestedValue,params=[text]) Other ::= 'b' @text; }",
+    "rule": "Root",
+    "startCP": 54,
+    "endCP": 142
+  },
+  {
+    "name": "reserved-dotted",
+    "grammar": "grammar Invalid { @package: invalid @whitespace: none @root @nestedCaptures @mapping(Root,params=[values]) Root ::= { (Mode | Leaf) } @values; @enum Mode ::= 'sync' | 'auto'; @mapping(Leaf,params=[text]) Leaf ::= 'a' @text; @mapping(NestedValue.Text,params=[text]) Other ::= 'b' @text; }",
+    "rule": "Root",
+    "startCP": 54,
+    "endCP": 142
+  },
+  {
+    "name": "reserved-enum",
+    "grammar": "grammar Invalid { @package: invalid @whitespace: none @root @nestedCaptures @mapping(Root,params=[values]) Root ::= { (Mode | Leaf) } @values; @enum Mode ::= 'sync' | 'auto'; @mapping(Leaf,params=[text]) Leaf ::= 'a' @text; @enum NestedValue ::= 'z'; }",
+    "rule": "Root",
+    "startCP": 54,
+    "endCP": 142
+  },
+  {
+    "name": "depth",
+    "grammar": "grammar Invalid { @package: invalid @whitespace: none @root @nestedCaptures @mapping(Root,params=[values]) Root ::= [ [ [ [ [ [ [ [ [ [ [ [ [ [ [ [ [ [ [ [ [ [ [ [ [ [ [ [ [ [ [ [ [ (Mode | Leaf) ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] @values; @enum Mode ::= 'sync' | 'auto'; @mapping(Leaf,params=[text]) Leaf ::= 'a' @text;  }",
+    "rule": "Root",
+    "startCP": 54,
+    "endCP": 270
+  },
+  {
+    "name": "shared-shape-mismatch",
+    "grammar": "grammar NestedMixed { @package: nestedmixed @whitespace: none token N = NumberParser @root Entry ::= First | Second; @nestedCaptures @mapping(Root,params=[values]) First ::= '[' { (Mode | Heat | Leaf | N | 'text' | '😀' | '\\r\\n') } @values ']'; @nestedCaptures @mapping(Root,params=[values]) Second ::= '(' [ (Mode | Heat | Leaf | N | 'text' | '😀' | '\\r\\n') ] @values ')'; @enum Mode ::= 'sync' | 'auto'; @enum Heat ::= 'hot' | 'cold'; @mapping(Leaf,params=[text]) Leaf ::= '<' ('a' | '😀') @text '>'; }",
+    "rule": "First",
+    "startCP": 117,
+    "endCP": 243
+  }
+]

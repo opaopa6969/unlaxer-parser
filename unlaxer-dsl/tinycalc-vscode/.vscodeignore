@@ -7,6 +7,8 @@ grammar/**
 tsconfig.json
 **/*.ts
 **/*.map
-node_modules/**
 target/**
 pom.xml
+
+rust/**
+scripts/**
