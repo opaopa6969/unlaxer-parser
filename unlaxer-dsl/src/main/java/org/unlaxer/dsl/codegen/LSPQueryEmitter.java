@@ -108,6 +108,7 @@ final class LSPQueryEmitter {
         """
             @Override
             public CompletableFuture<Either<List<? extends Location>, List<? extends LocationLink>>> definition(DefinitionParams params) {
+                if (server.hasStopped()) return server.stoppedRequest();
                 if (!server.profileAllows("DEFINITION")) return CompletableFuture.completedFuture(Either.forLeft(List.of()));
                 var locations = server.languageDefinitions(params);
                 if (locations != null) return CompletableFuture.completedFuture(Either.forLeft(locations));

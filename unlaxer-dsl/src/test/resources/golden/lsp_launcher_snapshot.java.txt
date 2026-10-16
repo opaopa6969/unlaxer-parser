@@ -1,9 +1,16 @@
 package org.example.snapshot;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
 import org.eclipse.lsp4j.launch.LSPLauncher;
 import org.eclipse.lsp4j.services.LanguageClient;
-import org.eclipse.lsp4j.jsonrpc.Launcher;
+import org.eclipse.lsp4j.jsonrpc.RemoteEndpoint;
+import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler;
+import org.eclipse.lsp4j.jsonrpc.json.StreamMessageConsumer;
 
 @javax.annotation.processing.Generated("org.unlaxer.dsl.codegen.LSPLauncherGenerator")
 public abstract class SnapshotLspLauncher {
@@ -11,10 +18,53 @@ public abstract class SnapshotLspLauncher {
     protected abstract SnapshotLanguageServer createServer();
 
     public void launch() throws IOException {
-        SnapshotLanguageServer server = createServer();
-        Launcher<LanguageClient> launcher =
-            LSPLauncher.createServerLauncher(server, System.in, System.out);
-        server.connect(launcher.getRemoteProxy());
-        launcher.startListening();
+        launch(System.in, System.out);
+    }
+
+    /** Stdio mains apply this status; library methods never call System.exit. */
+    public int launchStdio() throws IOException {
+        try { return launch(System.in, System.out).get(); }
+        catch (InterruptedException error) { Thread.currentThread().interrupt(); throw new IOException(error); }
+        catch (ExecutionException error) { throw new IOException("LSP transport failed", error.getCause()); }
+    }
+
+    /** Owns its worker threads and closes input on exit; output remains caller-owned. */
+    public CompletableFuture<Integer> launch(InputStream input, OutputStream output) throws IOException {
+        var server = createServer();
+        var executor = Executors.newCachedThreadPool();
+        try {
+            var builder = new LSPLauncher.Builder<LanguageClient>() {
+                @Override protected RemoteEndpoint createRemoteEndpoint(MessageJsonHandler handler) {
+                    var writer = wrapMessageConsumer(new StreamMessageConsumer(output, handler));
+                    var endpoint = new RemoteEndpoint(writer, server.lifecycleEndpoint());
+                    handler.setMethodProvider(endpoint);
+                    endpoint.setJsonHandler(handler);
+                    return endpoint;
+                }
+            };
+            var launcher = builder.setLocalService(server).setRemoteInterface(LanguageClient.class)
+                .setInput(input).setOutput(output).setExecutorService(executor).create();
+            server.connect(launcher.getRemoteProxy());
+            var exit = server.exitStatus();
+            exit.thenRun(() -> { try { input.close(); } catch (IOException ignored) {} });
+            var listening = launcher.startListening();
+            var completion = new CompletableFuture<Integer>();
+            executor.execute(() -> {
+                try {
+                    listening.get();
+                    completion.complete(exit.getNow(1));
+                } catch (InterruptedException error) {
+                    Thread.currentThread().interrupt();
+                    completion.completeExceptionally(error);
+                } catch (ExecutionException error) {
+                    if (exit.isDone()) completion.complete(exit.join());
+                    else completion.completeExceptionally(error.getCause());
+                } finally { executor.shutdown(); }
+            });
+            return completion;
+        } catch (RuntimeException | Error error) {
+            executor.shutdownNow();
+            throw error;
+        }
     }
 }

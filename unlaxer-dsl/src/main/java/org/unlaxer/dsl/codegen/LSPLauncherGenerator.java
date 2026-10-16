@@ -3,46 +3,87 @@ package org.unlaxer.dsl.codegen;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.StringSettingValue;
 
-/**
- * GrammarDecl から {Name}LspLauncher.java を生成する。
- */
+/** Generates a lifecycle-aware launcher without exiting an embedding application. */
 public class LSPLauncherGenerator implements CodeGenerator {
-
     @Override
     public GeneratedSource generate(GrammarDecl grammar) {
-        String packageName = getPackageName(grammar);
-        String grammarName = grammar.name();
-        String launcherClass = grammarName + "LspLauncher";
-        String serverClass = grammarName + "LanguageServer";
-
-        StringBuilder sb = new StringBuilder();
-        sb.append("package ").append(packageName).append(";\n\n");
-
-        sb.append("import java.io.IOException;\n");
-        sb.append("import org.eclipse.lsp4j.launch.LSPLauncher;\n");
-        sb.append("import org.eclipse.lsp4j.services.LanguageClient;\n");
-        sb.append("import org.eclipse.lsp4j.jsonrpc.Launcher;\n");
-        sb.append("\n");
-        sb.append(CodeGenerator.generatedAnnotation("org.unlaxer.dsl.codegen.LSPLauncherGenerator"));
-        sb.append("public abstract class ").append(launcherClass).append(" {\n\n");
-        sb.append("    protected abstract ").append(serverClass).append(" createServer();\n\n");
-        sb.append("    public void launch() throws IOException {\n");
-        sb.append("        ").append(serverClass).append(" server = createServer();\n");
-        sb.append("        Launcher<LanguageClient> launcher =\n");
-        sb.append("            LSPLauncher.createServerLauncher(server, System.in, System.out);\n");
-        sb.append("        server.connect(launcher.getRemoteProxy());\n");
-        sb.append("        launcher.startListening();\n");
-        sb.append("    }\n");
-        sb.append("}\n");
-
-        return new GeneratedSource(packageName, launcherClass, sb.toString());
-    }
-
-    private String getPackageName(GrammarDecl grammar) {
-        return grammar.settings().stream()
+        String packageName = grammar.settings().stream()
             .filter(s -> "package".equals(s.key()))
             .map(s -> s.value() instanceof StringSettingValue sv ? sv.value() : "")
-            .findFirst()
-            .orElse("generated");
+            .findFirst().orElse("generated");
+        String launcherClass = grammar.name() + "LspLauncher";
+        String serverClass = grammar.name() + "LanguageServer";
+        String body = """
+            package %s;
+
+            import java.io.IOException;
+            import java.io.InputStream;
+            import java.io.OutputStream;
+            import java.util.concurrent.CompletableFuture;
+            import java.util.concurrent.ExecutionException;
+            import java.util.concurrent.Executors;
+            import org.eclipse.lsp4j.launch.LSPLauncher;
+            import org.eclipse.lsp4j.services.LanguageClient;
+            import org.eclipse.lsp4j.jsonrpc.RemoteEndpoint;
+            import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler;
+            import org.eclipse.lsp4j.jsonrpc.json.StreamMessageConsumer;
+
+            %spublic abstract class %s {
+
+                protected abstract %s createServer();
+
+                public void launch() throws IOException {
+                    launch(System.in, System.out);
+                }
+
+                /** Stdio mains apply this status; library methods never call System.exit. */
+                public int launchStdio() throws IOException {
+                    try { return launch(System.in, System.out).get(); }
+                    catch (InterruptedException error) { Thread.currentThread().interrupt(); throw new IOException(error); }
+                    catch (ExecutionException error) { throw new IOException("LSP transport failed", error.getCause()); }
+                }
+
+                /** Owns its worker threads and closes input on exit; output remains caller-owned. */
+                public CompletableFuture<Integer> launch(InputStream input, OutputStream output) throws IOException {
+                    var server = createServer();
+                    var executor = Executors.newCachedThreadPool();
+                    try {
+                        var builder = new LSPLauncher.Builder<LanguageClient>() {
+                            @Override protected RemoteEndpoint createRemoteEndpoint(MessageJsonHandler handler) {
+                                var writer = wrapMessageConsumer(new StreamMessageConsumer(output, handler));
+                                var endpoint = new RemoteEndpoint(writer, server.lifecycleEndpoint());
+                                handler.setMethodProvider(endpoint);
+                                endpoint.setJsonHandler(handler);
+                                return endpoint;
+                            }
+                        };
+                        var launcher = builder.setLocalService(server).setRemoteInterface(LanguageClient.class)
+                            .setInput(input).setOutput(output).setExecutorService(executor).create();
+                        server.connect(launcher.getRemoteProxy());
+                        var exit = server.exitStatus();
+                        exit.thenRun(() -> { try { input.close(); } catch (IOException ignored) {} });
+                        var listening = launcher.startListening();
+                        var completion = new CompletableFuture<Integer>();
+                        executor.execute(() -> {
+                            try {
+                                listening.get();
+                                completion.complete(exit.getNow(1));
+                            } catch (InterruptedException error) {
+                                Thread.currentThread().interrupt();
+                                completion.completeExceptionally(error);
+                            } catch (ExecutionException error) {
+                                if (exit.isDone()) completion.complete(exit.join());
+                                else completion.completeExceptionally(error.getCause());
+                            } finally { executor.shutdown(); }
+                        });
+                        return completion;
+                    } catch (RuntimeException | Error error) {
+                        executor.shutdownNow();
+                        throw error;
+                    }
+                }
+            }
+            """.formatted(packageName, CodeGenerator.generatedAnnotation("org.unlaxer.dsl.codegen.LSPLauncherGenerator"), launcherClass, serverClass);
+        return new GeneratedSource(packageName, launcherClass, body);
     }
 }

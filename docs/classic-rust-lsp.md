@@ -19,7 +19,9 @@ unlaxer-lsp = { path = "/path/to/unlaxer-parser/rust/unlaxer-lsp" }
 ```rust
 mod generated;
 fn main() -> std::io::Result<()> {
-    generated::lsp::serve_stdio()
+    let mut server = unlaxer_lsp::Server::new(generated::lsp::backend());
+    server.serve_stdio()?;
+    std::process::exit(server.exit_code());
 }
 ```
 
@@ -31,6 +33,16 @@ Content-Length は UTF-8 **bytes**。ASCII/CRLF headers を検証し、header 8 
 request ID は整数または文字列。未知の request は MethodNotFound (-32601)、notification に response は返さない。
 
 initialize/initialized/shutdown/exit と full document didOpen/didChange/didClose を扱う。
+shutdown 後はすべての request を InvalidRequest (-32600) で拒否し、exit 以外の
+notification を無視する。Java の生成 launcher は subclass の独自 request もこの境界で保護する。
+exit は client が stdin を閉じる前に transport と所有 worker を終了する。
+stdio main は shutdown 後の exit を status 0、shutdown 無しの exit と exit 無しの EOF を status 1 にする（#508）。
+Java の `launchStdio()` と Rust の `Server::exit_code()` はこの status を返し、
+`System.exit` / `std::process::exit` は main 側が適用する。
+Java server の `exit()` / `exitStatus()` や `launch(InputStream, OutputStream)` は埋め込み host を終了しない。
+後者は完了 future を返し、exit 時に入力を閉じて worker を解放するが、出力の所有権は caller に残す。
+既存の `launch()` は非同期の入口を維持する。UBNF VSIX の main は `launchStdio()` の status を適用する。
+
 変更は開いている文書の増加 version と非空 contentChanges が必要で、全 entry が full replacement の場合に
 最後の text を適用する。ranged edit、空 changes、古い/負の version、未 open 文書を黙って全置換しない。
 Java 生成 LSP も同じ判定を行う。close は保持文書と version を捨て、空 diagnostics を publish する。
