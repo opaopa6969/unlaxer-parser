@@ -3,54 +3,125 @@ package org.unlaxer.dsl.codegen;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.StringSettingValue;
 
-/**
- * GrammarDecl から {Name}DapLauncher.java を生成する。
- *
- * stdio 経由で DAP サーバーを起動する main クラス。
- * 起動方法: java --enable-preview -cp server.jar {package}.{Name}DapLauncher
- */
+/** Generates a DAP launcher whose owned workers stop after the disconnect reply is flushed. */
 public class DAPLauncherGenerator implements CodeGenerator {
-
     @Override
     public GeneratedSource generate(GrammarDecl grammar) {
-        String packageName = getPackageName(grammar);
-        String grammarName = grammar.name();
-        String launcherClass = grammarName + "DapLauncher";
-        String adapterClass = grammarName + "DebugAdapter";
+        String packageName = grammar.settings().stream()
+            .filter(setting -> "package".equals(setting.key()))
+            .map(setting -> setting.value() instanceof StringSettingValue value ? value.value() : "")
+            .findFirst().orElse("generated");
+        String launcherClass = grammar.name() + "DapLauncher";
+        String adapterClass = grammar.name() + "DebugAdapter";
+        String body = """
+            package %s;
 
-        StringBuilder sb = new StringBuilder();
-        sb.append("package ").append(packageName).append(";\n\n");
+            import java.io.FilterInputStream;
+            import java.io.IOException;
+            import java.io.InputStream;
+            import java.io.OutputStream;
+            import java.util.Objects;
+            import java.util.concurrent.CompletableFuture;
+            import java.util.concurrent.ExecutionException;
+            import java.util.concurrent.Executors;
+            import java.util.concurrent.TimeUnit;
+            import java.util.concurrent.atomic.AtomicBoolean;
+            import java.util.concurrent.atomic.AtomicReference;
+            import org.eclipse.lsp4j.debug.launch.DSPLauncher;
+            import org.eclipse.lsp4j.jsonrpc.JsonRpcException;
+            import org.eclipse.lsp4j.jsonrpc.debug.messages.DebugResponseMessage;
+            import org.eclipse.lsp4j.jsonrpc.messages.RequestMessage;
 
-        sb.append("import java.io.IOException;\n");
-        sb.append("import org.eclipse.lsp4j.debug.launch.DSPLauncher;\n");
-        sb.append("import org.eclipse.lsp4j.debug.services.IDebugProtocolClient;\n");
-        sb.append("import org.eclipse.lsp4j.jsonrpc.Launcher;\n");
-        sb.append("\n");
-        sb.append(CodeGenerator.generatedAnnotation("org.unlaxer.dsl.codegen.DAPLauncherGenerator"));
-        sb.append("public class ").append(launcherClass).append(" {\n\n");
-        sb.append("    protected ").append(adapterClass).append(" createAdapter() {\n");
-        sb.append("        return new ").append(adapterClass).append("() {};\n");
-        sb.append("    }\n\n");
-        sb.append("    public static void main(String[] args) throws IOException {\n");
-        sb.append("        new ").append(launcherClass).append("().launch();\n");
-        sb.append("    }\n\n");
-        sb.append("    public void launch() throws IOException {\n");
-        sb.append("        ").append(adapterClass).append(" adapter = createAdapter();\n");
-        sb.append("        Launcher<IDebugProtocolClient> launcher =\n");
-        sb.append("            DSPLauncher.createServerLauncher(adapter, System.in, System.out);\n");
-        sb.append("        adapter.connect(launcher.getRemoteProxy());\n");
-        sb.append("        launcher.startListening();\n");
-        sb.append("    }\n");
-        sb.append("}\n");
+            %spublic class %s {
+                protected %s createAdapter() {
+                    return new %s() {};
+                }
 
-        return new GeneratedSource(packageName, launcherClass, sb.toString());
-    }
+                public static void main(String[] args) throws IOException {
+                    new %s().launchStdio();
+                }
 
-    private String getPackageName(GrammarDecl grammar) {
-        return grammar.settings().stream()
-            .filter(s -> "package".equals(s.key()))
-            .map(s -> s.value() instanceof StringSettingValue sv ? sv.value() : "")
-            .findFirst()
-            .orElse("generated");
+                /** Starts a session without exiting the caller's process. */
+                public void launch() throws IOException {
+                    launch(System.in, System.out);
+                }
+
+                /** Waits for disconnect or peer EOF; never closes System.in/out or calls System.exit. */
+                public void launchStdio() throws IOException {
+                    try { launch(System.in, System.out).get(); }
+                    catch (InterruptedException error) { Thread.currentThread().interrupt(); throw new IOException(error); }
+                    catch (ExecutionException error) { throw new IOException("DAP transport failed", error.getCause()); }
+                }
+
+                /** Owns only its worker threads. Both streams remain caller-owned. */
+                public CompletableFuture<Void> launch(InputStream input, OutputStream output) throws IOException {
+                    Objects.requireNonNull(input, "input");
+                    Objects.requireNonNull(output, "output");
+                    var adapter = createAdapter();
+                    var stopped = new AtomicBoolean();
+                    var failure = new AtomicReference<Throwable>();
+                    var disconnectReply = new CompletableFuture<Void>();
+                    var executor = Executors.newCachedThreadPool();
+                    // A disconnect request waits for its reply before returning to the read loop.
+                    // The next read is logical EOF, so no borrowed stream must be closed to unblock it.
+                    var connection = new FilterInputStream(input) {
+                        @Override public int read() throws IOException {
+                            if (stopped.get()) return -1;
+                            try { return super.read(); }
+                            catch (IOException error) { failure.compareAndSet(null, error); throw error; }
+                        }
+                        @Override public int read(byte[] bytes, int offset, int length) throws IOException {
+                            if (length == 0) return 0;
+                            if (stopped.get()) return -1;
+                            try { return super.read(bytes, offset, length); }
+                            catch (IOException error) { failure.compareAndSet(null, error); throw error; }
+                        }
+                        @Override public void close() { /* The caller owns the underlying stream. */ }
+                    };
+                    try {
+                        var launcher = DSPLauncher.createServerLauncher(adapter, connection, output, executor,
+                            consumer -> message -> {
+                                try {
+                                    consumer.consume(message);
+                                    if (message instanceof DebugResponseMessage response && "disconnect".equals(response.getMethod())) {
+                                        // StreamMessageConsumer.consume writes and flushes before returning.
+                                        stopped.set(true);
+                                        disconnectReply.complete(null);
+                                    } else if (message instanceof RequestMessage request && "disconnect".equals(request.getMethod())) {
+                                        try { disconnectReply.get(5, TimeUnit.SECONDS); }
+                                        catch (InterruptedException error) { Thread.currentThread().interrupt(); throw new JsonRpcException(error); }
+                                        catch (ExecutionException | java.util.concurrent.TimeoutException error) { throw new JsonRpcException(error); }
+                                    }
+                                } catch (RuntimeException error) {
+                                    stopped.set(true);
+                                    failure.compareAndSet(null, error);
+                                    disconnectReply.completeExceptionally(error);
+                                    throw error;
+                                }
+                            });
+                        adapter.connect(launcher.getRemoteProxy());
+                        var listening = launcher.startListening();
+                        var completion = new CompletableFuture<Void>();
+                        executor.execute(() -> {
+                            try {
+                                listening.get();
+                                if (failure.get() == null) completion.complete(null);
+                                else completion.completeExceptionally(failure.get());
+                            } catch (InterruptedException error) {
+                                Thread.currentThread().interrupt();
+                                completion.completeExceptionally(error);
+                            } catch (ExecutionException error) {
+                                completion.completeExceptionally(error.getCause());
+                            } finally { executor.shutdown(); }
+                        });
+                        return completion;
+                    } catch (RuntimeException | Error error) {
+                        executor.shutdownNow();
+                        throw error;
+                    }
+                }
+            }
+            """.formatted(packageName, CodeGenerator.generatedAnnotation("org.unlaxer.dsl.codegen.DAPLauncherGenerator"), launcherClass, adapterClass, adapterClass, launcherClass);
+        return new GeneratedSource(packageName, launcherClass, body);
     }
 }

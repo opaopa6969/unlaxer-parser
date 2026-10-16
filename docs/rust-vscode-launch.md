@@ -42,4 +42,8 @@ xvfb-run -a npm run test:vsix -- target/tinycalc.vsix
 
 配布VSIXを一時directoryへ展開し、実際の拡張hostでJava/Rust両方を起動する。空白を含む実行パス、補完、同期後hover、既定definition非提供、Unicode診断、AST/token DAP、異常終了からの再起動、設定不正からの復帰、停止時のchild process終了を確認する。初期化に応答せずTERMも無視するfixtureを使い、timeout・設定修正・deactivate時の中断と強制終了、未処理Promise rejectionがないことも検査する。観測値は `target/ide-java.json` と `target/ide-rust.json` に保存し、両者を比較する。ユーザーのVS Code profileは使わない。
 
-終了時の残課題: Java DAPの切断時にVS Code側へ `Invalid debug adapter` ログが出る場合がある。操作・後続session・child終了は上記試験で確認しているが、終了handshakeの改善は [#555](https://github.com/opaopa6969/unlaxer-parser/issues/555) で追跡する。
+生成DAP launcherは `disconnect` の応答を書き出してflushしてからtransportを終了する。Java/Rustとも初期化前の切断も受理し、正常切断・相手EOFでは終了code0となる。入力を閉じずに応答を待つclientでもJavaの所有workerが残らず、後続sessionは新adapterで開始できる。
+
+Javaのlibrary API `launch(InputStream, OutputStream)` は完了futureを返し、渡されたstreamをcloseせず、processも終了しない。`launchStdio()` は同じ完了を待つ。切断応答が非同期の場合はflushまで待ち、5秒以内に応答しないadapter hookや入出力のI/O失敗はfutureの異常完了となる。standalone mainで未処理のtransport失敗は非0終了となる。通常の要求を受信中にclientがstreamを開いたまま送信を止めた場合は接続が継続するため、callerがEOFを与える責任を持つ。
+
+実VSIX試験は各backendのエディタログを `target/ide-<backend>-editor.log` へ保存し、`Invalid debug adapter` と未処理Promise rejectionがないことを検査する。[#555](https://github.com/opaopa6969/unlaxer-parser/issues/555) の切断時ログはこの試験と生成launcherの実通信試験で回帰を防ぐ。
