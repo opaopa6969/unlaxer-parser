@@ -60,4 +60,38 @@ public class MappingGuardTest {
         Token generated = new Token(TokenKind.virtualTokenConsumed, StringSource.createDetachedSource("generated"), new EmptyParser());
         MappingGuard.prepare(token(generated));
     }
+    private static Token flattenedTree(int count) {
+        Token[] branches = new Token[count], leaves = new Token[count];
+        for (int i = 0; i < count; i++) {
+            leaves[i] = token();
+            branches[i] = token(token(token(leaves[i])));
+        }
+        Token root = token(token(branches));
+        root.filteredChildren.clear();
+        root.filteredChildren.addAll(java.util.List.of(leaves));
+        return root;
+    }
+    @Test public void flattenedTreeValidationHasLinearWorkWithoutIncreasingLimits() throws Exception {
+        var counter = MappingGuard.class.getDeclaredField("validationWork");
+        counter.setAccessible(true);
+        for (int count : new int[] {64, 512, 2048}) {
+            MappingGuard guard = MappingGuard.prepare(flattenedTree(count));
+            long work = counter.getLong(guard);
+            assertTrue("count=" + count + " validationWork=" + work, work <= 8L * count + 16);
+            Token repeated = flattenedTree(count);
+            repeated.getOriginalChildren().add(repeated.getOriginalChildren().get(0));
+            long repeatedWork = counter.getLong(MappingGuard.prepare(repeated));
+            assertTrue("same-parent duplicate count=" + count + " work=" + repeatedWork, repeatedWork <= 8L * count + 16);
+        }
+        assertEquals(8_388_608, MappingGuard.MAX_WORK);
+    }
+    @Test public void sharedDagShortcutsAndSameSpanForeignNodesKeepTheirBoundary() {
+        Token leaf = token(), left = token(leaf), right = token(leaf), root = token(left, right);
+        root.filteredChildren.clear(); root.filteredChildren.add(leaf);
+        MappingGuard.prepare(root);
+        left.filteredChildren.add(right); // another branch has the same source span, not ancestry
+        rejected(root, "outside");
+        MappingGuard.prepare(flattenedTree(8));
+    }
+
 }

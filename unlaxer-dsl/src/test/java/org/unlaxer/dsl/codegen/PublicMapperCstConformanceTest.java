@@ -31,13 +31,18 @@ public class PublicMapperCstConformanceTest extends PreferredAstConformanceTest 
                 rows.add(item.get("id").getAsString()+"\t"+entry+"\t"+category);
             }
         }
+        for (var count : fixture.getAsJsonArray("scalingCounts")) {
+            for (String entry : List.of("ordinary","source-map","subtree","subtree-source-map","preferred","subtree-preferred")) {
+                rows.add("scaling-" + count + "\t" + entry + "\tOK");
+            }
+        }
         return rows;
     }
     @Override @Test public void javaSnapshots() throws Exception {
         var fixture=fixture();
         var grammar=UBNFMapper.parse(fixture.get("grammar").getAsString()).grammars().get(0);
         var units=new ArrayList<JavaFileObject>();
-        for (var item:List.of(grammar,UBNFMapper.parse(fixture.get("dagGrammar").getAsString()).grammars().get(0))) {
+        for (var item:List.of(grammar,UBNFMapper.parse(fixture.get("dagGrammar").getAsString()).grammars().get(0),UBNFMapper.parse(fixture.get("scalingGrammar").getAsString()).grammars().get(0))) {
             for (CodeGenerator generator:List.of(new ParserGenerator(),new ASTGenerator(),new MapperGenerator())) {
                 var file=generator.generate(item); units.add(unit(file.packageName()+"."+file.className(),file.source()));
             }
@@ -79,6 +84,13 @@ public class PublicMapperCstConformanceTest extends PreferredAstConformanceTest 
                 if(host.equals("native"))assertEquals(file.relativePath(),file.content(),Files.readString(dag.resolve(file.relativePath())));
                 else Files.writeString(dag.resolve(file.relativePath()),file.content());
             }
+            Path scaling=Files.createDirectory(dir.resolve("scaling")), scalingInput=workspace.resolve("scaling.ubnf");
+            Files.writeString(scalingInput,fixture.get("scalingGrammar").getAsString());
+            if(host.equals("native"))run(List.of(root.resolve("rust/target/debug/unlaxer").toString(),"generate","--grammar",scalingInput.toString(),"--output",scaling.toString()),"",true,true);
+            for(var file:new RustBackend().generate(UBNFMapper.parse(Files.readString(scalingInput)).grammars().get(0))) {
+                if(host.equals("native"))assertEquals(file.relativePath(),file.content(),Files.readString(scaling.resolve(file.relativePath())));
+                else Files.writeString(scaling.resolve(file.relativePath()),file.content());
+            }
             Path probe=dir.resolve("probe.rs"), exe=dir.resolve("probe");
             Files.writeString(probe,probe(fixture,"rust-probe.rs",true));
             run(List.of("rustc","--edition=2021",probe.toString(),"--extern","unlaxer_runtime="+runtime,"-o",exe.toString()),"",false,true);
@@ -95,7 +107,8 @@ public class PublicMapperCstConformanceTest extends PreferredAstConformanceTest 
         return Files.readString(corpusDir().resolve(file))
             .replace("__ROOT_START__",span.get(0).toString()).replace("__ROOT_END__",span.get(1).toString())
             .replace("__LEAF_SPANS__",String.join(",",leaves))
-            .replace("__DAG_DEPTH__",fixture.get("dagDepth").toString());
+            .replace("__DAG_DEPTH__",fixture.get("dagDepth").toString())
+            .replace("__SCALING_COUNTS__",fixture.getAsJsonArray("scalingCounts").toString().replace("[", "").replace("]", ""));
     }
     private JavaFileObject unit(String name,String source) {
         return new SimpleJavaFileObject(URI.create("string:///"+name.replace('.','/')+".java"),JavaFileObject.Kind.SOURCE) {

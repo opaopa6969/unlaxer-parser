@@ -20,9 +20,14 @@ public final class MappingGuard {
     private long textBytes;
     private long validationWork;
     private int edges;
+    private boolean originalIsTree = true;
+    private int originalClock;
 
     private static final class State {
         int originalHeight;
+        Token originalParent;
+        int originalEnter;
+        int originalExit;
         int filteredHeight;
         long cost;
         long textBytes = -1;
@@ -62,7 +67,10 @@ public final class MappingGuard {
             if (frame.next == frame.children.size()) {
                 State state = nodes.get(frame.token);
                 if (filtered) state.filteredHeight = frame.height;
-                else state.originalHeight = frame.height;
+                else {
+                    state.originalHeight = frame.height;
+                    state.originalExit = ++originalClock;
+                }
                 active.remove(frame.token);
                 stack.pop();
                 if (!stack.isEmpty()) {
@@ -79,6 +87,7 @@ public final class MappingGuard {
             }
             if (active.containsKey(child)) throw invalid("cycle");
             State childState = nodes.get(child);
+            if (!filtered && childState != null && childState.originalParent != frame.token) originalIsTree = false;
             int height = childState == null ? 0
                 : filtered ? childState.filteredHeight : childState.originalHeight;
             if (height != 0) {
@@ -106,6 +115,8 @@ public final class MappingGuard {
                 throw invalid("invalid source span");
             }
             state = new State();
+            state.originalParent = stack.isEmpty() ? null : stack.peek().token;
+            state.originalEnter = ++originalClock;
             state.cost = 1L + token.getOriginalChildren().size() + token.filteredChildren.size();
             if (state.cost - 1 > MAX_EDGES - edges) throw limit("edges");
             edges += (int) state.cost - 1;
@@ -118,6 +129,16 @@ public final class MappingGuard {
 
     private boolean isOriginalDescendant(Frame frame, Token target) {
         Token owner = frame.token;
+        if (originalIsTree) {
+            // The original DFS has already validated every node and assigned nested intervals.
+            // Use identity-derived ancestry, never source-span containment: lookahead/generated
+            // nodes may legitimately share or exceed their owner's consumed source range.
+            chargeValidation();
+            State parent = nodes.get(owner), child = nodes.get(target);
+            return child != null && parent.originalEnter < child.originalEnter
+                && child.originalExit < parent.originalExit;
+        }
+        // Shared original DAGs have no single DFS interval; preserve their bounded exact search.
         if (owner.getOriginalChildren().size() > 4) {
             if (frame.direct == null) {
                 frame.direct = new IdentityHashMap<>();

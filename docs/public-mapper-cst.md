@@ -17,6 +17,8 @@
 
 通常と preferred の両入口で、最大 node 数 1,048,576、edge 数 8,388,608、CST 高さ 256、実投影 work 8,388,608、要求する text の累計 UTF-8 byte 数 268,435,456 を上限とする。Java は到達可能な original/filtered graph、Rust は public arena 全体を検査する。内部 CST 表現の違いにより、同じ文法でも node/edge/work 数は一致するとは限らない。
 
+通常の original tree / forest は、一度の iterative DFS で作る祖先区間を使う。索引構築は O(node + original edge)、各 filtered / capture shortcut の厳密な子孫判定は O(1) であり、平坦化された子ごとに元 subtree を繰り返し探索しない。判定は node identity に基づき、source span の包含を仮定しない。同じ original parent からの重複 edge は索引を利用できるが、実投影の反復訪問は従来どおり計上する。複数の異なる original parent を持つ DAG は従来の上限付き正確な探索を保つ。公開 Token の mutable parent backpointer は索引に使用しない。
+
 構造検査は bounded な table と iterative stack を使う。通常の走査は node/edge 数に比例し、capture/filtered shortcut の到達性検査には独立した 8,388,608 work 上限を適用する。Rust の private offset 検証は入力も単一走査するが、新しい全文座標表や入力のコピーを作らない。preferred snapshot は従来の所有契約に従い、検証成功後に原文と CP 境界表を保持するため、別途 O(input) の出力領域を必要とする。Java は text を materialize する前に CP accessor で UTF-8 長を計数し、同じ token の計数結果をその mapping call 内だけ保持する。
 
 DAG の静的な children/capture union 経路数を投影回数とみなさない。合法な capture shortcut を二重経路として指数的に数えてしまうため、実際の mapper/helper 呼出しと走査を call-local budget に計上する。node の訪問には、その node の child/capture 数も加算する。nested snapshot は既存の局所上限に加えて、累計 snapshot element/text を計上する。
@@ -29,4 +31,4 @@ Rust preferred `MappingLimits` の既存既定値（candidate 4,096、projection
 
 budget と検証 table は呼出し単位。Java は各公開 mapping 入口で memo/span layer を新規化し、投影失敗時に部分 memo/span を破棄する。成功して既に返した source snapshot は保持され、後の失敗や別 parse/map で内容を変えない。Rust の公開 map は呼出しのローカル state を破棄して `Err` を返す。
 
-共通 corpus は `spec-corpus/public-mapper-cst/`。`PublicMapperCstConformanceTest` は Java consumer と Java/native 両 host の Rust 生成 consumer を実 compile/run し、入口ごとの不正グラフ分類、共有 DAG の実投影上限、失敗後の正常値、補助文字の CP span、retained snapshot を照合する。型の正常系は既存の preferred・typed nested・mapped leaf・family・enum・typeof corpus を併用する。
+共通 corpus は `spec-corpus/public-mapper-cst/`。1/64/512/2,048 個の補助文字 Leaf を含む同じ入力について、通常・source snapshot・preferred の各入口で値・全 node の CP 範囲・候補数・retained snapshot を独立期待値と比較する。2,048 個は preferred の既存 4,096 候補上限内であり、検証 work 上限の引上げを必要としない。`PublicMapperCstConformanceTest` は Java consumer と Java/native 両 host の Rust 生成 consumer を実 compile/run し、入口ごとの不正グラフ分類、共有 DAG の実投影上限、失敗後の正常値、補助文字の CP span、retained snapshot を照合する。型の正常系は既存の preferred・typed nested・mapped leaf・family・enum・typeof corpus を併用する。

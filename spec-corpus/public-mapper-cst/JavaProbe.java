@@ -40,6 +40,48 @@ public final class JavaProbe {
         catch(IllegalArgumentException expected) { if(!expected.getMessage().contains("E-MAPPING-LIMIT"))throw expected; }
         if(!((MapperDagAST.Leaf)MapperDagMapper.mapParsedToken(original).ast()).text().equals("😀"))throw new AssertionError("dag cleanup");
     }
+    private static void scaling(List<String> result) {
+        for (int count : new int[] {__SCALING_COUNTS__}) {
+            String input = "[" + "😀".repeat(count) + "]";
+            var parser = MapperScalingParsers.getRootParser();
+            Token token;
+            try (var context = new ParseContext(StringSource.createRootSource(input))) {
+                if (!parser.parse(context).isSucceeded()) throw new AssertionError("scaling parse");
+                token = context.getCurrent().getTokens().stream().filter(t -> t.parser == parser).findFirst().orElseThrow();
+            }
+            var retained = MapperScalingMapper.mapParsedTokenWithSourceMap(token);
+            for (String entry : new String[]{"ordinary","source-map","subtree","subtree-source-map","preferred","subtree-preferred"}) {
+                MapperScalingAST ast;
+                java.util.function.Function<Object, Optional<int[]>> spans;
+                switch (entry) {
+                    case "ordinary": ast = MapperScalingMapper.mapParsedToken(token).ast(); spans = MapperScalingMapper::sourceSpanOf; break;
+                    case "subtree": ast = MapperScalingMapper.mapSubtreeToken(token).ast(); spans = MapperScalingMapper::sourceSpanOf; break;
+                    case "source-map": {
+                        var mapped = MapperScalingMapper.mapParsedTokenWithSourceMap(token); ast = mapped.ast(); spans = mapped::sourceSpanOf; break;
+                    }
+                    case "subtree-source-map": {
+                        var mapped = MapperScalingMapper.mapSubtreeTokenWithSourceMap(token); ast = mapped.ast(); spans = mapped::sourceSpanOf; break;
+                    }
+                    case "preferred": case "subtree-preferred": {
+                        var tree = entry.equals("preferred") ? MapperScalingMapper.mapParsedTree(token) : MapperScalingMapper.mapSubtreeTree(token);
+                        if(tree.candidates().size()!=count+1) throw new AssertionError("scaling inventory");
+                        var mapped=tree.selectDefault().sourceMap(); ast=mapped.ast(); spans=mapped::sourceSpanOf; break;
+                    }
+                    default: throw new AssertionError(entry);
+                }
+                var root = (MapperScalingAST.Root) ast;
+                if (root.value().size()!=count) throw new AssertionError("scaling cardinality");
+                if (!Arrays.equals(new int[]{0,count+2},spans.apply(root).orElseThrow())) throw new AssertionError("scaling root span");
+                for(int index=0; index<count; index++) {
+                    var leaf=root.value().get(index);
+                    if(!leaf.text().equals("😀"))throw new AssertionError("scaling leaf text");
+                    if(!Arrays.equals(new int[]{index+1,index+2},spans.apply(leaf).orElseThrow()))throw new AssertionError("scaling leaf span");
+                }
+                if(!Arrays.equals(new int[]{0,count+2},retained.sourceSpanOf(retained.ast()).orElseThrow()))throw new AssertionError("scaling retained span");
+                result.add("scaling-"+count+"\t"+entry+"\tOK");
+            }
+        }
+    }
     public static List<String> run(String input, String[] ids) {
         var retained = MapperGuardMapper.mapParsedTokenWithSourceMap(parsed(input));
         var result = new ArrayList<String>();
@@ -71,6 +113,7 @@ public final class JavaProbe {
             if (MapperGuardMapper.mapParsedTree(parsed(input)).candidates().size() != 3) throw new AssertionError("candidates");
         }
         dag();
+        scaling(result);
         return result;
     }
 }
