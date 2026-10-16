@@ -40,9 +40,10 @@ public class ZeroWidthSourceRuntimeTest {
         var diagnostics = new DiagnosticCollector<JavaFileObject>();
         var output = temporary.newFolder().toPath();
         try (var manager = compiler.getStandardFileManager(diagnostics, Locale.ROOT, StandardCharsets.UTF_8)) {
-            assertTrue(diagnostics.getDiagnostics().toString(), compiler.getTask(null, manager, diagnostics,
+            boolean compiled = compiler.getTask(null, manager, diagnostics,
                 List.of("--release", "17", "-classpath", System.getProperty("java.class.path"),
-                    "-d", output.toString()), null, units).call());
+                    "-d", output.toString()), null, units).call();
+            assertTrue(diagnostics.getDiagnostics().toString(), compiled);
         }
         return new URLClassLoader(new URL[]{output.toUri().toURL()}, getClass().getClassLoader());
     }

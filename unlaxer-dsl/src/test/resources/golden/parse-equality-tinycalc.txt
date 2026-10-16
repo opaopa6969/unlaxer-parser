@@ -35,7 +35,7 @@ cst.lines=26
   #25 1 consumed TinyCalcSpaceDelimitor subSource 1/1 0/0 [0] 0/0 - ""
 memo table=null
 transactions opened=116 committed=31 rolledBack=85 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=116 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=1
+diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=1 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=1
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -69,7 +69,7 @@ diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 li
 succeeded=true consumedChars=1
 memo table=null
 transactions opened=116 committed=31 rolledBack=85 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=116 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=1
+diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=1 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=1
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -130,7 +130,7 @@ cst.lines=26
   #25 1 consumed TinyCalcSpaceDelimitor subSource 1/1 0/0 [0] 0/0 - ""
 memo failureHits=0 successHits=11 entryCount=5 maxEntryCount=5 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=61 committed=31 rolledBack=30 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=61 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=1
+diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=1 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=1
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -164,7 +164,7 @@ diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 li
 succeeded=true consumedChars=1
 memo failureHits=0 successHits=11 entryCount=12 maxEntryCount=12 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=61 committed=31 rolledBack=30 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=61 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=1
+diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=1 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=1
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -333,7 +333,7 @@ cst.lines=48
   #47 1 consumed TinyCalcSpaceDelimitor subSource 3/3 0/0 [0] 0/0 - ""
 memo table=null
 transactions opened=191 committed=55 rolledBack=136 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=191 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=3 farthestConsumedOffset=3 farthestMatchedOffset=3 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=3
+diagnostics farthestOffset=3 farthestConsumedOffset=3 farthestMatchedOffset=3 line=0 column=3 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=3
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -369,7 +369,7 @@ diagnostics farthestOffset=3 farthestConsumedOffset=3 farthestMatchedOffset=3 li
 succeeded=true consumedChars=3
 memo table=null
 transactions opened=191 committed=55 rolledBack=136 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=191 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=3 farthestConsumedOffset=3 farthestMatchedOffset=3 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=3
+diagnostics farthestOffset=3 farthestConsumedOffset=3 farthestMatchedOffset=3 line=0 column=3 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=3
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -454,7 +454,7 @@ cst.lines=48
   #47 1 consumed TinyCalcSpaceDelimitor subSource 3/3 0/0 [0] 0/0 - ""
 memo failureHits=0 successHits=17 entryCount=9 maxEntryCount=9 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=106 committed=55 rolledBack=51 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=106 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=3 farthestConsumedOffset=3 farthestMatchedOffset=3 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=3
+diagnostics farthestOffset=3 farthestConsumedOffset=3 farthestMatchedOffset=3 line=0 column=3 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=3
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -490,7 +490,7 @@ diagnostics farthestOffset=3 farthestConsumedOffset=3 farthestMatchedOffset=3 li
 succeeded=true consumedChars=3
 memo failureHits=0 successHits=17 entryCount=20 maxEntryCount=20 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=106 committed=55 rolledBack=51 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=106 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=3 farthestConsumedOffset=3 farthestMatchedOffset=3 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=3
+diagnostics farthestOffset=3 farthestConsumedOffset=3 farthestMatchedOffset=3 line=0 column=3 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=3
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -721,7 +721,7 @@ cst.lines=64
   #63 1 consumed TinyCalcSpaceDelimitor subSource 5/5 0/0 [0] 0/0 - ""
 memo table=null
 transactions opened=235 committed=72 rolledBack=163 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=235 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=5 farthestConsumedOffset=5 farthestMatchedOffset=5 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=5
+diagnostics farthestOffset=5 farthestConsumedOffset=5 farthestMatchedOffset=5 line=0 column=5 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=5
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -759,7 +759,7 @@ diagnostics farthestOffset=5 farthestConsumedOffset=5 farthestMatchedOffset=5 li
 succeeded=true consumedChars=5
 memo table=null
 transactions opened=235 committed=72 rolledBack=163 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=235 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=5 farthestConsumedOffset=5 farthestMatchedOffset=5 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=5
+diagnostics farthestOffset=5 farthestConsumedOffset=5 farthestMatchedOffset=5 line=0 column=5 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=5
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -862,7 +862,7 @@ cst.lines=64
   #63 1 consumed TinyCalcSpaceDelimitor subSource 5/5 0/0 [0] 0/0 - ""
 memo failureHits=0 successHits=19 entryCount=12 maxEntryCount=12 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=140 committed=72 rolledBack=68 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=140 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=5 farthestConsumedOffset=5 farthestMatchedOffset=5 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=5
+diagnostics farthestOffset=5 farthestConsumedOffset=5 farthestMatchedOffset=5 line=0 column=5 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=5
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -900,7 +900,7 @@ diagnostics farthestOffset=5 farthestConsumedOffset=5 farthestMatchedOffset=5 li
 succeeded=true consumedChars=5
 memo failureHits=0 successHits=19 entryCount=25 maxEntryCount=25 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=140 committed=72 rolledBack=68 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=140 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=5 farthestConsumedOffset=5 farthestMatchedOffset=5 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=5
+diagnostics farthestOffset=5 farthestConsumedOffset=5 farthestMatchedOffset=5 line=0 column=5 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=5
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -1185,7 +1185,7 @@ cst.lines=84
   #83 1 consumed TinyCalcSpaceDelimitor subSource 7/7 0/0 [0] 0/0 - ""
 memo table=null
 transactions opened=323 committed=92 rolledBack=231 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=323 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=7 farthestConsumedOffset=7 farthestMatchedOffset=7 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=7
+diagnostics farthestOffset=7 farthestConsumedOffset=7 farthestMatchedOffset=7 line=0 column=7 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=7
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -1221,7 +1221,7 @@ diagnostics farthestOffset=7 farthestConsumedOffset=7 farthestMatchedOffset=7 li
 succeeded=true consumedChars=7
 memo table=null
 transactions opened=323 committed=92 rolledBack=231 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=323 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=7 farthestConsumedOffset=7 farthestMatchedOffset=7 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=7
+diagnostics farthestOffset=7 farthestConsumedOffset=7 farthestMatchedOffset=7 line=0 column=7 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=7
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -1342,7 +1342,7 @@ cst.lines=84
   #83 1 consumed TinyCalcSpaceDelimitor subSource 7/7 0/0 [0] 0/0 - ""
 memo failureHits=0 successHits=29 entryCount=16 maxEntryCount=16 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=178 committed=92 rolledBack=86 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=178 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=7 farthestConsumedOffset=7 farthestMatchedOffset=7 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=7
+diagnostics farthestOffset=7 farthestConsumedOffset=7 farthestMatchedOffset=7 line=0 column=7 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=7
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -1378,7 +1378,7 @@ diagnostics farthestOffset=7 farthestConsumedOffset=7 farthestMatchedOffset=7 li
 succeeded=true consumedChars=7
 memo failureHits=0 successHits=29 entryCount=34 maxEntryCount=34 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=178 committed=92 rolledBack=86 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=178 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=7 farthestConsumedOffset=7 farthestMatchedOffset=7 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=7
+diagnostics farthestOffset=7 farthestConsumedOffset=7 farthestMatchedOffset=7 line=0 column=7 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=7
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -1639,7 +1639,7 @@ cst.lines=22
   #21 1 consumed TinyCalcSpaceDelimitor subSource 1/1 0/0 [0] 0/0 - ""
 memo table=null
 transactions opened=119 committed=26 rolledBack=93 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=119 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=1
+diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=1 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=1
   expectedParsers=[AlphabetNumericUnderScoreParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', AlphabetNumericUnderScoreParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -1669,7 +1669,7 @@ diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 li
 succeeded=true consumedChars=1
 memo table=null
 transactions opened=119 committed=26 rolledBack=93 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=119 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=1
+diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=1 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=1
   expectedParsers=[AlphabetNumericUnderScoreParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', AlphabetNumericUnderScoreParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -1722,7 +1722,7 @@ cst.lines=22
   #21 1 consumed TinyCalcSpaceDelimitor subSource 1/1 0/0 [0] 0/0 - ""
 memo failureHits=0 successHits=11 entryCount=5 maxEntryCount=5 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=64 committed=26 rolledBack=38 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=64 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=1
+diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=1 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=1
   expectedParsers=[AlphabetNumericUnderScoreParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', AlphabetNumericUnderScoreParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -1752,7 +1752,7 @@ diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 li
 succeeded=true consumedChars=1
 memo failureHits=0 successHits=11 entryCount=12 maxEntryCount=12 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=64 committed=26 rolledBack=38 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=64 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=1
+diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=1 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=1
   expectedParsers=[AlphabetNumericUnderScoreParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', AlphabetNumericUnderScoreParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -1921,7 +1921,7 @@ cst.lines=60
   #59 1 consumed TinyCalcSpaceDelimitor subSource 9/9 0/0 [0] 0/0 - ""
 memo table=null
 transactions opened=197 committed=61 rolledBack=136 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=197 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=9
+diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=9 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=9
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -1952,7 +1952,7 @@ diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 li
 succeeded=true consumedChars=9
 memo table=null
 transactions opened=197 committed=61 rolledBack=136 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=197 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=9
+diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=9 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=9
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -2044,7 +2044,7 @@ cst.lines=60
   #59 1 consumed TinyCalcSpaceDelimitor subSource 9/9 0/0 [0] 0/0 - ""
 memo failureHits=0 successHits=13 entryCount=13 maxEntryCount=13 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=132 committed=61 rolledBack=71 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=132 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=9
+diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=9 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=9
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -2075,7 +2075,7 @@ diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 li
 succeeded=true consumedChars=9
 memo failureHits=0 successHits=13 entryCount=24 maxEntryCount=24 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=132 committed=61 rolledBack=71 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=132 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=9
+diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=9 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=9
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -2363,7 +2363,7 @@ cst.lines=102
   #101 1 consumed TinyCalcSpaceDelimitor subSource 9/9 0/0 [0] 0/0 - ""
 memo table=null
 transactions opened=356 committed=113 rolledBack=243 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=356 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=9
+diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=9 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=9
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -2399,7 +2399,7 @@ diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 li
 succeeded=true consumedChars=9
 memo table=null
 transactions opened=356 committed=113 rolledBack=243 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=356 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=9
+diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=9 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=9
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -2538,7 +2538,7 @@ cst.lines=102
   #101 1 consumed TinyCalcSpaceDelimitor subSource 9/9 0/0 [0] 0/0 - ""
 memo failureHits=0 successHits=27 entryCount=19 maxEntryCount=19 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=221 committed=113 rolledBack=108 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=221 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=9
+diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=9 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=9
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -2574,7 +2574,7 @@ diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 li
 succeeded=true consumedChars=9
 memo failureHits=0 successHits=27 entryCount=38 maxEntryCount=38 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=221 committed=113 rolledBack=108 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=221 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=9
+diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=9 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=9
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -2955,7 +2955,7 @@ cst.lines=106
   #105 1 consumed TinyCalcSpaceDelimitor subSource 9/9 0/0 [0] 0/0 - ""
 memo table=null
 transactions opened=468 committed=111 rolledBack=357 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=468 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=9
+diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=9 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=9
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -2985,7 +2985,7 @@ diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 li
 succeeded=true consumedChars=9
 memo table=null
 transactions opened=468 committed=111 rolledBack=357 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=468 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=9
+diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=9 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=9
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -3122,7 +3122,7 @@ cst.lines=106
   #105 1 consumed TinyCalcSpaceDelimitor subSource 9/9 0/0 [0] 0/0 - ""
 memo failureHits=0 successHits=51 entryCount=21 maxEntryCount=21 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=213 committed=111 rolledBack=102 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=213 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=9
+diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=9 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=9
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -3152,7 +3152,7 @@ diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 li
 succeeded=true consumedChars=9
 memo failureHits=0 successHits=51 entryCount=48 maxEntryCount=48 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=213 committed=111 rolledBack=102 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=213 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=9
+diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=9 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=9
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -3609,7 +3609,7 @@ cst.lines=180
   #179 1 consumed TinyCalcSpaceDelimitor subSource 15/15 0/0 [0] 0/0 - ""
 memo table=null
 transactions opened=641 committed=199 rolledBack=442 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=641 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=15 farthestConsumedOffset=15 farthestMatchedOffset=15 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=15
+diagnostics farthestOffset=15 farthestConsumedOffset=15 farthestMatchedOffset=15 line=0 column=15 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=15
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -3645,7 +3645,7 @@ diagnostics farthestOffset=15 farthestConsumedOffset=15 farthestMatchedOffset=15
 succeeded=true consumedChars=15
 memo table=null
 transactions opened=641 committed=199 rolledBack=442 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=641 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=15 farthestConsumedOffset=15 farthestMatchedOffset=15 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=15
+diagnostics farthestOffset=15 farthestConsumedOffset=15 farthestMatchedOffset=15 line=0 column=15 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=15
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -3862,7 +3862,7 @@ cst.lines=180
   #179 1 consumed TinyCalcSpaceDelimitor subSource 15/15 0/0 [0] 0/0 - ""
 memo failureHits=0 successHits=53 entryCount=33 maxEntryCount=33 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=376 committed=199 rolledBack=177 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=376 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=15 farthestConsumedOffset=15 farthestMatchedOffset=15 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=15
+diagnostics farthestOffset=15 farthestConsumedOffset=15 farthestMatchedOffset=15 line=0 column=15 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=15
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -3898,7 +3898,7 @@ diagnostics farthestOffset=15 farthestConsumedOffset=15 farthestMatchedOffset=15
 succeeded=true consumedChars=15
 memo failureHits=0 successHits=53 entryCount=68 maxEntryCount=68 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=376 committed=199 rolledBack=177 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=376 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=15 farthestConsumedOffset=15 farthestMatchedOffset=15 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=15
+diagnostics farthestOffset=15 farthestConsumedOffset=15 farthestMatchedOffset=15 line=0 column=15 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=15
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -4471,7 +4471,7 @@ cst.lines=142
   #141 1 consumed TinyCalcSpaceDelimitor subSource 13/13 0/0 [0] 0/0 - ""
 memo table=null
 transactions opened=532 committed=153 rolledBack=379 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=532 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=13 farthestConsumedOffset=13 farthestMatchedOffset=13 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=13
+diagnostics farthestOffset=13 farthestConsumedOffset=13 farthestMatchedOffset=13 line=0 column=13 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=13
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -4503,7 +4503,7 @@ diagnostics farthestOffset=13 farthestConsumedOffset=13 farthestMatchedOffset=13
 succeeded=true consumedChars=13
 memo table=null
 transactions opened=532 committed=153 rolledBack=379 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=532 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=13 farthestConsumedOffset=13 farthestMatchedOffset=13 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=13
+diagnostics farthestOffset=13 farthestConsumedOffset=13 farthestMatchedOffset=13 line=0 column=13 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=13
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -4678,7 +4678,7 @@ cst.lines=142
   #141 1 consumed TinyCalcSpaceDelimitor subSource 13/13 0/0 [0] 0/0 - ""
 memo failureHits=0 successHits=47 entryCount=27 maxEntryCount=27 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=297 committed=153 rolledBack=144 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=297 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=13 farthestConsumedOffset=13 farthestMatchedOffset=13 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=13
+diagnostics farthestOffset=13 farthestConsumedOffset=13 farthestMatchedOffset=13 line=0 column=13 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=13
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -4710,7 +4710,7 @@ diagnostics farthestOffset=13 farthestConsumedOffset=13 farthestMatchedOffset=13
 succeeded=true consumedChars=13
 memo failureHits=0 successHits=47 entryCount=56 maxEntryCount=56 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=297 committed=153 rolledBack=144 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=297 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=13 farthestConsumedOffset=13 farthestMatchedOffset=13 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=13
+diagnostics farthestOffset=13 farthestConsumedOffset=13 farthestMatchedOffset=13 line=0 column=13 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=13
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -5302,7 +5302,7 @@ cst.lines=241
   #240 1 consumed TinyCalcSpaceDelimitor subSource 24/24 0/0 [0] 0/0 - ""
 memo table=null
 transactions opened=847 committed=259 rolledBack=588 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=847 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=24 farthestConsumedOffset=24 farthestMatchedOffset=24 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=24
+diagnostics farthestOffset=24 farthestConsumedOffset=24 farthestMatchedOffset=24 line=0 column=24 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=24
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -5336,7 +5336,7 @@ diagnostics farthestOffset=24 farthestConsumedOffset=24 farthestMatchedOffset=24
 succeeded=true consumedChars=24
 memo table=null
 transactions opened=847 committed=259 rolledBack=588 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=847 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=24 farthestConsumedOffset=24 farthestMatchedOffset=24 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=24
+diagnostics farthestOffset=24 farthestConsumedOffset=24 farthestMatchedOffset=24 line=0 column=24 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=24
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -5612,7 +5612,7 @@ cst.lines=241
   #240 1 consumed TinyCalcSpaceDelimitor subSource 24/24 0/0 [0] 0/0 - ""
 memo failureHits=0 successHits=69 entryCount=45 maxEntryCount=45 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=502 committed=259 rolledBack=243 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=502 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=24 farthestConsumedOffset=24 farthestMatchedOffset=24 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=24
+diagnostics farthestOffset=24 farthestConsumedOffset=24 farthestMatchedOffset=24 line=0 column=24 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=24
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -5646,7 +5646,7 @@ diagnostics farthestOffset=24 farthestConsumedOffset=24 farthestMatchedOffset=24
 succeeded=true consumedChars=24
 memo failureHits=0 successHits=69 entryCount=90 maxEntryCount=90 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=502 committed=259 rolledBack=243 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=502 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=24 farthestConsumedOffset=24 farthestMatchedOffset=24 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=24
+diagnostics farthestOffset=24 farthestConsumedOffset=24 farthestMatchedOffset=24 line=0 column=24 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=24
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -6269,7 +6269,7 @@ cst.lines=72
   #71 1 consumed TinyCalcSpaceDelimitor subSource 14/14 0/0 [0] 0/0 - ""
 memo table=null
 transactions opened=265 committed=72 rolledBack=193 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=265 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=14 farthestConsumedOffset=14 farthestMatchedOffset=14 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=14
+diagnostics farthestOffset=14 farthestConsumedOffset=14 farthestMatchedOffset=14 line=0 column=14 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=14
   expectedParsers=[AlphabetNumericUnderScoreParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', AlphabetNumericUnderScoreParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -6299,7 +6299,7 @@ diagnostics farthestOffset=14 farthestConsumedOffset=14 farthestMatchedOffset=14
 succeeded=true consumedChars=14
 memo table=null
 transactions opened=265 committed=72 rolledBack=193 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=265 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=14 farthestConsumedOffset=14 farthestMatchedOffset=14 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=14
+diagnostics farthestOffset=14 farthestConsumedOffset=14 farthestMatchedOffset=14 line=0 column=14 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=14
   expectedParsers=[AlphabetNumericUnderScoreParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', AlphabetNumericUnderScoreParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -6402,7 +6402,7 @@ cst.lines=72
   #71 1 consumed TinyCalcSpaceDelimitor subSource 14/14 0/0 [0] 0/0 - ""
 memo failureHits=0 successHits=20 entryCount=16 maxEntryCount=16 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=165 committed=72 rolledBack=93 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=165 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=14 farthestConsumedOffset=14 farthestMatchedOffset=14 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=14
+diagnostics farthestOffset=14 farthestConsumedOffset=14 farthestMatchedOffset=14 line=0 column=14 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=14
   expectedParsers=[AlphabetNumericUnderScoreParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', AlphabetNumericUnderScoreParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -6432,7 +6432,7 @@ diagnostics farthestOffset=14 farthestConsumedOffset=14 farthestMatchedOffset=14
 succeeded=true consumedChars=14
 memo failureHits=0 successHits=20 entryCount=30 maxEntryCount=30 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=165 committed=72 rolledBack=93 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=165 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=14 farthestConsumedOffset=14 farthestMatchedOffset=14 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=14
+diagnostics farthestOffset=14 farthestConsumedOffset=14 farthestMatchedOffset=14 line=0 column=14 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=14
   expectedParsers=[AlphabetNumericUnderScoreParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', AlphabetNumericUnderScoreParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -7081,7 +7081,7 @@ cst.lines=156
   #155 1 consumed TinyCalcSpaceDelimitor subSource 31/31 0/0 [0] 0/0 - ""
 memo table=null
 transactions opened=533 committed=154 rolledBack=379 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=533 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=31 farthestConsumedOffset=31 farthestMatchedOffset=31 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=31
+diagnostics farthestOffset=31 farthestConsumedOffset=31 farthestMatchedOffset=31 line=0 column=31 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=31
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -7117,7 +7117,7 @@ diagnostics farthestOffset=31 farthestConsumedOffset=31 farthestMatchedOffset=31
 succeeded=true consumedChars=31
 memo table=null
 transactions opened=533 committed=154 rolledBack=379 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=533 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=31 farthestConsumedOffset=31 farthestMatchedOffset=31 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=31
+diagnostics farthestOffset=31 farthestConsumedOffset=31 farthestMatchedOffset=31 line=0 column=31 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=31
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -7310,7 +7310,7 @@ cst.lines=156
   #155 1 consumed TinyCalcSpaceDelimitor subSource 31/31 0/0 [0] 0/0 - ""
 memo failureHits=0 successHits=37 entryCount=34 maxEntryCount=34 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=348 committed=154 rolledBack=194 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=348 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=31 farthestConsumedOffset=31 farthestMatchedOffset=31 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=31
+diagnostics farthestOffset=31 farthestConsumedOffset=31 farthestMatchedOffset=31 line=0 column=31 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=31
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -7346,7 +7346,7 @@ diagnostics farthestOffset=31 farthestConsumedOffset=31 farthestMatchedOffset=31
 succeeded=true consumedChars=31
 memo failureHits=0 successHits=37 entryCount=61 maxEntryCount=61 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=348 committed=154 rolledBack=194 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=348 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=31 farthestConsumedOffset=31 farthestMatchedOffset=31 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=31
+diagnostics farthestOffset=31 farthestConsumedOffset=31 farthestMatchedOffset=31 line=0 column=31 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=31
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -7793,7 +7793,7 @@ cst.lines=64
   #63 1 consumed TinyCalcSpaceDelimitor subSource 10/10 0/0 [0] 0/0 - ""
 memo table=null
 transactions opened=241 committed=66 rolledBack=175 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=241 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=10 farthestConsumedOffset=10 farthestMatchedOffset=10 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=10
+diagnostics farthestOffset=10 farthestConsumedOffset=10 farthestMatchedOffset=10 line=0 column=10 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=10
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -7829,7 +7829,7 @@ diagnostics farthestOffset=10 farthestConsumedOffset=10 farthestMatchedOffset=10
 succeeded=true consumedChars=10
 memo table=null
 transactions opened=241 committed=66 rolledBack=175 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=241 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=10 farthestConsumedOffset=10 farthestMatchedOffset=10 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=10
+diagnostics farthestOffset=10 farthestConsumedOffset=10 farthestMatchedOffset=10 line=0 column=10 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=10
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -7930,7 +7930,7 @@ cst.lines=64
   #63 1 consumed TinyCalcSpaceDelimitor subSource 10/10 0/0 [0] 0/0 - ""
 memo failureHits=0 successHits=19 entryCount=14 maxEntryCount=14 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=146 committed=66 rolledBack=80 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=146 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=10 farthestConsumedOffset=10 farthestMatchedOffset=10 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=10
+diagnostics farthestOffset=10 farthestConsumedOffset=10 farthestMatchedOffset=10 line=0 column=10 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=10
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -7966,7 +7966,7 @@ diagnostics farthestOffset=10 farthestConsumedOffset=10 farthestMatchedOffset=10
 succeeded=true consumedChars=10
 memo failureHits=0 successHits=19 entryCount=27 maxEntryCount=27 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=146 committed=66 rolledBack=80 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=146 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=10 farthestConsumedOffset=10 farthestMatchedOffset=10 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=10
+diagnostics farthestOffset=10 farthestConsumedOffset=10 farthestMatchedOffset=10 line=0 column=10 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=10
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -8386,7 +8386,7 @@ cst.lines=221
   #220 1 consumed TinyCalcSpaceDelimitor subSource 49/49 0/0 [0] 0/0 - ""
 memo table=null
 transactions opened=728 committed=206 rolledBack=522 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=728 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=49 farthestConsumedOffset=49 farthestMatchedOffset=49 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="AlphabetNumericUnderScoreParser" deepestConsumedPosition=49
+diagnostics farthestOffset=49 farthestConsumedOffset=49 farthestMatchedOffset=49 line=0 column=49 hasFailureCandidate=true deepestMatchedRule="AlphabetNumericUnderScoreParser" deepestConsumedPosition=49
   expectedParsers=[AlphabetNumericUnderScoreParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', AlphabetNumericUnderScoreParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -8417,7 +8417,7 @@ diagnostics farthestOffset=49 farthestConsumedOffset=49 farthestMatchedOffset=49
 succeeded=true consumedChars=49
 memo table=null
 transactions opened=728 committed=206 rolledBack=522 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=728 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=49 farthestConsumedOffset=49 farthestMatchedOffset=49 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="AlphabetNumericUnderScoreParser" deepestConsumedPosition=49
+diagnostics farthestOffset=49 farthestConsumedOffset=49 farthestMatchedOffset=49 line=0 column=49 hasFailureCandidate=true deepestMatchedRule="AlphabetNumericUnderScoreParser" deepestConsumedPosition=49
   expectedParsers=[AlphabetNumericUnderScoreParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', AlphabetNumericUnderScoreParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -8670,7 +8670,7 @@ cst.lines=221
   #220 1 consumed TinyCalcSpaceDelimitor subSource 49/49 0/0 [0] 0/0 - ""
 memo failureHits=0 successHits=58 entryCount=41 maxEntryCount=41 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=438 committed=206 rolledBack=232 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=438 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=49 farthestConsumedOffset=49 farthestMatchedOffset=49 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="AlphabetNumericUnderScoreParser" deepestConsumedPosition=49
+diagnostics farthestOffset=49 farthestConsumedOffset=49 farthestMatchedOffset=49 line=0 column=49 hasFailureCandidate=true deepestMatchedRule="AlphabetNumericUnderScoreParser" deepestConsumedPosition=49
   expectedParsers=[AlphabetNumericUnderScoreParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', AlphabetNumericUnderScoreParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -8701,7 +8701,7 @@ diagnostics farthestOffset=49 farthestConsumedOffset=49 farthestMatchedOffset=49
 succeeded=true consumedChars=49
 memo failureHits=0 successHits=58 entryCount=79 maxEntryCount=79 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=438 committed=206 rolledBack=232 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=438 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=49 farthestConsumedOffset=49 farthestMatchedOffset=49 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="AlphabetNumericUnderScoreParser" deepestConsumedPosition=49
+diagnostics farthestOffset=49 farthestConsumedOffset=49 farthestMatchedOffset=49 line=0 column=49 hasFailureCandidate=true deepestMatchedRule="AlphabetNumericUnderScoreParser" deepestConsumedPosition=49
   expectedParsers=[AlphabetNumericUnderScoreParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', AlphabetNumericUnderScoreParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -9409,7 +9409,7 @@ succeeded=false consumedChars=0
 cst.lines=0
 memo table=null
 transactions opened=66 committed=8 rolledBack=58 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=66 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=1
+diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=1 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=1
   expectedParsers=[DigitParser, OneOrMore, '.', Chain]
   expectedTokens=['.', Chain, DigitParser, OneOrMore]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -9433,7 +9433,7 @@ diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 li
 succeeded=false consumedChars=0
 memo table=null
 transactions opened=66 committed=8 rolledBack=58 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=66 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=1
+diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=1 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=1
   expectedParsers=[DigitParser, OneOrMore, '.', Chain]
   expectedTokens=['.', Chain, DigitParser, OneOrMore]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -9458,7 +9458,7 @@ succeeded=false consumedChars=0
 cst.lines=0
 memo failureHits=0 successHits=5 entryCount=2 maxEntryCount=2 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=41 committed=8 rolledBack=33 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=41 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=1
+diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=1 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=1
   expectedParsers=[DigitParser, OneOrMore, '.', Chain]
   expectedTokens=['.', Chain, DigitParser, OneOrMore]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -9482,7 +9482,7 @@ diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 li
 succeeded=false consumedChars=0
 memo failureHits=0 successHits=5 entryCount=7 maxEntryCount=7 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=41 committed=8 rolledBack=33 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=41 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=1
+diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=1 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=1
   expectedParsers=[DigitParser, OneOrMore, '.', Chain]
   expectedTokens=['.', Chain, DigitParser, OneOrMore]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -9767,7 +9767,7 @@ cst.lines=26
   #25 1 consumed TinyCalcSpaceDelimitor subSource 1/1 0/0 [0] 0/0 - ""
 memo table=null
 transactions opened=154 committed=37 rolledBack=117 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=154 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=2
+diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 line=0 column=2 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=2
   expectedParsers=[' ', '//', '/*', '*/', '(', ')', SignParser, DigitParser, OneOrMore, '.', Chain, NumberParser, AlphabetUnderScoreParser, IdentifierParser, __CaptureSite, TermParser]
   expectedTokens=[' ', '(', ')', '*/', '.', '/*', '//', AlphabetUnderScoreParser, Chain, DigitParser, IdentifierParser, NumberParser, OneOrMore, SignParser, TermParser, __CaptureSite]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -9805,7 +9805,7 @@ diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 li
 succeeded=true consumedChars=1
 memo table=null
 transactions opened=154 committed=37 rolledBack=117 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=154 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=2
+diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 line=0 column=2 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=2
   expectedParsers=[' ', '//', '/*', '*/', '(', ')', SignParser, DigitParser, OneOrMore, '.', Chain, NumberParser, AlphabetUnderScoreParser, IdentifierParser, __CaptureSite, TermParser]
   expectedTokens=[' ', '(', ')', '*/', '.', '/*', '//', AlphabetUnderScoreParser, Chain, DigitParser, IdentifierParser, NumberParser, OneOrMore, SignParser, TermParser, __CaptureSite]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -9870,7 +9870,7 @@ cst.lines=26
   #25 1 consumed TinyCalcSpaceDelimitor subSource 1/1 0/0 [0] 0/0 - ""
 memo failureHits=0 successHits=13 entryCount=6 maxEntryCount=6 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=1
 transactions opened=89 committed=37 rolledBack=52 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=89 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=2
+diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 line=0 column=2 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=2
   expectedParsers=[' ', '//', '/*', '*/', '(', ')', SignParser, DigitParser, OneOrMore, '.', Chain, NumberParser, AlphabetUnderScoreParser, IdentifierParser, __CaptureSite, TermParser]
   expectedTokens=[' ', '(', ')', '*/', '.', '/*', '//', AlphabetUnderScoreParser, Chain, DigitParser, IdentifierParser, NumberParser, OneOrMore, SignParser, TermParser, __CaptureSite]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -9908,7 +9908,7 @@ diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 li
 succeeded=true consumedChars=1
 memo failureHits=0 successHits=13 entryCount=15 maxEntryCount=15 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=1
 transactions opened=89 committed=37 rolledBack=52 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=89 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=2
+diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 line=0 column=2 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=2
   expectedParsers=[' ', '//', '/*', '*/', '(', ')', SignParser, DigitParser, OneOrMore, '.', Chain, NumberParser, AlphabetUnderScoreParser, IdentifierParser, __CaptureSite, TermParser]
   expectedTokens=[' ', '(', ')', '*/', '.', '/*', '//', AlphabetUnderScoreParser, Chain, DigitParser, IdentifierParser, NumberParser, OneOrMore, SignParser, TermParser, __CaptureSite]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -10033,7 +10033,7 @@ succeeded=false consumedChars=0
 cst.lines=0
 memo table=null
 transactions opened=162 committed=34 rolledBack=128 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=162 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=2
+diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 line=0 column=2 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=2
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser, ')']
   expectedTokens=[' ', ')', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -10074,7 +10074,7 @@ diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 li
 succeeded=false consumedChars=0
 memo table=null
 transactions opened=162 committed=34 rolledBack=128 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=162 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=2
+diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 line=0 column=2 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=2
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser, ')']
   expectedTokens=[' ', ')', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -10116,7 +10116,7 @@ succeeded=false consumedChars=0
 cst.lines=0
 memo failureHits=0 successHits=14 entryCount=6 maxEntryCount=6 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=92 committed=34 rolledBack=58 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=92 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=2
+diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 line=0 column=2 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=2
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser, ')']
   expectedTokens=[' ', ')', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -10157,7 +10157,7 @@ diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 li
 succeeded=false consumedChars=0
 memo failureHits=0 successHits=14 entryCount=16 maxEntryCount=16 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=92 committed=34 rolledBack=58 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=92 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=2
+diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 line=0 column=2 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=2
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser, ')']
   expectedTokens=[' ', ')', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -11761,7 +11761,7 @@ succeeded=false consumedChars=0
 cst.lines=0
 memo table=null
 transactions opened=325 committed=78 rolledBack=247 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=325 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=6 farthestConsumedOffset=6 farthestMatchedOffset=6 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=6
+diagnostics farthestOffset=6 farthestConsumedOffset=6 farthestMatchedOffset=6 line=0 column=6 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=6
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser, ')']
   expectedTokens=[' ', ')', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -11798,7 +11798,7 @@ diagnostics farthestOffset=6 farthestConsumedOffset=6 farthestMatchedOffset=6 li
 succeeded=false consumedChars=0
 memo table=null
 transactions opened=325 committed=78 rolledBack=247 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=325 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=6 farthestConsumedOffset=6 farthestMatchedOffset=6 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=6
+diagnostics farthestOffset=6 farthestConsumedOffset=6 farthestMatchedOffset=6 line=0 column=6 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=6
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser, ')']
   expectedTokens=[' ', ')', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -11836,7 +11836,7 @@ succeeded=false consumedChars=0
 cst.lines=0
 memo failureHits=0 successHits=30 entryCount=14 maxEntryCount=14 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=175 committed=78 rolledBack=97 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=175 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=6 farthestConsumedOffset=6 farthestMatchedOffset=6 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=6
+diagnostics farthestOffset=6 farthestConsumedOffset=6 farthestMatchedOffset=6 line=0 column=6 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=6
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser, ')']
   expectedTokens=[' ', ')', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -11873,7 +11873,7 @@ diagnostics farthestOffset=6 farthestConsumedOffset=6 farthestMatchedOffset=6 li
 succeeded=false consumedChars=0
 memo failureHits=0 successHits=30 entryCount=33 maxEntryCount=33 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=175 committed=78 rolledBack=97 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=175 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=6 farthestConsumedOffset=6 farthestMatchedOffset=6 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=6
+diagnostics farthestOffset=6 farthestConsumedOffset=6 farthestMatchedOffset=6 line=0 column=6 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=6
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser, ')']
   expectedTokens=[' ', ')', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -11969,7 +11969,7 @@ cst.lines=24
   #23 1 consumed TinyCalcSpaceDelimitor subSource 3/3 0/0 [0] 0/0 - ""
 memo table=null
 transactions opened=126 committed=29 rolledBack=97 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=126 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=3 farthestConsumedOffset=3 farthestMatchedOffset=3 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=3
+diagnostics farthestOffset=3 farthestConsumedOffset=3 farthestMatchedOffset=3 line=0 column=3 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=3
   expectedParsers=[' ', '//', '/*', '*/', AlphabetUnderScoreParser, IdentifierParser, __CaptureSite, AlphabetNumericUnderScoreParser, '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', AlphabetNumericUnderScoreParser, AlphabetUnderScoreParser, ExpressionRepeat0Parser, IdentifierParser, TermRepeat0Parser, __CaptureSite]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -12002,7 +12002,7 @@ diagnostics farthestOffset=3 farthestConsumedOffset=3 farthestMatchedOffset=3 li
 succeeded=true consumedChars=3
 memo table=null
 transactions opened=126 committed=29 rolledBack=97 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=126 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=3 farthestConsumedOffset=3 farthestMatchedOffset=3 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=3
+diagnostics farthestOffset=3 farthestConsumedOffset=3 farthestMatchedOffset=3 line=0 column=3 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=3
   expectedParsers=[' ', '//', '/*', '*/', AlphabetUnderScoreParser, IdentifierParser, __CaptureSite, AlphabetNumericUnderScoreParser, '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', AlphabetNumericUnderScoreParser, AlphabetUnderScoreParser, ExpressionRepeat0Parser, IdentifierParser, TermRepeat0Parser, __CaptureSite]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -12060,7 +12060,7 @@ cst.lines=24
   #23 1 consumed TinyCalcSpaceDelimitor subSource 3/3 0/0 [0] 0/0 - ""
 memo failureHits=0 successHits=12 entryCount=5 maxEntryCount=5 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=3
 transactions opened=66 committed=29 rolledBack=37 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=66 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=3 farthestConsumedOffset=3 farthestMatchedOffset=3 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=3
+diagnostics farthestOffset=3 farthestConsumedOffset=3 farthestMatchedOffset=3 line=0 column=3 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=3
   expectedParsers=[' ', '//', '/*', '*/', AlphabetUnderScoreParser, IdentifierParser, __CaptureSite, AlphabetNumericUnderScoreParser, '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', AlphabetNumericUnderScoreParser, AlphabetUnderScoreParser, ExpressionRepeat0Parser, IdentifierParser, TermRepeat0Parser, __CaptureSite]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
@@ -12093,7 +12093,7 @@ diagnostics farthestOffset=3 farthestConsumedOffset=3 farthestMatchedOffset=3 li
 succeeded=true consumedChars=3
 memo failureHits=0 successHits=12 entryCount=12 maxEntryCount=12 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=3
 transactions opened=66 committed=29 rolledBack=37 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=66 copyOnWriteDeepCopies=0
-diagnostics farthestOffset=3 farthestConsumedOffset=3 farthestMatchedOffset=3 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=3
+diagnostics farthestOffset=3 farthestConsumedOffset=3 farthestMatchedOffset=3 line=0 column=3 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=3
   expectedParsers=[' ', '//', '/*', '*/', AlphabetUnderScoreParser, IdentifierParser, __CaptureSite, AlphabetNumericUnderScoreParser, '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', AlphabetNumericUnderScoreParser, AlphabetUnderScoreParser, ExpressionRepeat0Parser, IdentifierParser, TermRepeat0Parser, __CaptureSite]
   stack parser=TinyCalcParser depth=0 start=0 maxConsumed=0 maxMatched=0
