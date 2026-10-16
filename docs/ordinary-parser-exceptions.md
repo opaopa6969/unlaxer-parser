@@ -21,7 +21,9 @@ Rust callback が panic した context の再利用は保証しない。unwind �
 - `conformance/ordinary-exceptions/state.tsv`: 9 形式（chain、optional、repeat、choice、negative assertion、match-only、owned capture、capture scope、catch-and-success）。Java/Rust の制御フロー差は別の期待値列に記載する。補助文字を含む入力 `p😀;x` で CP cursor、登録状態、metadata、owned capture、fresh ID 無効化、再試行を比較する。
 - `OrdinaryExceptionOracleTest`: 9 形式 × memoization 2 × diagnostics 3 × manual transaction 2 × abandoned frame 2 = 216 ケース。
 - Rust `ordinary_exception_oracle`: 同じ 9 形式 × 6 モード × transaction 2 = 108 ケース、および panic 後 context 破棄の 4 形式。
-- `spec-corpus/ordinary-exceptions/cases.json` と `OrdinaryParserExceptionConformanceTest`: separated item / separator / tail と typed nested list の item / tail、合計 5 故障位置。Java 生成 consumer は 120 観測、Java host と native host の Rust 生成 consumer は各 60 観測。両 host の Rust 出力一致だけで代替せず、各出力を実 compile/run する。
+- `spec-corpus/ordinary-exceptions/cases.json` と `OrdinaryParserExceptionConformanceTest`: separated item / separator / tail、typed nested list の item / tail、typed nested separated の item / separator / tail、合計 8 故障位置。Java 生成 consumer は 192 観測、Java host と native host の Rust 生成 consumer は各 96 観測。両 host の Rust 出力一致だけで代替せず、各出力を実 compile/run する。
+
+最後の typed nested separated fixture は #646 と本例外境界の統合 gate である。共通入力 `p😀;😀!` の CP1 / CP2 / CP3 で故障させ、再試行後は field を `List<String>` / `Vec<String>` の二つの `😀` として復元する。list boundary の原文範囲は CP1..4、二つの item は CP1..2 / CP3..4 と固定し、separator の `;` は値へ混入させない。通常 CST に separator marker を一つ保持し、その marker 自体は snapshot root として拒否する。外側 manual rollback 後も、保持済み AST source map / boundary snapshot と先行 metadata snapshot は有効である。
 
 生成 consumer は root 末尾に必須の `!` を置く。Rust repetition が callback の `Err` を反復停止として吸収しても、故障位置以降の残りを成功として公開できず root 全体が失敗する。その後、同じ context と parser/grammar で故障を無効化して再試行し、AST 値、CST/AST の原文 CP span、owned scope の復元、保持 snapshot を確認する。native generator と生成実行ファイルは空の `PATH` でも実行する。
 

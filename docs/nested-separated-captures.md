@@ -65,7 +65,11 @@ manual evaluator を検証する。mixed、透過 rule alias/recursive helper、
 consumer を同じ入力で比較し、全生成 Rust file の byte 一致と memo 2種 × diagnostics
 3種の結果を確認する。`conformance/nested-separated/` は状態/outer rollback、
 各 list 位置の sticky resource abort、一般 Generated/Projected snapshot の共有 oracle。
-通常 child callback exception の一般 parser cleanup は依存 #649 で追跡し、Rust の
-Result::Err rollback と panic 後の context 破棄という境界を混同しない。
+通常 child callback exception の一般 parser cleanup は #649 の境界を使用する。
+`OrdinaryParserExceptionConformanceTest` は typed nested separated の first item /
+separator / tail を故障させ、Java の元例外同一性、abandoned/manual frame、登録 state /
+metadata / owned binding の復元と、両ホスト Rust の通常 Err / rollback / retry を
+共通の入力・値・CP境界で確認する。Rust の Result::Err rollback と panic 後の context
+破棄という境界を混同しない。
 
 本機能は #646。親 #583 / #568 の全体完了を意味しない。
