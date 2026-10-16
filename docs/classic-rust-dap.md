@@ -23,6 +23,7 @@ clientはinitialize後、`launch` に `program`（旧Java互換の `formulaSourc
 |---|---|
 | protocol | initialize/launch/configurationDone/setBreakpoints/threads/stackTrace/scopes/variables/next/continue/disconnect。未知/無効requestはfailure response |
 | configuration lifecycle | configurationDone は有効な launch ごとに一度だけ受理する。未 launch・処理済み・終了後・source 準備失敗後の要求は、event を出さず stack/scopes/variables を保持して拒否する。再試行には新しい launch を使う（#504） |
+| breakpoint source | source.path と program を絶対化し、`.` / `..` を字句正規化して比較する。同一の対象だけを検証・更新し、別対象や空・欠落・不正 path は unverified を返して既存 breakpoint を保持する。source 自体の省略/null は現在 program の旧互換略記。同じ正規化 path の relaunch は保持し、対象変更時は消去する。symlink の実体比較は行わない（#507） |
 | thread/frame | 単一thread 1、現在nodeのframe 0、variablesReference 1。値そのもののreferenceは0 |
 | 座標 | 内部spanは原文CP。DAPの開始/終了columnはUTF-16、line/columnの基底はclientのlinesStartAt1/columnsStartAt1に従う。省略時は1-based |
 | CR / LF / CRLF | immutable source snapshotで変換する。CRLF途中の境界は表示可能な位置として受理しない |

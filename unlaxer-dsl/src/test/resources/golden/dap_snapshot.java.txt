@@ -59,6 +59,7 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
         String runtime = String.valueOf(proposed.getOrDefault("runtimeMode", "token"));
         String stepping = String.valueOf(proposed.getOrDefault("steppingMode", inferSteppingMode(runtime)));
         if (program.isBlank() || !("ast".equalsIgnoreCase(stepping) || "token".equalsIgnoreCase(stepping))) return CompletableFuture.failedFuture(new IllegalArgumentException("invalid program or stepping mode"));
+        if (!java.util.Objects.equals(normalizedDebugPath(pendingProgram), normalizedDebugPath(program))) breakpointLines.clear();
         terminated = false;
         stepPoints = List.of(); astNodeTypes = List.of(); astNodeSpans = List.of(); astNodeCount = 0; stepIndex = 0;
         launchArguments = proposed; pendingProgram = program; runtimeMode = runtime; steppingMode = stepping;
@@ -104,21 +105,32 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
 
     @Override
     public CompletableFuture<SetBreakpointsResponse> setBreakpoints(SetBreakpointsArguments args) {
-        breakpointLines.clear();
+        Path target = normalizedDebugPath(pendingProgram);
+        Path requestedPath = args.getSource() == null ? target : normalizedDebugPath(args.getSource().getPath());
+        boolean sameSource = target != null && target.equals(requestedPath);
+        Set<Integer> proposedLines = new HashSet<>();
         SetBreakpointsResponse response = new SetBreakpointsResponse();
         SourceBreakpoint[] requested = args.getBreakpoints();
         int count = requested == null ? 0 : requested.length;
         Breakpoint[] breakpoints = new Breakpoint[count];
         for (int i = 0; i < count; i++) {
             int line = requested[i].getLine();
-            breakpointLines.add(line);
+            proposedLines.add(line);
             Breakpoint bp = new Breakpoint();
-            bp.setVerified(true);
+            bp.setVerified(sameSource);
+            if (!sameSource) bp.setMessage("source does not match launch program");
             bp.setLine(line);
             breakpoints[i] = bp;
         }
+        if (sameSource) { breakpointLines.clear(); breakpointLines.addAll(proposedLines); }
         response.setBreakpoints(breakpoints);
         return CompletableFuture.completedFuture(response);
+    }
+
+    private static Path normalizedDebugPath(String path) {
+        if (path == null || path.isBlank()) return null;
+        try { return Path.of(path).toAbsolutePath().normalize(); }
+        catch (java.nio.file.InvalidPathException | SecurityException error) { return null; }
     }
 
     @Override

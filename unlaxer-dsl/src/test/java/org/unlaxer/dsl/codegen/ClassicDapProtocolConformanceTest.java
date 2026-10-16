@@ -16,7 +16,7 @@ import org.unlaxer.dsl.codegen.rust.RustBackend;
 /** Actual DAP byte frames with independent AST, source and traversal-order expectations. */
 public class ClassicDapProtocolConformanceTest {
     @Rule public org.junit.rules.TemporaryFolder temporary = new org.junit.rules.TemporaryFolder();
-    private static final Gson JSON = new Gson();
+    private static final Gson JSON = new GsonBuilder().serializeNulls().create();
     private final List<String> evidence = new ArrayList<>(List.of("backend\tfixture\tstart_at_1\tline_offset\taccepted\tast_steps"));
     private static final Path ROOT = Path.of("..").toAbsolutePath().normalize();
     @Test public void generatedJavaAndRustShareStrictTypedAstInspection() throws Exception {
@@ -82,6 +82,7 @@ public class ClassicDapProtocolConformanceTest {
     }
     private void exercise(Wire wire,String backend)throws Exception {
         exerciseConfigurationLifecycle(wire, backend);
+        exerciseBreakpointSources(wire, backend);
         var rows=JsonParser.parseString(Files.readString(ROOT.resolve("docs/fixtures/classic-dap/ast.json"))).getAsJsonArray();assertEquals(9,rows.size());
         for(boolean startAt1:List.of(true,false)) for(int offset:List.of(0,7)) {
             assertTrue(wire.request("initialize",Map.of("adapterID","fixture","linesStartAt1",startAt1,"columnsStartAt1",startAt1)).get("supportsConfigurationDoneRequest").getAsBoolean());
@@ -130,6 +131,55 @@ public class ClassicDapProtocolConformanceTest {
         while(true){wire.request("continue",Map.of("threadId",1));var event=wire.oneOf("stopped","output");if(event.get("event").getAsString().equals("output")){wire.event("terminated");wire.event("exited");break;}}
         for(var invalid:List.of(Map.entry("stackTrace",Map.of("threadId",99)),Map.entry("scopes",Map.of("frameId",99)),Map.entry("variables",Map.of("variablesReference",99)),Map.entry("next",Map.of("threadId",1)),Map.entry("launch",Map.of("program","missing","steppingMode","unsupported")))) assertFalse(wire.response(invalid.getKey(),invalid.getValue()).get("success").getAsBoolean());
         assertFalse(wire.response("unknown-fixture-command",Map.of()).get("success").getAsBoolean());wire.request("disconnect",Map.of());
+    }
+    private void exerciseBreakpointSources(Wire wire, String backend) throws Exception {
+        wire.request("initialize", Map.of("adapterID", "breakpoint-source", "linesStartAt1", true));
+        Path program = temporary.newFile("breakpoint-" + backend + "😀.txt").toPath();
+        Path other = temporary.newFile("other-breakpoint-" + backend + ".txt").toPath();
+        Files.writeString(program, "p<a><b>[]x!"); Files.writeString(other, "p<a><b>[]x!");
+        wire.request("launch", Map.of("program", program.toString(), "runtimeMode", "ast")); wire.event("initialized");
+        assertBreakpointVerification(wire, Map.of("source", Map.of("path", program.toString()), "breakpoints", List.of(Map.of("line", 1))), true);
+        // A different source must neither install its lines nor clear this program's lines.
+        assertBreakpointVerification(wire, Map.of("source", Map.of("path", other.toString()), "breakpoints", List.of(Map.of("line", 2))), false);
+        assertTrue(wire.request("setBreakpoints", Map.of("source", Map.of("path", other.toString()), "breakpoints", List.of())).getAsJsonArray("breakpoints").isEmpty());
+        for (var source : List.of(Map.of("path", ""), Map.of("path", "\u0000"), Map.of("name", "missing-path"))) {
+            assertBreakpointVerification(wire, Map.of("source", source, "breakpoints", List.of(Map.of("line", 2))), false);
+        }
+        wire.request("configurationDone", Map.of()); assertEquals("breakpoint", wire.event("stopped").get("reason").getAsString());
+        assertEquals(1, wire.request("stackTrace", Map.of("threadId", 1)).getAsJsonArray("stackFrames").get(0).getAsJsonObject().get("line").getAsInt());
+        finishAtBreakpoints(wire);
+        // Lexical normalization accepts . / .. and relative paths without filesystem canonicalization.
+        wire.request("launch", Map.of("program", program.toString(), "runtimeMode", "ast")); wire.event("initialized");
+        String normalizedAlias = program.getParent().resolve("unused/../" + program.getFileName()).toString();
+        assertBreakpointVerification(wire, Map.of("source", Map.of("path", normalizedAlias), "breakpoints", List.of(Map.of("line", 1))), true);
+        String relative = Path.of("").toAbsolutePath().relativize(program.toAbsolutePath()).toString();
+        assertBreakpointVerification(wire, Map.of("source", Map.of("path", relative), "breakpoints", List.of(Map.of("line", 1))), true);
+        // Omitted/null source keeps the old current-program shorthand.
+        assertBreakpointVerification(wire, Map.of("breakpoints", List.of(Map.of("line", 1))), true);
+        var nullSource = new LinkedHashMap<String, Object>(); nullSource.put("source", null); nullSource.put("breakpoints", List.of(Map.of("line", 1)));
+        assertBreakpointVerification(wire, nullSource, true);
+        wire.request("configurationDone", Map.of()); wire.event("stopped"); finishAtBreakpoints(wire);
+        String launchAlias = program.getParent().resolve(".").resolve(program.getFileName()).toString();
+        wire.request("launch", Map.of("program", launchAlias, "runtimeMode", "ast")); wire.event("initialized");
+        wire.request("configurationDone", Map.of()); assertEquals("breakpoint", wire.event("stopped").get("reason").getAsString()); finishAtBreakpoints(wire);
+        wire.request("launch", Map.of("program", other.toString(), "runtimeMode", "ast")); wire.event("initialized");
+        wire.request("configurationDone", Map.of()); wire.event("output"); wire.event("terminated"); wire.event("exited");
+        wire.request("stackTrace", Map.of("threadId", 1));
+        assertTrue("source changes leave no stopped event", wire.pending.isEmpty());
+        System.out.println("DAP breakpoint sources passed: " + backend + " (same, different, invalid, normalized, relative, omitted, relaunch)");
+    }
+    private void assertBreakpointVerification(Wire wire, Object arguments, boolean verified) throws Exception {
+        var breakpoints = wire.request("setBreakpoints", arguments).getAsJsonArray("breakpoints");
+        assertEquals(1, breakpoints.size());
+        assertEquals(verified, breakpoints.get(0).getAsJsonObject().get("verified").getAsBoolean());
+    }
+    private void finishAtBreakpoints(Wire wire) throws Exception {
+        while (true) {
+            wire.request("continue", Map.of("threadId", 1));
+            var event = wire.oneOf("stopped", "output");
+            if (event.get("event").getAsString().equals("output")) { wire.event("terminated"); wire.event("exited"); return; }
+            assertEquals("breakpoint", event.getAsJsonObject("body").get("reason").getAsString());
+        }
     }
     private void exerciseConfigurationLifecycle(Wire wire, String backend) throws Exception {
         wire.request("initialize", Map.of("adapterID", "configuration-lifecycle"));

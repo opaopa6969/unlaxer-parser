@@ -202,13 +202,13 @@ public class DAPGeneratorTest {
     }
 
     @Test
-    public void testAdapterSetBreakpointsStoresLines() {
-        assertTrue(adapterResult.source().contains("breakpointLines.add(line)"));
+    public void testAdapterSetBreakpointsStoresMatchingSourceLines() {
+        assertTrue(adapterResult.source().contains("breakpointLines.addAll(proposedLines)"));
     }
 
     @Test
-    public void testAdapterSetBreakpointsReturnsVerified() {
-        assertTrue(adapterResult.source().contains("bp.setVerified(true)"));
+    public void testAdapterSetBreakpointsVerifiesMatchingSource() {
+        assertTrue(adapterResult.source().contains("bp.setVerified(sameSource)"));
     }
 
     @Test
