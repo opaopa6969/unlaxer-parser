@@ -75,9 +75,9 @@ public class RustBackendTest {
         reject(SIMPLE.replace("value", "span"), "reserved");
         reject(SIMPLE.replace("value", "semantics"), "reserved");
         reject(SIMPLE.replace("'hello' @value", "[ 'x' ] Root @value"), "left recursion");
-        reject(SIMPLE.replace("'hello' @value", "{ [ 'hello' ] } 'x' @value"), "nullable unbounded");
+        assertEquals(5, new RustBackend().generate(UBNFMapper.parse(SIMPLE.replace("'hello' @value", "{ [ 'hello' ] } 'x' @value")).grammars().get(0)).size());
         reject(SIMPLE.replace("'hello' @value", "[ [ 'hello' ] ] @value"), "nested container capture");
-        reject(SIMPLE.replace("'hello' @value", "{ Maybe } @value").replace("Root ::=", "Maybe ::= [ 'x' ];\nRoot ::="), "nullable unbounded");
+        assertEquals(5, new RustBackend().generate(UBNFMapper.parse(SIMPLE.replace("'hello' @value", "{ Maybe } @value").replace("@root", "Maybe ::= [ 'x' ];\n@root")).grammars().get(0)).size());
         reject(SIMPLE.replace("'hello' @value", "'' @value"), "empty literal");
         reject(SIMPLE.replace("grammar Example {", "grammar Example {\n@whitespace: python"), "whitespace");
         reject(SIMPLE.replace("grammar Example {", "grammar Example {\ntoken TEXT = StringParser"), "external token");
@@ -112,8 +112,8 @@ public class RustBackendTest {
     @Test public void zeroWidthTokensCannotCreateUnboundedLoopsOrLeftRecursion() {
         for (String declaration : new String[]{"EMPTY", "EOF", "LOOKAHEAD('x')", "NEGATIVE_LOOKAHEAD('x')", "UNTIL('#')"}) {
             String source = SIMPLE.replace("grammar Example {", "grammar Example { token T = " + declaration + "\n");
-            reject(source.replace("'hello' @value", "{ T } 'hello' @value"), "nullable unbounded");
-            reject(source.replace("'hello' @value", "(T | 'x')+ @value"), "nullable unbounded");
+            assertEquals(5, new RustBackend().generate(UBNFMapper.parse(source.replace("'hello' @value", "{ T } 'hello' @value")).grammars().get(0)).size());
+            assertEquals(5, new RustBackend().generate(UBNFMapper.parse(source.replace("'hello' @value", "(T | 'x')+ @value")).grammars().get(0)).size());
             reject(source.replace("'hello' @value", "T @value Root @value"), "left recursion");
         }
         reject(SIMPLE.replace("grammar Example {", "grammar Example { token T = REGEX('x')\n"), "E-REGEX-RETIRED");
@@ -146,7 +146,7 @@ public class RustBackendTest {
                 .replace("'hello' @value", "T @value");
             assertEquals(5, new RustBackend().generate(UBNFMapper.parse(source).grammars().get(0)).size());
             if (parser.endsWith("EndOfSourceParser")) {
-                reject(source.replace("T @value", "{ T } 'x' @value"), "nullable unbounded");
+                assertEquals(5, new RustBackend().generate(UBNFMapper.parse(source.replace("T @value", "{ T } 'x' @value")).grammars().get(0)).size());
                 reject(source.replace("T @value", "T Root @value"), "left recursion");
             }
         }

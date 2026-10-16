@@ -4,7 +4,7 @@ multi-gap.ubnf	blocked	12
 multiple-grammars.ubnf	blocked	1
 no-root.ubnf	failed	1
 root-text.ubnf	failed	1
-nullable-repeat.ubnf	failed	1
+nullable-repeat.ubnf	passed	0
 left-recursion.ubnf	failed	1
 mapping-fields.ubnf	failed	1
 assoc-without-precedence.ubnf	failed	1

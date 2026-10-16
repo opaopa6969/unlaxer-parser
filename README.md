@@ -246,6 +246,8 @@ Classic Identifier, Number, and quoted tokens now [isolate their internal lexica
 
 [Explicit nested capture boundaries](docs/nested-capture-boundaries.md) preserve missing optionals, present empty lists, order, duplicates, and owned source snapshots in both runtimes. This runtime API is a development addition; generated nested field types and mappers remain tracked in [#583](https://github.com/opaopa6969/unlaxer-parser/issues/583).
 
+[Nullable Classic repetitions](docs/nullable-repetition.md) now generate in both Rust hosts using the same single-success termination rule as Java. A successful zero-progress item is retained once before stopping; pure PEG and lexical repetition keep their separate contracts. Nullable separated lists remain tracked in #616.
+
 Downstream `tinyexpression-rs` and `rustcodeblock` AOT exist on the separate **ubnfc** engine. Their results do not establish Classic Rust parity or production deployment history. See the [engine guide](docs/engine-selection-guide-ja.md) and [pinned downstream audit](rust/FULL-SPEC.md#下流tinyexpressionの現状監査2026-09-30).
 
 ---
