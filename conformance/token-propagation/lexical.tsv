@@ -1,0 +1,14 @@
+# Hand-written declarative lexical atom expectations. Program is RANGE(a,c)+; UTF8hex, ~ empty.
+# id	inputHex	kind	invert	priorMatched	success	consumed	matched	sourceOffset	sourceLength	textHex
+normal-consumed	616278	consumed	false	false	true	2	2	0	2	6162
+inverse-empty-consumed	78	consumed	true	false	true	0	0	0	0	~
+inverse-failure-consumed	6162	consumed	true	false	false	0	0	0	0	~
+normal-matchOnly	616278	matchOnly	false	false	true	0	2	0	2	6162
+inverse-empty-matchOnly	78	matchOnly	true	false	true	0	0	0	0	~
+inverse-failure-matchOnly	6162	matchOnly	true	false	false	0	0	0	0	~
+normal-virtualTokenConsumed	616278	virtualTokenConsumed	false	false	true	2	2	0	2	6162
+inverse-empty-virtualTokenConsumed	78	virtualTokenConsumed	true	false	true	0	0	0	0	~
+inverse-failure-virtualTokenConsumed	6162	virtualTokenConsumed	true	false	false	0	0	0	0	~
+normal-virtualTokenMatchOnly	616278	virtualTokenMatchOnly	false	false	true	0	2	0	2	6162
+inverse-empty-virtualTokenMatchOnly	78	virtualTokenMatchOnly	true	false	true	0	0	0	0	~
+inverse-failure-virtualTokenMatchOnly	6162	virtualTokenMatchOnly	true	false	false	0	0	0	0	~

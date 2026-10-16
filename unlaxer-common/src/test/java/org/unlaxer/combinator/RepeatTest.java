@@ -23,19 +23,12 @@ public class RepeatTest extends ParserTestBase{
 		testUnMatch(repeat, "");
 	}
 
-	/**
-	 * Repeat(child, 0, 0) commits only when the child matches zero times.
-	 * A non-empty input where the child succeeds even once exceeds max=0
-	 * and must fail; an empty input where the child fails commits at 0.
-	 * This pins the Occurs commit condition `matchCount >= min && matchCount <= max`.
-	 */
-	@Test
-	public void zeroZeroRejectsAnyMatchButAcceptsEmpty() {
-		Repeat zeroZero = new Repeat(AlphabetParser.class, 0, 0);
-
-		testUnMatch(zeroZero, "a");
-		testAllMatch(zeroZero, "");
-	}
+    /** An ordinary zero count succeeds without consulting its child, even on matching input. */
+    @Test public void zeroZeroDoesNotAttemptTheChild() {
+        Repeat zeroZero = new Repeat(AlphabetParser.class, 0, 0);
+        testPartialMatch(zeroZero, "a", "");
+        testAllMatch(zeroZero, "");
+    }
 
 	/**
 	 * min > max can never satisfy the commit condition, so it must always

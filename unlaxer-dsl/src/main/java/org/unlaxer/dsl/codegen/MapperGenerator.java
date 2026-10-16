@@ -22,6 +22,14 @@ public class MapperGenerator implements CodeGenerator {
 
     @Override
     public GeneratedSource generate(GrammarDecl grammar) {
+        org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
+        NestedCaptures.requireValid(grammar);
+        GrammarValidator.requireValidBoundedRepeatElements(grammar);
+        LeftRecursionAnalysis.requireValid(grammar);
+        CommonFieldSchema.build(grammar);
+        EnumSchema.validate(grammar);
+        TypeofConstraints.validate(grammar);
+        var enumRoots = EnumSchema.rootEnums(grammar);
         String packageName = getPackageName(grammar);
         String grammarName = grammar.name();
         String astClass = grammarName + "AST";
@@ -43,13 +51,21 @@ public class MapperGenerator implements CodeGenerator {
         Map<String, String> mappedClassByRuleName = new LinkedHashMap<>();
         for (RuleDecl rule : grammar.rules()) {
             boolean isSkip = rule.annotations().stream().anyMatch(a -> a instanceof SkipAnnotation);
-            if (!isSkip) {
+            if (!isSkip && !EnumSchema.isEnum(rule)) {
                 MapperElementUtil.getMappingAnnotation(rule).ifPresent(m -> {
                     mappingRules.putIfAbsent(m.className(), rule);
                     allMappingRules.computeIfAbsent(m.className(), k -> new ArrayList<>()).add(rule);
                     mappedClassByRuleName.putIfAbsent(rule.name(), m.className());
                 });
             }
+        }
+
+        for (var entry : enumRoots.entrySet()) {
+            RuleDecl source = ruleByName.get(entry.getKey());
+            RuleDecl projected = EnumSchema.projection(source, entry.getValue());
+            mappingRules.put(entry.getValue(), projected);
+            allMappingRules.put(entry.getValue(), List.of(projected));
+            mappedClassByRuleName.put(source.name(), entry.getValue());
         }
 
         StringBuilder sb = new StringBuilder();
@@ -71,6 +87,8 @@ public class MapperGenerator implements CodeGenerator {
         sb.append(" */\n");
         sb.append("public class ").append(mapperClass).append(" {\n\n");
         sb.append("    private ").append(mapperClass).append("() {}\n\n");
+        if(grammar.rules().stream().anyMatch(NestedCaptures::enabled)) sb.append(NestedMapperEmitter.HELPERS);
+        if(grammar.rules().stream().filter(NestedCaptures::enabled).anyMatch(rule -> MapperElementUtil.getMappingAnnotation(rule).orElseThrow().paramNames().stream().anyMatch(name -> NestedCaptures.field(grammar,rule,name).javaLeafType()!=null))) sb.append(NestedMapperEmitter.PROJECT_HELPERS);
         // Span layers of the current mapping call. SourceMappedAst snapshots freeze the layers they
         // reference instead of copying every span, so later registrations open a new layer and the
         // next mapping call starts from an empty layer; a snapshot therefore never changes after
@@ -105,7 +123,7 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("    private static final java.util.IdentityHashMap<Token, MappingCandidate> BEST_MEMO =\n");
         sb.append("        new java.util.IdentityHashMap<>();\n\n");
 
-        String rootClassName = rootRule.flatMap(MapperElementUtil::getMappingAnnotation)
+        String rootClassName = rootRule.filter(r -> !EnumSchema.isEnum(r)).flatMap(MapperElementUtil::getMappingAnnotation)
             .map(m -> astClass + "." + m.className())
             .orElse(astClass);
 
@@ -146,7 +164,43 @@ public class MapperGenerator implements CodeGenerator {
 
         // ----- mapTransparentValue (heterogeneous @value node resolution) -----
         sb.append(MapperRuleEmitter.emitMapTransparentValue(astClass,
-            grammar.rules().stream().anyMatch(MapperElementUtil::isSkipped)));
+            grammar.rules().stream().anyMatch(MapperElementUtil::isSkipped), grammar.rules().stream().anyMatch(EnumSchema::isEnum)));
+
+        boolean hasTypeof = grammar.rules().stream().anyMatch(rule -> !TypeofConstraints.collect(rule).isEmpty());
+        if (hasTypeof || grammar.rules().stream().anyMatch(EnumSchema::isEnum)) {
+            sb.append("    private static Class<?> semanticType(Object value) {\n");
+            if (grammar.rules().stream().anyMatch(EnumSchema::isEnum))
+                sb.append("        if (value instanceof ").append(astClass).append(".EnumValue item) return item.value().getDeclaringClass();\n");
+            sb.append("        if (value instanceof java.util.List<?>) return java.util.List.class;\n")
+                .append("        if (value instanceof java.util.Optional<?>) return java.util.Optional.class;\n")
+                .append("        return value instanceof Enum<?> item ? item.getDeclaringClass() : value.getClass();\n    }\n\n");
+        }
+        if (hasTypeof) {
+            sb.append("    private static int[] typeofSpan(Token token, java.util.Set<String> bindings, Object value) {\n")
+                .append("        int start = Integer.MAX_VALUE, end = -1;\n")
+                .append("        boolean empty = value instanceof List<?> list && list.isEmpty() || value instanceof Optional<?> option && option.isEmpty();\n")
+                .append("        for (CaptureOccurrence occurrence : empty ? java.util.List.<CaptureOccurrence>of() : findCaptureOccurrences(token, bindings)) {\n")
+                .append("            Token site = occurrence.token();\n")
+                .append("            int at = site.source.offsetFromRoot().value();\n")
+                .append("            start = Math.min(start, at); end = Math.max(end, at + site.source.codePointLength().value());\n")
+                .append("        }\n")
+                .append("        if (end < 0) { start = token.source.offsetFromRoot().value(); end = start + token.source.codePointLength().value(); }\n")
+                .append("        return new int[]{start, end};\n    }\n\n");
+        }
+        if (grammar.rules().stream().anyMatch(EnumSchema::isEnum)) {
+            sb.append("    private static Object directEnumValue(Token token) {\n        if (token == null) return null;\n");
+            for (RuleDecl rule : grammar.rules()) if (EnumSchema.isEnum(rule)) sb.append("        if (token.parser instanceof ")
+                .append(parsersClass).append(".").append(rule.name()).append("Parser) return registerNodeSourceSpan(new ")
+                .append(astClass).append(".EnumValue(").append(astClass).append(".").append(rule.name())
+                .append(".fromText(tokenTextCompat(token))), token);\n");
+            sb.append("        return null;\n    }\n    private static Object findEnumValue(Token token) {\n        guardVisit(token);\n        if (token == null) return null;\n");
+            if (grammar.rules().stream().anyMatch(MapperElementUtil::isSkipped)) sb.append("        if (isSkippedRuleToken(token)) return null;\n");
+            sb.append("        Object direct = directEnumValue(token); if (direct != null) return direct;\n");
+            for (String name : mappedClassByRuleName.keySet()) if (!EnumSchema.isEnum(ruleByName.get(name))) {
+                sb.append("        if (token.parser instanceof ").append(parsersClass).append(".").append(name).append("Parser) return null;\n");
+            }
+            sb.append("        for (Token child : token.filteredChildren) { Object value = findEnumValue(child); if (value != null) return value; }\n        return null;\n    }\n\n");
+        }
 
         // ----- Mapping Methods -----
         sb.append(MapperRuleEmitter.emitMappingMethods(grammar, astClass, parsersClass,
@@ -154,7 +208,7 @@ public class MapperGenerator implements CodeGenerator {
 
         // ----- Utilities -----
         sb.append(MapperRuleEmitter.emitUtilities(parsersClass, mappedClassByRuleName.keySet()));
-        if (grammar.rules().stream().anyMatch(rule -> !MapperElementUtil.isSkipped(rule)
+        if (hasTypeof || grammar.rules().stream().anyMatch(rule -> !MapperElementUtil.isSkipped(rule)
                 && !SemanticCardinality.associative(rule)
                 && MapperElementUtil.getMappingAnnotation(rule).isPresent())) {
             sb.append(MapperRuleEmitter.emitCaptureOccurrenceUtilities(parsersClass, ruleByName.keySet()));
@@ -342,13 +396,17 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("     * Use the committed parser root, not a choice's root-stripped Parsed token.\n");
         sb.append("     */\n");
         sb.append("    public static synchronized MappedAst mapParsedToken(Token rootToken, String preferredAstSimpleName) {\n");
-        sb.append("        validateParsedRoot(rootToken);\n");
-        sb.append("        return mapTokenTree(rootToken, preferredAstSimpleName);\n");
+        sb.append("        return guardedMapping(rootToken, () -> {\n");
+        sb.append("            validateParsedRoot(rootToken);\n");
+        sb.append("            return mapTokenTree(rootToken, preferredAstSimpleName);\n");
+        sb.append("        });\n");
         sb.append("    }\n\n");
         sb.append("    /** Maps once for repeated selection; uses mapParsedToken's committed-root validation. */\n");
         sb.append("    public static synchronized MappedTree mapParsedTree(Token rootToken) {\n");
-        sb.append("        validateParsedRoot(rootToken);\n");
-        sb.append("        return mapTree(rootToken);\n");
+        sb.append("        return guardedMapping(rootToken, () -> {\n");
+        sb.append("            validateParsedRoot(rootToken);\n");
+        sb.append("            return mapTree(rootToken);\n");
+        sb.append("        });\n");
         sb.append("    }\n\n");
         sb.append("    private static void validateParsedRoot(Token rootToken) {\n");
         sb.append("        if (rootToken == null) {\n");
@@ -374,16 +432,20 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("    }\n\n");
         sb.append("    /** Maps a committed alternate-entry token, preferring an AST type by simple name. */\n");
         sb.append("    public static synchronized MappedAst mapSubtreeToken(Token subtreeToken, String preferredAstSimpleName) {\n");
-        sb.append("        validateSubtreeToken(subtreeToken);\n");
-        sb.append("        return mapTokenTree(subtreeToken, preferredAstSimpleName);\n");
+        sb.append("        return guardedMapping(subtreeToken, () -> {\n");
+        sb.append("            validateSubtreeToken(subtreeToken);\n");
+        sb.append("            return mapTokenTree(subtreeToken, preferredAstSimpleName);\n");
+        sb.append("        });\n");
         sb.append("    }\n\n");
         sb.append("    /**\n");
         sb.append("     * Maps a committed alternate-entry token once for repeated selection.\n");
         sb.append("     * Uses mapSubtreeToken's generated-rule validation; callers must verify full-input consumption.\n");
         sb.append("     */\n");
         sb.append("    public static synchronized MappedTree mapSubtreeTree(Token subtreeToken) {\n");
-        sb.append("        validateSubtreeToken(subtreeToken);\n");
-        sb.append("        return mapTree(subtreeToken);\n");
+        sb.append("        return guardedMapping(subtreeToken, () -> {\n");
+        sb.append("            validateSubtreeToken(subtreeToken);\n");
+        sb.append("            return mapTree(subtreeToken);\n");
+        sb.append("        });\n");
         sb.append("    }\n\n");
         sb.append("    private static void validateSubtreeToken(Token subtreeToken) {\n");
         sb.append("        if (subtreeToken == null) {\n");
@@ -424,10 +486,25 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("        MAP_MEMO.clear();\n");
         sb.append("        BEST_MEMO.clear();\n");
         sb.append("    }\n\n");
+        sb.append("""
+                private static org.unlaxer.mapper.MappingGuard MAPPING_GUARD;
+                private static void guardVisit(Token token) {
+                    if (MAPPING_GUARD != null) MAPPING_GUARD.visit(token);
+                }
+                private static <T> T guardedMapping(Token token, java.util.function.Supplier<T> operation) {
+                    resetMappingMemos();
+                    // Public entry validators retain their root/subtree null argument contract.
+                    if (token == null) return operation.get();
+                    MAPPING_GUARD = org.unlaxer.mapper.MappingGuard.prepare(token);
+                    try { return operation.get(); }
+                    catch (RuntimeException failure) { resetMappingMemos(); throw failure; }
+                    finally { MAPPING_GUARD = null; }
+                }
+
+            """);
         sb.append("    private static MappedAst mapTokenTree(Token token, String preferredAstSimpleName) {\n");
         sb.append("        // Every public mapping call maps afresh: callers may rely on distinct AST instances and on\n");
         sb.append("        // a snapshot that resolves only the nodes of its own mapping.\n");
-        sb.append("        resetMappingMemos();\n");
         sb.append("        Token selectedToken = findBestMappedToken(token, preferredAstSimpleName);\n");
         sb.append("        if (selectedToken == null) {\n");
         sb.append("            throw new IllegalArgumentException(\"No mapped node found in token tree\");\n");
@@ -487,11 +564,13 @@ public class MapperGenerator implements CodeGenerator {
         // Capture-site metadata includes successful zero-width matches. The generic reducer
         // drops empty children and mutates the CST, so typed mapping must use the original tree.
 
+        sb.append("        final Token committedRoot = rootToken;\n");
+        sb.append("        return guardedMapping(committedRoot, () -> {\n");
         if (rootRule.isPresent() && MapperElementUtil.getMappingAnnotation(rootRule.get()).isPresent()) {
             RuleDecl rr = rootRule.get();
             String rootParserClass = parsersClass + "." + rr.name() + "Parser.class";
             String rootMappingClass = MapperElementUtil.getMappingAnnotation(rr).orElseThrow().className();
-            sb.append("        Token mappingRoot = rootToken;\n");
+            sb.append("        Token mappingRoot = committedRoot;\n");
             sb.append("        if (mappingRoot.parser.getClass() != ").append(rootParserClass).append(") {\n");
             sb.append("            mappingRoot = findFirstDescendant(mappingRoot, ").append(rootParserClass).append(");\n");
             sb.append("        }\n");
@@ -502,13 +581,14 @@ public class MapperGenerator implements CodeGenerator {
         } else if (rootRule.isPresent() && MapperElementUtil.isSkipped(rootRule.get())) {
             sb.append("        throw new IllegalArgumentException(\"No mapped node found in parse tree: @skip root\");\n");
         } else {
-            sb.append("        Token bestMappedToken = findBestMappedToken(rootToken, preferredAstSimpleName);\n");
+            sb.append("        Token bestMappedToken = findBestMappedToken(committedRoot, preferredAstSimpleName);\n");
             sb.append("        ").append(astClass).append(" mapped = mapToken(bestMappedToken);\n");
             sb.append("        if (mapped == null) {\n");
             sb.append("            throw new IllegalArgumentException(\"No mapped node found in parse tree\");\n");
             sb.append("        }\n");
             sb.append("        return (").append(rootClassName).append(") mapped;\n");
         }
+        sb.append("        });\n");
         sb.append("    }\n\n");
     }
 

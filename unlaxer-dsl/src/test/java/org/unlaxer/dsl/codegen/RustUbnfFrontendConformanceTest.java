@@ -40,7 +40,7 @@ public class RustUbnfFrontendConformanceTest {
      */
     private static final Set<String> POSITIONED_REJECTIONS = Set.of("trailing-input", "trailing-input-no-space");
 
-    @Test public void nativeFrontendMatchesJavaSyntaxAndRecordsKnownMapperDifferences() throws Exception {
+    @Test public void nativeFrontendMatchesJavaSyntax() throws Exception {
         if (false == Boolean.getBoolean("rustConformance")) {
             System.out.println("[assumption] RustUbnfFrontendConformanceTest skipped:"
                 + " requires -DrustConformance=true and a rustc toolchain on PATH."
@@ -66,6 +66,9 @@ public class RustUbnfFrontendConformanceTest {
         // defect (UBNFMapper only kept the first two identifiers). Now fixed, so this
         // fixture is checked for full AST equality like every other positive case.
         positives.add(crate.resolve("tests/fixtures/known/namespace.ubnf"));
+        for (String name : List.of("eval-default", "keyword-boundary", "common-field-space")) {
+            positives.add(crate.resolve("tests/fixtures/known/" + name + ".ubnf"));
+        }
         for (int i = 0; i < 4; i++) positives.add(repo.resolve("unlaxer-dsl/src/test/resources/evolution/" + i + "/Evolution.ubnf"));
         var report = new ArrayList<>(List.of("case\tclassification\tjava\trust"));
         for (Path path : positives) {
@@ -97,24 +100,6 @@ public class RustUbnfFrontendConformanceTest {
             } else {
                 report.add(parts[0] + "\treject\trejected\t" + nativeResult);
             }
-        }
-        // These are isolated Java frontend defects, not hidden normalizations in the equality check.
-        for (String name : List.of("eval-default", "keyword-boundary", "common-field-space")) {
-            Path path = crate.resolve("tests/fixtures/known/" + name + ".ubnf");
-            JsonObject nativeResult = inspect(binary, path);
-            assertTrue(nativeResult.toString(), nativeResult.has("ast"));
-            if (name.equals("keyword-boundary") || name.equals("common-field-space")) {
-                assertThrows(name, IllegalArgumentException.class, () -> UBNFMapper.parse(Files.readString(path)));
-                report.add(name + "\tknown-java-rejection\trejected\t" + nativeResult);
-                continue;
-            }
-            UBNFAST.UBNFFile java = UBNFMapper.parse(Files.readString(path));
-            assertNotEquals(name, canonical(java), nativeResult.get("ast"));
-            if (name.equals("eval-default")) {
-                var annotation = (UBNFAST.EvalAnnotation) java.grammars().get(0).rules().get(0).annotations().get(0);
-                assertEquals("$", annotation.strategy());
-            }
-            report.add(name + "\tknown-difference\t" + canonical(java) + "\t" + nativeResult);
         }
         Files.write(Path.of("target/rust-ubnf-frontend.tsv"), report, StandardCharsets.UTF_8);
     }

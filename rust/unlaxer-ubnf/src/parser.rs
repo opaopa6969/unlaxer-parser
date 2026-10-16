@@ -236,6 +236,13 @@ impl Parser<'_> {
         self.expect('=')?;
         let value_start = self.current().span;
         let value = self.dotted()?;
+        if (value == "REGEX" && self.is('('))
+            || value == "RegexTokenParser"
+            || value == "org.unlaxer.dsl.runtime.RegexTokenParser"
+        {
+            return Err(self.invalid(value_start.through(self.previous()),
+                "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)"));
+        }
         let kind = match value.as_str() {
             "ANY" => TokenKind::Any,
             "XID_IDENTIFIER" => TokenKind::Declarative {
@@ -246,9 +253,7 @@ impl Parser<'_> {
             },
             "EOF" => TokenKind::Eof,
             "EMPTY" => TokenKind::Empty,
-            "UNTIL" | "NEGATION" | "LOOKAHEAD" | "NEGATIVE_LOOKAHEAD" | "CI" | "REGEX"
-                if self.is('(') =>
-            {
+            "UNTIL" | "NEGATION" | "LOOKAHEAD" | "NEGATIVE_LOOKAHEAD" | "CI" if self.is('(') => {
                 self.expect('(')?;
                 let arg = if format_two && value == "NEGATION" {
                     self.class_quoted()?
@@ -264,7 +269,7 @@ impl Parser<'_> {
                     "LOOKAHEAD" => TokenKind::Lookahead { pattern: arg },
                     "NEGATIVE_LOOKAHEAD" => TokenKind::NegativeLookahead { pattern: arg },
                     "CI" => TokenKind::CaseInsensitive { word: arg },
-                    _ => TokenKind::Regex { pattern: arg },
+                    _ => unreachable!(),
                 }
             }
             "CHAR_RANGE" if self.is('(') => {

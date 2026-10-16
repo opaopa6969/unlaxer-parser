@@ -94,9 +94,10 @@ public class RustPredictiveChoiceBackendTest {
     }
 
     private static String parser(String source) {
-        return new RustBackend().generate(UBNFMapper.parse(source).grammars().get(0)).stream()
-            .filter(file -> file.relativePath().endsWith("parser.rs"))
-            .findFirst().orElseThrow().content();
+        // Check one IR grammar: source-aware generation can append an independent
+        // preferred-mapping grammar with its own correctly deduplicated FIRST set.
+        return new RustBackend().parser(RustGrammarLowering.lower(
+            UBNFMapper.parse(source).grammars().get(0)));
     }
 
     private static int occurrences(String source, String needle) {

@@ -125,9 +125,12 @@ public class TokenAdapterRegistryTest {
             + "token WORD = ADAPTER('example.word', version=1)")).grammars().get(0);
         assertTrue(GrammarValidator.validate(custom).stream()
             .anyMatch(issue -> issue.toString().contains("E-MEMO-SAFE-TOKEN-KIND")));
-        assertFalse(PortabilityCheck.check(grammar(CUSTOM_SETTING + "\n"
-            + "token WORD = ADAPTER('example.word', version=1)")
-            .replace("WORD @value", "WORD* @value")).portable());
+        String nullableRepeat = grammar(CUSTOM_SETTING + "\n"
+            + "token WORD = ADAPTER('example.word', version=1)").replace("WORD @value", "WORD* @value");
+        assertTrue(PortabilityCheck.check(nullableRepeat).portable());
+        String repeated = new ParserGenerator().generate(UBNFMapper.parse(nullableRepeat).grammars().get(0)).source().lines()
+            .filter(line -> line.contains("class StartParser ")).findFirst().orElseThrow();
+        assertFalse(repeated, repeated.contains("Memoizable"));
     }
 
     @Test
