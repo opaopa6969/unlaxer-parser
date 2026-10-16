@@ -39,7 +39,7 @@ let original_text = snapshot.source_text(selected.span());
 
 認識規則は共通ですが、metadata capture が追加されるため、資源上限に達する入力深さは通常入口と異なる場合があります。
 
-内部 capture は call site の Java 深さと grammar schema と source call-site の fingerprint を記録し、通常の transaction / memo に従います。標準 CST、別 grammar の CST、synthetic value node を entry に渡した場合はエラーです。root に `@mapping` がある場合はその root rule が必須です。代替 entry の全入力消費は呼出側が確認してください。候補の `node_id()` は Rust の rule entry を示し、Java wrapper token への参照ではありません。回復 wrapper を持つ rule entry は、その wrapper を含めた深さから列挙します。
+内部 capture は call site の Java 深さと grammar schema と source call-site および `@typeof` 制約の fingerprint を記録し、通常の transaction / memo に従います。標準 CST、別 grammar の CST、synthetic value node を entry に渡した場合はエラーです。root に `@mapping` がある場合はその root rule が必須です。代替 entry の全入力消費は呼出側が確認してください。候補の `node_id()` は Rust の rule entry を示し、Java wrapper token への参照ではありません。回復 wrapper を持つ rule entry は、その wrapper を含めた深さから列挙します。
 
 snapshot は原文、CP 境界、候補 AST を所有します。同じ候補を再選択すると同じ AST を参照し、別 snapshot は独立です。Rust では各候補が AST を所有するため、親候補の内部 AST と子候補の AST のアドレス同一性は保証しません。Java の既存 identity source map は維持されます。AST 内の各 node の `span()` と `source_text` を組み合わせて、保持した原文を取り出せます。位置は UTF-16 / byte / 表示幅ではなく、元の Unicode code point 単位です。正規化はしません。
 
