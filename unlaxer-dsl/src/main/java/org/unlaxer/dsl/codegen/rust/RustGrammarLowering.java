@@ -52,6 +52,7 @@ public final class RustGrammarLowering {
     public static GrammarIR lower(GrammarDecl grammar) {
         CommonFieldSchema.build(grammar);
         EnumSchema.validate(grammar);
+        org.unlaxer.dsl.codegen.TypeofConstraints.validate(grammar);
         org.unlaxer.dsl.codegen.EvalSchema.specifications(grammar);
         org.unlaxer.dsl.codegen.EmbeddedGrammarEmitter.declarations(grammar);
         var ir = new RustGrammarLowering(grammar).run();
@@ -301,13 +302,16 @@ public final class RustGrammarLowering {
                 mapping = new Mapping(enumRoots.get(name),
                     List.of(new Field("value", Kind.ENUM, Cardinality.ONE, name)));
             } else if (annotation == null) {
+                boolean constrainedSum = CommonFieldSchema.isSum(grammar, grammar.rules().get(i))
+                    && org.unlaxer.dsl.codegen.TypeofConstraints.captures(grammar.rules().get(i)).containsAll(captures.keySet());
                 if (!captures.isEmpty() && effects == null && catalog == null && !skips.get(i)
-                        && comparisons.get(i) == null) {
+                        && comparisons.get(i) == null && !constrainedSum) {
                     throw unsupported("captures without @mapping on " + grammar.rules().get(i).name());
                 }
             } else {
                 if (new HashSet<>(annotation.paramNames()).size() != annotation.paramNames().size()
-                    || !captures.keySet().equals(new HashSet<>(annotation.paramNames()))) {
+                    || (!captures.keySet().containsAll(annotation.paramNames())
+                        || !java.util.stream.Stream.concat(annotation.paramNames().stream(), org.unlaxer.dsl.codegen.TypeofConstraints.captures(grammar.rules().get(i)).stream()).collect(java.util.stream.Collectors.toSet()).containsAll(captures.keySet()))) {
                     throw unsupported("@mapping params must match capture names on " + grammar.rules().get(i).name());
                 }
                 List<Field> fields = new ArrayList<>();
@@ -343,11 +347,14 @@ public final class RustGrammarLowering {
             var documentation = grammar.rules().get(i).annotations().stream()
                 .filter(DocAnnotation.class::isInstance).map(DocAnnotation.class::cast)
                 .map(DocAnnotation::text).toList();
-            rules.add(new Rule(grammar.rules().get(i).name(), ruleBody, mapping, operators.get(i), catalog, skips.get(i), documentation, EnumSchema.isEnum(grammar.rules().get(i)) ? EnumSchema.literals(grammar.rules().get(i)) : List.of()));
+            rules.add(new Rule(grammar.rules().get(i).name(), ruleBody, mapping, operators.get(i), catalog, skips.get(i), documentation, EnumSchema.isEnum(grammar.rules().get(i)) ? EnumSchema.literals(grammar.rules().get(i)) : List.of(),
+                org.unlaxer.dsl.codegen.TypeofConstraints.collect(grammar.rules().get(i)).stream()
+                    .map(value -> new TypeConstraint(constraintField(value.capture(), captures), constraintField(value.reference(), captures))).toList()));
         }
         List<Rule> rewritten = new ArrayList<>();
         boolean hasValues = variants.values().stream().flatMap(mapping -> mapping.fields().stream())
-            .anyMatch(field -> field.kind() == Kind.VALUE);
+            .anyMatch(field -> field.kind() == Kind.VALUE) || rules.stream().flatMap(rule -> rule.typeConstraints().stream())
+                .anyMatch(value -> value.capture().kind() == Kind.VALUE || value.reference().kind() == Kind.VALUE);
         for (int i = 0; i < rules.size(); i++) {
             Rule rule = rules.get(i);
             Mapping mapping = rule.mapping() == null ? null : variants.get(rule.mapping().name());
@@ -358,7 +365,7 @@ public final class RustGrammarLowering {
                         ? new Field(field.name(), Kind.INTEGER, field.cardinality()) : field).toList());
             }
             Expression expression = hasValues && !rule.skip()
-                ? mapping == null ? retainHelperValue(rule.body()) : retainTextValues(rule.body(), mapping)
+                ? mapping == null ? retainHelperValue(rule.body()) : retainTextValues(rule.body(), projectionMapping(mapping, rule.typeConstraints()))
                 : rule.body();
             // Rewrite only after source-level shapes have been analyzed: this synthetic choice
             // is not a heterogeneous source choice and must not introduce text sentinels.
@@ -399,9 +406,39 @@ public final class RustGrammarLowering {
             }
             if(i==root && org.unlaxer.dsl.codegen.NamePredicates.enabled(grammar)) expression=new NameResolutionScope(expression,
                 org.unlaxer.dsl.codegen.NamePredicates.requirements(grammar).stream().map(value->new NameRequirement(value.id(),value.version())).toList());
-            rewritten.add(new Rule(rule.name(), expression, mapping, rule.operator(), rule.catalog(), rule.skip(), rule.documentation(),rule.enumLiterals()));
+            var sourceRule = grammar.rules().get(i);
+            var effectiveMapping = mapping;
+            rewritten.add(new Rule(rule.name(), expression, mapping, rule.operator(), rule.catalog(), rule.skip(), rule.documentation(),rule.enumLiterals(), rule.typeConstraints().stream().map(value ->
+                    new TypeConstraint(boundConstraintField(value.capture(), effectiveMapping, sourceRule), boundConstraintField(value.reference(), effectiveMapping, sourceRule))).toList()));
         }
         return new GrammarIR(rewritten, root, whitespace);
+    }
+
+    private static Mapping projectionMapping(Mapping mapping, List<TypeConstraint> constraints) {
+        var fields = new LinkedHashMap<String, Field>();
+        for (Field field : mapping.fields()) fields.put(field.name(), field);
+        for (TypeConstraint value : constraints) {
+            fields.putIfAbsent(value.capture().name(), value.capture());
+            fields.putIfAbsent(value.reference().name(), value.reference());
+        }
+        return new Mapping(mapping.name(), List.copyOf(fields.values()));
+    }
+
+    private static Field constraintField(String name, Map<String, Shape> captures) {
+        Shape shape = captures.get(name);
+        if (shape == null) throw unsupported("E-TYPEOF-UNKNOWN-CAPTURE: " + name);
+        return new Field(name, shape.kind(), shape.cardinality(), shape.enumName());
+    }
+    private static boolean integerConstraint(GrammarDecl grammar, RuleDecl rule, String name) {
+        String type = org.unlaxer.dsl.codegen.TypeofConstraints.valueType(grammar, rule, name);
+        return type.equals("int") || type.equals("Optional<Integer>") || type.equals("List<Integer>");
+    }
+
+    private Field boundConstraintField(Field field, Mapping mapping, RuleDecl sourceRule) {
+        Field bound = mapping == null ? field : mapping.fields().stream()
+            .filter(value -> value.name().equals(field.name())).findFirst().orElse(field);
+        return integerConstraint(grammar, sourceRule, field.name())
+            ? new Field(field.name(), Kind.INTEGER, field.cardinality()) : bound;
     }
 
     private static boolean whitespaceStyle(String style) {
@@ -585,7 +622,6 @@ public final class RustGrammarLowering {
         }
         if (body instanceof SequenceBody sequence) {
             return new Sequence(sequence.elements().stream().map(element -> {
-                if (element.typeofConstraint().isPresent()) throw unsupported("@typeof");
                 Expression expression = atomic(element.element());
                 if (element.captureName().isEmpty()) return expression;
                 return capture(element.captureName().get(), expression);

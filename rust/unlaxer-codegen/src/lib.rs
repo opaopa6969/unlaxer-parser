@@ -8,6 +8,7 @@ pub mod ir;
 pub use enums::{enum_constant_name, validate_enum_type};
 pub mod lexical;
 pub mod lsp;
+mod typeof_constraints;
 mod validate;
 pub use ir::*;
 use std::fmt::Write;
@@ -135,6 +136,15 @@ fn has_values(ir: &GrammarIr) -> bool {
         .any(|f| f.kind == Kind::Value)
 }
 
+fn needs_values(ir: &GrammarIr) -> bool {
+    has_values(ir)
+        || ir
+            .rules
+            .iter()
+            .flat_map(|rule| &rule.type_constraints)
+            .any(|value| value.capture.kind == Kind::Value || value.reference.kind == Kind::Value)
+}
+
 fn contains_recovery(expression: &Expression) -> bool {
     use Expression::*;
     match expression {
@@ -168,7 +178,7 @@ fn ast(ir: &GrammarIr) -> String {
         out.push_str("use unlaxer_runtime::{Span, json_string};\n\n");
     }
     out.push_str(&enum_declarations(ir));
-    if has_values(ir) {
+    if needs_values(ir) {
         out.push_str(&ast_values(ir));
     }
     out.push_str("#[allow(non_snake_case, non_camel_case_types)]\n#[derive(Debug, Clone, PartialEq)]\npub enum Ast {\n");
@@ -630,7 +640,7 @@ fn grapheme_capture(ir: &GrammarIr, body: &Expression, name: &str) -> bool {
 
 fn mapper(ir: &GrammarIr) -> String {
     let mut out = String::from(HEADER);
-    if has_values(ir) {
+    if needs_values(ir) {
         out.push_str("use super::ast::AstValue;\n");
     }
     out.push_str(&enum_imports(ir));
@@ -639,6 +649,13 @@ fn mapper(ir: &GrammarIr) -> String {
         out.push_str("    if !tree.recoveries().is_empty() { return Err(\"cannot map recovered syntax\".into()); }\n");
     }
     out.push_str("    required(map_node(tree, tree.root)?, \"root\")\n}\n\nfn required<T>(mut values: Vec<T>, name: &str) -> Result<T, String> {\n    if values.len() != 1 { return Err(format!(\"expected one value for {name}, got {}\", values.len())); }\n    Ok(values.remove(0))\n}\n\nfn map_nodes(tree: &Tree, ids: &[usize]) -> Result<Vec<Ast>, String> {\n    let mut found = Vec::new();\n    for &id in ids { found.extend(map_node(tree, id)?); }\n    Ok(found)\n}\n");
+    if ir
+        .rules
+        .iter()
+        .any(|rule| !rule.type_constraints.is_empty())
+    {
+        out.push_str(&typeof_constraints::helpers(ir));
+    }
     for (index, rule) in ir
         .rules
         .iter()
@@ -654,7 +671,7 @@ fn mapper(ir: &GrammarIr) -> String {
         out.push_str("    let mut found = Vec::new();\n    for &id in ids {\n        let node = &tree.nodes[id];\n");
         writeln!(out, "        if node.rule == {index} {{\n            found.push({}::from_text(tree.text(node.span))?);\n        }} else {{\n            found.extend(map_enum_{index}(tree, &node.children)?);\n        }}\n    }}\n    Ok(found)\n}}",rule.name).unwrap();
     }
-    if has_values(ir) {
+    if needs_values(ir) {
         out.push_str("\nfn map_values(tree: &Tree, ids: &[usize]) -> Result<Vec<AstValue>, String> {\n    let mut found = Vec::new();\n    for &id in ids {\n        let node = &tree.nodes[id];\n        match node.rule {\n            unlaxer_runtime::TEXT_VALUE_RULE => found.push(AstValue::Text {\n                text: unlaxer_runtime::java_capture_text(tree.text(node.span)).to_owned(),\n                span: node.span,\n            }),\n");
         out.push_str("            unlaxer_runtime::VALUE_BOUNDARY_RULE => {\n                let values = map_values(tree, &node.children)?;\n                if !values.is_empty() && values.iter().all(|value| matches!(value, AstValue::Text { .. })) {\n                    found.push(AstValue::Text {\n                        text: unlaxer_runtime::java_capture_text(tree.text(node.span)).to_owned(),\n                        span: node.span,\n                    });\n                } else {\n                    found.extend(values);\n                }\n            },\n");
         for (id, rule) in ir
@@ -670,7 +687,10 @@ fn mapper(ir: &GrammarIr) -> String {
             .rules
             .iter()
             .enumerate()
-            .filter(|(_, r)| r.mapping.is_some() && r.enum_literals.is_empty())
+            .filter(|(_, r)| {
+                (r.mapping.is_some() || !r.type_constraints.is_empty())
+                    && r.enum_literals.is_empty()
+            })
             .map(|(id, _)| id.to_string())
             .collect();
         writeln!(out, "            {} => found.extend(map_node(tree, id)?.into_iter().map(|node| AstValue::Node(Box::new(node)))),", ids.join(" | ")).unwrap();
@@ -686,9 +706,11 @@ fn mapper(ir: &GrammarIr) -> String {
         }
         out.push_str("            _ => found.extend(map_values(tree, &node.children)?),\n        }\n    }\n    Ok(found)\n}\n");
     }
-    if mappings(ir)
+    if ir
+        .rules
         .iter()
-        .flat_map(|m| &m.fields)
+        .filter(|rule| rule.mapping.is_some() || !rule.type_constraints.is_empty())
+        .flat_map(typeof_constraints::fields)
         .any(|f| f.cardinality == Cardinality::Optional)
     {
         out.push_str("\nfn optional<T>(mut values: Vec<T>, name: &str) -> Result<Option<T>, String> {\n    if values.len() > 1 { return Err(format!(\"expected at most one value for {name}, got {}\", values.len())); }\n    Ok(values.pop())\n}\n");
@@ -697,12 +719,16 @@ fn mapper(ir: &GrammarIr) -> String {
     for (index, rule) in ir.rules.iter().enumerate() {
         if rule.skip {
             writeln!(out, "        {index} => Ok(Vec::new()),").unwrap();
-        } else if rule.mapping.is_some() {
+        } else if rule.mapping.is_some() || !rule.type_constraints.is_empty() {
             writeln!(out, "        {index} => map_rule_{index}(tree, id),").unwrap();
         }
     }
     out.push_str("        _ => map_nodes(tree, &tree.nodes[id].children),\n    }\n}\n");
     for (index, rule) in ir.rules.iter().enumerate() {
+        if !rule.type_constraints.is_empty() {
+            out.push_str(&typeof_constraints::rule(ir, index));
+            continue;
+        }
         if let Some(mapping) = &rule.mapping {
             writeln!(
                 out,

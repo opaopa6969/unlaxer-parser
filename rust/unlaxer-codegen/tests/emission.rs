@@ -160,6 +160,7 @@ fn parser_only_raw_ir_requires_a_root_reachable_projection_boundary() {
             operator: None,
             catalog: None,
             enum_literals: Vec::new(),
+            type_constraints: Vec::new(),
             documentation: Vec::new(),
         }
     }
@@ -571,6 +572,7 @@ fn expression_variants_escape_unicode_and_control_characters() {
         operator: None,
         catalog: None,
         enum_literals: Vec::new(),
+        type_constraints: Vec::new(),
         documentation: Vec::new(),
         body: Sequence(vec![
             Literal("\"\\\n\r\t\0\u{7f}😀".into()),

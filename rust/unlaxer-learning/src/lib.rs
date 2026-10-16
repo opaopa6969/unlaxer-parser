@@ -94,6 +94,13 @@ impl LessonGrammar {
         }
         let ir = unlaxer_generator::lowering::lower(&file.grammars[0])?;
         unlaxer_codegen::validate_ir(&ir).map_err(|e| e.to_string())?;
+        if ir
+            .rules
+            .iter()
+            .any(|rule| !rule.type_constraints.is_empty())
+        {
+            return Err("学習エンジンでは @typeof は対応範囲外です。CLI / VS Code / 生成 Playground の mapper を使ってください。".into());
+        }
         if ir.rules.iter().any(|r| {
             r.mapping
                 .as_ref()

@@ -44,6 +44,19 @@ pub(crate) fn refine(grammar: &GrammarDecl, ir: &mut GrammarIr) {
                 field.kind = Kind::Integer;
             }
         }
+        for constraint in &mut rule.type_constraints {
+            for value in [&mut constraint.capture, &mut constraint.reference] {
+                if let Some(field) = mapped.fields.iter().find(|field| field.name == value.name) {
+                    *value = field.clone();
+                } else {
+                    let mut captures = Vec::new();
+                    collect(grammar, &source.body, &value.name, &mut captures);
+                    if !captures.is_empty() && captures.iter().all(|numeric| *numeric) {
+                        value.kind = Kind::Integer;
+                    }
+                }
+            }
+        }
     }
 }
 

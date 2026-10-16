@@ -17,7 +17,6 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.SequenceBody;
 import org.unlaxer.dsl.bootstrap.UBNFAST.SkipAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.TerminalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.TokenDecl;
-import org.unlaxer.dsl.bootstrap.UBNFAST.TypeofElement;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -656,42 +655,4 @@ class MapperElementUtil {
         return rule != null && rule.annotations().stream().anyMatch(SkipAnnotation.class::isInstance);
     }
 
-    /** ルール本体から @typeof(x) @param の関係を収集する: paramName -> referencedCaptureName */
-    static Map<String, String> collectTypeofConstraints(RuleBody body) {
-        Map<String, String> result = new LinkedHashMap<>();
-        collectTypeofConstraintsFromBody(body, result);
-        return result;
-    }
-
-    static void collectTypeofConstraintsFromBody(RuleBody body, Map<String, String> result) {
-        if (body instanceof ChoiceBody choiceBody) {
-            for (SequenceBody seq : choiceBody.alternatives()) {
-                collectTypeofConstraintsFromSequence(seq, result);
-            }
-        } else if (body instanceof SequenceBody seq) {
-            collectTypeofConstraintsFromSequence(seq, result);
-        } else {
-            throw new IllegalStateException("unhandled " + body);
-        }
-    }
-
-    static void collectTypeofConstraintsFromSequence(SequenceBody seq, Map<String, String> result) {
-        for (AnnotatedElement ae : seq.elements()) {
-            if (ae.typeofConstraint().isPresent() && ae.captureName().isPresent()) {
-                TypeofElement te = ae.typeofConstraint().get();
-                result.put(ae.captureName().get(), te.captureName());
-            } else {
-                var switchSubject = ae.element();
-                if (switchSubject instanceof GroupElement g) {
-                    collectTypeofConstraintsFromBody(g.body(), result);
-                } else if (switchSubject instanceof OptionalElement o) {
-                    collectTypeofConstraintsFromBody(o.body(), result);
-                } else if (switchSubject instanceof RepeatElement r) {
-                    collectTypeofConstraintsFromBody(r.body(), result);
-                } else {
-
-                }
-            }
-        }
-    }
 }
