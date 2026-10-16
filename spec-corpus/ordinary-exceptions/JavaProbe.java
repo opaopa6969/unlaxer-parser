@@ -43,6 +43,7 @@ public final class JavaProbe {
                                         new IllegalStateException("generated callback");
                                 CallbackWord.failAt = failCP;
                                 CallbackWord.freshId = null;
+                                var outerTokens=List.copyOf(c.getCurrent().getTokens());
                                 if (manual) c.begin(parser);
                                 var before = List.copyOf(c.getCurrent().getTokens());
                                 try {
@@ -86,7 +87,7 @@ public final class JavaProbe {
                                         "rollback related");
                                 CallbackWord.failAt = -1;
                                 check(parser.parse(c).isSucceeded(), "retry");
-                                check(c.position() == end, "retry cursor");
+                                check(c.position() == end && c.getMatchedPosition().value() == end, "retry cursors");
                                 check(
                                         c.captured("word").orElseThrow().text().equals("p"),
                                         "scope restored after success");
@@ -109,6 +110,8 @@ public final class JavaProbe {
                                         root.source.offsetFromRoot().value() == 1
                                                 && root.source.codePointLength().value() == end - 1,
                                         "retry CST span");
+                                String expectedBoundary = __EXPECTED_BOUNDARY__;
+                                var retainedBoundary = expectedBoundary == null ? null : boundary(root, expectedBoundary);
                                 check(
                                         retained.info(oldId)
                                                 .orElseThrow()
@@ -118,8 +121,14 @@ public final class JavaProbe {
                                         "retained metadata");
                                 if (manual) {
                                     c.rollback(parser);
-                                    check(c.position() == 1, "manual outer rollback");
+                                    check(c.position() == 1 && c.getMatchedPosition().value() == 1, "manual outer rollback cursors");
+                                    check(c.getTokenStack().size() == 1 && registered[0] == 7, "manual outer rollback state/frames");
+                                    check(outerTokens.equals(c.getCurrent().getTokens()), "manual outer rollback CST");
+                                    check(c.captured("word").orElseThrow().text().equals("p"), "manual outer rollback capture");
+                                    check(CallbackWord.metadata.info(oldId).orElseThrow().extra().get("label").equals("before"), "manual outer rollback metadata");
+                                    check(Arrays.equals(mapped.sourceSpanOf(value).orElseThrow(),new int[] {__ROOT_START__, __ROOT_END__}), "retained AST span after rollback");
                                 }
+                                if (retainedBoundary != null) check(canonical(retainedBoundary).equals(expectedBoundary), "retained nested boundary");
                                 observed++;
                             } finally {
                                 CallbackWord.metadata = null;
@@ -130,6 +139,35 @@ public final class JavaProbe {
                             }
                         }
         return observed;
+    }
+
+    private static org.unlaxer.capture.CaptureSnapshot.Element boundary(Token root,String expected) {
+        var pending=new ArrayDeque<Token>();pending.push(root);
+        org.unlaxer.capture.CaptureSnapshot.Element retained=null;
+        int separators=0;
+        while(!pending.isEmpty()) {
+            Token token=pending.pop();
+            if(token.parser instanceof org.unlaxer.parser.combinator.CaptureBoundaryParser marker) {
+                if(marker.boundaryKind()==org.unlaxer.parser.combinator.CaptureBoundaryParser.Kind.LIST) {
+                    check(retained==null,"one outer list boundary");
+                    retained=org.unlaxer.capture.CaptureSnapshot.from(token);
+                    check(canonical(retained).equals(expected),"retry item boundaries " + canonical(retained));
+                }
+                if(marker.boundaryKind()==org.unlaxer.parser.combinator.CaptureBoundaryParser.Kind.SEPARATOR) {
+                    separators++;
+                    try {org.unlaxer.capture.CaptureSnapshot.from(token);throw new AssertionError("separator root accepted");}
+                    catch(org.unlaxer.capture.CaptureSnapshot.SnapshotException failure) {check(failure.error()==org.unlaxer.capture.CaptureSnapshot.Error.NOT_BOUNDARY,"separator root diagnosis");}
+                }
+            }
+            for(Token child:token.getOriginalChildren())pending.push(child);
+        }
+        check(retained!=null && separators==1,"separator CST retained exactly once");
+        return retained;
+    }
+    private static String canonical(org.unlaxer.capture.CaptureSnapshot.Element element) {
+        String kind=switch(element.kind()) {case VALUE->"V";case OPTIONAL->"O";case LIST->"L";case SEPARATOR->throw new AssertionError("opaque separator is not a value");};
+        String text=element.text().isEmpty()?"~":HexFormat.of().formatHex(element.text().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return kind+"@"+element.startCP()+":"+element.endCP()+":"+text+"["+element.children().stream().map(JavaProbe::canonical).collect(java.util.stream.Collectors.joining(","))+"]";
     }
 
     private static void check(boolean value, String label) {

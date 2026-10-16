@@ -47,5 +47,34 @@
       "😀",
       "😀"
     ]
+  },
+  {
+    "name": "nested-separated",
+    "grammar": "grammar ExceptionProbe { @package: exceptionprobe @whitespace: none @tokenAdapter: { id: 'exception.item' version: '1' java: 'exceptionprobe.Item' rust: 'crate::item' } @tokenAdapter: { id: 'exception.separator' version: '1' java: 'exceptionprobe.Separator' rust: 'crate::separator' } token I=ADAPTER('exception.item',version=1) token S=ADAPTER('exception.separator',version=1) @root @nestedCaptures @mapping(Value,params=[items]) Root ::= CAPTURE_SCOPE(CAPTURE(word,I) % Sep) @items '!'; @skip Sep ::= S; }",
+    "input": "p😀;😀!",
+    "cases": [
+      {
+        "id": "item",
+        "failCP": 1
+      },
+      {
+        "id": "separator",
+        "failCP": 2
+      },
+      {
+        "id": "tail",
+        "failCP": 3
+      }
+    ],
+    "retryEnd": 5,
+    "rootSpan": [
+      1,
+      5
+    ],
+    "items": [
+      "😀",
+      "😀"
+    ],
+    "boundary": "L@1:4:f09f98803bf09f9880[V@1:2:f09f9880[],V@3:4:f09f9880[]]"
   }
 ]

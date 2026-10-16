@@ -194,6 +194,9 @@ public class OrdinaryParserExceptionConformanceTest extends PreferredAstConforma
         } else expected = items.toString();
         return Files.readString(repo.resolve("spec-corpus/ordinary-exceptions/" + name))
                 .replace("__EXPECTED_ITEMS__", expected)
+                .replace("__EXPECTED_BOUNDARY__", fixture.has("boundary")
+                        ? (rust ? "Some(" + fixture.get("boundary") + ")" : fixture.get("boundary").toString())
+                        : (rust ? "None" : "null"))
                 .replace("__ROOT_START__", fixture.getAsJsonArray("rootSpan").get(0).toString())
                 .replace("__ROOT_END__", fixture.getAsJsonArray("rootSpan").get(1).toString());
     }
