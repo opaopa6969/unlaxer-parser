@@ -104,8 +104,8 @@ user state に依存する token には指定できない。
 未指定の custom token は従来どおり fail-closed で unsafe のままである。未知の global setting に
 対する従来の validator 互換性は変更しない。
 
-Rust runtime の built-in `Expr` は runtime が所有する既知の実装なので、既に failure
-memoization の安全対象である。現在の Rust generator は任意の Java custom token class を Rust
+Rust runtime の built-in `Expr` は runtime が所有する既知の実装なので、既にfailureとpure successの
+memoizationの安全対象である（詳細は[成功memoの共通契約](pure-success-memo.md)）。現在の Rust generator は任意の Java custom token class を Rust
 実装へ接続する仕組みを持たないため、`@memoSafeToken` を Rust custom token の許可にはまだ使用
 しない。将来 custom token 接続を追加するときは、同じ alias 単位の設定を安全性の明示契約として
 尊重し、未指定 custom token とその ancestor を fail-closed で除外する。
@@ -158,6 +158,7 @@ unknown/custom/state-dependent parser を cache することはない。
 failure memoization は、複数の選択肢が同じ内側部分木を最後まで調べて失敗する文法で特に
 有効になる。成功 memoization は純粋な成功部分木の再導出を抑える。entry 数は概ね
 「安全 rule 数 × position / state version 数」で、成功 entry には token snapshot 分のメモリも必要になる。
-listener を含む部分木の指数的な再導出までは省略しない。Rust runtime と Rust golden は今回変更しない。
+listener を含む部分木の指数的な再導出までは省略しない。Rustの対応範囲・保存予算・未完境界は
+[pure success memo](pure-success-memo.md)を参照。
 
 関連: #40, #184, #192, #194, #269
