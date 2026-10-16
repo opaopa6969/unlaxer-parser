@@ -1066,6 +1066,82 @@ public class ParseContext implements
     }
   }
 
+  private CaptureBindings captureBindings;
+
+  private CaptureBindings captureBindings() {
+    if (captureBindings == null) captureBindings = new CaptureBindings(this);
+    return captureBindings;
+  }
+
+  /** Latest general capture; lexical and AST mapping captures use separate stores. */
+  public java.util.Optional<org.unlaxer.CapturedValue> captured(String name) {
+    java.util.Objects.requireNonNull(name, "name");
+    return captureBindings == null ? java.util.Optional.empty() : captureBindings.get(name);
+  }
+
+  /** Define an immutable general capture as owned transactional state. */
+  public void capture(String name, org.unlaxer.CapturedValue value) {
+    java.util.Objects.requireNonNull(value, "value");
+    int length = source.codePointLength().value();
+    if (value.start() > length || value.provenance() == org.unlaxer.CapturedValue.Provenance.INPUT
+        && (value.end() > length || !peek(new CodePointIndex(value.start()),
+            new CodePointLength(value.end() - value.start())).sourceAsString().equals(value.text()))) {
+      throw new IllegalArgumentException("capture provenance does not belong to this input");
+    }
+    captureBindings().put(name, value);
+  }
+
+  /** Internal transparent capture/scope boundary, including exceptional child cleanup. */
+  public Parsed parseCaptureBoundary(Parser owner, Parser child, String binding,
+      boolean scoped, TokenKind kind, boolean invert) {
+    startParse(owner, this, kind, invert);
+    ParseFrame frame = parseFrames.peekFirst();
+    int tokensBefore = tokenStack.size();
+    int framesBefore = parseFrames.size();
+    int terminalsBefore = terminalFrames.size();
+    int deferredBefore = deferredFrameDepth;
+    int diagnosticsBefore = memoDiagnosticFrames.size();
+    int transactionFramesBefore = memoTransactionFrameCount;
+    Runnable restoreScope = scoped ? captureBindings().checkpoint() : null;
+    boolean completed = false;
+    try {
+      begin(owner);
+      int anchor = getPosition(kind).value();
+      Parsed result = child.parse(this, kind, invert);
+      if (result.isFailed()) rollback(owner);
+      else {
+        if (!scoped) {
+          Source capturedSource = result.getTokenOptional().isEmpty() && result.getOriginalTokens().isEmpty()
+              ? peek(getPosition(kind), new CodePointLength(0)) : result.getRootToken().source;
+          capture(binding, org.unlaxer.CapturedValue.from(capturedSource, source, anchor));
+        }
+        if (restoreScope != null) restoreScope.run();
+        commit(owner, kind);
+      }
+      endParse(owner, result, this, kind, invert);
+      completed = true;
+      return result;
+    } finally {
+      if (!completed && observerFailure == null) {
+        while (tokenStack.size() > tokensBefore) {
+          TransactionElement abandoned = tokenStack.pollFirst();
+          abandoned.restoreSelectionChanges(chosenParserByChoice, orderedParsersByNonOrdered);
+          finishTransactionalState(abandoned, true);
+        }
+        while (parseFrames.size() > framesBefore) parseFrames.pollFirst();
+        while (terminalFrames.size() > terminalsBefore) terminalFrames.pollFirst();
+        while (memoDiagnosticFrames.size() > diagnosticsBefore) memoDiagnosticFrames.pollFirst();
+        while (memoTransactionFrameCount > transactionFramesBefore)
+          memoTransactionFrames[--memoTransactionFrameCount] = null;
+        deferredFrameDepth = deferredBefore;
+        if (frame != null && parseFrames.peekFirst() == frame) parseFrames.pollFirst();
+        if (frame != null && terminalFrames.peekFirst() == frame) terminalFrames.pollFirst();
+        if (deferredDiagnostics) deferredFrameDepth--;
+        releaseObserverBoundaryIfIdle();
+      }
+    }
+  }
+
   private FailureDiagnostic globalFailureDiagnostic() {
     FailureDiagnostic result = new FailureDiagnostic();
     result.farthestConsumedOffset = farthestConsumedOffset;
