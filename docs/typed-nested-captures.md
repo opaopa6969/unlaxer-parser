@@ -51,7 +51,8 @@ capture / typeof の準備走査も深さ 64 で停止し、schema 解析の再�
 | separated list | #646 で対応。[型・値・separator 境界の契約](nested-separated-captures.md)参照 |
 | 同一 mapping 型を共有する複数規則 | #637 で全 recursive shape / nominal leaf / opt-in が一致する場合に対応 |
 | nested family の `@commonField` | #637 で nested field の実 accessor と、field を持たない mapped sum の opt-in を検証 |
-| nested 規則の `@typeof` / associative projection / `@eval` | 未対応、明示拒否 |
+| nested 規則の `@typeof` | #660で既存の浅い意味型比較へ接続。[private/forward・空位置・shared/mixed](nested-typeof.md)参照 |
+| nested 規則の associative projection / `@eval` | 未対応、明示拒否 |
 | token-stream と nested の併用 | 未対応、明示拒否 |
 | nested 値を扱う family commonField / preferred snapshot | #626 で直接 mapped family 葉の commonField と preferred を実検証。全組合せは #583 に残す |
 
