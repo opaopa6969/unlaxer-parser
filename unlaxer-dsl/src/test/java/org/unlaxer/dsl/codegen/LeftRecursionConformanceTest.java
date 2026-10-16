@@ -62,7 +62,12 @@ public class LeftRecursionConformanceTest {
                     String input=value.getAsString();
                     for(var memo:Memoization.values()) for(var mode:ParseOptions.Diagnostics.values())
                     try(var context=ParseContext.withOptions(StringSource.createRootSource(input),ParseOptions.withMemoization(memo).withDiagnostics(mode))) {
-                        assertTrue(row.get("name")+" "+input,parser.parse(context).isSucceeded());
+                        var parsed = parser.parse(context);
+                        assertTrue(row.get("name")+" "+input,parsed.isSucceeded());
+                        var mapped = loader.loadClass("leftrecprobe.LeftRecMapper")
+                            .getMethod("mapParsedTokenWithSourceMap", org.unlaxer.Token.class)
+                            .invoke(null, context.getCurrent().getTokens().get(0));
+                        assertNotNull(row.get("name")+" "+input, mapped);
                         assertEquals(input.codePointCount(0,input.length()),context.getConsumedPosition().value());
                     }
                 }

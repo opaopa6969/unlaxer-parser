@@ -993,7 +993,7 @@ public final class RustGrammarLowering {
             return leadingRules(optional.child());
         }
         if (expression instanceof Repeat repeat) {
-            return leadingRules(repeat.child());
+            return repeat.max() != null && repeat.max() == 0 ? Set.of() : leadingRules(repeat.child());
         }
         if (expression instanceof Separated separated) {
             Set<Integer> result = new HashSet<>(leadingRules(separated.child()));

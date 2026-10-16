@@ -56,6 +56,14 @@ public interface Transaction extends TransactionListenerContainer , ParseContext
 		onBegin(get(), parser);
 	}
 	
+    /** Transaction for operations which must not reset a pre-existing matched cursor. */
+    public default void beginPreservingMatched(Parser parser) {
+        get().beforeTransactionBegin();
+        getTokenStack().push(getCurrent().createNewPreservingMatched());
+        get().checkpointTransactionalState(getCurrent());
+        onBegin(get(), parser);
+    }
+
 	Collection<AdditionalCommitAction> getActions();
 	
   default void addActions(AdditionalCommitAction... additionalCommitActions) {

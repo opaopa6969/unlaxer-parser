@@ -107,7 +107,7 @@ final class LeftRecursionAnalysis {
         }
         if (element instanceof OneOrMoreElement repeat) return atom(repeat.body(), leading, depth + 1);
         if (element instanceof BoundedRepeatElement repeat) {
-            // Classic currently attempts the child even at max=0; #598 tracks its correction.
+            if (repeat.max() == 0) return true; // the body is never evaluated
             boolean empty = atom(repeat.body(), leading, depth + 1);
             return repeat.min() == 0 || empty;
         }

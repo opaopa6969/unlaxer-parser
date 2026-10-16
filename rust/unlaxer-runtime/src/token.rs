@@ -582,7 +582,7 @@ impl ParseContext<'_> {
             }
             Expr::Eof => {
                 return self
-                    .expression(&Expr::Any.repeat_java(0, Some(0)), depth)
+                    .expression(&Expr::Any.zero_match(), depth)
                     .map(|fragment| self.classic_alias(fragment, "EndOfSourceParser"))
             }
             Expr::JavaLookahead { pattern, positive } => {

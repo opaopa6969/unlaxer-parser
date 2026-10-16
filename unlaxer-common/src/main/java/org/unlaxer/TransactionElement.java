@@ -147,6 +147,11 @@ public class TransactionElement implements Serializable{
 		return new TransactionElement(new ParserCursor(parserCursor,resetMatchedWithConsumed),resetMatchedWithConsumed);
 	}
 	
+    /** Open a no-input operation while preserving independent matched progress. */
+    public TransactionElement createNewPreservingMatched() {
+        return new TransactionElement(new ParserCursor(parserCursor, false), resetMatchedWithConsumed);
+    }
+
 	public void consume(CodePointLength length){
 		parserCursor.addPosition(length.toOffset());
 	}

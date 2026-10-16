@@ -192,6 +192,9 @@ pub enum Expr {
         min: usize,
         max: Option<usize>,
     },
+    /// Explicit historical Java Zero/LazyZero: probe once and accept no matches.
+    /// Unlike a bounded zero repetition this can inspect and reset the match cursor.
+    ZeroMatch(Box<Expr>),
     /// Java Occurs counts a successful zero-consumption child once, then stops.
     JavaRepeat {
         child: Box<Expr>,
@@ -358,6 +361,9 @@ impl Expr {
     }
     pub fn zero_or_more(self) -> Self {
         self.repeat(0, None)
+    }
+    pub fn zero_match(self) -> Self {
+        Self::ZeroMatch(Box::new(self))
     }
     pub fn repeat_java(self, min: usize, max: Option<usize>) -> Self {
         Self::JavaRepeat {
@@ -2419,19 +2425,24 @@ impl<'a> ParseContext<'a> {
                 | Expr::JavaUntil(_)
                 | Expr::JavaOptional(_)
                 | Expr::JavaRepeat { .. }
+                | Expr::ZeroMatch(_)
                 | Expr::Choice(_)
                 | Expr::LongestChoice(_)
                 | Expr::UniqueLongestChoice(_)
                 | Expr::PredictiveChoice { .. }
                 | Expr::Recovery { .. }
         );
+        let no_repeat_attempt = matches!(expression,
+            Expr::Repeat { min, max: Some(max), .. } | Expr::JavaRepeat { min, max: Some(max), .. }
+                if *max == 0 || *max < *min);
         if java_transaction {
-            if (self.token_mode.is_some()
-                || self.match_cursor_policy.non_ordered
-                || matches!(
-                    expression,
-                    Expr::NonOrdered(_) | Expr::MatchOnly(_) | Expr::InvertMatch(_)
-                ))
+            if !no_repeat_attempt
+                && (self.token_mode.is_some()
+                    || self.match_cursor_policy.non_ordered
+                    || matches!(
+                        expression,
+                        Expr::NonOrdered(_) | Expr::MatchOnly(_) | Expr::InvertMatch(_)
+                    ))
                 && self.match_cursor_policy.reset
                 && !matches!(
                     expression,
@@ -2499,7 +2510,7 @@ impl<'a> ParseContext<'a> {
             Expr::Optional(_) | Expr::JavaOptional(_) => {
                 self.expression_optional(expression, depth)
             }
-            Expr::Repeat { .. } | Expr::JavaRepeat { .. } => {
+            Expr::Repeat { .. } | Expr::JavaRepeat { .. } | Expr::ZeroMatch(_) => {
                 self.expression_repeat(expression, depth)
             }
             Expr::Lookahead { .. } => self.expression_lookahead(expression, depth),
@@ -2889,7 +2900,7 @@ impl<'a> ParseContext<'a> {
             Expr::Optional(_) | Expr::JavaOptional(_) => {
                 unreachable!("recursive expression dispatched by expression")
             }
-            Expr::Repeat { .. } | Expr::JavaRepeat { .. } => {
+            Expr::Repeat { .. } | Expr::JavaRepeat { .. } | Expr::ZeroMatch(_) => {
                 unreachable!("recursive expression dispatched by expression")
             }
             Expr::Lookahead { .. } => unreachable!("recursive expression dispatched by expression"),
@@ -3281,84 +3292,92 @@ impl<'a> ParseContext<'a> {
 
     #[inline(never)]
     fn expression_repeat(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
-        match expression {
-            Expr::Repeat { child, min, max } | Expr::JavaRepeat { child, min, max } => {
-                let java = matches!(expression, Expr::JavaRepeat { .. });
-                if max.is_some_and(|max| max < *min) {
-                    self.fail("valid repetition bounds");
-                    return None;
-                }
-                let mut result = Fragment::default();
-                let owner_start = self.position();
-                let mut iterations = 0;
-                while (java && iterations == 0) || max.is_none_or(|max| iterations < max) {
-                    let start = self.position;
-                    let progress_start = if self.token_mode.is_some() {
+        let (child, min, max, java, probe) = match expression {
+            Expr::Repeat { child, min, max } | Expr::JavaRepeat { child, min, max } => (
+                child.as_ref(),
+                *min,
+                *max,
+                matches!(expression, Expr::JavaRepeat { .. }),
+                false,
+            ),
+            Expr::ZeroMatch(child) => (child.as_ref(), 0, Some(0), true, true),
+            _ => unreachable!("repetition dispatched by variant"),
+        };
+        if max.is_some_and(|max| max < min) {
+            self.fail_at(
+                self.position.max(self.matched_position),
+                "valid repetition bounds",
+            );
+            return None;
+        }
+        let mut result = Fragment::default();
+        let owner_start = self.position();
+        let mut iterations = 0;
+        while (probe && iterations == 0) || max.is_none_or(|max| iterations < max) {
+            let start = self.position;
+            let progress_start = if self.token_mode.is_some() {
+                self.mode_cursor()
+            } else {
+                start
+            };
+            let count = self.nodes.len();
+            // A skipped body takes the failure branch, including Java's
+            // failed-atom cursor reset, exactly as an evaluated failure would.
+            let attempt = if self.excludes(child, depth) {
+                None
+            } else {
+                self.expression(child, depth)
+            };
+            match attempt {
+                Some(fragment) => {
+                    let progress_end = if self.token_mode.is_some() {
                         self.mode_cursor()
                     } else {
-                        start
+                        self.position
                     };
-                    let count = self.nodes.len();
-                    // A skipped body takes the failure branch, including Java's
-                    // failed-atom cursor reset, exactly as an evaluated failure would.
-                    let attempt = if self.excludes(child, depth) {
-                        None
-                    } else {
-                        self.expression(child, depth)
-                    };
-                    match attempt {
-                        Some(fragment) => {
-                            let progress_end = if self.token_mode.is_some() {
-                                self.mode_cursor()
-                            } else {
-                                self.position
-                            };
-                            if progress_end == progress_start && max.is_none() && !java {
-                                self.nodes.truncate(count);
-                                self.fail("progress in unbounded repetition");
-                                return None;
-                            }
-                            iterations += 1;
-                            self.append_classic_fragment(
-                                &mut result,
-                                fragment,
-                                self.span(start),
-                                owner_start,
-                            );
-                            if java
-                                && (if self.token_mode.is_some() {
-                                    self.mode_cursor()
-                                } else {
-                                    self.position
-                                }) == progress_start
-                            {
-                                break;
-                            }
-                        }
-                        None => {
-                            self.position = start;
-                            self.nodes.truncate(count);
-                            if java {
-                                self.java_failed_atom(child);
-                            }
-                            break;
-                        }
+                    if progress_end == progress_start && max.is_none() && !java {
+                        self.nodes.truncate(count);
+                        self.fail("progress in unbounded repetition");
+                        return None;
+                    }
+                    iterations += 1;
+                    self.append_classic_fragment(
+                        &mut result,
+                        fragment,
+                        self.span(start),
+                        owner_start,
+                    );
+                    if java
+                        && (if self.token_mode.is_some() {
+                            self.mode_cursor()
+                        } else {
+                            self.position
+                        }) == progress_start
+                    {
+                        break;
                     }
                 }
-                if java && iterations == 0 && *min == 0 {
-                    if self.token_mode.is_some() {
-                        return Some(Fragment::default());
+                None => {
+                    self.position = start;
+                    self.nodes.truncate(count);
+                    if java {
+                        self.java_failed_atom(child);
                     }
-                    self.trace_empty("ZeroOrMore");
+                    break;
                 }
-                let accepted = iterations >= *min && max.is_none_or(|max| iterations <= max);
-                if !accepted && self.token_mode.is_some() {
-                    self.fail_at(self.byte_offsets[owner_start], "repetition bounds");
-                }
-                accepted.then_some(result)
             }
-            _ => unreachable!("recursive expression dispatched by variant"),
         }
+        if java && iterations == 0 && min == 0 {
+            if self.token_mode.is_some() {
+                return Some(Fragment::default());
+            }
+            self.trace_empty("ZeroOrMore");
+        }
+        let accepted = iterations >= min && max.is_none_or(|max| iterations <= max);
+        if !accepted && self.token_mode.is_some() {
+            self.fail_at(self.byte_offsets[owner_start], "repetition bounds");
+        }
+        accepted.then_some(result)
     }
 
     #[inline(never)]
@@ -4172,6 +4191,7 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
         | Expr::ValueBoundary(child)
         | Expr::Optional(child)
         | Expr::JavaOptional(child)
+        | Expr::ZeroMatch(child)
         | Expr::Repeat { child, .. }
         | Expr::JavaRepeat { child, .. }
         | Expr::Lookahead { child, .. }
@@ -4278,6 +4298,7 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>) -> bo
         | Expr::ValueBoundary(child)
         | Expr::Optional(child)
         | Expr::JavaOptional(child)
+        | Expr::ZeroMatch(child)
         | Expr::Repeat { child, .. }
         | Expr::JavaRepeat { child, .. }
         | Expr::Lookahead { child, .. }
@@ -5440,7 +5461,7 @@ fn classic_collector_label(expression: &Expr) -> Option<&'static str> {
         | Expr::JavaRepeat {
             min: 1, max: None, ..
         } => Some("OneOrMore"),
-        Expr::Repeat { .. } | Expr::JavaRepeat { .. } => Some("Occurs"),
+        Expr::Repeat { .. } | Expr::JavaRepeat { .. } | Expr::ZeroMatch(_) => Some("Occurs"),
         Expr::Number => Some("NumberParser"),
         Expr::Identifier => Some("IdentifierParser"),
         Expr::Quoted('\'') => Some("SingleQuotedParser"),
@@ -5517,7 +5538,8 @@ fn requires_classic_mode<'a>(expression: &'a Expr, rules: &'a [Rule]) -> bool {
     let mut current = Some(expression);
     while let Some(expression) = current.take().or_else(|| scan.next()) {
         current = match expression {
-            Expr::OwnedCapture(_, _)
+            Expr::ZeroMatch(_)
+            | Expr::OwnedCapture(_, _)
             | Expr::Replay(_)
             | Expr::CaptureScope(_)
             | Expr::MatchOnly(_)

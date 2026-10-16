@@ -108,8 +108,10 @@
   {
     "name": "zero-maximum",
     "grammar": "grammar LeftRec { @package: leftrecprobe  @root @mapping(Node) Root ::= Root{0} 'x'; }",
-    "status": "reject",
-    "inputs": []
+    "status": "accept",
+    "inputs": [
+      "x"
+    ]
   },
   {
     "name": "consuming-token",
@@ -120,5 +122,35 @@
       "1x",
       "21x"
     ]
+  },
+  {
+    "name": "zero-maximum-group",
+    "grammar": "grammar LeftRec { @package: leftrecprobe @root @mapping(Node) Root ::= (Root{0}) 'x'; }",
+    "status": "accept",
+    "inputs": [
+      "x"
+    ]
+  },
+  {
+    "name": "zero-maximum-nested",
+    "grammar": "grammar LeftRec { @package: leftrecprobe @root @mapping(Node) Root ::= (Root{0} 'z'){0} 'x'; }",
+    "status": "accept",
+    "inputs": [
+      "x"
+    ]
+  },
+  {
+    "name": "zero-maximum-mutual",
+    "grammar": "grammar LeftRec { @package: leftrecprobe @root @mapping(Node) Root ::= Alias{0} 'x'; Alias ::= Root '!'; }",
+    "status": "accept",
+    "inputs": [
+      "x"
+    ]
+  },
+  {
+    "name": "zero-maximum-live-successor",
+    "grammar": "grammar LeftRec { @package: leftrecprobe @root @mapping(Node) Root ::= Root{0} Root | 'x'; }",
+    "status": "reject",
+    "inputs": []
   }
 ]
