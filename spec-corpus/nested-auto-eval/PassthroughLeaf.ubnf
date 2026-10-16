@@ -1,0 +1,8 @@
+grammar PassthroughLeaf {
+  @package: org.example.passnested
+  @whitespace: none
+  @root @mapping(Root,params=[value]) @eval(kind='passthrough')
+  Root ::= Leaf @value;
+  @nestedCaptures @mapping(Leaf,params=[value])
+  Leaf ::= {[ ('😀' | '👨‍👩‍👧‍👦' | 'é' | '!') ]} @value;
+}

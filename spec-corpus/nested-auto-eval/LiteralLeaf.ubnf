@@ -1,0 +1,8 @@
+grammar LiteralLeaf {
+  @package: org.example.literalnested
+  @whitespace: none
+  @root @nestedCaptures @mapping(Root,params=[value])
+  Root ::= {[Leaf]} @value;
+  @mapping(Leaf,params=[value]) @eval(kind='literal')
+  Leaf ::= ('😀' | '👨‍👩‍👧‍👦' | 'é' | '!') @value;
+}
