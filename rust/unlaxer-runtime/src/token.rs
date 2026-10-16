@@ -254,8 +254,8 @@ impl ParseContext<'_> {
         }
         let previous = self.token_mode.replace(ParseMode { kind, invert });
         if self.options.diagnostics == super::Diagnostics::Detailed {
-            self.classic_max_reached
-                .get_or_insert(self.position.max(self.matched_position));
+            let reached = self.position.max(self.matched_position);
+            self.classic_max_reached = Some(self.classic_max_reached.unwrap_or(0).max(reached));
         }
         self.call_depth += 1;
         let result = parser.parse_classic(self);
