@@ -414,7 +414,7 @@ public class DeclarativeTokenConformanceTest {
             for (var file : emitted) assertEquals(name + "/" + file.relativePath(), file.content(),
                 Files.readString(generated.resolve(file.relativePath())));
             Path main = directory.resolve("main.rs");
-            Files.writeString(main, rustProbe(name.equals("fence")));
+            Files.writeString(main, rustProbe(name.equals("fence"), true));
             Path binary = directory.resolve("probe");
             success(run(List.of("rustc", "--edition=2021", "--extern", "unlaxer_runtime=" + library,
                 main.toString(), "-o", binary.toString()), "", false));
@@ -555,6 +555,10 @@ public class DeclarativeTokenConformanceTest {
     }
 
     private String rustProbe(boolean fenceOracle) {
+        return rustProbe(fenceOracle, false);
+    }
+
+    private String rustProbe(boolean fenceOracle, boolean emitOffsets) {
         return """
             mod generated;
             use std::io::{self, BufRead};
@@ -573,10 +577,13 @@ public class DeclarativeTokenConformanceTest {
                             (old_ok, legacy.position(), legacy.matched_position()), "{input:?}");
                     }
                     let cp = context.position();
-                    let snapshot = unlaxer_runtime::source::Snapshot::new("memory:probe", 0, &input).unwrap();
-                    print!(r#"{{"offsets":[{},{},{}],"prefix":[{},{},{}],"ast":"#,
-                        cp, snapshot.utf16(cp).unwrap(), snapshot.utf8(cp).unwrap(),
-                        ok, cp, context.matched_position());
+                    print!("{{");
+                    if EMIT_OFFSETS {
+                        let snapshot = unlaxer_runtime::source::Snapshot::new("memory:probe", 0, &input).unwrap();
+                        print!(r#""offsets":[{},{},{}],"#,
+                            cp, snapshot.utf16(cp).unwrap(), snapshot.utf8(cp).unwrap());
+                    }
+                    print!(r#""prefix":[{},{},{}],"ast":"#, ok, cp, context.matched_position());
                     match generated::parser::parse_tree_detailed(&input) {
                         Ok(tree) => {
                             let ast = generated::mapper::map(&tree).unwrap();
@@ -588,7 +595,8 @@ public class DeclarativeTokenConformanceTest {
                     println!("}}");
                 }
             }
-            """.replace("FENCE_ORACLE", Boolean.toString(fenceOracle));
+            """.replace("FENCE_ORACLE", Boolean.toString(fenceOracle))
+                .replace("EMIT_OFFSETS", Boolean.toString(emitOffsets));
     }
 
     private record Run(int code, String output) {}
