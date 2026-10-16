@@ -85,6 +85,9 @@ public class CommonFieldConformanceTest {
                                     expectedSpan.get(0).getAsInt(), expectedSpan.get(1).getAsInt()
                                 },
                                 span);
+                        if (entry.has("mixed"))
+                            verifyOccurrences(
+                                    mapped, ast, row.getAsJsonArray().get(3).getAsJsonArray());
                         assertEquals(
                                 input,
                                 row.getAsJsonArray().get(1).getAsString(),
@@ -234,7 +237,27 @@ public class CommonFieldConformanceTest {
                         .append(row.getAsJsonArray().get(2))
                         .append(");assert_eq!(value,")
                         .append(row.getAsJsonArray().get(1))
-                        .append(");}\n");
+                        .append(");");
+                if (entry.has("mixed"))
+                    for (var occurrence : row.getAsJsonArray().get(3).getAsJsonArray()) {
+                        var expectedOccurrence = occurrence.getAsJsonArray();
+                        String field = expectedOccurrence.get(0).getAsString();
+                        String access =
+                                field.equals("value")
+                                        ? "view.value"
+                                        : field.equals("maybe")
+                                                ? "view.maybe.as_ref().unwrap()"
+                                                : "&view.many[" + expectedOccurrence.get(1).getAsInt() + "]";
+                        probe.append("{let occurrence=")
+                                .append(access)
+                                .append(
+                                        ";assert_eq!([occurrence.span().start,occurrence.span().end],[")
+                                .append(expectedOccurrence.get(2).getAsInt())
+                                .append(",")
+                                .append(expectedOccurrence.get(3).getAsInt())
+                                .append("]);}\n");
+                    }
+                probe.append("}\n");
             }
             probe.append(
                     "assert!(generated::parser::parse_tree(\"\").is_err());assert!(generated::parser::parse_tree(\"?\").is_err());}\n");
@@ -271,6 +294,27 @@ public class CommonFieldConformanceTest {
                                     true,
                                     false)
                             .contains("E-COMMONFIELD"));
+        }
+    }
+
+    private void verifyOccurrences(Object mapped, Object ast, JsonArray expected) throws Exception {
+        var identities = Collections.newSetFromMap(new IdentityHashMap<Object, Boolean>());
+        for (var occurrence : expected) {
+            var item = occurrence.getAsJsonArray();
+            String field = item.get(0).getAsString();
+            Object value = ast.getClass().getMethod(field).invoke(ast);
+            if (field.equals("maybe")) value = ((Optional<?>) value).orElseThrow();
+            if (field.equals("many")) value = ((List<?>) value).get(item.get(1).getAsInt());
+            assertEquals("EnumValue", value.getClass().getSimpleName());
+            assertTrue("distinct occurrence wrapper", identities.add(value));
+            int[] span =
+                    (int[])
+                            ((Optional<?>)
+                                            mapped.getClass()
+                                                    .getMethod("sourceSpanOf", Object.class)
+                                                    .invoke(mapped, value))
+                                    .orElseThrow();
+            assertArrayEquals(new int[] {item.get(2).getAsInt(), item.get(3).getAsInt()}, span);
         }
     }
 

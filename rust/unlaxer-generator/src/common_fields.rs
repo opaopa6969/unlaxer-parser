@@ -179,6 +179,29 @@ pub(crate) fn families(grammar: &GrammarDecl) -> Result<Vec<Family>, String> {
                 ));
             }
         }
+        for field in &fields {
+            for contributor in &grammar.rules {
+                if contributor
+                    .annotations
+                    .iter()
+                    .any(|a| matches!(a.kind, AnnotationKind::Skip))
+                {
+                    continue;
+                }
+                if let Some((mapped, params)) = mapping(contributor) {
+                    if leaves.iter().any(|leaf| leaf == mapped) {
+                        let mut captured = HashSet::new();
+                        capture_types(grammar, &contributor.body, field, &mut captured);
+                        if !params.contains(field) || captured.is_empty() {
+                            return Err(invalid(
+                                &rule.name,
+                                &format!("missing field {field} on {}", contributor.name),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
         result.push(Family {
             name: name.into(),
             rule: rule.name.clone(),
@@ -239,13 +262,26 @@ fn capture_types(grammar: &GrammarDecl, body: &RuleBody, field: &str, out: &mut 
             if child.capture.as_deref() == Some(field) {
                 atom_types(grammar, &child.element, out);
             }
-            match &child.element.kind {
-                ElementKind::Group(body)
-                | ElementKind::Optional(body)
-                | ElementKind::Repeat(body) => capture_types(grammar, body, field, out),
-                _ => {}
-            }
+            capture_nested_types(grammar, &child.element, field, out);
         }
+    }
+}
+fn capture_nested_types(
+    grammar: &GrammarDecl,
+    atom: &AtomicElement,
+    field: &str,
+    out: &mut HashSet<String>,
+) {
+    match &atom.kind {
+        ElementKind::Group(body) | ElementKind::Optional(body) | ElementKind::Repeat(body) => {
+            capture_types(grammar, body, field, out)
+        }
+        ElementKind::OneOrMore(child)
+        | ElementKind::BoundedRepeat { element: child, .. }
+        | ElementKind::Separated { element: child, .. } => {
+            capture_nested_types(grammar, child, field, out)
+        }
+        _ => {}
     }
 }
 pub(crate) fn emit(grammar: &GrammarDecl, ir: &GrammarIr) -> Result<String, String> {
@@ -278,7 +314,8 @@ pub(crate) fn emit(grammar: &GrammarDecl, ir: &GrammarIr) -> Result<String, Stri
                     .ok_or_else(|| {
                         invalid(&family.rule, &format!("missing field {name} on {variant}"))
                     })?;
-                if !matches!(actual.kind, Kind::Enum(_)) {
+                // Value is the normalized mixed contract; its source alternatives need not be nominally identical.
+                if !matches!(actual.kind, Kind::Enum(_) | Kind::Value) {
                     for rule in grammar
                         .rules
                         .iter()
