@@ -207,7 +207,7 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
                 FirstSet::NULLABLE
             }
         }
-        Expr::Any => FirstSet::ANY,
+        Expr::Grapheme | Expr::Any => FirstSet::ANY,
         Expr::CharRange(min, max) => {
             let mut set = FirstSet::EMPTY;
             if min <= max {

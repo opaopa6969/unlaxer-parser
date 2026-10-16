@@ -11,6 +11,7 @@ pub mod editor_cst;
 pub mod editor_queries;
 pub mod embedded;
 mod first;
+pub mod grapheme;
 pub mod language_profile;
 pub mod language_queries;
 pub mod lexical;
@@ -35,6 +36,7 @@ pub mod source_edits;
 pub mod token;
 pub mod token_trace;
 pub mod type_system;
+mod unicode_grapheme_data;
 mod unicode_xid;
 #[doc(hidden)]
 pub use first::{set_candidate_exclusion_for_current_thread, CandidateExclusion};
@@ -90,6 +92,8 @@ pub enum Expr {
     Number,
     /// Java clang IdentifierParser: ASCII letter/underscore, then ASCII alphanumeric/underscore.
     Identifier,
+    /// One Unicode 17 extended grapheme cluster, only at an original-source boundary.
+    Grapheme,
     /// tinyexpression CodeStartParser: an atomic line-oriented opening code fence.
     CodeStart,
     /// tinyexpression CodeEndParser: an atomic line-oriented closing code fence.
@@ -1104,6 +1108,7 @@ impl FailureMemoBuckets {
 pub struct ParseContext<'a> {
     bindings: BTreeMap<String, Vec<String>>,
     input: &'a str,
+    grapheme_boundaries: Option<grapheme::Boundaries>,
     lexing: Option<lexing::Session<'a>>,
     rules: Arc<[Rule]>,
     whitespace: bool,
@@ -1461,6 +1466,7 @@ impl<'a> ParseContext<'a> {
             scopes: ScopeStore::default(),
             recoveries: Vec::new(),
             call_depth: 0,
+            grapheme_boundaries: None,
             expression_depth: 0,
             resource_failure: None,
             options,
@@ -2335,6 +2341,20 @@ impl<'a> ParseContext<'a> {
                 None
             }
             Expr::Recovery { .. } => unreachable!("recursive expression dispatched by expression"),
+            Expr::Grapheme => {
+                let boundaries = self
+                    .grapheme_boundaries
+                    .get_or_insert_with(|| grapheme::Boundaries::new(self.input));
+                if let Some(end) = boundaries.next_utf8(self.position) {
+                    self.position = end;
+                    self.matched_position = end;
+                    Some(Fragment::default())
+                } else {
+                    self.fail("grapheme cluster");
+                    None
+                }
+            }
+
             Expr::Any | Expr::CharRange(_, _) | Expr::Except(_) => {
                 let next = self.input[self.position..].chars().next();
                 let accepted = next.is_some_and(|c| match expression {
@@ -3401,6 +3421,7 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
         | Expr::Literal(_)
         | Expr::Number
         | Expr::Identifier
+        | Expr::Grapheme
         | Expr::CodeStart
         | Expr::CodeEnd
         | Expr::LongCodeBlock

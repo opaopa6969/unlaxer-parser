@@ -1,0 +1,2 @@
+# Keep official Unicode bytes, including upstream comment whitespace, unchanged.
+*.txt -text -whitespace

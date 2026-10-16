@@ -30,6 +30,7 @@ public record DocumentSnapshot(String uri, long version, String text) {
             if (line < 0 || character < 0) { throw new IllegalArgumentException("invalid position"); }
         }
     }
+    public GraphemeBoundaryTable graphemes() { return new GraphemeBoundaryTable(this); }
     public int length() { return text.codePointCount(0, text.length()); }
     public void check(Span span) {
         if (span.end > length()) { throw new IllegalArgumentException("outside snapshot"); }

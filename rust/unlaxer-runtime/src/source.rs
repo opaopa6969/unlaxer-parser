@@ -27,6 +27,9 @@ impl Snapshot {
         }
         Ok(result)
     }
+    pub fn graphemes(&self) -> crate::grapheme::GraphemeBoundaryTable {
+        crate::grapheme::GraphemeBoundaryTable::new(self.clone())
+    }
     pub fn len(&self) -> usize {
         self.text.chars().count()
     }
