@@ -397,3 +397,140 @@ fn source_failure_can_be_before_or_after_a_classic_watermark() {
         }
     }
 }
+
+fn failure_memo_driver(context: &mut ParseContext<'_>) -> ParseResult {
+    let expected = *context.state::<usize>("expected").unwrap();
+    let detailed = context.state::<bool>("detailed") == Some(&true);
+    context
+        .parse_with_token_mode(&Expr::literal("a"), TokenKind::MatchOnly, false)
+        .unwrap();
+    for _ in 0..2 {
+        assert!(context.parse(&Expr::Rule(1).ahead()).is_err());
+        assert_eq!(
+            context.failure().offset,
+            if detailed { expected } else { 0 }
+        );
+        assert_eq!(!context.failure().expected.is_empty(), detailed);
+        assert_eq!((context.position(), context.matched_position()), (0, 1));
+    }
+    // Switching back must combine real failures with the Classic failure frontier.
+    assert!(context
+        .parse_with_token_mode(&Expr::literal("Z"), TokenKind::Consumed, false)
+        .is_err());
+    assert_eq!(
+        context.failure().offset,
+        if detailed { expected.max(1) } else { 0 }
+    );
+    Ok(unlaxer_runtime::ParseMatch::empty(unlaxer_runtime::Span {
+        start: 0,
+        end: 0,
+    }))
+}
+
+#[test]
+fn actual_failure_memo_hits_preserve_native_and_classic_frontiers() {
+    for memo in [Memoization::Off, Memoization::SafeFailures] {
+        for diagnostics in [
+            Diagnostics::Auto,
+            Diagnostics::Detailed,
+            Diagnostics::DetailedOnFailure,
+        ] {
+            for reset in [false, true] {
+                for (expression, expected) in [
+                    (Expr::literal("Z"), 0_usize),
+                    (Expr::sequence([Expr::literal("ab"), Expr::literal("Z")]), 2),
+                ] {
+                    let grammar = unlaxer_runtime::share_grammar(vec![
+                        unlaxer_runtime::Rule {
+                            name: "driver",
+                            expression: Expr::Custom(failure_memo_driver),
+                        },
+                        unlaxer_runtime::Rule {
+                            name: "failure",
+                            expression,
+                        },
+                    ]);
+                    let mut context = ParseContext::with_options("ab", options(memo, diagnostics));
+                    context.set_state("expected", expected);
+                    context.set_state("detailed", diagnostics != Diagnostics::DetailedOnFailure);
+                    context.set_reset_matched_with_consumed(reset);
+                    context.parse_shared_grammar(&grammar, 0, false).unwrap();
+                    assert_eq!(
+                        context.memoized_failure_hits(),
+                        usize::from(memo == Memoization::SafeFailures),
+                        "{memo:?}/{diagnostics:?}/reset={reset}/sourceCP{expected}"
+                    );
+                    assert_eq!(context.memoized_success_hits(), 0);
+                    assert_eq!((context.position(), context.matched_position()), (0, 0));
+                    assert_eq!(context.reset_matched_with_consumed(), reset);
+                }
+            }
+        }
+    }
+}
+
+fn success_memo_driver(context: &mut ParseContext<'_>) -> ParseResult {
+    let detailed = context.state::<bool>("detailed") == Some(&true);
+    context
+        .parse_with_token_mode(&Expr::literal("a"), TokenKind::MatchOnly, false)
+        .unwrap();
+    for _ in 0..2 {
+        context.parse(&Expr::Rule(1).ahead()).unwrap();
+        assert_eq!(context.failure().offset, usize::from(detailed));
+        assert!(context.failure().expected.is_empty());
+        assert_eq!((context.position(), context.matched_position()), (0, 1));
+    }
+    // Successful rule replay includes a failed branch. A positive assertion
+    // discards it, while a failing negative assertion deliberately retains it.
+    assert!(context.parse(&Expr::Rule(1).not_ahead()).is_err());
+    assert_eq!(context.failure().offset, if detailed { 2 } else { 0 });
+    assert_eq!(!context.failure().expected.is_empty(), detailed);
+    assert_eq!((context.position(), context.matched_position()), (0, 1));
+    Ok(unlaxer_runtime::ParseMatch::empty(unlaxer_runtime::Span {
+        start: 0,
+        end: 0,
+    }))
+}
+
+#[test]
+fn actual_success_memo_hits_do_not_resurrect_discarded_assertion_hints() {
+    for memo in [Memoization::Off, Memoization::SafeFailures] {
+        for diagnostics in [
+            Diagnostics::Auto,
+            Diagnostics::Detailed,
+            Diagnostics::DetailedOnFailure,
+        ] {
+            for reset in [false, true] {
+                let grammar = unlaxer_runtime::share_grammar(vec![
+                    unlaxer_runtime::Rule {
+                        name: "driver",
+                        expression: Expr::Custom(success_memo_driver),
+                    },
+                    unlaxer_runtime::Rule {
+                        name: "hint",
+                        expression: Expr::choice([
+                            Expr::sequence([Expr::literal("ab"), Expr::literal("Z")]),
+                            Expr::literal("ab"),
+                        ]),
+                    },
+                ]);
+                let mut context = ParseContext::with_options("ab", options(memo, diagnostics));
+                context.set_state("detailed", diagnostics != Diagnostics::DetailedOnFailure);
+                context.set_reset_matched_with_consumed(reset);
+                context.parse_shared_grammar(&grammar, 0, false).unwrap();
+                assert_eq!(
+                    context.memoized_success_hits(),
+                    if memo == Memoization::SafeFailures {
+                        2
+                    } else {
+                        0
+                    },
+                    "{memo:?}/{diagnostics:?}/reset={reset}"
+                );
+                assert_eq!(context.memoized_failure_hits(), 0);
+                assert_eq!((context.position(), context.matched_position()), (0, 1));
+                assert_eq!(context.reset_matched_with_consumed(), reset);
+            }
+        }
+    }
+}
