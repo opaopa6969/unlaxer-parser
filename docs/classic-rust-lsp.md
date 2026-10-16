@@ -19,9 +19,7 @@ unlaxer-lsp = { path = "/path/to/unlaxer-parser/rust/unlaxer-lsp" }
 ```rust
 mod generated;
 fn main() -> std::io::Result<()> {
-    let mut server = unlaxer_lsp::Server::new(generated::lsp::backend());
-    server.serve_stdio()?;
-    std::process::exit(server.exit_code());
+    std::process::exit(generated::lsp::serve_stdio_status()?);
 }
 ```
 
@@ -37,8 +35,10 @@ shutdown 後はすべての request を InvalidRequest (-32600) で拒否し、e
 notification を無視する。Java の生成 launcher は subclass の独自 request もこの境界で保護する。
 exit は client が stdin を閉じる前に transport と所有 worker を終了する。
 stdio main は shutdown 後の exit を status 0、shutdown 無しの exit と exit 無しの EOF を status 1 にする（#508）。
-Java の `launchStdio()` と Rust の `Server::exit_code()` はこの status を返し、
+Java の `launchStdio()` と生成 Rust の `serve_stdio_status()` はこの status を返し、
 `System.exit` / `std::process::exit` は main 側が適用する。
+Rust の既存 `serve_stdio() -> io::Result<()>` は埋め込み互換の入口として残し、終了コードを適用する main は `serve_stdio_status()` を選ぶ。
+独自 backend の場合は `Server::serve_stdio()` 後の `Server::exit_code()` で同じ status を得る。
 Java server の `exit()` / `exitStatus()` や `launch(InputStream, OutputStream)` は埋め込み host を終了しない。
 後者は完了 future を返し、exit 時に入力を閉じて worker を解放するが、出力の所有権は caller に残す。
 既存の `launch()` は非同期の入口を維持する。UBNF VSIX の main は `launchStdio()` の status を適用する。

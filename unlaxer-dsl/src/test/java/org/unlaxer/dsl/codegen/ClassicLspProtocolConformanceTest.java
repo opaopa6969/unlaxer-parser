@@ -100,7 +100,7 @@ public class ClassicLspProtocolConformanceTest {
         String runtime=ROOT.resolve("rust/unlaxer-runtime").toString().replace("\\","\\\\");
         String lsp=ROOT.resolve("rust/unlaxer-lsp").toString().replace("\\","\\\\");
         Files.writeString(project.resolve("Cargo.toml"),"[package]\nname=\"classic-lsp-fixture\"\nversion=\"0.1.0\"\nedition=\"2021\"\n[dependencies]\nunlaxer-runtime={path=\""+runtime+"\"}\nunlaxer-lsp={path=\""+lsp+"\"}\n");
-        Files.writeString(project.resolve("src/main.rs"),"mod generated; fn main() { let mut server = unlaxer_lsp::Server::new(generated::lsp::backend()); server.serve_stdio().unwrap(); std::process::exit(server.exit_code()); }\n");
+        Files.writeString(project.resolve("src/main.rs"),"mod generated; fn main() { std::process::exit(generated::lsp::serve_stdio_status().unwrap()); }\n");
         run(List.of("cargo","build","--quiet","--offline","--manifest-path",project.resolve("Cargo.toml").toString()),ROOT);
         Path executable=ROOT.resolve("rust/target/debug/classic-lsp-fixture");
         try(var wire=new Wire(new ProcessBuilder(executable.toString()).redirectError(temporary.newFile("rust-stderr.log")).start())) { exercise(wire); }
