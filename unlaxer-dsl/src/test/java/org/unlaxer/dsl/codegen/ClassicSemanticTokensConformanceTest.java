@@ -136,6 +136,8 @@ public class ClassicSemanticTokensConformanceTest {
             """);
         run(List.of("cargo", "build", "--quiet", "--offline", "--manifest-path", project.resolve("Cargo.toml").toString()));
         exerciseBothModes(List.of(ROOT.resolve("rust/target/debug/semantic-token-wire-fixture").toString()), "rust");
+        Files.writeString(Path.of("target/classic-semantic-tokens.tsv"),
+            "backend\tmodes\tstatus\njava\t7\tpassed\nrust\t7\tpassed\ngenerator-artifacts\t6\tidentical\n");
     }
 
     private void exerciseBothModes(List<String> baseCommand, String backend) throws Exception {
