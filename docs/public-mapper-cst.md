@@ -2,7 +2,7 @@
 
 この防御は更新後に再生成した mapper に適用する。以前生成した source は再生成が必要。
 
-生成された Java mapper の `mapParsedToken` / `mapSubtreeToken` とその SourceMap・preferred snapshot 入口、および Rust の `map` / `map_parsed_tree` / `map_subtree_tree` は、投影前に CST の構造を検証する。構造不正は Java の `IllegalArgumentException`、Rust の `Err(String)` となり、診断には `E-MAPPING-CST` を含む。資源上限は `E-MAPPING-LIMIT` となる。通常の型変換・typeof・必須捕捉・recovery 等の失敗契約も引き続き適用する。
+生成された Java mapper の `mapParsedToken` / `mapSubtreeToken` とその SourceMap・preferred snapshot 入口、および Rust の `map` / `map_parsed_tree` / `map_subtree_tree` は、投影前に CST の構造を検証する。構造不正は Java の `IllegalArgumentException`、Rust の `Err(String)` となり、診断には `E-MAPPING-CST` を含む。資源上限は `E-MAPPING-LIMIT` となる。 Java の null 引数は従来の `rootToken must not be null` / `subtreeToken must not be null` を保持し、その入口の引数検証を先に行う。Rust の存在しない root ID は構造不正として拒否する。通常の型変換・typeof・必須捕捉・recovery 等の失敗契約も引き続き適用する。
 
 検査は公開 CST を改変する consumer の誤りを境界で止めるためのもので、元 parser が実際にこの CST を生成したという認証ではない。Rust の通常 `map` は従来どおり grammar fingerprint を要求せず、preferred 入口は既存の fingerprint と rule metadata を検証する。Java の元 root / alternate-entry parser class 検証も維持する。
 

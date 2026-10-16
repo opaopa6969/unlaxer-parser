@@ -17,12 +17,18 @@ public class PublicMapperCstConformanceTest extends PreferredAstConformanceTest 
     private final Path root = Path.of("..").toAbsolutePath().normalize();
     private Path corpusDir() { return root.resolve("spec-corpus/public-mapper-cst"); }
     private JsonObject fixture() throws Exception { return JsonParser.parseString(Files.readString(corpusDir().resolve("cases.json"))).getAsJsonObject(); }
-    private List<String> expected(JsonObject fixture) {
+    private List<String> expected(JsonObject fixture, boolean java) {
         var rows = new ArrayList<String>();
         for (var raw : fixture.getAsJsonArray("cases")) {
             var item = raw.getAsJsonObject();
             for (String entry : List.of("ordinary","source-map","subtree","subtree-source-map","preferred","subtree-preferred")) {
-                rows.add(item.get("id").getAsString()+"\t"+entry+"\t"+item.get("category").getAsString());
+                String category = item.get("category").getAsString();
+                if (java && item.get("id").getAsString().equals("null-root")) {
+                    // Existing Java argument diagnostics precede new malformed-CST diagnostics.
+                    category = entry.startsWith("subtree") ? "subtreeToken must not be null"
+                            : "rootToken must not be null";
+                }
+                rows.add(item.get("id").getAsString()+"\t"+entry+"\t"+category);
             }
         }
         return rows;
@@ -47,7 +53,7 @@ public class PublicMapperCstConformanceTest extends PreferredAstConformanceTest 
             String[] ids=new String[fixture.getAsJsonArray("cases").size()];
             for(int i=0;i<ids.length;i++)ids[i]=fixture.getAsJsonArray("cases").get(i).getAsJsonObject().get("id").getAsString();
             var actual=loader.loadClass("guardprobe.JavaProbe").getMethod("run",String.class,String[].class).invoke(null,fixture.get("input").getAsString(),ids);
-            assertEquals(expected(fixture),actual);
+            assertEquals(expected(fixture, true),actual);
         }
     }
     @Override @Test public void bothHostsSnapshots() throws Exception {
@@ -76,7 +82,7 @@ public class PublicMapperCstConformanceTest extends PreferredAstConformanceTest 
             Path probe=dir.resolve("probe.rs"), exe=dir.resolve("probe");
             Files.writeString(probe,probe(fixture,"rust-probe.rs",true));
             run(List.of("rustc","--edition=2021",probe.toString(),"--extern","unlaxer_runtime="+runtime,"-o",exe.toString()),"",false,true);
-            assertEquals(host,expected(fixture),run(List.of(exe.toString()),"",true,true).lines().toList());
+            assertEquals(host,expected(fixture, false),run(List.of(exe.toString()),"",true,true).lines().toList());
         }
     }
     private String probe(JsonObject fixture,String file,boolean rust) throws Exception {
