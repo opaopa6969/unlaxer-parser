@@ -110,3 +110,12 @@ OFF の実測も保存するが、Safe の合格と取り違えない。
 古い build の再利用を拒否する。
 
 この準備 unit だけで #184/#197 の stateful/performance/full-spec 全体を close しない。
+
+
+## 継続検証
+
+`Classic Tiny semantic oracle` CIは独立checkoutと専用Maven repositoryで同じpinから再生成し、
+harness負例9 testsと小oracleの216 samples（4入力×memo2×diagnostics3×3consumer×3phase）を検証する。
+両Rust出力のbyte一致、全consumer compile、完全AST/CP/診断、12設定の意味一致を必須にし、
+raw JSONLとbuild identityを保存する。CIは共有runner上の `verify` であり、全sampleの
+`measurement_eligible=false` を確認する。fraudの期限達成や全corpus OFFの完了はこのCIの合格条件と混同しない。
