@@ -948,7 +948,8 @@ public final class RustGrammarLowering {
 
     private void checkRepetition(Expression expression) {
         if (expression instanceof Repeat repeat) {
-            if (repeat.max() == null && nullable(repeat.child())) throw unsupported("nullable unbounded repetition");
+            // Generated repeats use JavaRepeat: one successful zero-progress iteration stops.
+            // Nullable bodies are safe here; source left-recursion analysis remains separate.
             checkRepetition(repeat.child());
         } else if (expression instanceof Separated separated) {
             if (nullable(separated.child()) && nullable(separated.separator())) throw unsupported("nullable unbounded separation");

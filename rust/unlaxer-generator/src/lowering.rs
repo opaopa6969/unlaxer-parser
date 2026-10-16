@@ -1382,14 +1382,8 @@ impl Lowering<'_> {
     }
 
     fn check_repetition(&self, expression: &Expression) -> Result<()> {
-        if let Expression::Repeat {
-            child, max: None, ..
-        } = expression
-        {
-            if self.is_nullable(child) {
-                return Err("nullable unbounded repetition".into());
-            }
-        }
+        // Generated repeats use JavaRepeat's successful no-progress termination.
+        // Source left-recursion and lexical nullability are validated independently.
         if let Expression::Separated { child, separator } = expression {
             if self.shape(separator, &mut HashSet::new())?.kind != Kind::Text {
                 return Err("mapped separator".into());
