@@ -1171,45 +1171,17 @@ public final class GrammarValidator {
     }
 
     private static void validateCommonFields(GrammarDecl grammar, List<ValidationIssue> errors) {
-        // @commonField(field) が付いたルールの全 permit に該当フィールドが存在するか確認
-        for (RuleDecl rule : grammar.rules()) {
-            rule.annotations().stream()
-                .filter(a -> a instanceof UBNFAST.CommonFieldAnnotation)
-                .map(a -> (UBNFAST.CommonFieldAnnotation) a)
-                .forEach(commonField -> {
-                    MappingAnnotation mapping = rule.annotations().stream()
-                        .filter(a -> a instanceof MappingAnnotation)
-                        .map(a -> (MappingAnnotation) a)
-                        .findFirst().orElse(null);
-                    if (mapping == null) {
-                        return;
-                    }
-                    String sealedName = mapping.className();
-                    List<RuleDecl> permits = grammar.rules().stream()
-                        .filter(r -> {
-                            MappingAnnotation m = r.annotations().stream()
-                                .filter(a -> a instanceof MappingAnnotation)
-                                .map(a -> (MappingAnnotation) a)
-                                .findFirst().orElse(null);
-                            return m != null && m.className().startsWith(sealedName + ".");
-                        })
-                        .toList();
-                    for (String field : commonField.fieldNames()) {
-                        for (RuleDecl permit : permits) {
-                            MappingAnnotation pm = permit.annotations().stream()
-                                .filter(a -> a instanceof MappingAnnotation)
-                                .map(a -> (MappingAnnotation) a)
-                                .findFirst().orElse(null);
-                            if (pm != null && !pm.paramNames().contains(field)) {
-                                addRuleError(errors, rule.name(),
-                                    "@commonField(" + field + ") is declared on " + rule.name()
-                                        + " but permit " + pm.className() + " does not have param '" + field + "'",
-                                    "Add @" + field + " capture to " + pm.className() + " rule.",
-                                    "E-COMMONFIELD-MISMATCH");
-                            }
-                        }
-                    }
-                });
+        try {
+            CommonFieldSchema.build(grammar);
+        } catch (CommonFieldSchema.SchemaException error) {
+            String message = error.getMessage();
+            String rule = error.rule;
+            addRuleError(
+                    errors,
+                    rule,
+                    message,
+                    "Align family fields and cardinalities.",
+                    "E-COMMONFIELD-MISMATCH");
         }
     }
 
