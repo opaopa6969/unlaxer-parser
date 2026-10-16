@@ -92,7 +92,7 @@
         <targetPath>playground/runtime/src</targetPath>
         <directory>../rust/unlaxer-runtime/src</directory>
         <includes>
-          <include>*.rs</include>
+          <include>**/*.rs</include>
         </includes>
       </resource>
       <resource>
