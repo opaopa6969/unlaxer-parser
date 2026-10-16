@@ -20,6 +20,11 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
     protected LanguageClient client;
     protected final Map<String, DocumentState> documents = new HashMap<>();
     protected final Map<String, Long> documentVersions = new HashMap<>();
+    private final org.unlaxer.parser.incremental.SnapshotParseCache<ParseResult> parseCache = new org.unlaxer.parser.incremental.SnapshotParseCache<>(128, 1_048_576, value -> value);
+    public org.unlaxer.parser.incremental.SnapshotParseCache.Stats parseCacheStats() { return parseCache.stats(); }
+    private org.unlaxer.parser.incremental.SnapshotParseCache.Revisions parseCacheRevisions;
+    public void invalidateParseCache() { parseCache.invalidateAll(); parseCacheRevisions = null; }
+    protected String parseStateRevision() { return ""; }
     private volatile boolean shutdownRequested;
     private volatile boolean initialized;
     private boolean initializedNotificationReceived;
@@ -53,7 +58,7 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
                 if (failure != null) {
                     selectedLanguageProfile = previousProfile; semanticTokenLegend = previousLegend;
                     semanticMultiline = previousMultiline; semanticOverlapping = previousOverlapping;
-                }
+                } else { invalidateParseCache(); }
             });
         } catch (RuntimeException failure) {
             selectedLanguageProfile = previousProfile; semanticTokenLegend = previousLegend;
@@ -381,7 +386,7 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
 
     private ParseResult doParse(String content) {
         Parser parser = SnapshotParsers.getRootParser();
-        ParseContext context = new ParseContext(createRootSourceCompat(content));
+        try (ParseContext context = new ParseContext(createRootSourceCompat(content))) {
         Parsed result = parser.parse(context);
         int consumedLength = 0;
         if (result.isSucceeded()) {
@@ -402,13 +407,22 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
         List<String> expectedParsers = failure.getExpectedParsers().stream()
             .filter(s -> s != null && !s.isBlank()).distinct().sorted().limit(20).toList();
         String deepestMatchedRule = failure.getDeepestMatchedRule();
-        context.close();
         return new ParseResult(result.isSucceeded(), consumedLength, content.length(),
             errorOffset, expectedTokens, expectedHints, expectedParsers, deepestMatchedRule);
+        }
+    }
+
+    private ParseResult cachedParse(String uri, String content, long version) {
+        var snapshot = new org.unlaxer.source.DocumentSnapshot(uri, version, content);
+        if (!parseCacheEnabled()) { invalidateParseCache(); return doParse(content); }
+        String profile = selectedLanguageProfile == null ? "" : selectedLanguageProfile.profile().canonicalTsv();
+        var revisions = new org.unlaxer.parser.incremental.SnapshotParseCache.Revisions("SnapshotParsers", profile, parseStateRevision());
+        if (!revisions.equals(parseCacheRevisions)) { parseCache.invalidateAll(); parseCacheRevisions = revisions; }
+        return parseCache.getOrCompute(snapshot, revisions, () -> doParse(content));
     }
 
     public ParseResult parseDocument(String uri, String content) {
-        ParseResult parseResult = doParse(content);
+        ParseResult parseResult = cachedParse(uri, content, documentVersions.getOrDefault(uri, 0L));
         documents.put(uri, new DocumentState(uri, content, parseResult, new IncrementalParseCache()));
         if (client != null) {
             publishDiagnostics(uri, content, parseResult);
@@ -416,25 +430,20 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
         return parseResult;
     }
 
-    public ParseResult parseDocumentIncremental(String uri, String content) {
+    private ParseResult parseNotifiedDocument(String uri, String content, long version, boolean incremental) {
+        Long previousVersion = documentVersions.put(uri, version);
         DocumentState previous = documents.get(uri);
-        if (previous != null && previous.content().equals(content)) {
-            if (client != null) publishDiagnostics(uri, content, previous.parseResult());
-            return previous.parseResult();
+        try { return incremental ? parseDocumentIncremental(uri, content) : parseDocument(uri, content); }
+        catch (RuntimeException | Error failure) {
+            if (previousVersion == null) documentVersions.remove(uri); else documentVersions.put(uri, previousVersion);
+            if (previous == null) documents.remove(uri); else documents.put(uri, previous);
+            parseCache.invalidate(uri);
+            throw failure;
         }
-        IncrementalParseCache cache = previous != null ? previous.cache() : new IncrementalParseCache();
-        List<String> chunks = cache.splitIntoChunks(content, ";");
-        ParseResult parseResult = doParse(content);
-        int offset = 0;
-        for (String chunk : chunks) {
-            cache.put(chunk, null, offset);
-            offset += chunk.length();
-        }
-        documents.put(uri, new DocumentState(uri, content, parseResult, cache));
-        if (client != null) {
-            publishDiagnostics(uri, content, parseResult);
-        }
-        return parseResult;
+    }
+
+    public ParseResult parseDocumentIncremental(String uri, String content) {
+        return parseDocument(uri, content);
     }
 
     private static StringSource createRootSourceCompat(String source) {
@@ -527,6 +536,7 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
         return new Position(position.line(), position.character());
     }
 
+    protected boolean parseCacheEnabled() { return false; }
     /** Opt-in immutable editor result. Exact URI, version and source must match this request. */
     protected org.unlaxer.dsl.semantic.EditorParseResult<?> editorParseResult(String uri, long version, String source) {
         return null;
@@ -688,10 +698,10 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
             long version = params.getTextDocument().getVersion();
             if (version < 0 || server.documentVersions.containsKey(uri) && version <= server.documentVersions.get(uri)) return;
             try { new org.unlaxer.source.DocumentSnapshot(uri, version, params.getTextDocument().getText()); } catch (IllegalArgumentException invalid) { return; }
-            server.documentVersions.put(uri, version);
-            server.parseDocument(
+            server.parseCache.invalidate(uri);
+            server.parseNotifiedDocument(
                 params.getTextDocument().getUri(),
-                params.getTextDocument().getText());
+                params.getTextDocument().getText(), version, false);
         }
 
         @Override
@@ -704,14 +714,15 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
             for (var change : params.getContentChanges()) if (change.getRange() != null || change.getText() == null) return;
             String content = params.getContentChanges().get(params.getContentChanges().size() - 1).getText();
             try { new org.unlaxer.source.DocumentSnapshot(uri, version, content); } catch (IllegalArgumentException invalid) { return; }
-            server.documentVersions.put(uri, version.longValue());
-            server.parseDocumentIncremental(uri, content);
+            server.parseCache.invalidate(uri);
+            server.parseNotifiedDocument(uri, content, version.longValue(), true);
         }
 
         @Override
         public void didClose(DidCloseTextDocumentParams params) {
             if (!server.initialized || server.hasStopped()) return;
             server.documents.remove(params.getTextDocument().getUri());
+            server.parseCache.invalidate(params.getTextDocument().getUri());
             server.documentVersions.remove(params.getTextDocument().getUri());
             server.clearLanguageDiagnostics(params.getTextDocument().getUri());
         }

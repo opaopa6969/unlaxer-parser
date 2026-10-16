@@ -179,6 +179,10 @@ The development branch supports [literal enum values](docs/enum-values.md) in Ja
 
 See the [full-spec matrix](rust/FULL-SPEC.md) and [IDE inventory](docs/lsp-dap-ide-gap-inventory.md) for remaining limits: Rust incremental parsing, LSP cancellation / semantic tokens / rename and formatting transport, and some tokens and annotations are unsupported. DAP implements AST/token stepping, not live evaluator suspension. Numeric capture types/conversion and some diagnostics also differ between Java and Rust; compatibility with every Java grammar is not guaranteed.
 
+Java and Rust development runtimes provide [bounded snapshot and chunk caches](docs/incremental-cache.md). Generated LSP servers reuse complete unchanged snapshots and invalidate on edits, configuration and external-state revisions. Edited documents are reparsed in full; partial CST splicing is not implemented in either version. This addition is not included in 3.3.0.
+
+See the [full-spec matrix](rust/FULL-SPEC.md) and [IDE inventory](docs/lsp-dap-ide-gap-inventory.md) for remaining limits: partial CST reparsing, LSP cancellation / rename and formatting transport, and some tokens and annotations are unsupported. DAP implements AST/token stepping, not live evaluator suspension. Numeric capture types/conversion and some diagnostics also differ between Java and Rust; compatibility with every Java grammar is not guaranteed.
+
 Downstream `tinyexpression-rs` and `rustcodeblock` AOT exist on the separate **ubnfc** engine. Their results do not establish Classic Rust parity or production deployment history. See the [engine guide](docs/engine-selection-guide-ja.md) and [pinned downstream audit](rust/FULL-SPEC.md#下流tinyexpressionの現状監査2026-09-30).
 
 ---
