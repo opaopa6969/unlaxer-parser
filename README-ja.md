@@ -155,6 +155,8 @@ MulOp ::= '*' | '/' ;
 
 品質の根拠は [CI](.github/workflows/maven.yml) の Rust 1.85 による Cargo test / fmt / Clippy、Java/Rust 共通 corpus の受理・拒否・AST・ソース位置比較、Java host/native generator の生成一致、実 stdio LSP/DAP 通信、release バイナリ smoke です。通常の `mvn test` では Rust conformance は skip されるため、再検証には `-DrustConformance=true` が必要です。再現手順は [Rust README](rust/README.md) にあります。
 
+開発ブランチでは、3.3.0公開後の追加として [`CI('word')` のUnicode固定比較](docs/case-insensitive-tokens.md)をJava/Rust両方に実装しています。JDKのUnicode版による差とJavaの誤った枝刈りを解消します。この追加は公開済み3.3.0には含まれません。
+
 残る境界は [full-spec 対応表](rust/FULL-SPEC.md) と [IDE 棚卸し](docs/lsp-dap-ide-gap-inventory.md) を参照してください。Rust の増分解析、LSP cancellation / semantic tokens / rename・format transport、一部の token・annotation は未対応です。DAP の AST/token ステップは実装済みですが、live evaluator の停止・再開ではありません。数値 capture の型・変換や一部の診断にも Java/Rust 差があり、全 Java 文法の互換性は保証しません。
 
 下流の `tinyexpression-rs` と `rustcodeblock` AOT は実在しますが、別 engine の **ubnfc** による実装です。その成果を Classic Rust の全面互換性や本番実績の証拠とは扱いません。[engine の選び方](docs/engine-selection-guide-ja.md)と[固定 revision の監査](rust/FULL-SPEC.md#下流tinyexpressionの現状監査2026-09-30)を参照してください。

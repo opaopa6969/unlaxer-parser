@@ -111,7 +111,7 @@ JSON 値と配列順を両 host で比較する。空白や `\n` / `\u000a` 等�
 | `P-SETTING` | 未対応 key または block setting / key |
 | `P-WHITESPACE` | `none` / `javaStyle` 以外 / style |
 | `P-EXTERNAL-TOKEN` | 実際の lowerer の組み込み対応表にない Simple token / class 名 |
-| `P-TOKEN-KIND` | 未対応の `REGEX` / `CI` |
+| `P-TOKEN-KIND` | 未対応の `REGEX`（開発版の非空 `CI` は対応済み。公開済み3.3.0では `CI` も未対応） |
 | `P-ADAPTER-DEFINITION` | adapter schema・ID・version・binding path 不正 / ID（不明なら `tokenAdapter`） |
 | `P-ADAPTER-DUPLICATE` | 同じ ID/version の重複登録 / ID（後出 setting の範囲） |
 | `P-ADAPTER-UNKNOWN` | 未登録 adapter 参照 / ID（token 全体） |

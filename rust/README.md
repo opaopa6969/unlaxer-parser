@@ -12,6 +12,8 @@ full-specの進捗は[対応表と受け入れ条件](FULL-SPEC.md)で追跡す�
 
 [宣言的な意味規則](../docs/declarative-semantics.md)では、同じ version 付き JSON を Java / Rust で検証し、生成 `EditorCst` から型・scope・参照・call-site と期待型補完を構築する。Rust の JSON loader は `unlaxer_generator::semantic_rules`、実行 IR は `unlaxer_runtime::semantic_rules`。`portableNominal/1` の対応範囲と独自 provider の境界を仕様に記載している。
 
+3.3.0公開後の開発版では [`CI('word')`](../docs/case-insensitive-tokens.md) を両hostから生成できる。Unicode17固定のsimple upper→lower比較で、原文とCP位置を保持する。Rustでは `Expr::CaseInsensitive("select")`、Java生成先は `UnicodeIgnoreCaseWordParser`。公開済み3.3.0には含まれず、汎用 `REGEX` は引き続き未対応。
+
 ## すぐ動かす
 
 3.3.0 では `unlaxer playground --grammar ... --output ...` により、
@@ -200,6 +202,7 @@ ASCII bitset・非 ASCII フラグ・nullable・unknown・「sequence が先に 
 - `org.unlaxer.tinyexpression.parser.javalang.CodeStartParser` / `CodeEndParser`の完全修飾名。内部triviaなしの原子的なcode fenceとして行頭・行末条件を保持する。[実クラスとの比較・字句契約](../docs/tiny-code-fence.md)を参照。javacodeblock/rustcodeblockの実行機能ではない。
 - `org.unlaxer.tinyexpression.parser.javalang.LongCodeBlockParser` の完全修飾名。4個以上の backtick で本文全体を原子的に認識し、同じ幅だけの単独行で閉じる。動的 combinator からは `Expr::long_code_block()` を使える。本文のコンパイル・実行はしない。
 - `ANY`・`EOF`・`EMPTY`・`CHAR_RANGE`・`NEGATION`・`UNTIL`・`LOOKAHEAD`・`NEGATIVE_LOOKAHEAD`。詳細は下記のprimitive互換契約を参照。
+- 非空の `CI('word')`（3.3.0公開後）。[Unicode17固定比較と旧Javaとの差](../docs/case-insensitive-tokens.md)。
 - `@mapping`とterminal/rule/group/quantifierへのcapture。全capture名の集合とparamsが一致すること。欠ける選択肢はoptional、繰り返しや同名の複数出現はlistとして推論する。text/node混在値は下記の`AstValue`で保持する。
 - 同じfield名・順序・cardinalityを持つ複数ruleのshared mapping。text/node種別が異なるfieldは宣言順に依存せず`AstValue`へ統合する。AST variantとSemantics methodは一つに統合し、ruleごとのcaptureとspanは保持する。
 - `@leftAssoc`の`Left @left { Op @op Right @right }`形と`params=[left, op, right]`、`@precedence(level=N)`。詳細は下記参照。

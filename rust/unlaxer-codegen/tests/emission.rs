@@ -528,6 +528,9 @@ fn invalid_ir_is_rejected_before_emission() {
     g.rules[3].body = Expression::CharRangeToken { min: 'z', max: 'a' };
     cases.push(g);
     let mut g = base.clone();
+    g.rules[3].body = Expression::CaseInsensitiveToken(String::new());
+    cases.push(g);
+    let mut g = base.clone();
     g.rules[3].body = Expression::CustomToken("crate::safe); std::fs::remove_file(\"x\")".into());
     cases.push(g);
     let mut g = base.clone();

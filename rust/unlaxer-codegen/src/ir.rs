@@ -144,6 +144,8 @@ pub enum Expression {
     AnyToken,
     EofToken,
     EmptyToken,
+    /// A nonempty word matched using the pinned Unicode simple case mapping.
+    CaseInsensitiveToken(String),
     CharRangeToken {
         min: char,
         max: char,

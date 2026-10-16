@@ -2757,7 +2757,7 @@ nullable を、コンビネータグラフ上の最小不動点として初回�
 | `ChoiceInterface`（`LongestChoice` を含む） | 候補の union。nullable は「どれかが nullable」 |
 | `ChainInterface` | 先頭から nullable な要素の FIRST を union し、最初の非 nullable 要素で止める。全要素 nullable なら nullable |
 | `Occurs`（`ZeroOrMore` / `OneOrMore` / `Optional` / `Repeat` …） | 本体（＋terminator、保守側）の FIRST。`min() == 0` か本体が nullable なら nullable |
-| `WordParser` / `IgnoreCaseWordParser` | 先頭 1 code point（ignoreCase は大小両方）。空語は nullable |
+| `WordParser` / `IgnoreCaseWordParser` / `UnicodeIgnoreCaseWordParser` | 大小を区別する場合は先頭1CP。ignoreCaseは逆写像の同値文字を漏らさないようunknown（#533、3.3.0公開後）。空語のFIRSTは保守的なnullable近似 |
 | `SingleCharacterParser`（`posix/*` `ascii/*` を含む） | `isMatch(cp)` を 0〜127 で走査した正確な bitset ＋ 非 ASCII は「あり得る」 |
 | **それ以外すべて**（`Not` / `MatchOnly` / `PropagatableSource` による反転 / `ParserWrapper` / `SyncPointRecoveryParser` / `ContainerParser` / 参照系 / 独自 `parse` を持つもの / 子が空のもの） | **unknown**（全 code point で「あり得る」＝決して除外しない） |
 

@@ -107,6 +107,7 @@ public final class GrammarValidator {
     private static List<ValidationIssue> validate(GrammarDecl grammar, boolean resolveParserClasses) {
         List<ValidationIssue> errors = new ArrayList<>();
         validateScalarRanges(grammar, errors);
+        errors.addAll(validateCaseInsensitiveTokens(grammar));
 
         try { org.unlaxer.dsl.bootstrap.LexicalCompiler.compile(grammar); }
         catch (IllegalArgumentException error) {
@@ -735,6 +736,22 @@ public final class GrammarValidator {
                 "W-GENERAL-NO-ROOT"
             );
         }
+    }
+
+    /** Shared with direct parser generation, which otherwise retains its caller-validation contract. */
+    static List<ValidationIssue> validateCaseInsensitiveTokens(GrammarDecl grammar) {
+        List<ValidationIssue> errors = new ArrayList<>();
+        for (TokenDecl token : grammar.tokens()) {
+            if (token instanceof TokenDecl.CaseInsensitive ci && ci.word().isEmpty()) {
+                addError(errors, "CI token " + ci.name() + " must not be empty",
+                    "Use at least one Unicode code point in CI(...).", "E-CI-EMPTY");
+            } else if (token instanceof TokenDecl.CaseInsensitive ci
+                    && ci.word().codePoints().anyMatch(cp -> cp >= 0xd800 && cp <= 0xdfff)) {
+                addError(errors, "CI token " + ci.name() + " contains an unpaired surrogate",
+                    "Use Unicode scalar values in CI(...).", "E-CI-SCALAR");
+            }
+        }
+        return errors;
     }
 
     private static void validateScalarRanges(GrammarDecl grammar, List<ValidationIssue> errors) {

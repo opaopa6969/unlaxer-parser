@@ -57,7 +57,7 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
         }
     }
     public sealed interface Expression permits Literal, NumberToken, Reference, Sequence, Choice, LongestChoice, UniqueLongestChoice, PredictiveChoice, Capture,
-        OptionalExpr, Repeat, Separated, AnyToken, EofToken, EmptyToken, ErrorExpected, CharRangeToken,
+        OptionalExpr, Repeat, Separated, AnyToken, EofToken, EmptyToken, CaseInsensitiveToken, ErrorExpected, CharRangeToken,
         ExceptToken, UntilToken, LookaheadToken, Delimited, IdentifierToken, GraphemeToken, QuotedToken,
         CodeStartToken, CodeEndToken, LongCodeBlockToken, CustomToken, TextValue, ValueBoundary, TriviaScope, RuleEffects,
         CaptureEquality, NamePredicate, NameResolutionScope, Recovery, LexicalToken, LexicalTriviaScope, LexicalContextScope {}
@@ -84,6 +84,8 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     public record AnyToken() implements Expression {}
     public record EofToken() implements Expression {}
     public record EmptyToken() implements Expression {}
+    /** A nonempty word matched using the pinned Unicode simple case mapping. */
+    public record CaseInsensitiveToken(String word) implements Expression {}
     /** A non-consuming, always-failing expected hint; distinct from recovery. */
     public record ErrorExpected(String message) implements Expression {}
     public record CharRangeToken(char min, char max) implements Expression {}

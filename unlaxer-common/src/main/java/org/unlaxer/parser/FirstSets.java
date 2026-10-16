@@ -280,7 +280,7 @@ public final class FirstSets {
     return FirstSet.UNKNOWN;
   }
 
-  /** A zero length word matches the empty input; otherwise only its first code point can start it. */
+  /** Conservative word prediction: empty words use a nullable overapproximation. */
   private static FirstSet wordOf(WordParser wordParser) {
     int length = wordParser.word.codePointLength().value();
     if (length == 0) {
@@ -293,7 +293,9 @@ public final class FirstSets {
     if (false == wordParser.ignoreCase) {
       return FirstSet.ofCodePoints(first);
     }
-    return FirstSet.ofCodePoints(first, Character.toUpperCase(first), Character.toLowerCase(first));
+    // Forward upper/lower mappings omit inverse equivalents (K also matches Kelvin sign).
+    // Both the legacy JDK matcher and the pinned Unicode matcher need a sound superset.
+    return FirstSet.UNKNOWN;
   }
 
   /**

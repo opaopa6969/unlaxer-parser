@@ -36,6 +36,7 @@ pub mod source_edits;
 pub mod token;
 pub mod token_trace;
 pub mod type_system;
+mod unicode_case_data;
 mod unicode_grapheme_data;
 mod unicode_xid;
 #[doc(hidden)]
@@ -89,6 +90,9 @@ pub enum Expr {
     /// An atomic token compiled from a declarative UBNF lexical expression.
     Lexical(&'static str, lexical::LexicalExpression),
     Literal(&'static str),
+    /// Unicode 17.0.0 simple lower(upper(cp)) equality, preserving original text.
+    /// No normalization, locale tailoring, or multi-scalar folding. Empty words fail.
+    CaseInsensitive(&'static str),
     Number,
     /// Java clang IdentifierParser: ASCII letter/underscore, then ASCII alphanumeric/underscore.
     Identifier,
@@ -258,6 +262,11 @@ fn identifier_may_start(value: &str) -> bool {
 
 /// Reusable combinators. These build the same rule expressions used by generated parsers.
 impl Expr {
+    /// A pinned Unicode 17 simple case-insensitive word. Empty words fail to parse.
+    pub fn case_insensitive(text: &'static str) -> Self {
+        Self::CaseInsensitive(text)
+    }
+
     pub fn literal(text: &'static str) -> Self {
         Self::Literal(text)
     }
@@ -2388,6 +2397,25 @@ impl<'a> ParseContext<'a> {
                 unreachable!("recursive expression dispatched by expression")
             }
             Expr::Lookahead { .. } => unreachable!("recursive expression dispatched by expression"),
+            Expr::CaseInsensitive(word) => {
+                let mut input = self.input[self.position..].chars();
+                let mut bytes = 0;
+                let matched = !word.is_empty()
+                    && word.chars().all(|expected| {
+                        input.next().is_some_and(|actual| {
+                            bytes += actual.len_utf8();
+                            unicode_case_data::key(expected) == unicode_case_data::key(actual)
+                        })
+                    });
+                if matched {
+                    self.position += bytes;
+                    self.matched_position = self.position;
+                    Some(Fragment::default())
+                } else {
+                    self.fail(word);
+                    None
+                }
+            }
             Expr::Literal(literal) => {
                 let end = match &mut self.lexing {
                     Some(session) => session.match_at(
@@ -3296,7 +3324,11 @@ impl<'a> ParseContext<'a> {
         }
         if matches!(
             child,
-            Expr::Literal(_) | Expr::Any | Expr::CharRange(_, _) | Expr::Except(_)
+            Expr::Literal(_)
+                | Expr::CaseInsensitive(_)
+                | Expr::Any
+                | Expr::CharRange(_, _)
+                | Expr::Except(_)
         ) {
             self.matched_position = self.position;
         }
@@ -3419,6 +3451,7 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
         | Expr::LexicalContextScope { child, .. } => expression_allows_deferred_diagnostics(child),
         Expr::Lexical(_, _)
         | Expr::Literal(_)
+        | Expr::CaseInsensitive(_)
         | Expr::Number
         | Expr::Identifier
         | Expr::Grapheme

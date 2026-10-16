@@ -141,3 +141,12 @@ DAPはAST/token inspectionであり、live evaluatorの停止・再開ではな�
 
 資源制限は[Rust runtimeの説明](../rust/README.md)と[Javaの解析上限API](java-parser-limits.md)を参照する。Rustの`resource_limit`・Javaの`ParseLimitException`が発生したcontextは再利用せず、新しいcontextを作る。通常の構文不一致のrollbackとは区別する。利用者callback内部の任意コードや極端に小さいthread stackを隔離するsandboxではない。
 配布・公開済みversionと、ここで検証したsource revisionを区別する。CIの待機中・未実行を成功と表記せず、導入先では使用文法と最大入力の負荷検証を追加する。
+
+## 3.3.0公開後の互換拡張
+
+開発版の [#533](https://github.com/opaopa6969/unlaxer-parser/issues/533) は、
+[Unicode17固定のCI token](case-insensitive-tokens.md)をJava/Rustへ追加する。
+手書きJava parserのJDK依存比較は維持し、生成CIは同じ固定表を使用する。
+監査で再現したJavaのFIRST誤判定（`k`と`K`が診断policyによって不一致になる）も修正する。
+この追加は上記3.3.0配布記録の検証対象には含まれず、公開済み3.3.0には入っていない。
+新しい共通fixture、Java17/21の生成parser検証、Unicode表の再生成checkを継続CIへ追加する。

@@ -1,0 +1,920 @@
+[
+  {
+    "name": "Ascii",
+    "grammar": "grammar Ascii { @package: ci.probe token T = CI('if') @root @mapping(Value,params=[text]) Root ::= T @text; }",
+    "cases": [
+      {
+        "id": "lower",
+        "input": "if",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "coordinates": [
+          2,
+          2,
+          2
+        ],
+        "accepted": true,
+        "value": "if",
+        "diagnostic": null
+      },
+      {
+        "id": "mixed",
+        "input": "iF",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "coordinates": [
+          2,
+          2,
+          2
+        ],
+        "accepted": true,
+        "value": "iF",
+        "diagnostic": null
+      },
+      {
+        "id": "prefix-not-keyword-boundary",
+        "input": "IFx",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "coordinates": [
+          2,
+          2,
+          2
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "trailing_input",
+          "offset": 2
+        }
+      },
+      {
+        "id": "mismatch",
+        "input": "ix",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        }
+      },
+      {
+        "id": "short",
+        "input": "i",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        }
+      },
+      {
+        "id": "eof",
+        "input": "",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "TurkishSigma",
+    "grammar": "grammar TurkishSigma { @package: ci.probe token T = CI('İıΣ') @root @mapping(Value,params=[text]) Root ::= T @text; }",
+    "cases": [
+      {
+        "id": "simple-upper-lower",
+        "input": "iIς",
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "coordinates": [
+          3,
+          3,
+          4
+        ],
+        "accepted": true,
+        "value": "iIς",
+        "diagnostic": null
+      },
+      {
+        "id": "same-equivalence-class",
+        "input": "Iiσ",
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "coordinates": [
+          3,
+          3,
+          4
+        ],
+        "accepted": true,
+        "value": "Iiσ",
+        "diagnostic": null
+      },
+      {
+        "id": "wrong-scalar",
+        "input": "iXς",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "Sharp",
+    "grammar": "grammar Sharp { @package: ci.probe token T = CI('ß') @root @mapping(Value,params=[text]) Root ::= T @text; }",
+    "cases": [
+      {
+        "id": "capital-sharp",
+        "input": "ẞ",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "coordinates": [
+          1,
+          1,
+          3
+        ],
+        "accepted": true,
+        "value": "ẞ",
+        "diagnostic": null
+      },
+      {
+        "id": "unchanged",
+        "input": "ß",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "coordinates": [
+          1,
+          1,
+          2
+        ],
+        "accepted": true,
+        "value": "ß",
+        "diagnostic": null
+      },
+      {
+        "id": "no-expansion",
+        "input": "SS",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "Canonical",
+    "grammar": "grammar Canonical { @package: ci.probe token T = CI('é') @root @mapping(Value,params=[text]) Root ::= T @text; }",
+    "cases": [
+      {
+        "id": "upper",
+        "input": "É",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "coordinates": [
+          1,
+          1,
+          2
+        ],
+        "accepted": true,
+        "value": "É",
+        "diagnostic": null
+      },
+      {
+        "id": "no-normalization",
+        "input": "é",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "Supplementary",
+    "grammar": "grammar Supplementary { @package: ci.probe token T = CI('𐐀') @root @mapping(Value,params=[text]) Root ::= T @text; }",
+    "cases": [
+      {
+        "id": "deseret-lower",
+        "input": "𐐨",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "coordinates": [
+          1,
+          2,
+          4
+        ],
+        "accepted": true,
+        "value": "𐐨",
+        "diagnostic": null
+      },
+      {
+        "id": "deseret-upper",
+        "input": "𐐀",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "coordinates": [
+          1,
+          2,
+          4
+        ],
+        "accepted": true,
+        "value": "𐐀",
+        "diagnostic": null
+      },
+      {
+        "id": "different-emoji",
+        "input": "😀",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "Prefix",
+    "grammar": "grammar Prefix { @package: ci.probe token T = CI('Σİ𐐀') @root @mapping(Value,params=[text]) Root ::= '😀' T @text; }",
+    "cases": [
+      {
+        "id": "unicode-offset",
+        "input": "😀ςi𐐨",
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "coordinates": [
+          4,
+          6,
+          11
+        ],
+        "accepted": true,
+        "value": "ςi𐐨",
+        "diagnostic": null
+      },
+      {
+        "id": "trailing-offset",
+        "input": "😀σİ𐐀!",
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "coordinates": [
+          4,
+          6,
+          12
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "trailing_input",
+          "offset": 4
+        }
+      },
+      {
+        "id": "atomic-failure",
+        "input": "😀Σz𐐨",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 1
+        }
+      }
+    ]
+  },
+  {
+    "name": "Family",
+    "grammar": "grammar Family { @package: ci.probe token T = CI('👨‍👩‍👧‍👦É') @root @mapping(Value,params=[text]) Root ::= T @text; }",
+    "cases": [
+      {
+        "id": "raw-family-and-combining",
+        "input": "👨‍👩‍👧‍👦é",
+        "prefix": [
+          true,
+          9,
+          9
+        ],
+        "coordinates": [
+          9,
+          13,
+          28
+        ],
+        "accepted": true,
+        "value": "👨‍👩‍👧‍👦é",
+        "diagnostic": null
+      },
+      {
+        "id": "no-composition",
+        "input": "👨‍👩‍👧‍👦é",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "Retry",
+    "grammar": "grammar Retry { @package: ci.probe token T = CI('Go') @root @mapping(Value,params=[text]) Root ::= ('😀' T '!' | '😀' T) @text; }",
+    "cases": [
+      {
+        "id": "second-branch-after-rollback",
+        "input": "😀gO",
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "coordinates": [
+          3,
+          4,
+          6
+        ],
+        "accepted": true,
+        "value": "😀gO",
+        "diagnostic": null
+      },
+      {
+        "id": "first-branch",
+        "input": "😀GO!",
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "coordinates": [
+          4,
+          5,
+          7
+        ],
+        "accepted": true,
+        "value": "😀GO!",
+        "diagnostic": null
+      },
+      {
+        "id": "prefix-after-rollback",
+        "input": "😀gO?",
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "coordinates": [
+          3,
+          4,
+          6
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "trailing_input",
+          "offset": 3
+        }
+      },
+      {
+        "id": "all-branches-fail",
+        "input": "😀no",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 1
+        }
+      }
+    ]
+  },
+  {
+    "name": "Chain",
+    "grammar": "grammar Chain { @package: ci.probe token T = CI('Go') @root @mapping(Value,params=[text]) Root ::= '😀' T @text '!'; }",
+    "cases": [
+      {
+        "id": "failed-suffix-rolls-back-ci",
+        "input": "😀gO",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 3
+        }
+      },
+      {
+        "id": "complete",
+        "input": "😀go!",
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "coordinates": [
+          4,
+          5,
+          7
+        ],
+        "accepted": true,
+        "value": "go",
+        "diagnostic": null
+      }
+    ]
+  },
+  {
+    "name": "NewUnicode17",
+    "grammar": "grammar NewUnicode17 { @package: ci.probe token T = CI('ꟋᲉꟜ𐵐') @root @mapping(Value,params=[text]) Root ::= T @text; }",
+    "cases": [
+      {
+        "id": "new-simple-mappings",
+        "input": "ɤᲊƛ𐵰",
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "coordinates": [
+          4,
+          5,
+          11
+        ],
+        "accepted": true,
+        "value": "ɤᲊƛ𐵰",
+        "diagnostic": null
+      },
+      {
+        "id": "unchanged-capitals",
+        "input": "ꟋᲉꟜ𐵐",
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "coordinates": [
+          4,
+          5,
+          13
+        ],
+        "accepted": true,
+        "value": "ꟋᲉꟜ𐵐",
+        "diagnostic": null
+      }
+    ]
+  },
+  {
+    "name": "Jdk17Delta",
+    "grammar": "grammar Jdk17Delta { @package: ci.probe token T = CI('ᲉⰯꟀꟋꟌ꟎Ꟑ꟒꟔ꟖꟘꟚꟜ𐕰𐕱𐕲𐕳𐕴𐕵𐕶𐕷𐕸𐕹𐕺𐕼𐕽𐕾𐕿𐖀𐖁𐖂𐖃𐖄𐖅𐖆𐖇𐖈𐖉𐖊𐖌𐖍𐖎𐖏𐖐𐖑𐖒𐖔𐖕𐵐𐵑𐵒𐵓𐵔𐵕𐵖𐵗𐵘𐵙𐵚𐵛𐵜𐵝𐵞𐵟𐵠𐵡𐵢𐵣𐵤𐵥𖺠𖺡𖺢𖺣𖺤𖺥𖺦𖺧𖺨𖺩𖺪𖺫𖺬𖺭𖺮𖺯𖺰𖺱𖺲𖺳𖺴𖺵𖺶𖺷𖺸') @root @mapping(Value,params=[text]) Root ::= T @text; }",
+    "cases": [
+      {
+        "id": "all-95-changed-fold-values",
+        "input": "ᲊⱟꟁɤꟍ꟏ꟑꟓꟕꟗꟙꟛƛ𐖗𐖘𐖙𐖚𐖛𐖜𐖝𐖞𐖟𐖠𐖡𐖣𐖤𐖥𐖦𐖧𐖨𐖩𐖪𐖫𐖬𐖭𐖮𐖯𐖰𐖱𐖳𐖴𐖵𐖶𐖷𐖸𐖹𐖻𐖼𐵰𐵱𐵲𐵳𐵴𐵵𐵶𐵷𐵸𐵹𐵺𐵻𐵼𐵽𐵾𐵿𐶀𐶁𐶂𐶃𐶄𐶅𖺻𖺼𖺽𖺾𖺿𖻀𖻁𖻂𖻃𖻄𖻅𖻆𖻇𖻈𖻉𖻊𖻋𖻌𖻍𖻎𖻏𖻐𖻑𖻒𖻓",
+        "prefix": [
+          true,
+          95,
+          95
+        ],
+        "coordinates": [
+          95,
+          177,
+          365
+        ],
+        "accepted": true,
+        "value": "ᲊⱟꟁɤꟍ꟏ꟑꟓꟕꟗꟙꟛƛ𐖗𐖘𐖙𐖚𐖛𐖜𐖝𐖞𐖟𐖠𐖡𐖣𐖤𐖥𐖦𐖧𐖨𐖩𐖪𐖫𐖬𐖭𐖮𐖯𐖰𐖱𐖳𐖴𐖵𐖶𐖷𐖸𐖹𐖻𐖼𐵰𐵱𐵲𐵳𐵴𐵵𐵶𐵷𐵸𐵹𐵺𐵻𐵼𐵽𐵾𐵿𐶀𐶁𐶂𐶃𐶄𐶅𖺻𖺼𖺽𖺾𖺿𖻀𖻁𖻂𖻃𖻄𖻅𖻆𖻇𖻈𖻉𖻊𖻋𖻌𖻍𖻎𖻏𖻐𖻑𖻒𖻓",
+        "diagnostic": null
+      }
+    ]
+  },
+  {
+    "name": "Jdk21Delta",
+    "grammar": "grammar Jdk21Delta { @package: ci.probe token T = CI('ᲉꟋꟌ꟎꟒꟔ꟚꟜ𐵐𐵑𐵒𐵓𐵔𐵕𐵖𐵗𐵘𐵙𐵚𐵛𐵜𐵝𐵞𐵟𐵠𐵡𐵢𐵣𐵤𐵥𖺠𖺡𖺢𖺣𖺤𖺥𖺦𖺧𖺨𖺩𖺪𖺫𖺬𖺭𖺮𖺯𖺰𖺱𖺲𖺳𖺴𖺵𖺶𖺷𖺸') @root @mapping(Value,params=[text]) Root ::= T @text; }",
+    "cases": [
+      {
+        "id": "all-55-changed-fold-values",
+        "input": "ᲊɤꟍ꟏ꟓꟕꟛƛ𐵰𐵱𐵲𐵳𐵴𐵵𐵶𐵷𐵸𐵹𐵺𐵻𐵼𐵽𐵾𐵿𐶀𐶁𐶂𐶃𐶄𐶅𖺻𖺼𖺽𖺾𖺿𖻀𖻁𖻂𖻃𖻄𖻅𖻆𖻇𖻈𖻉𖻊𖻋𖻌𖻍𖻎𖻏𖻐𖻑𖻒𖻓",
+        "prefix": [
+          true,
+          55,
+          55
+        ],
+        "coordinates": [
+          55,
+          102,
+          210
+        ],
+        "accepted": true,
+        "value": "ᲊɤꟍ꟏ꟓꟕꟛƛ𐵰𐵱𐵲𐵳𐵴𐵵𐵶𐵷𐵸𐵹𐵺𐵻𐵼𐵽𐵾𐵿𐶀𐶁𐶂𐶃𐶄𐶅𖺻𖺼𖺽𖺾𖺿𖻀𖻁𖻂𖻃𖻄𖻅𖻆𖻇𖻈𖻉𖻊𖻋𖻌𖻍𖻎𖻏𖻐𖻑𖻒𖻓",
+        "diagnostic": null
+      }
+    ]
+  },
+  {
+    "name": "Predictive",
+    "grammar": "grammar Predictive { @package: ci.probe token T=CI('Kx') @root @mapping(Value,params=[text]) @predictiveChoice Root ::= T @text | 'fallback' @text; }",
+    "cases": [
+      {
+        "id": "unicode-first",
+        "input": "KX",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "coordinates": [
+          2,
+          2,
+          4
+        ],
+        "accepted": true,
+        "value": "KX",
+        "diagnostic": null
+      },
+      {
+        "id": "ascii",
+        "input": "kX",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "coordinates": [
+          2,
+          2,
+          2
+        ],
+        "accepted": true,
+        "value": "kX",
+        "diagnostic": null
+      },
+      {
+        "id": "fallback",
+        "input": "fallback",
+        "prefix": [
+          true,
+          8,
+          8
+        ],
+        "coordinates": [
+          8,
+          8,
+          8
+        ],
+        "accepted": true,
+        "value": "fallback",
+        "diagnostic": null
+      }
+    ]
+  },
+  {
+    "name": "Longest",
+    "grammar": "grammar Longest { @package: ci.probe token T=CI('Kx') @root @mapping(Value,params=[text]) @longestChoice Root ::= T @text | 'K' @text; }",
+    "cases": [
+      {
+        "id": "actual-unicode-byte-width",
+        "input": "KX",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "coordinates": [
+          2,
+          2,
+          4
+        ],
+        "accepted": true,
+        "value": "KX",
+        "diagnostic": null
+      },
+      {
+        "id": "ascii",
+        "input": "KX",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "coordinates": [
+          2,
+          2,
+          2
+        ],
+        "accepted": true,
+        "value": "KX",
+        "diagnostic": null
+      },
+      {
+        "id": "shorter-prefix",
+        "input": "K!",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "coordinates": [
+          1,
+          1,
+          3
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "trailing_input",
+          "offset": 1
+        }
+      }
+    ]
+  },
+  {
+    "name": "TrimProjection",
+    "grammar": "grammar TrimProjection { @package: ci.probe @whitespace: none token T=CI(' K ') @root @mapping(Value,params=[text]) Root ::= T @text; }",
+    "cases": [
+      {
+        "id": "raw-token-versus-trimmed-value",
+        "input": " K ",
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "coordinates": [
+          3,
+          3,
+          5
+        ],
+        "accepted": true,
+        "value": "K",
+        "diagnostic": null
+      }
+    ]
+  },
+  {
+    "name": "Optional",
+    "grammar": "grammar Optional { @package: ci.probe token T=CI('Kx') @root @mapping(Value,params=[text]) Root ::= [T] 'x' @text; }",
+    "cases": [
+      {
+        "id": "missing-token",
+        "input": "x",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "coordinates": [
+          1,
+          1,
+          1
+        ],
+        "accepted": true,
+        "value": "x",
+        "diagnostic": null
+      },
+      {
+        "id": "present-token",
+        "input": "KXx",
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "coordinates": [
+          3,
+          3,
+          5
+        ],
+        "accepted": true,
+        "value": "x",
+        "diagnostic": null
+      },
+      {
+        "id": "mismatch",
+        "input": "KQx",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "Repeated",
+    "grammar": "grammar Repeated { @package: ci.probe token T=CI('Kx') @root @mapping(Value,params=[text]) Root ::= {T} '!' @text; }",
+    "cases": [
+      {
+        "id": "zero-tokens",
+        "input": "!",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "coordinates": [
+          1,
+          1,
+          1
+        ],
+        "accepted": true,
+        "value": "!",
+        "diagnostic": null
+      },
+      {
+        "id": "multiple-tokens",
+        "input": "KXkx!",
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "coordinates": [
+          5,
+          5,
+          7
+        ],
+        "accepted": true,
+        "value": "!",
+        "diagnostic": null
+      },
+      {
+        "id": "failed-suffix",
+        "input": "KX?",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 2
+        }
+      }
+    ]
+  }
+]
