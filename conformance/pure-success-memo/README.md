@@ -37,11 +37,11 @@ rustc --edition=2021 -O conformance/pure-success-memo/benchmark.rs \
 /tmp/pure-success-bench
 ```
 
-RustのClassic/general token modeは後続 #628 で実hitへ対応しています。stateful rule、opt-in terminal traceのsuccess replayは未対応です。
+RustのClassic/general token modeは後続 #628 で実hitへ対応しています。stateful failureは [#629](../stateful-failure-memo/README.md) でversion対応し、任意stateful/opt-in terminal traceのsuccess replayは対象外です。
 [境界・保存予算・互換性](../../docs/pure-success-memo.md)を参照してください。#184/#197は未完のままです。
 
 `benchmark-results.tsv` は2026-10-17、Rust1.85.0 `-O`、本変更の1回の測定です。
 retry0はOFF1812µs/ON2560µs（約41% overhead）、retry8はOFF14898µs/ON7173µs（約2.1倍高速）でした。
 後者のcheckpointは325005→61005、実success hitは8000です。測定値をtestの閾値にはしません。
 この測定は同一processの3 warmup+5 samplesで、host負荷による差を含みます。
-後続: #628 (Classic実hit)。残差: #629 (stateful failure)、親 #184/#197 (記録付きreplay/production benchmark等)。
+後続: #628 (Classic実hit)、#629 (versioned stateful failure)。残差: 親 #184/#197 (記録付きreplay/production benchmark等)。
