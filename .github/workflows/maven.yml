@@ -58,12 +58,16 @@ jobs:
     - name: Cross-language fixtures, compile failures, and generated-file drift
       run: >
         mvn -B -pl unlaxer-common,unlaxer-dsl -am test
-        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,RustPortabilityConformanceTest,TokenAdapterConformanceTest,UnicodeIgnoreCaseWordParserTest,CaseInsensitiveConformanceTest,GraphemeTest,GraphemeConformanceTest,ParseBindingsConformanceTest,DeclarativeTokenConformanceTest,ApiImpactConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest,SkipMappingConformanceTest,CaptureEqualityConformanceTest,ErrorElementConformanceTest,RecoveryConformanceTest,SemanticModelConformanceTest,ProjectSymbolIndexConformanceTest,EditorParseResultConformanceTest,EditorPipelineConformanceTest,EditorCstTest,SemanticModelUbnfTest,TokenStreamConformanceTest,TypeSystemConformanceTest,CallInferenceConformanceTest,SemanticQueriesConformanceTest,SemanticQueryEditsTest,PackageResolverConformanceTest,HttpsPackageConformanceTest,VocabularyOriginsConformanceTest,SemanticRulesConformanceTest,SemanticDiagnosticConformanceTest,ClassicLspProtocolConformanceTest,LSPQueryConsumerTest,LSPNonBmpOffsetTest,LSPProfileInitializationTest,PreprocessingConformanceTest,UniqueLongestConformanceTest,NameSnapshotConformanceTest,NamePredicateConformanceTest,ContextualLexingConformanceTest,CodePointEscapeConformanceTest,ClassicDapProtocolConformanceTest,ClassicTokenDapProtocolConformanceTest,TokenTraceConformanceTest -DrustConformance=true -DtokenStreamBench=true
+        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,RustPortabilityConformanceTest,TokenAdapterConformanceTest,UnicodeIgnoreCaseWordParserTest,CaseInsensitiveConformanceTest,GraphemeTest,GraphemeConformanceTest,ParseBindingsConformanceTest,DeclarativeTokenConformanceTest,RegexRetirementConformanceTest,ApiImpactConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest,SkipMappingConformanceTest,CaptureEqualityConformanceTest,ErrorElementConformanceTest,RecoveryConformanceTest,SemanticModelConformanceTest,ProjectSymbolIndexConformanceTest,EditorParseResultConformanceTest,EditorPipelineConformanceTest,EditorCstTest,SemanticModelUbnfTest,TokenStreamConformanceTest,TypeSystemConformanceTest,CallInferenceConformanceTest,SemanticQueriesConformanceTest,SemanticQueryEditsTest,PackageResolverConformanceTest,HttpsPackageConformanceTest,VocabularyOriginsConformanceTest,SemanticRulesConformanceTest,SemanticDiagnosticConformanceTest,ClassicLspProtocolConformanceTest,LSPQueryConsumerTest,LSPNonBmpOffsetTest,LSPProfileInitializationTest,PreprocessingConformanceTest,UniqueLongestConformanceTest,NameSnapshotConformanceTest,NamePredicateConformanceTest,ContextualLexingConformanceTest,CodePointEscapeConformanceTest,ClassicDapProtocolConformanceTest,ClassicTokenDapProtocolConformanceTest,TokenTraceConformanceTest -DrustConformance=true -DtokenStreamBench=true
         -Dsurefire.failIfNoSpecifiedTests=false
     - name: Require generated case-insensitive token conformance evidence
       run: |
         test -s unlaxer-dsl/target/case-insensitive-conformance.tsv
         test -s unlaxer-dsl/target/case-insensitive-java.tsv
+    - name: Require REGEX retirement and lexical migration evidence
+      run: |
+        test -s unlaxer-dsl/target/regex-retirement-runtime.tsv
+        test -s unlaxer-dsl/target/regex-retirement-rejections.tsv
     - name: Require real Java and Rust DAP protocol evidence
       run: |
         test -s unlaxer-dsl/target/classic-dap-protocol.tsv
@@ -195,6 +199,8 @@ jobs:
           unlaxer-dsl/target/rust-parse-bindings.tsv
           examples/resolver-tutorial/target/conformance.tsv
           unlaxer-dsl/target/rust-declarative-token-runtime.tsv
+          unlaxer-dsl/target/regex-retirement-runtime.tsv
+          unlaxer-dsl/target/regex-retirement-rejections.tsv
           unlaxer-dsl/target/api-impact-conformance.tsv
           unlaxer-dsl/target/api-impact-compile.tsv
           unlaxer-dsl/target/rust-associative.tsv

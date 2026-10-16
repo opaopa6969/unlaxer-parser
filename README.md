@@ -159,6 +159,9 @@ The evidence includes [CI](.github/workflows/maven.yml) on Rust 1.85 with Cargo 
 
 The development branch adds [Unicode-pinned `CI('word')` tokens](docs/case-insensitive-tokens.md) to both Java and Rust, removing JDK Unicode-version drift and correcting unsafe Java candidate pruning. This addition is **not included in the published 3.3.0 artifacts**.
 
+The development branch retires `REGEX(...)` and the Java `RegexTokenParser` runtime. Use declarative lexical combinators (`token NAME ::= expression;`); old declarations fail with `E-REGEX-RETIRED`. The [migration guide](docs/regex-retirement.md) covers identifiers, numbers, quotes, Unicode, and the differences in choice and repetition. Published 3.3.0 is unchanged.
+
+
 See the [full-spec matrix](rust/FULL-SPEC.md) and [IDE inventory](docs/lsp-dap-ide-gap-inventory.md) for remaining limits: Rust incremental parsing, LSP cancellation / semantic tokens / rename and formatting transport, and some tokens and annotations are unsupported. DAP implements AST/token stepping, not live evaluator suspension. Numeric capture types/conversion and some diagnostics also differ between Java and Rust; compatibility with every Java grammar is not guaranteed.
 
 Downstream `tinyexpression-rs` and `rustcodeblock` AOT exist on the separate **ubnfc** engine. Their results do not establish Classic Rust parity or production deployment history. See the [engine guide](docs/engine-selection-guide-ja.md) and [pinned downstream audit](rust/FULL-SPEC.md#下流tinyexpressionの現状監査2026-09-30).
