@@ -19,9 +19,10 @@ Chainがlookup前にpolicy=falseへ正規化する既存挙動は維持します
 keyは分離します。内部helper/反復へpolicyが伝播するため、開始時にconsumed==matchedであることだけから
 policyを捨てる最適化は行いません。保持窓のtestはpolicyを固定し、windowの再保存と別の問題を混ぜません。
 
-Rustのfailure keyは既にreset/nonOrderedを保持しています。一方、明示Classic token modeは現在memo対象外です。
-共通fixtureのRust ON/OFF一致はこのno-hit境界を維持した意味検証で、hit parityの実装とは呼びません。
-通常modeの既存key分離は、同一grammar session内で実hitを伴って独立検証します。
+Rustのfailure keyはreset/nonOrderedを保持します。後続の [#628 Classic memo](classic-memo.md) は
+kind/invertも区別して実failure/success hitを提供します。この14ケースのRust warm/nextは別grammar sessionで
+あるためentryを共有せず、ON/OFF一致は意味検証です。同一grammar session内の別probeでは
+通常/Classic双方でreset切替時のmissと同policyへ戻したときの実hitを独立検証します。
 
 [共通の14ケースと再現手順](../conformance/memo-reset-policy/)を参照してください。
 Java/Rustのpure success/stateful failure全体は引き続き#184/#197で追跡します。

@@ -230,7 +230,7 @@ public class MemoResetPolicyTest {
     }
 
     @Test
-    public void rustExistingResetKeyAndClassicNoHitBoundaryAgreeWithTheOracle() throws Exception {
+    public void rustExistingResetKeyAndIndependentSessionsAgreeWithTheOracle() throws Exception {
         if (!Boolean.getBoolean("rustConformance"))
             System.out.println(
                     "[assumption] MemoResetPolicyTest native comparison requires"

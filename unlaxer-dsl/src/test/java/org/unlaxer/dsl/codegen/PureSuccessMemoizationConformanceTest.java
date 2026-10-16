@@ -69,7 +69,7 @@ public class PureSuccessMemoizationConformanceTest {
         if (!Boolean.getBoolean("rustConformance")) {
             System.out.println(
                     "[assumption] PureSuccessMemoizationConformanceTest requires"
-                        + " -DrustConformance=true and rustc/cargo");
+                            + " -DrustConformance=true and rustc/cargo");
         }
         assumeTrue(Boolean.getBoolean("rustConformance"));
         Path runtime = temporary.getRoot().toPath().resolve("libunlaxer_runtime.rlib");
@@ -175,6 +175,211 @@ public class PureSuccessMemoizationConformanceTest {
         Files.write(Path.of("target/pure-success-memo-conformance.tsv"), report);
     }
 
+    @Test
+    public void generatedClassicRetriesKeepTypedCapturesInBothRustHosts() throws Exception {
+        if (!Boolean.getBoolean("rustConformance"))
+            System.out.println(
+                    "[assumption] generated Classic memo requires -DrustConformance=true");
+        assumeTrue(Boolean.getBoolean("rustConformance"));
+        String source =
+                """
+                grammar ClassicMemo {
+                  @package: memo.probe
+                  @whitespace: none
+                  @root @mapping(Value,params=[item]) Root ::= Item @item '!' | Item @item '?';
+                  @mapping(Item,params=[text]) Item ::= '😀' @text;
+                }
+                """;
+        var grammar = UBNFMapper.parse(source).grammars().get(0);
+        Path dir = temporary.newFolder().toPath();
+        Path runtime = dir.resolve("libunlaxer_runtime.rlib");
+        run(
+                List.of(
+                        "rustc",
+                        "--edition=2021",
+                        "--crate-type=rlib",
+                        "--crate-name=unlaxer_runtime",
+                        repo.resolve("rust/unlaxer-runtime/src/lib.rs").toString(),
+                        "-o",
+                        runtime.toString()),
+                "",
+                false,
+                true);
+        Path target = dir.resolve("native-target");
+        run(
+                List.of(
+                        "cargo",
+                        "build",
+                        "--locked",
+                        "--manifest-path",
+                        repo.resolve("rust/Cargo.toml").toString(),
+                        "-p",
+                        "unlaxer-generator",
+                        "--target-dir",
+                        target.toString()),
+                "",
+                false,
+                true);
+        Path file = dir.resolve("grammar.ubnf");
+        Files.writeString(file, source);
+        Path generated = dir.resolve("generated");
+        run(
+                List.of(
+                        target.resolve("debug/unlaxer").toString(),
+                        "generate",
+                        "--grammar",
+                        file.toString(),
+                        "--output",
+                        generated.toString()),
+                "",
+                true,
+                true);
+        for (var module : new RustBackend().generate(grammar))
+            assertArrayEquals(
+                    module.relativePath(),
+                    module.content().getBytes(StandardCharsets.UTF_8),
+                    Files.readAllBytes(generated.resolve(module.relativePath())));
+        Files.writeString(
+                dir.resolve("main.rs"),
+                """
+                mod generated;
+                use unlaxer_runtime::{Diagnostics,Memoization,ParseContext,ParseOptions,Parser,ParseResult};
+                use unlaxer_runtime::token::TokenKind;
+                struct Root;
+                impl Parser for Root {fn parse(&self,c:&mut ParseContext<'_>)->ParseResult{generated::parser::parse_context(c)}}
+                fn main(){
+                  for kind in [TokenKind::Consumed,TokenKind::MatchOnly,TokenKind::VirtualConsumed,TokenKind::VirtualMatchOnly] {
+                    for invert in [false,true] {for reset in [false,true] {
+                      for diagnostics in [Diagnostics::Auto,Diagnostics::Detailed,Diagnostics::DetailedOnFailure] {
+                        for memo in [Memoization::Off,Memoization::SafeFailures] {
+                          let input=if invert {"a!"} else {"😀?"};
+                          let mut c=ParseContext::with_options(input,ParseOptions::with_memoization(memo).with_diagnostics(diagnostics));
+                          c.set_reset_matched_with_consumed(reset);
+                          let parsed=c.parse_with_token_mode(&Root,kind,invert).unwrap();
+                          if memo==Memoization::SafeFailures{assert!(c.memoized_success_hits()>0,"actual generated Classic success hit");}
+                          assert_eq!(c.capture_spans("text"),&[unlaxer_runtime::Span{start:0,end:1}]);
+                          assert_eq!(c.capture_spans("item"),&[unlaxer_runtime::Span{start:0,end:1}]);
+                          let ast=generated::mapper::map(&c.tree(parsed.root_node().unwrap()).unwrap()).unwrap();
+                          println!("{}/{}/{}",c.position(),c.matched_position(),ast.canonical_json());
+                        }
+                      }
+                    }}
+                  }
+                }
+                """);
+        Path binary = dir.resolve("probe");
+        run(
+                List.of(
+                        "rustc",
+                        "--edition=2021",
+                        "--extern",
+                        "unlaxer_runtime=" + runtime,
+                        dir.resolve("main.rs").toString(),
+                        "-o",
+                        binary.toString()),
+                "",
+                false,
+                true);
+        var nativeRows = run(List.of(binary.toString()), "", true, true).lines().toList();
+        var report = new ArrayList<String>();
+        int index = 0;
+        try (var loader = compileJava(grammar)) {
+            var parser =
+                    (Parser)
+                            loader.loadClass("memo.probe.ClassicMemoParsers")
+                                    .getMethod("getRootParser")
+                                    .invoke(null);
+            var mapper = loader.loadClass("memo.probe.ClassicMemoMapper");
+            for (var kind :
+                    new org.unlaxer.TokenKind[] {
+                        org.unlaxer.TokenKind.consumed,
+                        org.unlaxer.TokenKind.matchOnly,
+                        org.unlaxer.TokenKind.virtualTokenConsumed,
+                        org.unlaxer.TokenKind.virtualTokenMatchOnly
+                    })
+                for (boolean invert : new boolean[] {false, true})
+                    for (boolean reset : new boolean[] {false, true})
+                        for (var diagnostic : ParseOptions.Diagnostics.values())
+                            for (var memo : Memoization.values()) {
+                                String input = invert ? "a!" : "😀?";
+                                try (var context =
+                                        ParseContext.withOptions(
+                                                StringSource.createRootSource(input),
+                                                ParseOptions.withMemoization(memo)
+                                                        .withDiagnostics(diagnostic))) {
+                                    context.getCurrent().setResetMatchedWithConsumed(reset);
+                                    assertTrue(parser.parse(context, kind, invert).isSucceeded());
+                                    if (memo == Memoization.SAFE_FAILURES)
+                                        assertTrue(context.getPackratMemoTable().successHits() > 0);
+                                    var root = context.getCurrent().getTokens().get(0);
+                                    var mapped =
+                                            mapper.getMethod(
+                                                            "mapParsedTokenWithSourceMap",
+                                                            org.unlaxer.Token.class)
+                                                    .invoke(null, root);
+                                    Object ast = mapped.getClass().getMethod("ast").invoke(mapped);
+                                    Object item = ast.getClass().getMethod("item").invoke(ast);
+                                    int[] rootSpan =
+                                            (int[])
+                                                    ((Optional<?>)
+                                                                    mapped.getClass()
+                                                                            .getMethod(
+                                                                                    "sourceSpanOf",
+                                                                                    Object.class)
+                                                                            .invoke(mapped, ast))
+                                                            .orElseThrow();
+                                    int[] itemSpan =
+                                            (int[])
+                                                    ((Optional<?>)
+                                                                    mapped.getClass()
+                                                                            .getMethod(
+                                                                                    "sourceSpanOf",
+                                                                                    Object.class)
+                                                                            .invoke(mapped, item))
+                                                            .orElseThrow();
+                                    assertArrayEquals(new int[] {0, 2}, rootSpan);
+                                    assertArrayEquals(new int[] {0, 1}, itemSpan);
+                                    assertEquals(
+                                            invert ? "a" : "😀",
+                                            item.getClass().getMethod("text").invoke(item));
+                                    int consumed = kind.isConsumed() ? 2 : 0;
+                                    assertEquals(consumed, context.position());
+                                    assertEquals(2, context.matchedPosition());
+                                    String expected =
+                                            "{\"type\":\"Value\",\"span\":[0,2],\"fields\":{\"item\":{\"type\":\"Item\",\"span\":[0,1],\"fields\":{\"text\":\""
+                                                    + (invert ? "a" : "😀")
+                                                    + "\"}}}}";
+                                    String nativeRow = nativeRows.get(index++);
+                                    assertTrue(nativeRow, nativeRow.startsWith(consumed + "/2/"));
+                                    assertEquals(
+                                            JsonParser.parseString(expected),
+                                            JsonParser.parseString(
+                                                    nativeRow.substring(
+                                                            nativeRow.indexOf(
+                                                                            '/',
+                                                                            nativeRow.indexOf('/')
+                                                                                    + 1)
+                                                                    + 1)));
+                                    report.add(
+                                            kind
+                                                    + "/"
+                                                    + invert
+                                                    + "/"
+                                                    + reset
+                                                    + "/"
+                                                    + diagnostic
+                                                    + "/"
+                                                    + memo
+                                                    + "\t"
+                                                    + nativeRow);
+                                }
+                            }
+        }
+        assertEquals(96, index);
+        assertEquals(index, nativeRows.size());
+        Files.write(Path.of("target/classic-memo-generated.tsv"), report);
+    }
+
     private void verifyJava(
             JsonObject entry, URLClassLoader loader, List<String> nativeLines, List<String> report)
             throws Exception {
@@ -237,7 +442,7 @@ public class PureSuccessMemoizationConformanceTest {
                                                     () ->
                                                             new AssertionError(
                                                                     "missing committed generated"
-                                                                        + " root"));
+                                                                            + " root"));
                             var mapped =
                                     mapper.getMethod(
                                                     "mapParsedTokenWithSourceMap",
