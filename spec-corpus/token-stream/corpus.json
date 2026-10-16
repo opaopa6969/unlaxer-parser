@@ -3002,5 +3002,703 @@
         ]
       }
     ]
+  },
+  {
+    "name": "literal-capture-scalar",
+    "grammar": "grammar Input { @ubnf: v2 @package: example.lexing @tokenStream: enabled @whitespace: none  @root @mapping(Value,params=[value]) Root ::= 'a' @value; }",
+    "cases": [
+      {
+        "name": "literal",
+        "input": "a",
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            1
+          ],
+          "fields": {
+            "value": "a"
+          }
+        },
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "a",
+            "span": [
+              0,
+              1
+            ],
+            "text": "a"
+          }
+        ],
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              0,
+              1
+            ]
+          }
+        ]
+      },
+      {
+        "name": "missing",
+        "input": "",
+        "accepted": false,
+        "farthest": 0,
+        "lexemes": []
+      },
+      {
+        "name": "wrong",
+        "input": "b",
+        "accepted": false,
+        "farthest": 0,
+        "lexemes": [
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              0,
+              1
+            ],
+            "text": "b"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "literal-capture-occurrences",
+    "grammar": "grammar Input { @ubnf: v2 @package: example.lexing @tokenStream: enabled @whitespace: none  @root @mapping(Value,params=[first,maybe,items]) Root ::= 'x' 'x' @first ['x' @maybe] {'x' @items} '!'; }",
+    "cases": [
+      {
+        "name": "absent-empty",
+        "input": "xx!",
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {
+            "first": "x",
+            "maybe": null,
+            "items": []
+          }
+        },
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "x",
+            "span": [
+              0,
+              1
+            ],
+            "text": "x"
+          },
+          {
+            "kind": "token",
+            "name": "x",
+            "span": [
+              1,
+              2
+            ],
+            "text": "x"
+          },
+          {
+            "kind": "token",
+            "name": "!",
+            "span": [
+              2,
+              3
+            ],
+            "text": "!"
+          }
+        ],
+        "captures": [
+          {
+            "name": "first",
+            "span": [
+              1,
+              2
+            ]
+          }
+        ]
+      },
+      {
+        "name": "duplicates",
+        "input": "xxxxx!",
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            6
+          ],
+          "fields": {
+            "first": "x",
+            "maybe": "x",
+            "items": [
+              "x",
+              "x"
+            ]
+          }
+        },
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "x",
+            "span": [
+              0,
+              1
+            ],
+            "text": "x"
+          },
+          {
+            "kind": "token",
+            "name": "x",
+            "span": [
+              1,
+              2
+            ],
+            "text": "x"
+          },
+          {
+            "kind": "token",
+            "name": "x",
+            "span": [
+              2,
+              3
+            ],
+            "text": "x"
+          },
+          {
+            "kind": "token",
+            "name": "x",
+            "span": [
+              3,
+              4
+            ],
+            "text": "x"
+          },
+          {
+            "kind": "token",
+            "name": "x",
+            "span": [
+              4,
+              5
+            ],
+            "text": "x"
+          },
+          {
+            "kind": "token",
+            "name": "!",
+            "span": [
+              5,
+              6
+            ],
+            "text": "!"
+          }
+        ],
+        "captures": [
+          {
+            "name": "first",
+            "span": [
+              1,
+              2
+            ]
+          },
+          {
+            "name": "maybe",
+            "span": [
+              2,
+              3
+            ]
+          },
+          {
+            "name": "items",
+            "span": [
+              3,
+              4
+            ]
+          },
+          {
+            "name": "items",
+            "span": [
+              4,
+              5
+            ]
+          }
+        ]
+      },
+      {
+        "name": "partial-rollback",
+        "input": "xy!",
+        "accepted": false,
+        "farthest": 1,
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "x",
+            "span": [
+              0,
+              1
+            ],
+            "text": "x"
+          },
+          {
+            "kind": "error",
+            "name": "",
+            "span": [
+              1,
+              2
+            ],
+            "text": "y"
+          },
+          {
+            "kind": "token",
+            "name": "!",
+            "span": [
+              2,
+              3
+            ],
+            "text": "!"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "literal-capture-unicode-trivia",
+    "grammar": "grammar Input { @ubnf: v2 @package: example.lexing @tokenStream: enabled @whitespace: javaStyle  @root @mapping(Value,params=[head,maybe,items]) Root ::= '😀' @head '[' ['x' @maybe] {'x' @items} ']' '!'; }",
+    "cases": [
+      {
+        "name": "empty",
+        "input": "😀[]!",
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {
+            "head": "😀",
+            "maybe": null,
+            "items": []
+          }
+        },
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "😀",
+            "span": [
+              0,
+              1
+            ],
+            "text": "😀"
+          },
+          {
+            "kind": "token",
+            "name": "[",
+            "span": [
+              1,
+              2
+            ],
+            "text": "["
+          },
+          {
+            "kind": "token",
+            "name": "]",
+            "span": [
+              2,
+              3
+            ],
+            "text": "]"
+          },
+          {
+            "kind": "token",
+            "name": "!",
+            "span": [
+              3,
+              4
+            ],
+            "text": "!"
+          }
+        ],
+        "captures": [
+          {
+            "name": "head",
+            "span": [
+              0,
+              1
+            ]
+          }
+        ]
+      },
+      {
+        "name": "crlf",
+        "input": "😀[\r\nx x]!",
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            9
+          ],
+          "fields": {
+            "head": "😀",
+            "maybe": "x",
+            "items": [
+              "x"
+            ]
+          }
+        },
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "😀",
+            "span": [
+              0,
+              1
+            ],
+            "text": "😀"
+          },
+          {
+            "kind": "token",
+            "name": "[",
+            "span": [
+              1,
+              2
+            ],
+            "text": "["
+          },
+          {
+            "kind": "space",
+            "name": "",
+            "span": [
+              2,
+              4
+            ],
+            "text": "\r\n"
+          },
+          {
+            "kind": "token",
+            "name": "x",
+            "span": [
+              4,
+              5
+            ],
+            "text": "x"
+          },
+          {
+            "kind": "space",
+            "name": "",
+            "span": [
+              5,
+              6
+            ],
+            "text": " "
+          },
+          {
+            "kind": "token",
+            "name": "x",
+            "span": [
+              6,
+              7
+            ],
+            "text": "x"
+          },
+          {
+            "kind": "token",
+            "name": "]",
+            "span": [
+              7,
+              8
+            ],
+            "text": "]"
+          },
+          {
+            "kind": "token",
+            "name": "!",
+            "span": [
+              8,
+              9
+            ],
+            "text": "!"
+          }
+        ],
+        "captures": [
+          {
+            "name": "head",
+            "span": [
+              0,
+              1
+            ]
+          },
+          {
+            "name": "maybe",
+            "span": [
+              4,
+              5
+            ]
+          },
+          {
+            "name": "items",
+            "span": [
+              6,
+              7
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "literal-capture-quoted-choice",
+    "grammar": "grammar Input { @ubnf: v2 @package: example.lexing @tokenStream: enabled @whitespace: none  @root @mapping(Value,params=[value]) Root ::= '\\'a\\'' @value | '\"a\"' @value; }",
+    "cases": [
+      {
+        "name": "single",
+        "input": "'a'",
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {
+            "value": "a"
+          }
+        },
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "'a'",
+            "span": [
+              0,
+              3
+            ],
+            "text": "'a'"
+          }
+        ],
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              0,
+              3
+            ]
+          }
+        ]
+      },
+      {
+        "name": "double",
+        "input": "\"a\"",
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {
+            "value": "\"a\""
+          }
+        },
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "\"a\"",
+            "span": [
+              0,
+              3
+            ],
+            "text": "\"a\""
+          }
+        ],
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              0,
+              3
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "literal-capture-declared-enum",
+    "grammar": "grammar Input { @ubnf: v2 @package: example.lexing @tokenStream: enabled @whitespace: javaStyle token DIGITS ::= CHAR_RANGE('0','9')+; token TEXT ::= '\"' { CHAR_RANGE('a','z') } '\"'; @root @mapping(Value,params=[number,text,mode,mark]) Root ::= DIGITS @number TEXT @text Mode @mode '!' @mark; @enum Mode ::= 'on' | 'off'; }",
+    "cases": [
+      {
+        "name": "typed-values",
+        "input": "12 \"ab\" on !",
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            12
+          ],
+          "fields": {
+            "number": "12",
+            "text": "\"ab\"",
+            "mode": "ON",
+            "mark": "!"
+          }
+        },
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "DIGITS",
+            "span": [
+              0,
+              2
+            ],
+            "text": "12"
+          },
+          {
+            "kind": "space",
+            "name": "",
+            "span": [
+              2,
+              3
+            ],
+            "text": " "
+          },
+          {
+            "kind": "token",
+            "name": "TEXT",
+            "span": [
+              3,
+              7
+            ],
+            "text": "\"ab\""
+          },
+          {
+            "kind": "space",
+            "name": "",
+            "span": [
+              7,
+              8
+            ],
+            "text": " "
+          },
+          {
+            "kind": "token",
+            "name": "on",
+            "span": [
+              8,
+              10
+            ],
+            "text": "on"
+          },
+          {
+            "kind": "space",
+            "name": "",
+            "span": [
+              10,
+              11
+            ],
+            "text": " "
+          },
+          {
+            "kind": "token",
+            "name": "!",
+            "span": [
+              11,
+              12
+            ],
+            "text": "!"
+          }
+        ],
+        "captures": [
+          {
+            "name": "number",
+            "span": [
+              0,
+              2
+            ]
+          },
+          {
+            "name": "text",
+            "span": [
+              3,
+              7
+            ]
+          },
+          {
+            "name": "mode",
+            "span": [
+              8,
+              10
+            ]
+          },
+          {
+            "name": "mark",
+            "span": [
+              11,
+              12
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "literal-capture-context",
+    "grammar": "grammar Input { @ubnf: v2 @package: example.lexing @tokenStream: enabled @whitespace: none  @root @mapping(Value,params=[value]) @lexicalContext(tokens=[], literals=['😀','!']) Root ::= '😀' @value '!'; }",
+    "cases": [
+      {
+        "name": "context",
+        "input": "😀!",
+        "accepted": true,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            2
+          ],
+          "fields": {
+            "value": "😀"
+          }
+        },
+        "lexemes": [
+          {
+            "kind": "token",
+            "name": "😀",
+            "span": [
+              0,
+              1
+            ],
+            "text": "😀"
+          },
+          {
+            "kind": "token",
+            "name": "!",
+            "span": [
+              1,
+              2
+            ],
+            "text": "!"
+          }
+        ],
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              0,
+              1
+            ]
+          }
+        ]
+      }
+    ]
   }
 ]

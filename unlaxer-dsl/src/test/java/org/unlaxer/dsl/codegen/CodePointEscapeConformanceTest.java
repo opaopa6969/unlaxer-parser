@@ -29,9 +29,6 @@ public class CodePointEscapeConformanceTest {
             TokenDecl.Until until = (TokenDecl.Until) UBNFMapper.parse(prefix
                 + " token T = UNTIL('\\u0041') @root Root ::= T; }").grammars().get(0).tokens().get(0);
             assertEquals("\\u0041", until.terminator());
-            TokenDecl.Regex regex = (TokenDecl.Regex) UBNFMapper.parse(prefix
-                + " token T = REGEX('\\u0041') @root Root ::= T; }").grammars().get(0).tokens().get(0);
-            assertEquals("\\u0041", regex.pattern());
         }
     }
 

@@ -19,91 +19,105 @@ public interface Occurs extends MetaFunctionParser , NonTerminallSymbol {
   
 	@Override
 	public default Parsed parse(ParseContext parseContext,TokenKind tokenKind,boolean invertMatch) {
+		parseContext.enterParserCall();
+		try {
 	  
-        // Generated whitespace delimitors use Occurs directly, bypassing AbstractParser.
-        var memo = PackratMemoTable.lookup(parseContext, this, tokenKind, invertMatch);
-        if (memo != null) return PackratMemoTable.replay(parseContext, this, tokenKind, invertMatch, memo);
-        var memoDiagnostic = PackratMemoTable.beginFailure(parseContext, this);
-        var memoStart = PackratMemoTable.successKey(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
+	        // Generated whitespace delimitors use Occurs directly, bypassing AbstractParser.
+	        var memo = PackratMemoTable.lookup(parseContext, this, tokenKind, invertMatch);
+	        if (memo != null) return PackratMemoTable.replay(parseContext, this, tokenKind, invertMatch, memo);
+	        var memoDiagnostic = PackratMemoTable.beginFailure(parseContext, this);
+	        var memoStart = PackratMemoTable.successKey(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
 
-		parseContext.startParse(this, parseContext, tokenKind, invertMatch);
+			parseContext.startParse(this, parseContext, tokenKind, invertMatch);
 		
-		parseContext.begin(this);
-		int matchCount = 0;
-		Optional<Parser> terminator = getTerminator();
-		/*
-		 * Same conservative FIRST-set test as ChoiceInterface: when the body cannot start on the next
-		 * code point the loop is already over, so the body is not evaluated even once. A terminator
-		 * has to be consulted before the body, so repetitions that own one keep the ordinary path.
-		 *
-		 * Unlike a choice candidate or a chain element, the body runs inside this repetition's own
-		 * transaction, which is committed afterwards. A failing terminal still calls consume(0), and
-		 * consuming resets the matched cursor to the consumed one, so after a lookahead (MatchOnly)
-		 * has moved the matched cursor ahead, even a failed body is observable. The body is therefore
-		 * skipped only while the two cursors coincide, where that reset changes nothing.
-		 */
-		boolean excludeBody = false == invertMatch && terminator.isEmpty()
-			&& parseContext.isCandidateExclusionEnabled();
-		FirstSet bodyFirstSet = excludeBody ? FirstSets.of(getChild()) : null;
-		while (true) {
+	        boolean invalidBounds = min() < 0 || max() < min();
+	        boolean noAttempt = invalidBounds || max() == 0 && !isZeroMatchCheck();
+	        if (noAttempt) parseContext.beginPreservingMatched(this);
+	        else parseContext.begin(this);
+			int matchCount = 0;
+			Optional<Parser> terminator = noAttempt ? Optional.empty() : getTerminator();
+			/*
+			 * Same conservative FIRST-set test as ChoiceInterface: when the body cannot start on the next
+			 * code point the loop is already over, so the body is not evaluated even once. A terminator
+			 * has to be consulted before the body, so repetitions that own one keep the ordinary path.
+			 *
+			 * Unlike a choice candidate or a chain element, the body runs inside this repetition's own
+			 * transaction, which is committed afterwards. A failing terminal still calls consume(0), and
+			 * consuming resets the matched cursor to the consumed one, so after a lookahead (MatchOnly)
+			 * has moved the matched cursor ahead, even a failed body is observable. The body is therefore
+			 * skipped only while the two cursors coincide, where that reset changes nothing.
+			 */
+			boolean excludeBody = !noAttempt && false == invertMatch && terminator.isEmpty()
+				&& parseContext.isCandidateExclusionEnabled();
+			FirstSet bodyFirstSet = excludeBody ? FirstSets.of(getChild()) : null;
+			while (!noAttempt) {
 		  
-//		  infiniteLoopDetector.incrementsAndThrow(1000);
+	//		  infiniteLoopDetector.incrementsAndThrow(1000);
 		  
-		  CodePointIndex startPosition = parseContext.getPosition(tokenKind);
+			  CodePointIndex startPosition = parseContext.getPosition(tokenKind);
 			
-			if (excludeBody
-				&& false == bodyFirstSet.mayStartWith(parseContext.lookaheadCodePoint(tokenKind))
-				&& parseContext.getPosition(TokenKind.consumed).value()
-					== parseContext.getPosition(TokenKind.matchOnly).value()) {
-				break;
-			}
-			
-			if(terminator.isPresent()){
-				parseContext.begin(this);
-				Parser terminatorParser = terminator.get();
-				Parsed terminatorParsed = terminatorParser.parse(parseContext);
-				
-				if(terminatorParsed.isSucceeded() && tokenKind.isConsumed()){
-					parseContext.commit(terminatorParser,terminatorParser.getTokenKind());
-				}else{
-					parseContext.rollback(this);
+				if (excludeBody
+					&& false == bodyFirstSet.mayStartWith(parseContext.lookaheadCodePoint(tokenKind))
+					&& parseContext.getPosition(TokenKind.consumed).value()
+						== parseContext.getPosition(TokenKind.matchOnly).value()) {
+					break;
 				}
-				if(terminatorParsed.isSucceeded()){
+			
+				if(terminator.isPresent()){
+					parseContext.begin(this);
+					Parser terminatorParser = terminator.get();
+					Parsed terminatorParsed = terminatorParser.parse(parseContext);
+				
+					if(terminatorParsed.isSucceeded() && tokenKind.isConsumed()){
+						parseContext.commit(terminatorParser,terminatorParser.getTokenKind());
+					}else{
+						parseContext.rollback(this);
+					}
+					if(terminatorParsed.isSucceeded()){
+						break;
+					}
+				}
+			
+				Parser child = getChild();
+	      Parsed parsed = child.parse(parseContext,tokenKind,invertMatch);
+			
+				if (parsed.isFailed() ||parsed.isStopped() ){
+					break;
+				}
+			
+				matchCount++;
+				if (startPosition.eq(parseContext.getPosition(tokenKind))) {
+					break;
+				}
+			
+			
+				if (matchCount >= max()) {
 					break;
 				}
 			}
-			
-			Parser child = getChild();
-      Parsed parsed = child.parse(parseContext,tokenKind,invertMatch);
-			
-			if (parsed.isFailed() ||parsed.isStopped() ){
-				break;
-			}
-			
-			matchCount++;
-			if (startPosition.eq(parseContext.getPosition(tokenKind))) {
-				break;
-			}
-			
-			
-			if (matchCount >= max()) {
-				break;
-			}
-		}
 		
-		if (matchCount >= min() && matchCount <=max()) {
+			if (!invalidBounds && matchCount >= min() && matchCount <=max()) {
 			
-            return PackratMemoTable.commitSuccess(parseContext, this, tokenKind, invertMatch,
-                memoStart, memoDiagnostic, null, null);
-		} else {
+	            return PackratMemoTable.commitSuccess(parseContext, this, tokenKind, invertMatch,
+	                memoStart, memoDiagnostic, null, null);
+			} else {
 			
-			parseContext.rollback(this);
-			parseContext.endParse(this, Parsed.FAILED , parseContext, tokenKind, invertMatch);
-            PackratMemoTable.memoizeFailure(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
-			return Parsed.FAILED;
+				parseContext.rollback(this);
+				parseContext.endParse(this, Parsed.FAILED , parseContext, tokenKind, invertMatch);
+	            PackratMemoTable.memoizeFailure(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
+				return Parsed.FAILED;
+			}
+		} catch (RuntimeException | Error failure) {
+			parseContext.failParserCall(failure);
+			throw failure;
+		} finally {
+			parseContext.leaveParserCall();
 		}
 	}
 	
+    /** Historical negative-zero check. Ordinary bounded repetitions never probe at max=0. */
+    public default boolean isZeroMatchCheck() { return false; }
+
 	public int min();
 	
 	public int max();

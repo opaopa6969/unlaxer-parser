@@ -1,0 +1,275 @@
+[
+  {
+    "id": "valid-expression",
+    "text": "x + 2",
+    "range": null,
+    "requiredTokens": []
+  },
+  {
+    "id": "valid-declaration-crlf",
+    "text": "var x set 1;\r\nx + 2",
+    "range": null,
+    "requiredTokens": []
+  },
+  {
+    "id": "incomplete-add",
+    "text": "x +",
+    "range": [
+      0,
+      3,
+      0,
+      3
+    ],
+    "requiredTokens": [
+      "("
+    ],
+    "offset": 3
+  },
+  {
+    "id": "incomplete-multiply",
+    "text": "x *",
+    "range": [
+      0,
+      3,
+      0,
+      3
+    ],
+    "requiredTokens": [
+      "("
+    ],
+    "offset": 3
+  },
+  {
+    "id": "incomplete-nested",
+    "text": "(x",
+    "range": [
+      0,
+      2,
+      0,
+      2
+    ],
+    "requiredTokens": [
+      ")"
+    ],
+    "offset": 2
+  },
+  {
+    "id": "emoji-after-add",
+    "text": "x + 😀",
+    "range": [
+      0,
+      4,
+      0,
+      6
+    ],
+    "requiredTokens": [
+      "("
+    ],
+    "offset": 4
+  },
+  {
+    "id": "tinycalc-vsix-reproducer",
+    "text": "var x set 1;\r\nx + 😀",
+    "range": [
+      1,
+      4,
+      1,
+      6
+    ],
+    "requiredTokens": [
+      "("
+    ],
+    "offset": 18
+  },
+  {
+    "id": "incomplete-after-lf",
+    "text": "var x set 1;\nx +",
+    "range": [
+      1,
+      3,
+      1,
+      3
+    ],
+    "requiredTokens": [
+      "("
+    ],
+    "offset": 16
+  },
+  {
+    "id": "emoji-next-line",
+    "text": "x + \r\n😀",
+    "range": [
+      1,
+      0,
+      1,
+      2
+    ],
+    "requiredTokens": [
+      "("
+    ],
+    "offset": 6
+  },
+  {
+    "id": "emoji-nested",
+    "text": "(x + 😀)",
+    "range": [
+      0,
+      5,
+      0,
+      7
+    ],
+    "requiredTokens": [
+      "("
+    ],
+    "offset": 5
+  },
+  {
+    "id": "trailing-junk",
+    "text": "x ?",
+    "range": [
+      0,
+      2,
+      0,
+      3
+    ],
+    "requiredTokens": [
+      "+",
+      "-",
+      "*",
+      "/"
+    ],
+    "offset": 2
+  },
+  {
+    "id": "trailing-junk-after-expression",
+    "text": "x + 1 ?",
+    "range": [
+      0,
+      6,
+      0,
+      7
+    ],
+    "requiredTokens": [
+      "+",
+      "-",
+      "*",
+      "/"
+    ],
+    "offset": 6
+  },
+  {
+    "id": "empty",
+    "text": "",
+    "range": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "requiredTokens": [
+      "("
+    ],
+    "offset": 0
+  },
+  {
+    "id": "syntax-at-start",
+    "text": "@",
+    "range": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "requiredTokens": [
+      "("
+    ],
+    "offset": 0
+  },
+  {
+    "id": "syntax-after-crlf",
+    "text": "\r\n@",
+    "range": [
+      1,
+      0,
+      1,
+      1
+    ],
+    "requiredTokens": [
+      "("
+    ],
+    "offset": 2
+  },
+  {
+    "id": "emoji-at-start",
+    "text": "😀",
+    "range": [
+      0,
+      0,
+      0,
+      2
+    ],
+    "requiredTokens": [
+      "("
+    ],
+    "offset": 0
+  },
+  {
+    "id": "declaration-missing-semicolon",
+    "text": "var x set 1",
+    "range": [
+      0,
+      11,
+      0,
+      11
+    ],
+    "offset": 11,
+    "requiredTokens": [
+      ";"
+    ]
+  },
+  {
+    "id": "supplementary-comment-then-emoji",
+    "text": "/*😀*/ x + 😀",
+    "range": [
+      0,
+      11,
+      0,
+      13
+    ],
+    "offset": 11,
+    "requiredTokens": [
+      "("
+    ]
+  },
+  {
+    "id": "supplementary-comment-incomplete",
+    "text": "/*😀*/ x +",
+    "range": [
+      0,
+      10,
+      0,
+      10
+    ],
+    "offset": 10,
+    "requiredTokens": [
+      "("
+    ]
+  },
+  {
+    "id": "supplementary-comment-trailing",
+    "text": "/*😀*/ x + 1 ?",
+    "range": [
+      0,
+      13,
+      0,
+      14
+    ],
+    "offset": 13,
+    "requiredTokens": [
+      "+",
+      "-",
+      "*",
+      "/"
+    ]
+  }
+]

@@ -1,0 +1,99 @@
+{
+  "bindings": [
+    {
+      "name": "adapter-final",
+      "kind": "adapter",
+      "javaClass": "org.unlaxer.dsl.codegen.FinalTokenBindingParser",
+      "java": "final",
+      "rust": true
+    },
+    {
+      "name": "adapter-open",
+      "kind": "adapter",
+      "javaClass": "org.unlaxer.dsl.codegen.OpenTokenBindingParser",
+      "java": "open",
+      "rust": true
+    },
+    {
+      "name": "adapter-missing",
+      "kind": "adapter",
+      "javaClass": "unavailable.binding.AbsentParser",
+      "java": "missing",
+      "rust": true
+    },
+    {
+      "name": "simple-final",
+      "kind": "simple",
+      "javaClass": "org.unlaxer.dsl.codegen.FinalTokenBindingParser",
+      "java": "final",
+      "rust": false
+    },
+    {
+      "name": "simple-open",
+      "kind": "simple",
+      "javaClass": "org.unlaxer.dsl.codegen.OpenTokenBindingParser",
+      "java": "open",
+      "rust": false
+    },
+    {
+      "name": "simple-missing",
+      "kind": "simple",
+      "javaClass": "unavailable.binding.AbsentParser",
+      "java": "missing",
+      "rust": false
+    },
+    {
+      "name": "adapter-nested-final",
+      "kind": "adapter",
+      "javaClass": "org.unlaxer.dsl.codegen.TokenBindingFixtureFamily.FinalParser",
+      "java": "final",
+      "rust": true
+    },
+    {
+      "name": "simple-nested-final",
+      "kind": "simple",
+      "javaClass": "org.unlaxer.dsl.codegen.TokenBindingFixtureFamily.FinalParser",
+      "java": "final",
+      "rust": false
+    },
+    {
+      "name": "adapter-missing-member-lookalike",
+      "kind": "adapter",
+      "javaClass": "org.unlaxer.dsl.codegen.TokenBindingFixtureFamily.AbsentParser",
+      "java": "missing",
+      "rust": true
+    },
+    {
+      "name": "simple-missing-member-lookalike",
+      "kind": "simple",
+      "javaClass": "org.unlaxer.dsl.codegen.TokenBindingFixtureFamily.AbsentParser",
+      "java": "missing",
+      "rust": false
+    }
+  ],
+  "inputs": [
+    {
+      "input": "a",
+      "success": true,
+      "consumed": 1,
+      "matched": 1,
+      "value": "a",
+      "ast": {
+        "type": "Value",
+        "span": [
+          0,
+          1
+        ],
+        "fields": {
+          "value": "a"
+        }
+      }
+    },
+    {
+      "input": "b",
+      "success": false,
+      "consumed": 0,
+      "matched": 0
+    }
+  ]
+}

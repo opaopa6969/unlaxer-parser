@@ -1,5 +1,7 @@
 package org.unlaxer.dsl.codegen;
 
+import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
+
 import java.util.*;
 import org.unlaxer.dsl.bootstrap.LexicalCompiler;
 import org.unlaxer.dsl.bootstrap.UBNFAST.*;
@@ -81,7 +83,7 @@ public final class TokenStreamGrammar {
     private static void visit(AtomicElement e, Set<String> literals, Set<String> references) {
         if (e instanceof TerminalElement t) literals.add(t.value());
         else if (e instanceof RuleRefElement r) references.add(r.name());
-        else if (e instanceof GroupElement g) visit(g.body(), literals, references);
+        else if (e instanceof TransparentElement g) visit(g.body(), literals, references);
         else if (e instanceof OptionalElement o) visit(o.body(), literals, references);
         else if (e instanceof RepeatElement r) visit(r.body(), literals, references);
         else if (e instanceof OneOrMoreElement o) visit(o.body(), literals, references);

@@ -1,0 +1,17 @@
+[
+  {
+    "name": "TwoSemanticRepeats",
+    "grammar": "grammar InvalidAssoc { @package: preferredprobe @whitespace: none @root @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=10) Root ::= ['('] 'a' @left { '+' @op 'a' @right } { '-' @op 'a' @right }; }",
+    "error": "@leftAssoc requires"
+  },
+  {
+    "name": "UnboundSemanticPrefix",
+    "grammar": "grammar InvalidAssoc { @package: preferredprobe @whitespace: none @root @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=10) Root ::= '!' @noise 'a' @left { '+' @op 'a' @right }; }",
+    "error": "@mapping params must match capture names"
+  },
+  {
+    "name": "EmptyDelimiter",
+    "grammar": "grammar InvalidAssoc { @package: preferredprobe @whitespace: none @root @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=10) Root ::= '' 'a' @left { '+' @op 'a' @right }; }",
+    "error": "empty literal"
+  }
+]

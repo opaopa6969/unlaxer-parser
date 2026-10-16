@@ -1,0 +1,370 @@
+[
+  {
+    "name": "OptionalNumericDelimiter",
+    "grammar": "grammar OptionalNumericDelimiter { @package: preferredprobe @whitespace: none token NUMBER = org.unlaxer.parser.elementary.NumberParser @root @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=10) Root ::= ['('] NUMBER @left { '+' @op NUMBER @right }; }",
+    "java": "protected String evalBinary(OptionalNumericDelimiterAST.Binary n){return \"B(\"+n.left()+\",\"+String.join(\"|\",n.op())+\",\"+n.right().stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(\"|\"))+\")\";}",
+    "rust": "fn eval_binary(&mut self,left:&i32,op:&[String],right:&[i32],_:unlaxer_runtime::Span)->String{format!(\"B({},{},{})\",left,op.join(\"|\"),right.iter().map(ToString::to_string).collect::<Vec<_>>().join(\"|\"))}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "1",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            1,
+            "B(1,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "(1",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            2,
+            "B(1,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "(1+2",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            4,
+            "B(1,+,2)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "(1+2+3",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            6,
+            "B(1,+|+,2|3)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "(1+",
+        "stage": "parse",
+        "parseCp": 3,
+        "primaryCp": 2
+      },
+      {
+        "input": "(",
+        "stage": "parse",
+        "parseCp": 1,
+        "primaryCp": 1
+      }
+    ],
+    "parseOptions": true
+  },
+  {
+    "name": "RepeatNumericDelimiter",
+    "grammar": "grammar RepeatNumericDelimiter { @package: preferredprobe @whitespace: none token NUMBER = org.unlaxer.parser.elementary.NumberParser @root @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=10) Root ::= { '!' } NUMBER @left { '+' @op NUMBER @right }; }",
+    "java": "protected String evalBinary(RepeatNumericDelimiterAST.Binary n){return \"B(\"+n.left()+\",\"+String.join(\"|\",n.op())+\",\"+n.right().stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(\"|\"))+\")\";}",
+    "rust": "fn eval_binary(&mut self,left:&i32,op:&[String],right:&[i32],_:unlaxer_runtime::Span)->String{format!(\"B({},{},{})\",left,op.join(\"|\"),right.iter().map(ToString::to_string).collect::<Vec<_>>().join(\"|\"))}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "1",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            1,
+            "B(1,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "!1",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            2,
+            "B(1,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "!!1+2",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            5,
+            "B(1,+,2)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "!!1+2+3",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            7,
+            "B(1,+|+,2|3)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "!!1+",
+        "stage": "parse",
+        "parseCp": 4,
+        "primaryCp": 3
+      },
+      {
+        "input": "!!",
+        "stage": "parse",
+        "parseCp": 2,
+        "primaryCp": 2
+      }
+    ],
+    "parseOptions": true
+  },
+  {
+    "name": "DenseNullableDelimiters",
+    "grammar": "grammar DenseNullableDelimiters { @package: preferredprobe @whitespace: none @root @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=10) Root ::= ['('] { '!' } 'a' @left [':'] { ['|'] '+' @op { '~' } 'a' @right [';'] } [')']; }",
+    "java": "protected String evalBinary(DenseNullableDelimitersAST.Binary n){return \"B(\"+n.left()+\",\"+String.join(\"|\",n.op())+\",\"+String.join(\"|\",n.right())+\")\";}",
+    "rust": "fn eval_binary(&mut self,left:&str,op:&[String],right:&[String],_:unlaxer_runtime::Span)->String{format!(\"B({},{},{})\",left,op.join(\"|\"),right.join(\"|\"))}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "a",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            1,
+            "B(a,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "(!a:|+~~a;)",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            11,
+            "B(a,+,a)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "a+a+a",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            5,
+            "B(a,+|+,a|a)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "!!a:+a;+~a",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            10,
+            "B(a,+|+,a|a)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "a+~~",
+        "stage": "parse",
+        "parseCp": 4,
+        "primaryCp": 1
+      }
+    ],
+    "parseOptions": true
+  },
+  {
+    "name": "LexicalNullableDelimiters",
+    "grammar": "grammar LexicalNullableDelimiters { @package: preferredprobe @whitespace: none @ubnf: v2 @tokenStream: enabled @root @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=10) Root ::= ['('] { '!' } 'a' @left [':'] { ['|'] '+' @op { '~' } 'a' @right [';'] } [')']; }",
+    "java": "protected String evalBinary(LexicalNullableDelimitersAST.Binary n){return \"B(\"+n.left()+\",\"+String.join(\"|\",n.op())+\",\"+String.join(\"|\",n.right())+\")\";}",
+    "rust": "fn eval_binary(&mut self,left:&str,op:&[String],right:&[String],_:unlaxer_runtime::Span)->String{format!(\"B({},{},{})\",left,op.join(\"|\"),right.join(\"|\"))}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "a",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            1,
+            "B(a,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "(!a:|+~~a;)",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            11,
+            "B(a,+,a)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "a+a+a",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            5,
+            "B(a,+|+,a|a)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "!!a:+a;+~a",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            10,
+            "B(a,+|+,a|a)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "a+~~",
+        "stage": "parse",
+        "parseCp": 4,
+        "primaryCp": 1
+      }
+    ],
+    "parseOptions": true
+  },
+  {
+    "name": "UnicodeNullableDelimiters",
+    "grammar": "grammar UnicodeNullableDelimiters { @package: preferredprobe @whitespace: javaStyle  @root @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=10) Root ::= ['😀'] { '!' } 'a' @left { '+' @op 'a' @right }; }",
+    "java": "protected String evalBinary(UnicodeNullableDelimitersAST.Binary n){return \"B(\"+n.left()+\",\"+String.join(\"|\",n.op())+\",\"+String.join(\"|\",n.right())+\")\";}",
+    "rust": "fn eval_binary(&mut self,left:&str,op:&[String],right:&[String],_:unlaxer_runtime::Span)->String{format!(\"B({},{},{})\",left,op.join(\"|\"),right.join(\"|\"))}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "a",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            1,
+            "B(a,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "😀!!a+\r\na",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            8,
+            "B(a,+,a)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "😀!!a+",
+        "stage": "parse",
+        "parseCp": 5,
+        "primaryCp": 4
+      }
+    ],
+    "parseOptions": true
+  },
+  {
+    "name": "SharedNullableDelimiters",
+    "grammar": "grammar SharedNullableDelimiters { @package: preferredprobe @whitespace: none token NUMBER = org.unlaxer.parser.elementary.NumberParser @root @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=10) Expr ::= { '?' } '[' Term @left { '-' @op Term @right } ']'; @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=20) Term ::= { '!' } '(' 'a' @left { '/' @op 'a' @right } ')'; }",
+    "java": "protected String evalBinary(SharedNullableDelimitersAST.Binary n){if(n.left()==null){if(n.op().size()!=1||!n.right().isEmpty())throw new AssertionError();return \"L:\"+n.op().get(0);}return \"B(\"+eval(n.left())+\",\"+String.join(\"|\",n.op())+\",\"+n.right().stream().map(this::eval).collect(java.util.stream.Collectors.joining(\"|\"))+\")\";}",
+    "rust": "fn eval_binary(&mut self,left:Option<&Ast>,op:&[String],right:&[Ast],_:unlaxer_runtime::Span)->String{if let Some(left)=left {format!(\"B({},{},{})\",evaluate(left,self),op.join(\"|\"),right.iter().map(|n|evaluate(n,self)).collect::<Vec<_>>().join(\"|\"))}else{assert_eq!(op.len(),1);assert!(right.is_empty());format!(\"L:{}\",op[0])}}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "??[!!(a/a)-(a)]",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            15,
+            "B(B(L:a,/,L:a),-,B(L:a,,))"
+          ],
+          [
+            "Binary",
+            2,
+            3,
+            10,
+            "B(L:a,/,L:a)"
+          ],
+          [
+            "Binary",
+            4,
+            11,
+            14,
+            "B(L:a,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "[(a/)]",
+        "stage": "parse"
+      }
+    ],
+    "rustCheck": "let mut missing=generated::parser::parse_tree(source).unwrap(); missing.nodes[missing.root].captures.retain(|capture|capture.name!=\"left\"); assert!(generated::mapper::map(&missing).is_err());",
+    "parseOptions": true
+  }
+]
