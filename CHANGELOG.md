@@ -59,6 +59,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
   未完成・曖昧・外部公開 token の rename は拒否し、画面内 help で対応範囲を明記。
 - VSIX が実行時依存の `vscode-languageclient` を除外していた梱包設定を修正。
   配布 VSIX を隔離した VS Code に読み込み、拡張起動・help・Java LSP 補完を CI で検証する。
+- 配布VSIXの内部versionを3.3.0へ更新。従来の0.3.0固定値ではなく、今回の配布ファイル名と同じ版をインストール時に識別できるようにする (#523)。
 
 ### Release notes
 
