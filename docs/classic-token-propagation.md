@@ -112,9 +112,8 @@ PEG/TokenExpr entry diagnostics equivalent. [General owned capture/replay](owned
 now has separate runtime APIs for input, projected and generated values (#590).
 The existing Rust AST field capture store retains its original-input boundary:
 it rejects a projected or detached field capture instead of reading a different
-input slice. Generated UBNF integration remains #591 / #572. Native
-code-fence scanners without a mode-aware implementation reject this explicit
-mode; normal native parsing remains available. Classic `JavaUntil` and positive /
+input slice. Generated UBNF integration remains #591 / #572. The Tiny code-fence adapters now have mode-aware implementations (see below).
+Other unsupported native scanner shapes still reject this explicit mode. Classic `JavaUntil` and positive /
 negative `JavaLookahead` preserve their distinct runtime APIs and have shared
 handwritten cases. Full generated capture/replay integration must be verified
 separately before claiming that remaining scope.
@@ -134,3 +133,5 @@ policies. Java also checks actual success-memo hits/tree copying and exceptional
 child frames. Rust additionally checks committed trace and the existing standard
 2 MiB recursion/resource tests. Callback exception rows use Java unchecked
 exceptions and Rust `ParseError`; Rust panics are not asserted to be recoverable.
+
+Tiny CodeStart/CodeEnd/LongCodeBlock also support explicit Classic modes; see the [pinned real-parser contract and corpus](tiny-classic-modes.md).

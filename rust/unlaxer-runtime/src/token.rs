@@ -570,6 +570,11 @@ impl ParseContext<'_> {
     }
     pub(crate) fn classic_atom(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
         match expression {
+            Expr::CodeStart | Expr::CodeEnd => {
+                return self.with_trivia(false, |context| {
+                    context.classic_code_fence(matches!(expression, Expr::CodeStart), depth)
+                });
+            }
             // Java's internal token Chain has no grammar delimiter. Its leaves
             // must never inherit the surrounding sequence's trivia policy.
             Expr::Number => {
@@ -738,6 +743,12 @@ impl ParseContext<'_> {
                     full && (text.is_some_and(|text| raw.starts_with(text)) != mode.invert),
                 )
             }
+            Expr::LongCodeBlock => {
+                let end = (!mode.invert)
+                    .then(|| super::long_code_fence::end(self.input, start))
+                    .flatten();
+                ("LongCodeBlockParser", end.unwrap_or(start), end.is_some())
+            }
             Expr::Until(terminator) => {
                 let at = raw.find(terminator);
                 (
@@ -767,11 +778,12 @@ impl ParseContext<'_> {
                     at,
                     match expression {
                         Expr::Literal(word) | Expr::CaseInsensitive(word) => word,
+                        Expr::LongCodeBlock => "long code block",
                         _ => "character",
                     },
                 );
             }
-            if mode.kind.is_consumed() {
+            if mode.kind.is_consumed() && !matches!(expression, Expr::LongCodeBlock) {
                 self.matched_position = self.position;
             }
             return None;
@@ -815,6 +827,69 @@ impl ParseContext<'_> {
                 text: None,
             })),
         })
+    }
+    // Mirror the pinned Tiny parser graph: line-boundary assertion has no CST,
+    // while each ordinary child retains its own Classic mode and diagnostics.
+    fn classic_code_fence(&mut self, opening: bool, depth: usize) -> Option<Fragment> {
+        let start = self.mode_cursor();
+        if self.token_mode().invert
+            || (start > 0 && !matches!(self.input.as_bytes()[start - 1], b'\r' | b'\n'))
+        {
+            return None;
+        }
+        let owner_start = self.code_point(start);
+        let mut result = Fragment::default();
+        let fence = self.expression(&Expr::Literal("```"), depth)?;
+        let fence = self.classic_alias(fence, "TripleBackTickParser");
+        self.append_classic_fragment(
+            &mut result,
+            fence,
+            Span {
+                start: owner_start,
+                end: self.code_point(self.mode_cursor()),
+            },
+            owner_start,
+        );
+        if opening {
+            for child in [Expr::Identifier, Expr::Literal(":")] {
+                let before = self.code_point(self.mode_cursor());
+                let fragment = self.expression(&child, depth)?;
+                self.append_classic_fragment(
+                    &mut result,
+                    fragment,
+                    Span {
+                        start: before,
+                        end: self.code_point(self.mode_cursor()),
+                    },
+                    owner_start,
+                );
+            }
+            let before = self.code_point(self.mode_cursor());
+            let name = self.expression(classic_class_name(), depth)?;
+            let name = self.classic_alias(name, "JavaClassNameParser");
+            self.append_classic_fragment(
+                &mut result,
+                name,
+                Span {
+                    start: before,
+                    end: self.code_point(self.mode_cursor()),
+                },
+                owner_start,
+            );
+        }
+        let before = self.code_point(self.mode_cursor());
+        let ending = self.expression(classic_line_end(), depth)?;
+        let ending = self.classic_alias(ending, "EndOfLineParser");
+        self.append_classic_fragment(
+            &mut result,
+            ending,
+            Span {
+                start: before,
+                end: self.code_point(self.mode_cursor()),
+            },
+            owner_start,
+        );
+        Some(result)
     }
     #[inline(never)]
     pub(crate) fn classic_longest_choice(
@@ -1312,6 +1387,30 @@ fn classic_quoted(quote: char) -> &'static Expr {
     })
 }
 
+fn classic_class_name() -> &'static Expr {
+    static VALUE: std::sync::OnceLock<Expr> = std::sync::OnceLock::new();
+    VALUE.get_or_init(|| {
+        Expr::sequence([
+            Expr::Identifier,
+            Expr::sequence([
+                Expr::character("DotParser", |cp| cp == '.'),
+                Expr::Identifier,
+            ])
+            .repeat_java(0, None),
+        ])
+    })
+}
+fn classic_line_end() -> &'static Expr {
+    static VALUE: std::sync::OnceLock<Expr> = std::sync::OnceLock::new();
+    VALUE.get_or_init(|| {
+        Expr::choice([
+            Expr::Literal("\r\n"),
+            Expr::Literal("\r"),
+            Expr::Literal("\n"),
+            Expr::Eof,
+        ])
+    })
+}
 fn classic_whitespace() -> &'static Expr {
     static VALUE: std::sync::OnceLock<Expr> = std::sync::OnceLock::new();
     VALUE.get_or_init(|| {

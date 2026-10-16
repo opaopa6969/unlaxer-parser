@@ -2435,7 +2435,12 @@ impl<'a> ParseContext<'a> {
         // These built-in lexical parsers are also Chain implementations in Java.
         if matches!(
             expression,
-            Expr::Sequence(_) | Expr::Number | Expr::Identifier | Expr::Quoted(_)
+            Expr::Sequence(_)
+                | Expr::Number
+                | Expr::Identifier
+                | Expr::Quoted(_)
+                | Expr::CodeStart
+                | Expr::CodeEnd
         ) {
             self.match_cursor_policy.reset = false;
         }
@@ -5488,6 +5493,8 @@ fn classic_collector_label(expression: &Expr) -> Option<&'static str> {
             min: 1, max: None, ..
         } => Some("OneOrMore"),
         Expr::Repeat { .. } | Expr::JavaRepeat { .. } | Expr::ZeroMatch(_) => Some("Occurs"),
+        Expr::CodeStart => Some("CodeStartParser"),
+        Expr::CodeEnd => Some("CodeEndParser"),
         Expr::Number => Some("NumberParser"),
         Expr::Identifier => Some("IdentifierParser"),
         Expr::Quoted('\'') => Some("SingleQuotedParser"),
