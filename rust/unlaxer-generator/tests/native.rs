@@ -594,5 +594,5 @@ fn literal_text_cannot_enable_internal_preferred_captures() {
         .unwrap()
         .content;
     assert!(!parser.contains("#preferred-extra:2"));
-    assert!(parser.contains(".separated_by("));
+    assert!(parser.contains(".separated_by_java("));
 }
