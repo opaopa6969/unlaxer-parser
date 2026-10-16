@@ -118,6 +118,9 @@ public class MemoEvictionTest {
         // The first alternative consumes everything and then fails, so the second re-parses from 0.
         Parser parser = new Choice(new Chain(atoms, new WordParser("z")), new Items(new Item()));
         try (ParseContext context = context(source)) {
+            // This test measures eviction/re-insertion, not reset-policy transitions.
+            // Keep both retries under the same policy now that it participates in the key.
+            context.getCurrent().setResetMatchedWithConsumed(false);
             context.getPackratMemoTable().setWindow(64);
             Parsed parsed = parser.parse(context);
             assertTrue(parsed.isSucceeded());

@@ -1,0 +1,1041 @@
+[
+  {
+    "name": "scalar",
+    "grammar": "grammar Typeof { @package: typeofprobe @whitespace: none  @root @nestedCaptures @mapping(Pair,params=[left,right]) Root ::= '😀' @left '=' @typeof(left) 'é' @right; }",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&String,_right:&String,_span:Span)->i32{42}",
+    "cases": [
+      {
+        "input": "😀=é",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              4
+            ],
+            "fields": {
+              "left": "😀",
+              "right": "é"
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "lists",
+    "grammar": "grammar Typeof { @package: typeofprobe @whitespace: none  @root @nestedCaptures @mapping(Pair,params=[left,right]) Root ::= {'a'} @left '=' @typeof(left) {'b'} @right; }",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&Vec<String>,_right:&Vec<String>,_span:Span)->i32{42}",
+    "cases": [
+      {
+        "input": "=",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              1
+            ],
+            "fields": {
+              "left": [],
+              "right": []
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "aa=bb",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              5
+            ],
+            "fields": {
+              "left": [
+                "a",
+                "a"
+              ],
+              "right": [
+                "b",
+                "b"
+              ]
+            }
+          },
+          "eval": 42
+        }
+      }
+    ]
+  },
+  {
+    "name": "optional",
+    "grammar": "grammar Typeof { @package: typeofprobe @whitespace: none  @root @nestedCaptures @mapping(Pair,params=[left,right]) Root ::= ['a'] @left '=' @typeof(left) ['b'] @right; }",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&Option<String>,_right:&Option<String>,_span:Span)->i32{42}",
+    "cases": [
+      {
+        "input": "=",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              1
+            ],
+            "fields": {
+              "left": null,
+              "right": null
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "a=",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              2
+            ],
+            "fields": {
+              "left": "a",
+              "right": null
+            }
+          },
+          "eval": 42
+        }
+      }
+    ]
+  },
+  {
+    "name": "shallow-option-list",
+    "grammar": "grammar Typeof { @package: typeofprobe @whitespace: none  @root @nestedCaptures @mapping(Pair,params=[left,right]) Root ::= [{'a'}] @left '=' @typeof(left) ['b'] @right; }",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&Option<Vec<String>>,_right:&Option<String>,_span:Span)->i32{42}",
+    "cases": [
+      {
+        "input": "=",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              1
+            ],
+            "fields": {
+              "left": [],
+              "right": null
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "aa=b",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              4
+            ],
+            "fields": {
+              "left": [
+                "a",
+                "a"
+              ],
+              "right": "b"
+            }
+          },
+          "eval": 42
+        }
+      }
+    ]
+  },
+  {
+    "name": "shallow-list-option",
+    "grammar": "grammar Typeof { @package: typeofprobe @whitespace: none  @root @nestedCaptures @mapping(Pair,params=[left,right]) Root ::= {['a']} @left '=' @typeof(left) {'b'} @right; }",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&Vec<Option<String>>,_right:&Vec<String>,_span:Span)->i32{42}",
+    "cases": [
+      {
+        "input": "=",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              1
+            ],
+            "fields": {
+              "left": [
+                null
+              ],
+              "right": []
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "aa=b",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              4
+            ],
+            "fields": {
+              "left": [
+                "a",
+                "a",
+                null
+              ],
+              "right": [
+                "b"
+              ]
+            }
+          },
+          "eval": 42
+        }
+      }
+    ]
+  },
+  {
+    "name": "empty-list-vs-option",
+    "grammar": "grammar Typeof { @package: typeofprobe @whitespace: none  @root @nestedCaptures @mapping(Pair,params=[left,right]) Root ::= ['a'] @left '=' @typeof(left) {'b'} @right; }",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&Option<String>,_right:&Vec<String>,_span:Span)->i32{42}",
+    "cases": [
+      {
+        "input": "=",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected Optional but got List at CP 0:1"
+        }
+      },
+      {
+        "input": "a=bb",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected Optional but got List at CP 2:4"
+        }
+      }
+    ]
+  },
+  {
+    "name": "mixed-scalar",
+    "grammar": "grammar Typeof { @package: typeofprobe @whitespace: none token N = NumberParser @enum Mode ::= 'sync' | 'auto'; @enum Heat ::= 'hot' | 'cold'; @mapping(Leaf,params=[text]) Leaf ::= '[' '😀' @text ']'; @mapping(Other,params=[text]) Other ::= '<' 'x' @text '>'; @root @nestedCaptures @mapping(Pair,params=[left,right]) Root ::= ('txt' | Mode | Heat | N | Leaf | Other) @left '=' @typeof(left) ('txt' | Mode | Heat | N | Leaf | Other) @right; }",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;} @Override protected Integer evalLeaf(TypeofAST.Leaf node){return 11;} @Override protected Integer evalOther(TypeofAST.Other node){return 12;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&NestedValue,_right:&NestedValue,_span:Span)->i32{42} fn eval_leaf(&mut self,_text:&str,_span:Span)->i32{11} fn eval_other(&mut self,_text:&str,_span:Span)->i32{12}",
+    "cases": [
+      {
+        "input": "txt=txt",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              7
+            ],
+            "fields": {
+              "left": "txt",
+              "right": "txt"
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "1=2",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              3
+            ],
+            "fields": {
+              "left": 1,
+              "right": 2
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "txt=1",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected String but got Integer at CP 4:5"
+        }
+      },
+      {
+        "input": "sync=hot",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected Mode but got Heat at CP 5:8"
+        }
+      },
+      {
+        "input": "[😀]=<x>",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected Leaf but got Other at CP 4:7"
+        }
+      },
+      {
+        "input": "[😀]=[😀]",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              7
+            ],
+            "fields": {
+              "left": {
+                "type": "Leaf",
+                "span": [
+                  0,
+                  3
+                ],
+                "fields": {
+                  "text": "😀"
+                }
+              },
+              "right": {
+                "type": "Leaf",
+                "span": [
+                  4,
+                  7
+                ],
+                "fields": {
+                  "text": "😀"
+                }
+              }
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "sync=auto",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              9
+            ],
+            "fields": {
+              "left": {
+                "enum": "Mode",
+                "value": "SYNC",
+                "span": [
+                  0,
+                  4
+                ]
+              },
+              "right": {
+                "enum": "Mode",
+                "value": "AUTO",
+                "span": [
+                  5,
+                  9
+                ]
+              }
+            }
+          },
+          "eval": 42
+        }
+      }
+    ]
+  },
+  {
+    "name": "mixed-underlying-text",
+    "grammar": "grammar Typeof { @package: typeofprobe @whitespace: none token N = NumberParser @enum Mode ::= 'sync' | 'auto'; @enum Heat ::= 'hot' | 'cold'; @mapping(Leaf,params=[text]) Leaf ::= '[' '😀' @text ']'; @mapping(Other,params=[text]) Other ::= '<' 'x' @text '>'; @root @nestedCaptures @mapping(Pair,params=[left,right]) Root ::= ('txt' | Mode | Heat | N | Leaf | Other) @left '=' @typeof(left) 'txt' @right; }",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;} @Override protected Integer evalLeaf(TypeofAST.Leaf node){return 11;} @Override protected Integer evalOther(TypeofAST.Other node){return 12;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&NestedValue,_right:&String,_span:Span)->i32{42} fn eval_leaf(&mut self,_text:&str,_span:Span)->i32{11} fn eval_other(&mut self,_text:&str,_span:Span)->i32{12}",
+    "cases": [
+      {
+        "input": "txt=txt",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              7
+            ],
+            "fields": {
+              "left": "txt",
+              "right": "txt"
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "1=txt",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected Integer but got String at CP 2:5"
+        }
+      }
+    ]
+  },
+  {
+    "name": "mixed-underlying-i32",
+    "grammar": "grammar Typeof { @package: typeofprobe @whitespace: none token N = NumberParser @enum Mode ::= 'sync' | 'auto'; @enum Heat ::= 'hot' | 'cold'; @mapping(Leaf,params=[text]) Leaf ::= '[' '😀' @text ']'; @mapping(Other,params=[text]) Other ::= '<' 'x' @text '>'; @root @nestedCaptures @mapping(Pair,params=[left,right]) Root ::= ('txt' | Mode | Heat | N | Leaf | Other) @left '=' @typeof(left) N @right; }",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;} @Override protected Integer evalLeaf(TypeofAST.Leaf node){return 11;} @Override protected Integer evalOther(TypeofAST.Other node){return 12;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&NestedValue,_right:&i32,_span:Span)->i32{42} fn eval_leaf(&mut self,_text:&str,_span:Span)->i32{11} fn eval_other(&mut self,_text:&str,_span:Span)->i32{12}",
+    "cases": [
+      {
+        "input": "1=2",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              3
+            ],
+            "fields": {
+              "left": 1,
+              "right": 2
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "txt=2",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected String but got Integer at CP 4:5"
+        }
+      }
+    ]
+  },
+  {
+    "name": "private-forward",
+    "grammar": "grammar Typeof { @package: typeofprobe @whitespace: none  @root @nestedCaptures @mapping(Pair,params=[left]) Root ::= @typeof(right) 'a' @left '=' ['b'] @right; }",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&String,_span:Span)->i32{42}",
+    "cases": [
+      {
+        "input": "a=",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: left must be same type as right, expected Optional but got String at CP 0:1"
+        }
+      }
+    ]
+  },
+  {
+    "name": "private-only-mixed",
+    "grammar": "grammar Typeof { @package: typeofprobe @whitespace: none token N = NumberParser @enum Mode ::= 'sync' | 'auto'; @enum Heat ::= 'hot' | 'cold'; @mapping(Leaf,params=[text]) Leaf ::= '[' '😀' @text ']'; @mapping(Other,params=[text]) Other ::= '<' 'x' @text '>'; @root @nestedCaptures @mapping(Pair) Root ::= ('txt' | Mode | Heat | N | Leaf | Other) @left '=' @typeof(left) ('txt' | Mode | Heat | N | Leaf | Other) @right; }",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;} @Override protected Integer evalLeaf(TypeofAST.Leaf node){return 11;} @Override protected Integer evalOther(TypeofAST.Other node){return 12;}",
+    "rustMethods": "fn eval_pair(&mut self,_span:Span)->i32{42} fn eval_leaf(&mut self,_text:&str,_span:Span)->i32{11} fn eval_other(&mut self,_text:&str,_span:Span)->i32{12}",
+    "cases": [
+      {
+        "input": "1=2",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              3
+            ],
+            "fields": {}
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "txt=1",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected String but got Integer at CP 4:5"
+        }
+      }
+    ]
+  },
+  {
+    "name": "mixed-lists-contents-not-compared",
+    "grammar": "grammar Typeof { @package: typeofprobe @whitespace: none token N = NumberParser @enum Mode ::= 'sync' | 'auto'; @enum Heat ::= 'hot' | 'cold'; @mapping(Leaf,params=[text]) Leaf ::= '[' '😀' @text ']'; @mapping(Other,params=[text]) Other ::= '<' 'x' @text '>'; @root @nestedCaptures @mapping(Pair,params=[left,right]) Root ::= { ('txt' | N | Leaf) } @left '=' @typeof(left) { ('txt' | Mode) } @right; }",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;} @Override protected Integer evalLeaf(TypeofAST.Leaf node){return 11;} @Override protected Integer evalOther(TypeofAST.Other node){return 12;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&Vec<NestedValue>,_right:&Vec<NestedValue>,_span:Span)->i32{42} fn eval_leaf(&mut self,_text:&str,_span:Span)->i32{11} fn eval_other(&mut self,_text:&str,_span:Span)->i32{12}",
+    "cases": [
+      {
+        "input": "=",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              1
+            ],
+            "fields": {
+              "left": [],
+              "right": []
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "1txt=sync",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              9
+            ],
+            "fields": {
+              "left": [
+                1,
+                "txt"
+              ],
+              "right": [
+                {
+                  "enum": "Mode",
+                  "value": "SYNC",
+                  "span": [
+                    5,
+                    9
+                  ]
+                }
+              ]
+            }
+          },
+          "eval": 42
+        }
+      }
+    ]
+  },
+  {
+    "name": "mixed-separated-list-option",
+    "grammar": "grammar Typeof { @package: typeofprobe @whitespace: none token N = NumberParser @enum Mode ::= 'sync' | 'auto'; @enum Heat ::= 'hot' | 'cold'; @mapping(Leaf,params=[text]) Leaf ::= '[' '😀' @text ']'; @mapping(Other,params=[text]) Other ::= '<' 'x' @text '>'; @root @nestedCaptures @mapping(Pair,params=[left,right]) Root ::= [('txt' | N | Leaf)] % (',' Mode) @left '=' @typeof(left) [N] % ',' @right; }",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;} @Override protected Integer evalLeaf(TypeofAST.Leaf node){return 11;} @Override protected Integer evalOther(TypeofAST.Other node){return 12;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&Vec<Option<NestedValue>>,_right:&Vec<Option<i32>>,_span:Span)->i32{42} fn eval_leaf(&mut self,_text:&str,_span:Span)->i32{11} fn eval_other(&mut self,_text:&str,_span:Span)->i32{12}",
+    "cases": [
+      {
+        "input": "=",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              1
+            ],
+            "fields": {
+              "left": [
+                null
+              ],
+              "right": [
+                null
+              ]
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "txt,sync1=2,3",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              13
+            ],
+            "fields": {
+              "left": [
+                "txt",
+                1
+              ],
+              "right": [
+                2,
+                3
+              ]
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": ",sync=",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              6
+            ],
+            "fields": {
+              "left": [
+                null,
+                null
+              ],
+              "right": [
+                null
+              ]
+            }
+          },
+          "eval": 42
+        }
+      }
+    ]
+  },
+  {
+    "name": "mixed-optional-separated",
+    "grammar": "grammar Typeof { @package: typeofprobe @whitespace: none token N = NumberParser @enum Mode ::= 'sync' | 'auto'; @enum Heat ::= 'hot' | 'cold'; @mapping(Leaf,params=[text]) Leaf ::= '[' '😀' @text ']'; @mapping(Other,params=[text]) Other ::= '<' 'x' @text '>'; @root @nestedCaptures @mapping(Pair,params=[left,right]) Root ::= [('txt' | N) % ','] @left '=' @typeof(left) [Mode] @right; }",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;} @Override protected Integer evalLeaf(TypeofAST.Leaf node){return 11;} @Override protected Integer evalOther(TypeofAST.Other node){return 12;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&Option<Vec<NestedValue>>,_right:&Option<Mode>,_span:Span)->i32{42} fn eval_leaf(&mut self,_text:&str,_span:Span)->i32{11} fn eval_other(&mut self,_text:&str,_span:Span)->i32{12}",
+    "cases": [
+      {
+        "input": "=",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              1
+            ],
+            "fields": {
+              "left": null,
+              "right": null
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "txt,1=sync",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              10
+            ],
+            "fields": {
+              "left": [
+                "txt",
+                1
+              ],
+              "right": "SYNC"
+            }
+          },
+          "eval": 42
+        }
+      }
+    ]
+  },
+  {
+    "name": "mixed-underlying-enum",
+    "grammar": "grammar Typeof { @package: typeofprobe @whitespace: none token N = NumberParser @enum Mode ::= 'sync' | 'auto'; @enum Heat ::= 'hot' | 'cold'; @mapping(Leaf,params=[text]) Leaf ::= '[' '😀' @text ']'; @mapping(Other,params=[text]) Other ::= '<' 'x' @text '>'; @root @nestedCaptures @mapping(Pair,params=[left,right]) Root ::= ('txt' | Mode) @left '=' @typeof(left) Mode @right; }",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;} @Override protected Integer evalLeaf(TypeofAST.Leaf node){return 11;} @Override protected Integer evalOther(TypeofAST.Other node){return 12;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&NestedValue,_right:&Mode,_span:Span)->i32{42} fn eval_leaf(&mut self,_text:&str,_span:Span)->i32{11} fn eval_other(&mut self,_text:&str,_span:Span)->i32{12}",
+    "cases": [
+      {
+        "input": "sync=auto",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              9
+            ],
+            "fields": {
+              "left": {
+                "enum": "Mode",
+                "value": "SYNC",
+                "span": [
+                  0,
+                  4
+                ]
+              },
+              "right": "AUTO"
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "txt=auto",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected String but got Mode at CP 4:8"
+        }
+      }
+    ]
+  },
+  {
+    "name": "mixed-underlying-node",
+    "grammar": "grammar Typeof { @package: typeofprobe @whitespace: none token N = NumberParser @enum Mode ::= 'sync' | 'auto'; @enum Heat ::= 'hot' | 'cold'; @mapping(Leaf,params=[text]) Leaf ::= '[' '😀' @text ']'; @mapping(Other,params=[text]) Other ::= '<' 'x' @text '>'; @root @nestedCaptures @mapping(Pair,params=[left,right]) Root ::= ('txt' | Leaf) @left '=' @typeof(left) Leaf @right; }",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;} @Override protected Integer evalLeaf(TypeofAST.Leaf node){return 11;} @Override protected Integer evalOther(TypeofAST.Other node){return 12;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&NestedValue,_right:&Box<Ast>,_span:Span)->i32{42} fn eval_leaf(&mut self,_text:&str,_span:Span)->i32{11} fn eval_other(&mut self,_text:&str,_span:Span)->i32{12}",
+    "cases": [
+      {
+        "input": "[😀]=[😀]",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              7
+            ],
+            "fields": {
+              "left": {
+                "type": "Leaf",
+                "span": [
+                  0,
+                  3
+                ],
+                "fields": {
+                  "text": "😀"
+                }
+              },
+              "right": {
+                "type": "Leaf",
+                "span": [
+                  4,
+                  7
+                ],
+                "fields": {
+                  "text": "😀"
+                }
+              }
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "txt=[😀]",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected String but got Leaf at CP 4:7"
+        }
+      }
+    ]
+  },
+  {
+    "name": "source-order-private",
+    "grammar": "grammar Typeof { @package: typeofprobe @whitespace: none  @root @nestedCaptures @mapping(Pair,params=[left,right]) Root ::= 'a' @left '=' @typeof(left) ['b'] @first @typeof(first) {'c'} @second 'd' @right; }",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&String,_right:&String,_span:Span)->i32{42}",
+    "cases": [
+      {
+        "input": "a=d",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: first must be same type as left, expected String but got Optional at CP 0:3"
+        }
+      }
+    ]
+  },
+  {
+    "name": "constructor-bind-before-constraint",
+    "grammar": "grammar Typeof { @package: typeofprobe @whitespace: none @root @nestedCaptures @mapping(Pair,params=[left,right]) Root ::= 'a' @left '=' @typeof(left) Leaf @right; @nestedCaptures @mapping(Leaf,params=[left,right]) Leaf ::= '[' 'a' @left '=' @typeof(left) ['b'] @right ']'; }",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;} @Override protected Integer evalLeaf(TypeofAST.Leaf node){return 11;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&String,_right:&Box<Ast>,_span:Span)->i32{42} fn eval_leaf(&mut self,_left:&String,_right:&Option<String>,_span:Span)->i32{11}",
+    "cases": [
+      {
+        "input": "a=[a=]",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected String but got Optional at CP 2:6"
+        }
+      }
+    ]
+  },
+  {
+    "name": "shared-contributors",
+    "grammar": "grammar Typeof { @package: typeofprobe @whitespace: none @root @mapping(Family) @commonField(left) @commonField(right) Root ::= A | B; @nestedCaptures @mapping(Pair,params=[left,right]) A ::= 'a' {'x'} @left '=' @typeof(left) {'y'} @right; @nestedCaptures @mapping(Pair,params=[left,right]) B ::= 'b' {'x'} @left '=' @typeof(right) {'y'} @right; }",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&Vec<String>,_right:&Vec<String>,_span:Span)->i32{42}",
+    "cases": [
+      {
+        "input": "a=",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              2
+            ],
+            "fields": {
+              "left": [],
+              "right": []
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "bxx=yy",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              6
+            ],
+            "fields": {
+              "left": [
+                "x",
+                "x"
+              ],
+              "right": [
+                "y",
+                "y"
+              ]
+            }
+          },
+          "eval": 42
+        }
+      }
+    ]
+  },
+  {
+    "name": "nested-mapped-sum",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n @mapping(Family) @commonField(text) Value ::= @typeof(value) A @value | @typeof(value) B @value;\n@mapping(Family.A,params=[text]) A ::= 'a' @text;\n@mapping(Family.B,params=[text]) B ::= 'b' @text;\n @root @nestedCaptures @mapping(Pair,params=[left,right]) Root ::= Value @left '=' @typeof(left) Value @right;\n}",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n@Override protected Integer evalFamilyA(TypeofAST.Family.A node){return 11;} @Override protected Integer evalFamilyB(TypeofAST.Family.B node){return 11;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&Box<Ast>,_right:&Box<Ast>,_span:Span)->i32{42}\nfn eval_family__a(&mut self,_text:&str,_span:Span)->i32{11}\nfn eval_family__b(&mut self,_text:&str,_span:Span)->i32{11}",
+    "cases": [
+      {
+        "input": "a=a",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              3
+            ],
+            "fields": {
+              "left": {
+                "type": "Family__A",
+                "span": [
+                  0,
+                  1
+                ],
+                "fields": {
+                  "text": "a"
+                }
+              },
+              "right": {
+                "type": "Family__A",
+                "span": [
+                  2,
+                  3
+                ],
+                "fields": {
+                  "text": "a"
+                }
+              }
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "a=b",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected A but got B at CP 2:3"
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "owned-scope-bounded",
+    "grammar": "grammar Typeof { @package: typeofprobe @whitespace: none  @root @nestedCaptures @mapping(Pair,params=[left,right]) Root ::= CAPTURE(word, [('a'){0,2}]) @left '=' @typeof(left) CAPTURE_SCOPE(['b']) @right; }",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&Option<Vec<String>>,_right:&Option<String>,_span:Span)->i32{42}",
+    "cases": [
+      {
+        "input": "=",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              1
+            ],
+            "fields": {
+              "left": [],
+              "right": null
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "aa=b",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              4
+            ],
+            "fields": {
+              "left": [
+                "a",
+                "a"
+              ],
+              "right": "b"
+            }
+          },
+          "eval": 42
+        }
+      }
+    ]
+  },
+  {
+    "name": "mixed-separated-crlf",
+    "grammar": "grammar Typeof { @package: typeofprobe @whitespace: none token N = NumberParser @enum Mode ::= 'sync' | 'auto'; @enum Heat ::= 'hot' | 'cold'; @mapping(Leaf,params=[text]) Leaf ::= '[' '😀' @text ']'; @mapping(Other,params=[text]) Other ::= '<' 'x' @text '>'; @root @nestedCaptures @mapping(Pair,params=[left,right]) Root ::= [('txt' | N | Leaf)] % (',\\r\\n' Mode) @left '=' @typeof(left) [N] % ',' @right; }",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;} @Override protected Integer evalLeaf(TypeofAST.Leaf node){return 11;} @Override protected Integer evalOther(TypeofAST.Other node){return 12;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&Vec<Option<NestedValue>>,_right:&Vec<Option<i32>>,_span:Span)->i32{42} fn eval_leaf(&mut self,_text:&str,_span:Span)->i32{11} fn eval_other(&mut self,_text:&str,_span:Span)->i32{12}",
+    "cases": [
+      {
+        "input": "txt,\r\nsync1=2,3",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              15
+            ],
+            "fields": {
+              "left": [
+                "txt",
+                1
+              ],
+              "right": [
+                2,
+                3
+              ]
+            }
+          },
+          "eval": 42
+        }
+      }
+    ]
+  },
+  {
+    "name": "shared-private-own-shape",
+    "grammar": "grammar Typeof { @package: typeofprobe @whitespace: none @root @mapping(Family) @commonField(left) Root ::= A | B; @nestedCaptures @mapping(Pair,params=[left]) A ::= 'a' {'x'} @left '=' @typeof(left) ['y'] @right; @nestedCaptures @mapping(Pair,params=[left]) B ::= 'b' {'x'} @left '=' @typeof(left) {'y'} @right; }",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&Vec<String>,_span:Span)->i32{42}",
+    "cases": [
+      {
+        "input": "a=",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected List but got Optional at CP 0:2"
+        }
+      },
+      {
+        "input": "ax=y",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected List but got Optional at CP 3:4"
+        }
+      },
+      {
+        "input": "b=",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              2
+            ],
+            "fields": {
+              "left": []
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "bxx=yy",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              6
+            ],
+            "fields": {
+              "left": [
+                "x",
+                "x"
+              ]
+            }
+          },
+          "eval": 42
+        }
+      }
+    ]
+  }
+]

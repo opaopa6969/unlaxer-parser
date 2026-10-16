@@ -1,0 +1,98 @@
+[
+  {
+    "id": "no-mapping",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @nestedCaptures Root ::= 'a' @value; }",
+    "startCP": 56,
+    "endCP": 98
+  },
+  {
+    "id": "duplicate",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @nestedCaptures @nestedCaptures @mapping(Root, params=[value]) Root ::= 'a' @value; }",
+    "startCP": 56,
+    "endCP": 145
+  },
+  {
+    "id": "inner",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @nestedCaptures @mapping(Root, params=[value]) Root ::= { 'a' @value }; }",
+    "startCP": 56,
+    "endCP": 133
+  },
+  {
+    "id": "overlap",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @nestedCaptures @mapping(Root, params=[value]) Root ::= ('a' @value) @value; }",
+    "startCP": 56,
+    "endCP": 138
+  },
+  {
+    "id": "alias",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @nestedCaptures @mapping(Root, params=[value]) Root ::= A @value; A ::= 'a'; }",
+    "startCP": 56,
+    "endCP": 127
+  },
+  {
+    "id": "group-containers",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @nestedCaptures @mapping(Root, params=[value]) Root ::= ('a' ['b']) @value; }",
+    "startCP": 56,
+    "endCP": 137
+  },
+  {
+    "id": "choice-containers",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @nestedCaptures @mapping(Root, params=[value]) Root ::= (['a'] | ['b']) @value; }",
+    "startCP": 56,
+    "endCP": 141
+  },
+  {
+    "id": "auto-eval",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @nestedCaptures @eval(kind='literal') @mapping(Root, params=[value]) Root ::= 'a' @value; }",
+    "startCP": 56,
+    "endCP": 151
+  },
+  {
+    "id": "shared",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @nestedCaptures @mapping(Root, params=[value]) Root ::= 'a' @value; @mapping(Root,params=[value]) Other ::= 'b' @value; }",
+    "startCP": 56,
+    "endCP": 129
+  },
+  {
+    "id": "depth",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @nestedCaptures @mapping(Root, params=[value]) Root ::= [[[[[[[[[[[[[[[[[[ 'a' ]]]]]]]]]]]]]]]]]] @value; }",
+    "startCP": 56,
+    "endCP": 167
+  },
+  {
+    "id": "common-field",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @commonField(value) @nestedCaptures @mapping(Root, params=[value]) Root ::= 'a' @value; }",
+    "startCP": 56,
+    "endCP": 149
+  },
+  {
+    "id": "token-stream",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @tokenStream: enabled @root @nestedCaptures @mapping(Root, params=[value]) Root ::= 'a' @value; }",
+    "startCP": 78,
+    "endCP": 151
+  },
+  {
+    "id": "preparatory-depth",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @nestedCaptures @mapping(Root, params=[value]) Root ::= [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[ 'a' ]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]] @value; }",
+    "startCP": 56,
+    "endCP": 211
+  },
+  {
+    "id": "deep-owned-scope",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE('a'))))))))))))))))))))))))))))))))) @value; }",
+    "startCP": 55,
+    "endCP": 622
+  },
+  {
+    "id": "owned-inner-capture",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= CAPTURE_SCOPE({ 'a' @value }); }",
+    "startCP": 55,
+    "endCP": 146
+  },
+  {
+    "id": "deep-separated-separator",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= 'a' % CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE('a'))))))))))))))))))))))))))))))))) @value; }",
+    "startCP": 55,
+    "endCP": 628
+  }
+]

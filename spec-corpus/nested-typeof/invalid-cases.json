@@ -1,0 +1,42 @@
+[
+  {
+    "name": "unknown-reference",
+    "grammar": "grammar Typeof { @package: typeofprobe @whitespace: none @root @nestedCaptures @mapping(Pair,params=[left,right]) Root ::= 'a' @left @typeof(missing) 'b' @right;  }",
+    "code": "E-TYPEOF-UNKNOWN-CAPTURE"
+  },
+  {
+    "name": "duplicate-site",
+    "grammar": "grammar Typeof { @package: typeofprobe @whitespace: none @root @nestedCaptures @mapping(Pair,params=[left,right]) Root ::= 'a' @left 'b' @left @typeof(left) 'c' @right;  }",
+    "code": "E-NESTED-SHAPE"
+  },
+  {
+    "name": "inner-capture",
+    "grammar": "grammar Typeof { @package: typeofprobe @whitespace: none @root @nestedCaptures @mapping(Pair,params=[left,right]) Root ::= {'a' @left} @typeof(left) 'b' @right;  }",
+    "code": "E-NESTED-SHAPE"
+  },
+  {
+    "name": "alias",
+    "grammar": "grammar Typeof { @package: typeofprobe @whitespace: none @root @nestedCaptures @mapping(Pair,params=[left,right]) Root ::= H @left @typeof(left) H @right; H ::= 'a'; }",
+    "code": "E-NESTED-SHAPE"
+  },
+  {
+    "name": "grouped-sum-owner",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n @nestedCaptures @mapping(Family) @commonField(text) Value ::= @typeof(value) (A | B) @value;\n@mapping(Family.A,params=[text]) A ::= 'a' @text;\n@mapping(Family.B,params=[text]) B ::= 'b' @text;\n @root @nestedCaptures @mapping(Pair,params=[left,right]) Root ::= Value @left '=' @typeof(left) Value @right;\n}",
+    "code": "E-COMMONFIELD-MISMATCH"
+  },
+  {
+    "name": "private-mixed-reserved-type",
+    "grammar": "grammar Typeof { @package: typeofprobe @whitespace: none token N = NumberParser @enum Mode ::= 'sync' | 'auto'; @enum Heat ::= 'hot' | 'cold'; @mapping(NestedValue,params=[text]) Leaf ::= '[' '😀' @text ']'; @mapping(Other,params=[text]) Other ::= '<' 'x' @text '>'; @root @nestedCaptures @mapping(Pair) Root ::= ('txt' | Mode | Heat | N | Leaf | Other) @left '=' @typeof(left) ('txt' | Mode | Heat | N | Leaf | Other) @right; }",
+    "code": "E-NESTED-SHAPE"
+  },
+  {
+    "name": "missing-own-capture",
+    "grammar": "grammar Typeof { @package: typeofprobe @root @nestedCaptures @mapping(Pair,params=[left]) Root ::= 'a' @left @typeof(left) 'b'; }",
+    "code": "E-TYPEOF-MISSING-CAPTURE"
+  },
+  {
+    "name": "private-shape-depth",
+    "grammar": "grammar Typeof { @package: typeofprobe @root @nestedCaptures @mapping(Pair,params=[left]) Root ::= 'a' @left @typeof(left) [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[['b']]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]] @right; }",
+    "code": "E-NESTED-SHAPE"
+  }
+]
