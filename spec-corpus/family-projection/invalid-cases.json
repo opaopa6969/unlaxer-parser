@@ -12,6 +12,8 @@
   {
     "name": "cyclic-sum",
     "grammar": "grammar Invalid { @package: invalidprobe @root @mapping(Alpha) Root ::= B; @mapping(Beta) B ::= Root; }",
-    "error": "E-COMMONFIELD-MISMATCH"
+    "error": "E-COMMONFIELD-MISMATCH",
+    "javaGeneratorError": "E-LEFT-RECURSION",
+    "additionalValidationError": "E-LEFT-RECURSION"
   }
 ]
