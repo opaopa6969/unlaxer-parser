@@ -1125,7 +1125,7 @@ pub struct ParseContext<'a> {
     recoveries: Vec<RecoveryDiagnostic>,
     call_depth: usize,
     expression_depth: usize,
-    expression_limit_events: u64,
+    resource_failure: Option<ParseError>,
     options: ParseOptions,
     grammar_session: u64,
     next_grammar_session: u64,
@@ -1208,7 +1208,8 @@ pub fn parse_detailed(
 }
 
 /// Full-input parsing with a categorized diagnostic. [`Diagnostics::Auto`] resolves
-/// from the grammar once before parsing. With
+/// from the grammar once before parsing. Resource exhaustion has kind
+/// `resource_limit` and cannot be recovered as a syntax mismatch. With
 /// [`Diagnostics::DetailedOnFailure`], failure (including trailing input) triggers
 /// a fresh detailed parse and returns its complete [`ParseDiagnostic`].
 pub fn parse_detailed_with_options(
@@ -1328,6 +1329,14 @@ fn parse_detailed_owned(
         }
         trailing_offset = Some(parser.code_point(parser.position));
         parser.fail("end of input");
+    }
+    if let Some(error) = parser.resource_failure.take() {
+        return Err(ParseDiagnostic {
+            kind: "resource_limit",
+            offset: error.offset,
+            expected: error.expected.clone(),
+            farthest: error,
+        });
     }
     if let Some(failure) = parser.name_failure() {
         return Err(ParseDiagnostic {
@@ -1453,7 +1462,7 @@ impl<'a> ParseContext<'a> {
             recoveries: Vec::new(),
             call_depth: 0,
             expression_depth: 0,
-            expression_limit_events: 0,
+            resource_failure: None,
             options,
             grammar_session: 0,
             next_grammar_session: 1,
@@ -1664,6 +1673,9 @@ impl<'a> ParseContext<'a> {
     }
 
     pub fn failure(&self) -> ParseError {
+        if let Some(error) = &self.resource_failure {
+            return error.clone();
+        }
         if let Some(failure) = self.name_failure() {
             return failure.error();
         }
@@ -1673,9 +1685,20 @@ impl<'a> ParseContext<'a> {
         }
     }
 
+    fn resource_error(&mut self, expected: &str) -> ParseError {
+        let error = ParseError {
+            offset: self.position(),
+            expected: vec![expected.to_owned()],
+        };
+        self.resource_failure.get_or_insert(error).clone()
+    }
+
     pub fn parse<P: Parser + ?Sized>(&mut self, parser: &P) -> ParseResult {
+        if let Some(error) = &self.resource_failure {
+            return Err(error.clone());
+        }
         if self.call_depth >= 256 {
-            return Err(self.error("parser calls below 256"));
+            return Err(self.resource_error("parser calls below 256"));
         }
         self.call_depth += 1;
         let result = self.transaction(|context| parser.parse(context));
@@ -1687,8 +1710,15 @@ impl<'a> ParseContext<'a> {
         &mut self,
         operation: impl FnOnce(&mut Self) -> Result<T, ParseError>,
     ) -> Result<T, ParseError> {
+        if let Some(error) = &self.resource_failure {
+            return Err(error.clone());
+        }
         let checkpoint = self.checkpoint();
         let result = operation(self);
+        let result = match &self.resource_failure {
+            Some(error) => Err(error.clone()),
+            None => result,
+        };
         if let Err(error) = &result {
             if let Some(&byte) = self
                 .byte_offsets
@@ -1739,8 +1769,11 @@ impl<'a> ParseContext<'a> {
         root: usize,
         whitespace: bool,
     ) -> ParseResult {
+        if let Some(error) = &self.resource_failure {
+            return Err(error.clone());
+        }
         if self.call_depth >= 256 {
-            return Err(self.error("parser calls below 256"));
+            return Err(self.resource_error("parser calls below 256"));
         }
         self.call_depth += 1;
         let previous_definition = self.lexical_trivia.take();
@@ -1990,7 +2023,7 @@ impl<'a> ParseContext<'a> {
 
     fn rule(&mut self, id: usize, depth: usize) -> Option<usize> {
         if depth >= 256 {
-            self.fail("rule nesting below 256");
+            self.resource_error("rule nesting below 256");
             return None;
         }
         if id >= self.rules.len() {
@@ -2024,7 +2057,6 @@ impl<'a> ParseContext<'a> {
         }
         let rules = Arc::clone(&self.rules);
         let rule = &rules[id];
-        let limit_events = self.expression_limit_events;
         let record_diagnostics = self.options.diagnostics == Diagnostics::Detailed;
         if memo_key.is_some() && record_diagnostics {
             self.diagnostic_frames.push(FailureDiagnostic::default());
@@ -2064,7 +2096,7 @@ impl<'a> ParseContext<'a> {
             // Resource exhaustion depends on active wrapper frames. Do not reuse
             // that failure from a shallower call; ordinary syntax failures retain
             // their existing memo sharing across wrappers.
-            if result.is_none() && limit_events == self.expression_limit_events {
+            if result.is_none() && self.resource_failure.is_none() {
                 self.failure_memo
                     .insert(position / FAILURE_MEMO_BUCKET_SIZE, key, diagnostic);
             }
@@ -2075,9 +2107,11 @@ impl<'a> ParseContext<'a> {
     fn expression(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
         // Wrappers do not increase rule depth. Bound their active frames separately,
         // including frames retained across a custom callback or child grammar entry.
+        if self.resource_failure.is_some() {
+            return None;
+        }
         if self.expression_depth >= 1024 {
-            self.expression_limit_events = self.expression_limit_events.wrapping_add(1);
-            self.fail("expression nesting below 1024");
+            self.resource_error("expression nesting below 1024");
             return None;
         }
         self.expression_depth += 1;
@@ -2134,6 +2168,11 @@ impl<'a> ParseContext<'a> {
                 self.expression_value_boundary(expression, depth)
             }
             _ => self.expression_inner(expression, depth),
+        };
+        let result = if self.resource_failure.is_some() {
+            None
+        } else {
+            result
         };
         if result.is_none() {
             self.restore(checkpoint);
@@ -2498,6 +2537,10 @@ impl<'a> ParseContext<'a> {
     fn expression_custom(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
         match expression {
             Expr::Custom(parser) | Expr::CustomWith { parser, .. } => {
+                if self.call_depth.max(depth) >= 256 {
+                    self.resource_error("parser calls below 256");
+                    return None;
+                }
                 let tracing = self.token_trace.is_some();
                 if tracing {
                     self.trace_custom_contracts.push(false);
@@ -2505,7 +2548,7 @@ impl<'a> ParseContext<'a> {
                 // A callback can re-enter a grammar through any public parser entry.
                 // Carry the active rule depth across that API boundary.
                 let previous_depth = self.call_depth;
-                self.call_depth = self.call_depth.max(depth);
+                self.call_depth = self.call_depth.max(depth) + 1;
                 let result = self.transaction(|context| parser(context));
                 self.call_depth = previous_depth;
                 if tracing && !self.trace_custom_contracts.pop().unwrap() && result.is_ok() {
@@ -2717,36 +2760,41 @@ impl<'a> ParseContext<'a> {
                 if effects.scope_mode.is_some() {
                     self.scopes_mut().leave();
                 }
-                if let Some(declaration) = &effects.declares {
-                    for capture in fragment
-                        .captures
-                        .iter()
-                        .filter(|c| c.name == declaration.symbol_capture)
-                    {
-                        if let Some((name, offset)) = self.symbol_capture(capture.span) {
-                            self.scopes_mut().declare(name, offset);
-                        }
-                    }
-                }
-                if let Some(target) = effects.backref {
-                    for capture in fragment.captures.iter().filter(|c| c.name == target) {
-                        if let Some((name, offset)) = self.symbol_capture(capture.span) {
-                            let length = name.chars().count();
-                            self.scopes_mut().add_reference(name, offset, length);
-                            if !self.scopes.is_declared(name) {
-                                self.scopes_mut().add_diagnostic(
-                                    &format!("未定義のシンボル: '{name}'"),
-                                    offset,
-                                    length,
-                                    Severity::Warning,
-                                );
-                            }
-                        }
-                    }
-                }
+                self.apply_rule_effects(&fragment, effects);
                 Some(fragment)
             }
             _ => unreachable!("recursive expression dispatched by variant"),
+        }
+    }
+
+    #[inline(never)]
+    fn apply_rule_effects(&mut self, fragment: &Fragment, effects: &RuleEffects) {
+        if let Some(declaration) = &effects.declares {
+            for capture in fragment
+                .captures
+                .iter()
+                .filter(|c| c.name == declaration.symbol_capture)
+            {
+                if let Some((name, offset)) = self.symbol_capture(capture.span) {
+                    self.scopes_mut().declare(name, offset);
+                }
+            }
+        }
+        if let Some(target) = effects.backref {
+            for capture in fragment.captures.iter().filter(|c| c.name == target) {
+                if let Some((name, offset)) = self.symbol_capture(capture.span) {
+                    let length = name.chars().count();
+                    self.scopes_mut().add_reference(name, offset, length);
+                    if !self.scopes.is_declared(name) {
+                        self.scopes_mut().add_diagnostic(
+                            &format!("未定義のシンボル: '{name}'"),
+                            offset,
+                            length,
+                            Severity::Warning,
+                        );
+                    }
+                }
+            }
         }
     }
 
@@ -2755,35 +2803,42 @@ impl<'a> ParseContext<'a> {
         match expression {
             Expr::CaptureEquality { child, name } => {
                 let fragment = self.expression(child, depth)?;
-                let mut first: Option<String> = None;
-                for capture in fragment
-                    .captures
-                    .iter()
-                    .filter(|capture| capture.name == *name)
-                {
-                    let raw = self
-                        .text(capture.span)
-                        .expect("capture span belongs to source");
-                    let leading = raw.chars().take_while(|ch| *ch <= '\u{20}').count();
-                    let value = raw.trim_matches(|ch| ch <= '\u{20}').to_owned();
-                    let offset = capture.span.start + leading;
-                    let length = value.chars().count();
-                    if let Some(expected) = &first {
-                        if expected != &value {
-                            self.scopes_mut().add_diagnostic(
-                                &format!("back-reference mismatch: expected '{expected}' but got '{value}'"),
-                                offset,
-                                length,
-                                Severity::Error,
-                            );
-                        }
-                    } else {
-                        first = Some(value);
-                    }
-                }
+                self.apply_capture_equality(&fragment, name);
                 Some(fragment)
             }
             _ => unreachable!("recursive expression dispatched by variant"),
+        }
+    }
+
+    #[inline(never)]
+    fn apply_capture_equality(&mut self, fragment: &Fragment, name: &str) {
+        let mut first: Option<String> = None;
+        for capture in fragment
+            .captures
+            .iter()
+            .filter(|capture| capture.name == name)
+        {
+            let raw = self
+                .text(capture.span)
+                .expect("capture span belongs to source");
+            let leading = raw.chars().take_while(|ch| *ch <= '\u{20}').count();
+            let value = raw.trim_matches(|ch| ch <= '\u{20}').to_owned();
+            let offset = capture.span.start + leading;
+            let length = value.chars().count();
+            if let Some(expected) = &first {
+                if expected != &value {
+                    self.scopes_mut().add_diagnostic(
+                        &format!(
+                            "back-reference mismatch: expected '{expected}' but got '{value}'"
+                        ),
+                        offset,
+                        length,
+                        Severity::Error,
+                    );
+                }
+            } else {
+                first = Some(value);
+            }
         }
     }
 
@@ -3757,7 +3812,7 @@ mod tests {
     }
 
     #[test]
-    fn memoized_budget_failure_does_not_reject_a_shallower_call() {
+    fn resource_failure_is_not_memoized_and_aborts_the_context() {
         let grammar = share_grammar(vec![Rule {
             name: "root",
             expression: Expr::Literal("ok"),
@@ -3776,8 +3831,9 @@ mod tests {
             .iter()
             .any(|value| value.contains("1024")));
         context.expression_depth = 0;
-        assert!(context.rule(0, 1).is_some());
-        assert_eq!(context.position(), 2);
+        assert!(context.rule(0, 1).is_none());
+        assert_eq!(context.position(), 0);
+        assert!(context.failure_memo.first.is_empty());
         assert_eq!(context.memoized_failure_hits(), 0);
     }
 
