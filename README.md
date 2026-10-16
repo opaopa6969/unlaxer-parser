@@ -165,6 +165,8 @@ Java also gains [explicit PEG assertions](docs/peg-assertions.md), matching the 
 
 The development branch also supports [Classic token-mode propagation](docs/classic-token-propagation.md) through general Rust expressions and custom parsers. The four kinds, inherited inversion, both cursors, and source projection are checked against Java. Capture/replay integration, external code-fence adapters, and observer exceptions remain tracked separately; this runtime slice does not complete parity.
 
+The development branch adds a [bounded Java 21 regex core](docs/regex-core.md) to Rust. Its prefix and token-prefix APIs are checked against actual Java Pattern; Unicode properties, lookaround/backreferences, and UBNF/token-mode integration remain tracked separately. This is not full Pattern parity and is not included in 3.3.0.
+
 See the [full-spec matrix](rust/FULL-SPEC.md) and [IDE inventory](docs/lsp-dap-ide-gap-inventory.md) for remaining limits: Rust incremental parsing, LSP cancellation / semantic tokens / rename and formatting transport, and some tokens and annotations are unsupported. DAP implements AST/token stepping, not live evaluator suspension. Numeric capture types/conversion and some diagnostics also differ between Java and Rust; compatibility with every Java grammar is not guaranteed.
 
 Downstream `tinyexpression-rs` and `rustcodeblock` AOT exist on the separate **ubnfc** engine. Their results do not establish Classic Rust parity or production deployment history. See the [engine guide](docs/engine-selection-guide-ja.md) and [pinned downstream audit](rust/FULL-SPEC.md#下流tinyexpressionの現状監査2026-09-30).
