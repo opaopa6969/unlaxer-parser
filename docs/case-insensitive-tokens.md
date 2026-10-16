@@ -40,7 +40,7 @@ Unicodeのfull case foldingや言語別の照合規則ではない。
 | `U+1C89` / `U+1C8A` | 一致 | JDK17/21内蔵表にないUnicode17の写像 |
 
 CIはfold後の文字列へ書き換えず、tokenとcaptureのspanは**入力の原文**を保持する。
-ASTのtextは既存mapperのtrivia投影規則に従うため、外側空白の除去等はその規則のままである。
+ASTのtextは既存mapperの文字列投影規則に従うため、外側空白・一重引用符の除去等はその規則のままである。
 消費幅とspanはCPであり、たとえば `k` に一致する入力 `K` は1CP・1 UTF-16 unit・3 UTF-8 bytes。
 補助文字やemojiが混ざっても、パターンのUTF-8 byte数を入力の消費幅に使わない。
 CPからUTF-16/UTF-8への変換には元source snapshotを使う。
