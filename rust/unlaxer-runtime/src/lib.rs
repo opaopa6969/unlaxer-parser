@@ -1124,6 +1124,8 @@ pub struct ParseContext<'a> {
     scopes: ScopeStore,
     recoveries: Vec<RecoveryDiagnostic>,
     call_depth: usize,
+    expression_depth: usize,
+    resource_failure: Option<ParseError>,
     options: ParseOptions,
     grammar_session: u64,
     next_grammar_session: u64,
@@ -1145,7 +1147,8 @@ pub struct ParseContext<'a> {
     trace_custom_contracts: Vec<bool>,
 }
 
-/// Ordered choice with rollback and full-input acceptance. Rule nesting is bounded at 256.
+/// Ordered choice with rollback and full-input acceptance. Rule nesting is bounded
+/// at 256 and active expression frames (including wrappers) at 1024.
 pub fn parse(
     rules: &[Rule],
     root: usize,
@@ -1205,7 +1208,8 @@ pub fn parse_detailed(
 }
 
 /// Full-input parsing with a categorized diagnostic. [`Diagnostics::Auto`] resolves
-/// from the grammar once before parsing. With
+/// from the grammar once before parsing. Resource exhaustion has kind
+/// `resource_limit` and cannot be recovered as a syntax mismatch. With
 /// [`Diagnostics::DetailedOnFailure`], failure (including trailing input) triggers
 /// a fresh detailed parse and returns its complete [`ParseDiagnostic`].
 pub fn parse_detailed_with_options(
@@ -1325,6 +1329,14 @@ fn parse_detailed_owned(
         }
         trailing_offset = Some(parser.code_point(parser.position));
         parser.fail("end of input");
+    }
+    if let Some(error) = parser.resource_failure.take() {
+        return Err(ParseDiagnostic {
+            kind: "resource_limit",
+            offset: error.offset,
+            expected: error.expected.clone(),
+            farthest: error,
+        });
     }
     if let Some(failure) = parser.name_failure() {
         return Err(ParseDiagnostic {
@@ -1449,6 +1461,8 @@ impl<'a> ParseContext<'a> {
             scopes: ScopeStore::default(),
             recoveries: Vec::new(),
             call_depth: 0,
+            expression_depth: 0,
+            resource_failure: None,
             options,
             grammar_session: 0,
             next_grammar_session: 1,
@@ -1659,6 +1673,9 @@ impl<'a> ParseContext<'a> {
     }
 
     pub fn failure(&self) -> ParseError {
+        if let Some(error) = &self.resource_failure {
+            return error.clone();
+        }
         if let Some(failure) = self.name_failure() {
             return failure.error();
         }
@@ -1668,9 +1685,20 @@ impl<'a> ParseContext<'a> {
         }
     }
 
+    fn resource_error(&mut self, expected: &str) -> ParseError {
+        let error = ParseError {
+            offset: self.position(),
+            expected: vec![expected.to_owned()],
+        };
+        self.resource_failure.get_or_insert(error).clone()
+    }
+
     pub fn parse<P: Parser + ?Sized>(&mut self, parser: &P) -> ParseResult {
+        if let Some(error) = &self.resource_failure {
+            return Err(error.clone());
+        }
         if self.call_depth >= 256 {
-            return Err(self.error("parser calls below 256"));
+            return Err(self.resource_error("parser calls below 256"));
         }
         self.call_depth += 1;
         let result = self.transaction(|context| parser.parse(context));
@@ -1682,8 +1710,15 @@ impl<'a> ParseContext<'a> {
         &mut self,
         operation: impl FnOnce(&mut Self) -> Result<T, ParseError>,
     ) -> Result<T, ParseError> {
+        if let Some(error) = &self.resource_failure {
+            return Err(error.clone());
+        }
         let checkpoint = self.checkpoint();
         let result = operation(self);
+        let result = match &self.resource_failure {
+            Some(error) => Err(error.clone()),
+            None => result,
+        };
         if let Err(error) = &result {
             if let Some(&byte) = self
                 .byte_offsets
@@ -1726,13 +1761,21 @@ impl<'a> ParseContext<'a> {
     /// Temporarily installs an immutable shared grammar while retaining this
     /// context's parse-local cursor, captures, nodes, scopes and user state.
     /// The previous grammar and trivia policy are restored on both success and
-    /// ordinary parse failure.
+    /// ordinary parse failure. Reentrant parser/grammar calls share the 256-call
+    /// budget; child grammars do not reset active expression nesting.
     pub fn parse_shared_grammar(
         &mut self,
         grammar: &SharedGrammar,
         root: usize,
         whitespace: bool,
     ) -> ParseResult {
+        if let Some(error) = &self.resource_failure {
+            return Err(error.clone());
+        }
+        if self.call_depth >= 256 {
+            return Err(self.resource_error("parser calls below 256"));
+        }
+        self.call_depth += 1;
         let previous_definition = self.lexical_trivia.take();
         let previous_goal = self.lexical_context.take();
         let outer_entry = self.rules.is_empty();
@@ -1768,6 +1811,7 @@ impl<'a> ParseContext<'a> {
         self.memo_safe_rules = previous_safe_rules;
         self.first_sets = previous_first_sets;
         self.grammar_session = previous_session;
+        self.call_depth -= 1;
         result
     }
 
@@ -1979,7 +2023,7 @@ impl<'a> ParseContext<'a> {
 
     fn rule(&mut self, id: usize, depth: usize) -> Option<usize> {
         if depth >= 256 {
-            self.fail("rule nesting below 256");
+            self.resource_error("rule nesting below 256");
             return None;
         }
         if id >= self.rules.len() {
@@ -2049,7 +2093,10 @@ impl<'a> ParseContext<'a> {
             } else {
                 FailureDiagnostic::default()
             };
-            if result.is_none() {
+            // Resource exhaustion depends on active wrapper frames. Do not reuse
+            // that failure from a shallower call; ordinary syntax failures retain
+            // their existing memo sharing across wrappers.
+            if result.is_none() && self.resource_failure.is_none() {
                 self.failure_memo
                     .insert(position / FAILURE_MEMO_BUCKET_SIZE, key, diagnostic);
             }
@@ -2058,6 +2105,16 @@ impl<'a> ParseContext<'a> {
     }
 
     fn expression(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
+        // Wrappers do not increase rule depth. Bound their active frames separately,
+        // including frames retained across a custom callback or child grammar entry.
+        if self.resource_failure.is_some() {
+            return None;
+        }
+        if self.expression_depth >= 1024 {
+            self.resource_error("expression nesting below 1024");
+            return None;
+        }
+        self.expression_depth += 1;
         let checkpoint = self.checkpoint();
         // Recursive combinators bypass the large general dispatch frame.
         let result = match expression {
@@ -2095,7 +2152,27 @@ impl<'a> ParseContext<'a> {
                 capture,
                 kind,
             } => self.name_predicate(child, snapshot, version, capture, kind, depth),
+            Expr::Custom(_) | Expr::CustomWith { .. } => self.expression_custom(expression, depth),
+            Expr::Recovery { .. } => self.expression_recovery(expression, depth),
+            Expr::Optional(_) | Expr::JavaOptional(_) => {
+                self.expression_optional(expression, depth)
+            }
+            Expr::Repeat { .. } | Expr::JavaRepeat { .. } => {
+                self.expression_repeat(expression, depth)
+            }
+            Expr::Lookahead { .. } => self.expression_lookahead(expression, depth),
+            Expr::Capture(_, _) => self.expression_capture(expression, depth),
+            Expr::RuleEffects { .. } => self.expression_rule_effects(expression, depth),
+            Expr::CaptureEquality { .. } => self.expression_capture_equality(expression, depth),
+            Expr::TextValue(_) | Expr::ValueBoundary(_) => {
+                self.expression_value_boundary(expression, depth)
+            }
             _ => self.expression_inner(expression, depth),
+        };
+        let result = if self.resource_failure.is_some() {
+            None
+        } else {
+            result
         };
         if result.is_none() {
             self.restore(checkpoint);
@@ -2103,6 +2180,7 @@ impl<'a> ParseContext<'a> {
             self.trace_expression(expression, checkpoint.position);
             self.commit_checkpoint(checkpoint);
         }
+        self.expression_depth -= 1;
         result
     }
 
@@ -2153,23 +2231,10 @@ impl<'a> ParseContext<'a> {
         Some(result)
     }
 
-    fn expression_inner(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
+    fn expression_inner(&mut self, expression: &Expr, _depth: usize) -> Option<Fragment> {
         match expression {
-            Expr::Custom(parser) | Expr::CustomWith { parser, .. } => {
-                let tracing = self.token_trace.is_some();
-                if tracing {
-                    self.trace_custom_contracts.push(false);
-                }
-                let result = self.transaction(|context| parser(context));
-                if tracing && !self.trace_custom_contracts.pop().unwrap() && result.is_ok() {
-                    self.unsupported_trace(
-                        "custom parser without explicit terminal trace contract",
-                    );
-                }
-                result.ok().map(|matched| Fragment {
-                    nodes: matched.nodes,
-                    captures: matched.captures,
-                })
+            Expr::Custom(_) | Expr::CustomWith { .. } => {
+                unreachable!("recursive expression dispatched by expression")
             }
             Expr::Lexical(label, expression) => {
                 let end = match &mut self.lexing {
@@ -2269,52 +2334,7 @@ impl<'a> ParseContext<'a> {
                 }
                 None
             }
-            Expr::Recovery {
-                child,
-                mode,
-                tokens,
-                message,
-            } => {
-                if tokens.iter().any(|token| token.is_empty()) {
-                    self.fail("nonempty recovery token");
-                    return None;
-                }
-                if tokens
-                    .iter()
-                    .enumerate()
-                    .any(|(index, token)| tokens[..index].contains(token))
-                {
-                    self.fail("unique recovery token");
-                    return None;
-                }
-                let start = self.position;
-                if let Some(fragment) = self.expression(child, depth) {
-                    return Some(fragment);
-                }
-                let end = self.recovery_end(*mode, tokens)?;
-                self.position = end;
-                self.matched_position = end;
-                let span = Span {
-                    start: self.code_point(start),
-                    end: self.code_point(end),
-                };
-                let node = self.nodes.len();
-                self.nodes.push(Node {
-                    rule: RECOVERY_ERROR_RULE,
-                    span,
-                    children: Vec::new(),
-                    captures: Vec::new(),
-                });
-                self.recoveries.push(RecoveryDiagnostic {
-                    span,
-                    message,
-                    node,
-                });
-                Some(Fragment {
-                    nodes: vec![node],
-                    captures: Vec::new(),
-                })
-            }
+            Expr::Recovery { .. } => unreachable!("recursive expression dispatched by expression"),
             Expr::Any | Expr::CharRange(_, _) | Expr::Except(_) => {
                 let next = self.input[self.position..].chars().next();
                 let accepted = next.is_some_and(|c| match expression {
@@ -2341,97 +2361,13 @@ impl<'a> ParseContext<'a> {
                     None
                 }
             }
-            Expr::Optional(child) | Expr::JavaOptional(child) => {
-                let start = self.position;
-                let count = self.nodes.len();
-                let attempt = if self.excludes(child, depth) {
-                    None
-                } else {
-                    self.expression(child, depth)
-                };
-                match attempt {
-                    Some(fragment) => Some(fragment),
-                    None => {
-                        self.position = start;
-                        self.nodes.truncate(count);
-                        if matches!(expression, Expr::JavaOptional(_)) {
-                            self.java_failed_atom(child);
-                            self.trace_empty("Optional");
-                        }
-                        Some(Fragment::default())
-                    }
-                }
+            Expr::Optional(_) | Expr::JavaOptional(_) => {
+                unreachable!("recursive expression dispatched by expression")
             }
-            Expr::Repeat { child, min, max } | Expr::JavaRepeat { child, min, max } => {
-                let java = matches!(expression, Expr::JavaRepeat { .. });
-                if max.is_some_and(|max| max < *min) {
-                    self.fail("valid repetition bounds");
-                    return None;
-                }
-                let mut result = Fragment::default();
-                let mut iterations = 0;
-                while (java && iterations == 0) || max.is_none_or(|max| iterations < max) {
-                    let start = self.position;
-                    let count = self.nodes.len();
-                    // A skipped body takes the failure branch, including Java's
-                    // failed-atom cursor reset, exactly as an evaluated failure would.
-                    let attempt = if self.excludes(child, depth) {
-                        None
-                    } else {
-                        self.expression(child, depth)
-                    };
-                    match attempt {
-                        Some(mut fragment) => {
-                            if self.position == start && max.is_none() && !java {
-                                self.nodes.truncate(count);
-                                self.fail("progress in unbounded repetition");
-                                return None;
-                            }
-                            iterations += 1;
-                            result.nodes.append(&mut fragment.nodes);
-                            result.captures.append(&mut fragment.captures);
-                            if java && self.position == start {
-                                break;
-                            }
-                        }
-                        None => {
-                            self.position = start;
-                            self.nodes.truncate(count);
-                            if java {
-                                self.java_failed_atom(child);
-                            }
-                            break;
-                        }
-                    }
-                }
-                if java && iterations == 0 && *min == 0 {
-                    self.trace_empty("ZeroOrMore");
-                }
-                (iterations >= *min && max.is_none_or(|max| iterations <= max)).then_some(result)
+            Expr::Repeat { .. } | Expr::JavaRepeat { .. } => {
+                unreachable!("recursive expression dispatched by expression")
             }
-            Expr::Lookahead { child, positive } => {
-                let checkpoint = self.checkpoint();
-                let farthest = self.farthest;
-                let expected = self.expected.clone();
-                let diagnostic_frames = self.diagnostic_frames.clone();
-                let matched = self.expression(child, depth).is_some();
-                self.restore(checkpoint);
-                // Successful assertions discard speculative diagnostics. A failed
-                // negative assertion retains failures explored inside its matching child.
-                if matched == *positive {
-                    self.farthest = farthest;
-                    self.expected = expected;
-                    self.diagnostic_frames = diagnostic_frames;
-                }
-                if matched == *positive {
-                    Some(Fragment::default())
-                } else {
-                    if !*positive {
-                        self.fail("negative lookahead");
-                    }
-                    None
-                }
-            }
+            Expr::Lookahead { .. } => unreachable!("recursive expression dispatched by expression"),
             Expr::Literal(literal) => {
                 let end = match &mut self.lexing {
                     Some(session) => session.match_at(
@@ -2579,6 +2515,224 @@ impl<'a> ParseContext<'a> {
                 unreachable!("combinators are dispatched by expression")
             }
 
+            Expr::Capture(_, _) => unreachable!("recursive expression dispatched by expression"),
+            Expr::RuleEffects { .. } => {
+                unreachable!("recursive expression dispatched by expression")
+            }
+            Expr::CaptureEquality { .. } => {
+                unreachable!("recursive expression dispatched by expression")
+            }
+            Expr::LexicalContextScope { .. }
+            | Expr::LexicalTriviaScope { .. }
+            | Expr::TriviaScope { .. } => {
+                unreachable!("trivia scopes are dispatched by expression")
+            }
+            Expr::TextValue(_) | Expr::ValueBoundary(_) => {
+                unreachable!("recursive expression dispatched by expression")
+            }
+        }
+    }
+
+    #[inline(never)]
+    fn expression_custom(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
+        match expression {
+            Expr::Custom(parser) | Expr::CustomWith { parser, .. } => {
+                if self.call_depth.max(depth) >= 256 {
+                    self.resource_error("parser calls below 256");
+                    return None;
+                }
+                let tracing = self.token_trace.is_some();
+                if tracing {
+                    self.trace_custom_contracts.push(false);
+                }
+                // A callback can re-enter a grammar through any public parser entry.
+                // Carry the active rule depth across that API boundary.
+                let previous_depth = self.call_depth;
+                self.call_depth = self.call_depth.max(depth) + 1;
+                let result = self.transaction(|context| parser(context));
+                self.call_depth = previous_depth;
+                if tracing && !self.trace_custom_contracts.pop().unwrap() && result.is_ok() {
+                    self.unsupported_trace(
+                        "custom parser without explicit terminal trace contract",
+                    );
+                }
+                result.ok().map(|matched| Fragment {
+                    nodes: matched.nodes,
+                    captures: matched.captures,
+                })
+            }
+            _ => unreachable!("recursive expression dispatched by variant"),
+        }
+    }
+
+    #[inline(never)]
+    fn expression_recovery(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
+        match expression {
+            Expr::Recovery {
+                child,
+                mode,
+                tokens,
+                message,
+            } => {
+                if tokens.iter().any(|token| token.is_empty()) {
+                    self.fail("nonempty recovery token");
+                    return None;
+                }
+                if tokens
+                    .iter()
+                    .enumerate()
+                    .any(|(index, token)| tokens[..index].contains(token))
+                {
+                    self.fail("unique recovery token");
+                    return None;
+                }
+                let start = self.position;
+                if let Some(fragment) = self.expression(child, depth) {
+                    return Some(fragment);
+                }
+                let end = self.recovery_end(*mode, tokens)?;
+                self.position = end;
+                self.matched_position = end;
+                let span = Span {
+                    start: self.code_point(start),
+                    end: self.code_point(end),
+                };
+                let node = self.nodes.len();
+                self.nodes.push(Node {
+                    rule: RECOVERY_ERROR_RULE,
+                    span,
+                    children: Vec::new(),
+                    captures: Vec::new(),
+                });
+                self.recoveries.push(RecoveryDiagnostic {
+                    span,
+                    message,
+                    node,
+                });
+                Some(Fragment {
+                    nodes: vec![node],
+                    captures: Vec::new(),
+                })
+            }
+            _ => unreachable!("recursive expression dispatched by variant"),
+        }
+    }
+
+    #[inline(never)]
+    fn expression_optional(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
+        match expression {
+            Expr::Optional(child) | Expr::JavaOptional(child) => {
+                let start = self.position;
+                let count = self.nodes.len();
+                let attempt = if self.excludes(child, depth) {
+                    None
+                } else {
+                    self.expression(child, depth)
+                };
+                match attempt {
+                    Some(fragment) => Some(fragment),
+                    None => {
+                        self.position = start;
+                        self.nodes.truncate(count);
+                        if matches!(expression, Expr::JavaOptional(_)) {
+                            self.java_failed_atom(child);
+                            self.trace_empty("Optional");
+                        }
+                        Some(Fragment::default())
+                    }
+                }
+            }
+            _ => unreachable!("recursive expression dispatched by variant"),
+        }
+    }
+
+    #[inline(never)]
+    fn expression_repeat(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
+        match expression {
+            Expr::Repeat { child, min, max } | Expr::JavaRepeat { child, min, max } => {
+                let java = matches!(expression, Expr::JavaRepeat { .. });
+                if max.is_some_and(|max| max < *min) {
+                    self.fail("valid repetition bounds");
+                    return None;
+                }
+                let mut result = Fragment::default();
+                let mut iterations = 0;
+                while (java && iterations == 0) || max.is_none_or(|max| iterations < max) {
+                    let start = self.position;
+                    let count = self.nodes.len();
+                    // A skipped body takes the failure branch, including Java's
+                    // failed-atom cursor reset, exactly as an evaluated failure would.
+                    let attempt = if self.excludes(child, depth) {
+                        None
+                    } else {
+                        self.expression(child, depth)
+                    };
+                    match attempt {
+                        Some(mut fragment) => {
+                            if self.position == start && max.is_none() && !java {
+                                self.nodes.truncate(count);
+                                self.fail("progress in unbounded repetition");
+                                return None;
+                            }
+                            iterations += 1;
+                            result.nodes.append(&mut fragment.nodes);
+                            result.captures.append(&mut fragment.captures);
+                            if java && self.position == start {
+                                break;
+                            }
+                        }
+                        None => {
+                            self.position = start;
+                            self.nodes.truncate(count);
+                            if java {
+                                self.java_failed_atom(child);
+                            }
+                            break;
+                        }
+                    }
+                }
+                if java && iterations == 0 && *min == 0 {
+                    self.trace_empty("ZeroOrMore");
+                }
+                (iterations >= *min && max.is_none_or(|max| iterations <= max)).then_some(result)
+            }
+            _ => unreachable!("recursive expression dispatched by variant"),
+        }
+    }
+
+    #[inline(never)]
+    fn expression_lookahead(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
+        match expression {
+            Expr::Lookahead { child, positive } => {
+                let checkpoint = self.checkpoint();
+                let farthest = self.farthest;
+                let expected = self.expected.clone();
+                let diagnostic_frames = self.diagnostic_frames.clone();
+                let matched = self.expression(child, depth).is_some();
+                self.restore(checkpoint);
+                // Successful assertions discard speculative diagnostics. A failed
+                // negative assertion retains failures explored inside its matching child.
+                if matched == *positive {
+                    self.farthest = farthest;
+                    self.expected = expected;
+                    self.diagnostic_frames = diagnostic_frames;
+                }
+                if matched == *positive {
+                    Some(Fragment::default())
+                } else {
+                    if !*positive {
+                        self.fail("negative lookahead");
+                    }
+                    None
+                }
+            }
+            _ => unreachable!("recursive expression dispatched by variant"),
+        }
+    }
+
+    #[inline(never)]
+    fn expression_capture(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
+        match expression {
             Expr::Capture(name, expression) => {
                 let start = self.position;
                 let mut fragment = self.expression(expression, depth)?;
@@ -2591,6 +2745,13 @@ impl<'a> ParseContext<'a> {
                 });
                 Some(fragment)
             }
+            _ => unreachable!("recursive expression dispatched by variant"),
+        }
+    }
+
+    #[inline(never)]
+    fn expression_rule_effects(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
+        match expression {
             Expr::RuleEffects { child, effects } => {
                 if effects.scope_mode.is_some() {
                     self.scopes_mut().enter();
@@ -2599,70 +2760,91 @@ impl<'a> ParseContext<'a> {
                 if effects.scope_mode.is_some() {
                     self.scopes_mut().leave();
                 }
-                if let Some(declaration) = &effects.declares {
-                    for capture in fragment
-                        .captures
-                        .iter()
-                        .filter(|c| c.name == declaration.symbol_capture)
-                    {
-                        if let Some((name, offset)) = self.symbol_capture(capture.span) {
-                            self.scopes_mut().declare(name, offset);
-                        }
-                    }
-                }
-                if let Some(target) = effects.backref {
-                    for capture in fragment.captures.iter().filter(|c| c.name == target) {
-                        if let Some((name, offset)) = self.symbol_capture(capture.span) {
-                            let length = name.chars().count();
-                            self.scopes_mut().add_reference(name, offset, length);
-                            if !self.scopes.is_declared(name) {
-                                self.scopes_mut().add_diagnostic(
-                                    &format!("未定義のシンボル: '{name}'"),
-                                    offset,
-                                    length,
-                                    Severity::Warning,
-                                );
-                            }
-                        }
-                    }
-                }
+                self.apply_rule_effects(&fragment, effects);
                 Some(fragment)
             }
+            _ => unreachable!("recursive expression dispatched by variant"),
+        }
+    }
+
+    #[inline(never)]
+    fn apply_rule_effects(&mut self, fragment: &Fragment, effects: &RuleEffects) {
+        if let Some(declaration) = &effects.declares {
+            for capture in fragment
+                .captures
+                .iter()
+                .filter(|c| c.name == declaration.symbol_capture)
+            {
+                if let Some((name, offset)) = self.symbol_capture(capture.span) {
+                    self.scopes_mut().declare(name, offset);
+                }
+            }
+        }
+        if let Some(target) = effects.backref {
+            for capture in fragment.captures.iter().filter(|c| c.name == target) {
+                if let Some((name, offset)) = self.symbol_capture(capture.span) {
+                    let length = name.chars().count();
+                    self.scopes_mut().add_reference(name, offset, length);
+                    if !self.scopes.is_declared(name) {
+                        self.scopes_mut().add_diagnostic(
+                            &format!("未定義のシンボル: '{name}'"),
+                            offset,
+                            length,
+                            Severity::Warning,
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[inline(never)]
+    fn expression_capture_equality(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
+        match expression {
             Expr::CaptureEquality { child, name } => {
                 let fragment = self.expression(child, depth)?;
-                let mut first: Option<String> = None;
-                for capture in fragment
-                    .captures
-                    .iter()
-                    .filter(|capture| capture.name == *name)
-                {
-                    let raw = self
-                        .text(capture.span)
-                        .expect("capture span belongs to source");
-                    let leading = raw.chars().take_while(|ch| *ch <= '\u{20}').count();
-                    let value = raw.trim_matches(|ch| ch <= '\u{20}').to_owned();
-                    let offset = capture.span.start + leading;
-                    let length = value.chars().count();
-                    if let Some(expected) = &first {
-                        if expected != &value {
-                            self.scopes_mut().add_diagnostic(
-                                &format!("back-reference mismatch: expected '{expected}' but got '{value}'"),
-                                offset,
-                                length,
-                                Severity::Error,
-                            );
-                        }
-                    } else {
-                        first = Some(value);
-                    }
-                }
+                self.apply_capture_equality(&fragment, name);
                 Some(fragment)
             }
-            Expr::LexicalContextScope { .. }
-            | Expr::LexicalTriviaScope { .. }
-            | Expr::TriviaScope { .. } => {
-                unreachable!("trivia scopes are dispatched by expression")
+            _ => unreachable!("recursive expression dispatched by variant"),
+        }
+    }
+
+    #[inline(never)]
+    fn apply_capture_equality(&mut self, fragment: &Fragment, name: &str) {
+        let mut first: Option<String> = None;
+        for capture in fragment
+            .captures
+            .iter()
+            .filter(|capture| capture.name == name)
+        {
+            let raw = self
+                .text(capture.span)
+                .expect("capture span belongs to source");
+            let leading = raw.chars().take_while(|ch| *ch <= '\u{20}').count();
+            let value = raw.trim_matches(|ch| ch <= '\u{20}').to_owned();
+            let offset = capture.span.start + leading;
+            let length = value.chars().count();
+            if let Some(expected) = &first {
+                if expected != &value {
+                    self.scopes_mut().add_diagnostic(
+                        &format!(
+                            "back-reference mismatch: expected '{expected}' but got '{value}'"
+                        ),
+                        offset,
+                        length,
+                        Severity::Error,
+                    );
+                }
+            } else {
+                first = Some(value);
             }
+        }
+    }
+
+    #[inline(never)]
+    fn expression_value_boundary(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
+        match expression {
             Expr::TextValue(child) | Expr::ValueBoundary(child) => {
                 let start = self.position;
                 let fragment = self.expression(child, depth)?;
@@ -2682,6 +2864,7 @@ impl<'a> ParseContext<'a> {
                     captures: fragment.captures,
                 })
             }
+            _ => unreachable!("recursive expression dispatched by variant"),
         }
     }
 
@@ -3626,6 +3809,32 @@ mod tests {
             assert_eq!(diagnostic.farthest.offset, 0);
             assert_eq!(diagnostic.farthest.expected, vec!["rule nesting below 256"]);
         }
+    }
+
+    #[test]
+    fn resource_failure_is_not_memoized_and_aborts_the_context() {
+        let grammar = share_grammar(vec![Rule {
+            name: "root",
+            expression: Expr::Literal("ok"),
+        }]);
+        let mut context = ParseContext::with_options(
+            "ok",
+            ParseOptions::with_memoization(Memoization::SafeFailures),
+        );
+        context.rules = Arc::clone(&grammar);
+        context.memo_safe_rules = memo_safe_rules(&grammar);
+        context.expression_depth = 1024;
+        assert!(context.rule(0, 1).is_none());
+        assert!(context
+            .failure()
+            .expected
+            .iter()
+            .any(|value| value.contains("1024")));
+        context.expression_depth = 0;
+        assert!(context.rule(0, 1).is_none());
+        assert_eq!(context.position(), 0);
+        assert!(context.failure_memo.first.is_empty());
+        assert_eq!(context.memoized_failure_hits(), 0);
     }
 
     #[test]

@@ -197,8 +197,9 @@ fn custom_trait_failure_rolls_back_and_public_recursive_calls_are_bounded() {
         .unwrap_err()
         .expected
         .contains(&"parser calls below 256".to_owned()));
-    // The counter also unwinds after a normal Err, allowing later parser calls.
-    context.parse(&Expr::Empty).unwrap();
+    // A resource limit aborts this session; ordinary syntax errors remain retryable.
+    assert!(context.parse(&Expr::Empty).is_err());
+    ParseContext::new("").parse(&Expr::Empty).unwrap();
 }
 
 #[test]
