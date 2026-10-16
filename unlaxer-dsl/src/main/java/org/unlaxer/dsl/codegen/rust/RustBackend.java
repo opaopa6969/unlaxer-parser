@@ -543,15 +543,12 @@ public final class RustBackend {
         StringBuilder out = new StringBuilder(HEADER);
         if (needsValues(ir)) out.append("use super::ast::AstValue;\n");
         out.append(enumImports(ir));
-        out.append("use super::ast::Ast;\nuse unlaxer_runtime::Tree;\n\n");
+        out.append("use super::ast::Ast;\nuse unlaxer_runtime::mapping::Context as Tree;\n\npub fn map(tree: &unlaxer_runtime::Tree) -> Result<Ast, String> {\n");
+        out.append("    let tree = &Tree::new(tree, ").append(ir.rules().size()).append(")?;\n    tree.ensure_mappable(tree.root)?;\n");
         if (ir.rules().stream().anyMatch(rule -> containsRecovery(rule.body()))) {
-            out.append("pub fn map(tree: &Tree) -> Result<Ast, String> {\n"
-                + "    if !tree.recoveries().is_empty() { return Err(\"cannot map recovered syntax\".into()); }\n"
-                + "    required(map_node(tree, tree.root)?, \"root\")\n}\n\n");
-        } else {
-            out.append("pub fn map(tree: &Tree) -> Result<Ast, String> {\n"
-                + "    required(map_node(tree, tree.root)?, \"root\")\n}\n\n");
+            out.append("    if !tree.recoveries().is_empty() { return Err(\"cannot map recovered syntax\".into()); }\n");
         }
+        out.append("    required(map_node(tree, tree.root)?, \"root\")\n}\n\n");
         out.append("""
             fn required<T>(mut values: Vec<T>, name: &str) -> Result<T, String> {
                 if values.len() != 1 { return Err(format!("expected one value for {name}, got {}", values.len())); }
@@ -576,13 +573,14 @@ public final class RustBackend {
                     .append(
                             "    let mut found = Vec::new();\n"
                                 + "    for &id in ids {\n"
+                                + "        tree.visit(id)?;\n"
                                 + "        let node = &tree.nodes[id];\n")
                     .append("        if node.rule == ")
                     .append(i)
                     .append(" {\n            found.push(")
                     .append(rule.name())
                     .append(
-                            "::from_text(tree.text(node.span))?);\n"
+                            "::from_text(tree.text(node.span)?)?);\n"
                                 + "        } else {\n"
                                 + "            found.extend(map_enum_")
                     .append(i)
@@ -594,17 +592,18 @@ public final class RustBackend {
                 fn map_values(tree: &Tree, ids: &[usize]) -> Result<Vec<AstValue>, String> {
                     let mut found = Vec::new();
                     for &id in ids {
+                        tree.visit(id)?;
                         let node = &tree.nodes[id];
                         match node.rule {
                             unlaxer_runtime::TEXT_VALUE_RULE => found.push(AstValue::Text {
-                                text: unlaxer_runtime::java_capture_text(tree.text(node.span)).to_owned(),
+                                text: unlaxer_runtime::java_capture_text(tree.text(node.span)?).to_owned(),
                                 span: node.span,
                             }),
                             unlaxer_runtime::VALUE_BOUNDARY_RULE => {
                                 let values = map_values(tree, &node.children)?;
                                 if !values.is_empty() && values.iter().all(|value| matches!(value, AstValue::Text { .. })) {
                                     found.push(AstValue::Text {
-                                        text: unlaxer_runtime::java_capture_text(tree.text(node.span)).to_owned(),
+                                        text: unlaxer_runtime::java_capture_text(tree.text(node.span)?).to_owned(),
                                         span: node.span,
                                     });
                                 } else {
@@ -615,7 +614,7 @@ public final class RustBackend {
             for (int i = 0; i < ir.rules().size(); i++) {
                 Rule rule = ir.rules().get(i);
                 if (!rule.enumLiterals().isEmpty()) out.append("            ").append(i).append(" => found.push(AstValue::Enum")
-                    .append(rule.name()).append(" { value: ").append(rule.name()).append("::from_text(tree.text(node.span))?, span: node.span }),\n");
+                    .append(rule.name()).append(" { value: ").append(rule.name()).append("::from_text(tree.text(node.span)?)?, span: node.span }),\n");
             }
             List<String> ids = new ArrayList<>();
             for (int i = 0; i < ir.rules().size(); i++) if ((ir.rules().get(i).mapping() != null || !ir.rules().get(i).typeConstraints().isEmpty()) && ir.rules().get(i).enumLiterals().isEmpty()) ids.add(Integer.toString(i));
@@ -625,7 +624,7 @@ public final class RustBackend {
             for (int i = 0; i < ir.rules().size(); i++) if (ir.rules().get(i).skip()) skipped.add(Integer.toString(i));
             if (!skipped.isEmpty()) out.append("            ").append(String.join(" | ", skipped)).append("""
                  => found.push(AstValue::Text {
-                                text: unlaxer_runtime::java_capture_text(tree.text(node.span)).to_owned(),
+                                text: unlaxer_runtime::java_capture_text(tree.text(node.span)?).to_owned(),
                                 span: node.span,
                             }),
                 """);
@@ -645,6 +644,7 @@ public final class RustBackend {
         out.append("""
 
             fn map_node(tree: &Tree, id: usize) -> Result<Vec<Ast>, String> {
+                tree.visit(id)?;
                 match tree.nodes[id].rule {
             """);
         for (int i = 0; i < ir.rules().size(); i++) {
@@ -664,7 +664,7 @@ public final class RustBackend {
             if (!ir.rules().get(i).enumLiterals().isEmpty()) {
                 out.append("        r#value: ")
                     .append(ir.rules().get(i).name())
-                    .append("::from_text(tree.text(node.span))?,\n    }])\n}\n");
+                    .append("::from_text(tree.text(node.span)?)?,\n    }])\n}\n");
                 continue;
             }
             for (Field field : mapping.fields()) {
@@ -695,12 +695,12 @@ public final class RustBackend {
                     out.append("                values.push(").append(NestedEmitter.mapped(shape,"&nested",0,projection)).append("?);\n");
                     if(projection!=null)out.append("                if nested_sources.next().is_some() { return Err(\"unmapped original nested leaf\".into()); }\n");
                 }
-                else if (field.kind() == Kind.INTEGER) out.append("                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).parse::<i32>().map_err(|_| format!(\"invalid i32 capture {} at {}..{}\", capture.name, capture.span.start, capture.span.end))?);\n");
+                else if (field.kind() == Kind.INTEGER) out.append("                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)?).parse::<i32>().map_err(|_| format!(\"invalid i32 capture {} at {}..{}\", capture.name, capture.span.start, capture.span.end))?);\n");
                 else if (field.kind() == Kind.NODE) out.append("                values.extend(map_nodes(tree, &capture.nodes)?);\n");
                 else if (field.kind() == Kind.VALUE) out.append("                values.extend(map_values(tree, &capture.nodes)?);\n");
                 else if (graphemeCapture(ir, ir.rules().get(i).body(), field.name()))
-                    out.append("                values.push(tree.text(capture.span).to_owned());\n");
-                else out.append("                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).to_owned());\n");
+                    out.append("                values.push(tree.text(capture.span)?.to_owned());\n");
+                else out.append("                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)?).to_owned());\n");
                 out.append("            }\n            ").append(mappedValue(field)).append("\n        },\n");
             }
             out.append("    }])\n}\n");

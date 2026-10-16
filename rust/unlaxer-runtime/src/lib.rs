@@ -19,6 +19,7 @@ pub mod language_queries;
 pub mod lexical;
 pub mod lexing;
 mod long_code_fence;
+pub mod mapping;
 #[cfg(test)]
 mod memo_retention_tests;
 pub mod names;
