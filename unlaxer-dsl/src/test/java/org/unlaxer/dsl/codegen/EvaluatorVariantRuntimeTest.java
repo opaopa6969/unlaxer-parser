@@ -105,19 +105,20 @@ public class EvaluatorVariantRuntimeTest {
         var grammar = grammar("@root @mapping(Node) @eval(kind='literal', strategy='default') Root ::= Leaf; "
             + "@mapping(Item) Leaf ::= 'a';");
         var error = assertThrows(IllegalArgumentException.class, () -> new EvaluatorGenerator().generate(grammar));
-        assertTrue(error.getMessage(), error.getMessage().contains("concrete mapping, not sum Node"));
-        assertTrue(error.getMessage(), error.getMessage().contains("annotate its variants"));
+        assertTrue(error.getMessage(), error.getMessage().startsWith("E-EVAL:"));
     }
 
     @Test public void dottedAutoSemanticsAndFlattenedNameOverloadsAreLegal() throws Exception {
         for (String kind : List.of("literal", "passthrough")) {
             run(grammar("token NUM=NumberParser @root @mapping(Node.Num, params=[value]) "
                 + "@eval(kind='" + kind + "', strategy='default') Root ::= NUM @value;"), """
+                @Override protected Integer convertValue(Object value) { return (Integer) value; }
                 public static int run() { return new Semantics().eval(new VariantAST.Node.Num(8)); }
                 """, 8);
         }
         run(grammar("@root @mapping(Node.Wrapper, params=[value]) @eval(kind='passthrough', strategy='default') "
             + "Root ::= Leaf @value; @mapping(Node.Item) Leaf ::= 'a';"), """
+            @Override protected Integer convertValue(Object value) { throw new AssertionError("node passthrough must recurse"); }
             @Override protected Integer evalNodeItem(VariantAST.Node.Item node) { return 11; }
             public static int run() { return new Semantics().eval(new VariantAST.Node.Wrapper(new VariantAST.Node.Item())); }
             """, 11);

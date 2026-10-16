@@ -143,6 +143,7 @@ fn require(
 fn scalar(field: &Field, expression: &str) -> String {
     match &field.kind {
         Kind::Text => format!("EvalValue::Text({expression})"),
+        Kind::Integer => format!("EvalValue::Integer(*{expression})"),
         Kind::Node => format!("EvalValue::Node({expression})"),
         Kind::Enum(name) => format!(
             "EvalValue::Enum {{ name: {}, text: {expression}.text() }}",
@@ -168,6 +169,7 @@ fn operand(ir: &GrammarIr, field: &Field, expression: &str) -> String {
     match &field.kind {
         Kind::Node => format!("evaluate({expression}, self)"),
         Kind::Text => format!("self.evaluate_literal({expression})"),
+        Kind::Integer => format!("self.evaluate_literal(&{expression}.to_string())"),
         Kind::Enum(_) => format!("self.evaluate_literal(&format!(\"{{:?}}\", {expression}))"),
         Kind::Value => {
             let mut arms=format!("match {expression} {{ AstValue::Text {{ text, .. }} => self.evaluate_literal(text), AstValue::Node(node) => evaluate(node, self),");
@@ -300,7 +302,7 @@ pub(crate) fn apply(
         )
         .replace("evaluate<S: Semantics>", "evaluate<S: Semantics + ?Sized>");
     if values {
-        let mut ty="\n/// Borrowed typed literal input; containers preserve their shape.\n#[derive(Debug)]\npub enum EvalValue<'a> {\n    Text(&'a str),\n    Node(&'a Ast),\n    Enum { name: &'static str, text: &'static str },\n    Optional(Option<Box<EvalValue<'a>>>),\n    Many(Vec<EvalValue<'a>>),\n}\n".to_string();
+        let mut ty="\n/// Borrowed typed literal input; containers preserve their shape.\n#[derive(Debug)]\npub enum EvalValue<'a> {\n    Text(&'a str),\n    Integer(i32),\n    Node(&'a Ast),\n    Enum { name: &'static str, text: &'static str },\n    Optional(Option<Box<EvalValue<'a>>>),\n    Many(Vec<EvalValue<'a>>),\n}\n".to_string();
         if mappings
             .iter()
             .any(|m| m.fields.iter().any(|f| f.kind == Kind::Value))

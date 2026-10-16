@@ -16,7 +16,7 @@ impl Semantics for Probe{
     fn is_truthy(&mut self,result:&Self::Output)->bool{let value=result.as_ref().unwrap();*value==json!(true)||value.as_str().is_some_and(|v|v.eq_ignore_ascii_case("true"))}
 }
 fn main(){
-    let invalid=Ast::Binary {span:Span{start:0,end:1},left:Box::new(Ast::Literal{span:Span{start:0,end:1},value:"1".into()}),op:vec!["+".into()],right:vec![]};
+    let invalid=Ast::Binary {span:Span{start:0,end:1},left:Box::new(Ast::Leaf{span:Span{start:0,end:1},value:"1".into()}),op:vec!["+".into()],right:vec![]};
     let mut invalid_probe=Probe::default();
     assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(||evaluate(&invalid,&mut invalid_probe))).is_err());
     assert!(invalid_probe.events.is_empty());

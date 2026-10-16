@@ -72,12 +72,34 @@ public final class JavaApiSchema {
                 }
             }
         }
-        Set<String> methodNames = new HashSet<>();
+        rejectDuplicateMethods(methods);
+    }
+
+    static void rejectDuplicateMethods(List<ApiImpact.Method> methods) {
+        Set<String> signatures = new HashSet<>();
         for (ApiImpact.Method method : methods) {
-            if (!methodNames.add(method.name())) {
-                throw new IllegalStateException("duplicate generated method: " + method.name());
+            String signature = method.name() + "(" + String.join(",", method.parameters().stream()
+                .map(parameter -> erasedType(parameter.type())).toList()) + ")";
+            if (!signatures.add(signature)) {
+                throw new IllegalStateException("duplicate generated method: " + signature);
             }
         }
+    }
+
+    // Java overload identity excludes parameter names and return type. The generator's
+    // source types are already qualified consistently; no external class loading is needed.
+    private static String erasedType(String type) {
+        StringBuilder erased = new StringBuilder();
+        int depth = 0;
+        for (int i = 0; i < type.length(); i++) {
+            char ch = type.charAt(i);
+            if (ch == '<') depth++;
+            else if (ch == '>') depth--;
+            else if (depth == 0 && !Character.isWhitespace(ch)) erased.append(ch);
+        }
+        String result = erased.toString().replace("...", "[]");
+        // The generated evaluator has exactly one unbounded type variable, T.
+        return result.equals("T") || result.startsWith("T[") ? "Object" + result.substring(1) : result;
     }
 
     private static String qualified(GeneratedSource source) {
@@ -191,22 +213,27 @@ public final class JavaApiSchema {
             List<ApiImpact.Parameter> parameters = method.getParameters().stream()
                 .map(parameter -> new ApiImpact.Parameter(parameter.getName().toString(),
                     parameter.getType().toString())).toList();
-            String mapping = mappingForMethod(snapshot, name);
+            String mapping = mappingForMethod(snapshot, name, parameters,
+                snapshot.ast().grammars().get(0).name() + "AST");
             methods.add(new ApiImpact.Method(name, method.getReturnType().toString(), parameters,
                 method.getBody() == null, ApiImpact.origins(snapshot, mapping), parsed.location(method)));
         }
         return methods;
     }
 
-    private static String mappingForMethod(UBNFSourceSnapshot snapshot, String methodName) {
+    private static String mappingForMethod(UBNFSourceSnapshot snapshot, String methodName,
+            List<ApiImpact.Parameter> parameters, String astClass) {
+        if (parameters.size() != 1) return null;
+        String parameterType = parameters.get(0).type();
         for (var wrapper : org.unlaxer.dsl.codegen.EnumSchema.rootEnums(snapshot.ast().grammars().get(0)).values()) {
-            if (methodName.equals("eval" + wrapper)) return wrapper;
+            if (methodName.equals("eval" + wrapper) && parameterType.equals(astClass + "." + wrapper)) return wrapper;
         }
         for (var rule : snapshot.ast().grammars().get(0).rules()) {
             Optional<org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation> mapping = rule.annotations().stream()
                 .filter(org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation.class::isInstance)
                 .map(org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation.class::cast).findFirst();
-            if (mapping.isPresent() && methodName.equals("eval" + mapping.get().className().replace(".", ""))) {
+            if (mapping.isPresent() && methodName.equals("eval" + mapping.get().className().replace(".", ""))
+                    && parameterType.equals(astClass + "." + mapping.get().className())) {
                 return mapping.get().className();
             }
         }
