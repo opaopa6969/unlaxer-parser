@@ -39,7 +39,11 @@ fn nested(leaf: Kind, containers: Vec<Cardinality>) -> Kind {
 #[test]
 fn malformed_public_nested_schemas_are_rejected_before_emission() {
     for (kind, cardinality) in [
-        (nested(Kind::Node, vec![]), Cardinality::One),
+        (nested(Kind::Value, vec![]), Cardinality::One),
+        (
+            nested(Kind::Enum("Unknown".into()), vec![]),
+            Cardinality::One,
+        ),
         (nested(Kind::Text, vec![Cardinality::One]), Cardinality::One),
         (
             nested(Kind::Text, vec![Cardinality::Optional; 33]),

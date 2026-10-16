@@ -37,13 +37,14 @@ capture / typeof の準備走査も深さ 64 で停止し、schema 解析の再�
 | 組合せ | 状態 |
 | --- | --- |
 | text / i32 の直接 optional/list/group と manual evaluator | 本単位で両言語対応 |
-| node / enum / mixed value の再帰 container | 未対応、capture leaf の source shape を拒否 |
+| 直接 mapped node / enum の再帰 container | 後続 #626 で対応。[契約と検証範囲](nested-mapped-leaves.md)参照 |
+| mixed value の再帰 container | 未対応、capture leaf の source shape を拒否 |
 | 透過 rule alias / recursive helper を経由する container | 未対応、capture 内の rule reference を拒否 |
 | separated list | 未対応、nested shape では早期拒否（通常 flat separated は別契約） |
 | 同一 mapping 型を共有する複数規則 | 未対応、nested 規則の shared mapping を拒否 |
 | nested 規則自身の `@commonField` / `@typeof` / associative projection / `@eval` | 未対応、明示拒否 |
 | token-stream と nested の併用 | 未対応、明示拒否 |
-| nested 値を扱う family commonField / preferred snapshot の全組合せ | 未確認。一部は既存の汎用投影で生成できるが、#583 の実 consumer 検証対象として残す |
+| nested 値を扱う family commonField / preferred snapshot | #626 で直接 mapped family 葉の commonField と preferred を実検証。全組合せは #583 に残す |
 
 既存 preferred / flat AST family の契約は変更しない。新しい nested shape と全ての family / preferred / auto-eval 組合せの実用同等性は、この単位の検証だけで完了扱いにしない。
 

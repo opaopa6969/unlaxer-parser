@@ -88,9 +88,18 @@ public final class NestedCaptures {
         if (element instanceof GroupElement e) return body(grammar,e.body(),depth+1);
         if (element instanceof TerminalElement) return new GrammarIR.NestedShape(Kind.TEXT,null,List.of());
         if (element instanceof RuleRefElement e) {
-            var token=grammar.tokens().stream().filter(t->t.name().equals(e.name())).findFirst().orElseThrow(()->new IllegalArgumentException("E-NESTED-SHAPE: rule aliases/nodes require the remaining #583 implementation"));
-            boolean integer=token instanceof TokenDecl.Simple t && List.of("NumberParser","DigitParser").contains(t.parserClass().substring(t.parserClass().lastIndexOf('.')+1));
-            return new GrammarIR.NestedShape(integer?Kind.INTEGER:Kind.TEXT,null,List.of());
+            var token=grammar.tokens().stream().filter(t->t.name().equals(e.name())).findFirst();
+            if(token.isPresent()) {
+                boolean integer=token.get() instanceof TokenDecl.Simple t && List.of("NumberParser","DigitParser").contains(t.parserClass().substring(t.parserClass().lastIndexOf('.')+1));
+                return new GrammarIR.NestedShape(integer?Kind.INTEGER:Kind.TEXT,null,List.of());
+            }
+            var target=grammar.rules().stream().filter(r->r.name().equals(e.name())).findFirst().orElseThrow(()->new IllegalArgumentException("E-NESTED-SHAPE: unknown rule "+e.name()));
+            if(EnumSchema.isEnum(target)) return new GrammarIR.NestedShape(Kind.ENUM,target.name(),List.of(),grammar.name()+"AST."+target.name());
+            if(!MapperElementUtil.isSkipped(target)) {
+                var mapping=MapperElementUtil.getMappingAnnotation(target);
+                if(mapping.isPresent()) return new GrammarIR.NestedShape(Kind.NODE,null,List.of(),grammar.name()+"AST."+mapping.get().className());
+            }
+            throw new IllegalArgumentException("E-NESTED-SHAPE: unmapped/skip aliases require the remaining #583 implementation");
         }
         throw new IllegalArgumentException("E-NESTED-SHAPE: unsupported element " + element.getClass().getSimpleName());
     }
@@ -101,10 +110,13 @@ public final class NestedCaptures {
             GrammarIR.NestedShape current;
             if (sequence.elements().size()==1) current=shape(grammar,sequence.elements().get(0).element(),depth+1);
             else {
-                for (var e:sequence.elements()) if (!shape(grammar,e.element(),depth+1).containers().isEmpty()) throw new IllegalArgumentException("E-NESTED-SHAPE: multi-element container group needs an explicit mapped node");
+                for (var e:sequence.elements()) {
+                    var item=shape(grammar,e.element(),depth+1);
+                    if (!item.containers().isEmpty() || item.javaLeafType()!=null) throw new IllegalArgumentException("E-NESTED-SHAPE: multi-element container/mapped group needs an explicit mapped node");
+                }
                 current=new GrammarIR.NestedShape(Kind.TEXT,null,List.of());
             }
-            if (result!=null && (!result.equals(current) || !current.containers().isEmpty())) throw new IllegalArgumentException("E-NESTED-SHAPE: heterogeneous/container choice requires the remaining #583 implementation");
+            if (result!=null && (!result.equals(current) || !current.containers().isEmpty() || current.javaLeafType()!=null)) throw new IllegalArgumentException("E-NESTED-SHAPE: heterogeneous/container/mapped choice requires the remaining #583 implementation");
             result=current;
         }
         if (result==null) throw new IllegalArgumentException("E-NESTED-SHAPE: empty body");
@@ -112,10 +124,10 @@ public final class NestedCaptures {
     }
     private static GrammarIR.NestedShape wrap(Cardinality container,GrammarIR.NestedShape inner) {
         var containers=new ArrayList<Cardinality>();containers.add(container);containers.addAll(inner.containers());
-        return new GrammarIR.NestedShape(inner.leaf(),inner.enumName(),containers);
+        return new GrammarIR.NestedShape(inner.leaf(),inner.enumName(),containers,inner.javaLeafType());
     }
     public static String javaType(GrammarIR.NestedShape shape) {
-        String type=shape.leaf()==Kind.INTEGER?"Integer":"String";
+        String type=shape.javaLeafType()!=null?shape.javaLeafType():shape.leaf()==Kind.INTEGER?"Integer":"String";
         for(int i=shape.containers().size()-1;i>=0;i--) type=(shape.containers().get(i)==Cardinality.OPTIONAL?"Optional":"List")+"<"+type+">";
         return type;
     }
