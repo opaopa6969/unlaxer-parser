@@ -28,7 +28,7 @@ public class DapLauncherLifecycleConformanceTest {
     @Rule public org.junit.rules.TemporaryFolder temporary = new org.junit.rules.TemporaryFolder();
     private static final String GRAMMAR =
             "grammar Lifecycle { @package: wire.lifecycle @whitespace: none @root @mapping(Value)"
-                + " Root ::= 'x'; }";
+                    + " Root ::= 'x'; }";
     private static final Path ROOT = Path.of("..").toAbsolutePath().normalize();
 
     @Test
@@ -39,7 +39,7 @@ public class DapLauncherLifecycleConformanceTest {
         if (!Boolean.getBoolean("rustConformance")) {
             System.out.println(
                     "[assumption] native DAP lifecycle requires -DrustConformance=true; Java"
-                        + " transport oracle ran");
+                            + " transport oracle ran");
             return;
         }
         Path project = temporary.newFolder("native").toPath();
@@ -53,11 +53,11 @@ public class DapLauncherLifecycleConformanceTest {
         Files.writeString(
                 project.resolve("Cargo.toml"),
                 "[package]\n"
-                    + "name=\"dap-lifecycle-fixture\"\n"
-                    + "version=\"0.1.0\"\n"
-                    + "edition=\"2021\"\n"
-                    + "[dependencies]\n"
-                    + "unlaxer-runtime={path=\""
+                        + "name=\"dap-lifecycle-fixture\"\n"
+                        + "version=\"0.1.0\"\n"
+                        + "edition=\"2021\"\n"
+                        + "[dependencies]\n"
+                        + "unlaxer-runtime={path=\""
                         + ROOT.resolve("rust/unlaxer-runtime")
                         + "\"}\nunlaxer-dap={path=\""
                         + ROOT.resolve("rust/unlaxer-dap")
@@ -91,8 +91,8 @@ public class DapLauncherLifecycleConformanceTest {
         Files.writeString(
                 Path.of("target/dap-launcher-lifecycle.tsv"),
                 "backend\tmode\tdisconnect_response\tclient_eof_required\tprocess_exit\n"
-                    + "java\tast/token\tsuccess\tfalse\t0\n"
-                    + "rust\tast/token\tsuccess\tfalse\t0\n");
+                        + "java\tast/token\tsuccess\tfalse\t0\n"
+                        + "rust\tast/token\tsuccess\tfalse\t0\n");
     }
 
     @Test
@@ -238,6 +238,132 @@ public class DapLauncherLifecycleConformanceTest {
         }
     }
 
+    @Test
+    public void delayedResponseWriteFailureDoesNotRetainHalfOpenReader() throws Exception {
+        String harness =
+                """
+                package wire.lifecycle;
+                import java.io.*;
+                import java.nio.charset.StandardCharsets;
+                import java.util.concurrent.*;
+                public final class HalfOpen {
+                    public static void main(String[] args) throws Exception {
+                        var input = new PipedInputStream(); var peer = new PipedOutputStream(input);
+                        var launcher = new LifecycleDapLauncher() {
+                            @Override protected LifecycleDebugAdapter createAdapter() {
+                                return new LifecycleDebugAdapter() {
+                                    @Override public CompletableFuture<org.eclipse.lsp4j.debug.Capabilities> initialize(org.eclipse.lsp4j.debug.InitializeRequestArguments args) {
+                                        return CompletableFuture.supplyAsync(() -> super.initialize(args).join(), CompletableFuture.delayedExecutor(200, TimeUnit.MILLISECONDS));
+                                    }
+                                };
+                            }
+                        };
+                        var broken = new OutputStream() {
+                            @Override public void write(int value) throws IOException { throw new IOException("half-open response write failure"); }
+                        };
+                        var completion = launcher.launch(input, broken);
+                        String body = "{\\"seq\\":1,\\"type\\":\\"request\\",\\"command\\":\\"initialize\\",\\"arguments\\":{}}";
+                        peer.write(("Content-Length: " + body.length() + "\\r\\n\\r\\n" + body).getBytes(StandardCharsets.UTF_8)); peer.flush();
+                        try {
+                            try { completion.get(3, TimeUnit.SECONDS); throw new AssertionError("write failure lost"); }
+                            catch (ExecutionException expected) { }
+                            System.out.print("half-open failure released");
+                        } finally { peer.close(); input.close(); }
+                    }
+                }
+                """;
+        Path errors = temporary.newFile("half-open-stderr.log").toPath();
+        var process =
+                new ProcessBuilder(javaCommand("wire.lifecycle.HalfOpen", harness))
+                        .redirectError(errors.toFile())
+                        .start();
+        try {
+            assertTrue("half-open failure worker leak", process.waitFor(8, TimeUnit.SECONDS));
+            assertEquals(Files.readString(errors), 0, process.exitValue());
+            assertEquals(
+                    "half-open failure released",
+                    new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8));
+        } finally {
+            if (process.isAlive()) process.destroyForcibly();
+        }
+    }
+
+    @Test
+    public void asynchronousReverseRequestRemainsFullDuplex() throws Exception {
+        String harness =
+                """
+                package wire.lifecycle;
+                import java.util.concurrent.CompletableFuture;
+                public final class Reverse {
+                    public static void main(String[] args) throws Exception {
+                        new LifecycleDapLauncher() {
+                            @Override protected LifecycleDebugAdapter createAdapter() {
+                                return new LifecycleDebugAdapter() {
+                                    @Override public CompletableFuture<org.eclipse.lsp4j.debug.Capabilities> initialize(org.eclipse.lsp4j.debug.InitializeRequestArguments args) {
+                                        var terminal = new org.eclipse.lsp4j.debug.RunInTerminalRequestArguments();
+                                        terminal.setCwd("."); terminal.setArgs(new String[] {"fixture"});
+                                        return client.runInTerminal(terminal).thenApply(response -> {
+                                            if (response.getProcessId() != 42) throw new AssertionError("reverse response lost");
+                                            return super.initialize(args).join();
+                                        });
+                                    }
+                                };
+                            }
+                        }.launchStdio();
+                    }
+                }
+                """;
+        Path errors = temporary.newFile("reverse-stderr.log").toPath();
+        try (var wire =
+                new Wire(
+                        new ProcessBuilder(javaCommand("wire.lifecycle.Reverse", harness))
+                                .redirectError(errors.toFile())
+                                .start())) {
+            int initialize = wire.sendRequest("initialize", "{}");
+            var reverse = wire.read();
+            assertEquals("request", reverse.get("type").getAsString());
+            assertEquals("runInTerminal", reverse.get("command").getAsString());
+            var response = new JsonObject();
+            response.addProperty("seq", ++wire.sequence);
+            response.addProperty("type", "response");
+            response.addProperty("request_seq", reverse.get("seq").getAsInt());
+            response.addProperty("command", "runInTerminal");
+            response.addProperty("success", true);
+            var body = new JsonObject();
+            body.addProperty("processId", 42);
+            response.add("body", body);
+            wire.send(response.toString());
+            var initialized = wire.read();
+            assertEquals(initialize, initialized.get("request_seq").getAsInt());
+            assertTrue(initialized.toString(), initialized.get("success").getAsBoolean());
+            assertTrue(wire.request("disconnect", "{}").get("success").getAsBoolean());
+            assertTrue(
+                    "reverse request left owned threads",
+                    wire.process.waitFor(3, TimeUnit.SECONDS));
+            assertEquals(Files.readString(errors), 0, wire.process.exitValue());
+            assertEquals("", Files.readString(errors));
+        }
+    }
+
+    @Test
+    public void ownedStdioMainReportsBrokenOutputAndExitsWithOpenInput() throws Exception {
+        Path errors = temporary.newFile("broken-stdout-stderr.log").toPath();
+        try (var wire =
+                new Wire(
+                        new ProcessBuilder(javaCommand("wire.lifecycle.LifecycleDapLauncher", null))
+                                .redirectError(errors.toFile())
+                                .start())) {
+            wire.input.close();
+            wire.sendRequest("initialize", "{}");
+            assertTrue(
+                    "owned stdio main must exit when the client closes stdout, even with stdin"
+                        + " open",
+                    wire.process.waitFor(3, TimeUnit.SECONDS));
+            assertEquals(Files.readString(errors), 1, wire.process.exitValue());
+            assertFalse(Files.readString(errors).isEmpty());
+        }
+    }
+
     private List<String> javaCommand(String main, String harness) throws Exception {
         var grammar = UBNFMapper.parse(GRAMMAR).grammars().get(0);
         var units = new ArrayList<JavaFileObject>();
@@ -352,6 +478,18 @@ public class DapLauncherLifecycleConformanceTest {
                 assertEquals("", Files.readString(errors));
             }
         }
+        if (backend.equals("rust")) {
+            Path errors = temporary.newFile().toPath();
+            try (var wire =
+                    new Wire(new ProcessBuilder(command).redirectError(errors.toFile()).start())) {
+                wire.input.close();
+                wire.sendRequest("initialize", "{}");
+                assertTrue(
+                        "native owned stdio must stop on broken output",
+                        wire.process.waitFor(3, TimeUnit.SECONDS));
+                assertEquals(Files.readString(errors), 1, wire.process.exitValue());
+            }
+        }
     }
 
     private static JavaFileObject source(String name, String text) {
@@ -379,26 +517,34 @@ public class DapLauncherLifecycleConformanceTest {
         }
 
         JsonObject request(String command, String arguments) throws Exception {
-            int id = ++sequence;
-            byte[] body =
-                    ("{\"seq\":"
-                                    + id
-                                    + ",\"type\":\"request\",\"command\":\""
-                                    + command
-                                    + "\",\"arguments\":"
-                                    + arguments
-                                    + "}")
-                            .getBytes(StandardCharsets.UTF_8);
-            output.write(
-                    ("Content-Length: " + body.length + "\r\n\r\n")
-                            .getBytes(StandardCharsets.US_ASCII));
-            output.write(body);
-            output.flush();
+            int id = sendRequest(command, arguments);
             while (true) {
                 var message = read();
                 if (message.get("type").getAsString().equals("response")
                         && message.get("request_seq").getAsInt() == id) return message;
             }
+        }
+
+        int sendRequest(String command, String arguments) throws IOException {
+            int id = ++sequence;
+            send(
+                    "{\"seq\":"
+                            + id
+                            + ",\"type\":\"request\",\"command\":\""
+                            + command
+                            + "\",\"arguments\":"
+                            + arguments
+                            + "}");
+            return id;
+        }
+
+        void send(String json) throws IOException {
+            byte[] body = json.getBytes(StandardCharsets.UTF_8);
+            output.write(
+                    ("Content-Length: " + body.length + "\r\n\r\n")
+                            .getBytes(StandardCharsets.US_ASCII));
+            output.write(body);
+            output.flush();
         }
 
         JsonObject read() throws Exception {

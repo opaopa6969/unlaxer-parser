@@ -38,7 +38,10 @@ public class DAPLauncherGenerator implements CodeGenerator {
                 }
 
                 public static void main(String[] args) throws IOException {
-                    new %s().launchStdio();
+                    int status = 0;
+                    try { new %s().launchStdio(); }
+                    catch (IOException error) { error.printStackTrace(System.err); status = 1; }
+                    System.exit(status);
                 }
 
                 /** Starts a session without exiting the caller's process. */
@@ -62,19 +65,29 @@ public class DAPLauncherGenerator implements CodeGenerator {
                     var failure = new AtomicReference<Throwable>();
                     var disconnectReply = new CompletableFuture<Void>();
                     var executor = Executors.newCachedThreadPool();
+                    var completion = new CompletableFuture<Void>();
+                    java.util.function.Consumer<Throwable> fail = error -> {
+                        stopped.set(true);
+                        failure.compareAndSet(null, error);
+                        disconnectReply.completeExceptionally(error);
+                        // An arbitrary borrowed InputStream may ignore interruption. Report the
+                        // failure now; its owner must then close/release any such blocked read.
+                        completion.completeExceptionally(error);
+                        executor.shutdownNow();
+                    };
                     // A disconnect request waits for its reply before returning to the read loop.
                     // The next read is logical EOF, so no borrowed stream must be closed to unblock it.
                     var connection = new FilterInputStream(input) {
                         @Override public int read() throws IOException {
                             if (stopped.get()) return -1;
                             try { return super.read(); }
-                            catch (IOException error) { failure.compareAndSet(null, error); throw error; }
+                            catch (IOException error) { fail.accept(error); throw error; }
                         }
                         @Override public int read(byte[] bytes, int offset, int length) throws IOException {
                             if (length == 0) return 0;
                             if (stopped.get()) return -1;
                             try { return super.read(bytes, offset, length); }
-                            catch (IOException error) { failure.compareAndSet(null, error); throw error; }
+                            catch (IOException error) { fail.accept(error); throw error; }
                         }
                         @Override public void close() { /* The caller owns the underlying stream. */ }
                     };
@@ -83,6 +96,11 @@ public class DAPLauncherGenerator implements CodeGenerator {
                             consumer -> message -> {
                                 try {
                                     consumer.consume(message);
+                                    // System.out is a PrintStream: it records IO failures instead
+                                    // of throwing them, so detect a broken stdio peer explicitly.
+                                    if (output instanceof java.io.PrintStream stream && stream.checkError()) {
+                                        throw new JsonRpcException(new IOException("DAP output failed"));
+                                    }
                                     if (message instanceof DebugResponseMessage response && "disconnect".equals(response.getMethod())) {
                                         // StreamMessageConsumer.consume writes and flushes before returning.
                                         stopped.set(true);
@@ -93,18 +111,17 @@ public class DAPLauncherGenerator implements CodeGenerator {
                                         catch (ExecutionException | java.util.concurrent.TimeoutException error) { throw new JsonRpcException(error); }
                                     }
                                 } catch (RuntimeException error) {
-                                    stopped.set(true);
-                                    failure.compareAndSet(null, error);
-                                    disconnectReply.completeExceptionally(error);
+                                    fail.accept(error);
                                     throw error;
                                 }
                             });
                         adapter.connect(launcher.getRemoteProxy());
-                        var listening = launcher.startListening();
-                        var completion = new CompletableFuture<Void>();
+                        var listening = new CompletableFuture<java.util.concurrent.Future<Void>>();
+                        // Register the joiner before starting IO: an immediate read failure may
+                        // shut down the executor before any later task can be accepted.
                         executor.execute(() -> {
                             try {
-                                listening.get();
+                                listening.get().get();
                                 if (failure.get() == null) completion.complete(null);
                                 else completion.completeExceptionally(failure.get());
                             } catch (InterruptedException error) {
@@ -114,6 +131,7 @@ public class DAPLauncherGenerator implements CodeGenerator {
                                 completion.completeExceptionally(error.getCause());
                             } finally { executor.shutdown(); }
                         });
+                        listening.complete(launcher.startListening());
                         return completion;
                     } catch (RuntimeException | Error error) {
                         executor.shutdownNow();
