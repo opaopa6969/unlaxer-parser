@@ -144,6 +144,7 @@ jobs:
     - name: Require selectable lexing conformance and measurement evidence
       run: |
         test -s unlaxer-dsl/target/rust-token-stream.tsv
+        awk -F '\t' 'NR > 1 {n[$5]++} END {exit NR != 1105 || n["generated"] != 552 || n["java-generated"] != 552}' unlaxer-dsl/target/rust-token-stream.tsv
         test -s unlaxer-dsl/target/token-stream-benchmark.tsv
         test -s unlaxer-dsl/target/rust-contextual-lexing.tsv
         test -s unlaxer-dsl/target/rust-contextual-lexing-invalid.tsv
