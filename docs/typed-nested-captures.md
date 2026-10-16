@@ -28,7 +28,7 @@ grammar Example {
 
 capture は unique な外側の site であり、mapping params が全 site を列挙する。enclosing repetition 内の部分 capture、同名 site の合流、outer/inner capture の重複、container を含む複数要素 group / choice はこの単位では拒否する。暗黙に flat 化しない。
 
-capture / typeof の準備走査も深さ 64 で停止し、schema 解析の再帰深さは 32 に制限する。これは AST の atomic/body/group 走査を含む解析深さであり、「container を必ず 32 個入れ子にできる」という保証ではない。不正な source shape は両 lowerer が `E-NESTED-SHAPE` で生成前に拒否する。Java の structured diagnostic は規則名から source snapshot の CP span へ解決でき、native diagnostic は規則の CP 範囲を表示する。public Rust IR も unsupported leaf / container / cardinality / typeof の組合せを検証する。
+capture / typeof の準備走査も深さ 64 で停止し、schema 解析の再帰深さは 32 に制限する。準備走査は Java の `ChoiceBody` とその `SequenceBody` 代替枝を一つの論理 body と数え、native の body/alternatives 表現と揃える。これは AST の atomic/body/group 走査を含む解析深さであり、「container を必ず 32 個入れ子にできる」という保証ではない。不正な source shape は両 lowerer が `E-NESTED-SHAPE` で生成前に拒否する。Java の structured diagnostic は規則名から source snapshot の CP span へ解決でき、native diagnostic は規則の CP 範囲を表示する。public Rust IR も unsupported leaf / container / cardinality / typeof の組合せを検証する。
 
 実行時 snapshot は #609 の上限（深さ 256 未満、訪問数 65,536、保持 UTF-8 text 合計 2 MiB）を共有する。これらは source 全体・既存 CST・生成 AST を含めた全プロセスメモリの上限ではない。
 

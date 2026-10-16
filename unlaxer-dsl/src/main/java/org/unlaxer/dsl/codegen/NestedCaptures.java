@@ -68,7 +68,9 @@ public final class NestedCaptures {
     // Bound preparatory capture/typeof visitors before constructing their recursive plans.
     private static void checkTraversal(Object value, int depth) {
         if (depth > 64) throw new IllegalArgumentException("E-NESTED-SHAPE: capture traversal depth exceeds 64");
-        if (value instanceof ChoiceBody c) for (var alternative : c.alternatives()) checkTraversal(alternative, depth + 1);
+        // ChoiceBody and its SequenceBody alternatives represent one logical RuleBody.
+        // Native RuleBody stores alternatives directly, without an extra AST wrapper.
+        if (value instanceof ChoiceBody c) for (var alternative : c.alternatives()) checkTraversal(alternative, depth);
         else if (value instanceof SequenceBody s) for (var element : s.elements()) checkTraversal(element.element(), depth + 1);
         else if (value instanceof GroupElement e) checkTraversal(e.body(), depth + 1);
         else if (value instanceof OptionalElement e) checkTraversal(e.body(), depth + 1);
