@@ -403,6 +403,16 @@ public class ASTGenerator implements CodeGenerator {
         if (!(grammar.name() + "AST." + className).equals(narrowInnerType)) {
             return false;
         }
+        // Widen only when both sides form the nominal recursive fold used by
+        // MapperRuleEmitter. A mixed Object left and recursive right retain
+        // their own types; widening just the right breaks List invariance.
+        String nominal = grammar.name() + "AST." + className;
+        if (!nominal.equals(MapperTypeResolver.inferType(grammar, rule, "left"))
+                || !"List<String>".equals(MapperTypeResolver.inferType(grammar, rule, "op"))
+                || !nominal.equals(MapperTypeResolver.unwrapListType(
+                        MapperTypeResolver.inferType(grammar, rule, "right")).orElse("Object"))) {
+            return false;
+        }
         Map<String, RuleDecl> ruleByName = new LinkedHashMap<>();
         List<RuleDecl> rulesForClass = new ArrayList<>();
         for (RuleDecl r : grammar.rules()) {
