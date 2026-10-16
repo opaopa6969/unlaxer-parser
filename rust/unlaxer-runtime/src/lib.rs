@@ -1269,7 +1269,7 @@ impl MemoValue for Rc<SuccessMemo> {
 
 const FAILURE_MEMO_BUCKET_SIZE: usize = 256;
 const DEFAULT_FAILURE_MEMO_ENTRIES: usize = 65_536;
-const DEFAULT_FAILURE_MEMO_BYTES: usize = 16 * 1024 * 1024;
+const DEFAULT_FAILURE_MEMO_BYTES: usize = 32 * 1024 * 1024;
 const DEFAULT_FAILURE_MEMO_ENTRY_BYTES: usize = 1024 * 1024;
 
 #[derive(Clone, Copy)]

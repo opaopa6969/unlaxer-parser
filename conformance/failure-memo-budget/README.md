@@ -19,11 +19,19 @@ OFF は保存数/hit/予算不採用数とも0。ON の件数/hit/不採用数�
 * `underrun`: 遠方の解析をrollbackし、窓を拡張して元位置を再保存しhit。
 * zero/small byte limit: 保存停止でも診断・状態・cursorは同じ。
 
+`configuration.tsv` の25行は、UTF-8 hex（`-` は未設定、空欄は空文字）と、
+同じ値を3設定へ渡した場合の件数/合計bytes/単体bytesの独立期待値です。
+欠省/不正値の合計既定は32 MiB、件数65,536と単体1 MiBは維持します。
+空白・符号・非ASCII数字・overflow・各ceiling境界・明示0を含みます。
+Java/Rustとも各行を新しいprocessでconstructor/OnceLockまで読み、
+既定memo OFF/AUTOと別のsuccess予算が変わらないことも確認します。
+共有processのSystem property/環境変数は変更しません。
+
 実行:
 
 ```sh
 mvn -pl unlaxer-common,unlaxer-dsl -am test \
-  -Dtest=FailureMemoBudgetTest,FailureMemoBudgetConformanceTest \
+  -Dtest=FailureMemoBudgetTest,FailureMemoConfigurationTest,FailureMemoBudgetConformanceTest \
   -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
 ```
 
@@ -38,4 +46,5 @@ Java `-Xms64m -Xmx512m` / Rust `rustc -O`、`/usr/bin/time` の max RSSを使用
 同時に他のビルドも動く共有hostの測定なので、一般の速度向上やRSS削減の保証にはしません。
 Javaは100,000→31,536件、Rustは100,000→65,536件で保持が止まりました。
 Rust baseline charge=0は未計数を意味し、payload保持が0である根拠ではありません。
-このcold試行では両言語とも修正後RSSの中央値が増えており、chargeの16MiBをRSS上限とは呼びません。
+このcold試行では両言語とも修正後RSSの中央値が増えており、当時のcharge16MiBをRSS上限とは呼びません。
+現在の32MiB既定の選択は[#670のproduction対照](../../benchmarks/tiny-classic/failure-budget-calibration.tsv)を参照してください。
