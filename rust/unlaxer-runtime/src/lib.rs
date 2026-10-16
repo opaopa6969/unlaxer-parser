@@ -6,8 +6,6 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 pub mod call_inference;
-#[cfg(test)]
-mod case_mapping_tests;
 pub mod editor;
 pub mod editor_cst;
 pub mod editor_queries;

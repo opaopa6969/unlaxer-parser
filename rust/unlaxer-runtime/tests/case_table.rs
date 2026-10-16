@@ -1,3 +1,6 @@
+#[path = "../src/unicode_case_data.rs"]
+mod unicode_case_data;
+
 #[test]
 fn unicode_17_simple_mappings_match_every_scalar() {
     let mut upper: Vec<u32> = (0..=0x10ffff).collect();
@@ -16,11 +19,11 @@ fn unicode_17_simple_mappings_match_every_scalar() {
     }
     for scalar in (0..=0x10ffff).filter_map(char::from_u32) {
         let expected = lower[upper[scalar as usize] as usize];
-        let actual = super::unicode_case_data::key(scalar);
+        let actual = unicode_case_data::key(scalar);
         assert_eq!(actual, expected, "U+{:04X}", scalar as u32);
         assert_eq!(
             actual,
-            super::unicode_case_data::key(char::from_u32(actual).unwrap())
+            unicode_case_data::key(char::from_u32(actual).unwrap())
         );
     }
 }
