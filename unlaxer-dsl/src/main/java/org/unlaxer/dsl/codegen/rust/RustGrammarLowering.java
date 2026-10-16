@@ -261,7 +261,7 @@ public final class RustGrammarLowering {
         bodies.forEach(this::checkRepetition);
         for (int i = 0; i < bodies.size(); i++) checkLeftRecursion(i, new HashSet<>(), new HashSet<>());
         if (!skippedProjection(new Reference(root), new HashSet<>())) {
-            Shape rootShape = shape(root, new HashSet<>());
+            Shape rootShape = shape(root, new HashSet<>(), true);
             if (rootShape.cardinality() != Cardinality.ONE
                 || (rootShape.kind() != Kind.NODE && rootShape.kind() != Kind.ENUM)) {
                 throw unsupported("root must resolve to exactly one AST node");
@@ -312,8 +312,6 @@ public final class RustGrammarLowering {
                         if (Set.of("span", "semantics").contains(name)) throw unsupported("capture name " + name + " is reserved");
                     }
                     Shape shape = captures.get(name);
-                    if (shape.kind() == Kind.VALUE && enumInCapture(bodies.get(i), name))
-                        throw unsupported("E-ENUM-JOIN: mixed enum capture requires #539");
                     fields.add(new Field(name, shape.kind(), shape.cardinality(),shape.enumName()));
                 }
                 mapping = new Mapping(annotation.className(), fields);
@@ -413,9 +411,8 @@ public final class RustGrammarLowering {
             if (!a.name().equals(b.name()) || a.cardinality() != b.cardinality()) {
                 throw unsupported("incompatible shared mapping schema " + left.name());
             }
-            if ((a.kind() == Kind.ENUM || b.kind() == Kind.ENUM) && !a.equals(b))
-                throw unsupported("E-ENUM-JOIN: shared mixed enum capture requires #539");
-            fields.add(new Field(a.name(), joinKind(a.kind(), b.kind()), a.cardinality(),a.enumName()));
+            Kind kind = a.kind() == b.kind() && java.util.Objects.equals(a.enumName(),b.enumName()) ? a.kind() : Kind.VALUE;
+            fields.add(new Field(a.name(), kind, a.cardinality(),kind == Kind.ENUM ? a.enumName() : null));
         }
         return new Mapping(left.name(), fields);
     }
@@ -1007,14 +1004,21 @@ public final class RustGrammarLowering {
     }
 
     private Shape shape(int rule, Set<Integer> visiting) {
+        return shape(rule, visiting, false);
+    }
+    private Shape shape(Expression expression, Set<Integer> visiting) {
+        return shape(expression, visiting, false);
+    }
+
+    private Shape shape(int rule, Set<Integer> visiting, boolean enumNodes) {
         enterAnalysis();
         try {
             if (skips.get(rule)) return new Shape(Kind.TEXT, Cardinality.ONE);
-            if (EnumSchema.isEnum(grammar.rules().get(rule))) return new Shape(Kind.ENUM,Cardinality.ONE,grammar.rules().get(rule).name());
+            if (EnumSchema.isEnum(grammar.rules().get(rule))) return enumNodes ? new Shape(Kind.NODE, Cardinality.ONE) : new Shape(Kind.ENUM,Cardinality.ONE,grammar.rules().get(rule).name());
             if (mappings.get(rule) != null) return new Shape(Kind.NODE, Cardinality.ONE);
             if (!visiting.add(rule)) throw unsupported("recursive unmapped rule " + grammar.rules().get(rule).name());
             if (visiting.size() > MAX_ANALYSIS_DEPTH) throw unsupported("rule shape depth exceeds 256");
-            Shape result = shape(bodies.get(rule), visiting);
+            Shape result = shape(bodies.get(rule), visiting, enumNodes);
             visiting.remove(rule);
             return result;
         } finally {
@@ -1022,45 +1026,45 @@ public final class RustGrammarLowering {
         }
     }
 
-    private Shape shape(Expression expression, Set<Integer> visiting) {
+    private Shape shape(Expression expression, Set<Integer> visiting, boolean enumNodes) {
         enterAnalysis();
         try {
             if (expression instanceof ErrorExpected ignored) {
                 return new Shape(Kind.TEXT, Cardinality.ONE);
             }
             if (expression instanceof Reference reference) {
-                return shape(reference.rule(), visiting);
+                return shape(reference.rule(), visiting, enumNodes);
             }
             if (expression instanceof Capture capture) {
-                return shape(capture.expression(), visiting);
+                return shape(capture.expression(), visiting, enumNodes);
             }
             if (expression instanceof Delimited delimited) {
-                return shape(delimited.child(), visiting);
+                return shape(delimited.child(), visiting, enumNodes);
             }
             if (expression instanceof OptionalExpr optional) {
-                return wrapNode(shape(optional.child(), visiting), Cardinality.OPTIONAL);
+                return wrapNode(shape(optional.child(), visiting, enumNodes), Cardinality.OPTIONAL);
             }
             if (expression instanceof Repeat repeat) {
-                return wrapNode(shape(repeat.child(), visiting), Cardinality.MANY);
+                return wrapNode(shape(repeat.child(), visiting, enumNodes), Cardinality.MANY);
             }
             if (expression instanceof Separated separated) {
-                if (shape(separated.separator(), visiting).kind() != Kind.TEXT) throw unsupported("mapped separator");
-                return wrapNode(shape(separated.child(), visiting), Cardinality.MANY);
+                if (shape(separated.separator(), visiting, enumNodes).kind() != Kind.TEXT) throw unsupported("mapped separator");
+                return wrapNode(shape(separated.child(), visiting, enumNodes), Cardinality.MANY);
             }
             if (expression instanceof Sequence sequence) {
-                var nodes = sequence.elements().stream().map(e -> shape(e, visiting)).filter(s -> s.kind() != Kind.TEXT).toList();
+                var nodes = sequence.elements().stream().map(e -> shape(e, visiting, enumNodes)).filter(s -> s.kind() != Kind.TEXT).toList();
                 Shape result = nodes.isEmpty() ? new Shape(Kind.TEXT, Cardinality.ONE) : nodes.get(0);
                 for (int i = 1; i < nodes.size(); i++) result = merge(result, nodes.get(i), true);
                 return result;
             }
             if (expression instanceof Choice choice) {
-                var shapes = choice.alternatives().stream().map(e -> shape(e, visiting)).toList();
+                var shapes = choice.alternatives().stream().map(e -> shape(e, visiting, enumNodes)).toList();
                 Shape result = shapes.get(0);
                 for (Shape alternative : shapes) result = merge(result, alternative, false);
                 return result;
             }
             if (expression instanceof PredictiveChoice choice) {
-                var shapes = choice.alternatives().stream().map(e -> shape(e, visiting)).toList();
+                var shapes = choice.alternatives().stream().map(e -> shape(e, visiting, enumNodes)).toList();
                 Shape result = shapes.get(0);
                 for (Shape alternative : shapes) result = merge(result, alternative, false);
                 return result;
@@ -1086,34 +1090,6 @@ public final class RustGrammarLowering {
         return new Shape(kind, sequence || left.cardinality() == Cardinality.MANY || right.cardinality() == Cardinality.MANY
             ? Cardinality.MANY : left.cardinality() == Cardinality.OPTIONAL || right.cardinality() == Cardinality.OPTIONAL
             ? Cardinality.OPTIONAL : Cardinality.ONE, kind==Kind.ENUM ? left.enumName() : null);
-    }
-
-    private static List<Expression> enumChildren(Expression expression) {
-        if (expression instanceof Sequence v) return v.elements();
-        if (expression instanceof Choice v) return v.alternatives();
-        if (expression instanceof Capture v) return List.of(v.expression());
-        if (expression instanceof Delimited v) return List.of(v.child());
-        if (expression instanceof OptionalExpr v) return List.of(v.child());
-        if (expression instanceof Repeat v) return List.of(v.child());
-        if (expression instanceof Separated v) return List.of(v.child(), v.separator());
-        return List.of();
-    }
-
-    private boolean enumInCapture(Expression expression, String name) {
-        if (expression instanceof Capture capture && capture.name().equals(name))
-            return containsEnum(capture.expression(), new HashSet<>());
-        return enumChildren(expression).stream().anyMatch(child -> enumInCapture(child, name));
-    }
-
-    private boolean containsEnum(Expression expression, Set<Integer> visited) {
-        if (expression instanceof Reference ref) {
-            if (EnumSchema.isEnum(grammar.rules().get(ref.rule()))) return true;
-            if (mappings.get(ref.rule()) != null
-                    || skips.get(ref.rule())
-                    || !visited.add(ref.rule())) return false;
-            return containsEnum(bodies.get(ref.rule()), visited);
-        }
-        return enumChildren(expression).stream().anyMatch(child -> containsEnum(child, visited));
     }
 
     private Kind joinKind(Kind left, Kind right) {

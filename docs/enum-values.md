@@ -101,11 +101,41 @@ change avoids host Unicode-version differences and surrogate splitting. Existing
 valid ASCII camel/kebab names are unchanged. Update handwritten constant
 references when regenerating non-ASCII enum APIs.
 
-Mixed enum/Text, enum/Node and distinct-enum values in one capture, root
-projection or shared mapping field remain the explicit next stage
-[#539](https://github.com/opaopa6969/unlaxer-parser/issues/539). They are rejected
-with `E-ENUM-JOIN`; they are not silently converted to text or counted as full
-`@enum` parity. Nested container capture shapes and arbitrary Java capture rules
+## Mixed values
+
+[#539](https://github.com/opaopa6969/unlaxer-parser/issues/539) supports enum/Text,
+enum/Node and different enum families in one capture, including scalar,
+optional and repeated values and shared mapping fields. Java uses `Object`,
+`Optional<Object>` or `List<Object>`: text stays `String`, mapped nodes retain
+their generated record, and an enum occurrence is `GrammarAST.EnumValue` whose
+`value()` retains the concrete enum type. Its identity-based source map entry
+belongs to that occurrence. Equal enum values in repetition, later parses and
+concurrent maps never share a mutable span. Pure single-enum fields retain their
+typed API. Generated enums provide `text()` for the exact literal.
+
+Rust `AstValue` adds a variant `EnumMode { value: Mode, span: Span }` for each enum
+family (`Mode` here). `span()` retains the occurrence, and `canonical_json()`
+includes `enum`, constant `value` and `span`. The concrete enum's `text()` returns
+the literal. Semantics borrows the tagged value and can exhaustively match its
+variants. Adding a family may therefore require a new consumer match arm.
+Java reserves `EnumValue` for its occurrence wrapper in grammars containing enums;
+both hosts reject collisions before emission.
+
+A root choice may project one enum wrapper or one explicit mapped node. The same
+enum used inside a mixed capture remains an occurrence value, even if that enum
+also has a root wrapper. Explicit mapped and skipped boundaries are preserved.
+A root that can produce raw text, multiple nodes or an absent node still needs an
+explicit `@mapping`. Shared mapping field names, order and cardinality must agree;
+only element types join. Different enum families are distinct types, not an
+ambiguous grammar.
+
+DAP AST stepping visits mapped nodes and enum root wrappers, not field-value
+wrappers or enum singletons. The enum's original parser/token occurrences remain
+available in token mode. Java `@typeof` compares underlying enum identity, not the
+occurrence-wrapper class; Rust `@typeof` support, including mixed enums, remains
+tracked by [#542](https://github.com/opaopa6969/unlaxer-parser/issues/542).
+
+Nested container capture shapes and arbitrary Java capture rules
 keep their existing separately documented limits. New Java enum value-shape analysis
 rejects helper chains deeper than 128 rules with a controlled diagnostic; structural
 analysis limits are implementation bounds, not guarantees of unbounded grammar depth.
@@ -123,7 +153,7 @@ compiles/runs generated parsers, mappers and handwritten semantics.
 
 ```sh
 mvn -pl unlaxer-common,unlaxer-dsl -am test \
-  -Dtest=EnumConformanceTest -DrustConformance=true \
+  -Dtest=EnumConformanceTest,MixedEnumConformanceTest -DrustConformance=true \
   -Dsurefire.failIfNoSpecifiedTests=false
 cargo test --manifest-path rust/Cargo.toml -p unlaxer-codegen -p unlaxer-generator
 ```
@@ -134,3 +164,9 @@ runs with an empty PATH and an invalid JAVA_HOME. Reports are written to
 `unlaxer-dsl/target/enum-java.tsv` and `enum-conformance.tsv`. On a JDK below 21
 this test declares the baseline assumption; it is not a successful Java21 parity
 check. Without `-DrustConformance=true` the native portion is skipped.
+
+The [mixed-value corpus](../spec-corpus/mixed-enums/README.md) adds nine grammar
+shapes and 116 inputs under six parse configurations, native/Java-host output
+agreement (including DAP), generated evaluator execution, retained/concurrent
+source maps, root/capture composition, and an independent DAP label/span oracle.
+API impact reports expose enum-to-mixed field widening in both targets.

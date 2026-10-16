@@ -100,30 +100,7 @@ public final class RustBackend {
         out.append(ir.mappings().isEmpty() && ir.rules().stream().allMatch(rule -> rule.enumLiterals().isEmpty()) ? "use unlaxer_runtime::Span;\n\n"
             : "use unlaxer_runtime::{Span, json_string};\n\n");
         out.append(enumDeclarations(ir));
-        if (hasValues(ir)) out.append("""
-            #[derive(Debug, Clone, PartialEq)]
-            pub enum AstValue {
-                Text { text: String, span: Span },
-                Node(Box<Ast>),
-            }
-
-            impl AstValue {
-                pub fn span(&self) -> Span {
-                    match self {
-                        Self::Text { span, .. } => *span,
-                        Self::Node(node) => node.span(),
-                    }
-                }
-
-                pub fn canonical_json(&self) -> String {
-                    match self {
-                        Self::Text { text, .. } => json_string(text),
-                        Self::Node(node) => node.canonical_json(),
-                    }
-                }
-            }
-
-            """);
+        if (hasValues(ir)) out.append(astValues(ir));
         out.append("#[allow(non_snake_case, non_camel_case_types)]\n#[derive(Debug, Clone, PartialEq)]\npub enum Ast {\n");
         for (Mapping mapping : ir.mappings()) {
             out.append("    r#").append(mapping.name()).append(" { span: Span");
@@ -188,9 +165,50 @@ public final class RustBackend {
                             .append(" => ")
                             .append(quote(EnumSchema.constantName(literal)))
                             .append(",\n");
-                out.append("        })\n    }\n}\n\n");
+                out.append("        })\n    }\n\n    pub fn text(&self) -> &'static str {\n        match self {\n");
+                for (String literal : rule.enumLiterals()) out.append("            Self::").append(EnumSchema.constantName(literal)).append(" => ").append(quote(literal)).append(",\n");
+                out.append("        }\n    }\n}\n\n");
             }
         return out.toString();
+    }
+
+    private static String astValues(GrammarIR ir) {
+        String template = """
+            #[derive(Debug, Clone, PartialEq)]
+            pub enum AstValue {
+                Text { text: String, span: Span },
+                Node(Box<Ast>),
+            }
+
+            impl AstValue {
+                pub fn span(&self) -> Span {
+                    match self {
+                        Self::Text { span, .. } => *span,
+                        Self::Node(node) => node.span(),
+                    }
+                }
+
+                pub fn canonical_json(&self) -> String {
+                    match self {
+                        Self::Text { text, .. } => json_string(text),
+                        Self::Node(node) => node.canonical_json(),
+                    }
+                }
+            }
+
+            """;
+        StringBuilder variants = new StringBuilder(), spans = new StringBuilder(), json = new StringBuilder();
+        for (Rule rule : ir.rules()) if (!rule.enumLiterals().isEmpty()) {
+            String name = rule.name();
+            variants.append("    Enum").append(name).append(" { value: ").append(name).append(", span: Span },\n");
+            spans.append("            Self::Enum").append(name).append(" { span, .. } => *span,\n");
+            json.append("            Self::Enum").append(name).append(" { value, span } => format!(r#\"{{\"enum\":{},\"value\":{},\"span\":[{},{}]}}\"#, json_string(")
+                .append(quote(name)).append("), value.canonical_json(), span.start, span.end),\n");
+        }
+        if (variants.isEmpty()) return template;
+        return "#[allow(non_camel_case_types)]\n" + template.replace("    Node(Box<Ast>),\n", "    Node(Box<Ast>),\n" + variants)
+            .replace("            Self::Node(node) => node.span(),\n", "            Self::Node(node) => node.span(),\n" + spans)
+            .replace("            Self::Node(node) => node.canonical_json(),\n", "            Self::Node(node) => node.canonical_json(),\n" + json);
     }
 
     private static String enumImports(GrammarIR ir) {
@@ -579,8 +597,13 @@ public final class RustBackend {
                                 }
                             },
                 """);
+            for (int i = 0; i < ir.rules().size(); i++) {
+                Rule rule = ir.rules().get(i);
+                if (!rule.enumLiterals().isEmpty()) out.append("            ").append(i).append(" => found.push(AstValue::Enum")
+                    .append(rule.name()).append(" { value: ").append(rule.name()).append("::from_text(tree.text(node.span))?, span: node.span }),\n");
+            }
             List<String> ids = new ArrayList<>();
-            for (int i = 0; i < ir.rules().size(); i++) if (ir.rules().get(i).mapping() != null) ids.add(Integer.toString(i));
+            for (int i = 0; i < ir.rules().size(); i++) if (ir.rules().get(i).mapping() != null && ir.rules().get(i).enumLiterals().isEmpty()) ids.add(Integer.toString(i));
             out.append("            ").append(String.join(" | ", ids))
                 .append(" => found.extend(map_node(tree, id)?.into_iter().map(|node| AstValue::Node(Box::new(node)))),\n");
             List<String> skipped = new ArrayList<>();
