@@ -308,6 +308,27 @@ fn build_snapshot(
             generated,
         });
     }
+    if ir.rules.iter().filter_map(|r|r.mapping.as_ref()).flat_map(|m|&m.fields).any(|f|matches!(&f.kind,unlaxer_codegen::Kind::Nested{leaf,..} if **leaf==unlaxer_codegen::Kind::Value)) {
+        let (_,generated)=declaration(ast,"ast.rs","pub enum NestedValue {")?;
+        let mut variants=vec!["Text".into(),"Integer".into(),"Node".into()];
+        variants.extend(ir.rules.iter().filter(|r|!r.enum_literals.is_empty()).map(|r|format!("Enum{}",r.name)));
+        variants.sort();
+        let mut origins=grammar.rules.iter().map(|r|Origin{rule:r.name.clone(),span:Span{start:r.span.codepoint_start,end:r.span.codepoint_end}}).collect::<Vec<_>>();
+        origins.sort_by(|a,b|a.rule.cmp(&b.rule));
+        let start=ast.find("pub enum NestedValue {").unwrap();
+        for variant in &variants {
+            let name=match variant.as_str(){"Text"=>"text","Node"=>"0",_=>"value"};
+            let field_type=match variant.as_str(){"Text"=>"String","Integer"=>"i32","Node"=>"Box<Ast>",_=>&variant[4..]};
+            let prefix=format!("    {}{}",variant,if variant=="Node"{"("}else{" {"});
+            let (line,mut location)=declaration(&ast[start..],"ast.rs",&prefix)?;
+            location.span.start+=ast[..start].chars().count();location.span.end+=ast[..start].chars().count();location.line+=ast[..start].matches('\n').count();
+            let needle=if variant=="Node"{field_type.to_owned()}else{format!("{name}: {field_type}")};
+            let mut fields=vec![Field{name:name.into(),r#type:field_type.into(),cardinality:"one",generated:fragment(ast,"ast.rs",&line,&location,&needle)?}];
+            if variant!="Node" {fields.push(Field{name:"span".into(),r#type:"Span".into(),cardinality:"one",generated:fragment(ast,"ast.rs",&line,&location,"span: Span")?});}
+            nodes.push(Node{name:format!("NestedValue.{variant}"),kind:"variant",fields,parents:vec!["NestedValue".into()],variants:Vec::new(),origins:origins.clone(),generated:location});
+        }
+        nodes.push(Node{name:"NestedValue".into(),kind:"enum",fields:Vec::new(),parents:Vec::new(),variants,origins,generated});
+    }
     for line in evaluator
         .lines()
         .filter(|line| line.starts_with("    fn ") && line.ends_with(';'))

@@ -39,7 +39,6 @@ fn nested(leaf: Kind, containers: Vec<Cardinality>) -> Kind {
 #[test]
 fn malformed_public_nested_schemas_are_rejected_before_emission() {
     for (kind, cardinality) in [
-        (nested(Kind::Value, vec![]), Cardinality::One),
         (
             nested(Kind::Enum("Unknown".into()), vec![]),
             Cardinality::One,
@@ -67,11 +66,22 @@ fn malformed_public_nested_schemas_are_rejected_before_emission() {
 }
 #[test]
 fn nested_scalar_schema_has_an_owned_value_and_borrowed_evaluator_parameter() {
-    for (leaf, ty) in [(Kind::Text, "String"), (Kind::Integer, "i32")] {
+    for (leaf, ty) in [
+        (Kind::Text, "String"),
+        (Kind::Integer, "i32"),
+        (Kind::Value, "NestedValue"),
+    ] {
         let ir = fixture(nested(leaf, vec![]), Cardinality::One);
         generate(&ir).unwrap();
         let field = &ir.rules[0].mapping.as_ref().unwrap().fields[0];
         assert_eq!(ast_field_type(field), ty);
         assert_eq!(evaluator_parameter_type(field), format!("&{ty}"));
     }
+}
+
+#[test]
+fn nested_mixed_type_reserves_its_generated_namespace() {
+    let mut ir = fixture(nested(Kind::Value, vec![]), Cardinality::One);
+    ir.rules[0].mapping.as_mut().unwrap().name = "NestedValue".into();
+    assert!(generate(&ir).unwrap_err().0.contains("E-NESTED-SHAPE"));
 }

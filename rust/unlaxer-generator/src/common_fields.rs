@@ -334,7 +334,9 @@ pub(crate) fn emit(grammar: &GrammarDecl, ir: &GrammarIr) -> Result<String, Stri
                         ));
                     }
                     nominal = Some(actual);
-                } else if !matches!(actual.kind, Kind::Enum(_) | Kind::Value) {
+                } else if !matches!(actual.kind, Kind::Enum(_) | Kind::Value)
+                    && !matches!(&actual.kind, Kind::Nested { leaf, .. } if **leaf == Kind::Value)
+                {
                     for rule in grammar
                         .rules
                         .iter()

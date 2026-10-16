@@ -30,6 +30,37 @@ final class CaptureBindingPlan {
         if (!nested) markSemanticValues(rule.body(), semantics);
     }
 
+    static final String NESTED_TEXT = "#nested:text";
+    static final String NESTED_INTEGER = "#nested:integer";
+    boolean outerCapture(Object element) {
+        return bindings(element).stream().anyMatch(binding -> !binding.startsWith("#"));
+    }
+    void markNestedMixed(GrammarDecl grammar, RuleDecl rule) {
+        if (nested) markNestedMixed(grammar, rule.body());
+    }
+    private void markNestedMixed(GrammarDecl grammar, RuleBody body) {
+        if (body instanceof ChoiceBody choice) {
+            boolean mixed;
+            try { mixed=NestedCaptures.body(grammar,body,0).leaf()==org.unlaxer.dsl.codegen.rust.GrammarIR.Kind.VALUE; }
+            catch (IllegalArgumentException ignored) { mixed=false; }
+            for (var alternative : choice.alternatives()) {
+                if (mixed) {
+                    var shape=NestedCaptures.body(grammar,alternative,0);
+                    if (shape.leaf()==org.unlaxer.dsl.codegen.rust.GrammarIR.Kind.TEXT) bindUnit(alternative,NESTED_TEXT);
+                    else if (shape.leaf()==org.unlaxer.dsl.codegen.rust.GrammarIR.Kind.INTEGER) bindUnit(alternative,NESTED_INTEGER);
+                }
+                markNestedMixed(grammar,alternative);
+            }
+        } else for (var element:((SequenceBody)body).elements()) markNestedMixed(grammar,element.element());
+    }
+    private void markNestedMixed(GrammarDecl grammar, AtomicElement element) {
+        if(element instanceof TransparentElement e) markNestedMixed(grammar,e.body());
+        else if(element instanceof OptionalElement e) markNestedMixed(grammar,e.body());
+        else if(element instanceof RepeatElement e) markNestedMixed(grammar,e.body());
+        else if(element instanceof OneOrMoreElement e) markNestedMixed(grammar,e.body());
+        else if(element instanceof BoundedRepeatElement e) markNestedMixed(grammar,e.body());
+    }
+
     private void markSemanticValues(RuleBody body, SemanticCardinality semantics) {
         if (body instanceof ChoiceBody choice) {
             boolean mixed = semantics.shape(body).kind() == SemanticCardinality.Kind.VALUE;

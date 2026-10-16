@@ -994,7 +994,7 @@ class ParserRuleEmitter {
     static ElementModel resolveElement(ParserGenerator.GenContext ctx, String ruleName, AtomicElement element) {
         var plan=ctx.captureBindings.get(ruleName);
         var bindings=plan.bindings(element);
-        if (plan.nested && !bindings.isEmpty()) return new ElementModel.Captured(resolveNested(ctx,ruleName,element),bindings);
+        if (plan.nested && plan.outerCapture(element)) return new ElementModel.Captured(resolveNested(ctx,ruleName,element),bindings);
         return resolveFlatElement(ctx,ruleName,element);
     }
     private static ElementModel resolveNested(ParserGenerator.GenContext ctx,String ruleName,AtomicElement element) {

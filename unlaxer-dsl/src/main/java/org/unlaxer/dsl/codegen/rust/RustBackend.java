@@ -106,6 +106,10 @@ public final class RustBackend {
             : "use unlaxer_runtime::{Span, json_string};\n\n");
         out.append(enumDeclarations(ir));
         if (needsValues(ir)) out.append(astValues(ir));
+        if (hasNestedValues(ir)) out.append(astValues(ir).replace("AstValue","NestedValue")
+            .replace("    Node(Box<Ast>),\n","    Integer { value: i32, span: Span },\n    Node(Box<Ast>),\n")
+            .replace("            Self::Node(node) => node.span(),\n","            Self::Integer { span, .. } => *span,\n            Self::Node(node) => node.span(),\n")
+            .replace("            Self::Node(node) => node.canonical_json(),\n","            Self::Integer { value, .. } => value.to_string(),\n            Self::Node(node) => node.canonical_json(),\n"));
         out.append("#[allow(non_snake_case, non_camel_case_types)]\n#[derive(Debug, Clone, PartialEq)]\npub enum Ast {\n");
         for (Mapping mapping : ir.mappings()) {
             out.append("    r#").append(mapping.name()).append(" { span: Span");
@@ -542,6 +546,7 @@ public final class RustBackend {
     private String mapper(GrammarIR ir) {
         StringBuilder out = new StringBuilder(HEADER);
         if (needsValues(ir)) out.append("use super::ast::AstValue;\n");
+        if (hasNestedValues(ir)) out.append("use super::ast::NestedValue;\n");
         out.append(enumImports(ir));
         out.append("use super::ast::Ast;\nuse unlaxer_runtime::mapping::Context as Tree;\n\npub fn map(tree: &unlaxer_runtime::Tree) -> Result<Ast, String> {\n");
         out.append("    let tree = &Tree::new(tree, ").append(ir.rules().size()).append(")?;\n    tree.ensure_mappable(tree.root)?;\n");
@@ -638,8 +643,9 @@ public final class RustBackend {
                 Ok(values.pop())
             }
             """);
+        if(hasNestedValues(ir)) out.append(NestedEmitter.mixedMapper(ir));
         if(ir.mappings().stream().flatMap(m->m.fields().stream()).anyMatch(f->f.kind()==Kind.NESTED)) out.append(NestedEmitter.HELPERS);
-        if(ir.mappings().stream().flatMap(m->m.fields().stream()).anyMatch(f->f.kind()==Kind.NESTED && (f.nested().leaf()==Kind.NODE || f.nested().leaf()==Kind.ENUM))) out.append(NestedEmitter.PROJECT_HELPERS);
+        if(ir.mappings().stream().flatMap(m->m.fields().stream()).anyMatch(f->f.kind()==Kind.NESTED && (f.nested().leaf()==Kind.NODE || f.nested().leaf()==Kind.ENUM || f.nested().leaf()==Kind.VALUE))) out.append(NestedEmitter.PROJECT_HELPERS);
         out.append(AssociativeSpines.helpers(ir));
         out.append("""
 
@@ -689,7 +695,7 @@ public final class RustBackend {
                 if (associative != null) out.append(associative);
                 else if (field.kind() == Kind.NESTED) {
                     var shape=field.nested();
-                    String projection=shape.leaf()==Kind.NODE?"map_nodes":shape.leaf()==Kind.ENUM?"map_enum_"+java.util.stream.IntStream.range(0,ir.rules().size()).filter(id->ir.rules().get(id).name().equals(shape.enumName()) && !ir.rules().get(id).enumLiterals().isEmpty()).findFirst().orElseThrow():null;
+                    String projection=shape.leaf()==Kind.VALUE?"map_nested_values":shape.leaf()==Kind.NODE?"map_nodes":shape.leaf()==Kind.ENUM?"map_enum_"+java.util.stream.IntStream.range(0,ir.rules().size()).filter(id->ir.rules().get(id).name().equals(shape.enumName()) && !ir.rules().get(id).enumLiterals().isEmpty()).findFirst().orElseThrow():null;
                     out.append("                let nested = nested_capture(tree, capture)?;\n");
                     if(projection!=null)out.append("                let mut nested_sources = nested_source_nodes(tree, capture.nodes[0])?.into_iter();\n");
                     out.append("                values.push(").append(NestedEmitter.mapped(shape,"&nested",0,projection)).append("?);\n");
@@ -711,6 +717,7 @@ public final class RustBackend {
     private String evaluator(GrammarIR ir) {
         StringBuilder out = new StringBuilder(HEADER);
         if (hasValues(ir)) out.append("use super::ast::AstValue;\n");
+        if (hasNestedValues(ir)) out.append("use super::ast::NestedValue;\n");
         out.append(enumImports(ir));
         out.append("use super::ast::Ast;\n");
         if (!ir.mappings().isEmpty()) out.append("use unlaxer_runtime::Span;\n");
@@ -866,6 +873,9 @@ public final class RustBackend {
             .anyMatch(value -> value.capture().kind() == Kind.VALUE || value.reference().kind() == Kind.VALUE);
     }
 
+    private static boolean hasNestedValues(GrammarIR ir) {
+        return ir.mappings().stream().flatMap(mapping -> mapping.fields().stream()).anyMatch(field -> field.kind()==Kind.NESTED && field.nested().leaf()==Kind.VALUE);
+    }
     private static boolean hasValues(GrammarIR ir) {
         return ir.mappings().stream().flatMap(mapping -> mapping.fields().stream()).anyMatch(field -> field.kind() == Kind.VALUE);
     }

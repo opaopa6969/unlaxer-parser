@@ -252,6 +252,13 @@ pub(super) fn validate(ir: &GrammarIr) -> Result<(), GenerateError> {
                 }
             }
 
+            if has_nested_values(ir)
+                && (mapping.name == "NestedValue" || enum_names.contains("NestedValue"))
+            {
+                return Err(fail(
+                    "E-NESTED-SHAPE: NestedValue is reserved for the nested mixed sum type",
+                ));
+            }
             if enum_names.contains(mapping.name.as_str()) {
                 return Err(fail("E-ENUM: enum type name collision"));
             }
@@ -281,7 +288,7 @@ pub(super) fn validate(ir: &GrammarIr) -> Result<(), GenerateError> {
                         || containers.len() > 32
                         || !matches!(
                             **leaf,
-                            Kind::Text | Kind::Integer | Kind::Node | Kind::Enum(_)
+                            Kind::Text | Kind::Integer | Kind::Node | Kind::Enum(_) | Kind::Value
                         )
                         || containers.contains(&Cardinality::One)
                         || !rule.type_constraints.is_empty()

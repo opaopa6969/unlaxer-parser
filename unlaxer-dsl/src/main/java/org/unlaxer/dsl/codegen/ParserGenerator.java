@@ -89,6 +89,7 @@ public class ParserGenerator implements CodeGenerator {
             boolean semanticCollections = semantics.enabled();
             grammar.rules().forEach(rule -> captureBindings.put(rule.name(), semanticCollections
                 ? new CaptureBindingPlan(rule, semantics) : new CaptureBindingPlan(rule)));
+            grammar.rules().forEach(rule -> captureBindings.get(rule.name()).markNestedMixed(grammar,rule));
             this.tokenParserMap = new LinkedHashMap<>();
             this.tokenUntilMap = new LinkedHashMap<>();
             this.tokenNegationMap = new LinkedHashMap<>();

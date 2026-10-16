@@ -20,6 +20,7 @@ public final class PreferredAstPlan {
                     semantic
                             ? new CaptureBindingPlan(rule, semantics)
                             : new CaptureBindingPlan(rule);
+            plan.markNestedMixed(grammar,rule);
             var calls = new ArrayList<Call>();
             var right = ParserRuleEmitter.getRightAssocShape(rule);
             if (right == null) body(rule.body(), 0, plan, rules, calls);
@@ -74,7 +75,7 @@ public final class PreferredAstPlan {
             CaptureBindingPlan plan,
             List<String> rules,
             List<Call> calls) {
-        if (plan.nested && !plan.bindings(atom).isEmpty()) {
+        if (plan.nested && plan.outerCapture(atom)) {
             nested(atom, depth + 1, plan, rules, calls);
             return;
         }

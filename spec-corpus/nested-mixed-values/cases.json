@@ -1,0 +1,955 @@
+[
+  {
+    "name": "list",
+    "grammar": "grammar NestedMixed { @package: nestedmixed @whitespace: none token N = NumberParser @root @nestedCaptures @mapping(Root,params=[values]) Root ::= '[' { (Mode | Heat | Leaf | N | 'text' | '😀' | '\\r\\n') } @values ']'; @enum Mode ::= 'sync' | 'auto'; @enum Heat ::= 'hot' | 'cold'; @mapping(Leaf,params=[text]) Leaf ::= '<' ('a' | '😀') @text '>'; }",
+    "mixed": true,
+    "javaType": "java.util.List<NestedMixedAST.NestedValue>",
+    "rustType": "Vec<NestedValue>",
+    "valid": "[]",
+    "cases": [
+      {
+        "input": "[]",
+        "expected": {
+          "value": [
+            "list",
+            []
+          ],
+          "rootSpan": [
+            0,
+            2
+          ],
+          "dap": [
+            [
+              "Root",
+              0,
+              2
+            ]
+          ]
+        }
+      },
+      {
+        "input": "[syncsync]",
+        "expected": {
+          "value": [
+            "list",
+            [
+              [
+                "enum",
+                "Mode",
+                "sync",
+                1,
+                5
+              ],
+              [
+                "enum",
+                "Mode",
+                "sync",
+                5,
+                9
+              ]
+            ]
+          ],
+          "rootSpan": [
+            0,
+            10
+          ],
+          "dap": [
+            [
+              "Root",
+              0,
+              10
+            ]
+          ]
+        }
+      },
+      {
+        "input": "[hottext<😀>42😀\r\n]",
+        "expected": {
+          "value": [
+            "list",
+            [
+              [
+                "enum",
+                "Heat",
+                "hot",
+                1,
+                4
+              ],
+              [
+                "text",
+                "text",
+                4,
+                8
+              ],
+              [
+                "node",
+                "Leaf",
+                "😀",
+                8,
+                11
+              ],
+              [
+                "integer",
+                42,
+                11,
+                13
+              ],
+              [
+                "text",
+                "😀",
+                13,
+                14
+              ],
+              [
+                "text",
+                "\r\n",
+                14,
+                16
+              ]
+            ]
+          ],
+          "rootSpan": [
+            0,
+            17
+          ],
+          "dap": [
+            [
+              "Root",
+              0,
+              17
+            ],
+            [
+              "Leaf",
+              8,
+              11
+            ]
+          ]
+        }
+      },
+      {
+        "input": "[2147483647]",
+        "expected": {
+          "value": [
+            "list",
+            [
+              [
+                "integer",
+                2147483647,
+                1,
+                11
+              ]
+            ]
+          ],
+          "rootSpan": [
+            0,
+            12
+          ],
+          "dap": [
+            [
+              "Root",
+              0,
+              12
+            ]
+          ]
+        }
+      },
+      {
+        "input": "[2147483648]",
+        "stage": "map",
+        "expected": {
+          "stage": "map"
+        }
+      },
+      {
+        "input": "[1.5]",
+        "stage": "map",
+        "expected": {
+          "stage": "map"
+        }
+      },
+      {
+        "input": "[unknown]",
+        "stage": "parse",
+        "expected": {
+          "stage": "parse"
+        }
+      },
+      {
+        "input": "[sync",
+        "stage": "parse",
+        "expected": {
+          "stage": "parse"
+        }
+      }
+    ]
+  },
+  {
+    "name": "optional-list",
+    "grammar": "grammar NestedMixed { @package: nestedmixed @whitespace: none token N = NumberParser @root @nestedCaptures @mapping(Root,params=[values]) Root ::= '[' [ { (Mode | Heat | Leaf | N | 'text' | '😀' | '\\r\\n') } ] @values ']'; @enum Mode ::= 'sync' | 'auto'; @enum Heat ::= 'hot' | 'cold'; @mapping(Leaf,params=[text]) Leaf ::= '<' ('a' | '😀') @text '>'; }",
+    "mixed": true,
+    "javaType": "java.util.Optional<java.util.List<NestedMixedAST.NestedValue>>",
+    "rustType": "Option<Vec<NestedValue>>",
+    "valid": "[]",
+    "cases": [
+      {
+        "input": "[]",
+        "expected": {
+          "value": [
+            "some",
+            [
+              "list",
+              []
+            ]
+          ],
+          "rootSpan": [
+            0,
+            2
+          ],
+          "dap": [
+            [
+              "Root",
+              0,
+              2
+            ]
+          ]
+        }
+      },
+      {
+        "input": "[auto]",
+        "expected": {
+          "value": [
+            "some",
+            [
+              "list",
+              [
+                [
+                  "enum",
+                  "Mode",
+                  "auto",
+                  1,
+                  5
+                ]
+              ]
+            ]
+          ],
+          "rootSpan": [
+            0,
+            6
+          ],
+          "dap": [
+            [
+              "Root",
+              0,
+              6
+            ]
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "list-optional",
+    "grammar": "grammar NestedMixed { @package: nestedmixed @whitespace: none token N = NumberParser @root @nestedCaptures @mapping(Root,params=[values]) Root ::= '[' { [ (Mode | Heat | Leaf | N | 'text' | '😀' | '\\r\\n') ] } @values ']'; @enum Mode ::= 'sync' | 'auto'; @enum Heat ::= 'hot' | 'cold'; @mapping(Leaf,params=[text]) Leaf ::= '<' ('a' | '😀') @text '>'; }",
+    "mixed": true,
+    "javaType": "java.util.List<java.util.Optional<NestedMixedAST.NestedValue>>",
+    "rustType": "Vec<Option<NestedValue>>",
+    "valid": "[]",
+    "cases": [
+      {
+        "input": "[]",
+        "expected": {
+          "value": [
+            "list",
+            [
+              [
+                "none"
+              ]
+            ]
+          ],
+          "rootSpan": [
+            0,
+            2
+          ],
+          "dap": [
+            [
+              "Root",
+              0,
+              2
+            ]
+          ]
+        }
+      },
+      {
+        "input": "[syncsync]",
+        "expected": {
+          "value": [
+            "list",
+            [
+              [
+                "some",
+                [
+                  "enum",
+                  "Mode",
+                  "sync",
+                  1,
+                  5
+                ]
+              ],
+              [
+                "some",
+                [
+                  "enum",
+                  "Mode",
+                  "sync",
+                  5,
+                  9
+                ]
+              ],
+              [
+                "none"
+              ]
+            ]
+          ],
+          "rootSpan": [
+            0,
+            10
+          ],
+          "dap": [
+            [
+              "Root",
+              0,
+              10
+            ]
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "optional",
+    "grammar": "grammar NestedMixed { @package: nestedmixed @whitespace: none token N = NumberParser @root @nestedCaptures @mapping(Root,params=[values]) Root ::= '[' [ (Mode | Heat | Leaf | N | 'text' | '😀' | '\\r\\n') ] @values ']'; @enum Mode ::= 'sync' | 'auto'; @enum Heat ::= 'hot' | 'cold'; @mapping(Leaf,params=[text]) Leaf ::= '<' ('a' | '😀') @text '>'; }",
+    "mixed": true,
+    "javaType": "java.util.Optional<NestedMixedAST.NestedValue>",
+    "rustType": "Option<NestedValue>",
+    "valid": "[]",
+    "cases": [
+      {
+        "input": "[]",
+        "expected": {
+          "value": [
+            "none"
+          ],
+          "rootSpan": [
+            0,
+            2
+          ],
+          "dap": [
+            [
+              "Root",
+              0,
+              2
+            ]
+          ]
+        }
+      },
+      {
+        "input": "[<a>]",
+        "expected": {
+          "value": [
+            "some",
+            [
+              "node",
+              "Leaf",
+              "a",
+              1,
+              4
+            ]
+          ],
+          "rootSpan": [
+            0,
+            5
+          ],
+          "dap": [
+            [
+              "Root",
+              0,
+              5
+            ],
+            [
+              "Leaf",
+              1,
+              4
+            ]
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "uniform-node",
+    "grammar": "grammar NestedMixed { @package: nestedmixed @whitespace: none token N = NumberParser @root @nestedCaptures @mapping(Root,params=[values]) Root ::= '[' { [ Leaf ] } @values ']'; @enum Mode ::= 'sync' | 'auto'; @enum Heat ::= 'hot' | 'cold'; @mapping(Leaf,params=[text]) Leaf ::= '<' ('a' | '😀') @text '>'; }",
+    "mixed": false,
+    "javaType": "java.util.List<java.util.Optional<NestedMixedAST.Leaf>>",
+    "rustType": "Vec<Option<Box<Ast>>>",
+    "valid": "[]",
+    "cases": [
+      {
+        "input": "[]",
+        "expected": {
+          "value": [
+            "list",
+            [
+              [
+                "none"
+              ]
+            ]
+          ],
+          "rootSpan": [
+            0,
+            2
+          ],
+          "dap": [
+            [
+              "Root",
+              0,
+              2
+            ]
+          ]
+        }
+      },
+      {
+        "input": "[<a><😀>]",
+        "expected": {
+          "value": [
+            "list",
+            [
+              [
+                "some",
+                [
+                  "node",
+                  "Leaf",
+                  "a",
+                  1,
+                  4
+                ]
+              ],
+              [
+                "some",
+                [
+                  "node",
+                  "Leaf",
+                  "😀",
+                  4,
+                  7
+                ]
+              ],
+              [
+                "none"
+              ]
+            ]
+          ],
+          "rootSpan": [
+            0,
+            8
+          ],
+          "dap": [
+            [
+              "Root",
+              0,
+              8
+            ],
+            [
+              "Leaf",
+              1,
+              4
+            ],
+            [
+              "Leaf",
+              4,
+              7
+            ]
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "zero-text",
+    "grammar": "grammar NestedMixed { @package: nestedmixed @whitespace: none token N = NumberParser token E = EOF @root @nestedCaptures @mapping(Root,params=[values]) Root ::= { (Mode | E) } @values; @enum Mode ::= 'sync' | 'auto'; @enum Heat ::= 'hot' | 'cold'; @mapping(Leaf,params=[text]) Leaf ::= '<' ('a' | '😀') @text '>'; }",
+    "mixed": true,
+    "javaType": "java.util.List<NestedMixedAST.NestedValue>",
+    "rustType": "Vec<NestedValue>",
+    "valid": "",
+    "cases": [
+      {
+        "input": "",
+        "expected": {
+          "value": [
+            "list",
+            [
+              [
+                "text",
+                "",
+                0,
+                0
+              ]
+            ]
+          ],
+          "rootSpan": [
+            0,
+            0
+          ],
+          "dap": [
+            [
+              "Root",
+              0,
+              0
+            ]
+          ]
+        }
+      },
+      {
+        "input": "sync",
+        "expected": {
+          "value": [
+            "list",
+            [
+              [
+                "enum",
+                "Mode",
+                "sync",
+                0,
+                4
+              ],
+              [
+                "text",
+                "",
+                4,
+                4
+              ]
+            ]
+          ],
+          "rootSpan": [
+            0,
+            4
+          ],
+          "dap": [
+            [
+              "Root",
+              0,
+              4
+            ]
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "same-node-choice",
+    "grammar": "grammar NestedMixed { @package: nestedmixed @whitespace: none token N = NumberParser @root @nestedCaptures @mapping(Root,params=[values]) Root ::= '[' (Leaf | Leaf) @values ']'; @enum Mode ::= 'sync' | 'auto'; @enum Heat ::= 'hot' | 'cold'; @mapping(Leaf,params=[text]) Leaf ::= '<' ('a' | '😀') @text '>'; }",
+    "mixed": true,
+    "javaType": "NestedMixedAST.NestedValue",
+    "rustType": "NestedValue",
+    "valid": "[<a>]",
+    "cases": [
+      {
+        "input": "[<a>]",
+        "expected": {
+          "value": [
+            "node",
+            "Leaf",
+            "a",
+            1,
+            4
+          ],
+          "rootSpan": [
+            0,
+            5
+          ],
+          "dap": [
+            [
+              "Root",
+              0,
+              5
+            ],
+            [
+              "Leaf",
+              1,
+              4
+            ]
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "same-enum-choice",
+    "grammar": "grammar NestedMixed { @package: nestedmixed @whitespace: none token N = NumberParser @root @nestedCaptures @mapping(Root,params=[values]) Root ::= '[' (Mode | Mode) @values ']'; @enum Mode ::= 'sync' | 'auto'; @enum Heat ::= 'hot' | 'cold'; @mapping(Leaf,params=[text]) Leaf ::= '<' ('a' | '😀') @text '>'; }",
+    "mixed": true,
+    "javaType": "NestedMixedAST.NestedValue",
+    "rustType": "NestedValue",
+    "valid": "[sync]",
+    "cases": [
+      {
+        "input": "[sync]",
+        "expected": {
+          "value": [
+            "enum",
+            "Mode",
+            "sync",
+            1,
+            5
+          ],
+          "rootSpan": [
+            0,
+            6
+          ],
+          "dap": [
+            [
+              "Root",
+              0,
+              6
+            ]
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "shared",
+    "grammar": "grammar NestedMixed { @package: nestedmixed @whitespace: none token N = NumberParser @root Entry ::= First | Second; @nestedCaptures @mapping(Root,params=[values]) First ::= '[' { (Mode | Heat | Leaf | N | 'text' | '😀' | '\\r\\n') } @values ']'; @nestedCaptures @mapping(Root,params=[values]) Second ::= '(' { (Mode | Heat | Leaf | N | 'text' | '😀' | '\\r\\n') } @values ')'; @enum Mode ::= 'sync' | 'auto'; @enum Heat ::= 'hot' | 'cold'; @mapping(Leaf,params=[text]) Leaf ::= '<' ('a' | '😀') @text '>'; }",
+    "mixed": true,
+    "javaType": "java.util.List<NestedMixedAST.NestedValue>",
+    "rustType": "Vec<NestedValue>",
+    "valid": "[]",
+    "cases": [
+      {
+        "input": "[]",
+        "expected": {
+          "value": [
+            "list",
+            []
+          ],
+          "rootSpan": [
+            0,
+            2
+          ],
+          "dap": [
+            [
+              "Root",
+              0,
+              2
+            ]
+          ]
+        }
+      },
+      {
+        "input": "[syncsync]",
+        "expected": {
+          "value": [
+            "list",
+            [
+              [
+                "enum",
+                "Mode",
+                "sync",
+                1,
+                5
+              ],
+              [
+                "enum",
+                "Mode",
+                "sync",
+                5,
+                9
+              ]
+            ]
+          ],
+          "rootSpan": [
+            0,
+            10
+          ],
+          "dap": [
+            [
+              "Root",
+              0,
+              10
+            ]
+          ]
+        }
+      },
+      {
+        "input": "(hot42)",
+        "expected": {
+          "value": [
+            "list",
+            [
+              [
+                "enum",
+                "Heat",
+                "hot",
+                1,
+                4
+              ],
+              [
+                "integer",
+                42,
+                4,
+                6
+              ]
+            ]
+          ],
+          "rootSpan": [
+            0,
+            7
+          ],
+          "dap": [
+            [
+              "Root",
+              0,
+              7
+            ]
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "common-field",
+    "grammar": "grammar NestedMixed { @package: nestedmixed @whitespace: none token N = NumberParser @root @nestedCaptures @mapping(Root) @commonField(values) Entry ::= First | Second; @nestedCaptures @mapping(First,params=[values]) First ::= '[' { (Mode | Heat | Leaf | N | 'text' | '😀' | '\\r\\n') } @values ']'; @nestedCaptures @mapping(Second,params=[values]) Second ::= '(' { (Mode | Heat | Leaf | N | 'text' | '😀' | '\\r\\n') } @values ')'; @enum Mode ::= 'sync' | 'auto'; @enum Heat ::= 'hot' | 'cold'; @mapping(Leaf,params=[text]) Leaf ::= '<' ('a' | '😀') @text '>'; }",
+    "mixed": true,
+    "javaType": "java.util.List<NestedMixedAST.NestedValue>",
+    "rustType": "Vec<NestedValue>",
+    "valid": "[]",
+    "cases": [
+      {
+        "input": "[]",
+        "expected": {
+          "value": [
+            "list",
+            []
+          ],
+          "rootSpan": [
+            0,
+            2
+          ],
+          "dap": [
+            [
+              "First",
+              0,
+              2
+            ]
+          ]
+        }
+      },
+      {
+        "input": "[syncsync]",
+        "expected": {
+          "value": [
+            "list",
+            [
+              [
+                "enum",
+                "Mode",
+                "sync",
+                1,
+                5
+              ],
+              [
+                "enum",
+                "Mode",
+                "sync",
+                5,
+                9
+              ]
+            ]
+          ],
+          "rootSpan": [
+            0,
+            10
+          ],
+          "dap": [
+            [
+              "First",
+              0,
+              10
+            ]
+          ]
+        }
+      },
+      {
+        "input": "(hot42)",
+        "expected": {
+          "value": [
+            "list",
+            [
+              [
+                "enum",
+                "Heat",
+                "hot",
+                1,
+                4
+              ],
+              [
+                "integer",
+                42,
+                4,
+                6
+              ]
+            ]
+          ],
+          "rootSpan": [
+            0,
+            7
+          ],
+          "dap": [
+            [
+              "Second",
+              0,
+              7
+            ]
+          ]
+        }
+      }
+    ],
+    "family": true
+  },
+  {
+    "name": "text-budget",
+    "grammar": "grammar NestedMixed { @package: nestedmixed @whitespace: none token N = NumberParser token L = IdentifierParser @root @nestedCaptures @mapping(Root,params=[values]) Root ::= '[' { (Mode | L) } @values ']'; @enum Mode ::= 'sync' | 'auto'; @enum Heat ::= 'hot' | 'cold'; @mapping(Leaf,params=[text]) Leaf ::= '<' ('a' | '😀') @text '>'; }",
+    "mixed": true,
+    "javaType": "java.util.List<NestedMixedAST.NestedValue>",
+    "rustType": "Vec<NestedValue>",
+    "valid": "[]",
+    "cases": [
+      {
+        "repeat": 2097153,
+        "stage": "map",
+        "expected": {
+          "stage": "map"
+        }
+      }
+    ]
+  },
+  {
+    "name": "grammar-and-helper-namespace",
+    "grammar": "grammar NestedValue { @package: nestedmixed @whitespace: none token N = NumberParser @root @nestedCaptures @mapping(Root,params=[values]) Root ::= '[' [ (Mode | Heat | Leaf | N | 'text' | '😀' | '\\r\\n') ] @values ']'; @enum Mode ::= 'sync' | 'auto'; @enum Heat ::= 'hot' | 'cold'; @mapping(Leaf,params=[text]) Leaf ::= '<' ('a' | '😀') @text '>'; NestedValue ::= 'unused'; }",
+    "mixed": true,
+    "javaType": "java.util.Optional<NestedValueAST.NestedValue>",
+    "rustType": "Option<NestedValue>",
+    "valid": "[]",
+    "cases": [
+      {
+        "input": "[]",
+        "expected": {
+          "value": [
+            "none"
+          ],
+          "rootSpan": [
+            0,
+            2
+          ],
+          "dap": [
+            [
+              "Root",
+              0,
+              2
+            ]
+          ]
+        }
+      },
+      {
+        "input": "[<a>]",
+        "expected": {
+          "value": [
+            "some",
+            [
+              "node",
+              "Leaf",
+              "a",
+              1,
+              4
+            ]
+          ],
+          "rootSpan": [
+            0,
+            5
+          ],
+          "dap": [
+            [
+              "Root",
+              0,
+              5
+            ],
+            [
+              "Leaf",
+              1,
+              4
+            ]
+          ]
+        }
+      }
+    ],
+    "apiName": "NestedValue"
+  },
+  {
+    "name": "mapped-family-leaf",
+    "grammar": "grammar NestedMixed { @package: nestedmixed @whitespace: none token N = NumberParser @root @nestedCaptures @mapping(Root,params=[values]) Root ::= '[' [ (Mode | Heat | FamilyRule | N | 'text' | '😀' | '\\r\\n') ] @values ']'; @enum Mode ::= 'sync' | 'auto'; @enum Heat ::= 'hot' | 'cold'; @mapping(Leaf,params=[text]) Leaf ::= '<' ('a' | '😀') @text '>'; @mapping(Family) FamilyRule ::= Leaf | Leaf; }",
+    "mixed": true,
+    "javaType": "java.util.Optional<NestedMixedAST.NestedValue>",
+    "rustType": "Option<NestedValue>",
+    "valid": "[]",
+    "cases": [
+      {
+        "input": "[]",
+        "expected": {
+          "value": [
+            "none"
+          ],
+          "rootSpan": [
+            0,
+            2
+          ],
+          "dap": [
+            [
+              "Root",
+              0,
+              2
+            ]
+          ]
+        }
+      },
+      {
+        "input": "[<a>]",
+        "expected": {
+          "value": [
+            "some",
+            [
+              "node",
+              "Leaf",
+              "a",
+              1,
+              4
+            ]
+          ],
+          "rootSpan": [
+            0,
+            5
+          ],
+          "dap": [
+            [
+              "Root",
+              0,
+              5
+            ],
+            [
+              "Leaf",
+              1,
+              4
+            ]
+          ]
+        }
+      }
+    ]
+  }
+]

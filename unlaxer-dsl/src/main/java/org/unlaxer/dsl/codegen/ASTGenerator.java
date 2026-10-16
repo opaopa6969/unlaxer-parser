@@ -205,6 +205,8 @@ public class ASTGenerator implements CodeGenerator {
         if (!enumRules.isEmpty()) sb.append("    /** One enum occurrence in a mixed capture; source maps use this wrapper's identity. */\n")
             .append("    record EnumValue(java.lang.Enum<?> value) { public EnumValue { java.util.Objects.requireNonNull(value); } }\n\n");
 
+        if (NestedCaptures.hasMixed(grammar)) sb.append(NestedMixedEmitter.ast(grammar));
+
         // enum ルール
         for (RuleDecl enumRule : enumRules) {
             sb.append(generateEnumClass(enumRule, "    "));

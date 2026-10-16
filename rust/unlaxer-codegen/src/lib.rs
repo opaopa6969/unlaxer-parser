@@ -139,6 +139,12 @@ fn has_values(ir: &GrammarIr) -> bool {
         .any(|f| f.kind == Kind::Value)
 }
 
+fn has_nested_values(ir: &GrammarIr) -> bool {
+    mappings(ir)
+        .iter()
+        .flat_map(|m| &m.fields)
+        .any(|f| matches!(&f.kind,Kind::Nested{leaf,..} if **leaf==Kind::Value))
+}
 fn needs_values(ir: &GrammarIr) -> bool {
     has_values(ir)
         || ir
@@ -188,6 +194,12 @@ fn ast(ir: &GrammarIr) -> String {
     out.push_str(&enum_declarations(ir));
     if needs_values(ir) {
         out.push_str(&ast_values(ir));
+    }
+    if has_nested_values(ir) {
+        out.push_str(&ast_values(ir).replace("AstValue","NestedValue")
+            .replace("    Node(Box<Ast>),\n","    Integer { value: i32, span: Span },\n    Node(Box<Ast>),\n")
+            .replace("            Self::Node(node) => node.span(),\n","            Self::Integer { span, .. } => *span,\n            Self::Node(node) => node.span(),\n")
+            .replace("            Self::Node(node) => node.canonical_json(),\n","            Self::Integer { value, .. } => value.to_string(),\n            Self::Node(node) => node.canonical_json(),\n"));
     }
     out.push_str("#[allow(non_snake_case, non_camel_case_types)]\n#[derive(Debug, Clone, PartialEq)]\npub enum Ast {\n");
     for mapping in mappings(ir) {
@@ -663,6 +675,9 @@ fn mapper(ir: &GrammarIr) -> String {
     if needs_values(ir) {
         out.push_str("use super::ast::AstValue;\n");
     }
+    if has_nested_values(ir) {
+        out.push_str("use super::ast::NestedValue;\n");
+    }
     out.push_str(&enum_imports(ir));
     out.push_str("use super::ast::Ast;\nuse unlaxer_runtime::mapping::Context as Tree;\n\npub fn map(tree: &unlaxer_runtime::Tree) -> Result<Ast, String> {\n");
     writeln!(
@@ -748,8 +763,11 @@ fn mapper(ir: &GrammarIr) -> String {
         .flat_map(|m| &m.fields)
         .any(|f| matches!(f.kind, Kind::Nested { .. }))
     {
+        if has_nested_values(ir) {
+            out.push_str(&nested::mixed_mapper(ir));
+        }
         out.push_str(nested::HELPERS);
-        if ir.rules.iter().filter_map(|r|r.mapping.as_ref()).flat_map(|m|&m.fields).any(|f|matches!(&f.kind,Kind::Nested{leaf,..} if matches!(leaf.as_ref(),Kind::Node|Kind::Enum(_)))) { out.push_str(nested::PROJECT_HELPERS); }
+        if ir.rules.iter().filter_map(|r|r.mapping.as_ref()).flat_map(|m|&m.fields).any(|f|matches!(&f.kind,Kind::Nested{leaf,..} if matches!(leaf.as_ref(),Kind::Node|Kind::Enum(_)|Kind::Value))) { out.push_str(nested::PROJECT_HELPERS); }
     }
     out.push_str(&associative::helpers(ir));
     out.push_str("\nfn map_node(tree: &Tree, id: usize) -> Result<Vec<Ast>, String> {\n    tree.visit(id)?;\n    match tree.nodes[id].rule {\n");
@@ -795,6 +813,7 @@ fn mapper(ir: &GrammarIr) -> String {
                 writeln!(out, "        r#{}: {{\n            let mut values = Vec::new();\n            for capture in node.captures.iter().filter(|c| c.name == {}) {{", field.name, quote(&field.name)).unwrap();
                 if let Kind::Nested { leaf, containers } = &field.kind {
                     let projection = match leaf.as_ref() {
+                        Kind::Value => Some("map_nested_values".to_owned()),
                         Kind::Node => Some("map_nodes".to_owned()),
                         Kind::Enum(name) => Some(format!(
                             "map_enum_{}",
@@ -851,6 +870,9 @@ fn evaluator(ir: &GrammarIr) -> String {
     let mut out = String::from(HEADER);
     if has_values(ir) {
         out.push_str("use super::ast::AstValue;\n");
+    }
+    if has_nested_values(ir) {
+        out.push_str("use super::ast::NestedValue;\n");
     }
     out.push_str(&enum_imports(ir));
     out.push_str("use super::ast::Ast;\n");

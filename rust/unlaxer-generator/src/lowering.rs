@@ -1265,6 +1265,11 @@ impl Lowering<'_> {
         if body.alternatives.is_empty() {
             return Err("empty choice".into());
         }
+        let mixed_nested = self.nested_rule
+            && matches!(
+                crate::nested_captures::body_shape(self.grammar, body, 0),
+                Ok(Kind::Value)
+            );
         let mut alternatives = Vec::new();
         for sequence in &body.alternatives {
             if sequence.elements.is_empty() {
@@ -1286,11 +1291,24 @@ impl Lowering<'_> {
                     value
                 });
             }
-            alternatives.push(if body.alternatives.len() > 1 && elements.len() == 1 {
+            let mut value = if body.alternatives.len() > 1 && elements.len() == 1 {
                 elements.remove(0)
             } else {
                 Expression::Sequence(elements)
-            });
+            };
+            if mixed_nested {
+                let kind = if let [element] = sequence.elements.as_slice() {
+                    crate::nested_captures::shape(self.grammar, &element.element, 0)?
+                } else {
+                    Kind::Text
+                };
+                value = match kind {
+                    Kind::Text => Expression::TextValue(Box::new(value)),
+                    Kind::Integer => Expression::ValueBoundary(Box::new(value)),
+                    _ => value,
+                };
+            }
+            alternatives.push(value);
         }
         Ok(if alternatives.len() == 1 {
             alternatives.remove(0)

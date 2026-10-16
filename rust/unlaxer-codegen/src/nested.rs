@@ -7,6 +7,7 @@ pub(crate) fn ty(leaf: &Kind, containers: &[Cardinality]) -> String {
         Kind::Integer => "i32".into(),
         Kind::Node => "Box<Ast>".into(),
         Kind::Enum(name) => name.clone(),
+        Kind::Value => "NestedValue".into(),
         _ => unreachable!("validated nested leaf"),
     };
     for container in containers.iter().rev() {
@@ -22,7 +23,7 @@ pub(crate) fn json(leaf: &Kind, containers: &[Cardinality], value: &str, depth: 
     let Some((container, tail)) = containers.split_first() else {
         return if *leaf == Kind::Integer {
             format!("{value}.to_string()")
-        } else if matches!(leaf, Kind::Node | Kind::Enum(_)) {
+        } else if matches!(leaf, Kind::Node | Kind::Enum(_) | Kind::Value) {
             format!("{value}.canonical_json()")
         } else {
             format!("json_string({value})")
@@ -135,3 +136,56 @@ fn nested_project<T>(tree: &Tree, value: &unlaxer_runtime::capture_tree::Element
     Ok(values.remove(0))
 }
 "#;
+
+pub(crate) fn mixed_mapper(ir: &crate::GrammarIr) -> String {
+    use std::fmt::Write;
+    let mut out=String::from("\nfn map_nested_values(tree: &Tree, ids: &[usize]) -> Result<Vec<NestedValue>, String> {\n    let mut found = Vec::new();\n    for &id in ids {\n        tree.visit(id)?;\n        let node = &tree.nodes[id];\n        match node.rule {\n            unlaxer_runtime::TEXT_VALUE_RULE => found.push(NestedValue::Text { text: tree.text(node.span)?.to_owned(), span: node.span }),\n            unlaxer_runtime::VALUE_BOUNDARY_RULE => found.push(NestedValue::Integer { value: tree.text(node.span)?.trim_matches(|ch: char| ch <= '\\u{20}').parse().map_err(|_| format!(\"invalid i32 nested mixed capture at {}..{}\", node.span.start, node.span.end))?, span: node.span }),\n");
+    for (id, rule) in ir
+        .rules
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| !r.enum_literals.is_empty())
+    {
+        let name = &rule.name;
+        writeln!(out,"            {id} => found.push(NestedValue::Enum{name} {{ value: {name}::from_text(tree.text(node.span)?)?, span: node.span }}),").unwrap();
+    }
+    let ids = ir
+        .rules
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| {
+            (r.mapping.is_some() || !r.type_constraints.is_empty()) && r.enum_literals.is_empty()
+        })
+        .map(|(id, _)| id.to_string())
+        .collect::<Vec<_>>();
+    writeln!(out,"            {} => found.extend(map_node(tree, id)?.into_iter().map(|node| NestedValue::Node(Box::new(node)))),",ids.join(" | ")).unwrap();
+    out.push_str("            _ => found.extend(map_nested_values(tree, &node.children)?),\n        }\n    }\n    Ok(found)\n}\n");
+    out
+}
+
+pub(crate) fn dap_node(field: &crate::Field) -> bool {
+    matches!(&field.kind,Kind::Nested{leaf,..} if matches!(leaf.as_ref(),Kind::Node|Kind::Value))
+}
+pub(crate) fn dap_walk(
+    leaf: &Kind,
+    containers: &[Cardinality],
+    value: &str,
+    depth: usize,
+) -> String {
+    let Some((container, tail)) = containers.split_first() else {
+        return if *leaf == Kind::Node {
+            format!("collect({value}, out);")
+        } else {
+            format!(
+                "if let super::ast::NestedValue::Node(child) = {value} {{ collect(child, out); }}"
+            )
+        };
+    };
+    let child = format!("nested_{depth}");
+    let inner = dap_walk(leaf, tail, &child, depth + 1);
+    if *container == Cardinality::Optional {
+        format!("if let Some({child}) = {value} {{ {inner} }}")
+    } else {
+        format!("for {child} in {value} {{ {inner} }}")
+    }
+}

@@ -53,7 +53,7 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
         public NestedShape(Kind leaf, String enumName, List<Cardinality> containers) { this(leaf,enumName,containers,null); }
         public NestedShape {
             containers = List.copyOf(containers);
-            boolean mapped = leaf == Kind.NODE || leaf == Kind.ENUM;
+            boolean mapped = leaf == Kind.NODE || leaf == Kind.ENUM || leaf == Kind.VALUE;
             if ((leaf != Kind.TEXT && leaf != Kind.INTEGER && !mapped)
                     || (leaf == Kind.ENUM ? enumName == null || enumName.isBlank() : enumName != null)
                     || (mapped ? javaLeafType == null || javaLeafType.isBlank() : javaLeafType != null)

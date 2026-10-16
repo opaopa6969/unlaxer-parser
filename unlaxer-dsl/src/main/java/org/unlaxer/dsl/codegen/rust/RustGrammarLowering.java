@@ -626,12 +626,23 @@ public final class RustGrammarLowering {
         return new Choice(List.of(new Sequence(List.of(left, op, right)), left));
     }
 
+    private boolean nestedMixed(RuleBody body) {
+        if(!nestedRule)return false;
+        try { return org.unlaxer.dsl.codegen.NestedCaptures.body(grammar,body,0).leaf()==Kind.VALUE; }
+        catch(IllegalArgumentException ignored){return false;}
+    }
     private Expression body(RuleBody body) {
         if (body instanceof ChoiceBody choice) {
             return choice.alternatives().size() == 1 ? body(choice.alternatives().get(0))
                 : new Choice(choice.alternatives().stream().map(alt -> {
                     Expression lowered = body(alt);
-                    return alt.elements().size() == 1 ? ((Sequence) lowered).elements().get(0) : lowered;
+                    Expression value=alt.elements().size() == 1 ? ((Sequence) lowered).elements().get(0) : lowered;
+                    if (nestedMixed(body)) {
+                        var leaf=org.unlaxer.dsl.codegen.NestedCaptures.body(grammar,alt,0).leaf();
+                        if(leaf==Kind.TEXT)value=new TextValue(value);
+                        else if(leaf==Kind.INTEGER)value=new ValueBoundary(value);
+                    }
+                    return value;
                 }).toList());
         }
         if (body instanceof SequenceBody sequence) {
