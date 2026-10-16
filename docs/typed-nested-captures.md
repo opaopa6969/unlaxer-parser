@@ -46,7 +46,7 @@ capture / typeof の準備走査も深さ 64 で停止し、schema 解析の再�
 | --- | --- |
 | text / i32 の直接 optional/list/group と manual evaluator | 本単位で両言語対応 |
 | 直接 mapped node / enum の再帰 container | 後続 #626 で対応。[契約と検証範囲](nested-mapped-leaves.md)参照 |
-| mixed value の再帰 container | 未対応、capture leaf の source shape を拒否 |
+| mixed value の再帰 container | #653 で直接 scalar choice の text/i32/node/enum を保持する専用 sum を生成。[型・CP・DAP・separated 合成](nested-mixed-values.md)参照。container alternative の choice は未対応 |
 | 透過 rule alias / recursive helper を経由する container | 未対応、capture 内の rule reference を拒否 |
 | separated list | #646 で対応。[型・値・separator 境界の契約](nested-separated-captures.md)参照 |
 | 同一 mapping 型を共有する複数規則 | #637 で全 recursive shape / nominal leaf / opt-in が一致する場合に対応 |
