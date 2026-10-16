@@ -40,6 +40,7 @@ annotation、`ParseContext` API、consume/invert伝播、incremental、IDE proto
 | error | `ERROR(...)`をJava/native Rust両hostから生成（#329）。非消費で必ず失敗し、expected候補を提示 | [12文法19入力の契約・corpus・再現手順](../docs/error-elements.md)。受理/両cursor、CP位置と明示hint、AST/span、状態rollback、診断/memo modeを比較。native候補の表示差は個別oracleで保持。下記の回復とは別 |
 | Number token | 限定生成済み | 不完全指数の診断差を記録済み。数値型・overflow・triviaを実言語仕様に合わせる |
 | Identifier・Single/DoubleQuoted・EndOfSource token binding | UBNF生成・runtime実装 | 22文法78入力の受理/両cursor比較と受理48 AST/spanのfixture。ASCII identifier、生escape、single quoteだけ除去するJava mapper契約。tinyexpression文字列評価は別途検証 |
+| GraphemeParser・型付きG位置 | Unicode17 extended grapheme分割・snapshot境界表・strict/floor/ceiling変換・両host token binding（#510） | [契約と公式766ケース/共通fixture](../docs/grapheme-coordinates.md)。CP cursor/span、原文、CRLF、混在/rollback/先読み、生成ASTを検証。表示幅/正規化とAstValue意味投影は別契約 |
 | tinyexpression StringLiteral token binding | exact FQNを両生成経路で対応（#168） | 固定した実tinyexpressionクラスと共通corpusで字句・両cursor・AST/spanを比較。文字列評価の意味論は別途検証 |
 | tinyexpression CodeStart/CodeEnd token binding | exact FQNを両生成経路で対応（#170）。内部triviaなしの原子的字句 | 実tinyexpressionクラスと共通corpusで行頭/行末・両cursor・AST/spanを比較。codeblockの実行やJavaのparser tag/CST構造同値は含まない |
 | tinyexpression LongCodeBlock token binding | exact FQN を Java/native Rust 両生成器から `Expr::LongCodeBlock` に写像（#316 / tinyexpression#232） | N >= 4、同幅の単独終端行、opaque 本文、Unicode/CRLF/CR、atomic failure、実 Java parser と14文法86入力の比較。本文の AOT 実行は TinyExpression 側の別 API |

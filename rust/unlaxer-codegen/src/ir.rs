@@ -134,6 +134,7 @@ pub enum Expression {
     ErrorExpected(String),
     NumberToken,
     IdentifierToken,
+    GraphemeToken,
     QuotedToken(char),
     CodeStartToken,
     CodeEndToken,

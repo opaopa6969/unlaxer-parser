@@ -1946,6 +1946,9 @@ fn token_expression_with_registry(
             "NumberParser" | "org.unlaxer.parser.elementary.NumberParser" => {
                 Expression::NumberToken
             }
+            "GraphemeParser" | "org.unlaxer.parser.elementary.GraphemeParser" => {
+                Expression::GraphemeToken
+            }
             "IdentifierParser" | "org.unlaxer.parser.clang.IdentifierParser" => {
                 Expression::IdentifierToken
             }

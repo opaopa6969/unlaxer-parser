@@ -363,6 +363,7 @@ fn expression(expr: &Expression) -> String {
         Literal(s) => format!("Expr::Literal({})", quote(s)),
         ErrorExpected(message) => format!("Expr::Error({})", quote(message)),
         NumberToken => "Expr::Number".into(),
+        GraphemeToken => "Expr::Grapheme".into(),
         IdentifierToken => "Expr::Identifier".into(),
         QuotedToken(q) => format!("Expr::Quoted('\\u{{{:x}}}')", u32::from(*q)),
         CodeStartToken => "Expr::CodeStart".into(),
@@ -477,6 +478,52 @@ fn expressions(items: &[Expression]) -> String {
     items.iter().map(expression).collect::<Vec<_>>().join(", ")
 }
 
+// Only the new grapheme-containing text capture opts out of legacy whitespace/quote stripping.
+fn grapheme_capture(ir: &GrammarIr, body: &Expression, name: &str) -> bool {
+    use Expression::*;
+    let mut pending = vec![(body, false)];
+    let mut visited = std::collections::HashSet::new();
+    while let Some((expression, captured)) = pending.pop() {
+        match expression {
+            GraphemeToken if captured => return true,
+            Reference(id) if captured && visited.insert(*id) => {
+                pending.push((&ir.rules[*id].body, true))
+            }
+            Capture {
+                name: capture,
+                expression,
+            } => pending.push((expression, captured || capture == name)),
+            Sequence(children)
+            | Choice(children)
+            | LongestChoice(children)
+            | UniqueLongestChoice(children)
+            | PredictiveChoice {
+                alternatives: children,
+                ..
+            } => pending.extend(children.iter().map(|child| (child, captured))),
+            OptionalExpr(child)
+            | Delimited(child)
+            | TextValue(child)
+            | ValueBoundary(child)
+            | Repeat { child, .. }
+            | TriviaScope { child, .. }
+            | RuleEffects { child, .. }
+            | CaptureEquality { child, .. }
+            | NamePredicate { child, .. }
+            | NameResolutionScope { child, .. }
+            | Recovery { child, .. }
+            | LexicalTriviaScope { child, .. }
+            | LexicalContextScope { child, .. } => pending.push((child, captured)),
+            Separated { child, separator } => {
+                pending.push((child, captured));
+                pending.push((separator, captured));
+            }
+            _ => (),
+        }
+    }
+    false
+}
+
 fn mapper(ir: &GrammarIr) -> String {
     let mut out = String::from(HEADER);
     if has_values(ir) {
@@ -539,6 +586,7 @@ fn mapper(ir: &GrammarIr) -> String {
                 out.push_str(match field.kind {
                     Kind::Node => "                values.extend(map_nodes(tree, &capture.nodes)?);\n",
                     Kind::Value => "                values.extend(map_values(tree, &capture.nodes)?);\n",
+                    Kind::Text if grapheme_capture(ir, &rule.body, &field.name) => "                values.push(tree.text(capture.span).to_owned());\n",
                     Kind::Text => "                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).to_owned());\n",
                 });
                 writeln!(

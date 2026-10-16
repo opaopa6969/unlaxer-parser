@@ -58,7 +58,7 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     }
     public sealed interface Expression permits Literal, NumberToken, Reference, Sequence, Choice, LongestChoice, UniqueLongestChoice, PredictiveChoice, Capture,
         OptionalExpr, Repeat, Separated, AnyToken, EofToken, EmptyToken, ErrorExpected, CharRangeToken,
-        ExceptToken, UntilToken, LookaheadToken, Delimited, IdentifierToken, QuotedToken,
+        ExceptToken, UntilToken, LookaheadToken, Delimited, IdentifierToken, GraphemeToken, QuotedToken,
         CodeStartToken, CodeEndToken, LongCodeBlockToken, CustomToken, TextValue, ValueBoundary, TriviaScope, RuleEffects,
         CaptureEquality, NamePredicate, NameResolutionScope, Recovery, LexicalToken, LexicalTriviaScope, LexicalContextScope {}
     public record LexicalContextScope(Expression child, List<org.unlaxer.dsl.runtime.Lexing.Terminal> terminals) implements Expression {
@@ -72,6 +72,7 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     public record TextValue(Expression child) implements Expression {}
     public record ValueBoundary(Expression child) implements Expression {}
     public record IdentifierToken() implements Expression {}
+    public record GraphemeToken() implements Expression {}
     public record QuotedToken(char quote) implements Expression {}
     public record CodeStartToken() implements Expression {}
     public record CodeEndToken() implements Expression {}

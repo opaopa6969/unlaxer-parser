@@ -1,0 +1,5 @@
+grammar Graphemes {
+  @package: grapheme.probe
+  token G = org.unlaxer.parser.elementary.GraphemeParser
+  @root @mapping(Value, params=[text]) Root ::= G @text;
+}

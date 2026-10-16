@@ -429,3 +429,5 @@ TSVは`unlaxer-dsl/target/`配下で、CI artifact `rust-conformance`にも添�
 [仕様と実行例](../docs/parse-composition.md)を参照。
 
 Classic の opt-in stdio [LSP](../docs/classic-rust-lsp.md) と [AST / token DAP](../docs/classic-rust-dap.md) を利用できる。`generate --lsp` / `--dap` は通常の5-file出力に各 module を追加し、両指定では7ファイルになる。live evaluator 制御などの残差は [full-spec対応表](FULL-SPEC.md) に残す。
+
+Unicode 17固定の[書記素parser・G/CP/UTF16/UTF8位置変換](../docs/grapheme-coordinates.md)を提供する。既存cursor/spanはCPのまま、`GraphemeParser` bindingを両hostから生成できる。

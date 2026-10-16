@@ -162,6 +162,8 @@ fn generate_resolved(
     runtime!("first.rs");
     runtime!("lexical.rs");
     runtime!("unicode_xid.rs");
+    runtime!("unicode_grapheme_data.rs");
+    runtime!("grapheme.rs");
     runtime!("long_code_fence.rs");
     runtime!("memo_retention_tests.rs");
     let wrapper = include_str!("../../../unlaxer-dsl/src/main/resources/playground/lib.rs")

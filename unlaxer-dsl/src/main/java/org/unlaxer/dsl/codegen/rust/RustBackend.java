@@ -308,6 +308,9 @@ public final class RustBackend {
         if (expression instanceof NumberToken ignored) {
             return "Expr::Number";
         }
+        if (expression instanceof GraphemeToken ignored) {
+            return "Expr::Grapheme";
+        }
         if (expression instanceof IdentifierToken ignored) {
             return "Expr::Identifier";
         }
@@ -544,6 +547,8 @@ public final class RustBackend {
                     .append("            for capture in node.captures.iter().filter(|c| c.name == ").append(quote(field.name())).append(") {\n");
                 if (field.kind() == Kind.NODE) out.append("                values.extend(map_nodes(tree, &capture.nodes)?);\n");
                 else if (field.kind() == Kind.VALUE) out.append("                values.extend(map_values(tree, &capture.nodes)?);\n");
+                else if (graphemeCapture(ir, ir.rules().get(i).body(), field.name()))
+                    out.append("                values.push(tree.text(capture.span).to_owned());\n");
                 else out.append("                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).to_owned());\n");
                 out.append("            }\n            ").append(mappedValue(field)).append("\n        },\n");
             }
@@ -618,6 +623,51 @@ public final class RustBackend {
             case OPTIONAL -> name + ".as_ref().map_or_else(|| \"null\".to_owned(), |value| " + value + ")";
             case MANY -> "format!(\"[{}]\", " + name + ".iter().map(|value| " + value + ").collect::<Vec<_>>().join(\",\"))";
         };
+    }
+
+    // New grapheme captures preserve raw source; existing text captures retain their contract.
+    private static boolean graphemeCapture(GrammarIR ir, Expression body, String name) {
+        record Visit(Expression expression, boolean captured) {}
+        var pending = new java.util.ArrayDeque<Visit>();
+        var visited = new java.util.HashSet<Integer>();
+        pending.push(new Visit(body, false));
+        while (!pending.isEmpty()) {
+            Visit current = pending.pop();
+            Expression expression = current.expression();
+            boolean captured = current.captured();
+            if (expression instanceof GraphemeToken && captured) return true;
+            if (expression instanceof Reference ref) {
+                if (captured && visited.add(ref.rule())) pending.push(new Visit(ir.rules().get(ref.rule()).body(), true));
+                continue;
+            }
+            if (expression instanceof Capture capture) {
+                pending.push(new Visit(capture.expression(), captured || capture.name().equals(name)));
+                continue;
+            }
+            List<Expression> children;
+            if (expression instanceof Sequence value) children = value.elements();
+            else if (expression instanceof Choice value) children = value.alternatives();
+            else if (expression instanceof LongestChoice value) children = value.alternatives();
+            else if (expression instanceof UniqueLongestChoice value) children = value.alternatives();
+            else if (expression instanceof PredictiveChoice value) children = value.alternatives();
+            else if (expression instanceof OptionalExpr value) children = List.of(value.child());
+            else if (expression instanceof Repeat value) children = List.of(value.child());
+            else if (expression instanceof Separated value) children = List.of(value.child(), value.separator());
+            else if (expression instanceof Delimited value) children = List.of(value.child());
+            else if (expression instanceof TextValue value) children = List.of(value.child());
+            else if (expression instanceof ValueBoundary value) children = List.of(value.child());
+            else if (expression instanceof TriviaScope value) children = List.of(value.child());
+            else if (expression instanceof RuleEffects value) children = List.of(value.child());
+            else if (expression instanceof CaptureEquality value) children = List.of(value.child());
+            else if (expression instanceof NamePredicate value) children = List.of(value.child());
+            else if (expression instanceof NameResolutionScope value) children = List.of(value.child());
+            else if (expression instanceof Recovery value) children = List.of(value.child());
+            else if (expression instanceof LexicalTriviaScope value) children = List.of(value.child());
+            else if (expression instanceof LexicalContextScope value) children = List.of(value.child());
+            else children = List.of();
+            for (Expression child : children) pending.push(new Visit(child, captured));
+        }
+        return false;
     }
 
     private static boolean containsRecovery(Expression expression) {

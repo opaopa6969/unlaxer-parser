@@ -934,11 +934,13 @@ class MapperRuleEmitter {
         for (int i = 0; i < sites.size(); i++) {
             CaptureBindingPlan.Site site = sites.get(i);
             boolean boundText = MapperElementUtil.usesBoundTextCapture(site.element(), ruleByName, tokenDeclByName);
+            boolean graphemeText = MapperElementUtil.containsGraphemeReference(site.element(), ruleByName, tokenDeclByName)
+                && !MapperElementUtil.containsMappedValue(site.element(), ruleByName);
             boolean skippedText = boundText && MapperElementUtil.containsSkippedReference(site.element(), ruleByName);
             boolean boundValue = "Object".equals(valueType) && MapperElementUtil.containsMappedValue(site.element(), ruleByName);
             AtomicElement normalized = boundValue ? site.element()
                 : MapperElementUtil.normalizeCapturedElement(site.element()).orElse(site.element());
-            String parserClass = boundText || boundValue ? null : MapperElementUtil.parserClassLiteral(normalized, parsersClass, tokenDeclByName, ruleByName)
+            String parserClass = boundText || boundValue || graphemeText ? null : MapperElementUtil.parserClassLiteral(normalized, parsersClass, tokenDeclByName, ruleByName)
                 .orElse(null);
             String candidateType = MapperTypeResolver.inferTypeFromElement(grammar, normalized);
             if (!MapperTypeResolver.isTypeCompatible(valueType, candidateType) && !"String".equals(valueType)) continue;
@@ -949,7 +951,8 @@ class MapperRuleEmitter {
                 : "findDescendants(" + siteToken + ", " + parserClass + ").stream().findFirst().orElse(null)") + ";");
             w.line("if (" + valueToken + " != null) {");
             w.indent();
-            String expression = skippedText ? "skippedRuleText(" + valueToken + ")"
+            String expression = graphemeText ? "tokenTextCompat(" + valueToken + ")"
+                : skippedText ? "skippedRuleText(" + valueToken + ")"
                 : boundText ? "stripQuotes(firstTokenText(" + valueToken + "))"
                 : MapperElementUtil.mapExpressionForTargetType(valueType, normalized, valueToken,
                 mappedClassByRuleName, tokenDeclByName, ruleByName);

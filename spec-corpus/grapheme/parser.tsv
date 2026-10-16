@@ -1,0 +1,20 @@
+# name<TAB>scalar hex<TAB>operation<TAB>success<TAB>consumed<TAB>Java matched<TAB>Rust matched<TAB>Java root end<TAB>Rust root end
+family	1F468 200D 1F469 200D 1F467 200D 1F466	G	true	7	7	7	7	7
+empty	~	G	false	0	0	0	0	0
+combining	0065 0301	G	true	2	2	2	2	2
+flag	1F1EF 1F1F5	G	true	2	2	2	2	2
+skin-tone	1F44D 1F3FD	G	true	2	2	2	2	2
+crlf	000D 000A	G	true	2	2	2	2	2
+cp-then-g	0041 1F468 200D 1F469 200D 1F467 200D 1F466	CG	true	8	8	8	8	8
+g-then-cp	1F468 200D 1F469 200D 1F467 200D 1F466 005A	GC	true	8	8	8	8	8
+inside-zwj	1F468 200D 1F469 200D 1F467 200D 1F466	CG	false	0	0	0	0	0
+inside-combining	0065 0301	CG	false	0	0	0	0	0
+inside-flag	1F1EF 1F1F5	CG	false	0	0	0	0	0
+inside-crlf	000D 000A	CG	false	0	0	0	0	0
+retry	1F468 200D 1F469 200D 1F467 200D 1F466	RETRY	true	7	7	7	7	7
+suffix-failure	1F468 200D 1F469 200D 1F467 200D 1F466	FAIL	false	0	0	0	0	0
+ahead	1F468 200D 1F469 200D 1F467 200D 1F466	AHEAD	true	0	7	0	7	0
+ahead-consume	1F468 200D 1F469 200D 1F467 200D 1F466	AHEAD_G	true	7	7	7	7	7
+ahead-failure	~	AHEAD	false	0	0	0	0	0
+eof	0065 0301	GG	false	0	0	0	0	0
+two-clusters	0065 0301 1F1EF 1F1F5	GG	true	4	4	4	4	4

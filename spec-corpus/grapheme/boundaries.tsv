@@ -1,0 +1,15 @@
+# name<TAB>Unicode scalars (hex; ~ empty)<TAB>CP:UTF16:UTF8 for each grapheme boundary
+empty	~	0:0:0
+family	1F468 200D 1F469 200D 1F467 200D 1F466	0:0:0,7:11:25
+combining	0065 0301	0:0:0,2:2:3
+precomposed	00E9	0:0:0,1:1:2
+flag	1F1EF 1F1F5	0:0:0,2:4:8
+skin-tone	1F44D 1F3FD	0:0:0,2:4:8
+crlf	000D 000A	0:0:0,2:2:2
+empty-lines	000D 000A 000A 000D	0:0:0,2:2:2,3:3:3,4:4:4
+mixed	1F468 200D 1F469 200D 1F467 200D 1F466 0065 0301 1F1EF 1F1F5 1F44D 1F3FD 000D 000A 005A	0:0:0,7:11:25,9:13:28,11:17:36,13:21:44,15:23:46,16:24:47
+odd-regional	1F1EF 1F1F5 1F1FA	0:0:0,2:4:8,3:6:12
+indic-conjunct	0915 094D 0915	0:0:0,3:3:9
+indic-no-consonant	094D 0915	0:0:0,1:1:3,2:2:6
+quote	0027	0:0:0,1:1:1
+space	0020	0:0:0,1:1:1

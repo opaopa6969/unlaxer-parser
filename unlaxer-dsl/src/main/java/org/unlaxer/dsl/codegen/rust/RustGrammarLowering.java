@@ -847,6 +847,7 @@ public final class RustGrammarLowering {
     private static Expression simpleToken(String parserClass) {
         if (parserClass == null) return null;
         return switch (parserClass) {
+                case "GraphemeParser", "org.unlaxer.parser.elementary.GraphemeParser" -> new GraphemeToken();
                 case "NumberParser", "org.unlaxer.parser.elementary.NumberParser" -> new NumberToken();
                 case "IdentifierParser", "org.unlaxer.parser.clang.IdentifierParser" -> new IdentifierToken();
                 case "SingleQuotedParser", "org.unlaxer.parser.elementary.SingleQuotedParser" -> new QuotedToken('\'');

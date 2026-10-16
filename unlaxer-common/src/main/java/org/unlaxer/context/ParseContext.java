@@ -1139,6 +1139,16 @@ public class ParseContext implements
 		return source;
 	}
 
+  private org.unlaxer.source.GraphemeBoundaryTable graphemeBoundaries;
+
+  /** Immutable original-input boundaries, lazily built once; independent of parser rollback. */
+  public org.unlaxer.source.GraphemeBoundaryTable graphemeBoundaries() {
+    if (graphemeBoundaries == null) {
+      graphemeBoundaries = new org.unlaxer.source.DocumentSnapshot("parse:input", 0, sourceText()).graphemes();
+    }
+    return graphemeBoundaries;
+  }
+
   /**
    * Format-2 adapter accessor: complete immutable input text.
    * This is observational only and does not create a transaction frame.

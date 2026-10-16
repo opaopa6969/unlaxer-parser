@@ -517,6 +517,28 @@ class MapperElementUtil {
             reachesMappedOrEnum(ref.name(), ruleByName, tokenDeclByName, visited));
     }
 
+    /** New grapheme bindings keep original whitespace and quote code points in text captures. */
+    static boolean containsGraphemeReference(AtomicElement element, Map<String, RuleDecl> rules,
+            Map<String, TokenDecl> tokens) {
+        Object value = captureValueShape(element);
+        var visited = new java.util.HashSet<String>();
+        if (value instanceof RuleRefElement ref) return reachesGrapheme(ref.name(), rules, tokens, visited);
+        RuleBody body = value instanceof GroupElement group ? group.body()
+            : value instanceof RuleBody compound ? compound : null;
+        return body != null && collectRuleRefs(body).stream().anyMatch(ref -> reachesGrapheme(ref.name(), rules, tokens, visited));
+    }
+
+    private static boolean reachesGrapheme(String name, Map<String, RuleDecl> rules,
+            Map<String, TokenDecl> tokens, java.util.Set<String> visited) {
+        if (!visited.add(name)) return false;
+        TokenDecl token = tokens.get(name);
+        if (token != null) return "GraphemeParser".equals(token.parserClass())
+            || "org.unlaxer.parser.elementary.GraphemeParser".equals(token.parserClass());
+        RuleDecl rule = rules.get(name);
+        return rule != null && getMappingAnnotation(rule).isEmpty() && collectRuleRefs(rule.body()).stream()
+            .anyMatch(ref -> reachesGrapheme(ref.name(), rules, tokens, visited));
+    }
+
     /** A capture involving @skip retains the complete matched source slice as text. */
     static boolean containsSkippedReference(AtomicElement element, Map<String, RuleDecl> ruleByName) {
         Object value = captureValueShape(element);
