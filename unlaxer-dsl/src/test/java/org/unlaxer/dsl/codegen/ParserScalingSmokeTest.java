@@ -36,12 +36,16 @@ import org.unlaxer.parser.Parser;
  * <p>ケース 32〜36 は毎回「GC pause を引いた µs/byte 倍率は ×1.04〜1.08 で、パーサ本体は線形」と
  * 結論したが、根拠は手元の 1 回きりのベンチだった。時間は共有ホストの負荷で 4 倍も振れるので
  * CI では測れない。代わりに **負荷に依らない量**（transaction 数・memo hit 数・memo entry 数・
- * {@code getThreadAllocatedBytes} の割当）を x1 / x4 / x16 で取り、**1 byte あたりの値が
+ * {@code getThreadAllocatedBytes} の割当）を x1 / x4 / x16（生成系は x64 まで）で取り、**1 byte あたりの値が
  * ×1.3 を超えて増えないこと**を突き合わせる。超線形に戻ったらここで落ちる。
  *
  * <p>×1.3 は測定誤差ではなく余裕。ケース 32〜36 の実測は µs/byte で ×1.04〜1.08、
  * 割当は入力長にほぼ比例（x1→x64 で ×1.0 前後）だった。二次の項が入れば x1→x16 で
- * 16 倍近くになるので、この閾値は「線形か否か」を十分に切り分ける。
+ * 16 倍近くになるので、回帰を検出する smoke 条件になる。
+ *
+ * <p>有限 success memo の予算が飽和すると再評価が増え、rollback/byte は小入力と
+ * 同じ係数にはならない。ON の rollback と transaction 数は、独立に線形性を検証した
+ * 同入力 OFF の値以下として直接制限する。他の量の ×1.3 条件は維持する。
  */
 public class ParserScalingSmokeTest {
 
@@ -51,28 +55,11 @@ public class ParserScalingSmokeTest {
     private static final String PACKAGE = "org.unlaxer.scaling.generated";
 
     /** 組み込みトークンだけを使うので、生成規則すべてに SafeFailureMemoizable が付く。 */
-    private static final String GRAMMAR = """
-        grammar Scale {
-          @package: %s
-          @whitespace: javaStyle
+    private static final java.nio.file.Path CORPUS =
+        java.nio.file.Path.of("..", "conformance", "memo-scaling");
 
-          token DIGIT  = CHAR_RANGE('0', '9')
-          token LETTER = CHAR_RANGE('a', 'z')
-
-          @root
-          Program ::= { Statement } ;
-          Statement ::= 'let' Name '=' Expression ';' ;
-          Expression ::= Term { ( '+' | '-' ) Term } ;
-          Term ::= Factor { ( '*' | '/' ) Factor } ;
-          Factor ::= '(' Expression ')' | Number | Name ;
-          Number ::= DIGIT { DIGIT } ;
-          Name ::= LETTER { LETTER } ;
-        }
-        """.formatted(PACKAGE);
-
-    /** x1 が 16 文、x4 が 64 文、x16 が 256 文。 */
+    /** x1 が 16 文、x4 が 64 文、x16 が 256 文、x64 が 1024 文。 */
     private static final String STATEMENT = "let abc = 1+2*3-(4+5)/6; ";
-    private static final int BASE_STATEMENTS = 16;
 
     /**
      * UBNF 自身は文法ブロックを並べれば厳密に x 倍になるので、連結 fixture に向く。
@@ -90,7 +77,9 @@ public class ParserScalingSmokeTest {
 
     /** 1 回の parse で観測する、負荷に依らない量。 */
     private record Counters(int bytes, long transactionsOpened, long transactionsRolledBack,
-            int memoSuccessHits, int memoFailureHits, int memoMaxEntryCount, long allocatedBytes) {}
+            int memoSuccessHits, int memoFailureHits, int memoMaxEntryCount, long allocatedBytes,
+            int successEntries, long successCharge, long successBudgetMisses,
+            int memoEvictions, int memoUnderruns) {}
 
     // =========================================================================
     // 生成パーサ（memo あり）
@@ -101,15 +90,69 @@ public class ParserScalingSmokeTest {
         try (URLClassLoader loader = compile()) {
             Parser root = (Parser) loader.loadClass(PACKAGE + ".ScaleParsers")
                 .getMethod("getRootParser").invoke(null);
+            Map<String, Counters> control = new LinkedHashMap<>();
             Map<String, Counters> byScale = new LinkedHashMap<>();
-            for (int scale : List.of(1, 4, 16)) {
-                String input = STATEMENT.repeat(BASE_STATEMENTS * scale);
+            var cases = java.nio.file.Files.readAllLines(CORPUS.resolve("cases.tsv"));
+            assertEquals("all handwritten scales must be exercised", 5, cases.size());
+            for (String line : cases.subList(1, cases.size())) {
+                String[] columns = line.split("\t");
+                int scale = Integer.parseInt(columns[0]);
+                String input = STATEMENT.repeat(Integer.parseInt(columns[1]));
+                assertEquals(Integer.parseInt(columns[2]), input.length());
+                assertEquals(columns[2], columns[3]);
+                assertEquals("0", columns[4]);
+                assertEquals(columns[2], columns[5]);
+                control.put("x" + scale, measure(root, input, Memoization.OFF));
                 byScale.put("x" + scale, measure(root, input, Memoization.SAFE_FAILURES));
             }
             assertTrue("memo が効いていないので memo 次元の比較にならない",
                 byScale.get("x1").memoSuccessHits() > 0);
-            assertPerByteGrowth(byScale, "生成パーサ (Scale, SAFE_FAILURES)");
+            assertPerByteGrowth(control, "生成パーサ (Scale, OFF)");
+            assertPerByteGrowth(byScale, "生成パーサ (Scale, SAFE_FAILURES)", false);
+            assertMemoWorkBound(control, byScale);
+            Counters saturated = byScale.get("x64");
+            assertTrue("default budget saturation must be exercised: " + byScale,
+                saturated.successBudgetMisses() > 0);
+            assertTrue(saturated.successEntries() <= 65536);
+            assertTrue(saturated.successCharge() <= 16L * 1024 * 1024);
+            assertTrue("rolling eviction must be exercised", saturated.memoEvictions() > 0);
+            var report = new ArrayList<String>(List.of(
+                "scale\tmemo\tconsumed_cp\tmatched_cp\tcst_start_cp\tcst_end_cp\topened\trolled_back\tactual_success_hits\tfailure_hits\tmax_entries\tsuccess_entries\tsuccess_charge\tbudget_misses\tevictions\tunderruns\tallocated_bytes"));
+            for (String scale : control.keySet()) for (var mode : List.of(control, byScale)) {
+                Counters c = mode.get(scale);
+                report.add(String.join("\t", scale, mode == control ? "OFF" : "ON",
+                    "" + c.bytes(), "" + c.bytes(), "0", "" + c.bytes(),
+                    "" + c.transactionsOpened(), "" + c.transactionsRolledBack(),
+                    "" + c.memoSuccessHits(), "" + c.memoFailureHits(), "" + c.memoMaxEntryCount(),
+                    "" + c.successEntries(), "" + c.successCharge(), "" + c.successBudgetMisses(),
+                    "" + c.memoEvictions(), "" + c.memoUnderruns(), "" + c.allocatedBytes()));
+            }
+            java.nio.file.Files.write(java.nio.file.Path.of("target/memo-scaling-java.tsv"), report);
         }
+    }
+
+    @Test
+    public void scalingOracleRejectsInjectedQuadraticWorkAndAllocation() {
+        var control = new LinkedHashMap<String, Counters>();
+        var quadraticWork = new LinkedHashMap<String, Counters>();
+        var quadraticAllocation = new LinkedHashMap<String, Counters>();
+        for (int scale : List.of(1, 4, 16, 64)) {
+            Counters linear = synthetic(scale, 100L * scale, 1000L * scale);
+            control.put("x" + scale, linear);
+            quadraticWork.put("x" + scale, synthetic(scale, 50L * scale * scale, 1000L * scale));
+            quadraticAllocation.put("x" + scale, synthetic(scale, 100L * scale, 1000L * scale * scale));
+        }
+        assertPerByteGrowth(control, "linear control");
+        assertMemoWorkBound(control, control);
+        org.junit.Assert.assertThrows(AssertionError.class,
+            () -> assertMemoWorkBound(control, quadraticWork));
+        org.junit.Assert.assertThrows(AssertionError.class,
+            () -> assertPerByteGrowth(quadraticAllocation, "injected quadratic allocation", false));
+    }
+
+    private static Counters synthetic(int scale, long rollbacks, long allocation) {
+        return new Counters(400 * scale, 1000L * scale, rollbacks,
+            100 * scale, 0, 100 * scale, allocation, 0, 0, 0, 0, 0);
     }
 
     // =========================================================================
@@ -137,6 +180,25 @@ public class ParserScalingSmokeTest {
     // =========================================================================
 
     private static void assertPerByteGrowth(Map<String, Counters> byScale, String label) {
+        assertPerByteGrowth(byScale, label, true);
+    }
+
+    private static void assertMemoWorkBound(Map<String, Counters> control,
+            Map<String, Counters> memo) {
+        assertEquals(control.keySet(), memo.keySet());
+        for (var entry : memo.entrySet()) {
+            Counters bound = control.get(entry.getKey());
+            Counters actual = entry.getValue();
+            assertEquals(bound.bytes(), actual.bytes());
+            assertTrue(entry.getKey() + " transaction work exceeds linear OFF control: " + actual,
+                actual.transactionsOpened() <= bound.transactionsOpened());
+            assertTrue(entry.getKey() + " rollback work exceeds linear OFF control: " + actual,
+                actual.transactionsRolledBack() <= bound.transactionsRolledBack());
+        }
+    }
+
+    private static void assertPerByteGrowth(Map<String, Counters> byScale, String label,
+            boolean checkRollbacks) {
         Counters base = byScale.get("x1");
         // 比が取れないほど小さい / 0 のままなら、このテストは何も見ていない。
         assertTrue(label + ": transaction を数えられていない", base.transactionsOpened() > 100);
@@ -148,7 +210,7 @@ public class ParserScalingSmokeTest {
             Counters counters = entry.getValue();
             check(failures, label, entry.getKey(), "transactions.opened",
                 base.transactionsOpened(), base.bytes(), counters.transactionsOpened(), counters.bytes());
-            check(failures, label, entry.getKey(), "transactions.rolledBack",
+            if (checkRollbacks) check(failures, label, entry.getKey(), "transactions.rolledBack",
                 base.transactionsRolledBack(), base.bytes(),
                 counters.transactionsRolledBack(), counters.bytes());
             check(failures, label, entry.getKey(), "memo.successHits",
@@ -203,7 +265,9 @@ public class ParserScalingSmokeTest {
         long allocated = sunThreads.getThreadAllocatedBytes(id) - before;
         return new Counters(input.length(), counters.transactionsOpened(),
             counters.transactionsRolledBack(), counters.memoSuccessHits(), counters.memoFailureHits(),
-            counters.memoMaxEntryCount(), allocated);
+            counters.memoMaxEntryCount(), allocated, counters.successEntries(),
+            counters.successCharge(), counters.successBudgetMisses(), counters.memoEvictions(),
+            counters.memoUnderruns());
     }
 
     private static Counters parseOnce(Parser root, String input, Memoization memoization) {
@@ -215,12 +279,23 @@ public class ParserScalingSmokeTest {
             Parsed parsed = root.parse(context);
             assertTrue("fixture が受理されない: " + input.substring(0, Math.min(60, input.length())),
                 parsed.isSucceeded());
+            assertEquals("full-input consumed cursor", input.length(), context.position());
+            assertEquals("full-input matched cursor", input.length(), context.matchedPosition());
+            var rootToken = context.getCurrent().getTokens().stream()
+                .filter(token -> token.parser == root).findFirst().orElseThrow();
+            assertEquals("CST input offset", 0, rootToken.source.offsetFromRoot().value());
+            assertEquals("CST input text", input, rootToken.source.toString());
             var metrics = context.snapshotTransactionMetrics();
             PackratMemoTable table = context.getPackratMemoTable();
             return new Counters(input.length(), metrics.opened(), metrics.rolledBack(),
                 table == null ? 0 : table.successHits(),
                 table == null ? 0 : table.failureHits(),
-                table == null ? 0 : table.maxEntryCount(), 0L);
+                table == null ? 0 : table.maxEntryCount(), 0L,
+                table == null ? 0 : table.successEntryCount(),
+                table == null ? 0 : table.successRetainedBytes(),
+                table == null ? 0 : table.successBudgetMisses(),
+                table == null ? 0 : table.evictedCount(),
+                table == null ? 0 : table.evictionUnderruns());
         }
     }
 
@@ -229,7 +304,7 @@ public class ParserScalingSmokeTest {
     // =========================================================================
 
     private URLClassLoader compile() throws Exception {
-        var grammar = UBNFMapper.parse(GRAMMAR).grammars().get(0);
+        var grammar = UBNFMapper.parse(java.nio.file.Files.readString(CORPUS.resolve("scale.ubnf"))).grammars().get(0);
         var sources = List.of(new ParserGenerator().generate(grammar),
             new ASTGenerator().generate(grammar), new MapperGenerator().generate(grammar));
         String directory = PACKAGE.replace('.', '/');

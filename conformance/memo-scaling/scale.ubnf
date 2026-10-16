@@ -1,0 +1,16 @@
+grammar Scale {
+  @package: org.unlaxer.scaling.generated
+  @whitespace: javaStyle
+
+  token DIGIT  = CHAR_RANGE('0', '9')
+  token LETTER = CHAR_RANGE('a', 'z')
+
+  @root @mapping(ProgramNode)
+  Program ::= { Statement } ;
+  Statement ::= 'let' Name '=' Expression ';' ;
+  Expression ::= Term { ( '+' | '-' ) Term } ;
+  Term ::= Factor { ( '*' | '/' ) Factor } ;
+  Factor ::= '(' Expression ')' | Number | Name ;
+  Number ::= DIGIT { DIGIT } ;
+  Name ::= LETTER { LETTER } ;
+}

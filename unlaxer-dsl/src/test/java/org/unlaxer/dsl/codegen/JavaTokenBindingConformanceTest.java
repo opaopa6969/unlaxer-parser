@@ -116,7 +116,7 @@ public class JavaTokenBindingConformanceTest {
         for(var source:sources)units.add(new SimpleJavaFileObject(URI.create("string:///bindingprobe/"+source.className()+".java"),JavaFileObject.Kind.SOURCE){
             @Override public CharSequence getCharContent(boolean ignore){return source.source();}
         });
-        var diagnostics=new DiagnosticCollector<JavaFileObject>();var compiler=ToolProvider.getSystemJavaCompiler();
+        var diagnostics=new DiagnosticCollector<JavaFileObject>();var compiler=org.unlaxer.dsl.Java21TestSupport.compiler();
         try(var manager=compiler.getStandardFileManager(diagnostics,null,null)) {
             boolean result=compiler.getTask(null,manager,diagnostics,List.of("--release","21","-classpath",System.getProperty("java.class.path"),"-d",directory.toString()),null,units).call();
             return new Compilation(result,diagnostics.getDiagnostics().toString());

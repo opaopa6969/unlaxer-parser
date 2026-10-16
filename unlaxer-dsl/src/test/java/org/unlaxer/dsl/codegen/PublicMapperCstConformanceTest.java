@@ -44,7 +44,7 @@ public class PublicMapperCstConformanceTest extends PreferredAstConformanceTest 
         }
         units.add(unit("guardprobe.JavaProbe",probe(fixture,"JavaProbe.java",false)));
         Path output=temporary.newFolder().toPath();
-        var compiler=ToolProvider.getSystemJavaCompiler(); var diagnostics=new DiagnosticCollector<JavaFileObject>();
+        var compiler=org.unlaxer.dsl.Java21TestSupport.compiler(); var diagnostics=new DiagnosticCollector<JavaFileObject>();
         try(var manager=compiler.getStandardFileManager(diagnostics,Locale.ROOT,StandardCharsets.UTF_8)) {
             boolean success=compiler.getTask(null,manager,diagnostics,List.of("--release","21","-classpath",System.getProperty("java.class.path"),"-d",output.toString()),null,units).call();
             assertTrue(diagnostics.getDiagnostics().toString(),success);

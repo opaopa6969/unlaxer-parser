@@ -1,0 +1,43 @@
+{
+  "before_revision": "feab16790b6a79fdb3eb0e70ffa047d86cf8b54b",
+  "after_revision": "bde53e3b34d6cec4a9c73e0c0a5fed1bfa22c893",
+  "original_grammar_sha256": "011a8947aff17aae8fe4370f4a3d8db5dc061e64ac7aa08deb96eb1f0644c84c",
+  "shared_mapped_grammar_sha256": "2f1664c7487a5999019ee2193e1d04c1f28b0e9a8f2a21be2d0f096847884b3d",
+  "input_sha256": {
+    "1": "33a96e5a8c13da852e04bebd0616090ed0347aa416b55a1ef9eb1ddef56aa07c",
+    "4": "cd7ecef2706de779aa68a62fc9d2db9541ae482474b107eb9f76416ebc2933f3",
+    "16": "5b1282d575720872c7e996b0365b1dd6abd761aeea193cfa3dc8b90cb384f859",
+    "64": "0fe2c74f2130565b78245a56031e7c789ff5a108a68c5db5e56fdc4ef4095c83",
+    "256": "85f37ee22bac9f6e495c933b92ff0835e4636d7b6a3e4c73430b6f8a0fd158ca"
+  },
+  "java": "java version \"21.0.9\" 2025-10-21 LTS\nJava(TM) SE Runtime Environment (build 21.0.9+7-LTS-338)\nJava HotSpot(TM) 64-Bit Server VM (build 21.0.9+7-LTS-338, mixed mode, sharing)\n",
+  "os": {
+    "system": "Linux",
+    "release": "6.18.33.2-microsoft-standard-WSL2",
+    "machine": "x86_64"
+  },
+  "samples_per_mode_size_condition": 1,
+  "warmup_operations_per_mode_size_condition": 1,
+  "context": "fresh ParseContext per warmup/measured operation",
+  "heap": [
+    "-Xms64m",
+    "-Xmx1g"
+  ],
+  "timed_region": "input Source/ParseContext creation and parse; excludes grammar generation, javac, serialization, metrics reflection and context close",
+  "limitations": "Shared host and JIT state; raw ns/RSS are not production performance claims. Allocation is per current Java thread, not total process allocation or retained RSS.",
+  "conditions": {
+    "default": [],
+    "roomy-64MiB": [
+      "-Dunlaxer.memo.success.maxBytes=67108864"
+    ],
+    "disabled": [
+      "-Dunlaxer.memo.success.maxBytes=0"
+    ],
+    "small-1MiB": [
+      "-Dunlaxer.memo.success.maxBytes=1048576"
+    ],
+    "no-eviction": [
+      "-Dunlaxer.memo.evictBelowFrontier=false"
+    ]
+  }
+}
