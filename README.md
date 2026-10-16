@@ -153,7 +153,7 @@ This repository provides Java and Rust implementations of **unlaxer Classic**, t
 | IDE | Generated LSP / DAP and extension hooks | Opt-in `--lsp` / `--dap`: stdio LSP and AST / token inspection |
 | Distribution | Stable Maven Central artifacts | Repository path dependencies and Linux x86_64 CI artifacts; crates use `publish = false` |
 
-**Rust now has tested generation, execution, and IDE protocols. The evidence does not yet justify an unconditional production-ready claim for the entire Rust implementation.** Evaluate production use within the documented scope against your grammar, workload, and deployment environment. Publication on crates.io and implementation quality are separate questions.
+**Java and Rust share documented [production quality criteria](docs/production-quality.md), covering source positions, Unicode, recursion limits, and IDE lifecycle.** Evaluate production use within the supported scope and resource limits against your grammar, workload, and deployment environment. This does not declare compatibility with every Java grammar or support for unimplemented features. Publication on crates.io and implementation quality are separate questions.
 
 The evidence includes [CI](.github/workflows/maven.yml) on Rust 1.85 with Cargo test / fmt / Clippy, shared Java/Rust acceptance, rejection, AST and source-position corpora, Java-host/native generator agreement, actual stdio LSP/DAP exchanges, and release-binary smoke tests. Plain `mvn test` skips Rust conformance; enable `-DrustConformance=true` to reproduce it. Commands are in the [Rust README](rust/README.md).
 

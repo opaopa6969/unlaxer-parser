@@ -151,7 +151,7 @@ MulOp ::= '*' | '/' ;
 | IDE | 生成 LSP / DAP と拡張 hook | opt-in `--lsp` / `--dap`。stdio LSP と AST / token inspection |
 | 配布 | Maven Central の安定版 | repo 内の path dependency と CI の Linux x86_64 artifact。crate は `publish = false` |
 
-**Rust は生成・実行・IDE protocol を検証する実装になっています。ただし、Rust 版全体を無条件に production-ready とする根拠はまだ揃っていません。** 対応範囲内の本番採用は、使う文法・負荷・対象環境での検証を前提に判断してください。crates.io 公開の有無と実装品質は別の軸です。
+**Java/Rust共通の[本番品質基準](docs/production-quality.md)を設け、位置・Unicode・再帰上限・IDE lifecycleを検証しています。** 対応範囲内の本番採用は、記載した資源制限と、使う文法・負荷・対象環境での検証を前提に判断してください。全Java文法との互換性や未対応機能を含む無条件のproduction-ready宣言ではありません。crates.io 公開の有無と実装品質は別の軸です。
 
 品質の根拠は [CI](.github/workflows/maven.yml) の Rust 1.85 による Cargo test / fmt / Clippy、Java/Rust 共通 corpus の受理・拒否・AST・ソース位置比較、Java host/native generator の生成一致、実 stdio LSP/DAP 通信、release バイナリ smoke です。通常の `mvn test` では Rust conformance は skip されるため、再検証には `-DrustConformance=true` が必要です。再現手順は [Rust README](rust/README.md) にあります。
 
