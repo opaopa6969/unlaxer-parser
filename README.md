@@ -424,7 +424,7 @@ The UBNF grammar file `unlaxer-dsl/grammar/ubnf.ubnf` is itself written in UBNF,
 - The generator can regenerate a `UBNFParsers` from `ubnf.ubnf`, and the self-hosting tests confirm the generated source compiles and is structurally sound. The generated `UBNFParsers` currently checked in (under `bootstrap/generated/`) is a thin shim that **delegates back to the hand-written parser**; there is **no** generated `UBNFAST` or `UBNFMapper`.
 - Because no generated `UBNFMapper` exists yet, the fixpoint tests (`SelfHostingTest`, `SelfHostingRoundTripTest`) reuse the hand-written `UBNFMapper` in both stages. As their own comments note, this is **not a true fixpoint** — what they guarantee is that generation is **deterministic** (stage-1 output == stage-2 output), not that a generated toolchain reproduces itself end to end.
 
-In short: UBNF describing UBNF, plus deterministic self-application of the parser generator, are in place; a fully self-hosted pipeline (generated parser *and* generated mapper regenerating themselves) is not yet complete.
+UBNF describing UBNF and deterministic self-application of the parser generator are in place; a fully self-hosted pipeline (generated parser *and* generated mapper regenerating themselves) is not yet complete.
 
 See [docs/architecture.md — Bootstrap](./docs/architecture.md#bootstrap-and-self-hosting) for details.
 

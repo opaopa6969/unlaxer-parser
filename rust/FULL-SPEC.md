@@ -36,7 +36,7 @@ annotation、`ParseContext` API、consume/invert伝播、incremental、IDE proto
 | numeric captures | Java int / Rust i32のchecked scalar/optional/list mappingを統一（#566） | [契約](../docs/numeric-captures.md)。8文法48入力、上下限/overflow/非整数と失敗CP位置を実consumerで比較。mixed/text aliasは別の型契約 |
 | AST family / dotted / shared | `@commonField`の有無によらず具体子variantへ透明投影（#592） | [契約](../docs/family-projection.md)。9文法25入力・不正schema3文法、両host生成一致・実mapper/eval・preferred選択/CP位置。associativeは下記#593 |
 | left recursion生成境界 | 入力非消費の再帰cycleを両hostで生成前拒否（#588） | [契約](../docs/left-recursion.md)。nullable rule/group/tokenの受理拒否、実consumer、bounded解析を比較。64/96重groupの受理を#618で維持。max=0の実行契約は#598、nullable repeatは#614で対応 |
-| preferred AST snapshot | Java既存選択とRust source由来candidate APIを統一（#567）。名前・Java wrapper depth・CP開始位置・preorder tieを比較し原文とASTを保持 | [契約](../docs/preferred-ast-snapshots.md)。20文法25入力、実compile/eval・両host全生成物一致・保持/並行mapping・不正CST/資源上限・typeof差のfingerprint拒否。family/assoc候補は#592/#593で対応、nested containerは#583で継続 |
+| preferred AST snapshot | Java既存選択とRust source由来candidate APIを統一（#567）。名前・Java wrapper depth・CP開始位置・preorder tieを比較し原文とASTを保持 | [契約](../docs/preferred-ast-snapshots.md)。20文法25入力、実compile/eval・両host全生成物一致・保持/並行mapping・不正CST/資源上限・typeof差のfingerprint拒否。family/assoc候補は#592/#593で対応。nested containerも[対応形](../docs/typed-nested-captures.md)のpreferred snapshotを検証し、残る組み合わせは#583で継続 |
 | mapping-time typeof | Java/Rust両hostで`@typeof`の値型制約を実装（#542）。private/forward capture、複数制約、enum/family/scalar/container、mapped sumを対応 | [契約・IR移行](../docs/typeof-constraints.md)。32文法100入力×6設定、5負例、全Rust生成物一致、値・失敗stage・CP位置を比較。学習用独立interpreterは明示拒否 |
 | Classic LSP構文診断 | Java/Rustで未消費末尾と最遠構文失敗を比較して表示位置を選択（#552） | [表示契約](../docs/classic-lsp-diagnostics.md)。TinyCalc共通20ケースを両生成サーバーの実stdioで検証。UTF-16範囲・offset・必要literalを比較し、public parser primary/farthestと資源失敗は保持。候補全体の表示文言はbackend固有 |
 | Java UBNF frontend → Rust generator | 限定範囲で生成済み。隣接参照の識別子境界 #131、annotation境界・eval既定値・commonField trivia #538 を修正。構文の一致とbackend対応を区別 | 全構文・annotationのpositive/negative fixture、未対応の明示拒否、再生成一致 |
@@ -167,7 +167,7 @@ Java選択テストの成功だけを今回の実行証拠とする。Java全sui
 
 ## 完了の扱いと順序
 
-公開context/combinator、optional/repeatとtyped ASTを基盤として、次はtoken/annotationとcapture互換性を拡げる。追加実験で見つけたJava numeric capture #115とcapture選択 #116の生成コードは修正した。直接numeric captureのchecked int/i32変換は#566で統一し、外側captureの入れ子container型やpreferred AST選択は#547で継続する。下流の実装済み評価器・rustcodeblockはその契約とcorpusを利用し、Classic側の未対応と製品側の残る境界を別々に進める。各行を小さなPRに分け、テスト・CI・merge・子issue closeまで行う。全体issueは未対応行を残したままcloseしない。
+公開context/combinator、optional/repeatとtyped ASTを基盤として、次はtoken/annotationとcapture互換性を拡げる。追加実験で見つけたJava numeric capture #115とcapture選択 #116の生成コードは修正した。直接numeric captureのchecked int/i32変換は#566で統一し、外側captureの入れ子container型とpreferred AST選択は上表の対応形で実装・検証し、残る組み合わせと全体の受け入れ条件は#583/#547で継続する。下流の実装済み評価器・rustcodeblockはその契約とcorpusを利用し、Classic側の未対応と製品側の残る境界を別々に進める。各行を小さなPRに分け、テスト・CI・merge・子issue closeまで行う。全体issueは未対応行を残したままcloseしない。
 
 Javaの継承階層を一対一に移植するのではなく、文法と観測可能な振る舞いを対象とする。JVM任意オブジェクト・reflection・bytecodeのnative直接実行はできないため、Rust側のhost interfaceと移植コードの境界を明記する。差を消して比較を通したことにせず、意図的な差は独立したfixtureにする。
 
