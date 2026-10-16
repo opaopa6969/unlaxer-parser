@@ -169,6 +169,8 @@ The development branch supports [literal enum values](docs/enum-values.md) in Ja
 
 [Recursive transparent helpers](docs/recursive-helpers.md) now preserve scalar and collected semantic values in both languages with bounded shape analysis.
 
+[Preferred AST snapshots](docs/preferred-ast-snapshots.md) retain mapping candidates and source positions, with Java-compatible name/depth/tie selection in Rust.
+
 [Automatic evaluation](docs/evaluation-strategies.md) now supports literal, passthrough, conditional, binary arithmetic, and variable-reference strategies in both languages, with explicit conversion hooks, short-circuit order, and fallible Rust outputs. Regenerated automatic Java evaluators must implement the new `convertValue` hook.
 
 See the [full-spec matrix](rust/FULL-SPEC.md) and [IDE inventory](docs/lsp-dap-ide-gap-inventory.md) for remaining limits: Rust incremental parsing, LSP cancellation / semantic tokens / rename and formatting transport, and some tokens and annotations are unsupported. DAP implements AST/token stepping, not live evaluator suspension. Some diagnostics and AST candidate/container behavior still differ between Java and Rust; compatibility with every Java grammar is not guaranteed.

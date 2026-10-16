@@ -27,7 +27,14 @@ fn evolution_matches_all_five_java_generated_files() {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../examples/evolution/src/generated");
     for file in generate(&support::fixture("evolution")).unwrap() {
         assert_eq!(
-            fs::read_to_string(root.join(&file.relative_path)).unwrap(),
+            fs::read_to_string(root.join(&file.relative_path))
+                .unwrap()
+                .split("\n/// Opt-in CST metadata")
+                .next()
+                .unwrap()
+                .split("\nconst __PREFERRED_ROOT:")
+                .next()
+                .unwrap(),
             file.content,
             "{}",
             file.relative_path

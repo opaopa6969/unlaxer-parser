@@ -5,6 +5,7 @@
 pub mod dap;
 mod enums;
 pub mod ir;
+pub mod preferred;
 pub use enums::{enum_constant_name, validate_enum_type};
 pub mod lexical;
 pub mod lsp;
@@ -557,11 +558,16 @@ fn expression(expr: &Expression) -> String {
             expression(child),
             max.map_or_else(|| "None".into(), |max| format!("Some({max})"))
         ),
-        Separated { child, separator } => format!(
-            "{}.separated_by_java({})",
-            expression(child),
-            expression(separator)
-        ),
+        Separated { child, separator } => {
+            let metadata = preferred::contains_depth(child);
+            let child = expression(child);
+            let separator = expression(separator);
+            if metadata {
+                format!("Expr::sequence([{child}, Expr::sequence([{separator}, Expr::Capture({}, Box::new({child}))]).zero_or_more()])",quote(preferred::EXTRA))
+            } else {
+                format!("{child}.separated_by_java({separator})")
+            }
+        },
     }
 }
 

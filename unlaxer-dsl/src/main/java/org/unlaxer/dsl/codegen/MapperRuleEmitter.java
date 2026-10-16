@@ -44,6 +44,13 @@ class MapperRuleEmitter {
                         this.spans = spans;
                     }
 
+                    /** Immutable preorder views; AST instances and span snapshots belong to this mapping. */
+                    public List<SourceMappedCandidate> candidates() {
+                        return candidates.stream().map(mapped -> new SourceMappedCandidate(
+                            mapped.token, mapped.depth, mapped.startOffset, mapped.simpleName,
+                            new SourceMappedAst<%1$s>(mapped.ast, spans))).toList();
+                    }
+
                     /** Selects without a preferred AST type. */
                     public SourceMappedSelection selectDefault() {
                         return select(null);
@@ -71,6 +78,9 @@ class MapperRuleEmitter {
                         return new SourceMappedSelection(best.token, new SourceMappedAst<>(ast, spans));
                     }
                 }
+
+                public record SourceMappedCandidate(Token token, int depth, int startOffset,
+                        String simpleName, SourceMappedAst<%1$s> sourceMap) {}
 
                 private record MappedTreeCandidate(Token token, int depth, int startOffset,
                         String simpleName, %1$s ast) {}

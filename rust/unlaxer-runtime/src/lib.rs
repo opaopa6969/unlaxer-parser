@@ -585,6 +585,32 @@ pub struct Tree {
 }
 
 impl Tree {
+    /// Validate public CST fields against the owned source before traversing a caller-supplied tree.
+    /// Parser-produced arenas are postorder; rejecting forward references also rejects cycles.
+    pub fn validate_structure(&self) -> Result<(), &'static str> {
+        if self.root >= self.nodes.len()
+            || self.byte_offsets.iter().copied().ne(self
+                .source
+                .char_indices()
+                .map(|(offset, _)| offset)
+                .chain(std::iter::once(self.source.len())))
+        {
+            return Err("invalid CST source or root");
+        }
+        let length = self.byte_offsets.len() - 1;
+        let valid_span = |span: Span| span.start <= span.end && span.end <= length;
+        for (id, node) in self.nodes.iter().enumerate() {
+            if !valid_span(node.span)
+                || node.children.iter().any(|&child| child >= id)
+                || node.captures.iter().any(|capture| {
+                    !valid_span(capture.span) || capture.nodes.iter().any(|&child| child >= id)
+                })
+            {
+                return Err("invalid CST span, edge or cycle");
+            }
+        }
+        Ok(())
+    }
     /// Recovery events reachable from this tree's selected root only.
     pub fn recoveries(&self) -> &[RecoveryDiagnostic] {
         &self.recoveries
