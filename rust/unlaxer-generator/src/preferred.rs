@@ -63,14 +63,9 @@ pub(crate) fn emit(
             a.kind,
             AnnotationKind::LeftAssoc | AnnotationKind::RightAssoc
         )
-    }) || !crate::common_fields::enabled(grammar)
-        && grammar
-            .rules
-            .iter()
-            .any(|rule| crate::common_fields::is_sum(grammar, rule))
-    {
+    }) {
         Err(unlaxer_codegen::GenerateError(
-            "sum family pending #569".into(),
+            "associative projection pending #593".into(),
         ))
     } else {
         unlaxer_codegen::preferred::parser(ir, &calls, &marker)

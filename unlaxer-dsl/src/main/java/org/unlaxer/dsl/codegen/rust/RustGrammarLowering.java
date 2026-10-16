@@ -254,7 +254,7 @@ public final class RustGrammarLowering {
             recoveries.add(recovery);
             hasLocalTrivia |= localWhitespace != null || interleave;
             ruleWhitespace.add(localWhitespace == null ? whitespace || interleave : localWhitespace);
-            mappings.add(EnumSchema.isEnum(rule) || CommonFieldSchema.enabled(grammar) && CommonFieldSchema.isSum(grammar, rule) ? null : mapping);
+            mappings.add(EnumSchema.isEnum(rule) || CommonFieldSchema.isSum(grammar, rule) ? null : mapping);
             skips.add(skip);
             operators.add(leftAssoc || rightAssoc || precedence != null
                 ? new Operator(leftAssoc ? Associativity.LEFT : rightAssoc ? Associativity.RIGHT : Associativity.NONE, precedence == null ? -1 : precedence)
@@ -971,7 +971,7 @@ public final class RustGrammarLowering {
 
     private void checkLeftRecursion(int rule, Set<Integer> visiting, Set<Integer> done) {
         if (done.contains(rule)) return;
-        if (!visiting.add(rule)) throw unsupported("left recursion at " + grammar.rules().get(rule).name());
+        if (!visiting.add(rule)) throw unsupported("E-LEFT-RECURSION: left recursion at " + grammar.rules().get(rule).name());
         if (visiting.size() > MAX_ANALYSIS_DEPTH) throw unsupported("rule analysis depth exceeds 256");
         for (int child : leadingRules(bodies.get(rule))) checkLeftRecursion(child, visiting, done);
         visiting.remove(rule);

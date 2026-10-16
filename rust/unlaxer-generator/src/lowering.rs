@@ -665,10 +665,7 @@ impl Lowering<'_> {
             self.catalogs.push(catalog);
             self.enums.push(enum_literals(rule)?);
             self.mappings.push(
-                if self.enums[i].is_empty()
-                    && !(crate::common_fields::enabled(self.grammar)
-                        && crate::common_fields::is_sum(self.grammar, rule))
-                {
+                if self.enums[i].is_empty() && !crate::common_fields::is_sum(self.grammar, rule) {
                     mapping
                 } else {
                     None
@@ -1415,7 +1412,7 @@ impl Lowering<'_> {
         }
         if !visiting.insert(rule) {
             return Err(format!(
-                "left recursion at {}",
+                "E-LEFT-RECURSION: left recursion at {}",
                 self.grammar.rules[rule].name
             ));
         }

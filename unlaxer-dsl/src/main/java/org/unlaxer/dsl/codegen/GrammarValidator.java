@@ -105,6 +105,11 @@ public final class GrammarValidator {
 
     private static List<ValidationIssue> validate(GrammarDecl grammar, boolean resolveParserClasses) {
         List<ValidationIssue> errors = new ArrayList<>();
+        try { LeftRecursionAnalysis.requireValid(grammar); }
+        catch (IllegalArgumentException error) {
+            errors.add(new ValidationIssue(error.getMessage().split(":", 2)[0], error.getMessage(),
+                "Rewrite using repetition or input-consuming right recursion."));
+        }
         validateScalarRanges(grammar, errors);
         errors.addAll(validateCaseInsensitiveTokens(grammar));
 
@@ -327,7 +332,7 @@ public final class GrammarValidator {
      * stripping optional and repeat wrappers) is a reference back to the rule
      * itself (direct) or to another rule that in turn reaches back to the original
      * rule (indirect). This method <b>never throws</b> — it is purely advisory.
-     * Existing grammars continue to parse normally.</p>
+     * Generation and strict validation reject cycles; this legacy query remains advisory.</p>
      *
      * @param grammar the grammar to inspect
      * @return {@link Optional#empty()} if no left-recursion is found, or an
@@ -343,7 +348,7 @@ public final class GrammarValidator {
     }
 
     // =========================================================================
-    // Left-recursion detection (warning only)
+    // Legacy advisory view of the bounded generation-time analysis
     // =========================================================================
 
     /**
@@ -354,7 +359,9 @@ public final class GrammarValidator {
     static List<String> detectLeftRecursion(GrammarDecl grammar) {
         List<String> warnings = new ArrayList<>();
         for (String cycleKey : detectLeftRecursionCycles(grammar)) {
-            warnings.add("W-LEFT-RECURSION: left-recursive cycle detected: " + cycleKey);
+            warnings.add(cycleKey.startsWith("analysis limit:")
+                ? "W-LEFT-RECURSION-LIMIT: " + cycleKey
+                : "W-LEFT-RECURSION: left-recursive cycle detected: " + cycleKey);
         }
         return warnings;
     }
@@ -371,8 +378,8 @@ public final class GrammarValidator {
             int firstArrow = cycleKey.indexOf(" ->");
             String firstRule = firstArrow < 0 ? cycleKey : cycleKey.substring(0, firstArrow);
             issues.add(new ValidationIssue(
-                "W-LEFT-RECURSION",
-                "left-recursive cycle detected: " + cycleKey,
+                cycleKey.startsWith("analysis limit:") ? "W-LEFT-RECURSION-LIMIT" : "W-LEFT-RECURSION",
+                cycleKey.startsWith("analysis limit:") ? cycleKey : "left-recursive cycle detected: " + cycleKey,
                 "Rewrite using repetition (e.g. A ::= B { Op B }) or right recursion.",
                 firstRule
             ));
@@ -381,142 +388,11 @@ public final class GrammarValidator {
     }
 
     private static List<String> detectLeftRecursionCycles(GrammarDecl grammar) {
-        // Build rule map
-        Map<String, RuleDecl> ruleMap = new LinkedHashMap<>();
-        for (RuleDecl rule : grammar.rules()) {
-            ruleMap.put(rule.name(), rule);
+        try { return LeftRecursionAnalysis.cycles(grammar); }
+        catch (IllegalArgumentException limit) {
+            // Legacy advisory API remains nonthrowing; generation rejects the same limit.
+            return List.of("analysis limit: " + limit.getMessage());
         }
-
-        List<String> cycles = new ArrayList<>();
-        Set<String> reported = new LinkedHashSet<>();
-
-        for (String startName : ruleMap.keySet()) {
-            // DFS: track current path for cycle detection
-            List<String> path = new ArrayList<>();
-            Set<String> onStack = new LinkedHashSet<>();
-            findLeftRecursion(startName, ruleMap, path, onStack, reported, cycles);
-        }
-        return cycles;
-    }
-
-    /**
-     * Collects the set of rule names that can appear as the <em>leftmost</em>
-     * symbol of the given rule body — i.e. rule references reachable without
-     * consuming any input first.
-     *
-     * <ul>
-     *   <li>For a {@link SequenceBody}, only the first element is relevant.</li>
-     *   <li>For a {@link ChoiceBody}, all alternatives contribute.</li>
-     *   <li>{@link OptionalElement} and {@link RepeatElement} bodies are
-     *       transparent because they can match zero tokens.</li>
-     *   <li>{@link GroupElement} is transparent (no input consumed by the group
-     *       wrapper itself).</li>
-     *   <li>A {@link UBNFAST.TerminalElement} terminates the leftmost scan —
-     *       it consumes input so no rule reference can be leftmost after it.</li>
-     * </ul>
-     */
-    private static Set<String> leftmostRuleRefs(RuleBody body) {
-        Set<String> refs = new LinkedHashSet<>();
-        collectLeftmostRefs(body, refs);
-        return refs;
-    }
-
-    private static void collectLeftmostRefs(RuleBody body, Set<String> out) {
-        if (body instanceof ChoiceBody choice) {
-            for (SequenceBody seq : choice.alternatives()) {
-                collectLeftmostRefsFromSequence(seq, out);
-            }
-        } else if (body instanceof SequenceBody seq) {
-            collectLeftmostRefsFromSequence(seq, out);
-        } else {
-            throw new IllegalStateException("unhandled " + body);
-        }
-    }
-
-    private static void collectLeftmostRefsFromSequence(SequenceBody seq, Set<String> out) {
-        for (AnnotatedElement ae : seq.elements()) {
-            boolean canBeEmpty = collectLeftmostRefsFromAtomic(ae.element(), out);
-            if (!canBeEmpty) {
-                // This element always consumes input → later elements are not leftmost
-                return;
-            }
-            // Element can match empty → continue to next element
-        }
-    }
-
-    /**
-     * Inspects one atomic element.
-     *
-     * @return {@code true} if the element can match the empty string
-     *         (allowing the next element to potentially be leftmost)
-     */
-    private static boolean collectLeftmostRefsFromAtomic(AtomicElement element, Set<String> out) {
-        if (element instanceof RuleRefElement ref) {
-            String fullName = ref.namespace()
-                .map(ns -> ns + "." + ref.name())
-                .orElse(ref.name());
-            out.add(fullName);
-            return false; // conservative: assume the referenced rule consumes input
-        }
-        if (element instanceof UBNFAST.TerminalElement t) {
-            return false;
-        }
-        if (element instanceof OptionalElement opt) {
-            collectLeftmostRefs(opt.body(), out);
-            return true; // optional always can be empty
-        }
-        if (element instanceof RepeatElement rep) {
-            collectLeftmostRefs(rep.body(), out);
-            return true; // zero-or-more can be empty
-        }
-        if (element instanceof GroupElement group) {
-            collectLeftmostRefs(group.body(), out);
-            return false; // conservative: treat group as non-empty
-        }
-        return false;
-    }
-
-    private static void findLeftRecursion(
-        String current,
-        Map<String, RuleDecl> ruleMap,
-        List<String> path,
-        Set<String> onStack,
-        Set<String> reported,
-        List<String> cycles
-    ) {
-        if (onStack.contains(current)) {
-            // Cycle detected — the cycle starts where current first appears in path
-            int cycleStart = path.indexOf(current);
-            if (cycleStart < 0) {
-                return;
-            }
-            List<String> cycle = new ArrayList<>(path.subList(cycleStart, path.size()));
-            cycle.add(current); // close the loop
-
-            // Build a canonical key to avoid duplicate reports
-            String cycleKey = String.join(" -> ", cycle);
-            if (!reported.contains(cycleKey)) {
-                reported.add(cycleKey);
-                cycles.add(cycleKey);
-            }
-            return;
-        }
-
-        RuleDecl rule = ruleMap.get(current);
-        if (rule == null) {
-            return; // external / imported rule — skip
-        }
-
-        path.add(current);
-        onStack.add(current);
-
-        Set<String> nextRefs = leftmostRuleRefs(rule.body());
-        for (String next : nextRefs) {
-            findLeftRecursion(next, ruleMap, path, onStack, reported, cycles);
-        }
-
-        path.remove(path.size() - 1);
-        onStack.remove(current);
     }
 
     private static void validateMapping(RuleDecl rule, MappingAnnotation mapping, List<ValidationIssue> errors) {
