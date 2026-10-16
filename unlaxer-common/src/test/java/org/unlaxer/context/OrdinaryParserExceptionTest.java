@@ -96,4 +96,18 @@ public class OrdinaryParserExceptionTest {
             }
         }
     }
+    @Test public void invalidRootBeforeParsingPreservesExplicitTransaction() {
+        try (var context=ParseContext.withOptions(StringSource.createRootSource("ab"),ParseOptions.DEFAULT)) {
+            Parser invalid=new org.unlaxer.parser.PseudoRootParser(org.unlaxer.Name.of("invalid"));
+            context.begin(invalid);
+            assertTrue(word("a").parse(context).isSucceeded());
+            assertThrows(RuntimeException.class,()->invalid.parse(context));
+            assertEquals(1,context.position());
+            assertEquals(2,context.getTokenStack().size());
+            assertTrue(word("b").parse(context).isSucceeded());
+            context.rollback(invalid);
+            assertEquals(0,context.position());
+        }
+    }
+
 }
