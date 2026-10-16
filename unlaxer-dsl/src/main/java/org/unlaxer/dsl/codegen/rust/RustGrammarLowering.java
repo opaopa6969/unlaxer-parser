@@ -351,6 +351,12 @@ public final class RustGrammarLowering {
         for (int i = 0; i < rules.size(); i++) {
             Rule rule = rules.get(i);
             Mapping mapping = rule.mapping() == null ? null : variants.get(rule.mapping().name());
+            if (mapping != null) {
+                var declared = grammar.rules().get(i);
+                mapping = new Mapping(mapping.name(), mapping.fields().stream().map(field ->
+                    org.unlaxer.dsl.codegen.NumericFields.isInteger(grammar, declared, field.name())
+                        ? new Field(field.name(), Kind.INTEGER, field.cardinality()) : field).toList());
+            }
             Expression expression = hasValues && !rule.skip()
                 ? mapping == null ? retainHelperValue(rule.body()) : retainTextValues(rule.body(), mapping)
                 : rule.body();
@@ -884,6 +890,7 @@ public final class RustGrammarLowering {
         return switch (parserClass) {
                 case "GraphemeParser", "org.unlaxer.parser.elementary.GraphemeParser" -> new GraphemeToken();
                 case "NumberParser", "org.unlaxer.parser.elementary.NumberParser" -> new NumberToken();
+                case "DigitParser", "org.unlaxer.parser.posix.DigitParser" -> new CharRangeToken('0', '9');
                 case "IdentifierParser", "org.unlaxer.parser.clang.IdentifierParser" -> new IdentifierToken();
                 case "SingleQuotedParser", "org.unlaxer.parser.elementary.SingleQuotedParser" -> new QuotedToken('\'');
                 case "DoubleQuotedParser", "org.unlaxer.parser.elementary.DoubleQuotedParser" -> new QuotedToken('"');

@@ -666,7 +666,8 @@ public final class RustBackend {
                 }
                 out.append("        r#").append(field.name()).append(": {\n            let mut values = Vec::new();\n")
                     .append("            for capture in node.captures.iter().filter(|c| c.name == ").append(quote(field.name())).append(") {\n");
-                if (field.kind() == Kind.NODE) out.append("                values.extend(map_nodes(tree, &capture.nodes)?);\n");
+                if (field.kind() == Kind.INTEGER) out.append("                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).parse::<i32>().map_err(|_| format!(\"invalid i32 capture {} at {}..{}\", capture.name, capture.span.start, capture.span.end))?);\n");
+                else if (field.kind() == Kind.NODE) out.append("                values.extend(map_nodes(tree, &capture.nodes)?);\n");
                 else if (field.kind() == Kind.VALUE) out.append("                values.extend(map_values(tree, &capture.nodes)?);\n");
                 else if (graphemeCapture(ir, ir.rules().get(i).body(), field.name()))
                     out.append("                values.push(tree.text(capture.span).to_owned());\n");
@@ -697,7 +698,7 @@ public final class RustBackend {
             .append(ir.mappings().isEmpty() ? "*node" : "node").append(" {\n");
         for (Mapping mapping : ir.mappings()) {
             var args = new ArrayList<>(mapping.fields().stream().map(f -> "r#" + f.name()
-                + (f.cardinality() == Cardinality.OPTIONAL ? (f.kind() == Kind.VALUE || f.kind() == Kind.ENUM ? ".as_ref()" : ".as_deref()") : "")).toList());
+                + (f.cardinality() == Cardinality.OPTIONAL ? (f.kind() == Kind.VALUE || f.kind() == Kind.ENUM || f.kind() == Kind.INTEGER ? ".as_ref()" : ".as_deref()") : "")).toList());
             args.add("*span");
             out.append("        ").append(pattern(mapping, "Ast")).append(" => semantics.")
                 .append(RustGrammarLowering.methodName(mapping.name())).append("(").append(String.join(", ", args)).append("),\n");
@@ -712,12 +713,14 @@ public final class RustBackend {
 
     static String fieldType(Field field, boolean borrowed) {
         String one = switch (field.kind()) {
+            case INTEGER -> borrowed ? "&i32" : "i32";
             case NODE -> borrowed ? "&Ast" : "Box<Ast>";
             case TEXT -> borrowed ? "&str" : "String";
             case VALUE -> borrowed ? "&AstValue" : "AstValue";
             case ENUM -> (borrowed ? "&" : "") + field.enumName();
         };
         String element = switch (field.kind()) {
+            case INTEGER -> "i32";
             case NODE -> "Ast";
             case TEXT -> "String";
             case VALUE -> "AstValue";
@@ -741,9 +744,9 @@ public final class RustBackend {
 
     private static String fieldJson(Field field) {
         String name = "r#" + field.name();
-        String value = field.kind() != Kind.TEXT ? "value.canonical_json()" : "json_string(value)";
+        String value = field.kind() == Kind.INTEGER ? "value.to_string()" : field.kind() != Kind.TEXT ? "value.canonical_json()" : "json_string(value)";
         return switch (field.cardinality()) {
-            case ONE -> field.kind() != Kind.TEXT ? name + ".canonical_json()" : "json_string(" + name + ")";
+            case ONE -> field.kind() == Kind.INTEGER ? name + ".to_string()" : field.kind() != Kind.TEXT ? name + ".canonical_json()" : "json_string(" + name + ")";
             case OPTIONAL -> name + ".as_ref().map_or_else(|| \"null\".to_owned(), |value| " + value + ")";
             case MANY -> "format!(\"[{}]\", " + name + ".iter().map(|value| " + value + ").collect::<Vec<_>>().join(\",\"))";
         };

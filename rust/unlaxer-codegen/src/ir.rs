@@ -57,6 +57,8 @@ pub struct Field {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Kind {
+    /// Java generated numeric capture contract: signed 32-bit integer.
+    Integer,
     Enum(String),
     Text,
     Node,
