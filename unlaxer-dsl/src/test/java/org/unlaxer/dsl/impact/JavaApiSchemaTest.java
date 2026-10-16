@@ -99,7 +99,7 @@ public class JavaApiSchemaTest {
         String before = """
             grammar Eval {
               @root @mapping(Binary, params=[left,op,right])
-              Root ::= '1' @left '+' @op '2' @right;
+              Root ::= '1' @left { '+' @op '2' @right };
             }
             """;
         String after = before.replace("@mapping(Binary, params=[left,op,right])",

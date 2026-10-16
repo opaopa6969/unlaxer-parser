@@ -131,7 +131,7 @@ pub fn fixture(name: &str) -> GrammarIr {
             rule(
                 "Leaf",
                 Sequence(vec![cap("value", NumberToken)]),
-                Some(("Leaf", vec![field("value", Text, One)])),
+                Some(("Leaf", vec![field("value", Integer, One)])),
             ),
         ],
         "shared" => {

@@ -4,7 +4,7 @@ use serde_json::{Value,json};
 use unlaxer_runtime::{Span,ParseOptions,Memoization,Diagnostics};
 #[derive(Default)]struct Probe{events:Vec<String>}
 fn value(v:EvalValue<'_>)->Value{match v{
-    EvalValue::Text(text)=>json!(text),EvalValue::Enum{name,text}=>json!(["enum",name,text]),
+    EvalValue::Text(text)=>json!(text),EvalValue::Integer(n)=>json!(n),EvalValue::Enum{name,text}=>json!(["enum",name,text]),
     EvalValue::Node(node)=>{let Ast::Node{text,..}=node else{panic!("unexpected node")};json!(["node",text])},
     EvalValue::Optional(v)=>v.map_or(Value::Null,|v|value(*v)),EvalValue::Many(v)=>json!(v.into_iter().map(value).collect::<Vec<_>>())}}
 impl Semantics for Probe{type Output=Value;

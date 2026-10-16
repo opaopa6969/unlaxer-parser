@@ -1,7 +1,8 @@
 grammar AutoEval {
   @package: org.example.autoeval
   token TEXT = UNTIL(')')
-  @root Root ::= Shadow | Conditional | Binary | Pass | Variable | Literal | Manual | Unknown;
+  token NUM = NumberParser
+  @root Root ::= BinaryInteger | Shadow | Conditional | Binary | Pass | Variable | Literal | Manual | Unknown;
   @mapping(Literal, params=[value]) Shadow ::= 'x(' TEXT @value ')';
   @mapping(Literal, params=[value])
   @eval(kind='literal')
@@ -15,6 +16,9 @@ grammar AutoEval {
   @mapping(Binary, params=[left, op, right])
   @eval(kind='binary_arithmetic')
   Binary ::= 'b(' Literal @left { '+' @op Literal @right } ')';
+  @mapping(BinaryInteger, params=[left, op, right])
+  @eval(kind='binary_arithmetic')
+  BinaryInteger ::= 'i(' NUM @left { '+' @op NUM @right } ')';
   @mapping(Conditional, params=[condition, thenExpr, elseExpr])
   @eval(kind='conditional')
   Conditional ::= 'c(' Literal @condition ',' Manual @thenExpr ',' Manual @elseExpr ')';

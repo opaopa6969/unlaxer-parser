@@ -62,7 +62,7 @@ final class RustEvalEmitter {
         source = source.replace("}\n\n#[allow(non_snake_case)]\npub fn evaluate", helpers+"}\n\n#[allow(non_snake_case)]\npub fn evaluate")
             .replace("evaluate<S: Semantics>","evaluate<S: Semantics + ?Sized>");
         if (values) {
-            String type = "\n/// Borrowed typed literal input; containers preserve their shape.\n#[derive(Debug)]\npub enum EvalValue<'a> {\n    Text(&'a str),\n    Node(&'a Ast),\n    Enum { name: &'static str, text: &'static str },\n    Optional(Option<Box<EvalValue<'a>>>),\n    Many(Vec<EvalValue<'a>>),\n}\n";
+            String type = "\n/// Borrowed typed literal input; containers preserve their shape.\n#[derive(Debug)]\npub enum EvalValue<'a> {\n    Text(&'a str),\n    Integer(i32),\n    Node(&'a Ast),\n    Enum { name: &'static str, text: &'static str },\n    Optional(Option<Box<EvalValue<'a>>>),\n    Many(Vec<EvalValue<'a>>),\n}\n";
             if (ir.mappings().stream().flatMap(m -> m.fields().stream()).anyMatch(f -> f.kind()==Kind.VALUE)) {
                 type += "\nfn eval_value(value: &AstValue) -> EvalValue<'_> {\n    match value {\n        AstValue::Text { text, .. } => EvalValue::Text(text),\n        AstValue::Node(node) => EvalValue::Node(node),\n";
                 for (var rule : ir.rules()) if (!rule.enumLiterals().isEmpty())
@@ -92,6 +92,7 @@ final class RustEvalEmitter {
     private static String scalar(Field field, String expression) {
         return switch(field.kind()) {
             case TEXT -> "EvalValue::Text("+expression+")";
+            case INTEGER -> "EvalValue::Integer(*"+expression+")";
             case NODE -> "EvalValue::Node("+expression+")";
             case ENUM -> "EvalValue::Enum { name: "+RustBackend.quote(field.enumName())+", text: "+expression+".text() }";
             case VALUE -> "eval_value("+expression+")";
@@ -101,6 +102,7 @@ final class RustEvalEmitter {
         return switch(field.kind()) {
             case NODE -> "evaluate("+expression+", self)";
             case TEXT -> "self.evaluate_literal("+expression+")";
+            case INTEGER -> "self.evaluate_literal(&"+expression+".to_string())";
             case ENUM -> "self.evaluate_literal(&format!(\"{:?}\", "+expression+"))";
             case VALUE -> {
                 String arms = "match "+expression+" { AstValue::Text { text, .. } => self.evaluate_literal(text), AstValue::Node(node) => evaluate(node, self),";

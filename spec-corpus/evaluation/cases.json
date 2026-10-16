@@ -321,5 +321,44 @@
       0,
       4
     ]
+  },
+  {
+    "input": "i(+001)",
+    "value": 1,
+    "events": [
+      "leaf:1"
+    ],
+    "span": [
+      0,
+      7
+    ]
+  },
+  {
+    "input": "i(-2+4+3)",
+    "value": 5,
+    "events": [
+      "leaf:-2",
+      "leaf:4",
+      "binary:+",
+      "leaf:3",
+      "binary:+"
+    ],
+    "span": [
+      0,
+      9
+    ]
+  },
+  {
+    "input": "i(1+13+8)",
+    "error": "binary failure",
+    "events": [
+      "leaf:1",
+      "leaf:13",
+      "binary:+"
+    ],
+    "span": [
+      0,
+      9
+    ]
   }
 ]
