@@ -4,7 +4,7 @@
 
 `parseOptions: true` は OFF/SAFE_FAILURES × AUTO/DETAILED/DETAILED_ON_FAILURE の6設定を要求する。`parseCp` は構文失敗のfarthest、または完全な構文prefixの後の余剰入力位置。Javaの直接contextはdeferred診断で自動再試行しないので位置はDETAILEDで観測し、全設定で受理/拒否・正常値・保持snapshotを比較する。
 
-`invalid-cases.json` は今回許可しないoptional/empty/別repeatの生成前拒否を、Java-host/native-host Rustで比較する。これらがJavaでも未対応だという意味ではない。右結合やnested-ownerの新形はこのcorpusの対象外。
+`invalid-cases.json` は空literalの既存生成前拒否をJava-host/native-host Rustで比較する。Optional/別Repeatの旧拒否2例は、基準Javaで正常であると確認し、後続 `associative-nullable-delimiters` の成功oracleへ移した（#679）。右結合やnested-ownerの新形はこのcorpusの対象外。
 
 実行:
 

@@ -2318,9 +2318,36 @@ fn assoc_skeleton(expression: &Expression) -> Vec<&Expression> {
     match expression {
         Expression::Sequence(elements) => elements
             .iter()
-            .filter(|element| !matches!(element, Expression::Literal(text) if !text.is_empty()))
+            .filter(|element| !assoc_delimiter(element))
             .collect(),
         _ => Vec::new(),
+    }
+}
+
+fn assoc_delimiter(expression: &Expression) -> bool {
+    match expression {
+        Expression::Literal(text) => !text.is_empty(),
+        Expression::OptionalExpr(child)
+        | Expression::Repeat {
+            child,
+            min: 0,
+            max: None,
+        } => literal_delimiter_body(child),
+        _ => false,
+    }
+}
+
+// Only one Optional/Repeat around a literal sequence: no recursive semantic inference.
+fn literal_delimiter_body(expression: &Expression) -> bool {
+    match expression {
+        Expression::Literal(text) => !text.is_empty(),
+        Expression::Sequence(elements) => {
+            !elements.is_empty()
+                && elements
+                    .iter()
+                    .all(|element| matches!(element, Expression::Literal(text) if !text.is_empty()))
+        }
+        _ => false,
     }
 }
 

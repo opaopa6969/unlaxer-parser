@@ -574,8 +574,24 @@ public final class RustGrammarLowering {
     private static List<Expression> assocSkeleton(Expression expression) {
         if (!(expression instanceof Sequence sequence)) return List.of();
         return sequence.elements().stream()
-            .filter(element -> !(element instanceof Literal literal && !literal.text().isEmpty()))
+            .filter(element -> !assocDelimiter(element))
             .toList();
+    }
+
+    private static boolean assocDelimiter(Expression expression) {
+        if (expression instanceof Literal literal) return !literal.text().isEmpty();
+        if (expression instanceof OptionalExpr optional) return literalDelimiterBody(optional.child());
+        if (expression instanceof Repeat repeat)
+            return repeat.min() == 0 && repeat.max() == null && literalDelimiterBody(repeat.child());
+        return false;
+    }
+
+    // Only one Optional/Repeat around a literal sequence: no recursive semantic inference.
+    private static boolean literalDelimiterBody(Expression expression) {
+        if (expression instanceof Literal literal) return !literal.text().isEmpty();
+        return expression instanceof Sequence sequence && !sequence.elements().isEmpty()
+            && sequence.elements().stream().allMatch(element ->
+                element instanceof Literal literal && !literal.text().isEmpty());
     }
 
     private void checkLeftAssoc(int rule, Mapping mapping) {

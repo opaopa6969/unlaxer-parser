@@ -56,6 +56,16 @@ AST の field 型・コンストラクタ・source span の単位は変更しま
 
 検査では、rule の直下 Sequence と、その唯一の無制限 Repeat の直下 Sequence から、capture を持たない**非空の固定 literal**だけを除いた形が `left { op right }` であることを要求します。検査用の列を作るだけで、実 IR・parser・CST から delimiter は取り除きません。prefix、left と Repeat の間、suffix、Repeat 内の op/right の前後に置いた固定 literal は入力として必要で、AST span と preferred source はその原文を保持します。`left` は scalar、`op` と `right` は順序付き List の既存 schema のままです。
 
-Optional delimiter、空 literal、別の Repeat、一般的な helper/choice を挟む形は今回開放しません。これらは Rust の生成前診断を維持し、Java の全ての左結合文法と同等になったとは主張しません。非 canonical な右結合や nested-owner associative annotation も対象外です。
+#674 単位は固定 literal に限定しました。非捕捉 Optional / Repeat delimiter は後続 #679 の下記範囲で対応します。空 literal、一般的な helper/choice、非 canonical な右結合、nested-owner associative annotation は今回開放しません。Java の全ての左結合文法を同等化したという主張はしません。
 
-`spec-corpus/associative-delimiters` は NUMBER、literal、tokenStream、Unicode / CRLF、複数 precedence の mapped operand、非捕捉 delimiter、0/1/複数回反復と失敗を共有します。Java21 と両 host の Rust1.85 出力を実 compile/map/eval し、memo OFF / SAFE_FAILURES と診断 AUTO / DETAILED / DETAILED_ON_FAILURE の6組を検証します。CP失敗位置は Java の DETAILED で、構文失敗なら farthest、成功した prefix の後に余剰入力がある場合は consumed end を観測し、Rust の完全入力解析が返す位置と比較します。直接 ParseContext の deferred 診断に、完全入力 API の自動再試行を仮定しません。
+`spec-corpus/associative-delimiters` は NUMBER、literal、tokenStream、Unicode / CRLF、複数 precedence の mapped operand、非捕捉 delimiter、0/1/複数回反復と失敗を共有します。Java21 と両 host の Rust1.85 出力を実 compile/map/eval し、memo OFF / SAFE_FAILURES と診断 AUTO / DETAILED / DETAILED_ON_FAILURE の6組を検証します。CP失敗位置は Java の DETAILED で、構文失敗なら farthest、成功した prefix の後に余剰入力がある場合は consumed end と記録済失敗の大きい位置を観測し、Rust の完全入力解析が返す位置と比較します。直接 ParseContext の deferred 診断に、完全入力 API の自動再試行を仮定しません。
+
+## 非捕捉 Optional / Repeat delimiter（#679）
+
+基準 Java `6816a2a6` で正常だった `['('] NUMBER @left { '+' @op NUMBER @right }` と `{ '!' } NUMBER @left { '+' @op NUMBER @right }` を、両 Rust host にも対応させます。前者の `(1+2+3` は `left=1, op=["+","+"], right=[2,3]` / CP `[0,6]`、後者の `!!1+2+3` は同じ値 / CP `[0,7]` です。`''` を置いた対照は Java でも常に構文失敗であり、Rust の empty-literal 生成前拒否を維持します。
+
+検査で除外できる非捕捉要素は、非空固定 literal またはその列を、1段の Optional / zero-or-more Repeat で包んだものです。これは検査用の列だけに適用し、実 parser の試行・rollback・位置・原文は保持します。意味を持つ唯一の `left {op right}` 列は既存 capture 名・順序・型条件で検証します。非捕捉の別 Repeat が先にあっても、shared spine は `op` / `right` capture を持つ Repeat を使うため、delimiter が AST operand や型判定へ混入しません。
+
+直接の入力位置を保つため、delimiter を消した文法で再parseしたり、構文を任意に書き換えたりしません。既存 AST型、コンストラクタ、field順、evaluator引数、nullable synthetic leaf の意味は維持します。任意 helper/choice・匿名再帰形・nested-owner の新合成はこの変更では開放しません。
+
+`spec-corpus/associative-nullable-delimiters` は6文法27入力、memo2×診断3で Java と各 Rust 出力を別compile/map/evalします。Optionalの有無・delimiter反復回数・演算子反復回数、内部delimiter、tokenStream、Unicode/CRLF、shared precedence、preferred/保持snapshot、失敗を手書き期待値と比較します。`(1+` は primary trailing-input CP2 / farthest CP3、`!!1+` は primary CP3 / farthest CP4です。Java direct parserのprefix成功とfull-input消費条件を区別して両位置を観測し、Rust full-input diagnosticと照合します。捕捉値を増やすprefix、意味列が二つあるshape、empty literalは生成前に拒否します。

@@ -37,16 +37,24 @@ fn operands(rule: &RuleDecl) -> Vec<&AtomicElement> {
     else {
         return vec![];
     };
-    let Some(body) = seq.elements.iter().find_map(|element| {
-        if let ElementKind::Repeat(body) = &element.element.kind {
-            Some(body)
-        } else {
-            None
-        }
+    // Other repetitions may contain only delimiters. The semantic tail owns both bindings.
+    let Some(tail) = seq.elements.iter().find_map(|element| {
+        let ElementKind::Repeat(body) = &element.element.kind else {
+            return None;
+        };
+        let [tail] = body.alternatives.as_slice() else {
+            return None;
+        };
+        (tail
+            .elements
+            .iter()
+            .any(|element| element.capture.as_deref() == Some("op"))
+            && tail
+                .elements
+                .iter()
+                .any(|element| element.capture.as_deref() == Some("right")))
+        .then_some(tail)
     }) else {
-        return vec![];
-    };
-    let [tail] = body.alternatives.as_slice() else {
         return vec![];
     };
     let Some(right) = tail

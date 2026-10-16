@@ -85,9 +85,11 @@ public class PreferredAstConformanceTest {
                             assertFalse(input, parsed);
                             if (row.has("parseCp") && parseOptions.diagnostics()
                                     == org.unlaxer.context.ParseOptions.Diagnostics.DETAILED) {
-                                assertEquals(input, row.get("parseCp").getAsInt(),
-                                    parseResult.isSucceeded() ? context.getConsumedPosition().value()
-                                        : context.getParseFailureDiagnostics().getFarthestOffset());
+                                int recorded = context.getParseFailureDiagnostics().getFarthestOffset();
+                                int primary = parseResult.isSucceeded() ? context.getConsumedPosition().value() : recorded;
+                                assertEquals(input, row.get("parseCp").getAsInt(), Math.max(primary, recorded));
+                                if (row.has("primaryCp"))
+                                    assertEquals(input, row.get("primaryCp").getAsInt(), primary);
                             }
                             continue;
                         }
@@ -330,6 +332,9 @@ public class PreferredAstConformanceTest {
                         if (row.has("parseCp")) code.append("assert_eq!(generated::parser::parse_tree_for_mapping(")
                             .append(rustString(value)).append(").unwrap_err().offset,")
                             .append(row.get("parseCp").getAsInt()).append(");\n");
+                        if (row.has("primaryCp")) code.append("assert_eq!(generated::parser::parse_tree_detailed(")
+                            .append(rustString(value)).append(").unwrap_err().offset,")
+                            .append(row.get("primaryCp").getAsInt()).append(");\n");
                     } else if (row.has("errorCp")) {
                         String at = "at CP " + row.getAsJsonArray("errorCp").get(0).getAsInt() + ":" + row.getAsJsonArray("errorCp").get(1).getAsInt();
                         code.append("{let tree=generated::parser::parse_tree_for_mapping(").append(rustString(value)).append(").unwrap();let error=generated::mapper::map_parsed_tree(&tree).err().expect(\"mapping failure\");assert!(error.contains(").append(rustString(at)).append("),\"{}\",error);}");
@@ -460,6 +465,8 @@ public class PreferredAstConformanceTest {
                     String value = rustString(raw.getAsJsonObject().get("input").getAsString());
                     configured = configured.replace("generated::parser::parse_tree_for_mapping(" + value + ")",
                         "generated::parser::parse_tree_for_mapping_with_options(" + value + ",options)");
+                    configured = configured.replace("generated::parser::parse_tree_detailed(" + value + ")",
+                        "generated::parser::parse_tree_detailed_with_options(" + value + ",options)");
                 }
                 code = new StringBuilder(configured).append(
                     "fn main(){use unlaxer_runtime::{ParseOptions,Memoization,Diagnostics};"

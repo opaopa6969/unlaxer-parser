@@ -27,8 +27,7 @@ public class AssociativeDelimiterConformanceTest extends PreferredAstConformance
         Path repo = Path.of("..").toAbsolutePath().normalize();
         run(List.of("cargo", "build", "--locked", "--manifest-path",
             repo.resolve("rust/Cargo.toml").toString(), "-p", "unlaxer-generator"), "", false, true);
-        var rows = JsonParser.parseString(Files.readString(
-            repo.resolve("spec-corpus/associative-delimiters/invalid-cases.json"))).getAsJsonArray();
+        var rows = invalidCorpus();
         for (var raw : rows) {
             var row = raw.getAsJsonObject();
             String source = row.get("grammar").getAsString();
@@ -45,5 +44,10 @@ public class AssociativeDelimiterConformanceTest extends PreferredAstConformance
             assertTrue(diagnostic, diagnostic.contains(expected));
             assertFalse(Files.exists(output.resolve("ast.rs")));
         }
+    }
+
+    protected JsonArray invalidCorpus() throws Exception {
+        return JsonParser.parseString(Files.readString(
+            Path.of("../spec-corpus/associative-delimiters/invalid-cases.json"))).getAsJsonArray();
     }
 }
