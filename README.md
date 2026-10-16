@@ -171,6 +171,8 @@ The development branch supports [literal enum values](docs/enum-values.md) in Ja
 
 [Automatic evaluation](docs/evaluation-strategies.md) now supports literal, passthrough, conditional, binary arithmetic, and variable-reference strategies in both languages, with explicit conversion hooks, short-circuit order, and fallible Rust outputs. Regenerated automatic Java evaluators must implement the new `convertValue` hook.
 
+[Owned capture and replay](docs/owned-capture-replay.md) now retain actual input, projected, or generated text in both runtimes, with nested scopes and transactional rollback. Java exposes `NamedCapture` / `ReplayParser` / `CaptureScope`; Rust exposes `capture_owned` / `Replay` / `capture_scope`. General UBNF syntax remains tracked in #591. These APIs are development changes after 3.3.0.
+
 See the [full-spec matrix](rust/FULL-SPEC.md) and [IDE inventory](docs/lsp-dap-ide-gap-inventory.md) for remaining limits: Rust incremental parsing, LSP cancellation / semantic tokens / rename and formatting transport, and some tokens and annotations are unsupported. DAP implements AST/token stepping, not live evaluator suspension. Some diagnostics and AST candidate/container behavior still differ between Java and Rust; compatibility with every Java grammar is not guaranteed.
 
 Downstream `tinyexpression-rs` and `rustcodeblock` AOT exist on the separate **ubnfc** engine. Their results do not establish Classic Rust parity or production deployment history. See the [engine guide](docs/engine-selection-guide-ja.md) and [pinned downstream audit](rust/FULL-SPEC.md#下流tinyexpressionの現状監査2026-09-30).
