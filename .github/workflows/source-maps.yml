@@ -12,7 +12,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-          cache: maven
       - uses: dtolnay/rust-toolchain@stable
       - run: python3 scripts/generate-grapheme-tables.py --check
       - run: mvn -B -pl unlaxer-common -am test -Dtest=SourceMapsTest,PositionResolverBoundaryTest,DocumentSnapshotInverseTest,GraphemeTest -Dsurefire.failIfNoSpecifiedTests=false

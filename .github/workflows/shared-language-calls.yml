@@ -12,7 +12,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '21.0.9'
-          cache: maven
       - uses: dtolnay/rust-toolchain@1.85.0
       - run: mvn -B -pl unlaxer-common,unlaxer-dsl -am test -Dtest=SharedLanguageCallConformanceTest,RustUbnfFrontendConformanceTest -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
         env:
