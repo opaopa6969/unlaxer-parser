@@ -4,6 +4,8 @@
 
 ## 基準と判定
 
+- 継続parity監査基準（2026-10-16）: Java `6816a2a69651ab5819f0397f9cba5510413871df`、JDK21、Rust1.85。Java17固有の互換維持を新機能の制約にしない。公開済み3.3.0と開発中の追加を区別する。#535〜#549、#552、#555等の受け入れ条件を順に解消し、全体の未完了は親#111で継続する。
+
 - 初期互換基準: unlaxer-parser `72de487020cd6321660dc7114f31ae008c629416`、tinyexpression `6c8196b7879abe58d6b739d3e63a16e853745ced`。構文・annotationの列挙元は`unlaxer-dsl/src/main/java/org/unlaxer/dsl/bootstrap/UBNFAST.java`、仕様案は`unlaxer-dsl/specs/`。文書と実装が異なる場合はテストで差を確認し、意図を記録する。
 - 現状監査（2026-09-30、#327）: unlaxer-parser `0b79ca4ddcfdde2fbce893bf30f3a64ae2a49d0a`、tinyexpression `19945446216b7f0d6d8817b353385cbb96bcee25`。初期基準からの要求を消したり、別engineの実装でClassicの互換性を証明したことにはしない。
 - 「生成済み」は現在の限定UBNFから生成・コンパイル・実行できる範囲。「runtimeのみ」は手書きAPIで使えるがUBNF経路は未対応。「未対応」は今後の作業で、対応済みとして数えない。
@@ -25,7 +27,12 @@ annotation、`ParseContext` API、consume/invert伝播、incremental、IDE proto
 
 | 機能群 | 現状 | 追加の受け入れ条件 |
 |---|---|---|
-| Java UBNF frontend → Rust generator | 限定範囲で生成済み。隣接参照の識別子境界 #131 修正 | 全構文・annotationのpositive/negative fixture、未対応の明示拒否、再生成一致 |
+| left recursion生成境界 | Java/Rust両hostで入力非消費の再帰cycleを生成前拒否（#588） | [契約・移行](../docs/left-recursion.md)。nullable rule/group/tokenを含む共通受理拒否、実生成consumerとbounded解析。max=0のruntime補修は#598 |
+| literal enum | Java/Rust両hostで型付きscalar/optional/listとroot wrapperを生成（#537） | [契約・命名移行・出現位置](../docs/enum-values.md)。24文法56入力を6設定で実compile/map/evalし、34負例・生成物/impact一致・exhaustive consumer破壊を検証。enum/Text/Node混在とshared mapping、rootとの併用も対応（#539）。追加9文法116入力×6設定で型・値・出現span・DAP AST stepsを確認。typeof混在制約も両hostで対応（#542） |
+| typed common fields | `@commonField`を両hostで検証・生成（#541）。Javaは実field型のinterface accessor、Rustはfamily所属を表すborrowed view。flat/dotted/中間sumとmixed enum/Text/Nodeをscalar/optional/listで対応 | [契約](../docs/common-fields.md)。10文法30入力・13負例で実compile/eval、CP位置、生成物/API schema一致。preferred type・nested containerは#547 |
+| numeric captures | Javaの既存int契約へRust i32/Option<i32>/Vec<i32>とchecked mappingを統一（#566）。NumberParser/DigitParserの純numeric fieldを対象とし、混合値やtext aliasは変更しない | [契約](../docs/numeric-captures.md)。8文法48入力・実compile/map/eval・上下限/overflow/非整数/CP位置を共有検証。preferred/nested/familyの残差は#567/#568/#569 |
+| mapping-time typeof | Java/Rust両hostで`@typeof`の値型制約を実装（#542）。private/forward capture、複数制約、enum/family/scalar/container、mapped sumを対応 | [契約・IR移行](../docs/typeof-constraints.md)。32文法100入力×6設定、5負例、全Rust生成物一致、値・失敗stage・CP位置を比較。学習用独立interpreterは明示拒否 |
+| Java UBNF frontend → Rust generator | 限定範囲で生成済み。隣接参照の識別子境界 #131、annotation境界・eval既定値・commonField trivia #538 を修正。構文の一致とbackend対応を区別 | 全構文・annotationのpositive/negative fixture、未対応の明示拒否、再生成一致 |
 | UBNF source snapshot | Java `parseWithSource` / Rust `parse_with_source`。同じparseのowned AST・元入力・code-point位置、capture/typeofの範囲を保持（#318） | [契約と検証](../docs/ubnf-source-snapshot.md)。LF/CRLFの共通corpusで全ノードの位置・元textを比較。import展開後の複数ファイル由来は未対応 |
 | 移植可能性チェック | 両hostの `check --target rust` と位置付きJSON（#157）。未対応機能の全出現inventory、対応範囲内は構造検証 | [契約と検証](../docs/portability-check.md)。共通corpus/実P4/注入負例で結果・位置・exit一致、無書込み・外部class非実行。構造検証はfail-first、target Javaや完全移植の保証とは区別 |
 | 公開ParseContext・custom parser | runtimeと生成入口を実装。生成grammarは`OnceLock<SharedGrammar>`で1回構築し、並行parseでは不変graphだけを共有（#185） | 共有入力・Unicode位置・typed状態・CST/captureのrollback、先読み、生成parser混在を継続検証。tinyexpressionでsetup/探索を分離して再測定 |
@@ -52,10 +59,10 @@ annotation、`ParseContext` API、consume/invert伝播、incremental、IDE proto
 | global/rule whitespace・interleave | javaStyle/none・interleave と non-nullable な名前付き lexical trivia を両生成経路で対応。global/rule の相対・package import、tokenStream 全4modeの global trivia に対応（#172 / #393 / #432） | [trivia契約](../docs/rule-trivia.md)と[tokenStream契約](../docs/token-stream.md)。親子の独立設定・override・token内部・nullable拒否・原文位置を共通corpusで比較。任意host parserのtrivia登録、global `@comment`、lexicalContext のない tokenStream の rule-local whitespace/interleave と tokenStream の全 profile における rule-local 名前付き定義は対応範囲外 |
 | scoped lexical context | 明示 terminal 集合を両frontend・生成器・runtimeで切替。global named trivia と rule-local javaStyle/none の合成、4 lexing modes を対応（#377 / #467） | [契約と共通corpus](../docs/contextual-lexing.md)。raw CP/UTF-16 位置・AST/CST・cache policy・失敗/choice/独立子entryの復元を比較。inventory は global 定義の原文一覧。動的indent/ASI・完全なTSX構文は未対応 |
 | imports・複数grammar・namespace | 宣言的token moduleの相対import・aliasと、builtin/local/HTTPSの固定package・manifest/lock/cache・出典表示に両hostで対応（#368 / #401 / #407 / #412） | [package契約](../docs/ubnf-packages.md)。明示resolveだけが取得し、通常生成はオフライン。exact版/hash・推移依存・競合/循環/境界外参照拒否を比較。rule/evaluator/host-code importと一般の複数grammar合成は未対応 |
-| mapping・capture・source-preserving AST | scalar/optional/list/groupと混在Text/Node値を生成。Rustはspan付きAstValue、JavaはObject系。shared mappingの型joinは宣言順非依存。単一capture内の複数semantic子とhelper内部optional/repeatのcardinality・全値収集を両言語で実装（#160）。純mapped aliasもNodeを保持し、直接/多段/group/delimiter・複数targetの値と位置を両backendで比較（#163）。Java位置binding #116・zero-field生成 #129・複合text capture #132・混在値 #156を修正 | 入れ子container型、再帰的unmapped rule、typeof/commonField/enum、全Java capture規則との互換性 |
-| evaluator dispatch・網羅性 | 限定範囲で生成済み | 新nodeのE0004/E0046検証を拡張。eval annotation、型境界、短絡評価を追加。Java sum/dotted evaluatorの不具合 #130 は修正済み |
+| mapping・capture・source-preserving AST | scalar/optional/list/groupと混在Text/Node値を生成。Rustはspan付きAstValue、JavaはObject系。shared mappingの型joinは宣言順非依存。単一capture内の複数semantic子とhelper内部optional/repeatのcardinality・全値収集を両言語で実装（#160）。純mapped aliasもNodeを保持し、直接/多段/group/delimiter・複数targetの値と位置を両backendで比較（#163）。Java位置binding #116・zero-field生成 #129・複合text capture #132・混在値 #156を修正 | 再帰unmapped helperは[共通契約](../docs/recursive-helpers.md)で対応（#582）。14文法40入力×6設定、失敗後状態/資源制限も比較。入れ子container構造は#583、未変換left recursionは#588 |
+| evaluator dispatch・網羅性 | Java/Rustの自動literal/passthrough/conditional/binary/variableとmanual/unknown義務を実装（#543）。checked conversionと短絡・失敗順序を保持 | [契約・移行](../docs/evaluation-strategies.md)。56入力×6設定、13不正文法、実compile/eval/負compile、両Rust host source/API schema一致。合法Java overloadのinspectionと個別originも#574で対応 |
 | 原文保持rename・format・code action | token/trivia所有とchecked plan、完全symbol identityに基づく定義/import名・明示alias rename、snapshot付きquery policyをJava/Rustへ実装（#382） | [契約・共通fixture](../docs/source-preserving-edits.md)。shadowing/別module/文字列・CRLF/Unicode・部分入力・3段source mapを保持。FORMATは明示policyによる既存空白編集。workspace batchと単一host queryを区別し、生成LSP/Playground登録は別の統合単位 |
-| 文法進化の API 影響レポート | Java / Rust target の AST / evaluator schema と read-only `impact` JSON（#159） | [契約と再現手順](../docs/api-impact-report.md)。13変更×LF/CRLF、Rust target の両host一致、実 javac/rustc の旧・新利用者検証。全API/ABIや意味的互換性の保証ではない |
+| 文法進化の API 影響レポート | Java / Rust target の AST / evaluator schema と read-only `impact` JSON（#159） | [契約と再現手順](../docs/api-impact-report.md)。16変更×LF/CRLF、Javaの合法overload保持とsignature別差分（#574）、Rust target の両host一致、実 javac/rustc の旧・新利用者検証。全API/ABIや意味的互換性の保証ではない |
 | leftAssoc/rightAssoc/precedence | canonical leftAssocとrightAssoc、precedence metadata、schemaを統合したshared mapping、混在factorを生成 | 左辺＋op/right列と右再帰、文法階層による優先順位を検証。非canonical右結合形、Javaの特殊null/literal leafとRust AstValueの構造互換は未完了。Java raw CST反復欠落 #138・右結合 #139 は独立修正 |
 | backref・MatchedToken相当 | context-wide replay、scope付き文法の参照検証、scopeなしUBNFのrule-local capture比較（#325）を区別して対応 | [比較の契約・移行・共通corpus](../docs/generated-scope-effects.md)。capture比較は構文認識ではなく意味診断。replayのUBNF接続、名前の寿命・入れ子・伝播の全互換、コピー言語のpositive/negative testは未完了 |
 | PropagationStopper・consume/invert・virtual token・metadata | 明示 runtime API の word / sequence / choice / invert / consume-invert stopper と4種 token、portable string metadata / 関連 ID を追加（#438）。Java 任意 Object / 関連 Token の既存 API は維持 | [契約・独立共通 fixture](../docs/portable-token-metadata.md)。Java/Rust 実 parser の source / 両 cursor / CP span / 失敗と rollback / owned retention / 失効 ID を検証。任意 custom parser の全伝播、全 combinator / annotation / UBNF 接続と stateful memo parity は未完了 |
@@ -138,7 +145,7 @@ Java選択テストの成功だけを今回の実行証拠とする。Java全sui
 
 ## 完了の扱いと順序
 
-公開context/combinator、optional/repeatとtyped ASTを基盤として、次はtoken/annotationとcapture互換性を拡げる。追加実験で見つけたJava numeric capture #115とcapture選択 #116の生成コードは修正した。int変換とRustの字句保持の差は共有corpusで固定し、数値意味論のbackend間統一と外側captureの入れ子container型は未完了事項とする。下流の実装済み評価器・rustcodeblockはその契約とcorpusを利用し、Classic側の未対応と製品側の残る境界を別々に進める。各行を小さなPRに分け、テスト・CI・merge・子issue closeまで行う。全体issueは未対応行を残したままcloseしない。
+公開context/combinator、optional/repeatとtyped ASTを基盤として、次はtoken/annotationとcapture互換性を拡げる。追加実験で見つけたJava numeric capture #115とcapture選択 #116の生成コードは修正した。直接numeric captureのchecked int/i32変換は#566で統一し、外側captureの入れ子container型やpreferred AST選択は#547で継続する。下流の実装済み評価器・rustcodeblockはその契約とcorpusを利用し、Classic側の未対応と製品側の残る境界を別々に進める。各行を小さなPRに分け、テスト・CI・merge・子issue closeまで行う。全体issueは未対応行を残したままcloseしない。
 
 Javaの継承階層を一対一に移植するのではなく、文法と観測可能な振る舞いを対象とする。JVM任意オブジェクト・reflection・bytecodeのnative直接実行はできないため、Rust側のhost interfaceと移植コードの境界を明記する。差を消して比較を通したことにせず、意図的な差は独立したfixtureにする。
 

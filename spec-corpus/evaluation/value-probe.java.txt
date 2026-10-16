@@ -1,0 +1,16 @@
+package org.example.valueeval;
+import java.util.*;
+import com.google.gson.*;
+public final class Probe extends ValueEvalEvaluator<Object>{
+    private final List<String> events=new ArrayList<>();
+    private Object value(Object value){
+        if(value instanceof ValueEvalAST.EnumValue e)return List.of("enum","Mode",((ValueEvalAST.Mode)e.value()).text());
+        if(value instanceof ValueEvalAST.Node n)return List.of("node",n.text());
+        if(value instanceof Optional<?> o)return o.map(this::value).orElse(null);
+        if(value instanceof List<?> l)return l.stream().map(this::value).toList();
+        return value;
+    }
+    @Override protected Object convertValue(Object value){events.add("convert");return value(value);}
+    @Override protected Object evalNode(ValueEvalAST.Node node){events.add("node:"+node.text());return "evaluated:"+node.text();}
+    public static JsonObject run(ValueEvalAST ast){var p=new Probe();var out=new JsonObject();out.add("value",new Gson().toJsonTree(p.eval(ast)));out.add("events",new Gson().toJsonTree(p.events));return out;}
+}

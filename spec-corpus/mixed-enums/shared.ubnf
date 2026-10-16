@@ -1,0 +1,15 @@
+grammar MixedEnums {
+  @package: org.example.mixedenum
+  @whitespace: none
+  @enum
+  Mode ::= 'sync' | 'auto' | '😀' | '👨‍👩‍👧‍👦' | 'a\r\nb';
+  @enum
+  Heat ::= 'hot' | 'cold';
+  @mapping(Leaf, params=[text])
+  Leaf ::= '<' 'node' @text '>';
+  @root Root ::= Modes | Heats | Texts | Nodes;
+  @mapping(Values, params=[head, values]) Modes ::= 'm' [Mode] @head ':' {Mode} @values;
+  @mapping(Values, params=[head, values]) Heats ::= 'h' [Heat] @head ':' {Heat} @values;
+  @mapping(Values, params=[head, values]) Texts ::= 't' ['text'] @head ':' {'text'} @values;
+  @mapping(Values, params=[head, values]) Nodes ::= 'n' [Leaf] @head ':' {Leaf} @values;
+}

@@ -12,7 +12,7 @@ pub fn generate(ir: &GrammarIr) -> GeneratedFile {
         for mapping in mappings {
             write!(out, "        super::ast::Ast::r#{} {{ span", mapping.name).unwrap();
             for field in &mapping.fields {
-                if field.kind != Kind::Text {
+                if matches!(field.kind, Kind::Node | Kind::Value) {
                     write!(out, ", r#{}", field.name).unwrap();
                 }
             }
@@ -24,7 +24,7 @@ pub fn generate(ir: &GrammarIr) -> GeneratedFile {
             )
             .unwrap();
             for field in &mapping.fields {
-                if field.kind == Kind::Text {
+                if !matches!(field.kind, Kind::Node | Kind::Value) {
                     continue;
                 }
                 let name = format!("r#{}", field.name);

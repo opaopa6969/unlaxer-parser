@@ -60,6 +60,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.TypeofElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.UBNFFile;
 import org.unlaxer.dsl.bootstrap.UBNFAST.WhitespaceAnnotation;
 import org.unlaxer.parser.Parser;
+import org.unlaxer.parser.elementary.SingleQuotedParser;
 
 /**
  * UBNF パースツリー（Token）を UBNFAST ノードに変換するマッパー。
@@ -720,31 +721,22 @@ public class UBNFMapper {
     }
 
     private EvalAnnotation mapEvalAnnotation(Token token) {
-        // Collect all SingleQuotedParser descendants for positional values
-        List<Token> quoted = findDescendants(
-            token, org.unlaxer.parser.elementary.SingleQuotedParser.class);
-
-        // First quoted value is the 'kind'
-        String kind = quoted.size() > 0 ? stripQuotes(quoted.get(0).source.toString().trim()) : "";
-
-        // Second quoted value (if present) is the 'strategy'
-        String strategy = quoted.size() > 1 ? stripQuotes(quoted.get(1).source.toString().trim()) : "default";
-
-        // Remaining key=value pairs from EvalParamParser children
+        List<Token> quoted = findDescendants(token, SingleQuotedParser.class);
+        String kind = stripQuotes(quoted.get(0).source.toString().trim());
+        String strategy = null;
         Map<String, String> params = new LinkedHashMap<>();
-        List<Token> evalParams = findDescendants(token, UBNFParsers.EvalParamParser.class);
-        for (Token paramToken : evalParams) {
-            List<Token> ids = findDescendants(paramToken, UBNFParsers.IdentifierParser.class);
-            List<Token> vals = findDescendants(
-                paramToken, org.unlaxer.parser.elementary.SingleQuotedParser.class);
-            if (!ids.isEmpty() && !vals.isEmpty()) {
-                String key = ids.get(0).source.toString().trim();
-                String value = stripQuotes(vals.get(0).source.toString().trim());
-                params.put(key, value);
+        for (Token paramToken : findDescendants(token, UBNFParsers.EvalParamParser.class)) {
+            String key = findDescendants(paramToken, UBNFParsers.IdentifierParser.class)
+                .get(0).source.toString().trim();
+            String value = stripQuotes(findDescendants(paramToken, SingleQuotedParser.class)
+                .get(0).source.toString().trim());
+            if (key.equals("kind") || params.containsKey(key) || (key.equals("strategy") && strategy != null)) {
+                throw new IllegalArgumentException("duplicate @eval argument " + key);
             }
+            if (key.equals("strategy")) strategy = value;
+            else params.put(key, value);
         }
-
-        return new EvalAnnotation(kind, strategy, Map.copyOf(params));
+        return new EvalAnnotation(kind, strategy == null ? "default" : strategy, Map.copyOf(params));
     }
 
     WhitespaceAnnotation toWhitespaceAnnotation(Token token) {
@@ -1125,7 +1117,7 @@ public class UBNFMapper {
 
     Optional<TypeofElement> findTypeofConstraintInAnnotatedElement(Token token) {
         // AnnotatedElementParser のプレフィックス Optional 内の TypeofElementParser を探す
-        List<Token> typeofTokens = findDescendants(token, UBNFParsers.TypeofElementParser.class);
+        List<Token> typeofTokens = findAtElementLevel(token, UBNFParsers.TypeofElementParser.class);
         if (typeofTokens.isEmpty()) return Optional.empty();
         Token typeofToken = typeofTokens.get(0);
         List<Token> identifiers = findDescendants(typeofToken, UBNFParsers.IdentifierParser.class);
