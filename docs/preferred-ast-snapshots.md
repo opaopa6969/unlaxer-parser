@@ -20,7 +20,7 @@ let original_text = snapshot.source_text(selected.span());
 
 ## 順位と候補
 
-候補は Java token tree の preorder です。`@skip` の subtree は候補に含めません。enum/Text 自体は AST 候補ではありませんが、root enum の生成 wrapper、mapped Node、enum/Text/Node を持つ mapped record は候補になります。sum の透明投影は具体的な AST の単純名を使います。例えば `Family.Item` の優先名は `Item` です。
+候補は Java token tree の preorder です。`@skip` の subtree は候補に含めません。enum/Text 自体は AST 候補ではありませんが、root enum の生成 wrapper、mapped Node、enum/Text/Node を持つ mapped record は候補になります。sum の透明投影は `@commonField` の有無にかかわらず具体的な AST の単純名を使います（#592）。例えば `Family.Item` の優先名は `Item` です。
 
 候補は次の順に比較します。
 
@@ -53,7 +53,7 @@ Rust の `MappingLimits` は候補数を既定 4096、展開作業量を 1,000,0
 
 ## 未完の範囲
 
-#547 全体をこの機能だけで完了とはしません。commonField を使わない mapped sum、associative mapping、および特殊 lowering で UBNF call site と IR の参照が一対一対応しない構造は #569 の対象です。その場合、通常の生成・解析 API は保持し、`mapping_grammar()` は `None`、preferred 解析入口は明示エラーを返します。nested container / recursive unmapped helper は #568 で継続します。公開低水準 IR には Java の source wrapper 情報がないため、IR 単独の `unlaxer-codegen::generate` にはこの source 由来 API を追加しません。
+#547 全体をこの機能だけで完了とはしません。associative mapping、および特殊 lowering で UBNF call site と IR の参照が一対一対応しない構造は #593（親 #569）の対象です。その場合、通常の生成・解析 API は保持し、`mapping_grammar()` は `None`、preferred 解析入口は明示エラーを返します。nested container / recursive unmapped helper は #568 で継続します。公開低水準 IR には Java の source wrapper 情報がないため、IR 単独の `unlaxer-codegen::generate` にはこの source 由来 API を追加しません。
 
 ## 共通検証
 

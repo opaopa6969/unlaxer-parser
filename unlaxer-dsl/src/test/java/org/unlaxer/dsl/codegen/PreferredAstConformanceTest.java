@@ -28,7 +28,7 @@ public class PreferredAstConformanceTest {
     @Rule public TemporaryFolder temporary = new TemporaryFolder();
     private final Path repo = Path.of("..").toAbsolutePath().normalize();
 
-    private JsonArray corpus() throws Exception {
+    protected JsonArray corpus() throws Exception {
         return JsonParser.parseString(
                         Files.readString(repo.resolve("spec-corpus/preferred-ast/cases.json")))
                 .getAsJsonArray();
@@ -125,6 +125,10 @@ public class PreferredAstConformanceTest {
                             var sourceMap = type.getMethod("sourceMap").invoke(candidate);
                             var ast = sourceMap.getClass().getMethod("ast").invoke(sourceMap);
                             var selectedToken = (Token) type.getMethod("token").invoke(candidate);
+                            if (i == 0 && fixture.has("ordinary")) {
+                                var ordinary = mapper.getMethod("mapParsedTokenWithSourceMap", Token.class).invoke(null, token);
+                                assertEquals(ast, ordinary.getClass().getMethod("ast").invoke(ordinary));
+                            }
                             assertEquals(
                                     grammar.name(),
                                     want.get(0).getAsString(),
@@ -339,6 +343,7 @@ public class PreferredAstConformanceTest {
                         "];assert_eq!(snapshot.candidates().len(),expected.len());for(c,e) in"
                             + " snapshot.candidates().iter().zip(expected){assert_eq!((c.simple_name(),c.depth(),c.span().start,c.span().end,evaluate(c.ast(),&mut"
                             + " Eval).as_str()),(e.0,e.1,e.2,e.3,e.4));assert_eq!(snapshot.source_text(c.span()),Some(tree.text(c.span())));}");
+                if (fixture.has("ordinary")) code.append("assert_eq!(generated::mapper::map(&generated::parser::parse_tree(source).unwrap()).unwrap().canonical_json(),snapshot.select_default().ast().canonical_json());");
                 code.append(
                         "for name in [None,Some(\"\"),Some(\""
                             + " \"),Some(\"Missing\"),Some(\"Pair\")]{assert!(std::ptr::eq(snapshot.select(name),&snapshot.candidates()["
@@ -507,7 +512,7 @@ public class PreferredAstConformanceTest {
         };
     }
 
-    private String run(List<String> command, String input, boolean withoutJava, boolean success)
+    protected String run(List<String> command, String input, boolean withoutJava, boolean success)
             throws Exception {
         Path log = temporary.newFile().toPath();
         var builder =
