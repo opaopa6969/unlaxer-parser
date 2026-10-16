@@ -20,43 +20,40 @@ public class Not extends ConstructedSingleChildParser {
 
 	@Override
 	public Parsed parse(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
-        parseContext.enterParserCall();
-        try {
-
-
-		parseContext.startParse(this, parseContext, tokenKind, invertMatch);
-
-		parseContext.begin(this);
-		org.unlaxer.TransactionElement stateBoundary = parseContext.getCurrent();
-		ParseContext.DiagnosticSpeculation diagnosticBoundary = parseContext.beginDiagnosticSpeculation();
-
-		Parsed parsed = getChild().parse(parseContext, TokenKind.matchOnly, invertMatch);
-
-		if (parsed.isSucceeded()) {
-			// child succeeded → Not fails; rollback any state changes
-			parseContext.rollback(this);
-			parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);
-			return Parsed.FAILED;
-		}
-
-		// child failed → Not succeeds; commit (no tokens consumed)
-		parseContext.discardDiagnosticSpeculation(diagnosticBoundary);
-		Parsed committed;
+		parseContext.enterParserCall();
 		try {
-			committed = new Parsed(parseContext.commit(this, TokenKind.matchOnly));
-		} finally {
-			// Include effects from this parser's own commit listener in speculation.
-			stateBoundary.restoreState();
-		}
-		parseContext.endParse(this, committed, parseContext, tokenKind, invertMatch);
-		return committed;
+			parseContext.startParse(this, parseContext, tokenKind, invertMatch);
 
-        } catch (RuntimeException | Error failure) {
-            parseContext.failParserCall(failure);
-            throw failure;
-        } finally {
-            parseContext.leaveParserCall();
-        }
-    }
+			parseContext.begin(this);
+			org.unlaxer.TransactionElement stateBoundary = parseContext.getCurrent();
+			ParseContext.DiagnosticSpeculation diagnosticBoundary = parseContext.beginDiagnosticSpeculation();
+
+			Parsed parsed = getChild().parse(parseContext, TokenKind.matchOnly, invertMatch);
+
+			if (parsed.isSucceeded()) {
+				// child succeeded → Not fails; rollback any state changes
+				parseContext.rollback(this);
+				parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);
+				return Parsed.FAILED;
+			}
+
+			// child failed → Not succeeds; commit (no tokens consumed)
+			parseContext.discardDiagnosticSpeculation(diagnosticBoundary);
+			Parsed committed;
+			try {
+				committed = new Parsed(parseContext.commit(this, TokenKind.matchOnly));
+			} finally {
+				// Include effects from this parser's own commit listener in speculation.
+				stateBoundary.restoreState();
+			}
+			parseContext.endParse(this, committed, parseContext, tokenKind, invertMatch);
+			return committed;
+		} catch (RuntimeException | Error failure) {
+			parseContext.failParserCall(failure);
+			throw failure;
+		} finally {
+			parseContext.leaveParserCall();
+		}
+	}
 
 }

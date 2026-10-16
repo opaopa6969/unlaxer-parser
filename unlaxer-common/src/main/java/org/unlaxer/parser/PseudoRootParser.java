@@ -35,25 +35,23 @@ public class PseudoRootParser extends AbstractParser{
 
 	@Override
 	public Parsed parse(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
-        parseContext.enterParserCall();
-        try {
-
-		if(getChildOccurs().isSingle()){
-			parseContext.startParse(this, parseContext, tokenKind, invertMatch);
-			Parsed parsed = getChildren().get(0).parse(parseContext,tokenKind,invertMatch);
-			parseContext.endParse(this, parsed , parseContext, tokenKind, invertMatch);
-			return parsed;
+		parseContext.enterParserCall();
+		try {
+			if(getChildOccurs().isSingle()){
+				parseContext.startParse(this, parseContext, tokenKind, invertMatch);
+				Parsed parsed = getChildren().get(0).parse(parseContext,tokenKind,invertMatch);
+				parseContext.endParse(this, parsed , parseContext, tokenKind, invertMatch);
+				return parsed;
 			
+			}
+			throw new RuntimeException(new IllegalAccessException());
+		} catch (RuntimeException | Error failure) {
+			parseContext.failParserCall(failure);
+			throw failure;
+		} finally {
+			parseContext.leaveParserCall();
 		}
-		throw new RuntimeException(new IllegalAccessException());
-
-        } catch (RuntimeException | Error failure) {
-            parseContext.failParserCall(failure);
-            throw failure;
-        } finally {
-            parseContext.leaveParserCall();
-        }
-    }
+	}
 
 	@Override
 	public Name getName() {
