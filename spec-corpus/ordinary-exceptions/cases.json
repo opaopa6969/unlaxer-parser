@@ -1,0 +1,51 @@
+[
+  {
+    "name": "separated",
+    "grammar": "grammar ExceptionProbe { @package: exceptionprobe @whitespace: none @tokenAdapter: { id: 'exception.item' version: '1' java: 'exceptionprobe.Item' rust: 'crate::item' } @tokenAdapter: { id: 'exception.separator' version: '1' java: 'exceptionprobe.Separator' rust: 'crate::separator' } token I=ADAPTER('exception.item',version=1) token S=ADAPTER('exception.separator',version=1) @root @mapping(Value,params=[items]) Root ::= CAPTURE_SCOPE(CAPTURE(word,I) % Sep) @items '!'; @skip Sep ::= S; }",
+    "input": "p😀;😀!",
+    "cases": [
+      {
+        "id": "item",
+        "failCP": 1
+      },
+      {
+        "id": "separator",
+        "failCP": 2
+      },
+      {
+        "id": "tail",
+        "failCP": 3
+      }
+    ],
+    "retryEnd": 5,
+    "rootSpan": [
+      1,
+      5
+    ],
+    "items": "😀;😀"
+  },
+  {
+    "name": "nested-list",
+    "grammar": "grammar ExceptionProbe { @package: exceptionprobe @whitespace: none @tokenAdapter: { id: 'exception.item' version: '1' java: 'exceptionprobe.Item' rust: 'crate::item' } @tokenAdapter: { id: 'exception.separator' version: '1' java: 'exceptionprobe.Separator' rust: 'crate::separator' } token I=ADAPTER('exception.item',version=1) token S=ADAPTER('exception.separator',version=1) @root @nestedCaptures @mapping(Value,params=[items]) Root ::= CAPTURE_SCOPE({ CAPTURE(word,I) }) @items '!'; }",
+    "input": "p😀😀!",
+    "cases": [
+      {
+        "id": "item",
+        "failCP": 1
+      },
+      {
+        "id": "tail",
+        "failCP": 2
+      }
+    ],
+    "retryEnd": 4,
+    "rootSpan": [
+      1,
+      4
+    ],
+    "items": [
+      "😀",
+      "😀"
+    ]
+  }
+]
