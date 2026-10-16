@@ -731,6 +731,7 @@ fn mapper(ir: &GrammarIr) -> String {
                 }
                 writeln!(out, "        r#{}: {{\n            let mut values = Vec::new();\n            for capture in node.captures.iter().filter(|c| c.name == {}) {{", field.name, quote(&field.name)).unwrap();
                 out.push_str(match field.kind {
+                    Kind::Integer => "                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).parse::<i32>().map_err(|_| format!(\"invalid i32 capture {} at {}..{}\", capture.name, capture.span.start, capture.span.end))?);\n",
                     Kind::Node => "                values.extend(map_nodes(tree, &capture.nodes)?);\n",
                     Kind::Value => "                values.extend(map_values(tree, &capture.nodes)?);\n",
                     Kind::Text if grapheme_capture(ir, &rule.body, &field.name) => "                values.push(tree.text(capture.span).to_owned());\n",
@@ -782,7 +783,7 @@ fn evaluator(ir: &GrammarIr) -> String {
                     "r#{}{}",
                     f.name,
                     if f.cardinality == Cardinality::Optional {
-                        if f.kind == Kind::Value || matches!(f.kind, Kind::Enum(_)) {
+                        if matches!(f.kind, Kind::Value | Kind::Integer | Kind::Enum(_)) {
                             ".as_ref()"
                         } else {
                             ".as_deref()"
@@ -818,6 +819,8 @@ fn pattern(mapping: &Mapping, ty: &str) -> String {
 
 fn field_type(field: &Field, borrowed: bool) -> String {
     let one = match (&field.kind, borrowed) {
+        (Kind::Integer, true) => "&i32",
+        (Kind::Integer, false) => "i32",
         (Kind::Node, true) => "&Ast",
         (Kind::Node, false) => "Box<Ast>",
         (Kind::Text, true) => "&str",
@@ -843,6 +846,7 @@ fn field_type(field: &Field, borrowed: bool) -> String {
         Cardinality::Optional => format!("Option<{one}>"),
         Cardinality::Many => {
             let element = match field.kind {
+                Kind::Integer => "i32",
                 Kind::Node => "Ast",
                 Kind::Text => "String",
                 Kind::Value => "AstValue",
@@ -888,12 +892,15 @@ fn mapped_value(field: &Field) -> String {
 
 fn field_json(field: &Field) -> String {
     let name = format!("r#{}", field.name);
-    let value = if field.kind != Kind::Text {
+    let value = if field.kind == Kind::Integer {
+        "value.to_string()"
+    } else if field.kind != Kind::Text {
         "value.canonical_json()"
     } else {
         "json_string(value)"
     };
     match field.cardinality {
+        Cardinality::One if field.kind == Kind::Integer => format!("{name}.to_string()"),
         Cardinality::One if field.kind != Kind::Text => format!("{name}.canonical_json()"),
         Cardinality::One => format!("json_string({name})"),
         Cardinality::Optional => format!("{name}.as_ref().map_or_else(|| \"null\".to_owned(), |value| {value})"),
