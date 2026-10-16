@@ -59,6 +59,8 @@ class LSPServerEmitter {
         w.line("protected LanguageClient client;");
         w.line("protected final Map<String, DocumentState> documents = new HashMap<>();");
         w.line("protected final Map<String, Long> documentVersions = new HashMap<>();");
+        w.line("private volatile boolean shutdownRequested;");
+        w.line("private final CompletableFuture<Integer> exitStatus = new CompletableFuture<>();");
         w.blankLine();
 
         w.line("private volatile org.unlaxer.source.LanguageProfile.Selection selectedLanguageProfile;");
@@ -82,6 +84,7 @@ class LSPServerEmitter {
         w.line("@Override");
         w.line("public CompletableFuture<InitializeResult> initialize(InitializeParams params) {");
         w.indent();
+        w.line("if (hasStopped()) return stoppedRequest();");
         w.line("try { selectedLanguageProfile = readLanguageProfile(params); }");
         w.line("catch (IllegalArgumentException error) {");
         w.line("    return CompletableFuture.failedFuture(new org.eclipse.lsp4j.jsonrpc.ResponseErrorException(");
@@ -114,6 +117,8 @@ class LSPServerEmitter {
         w.line("@Override");
         w.line("public CompletableFuture<Object> shutdown() {");
         w.indent();
+        w.line("if (hasStopped()) return stoppedRequest();");
+        w.line("shutdownRequested = true;");
         w.line("return CompletableFuture.completedFuture(null);");
         w.dedent();
         w.line("}");
@@ -121,7 +126,28 @@ class LSPServerEmitter {
 
         // exit()
         w.line("@Override");
-        w.line("public void exit() {}");
+        w.line("public void exit() { exitStatus.complete(shutdownRequested ? 0 : 1); }");
+        w.blankLine();
+        w.line("public final CompletableFuture<Integer> exitStatus() { return exitStatus.copy(); }");
+        w.line("protected final boolean hasStopped() { return shutdownRequested || exitStatus.isDone(); }");
+        w.line("protected final <T> CompletableFuture<T> stoppedRequest() {");
+        w.line("    return CompletableFuture.failedFuture(new org.eclipse.lsp4j.jsonrpc.ResponseErrorException(");
+        w.line("        new org.eclipse.lsp4j.jsonrpc.messages.ResponseError(org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode.InvalidRequest, \"Server has shut down\", null)));");
+        w.line("}");
+        w.blankLine();
+        w.line("public final org.eclipse.lsp4j.jsonrpc.Endpoint lifecycleEndpoint() {");
+        w.indent();
+        w.line("var delegate = org.eclipse.lsp4j.jsonrpc.services.ServiceEndpoints.toEndpoint(this);");
+        w.line("return new org.eclipse.lsp4j.jsonrpc.Endpoint() {");
+        w.line("    @Override public CompletableFuture<?> request(String method, Object params) {");
+        w.line("        return hasStopped() ? stoppedRequest() : delegate.request(method, params);");
+        w.line("    }");
+        w.line("    @Override public void notify(String method, Object params) {");
+        w.line("        if (\"exit\".equals(method) || !hasStopped()) delegate.notify(method, params);");
+        w.line("    }");
+        w.line("};");
+        w.dedent();
+        w.line("}");
         w.blankLine();
 
         // setTrace()
@@ -637,6 +663,7 @@ class LSPServerEmitter {
         w.line("@Override");
         w.line("public void didOpen(DidOpenTextDocumentParams params) {");
         w.indent();
+        w.line("if (server.hasStopped()) return;");
         w.line("String uri = params.getTextDocument().getUri();");
         w.line("long version = params.getTextDocument().getVersion();");
         w.line("if (version < 0 || server.documentVersions.containsKey(uri) && version <= server.documentVersions.get(uri)) return;");
@@ -652,6 +679,7 @@ class LSPServerEmitter {
         w.line("@Override");
         w.line("public void didChange(DidChangeTextDocumentParams params) {");
         w.indent();
+        w.line("if (server.hasStopped()) return;");
         w.line("String uri = params.getTextDocument().getUri();");
         w.line("Integer version = params.getTextDocument().getVersion();");
         w.line("Long previous = server.documentVersions.get(uri);");
@@ -668,6 +696,7 @@ class LSPServerEmitter {
         w.line("@Override");
         w.line("public void didClose(DidCloseTextDocumentParams params) {");
         w.indent();
+        w.line("if (server.hasStopped()) return;");
         w.line("server.documents.remove(params.getTextDocument().getUri());");
         w.line("server.documentVersions.remove(params.getTextDocument().getUri());");
         w.line("server.clearLanguageDiagnostics(params.getTextDocument().getUri());");
@@ -676,7 +705,7 @@ class LSPServerEmitter {
         w.blankLine();
 
         w.line("@Override");
-        w.line("public void didSave(DidSaveTextDocumentParams params) { var state = server.documents.get(params.getTextDocument().getUri()); if (state != null) server.parseDocument(state.uri(), state.content()); }");
+        w.line("public void didSave(DidSaveTextDocumentParams params) { if (server.hasStopped()) return; var state = server.documents.get(params.getTextDocument().getUri()); if (state != null) server.parseDocument(state.uri(), state.content()); }");
         w.blankLine();
 
         // completion()
@@ -684,6 +713,7 @@ class LSPServerEmitter {
         w.line("public CompletableFuture<Either<List<CompletionItem>, CompletionList>> completion(");
         w.line("        CompletionParams params) {");
         w.indent();
+        w.line("if (server.hasStopped()) return server.stoppedRequest();");
         w.line("var queryItems = server.languageCompletionItems(params);");
         w.line("if (queryItems != null) return CompletableFuture.completedFuture(Either.forLeft(queryItems));");
         w.line("if (!server.profileAllows(\"COMPLETION\")) return CompletableFuture.completedFuture(Either.forLeft(List.of()));");
@@ -721,6 +751,7 @@ class LSPServerEmitter {
         w.line("@Override");
         w.line("public CompletableFuture<Hover> hover(HoverParams params) {");
         w.indent();
+        w.line("if (server.hasStopped()) return server.stoppedRequest();");
         w.line("var queryHover = server.languageHover(params);");
         w.line("if (queryHover != null) return CompletableFuture.completedFuture(queryHover.orElse(null));");
         w.line("if (!server.profileAllows(\"HOVER\")) return CompletableFuture.completedFuture(null);");
@@ -756,6 +787,7 @@ class LSPServerEmitter {
         w.line("@Override");
         w.line("public CompletableFuture<SemanticTokens> semanticTokensFull(SemanticTokensParams params) {");
         w.indent();
+        w.line("if (server.hasStopped()) return server.stoppedRequest();");
         w.line("String uri = params.getTextDocument().getUri();");
         w.line("DocumentState state = server.documents.get(uri);");
         w.line("if (state == null) {");

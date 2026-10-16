@@ -22,18 +22,36 @@ public class ClassicLspProtocolConformanceTest {
     @Test public void generatedServersShareIndependentPositionsAndVersionTransactions() throws Exception {
         var grammar = UBNFMapper.parse(GRAMMAR).grammars().get(0);
         var sources = new ArrayList<JavaFileObject>();
-        for (var generated : List.of(new ParserGenerator().generate(grammar),new LSPGenerator().generate(grammar))) {
+        for (var generated : List.of(new ParserGenerator().generate(grammar),new LSPGenerator().generate(grammar),new LSPLauncherGenerator().generate(grammar))) {
             sources.add(source(generated.packageName()+"."+generated.className(),generated.source()));
         }
         sources.add(source("wire.fixture.Main", """
             package wire.fixture;
-            public final class Main {
+            public final class Main extends EmojiLspLauncher {
+                public static final class ProbeServer extends EmojiLanguageServer {
+                    @org.eclipse.lsp4j.jsonrpc.services.JsonRequest("fixture/probe")
+                    public java.util.concurrent.CompletableFuture<String> probe(Object params) {
+                        return java.util.concurrent.CompletableFuture.completedFuture("hook");
+                    }
+                }
+                @Override protected EmojiLanguageServer createServer() { return new ProbeServer(); }
                 public static void main(String[] args) throws Exception {
-                    var server = new EmojiLanguageServer() {};
-                    var launcher = org.eclipse.lsp4j.launch.LSPLauncher.createServerLauncher(server, System.in, System.out);
-                    server.connect(launcher.getRemoteProxy());
-                    launcher.startListening().get();
-                    System.exit(0);
+                    if (args.length > 0) {
+                        var output = new java.io.ByteArrayOutputStream() {
+                            @Override public void close() { throw new AssertionError("caller output closed"); }
+                        };
+                        try (var input = new java.io.FileInputStream(args[1])) {
+                            if (new Main().launch(input, output).get(5, java.util.concurrent.TimeUnit.SECONDS) != 0)
+                                throw new AssertionError("embedded launcher status");
+                        }
+                        var server = new ProbeServer();
+                        server.shutdown().join();
+                        server.exit();
+                        if (server.exitStatus().join() != 0) throw new AssertionError("embedded exit status");
+                        try { server.getTextDocumentService().hover(null).join(); throw new AssertionError("shutdown request accepted"); }
+                        catch (java.util.concurrent.CompletionException expected) {}
+                        System.out.println("embedded host alive");
+                    } else System.exit(new Main().launchStdio());
                 }
             }
             """));
@@ -43,9 +61,24 @@ public class ClassicLspProtocolConformanceTest {
             assertTrue(errors.toString(),compiler.getTask(new PrintWriter(errors),manager,null,List.of("--release","17","-classpath",System.getProperty("java.class.path"),"-d",classes.toString()),null,sources).call());
         }
         String javaExecutable=Path.of(System.getProperty("java.home"),"bin","java").toString();
-        try(var wire=new Wire(new ProcessBuilder(javaExecutable,"-cp",classes+File.pathSeparator+System.getProperty("java.class.path"),"wire.fixture.Main").redirectError(temporary.newFile("java-stderr.log")).start())) {
+        var javaCommand = List.of(javaExecutable, "-cp", classes+File.pathSeparator+System.getProperty("java.class.path"), "wire.fixture.Main");
+        try(var wire=new Wire(new ProcessBuilder(javaCommand).redirectError(temporary.newFile("java-stderr.log")).start())) {
+            assertEquals("hook", wire.response("fixture/probe", Map.of()).get("result").getAsString());
             exercise(wire);
         }
+        exerciseUncleanExit(javaCommand, "java");
+        Path embeddedFrames = temporary.newFile("embedded-frames").toPath();
+        try (var output = Files.newOutputStream(embeddedFrames)) {
+            for (String body : List.of("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}", "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"shutdown\"}", "{\"jsonrpc\":\"2.0\",\"method\":\"exit\"}")) {
+                byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+                output.write(("Content-Length: " + bytes.length + "\r\n\r\n").getBytes(StandardCharsets.US_ASCII)); output.write(bytes);
+            }
+        }
+        var embeddedCommand = new ArrayList<>(javaCommand); embeddedCommand.add("embedded"); embeddedCommand.add(embeddedFrames.toString());
+        var embedded = new ProcessBuilder(embeddedCommand).redirectError(temporary.newFile("embedded-stderr.log")).start();
+        assertTrue("embedded process returned", embedded.waitFor(5, TimeUnit.SECONDS));
+        assertEquals(0, embedded.exitValue());
+        assertEquals("embedded host alive", new String(embedded.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim());
         if (!Boolean.getBoolean("rustConformance")) {
             System.out.println("[assumption] Rust stdio cross-check requires -DrustConformance=true; Java protocol oracle ran");
             return;
@@ -67,10 +100,31 @@ public class ClassicLspProtocolConformanceTest {
         String runtime=ROOT.resolve("rust/unlaxer-runtime").toString().replace("\\","\\\\");
         String lsp=ROOT.resolve("rust/unlaxer-lsp").toString().replace("\\","\\\\");
         Files.writeString(project.resolve("Cargo.toml"),"[package]\nname=\"classic-lsp-fixture\"\nversion=\"0.1.0\"\nedition=\"2021\"\n[dependencies]\nunlaxer-runtime={path=\""+runtime+"\"}\nunlaxer-lsp={path=\""+lsp+"\"}\n");
-        Files.writeString(project.resolve("src/main.rs"),"mod generated; fn main() { generated::lsp::serve_stdio().unwrap(); }\n");
+        Files.writeString(project.resolve("src/main.rs"),"mod generated; fn main() { std::process::exit(generated::lsp::serve_stdio_status().unwrap()); }\n");
         run(List.of("cargo","build","--quiet","--offline","--manifest-path",project.resolve("Cargo.toml").toString()),ROOT);
         Path executable=ROOT.resolve("rust/target/debug/classic-lsp-fixture");
         try(var wire=new Wire(new ProcessBuilder(executable.toString()).redirectError(temporary.newFile("rust-stderr.log")).start())) { exercise(wire); }
+        exerciseUncleanExit(List.of(executable.toString()), "rust");
+    }
+    private void exerciseUncleanExit(List<String> command, String backend) throws Exception {
+        for (boolean initialize : List.of(false, true)) {
+            try (var wire = new Wire(new ProcessBuilder(command).redirectError(temporary.newFile()).start())) {
+                if (initialize) wire.request("initialize", Map.of("capabilities", Map.of()));
+                wire.notify("exit", null);
+                assertTrue(backend + " exit before shutdown must stop without EOF", wire.process.waitFor(5, TimeUnit.SECONDS));
+                assertEquals(backend + " exit without shutdown", 1, wire.process.exitValue());
+            }
+        }
+        for (boolean shutdown : List.of(false, true)) {
+            try (var wire = new Wire(new ProcessBuilder(command).redirectError(temporary.newFile()).start())) {
+                wire.request("initialize", Map.of("capabilities", Map.of()));
+                if (shutdown) wire.response("shutdown", null);
+                wire.output.close();
+                assertTrue(backend + " EOF must release workers", wire.process.waitFor(5, TimeUnit.SECONDS));
+                assertEquals(backend + " EOF without exit", 1, wire.process.exitValue());
+            }
+        }
+        System.out.println("LSP exit status passed: " + backend + " (shutdown/exit=0, no shutdown or no exit=1)");
     }
     private void exercise(Wire wire) throws Exception {
         JsonObject initialized=wire.request("initialize",Map.of("capabilities",Map.of()));
@@ -132,7 +186,20 @@ public class ClassicLspProtocolConformanceTest {
         assertTrue(wire.requestArray("textDocument/completion",Map.of("textDocument",Map.of("uri",uri),"position",Map.of("line",0,"character",0))).isEmpty());
         wire.notify("textDocument/didOpen",Map.of("textDocument",Map.of("uri",uri,"languageId","emoji","version",1,"text","bad")));
         assertEquals("VALIDATE EXTERNAL without provider publishes no syntax diagnostics",0,wire.notification("textDocument/publishDiagnostics").getAsJsonArray("diagnostics").size());
-        wire.response("shutdown",null);wire.notify("exit",null);
+        assertFalse(wire.response("shutdown", null).has("error"));
+        wire.notify("textDocument/didChange", Map.of("textDocument", Map.of("uri", uri, "version", 2), "contentChanges", List.of(Map.of("text", "<>!"))));
+        wire.notify("textDocument/didClose", Map.of("textDocument", Map.of("uri", uri)));
+        wire.notify("textDocument/didOpen", Map.of("textDocument", Map.of("uri", uri, "version", 3, "languageId", "emoji", "text", "<>!")));
+        wire.notify("textDocument/didSave", Map.of("textDocument", Map.of("uri", uri)));
+        for (String method : List.of("textDocument/hover", "textDocument/completion", "textDocument/definition", "textDocument/semanticTokens/full", "fixture/probe", "shutdown", "initialize")) {
+            var error = wire.response(method, Map.of("textDocument", Map.of("uri", uri), "position", Map.of("line", 0, "character", 0))).getAsJsonObject("error");
+            assertNotNull("request after shutdown: " + method, error);
+            assertEquals(method, -32600, error.get("code").getAsInt());
+        }
+        assertTrue("notifications after shutdown must be ignored", wire.pending.isEmpty());
+        wire.notify("exit", null);
+        assertTrue("exit must stop the server without client EOF", wire.process.waitFor(5, TimeUnit.SECONDS));
+        assertEquals("shutdown/exit status", 0, wire.process.exitValue());
     }
     private void run(List<String> command,Path directory)throws Exception {
         ProcessBuilder builder=new ProcessBuilder(command).directory(directory.toFile()).redirectErrorStream(true);builder.environment().put("CARGO_INCREMENTAL","0");builder.environment().put("CARGO_TARGET_DIR",ROOT.resolve("rust/target").toString());

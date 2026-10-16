@@ -20,12 +20,15 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
     protected LanguageClient client;
     protected final Map<String, DocumentState> documents = new HashMap<>();
     protected final Map<String, Long> documentVersions = new HashMap<>();
+    private volatile boolean shutdownRequested;
+    private final CompletableFuture<Integer> exitStatus = new CompletableFuture<>();
 
     private volatile org.unlaxer.source.LanguageProfile.Selection selectedLanguageProfile;
     public SnapshotLanguageServer() {}
 
     @Override
     public CompletableFuture<InitializeResult> initialize(InitializeParams params) {
+        if (hasStopped()) return stoppedRequest();
         try { selectedLanguageProfile = readLanguageProfile(params); }
         catch (IllegalArgumentException error) {
             return CompletableFuture.failedFuture(new org.eclipse.lsp4j.jsonrpc.ResponseErrorException(
@@ -51,11 +54,32 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
 
     @Override
     public CompletableFuture<Object> shutdown() {
+        if (hasStopped()) return stoppedRequest();
+        shutdownRequested = true;
         return CompletableFuture.completedFuture(null);
     }
 
     @Override
-    public void exit() {}
+    public void exit() { exitStatus.complete(shutdownRequested ? 0 : 1); }
+
+    public final CompletableFuture<Integer> exitStatus() { return exitStatus.copy(); }
+    protected final boolean hasStopped() { return shutdownRequested || exitStatus.isDone(); }
+    protected final <T> CompletableFuture<T> stoppedRequest() {
+        return CompletableFuture.failedFuture(new org.eclipse.lsp4j.jsonrpc.ResponseErrorException(
+            new org.eclipse.lsp4j.jsonrpc.messages.ResponseError(org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode.InvalidRequest, "Server has shut down", null)));
+    }
+
+    public final org.eclipse.lsp4j.jsonrpc.Endpoint lifecycleEndpoint() {
+        var delegate = org.eclipse.lsp4j.jsonrpc.services.ServiceEndpoints.toEndpoint(this);
+        return new org.eclipse.lsp4j.jsonrpc.Endpoint() {
+            @Override public CompletableFuture<?> request(String method, Object params) {
+                return hasStopped() ? stoppedRequest() : delegate.request(method, params);
+            }
+            @Override public void notify(String method, Object params) {
+                if ("exit".equals(method) || !hasStopped()) delegate.notify(method, params);
+            }
+        };
+    }
 
     @Override
     public void setTrace(SetTraceParams params) {}
@@ -548,6 +572,7 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
 
         @Override
         public void didOpen(DidOpenTextDocumentParams params) {
+            if (server.hasStopped()) return;
             String uri = params.getTextDocument().getUri();
             long version = params.getTextDocument().getVersion();
             if (version < 0 || server.documentVersions.containsKey(uri) && version <= server.documentVersions.get(uri)) return;
@@ -560,6 +585,7 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
 
         @Override
         public void didChange(DidChangeTextDocumentParams params) {
+            if (server.hasStopped()) return;
             String uri = params.getTextDocument().getUri();
             Integer version = params.getTextDocument().getVersion();
             Long previous = server.documentVersions.get(uri);
@@ -573,17 +599,19 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
 
         @Override
         public void didClose(DidCloseTextDocumentParams params) {
+            if (server.hasStopped()) return;
             server.documents.remove(params.getTextDocument().getUri());
             server.documentVersions.remove(params.getTextDocument().getUri());
             server.clearLanguageDiagnostics(params.getTextDocument().getUri());
         }
 
         @Override
-        public void didSave(DidSaveTextDocumentParams params) { var state = server.documents.get(params.getTextDocument().getUri()); if (state != null) server.parseDocument(state.uri(), state.content()); }
+        public void didSave(DidSaveTextDocumentParams params) { if (server.hasStopped()) return; var state = server.documents.get(params.getTextDocument().getUri()); if (state != null) server.parseDocument(state.uri(), state.content()); }
 
         @Override
         public CompletableFuture<Either<List<CompletionItem>, CompletionList>> completion(
                 CompletionParams params) {
+            if (server.hasStopped()) return server.stoppedRequest();
             var queryItems = server.languageCompletionItems(params);
             if (queryItems != null) return CompletableFuture.completedFuture(Either.forLeft(queryItems));
             if (!server.profileAllows("COMPLETION")) return CompletableFuture.completedFuture(Either.forLeft(List.of()));
@@ -611,6 +639,7 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
 
         @Override
         public CompletableFuture<Hover> hover(HoverParams params) {
+            if (server.hasStopped()) return server.stoppedRequest();
             var queryHover = server.languageHover(params);
             if (queryHover != null) return CompletableFuture.completedFuture(queryHover.orElse(null));
             if (!server.profileAllows("HOVER")) return CompletableFuture.completedFuture(null);
@@ -634,6 +663,7 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
 
         @Override
         public CompletableFuture<Either<List<? extends Location>, List<? extends LocationLink>>> definition(DefinitionParams params) {
+            if (server.hasStopped()) return server.stoppedRequest();
             if (!server.profileAllows("DEFINITION")) return CompletableFuture.completedFuture(Either.forLeft(List.of()));
             var locations = server.languageDefinitions(params);
             if (locations != null) return CompletableFuture.completedFuture(Either.forLeft(locations));
@@ -644,6 +674,7 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
 
         @Override
         public CompletableFuture<SemanticTokens> semanticTokensFull(SemanticTokensParams params) {
+            if (server.hasStopped()) return server.stoppedRequest();
             String uri = params.getTextDocument().getUri();
             DocumentState state = server.documents.get(uri);
             if (state == null) {

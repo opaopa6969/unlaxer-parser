@@ -107,7 +107,7 @@ pub struct Server<B> {
     backend: B,
     seq: i64,
     initialized: bool,
-    launched: bool,
+    configuration_pending: bool,
     terminated: bool,
     disconnected: bool,
     program: String,
@@ -130,7 +130,7 @@ impl<B: Backend> Server<B> {
             backend,
             seq: 0,
             initialized: false,
-            launched: false,
+            configuration_pending: false,
             terminated: false,
             disconnected: false,
             program: String::new(),
@@ -194,12 +194,15 @@ impl<B: Backend> Server<B> {
                     if mode.eq_ignore_ascii_case("token") && !self.backend.supports_token_trace() {
                         return Err("backend does not provide parser token tracing".into());
                     }
+                    if normalized_debug_path(program) != normalized_debug_path(&self.program) {
+                        self.breakpoints.clear();
+                    }
                     self.ast_mode = mode.eq_ignore_ascii_case("ast");
                     self.program = program.into();
                     self.runtime_mode = runtime.into();
                     self.stop_on_entry = arguments["stopOnEntry"] == true;
                     self.arguments = arguments.clone();
-                    self.launched = true;
+                    self.configuration_pending = true;
                     self.terminated = false;
                     self.snapshot = None;
                     self.steps.clear();
@@ -209,6 +212,12 @@ impl<B: Backend> Server<B> {
                     Ok(Value::Null)
                 }
                 "setBreakpoints" => {
+                    let target = normalized_debug_path(&self.program);
+                    let requested_path = match arguments.get("source") {
+                        None | Some(Value::Null) => target.clone(),
+                        Some(source) => source["path"].as_str().and_then(normalized_debug_path),
+                    };
+                    let same_source = target.is_some() && target == requested_path;
                     let empty = vec![];
                     let requested = match arguments.get("breakpoints") {
                         None | Some(Value::Null) => &empty,
@@ -224,15 +233,22 @@ impl<B: Backend> Server<B> {
                             .filter(|line| *line >= self.line_base)
                             .ok_or("invalid breakpoint line")?;
                         lines.insert(line);
-                        results.push(json!({"verified":true,"line":line}));
+                        let mut result = json!({"verified":same_source,"line":line});
+                        if !same_source {
+                            result["message"] = json!("source does not match launch program");
+                        }
+                        results.push(result);
                     }
-                    self.breakpoints = lines;
+                    if same_source {
+                        self.breakpoints = lines;
+                    }
                     Ok(json!({"breakpoints":results}))
                 }
                 "configurationDone" => {
-                    if !self.launched {
-                        return Err("not launched".into());
+                    if !self.configuration_pending {
+                        return Err("configurationDone requires a new launch".into());
                     }
+                    self.configuration_pending = false;
                     match self.prepare() {
                         Ok(()) => {
                             if self.stop_on_entry {
@@ -343,6 +359,7 @@ impl<B: Backend> Server<B> {
                 }
                 "disconnect" => {
                     self.disconnected = true;
+                    self.configuration_pending = false;
                     self.snapshot = None;
                     self.steps.clear();
                     self.variables.clear();
@@ -487,6 +504,29 @@ fn stopped(reason: &str) -> (&'static str, Value) {
         "stopped",
         json!({"reason":reason,"threadId":1,"allThreadsStopped":true}),
     )
+}
+fn normalized_debug_path(path: &str) -> Option<std::path::PathBuf> {
+    use std::path::{Component, Path, PathBuf};
+    if path.trim().is_empty() || path.contains('\0') {
+        return None;
+    }
+    let path = Path::new(path);
+    let absolute = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir().ok()?.join(path)
+    };
+    let mut normalized = PathBuf::new();
+    for component in absolute.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                normalized.pop();
+            }
+            other => normalized.push(other.as_os_str()),
+        }
+    }
+    Some(normalized)
 }
 fn variable(name: &str, value: &str, kind: &str) -> Value {
     json!({"name":name,"value":value,"type":kind,"variablesReference":0})

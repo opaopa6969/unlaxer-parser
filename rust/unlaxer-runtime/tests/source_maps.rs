@@ -127,6 +127,50 @@ fn shared_positions() {
         .is_err());
 }
 #[test]
+fn shared_cursor_position_boundaries() {
+    for row in include_str!("../../../docs/fixtures/source-maps/cursor-positions.tsv")
+        .lines()
+        .filter(|line| !line.starts_with('#'))
+    {
+        let fields: Vec<&str> = row.split('\t').collect();
+        let text = decode(fields[1]);
+        let source = snapshot("fixture", &text);
+        let point: usize = fields[2].parse().unwrap();
+        let utf16: usize = fields[3].parse().unwrap();
+        let label = format!("{} cp={point}", fields[0]);
+        assert_eq!(source.utf16(point).unwrap(), utf16, "{label}");
+        assert_eq!(source.from_utf16(utf16).unwrap(), point, "{label}");
+        let utf8: usize = fields[8].parse().unwrap();
+        assert_eq!(source.utf8(point).unwrap(), utf8, "{label}");
+        assert_eq!(source.from_utf8(utf8).unwrap(), point, "{label}");
+        assert_eq!(
+            source.slice(span(0, source.len())).unwrap(),
+            text,
+            "{label}"
+        );
+        if source
+            .text
+            .chars()
+            .nth(point)
+            .is_some_and(|c| c.len_utf16() == 2)
+        {
+            assert!(source.from_utf16(utf16 + 1).is_err(), "{label}");
+        }
+        // Legacy CP columns include the CR in a CRLF pair. LSP positions cannot
+        // represent that interior boundary; its -1 fields assert rejection instead.
+        if fields[6] == "-1" {
+            assert!(source.lsp(point).is_err(), "{label}");
+        } else {
+            let position = Position {
+                line: fields[6].parse().unwrap(),
+                character: fields[7].parse().unwrap(),
+            };
+            assert_eq!(source.lsp(point).unwrap(), position, "{label}");
+            assert_eq!(source.from_lsp(position).unwrap(), point, "{label}");
+        }
+    }
+}
+#[test]
 fn composition_and_multiple_origins() {
     let host = snapshot("host", "[日😀x]");
     let middle = snapshot("tiny", "日😀x");

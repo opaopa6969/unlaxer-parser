@@ -138,6 +138,14 @@ impl<B: Backend> Server<B> {
     pub fn snapshot(&self, uri: &str) -> Option<&Snapshot> {
         self.documents.get(uri)
     }
+    /// Exit status for a stdio main; library serving never exits the hosting process.
+    pub fn exit_code(&self) -> i32 {
+        if self.exited && self.shutdown {
+            0
+        } else {
+            1
+        }
+    }
     fn allows(&self, capability: &str) -> bool {
         self.profile.as_ref().is_none_or(|p| {
             p.allows(

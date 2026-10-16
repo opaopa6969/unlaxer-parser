@@ -94,6 +94,10 @@ public class PositionResolverImpl implements PositionResolver {
       }else if(codePointAt == SymbolMap.cr.codes[0]) {
         
         if(codePointCount-1!=i && codePoints[i+1] ==SymbolMap.lf.codes[0]) {
+          // The LF has its own code-point/UTF-16 boundary, still on the preceding line.
+          stringIndexByCodePointIndex[codePointIndex + 1] = stringIndex;
+          codePointIndexByStringIndex[stringIndex] = codePointIndex + 1;
+          codePointIndexInLineByCodePointIndex[codePointIndex + 1] = codePointOffsetInline + 1;
           i++;
           previousStartIndex = startIndex;
           startIndex = new CodePointIndex(i+1);
@@ -110,8 +114,6 @@ public class PositionResolverImpl implements PositionResolver {
           lineNumberByIndex.put(startIndex, lineNumber);
           
           stringIndex = stringIndex + 1;
-          stringIndexByCodePointIndex[codePointIndex + 1] = stringIndex;
-          codePointIndexByStringIndex[stringIndex] = codePointIndex + 1;
         }else {
           previousStartIndex = startIndex;
           startIndex = new CodePointIndex(i+1);
@@ -140,22 +142,15 @@ public class PositionResolverImpl implements PositionResolver {
     EndExclusiveCursor end = new EndExclusiveCursorImpl(SourceKind.root,this)
         .setPosition(position);
     cursorRange = new CursorRange(start, end);
-    codePointIndexInLineByCodePointIndex[codePointCount] = 0;
+    stringIndexByCodePointIndex[codePointCount] = stringIndex;
+    codePointIndexByStringIndex[stringIndex] = codePointCount;
+    codePointIndexInLineByCodePointIndex[codePointCount] = codePointOffsetInline;
     lineNumberByIndex.put(position, lineNumber);
-    if(cursorRanges.size()>0) {
-      CursorRange last = cursorRanges.get(cursorRanges.size()-1);
-      if(last.lessThan(new CodePointIndex(codePointIndex)) && startIndex.lessThan(position)) {
-        
-        cursorRanges.add(
-            CursorRange.of(
-              startIndex,
-              position,
-              CodePointOffset.ZERO,
-              SourceKind.subSource,
-              this
-            )
-        );
-      }
+    // Include the final unterminated line, even if it has only one code point.
+    // Empty input and the virtual empty line after a trailing newline are not slices.
+    if(startIndex.lessThan(position)) {
+      cursorRanges.add(
+          CursorRange.of(startIndex, position, CodePointOffset.ZERO, SourceKind.subSource, this));
     }
   }
   

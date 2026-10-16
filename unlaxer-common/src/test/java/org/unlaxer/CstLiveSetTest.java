@@ -154,7 +154,8 @@ public class CstLiveSetTest {
     assertEquals(8, resolver.rootCodePointIndexFrom(new StringIndex(9)).value());
     assertNull("the surrogate's trailing char is not a code point boundary",
         resolver.rootCodePointIndexFrom(new StringIndex(8)));
-    assertNull("one past the end has no string index", resolver.stringIndexInRootFrom(new CodePointIndex(9)));
+    assertEquals("EOF is a valid boundary", 10, resolver.stringIndexInRootFrom(new CodePointIndex(9)).value());
+    assertNull("one past EOF has no string index", resolver.stringIndexInRootFrom(new CodePointIndex(10)));
     assertNull("far out of range must not throw", resolver.stringIndexInRootFrom(new CodePointIndex(9999)));
 
     assertEquals(0, resolver.lineNumberFrom(new CodePointIndex(0)).value());
