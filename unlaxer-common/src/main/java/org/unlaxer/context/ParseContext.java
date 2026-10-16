@@ -41,6 +41,10 @@ public class ParseContext implements
 	ParserListenerContainer,
 	GlobalScopeTree , ParserContextScopeTree{
 
+  /** Maximum active parser notifications. Built-in/generated parsers require a JVM stack of at least 1 MiB. */
+  public static final int MAX_PARSE_DEPTH = 1024;
+  private ParseLimitException parseLimitFailure;
+
   // Opt-in packrat memoization (issue #40). Off by default — default parsing is unaffected.
 	private ParseOptions options = ParseOptions.DEFAULT;
 
@@ -482,6 +486,19 @@ public class ParseContext implements
 	@Override
 	public void close() {
 	  parseContextByThread.set(null);
+    if (parseLimitFailure != null) {
+      // A resource abort bypasses parser returns. Restore owned state without inventing
+      // normal parser/listener success or rollback notifications while unwinding.
+      while (tokenStack.size() > 1) {
+        TransactionElement frame = tokenStack.pollFirst();
+        frame.restoreSelectionChanges(chosenParserByChoice, orderedParsersByNonOrdered);
+        finishTransactionalState(frame, true);
+      }
+      parseFrames.clear();
+      terminalFrames.clear();
+      memoDiagnosticFrames.clear();
+      deferredFrameDepth = 0;
+    }
 		if (tokenStack.size() != 1) {
 			throw new IllegalStateException("transaction nest is illegal. check source code.");
 		}
@@ -1210,6 +1227,13 @@ public class ParseContext implements
 
   @Override
   public void startParse(Parser parser, ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
+    if (parseLimitFailure != null) throw parseLimitFailure;
+    int activeDepth = deferredDiagnostics ? deferredFrameDepth : parseFrames.size();
+    if (activeDepth >= MAX_PARSE_DEPTH) {
+      parseLimitFailure = new ParseLimitException(MAX_PARSE_DEPTH, getPosition(tokenKind).value());
+      disableMemoizationPermanently();
+      throw parseLimitFailure;
+    }
     int consumed = Transaction.super.getConsumedPosition().value();
     int matched = Transaction.super.getMatchedPosition().value();
     if (deferredDiagnostics) {
@@ -1228,6 +1252,7 @@ public class ParseContext implements
 
   @Override
   public void endParse(Parser parser, Parsed parsed, ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
+    if (parseLimitFailure != null) throw parseLimitFailure;
     if (deferredDiagnostics) {
       endDeferredParse(parser, parsed);
       ParserListenerContainer.super.endParse(parser, parsed, parseContext, tokenKind, invertMatch);
