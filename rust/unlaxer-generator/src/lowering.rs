@@ -69,7 +69,7 @@ pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
     crate::embedded::validate(grammar)?;
     validate_enum_rules(grammar)?;
     crate::common_fields::families(grammar)?;
-    Lowering {
+    let mut ir = Lowering {
         grammar,
         ids: HashMap::new(),
         tokens: HashMap::new(),
@@ -87,7 +87,9 @@ pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
         nullable: HashSet::new(),
         analysis_depth: Cell::new(0),
     }
-    .run()
+    .run()?;
+    crate::numeric_fields::refine(grammar, &mut ir);
+    Ok(ir)
 }
 
 struct Lowering<'a> {
@@ -2089,6 +2091,9 @@ fn token_expression_with_registry(
         TokenKind::Simple { parser_class } => match parser_class.as_str() {
             "NumberParser" | "org.unlaxer.parser.elementary.NumberParser" => {
                 Expression::NumberToken
+            }
+            "DigitParser" | "org.unlaxer.parser.posix.DigitParser" => {
+                Expression::CharRangeToken { min: '0', max: '9' }
             }
             "GraphemeParser" | "org.unlaxer.parser.elementary.GraphemeParser" => {
                 Expression::GraphemeToken

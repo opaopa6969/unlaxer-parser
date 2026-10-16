@@ -7,6 +7,7 @@ mod lexical;
 mod lexical_contexts;
 pub mod lowering;
 pub mod modules;
+mod numeric_fields;
 pub mod packaged_profiles;
 pub mod packages;
 pub mod playground;

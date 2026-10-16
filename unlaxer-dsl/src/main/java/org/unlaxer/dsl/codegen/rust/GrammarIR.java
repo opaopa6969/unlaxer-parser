@@ -37,7 +37,7 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     public record Field(String name, Kind kind, Cardinality cardinality, String enumName) {
         public Field(String name, Kind kind, Cardinality cardinality) { this(name,kind,cardinality,null); }
     }
-    public enum Kind { TEXT, NODE, VALUE, ENUM }
+    public enum Kind { TEXT, NODE, VALUE, ENUM, INTEGER }
     public enum Cardinality { ONE, OPTIONAL, MANY }
     public enum ScopeMode { LEXICAL, DYNAMIC }
     public record Declaration(String symbolCapture, String description) {}

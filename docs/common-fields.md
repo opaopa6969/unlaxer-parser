@@ -72,10 +72,9 @@ When a shared mapping omits a requested common parameter or capture, this family
 diagnostic takes precedence over the general shared-enum schema diagnostic.
 Grammars without common fields retain the existing validation order.
 
-This change does not complete the broader AST-family work in #547. Rust numeric
-capture fields continue to store source `String`; Java's existing `NumberParser`
-projection is `int`. No new numeric conversion, preferred-type selection, or
-nested-container projection is introduced. Mixed enum/value joins reuse #539
+This change does not complete the broader AST-family work in #547. Integer captures now share the Java `int` / Rust `i32` contract described in
+[numeric captures](numeric-captures.md). Preferred-type selection and
+nested-container projection remain separate work. Mixed enum/value joins reuse #539
 and are supported by these common accessors.
 Existing Java source which placed `@commonField` on a concrete record, omitted a
 member field, or relied on a fallback type now fails validation instead of being
@@ -85,8 +84,8 @@ silently ignored or producing uncompilable source.
 
 `spec-corpus/common-fields/generated-cases.json` contains independent input and
 accessor-evaluation expectations for flat/dotted/intermediate sums, Unicode text,
-optional/list text, nominal enum and AST node fields, and the existing numeric
-storage difference. `invalid-cases.json` supplies rejection codes and literal
+optional/list text, nominal enum and AST node fields, and typed integer
+capture fields. `invalid-cases.json` supplies rejection codes and literal
 CP spans. `CommonFieldConformanceTest` compiles Java21 output, compares the two
 hosts' Rust files and API schemas, then compiles/runs Rust1.85 output with no Java
 available to the native generator. Rust's `tests/common_fields.rs` independently
