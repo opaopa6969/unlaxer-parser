@@ -2547,7 +2547,7 @@ impl<'a> ParseContext<'a> {
     fn sequence(&mut self, elements: &[Expr], depth: usize) -> Option<Fragment> {
         let mut result = Fragment::default();
         let owner_start = self.position;
-        self.skip();
+        self.sequence_trivia(&mut result, owner_start, depth)?;
         for element in elements {
             if self.excludes(element, depth) {
                 return None;
@@ -2560,7 +2560,7 @@ impl<'a> ParseContext<'a> {
                 self.span(child_start),
                 self.code_point(owner_start),
             );
-            self.skip();
+            self.sequence_trivia(&mut result, owner_start, depth)?;
         }
         Some(result)
     }
