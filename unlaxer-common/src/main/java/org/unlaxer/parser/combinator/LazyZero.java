@@ -14,6 +14,9 @@ public abstract class LazyZero extends LazyOccurs{
 		super(name);
 	}
 	
+    /** An explicit negative check, distinct from an ordinary {0} repetition. */
+    @Override public boolean isZeroMatchCheck() { return true; }
+
 	@Override
 	public int min() {
 		return 0;

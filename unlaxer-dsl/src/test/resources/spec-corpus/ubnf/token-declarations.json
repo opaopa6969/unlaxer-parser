@@ -93,15 +93,12 @@
       "scope": "parse",
       "citation": {
         "file": "unlaxer-dsl/specs/ubnf-syntax.md",
-        "heading": "## 形式的な文法定義",
-        "sentence": "| REGEX('pattern')"
+        "heading": "#### 旧 `REGEX('pattern')` — 廃止",
+        "sentence": "開発版では `E-REGEX-RETIRED` を返します。"
       },
       "input": "grammar G { token I=REGEX('[0-9]+') R ::= I; }",
       "expectation": {
-        "verdict": "accept",
-        "canonicalContains": [
-          "[\"Regex\",\"I\",\"[0-9]+\"]"
-        ]
+        "verdict": "reject"
       }
     },
     {

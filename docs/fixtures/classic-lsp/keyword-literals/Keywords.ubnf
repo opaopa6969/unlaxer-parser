@@ -1,0 +1,4 @@
+grammar Keywords {
+  @package: wire.keywords
+  @root @mapping(Value) Root ::= 'line\nbreak' | 'carriage\rreturn' | 'crlf\r\nbreak' | 'tab\tstop' | 'double"quote' | 'back\\slash' | '\'quoted\'' | '😀' | '👨‍👩‍👧‍👦' | 'é' | 'literal\\n' | 'literal\\u000a';
+}

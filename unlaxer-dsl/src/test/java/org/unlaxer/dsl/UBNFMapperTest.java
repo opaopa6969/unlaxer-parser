@@ -489,10 +489,8 @@ public class UBNFMapperTest {
             + "  @root\n"
             + "  Rule ::= ID ;\n"
             + "}";
-        GrammarDecl grammar = UBNFMapper.parse(input).grammars().get(0);
-        TokenDecl token = grammar.tokens().get(0);
-        assertTrue("REGEX token should produce TokenDecl.Regex", token instanceof TokenDecl.Regex);
-        assertEquals("[a-z]+", ((TokenDecl.Regex) token).pattern());
+        assertTrue(org.junit.Assert.assertThrows(IllegalArgumentException.class, () -> UBNFMapper.parse(input))
+            .getMessage().startsWith("E-REGEX-RETIRED:"));
     }
 
     @Test

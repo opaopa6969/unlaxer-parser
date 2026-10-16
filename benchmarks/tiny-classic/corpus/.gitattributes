@@ -1,0 +1,2 @@
+# This fixture contains a literal CRLF inside a quoted Tiny string.
+oracle-crlf.tiny -text whitespace=cr-at-eol

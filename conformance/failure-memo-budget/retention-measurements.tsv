@@ -1,0 +1,17 @@
+# 100000 same-position state epochs; one literal failure per epoch; memo ON; DetailedOnFailure
+# Cold processes, 3 trials each, shared host load; not a production benchmark. Java -Xms64m -Xmx512m; Rust rustc -O.
+# Baseline bd7faf68; candidate #644. RSS measured by /usr/bin/time, structural charge is not RSS.
+# baseline Rust charge=0 means unaccounted, not no retained payload. Java baseline has no charge metric.
+language	revision	trial	entries	charge_bytes	parse_nanos	process_seconds	max_rss_kib
+java	before	0	100000	-1	376977989	0.48	132088
+java	before	1	100000	-1	322038310	0.38	117684
+java	before	2	100000	-1	294443889	0.39	116872
+java	after	0	31536	16777152	204407020	0.26	138448
+java	after	1	31536	16777152	177921786	0.23	134672
+java	after	2	31536	16777152	175460499	0.23	131792
+rust	before	0	100000	0	59429433	0.06	26596
+rust	before	1	100000	0	63462788	0.06	26280
+rust	before	2	100000	0	59299597	0.06	26352
+rust	after	0	65536	16777216	43693793	0.04	28016
+rust	after	1	65536	16777216	41614656	0.04	28076
+rust	after	2	65536	16777216	43918164	0.04	28108

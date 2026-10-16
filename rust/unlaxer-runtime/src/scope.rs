@@ -80,6 +80,13 @@ enum ScopeUndo {
     RestoreDiagnostics(Vec<SymbolDiagnostic>),
 }
 
+/// A rollback restores the current version, never its monotonic allocator.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Checkpoint {
+    journal: usize,
+    memo_version: usize,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct ScopeStore {
     stack: Vec<BTreeMap<String, SymbolInfo>>,
@@ -90,6 +97,8 @@ pub struct ScopeStore {
     journal: Vec<ScopeUndo>,
     checkpoint_depth: usize,
     journal_entries_created: u64,
+    memo_version: usize,
+    next_memo_version: usize,
 }
 
 impl PartialEq for ScopeStore {
@@ -105,6 +114,21 @@ impl PartialEq for ScopeStore {
 impl Eq for ScopeStore {}
 
 impl ScopeStore {
+    /// None permanently disables memoization after the allocator is exhausted.
+    /// Unlike a wrapping counter, no new branch can alias an old version.
+    pub(crate) fn memo_version(&self) -> Option<usize> {
+        (self.next_memo_version != usize::MAX).then_some(self.memo_version)
+    }
+
+    pub(crate) fn mark_memo_changed(&mut self) {
+        self.next_memo_version = self.next_memo_version.saturating_add(1);
+        self.memo_version = self.next_memo_version;
+    }
+
+    pub(crate) fn retain_memo_allocator(&mut self, other: &Self) {
+        self.next_memo_version = self.next_memo_version.max(other.next_memo_version);
+    }
+
     pub(crate) fn is_empty(&self) -> bool {
         self.stack.is_empty()
             && self.global.is_empty()
@@ -116,12 +140,14 @@ impl ScopeStore {
     pub fn enter(&mut self) {
         self.record(ScopeUndo::PopScope);
         self.stack.push(BTreeMap::new());
+        self.mark_memo_changed();
     }
 
     /// Leaving at global depth is a no-op, matching Java ScopeStore.
     pub fn leave(&mut self) {
         if let Some(scope) = self.stack.pop() {
             self.record(ScopeUndo::PushScope(scope));
+            self.mark_memo_changed();
         }
     }
 
@@ -150,6 +176,7 @@ impl ScopeStore {
             declarations_len: self.declarations.len(),
         });
         self.declarations.push(info);
+        self.mark_memo_changed();
     }
 
     pub fn resolve(&self, name: &str) -> Option<&SymbolInfo> {
@@ -222,13 +249,17 @@ impl ScopeStore {
         if !self.diagnostics.is_empty() {
             let diagnostics = std::mem::take(&mut self.diagnostics);
             self.record(ScopeUndo::RestoreDiagnostics(diagnostics));
+            self.mark_memo_changed();
         }
     }
 
-    pub(crate) fn checkpoint(&mut self) -> usize {
-        let mark = self.journal.len();
+    pub(crate) fn checkpoint(&mut self) -> Checkpoint {
+        let checkpoint = Checkpoint {
+            journal: self.journal.len(),
+            memo_version: self.memo_version,
+        };
         self.checkpoint_depth += 1;
-        mark
+        checkpoint
     }
 
     pub(crate) fn commit_checkpoint(&mut self) {
@@ -239,13 +270,14 @@ impl ScopeStore {
         }
     }
 
-    pub(crate) fn rollback_checkpoint(&mut self, mark: usize) {
+    pub(crate) fn rollback_checkpoint(&mut self, checkpoint: Checkpoint) {
         debug_assert!(self.checkpoint_depth > 0);
-        debug_assert!(mark <= self.journal.len());
-        while self.journal.len() > mark {
+        debug_assert!(checkpoint.journal <= self.journal.len());
+        while self.journal.len() > checkpoint.journal {
             let undo = self.journal.pop().expect("journal length checked");
             self.apply_undo(undo);
         }
+        self.memo_version = checkpoint.memo_version;
         self.checkpoint_depth -= 1;
         if self.checkpoint_depth == 0 {
             self.journal.clear();
@@ -295,5 +327,70 @@ impl ScopeStore {
             ScopeUndo::TruncateDiagnostics(len) => self.diagnostics.truncate(len),
             ScopeUndo::RestoreDiagnostics(diagnostics) => self.diagnostics = diagnostics,
         }
+    }
+}
+
+#[cfg(test)]
+mod memo_version_tests {
+    use super::*;
+
+    #[test]
+    fn rollback_restores_current_epoch_but_never_reuses_branch_ids() {
+        let mut store = ScopeStore::default();
+        let baseline = store.memo_version();
+        let mark = store.checkpoint();
+        store.declare("x", 0);
+        let branch = store.memo_version().unwrap();
+        store.rollback_checkpoint(mark);
+        assert_eq!(store.memo_version(), baseline);
+        store.declare("x", 0);
+        assert!(store.memo_version().unwrap() > branch);
+    }
+
+    #[test]
+    fn exhaustion_during_a_rule_does_not_save_its_old_entry_key() {
+        use crate::{
+            memo_safe_rules, share_grammar, Expr, FailureMemoKey, Memoization, ParseContext,
+            ParseOptions, Rule,
+        };
+        let mut context = ParseContext::with_options(
+            "x",
+            ParseOptions::with_memoization(Memoization::SafeFailures),
+        );
+        context.rules = share_grammar(vec![Rule {
+            name: "scoped-failure",
+            expression: Expr::RuleEffects {
+                child: Box::new(Expr::literal("!")),
+                effects: RuleEffects {
+                    scope_mode: Some(ScopeMode::Lexical),
+                    ..RuleEffects::default()
+                },
+            },
+        }]);
+        context.memo_safe_rules = memo_safe_rules(&context.rules);
+        context.scopes.next_memo_version = usize::MAX - 1;
+        assert!(context.rule(0, 0).is_none());
+        assert_eq!(context.memoization_state_version(), None);
+        assert!(context
+            .failure_memo
+            .probe(0, &FailureMemoKey::new(0, 0, 0, false, 0))
+            .is_none());
+        assert!(context.rule(0, 0).is_none());
+        assert_eq!(context.memoized_failure_hits(), 0);
+    }
+
+    #[test]
+    fn exhausted_epochs_are_permanent_misses_even_after_rollback() {
+        let mut store = ScopeStore {
+            next_memo_version: usize::MAX - 1,
+            ..ScopeStore::default()
+        };
+        let mark = store.checkpoint();
+        store.mark_memo_changed();
+        assert_eq!(store.memo_version(), None);
+        store.rollback_checkpoint(mark);
+        assert_eq!(store.memo_version(), None);
+        store.mark_memo_changed();
+        assert_eq!(store.memo_version(), None);
     }
 }

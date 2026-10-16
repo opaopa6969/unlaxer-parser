@@ -1,0 +1,5 @@
+scale	statements	consumed_cp	matched_cp	cst_start_cp	cst_end_cp
+1	16	400	400	0	400
+4	64	1600	1600	0	1600
+16	256	6400	6400	0	6400
+64	1024	25600	25600	0	25600

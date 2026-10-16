@@ -1,0 +1,881 @@
+{
+  "parent_issues": [
+    197,
+    184
+  ],
+  "issue": 663,
+  "parser_product_base": "f709d8c967ca5f92af16f273bd655e8fd659c743",
+  "harness_commit": "3f519760cbf837ded09fb4459944700cdfe87491",
+  "tiny_pin": "7d7bd1cbfab1bd9548ba53c73cc50502f0437c67",
+  "measurement_eligible": false,
+  "concurrent_builds": true,
+  "original_consumer_semantic_observations": 48,
+  "budget_control_semantic_observations": 36,
+  "units": {
+    "java_alloc": "ThreadMXBean accumulated VM approximation for the main thread; not RSS",
+    "rust_alloc": "GlobalAlloc requested bytes during operation; includes probe emission; not RSS",
+    "cache_bytes": "conservative cache-owned charge; Java/Rust entry payload representations differ",
+    "jfr_alloc": "ObjectAllocationSample.weight sampling estimate; inclusive stacks overlap",
+    "cpu": "main thread CPU ns for Java; OS child process CPU separately includes JIT/GC/startup"
+  },
+  "observations": [
+    {
+      "fixture": "fraud-1",
+      "language": "java",
+      "budget_bytes": 16777216,
+      "child_user_cpu_s": 14.215131,
+      "child_system_cpu_s": 1.368301,
+      "samples": [
+        {
+          "phase": "cold",
+          "iteration": 0,
+          "parse_map_ns": 3929197068,
+          "success_hits": 1725922,
+          "failure_hits": 229388,
+          "cache": {
+            "entries": 1882,
+            "max_entries": 1882,
+            "success_entries": 136,
+            "success_retained_bytes": 1333136,
+            "success_budget_misses": 0,
+            "failure_entries": 1746,
+            "failure_retained_bytes": 16777188,
+            "failure_budget_misses": 1421352,
+            "evicted": 0,
+            "eviction_underruns": 0,
+            "dead_on_arrival": 0,
+            "max_hit_lookback": 216,
+            "window": 1024
+          },
+          "phase_breakdown": {
+            "setup_ns": 69984805,
+            "parse_ns": 3835664662,
+            "cursor_check_ns": 7375,
+            "map_ns": 23540226
+          },
+          "cpu_ns": 3771567422,
+          "main_thread_allocated_bytes": 5935859264
+        },
+        {
+          "phase": "warmup",
+          "iteration": 1,
+          "parse_map_ns": 3113995027,
+          "success_hits": 1725922,
+          "failure_hits": 229388,
+          "cache": {
+            "entries": 1882,
+            "max_entries": 1882,
+            "success_entries": 136,
+            "success_retained_bytes": 1333136,
+            "success_budget_misses": 0,
+            "failure_entries": 1746,
+            "failure_retained_bytes": 16777188,
+            "failure_budget_misses": 1421352,
+            "evicted": 0,
+            "eviction_underruns": 0,
+            "dead_on_arrival": 0,
+            "max_hit_lookback": 216,
+            "window": 1024
+          },
+          "phase_breakdown": {
+            "setup_ns": 104774,
+            "parse_ns": 3108479532,
+            "cursor_check_ns": 4949,
+            "map_ns": 5405772
+          },
+          "cpu_ns": 3055328459,
+          "main_thread_allocated_bytes": 5936507272
+        },
+        {
+          "phase": "warm",
+          "iteration": 2,
+          "parse_map_ns": 3188740851,
+          "success_hits": 1725922,
+          "failure_hits": 229388,
+          "cache": {
+            "entries": 1882,
+            "max_entries": 1882,
+            "success_entries": 136,
+            "success_retained_bytes": 1333136,
+            "success_budget_misses": 0,
+            "failure_entries": 1746,
+            "failure_retained_bytes": 16777188,
+            "failure_budget_misses": 1421352,
+            "evicted": 0,
+            "eviction_underruns": 0,
+            "dead_on_arrival": 0,
+            "max_hit_lookback": 216,
+            "window": 1024
+          },
+          "phase_breakdown": {
+            "setup_ns": 80838,
+            "parse_ns": 3185385790,
+            "cursor_check_ns": 5492,
+            "map_ns": 3268731
+          },
+          "cpu_ns": 3111195748,
+          "main_thread_allocated_bytes": 5935057936
+        }
+      ]
+    },
+    {
+      "fixture": "fraud-1",
+      "language": "rust-java",
+      "budget_bytes": 16777216,
+      "child_user_cpu_s": 0.06006499999999981,
+      "child_system_cpu_s": 0.008008999999999933,
+      "samples": [
+        {
+          "phase": "cold",
+          "iteration": 0,
+          "parse_map_ns": 22044223,
+          "success_hits": 51,
+          "failure_hits": 46617,
+          "cache": {
+            "failure_entries": 18136,
+            "failure_retained_bytes": 7641296,
+            "failure_budget_misses": 0,
+            "success_entries": 46,
+            "success_retained_bytes": 25540,
+            "success_budget_misses": 0
+          },
+          "allocated_request_bytes": 13921726
+        },
+        {
+          "phase": "warmup",
+          "iteration": 1,
+          "parse_map_ns": 21739564,
+          "success_hits": 51,
+          "failure_hits": 46617,
+          "cache": {
+            "failure_entries": 18136,
+            "failure_retained_bytes": 7641296,
+            "failure_budget_misses": 0,
+            "success_entries": 46,
+            "success_retained_bytes": 25540,
+            "success_budget_misses": 0
+          },
+          "allocated_request_bytes": 13791974
+        },
+        {
+          "phase": "warm",
+          "iteration": 2,
+          "parse_map_ns": 21917651,
+          "success_hits": 51,
+          "failure_hits": 46617,
+          "cache": {
+            "failure_entries": 18136,
+            "failure_retained_bytes": 7641296,
+            "failure_budget_misses": 0,
+            "success_entries": 46,
+            "success_retained_bytes": 25540,
+            "success_budget_misses": 0
+          },
+          "allocated_request_bytes": 13791974
+        }
+      ]
+    },
+    {
+      "fixture": "fraud-1",
+      "language": "rust-native",
+      "budget_bytes": 16777216,
+      "child_user_cpu_s": 0.06097200000000136,
+      "child_system_cpu_s": 0.008129000000000053,
+      "samples": [
+        {
+          "phase": "cold",
+          "iteration": 0,
+          "parse_map_ns": 22955533,
+          "success_hits": 51,
+          "failure_hits": 46617,
+          "cache": {
+            "failure_entries": 18136,
+            "failure_retained_bytes": 7641296,
+            "failure_budget_misses": 0,
+            "success_entries": 46,
+            "success_retained_bytes": 25540,
+            "success_budget_misses": 0
+          },
+          "allocated_request_bytes": 13921726
+        },
+        {
+          "phase": "warmup",
+          "iteration": 1,
+          "parse_map_ns": 22815652,
+          "success_hits": 51,
+          "failure_hits": 46617,
+          "cache": {
+            "failure_entries": 18136,
+            "failure_retained_bytes": 7641296,
+            "failure_budget_misses": 0,
+            "success_entries": 46,
+            "success_retained_bytes": 25540,
+            "success_budget_misses": 0
+          },
+          "allocated_request_bytes": 13791974
+        },
+        {
+          "phase": "warm",
+          "iteration": 2,
+          "parse_map_ns": 20725957,
+          "success_hits": 51,
+          "failure_hits": 46617,
+          "cache": {
+            "failure_entries": 18136,
+            "failure_retained_bytes": 7641296,
+            "failure_budget_misses": 0,
+            "success_entries": 46,
+            "success_retained_bytes": 25540,
+            "success_budget_misses": 0
+          },
+          "allocated_request_bytes": 13791974
+        }
+      ]
+    },
+    {
+      "fixture": "fraud-1",
+      "language": "java",
+      "budget_bytes": 67108864,
+      "child_user_cpu_s": 4.862608,
+      "child_system_cpu_s": 0.878026,
+      "samples": [
+        {
+          "phase": "cold",
+          "iteration": 0,
+          "parse_map_ns": 471401966,
+          "success_hits": 14180,
+          "failure_hits": 12059,
+          "cache": {
+            "entries": 2226,
+            "max_entries": 2226,
+            "success_entries": 136,
+            "success_retained_bytes": 1333136,
+            "success_budget_misses": 0,
+            "failure_entries": 2090,
+            "failure_retained_bytes": 20290556,
+            "failure_budget_misses": 0,
+            "evicted": 0,
+            "eviction_underruns": 0,
+            "dead_on_arrival": 0,
+            "max_hit_lookback": 216,
+            "window": 1024
+          },
+          "phase_breakdown": {
+            "setup_ns": 75696818,
+            "parse_ns": 359811535,
+            "cursor_check_ns": 10764,
+            "map_ns": 35882849
+          },
+          "cpu_ns": 431767603,
+          "main_thread_allocated_bytes": 85434008
+        },
+        {
+          "phase": "warmup",
+          "iteration": 1,
+          "parse_map_ns": 100567939,
+          "success_hits": 14180,
+          "failure_hits": 12059,
+          "cache": {
+            "entries": 2226,
+            "max_entries": 2226,
+            "success_entries": 136,
+            "success_retained_bytes": 1333136,
+            "success_budget_misses": 0,
+            "failure_entries": 2090,
+            "failure_retained_bytes": 20290556,
+            "failure_budget_misses": 0,
+            "evicted": 0,
+            "eviction_underruns": 0,
+            "dead_on_arrival": 0,
+            "max_hit_lookback": 216,
+            "window": 1024
+          },
+          "phase_breakdown": {
+            "setup_ns": 131423,
+            "parse_ns": 94431851,
+            "cursor_check_ns": 3497,
+            "map_ns": 6001168
+          },
+          "cpu_ns": 97292954,
+          "main_thread_allocated_bytes": 73822152
+        },
+        {
+          "phase": "warm",
+          "iteration": 2,
+          "parse_map_ns": 78158698,
+          "success_hits": 14180,
+          "failure_hits": 12059,
+          "cache": {
+            "entries": 2226,
+            "max_entries": 2226,
+            "success_entries": 136,
+            "success_retained_bytes": 1333136,
+            "success_budget_misses": 0,
+            "failure_entries": 2090,
+            "failure_retained_bytes": 20290556,
+            "failure_budget_misses": 0,
+            "evicted": 0,
+            "eviction_underruns": 0,
+            "dead_on_arrival": 0,
+            "max_hit_lookback": 216,
+            "window": 1024
+          },
+          "phase_breakdown": {
+            "setup_ns": 101135,
+            "parse_ns": 73345852,
+            "cursor_check_ns": 4129,
+            "map_ns": 4707582
+          },
+          "cpu_ns": 73295991,
+          "main_thread_allocated_bytes": 72959720
+        }
+      ]
+    },
+    {
+      "fixture": "fraud-1",
+      "language": "rust-java",
+      "budget_bytes": 67108864,
+      "child_user_cpu_s": 0.06311399999999878,
+      "child_system_cpu_s": 0.003944999999999865,
+      "samples": [
+        {
+          "phase": "cold",
+          "iteration": 0,
+          "parse_map_ns": 23365120,
+          "success_hits": 51,
+          "failure_hits": 46617,
+          "cache": {
+            "failure_entries": 18136,
+            "failure_retained_bytes": 7641296,
+            "failure_budget_misses": 0,
+            "success_entries": 46,
+            "success_retained_bytes": 25540,
+            "success_budget_misses": 0
+          },
+          "allocated_request_bytes": 13921726
+        },
+        {
+          "phase": "warmup",
+          "iteration": 1,
+          "parse_map_ns": 21195272,
+          "success_hits": 51,
+          "failure_hits": 46617,
+          "cache": {
+            "failure_entries": 18136,
+            "failure_retained_bytes": 7641296,
+            "failure_budget_misses": 0,
+            "success_entries": 46,
+            "success_retained_bytes": 25540,
+            "success_budget_misses": 0
+          },
+          "allocated_request_bytes": 13791974
+        },
+        {
+          "phase": "warm",
+          "iteration": 2,
+          "parse_map_ns": 20627137,
+          "success_hits": 51,
+          "failure_hits": 46617,
+          "cache": {
+            "failure_entries": 18136,
+            "failure_retained_bytes": 7641296,
+            "failure_budget_misses": 0,
+            "success_entries": 46,
+            "success_retained_bytes": 25540,
+            "success_budget_misses": 0
+          },
+          "allocated_request_bytes": 13791974
+        }
+      ]
+    },
+    {
+      "fixture": "fraud-1",
+      "language": "rust-native",
+      "budget_bytes": 67108864,
+      "child_user_cpu_s": 0.06295700000000082,
+      "child_system_cpu_s": 0.003934000000000104,
+      "samples": [
+        {
+          "phase": "cold",
+          "iteration": 0,
+          "parse_map_ns": 23320336,
+          "success_hits": 51,
+          "failure_hits": 46617,
+          "cache": {
+            "failure_entries": 18136,
+            "failure_retained_bytes": 7641296,
+            "failure_budget_misses": 0,
+            "success_entries": 46,
+            "success_retained_bytes": 25540,
+            "success_budget_misses": 0
+          },
+          "allocated_request_bytes": 13921726
+        },
+        {
+          "phase": "warmup",
+          "iteration": 1,
+          "parse_map_ns": 21224477,
+          "success_hits": 51,
+          "failure_hits": 46617,
+          "cache": {
+            "failure_entries": 18136,
+            "failure_retained_bytes": 7641296,
+            "failure_budget_misses": 0,
+            "success_entries": 46,
+            "success_retained_bytes": 25540,
+            "success_budget_misses": 0
+          },
+          "allocated_request_bytes": 13791974
+        },
+        {
+          "phase": "warm",
+          "iteration": 2,
+          "parse_map_ns": 20151648,
+          "success_hits": 51,
+          "failure_hits": 46617,
+          "cache": {
+            "failure_entries": 18136,
+            "failure_retained_bytes": 7641296,
+            "failure_budget_misses": 0,
+            "success_entries": 46,
+            "success_retained_bytes": 25540,
+            "success_budget_misses": 0
+          },
+          "allocated_request_bytes": 13791974
+        }
+      ]
+    },
+    {
+      "fixture": "fraud-4",
+      "language": "java",
+      "budget_bytes": 16777216,
+      "child_user_cpu_s": 31.714505,
+      "child_system_cpu_s": 1.8416970000000004,
+      "samples": [
+        {
+          "phase": "cold",
+          "iteration": 0,
+          "parse_map_ns": 8411829364,
+          "success_hits": 3240802,
+          "failure_hits": 81821,
+          "cache": {
+            "entries": 1832,
+            "max_entries": 1832,
+            "success_entries": 147,
+            "success_retained_bytes": 1557124,
+            "success_budget_misses": 0,
+            "failure_entries": 1685,
+            "failure_retained_bytes": 16777204,
+            "failure_budget_misses": 2073210,
+            "evicted": 0,
+            "eviction_underruns": 0,
+            "dead_on_arrival": 0,
+            "max_hit_lookback": 605,
+            "window": 1024
+          },
+          "phase_breakdown": {
+            "setup_ns": 75059203,
+            "parse_ns": 8244529544,
+            "cursor_check_ns": 87296,
+            "map_ns": 92153321
+          },
+          "cpu_ns": 8127130031,
+          "main_thread_allocated_bytes": 12196697888
+        },
+        {
+          "phase": "warmup",
+          "iteration": 1,
+          "parse_map_ns": 11134017107,
+          "success_hits": 3240802,
+          "failure_hits": 81821,
+          "cache": {
+            "entries": 1832,
+            "max_entries": 1832,
+            "success_entries": 147,
+            "success_retained_bytes": 1557124,
+            "success_budget_misses": 0,
+            "failure_entries": 1685,
+            "failure_retained_bytes": 16777204,
+            "failure_budget_misses": 2073210,
+            "evicted": 0,
+            "eviction_underruns": 0,
+            "dead_on_arrival": 0,
+            "max_hit_lookback": 605,
+            "window": 1024
+          },
+          "phase_breakdown": {
+            "setup_ns": 312784,
+            "parse_ns": 11127528993,
+            "cursor_check_ns": 7725,
+            "map_ns": 6167605
+          },
+          "cpu_ns": 10672903759,
+          "main_thread_allocated_bytes": 12220283504
+        },
+        {
+          "phase": "warm",
+          "iteration": 2,
+          "parse_map_ns": 7822681618,
+          "success_hits": 3240802,
+          "failure_hits": 81821,
+          "cache": {
+            "entries": 1832,
+            "max_entries": 1832,
+            "success_entries": 147,
+            "success_retained_bytes": 1557124,
+            "success_budget_misses": 0,
+            "failure_entries": 1685,
+            "failure_retained_bytes": 16777204,
+            "failure_budget_misses": 2073210,
+            "evicted": 0,
+            "eviction_underruns": 0,
+            "dead_on_arrival": 0,
+            "max_hit_lookback": 605,
+            "window": 1024
+          },
+          "phase_breakdown": {
+            "setup_ns": 131249,
+            "parse_ns": 7818403089,
+            "cursor_check_ns": 5942,
+            "map_ns": 4141338
+          },
+          "cpu_ns": 7678621012,
+          "main_thread_allocated_bytes": 12219222472
+        }
+      ]
+    },
+    {
+      "fixture": "fraud-4",
+      "language": "rust-java",
+      "budget_bytes": 16777216,
+      "child_user_cpu_s": 0.06909300000000229,
+      "child_system_cpu_s": 0.0,
+      "samples": [
+        {
+          "phase": "cold",
+          "iteration": 0,
+          "parse_map_ns": 23291523,
+          "success_hits": 84,
+          "failure_hits": 40635,
+          "cache": {
+            "failure_entries": 16913,
+            "failure_retained_bytes": 7059696,
+            "failure_budget_misses": 0,
+            "success_entries": 73,
+            "success_retained_bytes": 44033,
+            "success_budget_misses": 0
+          },
+          "allocated_request_bytes": 15374827
+        },
+        {
+          "phase": "warmup",
+          "iteration": 1,
+          "parse_map_ns": 21519331,
+          "success_hits": 84,
+          "failure_hits": 40635,
+          "cache": {
+            "failure_entries": 16913,
+            "failure_retained_bytes": 7059696,
+            "failure_budget_misses": 0,
+            "success_entries": 73,
+            "success_retained_bytes": 44033,
+            "success_budget_misses": 0
+          },
+          "allocated_request_bytes": 15245075
+        },
+        {
+          "phase": "warm",
+          "iteration": 2,
+          "parse_map_ns": 22038102,
+          "success_hits": 84,
+          "failure_hits": 40635,
+          "cache": {
+            "failure_entries": 16913,
+            "failure_retained_bytes": 7059696,
+            "failure_budget_misses": 0,
+            "success_entries": 73,
+            "success_retained_bytes": 44033,
+            "success_budget_misses": 0
+          },
+          "allocated_request_bytes": 15245075
+        }
+      ]
+    },
+    {
+      "fixture": "fraud-4",
+      "language": "rust-native",
+      "budget_bytes": 16777216,
+      "child_user_cpu_s": 0.0572609999999969,
+      "child_system_cpu_s": 0.011451999999999352,
+      "samples": [
+        {
+          "phase": "cold",
+          "iteration": 0,
+          "parse_map_ns": 23647813,
+          "success_hits": 84,
+          "failure_hits": 40635,
+          "cache": {
+            "failure_entries": 16913,
+            "failure_retained_bytes": 7059696,
+            "failure_budget_misses": 0,
+            "success_entries": 73,
+            "success_retained_bytes": 44033,
+            "success_budget_misses": 0
+          },
+          "allocated_request_bytes": 15374827
+        },
+        {
+          "phase": "warmup",
+          "iteration": 1,
+          "parse_map_ns": 21233759,
+          "success_hits": 84,
+          "failure_hits": 40635,
+          "cache": {
+            "failure_entries": 16913,
+            "failure_retained_bytes": 7059696,
+            "failure_budget_misses": 0,
+            "success_entries": 73,
+            "success_retained_bytes": 44033,
+            "success_budget_misses": 0
+          },
+          "allocated_request_bytes": 15245075
+        },
+        {
+          "phase": "warm",
+          "iteration": 2,
+          "parse_map_ns": 21403250,
+          "success_hits": 84,
+          "failure_hits": 40635,
+          "cache": {
+            "failure_entries": 16913,
+            "failure_retained_bytes": 7059696,
+            "failure_budget_misses": 0,
+            "success_entries": 73,
+            "success_retained_bytes": 44033,
+            "success_budget_misses": 0
+          },
+          "allocated_request_bytes": 15245075
+        }
+      ]
+    },
+    {
+      "fixture": "fraud-4",
+      "language": "java",
+      "budget_bytes": 67108864,
+      "child_user_cpu_s": 6.874478000000003,
+      "child_system_cpu_s": 1.0055210000000008,
+      "samples": [
+        {
+          "phase": "cold",
+          "iteration": 0,
+          "parse_map_ns": 616620360,
+          "success_hits": 14459,
+          "failure_hits": 10643,
+          "cache": {
+            "entries": 2108,
+            "max_entries": 2108,
+            "success_entries": 147,
+            "success_retained_bytes": 1557124,
+            "success_budget_misses": 0,
+            "failure_entries": 1961,
+            "failure_retained_bytes": 20037248,
+            "failure_budget_misses": 0,
+            "evicted": 0,
+            "eviction_underruns": 0,
+            "dead_on_arrival": 0,
+            "max_hit_lookback": 605,
+            "window": 1024
+          },
+          "phase_breakdown": {
+            "setup_ns": 100776572,
+            "parse_ns": 474679481,
+            "cursor_check_ns": 16221,
+            "map_ns": 41148086
+          },
+          "cpu_ns": 567957768,
+          "main_thread_allocated_bytes": 91904344
+        },
+        {
+          "phase": "warmup",
+          "iteration": 1,
+          "parse_map_ns": 130141801,
+          "success_hits": 14459,
+          "failure_hits": 10643,
+          "cache": {
+            "entries": 2108,
+            "max_entries": 2108,
+            "success_entries": 147,
+            "success_retained_bytes": 1557124,
+            "success_budget_misses": 0,
+            "failure_entries": 1961,
+            "failure_retained_bytes": 20037248,
+            "failure_budget_misses": 0,
+            "evicted": 0,
+            "eviction_underruns": 0,
+            "dead_on_arrival": 0,
+            "max_hit_lookback": 605,
+            "window": 1024
+          },
+          "phase_breakdown": {
+            "setup_ns": 156005,
+            "parse_ns": 121352887,
+            "cursor_check_ns": 4949,
+            "map_ns": 8627960
+          },
+          "cpu_ns": 127666470,
+          "main_thread_allocated_bytes": 80348136
+        },
+        {
+          "phase": "warm",
+          "iteration": 2,
+          "parse_map_ns": 84575056,
+          "success_hits": 14459,
+          "failure_hits": 10643,
+          "cache": {
+            "entries": 2108,
+            "max_entries": 2108,
+            "success_entries": 147,
+            "success_retained_bytes": 1557124,
+            "success_budget_misses": 0,
+            "failure_entries": 1961,
+            "failure_retained_bytes": 20037248,
+            "failure_budget_misses": 0,
+            "evicted": 0,
+            "eviction_underruns": 0,
+            "dead_on_arrival": 0,
+            "max_hit_lookback": 605,
+            "window": 1024
+          },
+          "phase_breakdown": {
+            "setup_ns": 91132,
+            "parse_ns": 79025382,
+            "cursor_check_ns": 5481,
+            "map_ns": 5453061
+          },
+          "cpu_ns": 79389652,
+          "main_thread_allocated_bytes": 80141336
+        }
+      ]
+    },
+    {
+      "fixture": "fraud-4",
+      "language": "rust-java",
+      "budget_bytes": 67108864,
+      "child_user_cpu_s": 0.05790299999999604,
+      "child_system_cpu_s": 0.01158099999999962,
+      "samples": [
+        {
+          "phase": "cold",
+          "iteration": 0,
+          "parse_map_ns": 24123789,
+          "success_hits": 84,
+          "failure_hits": 40635,
+          "cache": {
+            "failure_entries": 16913,
+            "failure_retained_bytes": 7059696,
+            "failure_budget_misses": 0,
+            "success_entries": 73,
+            "success_retained_bytes": 44033,
+            "success_budget_misses": 0
+          },
+          "allocated_request_bytes": 15374827
+        },
+        {
+          "phase": "warmup",
+          "iteration": 1,
+          "parse_map_ns": 20947027,
+          "success_hits": 84,
+          "failure_hits": 40635,
+          "cache": {
+            "failure_entries": 16913,
+            "failure_retained_bytes": 7059696,
+            "failure_budget_misses": 0,
+            "success_entries": 73,
+            "success_retained_bytes": 44033,
+            "success_budget_misses": 0
+          },
+          "allocated_request_bytes": 15245075
+        },
+        {
+          "phase": "warm",
+          "iteration": 2,
+          "parse_map_ns": 21792688,
+          "success_hits": 84,
+          "failure_hits": 40635,
+          "cache": {
+            "failure_entries": 16913,
+            "failure_retained_bytes": 7059696,
+            "failure_budget_misses": 0,
+            "success_entries": 73,
+            "success_retained_bytes": 44033,
+            "success_budget_misses": 0
+          },
+          "allocated_request_bytes": 15245075
+        }
+      ]
+    },
+    {
+      "fixture": "fraud-4",
+      "language": "rust-native",
+      "budget_bytes": 67108864,
+      "child_user_cpu_s": 0.06283700000000181,
+      "child_system_cpu_s": 0.007854000000000028,
+      "samples": [
+        {
+          "phase": "cold",
+          "iteration": 0,
+          "parse_map_ns": 22566883,
+          "success_hits": 84,
+          "failure_hits": 40635,
+          "cache": {
+            "failure_entries": 16913,
+            "failure_retained_bytes": 7059696,
+            "failure_budget_misses": 0,
+            "success_entries": 73,
+            "success_retained_bytes": 44033,
+            "success_budget_misses": 0
+          },
+          "allocated_request_bytes": 15374827
+        },
+        {
+          "phase": "warmup",
+          "iteration": 1,
+          "parse_map_ns": 21760727,
+          "success_hits": 84,
+          "failure_hits": 40635,
+          "cache": {
+            "failure_entries": 16913,
+            "failure_retained_bytes": 7059696,
+            "failure_budget_misses": 0,
+            "success_entries": 73,
+            "success_retained_bytes": 44033,
+            "success_budget_misses": 0
+          },
+          "allocated_request_bytes": 15245075
+        },
+        {
+          "phase": "warm",
+          "iteration": 2,
+          "parse_map_ns": 23567036,
+          "success_hits": 84,
+          "failure_hits": 40635,
+          "cache": {
+            "failure_entries": 16913,
+            "failure_retained_bytes": 7059696,
+            "failure_budget_misses": 0,
+            "success_entries": 73,
+            "success_retained_bytes": 44033,
+            "success_budget_misses": 0
+          },
+          "allocated_request_bytes": 15245075
+        }
+      ]
+    }
+  ],
+  "sources": {
+    "PhaseConsumer.java": "0566f7728882b39becd7aaeef83e4ed1f783fdb23d6a530e104c3ff9d959a726",
+    "rust-budget-probe.rs": "d2d57d7aba479a3e770f588d6071fc7f96e065273b6b087bb398fc2adff9e884",
+    "lib.rs": "c1989a606cc0f395733dcd21d01e17ce257ba7c4ddb1f1e0eb31f16bf7f7d08d",
+    "classic-profile.jfc": "88be385f84e7f97e2a8c37e77ca6c87451cf9e439eb72ee758aa484b0d0da927"
+  }
+}

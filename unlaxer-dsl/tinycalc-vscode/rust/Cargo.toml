@@ -1,0 +1,21 @@
+[package]
+name = "tinycalc-ide"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+publish = false
+
+[dependencies]
+unlaxer-runtime = { path = "../../../rust/unlaxer-runtime" }
+unlaxer-lsp = { path = "../../../rust/unlaxer-lsp" }
+unlaxer-dap = { path = "../../../rust/unlaxer-dap" }
+
+[[bin]]
+name = "tinycalc-lsp"
+path = "src/lsp.rs"
+
+[[bin]]
+name = "tinycalc-dap"
+path = "src/dap.rs"
+
+[workspace]

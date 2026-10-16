@@ -1,0 +1,35 @@
+[
+  {
+    "name": "nested-order",
+    "grammar": "grammar Invalid { @package: commonprobe @root @mapping(Node) @commonField(value) Root ::= A | B; @nestedCaptures @mapping(A,params=[value]) A ::= 'a' [ {'x'} ] @value; @nestedCaptures @mapping(B,params=[value]) B ::= 'b' { ['x'] } @value;  }",
+    "error": {
+      "code": "P-COMMONFIELD",
+      "span": [
+        40,
+        96
+      ]
+    }
+  },
+  {
+    "name": "nested-node",
+    "grammar": "grammar Invalid { @package: commonprobe @root @mapping(Node) @commonField(value) Root ::= A | B; @nestedCaptures @mapping(A,params=[value]) A ::= 'a' [Leaf] @value; @nestedCaptures @mapping(B,params=[value]) B ::= 'b' [Other] @value; @mapping(Leaf,params=[text]) Leaf ::= 'x' @text; @mapping(Other,params=[text]) Other ::= 'x' @text; }",
+    "error": {
+      "code": "P-COMMONFIELD",
+      "span": [
+        40,
+        96
+      ]
+    }
+  },
+  {
+    "name": "nested-enum",
+    "grammar": "grammar Invalid { @package: commonprobe @root @mapping(Node) @commonField(value) Root ::= A | B; @nestedCaptures @mapping(A,params=[value]) A ::= 'a' [Mode] @value; @nestedCaptures @mapping(B,params=[value]) B ::= 'b' [Other] @value; @enum Mode ::= 'x'; @enum Other ::= 'x'; }",
+    "error": {
+      "code": "P-COMMONFIELD",
+      "span": [
+        40,
+        96
+      ]
+    }
+  }
+]

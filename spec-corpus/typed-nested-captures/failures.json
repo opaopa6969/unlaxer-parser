@@ -1,0 +1,48 @@
+{
+  "grammar": "grammar NestedFailures { @package: org.example.nestedcaptures token N = org.unlaxer.parser.elementary.NumberParser @root @nestedCaptures @mapping(Root, params=[value]) Root ::= '😀(' [N] @value ')'; }",
+  "validInput": "😀(7)",
+  "validStructure": "some(int(7))",
+  "cases": [
+    {
+      "id": "overflow",
+      "input": "😀(2147483648)",
+      "parse": true,
+      "errorSpan": [
+        2,
+        12
+      ]
+    },
+    {
+      "id": "decimal",
+      "input": "😀(1.5)",
+      "parse": true,
+      "errorSpan": [
+        2,
+        5
+      ]
+    },
+    {
+      "id": "negative-overflow",
+      "input": "😀(-2147483649)",
+      "parse": true,
+      "errorSpan": [
+        2,
+        13
+      ]
+    },
+    {
+      "id": "missing-close",
+      "input": "😀(1",
+      "parse": false,
+      "consumed": 0,
+      "matched": 0
+    },
+    {
+      "id": "bad-value",
+      "input": "😀(?)",
+      "parse": false,
+      "consumed": 0,
+      "matched": 0
+    }
+  ]
+}
