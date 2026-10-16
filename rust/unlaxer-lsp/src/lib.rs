@@ -91,7 +91,16 @@ impl Backend for GrammarBackend {
         ) {
             Ok(_) => vec![],
             Err(error) => {
-                let mut start = error.offset.min(snapshot.len());
+                // Editor diagnostics follow Java's farthest syntax failure, while the
+                // public parse_detailed primary still identifies unconsumed input.
+                // Keep non-syntax failures (in particular resource limits) primary.
+                let (offset, expected) =
+                    if error.kind == "trailing_input" && error.farthest.offset >= error.offset {
+                        (error.farthest.offset, &error.farthest.expected)
+                    } else {
+                        (error.offset, &error.expected)
+                    };
+                let mut start = offset.min(snapshot.len());
                 if snapshot.lsp(start).is_err() {
                     start = start.saturating_sub(1);
                 }
@@ -102,15 +111,15 @@ impl Backend for GrammarBackend {
                 }
                 vec![Diagnostic {
                     span: Span { start, end },
-                    message: if error.expected.is_empty() {
+                    message: if expected.is_empty() {
                         format!(
                             "Parse error at offset {}",
                             snapshot.utf16(start).unwrap_or(0)
                         )
                     } else {
-                        format!("Expected {}", error.expected.join(" or "))
+                        format!("Expected {}", expected.join(" or "))
                     },
-                    data: json!({"schemaVersion":1,"code":"ULX-PARSE-001","kind":"syntax","offset":snapshot.utf16(start).unwrap_or(0),"totalLength":snapshot.utf16(snapshot.len()).unwrap_or(0),"expectedTokens":error.expected}),
+                    data: json!({"schemaVersion":1,"code":"ULX-PARSE-001","kind":"syntax","offset":snapshot.utf16(start).unwrap_or(0),"totalLength":snapshot.utf16(snapshot.len()).unwrap_or(0),"expectedTokens":expected}),
                 }]
             }
         }
