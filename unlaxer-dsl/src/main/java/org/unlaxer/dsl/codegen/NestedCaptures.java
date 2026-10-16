@@ -46,10 +46,17 @@ public final class NestedCaptures {
                 if (sites.sites(field).size() != 1) throw invalid(rule,"one capture site required for " + field);
                 shape(grammar, sites.sites(field).get(0).element(), 0);
             }
+            if (mapping.paramNames().stream().anyMatch(name -> field(grammar,rule,name).leaf()==Kind.VALUE)) {
+                for (var candidate : grammar.rules()) {
+                    String name=MapperElementUtil.getMappingAnnotation(candidate).map(MappingAnnotation::className).orElse("");
+                    if (name.equals("NestedValue") || name.startsWith("NestedValue.") || EnumSchema.isEnum(candidate) && candidate.name().equals("NestedValue"))
+                        throw invalid(rule,"NestedValue is reserved for the nested mixed sum type");
+                }
+            }
             // Captures hidden by an enclosing quantifier would need an implicit container.
             requireOuter(rule, rule.body(), false);
     }
-    // Recursive containers cannot use the legacy flat Object/Value join without losing shape.
+    // Recursive containers share their explicit leaf type and complete container shape.
     private static void requireSharedShape(GrammarDecl grammar,RuleDecl owner,MappingAnnotation mapping) {
         for(var candidate:grammar.rules()) {
             var other=MapperElementUtil.getMappingAnnotation(candidate).orElse(null);
@@ -136,11 +143,21 @@ public final class NestedCaptures {
                 }
                 current=new GrammarIR.NestedShape(Kind.TEXT,null,List.of());
             }
-            if (result!=null && (!result.equals(current) || !current.containers().isEmpty() || current.javaLeafType()!=null)) throw new IllegalArgumentException("E-NESTED-SHAPE: heterogeneous/container/mapped choice requires the remaining #583 implementation");
+            if (result != null) {
+                if (!result.containers().isEmpty() || !current.containers().isEmpty())
+                    throw new IllegalArgumentException("E-NESTED-SHAPE: container choice requires the remaining #583 implementation");
+                if (!result.equals(current) || current.javaLeafType() != null)
+                    current = new GrammarIR.NestedShape(Kind.VALUE,null,List.of(),grammar.name()+"AST.NestedValue");
+            }
             result=current;
         }
         if (result==null) throw new IllegalArgumentException("E-NESTED-SHAPE: empty body");
         return result;
+    }
+    public static boolean hasMixed(GrammarDecl grammar) {
+        return grammar.rules().stream().filter(NestedCaptures::enabled).anyMatch(rule ->
+            MapperElementUtil.getMappingAnnotation(rule).orElseThrow().paramNames().stream()
+                .anyMatch(name -> field(grammar,rule,name).leaf() == Kind.VALUE));
     }
     private static GrammarIR.NestedShape wrap(Cardinality container,GrammarIR.NestedShape inner) {
         var containers=new ArrayList<Cardinality>();containers.add(container);containers.addAll(inner.containers());

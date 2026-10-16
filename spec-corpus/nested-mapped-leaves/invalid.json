@@ -6,21 +6,9 @@
     "endCP": 134
   },
   {
-    "id": "mapped-choice",
-    "grammar": "grammar Invalid { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= (Leaf | Leaf) @value; @mapping(Leaf,params=[text]) Leaf ::= 'a' @text; }",
-    "startCP": 55,
-    "endCP": 137
-  },
-  {
     "id": "enum-group",
     "grammar": "grammar Invalid { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= (Mode 'x') @value; @enum Mode ::= 'a' | 'b'; }",
     "startCP": 55,
     "endCP": 134
-  },
-  {
-    "id": "enum-choice",
-    "grammar": "grammar Invalid { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= (Mode | Mode) @value; @enum Mode ::= 'a' | 'b'; }",
-    "startCP": 55,
-    "endCP": 137
   }
 ]

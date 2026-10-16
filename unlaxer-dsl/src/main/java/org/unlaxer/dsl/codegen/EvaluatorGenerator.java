@@ -48,6 +48,7 @@ public class EvaluatorGenerator implements CodeGenerator {
     @Override
     public GeneratedSource generate(GrammarDecl grammar) {
         org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
+        NestedCaptures.requireValid(grammar);
         GrammarValidator.requireValidBoundedRepeatElements(grammar);
         LeftRecursionAnalysis.requireValid(grammar);
         CommonFieldSchema.build(grammar);

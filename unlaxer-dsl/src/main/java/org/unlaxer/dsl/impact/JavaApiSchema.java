@@ -135,7 +135,9 @@ public final class JavaApiSchema {
                     }
                 }
             }
-            List<ApiImpact.Origin> origins = kind.equals("enum")
+            List<ApiImpact.Origin> origins = ((name.equals("NestedValue") || name.startsWith("NestedValue."))
+                && org.unlaxer.dsl.codegen.NestedCaptures.hasMixed(grammar))
+                ? ApiImpact.origins(snapshot, null) : kind.equals("enum")
                 ? enumOrigins(snapshot, grammar, name) : ApiImpact.origins(snapshot, name);
             nodes.add(new ApiImpact.Node(name, kind, fields,
                 parents.stream().sorted().toList(), variants.stream().sorted().toList(),

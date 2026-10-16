@@ -12,7 +12,9 @@ pub fn generate(ir: &GrammarIr) -> GeneratedFile {
         for mapping in mappings {
             write!(out, "        super::ast::Ast::r#{} {{ span", mapping.name).unwrap();
             for field in &mapping.fields {
-                if matches!(field.kind, Kind::Node | Kind::NullableNode | Kind::Value) {
+                if matches!(field.kind, Kind::Node | Kind::NullableNode | Kind::Value)
+                    || crate::nested::dap_node(field)
+                {
                     write!(out, ", r#{}", field.name).unwrap();
                 }
             }
@@ -24,6 +26,22 @@ pub fn generate(ir: &GrammarIr) -> GeneratedFile {
             )
             .unwrap();
             for field in &mapping.fields {
+                if let Kind::Nested { leaf, containers } = &field.kind {
+                    if crate::nested::dap_node(field) {
+                        writeln!(
+                            out,
+                            "            {}",
+                            crate::nested::dap_walk(
+                                leaf,
+                                containers,
+                                &format!("r#{}", field.name),
+                                0
+                            )
+                        )
+                        .unwrap();
+                    }
+                    continue;
+                }
                 if !matches!(field.kind, Kind::Node | Kind::NullableNode | Kind::Value) {
                     continue;
                 }

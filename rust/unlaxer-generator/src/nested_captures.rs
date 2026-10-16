@@ -142,6 +142,17 @@ pub fn validate(grammar: &GrammarDecl) -> Result<(), String> {
         for value in values.values() {
             shape(grammar, value, 0).map_err(|e| error(rule, &e))?;
         }
+        if values
+            .values()
+            .any(|value| matches!(shape(grammar, value, 0).map(parts), Ok((Kind::Value, _))))
+        {
+            for candidate in &grammar.rules {
+                if candidate.annotations.iter().any(|a| matches!(&a.kind,AnnotationKind::Mapping{class_name,..} if class_name=="NestedValue" || class_name.starts_with("NestedValue.")))
+                    || candidate.name=="NestedValue" && candidate.annotations.iter().any(|a| matches!(a.kind,AnnotationKind::Enum)) {
+                    return Err(error(rule,"NestedValue is reserved for the nested mixed sum type"));
+                }
+            }
+        }
         validated.push((rule, mapping, values));
     }
     // Cross-rule comparison only follows bounded validation of every contributor.
@@ -298,7 +309,7 @@ pub fn shape(grammar: &GrammarDecl, atom: &AtomicElement, depth: usize) -> Resul
         _ => return Err("unsupported nested element".into()),
     })
 }
-fn body_shape(grammar: &GrammarDecl, body: &RuleBody, depth: usize) -> Result<Kind, String> {
+pub fn body_shape(grammar: &GrammarDecl, body: &RuleBody, depth: usize) -> Result<Kind, String> {
     let mut result = None;
     for sequence in &body.alternatives {
         let current = if let [element] = sequence.elements.as_slice() {
@@ -307,20 +318,25 @@ fn body_shape(grammar: &GrammarDecl, body: &RuleBody, depth: usize) -> Result<Ki
             for element in &sequence.elements {
                 if matches!(
                     shape(grammar, &element.element, depth + 1)?,
-                    Kind::Nested { .. } | Kind::Node | Kind::Enum(_)
+                    Kind::Nested { .. } | Kind::Node | Kind::Enum(_) | Kind::Value
                 ) {
                     return Err("multi-element container group needs explicit mapped node".into());
                 }
             }
             Kind::Text
         };
-        if result.as_ref().is_some_and(|old| {
-            old != &current || matches!(current, Kind::Nested { .. } | Kind::Node | Kind::Enum(_))
-        }) {
-            return Err(
-                "heterogeneous/container choice requires remaining #583 implementation".into(),
-            );
-        }
+        let current = if let Some(old) = &result {
+            if matches!(old, Kind::Nested { .. }) || matches!(current, Kind::Nested { .. }) {
+                return Err("container choice requires remaining #583 implementation".into());
+            }
+            if old != &current || matches!(current, Kind::Node | Kind::Enum(_) | Kind::Value) {
+                Kind::Value
+            } else {
+                current
+            }
+        } else {
+            current
+        };
         result = Some(current);
     }
     result.ok_or_else(|| "empty body".into())

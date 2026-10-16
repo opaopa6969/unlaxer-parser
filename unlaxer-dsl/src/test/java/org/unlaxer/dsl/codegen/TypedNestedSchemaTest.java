@@ -16,6 +16,8 @@ public class TypedNestedSchemaTest {
         assertThrows(UnsupportedOperationException.class,()->shape.containers().clear());
         assertEquals("Optional<List<Integer>>",NestedCaptures.javaType(shape));
         assertThrows(IllegalArgumentException.class,()->new NestedShape(Kind.NODE,null,List.of()));
+        assertThrows(IllegalArgumentException.class,()->new NestedShape(Kind.VALUE,null,List.of()));
+        assertEquals("List<GrammarAST.NestedValue>",NestedCaptures.javaType(new NestedShape(Kind.VALUE,null,List.of(Cardinality.MANY),"GrammarAST.NestedValue")));
         assertEquals("Optional<List<GrammarAST.Leaf>>",NestedCaptures.javaType(new NestedShape(Kind.NODE,null,List.of(Cardinality.OPTIONAL,Cardinality.MANY),"GrammarAST.Leaf")));
         assertEquals("Optional<GrammarAST.Mode>",NestedCaptures.javaType(new NestedShape(Kind.ENUM,"Mode",List.of(Cardinality.OPTIONAL),"GrammarAST.Mode")));
         assertThrows(IllegalArgumentException.class,()->new NestedShape(Kind.ENUM,null,List.of(),"GrammarAST.Mode"));

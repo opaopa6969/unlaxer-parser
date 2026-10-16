@@ -49,6 +49,29 @@ public final class RustApiSchema {
             nodes.add(new Node(rule.name(),"enum",List.of(),List.of(),variants,ApiImpact.origins(source,rule.name()),
                 ApiImpact.location("ast.rs",ast,start,ast.indexOf('\n',start))));
         }
+        if (org.unlaxer.dsl.codegen.NestedCaptures.hasMixed(grammar)) {
+            int start=requireIndex(ast,"pub enum NestedValue {",0);
+            var variants=new ArrayList<String>(List.of("Text","Integer","Node"));
+            for(var rule:ir.rules())if(!rule.enumLiterals().isEmpty())variants.add("Enum"+rule.name());
+            nodes.add(new Node("NestedValue","enum",List.of(),List.of(),variants.stream().sorted().toList(),ApiImpact.origins(source,null),
+                ApiImpact.location("ast.rs",ast,start,ast.indexOf('\n',start))));
+            for(String variant:variants) {
+                String name=variant.equals("Text")?"text":variant.equals("Node")?"0":"value";
+                String type=switch(variant) {case "Text"->"String";case "Integer"->"i32";case "Node"->"Box<Ast>";default->variant.substring(4);};
+                String prefix="    "+variant+(variant.equals("Node")?"(":" {");
+                int variantStart=requireIndex(ast,prefix,start),variantEnd=ast.indexOf('\n',variantStart);
+                var fields=new ArrayList<Field>();
+                String declaration=variant.equals("Node")?type:name+": "+type;
+                int fieldStart=requireIndex(ast,declaration,variantStart);
+                fields.add(new Field(name,type,"one",ApiImpact.location("ast.rs",ast,fieldStart,fieldStart+declaration.length())));
+                if(!variant.equals("Node")) {
+                    int spanStart=requireIndex(ast,"span: Span",variantStart);
+                    fields.add(new Field("span","Span","one",ApiImpact.location("ast.rs",ast,spanStart,spanStart+10)));
+                }
+                nodes.add(new Node("NestedValue."+variant,"variant",fields,List.of("NestedValue"),List.of(),ApiImpact.origins(source,null),
+                    ApiImpact.location("ast.rs",ast,variantStart,variantEnd)));
+            }
+        }
         var signatures = java.util.regex.Pattern.compile("(?m)^    fn ([A-Za-z_][A-Za-z_0-9]*)\\(([^\\n]*)\\) -> ([^;{]+);").matcher(evaluator);
         while (signatures.find()) {
             String name=signatures.group(1);
