@@ -48,8 +48,11 @@ public class LSPLauncherGeneratorTest {
     }
 
     @Test
-    public void testContainsLSPLauncherCreateServerLauncher() {
-        assertTrue(result.source().contains("LSPLauncher.createServerLauncher("));
+    public void testContainsLifecycleAwareBuilderAndStdioEntryPoint() {
+        String source = result.source();
+        assertTrue(source.contains("new LSPLauncher.Builder<LanguageClient>()"));
+        assertTrue(source.contains("new RemoteEndpoint(writer, server.lifecycleEndpoint())"));
+        assertTrue(source.contains("public int launchStdio() throws IOException"));
     }
 
     @Test

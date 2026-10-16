@@ -14,5 +14,6 @@ jobs:
           java-version: '21'
           cache: maven
       - uses: dtolnay/rust-toolchain@stable
-      - run: mvn -B -pl unlaxer-common -am test -Dtest=SourceMapsTest -Dsurefire.failIfNoSpecifiedTests=false
-      - run: cargo test --manifest-path rust/Cargo.toml -p unlaxer-runtime --test source_maps
+      - run: python3 scripts/generate-grapheme-tables.py --check
+      - run: mvn -B -pl unlaxer-common -am test -Dtest=SourceMapsTest,PositionResolverBoundaryTest,DocumentSnapshotInverseTest,GraphemeTest -Dsurefire.failIfNoSpecifiedTests=false
+      - run: cargo test --locked --manifest-path rust/Cargo.toml -p unlaxer-runtime --test source_maps --test source_inverse_positions --test grapheme
