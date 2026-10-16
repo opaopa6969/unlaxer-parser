@@ -72,6 +72,7 @@ public class ParserGenerator implements CodeGenerator {
 
         GenContext(GrammarDecl grammar) {
             this.grammar = grammar;
+            NestedCaptures.requireValid(grammar);
             TokenStreamGrammar.requireValid(grammar);
             LexicalContexts.requireValid(grammar);
             NamePredicates.requireValid(grammar);
@@ -186,6 +187,9 @@ public class ParserGenerator implements CodeGenerator {
 
     @Override
     public GeneratedSource generate(GrammarDecl grammar) {
+        GrammarValidator.requireValidBoundedRepeatElements(grammar);
+        LeftRecursionAnalysis.requireValid(grammar);
+        TypeofConstraints.validate(grammar);
         var ciErrors = GrammarValidator.validateCaseInsensitiveTokens(grammar);
         if (!ciErrors.isEmpty()) throw new IllegalArgumentException(ciErrors.toString());
         if (grammar.rules().stream().anyMatch(rule -> rule.annotations().stream().anyMatch(

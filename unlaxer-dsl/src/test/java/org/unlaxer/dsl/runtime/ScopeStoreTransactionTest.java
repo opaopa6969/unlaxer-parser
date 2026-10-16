@@ -60,7 +60,7 @@ public class ScopeStoreTransactionTest {
             ScopeStore.addDiagnostic(ctx, "message", 1, 1, Severity.INFO);
             ctx.commit(parser, TokenKind.consumed);
 
-            assertEquals(new TransactionMetrics(1, 1, 0, 1, 0, 1),
+            assertEquals(new TransactionMetrics(1, 1, 0, 1, 0, 2),
                 ctx.snapshotTransactionMetrics());
         }
     }

@@ -28,7 +28,6 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.ScopeTreeAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.SequenceBody;
 import org.unlaxer.dsl.bootstrap.UBNFAST.StringSettingValue;
 import org.unlaxer.dsl.bootstrap.UBNFAST.TokenDecl;
-import org.unlaxer.dsl.bootstrap.UBNFAST.TypeofElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.WhitespaceAnnotation;
 import org.unlaxer.dsl.bootstrap.TokenAdapterRegistry;
 import org.unlaxer.dsl.bootstrap.TokenContractRegistry;
@@ -106,6 +105,12 @@ public final class GrammarValidator {
 
     private static List<ValidationIssue> validate(GrammarDecl grammar, boolean resolveParserClasses) {
         List<ValidationIssue> errors = new ArrayList<>();
+        try { LeftRecursionAnalysis.requireValid(grammar); }
+        catch (IllegalArgumentException error) {
+            errors.add(new ValidationIssue(error.getMessage().split(":", 2)[0], error.getMessage(),
+                "Rewrite using repetition or input-consuming right recursion."));
+        }
+        errors.addAll(NestedCaptures.problems(grammar));
         validateScalarRanges(grammar, errors);
         errors.addAll(validateCaseInsensitiveTokens(grammar));
 
@@ -328,7 +333,7 @@ public final class GrammarValidator {
      * stripping optional and repeat wrappers) is a reference back to the rule
      * itself (direct) or to another rule that in turn reaches back to the original
      * rule (indirect). This method <b>never throws</b> — it is purely advisory.
-     * Existing grammars continue to parse normally.</p>
+     * Generation and strict validation reject cycles; this legacy query remains advisory.</p>
      *
      * @param grammar the grammar to inspect
      * @return {@link Optional#empty()} if no left-recursion is found, or an
@@ -344,7 +349,7 @@ public final class GrammarValidator {
     }
 
     // =========================================================================
-    // Left-recursion detection (warning only)
+    // Legacy advisory view of the bounded generation-time analysis
     // =========================================================================
 
     /**
@@ -355,7 +360,9 @@ public final class GrammarValidator {
     static List<String> detectLeftRecursion(GrammarDecl grammar) {
         List<String> warnings = new ArrayList<>();
         for (String cycleKey : detectLeftRecursionCycles(grammar)) {
-            warnings.add("W-LEFT-RECURSION: left-recursive cycle detected: " + cycleKey);
+            warnings.add(cycleKey.startsWith("analysis limit:")
+                ? "W-LEFT-RECURSION-LIMIT: " + cycleKey
+                : "W-LEFT-RECURSION: left-recursive cycle detected: " + cycleKey);
         }
         return warnings;
     }
@@ -372,8 +379,8 @@ public final class GrammarValidator {
             int firstArrow = cycleKey.indexOf(" ->");
             String firstRule = firstArrow < 0 ? cycleKey : cycleKey.substring(0, firstArrow);
             issues.add(new ValidationIssue(
-                "W-LEFT-RECURSION",
-                "left-recursive cycle detected: " + cycleKey,
+                cycleKey.startsWith("analysis limit:") ? "W-LEFT-RECURSION-LIMIT" : "W-LEFT-RECURSION",
+                cycleKey.startsWith("analysis limit:") ? cycleKey : "left-recursive cycle detected: " + cycleKey,
                 "Rewrite using repetition (e.g. A ::= B { Op B }) or right recursion.",
                 firstRule
             ));
@@ -382,142 +389,11 @@ public final class GrammarValidator {
     }
 
     private static List<String> detectLeftRecursionCycles(GrammarDecl grammar) {
-        // Build rule map
-        Map<String, RuleDecl> ruleMap = new LinkedHashMap<>();
-        for (RuleDecl rule : grammar.rules()) {
-            ruleMap.put(rule.name(), rule);
+        try { return LeftRecursionAnalysis.cycles(grammar); }
+        catch (IllegalArgumentException limit) {
+            // Legacy advisory API remains nonthrowing; generation rejects the same limit.
+            return List.of("analysis limit: " + limit.getMessage());
         }
-
-        List<String> cycles = new ArrayList<>();
-        Set<String> reported = new LinkedHashSet<>();
-
-        for (String startName : ruleMap.keySet()) {
-            // DFS: track current path for cycle detection
-            List<String> path = new ArrayList<>();
-            Set<String> onStack = new LinkedHashSet<>();
-            findLeftRecursion(startName, ruleMap, path, onStack, reported, cycles);
-        }
-        return cycles;
-    }
-
-    /**
-     * Collects the set of rule names that can appear as the <em>leftmost</em>
-     * symbol of the given rule body — i.e. rule references reachable without
-     * consuming any input first.
-     *
-     * <ul>
-     *   <li>For a {@link SequenceBody}, only the first element is relevant.</li>
-     *   <li>For a {@link ChoiceBody}, all alternatives contribute.</li>
-     *   <li>{@link OptionalElement} and {@link RepeatElement} bodies are
-     *       transparent because they can match zero tokens.</li>
-     *   <li>{@link GroupElement} is transparent (no input consumed by the group
-     *       wrapper itself).</li>
-     *   <li>A {@link UBNFAST.TerminalElement} terminates the leftmost scan —
-     *       it consumes input so no rule reference can be leftmost after it.</li>
-     * </ul>
-     */
-    private static Set<String> leftmostRuleRefs(RuleBody body) {
-        Set<String> refs = new LinkedHashSet<>();
-        collectLeftmostRefs(body, refs);
-        return refs;
-    }
-
-    private static void collectLeftmostRefs(RuleBody body, Set<String> out) {
-        if (body instanceof ChoiceBody choice) {
-            for (SequenceBody seq : choice.alternatives()) {
-                collectLeftmostRefsFromSequence(seq, out);
-            }
-        } else if (body instanceof SequenceBody seq) {
-            collectLeftmostRefsFromSequence(seq, out);
-        } else {
-            throw new IllegalStateException("unhandled " + body);
-        }
-    }
-
-    private static void collectLeftmostRefsFromSequence(SequenceBody seq, Set<String> out) {
-        for (AnnotatedElement ae : seq.elements()) {
-            boolean canBeEmpty = collectLeftmostRefsFromAtomic(ae.element(), out);
-            if (!canBeEmpty) {
-                // This element always consumes input → later elements are not leftmost
-                return;
-            }
-            // Element can match empty → continue to next element
-        }
-    }
-
-    /**
-     * Inspects one atomic element.
-     *
-     * @return {@code true} if the element can match the empty string
-     *         (allowing the next element to potentially be leftmost)
-     */
-    private static boolean collectLeftmostRefsFromAtomic(AtomicElement element, Set<String> out) {
-        if (element instanceof RuleRefElement ref) {
-            String fullName = ref.namespace()
-                .map(ns -> ns + "." + ref.name())
-                .orElse(ref.name());
-            out.add(fullName);
-            return false; // conservative: assume the referenced rule consumes input
-        }
-        if (element instanceof UBNFAST.TerminalElement t) {
-            return false;
-        }
-        if (element instanceof OptionalElement opt) {
-            collectLeftmostRefs(opt.body(), out);
-            return true; // optional always can be empty
-        }
-        if (element instanceof RepeatElement rep) {
-            collectLeftmostRefs(rep.body(), out);
-            return true; // zero-or-more can be empty
-        }
-        if (element instanceof GroupElement group) {
-            collectLeftmostRefs(group.body(), out);
-            return false; // conservative: treat group as non-empty
-        }
-        return false;
-    }
-
-    private static void findLeftRecursion(
-        String current,
-        Map<String, RuleDecl> ruleMap,
-        List<String> path,
-        Set<String> onStack,
-        Set<String> reported,
-        List<String> cycles
-    ) {
-        if (onStack.contains(current)) {
-            // Cycle detected — the cycle starts where current first appears in path
-            int cycleStart = path.indexOf(current);
-            if (cycleStart < 0) {
-                return;
-            }
-            List<String> cycle = new ArrayList<>(path.subList(cycleStart, path.size()));
-            cycle.add(current); // close the loop
-
-            // Build a canonical key to avoid duplicate reports
-            String cycleKey = String.join(" -> ", cycle);
-            if (!reported.contains(cycleKey)) {
-                reported.add(cycleKey);
-                cycles.add(cycleKey);
-            }
-            return;
-        }
-
-        RuleDecl rule = ruleMap.get(current);
-        if (rule == null) {
-            return; // external / imported rule — skip
-        }
-
-        path.add(current);
-        onStack.add(current);
-
-        Set<String> nextRefs = leftmostRuleRefs(rule.body());
-        for (String next : nextRefs) {
-            findLeftRecursion(next, ruleMap, path, onStack, reported, cycles);
-        }
-
-        path.remove(path.size() - 1);
-        onStack.remove(current);
     }
 
     private static void validateMapping(RuleDecl rule, MappingAnnotation mapping, List<ValidationIssue> errors) {
@@ -550,8 +426,9 @@ public final class GrammarValidator {
             }
         }
 
+        Set<String> constraintCaptures = TypeofConstraints.captures(rule);
         for (String capture : captures) {
-            if (!paramSet.contains(capture)) {
+            if (!paramSet.contains(capture) && !constraintCaptures.contains(capture)) {
                 addRuleError(errors, rule.name(),
                     "rule " + rule.name() + " has capture @" + capture
                         + " not listed in @mapping(" + mapping.className() + ") params",
@@ -1164,85 +1041,45 @@ public final class GrammarValidator {
     }
 
     private static void validateEnumRules(GrammarDecl grammar, List<ValidationIssue> errors) {
-        for (RuleDecl rule : grammar.rules()) {
-            boolean isEnum = rule.annotations().stream()
-                .anyMatch(a -> a instanceof UBNFAST.EnumAnnotation);
-            if (!isEnum) {
-                continue;
-            }
-            // @enum ルールは Choice+Terminal のみ許容
-            final boolean allTerminals;
-            var switchSubject2 = rule.body();
-            if (switchSubject2 instanceof UBNFAST.ChoiceBody choice) {
-                allTerminals = choice.alternatives().stream()
-                    .allMatch(seq -> seq.elements().size() == 1
-                        && seq.elements().get(0).element() instanceof UBNFAST.TerminalElement);
-            } else if (switchSubject2 instanceof UBNFAST.SequenceBody seq) {
-                allTerminals = seq.elements().size() == 1
-                    && seq.elements().get(0).element() instanceof UBNFAST.TerminalElement;
-            } else {
-                throw new IllegalStateException("unhandled " + switchSubject2);
-            }
-            if (!allTerminals) {
-                addRuleError(errors, rule.name(),
-                    "@enum rule " + rule.name() + " must consist only of terminal literals (e.g. 'a' | 'b')",
-                    "Use only quoted string literals as alternatives in an @enum rule.",
-                    "E-ENUM-NON-TERMINAL");
-            }
+        try { EnumSchema.validate(grammar); }
+        catch (IllegalArgumentException error) {
+            addError(errors, error.getMessage(), "Use distinct nonempty literal alternatives and valid enum names.", "E-ENUM");
         }
     }
 
     private static void validateCommonFields(GrammarDecl grammar, List<ValidationIssue> errors) {
-        // @commonField(field) が付いたルールの全 permit に該当フィールドが存在するか確認
-        for (RuleDecl rule : grammar.rules()) {
-            rule.annotations().stream()
-                .filter(a -> a instanceof UBNFAST.CommonFieldAnnotation)
-                .map(a -> (UBNFAST.CommonFieldAnnotation) a)
-                .forEach(commonField -> {
-                    MappingAnnotation mapping = rule.annotations().stream()
-                        .filter(a -> a instanceof MappingAnnotation)
-                        .map(a -> (MappingAnnotation) a)
-                        .findFirst().orElse(null);
-                    if (mapping == null) {
-                        return;
-                    }
-                    String sealedName = mapping.className();
-                    List<RuleDecl> permits = grammar.rules().stream()
-                        .filter(r -> {
-                            MappingAnnotation m = r.annotations().stream()
-                                .filter(a -> a instanceof MappingAnnotation)
-                                .map(a -> (MappingAnnotation) a)
-                                .findFirst().orElse(null);
-                            return m != null && m.className().startsWith(sealedName + ".");
-                        })
-                        .toList();
-                    for (String field : commonField.fieldNames()) {
-                        for (RuleDecl permit : permits) {
-                            MappingAnnotation pm = permit.annotations().stream()
-                                .filter(a -> a instanceof MappingAnnotation)
-                                .map(a -> (MappingAnnotation) a)
-                                .findFirst().orElse(null);
-                            if (pm != null && !pm.paramNames().contains(field)) {
-                                addRuleError(errors, rule.name(),
-                                    "@commonField(" + field + ") is declared on " + rule.name()
-                                        + " but permit " + pm.className() + " does not have param '" + field + "'",
-                                    "Add @" + field + " capture to " + pm.className() + " rule.",
-                                    "E-COMMONFIELD-MISMATCH");
-                            }
-                        }
-                    }
-                });
+        try {
+            CommonFieldSchema.build(grammar);
+        } catch (CommonFieldSchema.SchemaException error) {
+            String message = error.getMessage();
+            String rule = error.rule;
+            addRuleError(
+                    errors,
+                    rule,
+                    message,
+                    "Align family fields and cardinalities.",
+                    "E-COMMONFIELD-MISMATCH");
+        }
+    }
+
+    /** Validate repeat definitions even when the repeated child will never execute. */
+    static void requireValidBoundedRepeatElements(GrammarDecl grammar) {
+        var errors = new ArrayList<ValidationIssue>();
+        validateBoundedRepeatElements(grammar, errors);
+        if (!errors.isEmpty()) {
+            var error = errors.get(0);
+            throw new IllegalArgumentException(error.code() + ": " + error.message());
         }
     }
 
     private static void validateBoundedRepeatElements(GrammarDecl grammar, List<ValidationIssue> errors) {
         for (RuleDecl rule : grammar.rules()) {
             collectBoundedElements(rule.body()).forEach(bounded -> {
-                if (bounded.max() != UBNFAST.BoundedRepeatElement.UNBOUNDED && bounded.min() > bounded.max()) {
+                if (bounded.min() < 0 || bounded.max() < bounded.min()) {
                     addRuleError(errors, rule.name(),
                         "rule " + rule.name() + " has BoundedRepeatElement with min=" + bounded.min()
-                            + " > max=" + bounded.max(),
-                        "Ensure min <= max in {min,max} quantifier.",
+                            + ", max=" + bounded.max(),
+                        "Ensure 0 <= min <= max in {min,max} quantifier.",
                         "E-BOUNDED-INVALID");
                 }
             });
@@ -1250,32 +1087,35 @@ public final class GrammarValidator {
     }
 
     private static java.util.stream.Stream<UBNFAST.BoundedRepeatElement> collectBoundedElements(UBNFAST.RuleBody body) {
-        if (body instanceof UBNFAST.ChoiceBody choice) {
-            return choice.alternatives().stream()
-                .flatMap(seq -> seq.elements().stream())
-                .flatMap(ae -> collectBoundedFromAtomic(ae.element()));
+        var pending = new java.util.ArrayDeque<UBNFAST>();
+        var bounded = new ArrayList<UBNFAST.BoundedRepeatElement>();
+        pending.push(body);
+        // Iterative traversal also validates nested definitions under dead zero-count bodies.
+        while (!pending.isEmpty()) {
+            UBNFAST current = pending.pop();
+            if (current instanceof UBNFAST.ChoiceBody choice) {
+                var alternatives = choice.alternatives();
+                for (int i = alternatives.size() - 1; i >= 0; i--) pending.push(alternatives.get(i));
+            } else if (current instanceof UBNFAST.SequenceBody sequence) {
+                var elements = sequence.elements();
+                for (int i = elements.size() - 1; i >= 0; i--) pending.push(elements.get(i).element());
+            } else if (current instanceof UBNFAST.BoundedRepeatElement repeat) {
+                bounded.add(repeat);
+                pending.push(repeat.body());
+            } else if (current instanceof UBNFAST.GroupElement group) {
+                pending.push(group.body());
+            } else if (current instanceof UBNFAST.OptionalElement optional) {
+                pending.push(optional.body());
+            } else if (current instanceof UBNFAST.RepeatElement repeat) {
+                pending.push(repeat.body());
+            } else if (current instanceof UBNFAST.OneOrMoreElement repeat) {
+                pending.push(repeat.body());
+            } else if (current instanceof UBNFAST.SeparatedElement separated) {
+                pending.push(separated.separator());
+                pending.push(separated.element());
+            }
         }
-        if (body instanceof UBNFAST.SequenceBody seq) {
-            return seq.elements().stream()
-                .flatMap(ae -> collectBoundedFromAtomic(ae.element()));
-        }
-        throw new IllegalStateException("unhandled " + body);
-    }
-
-    private static java.util.stream.Stream<UBNFAST.BoundedRepeatElement> collectBoundedFromAtomic(UBNFAST.AtomicElement element) {
-        if (element instanceof UBNFAST.BoundedRepeatElement b) {
-            return java.util.stream.Stream.of(b);
-        }
-        if (element instanceof UBNFAST.GroupElement g) {
-            return collectBoundedElements(g.body());
-        }
-        if (element instanceof UBNFAST.OptionalElement o) {
-            return collectBoundedElements(o.body());
-        }
-        if (element instanceof UBNFAST.RepeatElement r) {
-            return collectBoundedElements(r.body());
-        }
-        return java.util.stream.Stream.empty();
+        return bounded.stream();
     }
 
     private static void addRuleError(
@@ -1472,68 +1312,10 @@ public final class GrammarValidator {
     // @typeof バリデーション
     // =========================================================================
 
-    /** (TypeofElement.captureName → parent capture name) のペアを収集する */
-    private record TypeofUsage(String referencedCapture, String ownCapture) {}
-
     private static void validateTypeofElements(RuleDecl rule, List<ValidationIssue> errors) {
-        List<TypeofUsage> usages = new ArrayList<>();
-        collectTypeofUsagesFromBody(rule.body(), usages);
-        if (usages.isEmpty()) {
-            return;
-        }
-
-        Set<String> captures = collectCaptureNames(rule.body());
-
-        for (TypeofUsage usage : usages) {
-            if (!captures.contains(usage.referencedCapture())) {
-                addRuleError(errors, rule.name(),
-                    "rule " + rule.name() + ": @typeof(" + usage.referencedCapture()
-                        + ") refers to unknown capture '" + usage.referencedCapture() + "'",
-                    "Use a capture name defined in the same rule (e.g. @captureRef).",
-                    "E-TYPEOF-UNKNOWN-CAPTURE");
-            }
-            if (usage.ownCapture() == null || usage.ownCapture().isEmpty()) {
-                addRuleError(errors, rule.name(),
-                    "rule " + rule.name() + ": @typeof(" + usage.referencedCapture()
-                        + ") must be paired with a capture name (e.g. @typeof(x) @myCapture)",
-                    "Add a capture name after @typeof(x).",
-                    "E-TYPEOF-MISSING-CAPTURE");
-            }
-        }
-    }
-
-    private static void collectTypeofUsagesFromBody(RuleBody body, List<TypeofUsage> usages) {
-        if (body instanceof ChoiceBody choice) {
-            for (SequenceBody seq : choice.alternatives()) {
-                collectTypeofUsagesFromSequence(seq, usages);
-            }
-        } else if (body instanceof SequenceBody seq) {
-            collectTypeofUsagesFromSequence(seq, usages);
-        } else {
-            throw new IllegalStateException("unhandled " + body);
-        }
-    }
-
-    private static void collectTypeofUsagesFromSequence(SequenceBody seq, List<TypeofUsage> usages) {
-        for (AnnotatedElement ae : seq.elements()) {
-            if (ae.typeofConstraint().isPresent()) {
-                TypeofElement te = ae.typeofConstraint().get();
-                usages.add(new TypeofUsage(te.captureName(), ae.captureName().orElse(null)));
-            } else {
-                collectTypeofUsagesFromAtomic(ae.element(), usages);
-            }
-        }
-    }
-
-    private static void collectTypeofUsagesFromAtomic(AtomicElement element, List<TypeofUsage> usages) {
-        if (element instanceof GroupElement group) {
-            collectTypeofUsagesFromBody(group.body(), usages);
-        } else if (element instanceof OptionalElement opt) {
-            collectTypeofUsagesFromBody(opt.body(), usages);
-        } else if (element instanceof RepeatElement rep) {
-            collectTypeofUsagesFromBody(rep.body(), usages);
-        } else {
-
+        for (var problem : TypeofConstraints.problems(rule)) {
+            addRuleError(errors, rule.name(), problem.message(),
+                "Use named captures in the same mapped rule; forward references are allowed.", problem.code());
         }
     }
 
