@@ -86,6 +86,8 @@ token mode は、構文 rule に書かれた非空 literal と、構文 rule か
 
 空一致する fragment は、非空 token の内部で使える。`EOF` と `EMPTY` は token 列へ項目を追加しないゼロ幅の条件。profile を有効にした Java の `EMPTY` は純粋な空一致で、従来の `EmptyParser` 内部の文字先読みを行わない。profile のない文法は従来どおり。
 
+literal の AST capture は、この profile が生成する `Lexing.LiteralParser` の token から値を取り出す。通常 grammar の `WordParser` を探して値を欠落させない。`@lexicalContext` だけを使う grammar も同じ選択になる。scalar / optional / list と同値反復は capture-site ごとに分け、構造 delimiter を値へ混ぜない。single quote 除去等の既存 text mapping と原文 CP span は維持する。これは既存 flat capture の修正（#668）であり、nested container と tokenStream の新しい合成を開放するものではない。
+
 不正な設定・未対応機能は `E-TOKEN-STREAM-SETTING` / `VERSION` / `TOKEN` / `TRIVIA` / `ANNOTATION` で生成前に拒否する。Java validator と Java / native Rust の portability check で位置も報告する。文法自体の既存の制限も引き続き適用する。
 
 字句 mode の切替・文脈依存キーワード・構文解析中の字句規則変更は [#377](https://github.com/opaopa6969/unlaxer-parser/issues/377)、入れ子の異言語 grammar の振分けは [#369](https://github.com/opaopa6969/unlaxer-parser/issues/369) の範囲。ここでは字句定義と原文を解析中に変えない。

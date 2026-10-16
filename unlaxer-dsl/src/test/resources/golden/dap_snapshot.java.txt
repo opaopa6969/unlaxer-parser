@@ -496,8 +496,7 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
         if (value == null) {
             return false;
         }
-        String className = value.getClass().getName();
-        return className.startsWith("org.example.snapshot.SnapshotAST");
+        return value instanceof SnapshotAST;
     }
 
     private int stepLimit() {

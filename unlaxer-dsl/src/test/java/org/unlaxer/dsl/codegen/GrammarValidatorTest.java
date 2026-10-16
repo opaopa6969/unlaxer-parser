@@ -902,11 +902,11 @@ public class GrammarValidatorTest {
     }
 
     @Test
-    public void testRegexTokenRuleNameCollisionIsRejected() {
+    public void testDeclarativeTokenRuleNameCollisionIsRejected() {
         GrammarDecl grammar = parseGrammar(
             "grammar G {\n"
                 + "  @package: org.example\n"
-                + "  token ID = REGEX('[a-z]+')\n"
+                + "  token ID ::= CHAR_RANGE('a','z')+;\n"
                 + "  @root\n"
                 + "  Id ::= ID ;\n"
                 + "}"
@@ -915,7 +915,7 @@ public class GrammarValidatorTest {
         GrammarValidator.ValidationIssue collision = GrammarValidator.validate(grammar).stream()
             .filter(issue -> "E-RULE-TOKEN-NAME-COLLISION".equals(issue.code()))
             .findFirst()
-            .orElseThrow(() -> new AssertionError("expected REGEX token/rule parser-name collision"));
+            .orElseThrow(() -> new AssertionError("expected declarative token/rule parser-name collision"));
 
         assertEquals("ERROR", collision.severity());
         assertEquals("RULE", collision.category());
@@ -955,11 +955,11 @@ public class GrammarValidatorTest {
     }
 
     @Test
-    public void testNonCollidingRegexTokenIsAccepted() {
+    public void testNonCollidingDeclarativeTokenIsAccepted() {
         GrammarDecl grammar = parseGrammar(
             "grammar G {\n"
                 + "  @package: org.example\n"
-                + "  token ID = REGEX('[a-z]+')\n"
+                + "  token ID ::= CHAR_RANGE('a','z')+;\n"
                 + "  @root\n"
                 + "  Identifier ::= ID ;\n"
                 + "}"
@@ -997,7 +997,7 @@ public class GrammarValidatorTest {
               @memoSafeToken: BUILTIN
               @memoSafeToken: { alias: 'SAFE' }
               token SAFE = org.example.SafeParser
-              token BUILTIN = REGEX('[a-z]+')
+              token BUILTIN = CI('a')
               @root Start ::= SAFE ;
             }
             """);

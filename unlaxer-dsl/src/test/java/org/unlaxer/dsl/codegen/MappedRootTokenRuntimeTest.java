@@ -158,9 +158,16 @@ public class MappedRootTokenRuntimeTest {
             assertSpan(directSnapshot, field(directSnapshot, "ast"), 0,
                 " /*😀*/42 ".codePointCount(0, " /*😀*/42 ".length()));
 
-            var nullError = assertThrows(InvocationTargetException.class,
-                () -> mapper.getMethod("mapSubtreeToken", Token.class).invoke(null, new Object[]{null}));
-            assertEquals("subtreeToken must not be null", nullError.getCause().getMessage());
+            for (String entry : java.util.List.of("mapSubtreeToken", "mapSubtreeTree",
+                    "mapSubtreeTokenWithSourceMap", "selectSubtreeTokenWithSourceMap",
+                    "mapParsedToken", "mapParsedTree", "mapParsedTokenWithSourceMap",
+                    "selectParsedTokenWithSourceMap")) {
+                var nullError = assertThrows(InvocationTargetException.class,
+                    () -> mapper.getMethod(entry, Token.class).invoke(null, new Object[]{null}));
+                assertTrue(entry, nullError.getCause() instanceof IllegalArgumentException);
+                assertEquals(entry, entry.contains("Subtree") ? "subtreeToken must not be null"
+                        : "rootToken must not be null", nullError.getCause().getMessage());
+            }
 
             @SuppressWarnings("unchecked")
             Class<? extends Parser> unmappedClass = (Class<? extends Parser>)

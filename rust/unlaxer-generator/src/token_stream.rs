@@ -155,9 +155,11 @@ fn element(e: &AtomicElement, literals: &mut Vec<String>, references: &mut HashS
         ElementKind::RuleRef { name, .. } => {
             references.insert(name.clone());
         }
-        ElementKind::Group(b) | ElementKind::Optional(b) | ElementKind::Repeat(b) => {
-            body(b, literals, references)
-        }
+        ElementKind::OwnedCapture { body: b, .. }
+        | ElementKind::CaptureScope(b)
+        | ElementKind::Group(b)
+        | ElementKind::Optional(b)
+        | ElementKind::Repeat(b) => body(b, literals, references),
         ElementKind::OneOrMore(e) | ElementKind::BoundedRepeat { element: e, .. } => {
             element(e, literals, references)
         }
@@ -168,6 +170,6 @@ fn element(e: &AtomicElement, literals: &mut Vec<String>, references: &mut HashS
             element(e, literals, references);
             element(separator, literals, references);
         }
-        ElementKind::Error(_) => {}
+        ElementKind::Replay { .. } | ElementKind::Error(_) => {}
     }
 }

@@ -1,0 +1,610 @@
+[
+  {
+    "name": "JavaStyle-Identifier",
+    "grammar": "grammar AtomicJavaStyleIdentifier { @package: org.example.ruletrivia @whitespace: javaStyle token TOKEN = org.unlaxer.parser.clang.IdentifierParser @root @mapping(Root,params=[value]) Root ::= TOKEN @value 'B'; }",
+    "cases": [
+      {
+        "id": "0",
+        "input": "A B",
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {
+            "value": "A"
+          }
+        }
+      },
+      {
+        "id": "1",
+        "input": " A/*😀*/B ",
+        "prefix": [
+          true,
+          9,
+          9
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            9
+          ],
+          "fields": {
+            "value": "A"
+          }
+        }
+      },
+      {
+        "id": "2",
+        "input": "A\r\nB",
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {
+            "value": "A"
+          }
+        }
+      },
+      {
+        "id": "3",
+        "input": "A C",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      }
+    ]
+  },
+  {
+    "name": "JavaStyle-Number",
+    "grammar": "grammar AtomicJavaStyleNumber { @package: org.example.ruletrivia @whitespace: javaStyle token TOKEN = org.unlaxer.parser.elementary.NumberParser @root @mapping(Root,params=[value]) Root ::= (TOKEN) @value '2'; }",
+    "cases": [
+      {
+        "id": "0",
+        "input": "1 2",
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {
+            "value": "1"
+          }
+        }
+      },
+      {
+        "id": "1",
+        "input": " 1/*😀*/2 ",
+        "prefix": [
+          true,
+          9,
+          9
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            9
+          ],
+          "fields": {
+            "value": "1/*😀*/"
+          }
+        }
+      },
+      {
+        "id": "2",
+        "input": "1.5\r\n2",
+        "prefix": [
+          true,
+          6,
+          6
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            6
+          ],
+          "fields": {
+            "value": "1.5"
+          }
+        }
+      },
+      {
+        "id": "3",
+        "input": "1e 2",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      }
+    ]
+  },
+  {
+    "name": "JavaStyle-Single",
+    "grammar": "grammar AtomicJavaStyleSingle { @package: org.example.ruletrivia @whitespace: javaStyle token TOKEN = org.unlaxer.parser.elementary.SingleQuotedParser @root @mapping(Root,params=[value]) Root ::= TOKEN @value '!'; }",
+    "cases": [
+      {
+        "id": "0",
+        "input": "'a b' !",
+        "prefix": [
+          true,
+          7,
+          7
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            7
+          ],
+          "fields": {
+            "value": "a b"
+          }
+        }
+      },
+      {
+        "id": "1",
+        "input": " ' /*😀*/ \r\n ' ! ",
+        "prefix": [
+          true,
+          16,
+          16
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            16
+          ],
+          "fields": {
+            "value": " /*😀*/ \r\n "
+          }
+        }
+      },
+      {
+        "id": "2",
+        "input": "'a\\ b' !",
+        "prefix": [
+          true,
+          8,
+          8
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            8
+          ],
+          "fields": {
+            "value": "a\\ b"
+          }
+        }
+      },
+      {
+        "id": "3",
+        "input": "' a !",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      }
+    ]
+  },
+  {
+    "name": "JavaStyle-Double",
+    "grammar": "grammar AtomicJavaStyleDouble { @package: org.example.ruletrivia @whitespace: javaStyle token TOKEN = org.unlaxer.parser.elementary.DoubleQuotedParser @root @mapping(Root,params=[value]) Root ::= TOKEN @value '!'; }",
+    "cases": [
+      {
+        "id": "0",
+        "input": "\"a b\" !",
+        "prefix": [
+          true,
+          7,
+          7
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            7
+          ],
+          "fields": {
+            "value": "\"a b\""
+          }
+        }
+      },
+      {
+        "id": "1",
+        "input": " \" /*😀*/ \r\n \" ! ",
+        "prefix": [
+          true,
+          16,
+          16
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            16
+          ],
+          "fields": {
+            "value": "\" /*😀*/ \r\n \""
+          }
+        }
+      },
+      {
+        "id": "2",
+        "input": "\"a\\ b\" !",
+        "prefix": [
+          true,
+          8,
+          8
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            8
+          ],
+          "fields": {
+            "value": "\"a\\ b\""
+          }
+        }
+      },
+      {
+        "id": "3",
+        "input": "\" a !",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      }
+    ]
+  },
+  {
+    "name": "Named-Identifier",
+    "grammar": "grammar AtomicNamedIdentifier { @package: org.example.ruletrivia @ubnf: v2 @whitespace: GAP token GAP ::= (' ' | '\\r' | '\\n' | '/*😀*/'); token TOKEN = org.unlaxer.parser.clang.IdentifierParser @root @mapping(Root,params=[value]) Root ::= TOKEN @value 'B'; }",
+    "cases": [
+      {
+        "id": "0",
+        "input": "A B",
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {
+            "value": "A"
+          }
+        }
+      },
+      {
+        "id": "1",
+        "input": " A/*😀*/B ",
+        "prefix": [
+          true,
+          9,
+          9
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            9
+          ],
+          "fields": {
+            "value": "A"
+          }
+        }
+      },
+      {
+        "id": "2",
+        "input": "A\r\nB",
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {
+            "value": "A"
+          }
+        }
+      },
+      {
+        "id": "3",
+        "input": "A C",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      }
+    ]
+  },
+  {
+    "name": "Named-Number",
+    "grammar": "grammar AtomicNamedNumber { @package: org.example.ruletrivia @ubnf: v2 @whitespace: GAP token GAP ::= (' ' | '\\r' | '\\n' | '/*😀*/'); token TOKEN = org.unlaxer.parser.elementary.NumberParser @root @mapping(Root,params=[value]) Root ::= (TOKEN) @value '2'; }",
+    "cases": [
+      {
+        "id": "0",
+        "input": "1 2",
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {
+            "value": "1"
+          }
+        }
+      },
+      {
+        "id": "1",
+        "input": " 1/*😀*/2 ",
+        "prefix": [
+          true,
+          9,
+          9
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            9
+          ],
+          "fields": {
+            "value": "1/*😀*/"
+          }
+        }
+      },
+      {
+        "id": "2",
+        "input": "1.5\r\n2",
+        "prefix": [
+          true,
+          6,
+          6
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            6
+          ],
+          "fields": {
+            "value": "1.5"
+          }
+        }
+      },
+      {
+        "id": "3",
+        "input": "1e 2",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      }
+    ]
+  },
+  {
+    "name": "Named-Single",
+    "grammar": "grammar AtomicNamedSingle { @package: org.example.ruletrivia @ubnf: v2 @whitespace: GAP token GAP ::= (' ' | '\\r' | '\\n' | '/*😀*/'); token TOKEN = org.unlaxer.parser.elementary.SingleQuotedParser @root @mapping(Root,params=[value]) Root ::= TOKEN @value '!'; }",
+    "cases": [
+      {
+        "id": "0",
+        "input": "'a b' !",
+        "prefix": [
+          true,
+          7,
+          7
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            7
+          ],
+          "fields": {
+            "value": "a b"
+          }
+        }
+      },
+      {
+        "id": "1",
+        "input": " ' /*😀*/ \r\n ' ! ",
+        "prefix": [
+          true,
+          16,
+          16
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            16
+          ],
+          "fields": {
+            "value": " /*😀*/ \r\n "
+          }
+        }
+      },
+      {
+        "id": "2",
+        "input": "'a\\ b' !",
+        "prefix": [
+          true,
+          8,
+          8
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            8
+          ],
+          "fields": {
+            "value": "a\\ b"
+          }
+        }
+      },
+      {
+        "id": "3",
+        "input": "' a !",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      }
+    ]
+  },
+  {
+    "name": "Named-Double",
+    "grammar": "grammar AtomicNamedDouble { @package: org.example.ruletrivia @ubnf: v2 @whitespace: GAP token GAP ::= (' ' | '\\r' | '\\n' | '/*😀*/'); token TOKEN = org.unlaxer.parser.elementary.DoubleQuotedParser @root @mapping(Root,params=[value]) Root ::= TOKEN @value '!'; }",
+    "cases": [
+      {
+        "id": "0",
+        "input": "\"a b\" !",
+        "prefix": [
+          true,
+          7,
+          7
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            7
+          ],
+          "fields": {
+            "value": "\"a b\""
+          }
+        }
+      },
+      {
+        "id": "1",
+        "input": " \" /*😀*/ \r\n \" ! ",
+        "prefix": [
+          true,
+          16,
+          16
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            16
+          ],
+          "fields": {
+            "value": "\" /*😀*/ \r\n \""
+          }
+        }
+      },
+      {
+        "id": "2",
+        "input": "\"a\\ b\" !",
+        "prefix": [
+          true,
+          8,
+          8
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            8
+          ],
+          "fields": {
+            "value": "\"a\\ b\""
+          }
+        }
+      },
+      {
+        "id": "3",
+        "input": "\" a !",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      }
+    ]
+  }
+]
