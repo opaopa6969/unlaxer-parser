@@ -106,9 +106,10 @@ contract still requires discarding a context after a panicking callback. Neither
 runtime rolls back arbitrary external I/O.
 
 Remaining #545 work is explicit: [capture/replay and name lifetime](https://github.com/opaopa6969/unlaxer-parser/issues/572),
-including its remaining generated UBNF integration, and [external Tiny code-fence mode graphs](https://github.com/opaopa6969/unlaxer-parser/issues/573). The earlier PEG diagnostic-frontier gap
-also remains tracked in #545; new Classic-entry cases do not prove all legacy
-PEG/TokenExpr entry diagnostics equivalent. [General owned capture/replay](owned-capture-replay.md)
+including its remaining generated UBNF integration, and [external Tiny code-fence mode graphs](https://github.com/opaopa6969/unlaxer-parser/issues/573). The [prior-matched diagnostic contract](prior-matched-diagnostics.md)
+now compares the existing PEG and TokenExpr entry boundaries explicitly: Java-compatible
+Classic frontiers are selectable without replacing native PEG's source-failure semantics.
+The legacy TokenExpr entry corresponds to an explicit outer Java transaction, not a raw leaf call. [General owned capture/replay](owned-capture-replay.md)
 now has separate runtime APIs for input, projected and generated values (#590).
 The existing Rust AST field capture store retains its original-input boundary:
 it rejects a projected or detached field capture instead of reading a different

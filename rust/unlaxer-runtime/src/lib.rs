@@ -1039,6 +1039,7 @@ struct FailureDiagnostic {
     farthest: Option<usize>,
     expected: ExpectedIds,
     classic_max_reached: Option<usize>,
+    // Historical name: any syntax failure (Classic or native) overrides a success watermark.
     classic_failure_seen: bool,
     classic_failure_end: Option<(usize, MatchCursorPolicy)>,
 }
@@ -1505,6 +1506,7 @@ impl Default for MatchCursorPolicy {
 pub struct ParseContext<'a> {
     token_mode: Option<token::ParseMode>,
     classic_max_reached: Option<usize>,
+    // Historical name: any syntax failure (Classic or native) overrides a success watermark.
     classic_failure_seen: bool,
     match_cursor_policy: MatchCursorPolicy,
     bindings: BTreeMap<String, Vec<String>>,
@@ -2486,7 +2488,9 @@ impl<'a> ParseContext<'a> {
     }
 
     fn fail_without_expected(&mut self) {
-        if self.token_mode.is_some() && self.options.diagnostics == Diagnostics::Detailed {
+        // The successful Classic watermark is only a fallback when neither entry
+        // has failed. Native PEG failures must also select the real failure frontier.
+        if self.options.diagnostics == Diagnostics::Detailed {
             self.classic_failure_seen = true;
             if let Some(frame) = self.diagnostic_frames.last_mut() {
                 frame.classic_failure_seen = true;
@@ -2506,7 +2510,9 @@ impl<'a> ParseContext<'a> {
     }
 
     fn fail_at(&mut self, position: usize, expected: &str) {
-        if self.token_mode.is_some() && self.options.diagnostics == Diagnostics::Detailed {
+        // The successful Classic watermark is only a fallback when neither entry
+        // has failed. Native PEG failures must also select the real failure frontier.
+        if self.options.diagnostics == Diagnostics::Detailed {
             self.classic_failure_seen = true;
             if let Some(frame) = self.diagnostic_frames.last_mut() {
                 frame.classic_failure_seen = true;
