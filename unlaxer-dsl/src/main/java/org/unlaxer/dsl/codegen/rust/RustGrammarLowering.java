@@ -818,6 +818,10 @@ public final class RustGrammarLowering {
         if (token instanceof TokenDecl.Empty ignored) {
             return new EmptyToken();
         }
+        if (token instanceof TokenDecl.CaseInsensitive ci) {
+            if (ci.word().isEmpty()) throw unsupported("empty CI literal " + ci.name());
+            return new CaseInsensitiveToken(scalarText(ci.word()));
+        }
         if (token instanceof TokenDecl.CharRange range) {
             if (range.min() > range.max() || Character.isSurrogate(range.min()) || Character.isSurrogate(range.max())) {
                 throw unsupported("invalid character range " + range.name());

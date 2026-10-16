@@ -1986,6 +1986,12 @@ fn token_expression_with_registry(
                 max: *max,
             }
         }
+        TokenKind::CaseInsensitive { word } => {
+            if word.is_empty() {
+                return Err("empty CI literal".into());
+            }
+            Expression::CaseInsensitiveToken(word.clone())
+        }
         TokenKind::Negation { excluded_chars } => Expression::ExceptToken(excluded_chars.clone()),
         TokenKind::Until { terminator } => Expression::UntilToken(terminator.clone()),
         TokenKind::Lookahead { pattern } => Expression::LookaheadToken {

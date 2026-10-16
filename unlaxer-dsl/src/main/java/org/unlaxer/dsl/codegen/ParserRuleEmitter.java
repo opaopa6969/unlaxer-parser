@@ -1124,7 +1124,7 @@ class ParserRuleEmitter {
             return tokenStream ? "new org.unlaxer.dsl.runtime.Lexing.LiteralParser(\"\")" : "new org.unlaxer.parser.elementary.EmptyParser()";
         }
         if (model instanceof ElementModel.IgnoreCaseWord m) {
-            return "new org.unlaxer.parser.elementary.IgnoreCaseWordParser(\""
+            return "new org.unlaxer.parser.elementary.UnicodeIgnoreCaseWordParser(\""
                 + ParserCodegenUtil.escapeString(m.word()) + "\")";
         }
         if (model instanceof ElementModel.ZeroOrMoreOf m) {
@@ -1280,7 +1280,7 @@ class ParserRuleEmitter {
         }
         String ciWord = ctx.tokenCIMap.get(name);
         if (ciWord != null) {
-            return "new org.unlaxer.parser.elementary.IgnoreCaseWordParser(\""
+            return "new org.unlaxer.parser.elementary.UnicodeIgnoreCaseWordParser(\""
                 + ParserCodegenUtil.escapeString(ciWord) + "\")";
         }
         return "Parser.get(" + resolveParserClass(ctx, name) + ")";

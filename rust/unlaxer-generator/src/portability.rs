@@ -244,7 +244,7 @@ impl Inventory {
                     }
                 }
                 TokenKind::Regex { .. } => self.add("P-TOKEN-KIND", "REGEX", token.span),
-                TokenKind::CaseInsensitive { .. } => self.add("P-TOKEN-KIND", "CI", token.span),
+                TokenKind::CaseInsensitive { .. } => {}
                 TokenKind::Until { .. }
                 | TokenKind::Negation { .. }
                 | TokenKind::Lookahead { .. }

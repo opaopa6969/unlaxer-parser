@@ -88,7 +88,10 @@ fn generate_resolved(
 ) -> Result<Vec<GeneratedFile>, String> {
     let grammar = &file.grammars[0];
     for token in &grammar.tokens {
-        if !matches!(token.kind, TokenKind::Declarative { .. }) {
+        if !matches!(
+            token.kind,
+            TokenKind::Declarative { .. } | TokenKind::CaseInsensitive { .. }
+        ) {
             return Err(format!("Playground requires declarative token {} ::= expression; (host bindings are not executed)", token.name));
         }
     }
@@ -163,6 +166,7 @@ fn generate_resolved(
     runtime!("lexical.rs");
     runtime!("unicode_xid.rs");
     runtime!("unicode_grapheme_data.rs");
+    runtime!("unicode_case_data.rs");
     runtime!("grapheme.rs");
     runtime!("long_code_fence.rs");
     runtime!("memo_retention_tests.rs");

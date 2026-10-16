@@ -87,6 +87,24 @@ fn host_binding_is_rejected_without_files() {
     assert!(!output.exists());
 }
 
+#[test]
+fn unicode_ci_builtin_is_self_contained_without_enabling_host_bindings() {
+    let scratch = Scratch::new();
+    let input = scratch.0.join("grammar.ubnf");
+    fs::write(&input, "grammar Ci { token Keyword = CI('İΣK𐐀') @root @mapping(Root, params=[value]) Start ::= Keyword @value; }").unwrap();
+    let output = scratch.0.join("project");
+    let result = run(&input, &output, false);
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert!(output.join("runtime/src/unicode_case_data.rs").is_file());
+    assert!(fs::read_to_string(output.join("src/generated/parser.rs"))
+        .unwrap()
+        .contains("Expr::CaseInsensitive("));
+}
+
 #[cfg(unix)]
 #[test]
 fn symlink_ancestor_is_rejected() {

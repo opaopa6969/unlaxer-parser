@@ -121,8 +121,6 @@ public final class PortabilityCheck {
                 add(out, "P-EXTERNAL-TOKEN", snapshot, token, simple.parserClass());
             } else if (token instanceof TokenDecl.Regex) {
                 add(out, "P-TOKEN-KIND", snapshot, token, "REGEX");
-            } else if (token instanceof TokenDecl.CaseInsensitive) {
-                add(out, "P-TOKEN-KIND", snapshot, token, "CI");
             }
         }
         for (RuleDecl rule : grammar.rules()) {

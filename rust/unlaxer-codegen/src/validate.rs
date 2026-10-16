@@ -296,6 +296,7 @@ fn expression(
             return Err(fail("character range must be ordered BMP scalars"))
         }
         Literal(s) if s.is_empty() => return Err(fail("empty literal")),
+        CaseInsensitiveToken(s) if s.is_empty() => return Err(fail("empty CI literal")),
         Capture {
             name,
             expression: child,

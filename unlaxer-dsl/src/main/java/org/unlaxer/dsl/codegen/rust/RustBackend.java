@@ -341,6 +341,9 @@ public final class RustBackend {
         if (expression instanceof EmptyToken ignored) {
             return "Expr::JavaEmpty";
         }
+        if (expression instanceof CaseInsensitiveToken ci) {
+            return "Expr::CaseInsensitive(" + quote(ci.word()) + ")";
+        }
         if (expression instanceof ErrorExpected error) {
             return "Expr::Error(" + quote(error.message()) + ")";
         }
