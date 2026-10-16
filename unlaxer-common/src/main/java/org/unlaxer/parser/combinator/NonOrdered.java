@@ -85,6 +85,10 @@ public class NonOrdered extends ConstructedCombinatorParser {
 				parseContext.getCurrent().setCursor(candidateCursor);
 				Parsed parsed = children.get(i).parse(parseContext, tokenKind, invertMatch);
 				if (parsed.isSucceeded()) {
+					// Chain changes the current frame policy before its own begin. Preserve
+					// that successful change for siblings, while failed candidates isolate it.
+					parseContext.getPrevious().orElseThrow().setResetMatchedWithConsumed(
+							parseContext.getCurrent().isResetMatchedWithConsumed());
 					parseContext.commit(CANDIDATE_BOUNDARY, tokenKind);
 					remain--;
 					comsumeds[i] = true;

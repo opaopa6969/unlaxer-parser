@@ -35,6 +35,26 @@ EOF は通常の child としてその時点の位置で評価する。
 Java `EmptyParser` / Rust `Expr::JavaEmpty` の matched cursor 契約は維持する。
 非 EOF でこの child だけなら consumed は 0、matched は 1 となり、CST span は 0..0 である。
 
+matched は単純な累積長ではない。Java の child transaction が持つ reset 方針に従う。
+直接呼んだ NonOrdered は consumed 起点で child transaction を開始する一方、
+Chain / Rust Sequence は現在の transaction を「matched を引き継ぐ」方針に切り替える。
+この切替は成功した child の後の兄弟にも効き、NonOrdered 自身の外へは漏れない。
+以下は入力 `"xy"`、consumed はすべて 0 の例である。
+
+| 構成（E = EmptyParser / JavaEmpty、N = NonOrdered、C = Chain / Sequence） | 最終 matched |
+|---|---:|
+| `N(E, E)` | 1 |
+| `N(E, N())` | 0 |
+| `C(N(E, E))` | 2 |
+| `C(N(E, N()))` | 1 |
+| `N(C(E), E, E)` | 2 |
+
+Java の Number / Identifier / Quoted も Chain としてこの方針を変更する。
+Rust は NonOrdered 内で対応する transaction 開始を再現し、方針を rollback と失敗 memo key
+に含める。NonOrdered 外の既存 JavaEmpty / JavaLookahead の挙動は変更しない。
+観測のためだけに Java child を Chain で包むとこの方針が変わるので、共通テストは
+実 child の parser identity から CST を照合する。
+
 NonOrdered 自身は trivia を飛ばさず、EOF も強制しない。子の Sequence / Chain や
 明示 trivia parser が行う処理はその child の契約に従う。
 成功した子の CST・capture は宣言順でなく**実際に選ばれた入力順**で保持する。
@@ -68,6 +88,7 @@ child 数そのものに新しい上限は追加しない。
 例: 入力 `"ba"` で child 0 が CP 0 から `"b"` を消費して失敗し、CP 1 なら `"a"` に成功する場合、
 child 1 の `"b"` は CP 0 から再試行できる。失敗した child 0 の state 変更も復元する。
 内部 transaction owner は CollectingParser ではなく、CST に wrapper を追加しない。
+成功した候補が変えた reset 方針は次の兄弟に伝播し、失敗候補の方針変更は復元する。
 **TransactionListener には候補ごとの begin / commit / rollback 通知が増える。**
 `ParseContext.addActions` の persistent commit action も、成功した候補境界の owner を受け取る。
 独自 listener / action が固定の transaction 数やすべての owner が文法 parser であることを

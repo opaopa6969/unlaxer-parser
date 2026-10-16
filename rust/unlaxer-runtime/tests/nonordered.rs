@@ -12,6 +12,15 @@ fn atom(spec: &str) -> Expr {
         "N" => Expr::non_ordered([]),
         "E" => Expr::Eof,
         "Z" => Expr::JavaEmpty,
+        "C" => Expr::sequence([]),
+        "CZ" => Expr::sequence([atom("Z")]),
+        "CN" => Expr::sequence([atom("N")]),
+        "ON" => atom("N").optional_java(),
+        "OC" => atom("C").optional_java(),
+        "D" => Expr::Number,
+        "I" => Expr::Identifier,
+        "S" => Expr::Quoted('\''),
+        "Uy" => Expr::JavaUntil("y"),
         _ => match spec.strip_prefix('O') {
             Some(word) => Expr::literal(Box::leak(decode(word).into_boxed_str())).optional_java(),
             None => Expr::literal(Box::leak(decode(spec).into_boxed_str())),
@@ -39,6 +48,7 @@ fn shared_greedy_order_nullable_spans_and_diagnostics() {
                 };
                 let n = Expr::non_ordered((1..=children.len()).map(Expr::Rule));
                 let parser = match f[3] {
+                    "CHAIN" | "PRIOR_CHAIN" => Expr::sequence([n]),
                     "FAIL" => n.then(Expr::literal("!")),
                     "RETRY" => Expr::choice([n.clone().then(Expr::literal("!")), n]),
                     "PREFIX" => Expr::Any.then(n),
@@ -57,6 +67,9 @@ fn shared_greedy_order_nullable_spans_and_diagnostics() {
                     &input,
                     ParseOptions::with_memoization(memo).with_diagnostics(diagnostics),
                 );
+                if f[3].starts_with("PRIOR") {
+                    context.parse(&Expr::JavaEmpty).unwrap();
+                }
                 let result = context.parse_grammar(rules.clone(), 0, false);
                 assert_eq!(
                     result.is_ok(),
@@ -360,4 +373,35 @@ fn finite_wide_nullable_inputs_and_explicit_trivia() {
     assert!(context
         .parse(&Expr::non_ordered([Expr::Sequence(vec![Expr::literal("a")])]).trivia_scope(true))
         .is_ok());
+}
+
+#[test]
+fn failure_memo_distinguishes_the_matched_cursor_transaction_policy() {
+    let grammar = vec![
+        Rule {
+            name: "root",
+            expression: Expr::non_ordered([Expr::JavaEmpty, Expr::Rule(1), Expr::sequence([])]),
+        },
+        Rule {
+            name: "peek",
+            expression: Expr::JavaLookahead {
+                pattern: "y",
+                positive: true,
+            },
+        },
+    ];
+    for memo in [Memoization::Off, Memoization::SafeFailures] {
+        for diagnostics in [
+            Diagnostics::Auto,
+            Diagnostics::Detailed,
+            Diagnostics::DetailedOnFailure,
+        ] {
+            let mut context = ParseContext::with_options(
+                "xy",
+                ParseOptions::with_memoization(memo).with_diagnostics(diagnostics),
+            );
+            context.parse_grammar(grammar.clone(), 0, false).unwrap();
+            assert_eq!((context.position(), context.matched_position()), (0, 2));
+        }
+    }
 }

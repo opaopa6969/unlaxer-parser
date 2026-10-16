@@ -10,9 +10,13 @@ Java と Rust は同じ TSV を読み、memo OFF / SAFE_FAILURES と診断 3 モ
 2. 入力（Unicode scalar の空白区切り16進表記、`~` は空）
 3. child の `/` 区切り宣言。通常は入力と同じ scalar 表記。`~` は child 数 0、
    `N` は空 NonOrdered、`O` に続く scalar は Java 互換 Optional、`E` は EOF、
-   `Z` は EmptyParser / JavaEmpty。
+   `Z` は EmptyParser / JavaEmpty。`C` は空 Chain / Sequence、`CZ` / `CN` はその単一子版、
+   `ON` / `OC` は N / C の Java 互換 Optional。`D` / `I` / `S` は Number / Identifier /
+   SingleQuoted、`Uy` は Java 互換 UNTIL("y")。
 4. 外側の構成: `N` はそのまま、`FAIL` は末尾 `"!"` を要求、`RETRY` は
    `Choice(Chain(N,"!"),N)`、`PREFIX` は最初に Any 1 CP、`NESTED` は `NonOrdered(N,"!")`。
+   `CHAIN` は N を Chain / Sequence で包む。`PRIOR` / `PRIOR_CHAIN` は先に EmptyParser /
+   JavaEmpty を同じ context で直接実行してから N / Chain(N) を評価する。
 5. 成否
 6. consumed CP
 7. matched CP
@@ -31,3 +35,8 @@ reference 数、semantic diagnostic 数、recovery span 列、capture span 列�
 Java の capture-site wrapper と Rust の named capture は内部形式が異なるため、
 raw text と CP span を共通観測値にする。Java `getOrdered`、Rust node 順序 / trace、
 両 runtime の再帰上限と memo hit は追加のホスト別テストで検証する。
+
+matched cursor の期待値は、直接 NonOrdered と Chain / Sequence 配下を区別する。
+Java の観測用 Chain は方針自体を変えるため使用せず、実 child の parser identity で
+元の CST を照合する。CST と入力 span の対応を保ったまま Empty / nullable / lexical child を
+組み合わせ、成功した Chain の方針伝播と外側の Choice 再試行も検査する。

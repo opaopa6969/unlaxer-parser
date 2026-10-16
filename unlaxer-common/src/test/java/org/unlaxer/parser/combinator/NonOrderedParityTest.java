@@ -86,6 +86,19 @@ public class NonOrderedParityTest {
         }
     }
 
+    @Test public void successfulChainChangesThePolicyForFollowingCandidates() {
+        for (var memo : Memoization.values()) for (var diagnostics : ParseOptions.Diagnostics.values()) {
+            var parser = new NonOrdered(new org.unlaxer.parser.elementary.EmptyParser(),
+                new MatchOnly(new WordParser("y")), new Chain());
+            try (var context = ParseContext.withOptions(StringSource.createRootSource("xy"),
+                    ParseOptions.withMemoization(memo).withDiagnostics(diagnostics))) {
+                assertTrue(parser.parse(context).isSucceeded());
+                assertEquals(0, context.getConsumedPosition().value());
+                assertEquals(2, context.getMatchedPosition().value());
+            }
+        }
+    }
+
     private static String decode(String hex) {
         if (hex.equals("~")) return "";
         StringBuilder value = new StringBuilder();
@@ -98,16 +111,20 @@ public class NonOrderedParityTest {
         if (root == null) throw new AssertionError("fixture missing");
         return root.resolve("spec-corpus/nonordered/cases.tsv");
     }
-    private static final class Child extends Chain {
-        private static final long serialVersionUID = 1L;
-        final int index;
-        Child(int index, org.unlaxer.parser.Parser parser) { super(parser); this.index = index; }
-    }
     private static org.unlaxer.parser.Parser atom(String spec) {
         return switch (spec) {
             case "N" -> new NonOrdered();
             case "E" -> new org.unlaxer.parser.elementary.EndOfSourceParser();
             case "Z" -> new org.unlaxer.parser.elementary.EmptyParser();
+            case "C" -> new Chain();
+            case "CZ" -> new Chain(atom("Z"));
+            case "CN" -> new Chain(atom("N"));
+            case "ON" -> new Optional(atom("N"));
+            case "OC" -> new Optional(atom("C"));
+            case "D" -> new org.unlaxer.parser.elementary.NumberParser();
+            case "I" -> new org.unlaxer.parser.clang.IdentifierParser();
+            case "S" -> new org.unlaxer.parser.elementary.SingleQuotedParser();
+            case "Uy" -> new org.unlaxer.parser.elementary.WildCardStringTerminatorParser("y");
             default -> spec.startsWith("O") ? new Optional(new WordParser(decode(spec.substring(1)))) : new WordParser(decode(spec));
         };
     }
@@ -118,9 +135,10 @@ public class NonOrderedParityTest {
                 String[] f = row.split("\t");
                 String input = decode(f[1]);
                 var children = new java.util.ArrayList<org.unlaxer.parser.Parser>();
-                if (!f[2].equals("~")) for (String spec : f[2].split("/")) children.add(new Child(children.size(), atom(spec)));
+                if (!f[2].equals("~")) for (String spec : f[2].split("/")) children.add(atom(spec));
                 var unordered = new NonOrdered(children.toArray(org.unlaxer.parser.Parser[]::new));
                 org.unlaxer.parser.Parser parser = switch (f[3]) {
+                    case "CHAIN", "PRIOR_CHAIN" -> new Chain(unordered);
                     case "FAIL" -> new Chain(unordered, new WordParser("!"));
                     case "RETRY" -> new Choice(new Chain(unordered, new WordParser("!")), unordered);
                     case "PREFIX" -> new Chain(new org.unlaxer.parser.elementary.WildCardCharacterParser(), unordered);
@@ -128,6 +146,7 @@ public class NonOrderedParityTest {
                     default -> unordered;
                 };
                 try (var context = ParseContext.withOptions(StringSource.createRootSource(input), ParseOptions.withMemoization(memo).withDiagnostics(diagnostics))) {
+                    if (f[3].startsWith("PRIOR")) assertTrue(atom("Z").parse(context).isSucceeded());
                     var result = parser.parse(context);
                     String label = f[0] + "/" + memo + "/" + diagnostics;
                     assertEquals(label, Boolean.parseBoolean(f[4]), result.isSucceeded());
@@ -136,10 +155,12 @@ public class NonOrderedParityTest {
                     if (result.isSucceeded()) {
                         var spans = new java.util.ArrayList<String>();
                         for (Token root : context.getCurrent().getTokens()) for (Token token : root.flatten(Token.ScanDirection.Depth, Token.ChildrenKind.original)) {
-                            if (token.parser instanceof Child child) {
+                            int index = -1;
+                            for (int child = 0; child < children.size(); child++) if (token.parser == children.get(child)) index = child;
+                            if (index >= 0) {
                                 int begin = token.source.offsetFromRoot().value();
                                 int end = begin + token.source.codePointLength().value();
-                                spans.add(child.index + ":" + begin + ":" + end);
+                                spans.add(index + ":" + begin + ":" + end);
                                 assertEquals(input.substring(input.offsetByCodePoints(0, begin), input.offsetByCodePoints(0, end)), token.source.toString());
                             }
                         }

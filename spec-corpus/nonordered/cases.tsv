@@ -32,3 +32,23 @@ nested-failed	21 62	61/62	NESTED	false	0	0	~	2
 empty-lookahead	61	Z/61	N	true	1	1	0:0:0,1:0:1	-1
 empty-lookahead-at-eof	~	Z	N	true	0	0	0:0:0	-1
 empty-lookahead-prefix	78	Z	N	true	0	1	0:0:0	-1
+matched-empty-then-empty	78 79	Z/Z	N	true	0	1	0:0:0,1:0:0	-1
+matched-empty-then-nonordered	78 79	Z/N	N	true	0	0	0:0:0,1:0:0	-1
+matched-chain-parent-empty-empty	78 79	Z/Z	CHAIN	true	0	2	0:0:0,1:0:0	-1
+matched-chain-parent-empty-nonordered	78 79	Z/N	CHAIN	true	0	1	0:0:0,1:0:0	-1
+matched-child-chain-policy	78 79	CZ/Z/Z	N	true	0	2	0:0:0,1:0:0,2:0:0	-1
+matched-child-empty-chain-policy	78 79	C/Z/Z	N	true	0	2	0:0:0,1:0:0,2:0:0	-1
+matched-later-chain-policy	78 79	Z/CZ/Z	N	true	0	2	0:0:0,1:0:0,2:0:0	-1
+matched-optional-nonordered	78 79	Z/ON	N	true	0	0	0:0:0,1:0:0	-1
+matched-optional-chain	78 79	Z/OC	N	true	0	0	0:0:0,1:0:0	-1
+matched-chain-parent-optional-chain	78 79	Z/OC	CHAIN	true	0	1	0:0:0,1:0:0	-1
+matched-prior-entry-reset	78 79	N	PRIOR	true	0	0	0:0:0	-1
+matched-prior-chain-entry-keeps	78 79	N	PRIOR_CHAIN	true	0	1	0:0:0	-1
+matched-choice-retry-policy	78 79	Z/Z	RETRY	true	0	1	0:0:0,1:0:0	-1
+matched-empty-empty-supplementary	1F600 754C	Z/Z	N	true	0	1	0:0:0,1:0:0	-1
+matched-chain-empty-empty-supplementary	1F600 754C	Z/Z	CHAIN	true	0	2	0:0:0,1:0:0	-1
+matched-empty-empty-eof	~	Z/Z	N	true	0	0	0:0:0,1:0:0	-1
+matched-number-chain-policy	31 78 79	D/Z/Z	N	true	1	3	0:0:1,1:1:1,2:1:1	-1
+matched-identifier-chain-policy	69 64 3B 3B	I/Z/Z	N	true	2	4	0:0:2,1:2:2,2:2:2	-1
+matched-quoted-chain-policy	27 61 27 78 79	S/Z/Z	N	true	3	5	0:0:3,1:3:3,2:3:3	-1
+matched-empty-until	78 79	Z/Uy	N	true	1	2	0:0:0,1:0:1	-1
