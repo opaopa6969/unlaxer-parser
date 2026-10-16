@@ -47,7 +47,7 @@ snapshot は原文、CP 境界、候補 AST を所有します。同じ候補を
 
 候補の mapping が失敗した場合（例: int / i32 overflow）、snapshot 作成全体が失敗します。失敗候補を無視して別候補へ進めません。候補ゼロ、選択 subtree 内の recovery marker、不正 root・source 境界・span・arena edge・cycle も拒否します。以前に成功した snapshot は変更しません。
 
-Rust の `MappingLimits` は候補数を既定 4096、展開作業量を 1,000,000 に制限します。`map_subtree_tree_with_limits` で調整できます。既存の再帰的 AST projection を守るため CST projection 深さ 256、Java token 深さ 4096 も上限です。caller が公開 CST fields を変更した場合も、構造検査後に traversal します。`Tree::validate_structure` は source と private CP 境界表の一致、および parser の postorder arena 契約を検査します。
+Rust の `MappingLimits` は候補数を既定 4096、実投影 work を 1,000,000 に制限します。`map_subtree_tree_with_limits` で通常 mapper の絶対上限内で調整できます。Java preferred 候補数も 4096、両版の CST projection 高さは 256 です。caller が公開 CST fields を変更した場合も、構造検査後に traversal します。node/edge/text と一時領域の上限、DAG の実訪問の計数、失敗後の state は [公開 mapper の CST 境界](public-mapper-cst.md) を参照してください。`Tree::validate_structure` は source と private CP 境界表の一致、および parser の postorder arena 契約を検査します。
 
 単純な大きい list を走査する際は capture edge を rule ごとに索引化します。候補 AST の投影は候補ごとに行うため、深く包含した多数候補では合計の投影作業量が増えます。その合計を上限で検査します。
 

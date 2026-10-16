@@ -138,16 +138,16 @@ final class TypeofEmitter {
                         case INTEGER ->
                         out.append(
                                 "           "
-                                    + " values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).parse::<i32>().map_err(|_|"
+                                    + " values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)?).parse::<i32>().map_err(|_|"
                                     + " format!(\"invalid i32 capture {} at {}..{}\", capture.name,"
                                     + " capture.span.start, capture.span.end))?);\n");
                 case TEXT ->
                         out.append(
                                 RustBackend.graphemeCapture(ir, rule.body(), field.name())
                                         ? "           "
-                                              + " values.push(tree.text(capture.span).to_owned());\n"
+                                              + " values.push(tree.text(capture.span)?.to_owned());\n"
                                         : "           "
-                                              + " values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).to_owned());\n");
+                                              + " values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)?).to_owned());\n");
             }
             out.append("        }\n        ")
                     .append(RustBackend.mappedValue(field))

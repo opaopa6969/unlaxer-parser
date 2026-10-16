@@ -163,6 +163,7 @@ fn generate_resolved(
     runtime!("provider_process.rs");
     runtime!("pipeline.rs");
     runtime!("lexing.rs");
+    runtime!("mapping.rs");
     runtime!("first.rs");
     runtime!("lexical.rs");
     runtime!("unicode_xid.rs");

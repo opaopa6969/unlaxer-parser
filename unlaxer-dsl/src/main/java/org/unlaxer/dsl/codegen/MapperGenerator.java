@@ -193,7 +193,7 @@ public class MapperGenerator implements CodeGenerator {
                 .append(parsersClass).append(".").append(rule.name()).append("Parser) return registerNodeSourceSpan(new ")
                 .append(astClass).append(".EnumValue(").append(astClass).append(".").append(rule.name())
                 .append(".fromText(tokenTextCompat(token))), token);\n");
-            sb.append("        return null;\n    }\n    private static Object findEnumValue(Token token) {\n        if (token == null) return null;\n");
+            sb.append("        return null;\n    }\n    private static Object findEnumValue(Token token) {\n        guardVisit(token);\n        if (token == null) return null;\n");
             if (grammar.rules().stream().anyMatch(MapperElementUtil::isSkipped)) sb.append("        if (isSkippedRuleToken(token)) return null;\n");
             sb.append("        Object direct = directEnumValue(token); if (direct != null) return direct;\n");
             for (String name : mappedClassByRuleName.keySet()) if (!EnumSchema.isEnum(ruleByName.get(name))) {
@@ -396,13 +396,17 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("     * Use the committed parser root, not a choice's root-stripped Parsed token.\n");
         sb.append("     */\n");
         sb.append("    public static synchronized MappedAst mapParsedToken(Token rootToken, String preferredAstSimpleName) {\n");
-        sb.append("        validateParsedRoot(rootToken);\n");
-        sb.append("        return mapTokenTree(rootToken, preferredAstSimpleName);\n");
+        sb.append("        return guardedMapping(rootToken, () -> {\n");
+        sb.append("            validateParsedRoot(rootToken);\n");
+        sb.append("            return mapTokenTree(rootToken, preferredAstSimpleName);\n");
+        sb.append("        });\n");
         sb.append("    }\n\n");
         sb.append("    /** Maps once for repeated selection; uses mapParsedToken's committed-root validation. */\n");
         sb.append("    public static synchronized MappedTree mapParsedTree(Token rootToken) {\n");
-        sb.append("        validateParsedRoot(rootToken);\n");
-        sb.append("        return mapTree(rootToken);\n");
+        sb.append("        return guardedMapping(rootToken, () -> {\n");
+        sb.append("            validateParsedRoot(rootToken);\n");
+        sb.append("            return mapTree(rootToken);\n");
+        sb.append("        });\n");
         sb.append("    }\n\n");
         sb.append("    private static void validateParsedRoot(Token rootToken) {\n");
         sb.append("        if (rootToken == null) {\n");
@@ -428,16 +432,20 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("    }\n\n");
         sb.append("    /** Maps a committed alternate-entry token, preferring an AST type by simple name. */\n");
         sb.append("    public static synchronized MappedAst mapSubtreeToken(Token subtreeToken, String preferredAstSimpleName) {\n");
-        sb.append("        validateSubtreeToken(subtreeToken);\n");
-        sb.append("        return mapTokenTree(subtreeToken, preferredAstSimpleName);\n");
+        sb.append("        return guardedMapping(subtreeToken, () -> {\n");
+        sb.append("            validateSubtreeToken(subtreeToken);\n");
+        sb.append("            return mapTokenTree(subtreeToken, preferredAstSimpleName);\n");
+        sb.append("        });\n");
         sb.append("    }\n\n");
         sb.append("    /**\n");
         sb.append("     * Maps a committed alternate-entry token once for repeated selection.\n");
         sb.append("     * Uses mapSubtreeToken's generated-rule validation; callers must verify full-input consumption.\n");
         sb.append("     */\n");
         sb.append("    public static synchronized MappedTree mapSubtreeTree(Token subtreeToken) {\n");
-        sb.append("        validateSubtreeToken(subtreeToken);\n");
-        sb.append("        return mapTree(subtreeToken);\n");
+        sb.append("        return guardedMapping(subtreeToken, () -> {\n");
+        sb.append("            validateSubtreeToken(subtreeToken);\n");
+        sb.append("            return mapTree(subtreeToken);\n");
+        sb.append("        });\n");
         sb.append("    }\n\n");
         sb.append("    private static void validateSubtreeToken(Token subtreeToken) {\n");
         sb.append("        if (subtreeToken == null) {\n");
@@ -478,10 +486,23 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("        MAP_MEMO.clear();\n");
         sb.append("        BEST_MEMO.clear();\n");
         sb.append("    }\n\n");
+        sb.append("""
+                private static org.unlaxer.mapper.MappingGuard MAPPING_GUARD;
+                private static void guardVisit(Token token) {
+                    if (MAPPING_GUARD != null) MAPPING_GUARD.visit(token);
+                }
+                private static <T> T guardedMapping(Token token, java.util.function.Supplier<T> operation) {
+                    resetMappingMemos();
+                    MAPPING_GUARD = org.unlaxer.mapper.MappingGuard.prepare(token);
+                    try { return operation.get(); }
+                    catch (RuntimeException failure) { resetMappingMemos(); throw failure; }
+                    finally { MAPPING_GUARD = null; }
+                }
+
+            """);
         sb.append("    private static MappedAst mapTokenTree(Token token, String preferredAstSimpleName) {\n");
         sb.append("        // Every public mapping call maps afresh: callers may rely on distinct AST instances and on\n");
         sb.append("        // a snapshot that resolves only the nodes of its own mapping.\n");
-        sb.append("        resetMappingMemos();\n");
         sb.append("        Token selectedToken = findBestMappedToken(token, preferredAstSimpleName);\n");
         sb.append("        if (selectedToken == null) {\n");
         sb.append("            throw new IllegalArgumentException(\"No mapped node found in token tree\");\n");
@@ -541,11 +562,13 @@ public class MapperGenerator implements CodeGenerator {
         // Capture-site metadata includes successful zero-width matches. The generic reducer
         // drops empty children and mutates the CST, so typed mapping must use the original tree.
 
+        sb.append("        final Token committedRoot = rootToken;\n");
+        sb.append("        return guardedMapping(committedRoot, () -> {\n");
         if (rootRule.isPresent() && MapperElementUtil.getMappingAnnotation(rootRule.get()).isPresent()) {
             RuleDecl rr = rootRule.get();
             String rootParserClass = parsersClass + "." + rr.name() + "Parser.class";
             String rootMappingClass = MapperElementUtil.getMappingAnnotation(rr).orElseThrow().className();
-            sb.append("        Token mappingRoot = rootToken;\n");
+            sb.append("        Token mappingRoot = committedRoot;\n");
             sb.append("        if (mappingRoot.parser.getClass() != ").append(rootParserClass).append(") {\n");
             sb.append("            mappingRoot = findFirstDescendant(mappingRoot, ").append(rootParserClass).append(");\n");
             sb.append("        }\n");
@@ -556,13 +579,14 @@ public class MapperGenerator implements CodeGenerator {
         } else if (rootRule.isPresent() && MapperElementUtil.isSkipped(rootRule.get())) {
             sb.append("        throw new IllegalArgumentException(\"No mapped node found in parse tree: @skip root\");\n");
         } else {
-            sb.append("        Token bestMappedToken = findBestMappedToken(rootToken, preferredAstSimpleName);\n");
+            sb.append("        Token bestMappedToken = findBestMappedToken(committedRoot, preferredAstSimpleName);\n");
             sb.append("        ").append(astClass).append(" mapped = mapToken(bestMappedToken);\n");
             sb.append("        if (mapped == null) {\n");
             sb.append("            throw new IllegalArgumentException(\"No mapped node found in parse tree\");\n");
             sb.append("        }\n");
             sb.append("        return (").append(rootClassName).append(") mapped;\n");
         }
+        sb.append("        });\n");
         sb.append("    }\n\n");
     }
 
