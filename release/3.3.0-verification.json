@@ -1,0 +1,602 @@
+{
+  "schemaVersion": 1,
+  "version": "3.3.0",
+  "sourceCommit": "567ef6bf1ac06a1d24f418880c2a150ea554b465",
+  "tag": "v3.3.0",
+  "qualityScope": "Documented Java / Rust Classic support; see docs/production-quality.md and rust/FULL-SPEC.md",
+  "ci": {
+    "requiredJobs": 18,
+    "allSucceeded": true,
+    "jobs": [
+      {
+        "sha": "567ef6bf1ac06a1d24f418880c2a150ea554b465",
+        "check_id": 116788365867,
+        "name": "*-jdk17 artifacts on JDK 17",
+        "workflow": "Java CI with Maven",
+        "run_id": 38843400728,
+        "job_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400728/job/116788365867",
+        "run_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400728",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-10-16T03:39:52Z",
+        "completed_at": "2026-10-16T03:41:24Z"
+      },
+      {
+        "sha": "567ef6bf1ac06a1d24f418880c2a150ea554b465",
+        "check_id": 116788365900,
+        "name": "Downstream smoke (tinyexpression)",
+        "workflow": "Java CI with Maven",
+        "run_id": 38843400728,
+        "job_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400728/job/116788365900",
+        "run_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400728",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-10-16T03:35:55Z",
+        "completed_at": "2026-10-16T03:39:49Z"
+      },
+      {
+        "sha": "567ef6bf1ac06a1d24f418880c2a150ea554b465",
+        "check_id": 116788365849,
+        "name": "Rust backend and Java conformance",
+        "workflow": "Java CI with Maven",
+        "run_id": 38843400728,
+        "job_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400728/job/116788365849",
+        "run_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400728",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-10-16T03:21:39Z",
+        "completed_at": "2026-10-16T03:35:28Z"
+      },
+      {
+        "sha": "567ef6bf1ac06a1d24f418880c2a150ea554b465",
+        "check_id": 116788366038,
+        "name": "UBNF VSIX (ubnf-vscode)",
+        "workflow": "Java CI with Maven",
+        "run_id": 38843400728,
+        "job_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400728/job/116788366038",
+        "run_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400728",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-10-16T03:41:29Z",
+        "completed_at": "2026-10-16T03:43:27Z"
+      },
+      {
+        "sha": "567ef6bf1ac06a1d24f418880c2a150ea554b465",
+        "check_id": 116788365694,
+        "name": "build",
+        "workflow": "Java CI with Maven",
+        "run_id": 38843400728,
+        "job_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400728/job/116788365694",
+        "run_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400728",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-10-16T03:16:02Z",
+        "completed_at": "2026-10-16T03:18:58Z"
+      },
+      {
+        "sha": "567ef6bf1ac06a1d24f418880c2a150ea554b465",
+        "check_id": 116788365401,
+        "name": "build",
+        "workflow": "Learning playground Pages",
+        "run_id": 38843400704,
+        "job_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400704/job/116788365401",
+        "run_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400704",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-10-16T03:14:41Z",
+        "completed_at": "2026-10-16T03:15:57Z"
+      },
+      {
+        "sha": "567ef6bf1ac06a1d24f418880c2a150ea554b465",
+        "check_id": 116792284092,
+        "name": "deploy",
+        "workflow": "Learning playground Pages",
+        "run_id": 38843400704,
+        "job_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400704/job/116792284092",
+        "run_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400704",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-10-16T03:35:34Z",
+        "completed_at": "2026-10-16T03:35:51Z"
+      },
+      {
+        "sha": "567ef6bf1ac06a1d24f418880c2a150ea554b465",
+        "check_id": 116788365734,
+        "name": "analysis-pipeline",
+        "workflow": "analysis-pipeline",
+        "run_id": 38843400832,
+        "job_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400832/job/116788365734",
+        "run_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400832",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-10-16T03:13:27Z",
+        "completed_at": "2026-10-16T03:14:38Z"
+      },
+      {
+        "sha": "567ef6bf1ac06a1d24f418880c2a150ea554b465",
+        "check_id": 116788365470,
+        "name": "assertion-contracts",
+        "workflow": "assertion-contracts",
+        "run_id": 38843400722,
+        "job_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400722/job/116788365470",
+        "run_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400722",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-10-16T03:03:45Z",
+        "completed_at": "2026-10-16T03:06:39Z"
+      },
+      {
+        "sha": "567ef6bf1ac06a1d24f418880c2a150ea554b465",
+        "check_id": 116788365665,
+        "name": "embedded-grammars",
+        "workflow": "embedded-grammars",
+        "run_id": 38843400775,
+        "job_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400775/job/116788365665",
+        "run_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400775",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-10-16T03:12:09Z",
+        "completed_at": "2026-10-16T03:13:24Z"
+      },
+      {
+        "sha": "567ef6bf1ac06a1d24f418880c2a150ea554b465",
+        "check_id": 116788365411,
+        "name": "public-contract",
+        "workflow": "engine-reuse-experiment",
+        "run_id": 38843400733,
+        "job_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400733/job/116788365411",
+        "run_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400733",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-10-16T03:09:28Z",
+        "completed_at": "2026-10-16T03:10:32Z"
+      },
+      {
+        "sha": "567ef6bf1ac06a1d24f418880c2a150ea554b465",
+        "check_id": 116788365535,
+        "name": "external-language-providers",
+        "workflow": "external-language-providers",
+        "run_id": 38843400716,
+        "job_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400716/job/116788365535",
+        "run_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400716",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-10-16T03:10:35Z",
+        "completed_at": "2026-10-16T03:12:06Z"
+      },
+      {
+        "sha": "567ef6bf1ac06a1d24f418880c2a150ea554b465",
+        "check_id": 116788365382,
+        "name": "language-profiles",
+        "workflow": "language-profiles",
+        "run_id": 38843400718,
+        "job_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400718/job/116788365382",
+        "run_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400718",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-10-16T03:07:25Z",
+        "completed_at": "2026-10-16T03:09:25Z"
+      },
+      {
+        "sha": "567ef6bf1ac06a1d24f418880c2a150ea554b465",
+        "check_id": 116788365420,
+        "name": "language-queries",
+        "workflow": "language-queries",
+        "run_id": 38843400693,
+        "job_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400693/job/116788365420",
+        "run_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400693",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-10-16T03:19:01Z",
+        "completed_at": "2026-10-16T03:20:10Z"
+      },
+      {
+        "sha": "567ef6bf1ac06a1d24f418880c2a150ea554b465",
+        "check_id": 116788365125,
+        "name": "shared-language-calls",
+        "workflow": "shared-language-calls",
+        "run_id": 38843400668,
+        "job_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400668/job/116788365125",
+        "run_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400668",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-10-16T03:02:05Z",
+        "completed_at": "2026-10-16T03:03:42Z"
+      },
+      {
+        "sha": "567ef6bf1ac06a1d24f418880c2a150ea554b465",
+        "check_id": 116788365505,
+        "name": "source-edits",
+        "workflow": "source-edits",
+        "run_id": 38843400709,
+        "job_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400709/job/116788365505",
+        "run_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400709",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-10-16T03:20:13Z",
+        "completed_at": "2026-10-16T03:21:36Z"
+      },
+      {
+        "sha": "567ef6bf1ac06a1d24f418880c2a150ea554b465",
+        "check_id": 116788365638,
+        "name": "source-maps",
+        "workflow": "source-maps",
+        "run_id": 38843400764,
+        "job_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400764/job/116788365638",
+        "run_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400764",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-10-16T03:06:43Z",
+        "completed_at": "2026-10-16T03:07:22Z"
+      },
+      {
+        "sha": "567ef6bf1ac06a1d24f418880c2a150ea554b465",
+        "check_id": 116788368415,
+        "name": "production-bridge",
+        "workflow": "tinyexpression-production",
+        "run_id": 38843400739,
+        "job_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400739/job/116788368415",
+        "run_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400739",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-10-16T03:43:30Z",
+        "completed_at": "2026-10-16T03:47:33Z"
+      }
+    ],
+    "conditionalSkips": "Core common 8 and DSL 144 tests had zero failures/errors; DSL skipped 2 real-Tiny cases. Portability was rerun downstream (3 tests, skip 0); Catalog.realTiny was verified in the earlier local full run, not rerun by this CI."
+  },
+  "productionBridge": {
+    "sha": "567ef6bf1ac06a1d24f418880c2a150ea554b465",
+    "job_id": 116788368415,
+    "job_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400739/job/116788368415",
+    "revision": "3.3.0",
+    "modules": {
+      "tiny": {
+        "counts": {
+          "tests": 125,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "resolved": {
+          "unlaxer-common": "3.3.0",
+          "unlaxer-dsl": "3.3.0"
+        }
+      },
+      "ide": {
+        "counts": {
+          "tests": 39,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "resolved": {
+          "unlaxer-dsl": "3.3.0",
+          "unlaxer-common": "3.3.0"
+        }
+      }
+    },
+    "observations": {
+      "java": {
+        "rows": 177,
+        "matches_independent_fixture": true,
+        "sha256": "58da4505b9d85e61503870e7f0f4c7d7c0f34857131713beab40b736f2170151"
+      },
+      "rust": {
+        "rows": 177,
+        "matches_independent_fixture": true,
+        "sha256": "58da4505b9d85e61503870e7f0f4c7d7c0f34857131713beab40b736f2170151"
+      },
+      "partial-java": {
+        "rows": 29,
+        "matches_independent_fixture": true,
+        "sha256": "516097720744cffcab5ba0b31fade7f8daaaf80d037c8b1609c36724e986abde"
+      },
+      "partial-rust": {
+        "rows": 29,
+        "matches_independent_fixture": true,
+        "sha256": "516097720744cffcab5ba0b31fade7f8daaaf80d037c8b1609c36724e986abde"
+      }
+    },
+    "compatibility": {
+      "UBNFC": 10,
+      "CLASSIC": 10,
+      "status": "PASS"
+    },
+    "xml_totals": {
+      "tests": 164,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "downstream": {
+    "sha": "567ef6bf1ac06a1d24f418880c2a150ea554b465",
+    "job_id": 116788365900,
+    "job_url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38843400728/job/116788365900",
+    "resolved_version": "3.3.0",
+    "root_and_ide_dependency_assertions": [
+      "Current downstream unlaxer dependencies: {'unlaxer-common': '3.3.0', 'unlaxer-dsl': '3.3.0'}",
+      "Current downstream IDE unlaxer dependencies: {'unlaxer-dsl': '3.3.0', 'unlaxer-common': '3.3.0'}"
+    ],
+    "portability_test_result": "[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 13.53 s -- in org.unlaxer.dsl.RustPortabilityConformanceTest",
+    "dependency_artifacts": [
+      {
+        "resolved": {
+          "unlaxer-common": "3.3.0",
+          "unlaxer-dsl": "3.3.0"
+        }
+      },
+      {
+        "resolved": {
+          "unlaxer-dsl": "3.3.0",
+          "unlaxer-common": "3.3.0"
+        }
+      }
+    ]
+  },
+  "central": {
+    "deploymentId": "62ded256-acc9-44a0-b253-8c1b4e3e27de",
+    "state": "PUBLISHED",
+    "observedAt": "2026-10-16T04:07:12.332990+00:00",
+    "uploadedBundleSha256": "fa84881c6108deed8627e7281ca87b77209817c03faff3ee7a293b69d4507fe8",
+    "allFilesMatchUploadedBundle": true,
+    "files": [
+      {
+        "artifact": "unlaxer-parser",
+        "file": "unlaxer-parser-3.3.0.pom",
+        "url": "https://repo1.maven.org/maven2/org/unlaxer/unlaxer-parser/3.3.0/unlaxer-parser-3.3.0.pom",
+        "lastModified": "Fri, 16 Oct 2026 03:52:51 GMT",
+        "sha256": "d8cb0e1b8ef78e2ecabd6b4ce114101092dc6da71ff121693f0bd310058b36e8",
+        "signer": [
+          "2BB901EBD3FFE1D0FD089BA1815CD8DAF0DFF081"
+        ]
+      },
+      {
+        "artifact": "unlaxer-common",
+        "file": "unlaxer-common-3.3.0.pom",
+        "url": "https://repo1.maven.org/maven2/org/unlaxer/unlaxer-common/3.3.0/unlaxer-common-3.3.0.pom",
+        "lastModified": "Fri, 16 Oct 2026 03:52:51 GMT",
+        "sha256": "179a2f4e21cdc02fb9aac6bd452e8808779109671799c48c9e426f1d9d7b7617",
+        "signer": [
+          "2BB901EBD3FFE1D0FD089BA1815CD8DAF0DFF081"
+        ]
+      },
+      {
+        "artifact": "unlaxer-common",
+        "file": "unlaxer-common-3.3.0.jar",
+        "url": "https://repo1.maven.org/maven2/org/unlaxer/unlaxer-common/3.3.0/unlaxer-common-3.3.0.jar",
+        "lastModified": "Fri, 16 Oct 2026 03:52:52 GMT",
+        "sha256": "5ae37e9892f68766d9dbd7175e78ca9aa5358f2ac4a8bc3d754c56bf7174ef97",
+        "signer": [
+          "2BB901EBD3FFE1D0FD089BA1815CD8DAF0DFF081"
+        ],
+        "classes": 605,
+        "major": [
+          65
+        ]
+      },
+      {
+        "artifact": "unlaxer-common",
+        "file": "unlaxer-common-3.3.0-sources.jar",
+        "url": "https://repo1.maven.org/maven2/org/unlaxer/unlaxer-common/3.3.0/unlaxer-common-3.3.0-sources.jar",
+        "lastModified": "Fri, 16 Oct 2026 03:52:52 GMT",
+        "sha256": "ca44fae7f8bcdb5c5c50f088cc9681763617b36768d4f3926cc66798bdd40878",
+        "signer": [
+          "2BB901EBD3FFE1D0FD089BA1815CD8DAF0DFF081"
+        ]
+      },
+      {
+        "artifact": "unlaxer-common",
+        "file": "unlaxer-common-3.3.0-javadoc.jar",
+        "url": "https://repo1.maven.org/maven2/org/unlaxer/unlaxer-common/3.3.0/unlaxer-common-3.3.0-javadoc.jar",
+        "lastModified": "Fri, 16 Oct 2026 03:52:52 GMT",
+        "sha256": "781c1fc61ee02a55334073cbf370bc537ff3014441c049c32f7bfb19c024677f",
+        "signer": [
+          "2BB901EBD3FFE1D0FD089BA1815CD8DAF0DFF081"
+        ]
+      },
+      {
+        "artifact": "unlaxer-dsl",
+        "file": "unlaxer-dsl-3.3.0.pom",
+        "url": "https://repo1.maven.org/maven2/org/unlaxer/unlaxer-dsl/3.3.0/unlaxer-dsl-3.3.0.pom",
+        "lastModified": "Fri, 16 Oct 2026 03:52:51 GMT",
+        "sha256": "b5a3279ff8f0dbeaf7dabbc2d89ef171113c3c044f5da93ef1c64da8b3e651e9",
+        "signer": [
+          "2BB901EBD3FFE1D0FD089BA1815CD8DAF0DFF081"
+        ]
+      },
+      {
+        "artifact": "unlaxer-dsl",
+        "file": "unlaxer-dsl-3.3.0.jar",
+        "url": "https://repo1.maven.org/maven2/org/unlaxer/unlaxer-dsl/3.3.0/unlaxer-dsl-3.3.0.jar",
+        "lastModified": "Fri, 16 Oct 2026 03:52:52 GMT",
+        "sha256": "fe8e0969921bb7301bbcab06187676603a7155819dcfc7cba85441ec7c0479c9",
+        "signer": [
+          "2BB901EBD3FFE1D0FD089BA1815CD8DAF0DFF081"
+        ],
+        "classes": 562,
+        "major": [
+          65
+        ]
+      },
+      {
+        "artifact": "unlaxer-dsl",
+        "file": "unlaxer-dsl-3.3.0-sources.jar",
+        "url": "https://repo1.maven.org/maven2/org/unlaxer/unlaxer-dsl/3.3.0/unlaxer-dsl-3.3.0-sources.jar",
+        "lastModified": "Fri, 16 Oct 2026 03:52:52 GMT",
+        "sha256": "39eb5e1e9ba3740db996936bdea0a1624e0a26352a32fbff8b5f155bd56ffeb7",
+        "signer": [
+          "2BB901EBD3FFE1D0FD089BA1815CD8DAF0DFF081"
+        ]
+      },
+      {
+        "artifact": "unlaxer-dsl",
+        "file": "unlaxer-dsl-3.3.0-javadoc.jar",
+        "url": "https://repo1.maven.org/maven2/org/unlaxer/unlaxer-dsl/3.3.0/unlaxer-dsl-3.3.0-javadoc.jar",
+        "lastModified": "Fri, 16 Oct 2026 03:52:52 GMT",
+        "sha256": "5df3ad2fc4f8fe60be7bec9c8ffb763f60fd916d7fc91d3e9dd1b0c7e5819371",
+        "signer": [
+          "2BB901EBD3FFE1D0FD089BA1815CD8DAF0DFF081"
+        ]
+      },
+      {
+        "artifact": "unlaxer-common-jdk17",
+        "file": "unlaxer-common-jdk17-3.3.0.pom",
+        "url": "https://repo1.maven.org/maven2/org/unlaxer/unlaxer-common-jdk17/3.3.0/unlaxer-common-jdk17-3.3.0.pom",
+        "lastModified": "Fri, 16 Oct 2026 03:52:51 GMT",
+        "sha256": "72c3bbd9fa37bcb79399747cac53bfec62a05406666cbd9cc0211b61c6248020",
+        "signer": [
+          "2BB901EBD3FFE1D0FD089BA1815CD8DAF0DFF081"
+        ]
+      },
+      {
+        "artifact": "unlaxer-common-jdk17",
+        "file": "unlaxer-common-jdk17-3.3.0.jar",
+        "url": "https://repo1.maven.org/maven2/org/unlaxer/unlaxer-common-jdk17/3.3.0/unlaxer-common-jdk17-3.3.0.jar",
+        "lastModified": "Fri, 16 Oct 2026 03:52:52 GMT",
+        "sha256": "6caf4c3277d0432da73052afcd066b68ce7da9a2e4a7ea64433d6d5f57bb53aa",
+        "signer": [
+          "2BB901EBD3FFE1D0FD089BA1815CD8DAF0DFF081"
+        ],
+        "classes": 605,
+        "major": [
+          61
+        ]
+      },
+      {
+        "artifact": "unlaxer-common-jdk17",
+        "file": "unlaxer-common-jdk17-3.3.0-sources.jar",
+        "url": "https://repo1.maven.org/maven2/org/unlaxer/unlaxer-common-jdk17/3.3.0/unlaxer-common-jdk17-3.3.0-sources.jar",
+        "lastModified": "Fri, 16 Oct 2026 03:52:52 GMT",
+        "sha256": "3e466150daeee3d82bf15a6a752dfce180445a09c3bc0c0f69a17e01fde63d6c",
+        "signer": [
+          "2BB901EBD3FFE1D0FD089BA1815CD8DAF0DFF081"
+        ]
+      },
+      {
+        "artifact": "unlaxer-common-jdk17",
+        "file": "unlaxer-common-jdk17-3.3.0-javadoc.jar",
+        "url": "https://repo1.maven.org/maven2/org/unlaxer/unlaxer-common-jdk17/3.3.0/unlaxer-common-jdk17-3.3.0-javadoc.jar",
+        "lastModified": "Fri, 16 Oct 2026 03:52:52 GMT",
+        "sha256": "fb832ac57ffaf9dd1cc7690fd8d6c19e8fdcfa720dc429a3c756d8549016b420",
+        "signer": [
+          "2BB901EBD3FFE1D0FD089BA1815CD8DAF0DFF081"
+        ]
+      },
+      {
+        "artifact": "unlaxer-dsl-jdk17",
+        "file": "unlaxer-dsl-jdk17-3.3.0.pom",
+        "url": "https://repo1.maven.org/maven2/org/unlaxer/unlaxer-dsl-jdk17/3.3.0/unlaxer-dsl-jdk17-3.3.0.pom",
+        "lastModified": "Fri, 16 Oct 2026 03:52:51 GMT",
+        "sha256": "5e10baf4237e97b82bd01b22d03749fc18f114e6fd4843cc1fada5391734d1ea",
+        "signer": [
+          "2BB901EBD3FFE1D0FD089BA1815CD8DAF0DFF081"
+        ]
+      },
+      {
+        "artifact": "unlaxer-dsl-jdk17",
+        "file": "unlaxer-dsl-jdk17-3.3.0.jar",
+        "url": "https://repo1.maven.org/maven2/org/unlaxer/unlaxer-dsl-jdk17/3.3.0/unlaxer-dsl-jdk17-3.3.0.jar",
+        "lastModified": "Fri, 16 Oct 2026 03:52:52 GMT",
+        "sha256": "c94010e47a99562a5e6a04c84cdfdaa39c4c18e1a08b4830b3d8f82e566a3f27",
+        "signer": [
+          "2BB901EBD3FFE1D0FD089BA1815CD8DAF0DFF081"
+        ],
+        "classes": 562,
+        "major": [
+          61
+        ]
+      },
+      {
+        "artifact": "unlaxer-dsl-jdk17",
+        "file": "unlaxer-dsl-jdk17-3.3.0-sources.jar",
+        "url": "https://repo1.maven.org/maven2/org/unlaxer/unlaxer-dsl-jdk17/3.3.0/unlaxer-dsl-jdk17-3.3.0-sources.jar",
+        "lastModified": "Fri, 16 Oct 2026 03:52:52 GMT",
+        "sha256": "b892c28b822098e4fc20022b95446e7ac493317ca3d69b3197f8cf9e5cbd86d7",
+        "signer": [
+          "2BB901EBD3FFE1D0FD089BA1815CD8DAF0DFF081"
+        ]
+      },
+      {
+        "artifact": "unlaxer-dsl-jdk17",
+        "file": "unlaxer-dsl-jdk17-3.3.0-javadoc.jar",
+        "url": "https://repo1.maven.org/maven2/org/unlaxer/unlaxer-dsl-jdk17/3.3.0/unlaxer-dsl-jdk17-3.3.0-javadoc.jar",
+        "lastModified": "Fri, 16 Oct 2026 03:52:52 GMT",
+        "sha256": "49c1007e83e8fea01fb5fcef470d92b032a835268584a42f1879c13ae3156e4b",
+        "signer": [
+          "2BB901EBD3FFE1D0FD089BA1815CD8DAF0DFF081"
+        ]
+      }
+    ],
+    "checksumVerification": "Central SHA-1 and uploaded-bundle SHA-256; all 17 OpenPGP signatures valid"
+  },
+  "consumers": {
+    "mode": "central",
+    "localCacheSeeded": false,
+    "result": "PASS",
+    "assertions": 358,
+    "variants": [
+      {
+        "jdk": 21,
+        "assertions": 179,
+        "artifacts": {
+          "unlaxer-common": {
+            "sha256": "5ae37e9892f68766d9dbd7175e78ca9aa5358f2ac4a8bc3d754c56bf7174ef97",
+            "classMajor": [
+              65
+            ]
+          },
+          "unlaxer-dsl": {
+            "sha256": "fe8e0969921bb7301bbcab06187676603a7155819dcfc7cba85441ec7c0479c9",
+            "classMajor": [
+              65
+            ]
+          }
+        },
+        "result": "PASS"
+      },
+      {
+        "jdk": 17,
+        "assertions": 179,
+        "artifacts": {
+          "unlaxer-common-jdk17": {
+            "sha256": "6caf4c3277d0432da73052afcd066b68ce7da9a2e4a7ea64433d6d5f57bb53aa",
+            "classMajor": [
+              61
+            ]
+          },
+          "unlaxer-dsl-jdk17": {
+            "sha256": "c94010e47a99562a5e6a04c84cdfdaa39c4c18e1a08b4830b3d8f82e566a3f27",
+            "classMajor": [
+              61
+            ]
+          }
+        },
+        "result": "PASS"
+      }
+    ]
+  },
+  "github": {
+    "release": "https://github.com/opaopa6969/unlaxer-parser/releases/tag/v3.3.0",
+    "releaseWorkflow": {
+      "conclusion": "success",
+      "headSha": "567ef6bf1ac06a1d24f418880c2a150ea554b465",
+      "status": "completed",
+      "url": "https://github.com/opaopa6969/unlaxer-parser/actions/runs/38847689350"
+    },
+    "downloadedAssets": {
+      "SHA256SUMS": "e659be0e2d2a87786b42ea0832f4fab96f02ac360104eb50e3cd332698ba38eb",
+      "SHA256SUMS.asc": "83e66d17c89eed96f2dcf7c23b27e345e3aa9137c48de7e76392f031bd1f6d15",
+      "ubnf-lsp-3.3.0.vsix": "cb11f2865db97f28e355140f62de4b7208f69b5453c2dba08098c5edc6435bba",
+      "unlaxer-evolution-linux-x86_64.tar.gz": "a70ebd8655aa1d19d538a7c4c99853ff7157c64e25bdb07cb2ce29931298e7c9",
+      "unlaxer-generator-linux-x86_64.tar.gz": "e1303a6bec4db7bd70de76bf185ce985cebeff8dc8efd5e8666546f62065c7d1"
+    },
+    "checksumSignature": "valid",
+    "signer": "2BB901EBD3FFE1D0FD089BA1815CD8DAF0DFF081",
+    "vsix": "Downloaded 3.3.0: manifest/version/MIT license verified; isolated VS Code activation, catalog, LSP imports, generation, WASM and live webview passed",
+    "native": "Downloaded archives: internal checksums, source SHA, empty-PATH Graphemes generation/check and expression value 9 passed",
+    "nativePlatform": "Linux x86_64 GNU; GLIBC_2.34 and libgcc_s.so.1; Rust 1.85.0 baseline x86-64 build",
+    "rustCratesPublished": false
+  }
+}

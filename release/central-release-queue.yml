@@ -9,38 +9,45 @@ policy:
   emergencyRequiresReason: true
 
 lastObserved:
-  asOf: "2026-10-03"
+  asOf: "2026-10-16"
   month: "2026-10"
-  publishedOperations: 1
-  source: https://repo1.maven.org/maven2/org/unlaxer/unlaxer-parser/3.2.0/unlaxer-parser-3.2.0.pom
-  deploymentId: "6235b68e-9cdd-48a5-8f0c-61b38f04f4ab"
+  publishedOperations: 2
+  source: https://repo1.maven.org/maven2/org/unlaxer/unlaxer-parser/3.3.0/unlaxer-parser-3.3.0.pom
+  deploymentId: "62ded256-acc9-44a0-b253-8c1b4e3e27de"
   note: >-
-    One verified deployment: Publisher API reports PUBLISHED and all five
-    coordinates are downloadable. The directory-index guard still reported
-    zero at 14:41 UTC because its listings lagged behind the actual files;
-    this observation uses the deployment and signed artifacts, not an inferred
-    directory-index timestamp. Artifact Last-Modified is 2026-10-03T14:36:11Z.
-    Signatures/checksums for all 17 files and isolated Java 21 / Java 17 consumers
-    passed. Evidence and source commit are recorded in #349.
+    Two verified deployments this month: 3.2.0 and 3.3.0. Publisher API reports
+    PUBLISHED for 3.3.0, all five coordinates and 17 signed files are downloadable,
+    and isolated Java 21 / Java 17 consumers passed 179 assertions each.
+    All file SHA-256 values match the uploaded bundle. The directory-index guard
+    still reported only 3.2.0 after publication; this record uses the deployment
+    and actual signed files rather than delayed directory listings. Artifact
+    Last-Modified is 2026-10-16T03:52:51Z–03:52:52Z. Source CI, public artifacts,
+    signatures and consumers are recorded in release/3.3.0-verification.json
+    and issue #522. The 3.2.0 evidence remains in issue #349.
   releases:
     - repository: opaopa6969/unlaxer-parser
-      versions: [3.2.0]
+      versions: [3.2.0, 3.3.0]
 
 nextWindow:
   month: "2026-10"
-  selected: opaopa6969/unlaxer-parser
+  selected: null
   candidates:
     - repository: opaopa6969/unlaxer-parser
-      status: selected
+      status: published
+      publishedAt: "2026-10-16T03:52:51Z"
       requestedVersion: "3.3.0"
+      release: "https://github.com/opaopa6969/unlaxer-parser/releases/tag/v3.3.0"
+      sourceCommit: "567ef6bf1ac06a1d24f418880c2a150ea554b465"
       checklist: "https://github.com/opaopa6969/unlaxer-parser/issues/522"
       note: >-
-        Production quality gate for Java/Rust Classic, Unicode 17 grapheme
-        parsing and positions, bounded recursion and IDE lifecycle fixes.
-        Publish the parent POM and four Java 21 / Java 17 library artifacts
-        only after release-source CI succeeds; verify Central signatures and
-        isolated consumers. Tag and GitHub Release include UBNF VSIX and
-        existing Linux x86_64 Rust binaries. Rust crates remain unpublished.
+        Published after all 18 release-source CI jobs succeeded. Java/Rust
+        Classic, Unicode 17 graphemes, bounded recursion and IDE lifecycle
+        fixes passed shared conformance and current-version downstream tests.
+        Parent POM and four Java 21 / Java 17 libraries verified from Central;
+        17 signatures/checksums and 358 fresh-consumer assertions passed.
+        Release VSIX and Linux x86_64 Rust binaries were downloaded and tested;
+        signed SHA256SUMS and license notices are included. Rust crates remain
+        unpublished. See 3.3.0-verification.json for exact source and evidence.
     - repository: opaopa6969/unlaxer-parser
       status: published
       publishedAt: "2026-10-03T14:36Z"

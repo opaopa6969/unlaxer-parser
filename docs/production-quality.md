@@ -1,6 +1,6 @@
 # Java / Rust Classic の本番品質基準
 
-対象は **3.3.0** の、対応表に記載した Classic の機能である。公開確認は [#522](https://github.com/opaopa6969/unlaxer-parser/issues/522) で追跡する。
+対象は **3.3.0** の、対応表に記載した Classic の機能である。公開検証は [#522](https://github.com/opaopa6969/unlaxer-parser/issues/522) と[配布記録](../release/3.3.0-verification.json)に保存した。
 Maven Central の 3.2.0 に以下の修正が含まれるという意味ではない。
 全 Java 文法との互換性、未対応 IDE 機能、任意の負荷に対する性能は別の条件である。
 
@@ -106,7 +106,31 @@ Java 17の全体再検証中、一度だけテスト内の動的javacが失敗�
 対象の動的javacは100回成功し、12生成ソースのSHA-256は24反復・4 JVM間で一致した。
 共有状態・class loader混入の再現根拠は見つからなかった。単発失敗の原因は未確定のまま記録し、追加の製品コード修正は行っていない。
 
-GitHub Actionsにはself-hosted runner待ちのqueueがある。上記はローカルで実施した結果であり、待機中のCIを成功として数えていない。
+上記のローカル監査時点ではGitHub Actionsはrunner待ちだった。以下の正式公開元のCI結果とは区別する。
+
+## 3.3.0の正式公開検証
+
+公開元は `567ef6bf1ac06a1d24f418880c2a150ea554b465`、タグは `v3.3.0`。
+このcommitの13 workflows / 18 jobsはすべて成功した。公開後の台帳・文書変更を、この検証済みsourceと混同しない。
+[全job URL・配布ファイルのSHA-256・署名者・consumer結果](../release/3.3.0-verification.json)を記録した。
+
+| 検証 | 結果 |
+|---|---|
+| 公開元CI | Java 21 / 17、Error Prone / SpotBugs、Rust 1.85 fmt / Clippy / 357 tests、両host適合性、ブラウザ・VSIX・Pagesを含む18 jobs成功 |
+| 現行依存の下流確認 | #530でproperty参照の旧版残留を修正。Tiny本体・IDEのcommon/dslが実際に3.3.0を解決することを確認 |
+| 本番bridge | 3.3.0でTiny 125件＋IDE 39件、skip 0。Java/Rust各strict 177＋partial 29観測が独立期待値と一致、両facade各10式成功 |
+| Central実配信 | 親POM＋Java 21 / 17の4座標、計17ファイル。署名・checksum・POM・class majorを検証し、全SHA-256が送信bundleと一致 |
+| 新規利用者 | 通常CentralからJDKごとに空のrepositoryへ取得。ローカルseedなし。Java 21 / 17各179項目、計358項目成功 |
+| GitHub配布物 | 公開した5assetsを再取得して送信元・server digestを照合。VSIXとRust archive 2個の3配布物は署名付きSHA256SUMSとも一致。取得VSIXの実VS Code smokeと、展開Rustの空PATH生成・check・式9も成功 |
+
+共通CIはcommon 8件、DSL 144件で失敗・error 0、DSLの実Tiny文法を必要とする2件はskipだった。
+`RustPortabilityConformanceTest`は下流で実Tiny文法を指定し3件skip 0で補完した。
+`RustCatalogConformanceTest.realTinyGrammar`は今回CIでは再実行しておらず、先のローカル全体検証の結果として扱う。
+
+Central deployment `62ded256-acc9-44a0-b253-8c1b4e3e27de` はPUBLISHED。
+正規URLのGET/HEADと、新規Maven consumerによる取得まで確認した。
+公開ファイルのLast-Modifiedは2026-10-16 03:52:51–52 UTC。公開直後の404キャッシュは公開失敗と混同せず、再送せずに反映を確認した。
+Rustの配布バイナリはLinux x86_64 GNU向けでGLIBC_2.34とlibgcc_s.so.1を必要とする。MIT・Unicode・依存noticeを同梱し、crateのcrates.io公開は行っていない。
 
 ## 対応範囲と適用時の条件
 
