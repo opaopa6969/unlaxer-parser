@@ -1,5 +1,8 @@
 //! Classic LSP stdio transport. Parsing remains in unlaxer-runtime.
 //! Full document sync is explicit; backend calls execute serially on immutable snapshots.
+mod semantic_tokens;
+pub use semantic_tokens::SemanticTokensLegend;
+
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::{self, BufRead, Write};
@@ -10,7 +13,7 @@ use unlaxer_runtime::source::{Operation, State};
 use unlaxer_runtime::source::{Position, Snapshot};
 use unlaxer_runtime::{SharedGrammar, Span};
 
-/// Snapshot-bound application hooks. All spans use Unicode code points.
+/// Snapshot-bound application hooks. Spans use Unicode code points unless explicitly LSP encoded.
 pub trait Backend {
     fn grammar(&self) -> &str;
     fn entry(&self) -> &str;
@@ -25,6 +28,15 @@ pub trait Backend {
     /// Return typed/provider items for this exact immutable source and version.
     fn complete(&mut self, _snapshot: &Snapshot, _cursor: usize) -> Vec<Completion> {
         vec![]
+    }
+    /// LSP legend advertised at initialize; defaults to the Java generated server legend.
+    fn semantic_tokens_legend(&self) -> SemanticTokensLegend {
+        SemanticTokensLegend::default()
+    }
+    /// Full LSP-encoded data: deltaLine, deltaStart, UTF-16 length, type, modifier bitset.
+    /// Called only for the current open immutable snapshot. Invalid data fails the request.
+    fn semantic_tokens(&mut self, _snapshot: &Snapshot) -> Result<Vec<u32>, String> {
+        Ok(vec![])
     }
     /// Explicitly registered providers. Metadata cannot install one.
     fn query_capabilities(&self) -> HashSet<Operation> {
@@ -162,6 +174,9 @@ pub struct Server<B> {
     diagnostic_contributions: BTreeMap<String, BTreeMap<String, DiagnosticDocument>>,
     profile: Option<Selection>,
     initialized: bool,
+    semantic_tokens_legend: SemanticTokensLegend,
+    semantic_multiline: bool,
+    semantic_overlapping: bool,
     shutdown: bool,
     exited: bool,
 }
@@ -175,6 +190,9 @@ impl<B: Backend> Server<B> {
             diagnostic_contributions: BTreeMap::new(),
             profile: None,
             initialized: false,
+            semantic_tokens_legend: SemanticTokensLegend::default(),
+            semantic_multiline: false,
+            semantic_overlapping: false,
             shutdown: false,
             exited: false,
         }
@@ -251,58 +269,65 @@ impl<B: Backend> Server<B> {
             if self.exited || self.shutdown {
                 return Err((-32600, "Server has shut down".into()));
             }
+            if !request
+                && matches!(
+                    method,
+                    "initialize"
+                        | "shutdown"
+                        | "unlaxer/configure"
+                        | "textDocument/semanticTokens/full"
+                        | "textDocument/completion"
+                        | "textDocument/hover"
+                        | "textDocument/definition"
+                )
+            {
+                return Ok(Value::Null);
+            }
             if method == "initialize" {
-                let selection = self.select_profile(&params).map_err(invalid)?;
-                self.profile = selection;
-                self.invalidate_parse_cache();
+                if self.initialized {
+                    return Err((-32600, "Server already initialized".into()));
+                }
+                let result = self.configure(&params)?;
                 self.initialized = true;
-                let mut caps = json!({"positionEncoding":"utf-16","textDocumentSync":1});
-                if self.allows("COMPLETION") {
-                    caps["completionProvider"] = json!({"resolveProvider":false});
-                }
-                if self.allows("HOVER") {
-                    caps["hoverProvider"] = json!(true);
-                }
-                if self.allows("DEFINITION")
-                    && self
-                        .backend
-                        .query_capabilities()
-                        .contains(&Operation::Definition)
-                {
-                    caps["definitionProvider"] = json!(true);
-                }
-                let mut operations = serde_json::Map::new();
-                for name in [
-                    "VALIDATE",
-                    "COMPLETION",
-                    "HOVER",
-                    "DEFINITION",
-                    "RENAME",
-                    "FORMAT",
-                    "CODE_ACTION",
-                ] {
-                    let transport =
-                        matches!(name, "VALIDATE" | "COMPLETION" | "HOVER" | "DEFINITION");
-                    let registered = operation(name)
-                        .is_some_and(|op| self.backend.query_capabilities().contains(&op));
-                    let allowed = self.allows(name);
-                    operations.insert(name.into(), json!({"transport":transport,"providerRegistered":registered,"profileAllowed":allowed,"available":transport && registered && allowed}));
-                }
-                caps["experimental"] =
-                    json!({"languageQueryConsumer":{"schemaVersion":1,"operations":operations}});
-                if let Some(p) = &self.profile {
-                    let l = &p.language;
-                    caps["experimental"]["languageProfile"] = json!({"schemaVersion":1,"tsv":p.profile.canonical_tsv(),"entry":l.entry,"grammar":l.grammar,"language":l.id,"package":l.package_id,"version":l.version});
-                }
-                return Ok(
-                    json!({"capabilities":caps,"serverInfo":{"name":"unlaxer-classic-rust"}}),
-                );
+                return Ok(result);
             }
             if !self.initialized {
-                return Err((-32002, "Server not initialized".into()));
+                return if request {
+                    Err((-32002, "Server not initialized".into()))
+                } else {
+                    Ok(Value::Null)
+                };
+            }
+            if request
+                && matches!(
+                    method,
+                    "exit"
+                        | "initialized"
+                        | "$/setTrace"
+                        | "textDocument/didOpen"
+                        | "textDocument/didChange"
+                        | "textDocument/didClose"
+                        | "textDocument/didSave"
+                        | "workspace/didChangeConfiguration"
+                        | "workspace/didChangeWatchedFiles"
+                        | "textDocument/willSave"
+                        | "window/workDoneProgress/cancel"
+                        | "notebookDocument/didOpen"
+                        | "notebookDocument/didChange"
+                        | "notebookDocument/didSave"
+                        | "notebookDocument/didClose"
+                        | "workspace/didCreateFiles"
+                        | "workspace/didDeleteFiles"
+                        | "workspace/didRenameFiles"
+                        | "workspace/didChangeWorkspaceFolders"
+                )
+            {
+                return Err((-32600, "Notification method requires a notification".into()));
             }
             match method {
-                "initialized" | "$/cancelRequest" => Ok(Value::Null),
+                "unlaxer/configure" => self.configure(&params),
+                "initialized" => Ok(Value::Null),
+                "$/cancelRequest" if !request => Ok(Value::Null),
                 "shutdown" if request => {
                     self.shutdown = true;
                     Ok(Value::Null)
@@ -370,6 +395,25 @@ impl<B: Backend> Server<B> {
                         self.diagnostics(&snapshot, &mut notifications);
                     }
                     Ok(Value::Null)
+                }
+                "textDocument/semanticTokens/full" => {
+                    let uri = string(&params["textDocument"], "uri")?;
+                    let Some(snapshot) = self.documents.get(uri).cloned() else {
+                        return Ok(json!({"data":[]}));
+                    };
+                    let data = self
+                        .backend
+                        .semantic_tokens(&snapshot)
+                        .map_err(|error| (-32603, error))?;
+                    semantic_tokens::validate(
+                        &snapshot,
+                        &self.semantic_tokens_legend,
+                        &data,
+                        self.semantic_multiline,
+                        self.semantic_overlapping,
+                    )
+                    .map_err(|error| (-32603, error.into()))?;
+                    Ok(json!({"data":data}))
                 }
                 "textDocument/completion" => {
                     if !self.allows("COMPLETION") {
@@ -502,6 +546,58 @@ impl<B: Backend> Server<B> {
         }
         notifications
     }
+    /// Explicit application extension for profile/client configuration after initialize.
+    fn configure(&mut self, params: &Value) -> Result<Value, (i64, String)> {
+        let selection = self.select_profile(params).map_err(invalid)?;
+        self.profile = selection;
+        self.semantic_tokens_legend = self.backend.semantic_tokens_legend();
+        let semantic = &params["capabilities"]["textDocument"]["semanticTokens"];
+        self.semantic_multiline = semantic["multilineTokenSupport"] == true;
+        self.semantic_overlapping = semantic["overlappingTokenSupport"] == true;
+        let mut caps = json!({"positionEncoding":"utf-16","textDocumentSync":1,
+        "semanticTokensProvider":{"legend":{
+            "tokenTypes":self.semantic_tokens_legend.token_types,
+            "tokenModifiers":self.semantic_tokens_legend.token_modifiers},"full":true}});
+        if self.allows("COMPLETION") {
+            caps["completionProvider"] = json!({"resolveProvider":false});
+        }
+        if self.allows("HOVER") {
+            caps["hoverProvider"] = json!(true);
+        }
+        if self.allows("DEFINITION")
+            && self
+                .backend
+                .query_capabilities()
+                .contains(&Operation::Definition)
+        {
+            caps["definitionProvider"] = json!(true);
+        }
+        let mut operations = serde_json::Map::new();
+        for name in [
+            "VALIDATE",
+            "COMPLETION",
+            "HOVER",
+            "DEFINITION",
+            "RENAME",
+            "FORMAT",
+            "CODE_ACTION",
+        ] {
+            let transport = matches!(name, "VALIDATE" | "COMPLETION" | "HOVER" | "DEFINITION");
+            let registered =
+                operation(name).is_some_and(|op| self.backend.query_capabilities().contains(&op));
+            let allowed = self.allows(name);
+            operations.insert(name.into(), json!({"transport":transport,"providerRegistered":registered,"profileAllowed":allowed,"available":transport && registered && allowed}));
+        }
+        caps["experimental"] =
+            json!({"languageQueryConsumer":{"schemaVersion":1,"operations":operations}});
+        if let Some(p) = &self.profile {
+            let l = &p.language;
+            caps["experimental"]["languageProfile"] = json!({"schemaVersion":1,"tsv":p.profile.canonical_tsv(),"entry":l.entry,"grammar":l.grammar,"language":l.id,"package":l.package_id,"version":l.version});
+        }
+        self.invalidate_parse_cache();
+        Ok(json!({"capabilities":caps,"serverInfo":{"name":"unlaxer-classic-rust"}}))
+    }
+
     fn query(
         &mut self,
         snapshot: &Snapshot,

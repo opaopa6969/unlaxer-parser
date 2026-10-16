@@ -231,6 +231,7 @@ pub fn grammar_is_snapshot_cacheable(rules: &[crate::Rule]) -> bool {
         match expression {
             Expr::Custom(_) | Expr::CustomWith { .. } => return false,
             Expr::Sequence(children)
+            | Expr::NonOrdered(children)
             | Expr::Choice(children)
             | Expr::LongestChoice(children)
             | Expr::UniqueLongestChoice(children) => pending.extend(children),
