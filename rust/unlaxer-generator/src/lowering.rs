@@ -1432,6 +1432,7 @@ impl Lowering<'_> {
 
     fn leading_rules(&self, expression: &Expression, result: &mut HashSet<usize>) {
         match expression {
+            Expression::Repeat { max: Some(0), .. } => {}
             Expression::Reference(rule) => {
                 result.insert(*rule);
             }

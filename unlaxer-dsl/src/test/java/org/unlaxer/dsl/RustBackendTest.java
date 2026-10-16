@@ -117,8 +117,10 @@ public class RustBackendTest {
             reject(source.replace("'hello' @value", "T @value Root @value"), "left recursion");
         }
         reject(SIMPLE.replace("grammar Example {", "grammar Example { token T = REGEX('x')\n"), "token T");
-        reject(SIMPLE.replace("'hello' @value", "Root{0} @value"), "left recursion");
-        reject(SIMPLE.replace("'hello' @value", "(Root | 'x'){0} @value"), "left recursion");
+        assertEquals(5, new RustBackend().generate(UBNFMapper.parse(
+            SIMPLE.replace("'hello' @value", "Root{0} @value")).grammars().get(0)).size());
+        assertEquals(5, new RustBackend().generate(UBNFMapper.parse(
+            SIMPLE.replace("'hello' @value", "(Root | 'x'){0} @value")).grammars().get(0)).size());
     }
 
     @Test public void invalidUnicodeTextIsRejectedBeforeRustEmission() {

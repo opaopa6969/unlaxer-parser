@@ -22,6 +22,7 @@ public class MapperGenerator implements CodeGenerator {
 
     @Override
     public GeneratedSource generate(GrammarDecl grammar) {
+        GrammarValidator.requireValidBoundedRepeatElements(grammar);
         LeftRecursionAnalysis.requireValid(grammar);
         CommonFieldSchema.build(grammar);
         EnumSchema.validate(grammar);

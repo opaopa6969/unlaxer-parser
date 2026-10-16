@@ -186,6 +186,7 @@ public class ParserGenerator implements CodeGenerator {
 
     @Override
     public GeneratedSource generate(GrammarDecl grammar) {
+        GrammarValidator.requireValidBoundedRepeatElements(grammar);
         LeftRecursionAnalysis.requireValid(grammar);
         TypeofConstraints.validate(grammar);
         var ciErrors = GrammarValidator.validateCaseInsensitiveTokens(grammar);
