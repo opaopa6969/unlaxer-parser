@@ -274,9 +274,11 @@ fn atom(
                 name,
             };
         }
-        ElementKind::Group(value) | ElementKind::Optional(value) | ElementKind::Repeat(value) => {
-            body(value, imported, tokens, used, synthetic)?
-        }
+        ElementKind::OwnedCapture { body: value, .. }
+        | ElementKind::CaptureScope(value)
+        | ElementKind::Group(value)
+        | ElementKind::Optional(value)
+        | ElementKind::Repeat(value) => body(value, imported, tokens, used, synthetic)?,
         ElementKind::OneOrMore(child) | ElementKind::BoundedRepeat { element: child, .. } => {
             atom(child, imported, tokens, used, synthetic)?
         }

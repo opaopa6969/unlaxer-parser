@@ -1,5 +1,7 @@
 package org.unlaxer.dsl.codegen;
 
+import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
+
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -114,7 +116,7 @@ record SharedAssocSchema(String leftType, String rightType, boolean spine, boole
     private static void collectMappedOperands(AtomicElement operand, Map<String, RuleDecl> rules,
             Map<String, TokenDecl> tokens, Set<String> result) {
         result.addAll(MapperElementUtil.reachableMappedClasses(operand, rules, tokens));
-        if (operand instanceof GroupElement group) {
+        if (operand instanceof TransparentElement group) {
             for (RuleRefElement reference : MapperElementUtil.collectRuleRefs(group.body())) {
                 result.addAll(MapperElementUtil.reachableMappedClasses(reference, rules, tokens));
             }

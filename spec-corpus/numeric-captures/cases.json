@@ -1,0 +1,514 @@
+[
+  {
+    "name": "IntScalar",
+    "grammar": "grammar IntScalar {\n @package: numericprobe\n @whitespace: javaStyle\n token NUM = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Item,params=[value])\n Root ::= '😀' NUM @value ';';\n}",
+    "type": "int",
+    "rustArgs": "value: &i32",
+    "java": "Integer.toString(node.value())",
+    "rust": "value.to_string()",
+    "cases": [
+      [
+        "😀0;",
+        "ok",
+        "0",
+        [
+          0,
+          3
+        ]
+      ],
+      [
+        "😀+0012;",
+        "ok",
+        "12",
+        [
+          0,
+          7
+        ]
+      ],
+      [
+        "😀-0;",
+        "ok",
+        "0",
+        [
+          0,
+          4
+        ]
+      ],
+      [
+        "😀2147483647;",
+        "ok",
+        "2147483647",
+        [
+          0,
+          12
+        ]
+      ],
+      [
+        "😀-2147483648;",
+        "ok",
+        "-2147483648",
+        [
+          0,
+          13
+        ]
+      ],
+      [
+        "😀\r\n -12 ;",
+        "ok",
+        "-12",
+        [
+          0,
+          9
+        ]
+      ],
+      [
+        "😀2147483648;",
+        "map",
+        "",
+        [
+          0,
+          12
+        ]
+      ],
+      [
+        "😀-2147483649;",
+        "map",
+        "",
+        [
+          0,
+          13
+        ]
+      ],
+      [
+        "😀999999999999999999999999;",
+        "map",
+        "",
+        [
+          0,
+          26
+        ]
+      ],
+      [
+        "😀1.25;",
+        "map",
+        "",
+        [
+          0,
+          6
+        ]
+      ],
+      [
+        "😀1.;",
+        "map",
+        "",
+        [
+          0,
+          4
+        ]
+      ],
+      [
+        "😀.5;",
+        "map",
+        "",
+        [
+          0,
+          4
+        ]
+      ],
+      [
+        "😀1e2;",
+        "map",
+        "",
+        [
+          0,
+          5
+        ]
+      ],
+      [
+        "😀1e9999;",
+        "map",
+        "",
+        [
+          0,
+          8
+        ]
+      ],
+      [
+        "😀NaN;",
+        "parse",
+        "",
+        [
+          0,
+          5
+        ]
+      ],
+      [
+        "😀Infinity;",
+        "parse",
+        "",
+        [
+          0,
+          10
+        ]
+      ],
+      [
+        "😀-Infinity;",
+        "parse",
+        "",
+        [
+          0,
+          11
+        ]
+      ],
+      [
+        "😀;",
+        "parse",
+        "",
+        [
+          0,
+          2
+        ]
+      ],
+      [
+        "😀1;tail",
+        "parse",
+        "",
+        [
+          0,
+          7
+        ]
+      ]
+    ]
+  },
+  {
+    "name": "IntOptional",
+    "grammar": "grammar IntOptional {\n @package: numericprobe\n @whitespace: javaStyle\n token NUM = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Item,params=[value])\n Root ::= '😀' '[' [ NUM @value ] ']';\n}",
+    "type": "java.util.Optional",
+    "rustArgs": "value: Option<&i32>",
+    "java": "node.value().map(Object::toString).orElse(\"none\")",
+    "rust": "value.map(i32::to_string).unwrap_or_else(|| \"none\".into())",
+    "cases": [
+      [
+        "😀[]",
+        "ok",
+        "none",
+        [
+          0,
+          3
+        ]
+      ],
+      [
+        "😀[+12]",
+        "ok",
+        "12",
+        [
+          0,
+          6
+        ]
+      ],
+      [
+        "😀[-2147483648]",
+        "ok",
+        "-2147483648",
+        [
+          0,
+          14
+        ]
+      ],
+      [
+        "😀[2147483648]",
+        "map",
+        "",
+        [
+          0,
+          13
+        ]
+      ],
+      [
+        "😀[2.5]",
+        "map",
+        "",
+        [
+          0,
+          6
+        ]
+      ],
+      [
+        "😀[NaN]",
+        "parse",
+        "",
+        [
+          0,
+          6
+        ]
+      ]
+    ]
+  },
+  {
+    "name": "IntList",
+    "grammar": "grammar IntList {\n @package: numericprobe\n @whitespace: javaStyle\n token NUM = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Item,params=[value])\n Root ::= '😀' '[' { NUM @value ',' } ']';\n}",
+    "type": "java.util.List",
+    "rustArgs": "value: &[i32]",
+    "java": "node.value().toString()",
+    "rust": "format!(\"{:?}\", value)",
+    "cases": [
+      [
+        "😀[]",
+        "ok",
+        "[]",
+        [
+          0,
+          3
+        ]
+      ],
+      [
+        "😀[1,-2,+3,1,]",
+        "ok",
+        "[1, -2, 3, 1]",
+        [
+          0,
+          13
+        ]
+      ],
+      [
+        "😀[2147483647,-2147483648,]",
+        "ok",
+        "[2147483647, -2147483648]",
+        [
+          0,
+          26
+        ]
+      ],
+      [
+        "😀[1,2147483648,]",
+        "map",
+        "",
+        [
+          0,
+          16
+        ]
+      ],
+      [
+        "😀[1,2.5,]",
+        "map",
+        "",
+        [
+          0,
+          9
+        ]
+      ],
+      [
+        "😀[NaN,]",
+        "parse",
+        "",
+        [
+          0,
+          7
+        ]
+      ]
+    ]
+  },
+  {
+    "name": "IntOuterOptional",
+    "grammar": "grammar IntOuterOptional {\n @package: numericprobe\n @whitespace: javaStyle\n token NUM = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Item,params=[value])\n Root ::= '😀' '[' [ NUM ] @value ']';\n}",
+    "type": "java.util.Optional",
+    "rustArgs": "value: Option<&i32>",
+    "java": "node.value().map(Object::toString).orElse(\"none\")",
+    "rust": "value.map(i32::to_string).unwrap_or_else(|| \"none\".into())",
+    "cases": [
+      [
+        "😀[]",
+        "ok",
+        "none",
+        [
+          0,
+          3
+        ]
+      ],
+      [
+        "😀[+12]",
+        "ok",
+        "12",
+        [
+          0,
+          6
+        ]
+      ],
+      [
+        "😀[2147483648]",
+        "map",
+        "",
+        [
+          0,
+          13
+        ]
+      ]
+    ]
+  },
+  {
+    "name": "IntDigit",
+    "grammar": "grammar IntDigit {\n @package: numericprobe\n @whitespace: javaStyle\n token NUM = org.unlaxer.parser.posix.DigitParser\n @root @mapping(Item,params=[value])\n Root ::= '😀' NUM @value ';';\n}",
+    "type": "int",
+    "rustArgs": "value: &i32",
+    "java": "Integer.toString(node.value())",
+    "rust": "value.to_string()",
+    "cases": [
+      [
+        "😀0;",
+        "ok",
+        "0",
+        [
+          0,
+          3
+        ]
+      ],
+      [
+        "😀9;",
+        "ok",
+        "9",
+        [
+          0,
+          3
+        ]
+      ],
+      [
+        "😀12;",
+        "parse",
+        "",
+        [
+          0,
+          4
+        ]
+      ],
+      [
+        "😀-1;",
+        "parse",
+        "",
+        [
+          0,
+          4
+        ]
+      ],
+      [
+        "😀９;",
+        "parse",
+        "",
+        [
+          0,
+          3
+        ]
+      ]
+    ]
+  },
+  {
+    "name": "IntShared",
+    "grammar": "grammar IntShared {\n @package: numericprobe\n @whitespace: javaStyle\n token NUM = org.unlaxer.parser.elementary.NumberParser\n @root Root ::= A | B;\n @mapping(Item,params=[value]) A ::= '😀a' NUM @value ';';\n @mapping(Item,params=[value]) B ::= '😀b' NUM @value ';';\n}",
+    "type": "int",
+    "rustArgs": "value: &i32",
+    "java": "Integer.toString(node.value())",
+    "rust": "value.to_string()",
+    "cases": [
+      [
+        "😀a12;",
+        "ok",
+        "12",
+        [
+          0,
+          5
+        ]
+      ],
+      [
+        "😀b-2;",
+        "ok",
+        "-2",
+        [
+          0,
+          5
+        ]
+      ],
+      [
+        "😀b2147483648;",
+        "map",
+        "",
+        [
+          0,
+          13
+        ]
+      ]
+    ]
+  },
+  {
+    "name": "IntOuterList",
+    "grammar": "grammar IntOuterList {\n @package: numericprobe\n @whitespace: javaStyle\n token NUM = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Item,params=[value])\n Root ::= '😀' '[' { NUM } @value ']';\n}",
+    "type": "java.util.List",
+    "rustArgs": "value: &[i32]",
+    "java": "node.value().toString()",
+    "rust": "format!(\"{:?}\", value)",
+    "cases": [
+      [
+        "😀[]",
+        "ok",
+        "[]",
+        [
+          0,
+          3
+        ]
+      ],
+      [
+        "😀[1-2+3]",
+        "ok",
+        "[1, -2, 3]",
+        [
+          0,
+          8
+        ]
+      ],
+      [
+        "😀[1 -2 +3]",
+        "parse",
+        "",
+        [
+          0,
+          10
+        ]
+      ],
+      [
+        "😀[1+2147483648]",
+        "map",
+        "",
+        [
+          0,
+          15
+        ]
+      ]
+    ]
+  },
+  {
+    "name": "IntRepeatedSites",
+    "grammar": "grammar IntRepeatedSites {\n @package: numericprobe\n @whitespace: javaStyle\n token NUM = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Item,params=[value])\n Root ::= '😀' NUM @value ',' NUM @value ';';\n}",
+    "type": "java.util.List",
+    "rustArgs": "value: &[i32]",
+    "java": "node.value().toString()",
+    "rust": "format!(\"{:?}\", value)",
+    "cases": [
+      [
+        "😀1,-2;",
+        "ok",
+        "[1, -2]",
+        [
+          0,
+          6
+        ]
+      ],
+      [
+        "😀1,2147483648;",
+        "map",
+        "",
+        [
+          0,
+          14
+        ]
+      ]
+    ]
+  }
+]

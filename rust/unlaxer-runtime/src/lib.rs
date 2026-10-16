@@ -6,12 +6,14 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 pub mod call_inference;
+pub mod capture_tree;
 pub mod editor;
 pub mod editor_cst;
 pub mod editor_queries;
 pub mod embedded;
 mod first;
 pub mod grapheme;
+pub mod incremental;
 pub mod language_profile;
 pub mod language_queries;
 pub mod lexical;
@@ -65,6 +67,11 @@ pub const VALUE_BOUNDARY_RULE: usize = usize::MAX - 1;
 /// Recovery nodes are not grammar rules or typed AST values.
 pub const RECOVERY_ERROR_RULE: usize = usize::MAX - 2;
 
+/// Reserved rule ID for an explicit Classic terminal, never a grammar-rule index.
+pub const TOKEN_LEAF_RULE: usize = usize::MAX - 3;
+/// Reserved rule ID for a Classic collecting boundary.
+pub const TOKEN_META_RULE: usize = usize::MAX - 4;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RecoveryMode {
     /// Resume after the nearest sync token, consuming that token.
@@ -108,6 +115,10 @@ pub enum Expr {
     Quoted(char),
     Rule(usize),
     Sequence(Vec<Expr>),
+    /// Match each child occurrence once, greedily choosing the first unused match.
+    /// Failed candidates roll back; selected children are never permuted on later failure.
+    /// Empty children succeed, nullable children run once, and no trivia is added here.
+    NonOrdered(Vec<Expr>),
     Choice(Vec<Expr>),
     /// Try every alternative from the same transactional state and commit the
     /// one that consumes the most input. Equal-length matches keep declaration order.
@@ -121,10 +132,26 @@ pub enum Expr {
         predictors: Vec<Predictor>,
     },
     Capture(&'static str, Box<Expr>),
+    /// Read outer bindings, discard local captures on exit without discarding child results.
+    CaptureScope(Box<Expr>),
+    /// General owned binding, separate from AST field captures. CST-transparent.
+    OwnedCapture(&'static str, Box<Expr>),
+    /// Replay a general owned binding at the current input cursor.
+    Replay(&'static str),
+    /// Classic MatchOnly: publish matched tokens/cursor, restore owned semantic state.
+    MatchOnly(Box<Expr>),
+    /// Toggle leaf inversion; unlike PEG not_ahead, this can consume input.
+    InvertMatch(Box<Expr>),
+    /// Preserve token kind and stop inherited leaf inversion.
+    StopInvert(Box<Expr>),
+    /// Force the exact Consumed kind, preserving inherited leaf inversion.
+    StopConsume(Box<Expr>),
     /// Wrap successful child nodes in a text-projection boundary without changing parsing.
     TextValue(Box<Expr>),
     /// Preserve a scalar mixed-value capture span without deciding text versus node.
     ValueBoundary(Box<Expr>),
+    /// Explicit nested capture CST boundary; existing flat Capture remains unchanged.
+    CaptureBoundary(capture_tree::Kind, Box<Expr>),
     /// Apply rule-local symbol effects to this child's captures after a successful parse.
     RuleEffects {
         child: Box<Expr>,
@@ -169,6 +196,9 @@ pub enum Expr {
         min: usize,
         max: Option<usize>,
     },
+    /// Explicit historical Java Zero/LazyZero: probe once and accept no matches.
+    /// Unlike a bounded zero repetition this can inspect and reset the match cursor.
+    ZeroMatch(Box<Expr>),
     /// Java Occurs counts a successful zero-consumption child once, then stops.
     JavaRepeat {
         child: Box<Expr>,
@@ -183,6 +213,12 @@ pub enum Expr {
     Eof,
     Empty,
     CharRange(char, char),
+    /// One scalar recognized by a custom terminal, with inherited Classic arguments.
+    /// The callback may read external state, so FIRST and memoization are conservative.
+    Character {
+        label: &'static str,
+        predicate: fn(char) -> bool,
+    },
     Except(&'static str),
     Until(&'static str),
     /// UBNF/Java predicates use a separate, advancing match-only cursor.
@@ -270,11 +306,18 @@ impl Expr {
     pub fn literal(text: &'static str) -> Self {
         Self::Literal(text)
     }
+    pub fn character(label: &'static str, predicate: fn(char) -> bool) -> Self {
+        Self::Character { label, predicate }
+    }
     pub fn sequence(elements: impl IntoIterator<Item = Self>) -> Self {
         Self::Sequence(elements.into_iter().collect())
     }
     pub fn choice(alternatives: impl IntoIterator<Item = Self>) -> Self {
         Self::Choice(alternatives.into_iter().collect())
+    }
+    /// Java NonOrdered semantics; this is unrelated to UBNF trivia `@interleave`.
+    pub fn non_ordered(children: impl IntoIterator<Item = Self>) -> Self {
+        Self::NonOrdered(children.into_iter().collect())
     }
     pub fn longest_choice(alternatives: impl IntoIterator<Item = Self>) -> Self {
         Self::LongestChoice(alternatives.into_iter().collect())
@@ -323,6 +366,9 @@ impl Expr {
     pub fn zero_or_more(self) -> Self {
         self.repeat(0, None)
     }
+    pub fn zero_match(self) -> Self {
+        Self::ZeroMatch(Box::new(self))
+    }
     pub fn repeat_java(self, min: usize, max: Option<usize>) -> Self {
         Self::JavaRepeat {
             child: Box::new(self),
@@ -336,6 +382,15 @@ impl Expr {
     pub fn capture(self, name: &'static str) -> Self {
         Self::Capture(name, Box::new(self))
     }
+    /// Capture this child's actual source in the separate general owned binding store.
+    pub fn capture_owned(self, name: &'static str) -> Self {
+        Self::OwnedCapture(name, Box::new(self))
+    }
+    /// Read through outer captures and discard definitions made by this child.
+    pub fn capture_scope(self) -> Self {
+        Self::CaptureScope(Box::new(self))
+    }
+
     /// Preserve this expression's consumed source as one text value, including trivia.
     /// Inner nodes/captures remain available; no quote stripping or text decoding occurs.
     pub fn text_value(self) -> Self {
@@ -397,6 +452,18 @@ impl Expr {
             positive: true,
         }
     }
+    pub fn match_only(self) -> Self {
+        Self::MatchOnly(Box::new(self))
+    }
+    pub fn invert_match(self) -> Self {
+        Self::InvertMatch(Box::new(self))
+    }
+    pub fn stop_invert(self) -> Self {
+        Self::StopInvert(Box::new(self))
+    }
+    pub fn stop_consume(self) -> Self {
+        Self::StopConsume(Box::new(self))
+    }
     pub fn not_ahead(self) -> Self {
         Self::Lookahead {
             child: Box::new(self),
@@ -405,6 +472,12 @@ impl Expr {
     }
     pub fn separated_by(self, separator: Self) -> Self {
         Self::sequence([self.clone(), separator.then(self).zero_or_more()])
+    }
+    /// Classic separated list: require the first item, then count a successful
+    /// no-progress separator/item tail once and stop, matching Java Occurs.
+    /// The existing [`Self::separated_by`] retains its pure PEG repeat contract.
+    pub fn separated_by_java(self, separator: Self) -> Self {
+        Self::sequence([self.clone(), separator.then(self).repeat_java(0, None)])
     }
 }
 
@@ -494,7 +567,9 @@ pub struct Capture {
 
 #[derive(Debug, Clone)]
 pub struct Node {
-    /// Grammar-local rule index, [`TEXT_VALUE_RULE`], or [`VALUE_BOUNDARY_RULE`].
+    /// Grammar-local rule index or a reserved CST boundary/terminal constant:
+    /// [`TEXT_VALUE_RULE`], [`VALUE_BOUNDARY_RULE`], [`RECOVERY_ERROR_RULE`],
+    /// [`TOKEN_LEAF_RULE`] or [`TOKEN_META_RULE`].
     pub rule: usize,
     pub span: Span,
     pub children: Vec<usize>,
@@ -514,6 +589,32 @@ pub struct Tree {
 }
 
 impl Tree {
+    /// Validate public CST fields against the owned source before traversing a caller-supplied tree.
+    /// Parser-produced arenas are postorder; rejecting forward references also rejects cycles.
+    pub fn validate_structure(&self) -> Result<(), &'static str> {
+        if self.root >= self.nodes.len()
+            || self.byte_offsets.iter().copied().ne(self
+                .source
+                .char_indices()
+                .map(|(offset, _)| offset)
+                .chain(std::iter::once(self.source.len())))
+        {
+            return Err("invalid CST source or root");
+        }
+        let length = self.byte_offsets.len() - 1;
+        let valid_span = |span: Span| span.start <= span.end && span.end <= length;
+        for (id, node) in self.nodes.iter().enumerate() {
+            if !valid_span(node.span)
+                || node.children.iter().any(|&child| child >= id)
+                || node.captures.iter().any(|capture| {
+                    !valid_span(capture.span) || capture.nodes.iter().any(|&child| child >= id)
+                })
+            {
+                return Err("invalid CST span, edge or cycle");
+            }
+        }
+        Ok(())
+    }
     /// Recovery events reachable from this tree's selected root only.
     pub fn recoveries(&self) -> &[RecoveryDiagnostic] {
         &self.recoveries
@@ -613,12 +714,27 @@ pub fn java_capture_text(text: &str) -> &str {
 struct Fragment {
     nodes: Vec<usize>,
     captures: Vec<Capture>,
+    source: Option<Box<FragmentSource>>,
+}
+
+#[derive(Clone)]
+struct FragmentSource {
+    span: Span,
+    kind: token::TokenKind,
+    classic: bool,
+    generated: bool,
+    text: Option<Arc<str>>,
 }
 
 /// Shared entry point for handwritten and generated parsers. Use context.parse(parser)
 /// when calling a custom implementation so failed calls roll back transactional state.
 pub trait Parser {
     fn parse(&self, context: &mut ParseContext<'_>) -> ParseResult;
+    /// Classic entry. Existing custom parsers retain transactional failure cleanup;
+    /// mode-aware implementations may override this to reproduce leaf cursor effects.
+    fn parse_classic(&self, context: &mut ParseContext<'_>) -> ParseResult {
+        context.transaction(|context| self.parse(context))
+    }
 }
 
 pub type ParseResult = Result<ParseMatch, ParseError>;
@@ -649,6 +765,9 @@ impl ParseMatch {
 
 impl Parser for Expr {
     fn parse(&self, context: &mut ParseContext<'_>) -> ParseResult {
+        context.parse_expression(self)
+    }
+    fn parse_classic(&self, context: &mut ParseContext<'_>) -> ParseResult {
         context.parse_expression(self)
     }
 }
@@ -745,6 +864,67 @@ impl CaptureStore {
     }
 }
 
+#[derive(Debug, Clone, Default)]
+struct OwnedCaptureStore {
+    values: HashMap<&'static str, Vec<token::TokenSource>>,
+    journal: Vec<&'static str>,
+    checkpoint_depth: usize,
+}
+
+impl OwnedCaptureStore {
+    fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
+
+    fn get(&self, name: &str) -> Option<&Vec<token::TokenSource>> {
+        self.values.get(name)
+    }
+
+    fn push(&mut self, name: &'static str, source: token::TokenSource) {
+        if self.checkpoint_depth > 0 {
+            self.journal.push(name);
+        }
+        self.values.entry(name).or_default().push(source);
+    }
+
+    fn checkpoint(&mut self) -> usize {
+        let mark = self.journal.len();
+        self.checkpoint_depth += 1;
+        mark
+    }
+
+    fn commit_checkpoint(&mut self) {
+        debug_assert!(self.checkpoint_depth > 0);
+        self.checkpoint_depth -= 1;
+        if self.checkpoint_depth == 0 {
+            self.journal.clear();
+        }
+    }
+
+    fn rollback_checkpoint(&mut self, mark: usize) {
+        debug_assert!(self.checkpoint_depth > 0);
+        debug_assert!(mark <= self.journal.len());
+        while self.journal.len() > mark {
+            let name = self.journal.pop().expect("journal length checked");
+            let remove = {
+                let spans = self
+                    .values
+                    .get_mut(name)
+                    .expect("journaled capture must exist");
+                spans.pop().expect("journaled capture must have a source");
+                spans.is_empty()
+            };
+            if remove {
+                self.values.remove(name);
+            }
+        }
+        self.checkpoint_depth -= 1;
+        if self.checkpoint_depth == 0 {
+            self.journal.clear();
+        }
+    }
+}
+
 /// Opt-in counters for ParseContext checkpoint behavior. Payload counters exclude
 /// cursor and CST-length scalars, which are always copied inline.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -761,11 +941,13 @@ pub struct CheckpointMetrics {
 }
 
 struct Checkpoint {
+    match_cursor_policy: MatchCursorPolicy,
     position: usize,
     matched_position: usize,
     nodes: usize,
     metrics_counted: bool,
     captures_journal_mark: usize,
+    owned_captures_journal_mark: usize,
     state: Option<Rc<StateMap>>,
     scopes_journal_mark: usize,
     recoveries: usize,
@@ -779,6 +961,7 @@ struct ChoiceWinner {
     node_start: usize,
     nodes: Vec<Node>,
     captures: CaptureStore,
+    owned_captures: OwnedCaptureStore,
     state: Rc<StateMap>,
     scopes: ScopeStore,
     recoveries: Vec<RecoveryDiagnostic>,
@@ -922,7 +1105,7 @@ struct FailureMemoKey {
     rule: usize,
     position: usize,
     matched_position: usize,
-    depth_and_whitespace: usize,
+    depth_and_modes: usize,
 }
 
 impl FailureMemoKey {
@@ -937,8 +1120,14 @@ impl FailureMemoKey {
             rule,
             position,
             matched_position,
-            depth_and_whitespace: depth * 2 + usize::from(whitespace),
+            depth_and_modes: depth * 8 + 4 + usize::from(whitespace),
         }
+    }
+    fn with_match_policy(mut self, policy: MatchCursorPolicy) -> Self {
+        self.depth_and_modes = (self.depth_and_modes & !6)
+            | (usize::from(policy.reset) << 2)
+            | (usize::from(policy.non_ordered) << 1);
+        self
     }
 }
 
@@ -1099,6 +1288,23 @@ impl FailureMemoBuckets {
     }
 }
 
+// Java Chain switches its current transaction to an advancing matched cursor.
+// NonOrdered inherits that policy; its Java children otherwise reset on begin.
+// `non_ordered` confines the compatibility policy to the new combinator.
+#[derive(Clone, Copy)]
+struct MatchCursorPolicy {
+    reset: bool,
+    non_ordered: bool,
+}
+impl Default for MatchCursorPolicy {
+    fn default() -> Self {
+        Self {
+            reset: true,
+            non_ordered: false,
+        }
+    }
+}
+
 /// Per-parse state, shared by generated rules and custom parsers. Transactions restore
 /// cursors, CST nodes, captures and cloneable user values, but retain failure diagnostics.
 /// Clone must isolate mutable values: external effects and shared interior state are not rolled back.
@@ -1115,6 +1321,10 @@ impl FailureMemoBuckets {
 /// Checkpoint counters and memoized-failure hit counts describe only this context's
 /// first pass, not any separate diagnostic retry; semantic diagnostics are unaffected.
 pub struct ParseContext<'a> {
+    token_mode: Option<token::ParseMode>,
+    classic_max_reached: Option<usize>,
+    classic_failure_seen: bool,
+    match_cursor_policy: MatchCursorPolicy,
     bindings: BTreeMap<String, Vec<String>>,
     input: &'a str,
     grapheme_boundaries: Option<grapheme::Boundaries>,
@@ -1134,6 +1344,7 @@ pub struct ParseContext<'a> {
     // non-boundary bytes contain usize::MAX to retain code_point's rejection.
     code_point_offsets: Vec<usize>,
     captures: CaptureStore,
+    owned_captures: OwnedCaptureStore,
     state: Rc<StateMap>,
     scopes: ScopeStore,
     recoveries: Vec<RecoveryDiagnostic>,
@@ -1459,6 +1670,10 @@ impl<'a> ParseContext<'a> {
             input,
             lexing: None,
             rules: Arc::from([]),
+            token_mode: None,
+            classic_max_reached: None,
+            classic_failure_seen: false,
+            match_cursor_policy: MatchCursorPolicy::default(),
             whitespace: false,
             lexical_trivia: None,
             lexical_context: None,
@@ -1471,6 +1686,7 @@ impl<'a> ParseContext<'a> {
             byte_offsets,
             code_point_offsets,
             captures: CaptureStore::default(),
+            owned_captures: OwnedCaptureStore::default(),
             state: Rc::new(StateMap::default()),
             scopes: ScopeStore::default(),
             recoveries: Vec::new(),
@@ -1622,8 +1838,41 @@ impl<'a> ParseContext<'a> {
     pub fn captured(&self, name: &str) -> Option<&'a str> {
         self.text(*self.captures.get(name)?.last()?)
     }
+    /// Latest general owned binding; independent of AST field captures.
+    pub fn captured_source(&self, name: &str) -> Option<&token::TokenSource> {
+        self.owned_captures.get(name)?.last()
+    }
+    /// The actual captured text, including projected/generated values.
+    pub fn captured_text(&self, name: &str) -> Option<&str> {
+        match self.captured_source(name)? {
+            token::TokenSource::Input(span) => self.text(*span),
+            token::TokenSource::Projected { text, .. } => Some(text),
+            token::TokenSource::Generated { text, .. } => Some(text),
+        }
+    }
+    /// General binding history, including owned projected/generated sources.
+    pub fn capture_sources(&self, name: &str) -> &[token::TokenSource] {
+        self.owned_captures
+            .get(name)
+            .map(Vec::as_slice)
+            .unwrap_or(&[])
+    }
+    /// Legacy input-backed AST capture history.
     pub fn capture_spans(&self, name: &str) -> &[Span] {
         self.captures.get(name).map(Vec::as_slice).unwrap_or(&[])
+    }
+    /// Read outer bindings and discard local definitions on exit. Controlled errors
+    /// roll back child effects; a panic still requires discarding this context.
+    pub fn with_capture_scope<T>(
+        &mut self,
+        operation: impl FnOnce(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<T, ParseError> {
+        self.transaction(|context| {
+            let mark = context.owned_captures.checkpoint();
+            let result = operation(context);
+            context.owned_captures.rollback_checkpoint(mark);
+            result
+        })
     }
     pub fn set_state<T: Any + Clone>(&mut self, name: impl Into<String>, value: T) {
         self.state_mut_map().0.insert(name.into(), Box::new(value));
@@ -1695,7 +1944,11 @@ impl<'a> ParseContext<'a> {
             return failure.error();
         }
         ParseError {
-            offset: self.code_point(self.farthest),
+            offset: self.code_point(if !self.classic_failure_seen {
+                self.classic_max_reached.unwrap_or(self.farthest)
+            } else {
+                self.farthest
+            }),
             expected: self.expected_names.strings(&self.expected),
         }
     }
@@ -1846,18 +2099,31 @@ impl<'a> ParseContext<'a> {
     }
 
     fn parse_expression(&mut self, expression: &Expr) -> ParseResult {
+        let previous = self.token_mode;
+        if previous.is_none() && requires_classic_mode(expression, &self.rules) {
+            self.token_mode = Some(token::ParseMode::default());
+        }
         let start = self.position();
-        match self.expression(expression, self.call_depth) {
+        let result = match self.expression(expression, self.call_depth) {
             Some(fragment) => Ok(ParseMatch {
-                span: Span {
-                    start,
-                    end: self.position(),
-                },
+                span: fragment
+                    .source
+                    .as_deref()
+                    .filter(|source| source.classic)
+                    .map_or(
+                        Span {
+                            start,
+                            end: self.position(),
+                        },
+                        |source| source.span,
+                    ),
                 nodes: fragment.nodes,
                 captures: fragment.captures,
             }),
             None => Err(self.failure()),
-        }
+        };
+        self.token_mode = previous;
+        result
     }
 
     fn checkpoint(&mut self) -> Checkpoint {
@@ -1865,8 +2131,9 @@ impl<'a> ParseContext<'a> {
             self.failure_memo
                 .observe_cursor(self.code_point(self.position));
         }
-        let captures_nonempty = !self.captures.is_empty();
+        let captures_nonempty = !self.captures.is_empty() || !self.owned_captures.is_empty();
         let captures_journal_mark = self.captures.checkpoint();
+        let owned_captures_journal_mark = self.owned_captures.checkpoint();
         let state = (!self.state.0.is_empty()).then(|| Rc::clone(&self.state));
         let scopes_nonempty = !self.scopes.is_empty();
         let scopes_journal_mark = self.scopes.checkpoint();
@@ -1880,11 +2147,13 @@ impl<'a> ParseContext<'a> {
             }
         }
         Checkpoint {
+            match_cursor_policy: self.match_cursor_policy,
             position: self.position,
             matched_position: self.matched_position,
             nodes: self.nodes.len(),
             metrics_counted,
             captures_journal_mark,
+            owned_captures_journal_mark,
             scopes_journal_mark,
             recoveries: self.recoveries.len(),
             tokens: Rc::clone(&self.tokens),
@@ -1895,6 +2164,7 @@ impl<'a> ParseContext<'a> {
 
     fn commit_checkpoint(&mut self, checkpoint: Checkpoint) {
         self.captures.commit_checkpoint();
+        self.owned_captures.commit_checkpoint();
         self.scopes.commit_checkpoint();
         if checkpoint.metrics_counted {
             if let Some(metrics) = &mut self.checkpoint_metrics {
@@ -1909,6 +2179,7 @@ impl<'a> ParseContext<'a> {
                 metrics.rolled_back += 1;
             }
         }
+        self.match_cursor_policy = checkpoint.match_cursor_policy;
         self.position = checkpoint.position;
         self.matched_position = checkpoint.matched_position;
         self.nodes.truncate(checkpoint.nodes);
@@ -1917,6 +2188,8 @@ impl<'a> ParseContext<'a> {
         self.recoveries.truncate(checkpoint.recoveries);
         self.captures
             .rollback_checkpoint(checkpoint.captures_journal_mark);
+        self.owned_captures
+            .rollback_checkpoint(checkpoint.owned_captures_journal_mark);
         if let Some(state) = checkpoint.state {
             self.state = state;
         } else if !self.state.0.is_empty() {
@@ -1928,6 +2201,19 @@ impl<'a> ParseContext<'a> {
         }
         self.scopes
             .rollback_checkpoint(checkpoint.scopes_journal_mark);
+    }
+
+    // Optional mode-only boundaries stay boxed across recursive parsing. Moving
+    // Checkpoint values after recursion must not enlarge every native frame.
+    #[inline(never)]
+    fn finish_classic_candidate(&mut self, checkpoint: Option<Box<Checkpoint>>, commit: bool) {
+        if let Some(checkpoint) = checkpoint {
+            if commit {
+                self.commit_checkpoint(*checkpoint);
+            } else {
+                self.restore(*checkpoint);
+            }
+        }
     }
 
     fn record_cow_copy(&mut self) {
@@ -1973,6 +2259,9 @@ impl<'a> ParseContext<'a> {
     }
 
     fn fail_without_expected(&mut self) {
+        if self.token_mode.is_some() && self.options.diagnostics == Diagnostics::Detailed {
+            self.classic_failure_seen = true;
+        }
         if self.options.diagnostics == Diagnostics::DetailedOnFailure {
             return;
         }
@@ -1987,6 +2276,9 @@ impl<'a> ParseContext<'a> {
     }
 
     fn fail_at(&mut self, position: usize, expected: &str) {
+        if self.token_mode.is_some() && self.options.diagnostics == Diagnostics::Detailed {
+            self.classic_failure_seen = true;
+        }
         if self.options.diagnostics == Diagnostics::DetailedOnFailure {
             return;
         }
@@ -2046,6 +2338,7 @@ impl<'a> ParseContext<'a> {
             return None;
         }
         let memo_key = (self.options.memoization == Memoization::SafeFailures
+            && self.token_mode.is_none()
             && self.names_state.frames.is_empty()
             && self.lexical_trivia.is_none()
             && self.lexical_context.is_none()
@@ -2060,7 +2353,8 @@ impl<'a> ParseContext<'a> {
                     self.matched_position,
                     self.whitespace,
                     depth,
-                ),
+                )
+                .with_match_policy(self.match_cursor_policy),
             )
         });
         if let Some((position, key)) = memo_key {
@@ -2079,16 +2373,7 @@ impl<'a> ParseContext<'a> {
         let start = self.position;
         let count = self.nodes.len();
         let result = match self.expression(&rule.expression, depth + 1) {
-            Some(fragment) => {
-                let node_id = self.nodes.len();
-                self.nodes.push(Node {
-                    rule: id,
-                    span: self.span(start),
-                    children: fragment.nodes,
-                    captures: fragment.captures,
-                });
-                Some(node_id)
-            }
+            Some(fragment) => Some(self.build_rule_node(id, start, fragment)),
             None => {
                 self.position = start;
                 self.nodes.truncate(count);
@@ -2119,6 +2404,29 @@ impl<'a> ParseContext<'a> {
         result
     }
 
+    #[inline(never)]
+    fn build_rule_node(&mut self, id: usize, start: usize, fragment: Fragment) -> usize {
+        let fragment = self.collect_classic_fragment(fragment, self.token_mode().kind);
+        let classic = fragment
+            .source
+            .as_deref()
+            .filter(|source| source.classic)
+            .cloned();
+        let node_id = self.nodes.len();
+        self.nodes.push(Node {
+            rule: id,
+            span: classic
+                .as_ref()
+                .map_or_else(|| self.span(start), |source| source.span),
+            children: fragment.nodes,
+            captures: fragment.captures,
+        });
+        if let Some(source) = classic {
+            self.mark_classic_node(node_id, &source);
+        }
+        node_id
+    }
+
     fn expression(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
         // Wrappers do not increase rule depth. Bound their active frames separately,
         // including frames retained across a custom callback or child grammar entry.
@@ -2131,11 +2439,82 @@ impl<'a> ParseContext<'a> {
         }
         self.expression_depth += 1;
         let checkpoint = self.checkpoint();
+        let parent_policy = self.match_cursor_policy;
+        // Chain sets the policy before beginning its own transaction, so a successful
+        // Sequence changes the policy for following siblings in the same owner.
+        // These built-in lexical parsers are also Chain implementations in Java.
+        if matches!(
+            expression,
+            Expr::Sequence(_)
+                | Expr::Number
+                | Expr::Identifier
+                | Expr::Quoted(_)
+                | Expr::CodeStart
+                | Expr::CodeEnd
+                | Expr::CaptureBoundary(_, _)
+        ) {
+            self.match_cursor_policy.reset = false;
+        }
+        let java_transaction = matches!(
+            expression,
+            Expr::NonOrdered(_)
+                | Expr::OwnedCapture(_, _)
+                | Expr::CaptureScope(_)
+                | Expr::MatchOnly(_)
+                | Expr::InvertMatch(_)
+                | Expr::JavaEmpty
+                | Expr::JavaLookahead { .. }
+                | Expr::JavaUntil(_)
+                | Expr::JavaOptional(_)
+                | Expr::JavaRepeat { .. }
+                | Expr::ZeroMatch(_)
+                | Expr::Choice(_)
+                | Expr::LongestChoice(_)
+                | Expr::UniqueLongestChoice(_)
+                | Expr::PredictiveChoice { .. }
+                | Expr::Recovery { .. }
+        );
+        let no_repeat_attempt = matches!(expression,
+            Expr::Repeat { min, max: Some(max), .. } | Expr::JavaRepeat { min, max: Some(max), .. }
+                if *max == 0 || *max < *min);
+        if java_transaction {
+            if !no_repeat_attempt
+                && (self.token_mode.is_some()
+                    || self.match_cursor_policy.non_ordered
+                    || matches!(
+                        expression,
+                        Expr::NonOrdered(_) | Expr::MatchOnly(_) | Expr::InvertMatch(_)
+                    ))
+                && self.match_cursor_policy.reset
+                && !matches!(
+                    expression,
+                    Expr::LongestChoice(_) | Expr::UniqueLongestChoice(_)
+                )
+            {
+                self.matched_position = self.position;
+            }
+            if matches!(expression, Expr::NonOrdered(_)) {
+                self.match_cursor_policy.non_ordered = true;
+            }
+        }
         // Recursive combinators bypass the large general dispatch frame.
         let result = match expression {
+            Expr::MatchOnly(_)
+            | Expr::InvertMatch(_)
+            | Expr::StopInvert(_)
+            | Expr::StopConsume(_) => self.classic_wrapper(expression, depth),
             Expr::Rule(rule) => self.rule(*rule, depth).map(|id| Fragment {
                 nodes: vec![id],
                 captures: Vec::new(),
+                source: self.tokens.values.get(&id).map(|value| {
+                    Box::new(FragmentSource {
+                        span: self.nodes[id].span,
+                        kind: value.kind,
+                        classic: true,
+                        generated: matches!(value.source, token::TokenSource::Generated { .. }),
+                        text: value.source.owned_shared(),
+                    })
+                }),
             }),
             Expr::LexicalContextScope { child, terminals } => {
                 self.expression_with_lexical_context(child, terminals, depth)
@@ -2147,6 +2526,7 @@ impl<'a> ParseContext<'a> {
                 self.with_trivia(*whitespace, |context| context.expression(child, depth))
             }
             Expr::Sequence(elements) => self.sequence(elements, depth),
+            Expr::NonOrdered(children) => self.non_ordered(children, depth),
             Expr::Choice(alternatives) => self.ordered_choice(alternatives.iter(), depth),
             Expr::LongestChoice(alternatives) => self.longest_choice(alternatives, depth, false),
             Expr::UniqueLongestChoice(alternatives) => {
@@ -2172,28 +2552,151 @@ impl<'a> ParseContext<'a> {
             Expr::Optional(_) | Expr::JavaOptional(_) => {
                 self.expression_optional(expression, depth)
             }
-            Expr::Repeat { .. } | Expr::JavaRepeat { .. } => {
+            Expr::Repeat { .. } | Expr::JavaRepeat { .. } | Expr::ZeroMatch(_) => {
                 self.expression_repeat(expression, depth)
             }
             Expr::Lookahead { .. } => self.expression_lookahead(expression, depth),
-            Expr::Capture(_, _) => self.expression_capture(expression, depth),
+            Expr::Capture(_, _) | Expr::OwnedCapture(_, _) => {
+                self.expression_capture(expression, depth)
+            }
+            Expr::CaptureScope(child) => self.expression_capture_scope(child, depth),
             Expr::RuleEffects { .. } => self.expression_rule_effects(expression, depth),
             Expr::CaptureEquality { .. } => self.expression_capture_equality(expression, depth),
-            Expr::TextValue(_) | Expr::ValueBoundary(_) => {
+            Expr::TextValue(_) | Expr::ValueBoundary(_) | Expr::CaptureBoundary(_, _) => {
                 self.expression_value_boundary(expression, depth)
             }
+            Expr::Character { .. } => self.classic_atom(expression, depth),
+            _ if self.token_mode.is_some() => self.classic_atom(expression, depth),
             _ => self.expression_inner(expression, depth),
         };
+        self.finish_expression(
+            expression,
+            result,
+            checkpoint,
+            parent_policy,
+            java_transaction,
+        )
+    }
+
+    // Keep source/trace post-processing out of the recursive dispatch frame.
+    #[inline(never)]
+    fn finish_expression(
+        &mut self,
+        expression: &Expr,
+        result: Option<Fragment>,
+        checkpoint: Checkpoint,
+        parent_policy: MatchCursorPolicy,
+        java_transaction: bool,
+    ) -> Option<Fragment> {
         let result = if self.resource_failure.is_some() {
             None
         } else {
-            result
+            result.map(|mut fragment| {
+                if self.token_mode.is_some() {
+                    if let Some(label) = classic_collector_label(expression) {
+                        fragment = self.classic_meta_node(fragment, self.token_mode().kind, label);
+                    }
+                    if fragment.source.is_none() {
+                        let kind = self.token_mode().kind;
+                        let anchor = if kind.is_real() {
+                            self.code_point(self.mode_cursor())
+                        } else {
+                            0
+                        };
+                        fragment.source = Some(Box::new(FragmentSource {
+                            span: Span {
+                                start: anchor,
+                                end: anchor,
+                            },
+                            kind,
+                            classic: true,
+                            generated: false,
+                            text: None,
+                        }));
+                    }
+                }
+                fragment
+            })
         };
         if result.is_none() {
+            let leaf_reset = self.token_mode.is_some_and(|mode| mode.kind.is_consumed())
+                && matches!(
+                    expression,
+                    Expr::Literal(_)
+                        | Expr::CaseInsensitive(_)
+                        | Expr::Replay(_)
+                        | Expr::Any
+                        | Expr::CharRange(_, _)
+                        | Expr::Except(_)
+                        | Expr::Character { .. }
+                        | Expr::Grapheme
+                );
+            let transparent = self.token_mode.is_some()
+                && matches!(expression, Expr::StopConsume(_) | Expr::StopInvert(_));
+            let failed_matched = self.matched_position;
             self.restore(checkpoint);
+            if self.resource_failure.is_none() {
+                if leaf_reset {
+                    self.matched_position = self.position;
+                } else if transparent {
+                    self.matched_position = failed_matched;
+                }
+                // Java Chain sets this on its owner before beginning the local
+                // transaction, so syntax failure retains it until an enclosing
+                // transaction rolls back. Resource failures keep full rollback.
+                if self.token_mode.is_some()
+                    && matches!(
+                        expression,
+                        Expr::Sequence(_) | Expr::Number | Expr::Identifier | Expr::Quoted(_)
+                    )
+                {
+                    self.match_cursor_policy.reset = false;
+                }
+                if self.token_mode.is_some()
+                    && (classic_collector_label(expression).is_some()
+                        || matches!(
+                            expression,
+                            Expr::CaptureBoundary(_, _)
+                                | Expr::Rule(_)
+                                | Expr::MatchOnly(_)
+                                | Expr::InvertMatch(_)
+                                | Expr::JavaLookahead { .. }
+                                | Expr::JavaUntil(_)
+                                | Expr::JavaEmpty
+                                | Expr::Eof
+                                | Expr::Lookahead { .. }
+                        ))
+                {
+                    self.fail_at(
+                        self.position.max(self.matched_position),
+                        classic_collector_label(expression).unwrap_or("parser"),
+                    );
+                }
+            }
         } else {
-            self.trace_expression(expression, checkpoint.position);
+            if self.token_mode.is_some()
+                && (classic_collector_label(expression).is_some()
+                    || matches!(
+                        expression,
+                        Expr::CaptureBoundary(_, _)
+                            | Expr::MatchOnly(_)
+                            | Expr::InvertMatch(_)
+                            | Expr::Rule(_)
+                            | Expr::JavaUntil(_)
+                    ))
+            {
+                if let Some(fragment) = &result {
+                    self.collect_classic_trace(checkpoint.token_trace.leaves, &fragment.nodes);
+                }
+            }
+            if self.token_mode.is_none() {
+                self.trace_expression(expression, checkpoint.position);
+            }
             self.commit_checkpoint(checkpoint);
+        }
+        // A Java transaction discards its local cursor policy on both outcomes.
+        if java_transaction {
+            self.match_cursor_policy = parent_policy;
         }
         self.expression_depth -= 1;
         result
@@ -2233,21 +2736,72 @@ impl<'a> ParseContext<'a> {
     #[inline(never)]
     fn sequence(&mut self, elements: &[Expr], depth: usize) -> Option<Fragment> {
         let mut result = Fragment::default();
-        self.skip();
+        let owner_start = self.position;
+        self.sequence_trivia(&mut result, owner_start, depth)?;
         for element in elements {
             if self.excludes(element, depth) {
                 return None;
             }
-            let mut fragment = self.expression(element, depth)?;
-            result.nodes.append(&mut fragment.nodes);
-            result.captures.append(&mut fragment.captures);
-            self.skip();
+            let child_start = self.position;
+            let fragment = self.expression(element, depth)?;
+            self.append_classic_fragment(
+                &mut result,
+                fragment,
+                self.span(child_start),
+                self.code_point(owner_start),
+            );
+            self.sequence_trivia(&mut result, owner_start, depth)?;
+        }
+        Some(result)
+    }
+
+    #[inline(never)]
+    fn non_ordered(&mut self, children: &[Expr], depth: usize) -> Option<Fragment> {
+        let mut selected = vec![false; children.len()];
+        let mut result = Fragment::default();
+        let owner_start = self.position();
+        for _ in 0..children.len() {
+            let mut found = false;
+            for (index, child) in children.iter().enumerate() {
+                if selected[index] {
+                    continue;
+                }
+                let child_start = self.position;
+                let checkpoint = self
+                    .token_mode
+                    .is_some()
+                    .then(|| Box::new(self.checkpoint()));
+                if let Some(fragment) = self.expression(child, depth) {
+                    self.finish_classic_candidate(checkpoint, true);
+                    selected[index] = true;
+                    self.append_classic_fragment(
+                        &mut result,
+                        fragment,
+                        self.span(child_start),
+                        owner_start,
+                    );
+                    found = true;
+                    break;
+                }
+                self.finish_classic_candidate(checkpoint, false);
+                if self.resource_failure.is_some() {
+                    return None;
+                }
+            }
+            if !found {
+                return None;
+            }
         }
         Some(result)
     }
 
     fn expression_inner(&mut self, expression: &Expr, _depth: usize) -> Option<Fragment> {
         match expression {
+            Expr::MatchOnly(_)
+            | Expr::InvertMatch(_)
+            | Expr::StopInvert(_)
+            | Expr::StopConsume(_)
+            | Expr::Character { .. } => unreachable!("Classic expression dispatched by expression"),
             Expr::Custom(_) | Expr::CustomWith { .. } => {
                 unreachable!("recursive expression dispatched by expression")
             }
@@ -2278,14 +2832,22 @@ impl<'a> ParseContext<'a> {
                     None
                 }
             }
-            Expr::Backreference(name) => {
-                let text = self.captured(name);
+            Expr::Backreference(name) | Expr::Replay(name) => {
+                let text = if matches!(expression, Expr::Replay(_)) {
+                    self.captured_text(name)
+                } else {
+                    self.captured(name)
+                };
                 if let Some(text) = text.filter(|text| self.remaining().starts_with(text)) {
                     self.position += text.len();
                     self.matched_position = self.position;
                     Some(Fragment::default())
                 } else {
-                    self.fail(name);
+                    if matches!(expression, Expr::Replay(_)) {
+                        self.fail(&format!("SAME_AS({name})"));
+                    } else {
+                        self.fail(name);
+                    }
                     None
                 }
             }
@@ -2393,7 +2955,7 @@ impl<'a> ParseContext<'a> {
             Expr::Optional(_) | Expr::JavaOptional(_) => {
                 unreachable!("recursive expression dispatched by expression")
             }
-            Expr::Repeat { .. } | Expr::JavaRepeat { .. } => {
+            Expr::Repeat { .. } | Expr::JavaRepeat { .. } | Expr::ZeroMatch(_) => {
                 unreachable!("recursive expression dispatched by expression")
             }
             Expr::Lookahead { .. } => unreachable!("recursive expression dispatched by expression"),
@@ -2554,6 +3116,7 @@ impl<'a> ParseContext<'a> {
             }
             Expr::Rule(_) => unreachable!("rule references are dispatched by expression"),
             Expr::Sequence(_)
+            | Expr::NonOrdered(_)
             | Expr::Choice(_)
             | Expr::LongestChoice(_)
             | Expr::UniqueLongestChoice(_)
@@ -2563,7 +3126,9 @@ impl<'a> ParseContext<'a> {
                 unreachable!("combinators are dispatched by expression")
             }
 
-            Expr::Capture(_, _) => unreachable!("recursive expression dispatched by expression"),
+            Expr::Capture(_, _) | Expr::OwnedCapture(_, _) | Expr::CaptureScope(_) => {
+                unreachable!("recursive expression dispatched by expression")
+            }
             Expr::RuleEffects { .. } => {
                 unreachable!("recursive expression dispatched by expression")
             }
@@ -2575,7 +3140,7 @@ impl<'a> ParseContext<'a> {
             | Expr::TriviaScope { .. } => {
                 unreachable!("trivia scopes are dispatched by expression")
             }
-            Expr::TextValue(_) | Expr::ValueBoundary(_) => {
+            Expr::TextValue(_) | Expr::ValueBoundary(_) | Expr::CaptureBoundary(_, _) => {
                 unreachable!("recursive expression dispatched by expression")
             }
         }
@@ -2604,9 +3169,34 @@ impl<'a> ParseContext<'a> {
                         "custom parser without explicit terminal trace contract",
                     );
                 }
-                result.ok().map(|matched| Fragment {
-                    nodes: matched.nodes,
-                    captures: matched.captures,
+                result.ok().map(|matched| {
+                    let info = matched
+                        .nodes
+                        .first()
+                        .and_then(|index| self.tokens.values.get(index));
+                    let classic = self.token_mode.is_some()
+                        || matched.nodes.iter().any(|index| {
+                            self.tokens
+                                .values
+                                .get(index)
+                                .is_some_and(|info| info.classic)
+                        });
+                    let source = classic.then(|| {
+                        Box::new(FragmentSource {
+                            span: matched.span,
+                            kind: info.map_or(self.token_mode().kind, |info| info.kind),
+                            classic: true,
+                            generated: info.is_some_and(|info| {
+                                matches!(info.source, token::TokenSource::Generated { .. })
+                            }),
+                            text: info.and_then(|info| info.source.owned_shared()),
+                        })
+                    });
+                    Fragment {
+                        nodes: matched.nodes,
+                        captures: matched.captures,
+                        source,
+                    }
                 })
             }
             _ => unreachable!("recursive expression dispatched by variant"),
@@ -2635,8 +3225,65 @@ impl<'a> ParseContext<'a> {
                     return None;
                 }
                 let start = self.position;
+                let checkpoint = self
+                    .token_mode
+                    .is_some()
+                    .then(|| Box::new(self.checkpoint()));
                 if let Some(fragment) = self.expression(child, depth) {
+                    self.finish_classic_candidate(checkpoint, true);
                     return Some(fragment);
+                }
+                self.finish_classic_candidate(checkpoint, false);
+                if self.token_mode.is_some() {
+                    let token_kind = self.token_mode().kind;
+                    let active = self.mode_cursor();
+                    self.position = active;
+                    let end = self.recovery_end(*mode, tokens);
+                    self.position = start;
+                    let end = end?;
+                    if token_kind.is_match_only() {
+                        self.matched_position = end;
+                        return Some(Fragment::default());
+                    }
+                    let span = Span {
+                        start: self.code_point(active),
+                        end: self.code_point(end),
+                    };
+                    let target = self.position() + span.end - span.start;
+                    self.position = *self.byte_offsets.get(target)?;
+                    self.matched_position = self.position;
+                    let id = self.add_token_node(
+                        RECOVERY_ERROR_RULE,
+                        token_kind,
+                        token::TokenSource::Input(span),
+                    )?;
+                    self.recoveries.push(RecoveryDiagnostic {
+                        span,
+                        message,
+                        node: id.index(),
+                    });
+                    self.mark_classic_node(
+                        id.index(),
+                        &FragmentSource {
+                            span,
+                            kind: token_kind,
+                            classic: true,
+                            generated: false,
+                            text: None,
+                        },
+                    );
+                    self.unsupported_trace("recovery");
+                    return Some(Fragment {
+                        nodes: vec![id.index()],
+                        captures: Vec::new(),
+                        source: Some(Box::new(FragmentSource {
+                            span,
+                            kind: token_kind,
+                            classic: true,
+                            generated: false,
+                            text: None,
+                        })),
+                    });
                 }
                 let end = self.recovery_end(*mode, tokens)?;
                 self.position = end;
@@ -2660,6 +3307,7 @@ impl<'a> ParseContext<'a> {
                 Some(Fragment {
                     nodes: vec![node],
                     captures: Vec::new(),
+                    source: None,
                 })
             }
             _ => unreachable!("recursive expression dispatched by variant"),
@@ -2684,6 +3332,9 @@ impl<'a> ParseContext<'a> {
                         self.nodes.truncate(count);
                         if matches!(expression, Expr::JavaOptional(_)) {
                             self.java_failed_atom(child);
+                            if self.token_mode.is_some() {
+                                return Some(Fragment::default());
+                            }
                             self.trace_empty("Optional");
                         }
                         Some(Fragment::default())
@@ -2696,56 +3347,92 @@ impl<'a> ParseContext<'a> {
 
     #[inline(never)]
     fn expression_repeat(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
-        match expression {
-            Expr::Repeat { child, min, max } | Expr::JavaRepeat { child, min, max } => {
-                let java = matches!(expression, Expr::JavaRepeat { .. });
-                if max.is_some_and(|max| max < *min) {
-                    self.fail("valid repetition bounds");
-                    return None;
-                }
-                let mut result = Fragment::default();
-                let mut iterations = 0;
-                while (java && iterations == 0) || max.is_none_or(|max| iterations < max) {
-                    let start = self.position;
-                    let count = self.nodes.len();
-                    // A skipped body takes the failure branch, including Java's
-                    // failed-atom cursor reset, exactly as an evaluated failure would.
-                    let attempt = if self.excludes(child, depth) {
-                        None
+        let (child, min, max, java, probe) = match expression {
+            Expr::Repeat { child, min, max } | Expr::JavaRepeat { child, min, max } => (
+                child.as_ref(),
+                *min,
+                *max,
+                matches!(expression, Expr::JavaRepeat { .. }),
+                false,
+            ),
+            Expr::ZeroMatch(child) => (child.as_ref(), 0, Some(0), true, true),
+            _ => unreachable!("repetition dispatched by variant"),
+        };
+        if max.is_some_and(|max| max < min) {
+            self.fail_at(
+                self.position.max(self.matched_position),
+                "valid repetition bounds",
+            );
+            return None;
+        }
+        let mut result = Fragment::default();
+        let owner_start = self.position();
+        let mut iterations = 0;
+        while (probe && iterations == 0) || max.is_none_or(|max| iterations < max) {
+            let start = self.position;
+            let progress_start = if self.token_mode.is_some() {
+                self.mode_cursor()
+            } else {
+                start
+            };
+            let count = self.nodes.len();
+            // A skipped body takes the failure branch, including Java's
+            // failed-atom cursor reset, exactly as an evaluated failure would.
+            let attempt = if self.excludes(child, depth) {
+                None
+            } else {
+                self.expression(child, depth)
+            };
+            match attempt {
+                Some(fragment) => {
+                    let progress_end = if self.token_mode.is_some() {
+                        self.mode_cursor()
                     } else {
-                        self.expression(child, depth)
+                        self.position
                     };
-                    match attempt {
-                        Some(mut fragment) => {
-                            if self.position == start && max.is_none() && !java {
-                                self.nodes.truncate(count);
-                                self.fail("progress in unbounded repetition");
-                                return None;
-                            }
-                            iterations += 1;
-                            result.nodes.append(&mut fragment.nodes);
-                            result.captures.append(&mut fragment.captures);
-                            if java && self.position == start {
-                                break;
-                            }
-                        }
-                        None => {
-                            self.position = start;
-                            self.nodes.truncate(count);
-                            if java {
-                                self.java_failed_atom(child);
-                            }
-                            break;
-                        }
+                    if progress_end == progress_start && max.is_none() && !java {
+                        self.nodes.truncate(count);
+                        self.fail("progress in unbounded repetition");
+                        return None;
+                    }
+                    iterations += 1;
+                    self.append_classic_fragment(
+                        &mut result,
+                        fragment,
+                        self.span(start),
+                        owner_start,
+                    );
+                    if java
+                        && (if self.token_mode.is_some() {
+                            self.mode_cursor()
+                        } else {
+                            self.position
+                        }) == progress_start
+                    {
+                        break;
                     }
                 }
-                if java && iterations == 0 && *min == 0 {
-                    self.trace_empty("ZeroOrMore");
+                None => {
+                    self.position = start;
+                    self.nodes.truncate(count);
+                    if java {
+                        self.java_failed_atom(child);
+                    }
+                    break;
                 }
-                (iterations >= *min && max.is_none_or(|max| iterations <= max)).then_some(result)
             }
-            _ => unreachable!("recursive expression dispatched by variant"),
         }
+        if java && iterations == 0 && min == 0 {
+            if self.token_mode.is_some() {
+                return Some(Fragment::default());
+            }
+            self.trace_empty("ZeroOrMore");
+        }
+        let accepted = iterations >= min && max.is_none_or(|max| iterations <= max);
+        if !accepted && self.token_mode.is_some() {
+            self.fail_at(self.byte_offsets[owner_start], "repetition bounds");
+        }
+        accepted.then_some(result)
     }
 
     #[inline(never)]
@@ -2754,14 +3441,21 @@ impl<'a> ParseContext<'a> {
             Expr::Lookahead { child, positive } => {
                 let checkpoint = self.checkpoint();
                 let farthest = self.farthest;
+                let classic_diagnostics = (self.classic_max_reached, self.classic_failure_seen);
                 let expected = self.expected.clone();
                 let diagnostic_frames = self.diagnostic_frames.clone();
+                let previous = self.token_mode;
+                if previous.is_some() {
+                    self.token_mode = Some(token::ParseMode::default());
+                }
                 let matched = self.expression(child, depth).is_some();
+                self.token_mode = previous;
                 self.restore(checkpoint);
                 // Successful assertions discard speculative diagnostics. A failed
                 // negative assertion retains failures explored inside its matching child.
                 if matched == *positive {
                     self.farthest = farthest;
+                    (self.classic_max_reached, self.classic_failure_seen) = classic_diagnostics;
                     self.expected = expected;
                     self.diagnostic_frames = diagnostic_frames;
                 }
@@ -2780,21 +3474,78 @@ impl<'a> ParseContext<'a> {
 
     #[inline(never)]
     fn expression_capture(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
-        match expression {
-            Expr::Capture(name, expression) => {
-                let start = self.position;
-                let mut fragment = self.expression(expression, depth)?;
-                let span = self.span(start);
-                self.captures.push(name, span);
-                fragment.captures.push(Capture {
-                    name,
-                    span: self.span(start),
-                    nodes: fragment.nodes.clone(),
-                });
-                Some(fragment)
+        let (name, child, owned) = match expression {
+            Expr::Capture(name, child) => (*name, child.as_ref(), false),
+            Expr::OwnedCapture(name, child) => (*name, child.as_ref(), true),
+            _ => unreachable!("capture dispatched by variant"),
+        };
+        let start = self.position;
+        let anchor = self.code_point(self.mode_cursor());
+        let fragment = self.expression(child, depth)?;
+        self.finish_capture(fragment, name, start, anchor, owned)
+    }
+
+    // Source construction and binding publication must not enlarge the recursive
+    // capture frame: 1024 nested wrappers still fail safely on a 2 MiB stack.
+    #[inline(never)]
+    fn finish_capture(
+        &mut self,
+        mut fragment: Fragment,
+        name: &'static str,
+        start: usize,
+        anchor: usize,
+        owned: bool,
+    ) -> Option<Fragment> {
+        let span = fragment
+            .source
+            .as_deref()
+            .filter(|source| source.classic)
+            .map_or_else(|| self.span(start), |source| source.span);
+        if !owned {
+            // Keep the existing AST field contract and its input-only metadata.
+            if fragment
+                .source
+                .as_deref()
+                .is_some_and(|source| source.text.is_some() || source.generated)
+            {
+                self.fail("AST field capture requires original input source; use capture_owned for general replay");
+                return None;
             }
-            _ => unreachable!("recursive expression dispatched by variant"),
+            self.captures.push(name, span);
+            fragment.captures.push(Capture {
+                name,
+                span,
+                nodes: fragment.nodes.clone(),
+            });
+            return Some(fragment);
         }
+        let source = match fragment.source.as_deref().filter(|source| source.classic) {
+            Some(source) if source.generated => token::TokenSource::Generated {
+                anchor: source.span.start,
+                text: source.text.as_deref().unwrap_or("").to_owned(),
+            },
+            Some(source) if source.text.is_some() => token::TokenSource::Projected {
+                span,
+                text: Arc::clone(source.text.as_ref().unwrap()),
+            },
+            Some(source) if source.kind.is_virtual() && span.start == span.end => {
+                token::TokenSource::Generated {
+                    anchor,
+                    text: String::new(),
+                }
+            }
+            _ => token::TokenSource::Input(span),
+        };
+        self.owned_captures.push(name, source);
+        Some(fragment)
+    }
+
+    #[inline(never)]
+    fn expression_capture_scope(&mut self, child: &Expr, depth: usize) -> Option<Fragment> {
+        let mark = self.owned_captures.checkpoint();
+        let result = self.expression(child, depth);
+        self.owned_captures.rollback_checkpoint(mark);
+        result
     }
 
     #[inline(never)]
@@ -2893,23 +3644,45 @@ impl<'a> ParseContext<'a> {
     #[inline(never)]
     fn expression_value_boundary(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
         match expression {
-            Expr::TextValue(child) | Expr::ValueBoundary(child) => {
+            Expr::TextValue(child)
+            | Expr::ValueBoundary(child)
+            | Expr::CaptureBoundary(_, child) => {
                 let start = self.position;
                 let fragment = self.expression(child, depth)?;
+                if let Expr::CaptureBoundary(kind, _) = expression {
+                    if self.token_mode.is_some() {
+                        let fragment = self.classic_meta_node(
+                            fragment,
+                            self.token_mode().kind,
+                            "CaptureBoundaryParser",
+                        );
+                        self.nodes[fragment.nodes[0]].rule = kind.rule();
+                        return Some(fragment);
+                    }
+                }
                 let node_id = self.nodes.len();
                 self.nodes.push(Node {
-                    rule: if matches!(expression, Expr::TextValue(_)) {
+                    rule: if let Expr::CaptureBoundary(kind, _) = expression {
+                        kind.rule()
+                    } else if matches!(expression, Expr::TextValue(_)) {
                         TEXT_VALUE_RULE
                     } else {
                         VALUE_BOUNDARY_RULE
                     },
-                    span: self.span(start),
+                    span: fragment
+                        .source
+                        .as_deref()
+                        .map_or_else(|| self.span(start), |source| source.span),
                     children: fragment.nodes,
                     captures: vec![],
                 });
+                if let Some(source) = fragment.source.as_deref() {
+                    self.mark_classic_node(node_id, source);
+                }
                 Some(Fragment {
                     nodes: vec![node_id],
                     captures: fragment.captures,
+                    source: fragment.source,
                 })
             }
             _ => unreachable!("recursive expression dispatched by variant"),
@@ -3013,6 +3786,9 @@ impl<'a> ParseContext<'a> {
         depth: usize,
         unique: bool,
     ) -> Option<Fragment> {
+        if self.token_mode.is_some() {
+            return self.classic_longest_choice(alternatives, depth, unique);
+        }
         if unique && !(2..=64).contains(&alternatives.len()) {
             self.unique_choice_failure_seen = true;
             self.fail("2 to 64 unique longest alternatives");
@@ -3047,6 +3823,11 @@ impl<'a> ParseContext<'a> {
                         nodes: self.nodes[node_start..].to_vec(),
                         captures: {
                             let mut captures = self.captures.clone();
+                            captures.commit_checkpoint();
+                            captures
+                        },
+                        owned_captures: {
+                            let mut captures = self.owned_captures.clone();
                             captures.commit_checkpoint();
                             captures
                         },
@@ -3087,6 +3868,7 @@ impl<'a> ParseContext<'a> {
             self.matched_position = winner.matched_position;
             self.nodes.extend(winner.nodes);
             self.captures = winner.captures;
+            self.owned_captures = winner.owned_captures;
             self.state = winner.state;
             self.tokens = winner.tokens;
             self.token_trace = winner.token_trace;
@@ -3110,9 +3892,18 @@ impl<'a> ParseContext<'a> {
             if self.excludes(alternative, depth) {
                 continue;
             }
+            let checkpoint = self
+                .token_mode
+                .is_some()
+                .then(|| Box::new(self.checkpoint()));
+            if self.token_mode.is_some() && self.match_cursor_policy.reset {
+                self.matched_position = self.position;
+            }
             if let Some(fragment) = self.expression(alternative, depth) {
+                self.finish_classic_candidate(checkpoint, true);
                 return Some(fragment);
             }
+            self.finish_classic_candidate(checkpoint, false);
             self.position = start;
             self.nodes.truncate(count);
         }
@@ -3127,7 +3918,10 @@ impl<'a> ParseContext<'a> {
     ) -> Option<Fragment> {
         // With structural FIRST sets the generated predictors, and the retry that guards
         // them against a conservative predictor, are unnecessary (#300).
-        if alternatives.len() != predictors.len() || self.first_sets.is_some() {
+        if self.token_mode.is_some()
+            || alternatives.len() != predictors.len()
+            || self.first_sets.is_some()
+        {
             return self.ordered_choice(alternatives.iter(), depth);
         }
         let raw = self.remaining();
@@ -3169,7 +3963,7 @@ impl<'a> ParseContext<'a> {
         let Some(table) = &self.first_sets else {
             return false;
         };
-        if self.lexical_trivia.is_some() {
+        if self.token_mode.is_some() || self.lexical_trivia.is_some() {
             return false;
         }
         if first::of(candidate, table).may_start(&self.input[self.position..], self.whitespace) {
@@ -3313,7 +4107,28 @@ impl<'a> ParseContext<'a> {
     // does not wrap that attempt in a child transaction, whereas chain/rule/capture
     // children roll themselves back. Keep this effect confined to UBNF occurrences.
     fn java_failed_atom(&mut self, child: &Expr) {
+        match child {
+            Expr::StopConsume(inner) => {
+                let previous = self.token_mode;
+                self.token_mode = Some(token::ParseMode {
+                    kind: token::TokenKind::Consumed,
+                    ..self.token_mode()
+                });
+                self.java_failed_atom(inner);
+                self.token_mode = previous;
+                return;
+            }
+            Expr::StopInvert(inner) => {
+                self.java_failed_atom(inner);
+                return;
+            }
+            _ => {}
+        }
+        if self.token_mode.is_some_and(|mode| !mode.kind.is_consumed()) {
+            return;
+        }
         if let Expr::TextValue(child)
+        | Expr::CaptureBoundary(_, child)
         | Expr::ValueBoundary(child)
         | Expr::TriviaScope { child, .. }
         | Expr::LexicalTriviaScope { child, .. }
@@ -3326,9 +4141,11 @@ impl<'a> ParseContext<'a> {
             child,
             Expr::Literal(_)
                 | Expr::CaseInsensitive(_)
+                | Expr::Replay(_)
                 | Expr::Any
                 | Expr::CharRange(_, _)
                 | Expr::Except(_)
+                | Expr::Character { .. }
         ) {
             self.matched_position = self.position;
         }
@@ -3418,13 +4235,14 @@ pub fn grammar_allows_deferred_diagnostics(rules: &[Rule]) -> bool {
 
 fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
     match expression {
-        Expr::Custom(_) => false,
+        Expr::Custom(_) | Expr::Character { .. } => false,
         Expr::CustomWith {
             reads_diagnostics,
             replayable,
             ..
         } => !reads_diagnostics && *replayable,
         Expr::Sequence(children)
+        | Expr::NonOrdered(children)
         | Expr::Choice(children)
         | Expr::LongestChoice(children)
         | Expr::UniqueLongestChoice(children) => {
@@ -3433,11 +4251,19 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
         Expr::PredictiveChoice { alternatives, .. } => alternatives
             .iter()
             .all(expression_allows_deferred_diagnostics),
-        Expr::Capture(_, child)
+        Expr::MatchOnly(child)
+        | Expr::InvertMatch(child)
+        | Expr::StopInvert(child)
+        | Expr::StopConsume(child)
+        | Expr::OwnedCapture(_, child)
+        | Expr::CaptureScope(child)
+        | Expr::Capture(_, child)
         | Expr::TextValue(child)
+        | Expr::CaptureBoundary(_, child)
         | Expr::ValueBoundary(child)
         | Expr::Optional(child)
         | Expr::JavaOptional(child)
+        | Expr::ZeroMatch(child)
         | Expr::Repeat { child, .. }
         | Expr::JavaRepeat { child, .. }
         | Expr::Lookahead { child, .. }
@@ -3470,6 +4296,7 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
         | Expr::JavaEmpty
         | Expr::JavaUntil(_)
         | Expr::Error(_)
+        | Expr::Replay(_)
         | Expr::Backreference(_) => true,
     }
 }
@@ -3509,9 +4336,17 @@ fn memo_safe_rules(rules: &[Rule]) -> Vec<bool> {
 
 fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>) -> bool {
     match expression {
+        Expr::MatchOnly(_)
+        | Expr::InvertMatch(_)
+        | Expr::StopInvert(_)
+        | Expr::StopConsume(_)
+        | Expr::Character { .. } => false,
         Expr::Custom(_)
         | Expr::CustomWith { .. }
+        | Expr::Replay(_)
         | Expr::Backreference(_)
+        | Expr::OwnedCapture(_, _)
+        | Expr::CaptureScope(_)
         | Expr::CaptureEquality { .. }
         | Expr::NamePredicate { .. }
         | Expr::NameResolutionScope { .. }
@@ -3521,6 +4356,7 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>) -> bo
             true
         }
         Expr::Sequence(children)
+        | Expr::NonOrdered(children)
         | Expr::Choice(children)
         | Expr::LongestChoice(children)
         | Expr::UniqueLongestChoice(children) => children
@@ -3531,9 +4367,11 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>) -> bo
             .all(|child| expression_is_memo_safe(child, references)),
         Expr::Capture(_, child)
         | Expr::TextValue(child)
+        | Expr::CaptureBoundary(_, child)
         | Expr::ValueBoundary(child)
         | Expr::Optional(child)
         | Expr::JavaOptional(child)
+        | Expr::ZeroMatch(child)
         | Expr::Repeat { child, .. }
         | Expr::JavaRepeat { child, .. }
         | Expr::Lookahead { child, .. }
@@ -4673,4 +5511,152 @@ mod parse_bindings_tests {
         assert!(a.binding_values("missing").is_empty());
         assert!(ParseContext::new("𠮷").binding_values("words").is_empty());
     }
+}
+
+fn classic_collector_label(expression: &Expr) -> Option<&'static str> {
+    match expression {
+        Expr::Sequence(_) => Some("Chain"),
+        Expr::NonOrdered(_) => Some("NonOrdered"),
+        Expr::Recovery { .. } => Some("SyncPointRecoveryParser"),
+        Expr::Choice(_) | Expr::PredictiveChoice { .. } => Some("Choice"),
+        Expr::LongestChoice(_) => Some("LongestChoice"),
+        Expr::UniqueLongestChoice(_) => Some("UniqueLongestChoice"),
+        Expr::Optional(_) | Expr::JavaOptional(_) => Some("Optional"),
+        Expr::Repeat {
+            min: 0, max: None, ..
+        }
+        | Expr::JavaRepeat {
+            min: 0, max: None, ..
+        } => Some("ZeroOrMore"),
+        Expr::Repeat {
+            min: 1, max: None, ..
+        }
+        | Expr::JavaRepeat {
+            min: 1, max: None, ..
+        } => Some("OneOrMore"),
+        Expr::Repeat { .. } | Expr::JavaRepeat { .. } | Expr::ZeroMatch(_) => Some("Occurs"),
+        Expr::CodeStart => Some("CodeStartParser"),
+        Expr::CodeEnd => Some("CodeEndParser"),
+        Expr::Number => Some("NumberParser"),
+        Expr::Identifier => Some("IdentifierParser"),
+        Expr::Quoted('\'') => Some("SingleQuotedParser"),
+        Expr::Quoted('"') => Some("DoubleQuotedParser"),
+        _ => None,
+    }
+}
+
+/// Small inline work lists keep ordinary parser entries allocation-free. Very
+/// deep/wide rule graphs can spill without recursion or a fixed analysis limit.
+struct ClassicModeScan<'a> {
+    siblings: [Option<std::slice::Iter<'a, Expr>>; 32],
+    depth: usize,
+    overflow: Vec<std::slice::Iter<'a, Expr>>,
+    rules: [usize; 64],
+    rule_count: usize,
+    extra_rules: std::collections::BTreeSet<usize>,
+}
+impl<'a> ClassicModeScan<'a> {
+    fn new() -> Self {
+        Self {
+            siblings: std::array::from_fn(|_| None),
+            depth: 0,
+            overflow: Vec::new(),
+            rules: [0; 64],
+            rule_count: 0,
+            extra_rules: Default::default(),
+        }
+    }
+    fn children(&mut self, children: &'a [Expr]) -> Option<&'a Expr> {
+        let (first, rest) = children.split_first()?;
+        if !rest.is_empty() {
+            if self.depth < self.siblings.len() && self.overflow.is_empty() {
+                self.siblings[self.depth] = Some(rest.iter());
+                self.depth += 1;
+            } else {
+                self.overflow.push(rest.iter());
+            }
+        }
+        Some(first)
+    }
+    fn next(&mut self) -> Option<&'a Expr> {
+        while let Some(last) = self.overflow.last_mut() {
+            if let Some(next) = last.next() {
+                return Some(next);
+            }
+            self.overflow.pop();
+        }
+        while self.depth > 0 {
+            if let Some(next) = self.siblings[self.depth - 1].as_mut().unwrap().next() {
+                return Some(next);
+            }
+            self.depth -= 1;
+            self.siblings[self.depth] = None;
+        }
+        None
+    }
+    fn visit_rule(&mut self, id: usize) -> bool {
+        if self.rules[..self.rule_count].contains(&id) {
+            return false;
+        }
+        if self.rule_count < self.rules.len() {
+            self.rules[self.rule_count] = id;
+            self.rule_count += 1;
+            true
+        } else {
+            self.extra_rules.insert(id)
+        }
+    }
+}
+#[inline(never)]
+fn requires_classic_mode<'a>(expression: &'a Expr, rules: &'a [Rule]) -> bool {
+    let mut scan = ClassicModeScan::new();
+    let mut current = Some(expression);
+    while let Some(expression) = current.take().or_else(|| scan.next()) {
+        current = match expression {
+            Expr::ZeroMatch(_)
+            | Expr::OwnedCapture(_, _)
+            | Expr::Replay(_)
+            | Expr::CaptureScope(_)
+            | Expr::MatchOnly(_)
+            | Expr::InvertMatch(_)
+            | Expr::StopInvert(_)
+            | Expr::StopConsume(_)
+            | Expr::Character { .. } => return true,
+            Expr::Rule(id) => {
+                if scan.visit_rule(*id) {
+                    rules.get(*id).map(|rule| &rule.expression)
+                } else {
+                    None
+                }
+            }
+            Expr::Sequence(children)
+            | Expr::NonOrdered(children)
+            | Expr::Choice(children)
+            | Expr::LongestChoice(children)
+            | Expr::UniqueLongestChoice(children)
+            | Expr::PredictiveChoice {
+                alternatives: children,
+                ..
+            } => scan.children(children),
+            Expr::Capture(_, child)
+            | Expr::TextValue(child)
+            | Expr::CaptureBoundary(_, child)
+            | Expr::ValueBoundary(child)
+            | Expr::Optional(child)
+            | Expr::JavaOptional(child)
+            | Expr::Repeat { child, .. }
+            | Expr::JavaRepeat { child, .. }
+            | Expr::Lookahead { child, .. }
+            | Expr::RuleEffects { child, .. }
+            | Expr::CaptureEquality { child, .. }
+            | Expr::NamePredicate { child, .. }
+            | Expr::NameResolutionScope { child, .. }
+            | Expr::Recovery { child, .. }
+            | Expr::TriviaScope { child, .. }
+            | Expr::LexicalTriviaScope { child, .. }
+            | Expr::LexicalContextScope { child, .. } => Some(child.as_ref()),
+            _ => None,
+        };
+    }
+    false
 }

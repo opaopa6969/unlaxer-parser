@@ -218,6 +218,31 @@ public class SelfHostingRoundTripTest {
         }
     }
 
+    @Test
+    public void testGeneratedFrontendReservesOnlyAdjacentOwnedCalls() throws Exception {
+        Parser root = (Parser) generatedParsersClass.getMethod("getRootParser").invoke(null);
+        for (String body : List.of(
+                "CAPTURE(word, 'a') SAME_AS(word)",
+                "CAPTURE_SCOPE(CAPTURE(word, ('a' | 'b')) SAME_AS(word))",
+                "CAPTURE ('a') SAME_AS // comment\n('a') CAPTURE_SCOPE\n('a')",
+                "CAPTURE_MORE('a') ns.CAPTURE('a')")) {
+            String source = "grammar OwnedSyntax { Root ::= " + body + "; }";
+            try (var context = new ParseContext(StringSource.createRootSource(source))) {
+                Parsed parsed = root.parse(context);
+                assertTrue(source, parsed.isSucceeded() && context.allConsumed());
+            }
+        }
+        for (String body : List.of("CAPTURE(name)", "CAPTURE(name,)", "CAPTURE(, 'a')",
+                "SAME_AS()", "SAME_AS(name, other)", "CAPTURE_SCOPE()", "CAPTURE_SCOPE('a', 'b')",
+                "CAPTURE(name, 'a' |)", "CAPTURE_SCOPE(| 'a')")) {
+            String source = "grammar OwnedSyntax { Root ::= " + body + "; }";
+            try (var context = new ParseContext(StringSource.createRootSource(source))) {
+                Parsed parsed = root.parse(context);
+                assertTrue(source, !parsed.isSucceeded() || !context.allConsumed());
+            }
+        }
+    }
+
     private static void collectReferenceTexts(org.unlaxer.Token token, List<String> names) {
         if (token.parser.getClass().getSimpleName().equals("QuantifiedRefParser")) {
             // The enclosing source-preserving CST may include trailing comments;

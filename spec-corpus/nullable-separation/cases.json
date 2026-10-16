@@ -1,0 +1,298 @@
+[
+  {
+    "name": "nullable-eof-pair",
+    "grammar": "grammar Nullable { @package: nullableprobe token E=EOF @root @mapping(Node, params=[items]) Root ::= E % E @items; }",
+    "cases": [
+      {
+        "input": "",
+        "success": true,
+        "consumed": 0,
+        "matched": 0,
+        "items": [
+          "",
+          ""
+        ]
+      },
+      {
+        "input": "x",
+        "success": false,
+        "consumed": 0,
+        "matched": 0
+      }
+    ]
+  },
+  {
+    "name": "nullable-empty-pair",
+    "grammar": "grammar Nullable { @package: nullableprobe token E=EMPTY @root @mapping(Node, params=[items]) Root ::= E % E @items; }",
+    "cases": [
+      {
+        "input": "",
+        "success": true,
+        "consumed": 0,
+        "matched": 0,
+        "items": [
+          "",
+          ""
+        ]
+      },
+      {
+        "input": "😀",
+        "success": true,
+        "consumed": 0,
+        "matched": 1,
+        "items": [
+          "",
+          ""
+        ]
+      },
+      {
+        "input": "😀x",
+        "success": true,
+        "consumed": 0,
+        "matched": 2,
+        "items": [
+          "",
+          ""
+        ]
+      }
+    ]
+  },
+  {
+    "name": "optional-item",
+    "grammar": "grammar Nullable { @package: nullableprobe  @root @mapping(Node, params=[items]) Root ::= ['a'] % ',' @items; }",
+    "cases": [
+      {
+        "input": "",
+        "success": true,
+        "consumed": 0,
+        "matched": 0,
+        "items": []
+      },
+      {
+        "input": "a,a,",
+        "success": true,
+        "consumed": 4,
+        "matched": 4,
+        "items": [
+          "a",
+          "a"
+        ]
+      },
+      {
+        "input": "b",
+        "success": true,
+        "consumed": 0,
+        "matched": 0,
+        "items": []
+      }
+    ]
+  },
+  {
+    "name": "nullable-separator",
+    "grammar": "grammar Nullable { @package: nullableprobe token E=EOF @root @mapping(Node, params=[items]) Root ::= 'a' % E @items; }",
+    "cases": [
+      {
+        "input": "",
+        "success": false,
+        "consumed": 0,
+        "matched": 0
+      },
+      {
+        "input": "a",
+        "success": true,
+        "consumed": 1,
+        "matched": 1,
+        "items": [
+          "a"
+        ]
+      },
+      {
+        "input": "aa",
+        "success": true,
+        "consumed": 1,
+        "matched": 1,
+        "items": [
+          "a"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "nullable-optional-pair",
+    "grammar": "grammar Nullable { @package: nullableprobe  @root @mapping(Node, params=[items]) Root ::= ['a'] % [','] @items; }",
+    "cases": [
+      {
+        "input": "",
+        "success": true,
+        "consumed": 0,
+        "matched": 0,
+        "items": []
+      },
+      {
+        "input": "aa",
+        "success": true,
+        "consumed": 2,
+        "matched": 2,
+        "items": [
+          "a",
+          "a"
+        ]
+      },
+      {
+        "input": "a,a",
+        "success": true,
+        "consumed": 3,
+        "matched": 3,
+        "items": [
+          "a",
+          "a"
+        ]
+      },
+      {
+        "input": ",",
+        "success": true,
+        "consumed": 1,
+        "matched": 1,
+        "items": []
+      }
+    ]
+  },
+  {
+    "name": "mandatory-first",
+    "grammar": "grammar Nullable { @package: nullableprobe  @root @mapping(Node, params=[items]) Root ::= 'a' % [','] @items; }",
+    "cases": [
+      {
+        "input": "",
+        "success": false,
+        "consumed": 0,
+        "matched": 0
+      },
+      {
+        "input": "aa",
+        "success": true,
+        "consumed": 2,
+        "matched": 2,
+        "items": [
+          "a",
+          "a"
+        ]
+      },
+      {
+        "input": ",a",
+        "success": false,
+        "consumed": 0,
+        "matched": 0
+      }
+    ]
+  },
+  {
+    "name": "unicode-optional-pair",
+    "grammar": "grammar Nullable { @package: nullableprobe  @root @mapping(Node, params=[items]) Root ::= ['😀'] % [':'] @items; }",
+    "cases": [
+      {
+        "input": "😀:😀",
+        "success": true,
+        "consumed": 3,
+        "matched": 3,
+        "items": [
+          "😀",
+          "😀"
+        ]
+      },
+      {
+        "input": "😀:x",
+        "success": true,
+        "consumed": 2,
+        "matched": 2,
+        "items": [
+          "😀"
+        ]
+      },
+      {
+        "input": "x",
+        "success": true,
+        "consumed": 0,
+        "matched": 0,
+        "items": []
+      }
+    ]
+  },
+  {
+    "name": "nested-repeat",
+    "grammar": "grammar Nullable { @package: nullableprobe token E=EOF @root @mapping(Node) Root ::= (E % E)*; }",
+    "cases": [
+      {
+        "input": "",
+        "success": true,
+        "consumed": 0,
+        "matched": 0
+      },
+      {
+        "input": "x",
+        "success": true,
+        "consumed": 0,
+        "matched": 0
+      }
+    ]
+  },
+  {
+    "name": "choice-rollback",
+    "grammar": "grammar Nullable { @package: nullableprobe  @root @mapping(Node) Root ::= (('a' % [',']) 'z') | 'a'; }",
+    "cases": [
+      {
+        "input": "aa",
+        "success": true,
+        "consumed": 1,
+        "matched": 1
+      },
+      {
+        "input": "aaz",
+        "success": true,
+        "consumed": 3,
+        "matched": 3
+      },
+      {
+        "input": "x",
+        "success": false,
+        "consumed": 0,
+        "matched": 0
+      }
+    ]
+  },
+  {
+    "name": "dead-zero-leading-edge",
+    "grammar": "grammar Nullable { @package: nullableprobe token E=EOF @root @mapping(Node) Root ::= ((Root{0}) % E) 'x'; }",
+    "cases": [
+      {
+        "input": "x",
+        "success": true,
+        "consumed": 1,
+        "matched": 1
+      },
+      {
+        "input": "",
+        "success": false,
+        "consumed": 0,
+        "matched": 0
+      }
+    ]
+  },
+  {
+    "name": "outer-min-two",
+    "grammar": "grammar Nullable { @package: nullableprobe token E=EOF @root @mapping(Node) Root ::= (E % E){2}; }",
+    "cases": [
+      {
+        "input": "",
+        "success": false,
+        "consumed": 0,
+        "matched": 0
+      },
+      {
+        "input": "x",
+        "success": false,
+        "consumed": 0,
+        "matched": 0
+      }
+    ]
+  }
+]

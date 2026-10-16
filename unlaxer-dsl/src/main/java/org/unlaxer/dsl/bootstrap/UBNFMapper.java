@@ -24,6 +24,9 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.ChoiceBody;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GlobalSetting;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.OwnedCaptureElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.ReplayElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.CaptureScopeElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.EvalAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.InterleaveAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.KeyValuePair;
@@ -60,6 +63,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.TypeofElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.UBNFFile;
 import org.unlaxer.dsl.bootstrap.UBNFAST.WhitespaceAnnotation;
 import org.unlaxer.parser.Parser;
+import org.unlaxer.parser.elementary.SingleQuotedParser;
 
 /**
  * UBNF パースツリー（Token）を UBNFAST ノードに変換するマッパー。
@@ -545,8 +549,7 @@ public class UBNFMapper {
         // REGEX('pattern') 形式のチェック
         List<Token> regexTokens = findDescendants(token, UBNFParsers.RegexExpressionParser.class);
         if (!regexTokens.isEmpty()) {
-            String pattern = extractQuotedValue(regexTokens.get(0));
-            return new TokenDecl.Regex(name, pattern);
+            throw RegexRetirement.at(regexTokens.get(0), 5);
         }
 
         // ANY / EOF / EMPTY (parameterless) のチェック
@@ -574,6 +577,10 @@ public class UBNFMapper {
             parserClass = identifiers.size() > 1
                 ? firstWord(identifiers.get(1).source.toString())
                 : "";
+        }
+        if (RegexRetirement.legacyClass(parserClass)) {
+            Token origin = qualifiedTokens.isEmpty() ? identifiers.get(1) : qualifiedTokens.get(0);
+            throw RegexRetirement.at(origin, parserClass.codePointCount(0, parserClass.length()));
         }
         if (parserClass.equals("XID_IDENTIFIER")) {
             return new TokenDecl.Declarative(name, org.unlaxer.dsl.runtime.LexicalExpression.leaf(
@@ -720,31 +727,22 @@ public class UBNFMapper {
     }
 
     private EvalAnnotation mapEvalAnnotation(Token token) {
-        // Collect all SingleQuotedParser descendants for positional values
-        List<Token> quoted = findDescendants(
-            token, org.unlaxer.parser.elementary.SingleQuotedParser.class);
-
-        // First quoted value is the 'kind'
-        String kind = quoted.size() > 0 ? stripQuotes(quoted.get(0).source.toString().trim()) : "";
-
-        // Second quoted value (if present) is the 'strategy'
-        String strategy = quoted.size() > 1 ? stripQuotes(quoted.get(1).source.toString().trim()) : "default";
-
-        // Remaining key=value pairs from EvalParamParser children
+        List<Token> quoted = findDescendants(token, SingleQuotedParser.class);
+        String kind = stripQuotes(quoted.get(0).source.toString().trim());
+        String strategy = null;
         Map<String, String> params = new LinkedHashMap<>();
-        List<Token> evalParams = findDescendants(token, UBNFParsers.EvalParamParser.class);
-        for (Token paramToken : evalParams) {
-            List<Token> ids = findDescendants(paramToken, UBNFParsers.IdentifierParser.class);
-            List<Token> vals = findDescendants(
-                paramToken, org.unlaxer.parser.elementary.SingleQuotedParser.class);
-            if (!ids.isEmpty() && !vals.isEmpty()) {
-                String key = ids.get(0).source.toString().trim();
-                String value = stripQuotes(vals.get(0).source.toString().trim());
-                params.put(key, value);
+        for (Token paramToken : findDescendants(token, UBNFParsers.EvalParamParser.class)) {
+            String key = findDescendants(paramToken, UBNFParsers.IdentifierParser.class)
+                .get(0).source.toString().trim();
+            String value = stripQuotes(findDescendants(paramToken, SingleQuotedParser.class)
+                .get(0).source.toString().trim());
+            if (key.equals("kind") || params.containsKey(key) || (key.equals("strategy") && strategy != null)) {
+                throw new IllegalArgumentException("duplicate @eval argument " + key);
             }
+            if (key.equals("strategy")) strategy = value;
+            else params.put(key, value);
         }
-
-        return new EvalAnnotation(kind, strategy, Map.copyOf(params));
+        return new EvalAnnotation(kind, strategy == null ? "default" : strategy, Map.copyOf(params));
     }
 
     WhitespaceAnnotation toWhitespaceAnnotation(Token token) {
@@ -1125,7 +1123,7 @@ public class UBNFMapper {
 
     Optional<TypeofElement> findTypeofConstraintInAnnotatedElement(Token token) {
         // AnnotatedElementParser のプレフィックス Optional 内の TypeofElementParser を探す
-        List<Token> typeofTokens = findDescendants(token, UBNFParsers.TypeofElementParser.class);
+        List<Token> typeofTokens = findAtElementLevel(token, UBNFParsers.TypeofElementParser.class);
         if (typeofTokens.isEmpty()) return Optional.empty();
         Token typeofToken = typeofTokens.get(0);
         List<Token> identifiers = findDescendants(typeofToken, UBNFParsers.IdentifierParser.class);
@@ -1158,6 +1156,23 @@ public class UBNFMapper {
     }
 
     private AtomicElement mapAtomicElement(Token token) {
+        var captures = findAtElementLevel(token, UBNFParsers.OwnedCaptureElementParser.class);
+        if (!captures.isEmpty()) {
+            Token call = captures.get(0);
+            String name = findAtElementLevel(call, UBNFParsers.IdentifierParser.class).get(0).source.toString().trim();
+            var bodies = findDescendants(call, UBNFParsers.ChoiceBodyParser.class);
+            return new OwnedCaptureElement(name, toChoiceBody(bodies.get(0)));
+        }
+        var replays = findAtElementLevel(token, UBNFParsers.ReplayElementParser.class);
+        if (!replays.isEmpty()) {
+            String name = findAtElementLevel(replays.get(0), UBNFParsers.IdentifierParser.class).get(0).source.toString().trim();
+            return new ReplayElement(name);
+        }
+        var scopes = findAtElementLevel(token, UBNFParsers.CaptureScopeElementParser.class);
+        if (!scopes.isEmpty()) {
+            var bodies = findDescendants(scopes.get(0), UBNFParsers.ChoiceBodyParser.class);
+            return new CaptureScopeElement(toChoiceBody(bodies.get(0)));
+        }
         // GroupElement
         List<Token> groupTokens = findAtElementLevel(token, UBNFParsers.GroupElementParser.class);
         if (false == groupTokens.isEmpty()) {
@@ -1428,7 +1443,10 @@ public class UBNFMapper {
     }
 
     private static boolean isAtomicElementParser(Class<?> clazz) {
-        return clazz == UBNFParsers.GroupElementParser.class
+        return clazz == UBNFParsers.OwnedCaptureElementParser.class
+            || clazz == UBNFParsers.ReplayElementParser.class
+            || clazz == UBNFParsers.CaptureScopeElementParser.class
+            || clazz == UBNFParsers.GroupElementParser.class
             || clazz == UBNFParsers.OptionalElementParser.class
             || clazz == UBNFParsers.RepeatElementParser.class
             || clazz == UBNFParsers.TerminalElementParser.class

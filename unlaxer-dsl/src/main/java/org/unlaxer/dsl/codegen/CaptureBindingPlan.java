@@ -1,5 +1,7 @@
 package org.unlaxer.dsl.codegen;
 
+import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
+
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -41,7 +43,7 @@ final class CaptureBindingPlan {
     }
 
     private void markSemanticValues(AtomicElement element, SemanticCardinality semantics) {
-        if (element instanceof GroupElement group) {
+        if (element instanceof TransparentElement group) {
             markSemanticValues(group.body(), semantics);
         } else if (element instanceof OptionalElement optional) {
             markSemanticItem(optional.body(), semantics);
@@ -119,7 +121,7 @@ final class CaptureBindingPlan {
     }
 
     private void visit(AtomicElement element) {
-        if (element instanceof GroupElement group) {
+        if (element instanceof TransparentElement group) {
             visit(group.body());
         } else if (element instanceof OptionalElement optional) {
             visit(optional.body());

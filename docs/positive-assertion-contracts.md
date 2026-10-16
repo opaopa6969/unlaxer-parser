@@ -6,6 +6,10 @@ Java 21.0.9 / Rust 1.85.0 で同じ原文・独立期待値を使って現行 AP
 追加した両言語 contract / retry テストは Java 17 JVM でも skip なしで検証している。
 この変更は仕様・fixture・CI の追加であり、runtime、既存 API、Classic の性能凍結を変更しない。
 
+新しい明示 API `PegLookahead` と Rust PEG assertion の共通契約は
+[Pure PEG assertions](peg-assertions.md) を参照。この文書の監査基準における
+既存 `MatchOnly` の観測と fixture は維持する。
+
 ## 使い分け
 
 Java `MatchOnly(child)` は **消費せずに matched cursor と match-only token を公開する**。
@@ -63,14 +67,14 @@ source span は半開区間で、Java の source-local index をそのまま原�
 | literal を match-only cursor で確認し、matched を進める | `MatchOnly(new WordParser(text))` | `Expr::JavaLookahead { pattern: text, positive: true }` | 非空 literal の受理・consumed/matched は共通。token 形状と native diagnostic は同一契約ではない |
 | UBNF token の `LOOKAHEAD('literal')` | 上の Java 形式へ生成 | `JavaLookahead` へ生成 | `TokenAdapterConformanceTest` が生成後の既存契約を検証。PEG `ahead()` へ置換しない |
 | 任意 child の Java match-only token / matched 公開を完全に保存 | `MatchOnly(child)` | 一般 wrapper は未提供 | literal adapter を一般 child に拡張したとは扱わない |
-| 任意 child の PEG positive assertion を完全に保存 | 一般 wrapper は未提供 | `child.ahead()` | `Not(Not(child))` は診断所有・token 等の完全な互換 API として保証しない |
+| 任意 child の PEG positive assertion | `new PegLookahead(child)` | `child.ahead()` | 新しい共通契約は [PEG assertions](peg-assertions.md)。`Not(Not(child))` へ置換しない |
 | predicate の受理結果と意味状態の rollback だけを利用 | `MatchOnly(child)` | `child.ahead()` | 両 cursor が一致して始まり、child が先読み cursor に依存しない場合の共通部分。入れ子・続く match-only を含む任意 child には拡張しない |
 
-新しい `PegAhead` Java API / 一般 `JavaMatchOnly` Rust API は今回は追加しない。
+この監査時点では新しい wrapper API は追加しなかった。後続 #545 で Java の
+明示 opt-in `PegLookahead` と共通 fixture を追加した。Rust の一般 `JavaMatchOnly`
+相当と consume/invert 伝播・replay は同 issue の未完条件として残る。
 既存 API を黙って同一化すると token を利用する Java caller や、非消費を前提とする
-Rust PEG 文法の受理結果を壊す。一方、新しい互換 wrapper は診断・CST・capture の
-完全な相互変換契約が必要で、この監査だけを根拠に追加する用途はない。
-必要になった時点で別名の opt-in API と共通 fixture を追加する。
+Rust PEG 文法を壊す。呼出し側では必要な意味を表から選んで明示的に opt-in する。
 
 [shared language call](shared-language-calls.md) の成功 child は、子自身が作った
 構文診断を caller へ漏らさない別の境界を持つ。この一般 assertion の差を理由に
