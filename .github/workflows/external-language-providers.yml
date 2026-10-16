@@ -12,6 +12,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '21.0.9'
+          overwrite-settings: false
       - uses: actions/setup-node@v4
         with:
           node-version: '20.20.0'

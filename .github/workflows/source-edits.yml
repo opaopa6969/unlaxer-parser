@@ -12,6 +12,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+          overwrite-settings: false
       - uses: dtolnay/rust-toolchain@stable
       - run: mvn -B -pl unlaxer-common,unlaxer-dsl -am test -Dtest=SourceEditsTest,ProjectRenameTest,PlaygroundCommandTest -Dsurefire.failIfNoSpecifiedTests=false
       - run: cargo test --manifest-path rust/Cargo.toml -p unlaxer-runtime --test source_edits

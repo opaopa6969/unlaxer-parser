@@ -23,6 +23,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '21.0.9'
+          overwrite-settings: false
       - uses: dtolnay/rust-toolchain@1.85.0
       - name: Run real production parsers, source mapping and existing editor compatibility
         run: python3 scripts/check-tiny-production.py target/tiny-source
