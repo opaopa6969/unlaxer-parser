@@ -550,7 +550,7 @@ fn ubnf_occurrences_distinguish_direct_atoms_and_transactional_children() {
     assert!(ParseContext::new("ab")
         .parse(&Expr::JavaEmpty.repeat(2, Some(2)))
         .is_ok());
-    for (min, max, accepted) in [(2, 2, false), (1, 2, true), (0, 0, false)] {
+    for (min, max, accepted, matched) in [(2, 2, false, 0), (1, 2, true, 1), (0, 0, true, 0)] {
         let mut context = ParseContext::new("ab");
         assert_eq!(
             context
@@ -559,8 +559,12 @@ fn ubnf_occurrences_distinguish_direct_atoms_and_transactional_children() {
             accepted
         );
         assert_eq!(context.position(), 0);
-        assert_eq!(context.matched_position(), usize::from(accepted));
+        assert_eq!(context.matched_position(), matched);
     }
+    // The former one-probe max-zero operation remains explicit.
+    assert!(ParseContext::new("ab")
+        .parse(&Expr::JavaEmpty.zero_match())
+        .is_err());
     let mut context = ParseContext::new("ab");
     context.parse(&java_ahead("a")).unwrap();
     context

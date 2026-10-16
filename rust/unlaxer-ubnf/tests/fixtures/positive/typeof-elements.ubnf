@@ -1,0 +1,11 @@
+// Supplementary scalar 😀 keeps annotation locations in CP and UTF-8 distinct.
+grammar TypeofElements {
+  @package: typeofprobe
+  @whitespace: none
+  @root @mapping(Pair, params=[left,right,whole,opt,items])
+  Root ::= '😀' @left '='
+    @typeof(left) ('a' | 'b') @right
+    @typeof(right) (@typeof(left) 'c' @nested) @whole
+    @typeof(items) [ 'd' ] @opt
+    @typeof(opt) { 'e' } @items;
+}

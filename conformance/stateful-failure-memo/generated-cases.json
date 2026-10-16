@@ -1,0 +1,69 @@
+[
+  {
+    "name": "StatefulMemo",
+    "grammar": "grammar StatefulMemo {\n  @package: memo.probe\n  @whitespace: none\n  @root @mapping(Value,params=[item]) Root ::= [Fail] [Fail] Item @item;\n  @scopeTree(mode=lexical) Fail ::= Declaration '!';\n  @declares(symbol=name) @backref(name=name) Declaration ::= '😀' @name;\n  @backref(name=text) @mapping(Item,params=[text]) Item ::= '😀?' @text;\n}",
+    "cases": [
+      {
+        "id": "mapped-after-rolled-back-declarations",
+        "input": "😀?",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "coordinates": [
+          2,
+          3,
+          5
+        ],
+        "accepted": true,
+        "itemEnd": 2,
+        "hasText": true,
+        "item": "😀?",
+        "successHit": false,
+        "failureHit": true,
+        "diagnostic": null,
+        "semantic": [
+          0,
+          1,
+          [
+            [
+              0,
+              2,
+              "未定義のシンボル: '😀?'"
+            ]
+          ]
+        ]
+      },
+      {
+        "id": "failure-retries",
+        "input": "😀x",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "itemEnd": 0,
+        "hasText": true,
+        "item": "",
+        "successHit": false,
+        "failureHit": true,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 1
+        },
+        "semantic": [
+          0,
+          0,
+          []
+        ]
+      }
+    ]
+  }
+]

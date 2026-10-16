@@ -35,7 +35,7 @@ public class TransactionalStateTest {
             Parser parser = new WordParser("x");
             ctx.begin(parser);
             ctx.registerTransactionalState(state);
-            assertEquals(1, state.checkpoints);
+            assertEquals("one transaction and one root observer boundary", 2, state.checkpoints);
             state.value = 9;
             unowned.add("not transactional");
             ctx.rollback(parser);

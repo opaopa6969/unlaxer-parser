@@ -1,0 +1,8 @@
+# id	scenario	input_utf8hex	success	consumed	matched	state	item	separator	snapshot
+normal	plain	612c61	true	3	3	8	61	2c	L@0:3:612c61[V@0:1:61[],V@2:3:61[]]
+trailing-tail-rollback	plain	612c612c	true	3	3	8	61	2c	L@0:3:612c61[V@0:1:61[],V@2:3:61[]]
+mandatory-failure	plain	62	false	0	0	7	-	-	-
+nullable-empty	empty	~	true	0	0	8	~	~	L@0:0:~[V@0:0:~[],V@0:0:~[]]
+scoped-bindings	scope	612c61	true	3	3	8	-	-	L@0:3:612c61[V@0:1:61[],V@2:3:61[]]
+choice-rollback	choice	612c613f	true	4	4	7	-	-	L@0:4:612c613f[V@0:4:612c613f[]]
+nested-mask	nested-mask	612c61	true	3	3	8	61	2c	L@0:3:612c61[V@0:1:61[],V@2:3:61[]]
