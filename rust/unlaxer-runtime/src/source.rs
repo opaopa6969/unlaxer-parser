@@ -54,13 +54,25 @@ impl Snapshot {
         Ok(self.text.chars().take(point).map(char::len_utf16).sum())
     }
     pub fn from_utf8(&self, offset: usize) -> Result<usize> {
-        (0..=self.len())
-            .find(|&point| self.utf8(point) == Ok(offset))
-            .ok_or("not a UTF-8 boundary")
+        if !self.text.is_char_boundary(offset) {
+            return Err("not a UTF-8 boundary");
+        }
+        Ok(self.text[..offset].chars().count())
     }
     pub fn from_utf16(&self, offset: usize) -> Result<usize> {
-        (0..=self.len())
-            .find(|&point| self.utf16(point) == Ok(offset))
+        let (mut units, mut point) = (0, 0);
+        for character in self.text.chars() {
+            if units == offset {
+                return Ok(point);
+            }
+            if units > offset {
+                return Err("not a UTF-16 boundary");
+            }
+            units += character.len_utf16();
+            point += 1;
+        }
+        (units == offset)
+            .then_some(point)
             .ok_or("not a UTF-16 boundary")
     }
     pub fn slice(&self, span: Span) -> Result<&str> {
@@ -99,9 +111,29 @@ impl Snapshot {
         })
     }
     pub fn from_lsp(&self, position: Position) -> Result<usize> {
-        (0..=self.len())
-            .find(|&point| self.lsp(point) == Ok(position))
-            .ok_or("not an LSP boundary")
+        // One forward scan, without allocating or rescanning candidate prefixes.
+        let mut characters = self.text.chars().peekable();
+        let (mut line, mut column, mut point) = (0, 0, 0);
+        loop {
+            if line == position.line && column == position.character {
+                return Ok(point);
+            }
+            let Some(character) = characters.next() else {
+                return Err("not an LSP boundary");
+            };
+            if character == '\r' || character == '\n' {
+                // Skip the CRLF interior, which is not an LSP boundary.
+                if character == '\r' && characters.peek() == Some(&'\n') {
+                    characters.next();
+                    point += 1;
+                }
+                line += 1;
+                column = 0;
+            } else {
+                column += character.len_utf16();
+            }
+            point += 1;
+        }
     }
 }
 fn contains(outer: Span, inner: Span) -> bool {
