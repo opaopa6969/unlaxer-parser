@@ -228,6 +228,14 @@ pub type AtomicElement = Spanned<ElementKind>;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ElementKind {
+    OwnedCapture {
+        name: String,
+        body: RuleBody,
+    },
+    Replay {
+        name: String,
+    },
+    CaptureScope(RuleBody),
     Group(RuleBody),
     Optional(RuleBody),
     Repeat(RuleBody),

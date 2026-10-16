@@ -55,7 +55,11 @@ fn body(rows: &mut Vec<(String, Span)>, p: &str, body: &RuleBody) {
 fn element(rows: &mut Vec<(String, Span)>, p: &str, elem: &AtomicElement) {
     rows.push((p.to_owned(), elem.span));
     match &elem.kind {
-        ElementKind::Group(b) | ElementKind::Optional(b) | ElementKind::Repeat(b) => {
+        ElementKind::OwnedCapture { body: b, .. }
+        | ElementKind::CaptureScope(b)
+        | ElementKind::Group(b)
+        | ElementKind::Optional(b)
+        | ElementKind::Repeat(b) => {
             body(rows, &format!("{p}.body"), b);
         }
         ElementKind::OneOrMore(e) | ElementKind::BoundedRepeat { element: e, .. } => {

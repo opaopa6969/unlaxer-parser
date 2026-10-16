@@ -161,7 +161,7 @@ fn snapshot(source: &str) -> Result<Snapshot, String> {
         return Err("Rust impact requires exactly one grammar".into());
     };
     let ir = crate::lowering::lower(grammar)?;
-    let files = unlaxer_codegen::generate(&ir).map_err(|error| error.to_string())?;
+    let files = crate::generate_grammar(grammar)?;
     let ast = files
         .iter()
         .find(|file| file.relative_path == "ast.rs")
@@ -219,7 +219,12 @@ fn build_snapshot(
             fields.push(Field {
                 name: field.name.clone(),
                 r#type: field_type,
-                cardinality: cardinality(field.cardinality),
+                cardinality: cardinality(match &field.kind {
+                    unlaxer_codegen::Kind::Nested { containers, .. } => {
+                        containers.first().copied().unwrap_or(Cardinality::One)
+                    }
+                    _ => field.cardinality,
+                }),
                 generated,
             });
         }
@@ -260,7 +265,9 @@ fn build_snapshot(
             .unwrap();
         }
         expected_method.push_str(", span: Span) -> Self::Output;");
-        if method_line != expected_method {
+        if method_line != expected_method
+            && method_line != expected_method.trim_end_matches(';').to_string() + " {"
+        {
             return Err(format!(
                 "generated evaluator declaration differs for {method_name}"
             ));
@@ -269,11 +276,181 @@ fn build_snapshot(
             name: method_name,
             return_type: "Self::Output".into(),
             parameters,
-            required: true,
+            required: method_line.ends_with(';'),
             origins: origin_list,
             generated: method_location,
         });
     }
+    for (source_rule, rule) in grammar.rules.iter().zip(&ir.rules) {
+        if rule.enum_literals.is_empty() {
+            continue;
+        }
+        let (_, generated) = declaration(ast, "ast.rs", &format!("pub enum {} {{", rule.name))?;
+        let mut variants = rule
+            .enum_literals
+            .iter()
+            .map(|text| unlaxer_codegen::enum_constant_name(text).map_err(|e| e.0))
+            .collect::<Result<Vec<_>, _>>()?;
+        variants.sort();
+        nodes.push(Node {
+            name: rule.name.clone(),
+            kind: "enum",
+            fields: Vec::new(),
+            parents: Vec::new(),
+            variants,
+            origins: vec![Origin {
+                rule: source_rule.name.clone(),
+                span: Span {
+                    start: source_rule.span.codepoint_start,
+                    end: source_rule.span.codepoint_end,
+                },
+            }],
+            generated,
+        });
+    }
+    for line in evaluator
+        .lines()
+        .filter(|line| line.starts_with("    fn ") && line.ends_with(';'))
+    {
+        let (name, args) = line[7..]
+            .split_once('(')
+            .ok_or("invalid generated method")?;
+        if methods.iter().any(|method| method.name == name) {
+            continue;
+        }
+        let (args, return_type) = args.split_once(") -> ").ok_or("invalid generated method")?;
+        let parameters = args
+            .split(", ")
+            .map(|arg| match arg {
+                "&mut self" => Ok(Parameter {
+                    name: "self".into(),
+                    r#type: "&mut Self".into(),
+                }),
+                "&self" => Ok(Parameter {
+                    name: "self".into(),
+                    r#type: "&Self".into(),
+                }),
+                _ => arg
+                    .split_once(": ")
+                    .map(|(name, ty)| Parameter {
+                        name: name.into(),
+                        r#type: ty.into(),
+                    })
+                    .ok_or("invalid generated parameter"),
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let (_, generated) = declaration(evaluator, "evaluator.rs", line)?;
+        methods.push(Method {
+            name: name.into(),
+            return_type: return_type.trim_end_matches(';').into(),
+            parameters,
+            required: true,
+            origins: grammar
+                .rules
+                .iter()
+                .map(|r| Origin {
+                    rule: r.name.clone(),
+                    span: Span {
+                        start: r.span.codepoint_start,
+                        end: r.span.codepoint_end,
+                    },
+                })
+                .collect(),
+            generated,
+        });
+    }
+    for method in &mut methods {
+        method.origins.sort_by(|a, b| a.rule.cmp(&b.rule));
+    }
+    for family in crate::common_fields::families(grammar)? {
+        let name = format!("{}Fields", crate::common_fields::rust_name(&family.name));
+        let (_, generated) = declaration(ast, "ast.rs", &format!("pub struct {name}<'a> {{"))?;
+        let mapping = ir
+            .rules
+            .iter()
+            .filter_map(|r| r.mapping.as_ref())
+            .find(|m| m.name == crate::common_fields::rust_name(&family.variants[0]))
+            .ok_or("missing family member")?;
+        let mut fields = Vec::new();
+        for field_name in &family.fields {
+            let field = mapping
+                .fields
+                .iter()
+                .find(|f| &f.name == field_name)
+                .ok_or("missing family field")?;
+            let ty = format!("&'a {}", ast_field_type(field));
+            let needle = format!("r#{}: {ty}", field.name);
+            // Search inside this view, not another family's field with the same signature.
+            let start = ast
+                .find(&format!("pub struct {name}<'a> {{"))
+                .ok_or("missing view")?;
+            let offset = start + ast[start..].find(&needle).ok_or("missing field")?;
+            let prefix = &ast[..offset];
+            let line = prefix.bytes().filter(|b| *b == b'\n').count() + 1;
+            let line_start = prefix.rfind('\n').map_or(0, |v| v + 1);
+            fields.push(Field {
+                name: field.name.clone(),
+                r#type: ty,
+                cardinality: cardinality(match &field.kind {
+                    unlaxer_codegen::Kind::Nested { containers, .. } => {
+                        containers.first().copied().unwrap_or(Cardinality::One)
+                    }
+                    _ => field.cardinality,
+                }),
+                generated: Location {
+                    path: "ast.rs".into(),
+                    span: Span {
+                        start: prefix.chars().count(),
+                        end: prefix.chars().count() + needle.chars().count(),
+                    },
+                    line,
+                    column: ast[line_start..offset].chars().count() + 1,
+                },
+            });
+        }
+        let rule = grammar
+            .rules
+            .iter()
+            .find(|r| r.name == family.rule)
+            .ok_or("missing family source")?;
+        let origins = vec![Origin {
+            rule: rule.name.clone(),
+            span: Span {
+                start: rule.span.codepoint_start,
+                end: rule.span.codepoint_end,
+            },
+        }];
+        let mut variants: Vec<_> = family
+            .variants
+            .iter()
+            .map(|v| crate::common_fields::rust_name(v))
+            .collect();
+        variants.sort();
+        nodes.push(Node {
+            name: name.clone(),
+            kind: "struct",
+            fields,
+            parents: Vec::new(),
+            variants,
+            origins: origins.clone(),
+            generated,
+        });
+        let method = crate::lowering::method_name(&crate::common_fields::rust_name(&family.name))
+            .replacen("eval_", "common_", 1);
+        let (_, generated) = declaration(ast, "ast.rs", &format!("    pub fn {method}("))?;
+        methods.push(Method {
+            name: method,
+            return_type: format!("Option<{name}<'_>>"),
+            parameters: vec![Parameter {
+                name: "self".into(),
+                r#type: "&Self".into(),
+            }],
+            required: false,
+            origins,
+            generated,
+        });
+    }
+    nodes.sort_by(|a, b| a.name.cmp(&b.name));
     methods.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(Snapshot {
         grammar: grammar.name.clone(),

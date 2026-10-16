@@ -19,7 +19,7 @@ import org.unlaxer.parser.combinator.ChoiceInterface;
  * Opt-in packrat memoization table (issue #40).
  *
  * <p>Keyed by (parser identity, start consumed position, start matched position, tokenKind,
- * invertMatch, parser-visible state version). Caches the outcome of parsing a rule at a position so that the exponential
+ * invertMatch, parser-visible state version, matched-cursor reset policy). Caches the outcome of parsing a rule at a position so that the exponential
  * re-parsing of the same sub-tree under backtracking ambiguity collapses to a single attempt.
  *
  * <p>One deliberately narrow flavour, gated by immutable parse options:
@@ -38,7 +38,14 @@ public final class PackratMemoTable {
 
   /** Position component of the memo key (parser identity is the outer map key). */
   public record PositionKey(
-      int consumed, int matched, TokenKind tokenKind, boolean invertMatch, long stateVersion) {}
+      int consumed, int matched, TokenKind tokenKind, boolean invertMatch, long stateVersion,
+      boolean resetMatchedWithConsumed) {
+    /** Compatibility constructor for the historical default reset policy. */
+    public PositionKey(int consumed, int matched, TokenKind tokenKind,
+        boolean invertMatch, long stateVersion) {
+      this(consumed, matched, tokenKind, invertMatch, stateVersion, true);
+    }
+  }
 
   /** A rule outcome, including local diagnostics even when an alternative succeeded. */
   public static final class Entry {
@@ -90,6 +97,11 @@ public final class PackratMemoTable {
       table.reportEvictionUnderrun(positionKey.consumed());
     }
     Entry entry = table.get(parser, positionKey);
+    // A hit must have at least the resource budget available on the original
+    // evaluation. Shallower retries keep their existing reuse and stack rebasing.
+    if (entry != null && parseContext.activeParseDepth() > entry.diagnostic.memoParseDepth) {
+      return null;
+    }
     if (entry != null) {
       int lookback = table.highWater - positionKey.consumed();
       if (lookback > table.maxHitLookback) table.maxHitLookback = lookback;
@@ -114,7 +126,10 @@ public final class PackratMemoTable {
       boolean invertMatch, Entry entry) {
     if (entry.tokens == null) return Parsed.FAILED;
     context.startParse(parser, context, tokenKind, invertMatch);
-    context.begin(parser);
+    if (parser instanceof org.unlaxer.parser.combinator.Occurs occurs
+        && occurs.min() == 0 && occurs.max() == 0 && !occurs.isZeroMatchCheck())
+      context.beginPreservingMatched(parser);
+    else context.begin(parser);
     for (Token token : entry.tokens) context.getCurrent().getTokens().add(token.deepCopy());
     int consumeDelta = entry.endConsumed - context.getConsumedPosition().value();
     // Even a zero-width consumed token can reset a previously advanced matched cursor.
@@ -235,7 +250,8 @@ public final class PackratMemoTable {
     return new PositionKey(
         parseContext.getConsumedPosition().value(),
         parseContext.getMatchedPosition().value(),
-        tokenKind, invertMatch, parseContext.getMemoizationStateVersion());
+        tokenKind, invertMatch, parseContext.getMemoizationStateVersion(),
+        parseContext.getCurrent().isResetMatchedWithConsumed());
   }
 
   private final Map<Parser, Map<PositionKey, Entry>> entryByPositionByParser = new IdentityHashMap<>();

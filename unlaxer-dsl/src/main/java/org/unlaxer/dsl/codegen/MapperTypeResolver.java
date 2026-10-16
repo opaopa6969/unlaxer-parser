@@ -1,5 +1,7 @@
 package org.unlaxer.dsl.codegen;
 
+import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
+
 import java.util.Map;
 import org.unlaxer.dsl.bootstrap.UBNFAST;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AnnotatedElement;
@@ -38,6 +40,7 @@ class MapperTypeResolver {
 
     // inferType logic is borrowed from ASTGenerator to keep generated constructor argument types compile-safe.
     static String inferType(GrammarDecl grammar, RuleDecl rule, String fieldName) {
+        if (NestedCaptures.enabled(rule)) return NestedCaptures.javaType(NestedCaptures.field(grammar,rule,fieldName));
         return new SemanticCardinality(grammar).fieldType(rule, fieldName, inferLegacyType(grammar, rule, fieldName));
     }
 
@@ -74,8 +77,13 @@ class MapperTypeResolver {
 
     static String inferTypeFromElement(GrammarDecl grammar, AtomicElement element) {
         String astClassName = grammar.name() + "AST";
+        if (element instanceof org.unlaxer.dsl.bootstrap.UBNFAST.ReplayElement) return "String";
         if (element instanceof TerminalElement ignored) {
             return "String";
+        }
+        if (element instanceof RuleRefElement || element instanceof TransparentElement) {
+            var enumType=EnumSchema.enumType(grammar,element);
+            if(enumType.isPresent()) return grammar.name()+"AST."+enumType.get();
         }
         if (element instanceof RuleRefElement ruleRefElement) {
             if (grammar.rules().stream().anyMatch(r -> r.name().equals(ruleRefElement.name())
@@ -126,7 +134,7 @@ class MapperTypeResolver {
             String inner = inferTypeFromElement(grammar, sep.element());
             return "List<" + boxedType(inner) + ">";
         }
-        if (element instanceof GroupElement ignored) {
+        if (element instanceof TransparentElement ignored) {
             return "Object";
         }
         if (element instanceof ErrorElement ignored) {
@@ -245,7 +253,7 @@ class MapperTypeResolver {
         if (element instanceof UBNFAST.SeparatedElement separated) {
             return findCapturedTypesInAtomic(separated.element(), captureName, inOptional, true);
         }
-        if (element instanceof GroupElement groupElement) {
+        if (element instanceof TransparentElement groupElement) {
             return findCapturedTypesInBody(groupElement.body(), captureName, inOptional, inRepeat);
         }
         return List.of();

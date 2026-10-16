@@ -32,9 +32,21 @@ fn ordered_unicode_docs_are_metadata_not_recognition() {
             .unwrap()
             .content;
         if file.relative_path == "parser.rs" {
-            assert!(annotated.starts_with(&file.content));
+            assert_eq!(
+                without_documentation(&file.content),
+                without_documentation(annotated)
+            );
         } else {
             assert_eq!(&file.content, annotated);
         }
     }
+}
+
+fn without_documentation(source: &str) -> String {
+    let mut source = source.to_owned();
+    while let Some(start) = source.find("\n/// Ordered rule documentation;") {
+        let end = start + source[start..].find("\n];\n").unwrap() + 4;
+        source.replace_range(start..end, "");
+    }
+    source
 }

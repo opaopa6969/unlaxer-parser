@@ -67,11 +67,11 @@ grammar CanonicalPredictive {
         .unwrap();
     assert_eq!(
         parser.content.matches("Predictor::Literal(\"a\")").count(),
-        1
+        2 // One in the ordinary grammar and one in the opt-in preferred grammar.
     );
     assert_eq!(
         parser.content.matches("Predictor::Literal(\"b\")").count(),
-        1
+        2 // One in the ordinary grammar and one in the opt-in preferred grammar.
     );
     assert!(!parser
         .content

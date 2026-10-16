@@ -145,7 +145,8 @@ public sealed interface UBNFAST permits
         /** token NAME = CI('keyword') — case-insensitive literal match */
         record CaseInsensitive(String name, String word) implements TokenDecl {}
 
-        /** token NAME = REGEX('pattern') — regex-based multi-char token matching */
+        /** Removed syntax retained solely for migration diagnostics on directly constructed ASTs. */
+        @Deprecated
         record Regex(String name, String pattern) implements TokenDecl {}
     }
 
@@ -328,7 +329,8 @@ public sealed interface UBNFAST permits
     ) implements UBNFAST {}
 
     sealed interface AtomicElement extends UBNFAST permits
-        UBNFAST.GroupElement,
+        UBNFAST.TransparentElement,
+        UBNFAST.ReplayElement,
         UBNFAST.OptionalElement,
         UBNFAST.RepeatElement,
         UBNFAST.OneOrMoreElement,
@@ -339,7 +341,17 @@ public sealed interface UBNFAST permits
         UBNFAST.ErrorElement {}
 
     /** ( RuleBody ) */
-    record GroupElement(RuleBody body) implements AtomicElement {}
+    sealed interface TransparentElement extends AtomicElement permits
+        GroupElement, OwnedCaptureElement, CaptureScopeElement {
+        RuleBody body();
+    }
+
+    record GroupElement(RuleBody body) implements TransparentElement {}
+
+    /** General owned binding, independent of AST capture suffixes and lexical bindings. */
+    record OwnedCaptureElement(String name, RuleBody body) implements TransparentElement {}
+    record ReplayElement(String name) implements AtomicElement {}
+    record CaptureScopeElement(RuleBody body) implements TransparentElement {}
 
     /** [ RuleBody ] */
     record OptionalElement(RuleBody body) implements AtomicElement {}

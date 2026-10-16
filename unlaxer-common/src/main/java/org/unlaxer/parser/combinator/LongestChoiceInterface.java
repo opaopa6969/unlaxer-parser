@@ -22,79 +22,87 @@ public interface LongestChoiceInterface extends ChoiceInterface {
 
     @Override
     default Parsed parse(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
-        PackratMemoTable.Entry memo =
-            PackratMemoTable.lookup(parseContext, this, tokenKind, invertMatch);
-        if (memo != null) return PackratMemoTable.replay(parseContext, this, tokenKind, invertMatch, memo);
-        var memoDiagnostic = PackratMemoTable.beginFailure(parseContext, this);
-        var memoStart = PackratMemoTable.successKey(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
+        parseContext.enterParserCall();
+        try {
+            PackratMemoTable.Entry memo =
+                PackratMemoTable.lookup(parseContext, this, tokenKind, invertMatch);
+            if (memo != null) return PackratMemoTable.replay(parseContext, this, tokenKind, invertMatch, memo);
+            var memoDiagnostic = PackratMemoTable.beginFailure(parseContext, this);
+            var memoStart = PackratMemoTable.successKey(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
 
-        parseContext.startParse(this, parseContext, tokenKind, invertMatch);
-        List<Parser> children = getChildren();
-        Parser winner = null;
-        int winnerEnd = -1;
-        int start = tokenKind.isConsumed() ? parseContext.getConsumedPosition().value()
-            : parseContext.getMatchedPosition().value();
-        int ties = 0;
-        if (requiresUniqueLongestChoice() && (children.size() < 2 || children.size() > 64)) {
-            org.unlaxer.parser.ErrorMessageParser.expected("2 to 64 unique longest alternatives")
-                .parse(parseContext, tokenKind, invertMatch);
-            parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);
-            PackratMemoTable.memoizeFailure(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
-            return Parsed.FAILED;
-        }
-
-        for (Parser parser : children) {
-            parseContext.begin(this);
-            Parsed parsed = parser.parse(parseContext, tokenKind, invertMatch);
-            if (parsed.isSucceeded()) {
-                int candidateEnd = tokenKind.isConsumed()
-                    ? parseContext.getConsumedPosition().value()
-                    : parseContext.getMatchedPosition().value();
-                if (candidateEnd > winnerEnd) {
-                    winner = parser;
-                    winnerEnd = candidateEnd;
-                    ties = 1;
-                } else if (candidateEnd == winnerEnd) {
-                    ties++;
-                }
+            parseContext.startParse(this, parseContext, tokenKind, invertMatch);
+            List<Parser> children = getChildren();
+            Parser winner = null;
+            int winnerEnd = -1;
+            int start = tokenKind.isConsumed() ? parseContext.getConsumedPosition().value()
+                : parseContext.getMatchedPosition().value();
+            int ties = 0;
+            if (requiresUniqueLongestChoice() && (children.size() < 2 || children.size() > 64)) {
+                org.unlaxer.parser.ErrorMessageParser.expected("2 to 64 unique longest alternatives")
+                    .parse(parseContext, tokenKind, invertMatch);
+                parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);
+                PackratMemoTable.memoizeFailure(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
+                return Parsed.FAILED;
             }
-            parseContext.rollback(this);
-        }
 
-        if (winner != null && requiresUniqueLongestChoice() && (ties > 1 || winnerEnd == start)) {
+            for (Parser parser : children) {
+                parseContext.begin(this);
+                Parsed parsed = parser.parse(parseContext, tokenKind, invertMatch);
+                if (parsed.isSucceeded()) {
+                    int candidateEnd = tokenKind.isConsumed()
+                        ? parseContext.getConsumedPosition().value()
+                        : parseContext.getMatchedPosition().value();
+                    if (candidateEnd > winnerEnd) {
+                        winner = parser;
+                        winnerEnd = candidateEnd;
+                        ties = 1;
+                    } else if (candidateEnd == winnerEnd) {
+                        ties++;
+                    }
+                }
+                parseContext.rollback(this);
+            }
+
+            if (winner != null && requiresUniqueLongestChoice() && (ties > 1 || winnerEnd == start)) {
+                parseContext.begin(this);
+                var length = new org.unlaxer.CodePointLength(winnerEnd - start);
+                if (tokenKind.isConsumed()) parseContext.consume(length);
+                else parseContext.matchOnly(length);
+                org.unlaxer.parser.ErrorMessageParser.expected(winnerEnd == start
+                    ? "nonempty unique longest alternative" : "unique longest alternative")
+                    .parse(parseContext, tokenKind, invertMatch);
+                parseContext.rollback(this);
+                parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);
+                PackratMemoTable.memoizeFailure(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
+                return Parsed.FAILED;
+            }
+
+            if (winner == null) {
+                parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);
+                PackratMemoTable.memoizeFailure(
+                    parseContext, this, tokenKind, invertMatch, memoDiagnostic);
+                return Parsed.FAILED;
+            }
+
             parseContext.begin(this);
-            var length = new org.unlaxer.CodePointLength(winnerEnd - start);
-            if (tokenKind.isConsumed()) parseContext.consume(length);
-            else parseContext.matchOnly(length);
-            org.unlaxer.parser.ErrorMessageParser.expected(winnerEnd == start
-                ? "nonempty unique longest alternative" : "unique longest alternative")
-                .parse(parseContext, tokenKind, invertMatch);
-            parseContext.rollback(this);
-            parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);
-            PackratMemoTable.memoizeFailure(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
-            return Parsed.FAILED;
-        }
+            Parsed replayed = winner.parse(parseContext, tokenKind, invertMatch);
+            if (replayed.isSucceeded()) {
+                return PackratMemoTable.commitSuccess(parseContext, this, tokenKind, invertMatch,
+                        memoStart, memoDiagnostic, winner, replayed);
+            }
 
-        if (winner == null) {
+            // A custom parser may be non-deterministic.  Do not commit a different candidate than
+            // the one selected from the transactionally isolated trials.
+            parseContext.rollback(this);
             parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);
             PackratMemoTable.memoizeFailure(
                 parseContext, this, tokenKind, invertMatch, memoDiagnostic);
             return Parsed.FAILED;
+        } catch (RuntimeException | Error failure) {
+            parseContext.failParserCall(failure);
+            throw failure;
+        } finally {
+            parseContext.leaveParserCall();
         }
-
-        parseContext.begin(this);
-        Parsed replayed = winner.parse(parseContext, tokenKind, invertMatch);
-        if (replayed.isSucceeded()) {
-            return PackratMemoTable.commitSuccess(parseContext, this, tokenKind, invertMatch,
-                    memoStart, memoDiagnostic, winner, replayed);
-        }
-
-        // A custom parser may be non-deterministic.  Do not commit a different candidate than
-        // the one selected from the transactionally isolated trials.
-        parseContext.rollback(this);
-        parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);
-        PackratMemoTable.memoizeFailure(
-            parseContext, this, tokenKind, invertMatch, memoDiagnostic);
-        return Parsed.FAILED;
     }
 }
