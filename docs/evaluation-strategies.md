@@ -80,9 +80,9 @@ Manual/unknown methods and conversion hooks are checked by intentionally
 compiling incomplete implementations. Generated default methods appear as
 optional implementations in the API schema; required helpers remain visible.
 
-Java impact overload handling (`evalLeaf(AST.Leaf)` alongside its existing
-`evalLeaf(String)` hook) is tracked separately in #574; this change does not
-complete that existing inspection gap.
+Java impact preserves legal overloads such as `evalLeaf(AST.Leaf)` alongside
+the existing `evalLeaf(String)` hook, with separate source origins and signature
+identities. True erased-signature collisions remain errors (see #574).
 
 Existing grammars without automatic evaluation retain the old evaluator text and
 manual semantics obligations. Public parser IR layouts do not change: evaluation
