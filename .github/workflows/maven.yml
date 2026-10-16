@@ -555,3 +555,46 @@ jobs:
           tinyexpression/target/unlaxer-dependencies.txt
           tinyexpression/tools/tinyexpression-p4-lsp-vscode/target/unlaxer-dependencies.txt
         if-no-files-found: error
+
+  classic-ide:
+    name: Java and Rust packaged IDE
+    runs-on: [unlaxer-parser-ci, Linux, X64]
+    timeout-minutes: 30
+    env:
+      RUSTUP_TOOLCHAIN: 1.85.0
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        overwrite-settings: false
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    - name: Prepare Rust 1.85
+      run: |
+        export PATH="$HOME/.cargo/bin:$PATH"
+        rustup toolchain install 1.85.0 --profile minimal --component rustfmt,clippy
+        echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+    - name: Build Java server from current generators
+      run: mvn -B -pl unlaxer-common,unlaxer-dsl,unlaxer-dsl/tinycalc-vscode -am package -DskipTests -Dgpg.skip=true
+    - name: Generate Rust servers and package both backends
+      working-directory: unlaxer-dsl/tinycalc-vscode
+      run: |
+        npm ci
+        npm run build:rust
+        rustfmt --edition 2021 --config skip_children=true --check rust/src/lsp.rs rust/src/dap.rs
+        cargo clippy --locked --manifest-path rust/Cargo.toml --all-targets -- -D warnings
+        npx vsce package --allow-missing-repository --skip-license --out target/tinycalc-smoke.vsix
+    - name: Compare real packaged Java and Rust editor sessions
+      working-directory: unlaxer-dsl/tinycalc-vscode
+      run: xvfb-run -a npm run test:vsix
+    - uses: actions/upload-artifact@v4
+      with:
+        name: classic-ide-conformance
+        path: |
+          unlaxer-dsl/tinycalc-vscode/target/tinycalc-smoke.vsix
+          unlaxer-dsl/tinycalc-vscode/target/ide-java.json
+          unlaxer-dsl/tinycalc-vscode/target/ide-rust.json
+        if-no-files-found: error
