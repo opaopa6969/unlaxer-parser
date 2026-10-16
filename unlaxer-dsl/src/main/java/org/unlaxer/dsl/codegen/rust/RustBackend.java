@@ -469,7 +469,7 @@ public final class RustBackend {
         if (expression instanceof TextValue text) {
             return expression(text.child()) + ".text_value()";
         }
-        if (expression instanceof CaptureBoundary b) return "Expr::InputCaptureBoundary(unlaxer_runtime::capture_tree::Kind::"+switch(b.kind()){case VALUE->"Value";case OPTIONAL->"Optional";case LIST->"List";}+", Box::new("+expression(b.child())+"))";
+        if (expression instanceof CaptureBoundary b) return "Expr::"+(b.kind()==BoundaryKind.SEPARATOR?"CaptureBoundary":"InputCaptureBoundary")+"(unlaxer_runtime::capture_tree::Kind::"+switch(b.kind()){case VALUE->"Value";case OPTIONAL->"Optional";case LIST->"List";case SEPARATOR->"Separator";}+", Box::new("+expression(b.child())+"))";
         if (expression instanceof ValueBoundary boundary) {
             return expression(boundary.child()) + ".value_boundary()";
         }

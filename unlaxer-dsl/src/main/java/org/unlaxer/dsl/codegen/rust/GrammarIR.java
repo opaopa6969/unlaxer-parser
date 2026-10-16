@@ -124,7 +124,7 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     public record ExceptToken(String excluded) implements Expression {}
     public record UntilToken(String terminator) implements Expression {}
     public record LookaheadToken(String pattern, boolean positive) implements Expression {}
-    public enum BoundaryKind { VALUE, OPTIONAL, LIST }
+    public enum BoundaryKind { VALUE, OPTIONAL, LIST, SEPARATOR }
     public record CaptureBoundary(BoundaryKind kind, Expression child) implements Expression {}
     public record OptionalExpr(Expression child) implements Expression {}
     /** A null maximum denotes unbounded repetition. */

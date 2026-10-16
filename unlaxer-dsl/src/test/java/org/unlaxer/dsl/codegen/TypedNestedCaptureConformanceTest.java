@@ -49,11 +49,11 @@ public class TypedNestedCaptureConformanceTest extends NestedCaptureConformanceT
         assertEquals(fixture.getAsJsonObject("rustFieldTypes").getAsJsonObject("Root").get("value").getAsString(),rustField.type());
         assertEquals(javaField.cardinality(),rustField.cardinality());
     }
-    private static void boundaryRoots(org.unlaxer.Token token,java.util.List<org.unlaxer.Token> out) {
+    protected static void boundaryRoots(org.unlaxer.Token token,java.util.List<org.unlaxer.Token> out) {
         if(token.parser instanceof org.unlaxer.parser.combinator.CaptureBoundaryParser)out.add(token);
         else for(var child:token.getOriginalChildren())boundaryRoots(child,out);
     }
-    private static com.google.gson.JsonObject boundaryJson(org.unlaxer.capture.CaptureSnapshot.Element value) {
+    protected static com.google.gson.JsonObject boundaryJson(org.unlaxer.capture.CaptureSnapshot.Element value) {
         var result=new com.google.gson.JsonObject();result.addProperty("kind",value.kind().name().toLowerCase(java.util.Locale.ROOT));
         var span=new com.google.gson.JsonArray();span.add(value.startCP());span.add(value.endCP());result.add("span",span);result.addProperty("text",value.text());
         var children=new com.google.gson.JsonArray();for(var child:value.children())children.add(boundaryJson(child));result.add("children",children);return result;
@@ -69,7 +69,7 @@ public class TypedNestedCaptureConformanceTest extends NestedCaptureConformanceT
         String type=fixture.getAsJsonObject("rustFieldTypes").getAsJsonObject("Root").get("value").getAsString();
         return """
             fn boundary_json(value:&unlaxer_runtime::capture_tree::Element)->String {
-                let kind=match value.kind(){unlaxer_runtime::capture_tree::Kind::Value=>"value",unlaxer_runtime::capture_tree::Kind::Optional=>"optional",unlaxer_runtime::capture_tree::Kind::List=>"list"};
+                let kind=match value.kind(){unlaxer_runtime::capture_tree::Kind::Value=>"value",unlaxer_runtime::capture_tree::Kind::Optional=>"optional",unlaxer_runtime::capture_tree::Kind::List=>"list",unlaxer_runtime::capture_tree::Kind::Separator=>panic!("separator is not a snapshot value")};
                 format!(r#"{{"kind":{},"span":[{},{}],"text":{},"children":[{}]}}"#,unlaxer_runtime::json_string(kind),value.span().start,value.span().end,unlaxer_runtime::json_string(value.text()),value.children().iter().map(boundary_json).collect::<Vec<_>>().join(","))
             }
             trait Structure { fn structure(&self) -> String; }

@@ -6,7 +6,7 @@ import org.unlaxer.parser.Parser;
 /** Explicit nested capture CST markers; legacy capture binding/flattening is unchanged. */
 public final class CaptureBoundaryParser extends Chain {
     private static final long serialVersionUID = 1L;
-    public enum Kind { VALUE, OPTIONAL, LIST }
+    public enum Kind { VALUE, OPTIONAL, LIST, SEPARATOR }
     private final Kind kind;
     private final boolean inputOnly;
     private static final org.unlaxer.Name ORIGIN = org.unlaxer.Name.of("capture-boundary-origin");

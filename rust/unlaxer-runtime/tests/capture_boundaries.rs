@@ -36,6 +36,7 @@ fn canonical(e: &Element) -> String {
             Kind::Value => "V",
             Kind::Optional => "O",
             Kind::List => "L",
+            Kind::Separator => unreachable!("separator is not a snapshot value"),
         },
         e.span().start,
         e.span().end,

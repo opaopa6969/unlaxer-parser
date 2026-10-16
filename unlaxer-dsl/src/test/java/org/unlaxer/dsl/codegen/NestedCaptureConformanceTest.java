@@ -54,6 +54,7 @@ public class NestedCaptureConformanceTest {
     protected List<GeneratedSource> extraJavaSources(GrammarDecl grammar) { return List.of(); }
     protected Path nativeTarget() { return temporary.getRoot().toPath().resolve("native-target"); }
     protected String javaRelease() { return "17"; }
+    protected boolean javaCliParity() { return false; }
     protected String extraRustSource(JsonObject fixture) { return ""; }
     protected String extraRustBeforeDrop(JsonObject fixture) { return ""; }
     protected String extraRustObservation(JsonObject fixture) { return ""; }
@@ -101,6 +102,15 @@ public class NestedCaptureConformanceTest {
                 assertArrayEquals(name + " native frontend byte parity: " + file.relativePath(),
                     file.content().getBytes(StandardCharsets.UTF_8),
                     Files.readAllBytes(nativeGenerated.resolve(file.relativePath())));
+            }
+            if (javaCliParity()) {
+                Path javaCli = fixtureDir.resolve("java-cli-generated");
+                success(run(List.of(Path.of(System.getProperty("java.home"),"bin","java").toString(),
+                    "--enable-preview", "-cp", System.getProperty("java.class.path"),
+                    "org.unlaxer.dsl.CodegenMain", "generate", "--target", "rust", "--grammar", ubnf.toString(),
+                    "--output", javaCli.toString()), "", false));
+                for (var file : javaFrontend) assertArrayEquals(name + " Java CLI byte parity: " + file.relativePath(),
+                    file.content().getBytes(StandardCharsets.UTF_8), Files.readAllBytes(javaCli.resolve(file.relativePath())));
             }
             Path generated = Files.createDirectory(fixtureDir.resolve("generated"));
             for (var file : javaFrontend) Files.writeString(
@@ -266,7 +276,7 @@ public class NestedCaptureConformanceTest {
         return new URLClassLoader(new URL[]{output.toUri().toURL()}, getClass().getClassLoader());
     }
 
-    private JsonObject canonical(Object ast, Object mapped) throws Exception {
+    protected JsonObject canonical(Object ast, Object mapped) throws Exception {
         var result = new JsonObject();
         result.addProperty("type", canonicalType(ast));
         int[] span = (int[]) ((Optional<?>) mapped.getClass().getMethod("sourceSpanOf", Object.class)
