@@ -1029,6 +1029,8 @@ enum ExpectedIds {
 
 #[derive(Debug, Clone, Default)]
 struct FailureDiagnostic {
+    // Only memo entries use this field; diagnostic merging does not change it.
+    memo_expression_depth: usize,
     farthest: Option<usize>,
     expected: ExpectedIds,
 }
@@ -2427,17 +2429,20 @@ impl<'a> ParseContext<'a> {
         });
         if let Some((position, key)) = memo_key {
             if let Some(diagnostic) = self.failure_memo.probe(position, &key).cloned() {
-                self.memoized_failure_hits += 1;
-                self.replay_failure(&diagnostic);
-                return None;
+                // A deeper retry has less budget and must execute its guards.
+                // Shallower retries retain the existing diagnostic/memo reuse.
+                if self.expression_depth <= diagnostic.memo_expression_depth {
+                    self.memoized_failure_hits += 1;
+                    self.replay_failure(&diagnostic);
+                    return None;
+                }
             }
         }
         let success_key = memo_key.filter(|_| self.token_trace.is_none());
         if let Some((position, key)) = success_key {
             if let Some(entry) = self.success_memo.probe(position, &key).cloned() {
-                // Same remaining expression budget: never hide an OFF-mode resource
-                // failure by skipping recursive frames from a shallower invocation.
-                if entry.expression_depth == self.expression_depth {
+                // Reuse only with at least the original expression budget.
+                if self.expression_depth <= entry.expression_depth {
                     self.memoized_success_hits += 1;
                     return Some(self.replay_success(&entry));
                 }
@@ -2486,6 +2491,8 @@ impl<'a> ParseContext<'a> {
                         self.memoize_success(position, key, count, root, capture_mark, diagnostic);
                     }
                 } else {
+                    let mut diagnostic = diagnostic;
+                    diagnostic.memo_expression_depth = self.expression_depth;
                     self.failure_memo
                         .insert(position / FAILURE_MEMO_BUCKET_SIZE, key, diagnostic);
                 }
@@ -5067,6 +5074,7 @@ mod tests {
             deferred.replay_failure(&FailureDiagnostic {
                 farthest: Some(input.len()),
                 expected: ExpectedIds::Single(123),
+                ..FailureDiagnostic::default()
             });
             assert_eq!(deferred.farthest, 0);
             assert!(deferred.expected.is_empty());
