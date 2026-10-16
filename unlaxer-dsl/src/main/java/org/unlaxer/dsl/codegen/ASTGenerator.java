@@ -66,6 +66,7 @@ public class ASTGenerator implements CodeGenerator {
     public GeneratedSource generate(GrammarDecl grammar) {
         CommonFieldSchema.build(grammar);
         EnumSchema.validate(grammar);
+        TypeofConstraints.validate(grammar);
         var enumRoots = EnumSchema.rootEnums(grammar);
         String packageName = getPackageName(grammar);
         String grammarName = grammar.name();

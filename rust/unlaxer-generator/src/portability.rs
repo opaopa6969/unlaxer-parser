@@ -329,11 +329,6 @@ impl Inventory {
     fn body(&mut self, body: &RuleBody) {
         for sequence in &body.alternatives {
             for annotated in &sequence.elements {
-                if let (Some(name), Some(span)) =
-                    (&annotated.typeof_constraint, annotated.typeof_span)
-                {
-                    self.add("P-TYPEOF", name, span);
-                }
                 self.element(&annotated.element);
             }
         }

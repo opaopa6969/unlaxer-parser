@@ -417,6 +417,11 @@ class MapperRuleEmitter {
                 continue;
             }
 
+            for (RuleDecl constrained : allMappingRules.getOrDefault(className, List.of())) {
+                emitTypeofChecks(w, grammar, parsersClass, constrained,
+                    mappedClassByRuleName, tokenDeclByName, ruleByName);
+            }
+
             List<RuleDecl> sumVariants = MappingShape.sumVariants(grammar, rule, mapping);
             if (!sumVariants.isEmpty()) {
                 emitSumMappingBody(w, parsersClass, className, sumVariants);
@@ -867,6 +872,43 @@ class MapperRuleEmitter {
             mappedClassByRuleName, tokenDeclByName, ruleByName);
     }
 
+    private static void emitTypeofChecks(IndentedWriter w, GrammarDecl grammar, String parsersClass,
+            RuleDecl rule, Map<String, String> mappedClassByRuleName,
+            Map<String, TokenDecl> tokenDeclByName, Map<String, RuleDecl> ruleByName) {
+        var constraints = TypeofConstraints.collect(rule);
+        if (constraints.isEmpty()) return;
+        w.line("if (token.parser.getClass() == " + parsersClass + "." + rule.name() + "Parser.class) {");
+        w.indent();
+        var bindings = new CaptureBindingPlan(rule);
+        var names = new LinkedHashMap<String, String>();
+        var captures = new java.util.LinkedHashSet<>(MapperElementUtil.getMappingAnnotation(rule).orElseThrow().paramNames());
+        captures.addAll(TypeofConstraints.captures(rule));
+        for (String capture : captures) {
+            String local = "__typeofValue" + names.size();
+            names.put(capture, local);
+            String type = TypeofConstraints.valueType(grammar, rule, capture);
+            emitBoundParam(w, parsersClass, grammar, local, type, bindings.sites(capture),
+                mappedClassByRuleName, tokenDeclByName, ruleByName);
+        }
+        for (var constraint : constraints) {
+            String own = names.get(constraint.capture());
+            String ref = names.get(constraint.reference());
+            String ids = bindings.sites(constraint.capture()).stream()
+                .map(site -> "\"" + ParserCodegenUtil.escapeString(site.id()) + "\"")
+                .collect(java.util.stream.Collectors.joining(", "));
+            w.line("if (" + ref + " != null && " + own + " != null && !semanticType(" + ref + ").equals(semanticType(" + own + "))) {");
+            w.indent();
+            w.line("int[] at = typeofSpan(token, java.util.Set.of(" + ids + "), " + own + ");");
+            w.line("throw new java.lang.IllegalArgumentException(\"@typeof constraint violated: "
+                + constraint.capture() + " must be same type as " + constraint.reference()
+                + ", expected \" + semanticType(" + ref + ").getSimpleName() + \" but got \" + semanticType(" + own + ").getSimpleName() + \" at CP \" + at[0] + \":\" + at[1]);");
+            w.dedent();
+            w.line("}");
+        }
+        w.dedent();
+        w.line("}");
+    }
+
     private static void emitPlainMappingResolution(IndentedWriter w, GrammarDecl grammar,
             String astClass, String parsersClass, String className,
             RuleDecl rule, MappingAnnotation mapping,
@@ -874,8 +916,6 @@ class MapperRuleEmitter {
             Map<String, TokenDecl> tokenDeclByName, Map<String, RuleDecl> ruleByName) {
 
         CaptureBindingPlan bindings = new CaptureBindingPlan(rule);
-        // Collect @typeof constraints: ownCaptureName -> referencedCaptureName
-        Map<String, String> typeofConstraints = MapperElementUtil.collectTypeofConstraints(rule.body());
         for (String param : mapping.paramNames()) {
             String type = SharedPlainSchema.fieldType(grammar, rule, param)
                 .orElseGet(() -> MapperTypeResolver.inferType(grammar, rule, param));
@@ -888,21 +928,6 @@ class MapperRuleEmitter {
 
             emitBoundParam(w, parsersClass, grammar, param, type, bindings.sites(param),
                 mappedClassByRuleName, tokenDeclByName, ruleByName);
-        }
-        // An occurrence wrapper keeps source identity, while @typeof compares value identity.
-        boolean enumOccurrences = grammar.rules().stream().anyMatch(EnumSchema::isEnum);
-        for (Map.Entry<String, String> constraint : typeofConstraints.entrySet()) {
-            String ownCapture = constraint.getKey();
-            String refCapture = constraint.getValue();
-            String ownType = enumOccurrences ? "semanticType(" + ownCapture + ")" : ownCapture + ".getClass()";
-            String refType = enumOccurrences ? "semanticType(" + refCapture + ")" : refCapture + ".getClass()";
-            w.line("if (" + refCapture + " != null && " + ownCapture + " != null && !" + refType + ".equals(" + ownType + ")) {");
-            w.indent();
-            w.line("throw new IllegalArgumentException(\"@typeof constraint violated: "
-                + ownCapture + " must be same type as " + refCapture + ", expected \" + "
-                + refType + ".getSimpleName() + \" but got \" + " + ownType + ".getSimpleName());");
-            w.dedent();
-            w.line("}");
         }
         w.line(astClass + "." + className + " mapped = new "
             + astClass + "." + className + "(");

@@ -24,6 +24,7 @@ public class MapperGenerator implements CodeGenerator {
     public GeneratedSource generate(GrammarDecl grammar) {
         CommonFieldSchema.build(grammar);
         EnumSchema.validate(grammar);
+        TypeofConstraints.validate(grammar);
         var enumRoots = EnumSchema.rootEnums(grammar);
         String packageName = getPackageName(grammar);
         String grammarName = grammar.name();
@@ -159,8 +160,28 @@ public class MapperGenerator implements CodeGenerator {
         sb.append(MapperRuleEmitter.emitMapTransparentValue(astClass,
             grammar.rules().stream().anyMatch(MapperElementUtil::isSkipped), grammar.rules().stream().anyMatch(EnumSchema::isEnum)));
 
+        boolean hasTypeof = grammar.rules().stream().anyMatch(rule -> !TypeofConstraints.collect(rule).isEmpty());
+        if (hasTypeof || grammar.rules().stream().anyMatch(EnumSchema::isEnum)) {
+            sb.append("    private static Class<?> semanticType(Object value) {\n");
+            if (grammar.rules().stream().anyMatch(EnumSchema::isEnum))
+                sb.append("        if (value instanceof ").append(astClass).append(".EnumValue item) return item.value().getDeclaringClass();\n");
+            sb.append("        if (value instanceof java.util.List<?>) return java.util.List.class;\n")
+                .append("        if (value instanceof java.util.Optional<?>) return java.util.Optional.class;\n")
+                .append("        return value instanceof Enum<?> item ? item.getDeclaringClass() : value.getClass();\n    }\n\n");
+        }
+        if (hasTypeof) {
+            sb.append("    private static int[] typeofSpan(Token token, java.util.Set<String> bindings, Object value) {\n")
+                .append("        int start = Integer.MAX_VALUE, end = -1;\n")
+                .append("        boolean empty = value instanceof List<?> list && list.isEmpty() || value instanceof Optional<?> option && option.isEmpty();\n")
+                .append("        for (CaptureOccurrence occurrence : empty ? java.util.List.<CaptureOccurrence>of() : findCaptureOccurrences(token, bindings)) {\n")
+                .append("            Token site = occurrence.token();\n")
+                .append("            int at = site.source.offsetFromRoot().value();\n")
+                .append("            start = Math.min(start, at); end = Math.max(end, at + site.source.codePointLength().value());\n")
+                .append("        }\n")
+                .append("        if (end < 0) { start = token.source.offsetFromRoot().value(); end = start + token.source.codePointLength().value(); }\n")
+                .append("        return new int[]{start, end};\n    }\n\n");
+        }
         if (grammar.rules().stream().anyMatch(EnumSchema::isEnum)) {
-            sb.append("    private static Class<?> semanticType(Object value) {\n        return value instanceof ").append(astClass).append(".EnumValue item ? item.value().getDeclaringClass() : value.getClass();\n    }\n\n");
             sb.append("    private static Object directEnumValue(Token token) {\n        if (token == null) return null;\n");
             for (RuleDecl rule : grammar.rules()) if (EnumSchema.isEnum(rule)) sb.append("        if (token.parser instanceof ")
                 .append(parsersClass).append(".").append(rule.name()).append("Parser) return registerNodeSourceSpan(new ")

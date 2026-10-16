@@ -149,6 +149,19 @@ pub(super) fn validate(ir: &GrammarIr) -> Result<(), GenerateError> {
     let mut mappings = BTreeMap::new();
     let mut methods = BTreeMap::new();
     for rule in &ir.rules {
+        if !rule.type_constraints.is_empty() && (rule.skip || !rule.enum_literals.is_empty()) {
+            return Err(fail(
+                "E-TYPEOF-MAPPING: @typeof requires a non-skipped @mapping rule",
+            ));
+        }
+        if !rule.type_constraints.is_empty()
+            && rule.mapping.is_none()
+            && !transparent_constraint_projection(&rule.body)
+        {
+            return Err(fail(
+                "E-TYPEOF-MAPPING: transparent guard must project a single mapped-sum alternative",
+            ));
+        }
         // Rule names are diagnostic labels, not emitted Rust identifiers.
         // References use numeric indices, so frontend identifiers such as
         // `_Root` and Rust keywords must remain valid here.
@@ -162,6 +175,34 @@ pub(super) fn validate(ir: &GrammarIr) -> Result<(), GenerateError> {
         expression(&rule.body, ir.rules.len(), &mut captures)?;
         if rule.skip && rule.mapping.is_some() {
             return Err(fail(format!("skipped rule has mapping: {}", rule.name)));
+        }
+        let mut constraint_fields = BTreeMap::new();
+        for constraint in &rule.type_constraints {
+            for value in [&constraint.capture, &constraint.reference] {
+                identifier(&value.name)?;
+                if constraint_fields
+                    .insert(&value.name, value)
+                    .is_some_and(|old| old != value)
+                {
+                    return Err(fail("E-TYPEOF: inconsistent constraint field"));
+                }
+                if !captures.contains(&value.name) {
+                    return Err(fail("E-TYPEOF-UNKNOWN-CAPTURE: undeclared capture"));
+                }
+                if let Kind::Enum(name) = &value.kind {
+                    if !enum_names.contains(name.as_str()) {
+                        return Err(fail("E-TYPEOF: unknown enum value type"));
+                    }
+                }
+                if rule.mapping.as_ref().is_some_and(|mapping| {
+                    mapping
+                        .fields
+                        .iter()
+                        .any(|field| field.name == value.name && field != value)
+                }) {
+                    return Err(fail("E-TYPEOF: constraint differs from bound field"));
+                }
+            }
         }
         if let Some(mapping) = &rule.mapping {
             identifier(&mapping.name)?;
@@ -200,6 +241,12 @@ pub(super) fn validate(ir: &GrammarIr) -> Result<(), GenerateError> {
                     return Err(fail(format!("duplicate or reserved field: {}", field.name)));
                 }
             }
+            fields.extend(
+                rule.type_constraints
+                    .iter()
+                    .flat_map(|constraint| [&constraint.capture, &constraint.reference])
+                    .map(|field| field.name.clone()),
+            );
             if rule.enum_literals.is_empty() && fields != captures {
                 return Err(fail(format!(
                     "mapping fields differ from captures: {}",
@@ -212,6 +259,55 @@ pub(super) fn validate(ir: &GrammarIr) -> Result<(), GenerateError> {
         return Err(fail("at least one mapped rule is required"));
     }
     Ok(())
+}
+
+/// A mapped sum retains its checks but returns the selected child's AST, with no wrapper.
+fn transparent_constraint_projection(root: &Expression) -> bool {
+    use Expression::*;
+    let mut pending = vec![root];
+    while let Some(value) = pending.pop() {
+        match value {
+            Reference(_) => (),
+            Sequence(children) if children.len() == 1 => pending.extend(children),
+            Choice(children) | LongestChoice(children) | UniqueLongestChoice(children)
+                if !children.is_empty() =>
+            {
+                pending.extend(children)
+            }
+            PredictiveChoice { alternatives, .. } if !alternatives.is_empty() => {
+                pending.extend(alternatives)
+            }
+            Capture { expression, .. }
+            | Delimited(expression)
+            | ValueBoundary(expression)
+            | NamePredicate {
+                child: expression, ..
+            }
+            | NameResolutionScope {
+                child: expression, ..
+            }
+            | LexicalContextScope {
+                child: expression, ..
+            }
+            | LexicalTriviaScope {
+                child: expression, ..
+            }
+            | TriviaScope {
+                child: expression, ..
+            }
+            | RuleEffects {
+                child: expression, ..
+            }
+            | CaptureEquality {
+                child: expression, ..
+            }
+            | Recovery {
+                child: expression, ..
+            } => pending.push(expression),
+            _ => return false,
+        }
+    }
+    true
 }
 
 /// A parser-only grammar is valid only when the root can reach a projection

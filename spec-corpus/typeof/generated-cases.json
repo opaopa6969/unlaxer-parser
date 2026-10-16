@@ -1,0 +1,1782 @@
+[
+  {
+    "name": "text",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n \n @root @mapping(Pair,params=[left,right]) Root ::= ('😀' | 'é') @left '=' @typeof(left) ('😀' | 'é') @right;\n}",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n",
+    "rustMethods": "fn eval_pair(&mut self,_left:&str,_right:&str,_span:Span)->i32{42}\n",
+    "cases": [
+      {
+        "input": "😀=é",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              4
+            ],
+            "fields": {
+              "left": "😀",
+              "right": "é"
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "é=😀",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              4
+            ],
+            "fields": {
+              "left": "é",
+              "right": "😀"
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "mixed-scalar",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n @enum Mode ::= 'sync' | 'auto';\n@enum Heat ::= 'hot' | 'cold';\n@mapping(Leaf,params=[text]) Leaf ::= '[' ('😀' | 'é') @text ']';\nItem ::= Mode | Heat | Leaf | 'text';\n @root @mapping(Pair,params=[left,right]) Root ::= Item @left '=' @typeof(left) Item @right;\n}",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n@Override protected Integer evalLeaf(TypeofAST.Leaf node){return 11;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&AstValue,_right:&AstValue,_span:Span)->i32{42}\nfn eval_leaf(&mut self,_text:&str,_span:Span)->i32{11}",
+    "cases": [
+      {
+        "input": "sync=auto",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              9
+            ],
+            "fields": {
+              "left": {
+                "enum": "Mode",
+                "value": "SYNC",
+                "span": [
+                  0,
+                  4
+                ]
+              },
+              "right": {
+                "enum": "Mode",
+                "value": "AUTO",
+                "span": [
+                  5,
+                  9
+                ]
+              }
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "hot=cold",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              8
+            ],
+            "fields": {
+              "left": {
+                "enum": "Heat",
+                "value": "HOT",
+                "span": [
+                  0,
+                  3
+                ]
+              },
+              "right": {
+                "enum": "Heat",
+                "value": "COLD",
+                "span": [
+                  4,
+                  8
+                ]
+              }
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "text=text",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              9
+            ],
+            "fields": {
+              "left": "text",
+              "right": "text"
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "[😀]=[é]",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              8
+            ],
+            "fields": {
+              "left": {
+                "type": "Leaf",
+                "span": [
+                  0,
+                  3
+                ],
+                "fields": {
+                  "text": "😀"
+                }
+              },
+              "right": {
+                "type": "Leaf",
+                "span": [
+                  4,
+                  8
+                ],
+                "fields": {
+                  "text": "é"
+                }
+              }
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "sync=hot",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected Mode but got Heat at CP 5:8"
+        }
+      },
+      {
+        "input": "hot=sync",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected Heat but got Mode at CP 4:8"
+        }
+      },
+      {
+        "input": "text=auto",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected String but got Mode at CP 5:9"
+        }
+      },
+      {
+        "input": "[😀]=sync",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected Leaf but got Mode at CP 4:8"
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "transparent-alias",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n @enum Mode ::= 'sync' | 'auto';\n@enum Heat ::= 'hot' | 'cold';\n@mapping(Leaf,params=[text]) Leaf ::= '[' ('😀' | 'é') @text ']';\nItem ::= Mode | Heat | Leaf | 'text';\nAlias ::= Item;\nAlias2 ::= (Alias);\n @root @mapping(Pair,params=[left,right]) Root ::= Alias2 @left '=' @typeof(left) Alias2 @right;\n}",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n@Override protected Integer evalLeaf(TypeofAST.Leaf node){return 11;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&AstValue,_right:&AstValue,_span:Span)->i32{42}\nfn eval_leaf(&mut self,_text:&str,_span:Span)->i32{11}",
+    "cases": [
+      {
+        "input": "sync=auto",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              9
+            ],
+            "fields": {
+              "left": {
+                "enum": "Mode",
+                "value": "SYNC",
+                "span": [
+                  0,
+                  4
+                ]
+              },
+              "right": {
+                "enum": "Mode",
+                "value": "AUTO",
+                "span": [
+                  5,
+                  9
+                ]
+              }
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "hot=cold",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              8
+            ],
+            "fields": {
+              "left": {
+                "enum": "Heat",
+                "value": "HOT",
+                "span": [
+                  0,
+                  3
+                ]
+              },
+              "right": {
+                "enum": "Heat",
+                "value": "COLD",
+                "span": [
+                  4,
+                  8
+                ]
+              }
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "text=text",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              9
+            ],
+            "fields": {
+              "left": "text",
+              "right": "text"
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "[😀]=[é]",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              8
+            ],
+            "fields": {
+              "left": {
+                "type": "Leaf",
+                "span": [
+                  0,
+                  3
+                ],
+                "fields": {
+                  "text": "😀"
+                }
+              },
+              "right": {
+                "type": "Leaf",
+                "span": [
+                  4,
+                  8
+                ],
+                "fields": {
+                  "text": "é"
+                }
+              }
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "sync=hot",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected Mode but got Heat at CP 5:8"
+        }
+      },
+      {
+        "input": "hot=sync",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected Heat but got Mode at CP 4:8"
+        }
+      },
+      {
+        "input": "text=auto",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected String but got Mode at CP 5:9"
+        }
+      },
+      {
+        "input": "[😀]=sync",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected Leaf but got Mode at CP 4:8"
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "scalar-enum",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n @enum Mode ::= 'sync' | 'auto';\n @root @mapping(Pair,params=[left,right]) Root ::= Mode @left '=' @typeof(left) Mode @right;\n}",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n",
+    "rustMethods": "fn eval_pair(&mut self,_left:&Mode,_right:&Mode,_span:Span)->i32{42}\n",
+    "cases": [
+      {
+        "input": "sync=auto",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              9
+            ],
+            "fields": {
+              "left": "SYNC",
+              "right": "AUTO"
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "different-enums",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n @enum Mode ::= 'sync' | 'auto'; @enum Heat ::= 'hot' | 'cold';\n @root @mapping(Pair,params=[left,right]) Root ::= Mode @left '=' @typeof(left) Heat @right;\n}",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n",
+    "rustMethods": "fn eval_pair(&mut self,_left:&Mode,_right:&Heat,_span:Span)->i32{42}\n",
+    "cases": [
+      {
+        "input": "sync=hot",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected Mode but got Heat at CP 5:8"
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "optional",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n @enum Mode ::= 'sync' | 'auto';\n@enum Heat ::= 'hot' | 'cold';\n@mapping(Leaf,params=[text]) Leaf ::= '[' ('😀' | 'é') @text ']';\nItem ::= Mode | Heat | Leaf | 'text';\n @root @mapping(Pair,params=[left,right]) Root ::= [ Item ] @left '=' @typeof(left) [ Item ] @right;\n}",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n@Override protected Integer evalLeaf(TypeofAST.Leaf node){return 11;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:Option<&AstValue>,_right:Option<&AstValue>,_span:Span)->i32{42}\nfn eval_leaf(&mut self,_text:&str,_span:Span)->i32{11}",
+    "cases": [
+      {
+        "input": "=",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              1
+            ],
+            "fields": {
+              "left": null,
+              "right": null
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "sync=",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              5
+            ],
+            "fields": {
+              "left": {
+                "enum": "Mode",
+                "value": "SYNC",
+                "span": [
+                  0,
+                  4
+                ]
+              },
+              "right": null
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "sync=hot",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              8
+            ],
+            "fields": {
+              "left": {
+                "enum": "Mode",
+                "value": "SYNC",
+                "span": [
+                  0,
+                  4
+                ]
+              },
+              "right": {
+                "enum": "Heat",
+                "value": "HOT",
+                "span": [
+                  5,
+                  8
+                ]
+              }
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "lists",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n @enum Mode ::= 'sync' | 'auto';\n@enum Heat ::= 'hot' | 'cold';\n@mapping(Leaf,params=[text]) Leaf ::= '[' ('😀' | 'é') @text ']';\nItem ::= Mode | Heat | Leaf | 'text';\n @root @mapping(Pair,params=[left,right]) Root ::= { Item } @left '=' @typeof(left) { Item } @right;\n}",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n@Override protected Integer evalLeaf(TypeofAST.Leaf node){return 11;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&[AstValue],_right:&[AstValue],_span:Span)->i32{42}\nfn eval_leaf(&mut self,_text:&str,_span:Span)->i32{11}",
+    "cases": [
+      {
+        "input": "=",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              1
+            ],
+            "fields": {
+              "left": [],
+              "right": []
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "synchot=text[😀]",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              15
+            ],
+            "fields": {
+              "left": [
+                {
+                  "enum": "Mode",
+                  "value": "SYNC",
+                  "span": [
+                    0,
+                    4
+                  ]
+                },
+                {
+                  "enum": "Heat",
+                  "value": "HOT",
+                  "span": [
+                    4,
+                    7
+                  ]
+                }
+              ],
+              "right": [
+                "text",
+                {
+                  "type": "Leaf",
+                  "span": [
+                    12,
+                    15
+                  ],
+                  "fields": {
+                    "text": "😀"
+                  }
+                }
+              ]
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "container-mismatch",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n @enum Mode ::= 'sync' | 'auto';\n@enum Heat ::= 'hot' | 'cold';\n@mapping(Leaf,params=[text]) Leaf ::= '[' ('😀' | 'é') @text ']';\nItem ::= Mode | Heat | Leaf | 'text';\n @root @mapping(Pair,params=[left,right]) Root ::= [ Item ] @left '=' @typeof(left) { Item } @right;\n}",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n@Override protected Integer evalLeaf(TypeofAST.Leaf node){return 11;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:Option<&AstValue>,_right:&[AstValue],_span:Span)->i32{42}\nfn eval_leaf(&mut self,_text:&str,_span:Span)->i32{11}",
+    "cases": [
+      {
+        "input": "=",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected Optional but got List at CP 0:1"
+        }
+      },
+      {
+        "input": "sync=hot",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected Optional but got List at CP 5:8"
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "forward",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n @enum Mode ::= 'sync' | 'auto';\n@enum Heat ::= 'hot' | 'cold';\n@mapping(Leaf,params=[text]) Leaf ::= '[' ('😀' | 'é') @text ']';\nItem ::= Mode | Heat | Leaf | 'text';\n @root @mapping(Pair,params=[left,right]) Root ::= @typeof(right) Item @left '=' Item @right;\n}",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n@Override protected Integer evalLeaf(TypeofAST.Leaf node){return 11;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&AstValue,_right:&AstValue,_span:Span)->i32{42}\nfn eval_leaf(&mut self,_text:&str,_span:Span)->i32{11}",
+    "cases": [
+      {
+        "input": "sync=auto",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              9
+            ],
+            "fields": {
+              "left": {
+                "enum": "Mode",
+                "value": "SYNC",
+                "span": [
+                  0,
+                  4
+                ]
+              },
+              "right": {
+                "enum": "Mode",
+                "value": "AUTO",
+                "span": [
+                  5,
+                  9
+                ]
+              }
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "sync=hot",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: left must be same type as right, expected Heat but got Mode at CP 0:4"
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "hidden-reference",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n @enum Mode ::= 'sync' | 'auto';\n@enum Heat ::= 'hot' | 'cold';\n@mapping(Leaf,params=[text]) Leaf ::= '[' ('😀' | 'é') @text ']';\nItem ::= Mode | Heat | Leaf | 'text';\n @root @mapping(Pair,params=[right]) Root ::= Item @left '=' @typeof(left) Item @right;\n}",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n@Override protected Integer evalLeaf(TypeofAST.Leaf node){return 11;}",
+    "rustMethods": "fn eval_pair(&mut self,_right:&AstValue,_span:Span)->i32{42}\nfn eval_leaf(&mut self,_text:&str,_span:Span)->i32{11}",
+    "cases": [
+      {
+        "input": "sync=auto",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              9
+            ],
+            "fields": {
+              "right": {
+                "enum": "Mode",
+                "value": "AUTO",
+                "span": [
+                  5,
+                  9
+                ]
+              }
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "sync=hot",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected Mode but got Heat at CP 5:8"
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "all-private",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n @enum Mode ::= 'sync' | 'auto';\n@enum Heat ::= 'hot' | 'cold';\n@mapping(Leaf,params=[text]) Leaf ::= '[' ('😀' | 'é') @text ']';\nItem ::= Mode | Heat | Leaf | 'text';\n @root @mapping(Pair) Root ::= Item @left '=' @typeof(left) Item @right;\n}",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n@Override protected Integer evalLeaf(TypeofAST.Leaf node){return 11;}",
+    "rustMethods": "fn eval_pair(&mut self,_span:Span)->i32{42}\nfn eval_leaf(&mut self,_text:&str,_span:Span)->i32{11}",
+    "cases": [
+      {
+        "input": "sync=auto",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              9
+            ],
+            "fields": {}
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "sync=hot",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected Mode but got Heat at CP 5:8"
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "all-constraints",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n @enum Mode ::= 'sync' | 'auto';\n@enum Heat ::= 'hot' | 'cold';\n@mapping(Leaf,params=[text]) Leaf ::= '[' ('😀' | 'é') @text ']';\nItem ::= Mode | Heat | Leaf | 'text';\n @root @mapping(Pair,params=[left,other,right]) Root ::= Item @left ':' Item @other '=' (@typeof(left) Item @right | @typeof(other) Item @right);\n}",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n@Override protected Integer evalLeaf(TypeofAST.Leaf node){return 11;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&AstValue,_other:&AstValue,_right:&AstValue,_span:Span)->i32{42}\nfn eval_leaf(&mut self,_text:&str,_span:Span)->i32{11}",
+    "cases": [
+      {
+        "input": "sync:auto=sync",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              14
+            ],
+            "fields": {
+              "left": {
+                "enum": "Mode",
+                "value": "SYNC",
+                "span": [
+                  0,
+                  4
+                ]
+              },
+              "other": {
+                "enum": "Mode",
+                "value": "AUTO",
+                "span": [
+                  5,
+                  9
+                ]
+              },
+              "right": {
+                "enum": "Mode",
+                "value": "SYNC",
+                "span": [
+                  10,
+                  14
+                ]
+              }
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "sync:hot=hot",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected Mode but got Heat at CP 9:12"
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "skipped-alias",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n @enum Mode ::= 'sync' | 'auto'; @skip Alias ::= Mode;\n @root @mapping(Pair,params=[left,right]) Root ::= Alias @left '=' @typeof(left) Alias @right;\n}",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n",
+    "rustMethods": "fn eval_pair(&mut self,_left:&str,_right:&str,_span:Span)->i32{42}\n",
+    "cases": [
+      {
+        "input": "sync=auto",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              9
+            ],
+            "fields": {
+              "left": "sync",
+              "right": "auto"
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "family",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n @mapping(Family) @commonField(text) Value ::= A | B;\n@mapping(Family.A,params=[text]) A ::= 'a' @text;\n@mapping(Family.B,params=[text]) B ::= 'b' @text;\n @root @mapping(Pair,params=[left,right]) Root ::= Value @left '=' @typeof(left) Value @right;\n}",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n@Override protected Integer evalFamilyA(TypeofAST.Family.A node){return 11;} @Override protected Integer evalFamilyB(TypeofAST.Family.B node){return 11;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&Ast,_right:&Ast,_span:Span)->i32{42}\nfn eval_family__a(&mut self,_text:&str,_span:Span)->i32{11}\nfn eval_family__b(&mut self,_text:&str,_span:Span)->i32{11}",
+    "cases": [
+      {
+        "input": "a=a",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              3
+            ],
+            "fields": {
+              "left": {
+                "type": "Family__A",
+                "span": [
+                  0,
+                  1
+                ],
+                "fields": {
+                  "text": "a"
+                }
+              },
+              "right": {
+                "type": "Family__A",
+                "span": [
+                  2,
+                  3
+                ],
+                "fields": {
+                  "text": "a"
+                }
+              }
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "a=b",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected A but got B at CP 2:3"
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "same-record-type",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n @enum Mode ::= 'sync' | 'auto';\n@enum Heat ::= 'hot' | 'cold';\n@mapping(Atom,params=[value]) A ::= 'a' Mode @value;\n@mapping(Atom,params=[value]) B ::= 'b' Heat @value;\nItem ::= A | B;\n @root @mapping(Pair,params=[left,right]) Root ::= Item @left '=' @typeof(left) Item @right;\n}",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n@Override protected Integer evalAtom(TypeofAST.Atom node){return 11;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&Ast,_right:&Ast,_span:Span)->i32{42}\nfn eval_atom(&mut self,_value:&AstValue,_span:Span)->i32{11}",
+    "cases": [
+      {
+        "input": "async=bhot",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              10
+            ],
+            "fields": {
+              "left": {
+                "type": "Atom",
+                "span": [
+                  0,
+                  5
+                ],
+                "fields": {
+                  "value": {
+                    "enum": "Mode",
+                    "value": "SYNC",
+                    "span": [
+                      1,
+                      5
+                    ]
+                  }
+                }
+              },
+              "right": {
+                "type": "Atom",
+                "span": [
+                  6,
+                  10
+                ],
+                "fields": {
+                  "value": {
+                    "enum": "Heat",
+                    "value": "HOT",
+                    "span": [
+                      7,
+                      10
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "shared-mapping",
+    "grammar": "grammar Typeof { @package: typeofprobe @whitespace: none @enum Mode ::= 'sync' | 'auto';\n@enum Heat ::= 'hot' | 'cold';\n@mapping(Pair,params=[left,right]) First ::= '<' Mode @left '=' @typeof(left) Mode @right '>';\n@mapping(Pair,params=[left,right]) Second ::= '[' Heat @left '=' @typeof(left) Heat @right ']'; @root Root ::= First | Second; }",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n",
+    "rustMethods": "fn eval_pair(&mut self,_left:&AstValue,_right:&AstValue,_span:Span)->i32{42}\n",
+    "cases": [
+      {
+        "input": "<sync=auto>",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              11
+            ],
+            "fields": {
+              "left": {
+                "enum": "Mode",
+                "value": "SYNC",
+                "span": [
+                  1,
+                  5
+                ]
+              },
+              "right": {
+                "enum": "Mode",
+                "value": "AUTO",
+                "span": [
+                  6,
+                  10
+                ]
+              }
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "[hot=cold]",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              10
+            ],
+            "fields": {
+              "left": {
+                "enum": "Heat",
+                "value": "HOT",
+                "span": [
+                  1,
+                  4
+                ]
+              },
+              "right": {
+                "enum": "Heat",
+                "value": "COLD",
+                "span": [
+                  5,
+                  9
+                ]
+              }
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "integer",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n token NUM = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Pair,params=[left,right]) Root ::= NUM @left '=' @typeof(left) NUM @right;\n}",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n",
+    "rustMethods": "fn eval_pair(&mut self,_left:&i32,_right:&i32,_span:Span)->i32{42}\n",
+    "cases": [
+      {
+        "input": "12=-3",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              5
+            ],
+            "fields": {
+              "left": 12,
+              "right": -3
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "integer-text",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n token NUM = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Pair,params=[left,right]) Root ::= NUM @left '=' @typeof(left) '12' @right;\n}",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n",
+    "rustMethods": "fn eval_pair(&mut self,_left:&i32,_right:&str,_span:Span)->i32{42}\n",
+    "cases": [
+      {
+        "input": "12=12",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected Integer but got String at CP 3:5"
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "integer-private",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n token NUM = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Pair,params=[right]) Root ::= NUM @left '=' @typeof(left) NUM @right;\n}",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n",
+    "rustMethods": "fn eval_pair(&mut self,_right:&i32,_span:Span)->i32{42}\n",
+    "cases": [
+      {
+        "input": "12=-3",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              5
+            ],
+            "fields": {
+              "right": -3
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "integer-optional",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n token NUM = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Pair,params=[left,right]) Root ::= [ NUM ] @left '=' @typeof(left) [ 'x' ] @right;\n}",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n",
+    "rustMethods": "fn eval_pair(&mut self,_left:Option<&i32>,_right:Option<&str>,_span:Span)->i32{42}\n",
+    "cases": [
+      {
+        "input": "=",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              1
+            ],
+            "fields": {
+              "left": null,
+              "right": null
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "12=x",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              4
+            ],
+            "fields": {
+              "left": 12,
+              "right": "x"
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "integer-list",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n token NUM = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Pair,params=[left,right]) Root ::= { NUM } @left '=' @typeof(left) { 'x' } @right;\n}",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n",
+    "rustMethods": "fn eval_pair(&mut self,_left:&[i32],_right:&[String],_span:Span)->i32{42}\n",
+    "cases": [
+      {
+        "input": "=",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              1
+            ],
+            "fields": {
+              "left": [],
+              "right": []
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "12=xx",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              5
+            ],
+            "fields": {
+              "left": [
+                12
+              ],
+              "right": [
+                "x",
+                "x"
+              ]
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "shared-integer",
+    "grammar": "grammar Typeof { @package: typeofprobe @whitespace: none token NUM = org.unlaxer.parser.elementary.NumberParser @mapping(Pair,params=[left,right]) First ::= '<' NUM @left '=' @typeof(left) NUM @right '>'; @mapping(Pair,params=[left,right]) Second ::= '[' NUM @left '=' @typeof(left) NUM @right ']'; @root Root ::= First | Second; }",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n",
+    "rustMethods": "fn eval_pair(&mut self,_left:&i32,_right:&i32,_span:Span)->i32{42}\n",
+    "cases": [
+      {
+        "input": "<12=-3>",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              7
+            ],
+            "fields": {
+              "left": 12,
+              "right": -3
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "[0=42]",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              6
+            ],
+            "fields": {
+              "left": 0,
+              "right": 42
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "shared-private-local",
+    "grammar": "grammar Typeof { @package: typeofprobe @whitespace: none token NUM = org.unlaxer.parser.elementary.NumberParser @mapping(Pair,params=[right]) First ::= '<' NUM @left '=' @typeof(left) NUM @right '>'; @mapping(Pair,params=[right]) Second ::= '[' [ NUM ] @left '=' @typeof(left) NUM @right ']'; @root Root ::= First | Second; }",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n",
+    "rustMethods": "fn eval_pair(&mut self,_right:&i32,_span:Span)->i32{42}\n",
+    "cases": [
+      {
+        "input": "<1=2>",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              5
+            ],
+            "fields": {
+              "right": 2
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "[1=2]",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected Optional but got Integer at CP 3:4"
+        }
+      },
+      {
+        "input": "[=2]",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected Optional but got Integer at CP 2:3"
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "node-string-identity",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n @mapping(String) Node ::= '[' 'x' ']'; Item ::= Node | 'x';\n @root @mapping(Pair,params=[left,right]) Root ::= Item @left '=' @typeof(left) Item @right;\n}",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n@Override protected Integer evalString(TypeofAST.String node){return 11;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&AstValue,_right:&AstValue,_span:Span)->i32{42}\nfn eval_string(&mut self,_span:Span)->i32{11}",
+    "cases": [
+      {
+        "input": "[x]=[x]",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              7
+            ],
+            "fields": {
+              "left": {
+                "type": "String",
+                "span": [
+                  0,
+                  3
+                ],
+                "fields": {}
+              },
+              "right": {
+                "type": "String",
+                "span": [
+                  4,
+                  7
+                ],
+                "fields": {}
+              }
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "[x]=x",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected String but got String at CP 4:5"
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "node-integer-identity",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n token NUM = org.unlaxer.parser.elementary.NumberParser @mapping(Integer) Node ::= '[' 'x' ']';\n @root @mapping(Pair,params=[left,right]) Root ::= Node @left '=' @typeof(left) NUM @right;\n}",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n@Override protected Integer evalInteger(TypeofAST.Integer node){return 11;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&Ast,_right:&i32,_span:Span)->i32{42}\nfn eval_integer(&mut self,_span:Span)->i32{11}",
+    "cases": [
+      {
+        "input": "[x]=1",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected Integer but got Integer at CP 4:5"
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "left-assoc-containers",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n token NUM = org.unlaxer.parser.elementary.NumberParser @mapping(Leaf,params=[value]) Atom ::= NUM @value;\n @leftAssoc @precedence(level=10) @root @mapping(Pair,params=[left,op,right]) Root ::= Atom @left { '+' @op @typeof(op) Atom @right };\n}",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n@Override protected Integer evalLeaf(TypeofAST.Leaf node){return 11;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&Ast,_op:&[String],_right:&[Ast],_span:Span)->i32{42}\nfn eval_leaf(&mut self,_value:&i32,_span:Span)->i32{11}",
+    "cases": [
+      {
+        "input": "1",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              1
+            ],
+            "fields": {
+              "left": {
+                "type": "Leaf",
+                "span": [
+                  0,
+                  1
+                ],
+                "fields": {
+                  "value": 1
+                }
+              },
+              "op": [],
+              "right": []
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "1+2+3",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              5
+            ],
+            "fields": {
+              "left": {
+                "type": "Leaf",
+                "span": [
+                  0,
+                  1
+                ],
+                "fields": {
+                  "value": 1
+                }
+              },
+              "op": [
+                "+",
+                "+"
+              ],
+              "right": [
+                {
+                  "type": "Leaf",
+                  "span": [
+                    2,
+                    3
+                  ],
+                  "fields": {
+                    "value": 2
+                  }
+                },
+                {
+                  "type": "Leaf",
+                  "span": [
+                    4,
+                    5
+                  ],
+                  "fields": {
+                    "value": 3
+                  }
+                }
+              ]
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "left-assoc-mismatch",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n token NUM = org.unlaxer.parser.elementary.NumberParser @mapping(Leaf,params=[value]) Atom ::= NUM @value;\n @leftAssoc @precedence(level=10) @root @mapping(Pair,params=[left,op,right]) Root ::= Atom @left { '+' @op @typeof(left) Atom @right };\n}",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n@Override protected Integer evalLeaf(TypeofAST.Leaf node){return 11;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&Ast,_op:&[String],_right:&[Ast],_span:Span)->i32{42}\nfn eval_leaf(&mut self,_value:&i32,_span:Span)->i32{11}",
+    "cases": [
+      {
+        "input": "1",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected Leaf but got List at CP 0:1"
+        }
+      },
+      {
+        "input": "1+2+3",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected Leaf but got List at CP 2:5"
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "right-assoc-containers",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n token NUM = org.unlaxer.parser.elementary.NumberParser @mapping(Leaf,params=[value]) Atom ::= NUM @value;\n @rightAssoc @precedence(level=10) @root @mapping(Pair,params=[left,op,right]) Root ::= Atom @left { '^' @op @typeof(op) Root @right };\n}",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n@Override protected Integer evalLeaf(TypeofAST.Leaf node){return 11;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&Ast,_op:&[String],_right:&[Ast],_span:Span)->i32{42}\nfn eval_leaf(&mut self,_value:&i32,_span:Span)->i32{11}",
+    "cases": [
+      {
+        "input": "1",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              1
+            ],
+            "fields": {
+              "left": {
+                "type": "Leaf",
+                "span": [
+                  0,
+                  1
+                ],
+                "fields": {
+                  "value": 1
+                }
+              },
+              "op": [],
+              "right": []
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "1^2^3",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              5
+            ],
+            "fields": {
+              "left": {
+                "type": "Leaf",
+                "span": [
+                  0,
+                  1
+                ],
+                "fields": {
+                  "value": 1
+                }
+              },
+              "op": [
+                "^"
+              ],
+              "right": [
+                {
+                  "type": "Pair",
+                  "span": [
+                    2,
+                    5
+                  ],
+                  "fields": {
+                    "left": {
+                      "type": "Leaf",
+                      "span": [
+                        2,
+                        3
+                      ],
+                      "fields": {
+                        "value": 2
+                      }
+                    },
+                    "op": [
+                      "^"
+                    ],
+                    "right": [
+                      {
+                        "type": "Pair",
+                        "span": [
+                          4,
+                          5
+                        ],
+                        "fields": {
+                          "left": {
+                            "type": "Leaf",
+                            "span": [
+                              4,
+                              5
+                            ],
+                            "fields": {
+                              "value": 3
+                            }
+                          },
+                          "op": [],
+                          "right": []
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "constrained-sum",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n @mapping(Family) @commonField(text) Value ::= @typeof(value) A @value | @typeof(value) B @value;\n@mapping(Family.A,params=[text]) A ::= 'a' @text;\n@mapping(Family.B,params=[text]) B ::= 'b' @text;\n @root @mapping(Pair,params=[left,right]) Root ::= Value @left '=' @typeof(left) Value @right;\n}",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n@Override protected Integer evalFamilyA(TypeofAST.Family.A node){return 11;} @Override protected Integer evalFamilyB(TypeofAST.Family.B node){return 11;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&Ast,_right:&Ast,_span:Span)->i32{42}\nfn eval_family__a(&mut self,_text:&str,_span:Span)->i32{11}\nfn eval_family__b(&mut self,_text:&str,_span:Span)->i32{11}",
+    "cases": [
+      {
+        "input": "a=a",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              3
+            ],
+            "fields": {
+              "left": {
+                "type": "Family__A",
+                "span": [
+                  0,
+                  1
+                ],
+                "fields": {
+                  "text": "a"
+                }
+              },
+              "right": {
+                "type": "Family__A",
+                "span": [
+                  2,
+                  3
+                ],
+                "fields": {
+                  "text": "a"
+                }
+              }
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "a=b",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected A but got B at CP 2:3"
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "right-assoc-mismatch",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n token NUM = org.unlaxer.parser.elementary.NumberParser @mapping(Leaf,params=[value]) Atom ::= NUM @value;\n @rightAssoc @precedence(level=10) @root @mapping(Pair,params=[left,op,right]) Root ::= Atom @left { '^' @op @typeof(left) Root @right };\n}",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n@Override protected Integer evalLeaf(TypeofAST.Leaf node){return 11;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&Ast,_op:&[String],_right:&[Ast],_span:Span)->i32{42}\nfn eval_leaf(&mut self,_value:&i32,_span:Span)->i32{11}",
+    "cases": [
+      {
+        "input": "1",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected Leaf but got List at CP 0:1"
+        }
+      },
+      {
+        "input": "1^2^3",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: right must be same type as left, expected Leaf but got List at CP 4:5"
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "nested-failure-order",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n @enum Mode ::= 'sync'; @enum Heat ::= 'hot'; @mapping(Leaf,params=[a,b]) Leaf ::= '[' Mode @a ':' @typeof(a) Heat @b ']';\n @root @mapping(Pair,params=[left,right]) Root ::= Leaf @left '=' @typeof(left) Leaf @right;\n}",
+    "javaMethods": "@Override protected Integer evalPair(TypeofAST.Pair node){return 42;}\n@Override protected Integer evalLeaf(TypeofAST.Leaf node){return 11;}",
+    "rustMethods": "fn eval_pair(&mut self,_left:&Ast,_right:&Ast,_span:Span)->i32{42}\nfn eval_leaf(&mut self,_a:&Mode,_b:&Heat,_span:Span)->i32{11}",
+    "cases": [
+      {
+        "input": "[sync:hot]=[sync:hot]",
+        "expected": {
+          "status": "map_error",
+          "message": "@typeof constraint violated: b must be same type as a, expected Mode but got Heat at CP 6:9"
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  }
+]

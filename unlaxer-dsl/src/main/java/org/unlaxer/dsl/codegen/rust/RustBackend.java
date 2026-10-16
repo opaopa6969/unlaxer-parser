@@ -100,7 +100,7 @@ public final class RustBackend {
         out.append(ir.mappings().isEmpty() && ir.rules().stream().allMatch(rule -> rule.enumLiterals().isEmpty()) ? "use unlaxer_runtime::Span;\n\n"
             : "use unlaxer_runtime::{Span, json_string};\n\n");
         out.append(enumDeclarations(ir));
-        if (hasValues(ir)) out.append(astValues(ir));
+        if (needsValues(ir)) out.append(astValues(ir));
         out.append("#[allow(non_snake_case, non_camel_case_types)]\n#[derive(Debug, Clone, PartialEq)]\npub enum Ast {\n");
         for (Mapping mapping : ir.mappings()) {
             out.append("    r#").append(mapping.name()).append(" { span: Span");
@@ -527,7 +527,7 @@ public final class RustBackend {
 
     private String mapper(GrammarIR ir) {
         StringBuilder out = new StringBuilder(HEADER);
-        if (hasValues(ir)) out.append("use super::ast::AstValue;\n");
+        if (needsValues(ir)) out.append("use super::ast::AstValue;\n");
         out.append(enumImports(ir));
         out.append("use super::ast::Ast;\nuse unlaxer_runtime::Tree;\n\n");
         if (ir.rules().stream().anyMatch(rule -> containsRecovery(rule.body()))) {
@@ -550,6 +550,7 @@ public final class RustBackend {
                 Ok(found)
             }
             """);
+        if (ir.rules().stream().anyMatch(rule -> !rule.typeConstraints().isEmpty())) out.append(TypeofEmitter.helpers(ir));
         for (int i = 0; i < ir.rules().size(); i++) {
             var rule = ir.rules().get(i);
             if (rule.enumLiterals().isEmpty()) continue;
@@ -573,7 +574,7 @@ public final class RustBackend {
                     .append(i)
                     .append("(tree, &node.children)?);\n        }\n    }\n    Ok(found)\n}\n");
         }
-        if (hasValues(ir)) {
+        if (needsValues(ir)) {
             out.append("""
 
                 fn map_values(tree: &Tree, ids: &[usize]) -> Result<Vec<AstValue>, String> {
@@ -603,7 +604,7 @@ public final class RustBackend {
                     .append(rule.name()).append(" { value: ").append(rule.name()).append("::from_text(tree.text(node.span))?, span: node.span }),\n");
             }
             List<String> ids = new ArrayList<>();
-            for (int i = 0; i < ir.rules().size(); i++) if (ir.rules().get(i).mapping() != null && ir.rules().get(i).enumLiterals().isEmpty()) ids.add(Integer.toString(i));
+            for (int i = 0; i < ir.rules().size(); i++) if ((ir.rules().get(i).mapping() != null || !ir.rules().get(i).typeConstraints().isEmpty()) && ir.rules().get(i).enumLiterals().isEmpty()) ids.add(Integer.toString(i));
             out.append("            ").append(String.join(" | ", ids))
                 .append(" => found.extend(map_node(tree, id)?.into_iter().map(|node| AstValue::Node(Box::new(node)))),\n");
             List<String> skipped = new ArrayList<>();
@@ -616,7 +617,7 @@ public final class RustBackend {
                 """);
             out.append("            _ => found.extend(map_values(tree, &node.children)?),\n        }\n    }\n    Ok(found)\n}\n");
         }
-        if (ir.rules().stream().filter(r -> r.mapping() != null).flatMap(r -> r.mapping().fields().stream())
+        if (ir.rules().stream().filter(r -> r.mapping() != null || !r.typeConstraints().isEmpty()).flatMap(r -> TypeofEmitter.fields(r).stream())
             .anyMatch(f -> f.cardinality() == Cardinality.OPTIONAL)) out.append("""
 
             fn optional<T>(mut values: Vec<T>, name: &str) -> Result<Option<T>, String> {
@@ -631,13 +632,14 @@ public final class RustBackend {
             """);
         for (int i = 0; i < ir.rules().size(); i++) {
             if (ir.rules().get(i).skip()) out.append("        ").append(i).append(" => Ok(Vec::new()),\n");
-            else if (ir.rules().get(i).mapping() != null) {
+            else if (ir.rules().get(i).mapping() != null || !ir.rules().get(i).typeConstraints().isEmpty()) {
                 out.append("        ").append(i).append(" => map_rule_").append(i).append("(tree, id),\n");
             }
         }
         out.append("        _ => map_nodes(tree, &tree.nodes[id].children),\n    }\n}\n");
-        for (int i = 0; i < ir.rules().size(); i++) if (ir.rules().get(i).mapping() != null) {
+        for (int i = 0; i < ir.rules().size(); i++) if (ir.rules().get(i).mapping() != null || !ir.rules().get(i).typeConstraints().isEmpty()) {
             var mapping = ir.rules().get(i).mapping();
+            if (!ir.rules().get(i).typeConstraints().isEmpty()) { out.append(TypeofEmitter.rule(ir,i)); continue; }
             out.append("\n#[inline(never)]\nfn map_rule_").append(i)
                 .append("(tree: &Tree, id: usize) -> Result<Vec<Ast>, String> {\n")
                 .append("    let node = &tree.nodes[id];\n")
@@ -733,7 +735,7 @@ public final class RustBackend {
         };
     }
 
-    private static String mappedValue(Field field) {
+    static String mappedValue(Field field) {
         return switch (field.cardinality()) {
             case ONE -> field.kind() == Kind.NODE ? "Box::new(required(values, " + quote(field.name()) + ")?)"
                 : "required(values, " + quote(field.name()) + ")?";
@@ -753,7 +755,7 @@ public final class RustBackend {
     }
 
     // New grapheme captures preserve raw source; existing text captures retain their contract.
-    private static boolean graphemeCapture(GrammarIR ir, Expression body, String name) {
+    static boolean graphemeCapture(GrammarIR ir, Expression body, String name) {
         record Visit(Expression expression, boolean captured) {}
         var pending = new java.util.ArrayDeque<Visit>();
         var visited = new java.util.HashSet<Integer>();
@@ -820,6 +822,11 @@ public final class RustBackend {
         if (expression instanceof LongestChoice value) return value.alternatives().stream().anyMatch(RustBackend::containsRecovery);
         if (expression instanceof PredictiveChoice value) return value.alternatives().stream().anyMatch(RustBackend::containsRecovery);
         return false;
+    }
+
+    private static boolean needsValues(GrammarIR ir) {
+        return hasValues(ir) || ir.rules().stream().flatMap(rule -> rule.typeConstraints().stream())
+            .anyMatch(value -> value.capture().kind() == Kind.VALUE || value.reference().kind() == Kind.VALUE);
     }
 
     private static boolean hasValues(GrammarIR ir) {

@@ -457,8 +457,7 @@ public class MixedEnumConformanceTest {
                         error.getCause().getMessage().contains("@typeof constraint violated"));
             }
         }
-        // Rust @typeof remains explicitly tracked by #542, including this mixed-value composition.
-        assertFalse(org.unlaxer.dsl.PortabilityCheck.check(source).portable());
+        assertTrue(org.unlaxer.dsl.PortabilityCheck.check(source).portable());
     }
 
     @Test

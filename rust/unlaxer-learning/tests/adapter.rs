@@ -37,3 +37,16 @@ fn mapping_and_runtime_failures_are_separate_from_rejection() {
     assert!(result.contains("mappingError"), "{result}");
     assert!(grammar.analyze(&"x".repeat(8193)).contains("runtimeError"));
 }
+
+#[test]
+fn mapping_time_constraints_are_not_silently_ignored_by_the_teaching_subset() {
+    let source = "grammar Demo { @root @mapping(Pair,params=[left,right]) Root ::= Leaf @left '=' @typeof(left) 'x' @right; @mapping(Leaf) Leaf ::= 'x'; }";
+    let failure = match LessonGrammar::compile(source) {
+        Ok(_) => {
+            panic!("@typeof must use the generated mapper, not an unchecked teaching projection")
+        }
+        Err(error) => error,
+    };
+    assert!(failure.contains("@typeof"), "{failure}");
+    assert!(failure.contains("mapper"), "{failure}");
+}

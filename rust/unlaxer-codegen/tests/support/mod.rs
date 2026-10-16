@@ -25,6 +25,7 @@ fn rule(name: &str, body: Expression, mapping: Option<(&str, Vec<Field>)>) -> Ru
         operator: None,
         catalog: None,
         enum_literals: Vec::new(),
+        type_constraints: Vec::new(),
         documentation: Vec::new(),
     }
 }

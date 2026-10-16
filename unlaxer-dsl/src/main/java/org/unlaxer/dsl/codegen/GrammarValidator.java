@@ -28,7 +28,6 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.ScopeTreeAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.SequenceBody;
 import org.unlaxer.dsl.bootstrap.UBNFAST.StringSettingValue;
 import org.unlaxer.dsl.bootstrap.UBNFAST.TokenDecl;
-import org.unlaxer.dsl.bootstrap.UBNFAST.TypeofElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.WhitespaceAnnotation;
 import org.unlaxer.dsl.bootstrap.TokenAdapterRegistry;
 import org.unlaxer.dsl.bootstrap.TokenContractRegistry;
@@ -550,8 +549,9 @@ public final class GrammarValidator {
             }
         }
 
+        Set<String> constraintCaptures = TypeofConstraints.captures(rule);
         for (String capture : captures) {
-            if (!paramSet.contains(capture)) {
+            if (!paramSet.contains(capture) && !constraintCaptures.contains(capture)) {
                 addRuleError(errors, rule.name(),
                     "rule " + rule.name() + " has capture @" + capture
                         + " not listed in @mapping(" + mapping.className() + ") params",
@@ -1422,68 +1422,10 @@ public final class GrammarValidator {
     // @typeof バリデーション
     // =========================================================================
 
-    /** (TypeofElement.captureName → parent capture name) のペアを収集する */
-    private record TypeofUsage(String referencedCapture, String ownCapture) {}
-
     private static void validateTypeofElements(RuleDecl rule, List<ValidationIssue> errors) {
-        List<TypeofUsage> usages = new ArrayList<>();
-        collectTypeofUsagesFromBody(rule.body(), usages);
-        if (usages.isEmpty()) {
-            return;
-        }
-
-        Set<String> captures = collectCaptureNames(rule.body());
-
-        for (TypeofUsage usage : usages) {
-            if (!captures.contains(usage.referencedCapture())) {
-                addRuleError(errors, rule.name(),
-                    "rule " + rule.name() + ": @typeof(" + usage.referencedCapture()
-                        + ") refers to unknown capture '" + usage.referencedCapture() + "'",
-                    "Use a capture name defined in the same rule (e.g. @captureRef).",
-                    "E-TYPEOF-UNKNOWN-CAPTURE");
-            }
-            if (usage.ownCapture() == null || usage.ownCapture().isEmpty()) {
-                addRuleError(errors, rule.name(),
-                    "rule " + rule.name() + ": @typeof(" + usage.referencedCapture()
-                        + ") must be paired with a capture name (e.g. @typeof(x) @myCapture)",
-                    "Add a capture name after @typeof(x).",
-                    "E-TYPEOF-MISSING-CAPTURE");
-            }
-        }
-    }
-
-    private static void collectTypeofUsagesFromBody(RuleBody body, List<TypeofUsage> usages) {
-        if (body instanceof ChoiceBody choice) {
-            for (SequenceBody seq : choice.alternatives()) {
-                collectTypeofUsagesFromSequence(seq, usages);
-            }
-        } else if (body instanceof SequenceBody seq) {
-            collectTypeofUsagesFromSequence(seq, usages);
-        } else {
-            throw new IllegalStateException("unhandled " + body);
-        }
-    }
-
-    private static void collectTypeofUsagesFromSequence(SequenceBody seq, List<TypeofUsage> usages) {
-        for (AnnotatedElement ae : seq.elements()) {
-            if (ae.typeofConstraint().isPresent()) {
-                TypeofElement te = ae.typeofConstraint().get();
-                usages.add(new TypeofUsage(te.captureName(), ae.captureName().orElse(null)));
-            } else {
-                collectTypeofUsagesFromAtomic(ae.element(), usages);
-            }
-        }
-    }
-
-    private static void collectTypeofUsagesFromAtomic(AtomicElement element, List<TypeofUsage> usages) {
-        if (element instanceof GroupElement group) {
-            collectTypeofUsagesFromBody(group.body(), usages);
-        } else if (element instanceof OptionalElement opt) {
-            collectTypeofUsagesFromBody(opt.body(), usages);
-        } else if (element instanceof RepeatElement rep) {
-            collectTypeofUsagesFromBody(rep.body(), usages);
-        } else {
-
+        for (var problem : TypeofConstraints.problems(rule)) {
+            addRuleError(errors, rule.name(), problem.message(),
+                "Use named captures in the same mapped rule; forward references are allowed.", problem.code());
         }
     }
 
