@@ -24,6 +24,8 @@ public class DAPGenerator implements CodeGenerator {
 
     @Override
     public GeneratedSource generate(GrammarDecl grammar) {
+        org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
+        NestedCaptures.requireValid(grammar);
         String packageName = getPackageName(grammar);
         String grammarName = grammar.name();
         String adapterClass = grammarName + "DebugAdapter";
@@ -78,7 +80,7 @@ public class DAPGenerator implements CodeGenerator {
         DAPRuntimeEmitter.emitParseAndCollectSteps(w, parsersClass);
         DAPRuntimeEmitter.emitCollectRuntimeProbeVariables(w);
         DAPRuntimeEmitter.emitCreateRootSourceCompat(w);
-        DAPRuntimeEmitter.emitAstMethods(w, packageName, grammarName, mapperClass);
+        DAPRuntimeEmitter.emitAstMethods(w, packageName, grammarName, mapperClass, NestedCaptures.hasMixed(grammar));
         DAPRuntimeEmitter.emitStepHelpers(w);
         DAPRuntimeEmitter.emitCollectStepPoints(w);
         DAPRuntimeEmitter.emitBreakpointHelpers(w);

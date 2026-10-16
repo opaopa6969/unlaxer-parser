@@ -1,0 +1,35 @@
+package org.example.autoeval;
+import java.util.*;
+import com.google.gson.*;
+public final class Probe extends AutoEvalEvaluator<Object> {
+    private final List<String> events = new ArrayList<>();
+    private Object value(String text) {
+        if (text.equals("true")) return true;
+        if (text.equals("false")) return false;
+        if (text.matches("-?[0-9]+")) return Long.parseLong(text);
+        return text;
+    }
+    @Override protected Object convertValue(Object value) {
+        events.add("literal:"+value); if (value.equals("fail")) throw new IllegalArgumentException("literal failure"); return value(value.toString());
+    }
+    @Override protected Object evalManual(AutoEvalAST.Manual node) {
+        events.add("manual:"+node.value());
+        if (node.value().equals("fail")) throw new IllegalArgumentException("requested failure");
+        return value(node.value());
+    }
+    @Override protected Object evalUnknown(AutoEvalAST.Unknown node) {events.add("unknown:"+node.value()); return value(node.value());}
+    @Override protected Object resolveVariable(String name) {events.add("variable:"+name);if(name.equals("missing"))throw new IllegalArgumentException("variable failure");return "resolved:"+name;}
+    @Override protected Object evalLeaf(String literal) {events.add("leaf:"+literal);return value(literal);}
+    @Override protected Object applyBinary(String op,Object left,Object right) {
+        events.add("binary:"+op);if(((Number)right).longValue()==13)throw new IllegalArgumentException("binary failure");return ((Number)left).longValue()+((Number)right).longValue();
+    }
+    public static JsonObject invalidBinary() {
+        return run(new AutoEvalAST.Binary(new AutoEvalAST.Leaf("1"),List.of("+"),List.of()));
+    }
+    public static JsonObject run(AutoEvalAST ast) {
+        var probe = new Probe(); var out = new JsonObject();
+        try {out.add("value",new Gson().toJsonTree(probe.eval(ast)));}
+        catch(IllegalArgumentException failure){out.addProperty("error",failure.getMessage());}
+        out.add("events",new Gson().toJsonTree(probe.events));return out;
+    }
+}

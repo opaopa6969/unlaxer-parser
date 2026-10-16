@@ -1,0 +1,13 @@
+# id	success	warm_wrappers	retry_wrappers	resource	retry_success	hits
+failure_limit	false	0	1010	true	false	0
+failure_same	false	0	0	false	false	1
+failure_deeper	false	0	8	false	true	0
+failure_shallower	false	8	0	false	false	1
+failure_nested_same	false	8	8	false	true	1
+failure_deep_allowed	false	0	900	false	true	0
+success_same	true	0	0	false	true	1
+success_deeper	true	0	8	false	true	0
+success_shallower	true	8	0	false	true	1
+success_nested_same	true	8	8	false	true	1
+success_deep_allowed	true	0	900	false	true	0
+success_limit	true	0	1010	true	false	0

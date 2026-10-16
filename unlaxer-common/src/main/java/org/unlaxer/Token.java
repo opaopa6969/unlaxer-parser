@@ -139,6 +139,233 @@ public class Token implements Serializable{
 		return copy;
 	}
 
+    /**
+     * Internal memo snapshot plan. Traversal and pending frames are bounded by the structural
+     * charge limit (not an RSS estimate); unsupported or malformed public trees return null rather
+     * than entering recursive/overridable deepCopy. The caller must own the tree and not mutate it
+     * concurrently.
+     */
+    public static MemoSnapshot prepareMemoSnapshot(TokenList roots, long limit) {
+        if (roots == null
+                || roots.getClass() != TokenList.class
+                || limit < 64
+                || limit > 64L * 1024 * 1024
+                || roots.size() > (limit - 64) / 16) return null;
+        long bytes = 64 + 16L * roots.size();
+        var nodes = new ArrayList<MemoNode>();
+        var ids = new java.util.IdentityHashMap<Token, Integer>();
+        var sources = new java.util.IdentityHashMap<Source, Boolean>();
+        var frames = new ArrayDeque<MemoFrame>();
+        int[] rootIds = new int[roots.size()];
+        frames.push(new MemoFrame(roots, -1));
+        while (!frames.isEmpty()) {
+            MemoFrame frame = frames.peek();
+            if (frame.next == frame.children.size()) {
+                frames.pop();
+                continue;
+            }
+            int slot = frame.next++;
+            Token token = frame.children.get(slot);
+            if (token == null
+                    || token.getClass() != Token.class
+                    || ids.containsKey(token)
+                    || token.parser == null
+                    || token.tokenKind == null
+                    || !memoSourceSafe(token.source, sources, (int) (limit / 128))
+                    || token.originalChildren == null
+                    || token.originalChildren.getClass() != TokenList.class
+                    || token.filteredChildren == null
+                    || token.filteredChildren.getClass() != TokenList.class) return null;
+            int children = token.originalChildren.size(), filtered = token.filteredChildren.size();
+            int extras = token.extraObjectByName == null ? 0 : token.extraObjectByName.size();
+            int related = token.relatedTokenByName == null ? 0 : token.relatedTokenByName.size();
+            long charge =
+                    512L
+                            + 8L * token.tokenString.orElse("").length()
+                            + 24L * children
+                            + 16L * filtered
+                            + (extras == 0 ? 0 : 128L + 128L * extras)
+                            + (related == 0 ? 0 : 128L + 128L * related);
+            if (charge > limit - bytes || filtered > children) return null;
+            Object[] extraValues = memoMapSnapshot(token.extraObjectByName, extras);
+            Object[] relatedValues = memoMapSnapshot(token.relatedTokenByName, related);
+            if (extraValues == null || relatedValues == null) return null;
+            bytes += charge;
+            int index = nodes.size();
+            ids.put(token, index);
+            nodes.add(
+                    new MemoNode(
+                            token, frame.parent, children, filtered, extraValues, relatedValues));
+            if (frame.parent < 0) rootIds[slot] = index;
+            else nodes.get(frame.parent).children[slot] = index;
+            if (children != 0) frames.push(new MemoFrame(token.originalChildren, index));
+        }
+        boolean[] filteredSeen = new boolean[nodes.size()];
+        for (int i = 0; i < nodes.size(); i++) {
+            MemoNode node = nodes.get(i);
+            for (int j = 0; j < node.filtered.length; j++) {
+                Integer child = ids.get(node.token.filteredChildren.get(j));
+                if (child == null || nodes.get(child).parent != i || filteredSeen[child])
+                    return null;
+                filteredSeen[child] = true;
+                node.filtered[j] = child;
+            }
+        }
+        return new MemoSnapshot(nodes, rootIds, bytes);
+    }
+
+    private static boolean memoSourceSafe(
+            Source source, java.util.IdentityHashMap<Source, Boolean> seen, int maximum) {
+        if (source == null) return false;
+        if (seen.containsKey(source)) return true;
+        var pending = new ArrayDeque<Source>();
+        pending.push(source);
+        while (!pending.isEmpty()) {
+            Source next = pending.pop();
+            if (seen.containsKey(next)) continue;
+            if (next.getClass() != StringSource.class && next.getClass() != RangedString.class
+                    || seen.size() >= maximum) return false;
+            seen.put(next, Boolean.TRUE);
+            // Exact built-ins only: no custom Source callback. Do not traverse text/CP arrays.
+            Source root = next.root();
+            if (root == null) return false;
+            pending.push(root);
+            next.parent().ifPresent(pending::push);
+        }
+        return true;
+    }
+
+    private static final Object[] NO_MEMO_METADATA = new Object[0];
+
+    private static Object[] memoMapSnapshot(Map<Name, ?> map, int expected) {
+        if (map == null || expected == 0 && map.isEmpty()) return NO_MEMO_METADATA;
+        Object[] result = new Object[expected * 2];
+        int count = 0;
+        for (var entry : map.entrySet()) {
+            Name name = entry.getKey();
+            if (count >= expected || name == null || name.getClass() != Name.class) return null;
+            result[count * 2] = name;
+            result[count * 2 + 1] = entry.getValue();
+            count++;
+        }
+        return count == expected ? result : null;
+    }
+
+    private static final class MemoFrame {
+        final TokenList children;
+        final int parent;
+        int next;
+
+        MemoFrame(TokenList children, int parent) {
+            this.children = children;
+            this.parent = parent;
+        }
+    }
+
+    private static final class MemoNode {
+        Token token;
+        final int parent;
+        final int[] children, filtered;
+        final Object[] extras, related;
+        final Parser parser;
+
+        MemoNode(
+                Token token,
+                int parent,
+                int children,
+                int filtered,
+                Object[] extras,
+                Object[] related) {
+            this.token = token;
+            this.parent = parent;
+            this.parser = token.parser;
+            this.children = new int[children];
+            this.filtered = new int[filtered];
+            this.extras = extras;
+            this.related = related;
+        }
+    }
+
+    /**
+     * Opaque, memo-owned topology. Sources/host metadata values retain their historical shallow
+     * contract.
+     */
+    public static final class MemoSnapshot {
+        private final List<MemoNode> nodes;
+        private final int[] roots;
+        private final long bytes;
+
+        private MemoSnapshot(List<MemoNode> nodes, int[] roots, long bytes) {
+            this.nodes = nodes;
+            this.roots = roots;
+            this.bytes = bytes;
+        }
+
+        public long retainedBytes() {
+            return bytes;
+        }
+
+        /** First copy releases all original token references from the retained plan. */
+        public TokenList freeze() {
+            Token[] copies = copies();
+            for (int i = 0; i < copies.length; i++) nodes.get(i).token = copies[i];
+            return rootList(copies);
+        }
+
+        /** Replay never calls public deepCopy or source/parser callbacks, even for deep trees. */
+        public TokenList copy() {
+            Token[] copies = copies();
+            return rootList(copies);
+        }
+
+        private TokenList rootList(Token[] copies) {
+            TokenList result = new TokenList(roots.length);
+            for (int root : roots) result.add(copies[root]);
+            return result;
+        }
+
+        private Token[] copies() {
+            Token[] result = new Token[nodes.size()];
+            for (int i = nodes.size() - 1; i >= 0; i--) {
+                MemoNode node = nodes.get(i);
+                TokenList children = new TokenList(node.children.length);
+                for (int child : node.children) children.add(result[child]);
+                TokenList filtered = new TokenList(node.filtered.length);
+                for (int child : node.filtered) filtered.add(result[child]);
+                Token copy = new Token(node.token, node.parser, children, filtered);
+                copyMemoMaps(node, copy);
+                result[i] = copy;
+            }
+            return result;
+        }
+
+        private static void copyMemoMaps(MemoNode node, Token target) {
+            for (int i = 0; i < node.extras.length; i += 2)
+                target.extraObjects().put((Name) node.extras[i], node.extras[i + 1]);
+            for (int i = 0; i < node.related.length; i += 2)
+                target.relatedTokens().put((Name) node.related[i], (Token) node.related[i + 1]);
+        }
+    }
+
+    /** Construct a checked memo copy without evaluating a custom Source or Parser. */
+    private Token(Token original, Parser capturedParser, TokenList children, TokenList filtered) {
+        tokenKind = original.tokenKind;
+        source = original.source;
+        tokenString = original.tokenString;
+        tokenRange =
+                original.tokenRange == null
+                        ? null
+                        : new Range(
+                                original.tokenRange.startIndexInclusive,
+                                original.tokenRange.endIndexExclusive);
+        parser = capturedParser;
+        parent = Optional.empty();
+        originalChildren = children;
+        filteredChildren = filtered;
+        Optional<Token> self = children.isEmpty() ? null : Optional.of(this);
+        for (Token child : children) child.parent = self;
+    }
+
 	public Token setParent(Token parentToken) {
 		parent = Optional.ofNullable(parentToken);
 		return this;

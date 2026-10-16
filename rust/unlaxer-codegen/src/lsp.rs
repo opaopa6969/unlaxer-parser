@@ -34,9 +34,14 @@ fn collect(expression: &Expression, keywords: &mut Vec<String>) {
         | Delimited(child)
         | TextValue(child)
         | ValueBoundary(child)
+        | CaptureBoundary { child, .. }
         | TriviaScope { child, .. }
         | LexicalTriviaScope { child, .. } => collect(child, keywords),
-        Capture { expression, .. } => collect(expression, keywords),
+        OwnedCapture {
+            child: expression, ..
+        }
+        | CaptureScope(expression)
+        | Capture { expression, .. } => collect(expression, keywords),
         Separated { child, separator } => {
             collect(child, keywords);
             collect(separator, keywords);
