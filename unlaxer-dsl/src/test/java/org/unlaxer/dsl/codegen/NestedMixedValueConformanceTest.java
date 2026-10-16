@@ -24,7 +24,7 @@ public class NestedMixedValueConformanceTest extends PreferredAstConformanceTest
                 var generated=generator.generate(grammar);units.add(unit(generated.packageName()+"."+generated.className(),generated.source()));
             }
             units.add(unit("nestedmixed.Probe",template(fixture,false)));
-            Path classes=temporary.newFolder().toPath();var compiler=ToolProvider.getSystemJavaCompiler();var diagnostics=new DiagnosticCollector<JavaFileObject>();
+            Path classes=temporary.newFolder().toPath();var compiler=org.unlaxer.dsl.Java21TestSupport.compiler();var diagnostics=new DiagnosticCollector<JavaFileObject>();
             try(var manager=compiler.getStandardFileManager(diagnostics,null,null)) {
                 boolean ok=compiler.getTask(null,manager,diagnostics,List.of("--release","21","-classpath",System.getProperty("java.class.path"),"-d",classes.toString()),null,units).call();
                 assertTrue(fixture.get("name")+diagnostics.getDiagnostics().toString(),ok);

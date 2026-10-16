@@ -33,7 +33,7 @@ public class EditorPipelineConformanceTest {
             Path adapter=java.resolve("TypedModelEditor.java");Files.copy(REPO.resolve("examples/semantic-model/TypedModelEditor.java"),adapter);paths.add(adapter.toString());
             Path server=java.resolve("TypedModelEditorServer.java");Files.copy(REPO.resolve("examples/semantic-model/TypedModelEditorServer.java"),server);paths.add(server.toString());
             var arguments=new ArrayList<>(List.of("--release","21","-classpath",System.getProperty("java.class.path"),"-d",java.toString()));arguments.addAll(paths);
-            assertEquals(0,ToolProvider.getSystemJavaCompiler().run(null,System.out,System.err,arguments.toArray(String[]::new)));
+            assertEquals(0,org.unlaxer.dsl.Java21TestSupport.compiler().run(null,System.out,System.err,arguments.toArray(String[]::new)));
             Path generated=Files.createDirectories(directory.resolve("generated"));
             var files=new RustBackend().generate(grammar);for(var file:files)Files.writeString(generated.resolve(file.relativePath()),file.content());
             Path nativeTarget=REPO.resolve("rust/target");

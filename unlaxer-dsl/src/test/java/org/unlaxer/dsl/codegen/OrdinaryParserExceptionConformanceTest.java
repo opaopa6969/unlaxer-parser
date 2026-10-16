@@ -42,7 +42,7 @@ public class OrdinaryParserExceptionConformanceTest extends PreferredAstConforma
             }
             units.add(unit("exceptionprobe.JavaProbe", template("JavaProbe.java", fixture, false)));
             Path output = temporary.newFolder().toPath();
-            var compiler = ToolProvider.getSystemJavaCompiler();
+            var compiler = org.unlaxer.dsl.Java21TestSupport.compiler();
             var diagnostics = new DiagnosticCollector<JavaFileObject>();
             try (var manager =
                     compiler.getStandardFileManager(

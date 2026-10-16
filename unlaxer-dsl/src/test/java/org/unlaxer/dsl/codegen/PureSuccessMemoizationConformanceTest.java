@@ -655,7 +655,7 @@ public class PureSuccessMemoizationConformanceTest {
                         }
                     });
         }
-        var compiler = ToolProvider.getSystemJavaCompiler();
+        var compiler = org.unlaxer.dsl.Java21TestSupport.compiler();
         var diagnostics = new DiagnosticCollector<JavaFileObject>();
         Path output = temporary.newFolder().toPath();
         try (var manager =
