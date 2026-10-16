@@ -16,7 +16,11 @@ import org.unlaxer.parser.elementary.AbstractTokenParser;
  * 正規表現パターンに基づいてトークンをマッチするパーサー基底クラス。
  *
  * <p>UBNF の {@code REGEX('pattern')} キーワードから生成されるパーサークラスの継承元。
- * 現在位置に正規表現をアンカリングして適用し、マッチした長さのソースを消費する。</p>
+ * 指定された TokenKind の現在位置に正規表現をアンカリングして適用し、
+ * マッチした Unicode コードポイント数のソースを消費する。</p>
+ *
+ * <p>反転指定では、正規表現が不一致のときに次の1コードポイントを返す。
+ * ゼロ幅の正規一致と入力末尾は非空トークンを生成しない。</p>
  *
  * <pre>
  * // UBNF での使い方:
@@ -35,19 +39,23 @@ public abstract class RegexTokenParser extends AbstractTokenParser implements Te
 
     @Override
     public Token getToken(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
-        int consumedPos = parseContext.getConsumedPosition().value();
-        String fullSource = parseContext.getSource().sourceAsString();
+        Source source = parseContext.getSource();
+        int position = parseContext.getPosition(tokenKind).value();
+        String fullSource = source.sourceAsString();
 
-        if (consumedPos >= fullSource.length()) {
+        if (position >= source.codePointLength().value()) {
             return Token.empty(tokenKind, parseContext.getCursor(TokenKind.consumed), this);
         }
 
-        String remaining = fullSource.substring(consumedPos);
+        int stringPosition = fullSource.offsetByCodePoints(0, position);
+        String remaining = fullSource.substring(stringPosition);
         Matcher matcher = pattern.matcher(remaining);
 
         boolean matched = matcher.lookingAt();
         if (matched ^ invertMatch) {
-            int len = matcher.group().length();
+            // An unmatched pattern has no group/end; inverted tokens use the same
+            // one-scalar progress rule as SingleCharacterParser instead of guessing a width.
+            int len = invertMatch ? 1 : remaining.codePointCount(0, matcher.end());
             if (len == 0) {
                 return Token.empty(tokenKind, parseContext.getCursor(TokenKind.consumed), this);
             }
