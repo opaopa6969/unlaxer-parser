@@ -318,7 +318,11 @@ fn transparent_constraint_projection(root: &Expression) -> bool {
             PredictiveChoice { alternatives, .. } if !alternatives.is_empty() => {
                 pending.extend(alternatives)
             }
-            Capture { expression, .. }
+            OwnedCapture {
+                child: expression, ..
+            }
+            | CaptureScope(expression)
+            | Capture { expression, .. }
             | Delimited(expression)
             | ValueBoundary(expression)
             | NamePredicate {
@@ -380,7 +384,11 @@ fn root_reaches_projection_boundary(ir: &GrammarIr) -> bool {
                     pending.extend(children);
                 }
                 PredictiveChoice { alternatives, .. } => pending.extend(alternatives),
-                Capture { expression, .. }
+                OwnedCapture {
+                    child: expression, ..
+                }
+                | CaptureScope(expression)
+                | Capture { expression, .. }
                 | OptionalExpr(expression)
                 | Delimited(expression)
                 | TextValue(expression)
@@ -537,7 +545,9 @@ fn expression(
                 expression(child, count, captures)?;
             }
         }
-        OptionalExpr(child)
+        OwnedCapture { child, .. }
+        | CaptureScope(child)
+        | OptionalExpr(child)
         | Delimited(child)
         | TextValue(child)
         | ValueBoundary(child)

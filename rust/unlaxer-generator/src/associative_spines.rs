@@ -101,7 +101,9 @@ fn visit(
                 true
             }
         }
-        ElementKind::Group(b) => visit_body(g, b, seen, mapped, depth + 1, work)?,
+        ElementKind::Group(b)
+        | ElementKind::OwnedCapture { body: b, .. }
+        | ElementKind::CaptureScope(b) => visit_body(g, b, seen, mapped, depth + 1, work)?,
         ElementKind::Optional(b) | ElementKind::Repeat(b) => {
             visit_body(g, b, seen, mapped, depth + 1, work)?;
             true

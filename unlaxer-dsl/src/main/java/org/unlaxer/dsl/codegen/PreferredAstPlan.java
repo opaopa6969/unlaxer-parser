@@ -78,8 +78,12 @@ public final class PreferredAstPlan {
         if (atom instanceof RuleRefElement ref) {
             int id = rules.indexOf(ref.name());
             if (id >= 0) calls.add(new Call(id, depth));
-        } else if (atom instanceof GroupElement group)
-            body(group.body(), depth, plan, rules, calls);
+        } else if (atom instanceof TransparentElement group) {
+            var child=single(group.body());
+            if (!(atom instanceof GroupElement) && child instanceof RuleRefElement)
+                atom(child,depth,plan,rules,calls);
+            else body(group.body(), depth, plan, rules, calls);
+        }
         else if (atom instanceof OptionalElement optional) {
             var child = single(optional.body());
             if (child instanceof RuleRefElement || child instanceof TerminalElement)

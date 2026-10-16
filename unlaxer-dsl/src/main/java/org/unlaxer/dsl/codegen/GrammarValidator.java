@@ -1,5 +1,7 @@
 package org.unlaxer.dsl.codegen;
 
+import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
+
 import org.unlaxer.dsl.bootstrap.UBNFAST;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AnnotatedElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.Annotation;
@@ -1107,7 +1109,7 @@ public final class GrammarValidator {
             } else if (current instanceof UBNFAST.BoundedRepeatElement repeat) {
                 bounded.add(repeat);
                 pending.push(repeat.body());
-            } else if (current instanceof UBNFAST.GroupElement group) {
+            } else if (current instanceof UBNFAST.TransparentElement group) {
                 pending.push(group.body());
             } else if (current instanceof UBNFAST.OptionalElement optional) {
                 pending.push(optional.body());
@@ -1193,7 +1195,7 @@ public final class GrammarValidator {
     }
 
     private static void collectCaptureNamesFromAtomic(AtomicElement element, Set<String> captures) {
-        if (element instanceof GroupElement group) {
+        if (element instanceof TransparentElement group) {
             collectCaptureNamesFromBody(group.body(), captures);
         } else if (element instanceof OptionalElement opt) {
             collectCaptureNamesFromBody(opt.body(), captures);
@@ -1242,7 +1244,7 @@ public final class GrammarValidator {
                 .map(ns -> ns + "." + ref.name())
                 .orElse(ref.name());
             refs.add(fullName);
-        } else if (element instanceof GroupElement group) {
+        } else if (element instanceof TransparentElement group) {
             collectReferencedRuleNamesFromBody(group.body(), refs);
         } else if (element instanceof OptionalElement opt) {
             collectReferencedRuleNamesFromBody(opt.body(), refs);
@@ -1277,7 +1279,7 @@ public final class GrammarValidator {
         if (element instanceof RepeatElement rep) {
             return true;
         }
-        if (element instanceof GroupElement group) {
+        if (element instanceof TransparentElement group) {
             return containsRepeat(group.body());
         }
         if (element instanceof OptionalElement opt) {

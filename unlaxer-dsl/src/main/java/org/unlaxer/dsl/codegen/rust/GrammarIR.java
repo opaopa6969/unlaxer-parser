@@ -71,7 +71,7 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
         OptionalExpr, Repeat, Separated, AnyToken, EofToken, EmptyToken, CaseInsensitiveToken, ErrorExpected, CharRangeToken,
         ExceptToken, UntilToken, LookaheadToken, Delimited, IdentifierToken, GraphemeToken, QuotedToken,
         CodeStartToken, CodeEndToken, LongCodeBlockToken, CustomToken, TextValue, ValueBoundary, TriviaScope, RuleEffects,
-        CaptureEquality, NamePredicate, NameResolutionScope, Recovery, LexicalToken, LexicalTriviaScope, LexicalContextScope {}
+        CaptureEquality, NamePredicate, NameResolutionScope, Recovery, LexicalToken, LexicalTriviaScope, LexicalContextScope, GeneralBody, Replay {}
     public record LexicalContextScope(Expression child, List<org.unlaxer.dsl.runtime.Lexing.Terminal> terminals) implements Expression {
         public LexicalContextScope { terminals = List.copyOf(terminals); }
     }
@@ -141,5 +141,16 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
             }
         }
     }
+    public sealed interface GeneralBody extends Expression permits OwnedCapture, CaptureScope {
+        Expression child();
+        GeneralBody withChild(Expression child);
+    }
+    public record OwnedCapture(String name, Expression child) implements GeneralBody {
+        @Override public GeneralBody withChild(Expression child) { return new OwnedCapture(name, child); }
+    }
+    public record CaptureScope(Expression child) implements GeneralBody {
+        @Override public GeneralBody withChild(Expression child) { return new CaptureScope(child); }
+    }
+    public record Replay(String name) implements Expression {}
     public record Capture(String name, Expression expression) implements Expression {}
 }

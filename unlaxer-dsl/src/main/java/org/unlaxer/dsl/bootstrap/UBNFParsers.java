@@ -1389,6 +1389,8 @@ public class UBNFParsers {
         @Override
         public Parsers getLazyParsers() {
             return new Parsers(
+                new org.unlaxer.parser.combinator.Not(new Choice(
+                    ownedCallStart("CAPTURE"), ownedCallStart("SAME_AS"), ownedCallStart("CAPTURE_SCOPE"))),
                 Parser.get(RuleRefElementParser.class)
             );
         }
@@ -1398,6 +1400,33 @@ public class UBNFParsers {
      * GroupElement: '(' RuleBody ')'
      * Circular: references RuleBodyParser
      */
+    private static Parser ownedCallStart(String name) {
+        // Only an adjacent opening parenthesis reserves the builtin spelling.
+        // Trivia keeps the existing ordinary-reference followed by group syntax.
+        return new org.unlaxer.parser.combinator.Chain(
+            annotationKeyword(name), Parser.get(LeftParenthesisParser.class));
+    }
+
+    public static class OwnedCaptureElementParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+        @Override public Parsers getLazyParsers() {
+            return new Parsers(ownedCallStart("CAPTURE"), Parser.get(IdentifierParser.class),
+                Parser.get(CommaParser.class), Parser.get(RuleBodyParser.class), Parser.get(RightParenthesisParser.class));
+        }
+    }
+    public static class ReplayElementParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+        @Override public Parsers getLazyParsers() {
+            return new Parsers(ownedCallStart("SAME_AS"), Parser.get(IdentifierParser.class), Parser.get(RightParenthesisParser.class));
+        }
+    }
+    public static class CaptureScopeElementParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+        @Override public Parsers getLazyParsers() {
+            return new Parsers(ownedCallStart("CAPTURE_SCOPE"), Parser.get(RuleBodyParser.class), Parser.get(RightParenthesisParser.class));
+        }
+    }
+
     public static class GroupElementParser extends UBNFLazyChain {
         private static final long serialVersionUID = 1L;
 
@@ -1475,6 +1504,9 @@ public class UBNFParsers {
             // 先頭トークンで即コミット可能なものを先に配置し、
             // IDENTIFIER ベースの QuantifiedRef を最後に配置して backtracking 爆発を回避する。
             return new Parsers(
+                Parser.get(OwnedCaptureElementParser.class),
+                Parser.get(ReplayElementParser.class),
+                Parser.get(CaptureScopeElementParser.class),
                 Parser.get(GroupElementParser.class),    // (
                 Parser.get(OptionalElementParser.class), // [
                 Parser.get(RepeatElementParser.class),   // { (BoundedQuantifier より先)
