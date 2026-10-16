@@ -1,0 +1,889 @@
+[
+  {
+    "name": "direct-node",
+    "grammar": "grammar Recursive { @package: recursiveprobe @whitespace: none @root @mapping(Container,params=[value]) Root ::= H @value; H ::= '(' H ')' | Leaf; @mapping(Leaf,params=[text]) Leaf ::= '😀' @text; }",
+    "javaMethods": "@Override protected Integer evalContainer(RecursiveAST.Container node){return 42;} @Override protected Integer evalLeaf(RecursiveAST.Leaf node){return 42;}",
+    "rustMethods": "fn eval_container(&mut self,_value:&Ast,_span:Span)->i32{42} fn eval_leaf(&mut self,_text:&str,_span:Span)->i32{42}",
+    "cases": [
+      {
+        "input": "😀",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Container",
+            "span": [
+              0,
+              1
+            ],
+            "fields": {
+              "value": {
+                "type": "Leaf",
+                "span": [
+                  0,
+                  1
+                ],
+                "fields": {
+                  "text": "😀"
+                }
+              }
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "((😀))",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Container",
+            "span": [
+              0,
+              5
+            ],
+            "fields": {
+              "value": {
+                "type": "Leaf",
+                "span": [
+                  2,
+                  3
+                ],
+                "fields": {
+                  "text": "😀"
+                }
+              }
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      },
+      {
+        "input": "((((((((((((((((((((😀))))))))))))))))))))",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Container",
+            "span": [
+              0,
+              41
+            ],
+            "fields": {
+              "value": {
+                "type": "Leaf",
+                "span": [
+                  20,
+                  21
+                ],
+                "fields": {
+                  "text": "😀"
+                }
+              }
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((😀))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))",
+        "expected": {
+          "status": "limit"
+        }
+      }
+    ]
+  },
+  {
+    "name": "mutual-node",
+    "grammar": "grammar Recursive { @package: recursiveprobe @whitespace: none @root @mapping(Container,params=[value]) Root ::= H @value; H ::= '(' J ')' | Leaf; J ::= '[' H ']'; @mapping(Leaf,params=[text]) Leaf ::= '😀' @text; }",
+    "javaMethods": "@Override protected Integer evalContainer(RecursiveAST.Container node){return 42;} @Override protected Integer evalLeaf(RecursiveAST.Leaf node){return 42;}",
+    "rustMethods": "fn eval_container(&mut self,_value:&Ast,_span:Span)->i32{42} fn eval_leaf(&mut self,_text:&str,_span:Span)->i32{42}",
+    "cases": [
+      {
+        "input": "([😀])",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Container",
+            "span": [
+              0,
+              5
+            ],
+            "fields": {
+              "value": {
+                "type": "Leaf",
+                "span": [
+                  2,
+                  3
+                ],
+                "fields": {
+                  "text": "😀"
+                }
+              }
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "node-list",
+    "grammar": "grammar Recursive { @package: recursiveprobe @whitespace: none @root @mapping(Container,params=[value]) Root ::= H @value; H ::= Leaf [ H ]; @mapping(Leaf,params=[text]) Leaf ::= '😀' @text; }",
+    "javaMethods": "@Override protected Integer evalContainer(RecursiveAST.Container node){return 42;} @Override protected Integer evalLeaf(RecursiveAST.Leaf node){return 42;}",
+    "rustMethods": "fn eval_container(&mut self,_value:&[Ast],_span:Span)->i32{42} fn eval_leaf(&mut self,_text:&str,_span:Span)->i32{42}",
+    "cases": [
+      {
+        "input": "😀😀",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Container",
+            "span": [
+              0,
+              2
+            ],
+            "fields": {
+              "value": [
+                {
+                  "type": "Leaf",
+                  "span": [
+                    0,
+                    1
+                  ],
+                  "fields": {
+                    "text": "😀"
+                  }
+                },
+                {
+                  "type": "Leaf",
+                  "span": [
+                    1,
+                    2
+                  ],
+                  "fields": {
+                    "text": "😀"
+                  }
+                }
+              ]
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "😀",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Container",
+            "span": [
+              0,
+              1
+            ],
+            "fields": {
+              "value": [
+                {
+                  "type": "Leaf",
+                  "span": [
+                    0,
+                    1
+                  ],
+                  "fields": {
+                    "text": "😀"
+                  }
+                }
+              ]
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "mixed-value",
+    "grammar": "grammar Recursive { @package: recursiveprobe @whitespace: none @root @mapping(Container,params=[value]) Root ::= H @value; H ::= '(' H ')' | Leaf | 'x'; @mapping(Leaf,params=[text]) Leaf ::= '😀' @text; }",
+    "javaMethods": "@Override protected Integer evalContainer(RecursiveAST.Container node){return 42;} @Override protected Integer evalLeaf(RecursiveAST.Leaf node){return 42;}",
+    "rustMethods": "fn eval_container(&mut self,_value:&AstValue,_span:Span)->i32{42} fn eval_leaf(&mut self,_text:&str,_span:Span)->i32{42}",
+    "cases": [
+      {
+        "input": "(x)",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Container",
+            "span": [
+              0,
+              3
+            ],
+            "fields": {
+              "value": "(x)"
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "(😀)",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Container",
+            "span": [
+              0,
+              3
+            ],
+            "fields": {
+              "value": {
+                "type": "Leaf",
+                "span": [
+                  1,
+                  2
+                ],
+                "fields": {
+                  "text": "😀"
+                }
+              }
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "enum-alias",
+    "grammar": "grammar Recursive { @package: recursiveprobe @whitespace: none @root @mapping(Container,params=[value]) Root ::= H @value; H ::= '(' H ')' | Mode; @enum Mode ::= 'on' | 'off'; }",
+    "javaMethods": "@Override protected Integer evalContainer(RecursiveAST.Container node){return 42;} ",
+    "rustMethods": "fn eval_container(&mut self,_value:&Mode,_span:Span)->i32{42} ",
+    "cases": [
+      {
+        "input": "((on))",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Container",
+            "span": [
+              0,
+              6
+            ],
+            "fields": {
+              "value": "ON"
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "off",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Container",
+            "span": [
+              0,
+              3
+            ],
+            "fields": {
+              "value": "OFF"
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "text-recursion",
+    "grammar": "grammar Recursive { @package: recursiveprobe @whitespace: none @root @mapping(Container,params=[value]) Root ::= H @value; H ::= '(' H ')' | 'é'; }",
+    "javaMethods": "@Override protected Integer evalContainer(RecursiveAST.Container node){return 42;} ",
+    "rustMethods": "fn eval_container(&mut self,_value:&str,_span:Span)->i32{42} ",
+    "cases": [
+      {
+        "input": "((é))",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Container",
+            "span": [
+              0,
+              6
+            ],
+            "fields": {
+              "value": "((é))"
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "é",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Container",
+            "span": [
+              0,
+              2
+            ],
+            "fields": {
+              "value": "é"
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "optional-node",
+    "grammar": "grammar Recursive { @package: recursiveprobe @whitespace: none @root @mapping(Container,params=[value]) Root ::= H @value; H ::= '(' H ')' | [ Leaf ]; @mapping(Leaf,params=[text]) Leaf ::= '😀' @text;  }",
+    "javaMethods": "@Override protected Integer evalContainer(RecursiveAST.Container node){return 42;} @Override protected Integer evalLeaf(RecursiveAST.Leaf node){return 42;}",
+    "rustMethods": "fn eval_container(&mut self,_value:Option<&Ast>,_span:Span)->i32{42} fn eval_leaf(&mut self,_text:&str,_span:Span)->i32{42}",
+    "cases": [
+      {
+        "input": "",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Container",
+            "span": [
+              0,
+              0
+            ],
+            "fields": {
+              "value": null
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "()",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Container",
+            "span": [
+              0,
+              2
+            ],
+            "fields": {
+              "value": null
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "(😀)",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Container",
+            "span": [
+              0,
+              3
+            ],
+            "fields": {
+              "value": {
+                "type": "Leaf",
+                "span": [
+                  1,
+                  2
+                ],
+                "fields": {
+                  "text": "😀"
+                }
+              }
+            }
+          },
+          "eval": 42
+        }
+      }
+    ]
+  },
+  {
+    "name": "enum-list",
+    "grammar": "grammar Recursive { @package: recursiveprobe @whitespace: none @root @mapping(Container,params=[value]) Root ::= H @value; H ::= Mode [ ';' H ]; @enum Mode ::= 'on' | 'off'; }",
+    "javaMethods": "@Override protected Integer evalContainer(RecursiveAST.Container node){return 42;} ",
+    "rustMethods": "fn eval_container(&mut self,_value:&[Mode],_span:Span)->i32{42} ",
+    "cases": [
+      {
+        "input": "on;off;on",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Container",
+            "span": [
+              0,
+              9
+            ],
+            "fields": {
+              "value": [
+                "ON",
+                "OFF",
+                "ON"
+              ]
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "inner-captures",
+    "grammar": "grammar Recursive { @package: recursiveprobe @whitespace: none @root @mapping(Container,params=[value]) Root ::= H @value; H ::= Leaf @value [H]; @mapping(Leaf,params=[text]) Leaf ::= '😀' @text;  }",
+    "javaMethods": "@Override protected Integer evalContainer(RecursiveAST.Container node){return 42;} @Override protected Integer evalLeaf(RecursiveAST.Leaf node){return 42;}",
+    "rustMethods": "fn eval_container(&mut self,_value:&[Ast],_span:Span)->i32{42} fn eval_leaf(&mut self,_text:&str,_span:Span)->i32{42}",
+    "cases": [
+      {
+        "input": "😀😀",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Container",
+            "span": [
+              0,
+              2
+            ],
+            "fields": {
+              "value": [
+                {
+                  "type": "Leaf",
+                  "span": [
+                    0,
+                    1
+                  ],
+                  "fields": {
+                    "text": "😀"
+                  }
+                },
+                {
+                  "type": "Leaf",
+                  "span": [
+                    1,
+                    2
+                  ],
+                  "fields": {
+                    "text": "😀"
+                  }
+                }
+              ]
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "enum-node-recursion",
+    "grammar": "grammar Recursive { @package: recursiveprobe @whitespace: none @root @mapping(Container,params=[value]) Root ::= H @value; H ::= '(' H ')' | Leaf | Mode; @enum Mode ::= 'on' | 'off'; @mapping(Leaf,params=[text]) Leaf ::= '😀' @text;  }",
+    "javaMethods": "@Override protected Integer evalContainer(RecursiveAST.Container node){return 42;} @Override protected Integer evalLeaf(RecursiveAST.Leaf node){return 42;}",
+    "rustMethods": "fn eval_container(&mut self,_value:&AstValue,_span:Span)->i32{42} fn eval_leaf(&mut self,_text:&str,_span:Span)->i32{42}",
+    "cases": [
+      {
+        "input": "(on)",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Container",
+            "span": [
+              0,
+              4
+            ],
+            "fields": {
+              "value": {
+                "enum": "Mode",
+                "value": "ON",
+                "span": [
+                  1,
+                  3
+                ]
+              }
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "(😀)",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Container",
+            "span": [
+              0,
+              3
+            ],
+            "fields": {
+              "value": {
+                "type": "Leaf",
+                "span": [
+                  1,
+                  2
+                ],
+                "fields": {
+                  "text": "😀"
+                }
+              }
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "node-text-list",
+    "grammar": "grammar Recursive { @package: recursiveprobe @whitespace: none @root @mapping(Container,params=[value]) Root ::= H @value; H ::= Leaf [ H ] | 'end'; @mapping(Leaf,params=[text]) Leaf ::= '😀' @text;  }",
+    "javaMethods": "@Override protected Integer evalContainer(RecursiveAST.Container node){return 42;} @Override protected Integer evalLeaf(RecursiveAST.Leaf node){return 42;}",
+    "rustMethods": "fn eval_container(&mut self,_value:&[AstValue],_span:Span)->i32{42} fn eval_leaf(&mut self,_text:&str,_span:Span)->i32{42}",
+    "cases": [
+      {
+        "input": "😀end",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Container",
+            "span": [
+              0,
+              4
+            ],
+            "fields": {
+              "value": [
+                {
+                  "type": "Leaf",
+                  "span": [
+                    0,
+                    1
+                  ],
+                  "fields": {
+                    "text": "😀"
+                  }
+                },
+                "end"
+              ]
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "end",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Container",
+            "span": [
+              0,
+              3
+            ],
+            "fields": {
+              "value": [
+                "end"
+              ]
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "integer-node-list",
+    "grammar": "grammar Recursive { @package: recursiveprobe @whitespace: none token NUM = org.unlaxer.parser.elementary.NumberParser @root @mapping(Container,params=[value]) Root ::= H @value; H ::= Leaf [ ',' H ]; @mapping(Leaf,params=[text]) Leaf ::= NUM @text; }",
+    "javaMethods": "@Override protected Integer evalContainer(RecursiveAST.Container node){return 42;} @Override protected Integer evalLeaf(RecursiveAST.Leaf node){return 42;}",
+    "rustMethods": "fn eval_container(&mut self,_value:&[Ast],_span:Span)->i32{42} fn eval_leaf(&mut self,_text:&i32,_span:Span)->i32{42}",
+    "cases": [
+      {
+        "input": "1,-2",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Container",
+            "span": [
+              0,
+              4
+            ],
+            "fields": {
+              "value": [
+                {
+                  "type": "Leaf",
+                  "span": [
+                    0,
+                    1
+                  ],
+                  "fields": {
+                    "text": 1
+                  }
+                },
+                {
+                  "type": "Leaf",
+                  "span": [
+                    2,
+                    4
+                  ],
+                  "fields": {
+                    "text": -2
+                  }
+                }
+              ]
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "no-finite-tail",
+    "grammar": "grammar Recursive { @package: recursiveprobe @whitespace: none @root @mapping(Container,params=[value]) Root ::= H @value; H ::= 'x' H; }",
+    "javaMethods": "@Override protected Integer evalContainer(RecursiveAST.Container node){return 42;} ",
+    "rustMethods": "fn eval_container(&mut self,_value:&str,_span:Span)->i32{42} ",
+    "cases": [
+      {
+        "input": "",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      },
+      {
+        "input": "xxx",
+        "expected": {
+          "status": "syntax",
+          "offset": 3
+        }
+      }
+    ]
+  },
+  {
+    "name": "nullable-text-separator",
+    "grammar": "grammar Recursive { @package: recursiveprobe @whitespace: none @root @mapping(Container,params=[value]) Root ::= H @value; H ::= '(' H ')' | Leaf % [ Comma ]; Comma ::= ','; @mapping(Leaf,params=[text]) Leaf ::= 'x' @text; }",
+    "javaMethods": "@Override protected Integer evalContainer(RecursiveAST.Container node){return 42;} @Override protected Integer evalLeaf(RecursiveAST.Leaf node){return 42;}",
+    "rustMethods": "fn eval_container(&mut self,_value:&[Ast],_span:Span)->i32{42} fn eval_leaf(&mut self,_text:&str,_span:Span)->i32{42}",
+    "cases": [
+      {
+        "input": "x",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Container",
+            "span": [
+              0,
+              1
+            ],
+            "fields": {
+              "value": [
+                {
+                  "type": "Leaf",
+                  "span": [
+                    0,
+                    1
+                  ],
+                  "fields": {
+                    "text": "x"
+                  }
+                }
+              ]
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "xx",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Container",
+            "span": [
+              0,
+              2
+            ],
+            "fields": {
+              "value": [
+                {
+                  "type": "Leaf",
+                  "span": [
+                    0,
+                    1
+                  ],
+                  "fields": {
+                    "text": "x"
+                  }
+                },
+                {
+                  "type": "Leaf",
+                  "span": [
+                    1,
+                    2
+                  ],
+                  "fields": {
+                    "text": "x"
+                  }
+                }
+              ]
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "x,x",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Container",
+            "span": [
+              0,
+              3
+            ],
+            "fields": {
+              "value": [
+                {
+                  "type": "Leaf",
+                  "span": [
+                    0,
+                    1
+                  ],
+                  "fields": {
+                    "text": "x"
+                  }
+                },
+                {
+                  "type": "Leaf",
+                  "span": [
+                    2,
+                    3
+                  ],
+                  "fields": {
+                    "text": "x"
+                  }
+                }
+              ]
+            }
+          },
+          "eval": 42
+        }
+      },
+      {
+        "input": "(x,x)",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Container",
+            "span": [
+              0,
+              5
+            ],
+            "fields": {
+              "value": [
+                {
+                  "type": "Leaf",
+                  "span": [
+                    1,
+                    2
+                  ],
+                  "fields": {
+                    "text": "x"
+                  }
+                },
+                {
+                  "type": "Leaf",
+                  "span": [
+                    3,
+                    4
+                  ],
+                  "fields": {
+                    "text": "x"
+                  }
+                }
+              ]
+            }
+          },
+          "eval": 42
+        }
+      }
+    ]
+  }
+]
