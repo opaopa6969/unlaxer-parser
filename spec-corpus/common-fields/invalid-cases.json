@@ -118,5 +118,41 @@
         323
       ]
     }
+  },
+  {
+    "name": "mixed-cardinality",
+    "grammar": "grammar MixedFields {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(value,maybe,many)\n Root ::= A | B;\n @enum Mode ::= 'on' | '😀';\n @enum Heat ::= 'hot' | 'cold';\n @mapping(Leaf,params=[text]) Leaf ::= '<' 'node' @text '>';\n Item ::= Mode | Heat | Leaf | 'text';\n @mapping(A,params=[value,maybe,many]) A ::= 'a' Item @value '[' [Item] @maybe ']' '{' {Item} @many '}';\n @mapping(B,params=[value,maybe,many]) B ::= 'b' [Item] @value '[' [Item] @maybe ']' '{' {Item} @many '}';\n}",
+    "error": {
+      "code": "P-COMMONFIELD",
+      "rule": "Root",
+      "span": [
+        65,
+        133
+      ]
+    }
+  },
+  {
+    "name": "mixed-missing-capture",
+    "grammar": "grammar MixedFields {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(value,maybe,many)\n Root ::= A | B;\n @enum Mode ::= 'on' | '😀';\n @enum Heat ::= 'hot' | 'cold';\n @mapping(Leaf,params=[text]) Leaf ::= '<' 'node' @text '>';\n Item ::= Mode | Heat | Leaf | 'text';\n @mapping(A,params=[value,maybe,many]) A ::= 'a' Item @value '[' [Item] @maybe ']' '{' {Item} @many '}';\n @mapping(B,params=[value,maybe,many]) B ::= 'b' Item '[' [Item] @maybe ']' '{' {Item} @many '}';\n}",
+    "error": {
+      "code": "P-COMMONFIELD",
+      "rule": "Root",
+      "span": [
+        65,
+        133
+      ]
+    }
+  },
+  {
+    "name": "mixed-shared-missing-param",
+    "grammar": "grammar SharedMixedFields {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(value,maybe,many)\n Root ::= AEnum | AText | ANode | B;\n @enum Mode ::= 'on' | '😀';\n @enum Heat ::= 'hot' | 'cold';\n @mapping(Leaf,params=[text]) Leaf ::= '<' 'node' @text '>';\n Item ::= Mode | Heat | Leaf | 'text';\n @mapping(A,params=[maybe,many]) AEnum ::= 'm' Mode @value '[' [Mode] @maybe ']' '{' {Mode} @many '}';\n @mapping(A,params=[value,maybe,many]) AText ::= 't' 'text' @value '[' ['text'] @maybe ']' '{' {'text'} @many '}';\n @mapping(A,params=[value,maybe,many]) ANode ::= 'n' Leaf @value '[' [Leaf] @maybe ']' '{' {Leaf} @many '}';\n @mapping(B,params=[value,maybe,many]) B ::= 'b' Item @value '[' [Item] @maybe ']' '{' {Item} @many '}';\n}",
+    "error": {
+      "code": "P-COMMONFIELD",
+      "rule": "Root",
+      "span": [
+        71,
+        159
+      ]
+    }
   }
 ]

@@ -86,8 +86,23 @@ public final class CommonFieldSchema {
                     var lm = MapperElementUtil.getMappingAnnotation(leaf).orElseThrow();
                     if (!lm.paramNames().contains(name))
                         throw invalid(rule, "missing field " + name + " on " + lm.className());
+                    // Object is the established mixed-value contract, not evidence of a missing
+                    // capture.
+                    for (var contributor : grammar.rules()) {
+                        var cm = MapperElementUtil.getMappingAnnotation(contributor).orElse(null);
+                        if (cm != null
+                                && cm.className().equals(lm.className())
+                                && contributor.annotations().stream()
+                                        .noneMatch(SkipAnnotation.class::isInstance)
+                                && (!cm.paramNames().contains(name)
+                                        || MapperElementUtil.findCapturedElement(
+                                                        contributor.body(), name)
+                                                .isEmpty()))
+                            throw invalid(
+                                    rule, "missing capture " + name + " on " + contributor.name());
+                    }
                     String actual = new ASTGenerator().inferType(grammar, leaf, name);
-                    if (actual.equals("Object") || type != null && !type.equals(actual))
+                    if (type != null && !type.equals(actual))
                         throw invalid(rule, "incompatible field " + name + " on " + lm.className());
                     type = actual;
                 }

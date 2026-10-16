@@ -50,9 +50,9 @@ public final class RustGrammarLowering {
     private void leaveAnalysis() { analysisDepth--; }
 
     public static GrammarIR lower(GrammarDecl grammar) {
+        CommonFieldSchema.build(grammar);
         EnumSchema.validate(grammar);
         org.unlaxer.dsl.codegen.EvalSchema.specifications(grammar);
-        CommonFieldSchema.build(grammar);
         org.unlaxer.dsl.codegen.EmbeddedGrammarEmitter.declarations(grammar);
         var ir = new RustGrammarLowering(grammar).run();
         RustEvalEmitter.apply(grammar, ir, "");
