@@ -141,7 +141,7 @@ Java選択テストの成功だけを今回の実行証拠とする。Java全sui
 
 ## 完了の扱いと順序
 
-公開context/combinator、optional/repeatとtyped ASTを基盤として、次はtoken/annotationとcapture互換性を拡げる。追加実験で見つけたJava numeric capture #115とcapture選択 #116の生成コードは修正した。int変換とRustの字句保持の差は共有corpusで固定し、数値意味論のbackend間統一と外側captureの入れ子container型は未完了事項とする。下流の実装済み評価器・rustcodeblockはその契約とcorpusを利用し、Classic側の未対応と製品側の残る境界を別々に進める。各行を小さなPRに分け、テスト・CI・merge・子issue closeまで行う。全体issueは未対応行を残したままcloseしない。
+公開context/combinator、optional/repeatとtyped ASTを基盤として、次はtoken/annotationとcapture互換性を拡げる。追加実験で見つけたJava numeric capture #115とcapture選択 #116の生成コードは修正した。直接numeric captureのchecked int/i32変換は#566で統一し、外側captureの入れ子container型やpreferred AST選択は#547で継続する。下流の実装済み評価器・rustcodeblockはその契約とcorpusを利用し、Classic側の未対応と製品側の残る境界を別々に進める。各行を小さなPRに分け、テスト・CI・merge・子issue closeまで行う。全体issueは未対応行を残したままcloseしない。
 
 Javaの継承階層を一対一に移植するのではなく、文法と観測可能な振る舞いを対象とする。JVM任意オブジェクト・reflection・bytecodeのnative直接実行はできないため、Rust側のhost interfaceと移植コードの境界を明記する。差を消して比較を通したことにせず、意図的な差は独立したfixtureにする。
 
