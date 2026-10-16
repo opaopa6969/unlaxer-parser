@@ -12,6 +12,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+          overwrite-settings: false
       - uses: dtolnay/rust-toolchain@1.85.0
       - run: mvn -B -pl unlaxer-common -am test -Dtest=AnalysisPipelineTest -Dsurefire.failIfNoSpecifiedTests=false
       - run: cargo test --manifest-path rust/Cargo.toml -p unlaxer-runtime --test pipeline
