@@ -1,5 +1,7 @@
 package org.unlaxer.dsl.semantic;
 
+import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
+
 import com.google.gson.*;
 import com.google.gson.stream.*;
 import java.io.*;
@@ -46,7 +48,7 @@ public final class SemanticRulesLoader {
     }
     private static void atomic(AtomicElement element,Set<String> captures,int[] count,int depth) {
         if(depth>64 || ++count[0]>16384)throw error("LIMIT","inventory");
-        if(element instanceof GroupElement group)body(group.body(),captures,count,depth+1);
+        if(element instanceof TransparentElement group)body(group.body(),captures,count,depth+1);
         else if(element instanceof OptionalElement optional)body(optional.body(),captures,count,depth+1);
         else if(element instanceof RepeatElement repeat)body(repeat.body(),captures,count,depth+1);
         else if(element instanceof OneOrMoreElement repeat)atomic(repeat.body(),captures,count,depth+1);

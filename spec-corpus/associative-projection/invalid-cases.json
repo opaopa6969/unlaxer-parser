@@ -1,0 +1,20 @@
+[
+  {
+    "name": "no-mapping",
+    "grammar": "grammar Invalid { @package: invalidprobe @root  @leftAssoc @precedence(level=10) Expr ::= Base @left { '+' @op Base @right }; Base ::= 'x'; }",
+    "error": "E-ASSOC-NO-MAPPING",
+    "nativeError": "root must resolve to exactly one AST node"
+  },
+  {
+    "name": "missing-parameter",
+    "grammar": "grammar Invalid { @package: invalidprobe @root @mapping(Binary,params=[left,right]) @leftAssoc @precedence(level=10) Expr ::= Base @left { '+' @op Base @right }; Base ::= 'x'; }",
+    "error": "E-ASSOC-MAPPING-PARAM",
+    "nativeError": "@mapping params must match capture names"
+  },
+  {
+    "name": "noncanonical-right",
+    "grammar": "grammar Invalid { @package: invalidprobe @root @mapping(Binary,params=[left,op,right]) @rightAssoc @precedence(level=10) Expr ::= Base @left { '+' @op Base @right }; Base ::= 'x'; }",
+    "error": "E-RIGHTASSOC-NONCANONICAL",
+    "nativeError": "@rightAssoc requires left { op Self }"
+  }
+]

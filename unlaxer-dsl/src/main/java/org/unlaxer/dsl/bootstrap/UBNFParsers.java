@@ -599,7 +599,7 @@ public class UBNFParsers {
     }
 
     /**
-     * RegexExpressionParser: REGEX '(' STRING_LITERAL ')'
+     * Removed REGEX syntax: recognized only for a positioned migration error in UBNFMapper.
      * 例: REGEX('[a-z]+')
      */
     public static class RegexExpressionParser extends UBNFLazyChain {
@@ -730,6 +730,12 @@ public class UBNFParsers {
     // アノテーションパーサー
     // =========================================================================
 
+    // The boundary belongs to the keyword: no trivia may intervene before it.
+    private static Parser annotationKeyword(String keyword) {
+        return new org.unlaxer.parser.combinator.Chain(new WordParser(keyword),
+            new org.unlaxer.parser.combinator.Not(Parser.get(AlphabetNumericUnderScoreParser.class)));
+    }
+
     /**
      * RootAnnotation: '@root'
      */
@@ -739,7 +745,7 @@ public class UBNFParsers {
         @Override
         public Parsers getLazyParsers() {
             return new Parsers(
-                new WordParser("@root")
+                annotationKeyword("@root")
             );
         }
     }
@@ -825,7 +831,7 @@ public class UBNFParsers {
         @Override
         public Parsers getLazyParsers() {
             return new Parsers(
-                new WordParser("@whitespace"),
+                annotationKeyword("@whitespace"),
                 new org.unlaxer.parser.combinator.Optional(
                     new UBNFLazyChain() {
                         private static final long serialVersionUID = 1L;
@@ -1003,7 +1009,7 @@ public class UBNFParsers {
         @Override
         public Parsers getLazyParsers() {
             return new Parsers(
-                new WordParser("@leftAssoc")
+                annotationKeyword("@leftAssoc")
             );
         }
     }
@@ -1017,7 +1023,7 @@ public class UBNFParsers {
         @Override
         public Parsers getLazyParsers() {
             return new Parsers(
-                new WordParser("@rightAssoc")
+                annotationKeyword("@rightAssoc")
             );
         }
     }
@@ -1028,7 +1034,7 @@ public class UBNFParsers {
 
         @Override
         public Parsers getLazyParsers() {
-            return new Parsers(new WordParser("@longestChoice"));
+            return new Parsers(annotationKeyword("@longestChoice"));
         }
     }
 
@@ -1038,7 +1044,7 @@ public class UBNFParsers {
 
         @Override
         public Parsers getLazyParsers() {
-            return new Parsers(new WordParser("@uniqueLongestChoice"));
+            return new Parsers(annotationKeyword("@uniqueLongestChoice"));
         }
     }
 
@@ -1061,7 +1067,7 @@ public class UBNFParsers {
 
         @Override
         public Parsers getLazyParsers() {
-            return new Parsers(new WordParser("@predictiveChoice"));
+            return new Parsers(annotationKeyword("@predictiveChoice"));
         }
     }
 
@@ -1138,7 +1144,8 @@ public class UBNFParsers {
     }
 
     /**
-     * EvalAnnotation: '@eval' '(' 'kind' '=' STRING_LITERAL [',' 'strategy' '=' STRING_LITERAL] (',' IDENTIFIER '=' STRING_LITERAL)* ')'
+     * EvalAnnotation: '@eval' '(' 'kind' '=' STRING_LITERAL (',' IDENTIFIER '=' STRING_LITERAL)* ')'
+     * The optional strategy is a named argument, independent of parameter order.
      *
      * Declares evaluation hints for the code generator.
      */
@@ -1153,21 +1160,6 @@ public class UBNFParsers {
                 new WordParser("kind"),
                 Parser.get(EqualParser.class),
                 Parser.get(SingleQuotedParser.class),
-                new org.unlaxer.parser.combinator.Optional(
-                    new UBNFLazyChain() {
-                        private static final long serialVersionUID = 1L;
-
-                        @Override
-                        public Parsers getLazyParsers() {
-                            return new Parsers(
-                                Parser.get(CommaParser.class),
-                                new WordParser("strategy"),
-                                Parser.get(EqualParser.class),
-                                Parser.get(SingleQuotedParser.class)
-                            );
-                        }
-                    }
-                ),
                 new ZeroOrMore(
                     Parser.get(EvalParamParser.class)
                 ),
@@ -1234,7 +1226,7 @@ public class UBNFParsers {
         @Override
         public Parsers getLazyParsers() {
             return new Parsers(
-                new WordParser("@skip")
+                annotationKeyword("@skip")
             );
         }
     }
@@ -1266,7 +1258,7 @@ public class UBNFParsers {
 
         @Override
         public Parsers getLazyParsers() {
-            return new Parsers(new WordParser("@enum"));
+            return new Parsers(annotationKeyword("@enum"));
         }
     }
 
@@ -1282,7 +1274,7 @@ public class UBNFParsers {
                 new WordParser("@commonField"),
                 Parser.get(LeftParenthesisParser.class),
                 Parser.get(IdentifierParser.class),
-                new ZeroOrMore(new LazyChain() {
+                new ZeroOrMore(new UBNFLazyChain() {
                     private static final long serialVersionUID = 1L;
                     @Override
                     public Parsers getLazyParsers() {
@@ -1397,6 +1389,8 @@ public class UBNFParsers {
         @Override
         public Parsers getLazyParsers() {
             return new Parsers(
+                new org.unlaxer.parser.combinator.Not(new Choice(
+                    ownedCallStart("CAPTURE"), ownedCallStart("SAME_AS"), ownedCallStart("CAPTURE_SCOPE"))),
                 Parser.get(RuleRefElementParser.class)
             );
         }
@@ -1406,6 +1400,33 @@ public class UBNFParsers {
      * GroupElement: '(' RuleBody ')'
      * Circular: references RuleBodyParser
      */
+    private static Parser ownedCallStart(String name) {
+        // Only an adjacent opening parenthesis reserves the builtin spelling.
+        // Trivia keeps the existing ordinary-reference followed by group syntax.
+        return new org.unlaxer.parser.combinator.Chain(
+            annotationKeyword(name), Parser.get(LeftParenthesisParser.class));
+    }
+
+    public static class OwnedCaptureElementParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+        @Override public Parsers getLazyParsers() {
+            return new Parsers(ownedCallStart("CAPTURE"), Parser.get(IdentifierParser.class),
+                Parser.get(CommaParser.class), Parser.get(RuleBodyParser.class), Parser.get(RightParenthesisParser.class));
+        }
+    }
+    public static class ReplayElementParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+        @Override public Parsers getLazyParsers() {
+            return new Parsers(ownedCallStart("SAME_AS"), Parser.get(IdentifierParser.class), Parser.get(RightParenthesisParser.class));
+        }
+    }
+    public static class CaptureScopeElementParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+        @Override public Parsers getLazyParsers() {
+            return new Parsers(ownedCallStart("CAPTURE_SCOPE"), Parser.get(RuleBodyParser.class), Parser.get(RightParenthesisParser.class));
+        }
+    }
+
     public static class GroupElementParser extends UBNFLazyChain {
         private static final long serialVersionUID = 1L;
 
@@ -1483,6 +1504,9 @@ public class UBNFParsers {
             // 先頭トークンで即コミット可能なものを先に配置し、
             // IDENTIFIER ベースの QuantifiedRef を最後に配置して backtracking 爆発を回避する。
             return new Parsers(
+                Parser.get(OwnedCaptureElementParser.class),
+                Parser.get(ReplayElementParser.class),
+                Parser.get(CaptureScopeElementParser.class),
                 Parser.get(GroupElementParser.class),    // (
                 Parser.get(OptionalElementParser.class), // [
                 Parser.get(RepeatElementParser.class),   // { (BoundedQuantifier より先)
@@ -1524,6 +1548,7 @@ public class UBNFParsers {
                         @Override
                         public Parsers getLazyParsers() {
                             return new Parsers(
+                                new org.unlaxer.parser.combinator.Not(Parser.get(TypeofElementParser.class)),
                                 Parser.get(AtSignParser.class),
                                 Parser.get(IdentifierParser.class)
                             );

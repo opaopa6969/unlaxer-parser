@@ -214,6 +214,11 @@ fn element(e: &AnnotatedElement) -> String {
 }
 fn atomic(e: &AtomicElement) -> String {
     match &e.kind {
+        ElementKind::OwnedCapture { name, body: b } => {
+            tag("OwnedCaptureElement", [quote(name), body(b)])
+        }
+        ElementKind::Replay { name } => tag("ReplayElement", [quote(name)]),
+        ElementKind::CaptureScope(b) => tag("CaptureScopeElement", [body(b)]),
         ElementKind::Group(b) => tag("GroupElement", [body(b)]),
         ElementKind::Optional(b) => tag("OptionalElement", [body(b)]),
         ElementKind::Repeat(b) => tag("RepeatElement", [body(b)]),

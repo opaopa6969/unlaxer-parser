@@ -1,0 +1,142 @@
+[
+  {
+    "input": "m:",
+    "head": null,
+    "values": []
+  },
+  {
+    "input": "msync:",
+    "head": [
+      "enum",
+      "Mode",
+      "sync",
+      1,
+      5
+    ],
+    "values": []
+  },
+  {
+    "input": "m:syncsync",
+    "head": null,
+    "values": [
+      [
+        "enum",
+        "Mode",
+        "sync",
+        2,
+        6
+      ],
+      [
+        "enum",
+        "Mode",
+        "sync",
+        6,
+        10
+      ]
+    ]
+  },
+  {
+    "input": "m👨‍👩‍👧‍👦:😀👨‍👩‍👧‍👦",
+    "head": [
+      "enum",
+      "Mode",
+      "👨‍👩‍👧‍👦",
+      1,
+      8
+    ],
+    "values": [
+      [
+        "enum",
+        "Mode",
+        "😀",
+        9,
+        10
+      ],
+      [
+        "enum",
+        "Mode",
+        "👨‍👩‍👧‍👦",
+        10,
+        17
+      ]
+    ]
+  },
+  {
+    "input": "ma\r\nb:a\r\nb",
+    "head": [
+      "enum",
+      "Mode",
+      "a\r\nb",
+      1,
+      5
+    ],
+    "values": [
+      [
+        "enum",
+        "Mode",
+        "a\r\nb",
+        6,
+        10
+      ]
+    ]
+  },
+  {
+    "input": "h:",
+    "head": null,
+    "values": []
+  },
+  {
+    "input": "hhot:",
+    "head": [
+      "enum",
+      "Heat",
+      "hot",
+      1,
+      4
+    ],
+    "values": []
+  },
+  {
+    "input": "t:",
+    "head": null,
+    "values": []
+  },
+  {
+    "input": "ttext:",
+    "head": [
+      "text",
+      "text",
+      1,
+      5
+    ],
+    "values": []
+  },
+  {
+    "input": "n:",
+    "head": null,
+    "values": []
+  },
+  {
+    "input": "n<node>:",
+    "head": [
+      "node",
+      "Leaf",
+      "node",
+      1,
+      7
+    ],
+    "values": []
+  },
+  {
+    "input": "m:hot",
+    "failure": true
+  },
+  {
+    "input": "h:sync",
+    "failure": true
+  },
+  {
+    "input": "n:text",
+    "failure": true
+  }
+]

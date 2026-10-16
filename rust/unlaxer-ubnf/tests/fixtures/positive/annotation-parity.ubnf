@@ -1,0 +1,23 @@
+// Supplementary source prefix: 😀
+grammar AnnotationParity {
+    @rooted @root9 @root_extra
+    @whitespaceed @whitespace9 @whitespace_extra
+    @leftAssoced @leftAssoc9 @leftAssoc_extra
+    @rightAssoced @rightAssoc9 @rightAssoc_extra
+    @longestChoiceed @longestChoice9 @longestChoice_extra
+    @uniqueLongestChoiceed @uniqueLongestChoice9 @uniqueLongestChoice_extra
+    @predictiveChoiceed @predictiveChoice9 @predictiveChoice_extra
+    @skiped @skip9 @skip_extra
+    @enumed @enum9 @enum_extra
+    Extensions ::= 'x';
+
+    @eval(kind='variable_ref', strip_prefix='$')
+    DefaultStrategy ::= 'x';
+
+    @eval(kind='literal', prefix='😀\n', strategy='manual', suffix='\'')
+    NamedStrategy ::= 'x';
+
+    @commonField(left, // 😀 comment
+                 right, third)
+    CommonFields ::= 'x';
+}
