@@ -109,6 +109,8 @@ public class ClassicLspLifecycleConformanceTest {
         try { assertTrue(build.waitFor(180, TimeUnit.SECONDS)); assertEquals(Files.readString(log), 0, build.exitValue()); }
         finally { if (build.isAlive()) build.destroyForcibly(); }
         exercise(List.of(ROOT.resolve("rust/target/debug/lifecycle-wire-fixture").toString()), false);
+        Files.writeString(Path.of("target/classic-lsp-lifecycle.tsv"),
+            "backend\tstatus\njava\tpassed\nrust\tpassed\n");
     }
 
     private void exercise(List<String> command, boolean java) throws Exception {
