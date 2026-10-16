@@ -12,7 +12,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-          cache: maven
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
