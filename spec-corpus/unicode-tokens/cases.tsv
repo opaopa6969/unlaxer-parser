@@ -1,0 +1,7 @@
+# id text cp_length utf16_length utf8_length first_scalar
+ascii	abc	3	3	3	a
+supplementary	😀	1	2	4	😀
+family	👨‍👩‍👧‍👦	7	11	25	👨
+combining	é	2	2	3	e
+flag	🇯🇵	2	4	8	🇯
+skin-tone	👍🏽	2	4	8	👍
