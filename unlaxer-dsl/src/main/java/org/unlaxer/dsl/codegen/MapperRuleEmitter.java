@@ -535,11 +535,11 @@ class MapperRuleEmitter {
 
             String ruleParserClass = parsersClass + "." + rule.name() + "Parser.class";
             String repeatParserClass = parsersClass + "." + rule.name() + "Repeat" + assocShape.repeatIndex() + "Parser.class";
-            String leftParserClass = MapperElementUtil.parserClassLiteral(assocShape.leftElement(), parsersClass, tokenDeclByName, ruleByName)
+            String leftParserClass = MapperElementUtil.parserClassLiteral(grammar, assocShape.leftElement(), parsersClass, tokenDeclByName, ruleByName)
                 .orElse(ruleParserClass);
-            String opParserClass = MapperElementUtil.parserClassLiteral(assocShape.opElement(), parsersClass, tokenDeclByName, ruleByName)
-                .orElse("org.unlaxer.parser.elementary.WordParser.class");
-            String rightParserClass = MapperElementUtil.parserClassLiteral(assocShape.rightElement(), parsersClass, tokenDeclByName, ruleByName)
+            String opParserClass = MapperElementUtil.parserClassLiteral(grammar, assocShape.opElement(), parsersClass, tokenDeclByName, ruleByName)
+                .orElse(MapperElementUtil.literalParserClass(grammar));
+            String rightParserClass = MapperElementUtil.parserClassLiteral(grammar, assocShape.rightElement(), parsersClass, tokenDeclByName, ruleByName)
                 .orElse(ruleParserClass);
 
             // Use target-type-aware mapping so that Object operands bound to a transparent
@@ -578,7 +578,7 @@ class MapperRuleEmitter {
 
             // Generate dispatch for additional rules first
             for (RuleDecl additionalRule : additionalRules) {
-                emitAdditionalAssocRuleDispatch(w, astClass, parsersClass, className,
+                emitAdditionalAssocRuleDispatch(w, grammar, astClass, parsersClass, className,
                     additionalRule, leftType, opType, rightType, leafFallbackSupported,
                     heterogeneousOperand || shared.filter(SharedAssocSchema::spine).isPresent(), operandHelper,
                     mappedClassByRuleName, tokenDeclByName, ruleByName);
@@ -587,7 +587,7 @@ class MapperRuleEmitter {
             if (rightAssoc) {
                 emitRightAssocMapping(w, astClass, className, rule, ruleParserClass,
                     leftType, opType, rightType, leftMapper, rightMapper, leafFallbackSupported,
-                    MapperElementUtil.parserClassLiteral(assocShape.leftElement(), parsersClass, tokenDeclByName, ruleByName).orElse(null));
+                    MapperElementUtil.parserClassLiteral(grammar, assocShape.leftElement(), parsersClass, tokenDeclByName, ruleByName).orElse(null));
                 return;
             }
 
@@ -649,7 +649,7 @@ class MapperRuleEmitter {
         }
     }
 
-    private static void emitAdditionalAssocRuleDispatch(IndentedWriter w,
+    private static void emitAdditionalAssocRuleDispatch(IndentedWriter w, GrammarDecl grammar,
             String astClass, String parsersClass, String className,
             RuleDecl additionalRule, String leftType, String opType, String rightType,
             boolean leafFallbackSupported,
@@ -663,10 +663,10 @@ class MapperRuleEmitter {
         if (addAssocShape.isPresent()) {
             MapperElementUtil.AssocShape addShape = addAssocShape.get();
             String addRepeatParserClass = parsersClass + "." + additionalRule.name() + "Repeat" + addShape.repeatIndex() + "Parser.class";
-            String addLeftParserClass = MapperElementUtil.parserClassLiteral(addShape.leftElement(), parsersClass, tokenDeclByName, ruleByName)
+            String addLeftParserClass = MapperElementUtil.parserClassLiteral(grammar, addShape.leftElement(), parsersClass, tokenDeclByName, ruleByName)
                 .orElse(addRuleParserClass);
-            String addOpParserClass = MapperElementUtil.parserClassLiteral(addShape.opElement(), parsersClass, tokenDeclByName, ruleByName)
-                .orElse("org.unlaxer.parser.elementary.WordParser.class");
+            String addOpParserClass = MapperElementUtil.parserClassLiteral(grammar, addShape.opElement(), parsersClass, tokenDeclByName, ruleByName)
+                .orElse(MapperElementUtil.literalParserClass(grammar));
             // For rules sharing the same @mapping class, left/right mappers should call
             // the shared mapping method recursively — unless the operand is heterogeneous
             // (#43), in which case dispatch each operand to its real mapped type.
@@ -680,7 +680,7 @@ class MapperRuleEmitter {
                 : leafFallbackSupported ? "to" + MapperElementUtil.methodNameFor(className) + "(addRightToken)"
                 : MapperElementUtil.mapExpressionForTargetType(rightType, addShape.rightElement(), "addRightToken",
                     mappedClassByRuleName, tokenDeclByName, ruleByName);
-            String addRightParserClass = MapperElementUtil.parserClassLiteral(addShape.rightElement(), parsersClass, tokenDeclByName, ruleByName)
+            String addRightParserClass = MapperElementUtil.parserClassLiteral(grammar, addShape.rightElement(), parsersClass, tokenDeclByName, ruleByName)
                 .orElse(addRuleParserClass);
 
             w.line("// Handle " + additionalRule.name() + " tokens (same @mapping class)");
@@ -692,7 +692,7 @@ class MapperRuleEmitter {
                     leftType, opType, rightType,
                     addLeftMapper.replace("addLeftToken", "leftToken"),
                     addRightMapper.replace("addRightToken", "rightToken"), leafFallbackSupported,
-                    MapperElementUtil.parserClassLiteral(addShape.leftElement(), parsersClass, tokenDeclByName, ruleByName).orElse(null));
+                    MapperElementUtil.parserClassLiteral(grammar, addShape.leftElement(), parsersClass, tokenDeclByName, ruleByName).orElse(null));
                 w.dedent();
                 w.line("}");
                 return;
@@ -1091,7 +1091,7 @@ class MapperRuleEmitter {
             boolean boundValue = "Object".equals(valueType) && MapperElementUtil.containsMappedValue(site.element(), ruleByName);
             AtomicElement normalized = boundValue ? site.element()
                 : MapperElementUtil.normalizeCapturedElement(site.element()).orElse(site.element());
-            String parserClass = boundText || boundValue || graphemeText ? null : MapperElementUtil.parserClassLiteral(normalized, parsersClass, tokenDeclByName, ruleByName)
+            String parserClass = boundText || boundValue || graphemeText ? null : MapperElementUtil.parserClassLiteral(grammar, normalized, parsersClass, tokenDeclByName, ruleByName)
                 .orElse(null);
             String candidateType = MapperTypeResolver.inferTypeFromElement(grammar, normalized);
             if (!MapperTypeResolver.isTypeCompatible(valueType, candidateType) && !"String".equals(valueType)) continue;

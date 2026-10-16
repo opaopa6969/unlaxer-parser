@@ -3,6 +3,7 @@ package org.unlaxer.dsl.codegen;
 import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
 
 import org.unlaxer.dsl.bootstrap.UBNFAST;
+import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AnnotatedElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AtomicElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ChoiceBody;
@@ -317,7 +318,7 @@ class MapperElementUtil {
         return List.of();
     }
 
-    static Optional<String> parserClassLiteral(AtomicElement element, String parsersClass,
+    static Optional<String> parserClassLiteral(GrammarDecl grammar, AtomicElement element, String parsersClass,
         Map<String, TokenDecl> tokenDeclByName, Map<String, RuleDecl> ruleByName) {
 
         if (element instanceof RuleRefElement ruleRefElement) {
@@ -363,9 +364,16 @@ class MapperElementUtil {
             return Optional.empty();
         }
         if (element instanceof TerminalElement ignored) {
-            return Optional.of("org.unlaxer.parser.elementary.WordParser.class");
+            return Optional.of(literalParserClass(grammar));
         }
         return Optional.empty();
+    }
+
+    /** Match the exact literal class emitted by ParserRuleEmitter in lexical profiles. */
+    static String literalParserClass(GrammarDecl grammar) {
+        return TokenStreamGrammar.enabled(grammar) || LexicalContexts.enabled(grammar)
+            ? "org.unlaxer.dsl.runtime.Lexing.LiteralParser.class"
+            : "org.unlaxer.parser.elementary.WordParser.class";
     }
 
     /**

@@ -92,6 +92,34 @@ public class TokenStreamConformanceTest {
             }
         }
     }
+    @Test public void lexicalLiteralSnapshotsSurviveLaterMappingAndFailure() throws Exception {
+        // Context-only grammars use the same LiteralParser without enabling tokenStream.
+        for(boolean stream:List.of(false,true)) {
+            var grammar=UBNFMapper.parse("grammar Input { @ubnf: v2 @package: example.lexing @whitespace: none "
+                +(stream?"@tokenStream: enabled ":"")
+                +"@root @mapping(Value,params=[value]) @lexicalContext(tokens=[], literals=['😀','x']) "
+                +"Root ::= '😀' @value | 'x' @value; }").grammars().get(0);
+            GrammarValidator.validateOrThrow(grammar);
+            try(var loader=compileJava(grammar)) {
+                var mapper=loader.loadClass(PACKAGE+".InputMapper");
+                var parse=mapper.getMethod("parseWithSourceMap",String.class);
+                Object first=parse.invoke(null,"😀");
+                Object ast=first.getClass().getMethod("ast").invoke(first);
+                Object value=ast.getClass().getMethod("value").invoke(ast);
+                var expected=canonical(ast,first);
+                assertEquals("😀",value);
+                assertArrayEquals(new int[]{0,1},(int[])((Optional<?>)first.getClass()
+                    .getMethod("sourceSpanOf",Object.class).invoke(first,value)).orElseThrow());
+                assertThrows(java.lang.reflect.InvocationTargetException.class,()->parse.invoke(null,"?"));
+                Object later=parse.invoke(null,"x");
+                Object laterAst=later.getClass().getMethod("ast").invoke(later);
+                assertEquals("x",laterAst.getClass().getMethod("value").invoke(laterAst));
+                assertEquals(expected,canonical(ast,first));
+                assertArrayEquals(new int[]{0,1},(int[])((Optional<?>)first.getClass()
+                    .getMethod("sourceSpanOf",Object.class).invoke(first,value)).orElseThrow());
+            }
+        }
+    }
     @Test public void unsupportedProfilesAreExplicit() throws Exception {
         for(var entry:corpus("invalid.json")) {
             var f=entry.getAsJsonObject();var g=UBNFMapper.parse(f.get("grammar").getAsString()).grammars().get(0);
@@ -171,7 +199,7 @@ public class TokenStreamConformanceTest {
         Path nativeTarget=repo.resolve("rust/target");
         success(run(List.of("cargo","build","--locked","--manifest-path",repo.resolve("rust/Cargo.toml").toString(),"-p","unlaxer-generator","--target-dir",nativeTarget.toString()),"",false));
         Path nativeGenerator=nativeTarget.resolve("debug/unlaxer");
-        var report=new ArrayList<>(List.of("fixture\tcase\tmode\tpreserve_trivia\tjava\trust"));
+        var report=new ArrayList<>(List.of("fixture\tcase\tmode\tpreserve_trivia\trust_host\tjava\trust"));
         for(var fixture:corpus("corpus.json")) {
             var f=fixture.getAsJsonObject();Path ubnf=fixtureSource(f);Path folder=ubnf.getParent();
             var grammar=org.unlaxer.dsl.bootstrap.UBNFModuleLoader.load(ubnf).grammars().get(0);
@@ -179,23 +207,30 @@ public class TokenStreamConformanceTest {
             Path nativeOutput=folder.resolve("generated");
             success(run(List.of(nativeGenerator.toString(),"generate","--grammar",ubnf.toString(),"--output",nativeOutput.toString()),"",true));
             for(var file:generated) assertEquals(f.get("name")+" emitted "+file.relativePath(),file.content(),Files.readString(nativeOutput.resolve(file.relativePath())));
-            Files.writeString(folder.resolve("main.rs"),rustProbe());
-            success(run(List.of("rustc","--edition=2021","--extern","unlaxer_runtime="+runtime,folder.resolve("main.rs").toString(),"-o",folder.resolve("probe").toString()),"",false));
+            Path javaOutput=Files.createDirectories(folder.resolve("java-generated"));
+            for(var file:generated) Files.writeString(javaOutput.resolve(file.relativePath()),file.content());
             var framed=new StringBuilder();
             for(var c:f.getAsJsonArray("cases")) for(var mode:Lexing.Mode.values()) for(boolean keep:List.of(true,false)) {
                 framed.append(mode.ordinal()).append(keep?'1':'0').append(':').append(HexFormat.of().formatHex(c.getAsJsonObject().get("input").getAsString().getBytes(StandardCharsets.UTF_8))).append('\n');
             }
-            var output=run(List.of(folder.resolve("probe").toString()),framed.toString(),false);success(output);
-            var results=output.output().lines().map(JsonParser::parseString).toList(); int n=0;
-            try(var loader=compileJava(grammar)) {
-                for(var c:f.getAsJsonArray("cases")) for(var mode:Lexing.Mode.values()) for(boolean keep:List.of(true,false)) {
-                    var row=c.getAsJsonObject();String name=f.get("name")+"/"+row.get("name")+"/"+mode+"/"+keep;
-                    var rust=results.get(n++).getAsJsonObject();var java=javaObservation(loader,row.get("input").getAsString(),mode,keep);
-                    assertOracle(name+" Rust",row,mode,keep,rust);
-                    // Successful parses may retain backend-specific speculative failure hints.
-                    if(java.get("accepted").getAsBoolean()) {java.remove("farthest");rust.remove("farthest");}
-                    assertEquals(name+" Java/Rust",java,rust);
-                    report.add(f.get("name")+"\t"+row.get("name")+"\t"+mode+"\t"+keep+"\t"+java+"\t"+rust);
+            for(String host:List.of("generated","java-generated")) {
+                Path main=folder.resolve("main-"+host+".rs"),binary=folder.resolve("probe-"+host);
+                Files.writeString(main,rustProbe(f.get("name").getAsString().startsWith("literal-capture")).replace("mod generated;","#[path=\""+host+"/mod.rs\"] mod generated;"));
+                success(run(List.of("rustc","--edition=2021","--crate-name","probe","--extern","unlaxer_runtime="+runtime,main.toString(),"-o",binary.toString()),"",false));
+                var output=run(List.of(binary.toString()),framed.toString(),true);success(output);
+                var results=output.output().lines().map(JsonParser::parseString).toList(); int n=0;
+                try(var loader=compileJava(grammar)) {
+                    for(var c:f.getAsJsonArray("cases")) for(var mode:Lexing.Mode.values()) for(boolean keep:List.of(true,false)) {
+                        var row=c.getAsJsonObject();String name=f.get("name")+"/"+row.get("name")+"/"+mode+"/"+keep+"/"+host;
+                        var rust=results.get(n++).getAsJsonObject();var java=javaObservation(loader,row.get("input").getAsString(),mode,keep);
+                        assertOracle(name+" Rust",row,mode,keep,rust);
+                        assertOracle(name+" Java",row,mode,keep,java);
+                        // Successful parses may retain backend-specific speculative failure hints.
+                        if(java.get("accepted").getAsBoolean()) {java.remove("farthest");rust.remove("farthest");}
+                        assertEquals(name+" Java/Rust",java,rust);
+                        report.add(f.get("name")+"\t"+row.get("name")+"\t"+mode+"\t"+keep+"\t"+host+"\t"+java+"\t"+rust);
+                    }
+                    assertEquals("all framed observations consumed",results.size(),n);
                 }
             }
         }
@@ -211,7 +246,7 @@ public class TokenStreamConformanceTest {
         }
         Files.createDirectories(Path.of("target"));Files.write(Path.of("target/rust-token-stream.tsv"),report);
     }
-    private String rustProbe() {
+    private String rustProbe(boolean retention) {
         return """
             mod generated;
             use std::io::{self,BufRead};
@@ -222,13 +257,25 @@ public class TokenStreamConformanceTest {
                     let bytes=(0..encoded.len()).step_by(2).map(|i|u8::from_str_radix(&encoded[i..i+2],16).unwrap()).collect();
                     let source=String::from_utf8(bytes).unwrap();let mode=[Mode::Direct,Mode::TriviaCache,Mode::TokensLazy,Mode::TokensEager][usize::from(flags.as_bytes()[0]-b'0')];
                     let mut out=generated::parser::parse_with_lexing(&source,Options{mode,preserve_trivia:flags.as_bytes()[1]==b'1'}).unwrap();
-                    let ast=if out.succeeded {generated::mapper::map(out.tree.as_ref().unwrap()).unwrap().canonical_json()} else {"null".into()};
+                    let ast=if out.succeeded {
+                        let mapped=generated::mapper::map(out.tree.as_ref().unwrap()).unwrap();
+                        let original=mapped.canonical_json();
+                        if __CHECK_RETENTION__ {
+                        let failed=generated::parser::parse_with_lexing("\\0",Options{mode,preserve_trivia:true}).unwrap();
+                        assert!(!failed.succeeded);
+                        let later=generated::parser::parse_with_lexing(&source,Options{mode,preserve_trivia:false}).unwrap();
+                        assert!(later.succeeded);
+                        assert_eq!(generated::mapper::map(later.tree.as_ref().unwrap()).unwrap().canonical_json(),original);
+                        assert_eq!(mapped.canonical_json(),original);
+                        }
+                        original
+                    } else {"null".into()};
                     let captures=if out.succeeded {out.tree.as_ref().unwrap().nodes[out.tree.as_ref().unwrap().root].captures.iter().map(|c|format!(r#"{{"name":{},"span":[{},{}]}}"#,json_string(c.name),c.span.start,c.span.end)).collect::<Vec<_>>().join(",")} else {String::new()};
                     let lexemes=out.session.lexemes().iter().map(|e|format!(r#"{{"kind":{},"name":{},"span":[{},{}],"text":{}}}"#,json_string(e.kind),json_string(e.name),e.span.start,e.span.end,json_string(out.session.text(e)))).collect::<Vec<_>>().join(",");
                     println!(r#"{{"accepted":{},"consumed":{},"matched":{},"farthest":{},"ast":{},"captures":[{}],"lexemes":[{}]}}"#,out.succeeded,out.consumed,out.matched,out.farthest,ast,captures,lexemes);
                 }
             }
-            """;
+            """.replace("__CHECK_RETENTION__",Boolean.toString(retention));
     }
     @Test public void reportMeasuredWorkAndAllocation() throws Exception {
         assumeTrue("enable with -DtokenStreamBench=true -DrustConformance=true",Boolean.getBoolean("tokenStreamBench") && Boolean.getBoolean("rustConformance"));
@@ -339,6 +386,7 @@ public class TokenStreamConformanceTest {
     private JsonElement canonicalValue(Object value, Object mapped) throws Exception {
         if (value == null) return JsonNull.INSTANCE;
         if (value instanceof String text) return new JsonPrimitive(text);
+        if (value instanceof Enum<?> enumeration) return new JsonPrimitive(enumeration.name());
         if (value instanceof Optional<?> optional) return canonicalValue(optional.orElse(null), mapped);
         if (value instanceof List<?> list) {
             var result = new JsonArray();
