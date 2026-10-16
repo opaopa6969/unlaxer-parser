@@ -1,0 +1,5 @@
+# id	scenario	success	firstFailureCP	firstHasExpected	finalFailureCP
+native-miss-before-classic	peg-miss	false	1	true	4
+native-deep-before-classic	peg-deep	false	6	true	6
+successful-hint-before-classic	peg-success-hint	true	1	false	4
+successful-negative-before-classic	peg-negative-success	true	1	false	4

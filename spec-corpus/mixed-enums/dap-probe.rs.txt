@@ -1,0 +1,5 @@
+fn with_dap(mut value:String,source:&str)->String {
+    let steps=generated::dap::steps(source).unwrap();
+    value.pop();
+    format!(r#"{},"dap":[{}]}}"#,value,steps.iter().map(|step|format!(r#"[{},{},{}]"#,json_string(&step.label),step.span.start,step.span.end)).collect::<Vec<_>>().join(","))
+}

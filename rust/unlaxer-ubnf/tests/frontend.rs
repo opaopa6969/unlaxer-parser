@@ -61,13 +61,13 @@ fn owned_values_and_all_token_kinds_are_preserved() {
     assert!(
         matches!(&g.tokens[2].kind,TokenKind::Negation{excluded_chars} if excluded_chars=="😀\n\t")
     );
-    assert!(matches!(&g.tokens[10].kind,TokenKind::Regex{pattern} if pattern==r"\d+\.\d+"));
+    assert!(matches!(&g.tokens[10].kind, TokenKind::Declarative { .. }));
     let e = &ast.grammars[1].rules[0].body.alternatives[0].elements[0].element;
     assert_eq!(e.kind, ElementKind::Terminal("😀\n\t\r'\\\\q".to_owned()));
 }
 
 #[test]
-fn keyword_boundaries_and_known_java_mapping_errors_do_not_lose_data() {
+fn keyword_boundaries_and_repaired_java_mapping_regressions_do_not_lose_data() {
     let ast = parse(include_str!("fixtures/known/keyword-boundary.ubnf")).unwrap();
     assert_eq!(
         ast.grammars[0].rules[0].annotations[0].kind,
@@ -95,6 +95,74 @@ fn keyword_boundaries_and_known_java_mapping_errors_do_not_lose_data() {
             name: "Value".to_owned()
         }
     );
+}
+
+#[test]
+fn annotation_names_named_eval_arguments_and_trivia_keep_values_and_spans() {
+    let fixture = include_str!("fixtures/positive/annotation-parity.ubnf");
+    for source in [fixture.to_owned(), fixture.replace('\n', "\r\n")] {
+        let ast = parse(&source).unwrap();
+        let rules = &ast.grammars[0].rules;
+        let mut index = 0;
+        for keyword in [
+            "root",
+            "whitespace",
+            "leftAssoc",
+            "rightAssoc",
+            "longestChoice",
+            "uniqueLongestChoice",
+            "predictiveChoice",
+            "skip",
+            "enum",
+        ] {
+            for suffix in ["ed", "9", "_extra"] {
+                let name = format!("{keyword}{suffix}");
+                let a = &rules[0].annotations[index];
+                assert_eq!(a.kind, AnnotationKind::Simple { name: name.clone() });
+                let text = format!("@{name}");
+                let start = source.find(&text).unwrap();
+                assert_eq!(a.span.byte_start, start);
+                assert_eq!(a.span.byte_end, start + text.len());
+                assert_eq!(a.span.codepoint_start, source[..start].chars().count());
+                assert_eq!(
+                    a.span.codepoint_end,
+                    source[..start + text.len()].chars().count()
+                );
+                index += 1;
+            }
+        }
+        assert_eq!(rules[0].annotations.len(), index);
+        let AnnotationKind::Eval {
+            kind,
+            strategy,
+            params,
+        } = &rules[1].annotations[0].kind
+        else {
+            panic!()
+        };
+        assert_eq!(kind, "variable_ref");
+        assert_eq!(strategy, "default");
+        assert_eq!((&*params[0].key, &*params[0].value), ("strip_prefix", "$"));
+        let AnnotationKind::Eval {
+            kind,
+            strategy,
+            params,
+        } = &rules[2].annotations[0].kind
+        else {
+            panic!()
+        };
+        assert_eq!(kind, "literal");
+        assert_eq!(strategy, "manual");
+        assert_eq!(params.len(), 2);
+        assert_eq!((&*params[0].key, &*params[0].value), ("prefix", "😀\n"));
+        assert_eq!((&*params[1].key, &*params[1].value), ("suffix", "'"));
+        assert_eq!(
+            rules[3].annotations[0].kind,
+            AnnotationKind::CommonField {
+                fields: vec!["left".into(), "right".into(), "third".into()]
+            }
+        );
+    }
 }
 
 #[test]

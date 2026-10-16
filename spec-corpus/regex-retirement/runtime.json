@@ -1,0 +1,545 @@
+[
+  {
+    "name": "identifier",
+    "body": "ID @value",
+    "cases": [
+      {
+        "input": "_Ab09",
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "offsets": [
+          5,
+          5,
+          5
+        ],
+        "value": "_Ab09"
+      },
+      {
+        "input": "a😀",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "offsets": [
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "input": "1a",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "offsets": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "input": "",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "offsets": [
+          0,
+          0,
+          0
+        ]
+      }
+    ]
+  },
+  {
+    "name": "decimal",
+    "body": "DECIMAL @value",
+    "cases": [
+      {
+        "input": "-12.5",
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "offsets": [
+          5,
+          5,
+          5
+        ],
+        "value": "-12.5"
+      },
+      {
+        "input": "12.",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "offsets": [
+          2,
+          2,
+          2
+        ]
+      },
+      {
+        "input": "+",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "offsets": [
+          0,
+          0,
+          0
+        ]
+      }
+    ]
+  },
+  {
+    "name": "quoted",
+    "body": "QUOTED @value",
+    "cases": [
+      {
+        "input": "\"😀\"",
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "offsets": [
+          3,
+          4,
+          6
+        ],
+        "value": "\"😀\""
+      },
+      {
+        "input": "\"a\\\"b\"",
+        "prefix": [
+          true,
+          6,
+          6
+        ],
+        "offsets": [
+          6,
+          6,
+          6
+        ],
+        "value": "\"a\\\"b\""
+      },
+      {
+        "input": "\"bad",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "offsets": [
+          0,
+          0,
+          0
+        ]
+      }
+    ]
+  },
+  {
+    "name": "newline",
+    "body": "NL @value",
+    "cases": [
+      {
+        "input": "\r\n",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "offsets": [
+          2,
+          2,
+          2
+        ],
+        "value": ""
+      },
+      {
+        "input": "\n",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "offsets": [
+          1,
+          1,
+          1
+        ],
+        "value": ""
+      },
+      {
+        "input": "\r",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "offsets": [
+          1,
+          1,
+          1
+        ],
+        "value": ""
+      },
+      {
+        "input": "",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "offsets": [
+          0,
+          0,
+          0
+        ]
+      }
+    ]
+  },
+  {
+    "name": "family",
+    "body": "FAMILY @value",
+    "cases": [
+      {
+        "input": "👨‍👩‍👧‍👦",
+        "prefix": [
+          true,
+          7,
+          7
+        ],
+        "offsets": [
+          7,
+          11,
+          25
+        ],
+        "value": "👨‍👩‍👧‍👦"
+      },
+      {
+        "input": "👨‍👩‍👧‍👦x",
+        "prefix": [
+          true,
+          7,
+          7
+        ],
+        "offsets": [
+          7,
+          11,
+          25
+        ]
+      },
+      {
+        "input": "👨",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "offsets": [
+          0,
+          0,
+          0
+        ]
+      }
+    ]
+  },
+  {
+    "name": "keywordBoundary",
+    "body": "KEYWORD @value",
+    "cases": [
+      {
+        "input": "if",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "offsets": [
+          2,
+          2,
+          2
+        ],
+        "value": "if"
+      },
+      {
+        "input": "ifx",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "offsets": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "input": "if1",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "offsets": [
+          0,
+          0,
+          0
+        ]
+      }
+    ]
+  },
+  {
+    "name": "localCapture",
+    "body": "PAIR @value",
+    "cases": [
+      {
+        "input": "abc:abc",
+        "prefix": [
+          true,
+          7,
+          7
+        ],
+        "offsets": [
+          7,
+          7,
+          7
+        ],
+        "value": "abc:abc"
+      },
+      {
+        "input": "ab:ac",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "offsets": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "input": "x:x",
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "offsets": [
+          3,
+          3,
+          3
+        ],
+        "value": "x:x"
+      }
+    ]
+  },
+  {
+    "name": "captureRollback",
+    "body": "ROLLBACK @value",
+    "cases": [
+      {
+        "input": "😀a😀",
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "offsets": [
+          3,
+          5,
+          9
+        ],
+        "value": "😀a😀"
+      },
+      {
+        "input": "😀a!a",
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "offsets": [
+          4,
+          5,
+          7
+        ],
+        "value": "😀a!a"
+      },
+      {
+        "input": "😀aa",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "offsets": [
+          0,
+          0,
+          0
+        ]
+      }
+    ]
+  },
+  {
+    "name": "possessiveDifference",
+    "body": "POSSESSIVE @value",
+    "cases": [
+      {
+        "input": "aa",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "offsets": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "input": "aaa",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "offsets": [
+          0,
+          0,
+          0
+        ]
+      }
+    ]
+  },
+  {
+    "name": "orderedChoiceDifference",
+    "body": "ORDERED @value",
+    "cases": [
+      {
+        "input": "abc",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "offsets": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "input": "ac",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "offsets": [
+          2,
+          2,
+          2
+        ],
+        "value": "ac"
+      }
+    ]
+  },
+  {
+    "name": "lookaheadEof",
+    "body": "PEEK @value",
+    "cases": [
+      {
+        "input": "😀",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "offsets": [
+          1,
+          2,
+          4
+        ],
+        "value": "😀"
+      },
+      {
+        "input": "😀x",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "offsets": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "input": "",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "offsets": [
+          0,
+          0,
+          0
+        ]
+      }
+    ]
+  },
+  {
+    "name": "outerRollback",
+    "body": "(ROLLBACK '!' | FAMILY) @value",
+    "cases": [
+      {
+        "input": "😀a😀?",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "offsets": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "input": "👨‍👩‍👧‍👦",
+        "prefix": [
+          true,
+          7,
+          7
+        ],
+        "offsets": [
+          7,
+          11,
+          25
+        ],
+        "value": "👨‍👩‍👧‍👦"
+      }
+    ]
+  }
+]

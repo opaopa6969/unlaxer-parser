@@ -225,7 +225,7 @@ rule id ::= letter (letter | digit)* ?{ !isReservedWord($$) } ;
 | T3-3   | セマンティック述語        | Low    | XL   | **保留**    |
 | T4-1   | `CHAR_RANGE('a','z')`     | ✅     | —    | **完了**    |
 | T4-2   | `ANY`                     | ✅     | —    | **完了**    |
-| T4-3   | `REGEX('pattern')`        | ✅     | —    | **完了**    |
+| T4-3   | `REGEX('pattern')`        | 廃止   | 廃止 | 宣言的字句式へ移行 (#612) |
 | T4-4   | `CI('keyword')`           | ✅     | —    | **完了**    |
 | T4-5   | セパレータ糖衣 `%`         | ✅     | —    | **完了**    |
 | T4-6   | `EOF` / `EMPTY`           | ✅     | —    | **完了**    |

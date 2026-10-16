@@ -45,6 +45,7 @@ public class ClassicLspProtocolConformanceTest {
                                 throw new AssertionError("embedded launcher status");
                         }
                         var server = new ProbeServer();
+                        server.initialize(new org.eclipse.lsp4j.InitializeParams()).join();
                         server.shutdown().join();
                         server.exit();
                         if (server.exitStatus().join() != 0) throw new AssertionError("embedded exit status");
@@ -63,7 +64,7 @@ public class ClassicLspProtocolConformanceTest {
         String javaExecutable=Path.of(System.getProperty("java.home"),"bin","java").toString();
         var javaCommand = List.of(javaExecutable, "-cp", classes+File.pathSeparator+System.getProperty("java.class.path"), "wire.fixture.Main");
         try(var wire=new Wire(new ProcessBuilder(javaCommand).redirectError(temporary.newFile("java-stderr.log")).start())) {
-            assertEquals("hook", wire.response("fixture/probe", Map.of()).get("result").getAsString());
+            assertEquals(-32002, wire.response("fixture/probe", Map.of()).getAsJsonObject("error").get("code").getAsInt());
             exercise(wire);
         }
         exerciseUncleanExit(javaCommand, "java");
@@ -177,11 +178,11 @@ public class ClassicLspProtocolConformanceTest {
         wire.notify("textDocument/didClose",Map.of("textDocument",Map.of("uri",uri)));assertEquals(0,wire.notification("textDocument/publishDiagnostics").getAsJsonArray("diagnostics").size());
         // Java/Rust use the same profile API; explicit null or extra fields must fail without mutating the selected profile.
         String profile=Files.readString(ROOT.resolve("language-profiles/java/profile.tsv")).replace("Java21","Emoji").replace("CompilationUnit","Root");
-        var selected=wire.request("initialize",Map.of("initializationOptions",Map.of("languageProfile",Map.of("tsv",profile,"entry","Root"))));
+        var selected=wire.request("unlaxer/configure",Map.of("initializationOptions",Map.of("languageProfile",Map.of("tsv",profile,"entry","Root"))));
         assertFalse(selected.getAsJsonObject("capabilities").has("completionProvider"));
         var metadata=selected.getAsJsonObject("capabilities").getAsJsonObject("experimental").getAsJsonObject("languageProfile");assertEquals("Root",metadata.get("entry").getAsString());assertEquals("lang/java",metadata.get("package").getAsString());
         for(Object invalid:List.of(JsonNull.INSTANCE,Map.of("tsv",profile,"entry","wrong"),Map.of("tsv",profile.replace("PARSE\tPARTIAL","PARSE\tEXTERNAL"),"entry","Root"),Map.of("tsv",profile,"entry","Root","extra",true))) {
-            var error=wire.response("initialize",Map.of("initializationOptions",Map.of("languageProfile",invalid))).getAsJsonObject("error");assertEquals(-32602,error.get("code").getAsInt());
+            var error=wire.response("unlaxer/configure",Map.of("initializationOptions",Map.of("languageProfile",invalid))).getAsJsonObject("error");assertEquals(-32602,error.get("code").getAsInt());
         }
         assertTrue(wire.requestArray("textDocument/completion",Map.of("textDocument",Map.of("uri",uri),"position",Map.of("line",0,"character",0))).isEmpty());
         wire.notify("textDocument/didOpen",Map.of("textDocument",Map.of("uri",uri,"languageId","emoji","version",1,"text","bad")));
@@ -207,7 +208,7 @@ public class ClassicLspProtocolConformanceTest {
         try { assertTrue("command timeout: "+command,process.waitFor(120,TimeUnit.SECONDS));assertEquals(command+"\n"+Files.readString(log),0,process.exitValue()); } finally { if (process.isAlive()) process.destroyForcibly(); }
     }
     private static JavaFileObject source(String name,String body){return new SimpleJavaFileObject(URI.create("string:///"+name.replace('.','/')+".java"),JavaFileObject.Kind.SOURCE){@Override public CharSequence getCharContent(boolean ignore){return body;}};}
-    private static final class Wire implements AutoCloseable {
+    static final class Wire implements AutoCloseable {
         final Process process;final BufferedInputStream input;final OutputStream output;final ExecutorService reader=Executors.newSingleThreadExecutor();final List<JsonObject> pending=new ArrayList<>();int next=0;
         Wire(Process process){this.process=process;input=new BufferedInputStream(process.getInputStream());output=process.getOutputStream();}
         void notify(String method,Object params)throws Exception{send(method,params,null);}

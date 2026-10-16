@@ -138,6 +138,7 @@ fn generate_resolved(
     }
     runtime!("lib.rs");
     runtime!("token.rs");
+    runtime!("capture_tree.rs");
     runtime!("token_trace.rs");
     runtime!("scope.rs");
     runtime!("names.rs");
@@ -162,11 +163,13 @@ fn generate_resolved(
     runtime!("provider_process.rs");
     runtime!("pipeline.rs");
     runtime!("lexing.rs");
+    runtime!("mapping.rs");
     runtime!("first.rs");
     runtime!("lexical.rs");
     runtime!("unicode_xid.rs");
     runtime!("unicode_grapheme_data.rs");
     runtime!("unicode_case_data.rs");
+    runtime!("incremental.rs");
     runtime!("grapheme.rs");
     runtime!("long_code_fence.rs");
     runtime!("memo_retention_tests.rs");

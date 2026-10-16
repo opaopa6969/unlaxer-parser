@@ -9,3 +9,5 @@
 測定スナップショット: Linux x86_64、Java HotSpot 21.0.9、rustc 1.98.1 (`-O`)、2026-10-06。互換性テストは別途 Rust 1.85.0 / Java 17 でも実行する。8 文法・27 入力・216 組合せと、10 件の拒否 fixture を使用する。
 
 #432 の追加検証はローカル/標準packageの名前付きglobal triviaと独自Unicode定義を含む。現行は 13 文法・57 入力・456 組合せ、nullable/lookaheadを含む12件の拒否fixture。package fixtureは明示resolve後のlock/cacheだけを読む。
+
+#668 は literal capture の6文法12入力を追加し、現行19文法69入力を各4 mode × trivia公開有無で比較する。scalar/optional/list/構造literalとの重複、補助文字/CRLF、quote、宣言的な数値文字列token/enum、lexical contextを含む。Java/native両Rust出力を別々にcompile/runし、各552観測を独立oracleと照合する（Rust2hostで1104観測）。両出力のbyte一致だけを実行検証の代わりにしない。後続の失敗・再parse/mapが保持済みAST/source spanを変えないことも検証する。Javaのcontext-only入口は追加のsnapshot試験で確認する。

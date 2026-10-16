@@ -1,0 +1,16 @@
+# 100000 same-position state epochs, successful literal x, outer rollback each time; memo ON; DetailedOnFailure.
+# Baseline c5516831; candidate #652; 3 cold processes each on a shared host, not a production benchmark.
+# Java -Xms64m -Xmx512m; Rust rustc -O; max RSS from /usr/bin/time. Structural charge is not RSS.
+language	revision	trial	entries	charge_bytes	parse_nanos	process_seconds	max_rss_kib
+java	before	0	100000	-1	589932597	0.70	296320
+java	before	1	100000	-1	456288446	0.53	291360
+java	before	2	100000	-1	423809682	0.49	304396
+java	after	0	14820	16776240	451523284	0.53	290848
+java	after	1	14820	16776240	447498517	0.51	244260
+java	after	2	14820	16776240	423123248	0.50	267552
+rust	before	0	59918	16777040	47723802	0.07	30568
+rust	before	1	59918	16777040	47026045	0.06	30716
+rust	before	2	59918	16777040	41042281	0.05	30436
+rust	after	0	31300	16776800	22333579	0.03	16816
+rust	after	1	31300	16776800	23575084	0.03	16808
+rust	after	2	31300	16776800	23450934	0.03	16808

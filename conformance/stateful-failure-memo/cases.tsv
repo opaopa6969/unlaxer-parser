@@ -1,0 +1,18 @@
+# id	actions	on_failure_hits_after_each_F	final_scope_depth	final_declarations	final_references	final_diagnostics
+same-state	FF	0,1	0	0	0	0
+scope-rollback	F(EF)F	0,0,1	0	0	0	0
+declare-rollback	F(DF)F	0,0,1	0	0	0	0
+caller-mark-rollback	F(MF)F	0,0,1	0	0	0	0
+branch-epochs	(DF)(DF)	0,0	0	0	0	0
+write-only	FRAF	0,1	0	0	1	1
+clear-diagnostic	AFCFF	0,0,1	0	0	0	0
+clear-empty	FCF	0,1	0	0	0	0
+empty-declaration	FZF	0,1	0	0	0	0
+leave-global	FLF	0,1	0	0	0	0
+enter-leave	FEFLF	0,0,0	0	0	0	0
+committed-declaration	[D]FF	0,1	0	1	0	0
+nested-commit	(F[DF]F)F	0,0,1,2	0	0	0	0
+write-only-rollback	F(RAF)F	0,1,2	0	0	0	0
+clear-rollback	AF(CF)F	0,0,1	0	0	0	1
+owned-binding-rollback	F(BF)F	0,0,1	0	0	0	0
+capture-scope-version	F(SF)F	0,0,1	0	0	0	0

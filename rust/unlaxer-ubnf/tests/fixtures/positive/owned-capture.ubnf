@@ -1,0 +1,14 @@
+// General bindings are independent of AST captures and lexical bindings.
+grammar OwnedSyntax {
+  @root @mapping(Value, params=[first, again])
+  Root ::= CAPTURE_SCOPE(CAPTURE(word, ('😀' | 'x')) @first ':' SAME_AS(word) @again);
+  OrdinaryNames ::= CAPTURE SAME_AS CAPTURE_SCOPE CAPTURE_MORE;
+  OldGroups ::= CAPTURE ('x') SAME_AS // old reference, not a call
+      ('x')
+      CAPTURE_SCOPE // old reference followed by a group
+      ('x') CAPTURE_MORE ('x');
+  CAPTURE ::= 'capture';
+  SAME_AS ::= 'same';
+  CAPTURE_SCOPE ::= 'scope';
+  CAPTURE_MORE ::= 'prefix';
+}
