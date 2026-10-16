@@ -17,6 +17,6 @@ public final class UBNFLspLauncherExt extends UBNFLspLauncher {
     }
 
     public static void main(String[] args) throws IOException {
-        new UBNFLspLauncherExt().launch();
+        System.exit(new UBNFLspLauncherExt().launchStdio());
     }
 }

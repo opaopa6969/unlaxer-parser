@@ -429,3 +429,13 @@ TSVは`unlaxer-dsl/target/`配下で、CI artifact `rust-conformance`にも添�
 [仕様と実行例](../docs/parse-composition.md)を参照。
 
 Classic の opt-in stdio [LSP](../docs/classic-rust-lsp.md) と [AST / token DAP](../docs/classic-rust-dap.md) を利用できる。`generate --lsp` / `--dap` は通常の5-file出力に各 module を追加し、両指定では7ファイルになる。live evaluator 制御などの残差は [full-spec対応表](FULL-SPEC.md) に残す。
+
+LSP の stdio main は生成された終了 status を適用する。shutdown 後の exit は0、shutdown の無い exit / exit の無い EOF は1となる。
+ライブラリ自体は host process を終了しない。既存 `serve_stdio() -> io::Result<()>` は埋め込み用途の互換入口として残る。
+
+```rust
+mod generated;
+fn main() -> std::io::Result<()> {
+    std::process::exit(generated::lsp::serve_stdio_status()?);
+}
+```
