@@ -16,41 +16,31 @@ public interface PredictiveChoiceInterface extends ChoiceInterface {
 
     @Override
     default Parsed parse(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
-        PackratMemoTable.Entry memo = PackratMemoTable.lookup(parseContext, this, tokenKind, invertMatch);
-        if (memo != null) return PackratMemoTable.replay(parseContext, this, tokenKind, invertMatch, memo);
-        var memoDiagnostic = PackratMemoTable.beginFailure(parseContext, this);
-        var memoStart = PackratMemoTable.successKey(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
+        parseContext.enterParserCall();
+        try {
+            PackratMemoTable.Entry memo = PackratMemoTable.lookup(parseContext, this, tokenKind, invertMatch);
+            if (memo != null) return PackratMemoTable.replay(parseContext, this, tokenKind, invertMatch, memo);
+            var memoDiagnostic = PackratMemoTable.beginFailure(parseContext, this);
+            var memoStart = PackratMemoTable.successKey(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
 
-        parseContext.startParse(this, parseContext, tokenKind, invertMatch);
-        List<Parser> children = getChildren();
-        List<ChoicePredictor> predictors = getChoicePredictors();
-        int candidateCount = 0;
-        for (int i = 0; i < children.size(); i++) {
-            ChoicePredictor predictor = i < predictors.size() ? predictors.get(i) : ChoicePredictor.any();
-            if (invertMatch || predictor == null || predictor.mayMatch(parseContext, tokenKind)) {
-                candidateCount++;
+            parseContext.startParse(this, parseContext, tokenKind, invertMatch);
+            List<Parser> children = getChildren();
+            List<ChoicePredictor> predictors = getChoicePredictors();
+            int candidateCount = 0;
+            for (int i = 0; i < children.size(); i++) {
+                ChoicePredictor predictor = i < predictors.size() ? predictors.get(i) : ChoicePredictor.any();
+                if (invertMatch || predictor == null || predictor.mayMatch(parseContext, tokenKind)) {
+                    candidateCount++;
+                }
             }
-        }
-        // A malformed or overly narrow predictor must never turn a valid choice into failure.
-        boolean useAllChildren = candidateCount == 0;
+            // A malformed or overly narrow predictor must never turn a valid choice into failure.
+            boolean useAllChildren = candidateCount == 0;
 
-        for (int i = 0; i < children.size(); i++) {
-            ChoicePredictor predictor = i < predictors.size() ? predictors.get(i) : ChoicePredictor.any();
-            if (!useAllChildren && !invertMatch && predictor != null
-                    && !predictor.mayMatch(parseContext, tokenKind)) continue;
-            Parser parser = children.get(i);
-            parseContext.begin(this);
-            Parsed parsed = parser.parse(parseContext, tokenKind, invertMatch);
-            if (parsed.isSucceeded()) {
-                return PackratMemoTable.commitSuccess(parseContext, this, tokenKind, invertMatch,
-                    memoStart, memoDiagnostic, parser, parsed);
-            }
-            parseContext.rollback(this);
-        }
-        // Preserve ordered Choice correctness and diagnostics if generated metadata is ever
-        // too narrow: after the fast path fails, retry the complete list in declaration order.
-        if (!useAllChildren && candidateCount < children.size()) {
-            for (Parser parser : children) {
+            for (int i = 0; i < children.size(); i++) {
+                ChoicePredictor predictor = i < predictors.size() ? predictors.get(i) : ChoicePredictor.any();
+                if (!useAllChildren && !invertMatch && predictor != null
+                        && !predictor.mayMatch(parseContext, tokenKind)) continue;
+                Parser parser = children.get(i);
                 parseContext.begin(this);
                 Parsed parsed = parser.parse(parseContext, tokenKind, invertMatch);
                 if (parsed.isSucceeded()) {
@@ -59,9 +49,27 @@ public interface PredictiveChoiceInterface extends ChoiceInterface {
                 }
                 parseContext.rollback(this);
             }
+            // Preserve ordered Choice correctness and diagnostics if generated metadata is ever
+            // too narrow: after the fast path fails, retry the complete list in declaration order.
+            if (!useAllChildren && candidateCount < children.size()) {
+                for (Parser parser : children) {
+                    parseContext.begin(this);
+                    Parsed parsed = parser.parse(parseContext, tokenKind, invertMatch);
+                    if (parsed.isSucceeded()) {
+                        return PackratMemoTable.commitSuccess(parseContext, this, tokenKind, invertMatch,
+                            memoStart, memoDiagnostic, parser, parsed);
+                    }
+                    parseContext.rollback(this);
+                }
+            }
+            parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);
+            PackratMemoTable.memoizeFailure(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
+            return Parsed.FAILED;
+        } catch (RuntimeException | Error failure) {
+            parseContext.failParserCall(failure);
+            throw failure;
+        } finally {
+            parseContext.leaveParserCall();
         }
-        parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);
-        PackratMemoTable.memoizeFailure(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
-        return Parsed.FAILED;
     }
 }

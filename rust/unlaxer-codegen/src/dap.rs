@@ -12,7 +12,9 @@ pub fn generate(ir: &GrammarIr) -> GeneratedFile {
         for mapping in mappings {
             write!(out, "        super::ast::Ast::r#{} {{ span", mapping.name).unwrap();
             for field in &mapping.fields {
-                if field.kind != Kind::Text {
+                if matches!(field.kind, Kind::Node | Kind::NullableNode | Kind::Value)
+                    || crate::nested::dap_node(field)
+                {
                     write!(out, ", r#{}", field.name).unwrap();
                 }
             }
@@ -24,16 +26,36 @@ pub fn generate(ir: &GrammarIr) -> GeneratedFile {
             )
             .unwrap();
             for field in &mapping.fields {
-                if field.kind == Kind::Text {
+                if let Kind::Nested { leaf, containers } = &field.kind {
+                    if crate::nested::dap_node(field) {
+                        writeln!(
+                            out,
+                            "            {}",
+                            crate::nested::dap_walk(
+                                leaf,
+                                containers,
+                                &format!("r#{}", field.name),
+                                0
+                            )
+                        )
+                        .unwrap();
+                    }
+                    continue;
+                }
+                if !matches!(field.kind, Kind::Node | Kind::NullableNode | Kind::Value) {
                     continue;
                 }
                 let name = format!("r#{}", field.name);
-                let body: &str = if field.kind == Kind::Node {
+                let body: &str = if matches!(field.kind, Kind::Node | Kind::NullableNode) {
                     "collect(child, out);"
                 } else {
                     "if let super::ast::AstValue::Node(child) = child { collect(child, out); }"
                 };
                 match field.cardinality {
+                    Cardinality::One if field.kind == Kind::NullableNode => {
+                        writeln!(out, "            if let Some(child) = {name} {{ {body} }}")
+                            .unwrap()
+                    }
                     Cardinality::One => {
                         writeln!(out, "            {{ let child = {name}; {body} }}").unwrap()
                     }

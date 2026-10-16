@@ -64,12 +64,20 @@ public class ErrorMessageParser extends ContainerParser<String> implements Termi
 
 	@Override
 	public Parsed parse(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
-		if (expectedHintOnly) {
-			parseContext.startParse(this, parseContext, tokenKind, invertMatch);
-			parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);
-			return Parsed.FAILED;
+		parseContext.enterParserCall();
+		try {
+			if (expectedHintOnly) {
+				parseContext.startParse(this, parseContext, tokenKind, invertMatch);
+				parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);
+				return Parsed.FAILED;
+			}
+			return super.parse(parseContext, tokenKind, invertMatch);
+		} catch (RuntimeException | Error failure) {
+			parseContext.failParserCall(failure);
+			throw failure;
+		} finally {
+			parseContext.leaveParserCall();
 		}
-		return super.parse(parseContext, tokenKind, invertMatch);
 	}
 
 	@Override

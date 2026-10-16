@@ -1,0 +1,17 @@
+# Independent semantic-state oracle. UTF8 hex, ~ = empty.
+# Every context first consumes p, registers state=7 and existing portable extra label=before.
+# A mutating emoji callback sets state=99, changes existing extra, and registers a related new node.
+# MatchOnly restores semantic state even when inner consume/raw callbacks advance consumed.
+# Resource and callback exceptions restore owned boundaries BEFORE close; resource failure stays sticky.
+# id	scenario	inputHex	outcome	consumedCP	matchedCP	state	existingLabel	newRelated	newIdValid	committedRoots	originalRoots	recoveryCount	scopeDepth	declarations	references	semanticDiagnostics
+callback-success	success	70f09f9880	success	1	2	7	before	false	false	2	1	0	1	1	0	0
+callback-failure	failure	7078	failure	1	1	7	before	false	false	1	0	0	1	1	0	0
+callback-raw-consume	raw-consume	70f09f9880	success	2	2	7	before	false	false	2	0	0	1	1	0	0
+failed-choice	choice	70f09f9880	success	1	2	7	before	false	false	2	1	0	1	1	0	0
+outer-rollback	outer-rollback	70f09f9880	success	1	1	7	before	false	false	1	1	0	1	1	0	0
+callback-exception	exception	70f09f9880	callback_exception	1	1	7	before	false	false	1	0	0	1	1	0	0
+callback-open-exception	open-exception	70f09f9880	callback_exception	1	1	7	before	false	false	1	0	0	1	1	0	0
+resource-abort	resource	70f09f9880	resource_limit	1	1	7	before	false	false	1	0	0	1	1	0	0
+match-recovery	recovery	706261643b	success	1	5	7	before	false	false	2	1	0	1	1	0	0
+consume-recovery	consume-recovery	706261643b	success	5	5	7	before	false	false	2	1	0	1	1	0	0
+callback-retry	retry	70f09f9880	success	1	2	7	before	false	false	2	1	0	1	1	0	0

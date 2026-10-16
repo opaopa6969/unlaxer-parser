@@ -69,9 +69,10 @@ public class RustSkipLoweringTest {
     }
 
     @Test public void skipDoesNotHideInvalidSyntaxOrUnknownAnnotations() {
+        assertTrue(PortabilityCheck.check("grammar Skip { @root @skip Root ::= { [ 'x' ] }; }").portable());
         for (String body : new String[] {
             "@root @skip Root ::= Missing;",
-            "@root @skip Root ::= { [ 'x' ] };",
+            "@root @skip Root ::= Root;",
             "@root @skip @unknown Root ::= 'x';",
             "@root @skip @mapping(Ghost, params=[missing]) Root ::= 'x';"
         }) {

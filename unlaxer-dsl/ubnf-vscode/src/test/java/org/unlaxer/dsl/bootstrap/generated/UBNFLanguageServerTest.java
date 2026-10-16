@@ -60,19 +60,21 @@ public class UBNFLanguageServerTest {
     private static final String INVALID_UBNF = "this is not valid ubnf!!!";
 
     private UBNFLanguageServer server;
+    private InitializeResult initializeResult;
 
     @Before
-    public void setUp() {
+    public void setUp() throws Exception {
         // The class is `abstract` only so user code can override the protected
         // hooks (additionalCompletionItems, etc.). Default implementations of
         // every required method exist, so an empty subclass is enough.
         server = new UBNFLanguageServer() {};
+        // Service calls require the same completed initialization as a real client session.
+        initializeResult = server.initialize(new InitializeParams()).get();
     }
 
     @Test
     public void initializeReportsExpectedCapabilities() throws Exception {
-        InitializeResult result = server.initialize(new InitializeParams()).get();
-        ServerCapabilities caps = result.getCapabilities();
+        ServerCapabilities caps = initializeResult.getCapabilities();
 
         assertEquals(TextDocumentSyncKind.Full, caps.getTextDocumentSync().getLeft());
         assertNotNull("completion provider must be advertised", caps.getCompletionProvider());
