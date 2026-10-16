@@ -161,6 +161,7 @@ The development branch adds [Unicode-pinned `CI('word')` tokens](docs/case-insen
 
 The development branch also adds [full semantic-token providers](docs/classic-rust-lsp.md) to Rust and validates the existing Java hook against the same protocol corpus. Both default to empty data; applications supply the token legend and encoded tokens. Range and delta requests remain unsupported. This is not included in 3.3.0.
 
+
 The development branch adds [transactional `NonOrdered`](docs/nonordered-runtime.md) to the Rust runtime and fixes failed-candidate state leakage in Java. Each declared child occurrence is selected once, with declaration-order priority; later failure does not explore other permutations. This is not included in 3.3.0.
 
 Development servers also enforce the [single-initialize LSP lifecycle](docs/classic-lsp-lifecycle.md). Applications that previously reinitialized a connection to change its profile must use `unlaxer/configure`; failed configuration preserves the active settings.
@@ -180,6 +181,8 @@ The development branch supports [literal enum values](docs/enum-values.md) in Ja
 The development branch supports [literal enum values](docs/enum-values.md) in Java and Rust, including typed scalar/optional/list fields and source-positioned root wrappers. Mixed enum/Text/Node captures preserve type identity and per-occurrence positions through Java `EnumValue` and Rust tagged `AstValue`, including scalar/optional/list fields and shared mappings ([contract](docs/enum-values.md#mixed-values)). [Typed common fields](docs/common-fields.md) expose the actual Java member type and a borrowed Rust family view, including mixed values and optional/list fields. The parity baseline is Java 21; Java 17 compatibility does not limit new feature design.
 
 The development branch also supports [Classic token-mode propagation](docs/classic-token-propagation.md) through general Rust expressions and custom parsers. The four kinds, inherited inversion, both cursors, and source projection are checked against Java. Capture/replay integration, external code-fence adapters, and observer exceptions remain tracked separately; this runtime slice does not complete parity.
+
+The development branch also supports [Classic token-mode propagation](docs/classic-token-propagation.md) through general Rust expressions and custom parsers. The four kinds, inherited inversion, both cursors, and source projection are checked against Java. [Tiny code-fence adapters](docs/tiny-classic-modes.md) also preserve the four modes, both cursors, retained leaf sources, and atomic failures. Capture/replay integration and observer exceptions remain tracked separately; this runtime slice does not complete parity.
 
 The development branch also supports [Classic token-mode propagation](docs/classic-token-propagation.md) through general Rust expressions and custom parsers. The four kinds, inherited inversion, both cursors, and source projection are checked against Java. [Tiny code-fence adapters](docs/tiny-classic-modes.md) also preserve the four modes, both cursors, retained leaf sources, and atomic failures. Capture/replay integration and observer exceptions remain tracked separately; this runtime slice does not complete parity.
 
@@ -223,6 +226,10 @@ The development branch supports [literal enum values](docs/enum-values.md) in Ja
 
 [Recursive transparent helpers](docs/recursive-helpers.md) now preserve scalar and collected semantic values in both languages with bounded shape analysis.
 
+
+
+[Preferred AST snapshots](docs/preferred-ast-snapshots.md) retain mapping candidates and source positions, with Java-compatible name/depth/tie selection in Rust. [Family projections](docs/family-projection.md) preserve concrete children through sum/alias mappings. [Associative projections](docs/associative-projection.md) now preserve Java literal spines and mixed operands, including preferred candidates and DAP traversal. Synthetic literal leaves use an explicit nullable node slot; consumers of that generated Rust field must regenerate and handle `Option`.
+
 [Automatic evaluation](docs/evaluation-strategies.md) now supports literal, passthrough, conditional, binary arithmetic, and variable-reference strategies in both languages, with explicit conversion hooks, short-circuit order, and fallible Rust outputs. Regenerated automatic Java evaluators must implement the new `convertValue` hook.
 
 [Owned capture and replay](docs/owned-capture-replay.md) now retain actual input, projected, or generated text in both runtimes, with nested scopes and transactional rollback. Java exposes `NamedCapture` / `ReplayParser` / `CaptureScope`; Rust exposes `capture_owned` / `Replay` / `capture_scope`. General UBNF syntax remains tracked in #591. These APIs are development changes after 3.3.0.
@@ -230,6 +237,14 @@ The development branch supports [literal enum values](docs/enum-values.md) in Ja
 See the [full-spec matrix](rust/FULL-SPEC.md) and [IDE inventory](docs/lsp-dap-ide-gap-inventory.md) for remaining limits: Rust incremental parsing, LSP cancellation / semantic tokens / rename and formatting transport, and some tokens and annotations are unsupported. DAP implements AST/token stepping, not live evaluator suspension. Some diagnostics and AST candidate/container behavior still differ between Java and Rust; compatibility with every Java grammar is not guaranteed.
 
 [Zero-bound repetitions](docs/zero-repetition.md) now perform no child or terminator evaluation in both runtimes and generated grammars. Historical Java `Zero` / `LazyZero` / `EOF` negative checks remain available through distinct semantics, including Rust `zero_match`. These development changes preserve both cursors and transactional state.
+
+
+Classic Identifier, Number, and quoted tokens now [isolate their internal lexical scans](docs/classic-atomic-trivia.md) from surrounding grammar trivia. This preserves spaces inside quotes and keeps `A B` as two identifiers.
+
+
+[Classic sequence trivia](docs/classic-sequence-trivia.md) now contributes the same collected source and code-point ranges in Java and Rust, including explicit Classic CST-to-AST mapping. The four token kinds retain their distinct source projection semantics.
+
+[Explicit nested capture boundaries](docs/nested-capture-boundaries.md) preserve missing optionals, present empty lists, order, duplicates, and owned source snapshots in both runtimes. This runtime API is a development addition; generated nested field types and mappers remain tracked in [#583](https://github.com/opaopa6969/unlaxer-parser/issues/583).
 
 Downstream `tinyexpression-rs` and `rustcodeblock` AOT exist on the separate **ubnfc** engine. Their results do not establish Classic Rust parity or production deployment history. See the [engine guide](docs/engine-selection-guide-ja.md) and [pinned downstream audit](rust/FULL-SPEC.md#下流tinyexpressionの現状監査2026-09-30).
 
