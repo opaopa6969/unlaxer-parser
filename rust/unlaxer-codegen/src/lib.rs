@@ -566,7 +566,7 @@ fn expression(expr: &Expression) -> String {
             if metadata {
                 format!("Expr::sequence([{child}, Expr::sequence([{separator}, Expr::Capture({}, Box::new({child}))]).zero_or_more()])",quote(preferred::EXTRA))
             } else {
-                format!("{child}.separated_by({separator})")
+                format!("{child}.separated_by_java({separator})")
             }
         },
     }

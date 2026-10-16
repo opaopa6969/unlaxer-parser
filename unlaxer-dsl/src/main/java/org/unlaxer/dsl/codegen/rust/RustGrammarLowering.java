@@ -953,7 +953,6 @@ public final class RustGrammarLowering {
             // Nullable bodies are safe here; source left-recursion analysis remains separate.
             checkRepetition(repeat.child());
         } else if (expression instanceof Separated separated) {
-            if (nullable(separated.child()) && nullable(separated.separator())) throw unsupported("nullable unbounded separation");
             if (shape(separated.separator(), new HashSet<>()).kind() != Kind.TEXT) throw unsupported("mapped separator");
             checkRepetition(separated.child()); checkRepetition(separated.separator());
         } else if (expression instanceof OptionalExpr optional) {
