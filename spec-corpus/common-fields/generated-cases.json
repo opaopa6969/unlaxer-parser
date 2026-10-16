@@ -1,0 +1,186 @@
+[
+  {
+    "name": "Flat",
+    "grammar": "grammar Flat {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(text,maybe,many,mode)\n Root ::= A | B;\n @enum Mode ::= 'on' | 'off';\n @mapping(A, params=[text,maybe,many,mode])\n A ::= 'a' '😀' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n @mapping(B, params=[text,maybe,many,mode])\n B ::= 'b' 'é' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n}",
+    "java": "return node.text()+\"|\"+node.maybe().orElse(\"-\")+\"|\"+node.many().size()+\"|\"+node.mode().name();",
+    "rust": "format!(\"{}|{}|{}|{}\", view.text, view.maybe.as_deref().unwrap_or(\"-\"), view.many.len(), view.mode.canonical_json().trim_matches(char::from(34)))",
+    "cases": [
+      [
+        "a😀[]{}on",
+        "😀|-|0|ON",
+        [
+          0,
+          8
+        ]
+      ],
+      [
+        "bé[x]{zz}off",
+        "é|x|2|OFF",
+        [
+          0,
+          13
+        ]
+      ],
+      [
+        "a😀[x]{z}off",
+        "😀|x|1|OFF",
+        [
+          0,
+          11
+        ]
+      ]
+    ]
+  },
+  {
+    "name": "Dotted",
+    "grammar": "grammar Dotted {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(text,maybe,many,mode)\n Root ::= A | B;\n @enum Mode ::= 'on' | 'off';\n @mapping(Node.A, params=[text,maybe,many,mode])\n A ::= 'a' '😀' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n @mapping(Node.B, params=[text,maybe,many,mode])\n B ::= 'b' 'é' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n}",
+    "java": "return node.text()+\"|\"+node.maybe().orElse(\"-\")+\"|\"+node.many().size()+\"|\"+node.mode().name();",
+    "rust": "format!(\"{}|{}|{}|{}\", view.text, view.maybe.as_deref().unwrap_or(\"-\"), view.many.len(), view.mode.canonical_json().trim_matches(char::from(34)))",
+    "cases": [
+      [
+        "a😀[]{}on",
+        "😀|-|0|ON",
+        [
+          0,
+          8
+        ]
+      ],
+      [
+        "bé[x]{zz}off",
+        "é|x|2|OFF",
+        [
+          0,
+          13
+        ]
+      ],
+      [
+        "a😀[x]{z}off",
+        "😀|x|1|OFF",
+        [
+          0,
+          11
+        ]
+      ]
+    ]
+  },
+  {
+    "name": "Nodes",
+    "grammar": "grammar Nodes {\n @package: commonprobe\n @root @mapping(Node) @commonField(child)\n Root ::= A | B;\n @mapping(A,params=[child]) A ::= 'a' Leaf @child;\n @mapping(B,params=[child]) B ::= 'b' Leaf @child;\n @mapping(Leaf,params=[value]) Leaf ::= 'l' @value;\n}",
+    "java": "return node.child().value();",
+    "rust": "{ assert!(view.child.common_node().is_none()); match view.child.as_ref() { generated::ast::Ast::Leaf { value, .. } => value.clone(), _ => panic!(\"wrong child\") } }",
+    "cases": [
+      [
+        "al",
+        "l",
+        [
+          0,
+          2
+        ]
+      ],
+      [
+        "bl",
+        "l",
+        [
+          0,
+          2
+        ]
+      ]
+    ]
+  },
+  {
+    "name": "Numeric",
+    "grammar": "grammar Numeric {\n @package: commonprobe\n token NUMBER = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Node) @commonField(value)\n Root ::= A | B;\n @mapping(A,params=[value]) A ::= 'a' NUMBER @value;\n @mapping(B,params=[value]) B ::= 'b' NUMBER @value;\n}",
+    "java": "return Integer.toString((int)node.value()+1);",
+    "rust": "(view.value.parse::<i32>().unwrap()+1).to_string()",
+    "cases": [
+      [
+        "a12",
+        "13",
+        [
+          0,
+          3
+        ]
+      ],
+      [
+        "b7",
+        "8",
+        [
+          0,
+          2
+        ]
+      ]
+    ]
+  },
+  {
+    "name": "EnumContainers",
+    "grammar": "grammar EnumContainers {\n @package: commonprobe\n @root @mapping(Node) @commonField(maybe,many)\n Root ::= A | B;\n @enum Mode ::= 'on' | 'off';\n Alias ::= Mode;\n @mapping(A,params=[maybe,many]) A ::= 'a' '[' [ Mode @maybe ] ']' '{' { Mode @many } '}';\n @mapping(B,params=[maybe,many]) B ::= 'b' '[' [ Alias @maybe ] ']' '{' { Alias @many } '}';\n}",
+    "java": "return node.maybe().map(Enum::name).orElse(\"-\")+\"|\"+node.many().toString();",
+    "rust": "format!(\"{}|{:?}\",view.maybe.as_ref().map(|v|v.canonical_json().trim_matches(char::from(34)).to_owned()).unwrap_or(\"-\".into()),view.many)",
+    "cases": [
+      [
+        "a[]{}",
+        "-|[]",
+        [
+          0,
+          5
+        ]
+      ],
+      [
+        "b[on]{offon}",
+        "ON|[OFF, ON]",
+        [
+          0,
+          12
+        ]
+      ]
+    ]
+  },
+  {
+    "name": "Nested",
+    "grammar": "grammar Nested {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(text,maybe,many,mode)\n Root ::= Branch | C;\n @mapping(Branch) Branch ::= A | B;\n @mapping(C,params=[text,maybe,many,mode]) C ::= 'c' '😀' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n @enum Mode ::= 'on' | 'off';\n @mapping(A, params=[text,maybe,many,mode])\n A ::= 'a' '😀' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n @mapping(B, params=[text,maybe,many,mode])\n B ::= 'b' 'é' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n}",
+    "java": "return node.text()+\"|\"+node.maybe().orElse(\"-\")+\"|\"+node.many().size()+\"|\"+node.mode().name();",
+    "rust": "format!(\"{}|{}|{}|{}\", view.text, view.maybe.as_deref().unwrap_or(\"-\"), view.many.len(), view.mode.canonical_json().trim_matches(char::from(34)))",
+    "cases": [
+      [
+        "a😀[]{}on",
+        "😀|-|0|ON",
+        [
+          0,
+          8
+        ]
+      ],
+      [
+        "c😀[x]{zz}off",
+        "😀|x|2|OFF",
+        [
+          0,
+          12
+        ]
+      ]
+    ]
+  },
+  {
+    "name": "NodeContainers",
+    "grammar": "grammar NodeContainers {\n @package: commonprobe\n @root @mapping(Node) @commonField(maybe,many)\n Root ::= A | B;\n @mapping(A,params=[maybe,many]) A ::= 'a' '[' [ Leaf @maybe ] ']' '{' { Leaf @many } '}';\n @mapping(B,params=[maybe,many]) B ::= 'b' '[' [ Leaf @maybe ] ']' '{' { Leaf @many } '}';\n @mapping(Leaf,params=[value]) Leaf ::= 'l' @value;\n}",
+    "java": "return node.maybe().map(v->v.value()).orElse(\"-\")+\"|\"+node.many().size();",
+    "rust": "format!(\"{}|{}\",view.maybe.as_ref().map(|v|match v.as_ref() {generated::ast::Ast::Leaf{value,..}=>value.as_str(),_=>panic!(\"child\")}).unwrap_or(\"-\"),view.many.len())",
+    "cases": [
+      [
+        "a[]{}",
+        "-|0",
+        [
+          0,
+          5
+        ]
+      ],
+      [
+        "b[l]{ll}",
+        "l|2",
+        [
+          0,
+          8
+        ]
+      ]
+    ]
+  }
+]

@@ -1,5 +1,6 @@
 //! Native UBNF -> normalized IR -> Rust modules. No Java process is launched.
 pub mod adapters;
+mod common_fields;
 mod embedded;
 mod evaluation;
 pub mod impact;
@@ -44,6 +45,12 @@ pub(crate) fn generate_grammar(
         .find(|f| f.relative_path == "evaluator.rs")
         .unwrap();
     evaluator.content = evaluation::apply(grammar, &ir, std::mem::take(&mut evaluator.content))?;
+    files
+        .iter_mut()
+        .find(|f| f.relative_path == "ast.rs")
+        .unwrap()
+        .content
+        .push_str(&common_fields::emit(grammar, &ir)?);
     if token_stream::enabled(grammar) {
         let api = unlaxer_codegen::lexing_api_with_profile(
             &token_stream::terminals(grammar)?,

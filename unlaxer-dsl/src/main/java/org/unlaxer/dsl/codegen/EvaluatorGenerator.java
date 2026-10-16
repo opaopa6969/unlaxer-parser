@@ -49,6 +49,7 @@ public class EvaluatorGenerator implements CodeGenerator {
     public GeneratedSource generate(GrammarDecl grammar) {
         EnumSchema.validate(grammar);
         var evaluations = EvalSchema.specifications(grammar);
+        CommonFieldSchema.build(grammar);
         String packageName = getPackageName(grammar);
         String grammarName = grammar.name();
         String astClass = grammarName + "AST";

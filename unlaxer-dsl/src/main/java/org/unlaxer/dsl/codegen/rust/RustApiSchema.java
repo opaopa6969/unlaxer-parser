@@ -34,7 +34,7 @@ public final class RustApiSchema {
                     ApiImpact.location("ast.rs", ast, fieldStart, fieldStart + declaration.length())));
                 parameters.add(new Parameter(field.name(), RustBackend.fieldType(field, true)));
             }
-            var origins = ApiImpact.origins(source, mapping.name());
+            var origins = rustOrigins(source, mapping.name());
             nodes.add(new Node(mapping.name(), "variant", fields, List.of(), List.of(), origins,
                 ApiImpact.location("ast.rs", ast, start, end)));
             parameters.add(new Parameter("span", "Span"));
@@ -62,8 +62,131 @@ public final class RustApiSchema {
             methods.add(new Method(name,signatures.group(3),parameters,true,ApiImpact.origins(source,null),
                 ApiImpact.location("evaluator.rs",evaluator,signatures.start(),signatures.end())));
         }
+        for (var family : org.unlaxer.dsl.codegen.CommonFieldSchema.build(grammar)) {
+            String name =
+                    org.unlaxer.dsl.codegen.CommonFieldSchema.rustName(family.name()) + "Fields";
+            int start = requireIndex(ast, "pub struct " + name + "<'a> {", 0);
+            var first =
+                    ir.mappings().stream()
+                            .filter(
+                                    m ->
+                                            m.name()
+                                                    .equals(
+                                                            org.unlaxer.dsl.codegen
+                                                                    .CommonFieldSchema.rustName(
+                                                                    family.variants().get(0))))
+                            .findFirst()
+                            .orElseThrow();
+            var fields = new ArrayList<Field>();
+            for (var contract : family.fields()) {
+                var field =
+                        first.fields().stream()
+                                .filter(f -> f.name().equals(contract.name()))
+                                .findFirst()
+                                .orElseThrow();
+                String type = "&'a " + RustBackend.fieldType(field, false);
+                String declaration = "r#" + field.name() + ": " + type;
+                int fieldStart = requireIndex(ast, declaration, start);
+                fields.add(
+                        new Field(
+                                field.name(),
+                                type,
+                                field.cardinality().name().toLowerCase(Locale.ROOT),
+                                ApiImpact.location(
+                                        "ast.rs",
+                                        ast,
+                                        fieldStart,
+                                        fieldStart + declaration.length())));
+            }
+            var origins =
+                    source.ast().grammars().get(0).rules().stream()
+                            .filter(r -> r.name().equals(family.rule()))
+                            .map(
+                                    r -> {
+                                        var span = source.spanOf(r).orElseThrow();
+                                        return new Origin(
+                                                r.name(), new Span(span.start(), span.end()));
+                                    })
+                            .toList();
+            nodes.add(
+                    new Node(
+                            name,
+                            "struct",
+                            fields,
+                            List.of(),
+                            family.variants().stream()
+                                    .map(org.unlaxer.dsl.codegen.CommonFieldSchema::rustName)
+                                    .sorted()
+                                    .toList(),
+                            origins,
+                            ApiImpact.location("ast.rs", ast, start, ast.indexOf('\n', start))));
+            String method =
+                    "common_"
+                            + RustGrammarLowering.methodName(
+                                            org.unlaxer.dsl.codegen.CommonFieldSchema.rustName(
+                                                    family.name()))
+                                    .substring(5);
+            int methodStart = requireIndex(ast, "    pub fn " + method + "(", 0);
+            methods.add(
+                    new Method(
+                            method,
+                            "Option<" + name + "<'_>>",
+                            List.of(new Parameter("self", "&Self")),
+                            false,
+                            origins,
+                            ApiImpact.location(
+                                    "ast.rs", ast, methodStart, ast.indexOf('\n', methodStart))));
+        }
         return new Snapshot(grammar.name(), "Ast", "Semantics", nodes, methods);
     }
+    private static List<Origin> rustOrigins(UBNFSourceSnapshot source, String name) {
+        boolean dotted =
+                source.ast().grammars().get(0).rules().stream()
+                        .flatMap(r -> r.annotations().stream())
+                        .filter(
+                                org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation.class
+                                        ::isInstance)
+                        .map(org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation.class::cast)
+                        .anyMatch(
+                                m ->
+                                        m.className().contains(".")
+                                                && org.unlaxer.dsl.codegen.CommonFieldSchema
+                                                        .rustName(m.className())
+                                                        .equals(name));
+        if (!dotted) return ApiImpact.origins(source, name);
+        return source.ast().grammars().get(0).rules().stream()
+                .filter(
+                        r ->
+                                r.annotations().stream()
+                                        .noneMatch(
+                                                org.unlaxer.dsl.bootstrap.UBNFAST.SkipAnnotation
+                                                                .class
+                                                        ::isInstance))
+                .filter(
+                        rule ->
+                                rule.annotations().stream()
+                                        .filter(
+                                                org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation
+                                                                .class
+                                                        ::isInstance)
+                                        .map(
+                                                org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation
+                                                                .class
+                                                        ::cast)
+                                        .anyMatch(
+                                                m ->
+                                                        org.unlaxer.dsl.codegen.CommonFieldSchema
+                                                                .rustName(m.className())
+                                                                .equals(name)))
+                .map(
+                        rule -> {
+                            var span = source.spanOf(rule).orElseThrow();
+                            return new Origin(rule.name(), new Span(span.start(), span.end()));
+                        })
+                .sorted(java.util.Comparator.comparing(Origin::rule))
+                .toList();
+    }
+
     private static int requireIndex(String source, String declaration, int from) {
         int found = source.indexOf(declaration, from);
         if (found < 0) throw new IllegalStateException("generated declaration missing: " + declaration);

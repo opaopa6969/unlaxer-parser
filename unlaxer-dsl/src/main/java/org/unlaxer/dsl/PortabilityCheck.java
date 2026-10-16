@@ -76,7 +76,11 @@ public final class PortabilityCheck {
                     && rule.annotations().stream().noneMatch(annotation -> annotation instanceof PrecedenceAnnotation));
             if (invalid) add(diagnostics, "P-STRUCTURE", snapshot, grammar, "Rust structural constraints");
         } catch (RuntimeException error) {
-            add(diagnostics, "P-STRUCTURE", snapshot, grammar, "Rust structural constraints");
+            var commonRule=org.unlaxer.dsl.codegen.CommonFieldSchema.errorRule(error);
+            if(commonRule.isPresent()) {
+                var origin=grammar.rules().stream().filter(r->r.name().equals(commonRule.get())).findFirst().orElseThrow();
+                add(diagnostics,"P-COMMONFIELD",snapshot,origin,"commonField schema");
+            } else add(diagnostics, "P-STRUCTURE", snapshot, grammar, "Rust structural constraints");
         }
         return diagnostics.isEmpty() ? result(true, "passed", diagnostics) : result(false, "failed", diagnostics);
     }
@@ -145,12 +149,11 @@ public final class PortabilityCheck {
     private static void scanAnnotation(GrammarDecl grammar, Annotation annotation, UBNFSourceSnapshot snapshot, List<Diagnostic> out) {
         String unsupported = null;
         if (annotation instanceof SimpleAnnotation simple) unsupported = simple.name();
-        else if (annotation instanceof CommonFieldAnnotation) unsupported = "commonField";
 
         if (unsupported != null) add(out, "P-ANNOTATION", snapshot, annotation, unsupported);
 
         if (annotation instanceof MappingAnnotation mapping) {
-            if (!identifier(mapping.className())) add(out, "P-MAPPING-TYPE", snapshot, annotation, mapping.className());
+            if (!identifier(org.unlaxer.dsl.codegen.CommonFieldSchema.rustName(mapping.className()))) add(out, "P-MAPPING-TYPE", snapshot, annotation, mapping.className());
             for (String param : mapping.paramNames()) {
                 if (!identifier(param) || Set.of("span", "semantics").contains(param)) {
                     add(out, "P-FIELD-NAME", snapshot, annotation, param);

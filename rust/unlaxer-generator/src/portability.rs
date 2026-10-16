@@ -142,8 +142,16 @@ pub fn check_ast(file: &UbnfFile) -> Report {
         for grammar in &file.grammars {
             let result = crate::lowering::lower(grammar)
                 .and_then(|ir| unlaxer_codegen::validate_ir(&ir).map_err(|e| e.to_string()));
-            if result.is_err() {
-                inventory.add("P-STRUCTURE", "Rust structural constraints", grammar.span);
+            if let Err(error) = result {
+                if let Some(rule) = error
+                    .strip_prefix("E-COMMONFIELD-MISMATCH: ")
+                    .and_then(|s| s.split(": ").next())
+                    .and_then(|name| grammar.rules.iter().find(|r| r.name == name))
+                {
+                    inventory.add("P-COMMONFIELD", "commonField schema", rule.span);
+                } else {
+                    inventory.add("P-STRUCTURE", "Rust structural constraints", grammar.span);
+                }
             }
         }
         if inventory.diagnostics.is_empty() {
@@ -284,7 +292,7 @@ impl Inventory {
             | AnnotationKind::Catalog { .. }
             | AnnotationKind::LexicalContext { .. } => {}
             AnnotationKind::Mapping { class_name, params } => {
-                if !identifier(class_name) {
+                if !identifier(&crate::common_fields::rust_name(class_name)) {
                     self.add("P-MAPPING-TYPE", class_name, span);
                 }
                 for param in params {
@@ -314,7 +322,7 @@ impl Inventory {
             AnnotationKind::Doc { .. } | AnnotationKind::Recovery { .. } => {}
             AnnotationKind::Skip => {}
             AnnotationKind::Simple { name } => self.add("P-ANNOTATION", name, span),
-            AnnotationKind::CommonField { .. } => self.add("P-ANNOTATION", "commonField", span),
+            AnnotationKind::CommonField { .. } => {}
             AnnotationKind::Enum => {}
         }
     }

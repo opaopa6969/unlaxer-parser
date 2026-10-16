@@ -95,7 +95,7 @@ public final class JavaApiSchema {
                 case ENUM -> "enum";
                 default -> "interface";
             };
-            List<ApiImpact.Field> fields = kind.equals("record") ? recordFields(parsed, type) : List.of();
+            List<ApiImpact.Field> fields = kind.equals("record") ? recordFields(parsed, type) : kind.equals("interface") ? interfaceFields(parsed,type) : List.of();
             List<String> parents = new ArrayList<>();
             if (type.getExtendsClause() != null) parents.add(type.getExtendsClause().toString());
             for (Tree implemented : type.getImplementsClause()) parents.add(implemented.toString());
@@ -140,6 +140,30 @@ public final class JavaApiSchema {
                 var span = snapshot.spanOf(rule).orElseThrow(() -> new IllegalStateException("missing rule origin"));
                 return new ApiImpact.Origin(rule.name(), new ApiImpact.Span(span.start(), span.end()));
             }).sorted(Comparator.comparing(ApiImpact.Origin::rule)).toList();
+    }
+
+    private static List<ApiImpact.Field> interfaceFields(Parsed parsed, ClassTree type) {
+        List<ApiImpact.Field> fields = new ArrayList<>();
+        for (Tree member : type.getMembers())
+            if (member instanceof MethodTree method
+                    && method.getParameters().isEmpty()
+                    && method.getReturnType() != null) {
+                String fieldType = method.getReturnType().toString();
+                String outer = fieldType.replace(" ", "");
+                String cardinality =
+                        outer.startsWith("Optional<") || outer.startsWith("java.util.Optional<")
+                                ? "optional"
+                                : outer.startsWith("List<") || outer.startsWith("java.util.List<")
+                                        ? "many"
+                                        : "one";
+                fields.add(
+                        new ApiImpact.Field(
+                                method.getName().toString(),
+                                fieldType,
+                                cardinality,
+                                parsed.location(method)));
+            }
+        return fields;
     }
 
     private static List<ApiImpact.Field> recordFields(Parsed parsed, ClassTree type) {
