@@ -262,7 +262,7 @@ Rustの生成ASTはもともとspanを所有するため、別parseや別thread�
 
 `[[ Item ]] @head`など入れ子container全体のcaptureは、`Option<Option<_>>`を失わないよう現時点では明示拒否する。内側の要素に名前を付けるか、各階層をmapped ruleに分ける。再帰的なunmapped ruleの型推論、入れ子container型、全Java capture規則との互換性は今後の作業。scalarからoptionalに変わると手書きSemanticsも型変更が必要になり、古い引数型は`E0053`で検出される。
 
-Classic Rust の LSP/DAP、回復、明示的な PropagationStopper 相当 API は実装済み。incremental cache、Java MatchedTokenParser との完全互換、全 combinator への consume/invert 伝播などの残差は [対応表](FULL-SPEC.md) を参照する。TinyExpression の評価意味論は下流 ubnfc 側の実装と区別する。生成文法 graph は `OnceLock<SharedGrammar>` で共有し、runtime の既定 rule 呼出深さ上限は256。[性能測定](../docs/performance-tuning-ja.md)は個々の文法・条件での結果であり、任意入力の速度優位や資源量を保証しない。
+Classic Rust の LSP/DAP、回復、明示的な PropagationStopper 相当 API は実装済み。incremental cache、Java MatchedTokenParser との完全互換、全 combinator への consume/invert 伝播などの残差は [対応表](FULL-SPEC.md) を参照する。TinyExpression の評価意味論は下流 ubnfc 側の実装と区別する。生成文法 graph は `OnceLock<SharedGrammar>` で共有し、runtime の rule 呼出深さ上限は256、wrapperを含む同時実行expression数の上限は1024。`ParseContext::parse` / `parse_grammar` / `parse_shared_grammar` の再入でも予算を引き継ぎ、超過は通常の解析診断となる。wrapperが多い文法はrule上限より先にexpression上限へ達する場合がある。2MiBのスレッドstackで再帰・capture/optional・公開grammar再入を回帰検証している。任意の小さなstackや利用者callback内部の独自再帰、手作業で極端に深く構築したgrammar自体のclone/dropまで隔離するsandboxではない。[性能測定](../docs/performance-tuning-ja.md)は個々の文法・条件での結果であり、任意入力の速度優位や資源量を保証しない。
 
 ### 公開ParseContextと手書きcombinator
 
