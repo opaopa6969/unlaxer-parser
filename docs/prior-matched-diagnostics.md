@@ -48,6 +48,10 @@ matched が CP1 のままでも、raw consuming leaf の matched=CP0 への rese
 - Rust は同じ入力で legacy TokenExpr / 一般 Classic の両方による事前準備を使い、
   native PEG の独立 source 期待値も確認する。追加の CP0/CP2 probe は古い watermark
   に隠れた実 failure を直接固定する。memo 方針の検証を全行の実 memo hit とは数えない。
+- 追加の36設定では、同じ rule を反復して実 memo hit を検証する。失敗再利用は
+  OFF=0 / ON=1 hit、成功再利用は OFF=0 / ON=2 hit。診断3種と reset2種で、
+  native の CP0/CP2、続く Classic の CP1/CP2、成功先読みの hint 破棄と
+  失敗する否定先読みの hint 保持を確認する。
 
 旧 `peg-assertion/cases.tsv` の Java/Rust 別診断期待値は変更しない。その native PEG
 との比較を、Java互換 Classic 入口の不足と読み替えない。認識や既存 API の既定値は
