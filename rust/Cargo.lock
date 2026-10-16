@@ -346,6 +346,7 @@ dependencies = [
 name = "unlaxer-learning"
 version = "0.1.0"
 dependencies = [
+ "serde_json",
  "unlaxer-codegen",
  "unlaxer-generator",
  "unlaxer-runtime",

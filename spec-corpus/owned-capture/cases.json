@@ -1,0 +1,961 @@
+[
+  {
+    "name": "input-unicode",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none  @root @mapping(Value, params=[first,again]) Root ::= CAPTURE(word, ('😀' | 'x')) @first ':' SAME_AS(word) @again;  }",
+    "cases": [
+      {
+        "input": "😀:😀",
+        "success": true,
+        "consumed": 3,
+        "matched": 3,
+        "word": "😀",
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {
+            "first": "😀",
+            "again": "😀"
+          }
+        },
+        "binding": {
+          "text": "😀",
+          "source": "INPUT",
+          "start": 0,
+          "end": 1
+        }
+      },
+      {
+        "input": "x:x",
+        "success": true,
+        "consumed": 3,
+        "matched": 3,
+        "word": "x",
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {
+            "first": "x",
+            "again": "x"
+          }
+        },
+        "binding": {
+          "text": "x",
+          "source": "INPUT",
+          "start": 0,
+          "end": 1
+        }
+      },
+      {
+        "input": "😀:x",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null
+      },
+      {
+        "input": "x:😀",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null
+      }
+    ]
+  },
+  {
+    "name": "grapheme-codepoints",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none  @root @mapping(Value, params=[first,again]) Root ::= CAPTURE(word, ('👩‍👩‍👧‍👦' | 'é')) @first ':' SAME_AS(word) @again;  }",
+    "cases": [
+      {
+        "input": "👩‍👩‍👧‍👦:👩‍👩‍👧‍👦",
+        "success": true,
+        "consumed": 15,
+        "matched": 15,
+        "word": "👩‍👩‍👧‍👦",
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            15
+          ],
+          "fields": {
+            "first": "👩‍👩‍👧‍👦",
+            "again": "👩‍👩‍👧‍👦"
+          }
+        },
+        "binding": {
+          "text": "👩‍👩‍👧‍👦",
+          "source": "INPUT",
+          "start": 0,
+          "end": 7
+        }
+      },
+      {
+        "input": "é:é",
+        "success": true,
+        "consumed": 5,
+        "matched": 5,
+        "word": "é",
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "first": "é",
+            "again": "é"
+          }
+        },
+        "binding": {
+          "text": "é",
+          "source": "INPUT",
+          "start": 0,
+          "end": 2
+        }
+      },
+      {
+        "input": "é:é",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null
+      }
+    ]
+  },
+  {
+    "name": "forward-unbound",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none  @root @mapping(Value) Root ::= SAME_AS(word) CAPTURE(word,'x');  }",
+    "cases": [
+      {
+        "input": "xx",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null
+      },
+      {
+        "input": "",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null
+      }
+    ]
+  },
+  {
+    "name": "discarded-alternative",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none  @root @mapping(Value) Root ::= (CAPTURE(word,'x') 'z' | 'x') SAME_AS(word);  }",
+    "cases": [
+      {
+        "input": "xx",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null
+      },
+      {
+        "input": "xzx",
+        "success": true,
+        "consumed": 3,
+        "matched": 3,
+        "word": "x",
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {}
+        },
+        "binding": {
+          "text": "x",
+          "source": "INPUT",
+          "start": 0,
+          "end": 1
+        }
+      }
+    ]
+  },
+  {
+    "name": "shadow",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none  @root @mapping(Value) Root ::= CAPTURE(word,'a') CAPTURE(word,'b') SAME_AS(word);  }",
+    "cases": [
+      {
+        "input": "abb",
+        "success": true,
+        "consumed": 3,
+        "matched": 3,
+        "word": "b",
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {}
+        },
+        "binding": {
+          "text": "b",
+          "source": "INPUT",
+          "start": 1,
+          "end": 2
+        }
+      },
+      {
+        "input": "aba",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null
+      }
+    ]
+  },
+  {
+    "name": "scope-shadow",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none  @root @mapping(Value) Root ::= CAPTURE(word,'a') CAPTURE_SCOPE(CAPTURE(word,'b') SAME_AS(word)) SAME_AS(word);  }",
+    "cases": [
+      {
+        "input": "abba",
+        "success": true,
+        "consumed": 4,
+        "matched": 4,
+        "word": "a",
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {}
+        },
+        "binding": {
+          "text": "a",
+          "source": "INPUT",
+          "start": 0,
+          "end": 1
+        }
+      },
+      {
+        "input": "abbb",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null
+      }
+    ]
+  },
+  {
+    "name": "scope-expiry",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none  @root @mapping(Value) Root ::= CAPTURE_SCOPE(CAPTURE(word,'a')) SAME_AS(word);  }",
+    "cases": [
+      {
+        "input": "aa",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null
+      }
+    ]
+  },
+  {
+    "name": "scope-local",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none  @root @mapping(Value) Root ::= CAPTURE_SCOPE(CAPTURE(word,'a') SAME_AS(word));  }",
+    "cases": [
+      {
+        "input": "aa",
+        "success": true,
+        "consumed": 2,
+        "matched": 2,
+        "word": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            2
+          ],
+          "fields": {}
+        }
+      },
+      {
+        "input": "ab",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null
+      }
+    ]
+  },
+  {
+    "name": "empty-owned",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none token E=EOF @root @mapping(Value) Root ::= CAPTURE(word,E{0}) SAME_AS(word);  }",
+    "cases": [
+      {
+        "input": "",
+        "success": true,
+        "consumed": 0,
+        "matched": 0,
+        "word": "",
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            0
+          ],
+          "fields": {}
+        },
+        "binding": {
+          "text": "",
+          "source": "INPUT",
+          "start": 0,
+          "end": 0
+        }
+      },
+      {
+        "input": "😀",
+        "success": true,
+        "consumed": 0,
+        "matched": 0,
+        "word": "",
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            0
+          ],
+          "fields": {}
+        },
+        "binding": {
+          "text": "",
+          "source": "INPUT",
+          "start": 0,
+          "end": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "empty-replay-repeat",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none token E=EOF @root @mapping(Value, params=[values]) Root ::= CAPTURE(word,E{0}) SAME_AS(word)* @values 'x';  }",
+    "cases": [
+      {
+        "input": "x",
+        "success": true,
+        "consumed": 1,
+        "matched": 1,
+        "word": "",
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            1
+          ],
+          "fields": {
+            "values": [
+              ""
+            ]
+          }
+        },
+        "binding": {
+          "text": "",
+          "source": "INPUT",
+          "start": 0,
+          "end": 0
+        }
+      },
+      {
+        "input": "",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null
+      }
+    ]
+  },
+  {
+    "name": "empty-replay-separation",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none token E=EOF @root @mapping(Value, params=[values]) Root ::= CAPTURE(word,E{0}) SAME_AS(word) % SAME_AS(word) @values 'x';  }",
+    "cases": [
+      {
+        "input": "x",
+        "success": true,
+        "consumed": 1,
+        "matched": 1,
+        "word": "",
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            1
+          ],
+          "fields": {
+            "values": [
+              "",
+              ""
+            ]
+          }
+        },
+        "binding": {
+          "text": "",
+          "source": "INPUT",
+          "start": 0,
+          "end": 0
+        }
+      },
+      {
+        "input": "",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null
+      }
+    ]
+  },
+  {
+    "name": "retry-memo",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none  @root @mapping(Value) Root ::= (Captured 'z' | Captured 'y') SAME_AS(word); Captured ::= CAPTURE(word,'x'); }",
+    "cases": [
+      {
+        "input": "xyx",
+        "success": true,
+        "consumed": 3,
+        "matched": 3,
+        "word": "x",
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {}
+        },
+        "binding": {
+          "text": "x",
+          "source": "INPUT",
+          "start": 0,
+          "end": 1
+        }
+      },
+      {
+        "input": "xzx",
+        "success": true,
+        "consumed": 3,
+        "matched": 3,
+        "word": "x",
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {}
+        },
+        "binding": {
+          "text": "x",
+          "source": "INPUT",
+          "start": 0,
+          "end": 1
+        }
+      },
+      {
+        "input": "xyz",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null
+      }
+    ]
+  },
+  {
+    "name": "lexical-store-isolation",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @ubnf: v2 token T ::= CAPTURE(word,'a') SAME_AS(word); @root @mapping(Value) Root ::= CAPTURE(word,'b') T SAME_AS(word);  }",
+    "cases": [
+      {
+        "input": "baab",
+        "success": true,
+        "consumed": 4,
+        "matched": 4,
+        "word": "b",
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {}
+        },
+        "binding": {
+          "text": "b",
+          "source": "INPUT",
+          "start": 0,
+          "end": 1
+        }
+      },
+      {
+        "input": "baaa",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null
+      }
+    ]
+  },
+  {
+    "name": "ast-capture-store-isolation",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none  @root @mapping(Value, params=[word,again]) Root ::= CAPTURE(word,'a') @word CAPTURE(word,'b') SAME_AS(word) @again;  }",
+    "cases": [
+      {
+        "input": "abb",
+        "success": true,
+        "consumed": 3,
+        "matched": 3,
+        "word": "b",
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {
+            "word": "a",
+            "again": "b"
+          }
+        },
+        "binding": {
+          "text": "b",
+          "source": "INPUT",
+          "start": 1,
+          "end": 2
+        }
+      }
+    ]
+  },
+  {
+    "name": "optional-field-inside",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none  @root @mapping(Value, params=[first,again]) Root ::= CAPTURE(word,['a' @first]) SAME_AS(word) @again;  }",
+    "cases": [
+      {
+        "input": "",
+        "success": true,
+        "consumed": 0,
+        "matched": 0,
+        "word": "",
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            0
+          ],
+          "fields": {
+            "first": null,
+            "again": ""
+          }
+        },
+        "binding": {
+          "text": "",
+          "source": "INPUT",
+          "start": 0,
+          "end": 0
+        }
+      },
+      {
+        "input": "aa",
+        "success": true,
+        "consumed": 2,
+        "matched": 2,
+        "word": "a",
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            2
+          ],
+          "fields": {
+            "first": "a",
+            "again": "a"
+          }
+        },
+        "binding": {
+          "text": "a",
+          "source": "INPUT",
+          "start": 0,
+          "end": 1
+        }
+      }
+    ]
+  },
+  {
+    "name": "list-field-inside",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none  @root @mapping(Value, params=[parts,again]) Root ::= CAPTURE(word,{'a' @parts}) ':' SAME_AS(word) @again;  }",
+    "cases": [
+      {
+        "input": "aa:aa",
+        "success": true,
+        "consumed": 5,
+        "matched": 5,
+        "word": "aa",
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "parts": [
+              "a",
+              "a"
+            ],
+            "again": "aa"
+          }
+        },
+        "binding": {
+          "text": "aa",
+          "source": "INPUT",
+          "start": 0,
+          "end": 2
+        }
+      },
+      {
+        "input": ":",
+        "success": true,
+        "consumed": 1,
+        "matched": 1,
+        "word": "",
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            1
+          ],
+          "fields": {
+            "parts": [],
+            "again": ""
+          }
+        },
+        "binding": {
+          "text": "",
+          "source": "INPUT",
+          "start": 0,
+          "end": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "legacy-identifier-group",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none  @root @mapping(Value) Root ::= CAPTURE ('x') SAME_AS // comment\n('x') CAPTURE_SCOPE ('x') CAPTURE_MORE ('x'); CAPTURE ::= 'c'; SAME_AS ::= 's'; CAPTURE_SCOPE ::= 'g'; CAPTURE_MORE ::= 'l'; }",
+    "cases": [
+      {
+        "input": "cxsxgxlx",
+        "success": true,
+        "consumed": 8,
+        "matched": 8,
+        "word": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            8
+          ],
+          "fields": {}
+        }
+      }
+    ]
+  },
+  {
+    "name": "generated-actual-text",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @tokenAdapter: { id: 'owned.generated' version: '1' java: 'org.unlaxer.dsl.codegen.OwnedGeneratedTokenParser' rust: 'crate::generated_token' } token T = ADAPTER('owned.generated', version=1) @root @mapping(Value, params=[again]) Root ::= CAPTURE(word,T) SAME_AS(word) @again;  }",
+    "cases": [
+      {
+        "input": "bb",
+        "success": true,
+        "consumed": 2,
+        "matched": 2,
+        "word": "bb",
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            2
+          ],
+          "fields": {
+            "again": "bb"
+          }
+        },
+        "binding": {
+          "text": "bb",
+          "source": "GENERATED",
+          "start": 0,
+          "end": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "projected-actual-text",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @tokenAdapter: { id: 'owned.projected' version: '1' java: 'org.unlaxer.dsl.codegen.OwnedProjectedTokenParser' rust: 'crate::projected_token' } token T = ADAPTER('owned.projected', version=1) @root @mapping(Value, params=[again]) Root ::= CAPTURE(word,T) SAME_AS(word) @again;  }",
+    "cases": [
+      {
+        "input": "abb",
+        "success": true,
+        "consumed": 3,
+        "matched": 3,
+        "word": "bb",
+        "ast": {
+          "type": "Value",
+          "span": [
+            1,
+            3
+          ],
+          "fields": {
+            "again": "bb"
+          }
+        },
+        "binding": {
+          "text": "bb",
+          "source": "PROJECTED",
+          "start": 1,
+          "end": 3
+        }
+      }
+    ]
+  },
+  {
+    "name": "resource-owned-recursion",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @root @mapping(Value) Root ::= CAPTURE(word, ('x' Root | 'a')); }",
+    "cases": [
+      {
+        "input": "xxxa",
+        "success": true,
+        "consumed": 4,
+        "matched": 4,
+        "word": "xxxa",
+        "binding": {
+          "text": "xxxa",
+          "source": "INPUT",
+          "start": 0,
+          "end": 4
+        },
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {}
+        }
+      },
+      {
+        "input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxa",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null,
+        "resource": true
+      }
+    ]
+  },
+  {
+    "name": "mapped-child-inside-owned-scope",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @root @mapping(Value, params=[child, again]) Root ::= CAPTURE_SCOPE(CAPTURE(word, Child) @child ':' SAME_AS(word) @again); @mapping(Leaf, params=[text]) Child ::= '😀' @text; }",
+    "cases": [
+      {
+        "input": "😀:😀",
+        "success": true,
+        "consumed": 3,
+        "matched": 3,
+        "word": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {
+            "child": {
+              "type": "Leaf",
+              "span": [
+                0,
+                1
+              ],
+              "fields": {
+                "text": "😀"
+              }
+            },
+            "again": "😀"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "imported-token-inside-owned-scope",
+    "grammar": "grammar Owned { @import letters from 'parts/letters.ubnf' @ubnf: v2 @package: ownedprobe @whitespace: none @root @mapping(Value, params=[first, again]) Root ::= CAPTURE_SCOPE(CAPTURE(word, letters.A) @first SAME_AS(word) @again); }",
+    "modules": {
+      "parts/letters.ubnf": "grammar Letters { @ubnf: v2 token A ::= 'a'; }"
+    },
+    "cases": [
+      {
+        "input": "aa",
+        "success": true,
+        "consumed": 2,
+        "matched": 2,
+        "word": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            2
+          ],
+          "fields": {
+            "first": "a",
+            "again": "a"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "generated-ast-field-requires-input",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @tokenAdapter: { id: 'owned.generated' version: '1' java: 'org.unlaxer.dsl.codegen.OwnedGeneratedTokenParser' rust: 'crate::generated_token' } token T = ADAPTER('owned.generated', version=1) @root @mapping(Value, params=[first,again]) Root ::= CAPTURE(word,T) @first SAME_AS(word) @again; }",
+    "cases": [
+      {
+        "input": "bb",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null
+      }
+    ]
+  },
+  {
+    "name": "projected-ast-field-requires-input",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @tokenAdapter: { id: 'owned.projected' version: '1' java: 'org.unlaxer.dsl.codegen.OwnedProjectedTokenParser' rust: 'crate::projected_token' } token T = ADAPTER('owned.projected', version=1) @root @mapping(Value, params=[first,again]) Root ::= CAPTURE(word,T) @first SAME_AS(word) @again; }",
+    "cases": [
+      {
+        "input": "abb",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null
+      }
+    ]
+  },
+  {
+    "name": "nested-direct-generated-ast-field-requires-input",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @tokenAdapter: { id: 'owned.generated' version: '1' java: 'org.unlaxer.dsl.codegen.OwnedGeneratedTokenParser' rust: 'crate::generated_token' } token T = ADAPTER('owned.generated', version=1) @root @nestedCaptures @mapping(Value, params=[first,again]) Root ::= CAPTURE(word,T) @first SAME_AS(word) @again; }",
+    "cases": [
+      {
+        "input": "bb",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null
+      }
+    ]
+  },
+  {
+    "name": "nested-optional-generated-ast-field-absence-on-noninput",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @tokenAdapter: { id: 'owned.generated' version: '1' java: 'org.unlaxer.dsl.codegen.OwnedGeneratedTokenParser' rust: 'crate::generated_token' } token T = ADAPTER('owned.generated', version=1) @root @nestedCaptures @mapping(Value, params=[first,again]) Root ::= CAPTURE(word,[T]) @first SAME_AS(word) @again; }",
+    "cases": [
+      {
+        "input": "bb",
+        "success": true,
+        "consumed": 0,
+        "matched": 0,
+        "word": "",
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            0
+          ],
+          "fields": {
+            "first": null,
+            "again": ""
+          }
+        },
+        "binding": {
+          "text": "",
+          "source": "INPUT",
+          "start": 0,
+          "end": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "nested-direct-projected-ast-field-requires-input",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @tokenAdapter: { id: 'owned.projected' version: '1' java: 'org.unlaxer.dsl.codegen.OwnedProjectedTokenParser' rust: 'crate::projected_token' } token T = ADAPTER('owned.projected', version=1) @root @nestedCaptures @mapping(Value, params=[first,again]) Root ::= CAPTURE(word,T) @first SAME_AS(word) @again; }",
+    "cases": [
+      {
+        "input": "abb",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null
+      }
+    ]
+  },
+  {
+    "name": "nested-optional-projected-ast-field-absence-on-noninput",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @tokenAdapter: { id: 'owned.projected' version: '1' java: 'org.unlaxer.dsl.codegen.OwnedProjectedTokenParser' rust: 'crate::projected_token' } token T = ADAPTER('owned.projected', version=1) @root @nestedCaptures @mapping(Value, params=[first,again]) Root ::= CAPTURE(word,[T]) @first SAME_AS(word) @again; }",
+    "cases": [
+      {
+        "input": "abb",
+        "success": true,
+        "consumed": 0,
+        "matched": 0,
+        "word": "",
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            0
+          ],
+          "fields": {
+            "first": null,
+            "again": ""
+          }
+        },
+        "binding": {
+          "text": "",
+          "source": "INPUT",
+          "start": 0,
+          "end": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "nested-optional-generated-ast-field-complete-rejects-noninput",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @tokenAdapter: { id: 'owned.generated' version: '1' java: 'org.unlaxer.dsl.codegen.OwnedGeneratedTokenParser' rust: 'crate::generated_token' } token E = EOF token T = ADAPTER('owned.generated', version=1) @root @nestedCaptures @mapping(Value, params=[first,again]) Root ::= CAPTURE(word,[T]) @first SAME_AS(word) @again E; }",
+    "cases": [
+      {
+        "input": "bb",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null
+      }
+    ]
+  },
+  {
+    "name": "nested-optional-projected-ast-field-complete-rejects-noninput",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @tokenAdapter: { id: 'owned.projected' version: '1' java: 'org.unlaxer.dsl.codegen.OwnedProjectedTokenParser' rust: 'crate::projected_token' } token E = EOF token T = ADAPTER('owned.projected', version=1) @root @nestedCaptures @mapping(Value, params=[first,again]) Root ::= CAPTURE(word,[T]) @first SAME_AS(word) @again E; }",
+    "cases": [
+      {
+        "input": "abb",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null
+      }
+    ]
+  }
+]

@@ -1,0 +1,10 @@
+# form	javaOutcome	rustOutcome	javaConsumed	rustConsumed	javaRetry	rustRetry	javaAfterRetry	rustAfterRetry	input
+chain	exception	err	1	1	😀	😀	2	2	p😀;x
+optional	exception	ok	1	1	😀	😀	2	2	p😀;x
+repeat	exception	ok	1	1	😀	😀	2	2	p😀;x
+choice	exception	ok	1	2	😀	;	2	3	p😀;x
+not	exception	ok	1	1	😀	😀	2	2	p😀;x
+match	exception	err	1	1	😀	😀	2	2	p😀;x
+owned	exception	err	1	1	😀	😀	2	2	p😀;x
+scope	exception	err	1	1	😀	😀	2	2	p😀;x
+swallow	exception	ok	1	1	😀	😀	2	2	p😀;x

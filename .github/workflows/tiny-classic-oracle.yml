@@ -1,0 +1,83 @@
+name: Classic Tiny semantic oracle
+
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  CARGO_INCREMENTAL: '0'
+  RUSTUP_TOOLCHAIN: '1.85.0'
+
+jobs:
+  semantic-oracle:
+    runs-on: [unlaxer-parser-ci, Linux, X64]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: parser
+      - uses: actions/checkout@v4
+        with:
+          repository: opaopa6969/tinyexpression
+          ref: 7d7bd1cbfab1bd9548ba53c73cc50502f0437c67
+          path: tiny
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: temurin
+          overwrite-settings: false
+      - name: Set up Rust 1.85
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          rustup toolchain install 1.85.0 --profile minimal
+      - name: Verify harness failure detection
+        working-directory: parser
+        run: python3 -m unittest discover -s scripts/tests -p test_tiny_classic_benchmark.py
+      - name: Compile current Classic consumers and verify shared semantics
+        working-directory: parser
+        run: |
+          benchmark_m2="$RUNNER_TEMP/tiny-classic-m2-${{ github.run_id }}-${{ github.run_attempt }}"
+          python3 scripts/run-tiny-classic-benchmark.py \
+            --tiny "$GITHUB_WORKSPACE/tiny" --maven-repo "$benchmark_m2" --mode prepare
+          python3 scripts/run-tiny-classic-benchmark.py \
+            --tiny "$GITHUB_WORKSPACE/tiny" --maven-repo "$benchmark_m2" \
+            --mode verify --corpus oracle --warmups 1 --iterations 1
+      - name: Require complete semantic evidence without a timing verdict
+        working-directory: parser
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          runs = list(Path('target/tiny-classic-benchmark').glob('run-*'))
+          assert len(runs) == 1, runs
+          result = json.loads((runs[0] / 'result.json').read_text())
+          rows = [json.loads(line) for line in (runs[0] / 'samples.jsonl').read_text().splitlines()]
+          assert result['errors'] == [], result
+          assert result['semantic_configurations'] == 12, result
+          assert result['measurement_eligible'] is False, result
+          assert len(rows) == 216, len(rows)
+          assert all(row['measurement_eligible'] is False for row in rows)
+          assert {row['language'] for row in rows} == {'java', 'rust-java', 'rust-native'}
+          assert {row['phase'] for row in rows} == {'cold', 'warmup', 'warm'}
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: classic-tiny-semantic-oracle
+          if-no-files-found: error
+          path: |
+            parser/target/tiny-classic-benchmark/build.json
+            parser/target/tiny-classic-benchmark/resolved-dependencies.txt
+            parser/target/tiny-classic-benchmark/build-logs/
+            parser/target/tiny-classic-benchmark/run-*/*.json
+            parser/target/tiny-classic-benchmark/run-*/*.jsonl
