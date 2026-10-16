@@ -2,6 +2,9 @@
 
 親 [#111](https://github.com/opaopa6969/unlaxer-parser/issues/111)、この追加 API の受け入れ条件は [#438](https://github.com/opaopa6969/unlaxer-parser/issues/438)。Java の既存 `Token` / `TokenKind` / parser の動作を維持し、Rust に実 word recognition、consume/invert の限定伝播、owned metadata と関連 node の API を追加する。Classic の速度最適化 freeze は変更しない。
 
+開発版の一般Expr/Rule/custom parser向けconsume/invert伝播は[Classic token propagation](classic-token-propagation.md)（#571）を参照する。
+この文書のTokenExpr限定入口とmetadata fixtureは維持する。末尾の未完一覧は#438時点の履歴であり、現行の全体状態は[full-spec表](../rust/FULL-SPEC.md)で確認する。
+
 ## Token の種別と source
 
 | Java | Rust | 消費 | virtual |

@@ -10,6 +10,13 @@ Java 21.0.9 / Rust 1.85.0 で同じ原文・独立期待値を使って現行 AP
 [Pure PEG assertions](peg-assertions.md) を参照。この文書の監査基準における
 既存 `MatchOnly` の観測と fixture は維持する。
 
+## 開発版での追加
+
+この文書のfixtureと観測は上記監査revisionのものとして保持する。
+後続#571ではRust `.match_only()` と `parse_with_token_mode` による任意childのClassic入口を追加した。
+現在のAPI選択には[一般Classic伝播](classic-token-propagation.md)を参照する。
+純PEG `ahead()` とClassic match-onlyの契約は引き続き異なり、旧入口の診断frontier差は#545で追跡する。
+
 ## 使い分け
 
 Java `MatchOnly(child)` は **消費せずに matched cursor と match-only token を公開する**。

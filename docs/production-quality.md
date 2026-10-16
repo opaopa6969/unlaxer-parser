@@ -4,7 +4,22 @@
 Maven Central の 3.2.0 に以下の修正が含まれるという意味ではない。
 全 Java 文法との互換性、未対応 IDE 機能、任意の負荷に対する性能は別の条件である。
 
-## 受け入れ条件
+## 開発版の品質基準
+
+3.3.0公開後のparity作業は親[#111](https://github.com/opaopa6969/unlaxer-parser/issues/111)で継続している。
+開発版はJava21 / Rust1.85を共通検証の基準とし、Java17固有の互換維持を新機能の制約にしない。
+以下のJava17試験と配布記録は公開済み3.3.0の履歴であり、開発版の全機能をJava17で保証するものではない。
+
+現行の対応範囲は[full-spec表](../rust/FULL-SPEC.md)と各機能の共通fixtureで確認する。
+全体の完了にはJava/Rust両方の実装、生成consumerのcompile/parse/map/eval、原文・位置・失敗後状態の照合、
+対象opt-in試験のskipなし実行、CI成功、各PRのmergeが必要である。
+ローカルの部分的な成功、待機中のCI、openのPRを全体完了の根拠にしない。
+
+[REGEX廃止](https://github.com/opaopa6969/unlaxer-parser/issues/612)はユーザー指定の開発版変更として追跡する。
+後段の#505は3.3.0の不具合修正履歴であり、今後Java Pattern互換エンジンを開発する計画ではない。
+公開済み成果物・署名・配布記録は保持する。
+
+## 3.3.0の受け入れ条件
 
 1. Java/Rust の共通 corpus で受理・拒否、原文、CP span、UTF-16/UTF-8位置を独立期待値と比較する。
 2. 空入力・EOF・CRLF・補助文字・結合文字・書記素列、および途中位置・範囲外を検証する。位置の単位を暗黙に変更しない。

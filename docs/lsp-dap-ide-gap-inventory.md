@@ -9,6 +9,21 @@ IntelliJ IDEA と Eclipse JDT の編集・ナビゲーション・リファク�
 - 仕様: LSP は 3.18（公式サイトで「Current」）、DAP は公式 specification。メソッド名は仕様本文で確認した。確認しきれなかったものは「要確認」と書き、最後に一覧にする。
 - 「現状」欄は、該当箇所の `ファイル:行` かテスト名を根拠として書く。根拠が見つからない場合は「なし」とする。推測で「実装済み」とは書かない。
 
+## 開発版の追補
+
+元の棚卸しは上記revisionに固定した記録である。以降のJava21 / Rust1.85共通検証による変更は以下を参照する。
+生成server、UBNF専用server、下流の手書き拡張を区別し、片側の拡張機能で共通parityを主張しない。
+
+| 変更 | 現行の契約・検証 |
+|---|---|
+| full semantic tokens（#535） | [Java/Rust providerとlegend](classic-rust-lsp.md)。共通30-case corpus、実stdio、各7設定。既定は空、range/deltaは未対応 |
+| lifecycleと構文診断（#549/#552） | [initialize/configure](classic-lsp-lifecycle.md)の59操作と[診断位置](classic-lsp-diagnostics.md)の20ケースを両生成serverで比較 |
+| snapshot cache（#546/#613） | [不変snapshot再利用](incremental-cache.md)。同じ文書/設定/stateだけ再利用し、変更時は全文解析。LSPのincremental syncや部分CST再解析とは別 |
+| VS CodeとDAP終了（#548/#555） | [両backend起動](rust-vscode-launch.md)を実VSIXで検証。TinyCalc/新規生成拡張を対象とし、全下流拡張の互換性は主張しない |
+
+Java LSP4Jのcancellation機構があることと、利用者の同期providerやparserが途中で停止できることは別である。
+Rust transportのparse中interruptは未実装。rename/format/code-action transportとlive evaluator debuggerも、この追補で対応した機能には含めない。
+
 ## 1. 読み方
 
 ### 区分
