@@ -1,5 +1,6 @@
 #[path="generated/mod.rs"] mod generated;
 #[path="dag/mod.rs"] mod dag;
+#[path="scaling/mod.rs"] mod scaling;
 use unlaxer_runtime::{Node, Tree};
 fn parsed(input:&str)->Tree { generated::parser::parse_tree_for_mapping(input).unwrap() }
 fn corrupted(input:&str,id:&str)->Tree {
@@ -35,6 +36,41 @@ fn check_dag() {
     let ordinary=dag::mapper::map(&tree).err().expect("unbounded ordinary DAG mapping");
     assert!(ordinary.contains("E-MAPPING-LIMIT"),"{ordinary}");
 }
+fn check_scaling_ast(ast:&scaling::ast::Ast,count:usize) {
+    let scaling::ast::Ast::Root{span,value} = ast else { panic!("scaling root shape") };
+    assert_eq!(*span,unlaxer_runtime::Span{start:0,end:count+2});
+    assert_eq!(value.len(),count);
+    for (index,node) in value.iter().enumerate() {
+        let scaling::ast::Ast::Leaf{span,text} = node.as_ref() else { panic!("scaling leaf shape") };
+        assert_eq!(*span,unlaxer_runtime::Span{start:index+1,end:index+2});
+        assert_eq!(text,"😀");
+    }
+}
+fn check_scaling() {
+    for count in [__SCALING_COUNTS__] {
+        let input=format!("[{}]","😀".repeat(count));
+        let tree=scaling::parser::parse_tree_for_mapping(&input).unwrap();
+        let retained=scaling::mapper::map_parsed_tree(&tree).unwrap();
+        for entry in ["ordinary","source-map","subtree","subtree-source-map","preferred","subtree-preferred"] {
+            if matches!(entry,"ordinary"|"source-map") {
+                check_scaling_ast(&scaling::mapper::map(&tree).unwrap(),count);
+            } else {
+                let snapshot=if entry=="preferred" {
+                    scaling::mapper::map_parsed_tree(&tree).unwrap()
+                } else {
+                    scaling::mapper::map_subtree_tree(&tree,tree.root).unwrap()
+                };
+                assert_eq!(snapshot.candidates().len(),count+1);
+                check_scaling_ast(snapshot.select_default().ast(),count);
+                assert_eq!(snapshot.source_text(unlaxer_runtime::Span{start:1,end:count+1}),Some(input[1..input.len()-1].as_ref()));
+            }
+            println!("scaling-{count}\t{entry}\tOK");
+        }
+        drop(tree);
+        check_scaling_ast(retained.select_default().ast(),count);
+        assert_eq!(retained.source_text(unlaxer_runtime::Span{start:0,end:count+2}),Some(input.as_str()));
+    }
+}
 fn main() {
     check_dag();
     let input="[😀😀]";
@@ -69,4 +105,5 @@ fn main() {
             assert_eq!(retained.select_default().ast().canonical_json(),expected);
         }
     }
+    check_scaling();
 }

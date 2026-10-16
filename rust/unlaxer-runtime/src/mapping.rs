@@ -53,7 +53,12 @@ impl<'a> Context<'a> {
         let mut heights = vec![0usize; tree.nodes.len()];
         let mut costs = Vec::with_capacity(tree.nodes.len());
         let mut recovered = vec![false; tree.nodes.len()];
-        let mut seen = vec![0usize; tree.nodes.len()];
+        let forest = original_forest_intervals(tree);
+        let mut seen = if forest.is_none() {
+            vec![0usize; tree.nodes.len()]
+        } else {
+            Vec::new()
+        };
         let mut search = Vec::new();
         let mut search_epoch = 0usize;
         let mut validation_work = 0usize;
@@ -76,7 +81,7 @@ impl<'a> Context<'a> {
             for &child in &node.children {
                 height = height.max(heights[child] + 1);
             }
-            let mut direct = if node.captures.is_empty() {
+            let mut direct = if node.captures.is_empty() || forest.is_some() {
                 Vec::new()
             } else {
                 node.children.clone()
@@ -87,6 +92,16 @@ impl<'a> Context<'a> {
                 cost += capture.nodes.len();
                 for &target in &capture.nodes {
                     height = height.max(heights[target] + 1);
+                    if let Some(intervals) = &forest {
+                        let (start, end) = intervals[id];
+                        let target_start = intervals[target].0;
+                        if !(start < target_start && target_start < end) {
+                            return Err(
+                                "E-MAPPING-CST: capture is outside its original subtree".into()
+                            );
+                        }
+                        continue;
+                    }
                     if direct.binary_search(&target).is_ok() {
                         continue;
                     }
@@ -214,4 +229,45 @@ impl Deref for Context<'_> {
     fn deref(&self) -> &Tree {
         self.tree
     }
+}
+
+/// Index a forest of original edges once. Capture shortcuts do not introduce parents here.
+/// Distinct original parents require the existing bounded DAG search instead.
+fn original_forest_intervals(tree: &Tree) -> Option<Vec<(usize, usize)>> {
+    let mut parents = vec![usize::MAX; tree.nodes.len()];
+    for (id, node) in tree.nodes.iter().enumerate() {
+        for &child in &node.children {
+            if parents[child] != usize::MAX && parents[child] != id {
+                return None;
+            }
+            parents[child] = id;
+        }
+    }
+    let mut intervals = vec![(usize::MAX, usize::MAX); tree.nodes.len()];
+    let mut stack = Vec::new();
+    let mut next = 0;
+    for (root, &parent) in parents.iter().enumerate() {
+        if parent != usize::MAX {
+            continue;
+        }
+        intervals[root].0 = next;
+        next += 1;
+        stack.push((root, 0));
+        while let Some((id, child_index)) = stack.last_mut() {
+            if let Some(&child) = tree.nodes[*id].children.get(*child_index) {
+                *child_index += 1;
+                // Repeated edges from the same parent remain legal. Actual mapping visits
+                // are still charged separately, including repeated DAG expansion.
+                if intervals[child].0 == usize::MAX {
+                    intervals[child].0 = next;
+                    next += 1;
+                    stack.push((child, 0));
+                }
+            } else {
+                intervals[*id].1 = next;
+                stack.pop();
+            }
+        }
+    }
+    Some(intervals)
 }
