@@ -48,16 +48,20 @@ jobs:
     - uses: actions/setup-node@v4
       with:
         node-version: '20'
-    - name: Check pinned Unicode XID and grapheme tables
+    - name: Check pinned Unicode XID, grapheme, and case tables
       run: |
         python3 scripts/generate-xid-tables.py --check
         python3 scripts/generate-grapheme-tables.py --check
+        python3 scripts/generate-case-tables.py --check
+        (cd spec-corpus/case-insensitive/unicode-17.0.0 && sha256sum --check SHA256SUMS)
         (cd spec-corpus/grapheme/unicode-17.0.0 && sha256sum --check SHA256SUMS)
     - name: Cross-language fixtures, compile failures, and generated-file drift
       run: >
         mvn -B -pl unlaxer-common,unlaxer-dsl -am test
-        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,RustPortabilityConformanceTest,TokenAdapterConformanceTest,GraphemeTest,GraphemeConformanceTest,ParseBindingsConformanceTest,DeclarativeTokenConformanceTest,ApiImpactConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest,SkipMappingConformanceTest,CaptureEqualityConformanceTest,ErrorElementConformanceTest,RecoveryConformanceTest,SemanticModelConformanceTest,ProjectSymbolIndexConformanceTest,EditorParseResultConformanceTest,EditorPipelineConformanceTest,EditorCstTest,SemanticModelUbnfTest,TokenStreamConformanceTest,TypeSystemConformanceTest,CallInferenceConformanceTest,SemanticQueriesConformanceTest,SemanticQueryEditsTest,PackageResolverConformanceTest,HttpsPackageConformanceTest,VocabularyOriginsConformanceTest,SemanticRulesConformanceTest,SemanticDiagnosticConformanceTest,ClassicLspProtocolConformanceTest,LSPQueryConsumerTest,LSPNonBmpOffsetTest,LSPProfileInitializationTest,PreprocessingConformanceTest,UniqueLongestConformanceTest,NameSnapshotConformanceTest,NamePredicateConformanceTest,ContextualLexingConformanceTest,CodePointEscapeConformanceTest,ClassicDapProtocolConformanceTest,ClassicTokenDapProtocolConformanceTest,TokenTraceConformanceTest -DrustConformance=true -DtokenStreamBench=true
+        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,RustPortabilityConformanceTest,TokenAdapterConformanceTest,UnicodeIgnoreCaseWordParserTest,CaseInsensitiveConformanceTest,GraphemeTest,GraphemeConformanceTest,ParseBindingsConformanceTest,DeclarativeTokenConformanceTest,ApiImpactConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest,SkipMappingConformanceTest,CaptureEqualityConformanceTest,ErrorElementConformanceTest,RecoveryConformanceTest,SemanticModelConformanceTest,ProjectSymbolIndexConformanceTest,EditorParseResultConformanceTest,EditorPipelineConformanceTest,EditorCstTest,SemanticModelUbnfTest,TokenStreamConformanceTest,TypeSystemConformanceTest,CallInferenceConformanceTest,SemanticQueriesConformanceTest,SemanticQueryEditsTest,PackageResolverConformanceTest,HttpsPackageConformanceTest,VocabularyOriginsConformanceTest,SemanticRulesConformanceTest,SemanticDiagnosticConformanceTest,ClassicLspProtocolConformanceTest,LSPQueryConsumerTest,LSPNonBmpOffsetTest,LSPProfileInitializationTest,PreprocessingConformanceTest,UniqueLongestConformanceTest,NameSnapshotConformanceTest,NamePredicateConformanceTest,ContextualLexingConformanceTest,CodePointEscapeConformanceTest,ClassicDapProtocolConformanceTest,ClassicTokenDapProtocolConformanceTest,TokenTraceConformanceTest -DrustConformance=true -DtokenStreamBench=true
         -Dsurefire.failIfNoSpecifiedTests=false
+    - name: Require generated case-insensitive token conformance evidence
+      run: test -s unlaxer-dsl/target/case-insensitive-conformance.tsv
     - name: Require real Java and Rust DAP protocol evidence
       run: |
         test -s unlaxer-dsl/target/classic-dap-protocol.tsv
@@ -152,6 +156,7 @@ jobs:
       with:
         name: rust-conformance
         path: |
+          unlaxer-dsl/target/case-insensitive-conformance.tsv
           unlaxer-dsl/target/rust-token-stream.tsv
           unlaxer-dsl/target/token-stream-benchmark.tsv
           unlaxer-dsl/target/rust-contextual-lexing.tsv
@@ -319,6 +324,18 @@ jobs:
 
     - name: Build and test the -jdk17 modules on JDK 17
       run: mvn -B -pl unlaxer-common-jdk17,unlaxer-dsl-jdk17 -am clean package -Dgpg.skip=true
+
+    - name: Require Unicode-pinned CI parity on the Java 17 JVM
+      run: |
+        mvn -B -pl unlaxer-common-jdk17,unlaxer-dsl-jdk17 -am test \
+          -Dtest=UnicodeIgnoreCaseWordParserTest,CaseInsensitiveConformanceTest,RustUbnfFrontendConformanceTest \
+          -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
+        test -s unlaxer-dsl/target/case-insensitive-conformance.tsv
+    - uses: actions/upload-artifact@v4
+      with:
+        name: case-insensitive-jdk17-conformance
+        path: unlaxer-dsl/target/case-insensitive-conformance.tsv
+        if-no-files-found: error
 
     - name: Require class file major 61 (Java 17) in the -jdk17 jars
       run: |
