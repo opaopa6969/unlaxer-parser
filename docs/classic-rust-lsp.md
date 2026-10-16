@@ -116,12 +116,21 @@ is advertised; range, delta, result IDs and automatic provider installation
 are outside this contract. Language profiles currently have no semantic-token
 operation, so this hook remains available under a profile just as in Java.
 
-Tokens must be ordered, nonoverlapping, nonempty and confined to one line.
-All fields must fit LSP `uinteger` (0 through 2147483647), type and modifier
-indices must exist in the legend, and positions must lie on UTF-16 scalar
-boundaries inside the current open document. CR/LF/CRLF are line terminators;
-a token cannot include a terminator or bisect a supplementary scalar.
-Both transports validate in one forward source traversal. Invalid provider
+Tokens must be ordered. Zero-length tokens retain the existing Java raw-hook
+behavior and do not count as overlapping spans. `initialize` saves the client capabilities
+`textDocument.semanticTokens.multilineTokenSupport` and
+`overlappingTokenSupport` (missing/false means unsupported). With multiline
+support, length may span line terminators and the absolute UTF-16 endpoint
+must be a valid document boundary. Without it, length extending past a line
+is interpreted at that line's end, as specified by
+[LSP 3.17](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_semanticTokens).
+The encoded raw length is preserved; the client applies that clipping rule.
+Overlapping effective spans require overlapping support. CR/LF/CRLF are line
+terminators; endpoints cannot bisect CRLF or a supplementary scalar.
+All fields must fit LSP `uinteger` (0 through 2147483647), token type must also
+be below 65536, and type/modifier indices must exist in the advertised legend.
+Both transports build UTF-16 line/boundary indices in O(source + tokens), so
+overlap does not cause repeated scans of source prefixes. Invalid provider
 data or explicit provider failure returns InternalError (-32603), preserving
 the document and the ability to serve later requests. This differs from an
 unopened/closed document or a successful empty provider, which returns
@@ -136,8 +145,10 @@ Rust also rejects requests before initialize with -32002; Java's generated
 endpoint does not yet enforce that general pre-initialize boundary.
 
 [semantic-tokens.json](fixtures/classic-lsp/semantic-tokens.json) is the shared
-21-case oracle for actual nonempty hooks, custom legends, supplementary
-characters, CR/LF/CRLF, malformed data and provider failure. The Java21
+30-case oracle for actual nonempty hooks, custom legends, supplementary
+characters, CR/LF/CRLF, malformed data and provider failure. It also covers
+all four multiline/overlap capability combinations, omitted capabilities,
+and token types 65535/65536 against a real 65537-entry custom legend. The Java21
 `ClassicSemanticTokensConformanceTest` starts real generated Java and Rust
 stdio servers, compares both Rust generation hosts byte for byte, and checks
 version transactions, close/reopen, profile selection and shutdown/exit.

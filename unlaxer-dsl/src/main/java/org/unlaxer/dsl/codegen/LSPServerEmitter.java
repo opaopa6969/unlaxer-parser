@@ -60,6 +60,7 @@ class LSPServerEmitter {
         w.line("protected final Map<String, DocumentState> documents = new HashMap<>();");
         w.line("protected final Map<String, Long> documentVersions = new HashMap<>();");
         w.line("private volatile boolean shutdownRequested;");
+        w.line("private boolean semanticMultiline, semanticOverlapping;");
         w.line("private volatile SemanticTokensLegend semanticTokenLegend = new SemanticTokensLegend(List.of(\"valid\", \"invalid\"), List.of());");
         w.line("private final CompletableFuture<Integer> exitStatus = new CompletableFuture<>();");
         w.blankLine();
@@ -109,6 +110,10 @@ class LSPServerEmitter {
         w.line("configureAdditionalCapabilities(capabilities);");
         w.line("configureLanguageQueryCapabilities(capabilities);");
         w.line("applyLanguageProfile(capabilities);");
+        w.line("var textCapabilities = params == null || params.getCapabilities() == null ? null : params.getCapabilities().getTextDocument();");
+        w.line("var semantic = textCapabilities == null ? null : textCapabilities.getSemanticTokens();");
+        w.line("semanticMultiline = semantic != null && Boolean.TRUE.equals(semantic.getMultilineTokenSupport());");
+        w.line("semanticOverlapping = semantic != null && Boolean.TRUE.equals(semantic.getOverlappingTokenSupport());");
         w.line("var semanticProvider = capabilities.getSemanticTokensProvider();");
         w.line("var legend = semanticProvider == null ? new SemanticTokensLegend(List.of(), List.of()) : semanticProvider.getLegend();");
         w.line("semanticTokenLegend = legend == null ? null : new SemanticTokensLegend(List.copyOf(legend.getTokenTypes()), List.copyOf(legend.getTokenModifiers()));");
@@ -472,7 +477,7 @@ class LSPServerEmitter {
         w.blankLine();
 
         LSPSemanticTokenEmitter.emitValidation(w);
-        w.line("// Hook: full UTF-16 LSP data, sorted/non-overlapping and indexed by the advertised legend.");
+        w.line("// Hook: full UTF-16 LSP data indexed by the advertised legend and negotiated client support.");
         w.line("// Invalid data fails the request with InternalError; null preserves the legacy empty result.");
         w.line("protected int[] additionalSemanticTokenData(String uri, String documentContent) {");
         w.indent();
@@ -804,7 +809,7 @@ class LSPServerEmitter {
         w.line("try {");
         w.indent();
         w.line("int[] tokenData = server.additionalSemanticTokenData(uri, state.content());");
-        w.line("return CompletableFuture.completedFuture(new SemanticTokens(validateSemanticTokenData(state.content(), tokenData, server.semanticTokenLegend)));");
+        w.line("return CompletableFuture.completedFuture(new SemanticTokens(validateSemanticTokenData(state.content(), tokenData, server.semanticTokenLegend, server.semanticMultiline, server.semanticOverlapping)));");
         w.dedent();
         w.line("} catch (RuntimeException invalid) {");
         w.indent();

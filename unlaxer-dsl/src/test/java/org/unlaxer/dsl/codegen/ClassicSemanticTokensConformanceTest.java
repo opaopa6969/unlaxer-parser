@@ -31,13 +31,13 @@ public class ClassicSemanticTokensConformanceTest {
             package semantic.wire;
             public final class Main extends EmojiLspLauncher {
                 private static com.google.gson.JsonObject fixture;
-                private static boolean custom;
+                private static boolean custom, large;
                 public static final class Provider extends EmojiLanguageServer {
                     @Override protected void configureAdditionalCapabilities(org.eclipse.lsp4j.ServerCapabilities caps) {
                         var legend = fixture.getAsJsonObject("legend");
                         var options = caps.getSemanticTokensProvider();
                         options.setLegend(new org.eclipse.lsp4j.SemanticTokensLegend(
-                            legend.getAsJsonArray("tokenTypes").asList().stream().map(com.google.gson.JsonElement::getAsString).toList(),
+                            large ? java.util.stream.IntStream.range(0, 65537).mapToObj(i -> "type" + i).toList() : legend.getAsJsonArray("tokenTypes").asList().stream().map(com.google.gson.JsonElement::getAsString).toList(),
                             legend.getAsJsonArray("tokenModifiers").asList().stream().map(com.google.gson.JsonElement::getAsString).toList()));
                     }
                     @Override protected int[] additionalSemanticTokenData(String uri, String content) {
@@ -56,7 +56,7 @@ public class ClassicSemanticTokensConformanceTest {
                 }
                 public static void main(String[] args) throws Exception {
                     fixture = com.google.gson.JsonParser.parseString(java.nio.file.Files.readString(java.nio.file.Path.of(args[0]))).getAsJsonObject();
-                    custom = args[1].equals("custom");
+                    custom = !args[1].equals("default"); large = args[1].equals("large");
                     System.exit(new Main().launchStdio());
                 }
             }
@@ -100,7 +100,7 @@ public class ClassicSemanticTokensConformanceTest {
             use serde_json::Value;
             use unlaxer_lsp::{Backend, Diagnostic, GrammarBackend, SemanticTokensLegend};
             use unlaxer_runtime::source::Snapshot;
-            struct Provider { grammar: GrammarBackend, fixture: Value, custom: bool }
+            struct Provider { grammar: GrammarBackend, fixture: Value, custom: bool, large: bool }
             impl Backend for Provider {
                 fn grammar(&self) -> &str { self.grammar.grammar() }
                 fn entry(&self) -> &str { self.grammar.entry() }
@@ -110,7 +110,7 @@ public class ClassicSemanticTokensConformanceTest {
                     if !self.custom { return SemanticTokensLegend::default(); }
                     let legend = &self.fixture["legend"];
                     SemanticTokensLegend {
-                        token_types: legend["tokenTypes"].as_array().unwrap().iter().map(|v| v.as_str().unwrap().into()).collect(),
+                        token_types: if self.large { (0..65537).map(|i| format!("type{i}")).collect() } else { legend["tokenTypes"].as_array().unwrap().iter().map(|v| v.as_str().unwrap().into()).collect() },
                         token_modifiers: legend["tokenModifiers"].as_array().unwrap().iter().map(|v| v.as_str().unwrap().into()).collect(),
                     }
                 }
@@ -128,7 +128,7 @@ public class ClassicSemanticTokensConformanceTest {
             fn main() {
                 let args: Vec<_> = std::env::args().collect();
                 let fixture = serde_json::from_str(&std::fs::read_to_string(&args[1]).unwrap()).unwrap();
-                let backend = Provider { grammar: generated::lsp::backend(), fixture, custom: args[2] == "custom" };
+                let backend = Provider { grammar: generated::lsp::backend(), fixture, custom: args[2] != "default", large: args[2] == "large" };
                 let mut server = unlaxer_lsp::Server::new(backend);
                 server.serve_stdio().unwrap();
                 std::process::exit(server.exit_code());
@@ -139,32 +139,41 @@ public class ClassicSemanticTokensConformanceTest {
     }
 
     private void exerciseBothModes(List<String> baseCommand, String backend) throws Exception {
-        for (String mode : List.of("default", "custom")) {
+        for (String mode : List.of("default", "custom", "custom-00", "custom-10", "custom-01", "custom-11", "large")) {
+            boolean custom = !mode.equals("default"), large = mode.equals("large");
+            boolean multiline = mode.equals("custom-10") || mode.equals("custom-11") || large;
+            boolean overlapping = mode.equals("custom-01") || mode.equals("custom-11") || large;
+            Object capabilities = mode.equals("custom") || mode.equals("default") ? Map.of() : Map.of("textDocument", Map.of("semanticTokens", Map.of("multilineTokenSupport", multiline, "overlappingTokenSupport", overlapping)));
             var command = new ArrayList<>(baseCommand); command.add(FIXTURE.toString()); command.add(mode);
             try (var wire = new Wire(new ProcessBuilder(command).redirectError(temporary.newFile()).start())) {
-                var initialized = wire.request("initialize", Map.of("capabilities", Map.of()));
+                var initialized = wire.request("initialize", Map.of("capabilities", capabilities));
                 var provider = initialized.getAsJsonObject("capabilities").getAsJsonObject("semanticTokensProvider");
                 assertTrue(provider.get("full").getAsBoolean());
                 assertFalse(provider.has("range"));
                 var fixture = JsonParser.parseString(Files.readString(FIXTURE)).getAsJsonObject();
-                assertEquals(21, fixture.getAsJsonArray("cases").size());
-                assertEquals(mode, mode.equals("custom") ? fixture.get("legend") : JSON.toJsonTree(Map.of("tokenTypes", List.of("valid", "invalid"), "tokenModifiers", List.of())), provider.get("legend"));
+                assertEquals(30, fixture.getAsJsonArray("cases").size());
+                if (large) assertEquals(65537, provider.getAsJsonObject("legend").getAsJsonArray("tokenTypes").size());
+                else assertEquals(mode, custom ? fixture.get("legend") : JSON.toJsonTree(Map.of("tokenTypes", List.of("valid", "invalid"), "tokenModifiers", List.of())), provider.get("legend"));
                 wire.notify("initialized", Map.of());
                 assertEquals(JSON.toJsonTree(List.of()), tokens(wire, "file:///missing"));
                 for (var element : fixture.getAsJsonArray("cases")) {
-                    var row = element.getAsJsonObject(); String uri = "file:///" + row.get("id").getAsString();
+                    var row = element.getAsJsonObject();
+                    if (large != row.has("largeLegend")) continue;
+                    String uri = "file:///" + row.get("id").getAsString();
                     open(wire, uri, 2, row.get("text").getAsString());
                     var response = wire.response(FULL, document(uri));
-                    if (mode.equals("custom") && row.has("error")) assertEquals(row.toString(), row.get("error"), response.getAsJsonObject("error").get("code"));
+                    boolean invalid = row.has("error") || multiline && row.has("errorWhenMultiline")
+                        || !overlapping && (row.has("requiresOverlap") || multiline && row.has("overlapsWhenMultiline"));
+                    if (custom && invalid) assertEquals(row.toString(), -32603, response.getAsJsonObject("error").get("code").getAsInt());
                     else {
                         assertFalse(response.toString(), response.has("error"));
-                        assertEquals(row.toString(), mode.equals("custom") ? row.get("expected") : JSON.toJsonTree(List.of()), response.getAsJsonObject("result").get("data"));
+                        assertEquals(row.toString(), custom ? row.get("expected") : JSON.toJsonTree(List.of()), response.getAsJsonObject("result").get("data"));
                     }
                     close(wire, uri);
                     assertEquals(JSON.toJsonTree(List.of()), tokens(wire, uri));
                 }
                 String uri = "file:///ascii";
-                JsonElement expected = mode.equals("custom") ? fixture.getAsJsonArray("cases").get(1).getAsJsonObject().get("expected") : JSON.toJsonTree(List.of());
+                JsonElement expected = custom ? fixture.getAsJsonArray("cases").get(1).getAsJsonObject().get("expected") : JSON.toJsonTree(List.of());
                 open(wire, uri, 2, "<foo>!");
                 for (Object changes : List.of(List.of(Map.of("text", "<>!")), List.of(), List.of(Map.of("text", "<>!", "range", Map.of("start", Map.of("line", 0, "character", 0), "end", Map.of("line", 0, "character", 1)))))) {
                     int version = changes instanceof List<?> list && list.size() == 1 && !((Map<?, ?>) list.get(0)).containsKey("range") ? 1 : 3;
@@ -191,7 +200,7 @@ public class ClassicSemanticTokensConformanceTest {
                 assertTrue("exit stops without EOF", wire.process.waitFor(5, TimeUnit.SECONDS));
                 assertEquals(0, wire.process.exitValue());
             }
-            System.out.println("Semantic tokens full oracle: " + backend + "/" + mode + " (21 cases, versions/profile/lifecycle)");
+            System.out.println("Semantic tokens full oracle: " + backend + "/" + mode + " (30-case corpus, versions/profile/lifecycle)");
         }
     }
     private static Map<String, Object> document(String uri) { return Map.of("textDocument", Map.of("uri", uri)); }

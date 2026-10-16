@@ -13,14 +13,23 @@
     {"id": "outside-column", "text": "<😀>!", "tokens": [0, 8, 1, 0, 0], "error": -32603},
     {"id": "outside-line", "text": "<😀>!", "tokens": [2, 0, 1, 0, 0], "error": -32603},
     {"id": "inside-crlf", "text": "<a>\r\n<😀>!", "tokens": [0, 4, 1, 0, 0], "error": -32603},
-    {"id": "cross-line", "text": "<a>\r\n<😀>!", "tokens": [0, 1, 5, 0, 0], "error": -32603},
+    {"id": "cross-line", "text": "<a>\r\n<😀>!", "tokens": [0, 1, 5, 0, 0], "expected": [0, 1, 5, 0, 0]},
     {"id": "overlap", "text": "<😀x>!", "tokens": [0, 1, 2, 1, 0, 0, 1, 1, 0, 0], "error": -32603},
     {"id": "type-index", "text": "<a>!", "tokens": [0, 1, 1, 2, 0], "error": -32603},
     {"id": "modifier-index", "text": "<a>!", "tokens": [0, 1, 1, 0, 2], "error": -32603},
-    {"id": "zero-length", "text": "<a>!", "tokens": [0, 1, 0, 0, 0], "error": -32603},
+    {"id": "zero-length", "text": "<a>!", "tokens": [0, 1, 0, 0, 0], "expected": [0, 1, 0, 0, 0]},
     {"id": "negative", "text": "<a>!", "tokens": [0, -1, 1, 0, 0], "error": -32603},
     {"id": "partial-group", "text": "<a>!", "tokens": [0, 1, 1, 0], "error": -32603},
     {"id": "large-position", "text": "<a>!", "tokens": [2147483647, 2147483647, 1, 0, 0], "error": -32603},
-    {"id": "provider-failure", "text": "<a>!", "tokens": [], "providerFailure": true, "error": -32603}
+    {"id": "provider-failure", "text": "<a>!", "tokens": [], "providerFailure": true, "error": -32603},
+    {"id": "multiline", "text": "<a>\r\n<😀b>!", "tokens": [0, 1, 8, 0, 0], "expected": [0, 1, 8, 0, 0]},
+    {"id": "clipped-length", "text": "<a>!", "tokens": [0, 1, 100, 0, 0], "expected": [0, 1, 100, 0, 0], "errorWhenMultiline": -32603},
+    {"id": "crlf-endpoint", "text": "<a>\r\n<😀>!", "tokens": [0, 1, 3, 0, 0], "expected": [0, 1, 3, 0, 0], "errorWhenMultiline": -32603},
+    {"id": "valid-overlap", "text": "<abcd>!", "tokens": [0, 1, 3, 0, 0, 0, 1, 1, 0, 0], "expected": [0, 1, 3, 0, 0, 0, 1, 1, 0, 0], "requiresOverlap": true},
+    {"id": "multiline-overlap", "text": "<a>\r\n<😀b>!", "tokens": [0, 1, 8, 0, 0, 1, 1, 2, 1, 0], "expected": [0, 1, 8, 0, 0, 1, 1, 2, 1, 0], "overlapsWhenMultiline": true},
+    {"id": "max-type", "text": "<a>!", "tokens": [0, 1, 1, 65535, 0], "expected": [0, 1, 1, 65535, 0], "largeLegend": true},
+    {"id": "excess-type", "text": "<a>!", "tokens": [0, 1, 1, 65536, 0], "error": -32603, "largeLegend": true},
+    {"id": "zero-inside", "text": "<abcd>!", "tokens": [0, 1, 3, 0, 0, 0, 1, 0, 0, 0], "expected": [0, 1, 3, 0, 0, 0, 1, 0, 0, 0]},
+    {"id": "zero-previous-max", "text": "<abcd>!", "tokens": [0, 1, 3, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0], "expected": [0, 1, 3, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0], "requiresOverlap": true}
   ]
 }

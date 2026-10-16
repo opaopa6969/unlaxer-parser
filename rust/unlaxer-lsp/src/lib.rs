@@ -133,6 +133,8 @@ pub struct Server<B> {
     profile: Option<Selection>,
     initialized: bool,
     semantic_tokens_legend: SemanticTokensLegend,
+    semantic_multiline: bool,
+    semantic_overlapping: bool,
     shutdown: bool,
     exited: bool,
 }
@@ -145,6 +147,8 @@ impl<B: Backend> Server<B> {
             profile: None,
             initialized: false,
             semantic_tokens_legend: SemanticTokensLegend::default(),
+            semantic_multiline: false,
+            semantic_overlapping: false,
             shutdown: false,
             exited: false,
         }
@@ -198,6 +202,9 @@ impl<B: Backend> Server<B> {
                 self.profile = selection;
                 self.initialized = true;
                 self.semantic_tokens_legend = self.backend.semantic_tokens_legend();
+                let semantic = &params["capabilities"]["textDocument"]["semanticTokens"];
+                self.semantic_multiline = semantic["multilineTokenSupport"] == true;
+                self.semantic_overlapping = semantic["overlappingTokenSupport"] == true;
                 let mut caps = json!({"positionEncoding":"utf-16","textDocumentSync":1,
                     "semanticTokensProvider":{"legend":{
                         "tokenTypes":self.semantic_tokens_legend.token_types,
@@ -322,8 +329,14 @@ impl<B: Backend> Server<B> {
                         .backend
                         .semantic_tokens(&snapshot)
                         .map_err(|error| (-32603, error))?;
-                    semantic_tokens::validate(&snapshot, &self.semantic_tokens_legend, &data)
-                        .map_err(|error| (-32603, error.into()))?;
+                    semantic_tokens::validate(
+                        &snapshot,
+                        &self.semantic_tokens_legend,
+                        &data,
+                        self.semantic_multiline,
+                        self.semantic_overlapping,
+                    )
+                    .map_err(|error| (-32603, error.into()))?;
                     Ok(json!({"data":data}))
                 }
                 "textDocument/completion" => {
