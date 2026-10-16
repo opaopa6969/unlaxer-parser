@@ -381,8 +381,10 @@ mod memo_version_tests {
 
     #[test]
     fn exhausted_epochs_are_permanent_misses_even_after_rollback() {
-        let mut store = ScopeStore::default();
-        store.next_memo_version = usize::MAX - 1;
+        let mut store = ScopeStore {
+            next_memo_version: usize::MAX - 1,
+            ..ScopeStore::default()
+        };
         let mark = store.checkpoint();
         store.mark_memo_changed();
         assert_eq!(store.memo_version(), None);
