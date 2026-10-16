@@ -1,0 +1,29 @@
+use std::collections::HashMap;
+use std::io::{self,BufRead};
+use unlaxer_runtime::regex::Regex;
+fn decode(hex:&str)->String{
+    if hex=="~" {return String::new();}
+    String::from_utf8((0..hex.len()).step_by(2).map(|i|u8::from_str_radix(&hex[i..i+2],16).unwrap()).collect()).unwrap()
+}
+fn hex(input:&str)->String{if input.is_empty(){"~".into()}else{input.as_bytes().iter().map(|b|format!("{b:02x}")).collect()}}
+fn main(){
+    let mut compiled=HashMap::new();
+    for line in io::stdin().lock().lines(){
+        let line=line.unwrap();let fields:Vec<_>=line.split('\t').collect();let pattern=decode(fields[0]);let input=decode(fields[1]);
+        let regex=compiled.entry(pattern.clone()).or_insert_with(||Regex::compile(&pattern));
+        match regex {
+            Err(error)=>println!("compile\t{:?}",error.kind),
+            Ok(regex)=>{
+                match regex.looking_at(&input){
+                    Err(error)=>println!("resource\t{error:?}"),
+                    Ok(found)=>{
+                        let (kind,cp,u16,u8,prefix)=found.map_or(("none",0,0,0,"-".into()),|m|("ok",m.end_cp,m.end_utf16,m.end_utf8,hex(&input[..m.end_utf8])));
+                        let normal=regex.token_prefix(&input,false).unwrap().map_or(0,|m|m.end_cp);
+                        let inverted=regex.token_prefix(&input,true).unwrap().map_or(0,|m|m.end_cp);
+                        println!("{kind}\t{cp}\t{u16}\t{u8}\t{prefix}\t{normal}\t{inverted}");
+                    }
+                }
+            }
+        }
+    }
+}

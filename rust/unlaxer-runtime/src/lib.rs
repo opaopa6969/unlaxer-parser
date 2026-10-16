@@ -23,6 +23,7 @@ pub mod names;
 pub mod pipeline;
 pub mod provider_process;
 pub mod provider_protocol;
+pub mod regex;
 mod scope;
 pub mod semantic;
 pub mod semantic_project;

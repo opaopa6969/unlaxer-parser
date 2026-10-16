@@ -1,0 +1,34 @@
+feature	status	tracking_issue	contract
+unicode_scalar_literals	supported	578	Valid Rust str scalar patterns and inputs; supplementary scalars stay single matching units
+literal_escapes	supported	578	Backslash punctuation, control letters, c ASCII control, octal, x hex, u hex and paired UTF16 escapes
+quote_Q_E	supported	578	Quoted text including an unterminated final quote; following quantifier applies to the last quoted scalar
+ascii_predefined_sets	supported	578	d D s S w W with Java default ASCII membership and scalar complements
+ascii_posix_properties	supported	578	Lower Upper ASCII Alpha Digit Alnum Punct Graph Print Blank Cntrl XDigit Space
+scalar_character_classes	supported	578	Scalar ranges, nested union, negation and intersection/subtraction with nonempty operands
+empty_intersection_operands	unsupported	586	Java-accepted leading/trailing or otherwise degenerate ampersand intersections are not approximated
+sequence_ordered_alternation	supported	578	First successful prefix with continuation backtracking, not longest-match alternation
+greedy_quantifiers	supported	578	? * + {n} {n,} {n,m}, quantities up to Java signed-int maximum
+reluctant_quantifiers	supported	578	Question-mark suffix preserves Java exploration order
+possessive_quantifiers	supported	578	Plus suffix prevents retreat after successful repetition
+capturing_group_matching	supported	578	Plain parentheses affect matching; this prefix API does not expose group capture values
+noncapturing_groups	supported	578	(?:expression)
+atomic_groups	supported	578	(?>expression) discards only its own pending alternatives
+basic_anchors	supported	578	^ $ A z Z and G for a fresh lookingAt call; CRLF has no interior default line boundary
+ascii_inline_flags	supported	578	i d m s x, on/off and scoped forms; lexical flag restoration at group boundaries
+unicode_inline_flags	unsupported	585	u and U, including Unicode case folding and Unicode character classes
+canonical_equivalence	unsupported	585	Java-accepted c flag and canonical-equivalence matching
+unicode_properties	unsupported	585	Unicode scripts/blocks/categories/binary properties and Java Character properties
+unicode_word_boundaries	unsupported	585	b B, including Java21 nonspacing-mark inheritance even without U
+unicode_line_space_grapheme_matchers	unsupported	585	R X h H v V and b{g}
+unicode_character_names	unsupported	585	N{name}
+unpaired_surrogate_patterns	unsupported	585	Rust str cannot represent lone UTF16 surrogate values; no replacement-character substitution
+lookaround	unsupported	586	Positive/negative lookahead and lookbehind
+backreferences	unsupported	586	Numeric and named backreferences
+named_groups	unsupported	586	Named capturing groups
+capture_query_api	not_exposed	586	No group retrieval or capture history is claimed by the core prefix API
+search_replace_streaming_matcher_api	not_exposed	544	Only fresh lookingAt over a remaining-input slice is exposed; no find/replace matcher state
+external_integer_flags_api	not_exposed	544	String pattern and embedded flags, like the existing RegexTokenParser constructor
+zero_width_prefix	supported	578	looking_at may return a zero-width match, including EOF
+nonempty_token_prefix	supported	578	token_prefix rejects EOF/zero-width and inverted success; inverted failure advances one scalar
+resource_limits	supported	578	Pattern size/depth/operands/instructions/set work and input/VM-step/backtracking-state limits
+ubnf_and_token_modes	pending	587	No Expr atom, lowering, portability promotion or ParseContext propagation is added in core
