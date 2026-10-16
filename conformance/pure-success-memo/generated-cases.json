@@ -1,0 +1,578 @@
+[
+  {
+    "name": "Ascii",
+    "grammar": "grammar Ascii {\n @package: memo.probe\n @whitespace: none\n @root  @mapping(Value,params=[item]) Root ::= Item @item '!' | Item @item '?';\n @mapping(Item,params=[text]) Item ::= 'a' @text;\n}",
+    "cases": [
+      {
+        "id": "first",
+        "input": "a!",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "coordinates": [
+          2,
+          2,
+          2
+        ],
+        "accepted": true,
+        "item": "a",
+        "itemEnd": 1,
+        "valueEnd": 2,
+        "diagnostic": null,
+        "successHit": false,
+        "hasText": true
+      },
+      {
+        "id": "retry",
+        "input": "a?",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "coordinates": [
+          2,
+          2,
+          2
+        ],
+        "accepted": true,
+        "item": "a",
+        "itemEnd": 1,
+        "valueEnd": 2,
+        "diagnostic": null,
+        "successHit": true,
+        "hasText": true
+      },
+      {
+        "id": "failure",
+        "input": "a#",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "item": "a",
+        "itemEnd": 1,
+        "valueEnd": 0,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 1
+        },
+        "successHit": true,
+        "hasText": true
+      },
+      {
+        "id": "eof",
+        "input": "a",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "item": "a",
+        "itemEnd": 1,
+        "valueEnd": 0,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 1
+        },
+        "successHit": true,
+        "hasText": true
+      }
+    ]
+  },
+  {
+    "name": "Emoji",
+    "grammar": "grammar Emoji {\n @package: memo.probe\n @whitespace: none\n @root  @mapping(Value,params=[item]) Root ::= Item @item '!' | Item @item '?';\n @mapping(Item,params=[text]) Item ::= '😀' @text;\n}",
+    "cases": [
+      {
+        "id": "first",
+        "input": "😀!",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "coordinates": [
+          2,
+          3,
+          5
+        ],
+        "accepted": true,
+        "item": "😀",
+        "itemEnd": 1,
+        "valueEnd": 2,
+        "diagnostic": null,
+        "successHit": false,
+        "hasText": true
+      },
+      {
+        "id": "retry",
+        "input": "😀?",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "coordinates": [
+          2,
+          3,
+          5
+        ],
+        "accepted": true,
+        "item": "😀",
+        "itemEnd": 1,
+        "valueEnd": 2,
+        "diagnostic": null,
+        "successHit": true,
+        "hasText": true
+      },
+      {
+        "id": "failure",
+        "input": "😀#",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "item": "😀",
+        "itemEnd": 1,
+        "valueEnd": 0,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 1
+        },
+        "successHit": true,
+        "hasText": true
+      },
+      {
+        "id": "eof",
+        "input": "😀",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "item": "😀",
+        "itemEnd": 1,
+        "valueEnd": 0,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 1
+        },
+        "successHit": true,
+        "hasText": true
+      }
+    ]
+  },
+  {
+    "name": "Family",
+    "grammar": "grammar Family {\n @package: memo.probe\n @whitespace: none\n @root  @mapping(Value,params=[item]) Root ::= Item @item '!' | Item @item '?';\n @mapping(Item,params=[text]) Item ::= '👨‍👩‍👧‍👦' @text;\n}",
+    "cases": [
+      {
+        "id": "first",
+        "input": "👨‍👩‍👧‍👦!",
+        "prefix": [
+          true,
+          8,
+          8
+        ],
+        "coordinates": [
+          8,
+          12,
+          26
+        ],
+        "accepted": true,
+        "item": "👨‍👩‍👧‍👦",
+        "itemEnd": 7,
+        "valueEnd": 8,
+        "diagnostic": null,
+        "successHit": false,
+        "hasText": true
+      },
+      {
+        "id": "retry",
+        "input": "👨‍👩‍👧‍👦?",
+        "prefix": [
+          true,
+          8,
+          8
+        ],
+        "coordinates": [
+          8,
+          12,
+          26
+        ],
+        "accepted": true,
+        "item": "👨‍👩‍👧‍👦",
+        "itemEnd": 7,
+        "valueEnd": 8,
+        "diagnostic": null,
+        "successHit": true,
+        "hasText": true
+      },
+      {
+        "id": "failure",
+        "input": "👨‍👩‍👧‍👦#",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "item": "👨‍👩‍👧‍👦",
+        "itemEnd": 7,
+        "valueEnd": 0,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 7
+        },
+        "successHit": true,
+        "hasText": true
+      },
+      {
+        "id": "eof",
+        "input": "👨‍👩‍👧‍👦",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "item": "👨‍👩‍👧‍👦",
+        "itemEnd": 7,
+        "valueEnd": 0,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 7
+        },
+        "successHit": true,
+        "hasText": true
+      }
+    ]
+  },
+  {
+    "name": "Zero",
+    "grammar": "grammar Zero {\n @package: memo.probe\n @whitespace: none\n @root  @mapping(Value,params=[item]) Root ::= Item @item '!' | Item @item '?';\n @mapping(Item) Item ::= 'x'{0};\n}",
+    "cases": [
+      {
+        "id": "first",
+        "input": "!",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "coordinates": [
+          1,
+          1,
+          1
+        ],
+        "accepted": true,
+        "item": "",
+        "itemEnd": 0,
+        "valueEnd": 1,
+        "diagnostic": null,
+        "successHit": false,
+        "hasText": false
+      },
+      {
+        "id": "retry",
+        "input": "?",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "coordinates": [
+          1,
+          1,
+          1
+        ],
+        "accepted": true,
+        "item": "",
+        "itemEnd": 0,
+        "valueEnd": 1,
+        "diagnostic": null,
+        "successHit": false,
+        "hasText": false
+      },
+      {
+        "id": "failure",
+        "input": "#",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "item": "",
+        "itemEnd": 0,
+        "valueEnd": 0,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        },
+        "successHit": false,
+        "hasText": false
+      },
+      {
+        "id": "eof",
+        "input": "",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "item": "",
+        "itemEnd": 0,
+        "valueEnd": 0,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        },
+        "successHit": false,
+        "hasText": false
+      }
+    ]
+  },
+  {
+    "name": "Predictive",
+    "grammar": "grammar Predictive {\n @package: memo.probe\n @whitespace: none\n @root @predictiveChoice @mapping(Value,params=[item]) Root ::= Item @item '!' | Item @item '?';\n @mapping(Item,params=[text]) Item ::= 'K' @text;\n}",
+    "cases": [
+      {
+        "id": "first",
+        "input": "K!",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "coordinates": [
+          2,
+          2,
+          4
+        ],
+        "accepted": true,
+        "item": "K",
+        "itemEnd": 1,
+        "valueEnd": 2,
+        "diagnostic": null,
+        "successHit": false,
+        "hasText": true
+      },
+      {
+        "id": "retry",
+        "input": "K?",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "coordinates": [
+          2,
+          2,
+          4
+        ],
+        "accepted": true,
+        "item": "K",
+        "itemEnd": 1,
+        "valueEnd": 2,
+        "diagnostic": null,
+        "successHit": true,
+        "hasText": true
+      },
+      {
+        "id": "failure",
+        "input": "K#",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "item": "K",
+        "itemEnd": 1,
+        "valueEnd": 0,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 1
+        },
+        "successHit": true,
+        "hasText": true
+      },
+      {
+        "id": "eof",
+        "input": "K",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "item": "K",
+        "itemEnd": 1,
+        "valueEnd": 0,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 1
+        },
+        "successHit": true,
+        "hasText": true
+      }
+    ]
+  },
+  {
+    "name": "Longest",
+    "grammar": "grammar Longest {\n @package: memo.probe\n @whitespace: none\n @root @longestChoice @mapping(Value,params=[item]) Root ::= Item @item '!' | Item @item '?';\n @mapping(Item,params=[text]) Item ::= 'é' @text;\n}",
+    "cases": [
+      {
+        "id": "first",
+        "input": "é!",
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "coordinates": [
+          3,
+          3,
+          4
+        ],
+        "accepted": true,
+        "item": "é",
+        "itemEnd": 2,
+        "valueEnd": 3,
+        "diagnostic": null,
+        "successHit": true,
+        "hasText": true
+      },
+      {
+        "id": "retry",
+        "input": "é?",
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "coordinates": [
+          3,
+          3,
+          4
+        ],
+        "accepted": true,
+        "item": "é",
+        "itemEnd": 2,
+        "valueEnd": 3,
+        "diagnostic": null,
+        "successHit": true,
+        "hasText": true
+      },
+      {
+        "id": "failure",
+        "input": "é#",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "item": "é",
+        "itemEnd": 2,
+        "valueEnd": 0,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 2
+        },
+        "successHit": true,
+        "hasText": true
+      },
+      {
+        "id": "eof",
+        "input": "é",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "item": "é",
+        "itemEnd": 2,
+        "valueEnd": 0,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 2
+        },
+        "successHit": true,
+        "hasText": true
+      }
+    ]
+  }
+]

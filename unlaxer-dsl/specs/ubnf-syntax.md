@@ -296,22 +296,12 @@ token KW_FROM   = CI('from')
 `CI`の引数は非空で、原文tokenを保持します。`ß`/`ẞ`は一致し、`ß`/`SS`は不一致です。
 JDK依存の旧生成コードとの差、正規化やlocaleとの関係は[CIの共通契約](../../docs/case-insensitive-tokens.md)を参照してください。
 
-#### `REGEX('pattern')` — 正規表現によるマッチ
+#### 旧 `REGEX('pattern')` — 廃止
 
-```ubnf
-token IDENTIFIER = REGEX('[a-zA-Z_][a-zA-Z0-9_]*')
-token INTEGER    = REGEX('[0-9]+')
-token FLOAT      = REGEX('[0-9]+\\.[0-9]+')
-```
-
-> **ユースケース**: 複雑な文字パターンを正規表現で簡潔に書きたいとき。
-> Java の `Pattern`（`java.util.regex`）形式の正規表現が使えます。
->
-> **動作**: 現在位置に正規表現をアンカリングして適用し、マッチした長さ分のソースを消費します。
-> ゼロ幅マッチ（空文字列にマッチ）は失敗として扱われます。
->
-> **生成コード**: `REGEX('pattern')` を使ったトークンには、
-> `org.unlaxer.dsl.runtime.RegexTokenParser` を継承したクラスが生成されます。
+開発版では `E-REGEX-RETIRED` を返します。`token NAME ::= expression;` を使って
+字句定義を明示してください。Java `RegexTokenParser` API も削除しました。
+公開済み3.3.0は変更しません。識別子・数値・文字列・改行・Unicode・先読み・局所再照合の例と、
+PEG の選択／possessive 反復と正規表現の後戻りの差は[移行文書](../../docs/regex-retirement.md)を参照してください。
 
 ---
 
@@ -385,8 +375,7 @@ IfKeyword  ::= 'if' ;
 Unicode escapeの展開対象はtokenの `CHAR_RANGE` 境界と `NEGATION` 除外集合だけ。
 v2の宣言的字句式 `token T ::= CHAR_RANGE(...) | NEGATION(...);` にも同じ規定が適用される。
 ルール本体のリテラル、字句式の通常リテラル、`UNTIL` / `CI` / `LOOKAHEAD` /
-`NEGATIVE_LOOKAHEAD` / `REGEX` では、既存escape処理を維持する。
-`REGEX` は自身の解析器が読むraw escapeを前段でUnicode展開しない。
+`NEGATIVE_LOOKAHEAD` では、既存escape処理を維持する。
 診断コードは [validation.md](validation.md#unicode-code-point-escape) を参照。
 
 ### ルール参照・トークン参照
@@ -968,7 +957,6 @@ TokenValue   ::= CLASS_NAME
                | NEGATIVE_LOOKAHEAD('pattern')
                | CHAR_RANGE('min','max')
                | CI('word')
-               | REGEX('pattern')
                | ANY
                | EOF
                | EMPTY
@@ -1026,7 +1014,7 @@ ErrorElement    ::= 'ERROR' '(' STRING ')'
 - `grammar` — grammar ブロックの開始
 - `token` — トークン宣言
 - `UNTIL`, `NEGATION`, `LOOKAHEAD`, `NEGATIVE_LOOKAHEAD` — トークンキーワード
-- `CHAR_RANGE`, `CI`, `REGEX`, `ANY`, `EOF`, `EMPTY` — トークンキーワード
+- `CHAR_RANGE`, `CI`, `ANY`, `EOF`, `EMPTY` — トークンキーワード
 - `ERROR` — エラーヒント要素
 - `params` — `@mapping` アノテーション内
 

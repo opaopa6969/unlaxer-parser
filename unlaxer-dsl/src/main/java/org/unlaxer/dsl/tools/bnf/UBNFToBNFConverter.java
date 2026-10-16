@@ -1,5 +1,7 @@
 package org.unlaxer.dsl.tools.bnf;
 
+import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
+
 import java.util.List;
 import java.util.Optional;
 
@@ -58,6 +60,7 @@ public final class UBNFToBNFConverter {
 
         for (int i = 0; i < grammars.size(); i++) {
             GrammarDecl grammar = grammars.get(i);
+            org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
             convertGrammarDecl(grammar, builder, context);
 
             if (false == (i == grammars.size() - 1)) {
@@ -168,8 +171,6 @@ public final class UBNFToBNFConverter {
             tokenValue = "CHAR_RANGE('" + cr.min() + "','" + cr.max() + "')";
         } else if (token instanceof UBNFAST.TokenDecl.CaseInsensitive ci) {
             tokenValue = "CI('" + ci.word() + "')";
-        } else if (token instanceof UBNFAST.TokenDecl.Regex rx) {
-            tokenValue = "REGEX('" + rx.pattern() + "')";
         } else {
             throw new IllegalStateException("unhandled " + token);
         }
@@ -355,8 +356,14 @@ public final class UBNFToBNFConverter {
         StringBuilder builder,
         ConversionContext context
     ) {
-        if (element instanceof GroupElement groupElement) {
-            builder.append("( ");
+        if (element instanceof UBNFAST.ReplayElement replay) {
+            builder.append("SAME_AS(").append(replay.name()).append(")");
+        } else if (element instanceof TransparentElement groupElement) {
+            if (element instanceof UBNFAST.OwnedCaptureElement capture) {
+                builder.append("CAPTURE(").append(capture.name()).append(", ");
+            } else {
+                builder.append(element instanceof UBNFAST.CaptureScopeElement ? "CAPTURE_SCOPE( " : "( ");
+            }
             convertRuleBody(groupElement.body(), builder, context);
             builder.append(" )");
         } else if (element instanceof OptionalElement optionalElement) {

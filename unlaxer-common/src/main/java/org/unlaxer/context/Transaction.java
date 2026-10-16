@@ -50,11 +50,20 @@ public interface Transaction extends TransactionListenerContainer , ParseContext
 	}
 	
 	public default void begin(Parser parser) {
+        get().beforeTransactionBegin();
 		getTokenStack().push(getCurrent().createNew());
 		get().checkpointTransactionalState(getCurrent());
 		onBegin(get(), parser);
 	}
 	
+    /** Transaction for operations which must not reset a pre-existing matched cursor. */
+    public default void beginPreservingMatched(Parser parser) {
+        get().beforeTransactionBegin();
+        getTokenStack().push(getCurrent().createNewPreservingMatched());
+        get().checkpointTransactionalState(getCurrent());
+        onBegin(get(), parser);
+    }
+
 	Collection<AdditionalCommitAction> getActions();
 	
   default void addActions(AdditionalCommitAction... additionalCommitActions) {
@@ -73,6 +82,7 @@ public interface Transaction extends TransactionListenerContainer , ParseContext
    * @return last added Tokens
    */
 	public default Committed commit(Parser parser, TokenKind tokenKind , AdditionalCommitAction... actions) {
+        get().requireParseHealthy();
 
     Collection<AdditionalCommitAction> persistentActions = getActions();
     boolean hasArgActions = actions.length > 0;
@@ -100,7 +110,7 @@ public interface Transaction extends TransactionListenerContainer , ParseContext
 
     for (AdditionalCommitAction action : allActions) {
       if (action instanceof AdditionalPreCommitAction) {
-        ((AdditionalPreCommitAction) action).effect(parser, parseContext);
+        parseContext.notifyObserver(() -> ((AdditionalPreCommitAction) action).effect(parser, parseContext));
       }
     }
 
@@ -138,20 +148,9 @@ public interface Transaction extends TransactionListenerContainer , ParseContext
       committed = new Committed(current.tokens);
     }
 
-    if (hasPersistentActions) {
-      for (AdditionalCommitAction action : persistentActions) {
-        if (action instanceof AdditionalPostCommitAction) {
-          ((AdditionalPostCommitAction) action)
-            .effect(parser, parseContext , committed);
-        }
-      }
-    }
-    if (hasArgActions) {
-      for (AdditionalCommitAction action : actions) {
-        if (action instanceof AdditionalPostCommitAction) {
-          ((AdditionalPostCommitAction) action)
-            .effect(parser, parseContext , committed);
-        }
+    for (AdditionalCommitAction action : allActions) {
+      if (action instanceof AdditionalPostCommitAction) {
+        parseContext.notifyObserver(() -> ((AdditionalPostCommitAction) action).effect(parser, parseContext, committed));
       }
     }
     return committed;
@@ -161,6 +160,7 @@ public interface Transaction extends TransactionListenerContainer , ParseContext
   }
     
 	public default void rollback(Parser parser) {
+        get().requireParseHealthy();
 		TransactionElement pollFirst = getTokenStack().pollFirst();
 		pollFirst.restoreSelectionChanges(getChosenParserByChoice(), getOrderedParsersByNonOrdered());
 		try {

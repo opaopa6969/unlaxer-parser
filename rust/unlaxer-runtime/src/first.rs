@@ -131,6 +131,22 @@ impl FirstSet {
 /// The FIRST set of an expression; `Rule(id)` is looked up in `rules` (the fixed-point table).
 pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
     match expression {
+        Expr::Repeat {
+            min,
+            max: Some(max),
+            ..
+        }
+        | Expr::JavaRepeat {
+            min,
+            max: Some(max),
+            ..
+        } if *max == 0 || *max < *min => {
+            if *min == 0 && *max == 0 {
+                FirstSet::NULLABLE
+            } else {
+                FirstSet::EMPTY
+            }
+        }
         Expr::Literal(text) => text
             .chars()
             .next()
@@ -183,8 +199,12 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
             .fold(FirstSet::EMPTY, |set, alternative| {
                 set.union(of(alternative, rules))
             }),
-        Expr::Capture(_, child)
+        Expr::OwnedCapture(_, child)
+        | Expr::CaptureScope(child)
+        | Expr::Capture(_, child)
         | Expr::TextValue(child)
+        | Expr::CaptureBoundary(_, child)
+        | Expr::InputCaptureBoundary(_, child)
         | Expr::ValueBoundary(child)
         | Expr::RuleEffects { child, .. }
         | Expr::CaptureEquality { child, .. } => of(child, rules),
@@ -237,12 +257,20 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
             FirstSet::NULLABLE
         }
         Expr::Error(_) => FirstSet::EMPTY,
-        Expr::Lexical(_, _)
+        Expr::Character { .. }
+        | Expr::MatchOnly(_)
+        | Expr::InvertMatch(_)
+        | Expr::StopInvert(_)
+        | Expr::StopConsume(_)
+        | Expr::NonOrdered(_)
+        | Expr::Lexical(_, _)
         | Expr::Until(_)
         | Expr::JavaUntil(_)
         | Expr::Custom(_)
         | Expr::CustomWith { .. }
         | Expr::Recovery { .. }
+        | Expr::Replay(_)
+        | Expr::ZeroMatch(_)
         | Expr::Backreference(_)
         | Expr::NamePredicate { .. }
         | Expr::NameResolutionScope { .. } => FirstSet::UNKNOWN,

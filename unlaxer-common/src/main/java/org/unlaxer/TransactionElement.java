@@ -63,6 +63,11 @@ public class TransactionElement implements Serializable{
         hasSavedMemoizationStateVersion = true;
     }
 
+    /** Internal distinction between real transaction frames and observer rollback owners. */
+    public boolean hasSavedMemoizationStateVersion() {
+        return hasSavedMemoizationStateVersion;
+    }
+
     public long takeMemoizationStateVersion() {
         if (false == hasSavedMemoizationStateVersion) {
             throw new IllegalStateException("transaction state version snapshot is missing");
@@ -142,6 +147,11 @@ public class TransactionElement implements Serializable{
 		return new TransactionElement(new ParserCursor(parserCursor,resetMatchedWithConsumed),resetMatchedWithConsumed);
 	}
 	
+    /** Open a no-input operation while preserving independent matched progress. */
+    public TransactionElement createNewPreservingMatched() {
+        return new TransactionElement(new ParserCursor(parserCursor, false), resetMatchedWithConsumed);
+    }
+
 	public void consume(CodePointLength length){
 		parserCursor.addPosition(length.toOffset());
 	}
@@ -187,6 +197,22 @@ public class TransactionElement implements Serializable{
 		this.parserCursor = cursor;
 	}
 	
+    /** Internal fatal-observer rollback of the last unpublished root parse. */
+    public void restorePublication(ParserCursor cursor, CodePointIndex consumed, CodePointIndex matched,
+            int tokenCount, Optional<TokenKind> kind, boolean resetMatched) {
+        parserCursor = cursor;
+        parserCursor.getCursor(TokenKind.consumed).setPosition(consumed);
+        parserCursor.getCursor(TokenKind.matchOnly).setPosition(matched);
+        while (tokens.size() > tokenCount) tokens.remove(tokens.size() - 1);
+        tokenKind = kind;
+        resetMatchedWithConsumed = resetMatched;
+    }
+
+    /** Whether a child transaction begins with matched reset to consumed. */
+    public boolean isResetMatchedWithConsumed() {
+        return resetMatchedWithConsumed;
+    }
+
 	public void setResetMatchedWithConsumed(boolean resetMatchedWithConsumed) {
 		this.resetMatchedWithConsumed = resetMatchedWithConsumed;
 	}

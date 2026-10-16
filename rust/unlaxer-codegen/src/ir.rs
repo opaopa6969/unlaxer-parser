@@ -17,6 +17,16 @@ pub struct Rule {
     pub catalog: Option<Catalog>,
     /// Ordered @doc paragraphs. Tooling metadata; never changes recognition.
     pub documentation: Vec<String>,
+    /// Ordered literal alternatives for a grammar @enum; empty for ordinary rules.
+    pub enum_literals: Vec<String>,
+    /// Mapping-time constraints, resolved after every named value is bound.
+    pub type_constraints: Vec<TypeConstraint>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TypeConstraint {
+    pub capture: Field,
+    pub reference: Field,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -53,10 +63,20 @@ pub struct Field {
     pub cardinality: Cardinality,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Kind {
+    /// Java generated numeric capture contract: signed 32-bit integer.
+    Integer,
+    /// Explicit nested capture; containers are ordered outermost first.
+    Nested {
+        leaf: Box<Kind>,
+        containers: Vec<Cardinality>,
+    },
+    Enum(String),
     Text,
     Node,
+    /// Nullable only on an associative synthetic literal leaf; not an Optional container.
+    NullableNode,
     Value,
 }
 
@@ -65,6 +85,13 @@ pub enum Cardinality {
     One,
     Optional,
     Many,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BoundaryKind {
+    Value,
+    Optional,
+    List,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -95,6 +122,12 @@ pub enum RecoveryMode {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression {
+    OwnedCapture {
+        name: String,
+        child: Box<Expression>,
+    },
+    Replay(String),
+    CaptureScope(Box<Expression>),
     NamePredicate {
         child: Box<Expression>,
         snapshot: String,
@@ -168,6 +201,10 @@ pub enum Expression {
     Capture {
         name: String,
         expression: Box<Expression>,
+    },
+    CaptureBoundary {
+        kind: BoundaryKind,
+        child: Box<Expression>,
     },
     OptionalExpr(Box<Expression>),
     Repeat {

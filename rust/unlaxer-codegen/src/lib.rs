@@ -2,10 +2,16 @@
 //!
 //! This crate accepts normalized IR, not UBNF source. Frontends must validate
 //! grammar semantics (including capture shapes, nullability and left recursion).
+mod associative;
 pub mod dap;
+mod enums;
 pub mod ir;
+mod nested;
+pub mod preferred;
+pub use enums::{enum_constant_name, validate_enum_type};
 pub mod lexical;
 pub mod lsp;
+mod typeof_constraints;
 mod validate;
 pub use ir::*;
 use std::fmt::Write;
@@ -133,6 +139,15 @@ fn has_values(ir: &GrammarIr) -> bool {
         .any(|f| f.kind == Kind::Value)
 }
 
+fn needs_values(ir: &GrammarIr) -> bool {
+    has_values(ir)
+        || ir
+            .rules
+            .iter()
+            .flat_map(|rule| &rule.type_constraints)
+            .any(|value| value.capture.kind == Kind::Value || value.reference.kind == Kind::Value)
+}
+
 fn contains_recovery(expression: &Expression) -> bool {
     use Expression::*;
     match expression {
@@ -145,10 +160,15 @@ fn contains_recovery(expression: &Expression) -> bool {
         | LexicalContextScope { child, .. }
         | TextValue(child)
         | ValueBoundary(child)
+        | CaptureBoundary { child, .. }
         | Delimited(child)
         | OptionalExpr(child)
         | Repeat { child, .. } => contains_recovery(child),
-        Capture { expression, .. } => contains_recovery(expression),
+        Capture { expression, .. }
+        | OwnedCapture {
+            child: expression, ..
+        }
+        | CaptureScope(expression) => contains_recovery(expression),
         Separated { child, separator } => contains_recovery(child) || contains_recovery(separator),
         Sequence(values) | Choice(values) | LongestChoice(values) | UniqueLongestChoice(values) => {
             values.iter().any(contains_recovery)
@@ -160,13 +180,14 @@ fn contains_recovery(expression: &Expression) -> bool {
 
 fn ast(ir: &GrammarIr) -> String {
     let mut out = String::from(HEADER);
-    if mappings(ir).is_empty() {
+    if mappings(ir).is_empty() && ir.rules.iter().all(|r| r.enum_literals.is_empty()) {
         out.push_str("use unlaxer_runtime::Span;\n\n");
     } else {
         out.push_str("use unlaxer_runtime::{Span, json_string};\n\n");
     }
-    if has_values(ir) {
-        out.push_str("#[derive(Debug, Clone, PartialEq)]\npub enum AstValue {\n    Text { text: String, span: Span },\n    Node(Box<Ast>),\n}\n\nimpl AstValue {\n    pub fn span(&self) -> Span {\n        match self {\n            Self::Text { span, .. } => *span,\n            Self::Node(node) => node.span(),\n        }\n    }\n\n    pub fn canonical_json(&self) -> String {\n        match self {\n            Self::Text { text, .. } => json_string(text),\n            Self::Node(node) => node.canonical_json(),\n        }\n    }\n}\n\n");
+    out.push_str(&enum_declarations(ir));
+    if needs_values(ir) {
+        out.push_str(&ast_values(ir));
     }
     out.push_str("#[allow(non_snake_case, non_camel_case_types)]\n#[derive(Debug, Clone, PartialEq)]\npub enum Ast {\n");
     for mapping in mappings(ir) {
@@ -211,6 +232,106 @@ fn ast(ir: &GrammarIr) -> String {
         out.push_str("), span.start, span.end, fields.join(\",\"))\n            },\n");
     }
     out.push_str("        }\n    }\n}\n");
+    out
+}
+
+fn ast_values(ir: &GrammarIr) -> String {
+    let template = "#[derive(Debug, Clone, PartialEq)]\npub enum AstValue {\n    Text { text: String, span: Span },\n    Node(Box<Ast>),\n}\n\nimpl AstValue {\n    pub fn span(&self) -> Span {\n        match self {\n            Self::Text { span, .. } => *span,\n            Self::Node(node) => node.span(),\n        }\n    }\n\n    pub fn canonical_json(&self) -> String {\n        match self {\n            Self::Text { text, .. } => json_string(text),\n            Self::Node(node) => node.canonical_json(),\n        }\n    }\n}\n\n";
+    let mut variants = String::new();
+    let mut spans = String::new();
+    let mut json = String::new();
+    for rule in ir.rules.iter().filter(|r| !r.enum_literals.is_empty()) {
+        let name = &rule.name;
+        writeln!(variants, "    Enum{name} {{ value: {name}, span: Span }},").unwrap();
+        writeln!(
+            spans,
+            "            Self::Enum{name} {{ span, .. }} => *span,"
+        )
+        .unwrap();
+        writeln!(json,"            Self::Enum{name} {{ value, span }} => format!(r#\"{{{{\"enum\":{{}},\"value\":{{}},\"span\":[{{}},{{}}]}}}}\"#, json_string({}), value.canonical_json(), span.start, span.end),",quote(name)).unwrap();
+    }
+    if variants.is_empty() {
+        return template.into();
+    }
+    format!(
+        "#[allow(non_camel_case_types)]\n{}",
+        template
+            .replace(
+                "    Node(Box<Ast>),\n",
+                &format!("    Node(Box<Ast>),\n{variants}")
+            )
+            .replace(
+                "            Self::Node(node) => node.span(),\n",
+                &format!("            Self::Node(node) => node.span(),\n{spans}")
+            )
+            .replace(
+                "            Self::Node(node) => node.canonical_json(),\n",
+                &format!("            Self::Node(node) => node.canonical_json(),\n{json}")
+            )
+    )
+}
+
+fn enum_declarations(ir: &GrammarIr) -> String {
+    let mut out = String::new();
+    for rule in ir.rules.iter().filter(|r| !r.enum_literals.is_empty()) {
+        out.push_str("#[allow(non_camel_case_types)]\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum ");
+        writeln!(out, "{} {{", rule.name).unwrap();
+        for literal in &rule.enum_literals {
+            writeln!(
+                out,
+                "    {},",
+                enum_constant_name(literal).expect("validated enum")
+            )
+            .unwrap();
+        }
+        writeln!(out, "}}\n\nimpl {} {{", rule.name).unwrap();
+        out.push_str(
+            "    pub fn from_text(text: &str) -> Result<Self, String> {\n        match text {\n",
+        );
+        for literal in &rule.enum_literals {
+            writeln!(
+                out,
+                "            {} => Ok(Self::{}),",
+                quote(literal),
+                enum_constant_name(literal).unwrap()
+            )
+            .unwrap();
+        }
+        writeln!(
+            out,
+            "            _ => Err(format!(\"unknown {}: {{text}}\")),\n        }}\n    }}\n",
+            rule.name
+        )
+        .unwrap();
+        out.push_str(
+            "    pub fn canonical_json(&self) -> String {\n        json_string(match self {\n",
+        );
+        for literal in &rule.enum_literals {
+            let name = enum_constant_name(literal).unwrap();
+            writeln!(out, "            Self::{name} => {},", quote(&name)).unwrap();
+        }
+        out.push_str(
+            "        })\n    }\n\n    pub fn text(&self) -> &'static str {\n        match self {\n",
+        );
+        for literal in &rule.enum_literals {
+            writeln!(
+                out,
+                "            Self::{} => {},",
+                enum_constant_name(literal).unwrap(),
+                quote(literal)
+            )
+            .unwrap();
+        }
+        out.push_str("        }\n    }\n}\n\n");
+    }
+    out
+}
+
+fn enum_imports(ir: &GrammarIr) -> String {
+    let mut out = String::new();
+    for rule in ir.rules.iter().filter(|r| !r.enum_literals.is_empty()) {
+        writeln!(out, "use super::ast::{};", rule.name).unwrap();
+    }
     out
 }
 
@@ -398,6 +519,7 @@ fn expression(expr: &Expression) -> String {
         Delimited(child) => format!("Expr::Sequence(vec![{}])", expression(child)),
         TextValue(child) => format!("{}.text_value()", expression(child)),
         ValueBoundary(child) => format!("{}.value_boundary()", expression(child)),
+        CaptureBoundary { kind, child } => format!("Expr::InputCaptureBoundary(unlaxer_runtime::capture_tree::Kind::{kind:?}, Box::new({}))", expression(child)),
         LexicalContextScope { child, terminals } => format!(
             "{}.lexical_context_scope(vec![{}])", expression(child),
             terminals.iter().map(|(name, literal, definition)| format!(
@@ -430,6 +552,9 @@ fn expression(expr: &Expression) -> String {
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
+        OwnedCapture { name, child } => format!("Expr::OwnedCapture({}, Box::new({}))", quote(name), expression(child)),
+        Replay(name) => format!("Expr::Replay({})", quote(name)),
+        CaptureScope(child) => format!("Expr::CaptureScope(Box::new({}))", expression(child)),
         Capture {
             name,
             expression: child,
@@ -444,11 +569,16 @@ fn expression(expr: &Expression) -> String {
             expression(child),
             max.map_or_else(|| "None".into(), |max| format!("Some({max})"))
         ),
-        Separated { child, separator } => format!(
-            "{}.separated_by({})",
-            expression(child),
-            expression(separator)
-        ),
+        Separated { child, separator } => {
+            let metadata = preferred::contains_depth(child);
+            let child = expression(child);
+            let separator = expression(separator);
+            if metadata {
+                format!("Expr::sequence([{child}, Expr::sequence([{separator}, Expr::Capture({}, Box::new({child}))]).repeat_java(0, None)])",quote(preferred::EXTRA))
+            } else {
+                format!("{child}.separated_by_java({separator})")
+            }
+        },
     }
 }
 
@@ -502,10 +632,13 @@ fn grapheme_capture(ir: &GrammarIr, body: &Expression, name: &str) -> bool {
                 alternatives: children,
                 ..
             } => pending.extend(children.iter().map(|child| (child, captured))),
-            OptionalExpr(child)
+            OwnedCapture { child, .. }
+            | CaptureScope(child)
+            | OptionalExpr(child)
             | Delimited(child)
             | TextValue(child)
             | ValueBoundary(child)
+            | CaptureBoundary { child, .. }
             | Repeat { child, .. }
             | TriviaScope { child, .. }
             | RuleEffects { child, .. }
@@ -527,22 +660,57 @@ fn grapheme_capture(ir: &GrammarIr, body: &Expression, name: &str) -> bool {
 
 fn mapper(ir: &GrammarIr) -> String {
     let mut out = String::from(HEADER);
-    if has_values(ir) {
+    if needs_values(ir) {
         out.push_str("use super::ast::AstValue;\n");
     }
+    out.push_str(&enum_imports(ir));
     out.push_str("use super::ast::Ast;\nuse unlaxer_runtime::Tree;\n\npub fn map(tree: &Tree) -> Result<Ast, String> {\n");
     if ir.rules.iter().any(|rule| contains_recovery(&rule.body)) {
         out.push_str("    if !tree.recoveries().is_empty() { return Err(\"cannot map recovered syntax\".into()); }\n");
     }
     out.push_str("    required(map_node(tree, tree.root)?, \"root\")\n}\n\nfn required<T>(mut values: Vec<T>, name: &str) -> Result<T, String> {\n    if values.len() != 1 { return Err(format!(\"expected one value for {name}, got {}\", values.len())); }\n    Ok(values.remove(0))\n}\n\nfn map_nodes(tree: &Tree, ids: &[usize]) -> Result<Vec<Ast>, String> {\n    let mut found = Vec::new();\n    for &id in ids { found.extend(map_node(tree, id)?); }\n    Ok(found)\n}\n");
-    if has_values(ir) {
+    if ir
+        .rules
+        .iter()
+        .any(|rule| !rule.type_constraints.is_empty())
+    {
+        out.push_str(&typeof_constraints::helpers(ir));
+    }
+    for (index, rule) in ir
+        .rules
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| !r.enum_literals.is_empty())
+    {
+        writeln!(
+            out,
+            "\nfn map_enum_{index}(tree: &Tree, ids: &[usize]) -> Result<Vec<{}>, String> {{",
+            rule.name
+        )
+        .unwrap();
+        out.push_str("    let mut found = Vec::new();\n    for &id in ids {\n        let node = &tree.nodes[id];\n");
+        writeln!(out, "        if node.rule == {index} {{\n            found.push({}::from_text(tree.text(node.span))?);\n        }} else {{\n            found.extend(map_enum_{index}(tree, &node.children)?);\n        }}\n    }}\n    Ok(found)\n}}",rule.name).unwrap();
+    }
+    if needs_values(ir) {
         out.push_str("\nfn map_values(tree: &Tree, ids: &[usize]) -> Result<Vec<AstValue>, String> {\n    let mut found = Vec::new();\n    for &id in ids {\n        let node = &tree.nodes[id];\n        match node.rule {\n            unlaxer_runtime::TEXT_VALUE_RULE => found.push(AstValue::Text {\n                text: unlaxer_runtime::java_capture_text(tree.text(node.span)).to_owned(),\n                span: node.span,\n            }),\n");
         out.push_str("            unlaxer_runtime::VALUE_BOUNDARY_RULE => {\n                let values = map_values(tree, &node.children)?;\n                if !values.is_empty() && values.iter().all(|value| matches!(value, AstValue::Text { .. })) {\n                    found.push(AstValue::Text {\n                        text: unlaxer_runtime::java_capture_text(tree.text(node.span)).to_owned(),\n                        span: node.span,\n                    });\n                } else {\n                    found.extend(values);\n                }\n            },\n");
+        for (id, rule) in ir
+            .rules
+            .iter()
+            .enumerate()
+            .filter(|(_, r)| !r.enum_literals.is_empty())
+        {
+            let name = &rule.name;
+            writeln!(out,"            {id} => found.push(AstValue::Enum{name} {{ value: {name}::from_text(tree.text(node.span))?, span: node.span }}),").unwrap();
+        }
         let ids: Vec<_> = ir
             .rules
             .iter()
             .enumerate()
-            .filter(|(_, r)| r.mapping.is_some())
+            .filter(|(_, r)| {
+                (r.mapping.is_some() || !r.type_constraints.is_empty())
+                    && r.enum_literals.is_empty()
+            })
             .map(|(id, _)| id.to_string())
             .collect();
         writeln!(out, "            {} => found.extend(map_node(tree, id)?.into_iter().map(|node| AstValue::Node(Box::new(node)))),", ids.join(" | ")).unwrap();
@@ -558,23 +726,40 @@ fn mapper(ir: &GrammarIr) -> String {
         }
         out.push_str("            _ => found.extend(map_values(tree, &node.children)?),\n        }\n    }\n    Ok(found)\n}\n");
     }
-    if mappings(ir)
+    if ir
+        .rules
         .iter()
-        .flat_map(|m| &m.fields)
+        .filter(|rule| rule.mapping.is_some() || !rule.type_constraints.is_empty())
+        .flat_map(typeof_constraints::fields)
         .any(|f| f.cardinality == Cardinality::Optional)
     {
         out.push_str("\nfn optional<T>(mut values: Vec<T>, name: &str) -> Result<Option<T>, String> {\n    if values.len() > 1 { return Err(format!(\"expected at most one value for {name}, got {}\", values.len())); }\n    Ok(values.pop())\n}\n");
     }
+    if ir
+        .rules
+        .iter()
+        .filter_map(|r| r.mapping.as_ref())
+        .flat_map(|m| &m.fields)
+        .any(|f| matches!(f.kind, Kind::Nested { .. }))
+    {
+        out.push_str(nested::HELPERS);
+        if ir.rules.iter().filter_map(|r|r.mapping.as_ref()).flat_map(|m|&m.fields).any(|f|matches!(&f.kind,Kind::Nested{leaf,..} if matches!(leaf.as_ref(),Kind::Node|Kind::Enum(_)))) { out.push_str(nested::PROJECT_HELPERS); }
+    }
+    out.push_str(&associative::helpers(ir));
     out.push_str("\nfn map_node(tree: &Tree, id: usize) -> Result<Vec<Ast>, String> {\n    match tree.nodes[id].rule {\n");
     for (index, rule) in ir.rules.iter().enumerate() {
         if rule.skip {
             writeln!(out, "        {index} => Ok(Vec::new()),").unwrap();
-        } else if rule.mapping.is_some() {
+        } else if rule.mapping.is_some() || !rule.type_constraints.is_empty() {
             writeln!(out, "        {index} => map_rule_{index}(tree, id),").unwrap();
         }
     }
     out.push_str("        _ => map_nodes(tree, &tree.nodes[id].children),\n    }\n}\n");
     for (index, rule) in ir.rules.iter().enumerate() {
+        if !rule.type_constraints.is_empty() {
+            out.push_str(&typeof_constraints::rule(ir, index));
+            continue;
+        }
         if let Some(mapping) = &rule.mapping {
             writeln!(
                 out,
@@ -582,14 +767,67 @@ fn mapper(ir: &GrammarIr) -> String {
                 mapping.name
             )
             .unwrap();
+            if !rule.enum_literals.is_empty() {
+                writeln!(
+                    out,
+                    "        r#value: {}::from_text(tree.text(node.span))?,\n    }}])\n}}",
+                    rule.name
+                )
+                .unwrap();
+                continue;
+            }
             for field in &mapping.fields {
+                if let Kind::Enum(name) = &field.kind {
+                    let enum_id = ir
+                        .rules
+                        .iter()
+                        .position(|r| &r.name == name && !r.enum_literals.is_empty())
+                        .expect("validated enum field");
+                    writeln!(out, "        r#{}: {{\n            let mut values = Vec::new();\n            for capture in node.captures.iter().filter(|c| c.name == {}) {{\n                values.extend(map_enum_{enum_id}(tree, &capture.nodes)?);\n            }}\n            {}\n        }},",field.name,quote(&field.name),mapped_value(field)).unwrap();
+                    continue;
+                }
                 writeln!(out, "        r#{}: {{\n            let mut values = Vec::new();\n            for capture in node.captures.iter().filter(|c| c.name == {}) {{", field.name, quote(&field.name)).unwrap();
-                out.push_str(match field.kind {
+                if let Kind::Nested { leaf, containers } = &field.kind {
+                    let projection = match leaf.as_ref() {
+                        Kind::Node => Some("map_nodes".to_owned()),
+                        Kind::Enum(name) => Some(format!(
+                            "map_enum_{}",
+                            ir.rules
+                                .iter()
+                                .position(|r| &r.name == name && !r.enum_literals.is_empty())
+                                .expect("validated nested enum")
+                        )),
+                        _ => None,
+                    };
+                    out.push_str("                let nested = nested_capture(tree, capture)?;\n");
+                    if projection.is_some() {
+                        out.push_str("                let mut nested_sources = nested_source_nodes(tree, capture.nodes[0])?.into_iter();\n");
+                    }
+                    writeln!(
+                        out,
+                        "                values.push({}?);",
+                        nested::mapped(leaf, containers, "&nested", 0, projection.as_deref())
+                    )
+                    .unwrap();
+                    if projection.is_some() {
+                        out.push_str("                if nested_sources.next().is_some() { return Err(\"unmapped original nested leaf\".into()); }\n");
+                    }
+                } else if let Some(code) =
+                    associative::capture(Some(mapping), field, "                ")
+                {
+                    out.push_str(&code);
+                } else {
+                    out.push_str(match field.kind {
+                    Kind::Nested { .. } => unreachable!("handled nested field"),
+                    Kind::Integer => "                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).parse::<i32>().map_err(|_| format!(\"invalid i32 capture {} at {}..{}\", capture.name, capture.span.start, capture.span.end))?);\n",
+                    Kind::NullableNode => unreachable!("validated associative projection"),
                     Kind::Node => "                values.extend(map_nodes(tree, &capture.nodes)?);\n",
                     Kind::Value => "                values.extend(map_values(tree, &capture.nodes)?);\n",
                     Kind::Text if grapheme_capture(ir, &rule.body, &field.name) => "                values.push(tree.text(capture.span).to_owned());\n",
+                    Kind::Enum(_) => unreachable!("handled enum field"),
                     Kind::Text => "                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).to_owned());\n",
                 });
+                }
                 writeln!(
                     out,
                     "            }}\n            {}\n        }},",
@@ -608,6 +846,7 @@ fn evaluator(ir: &GrammarIr) -> String {
     if has_values(ir) {
         out.push_str("use super::ast::AstValue;\n");
     }
+    out.push_str(&enum_imports(ir));
     out.push_str("use super::ast::Ast;\n");
     if !mappings(ir).is_empty() {
         out.push_str("use unlaxer_runtime::Span;\n");
@@ -633,8 +872,8 @@ fn evaluator(ir: &GrammarIr) -> String {
                 format!(
                     "r#{}{}",
                     f.name,
-                    if f.cardinality == Cardinality::Optional {
-                        if f.kind == Kind::Value {
+                    if f.cardinality == Cardinality::Optional || f.kind == Kind::NullableNode {
+                        if matches!(f.kind, Kind::Value | Kind::Integer | Kind::Enum(_)) {
                             ".as_ref()"
                         } else {
                             ".as_deref()"
@@ -669,22 +908,48 @@ fn pattern(mapping: &Mapping, ty: &str) -> String {
 }
 
 fn field_type(field: &Field, borrowed: bool) -> String {
-    let one = match (field.kind, borrowed) {
+    if let Kind::Nested { leaf, containers } = &field.kind {
+        let value = nested::ty(leaf, containers);
+        return if borrowed { format!("&{value}") } else { value };
+    }
+    let one = match (&field.kind, borrowed) {
+        (Kind::Nested { .. }, _) => unreachable!("handled nested field"),
+        (Kind::Integer, true) => "&i32",
+        (Kind::Integer, false) => "i32",
         (Kind::Node, true) => "&Ast",
         (Kind::Node, false) => "Box<Ast>",
+        (Kind::NullableNode, true) => "Option<&Ast>",
+        (Kind::NullableNode, false) => "Option<Box<Ast>>",
         (Kind::Text, true) => "&str",
         (Kind::Text, false) => "String",
         (Kind::Value, true) => "&AstValue",
         (Kind::Value, false) => "AstValue",
+        (Kind::Enum(name), _) => {
+            let one = if borrowed {
+                format!("&{name}")
+            } else {
+                name.clone()
+            };
+            return match field.cardinality {
+                Cardinality::One => one,
+                Cardinality::Optional => format!("Option<{one}>"),
+                Cardinality::Many if borrowed => format!("&[{name}]"),
+                Cardinality::Many => format!("Vec<{name}>"),
+            };
+        }
     };
     match field.cardinality {
         Cardinality::One => one.into(),
         Cardinality::Optional => format!("Option<{one}>"),
         Cardinality::Many => {
             let element = match field.kind {
+                Kind::Nested { .. } => unreachable!("handled nested field"),
+                Kind::Integer => "i32",
                 Kind::Node => "Ast",
+                Kind::NullableNode => "Option<Box<Ast>>",
                 Kind::Text => "String",
                 Kind::Value => "AstValue",
+                Kind::Enum(_) => unreachable!("handled enum field"),
             };
             if borrowed {
                 format!("&[{element}]")
@@ -708,6 +973,9 @@ pub fn evaluator_parameter_type(field: &Field) -> String {
 fn mapped_value(field: &Field) -> String {
     let name = quote(&field.name);
     match field.cardinality {
+        Cardinality::One if field.kind == Kind::NullableNode => {
+            format!("Some(Box::new(required(values, {name})?))")
+        }
         Cardinality::One if field.kind == Kind::Node => {
             format!("Box::new(required(values, {name})?)")
         }
@@ -726,12 +994,19 @@ fn mapped_value(field: &Field) -> String {
 
 fn field_json(field: &Field) -> String {
     let name = format!("r#{}", field.name);
-    let value = if field.kind != Kind::Text {
+    if let Kind::Nested { leaf, containers } = &field.kind {
+        return nested::json(leaf, containers, &name, 0);
+    }
+    let value = if field.kind == Kind::Integer {
+        "value.to_string()"
+    } else if field.kind != Kind::Text {
         "value.canonical_json()"
     } else {
         "json_string(value)"
     };
     match field.cardinality {
+        Cardinality::One if field.kind == Kind::NullableNode => format!("{name}.as_ref().map_or_else(|| \"null\".to_owned(), |value| value.canonical_json())"),
+        Cardinality::One if field.kind == Kind::Integer => format!("{name}.to_string()"),
         Cardinality::One if field.kind != Kind::Text => format!("{name}.canonical_json()"),
         Cardinality::One => format!("json_string({name})"),
         Cardinality::Optional => format!("{name}.as_ref().map_or_else(|| \"null\".to_owned(), |value| {value})"),

@@ -76,7 +76,7 @@
     },
     "token-function": {
       "name": "support.function.token-type.ubnf",
-      "match": "\\b(UNTIL|NEGATION|LOOKAHEAD|NEGATIVE_LOOKAHEAD|CHAR_RANGE|REGEX|ANY|EOF|BOF|BOL|EOL|CAPTURE|SAME_AS|EMPTY|CI)\\b"
+      "match": "\\b(UNTIL|NEGATION|LOOKAHEAD|NEGATIVE_LOOKAHEAD|CHAR_RANGE|ANY|EOF|BOF|BOL|EOL|CAPTURE|SAME_AS|EMPTY|CI)\\b"
     },
     "rule-declaration": {
       "match": "^\\s*([A-Za-z_]\\w*)\\s*(::=)",

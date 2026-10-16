@@ -1,0 +1,9 @@
+grammar OwnedReferenceBoundaries {
+  Root ::= ns.CAPTURE('x') ns.SAME_AS('x') ns.CAPTURE_SCOPE('x')
+    CAPTURE_MORE('x') CAPTURE // reference before a group
+    ('x') SAME_AS ('x') CAPTURE_SCOPE ('x');
+  CAPTURE ::= 'c';
+  SAME_AS ::= 's';
+  CAPTURE_SCOPE ::= 'g';
+  CAPTURE_MORE ::= 'p';
+}

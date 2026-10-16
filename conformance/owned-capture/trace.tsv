@@ -1,0 +1,6 @@
+# input-utf8	scenario	committed-terminals (label@startCP:endCP:utf8,kind,consumedCP:matchedCP)
+6161	input	WordParser@0:1:61,consumed,1:1;ReplayParser@1:2:61,consumed,2:2
+61626261	shadow	WordParser@0:1:61,consumed,1:1;WordParser@1:2:62,consumed,2:2;ReplayParser@2:3:62,consumed,3:3;ReplayParser@3:4:61,consumed,4:4
+616278	scope-failure	WordParser@0:1:61,consumed,1:1
+6162	choice	WordParser@0:1:61,consumed,1:1
+6162636262	projected	WordParser@0:1:61,matchOnly,0:1;WordParser@1:2:62,virtualTokenConsumed,1:1;WordParser@1:2:62,virtualTokenConsumed,2:2;WordParser@2:3:63,consumed,3:3;ReplayParser@3:5:6262,consumed,5:5

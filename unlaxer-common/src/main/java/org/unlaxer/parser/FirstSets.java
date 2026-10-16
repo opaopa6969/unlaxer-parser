@@ -148,6 +148,10 @@ public final class FirstSets {
           || parser instanceof SingleCharacterParser) {
         classified = Kind.LEAF;
         leaf = leafOf(parser);
+      } else if (parser instanceof Occurs occurs && !occurs.isZeroMatchCheck()
+          && (occurs.max() == 0 || occurs.min() < 0 || occurs.max() < occurs.min())) {
+        classified = Kind.LEAF;
+        leaf = occurs.min() == 0 && occurs.max() == 0 ? FirstSet.EPSILON : FirstSet.EMPTY;
       } else if (parser instanceof Occurs occurs) {
         List<Parser> body = occursChildren(occurs);
         if (body.isEmpty()) {
