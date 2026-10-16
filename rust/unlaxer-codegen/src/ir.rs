@@ -70,6 +70,8 @@ pub enum Kind {
     Enum(String),
     Text,
     Node,
+    /// Nullable only on an associative synthetic literal leaf; not an Optional container.
+    NullableNode,
     Value,
 }
 

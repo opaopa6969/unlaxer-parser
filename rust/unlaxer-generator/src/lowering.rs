@@ -121,6 +121,7 @@ pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
     }
     .run()?;
     crate::numeric_fields::refine(grammar, &mut ir);
+    crate::associative_spines::refine(grammar, &mut ir)?;
     crate::evaluation::apply(grammar, &ir, String::new())?;
     Ok(ir)
 }

@@ -67,14 +67,7 @@ final class PreferredAstEmitter {
         String marker = "#preferred-schema:" + Long.toUnsignedString(hash, 16);
         var rules = new ArrayList<Rule>();
         try {
-            if (unsupported != null
-                    || grammar.rules().stream()
-                            .flatMap(rule -> rule.annotations().stream())
-                            .anyMatch(
-                                    annotation ->
-                                            annotation instanceof LeftAssocAnnotation
-                                                    || annotation instanceof RightAssocAnnotation))
-                throw new IllegalArgumentException("associative projection pending #593");
+            if (unsupported != null) throw new IllegalArgumentException(unsupported);
             for (int i = 0; i < ir.rules().size(); i++) {
                 var rule = ir.rules().get(i);
                 var iter = calls.get(i).iterator();
