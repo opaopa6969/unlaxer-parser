@@ -48,5 +48,20 @@
     "name": "manual-unmapped",
     "grammar": "grammar G { @root @eval(kind='user',strategy='manual') A ::= 'x'; }",
     "code": "E-EVAL"
+  },
+  {
+    "name": "condition-shared-text",
+    "grammar": "grammar G { @root Root ::= C1 | C2; @mapping(Cond,params=[condition,thenExpr,elseExpr]) @eval(kind='conditional') C1 ::= A @condition A @thenExpr A @elseExpr; @mapping(Cond,params=[condition,thenExpr,elseExpr]) C2 ::= 'x' @condition A @thenExpr A @elseExpr; @mapping(A) A ::= 'a'; @enum Flag ::= 'on'|'off'; }",
+    "code": "E-EVAL"
+  },
+  {
+    "name": "condition-shared-enum",
+    "grammar": "grammar G { @root Root ::= C1 | C2; @mapping(Cond,params=[condition,thenExpr,elseExpr]) @eval(kind='conditional') C1 ::= A @condition A @thenExpr A @elseExpr; @mapping(Cond,params=[condition,thenExpr,elseExpr]) C2 ::= Flag @condition A @thenExpr A @elseExpr; @mapping(A) A ::= 'a'; @enum Flag ::= 'on'|'off'; }",
+    "code": "E-EVAL"
+  },
+  {
+    "name": "condition-shared-mixed",
+    "grammar": "grammar G { @root Root ::= C1 | C2; @mapping(Cond,params=[condition,thenExpr,elseExpr]) @eval(kind='conditional') C1 ::= A @condition A @thenExpr A @elseExpr; @mapping(Cond,params=[condition,thenExpr,elseExpr]) C2 ::= (A | Flag) @condition A @thenExpr A @elseExpr; @mapping(A) A ::= 'a'; @enum Flag ::= 'on'|'off'; }",
+    "code": "E-EVAL"
   }
 ]

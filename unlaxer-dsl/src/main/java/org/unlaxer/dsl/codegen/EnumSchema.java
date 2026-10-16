@@ -384,6 +384,13 @@ public final class EnumSchema {
         }
     }
 
+    /** Whether a capture projects only AST nodes, through transparent helpers and choices. */
+    static boolean onlyAstValues(GrammarDecl grammar, AtomicElement element) {
+        var rules = new HashMap<String, RuleDecl>();
+        grammar.rules().forEach(rule -> rules.put(rule.name(), rule));
+        return valueType(element, rules, new HashSet<>()).equals("#node");
+    }
+
     private static String valueType(
             AtomicElement element, Map<String, RuleDecl> rules, Set<String> seen) {
         if (element instanceof RuleRefElement ref) {
