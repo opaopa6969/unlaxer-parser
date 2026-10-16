@@ -162,6 +162,30 @@ public class TypedNestedCaptureConformanceTest extends NestedCaptureConformanceT
         assertEquals(com.google.gson.JsonParser.parseString(org.unlaxer.dsl.impact.ApiImpact.compare("rust",before,after).toJson()),com.google.gson.JsonParser.parseString(nativeResult.output()));
     }
 
+    @org.junit.Test public void preparatoryDepthCountsLogicalChoiceBodiesOnBothHosts() throws Exception {
+        org.junit.Assume.assumeTrue(Boolean.getBoolean("rustConformance"));
+        success(run(List.of("cargo","build","--locked","--manifest-path",repo.resolve("rust/Cargo.toml").toString(),"-p","unlaxer-generator","--target-dir",nativeTarget().toString()),"",false));
+        var corpus=com.google.gson.JsonParser.parseString(java.nio.file.Files.readString(repo.resolve("spec-corpus/typed-nested-captures/depth-boundaries.json"))).getAsJsonArray();
+        for(var entry:corpus) {
+            var row=entry.getAsJsonObject();String source=row.get("grammar").getAsString();
+            var grammar=org.unlaxer.dsl.bootstrap.UBNFMapper.parse(source).grammars().get(0);
+            var directory=temporary.newFolder().toPath();var input=directory.resolve("fixture.ubnf");var output=directory.resolve("generated");java.nio.file.Files.writeString(input,source);
+            var nativeResult=run(List.of(nativeTarget().resolve("debug/unlaxer").toString(),"generate","--grammar",input.toString(),"--output",output.toString()),"",true);
+            boolean nativeAccepted=nativeResult.code()==0;
+            var issues=NestedCaptures.problems(grammar);
+            assertEquals("native depth "+row.get("depth")+": "+nativeResult.output(),row.get("accepted").getAsBoolean(),nativeAccepted);
+            assertEquals("Java depth "+row.get("depth")+": "+issues,row.get("accepted").getAsBoolean(),issues.isEmpty());
+            if(nativeAccepted) {
+                for(var file:new org.unlaxer.dsl.codegen.rust.RustBackend().generate(grammar))assertEquals(file.content(),java.nio.file.Files.readString(output.resolve(file.relativePath())));
+                for(CodeGenerator generator:List.of(new ParserGenerator(),new ASTGenerator(),new MapperGenerator()))assertFalse(generator.generate(grammar).source().isEmpty());
+            } else {
+                assertTrue(nativeResult.output(),nativeResult.output().contains("E-NESTED-SHAPE"));
+                assertTrue(nativeResult.output(),nativeResult.output().contains("at CP "+row.get("startCP")+".."+row.get("endCP")));
+                assertFalse(java.nio.file.Files.exists(output));
+            }
+        }
+    }
+
     @org.junit.Test public void unsupportedShapesFailBeforeEmissionWithSourceOrigins() throws Exception {
         org.junit.Assume.assumeTrue(Boolean.getBoolean("rustConformance"));
         success(run(List.of("cargo","build","--locked","--manifest-path",repo.resolve("rust/Cargo.toml").toString(),"-p","unlaxer-generator","--target-dir",nativeTarget().toString()),"",false));
