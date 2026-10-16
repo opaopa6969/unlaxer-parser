@@ -274,6 +274,34 @@ fn build_snapshot(
             generated: method_location,
         });
     }
+    for (source_rule, rule) in grammar.rules.iter().zip(&ir.rules) {
+        if rule.enum_literals.is_empty() {
+            continue;
+        }
+        let (_, generated) = declaration(ast, "ast.rs", &format!("pub enum {} {{", rule.name))?;
+        let mut variants = rule
+            .enum_literals
+            .iter()
+            .map(|text| unlaxer_codegen::enum_constant_name(text).map_err(|e| e.0))
+            .collect::<Result<Vec<_>, _>>()?;
+        variants.sort();
+        nodes.push(Node {
+            name: rule.name.clone(),
+            kind: "enum",
+            fields: Vec::new(),
+            parents: Vec::new(),
+            variants,
+            origins: vec![Origin {
+                rule: source_rule.name.clone(),
+                span: Span {
+                    start: source_rule.span.codepoint_start,
+                    end: source_rule.span.codepoint_end,
+                },
+            }],
+            generated,
+        });
+    }
+    nodes.sort_by(|a, b| a.name.cmp(&b.name));
     methods.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(Snapshot {
         grammar: grammar.name.clone(),
