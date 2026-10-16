@@ -634,6 +634,7 @@ public final class RustBackend {
             }
             """);
         if(ir.mappings().stream().flatMap(m->m.fields().stream()).anyMatch(f->f.kind()==Kind.NESTED)) out.append(NestedEmitter.HELPERS);
+        if(ir.mappings().stream().flatMap(m->m.fields().stream()).anyMatch(f->f.kind()==Kind.NESTED && (f.nested().leaf()==Kind.NODE || f.nested().leaf()==Kind.ENUM))) out.append(NestedEmitter.PROJECT_HELPERS);
         out.append(AssociativeSpines.helpers(ir));
         out.append("""
 
@@ -680,7 +681,14 @@ public final class RustBackend {
                     .append("            for capture in node.captures.iter().filter(|c| c.name == ").append(quote(field.name())).append(") {\n");
                 String associative = AssociativeSpines.capture(mapping,field,"                ");
                 if (associative != null) out.append(associative);
-                else if (field.kind() == Kind.NESTED) out.append("                let nested = nested_capture(tree, capture)?;\n                values.push(").append(NestedEmitter.mapped(field.nested(),"&nested",0)).append("?);\n");
+                else if (field.kind() == Kind.NESTED) {
+                    var shape=field.nested();
+                    String projection=shape.leaf()==Kind.NODE?"map_nodes":shape.leaf()==Kind.ENUM?"map_enum_"+java.util.stream.IntStream.range(0,ir.rules().size()).filter(id->ir.rules().get(id).name().equals(shape.enumName()) && !ir.rules().get(id).enumLiterals().isEmpty()).findFirst().orElseThrow():null;
+                    out.append("                let nested = nested_capture(tree, capture)?;\n");
+                    if(projection!=null)out.append("                let mut nested_sources = nested_source_nodes(tree, capture.nodes[0])?.into_iter();\n");
+                    out.append("                values.push(").append(NestedEmitter.mapped(shape,"&nested",0,projection)).append("?);\n");
+                    if(projection!=null)out.append("                if nested_sources.next().is_some() { return Err(\"unmapped original nested leaf\".into()); }\n");
+                }
                 else if (field.kind() == Kind.INTEGER) out.append("                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).parse::<i32>().map_err(|_| format!(\"invalid i32 capture {} at {}..{}\", capture.name, capture.span.start, capture.span.end))?);\n");
                 else if (field.kind() == Kind.NODE) out.append("                values.extend(map_nodes(tree, &capture.nodes)?);\n");
                 else if (field.kind() == Kind.VALUE) out.append("                values.extend(map_values(tree, &capture.nodes)?);\n");

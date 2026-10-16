@@ -87,6 +87,7 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("public class ").append(mapperClass).append(" {\n\n");
         sb.append("    private ").append(mapperClass).append("() {}\n\n");
         if(grammar.rules().stream().anyMatch(NestedCaptures::enabled)) sb.append(NestedMapperEmitter.HELPERS);
+        if(grammar.rules().stream().filter(NestedCaptures::enabled).anyMatch(rule -> MapperElementUtil.getMappingAnnotation(rule).orElseThrow().paramNames().stream().anyMatch(name -> NestedCaptures.field(grammar,rule,name).javaLeafType()!=null))) sb.append(NestedMapperEmitter.PROJECT_HELPERS);
         // Span layers of the current mapping call. SourceMappedAst snapshots freeze the layers they
         // reference instead of copying every span, so later registrations open a new layer and the
         // next mapping call starts from an empty layer; a snapshot therefore never changes after

@@ -1,0 +1,29 @@
+{
+  "grammar": "grammar NumericNode { @package: org.example.nestedcaptures token NUM = org.unlaxer.parser.elementary.NumberParser @root @nestedCaptures @mapping(Root,params=[value]) Root ::= '[' [Leaf] @value ']'; @mapping(Leaf,params=[text]) Leaf ::= NUM @text; }",
+  "cases": [
+    {
+      "input": "[2147483648]",
+      "parse": true,
+      "id": "0"
+    },
+    {
+      "input": "[-2147483649]",
+      "parse": true,
+      "id": "1"
+    },
+    {
+      "input": "[1.5]",
+      "parse": true,
+      "id": "2"
+    },
+    {
+      "input": "[?]",
+      "parse": false,
+      "consumed": 0,
+      "matched": 0,
+      "id": "3"
+    }
+  ],
+  "validInput": "[7]",
+  "validStructure": "some(node(Leaf,int(7)))"
+}

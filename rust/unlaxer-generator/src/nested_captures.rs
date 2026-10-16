@@ -163,16 +163,41 @@ pub fn shape(grammar: &GrammarDecl, atom: &AtomicElement, depth: usize) -> Resul
         ElementKind::Group(v) => body_shape(grammar, v, depth + 1)?,
         ElementKind::Terminal(_) => Kind::Text,
         ElementKind::RuleRef { name, .. } => {
-            let token = grammar
-                .tokens
-                .iter()
-                .find(|t| &t.name == name)
-                .ok_or("rule aliases/nodes require remaining #583 implementation")?;
-            if matches!(&token.kind,TokenKind::Simple{parser_class} if matches!(parser_class.rsplit('.').next(),Some("NumberParser"|"DigitParser")))
-            {
-                Kind::Integer
+            let token = grammar.tokens.iter().find(|t| &t.name == name);
+            if let Some(token) = token {
+                if matches!(&token.kind,TokenKind::Simple{parser_class} if matches!(parser_class.rsplit('.').next(),Some("NumberParser"|"DigitParser")))
+                {
+                    Kind::Integer
+                } else {
+                    Kind::Text
+                }
             } else {
-                Kind::Text
+                let target = grammar
+                    .rules
+                    .iter()
+                    .find(|r| &r.name == name)
+                    .ok_or("unknown nested rule")?;
+                if target
+                    .annotations
+                    .iter()
+                    .any(|a| matches!(a.kind, AnnotationKind::Enum))
+                {
+                    Kind::Enum(target.name.clone())
+                } else if !target
+                    .annotations
+                    .iter()
+                    .any(|a| matches!(a.kind, AnnotationKind::Skip))
+                    && target
+                        .annotations
+                        .iter()
+                        .any(|a| matches!(a.kind, AnnotationKind::Mapping { .. }))
+                {
+                    Kind::Node
+                } else {
+                    return Err(
+                        "unmapped/skip aliases require remaining #583 implementation".into(),
+                    );
+                }
             }
         }
         _ => return Err("unsupported nested element".into()),
@@ -187,17 +212,16 @@ fn body_shape(grammar: &GrammarDecl, body: &RuleBody, depth: usize) -> Result<Ki
             for element in &sequence.elements {
                 if matches!(
                     shape(grammar, &element.element, depth + 1)?,
-                    Kind::Nested { .. }
+                    Kind::Nested { .. } | Kind::Node | Kind::Enum(_)
                 ) {
                     return Err("multi-element container group needs explicit mapped node".into());
                 }
             }
             Kind::Text
         };
-        if result
-            .as_ref()
-            .is_some_and(|old| old != &current || matches!(current, Kind::Nested { .. }))
-        {
+        if result.as_ref().is_some_and(|old| {
+            old != &current || matches!(current, Kind::Nested { .. } | Kind::Node | Kind::Enum(_))
+        }) {
             return Err(
                 "heterogeneous/container choice requires remaining #583 implementation".into(),
             );

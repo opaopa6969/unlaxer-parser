@@ -734,6 +734,7 @@ fn mapper(ir: &GrammarIr) -> String {
         .any(|f| matches!(f.kind, Kind::Nested { .. }))
     {
         out.push_str(nested::HELPERS);
+        if ir.rules.iter().filter_map(|r|r.mapping.as_ref()).flat_map(|m|&m.fields).any(|f|matches!(&f.kind,Kind::Nested{leaf,..} if matches!(leaf.as_ref(),Kind::Node|Kind::Enum(_)))) { out.push_str(nested::PROJECT_HELPERS); }
     }
     out.push_str(&associative::helpers(ir));
     out.push_str("\nfn map_node(tree: &Tree, id: usize) -> Result<Vec<Ast>, String> {\n    match tree.nodes[id].rule {\n");
@@ -778,7 +779,30 @@ fn mapper(ir: &GrammarIr) -> String {
                 }
                 writeln!(out, "        r#{}: {{\n            let mut values = Vec::new();\n            for capture in node.captures.iter().filter(|c| c.name == {}) {{", field.name, quote(&field.name)).unwrap();
                 if let Kind::Nested { leaf, containers } = &field.kind {
-                    writeln!(out, "                let nested = nested_capture(tree, capture)?;\n                values.push({}?);", nested::mapped(leaf, containers, "&nested", 0)).unwrap();
+                    let projection = match leaf.as_ref() {
+                        Kind::Node => Some("map_nodes".to_owned()),
+                        Kind::Enum(name) => Some(format!(
+                            "map_enum_{}",
+                            ir.rules
+                                .iter()
+                                .position(|r| &r.name == name && !r.enum_literals.is_empty())
+                                .expect("validated nested enum")
+                        )),
+                        _ => None,
+                    };
+                    out.push_str("                let nested = nested_capture(tree, capture)?;\n");
+                    if projection.is_some() {
+                        out.push_str("                let mut nested_sources = nested_source_nodes(tree, capture.nodes[0])?.into_iter();\n");
+                    }
+                    writeln!(
+                        out,
+                        "                values.push({}?);",
+                        nested::mapped(leaf, containers, "&nested", 0, projection.as_deref())
+                    )
+                    .unwrap();
+                    if projection.is_some() {
+                        out.push_str("                if nested_sources.next().is_some() { return Err(\"unmapped original nested leaf\".into()); }\n");
+                    }
                 } else if let Some(code) =
                     associative::capture(Some(mapping), field, "                ")
                 {
