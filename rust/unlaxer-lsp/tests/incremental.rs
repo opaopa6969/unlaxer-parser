@@ -22,7 +22,38 @@ fn backend() -> GrammarBackend {
 }
 #[test]
 fn shared_lsp_reuse_edit_version_and_invalid_notification_oracle() {
-    let mut server = Server::new(backend());
+    use std::sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    };
+    struct RevisionBackend {
+        inner: GrammarBackend,
+        revision: Arc<AtomicU64>,
+    }
+    impl Backend for RevisionBackend {
+        fn grammar(&self) -> &str {
+            self.inner.grammar()
+        }
+        fn entry(&self) -> &str {
+            self.inner.entry()
+        }
+        fn keywords(&self) -> &[String] {
+            self.inner.keywords()
+        }
+        fn validate(&mut self, snapshot: &Snapshot) -> Vec<Diagnostic> {
+            self.inner.validate(snapshot)
+        }
+        fn validation_cache_key(&self) -> Option<unlaxer_lsp::ValidationCacheKey> {
+            let mut key = self.inner.validation_cache_key()?;
+            key.revisions.state = self.revision.load(Ordering::SeqCst).to_string();
+            Some(key)
+        }
+    }
+    let revision = Arc::new(AtomicU64::new(0));
+    let mut server = Server::new(RevisionBackend {
+        inner: backend(),
+        revision: revision.clone(),
+    });
     let uri = "file:///cache";
     server.handle(json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}));
     for line in include_str!("../../../spec-corpus/incremental-cache/lsp.tsv")
@@ -44,13 +75,31 @@ fn shared_lsp_reuse_edit_version_and_invalid_notification_oracle() {
             ),
             "save" => ("textDocument/didSave", json!({"textDocument":{"uri":uri}})),
             "close" => ("textDocument/didClose", json!({"textDocument":{"uri":uri}})),
+            "state" => {
+                revision.fetch_add(1, Ordering::SeqCst);
+                ("$/cancelRequest", json!({}))
+            }
+            "configure" => ("unlaxer/configure", json!({})),
+            "badconfigure" => (
+                "unlaxer/configure",
+                json!({"initializationOptions":{"languageProfile":true}}),
+            ),
             "invalidate" => {
                 server.invalidate_parse_cache();
                 ("$/cancelRequest", json!({}))
             }
             _ => panic!("bad fixture"),
         };
-        server.handle(json!({"jsonrpc":"2.0","method":method,"params":params}));
+        let mut message = json!({"jsonrpc":"2.0","method":method,"params":params});
+        if method == "unlaxer/configure" {
+            message["id"] = json!(2);
+        }
+        let response = server.handle(message);
+        if f[0] == "badconfigure" {
+            assert_eq!(response[0]["error"]["code"], -32602);
+        } else if f[0] == "configure" {
+            assert!(response[0].get("error").is_none());
+        }
         let stats = server.validation_cache_stats();
         assert_eq!(
             (stats.hits, stats.misses, stats.entries),

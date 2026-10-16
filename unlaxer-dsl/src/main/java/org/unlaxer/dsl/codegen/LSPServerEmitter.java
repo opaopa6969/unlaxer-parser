@@ -61,7 +61,8 @@ class LSPServerEmitter {
         w.line("protected final Map<String, Long> documentVersions = new HashMap<>();");
         w.line("private final org.unlaxer.parser.incremental.SnapshotParseCache<ParseResult> parseCache = new org.unlaxer.parser.incremental.SnapshotParseCache<>(128, 1_048_576, value -> value);");
         w.line("public org.unlaxer.parser.incremental.SnapshotParseCache.Stats parseCacheStats() { return parseCache.stats(); }");
-        w.line("public void invalidateParseCache() { parseCache.invalidateAll(); }");
+        w.line("private org.unlaxer.parser.incremental.SnapshotParseCache.Revisions parseCacheRevisions;");
+        w.line("public void invalidateParseCache() { parseCache.invalidateAll(); parseCacheRevisions = null; }");
         w.line("protected String parseStateRevision() { return \"\"; }");
         w.line("private volatile boolean shutdownRequested;");
         w.line("private volatile boolean initialized;");
@@ -309,18 +310,15 @@ class LSPServerEmitter {
         w.line("    if (!parseCacheEnabled()) { invalidateParseCache(); return doParse(content); }");
         w.line("    String profile = selectedLanguageProfile == null ? \"\" : selectedLanguageProfile.profile().canonicalTsv();");
         w.line("    var revisions = new org.unlaxer.parser.incremental.SnapshotParseCache.Revisions(\"" + parsersClass + "\", profile, parseStateRevision());");
+        w.line("    if (!revisions.equals(parseCacheRevisions)) { parseCache.invalidateAll(); parseCacheRevisions = revisions; }");
         w.line("    return parseCache.getOrCompute(snapshot, revisions, () -> doParse(content));");
         w.line("}");
         w.blankLine();
 
         // parseDocument() — 全文 snapshot cache（didOpen / didSave 用）
         w.line("public ParseResult parseDocument(String uri, String content) {");
-        w.line("    return parseDocumentAtVersion(uri, content, documentVersions.getOrDefault(uri, 0L), false);");
-        w.line("}");
-        w.line("private ParseResult parseDocumentAtVersion(String uri, String content, long version, boolean trackVersion) {");
         w.indent();
-        w.line("ParseResult parseResult = cachedParse(uri, content, version);");
-        w.line("if (trackVersion) documentVersions.put(uri, version);");
+        w.line("ParseResult parseResult = cachedParse(uri, content, documentVersions.getOrDefault(uri, 0L));");
         w.line("documents.put(uri, new DocumentState(uri, content, parseResult, new IncrementalParseCache()));");
         w.line("if (client != null) {");
         w.indent();
@@ -329,6 +327,20 @@ class LSPServerEmitter {
         w.line("}");
         w.line("return parseResult;");
         w.dedent();
+        w.line("}");
+        w.blankLine();
+
+        // Preserve both public extension hooks, while a throwing hook cannot advance the document.
+        w.line("private ParseResult parseNotifiedDocument(String uri, String content, long version, boolean incremental) {");
+        w.line("    Long previousVersion = documentVersions.put(uri, version);");
+        w.line("    DocumentState previous = documents.get(uri);");
+        w.line("    try { return incremental ? parseDocumentIncremental(uri, content) : parseDocument(uri, content); }");
+        w.line("    catch (RuntimeException | Error failure) {");
+        w.line("        if (previousVersion == null) documentVersions.remove(uri); else documentVersions.put(uri, previousVersion);");
+        w.line("        if (previous == null) documents.remove(uri); else documents.put(uri, previous);");
+        w.line("        parseCache.invalidate(uri);");
+        w.line("        throw failure;");
+        w.line("    }");
         w.line("}");
         w.blankLine();
 
@@ -738,9 +750,9 @@ class LSPServerEmitter {
         w.line("if (version < 0 || server.documentVersions.containsKey(uri) && version <= server.documentVersions.get(uri)) return;");
         w.line("try { new org.unlaxer.source.DocumentSnapshot(uri, version, params.getTextDocument().getText()); } catch (IllegalArgumentException invalid) { return; }");
         w.line("server.parseCache.invalidate(uri);");
-        w.line("server.parseDocumentAtVersion(");
+        w.line("server.parseNotifiedDocument(");
         w.line("    params.getTextDocument().getUri(),");
-        w.line("    params.getTextDocument().getText(), version, true);");
+        w.line("    params.getTextDocument().getText(), version, false);");
         w.dedent();
         w.line("}");
         w.blankLine();
@@ -757,7 +769,7 @@ class LSPServerEmitter {
         w.line("String content = params.getContentChanges().get(params.getContentChanges().size() - 1).getText();");
         w.line("try { new org.unlaxer.source.DocumentSnapshot(uri, version, content); } catch (IllegalArgumentException invalid) { return; }");
         w.line("server.parseCache.invalidate(uri);");
-        w.line("server.parseDocumentAtVersion(uri, content, version.longValue(), true);");
+        w.line("server.parseNotifiedDocument(uri, content, version.longValue(), true);");
         w.dedent();
         w.line("}");
         w.blankLine();

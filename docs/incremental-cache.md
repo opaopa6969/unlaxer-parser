@@ -92,8 +92,8 @@ UTF-8 化で同じ置換 byte になる場合も異なる原文を取り違え�
 - `spec-corpus/incremental-cache/edits.json`: 27 snapshot/edit/revision ケース。insert/delete/
   replace、CRLF、補助文字、EOF、空入力、受理/拒否、grammar/profile/state、並行 snapshot、
   回復を、生成 Java / Rust の全再解析と独立の CST/AST/span/診断/回復期待値と CP/UTF-16/UTF-8 座標に照合。
-- `lsp.tsv`: 13 操作。生成 Java LSP と Rust Server の hit/miss/保持数、現文書を同じ oracle
-  で比較。既存 Content-Length 実通信試験も実行する。
+- `lsp.tsv`: 21 操作。生成 Java LSP と Rust Server の hit/miss/保持数、現文書を同じ oracle
+  で比較。設定成功/失敗と外部state revision変更も比較。既存 Content-Length 実通信試験も実行する。
 - `chunks.tsv`: 11 分割ケースを両 runtime API で実行。
 - copy 分離、例外後の保持、LRU、保持上限、disabled cache、並行 snapshot とカスタム
   parser の外部状態変化は各言語の低水準テストでも検証。
@@ -108,3 +108,9 @@ cargo +1.85.0 test --locked --manifest-path rust/Cargo.toml -p unlaxer-lsp
 
 素の Maven 実行では新しい Java oracle を実行し、Rust 生成コードとの cross-check は
 `-DrustConformance=true` が必要。真の部分再解析を完了したという証拠にはしない。
+
+LSP設定の成功時だけcacheを無効化し、設定失敗時は現在の設定とcacheを保持する。
+Java/Rustとも外部state revisionが変わるとLSP cacheを全無効化する。
+Javaの通知処理は既存の `parseDocument` / `parseDocumentIncremental` overrideを経由し、
+例外が返ったときは文書とversionを直前の状態に戻す。`NonOrdered` 内のcustom callbackも
+snapshot cache対象外となり、安全性検査が子parserを飛ばさないことを回帰検証する。

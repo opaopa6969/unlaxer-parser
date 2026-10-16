@@ -12,3 +12,11 @@ save	0	~	3	4	1	😀
 close	0	~	3	4	0	~
 save	0	~	3	4	0	~
 open	5	ab	3	5	1	ab
+save	0	~	4	5	1	ab
+configure	0	~	4	5	0	ab
+save	0	~	4	6	1	ab
+badconfigure	0	~	4	6	1	ab
+save	0	~	5	6	1	ab
+state	0	changed	5	6	1	ab
+save	0	~	5	7	1	ab
+save	0	~	6	7	1	ab

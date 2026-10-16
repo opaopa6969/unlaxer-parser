@@ -169,3 +169,20 @@ fn invalid_coordinate_keeps_previous_snapshot() {
     assert_eq!(cache.get(&old, &rev), Some("last"));
     assert_eq!(cache.stats().entries, 1);
 }
+
+#[test]
+fn nonordered_children_obey_snapshot_cache_safety() {
+    use unlaxer_runtime::{Expr, Rule};
+    fn custom(context: &mut unlaxer_runtime::ParseContext<'_>) -> unlaxer_runtime::ParseResult {
+        context.parse(&Expr::Empty)
+    }
+    let mut rules = vec![Rule {
+        name: "Root",
+        expression: Expr::NonOrdered(vec![Expr::Literal("a"), Expr::Literal("b")]),
+    }];
+    assert!(unlaxer_runtime::incremental::grammar_is_snapshot_cacheable(
+        &rules
+    ));
+    rules[0].expression = Expr::NonOrdered(vec![Expr::Literal("a"), Expr::Custom(custom)]);
+    assert!(!unlaxer_runtime::incremental::grammar_is_snapshot_cacheable(&rules));
+}

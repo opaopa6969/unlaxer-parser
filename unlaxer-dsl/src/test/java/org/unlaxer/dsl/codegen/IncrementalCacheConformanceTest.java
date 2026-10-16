@@ -92,6 +92,10 @@ public class IncrementalCacheConformanceTest {
             assertEquals(row.get("id")+" Rust hit",row.get("hit"),result.get("hit"));
             assertEquals(row.get("id")+" independent Rust oracle",row.get("expected"),result.get("result"));
         }
+        Files.createDirectories(Path.of("target"));
+        var evidence=new ArrayList<String>(List.of("case\thit\tjava-rust-oracle"));
+        for(var row:rows)evidence.add(row.getAsJsonObject().get("id").getAsString()+"\t"+row.getAsJsonObject().get("hit")+"\tchecked");
+        Files.write(Path.of("target/incremental-cache.tsv"),evidence);
     }
     @Test public void generatedJavaLspSharesReuseAndInvalidationOracle() throws Exception {
         var grammar = UBNFMapper.parse("grammar Cache { @package: cache.fixture @root Root ::= 'ab' | 'a' | '😀'; }").grammars().get(0);
@@ -100,7 +104,7 @@ public class IncrementalCacheConformanceTest {
             var generated = generator.generate(grammar);
             units.add(source(generated.packageName()+"."+generated.className(),generated.source()));
         }
-        units.add(source("cache.fixture.CacheServer", "package cache.fixture; public final class CacheServer extends CacheLanguageServer { public boolean fail; @Override protected String parseStateRevision() { if(fail) throw new IllegalStateException(); return \"\"; } public long version(String uri) { return documentVersions.get(uri); } public String current(String uri) { var d=documents.get(uri); return d==null ? null : d.content(); } }"));
+        units.add(source("cache.fixture.CacheServer", "package cache.fixture; public final class CacheServer extends CacheLanguageServer { public boolean fail; public String revision = \"\"; @Override protected String parseStateRevision() { if(fail) throw new IllegalStateException(); return revision; } public boolean failAfterParse; public int incrementalCalls; @Override public ParseResult parseDocumentIncremental(String uri, String content) { incrementalCalls++; var result = super.parseDocumentIncremental(uri, content); if (failAfterParse) throw new IllegalStateException(); return result; } public long version(String uri) { return documentVersions.get(uri); } public String current(String uri) { var d=documents.get(uri); return d==null ? null : d.content(); } }"));
         Path classes=temporary.newFolder().toPath();var compiler=ToolProvider.getSystemJavaCompiler();var errors=new StringWriter();
         try(var manager=compiler.getStandardFileManager(null,null,null)) {
             boolean ok=compiler.getTask(new PrintWriter(errors),manager,null,List.of("--release","17","-classpath",System.getProperty("java.class.path"),"-d",classes.toString()),null,units).call();assertTrue(errors.toString(),ok);
@@ -121,6 +125,13 @@ public class IncrementalCacheConformanceTest {
                     }
                     case "save" -> service.didSave(new org.eclipse.lsp4j.DidSaveTextDocumentParams(new org.eclipse.lsp4j.TextDocumentIdentifier(uri)));
                     case "close" -> service.didClose(new org.eclipse.lsp4j.DidCloseTextDocumentParams(new org.eclipse.lsp4j.TextDocumentIdentifier(uri)));
+                    case "state" -> type.getField("revision").set(instance,f[2]);
+                    case "configure", "badconfigure" -> {
+                        var params=new org.eclipse.lsp4j.InitializeParams();
+                        if(f[0].equals("badconfigure"))params.setInitializationOptions(Map.of("languageProfile",true));
+                        var future=(java.util.concurrent.CompletableFuture<?>)type.getMethod("configure",org.eclipse.lsp4j.InitializeParams.class).invoke(instance,params);
+                        if(f[0].equals("badconfigure"))assertThrows(java.util.concurrent.CompletionException.class,()->future.join());else future.join();
+                    }
                     case "invalidate" -> type.getMethod("invalidateParseCache").invoke(instance);
                     default -> throw new AssertionError(line);
                 }
@@ -136,6 +147,18 @@ public class IncrementalCacheConformanceTest {
             type.getField("fail").setBoolean(instance,false);
             service.didSave(new org.eclipse.lsp4j.DidSaveTextDocumentParams(new org.eclipse.lsp4j.TextDocumentIdentifier(uri)));
             assertEquals("ab",type.getMethod("current",String.class).invoke(instance,uri));
+            assertEquals("accepted changes and throwing revision dispatch the incremental extension hook",3,type.getField("incrementalCalls").getInt(instance));
+            type.getField("failAfterParse").setBoolean(instance,true);
+            assertThrows(IllegalStateException.class,()->service.didChange(new org.eclipse.lsp4j.DidChangeTextDocumentParams(
+                new org.eclipse.lsp4j.VersionedTextDocumentIdentifier(uri,6),List.of(new org.eclipse.lsp4j.TextDocumentContentChangeEvent("a")))));
+            assertEquals("a throwing override must restore the previous document", "ab",type.getMethod("current",String.class).invoke(instance,uri));
+            assertEquals(5L,type.getMethod("version",String.class).invoke(instance,uri));
+            assertEquals(0,((SnapshotParseCache.Stats)type.getMethod("parseCacheStats").invoke(instance)).entries());
+            type.getField("failAfterParse").setBoolean(instance,false);
+            service.didChange(new org.eclipse.lsp4j.DidChangeTextDocumentParams(
+                new org.eclipse.lsp4j.VersionedTextDocumentIdentifier(uri,6),List.of(new org.eclipse.lsp4j.TextDocumentContentChangeEvent("a"))));
+            assertEquals("a",type.getMethod("current",String.class).invoke(instance,uri));
+            assertEquals(6L,type.getMethod("version",String.class).invoke(instance,uri));
         }
     }
     public static class StatefulToken extends org.unlaxer.parser.elementary.WordParser {
