@@ -1,5 +1,8 @@
 //! Classic LSP stdio transport. Parsing remains in unlaxer-runtime.
 //! Full document sync is explicit; backend calls execute serially on immutable snapshots.
+mod semantic_tokens;
+pub use semantic_tokens::SemanticTokensLegend;
+
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::{self, BufRead, Write};
@@ -9,7 +12,7 @@ use unlaxer_runtime::source::{Operation, State};
 use unlaxer_runtime::source::{Position, Snapshot};
 use unlaxer_runtime::{SharedGrammar, Span};
 
-/// Snapshot-bound application hooks. All spans use Unicode code points.
+/// Snapshot-bound application hooks. Spans use Unicode code points unless explicitly LSP encoded.
 pub trait Backend {
     fn grammar(&self) -> &str;
     fn entry(&self) -> &str;
@@ -18,6 +21,15 @@ pub trait Backend {
     /// Return typed/provider items for this exact immutable source and version.
     fn complete(&mut self, _snapshot: &Snapshot, _cursor: usize) -> Vec<Completion> {
         vec![]
+    }
+    /// LSP legend advertised at initialize; defaults to the Java generated server legend.
+    fn semantic_tokens_legend(&self) -> SemanticTokensLegend {
+        SemanticTokensLegend::default()
+    }
+    /// Full LSP-encoded data: deltaLine, deltaStart, UTF-16 length, type, modifier bitset.
+    /// Called only for the current open immutable snapshot. Invalid data fails the request.
+    fn semantic_tokens(&mut self, _snapshot: &Snapshot) -> Result<Vec<u32>, String> {
+        Ok(vec![])
     }
     /// Explicitly registered providers. Metadata cannot install one.
     fn query_capabilities(&self) -> HashSet<Operation> {
@@ -120,6 +132,7 @@ pub struct Server<B> {
     diagnostic_contributions: BTreeMap<String, BTreeMap<String, DiagnosticDocument>>,
     profile: Option<Selection>,
     initialized: bool,
+    semantic_tokens_legend: SemanticTokensLegend,
     shutdown: bool,
     exited: bool,
 }
@@ -131,6 +144,7 @@ impl<B: Backend> Server<B> {
             diagnostic_contributions: BTreeMap::new(),
             profile: None,
             initialized: false,
+            semantic_tokens_legend: SemanticTokensLegend::default(),
             shutdown: false,
             exited: false,
         }
@@ -183,7 +197,11 @@ impl<B: Backend> Server<B> {
                 let selection = self.select_profile(&params).map_err(invalid)?;
                 self.profile = selection;
                 self.initialized = true;
-                let mut caps = json!({"positionEncoding":"utf-16","textDocumentSync":1});
+                self.semantic_tokens_legend = self.backend.semantic_tokens_legend();
+                let mut caps = json!({"positionEncoding":"utf-16","textDocumentSync":1,
+                    "semanticTokensProvider":{"legend":{
+                        "tokenTypes":self.semantic_tokens_legend.token_types,
+                        "tokenModifiers":self.semantic_tokens_legend.token_modifiers},"full":true}});
                 if self.allows("COMPLETION") {
                     caps["completionProvider"] = json!({"resolveProvider":false});
                 }
@@ -294,6 +312,19 @@ impl<B: Backend> Server<B> {
                         self.diagnostics(&snapshot, &mut notifications);
                     }
                     Ok(Value::Null)
+                }
+                "textDocument/semanticTokens/full" => {
+                    let uri = string(&params["textDocument"], "uri")?;
+                    let Some(snapshot) = self.documents.get(uri).cloned() else {
+                        return Ok(json!({"data":[]}));
+                    };
+                    let data = self
+                        .backend
+                        .semantic_tokens(&snapshot)
+                        .map_err(|error| (-32603, error))?;
+                    semantic_tokens::validate(&snapshot, &self.semantic_tokens_legend, &data)
+                        .map_err(|error| (-32603, error.into()))?;
+                    Ok(json!({"data":data}))
                 }
                 "textDocument/completion" => {
                     if !self.allows("COMPLETION") {

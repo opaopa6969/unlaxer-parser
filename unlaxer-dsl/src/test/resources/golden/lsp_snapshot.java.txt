@@ -21,6 +21,7 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
     protected final Map<String, DocumentState> documents = new HashMap<>();
     protected final Map<String, Long> documentVersions = new HashMap<>();
     private volatile boolean shutdownRequested;
+    private volatile SemanticTokensLegend semanticTokenLegend = new SemanticTokensLegend(List.of("valid", "invalid"), List.of());
     private final CompletableFuture<Integer> exitStatus = new CompletableFuture<>();
 
     private volatile org.unlaxer.source.LanguageProfile.Selection selectedLanguageProfile;
@@ -49,6 +50,9 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
         configureAdditionalCapabilities(capabilities);
         configureLanguageQueryCapabilities(capabilities);
         applyLanguageProfile(capabilities);
+        var semanticProvider = capabilities.getSemanticTokensProvider();
+        var legend = semanticProvider == null ? new SemanticTokensLegend(List.of(), List.of()) : semanticProvider.getLegend();
+        semanticTokenLegend = legend == null ? null : new SemanticTokensLegend(List.copyOf(legend.getTokenTypes()), List.copyOf(legend.getTokenModifiers()));
         return CompletableFuture.completedFuture(new InitializeResult(capabilities));
     }
 
@@ -517,7 +521,43 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
         return null;
     }
 
-    // Hook: additional semantic tokens (for embedded languages like Java code blocks)
+    private static List<Integer> validateSemanticTokenData(String content, int[] data, SemanticTokensLegend legend) {
+        if (data == null) return List.of();
+        if (data.length % 5 != 0 || legend == null) throw new IllegalArgumentException("invalid semantic token encoding");
+        int modifiers = legend.getTokenModifiers().size();
+        int allowedModifiers = modifiers >= 31 ? Integer.MAX_VALUE : (1 << modifiers) - 1;
+        long tokenLine = 0, tokenStart = 0;
+        int index = 0, line = 0, column = 0;
+        List<Integer> result = new ArrayList<>(data.length);
+        for (int offset = 0; offset < data.length; offset += 5) {
+            for (int part = 0; part < 5; part++) {
+                if (data[offset + part] < 0) throw new IllegalArgumentException("invalid semantic token encoding");
+                result.add(data[offset + part]);
+            }
+            tokenLine += data[offset];
+            tokenStart = data[offset] == 0 ? tokenStart + data[offset + 1] : data[offset + 1];
+            if (data[offset + 2] == 0 || data[offset + 3] >= legend.getTokenTypes().size()
+                    || (data[offset + 4] & ~allowedModifiers) != 0)
+                throw new IllegalArgumentException("invalid semantic token length or legend index");
+            for (long target : new long[]{tokenStart, tokenStart + data[offset + 2]}) {
+                while (line != tokenLine || column != target) {
+                    if (line > tokenLine || line == tokenLine && column > target || index == content.length())
+                        throw new IllegalArgumentException("invalid semantic token position");
+                    int scalar = content.codePointAt(index);
+                    index += Character.charCount(scalar);
+                    if (scalar == '\r' || scalar == '\n') {
+                        if (line == tokenLine) throw new IllegalArgumentException("semantic token crosses line boundary");
+                        if (scalar == '\r' && index < content.length() && content.charAt(index) == '\n') index++;
+                        line++; column = 0;
+                    } else column += Character.charCount(scalar);
+                }
+            }
+        }
+        return result;
+    }
+
+    // Hook: full UTF-16 LSP data, sorted/non-overlapping and indexed by the advertised legend.
+    // Invalid data fails the request with InternalError; null preserves the legacy empty result.
     protected int[] additionalSemanticTokenData(String uri, String documentContent) {
         return new int[0];
     }
@@ -680,13 +720,13 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
             if (state == null) {
                 return CompletableFuture.completedFuture(new SemanticTokens(Collections.emptyList()));
             }
-            int[] tokenData = server.additionalSemanticTokenData(uri, state.content());
-            if (tokenData != null && tokenData.length > 0) {
-                List<Integer> data = new ArrayList<>();
-                for (int v : tokenData) { data.add(v); }
-                return CompletableFuture.completedFuture(new SemanticTokens(data));
+            try {
+                int[] tokenData = server.additionalSemanticTokenData(uri, state.content());
+                return CompletableFuture.completedFuture(new SemanticTokens(validateSemanticTokenData(state.content(), tokenData, server.semanticTokenLegend)));
+            } catch (RuntimeException invalid) {
+                return CompletableFuture.failedFuture(new org.eclipse.lsp4j.jsonrpc.ResponseErrorException(
+                    new org.eclipse.lsp4j.jsonrpc.messages.ResponseError(org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode.InternalError, "Invalid semantic token provider result", null)));
             }
-            return CompletableFuture.completedFuture(new SemanticTokens(Collections.emptyList()));
         }
     }
 
