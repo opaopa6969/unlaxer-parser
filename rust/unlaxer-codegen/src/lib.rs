@@ -564,7 +564,7 @@ fn expression(expr: &Expression) -> String {
             let child = expression(child);
             let separator = expression(separator);
             if metadata {
-                format!("Expr::sequence([{child}, Expr::sequence([{separator}, Expr::Capture({}, Box::new({child}))]).zero_or_more()])",quote(preferred::EXTRA))
+                format!("Expr::sequence([{child}, Expr::sequence([{separator}, Expr::Capture({}, Box::new({child}))]).repeat_java(0, None)])",quote(preferred::EXTRA))
             } else {
                 format!("{child}.separated_by_java({separator})")
             }
