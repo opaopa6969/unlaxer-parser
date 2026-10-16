@@ -897,8 +897,23 @@ class MapperRuleEmitter {
             String local = "__typeofValue" + names.size();
             names.put(capture, local);
             String type = TypeofConstraints.valueType(grammar, rule, capture);
-            emitBoundParam(w, parsersClass, grammar, local, type, bindings.sites(capture),
-                mappedClassByRuleName, tokenDeclByName, ruleByName);
+            String mapped = MapperElementUtil.getMappingAnnotation(rule).orElseThrow().className();
+            if (AssociativeProjection.literalSpines(grammar).contains(CommonFieldSchema.rustName(mapped))
+                    && (capture.equals("left") || capture.equals("right"))) {
+                boolean many = capture.equals("right");
+                w.line(type + " " + local + " = " + (many ? "new ArrayList<>()" : "null") + ";");
+                String ids = bindings.sites(capture).stream().map(site -> "\"" + ParserCodegenUtil.escapeString(site.id()) + "\"")
+                    .collect(java.util.stream.Collectors.joining(", "));
+                w.line("for (CaptureOccurrence occurrence : findCaptureOccurrences(token, java.util.Set.of(" + ids + "))) {");
+                w.indent();
+                String value = "mapAssocOperandTo" + MapperElementUtil.methodNameFor(mapped) + "(occurrence.token())";
+                w.line(many ? local + ".add(" + value + ");" : local + " = " + value + ";");
+                if (!many) w.line("break;");
+                w.dedent(); w.line("}");
+            } else {
+                emitBoundParam(w, parsersClass, grammar, local, type, bindings.sites(capture),
+                    mappedClassByRuleName, tokenDeclByName, ruleByName);
+            }
         }
         for (var constraint : constraints) {
             String own = names.get(constraint.capture());

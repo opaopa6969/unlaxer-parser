@@ -58,18 +58,7 @@ pub(crate) fn emit(
         hash = hash.wrapping_mul(0x100000001b3);
     }
     let marker = format!("#preferred-schema:{hash:x}");
-    let instrumented = if grammar.rules.iter().flat_map(|r| &r.annotations).any(|a| {
-        matches!(
-            a.kind,
-            AnnotationKind::LeftAssoc | AnnotationKind::RightAssoc
-        )
-    }) {
-        Err(unlaxer_codegen::GenerateError(
-            "associative projection pending #593".into(),
-        ))
-    } else {
-        unlaxer_codegen::preferred::parser(ir, &calls, &marker)
-    };
+    let instrumented = unlaxer_codegen::preferred::parser(ir, &calls, &marker);
     let mut parser =
         include_str!("../../../unlaxer-dsl/src/main/resources/rust/preferred-parser.rs.txt")
             .replace("$ROOT", &ir.root.to_string())

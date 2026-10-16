@@ -411,7 +411,7 @@ public final class RustGrammarLowering {
             rewritten.add(new Rule(rule.name(), expression, mapping, rule.operator(), rule.catalog(), rule.skip(), rule.documentation(),rule.enumLiterals(), rule.typeConstraints().stream().map(value ->
                     new TypeConstraint(boundConstraintField(value.capture(), effectiveMapping, sourceRule), boundConstraintField(value.reference(), effectiveMapping, sourceRule))).toList()));
         }
-        return new GrammarIR(rewritten, root, whitespace);
+        return AssociativeSpines.refine(grammar, new GrammarIR(rewritten, root, whitespace));
     }
 
     private static Mapping projectionMapping(Mapping mapping, List<TypeConstraint> constraints) {

@@ -202,7 +202,7 @@ public class MapperGenerator implements CodeGenerator {
 
         // ----- Utilities -----
         sb.append(MapperRuleEmitter.emitUtilities(parsersClass, mappedClassByRuleName.keySet()));
-        if (grammar.rules().stream().anyMatch(rule -> !MapperElementUtil.isSkipped(rule)
+        if (hasTypeof || grammar.rules().stream().anyMatch(rule -> !MapperElementUtil.isSkipped(rule)
                 && !SemanticCardinality.associative(rule)
                 && MapperElementUtil.getMappingAnnotation(rule).isPresent())) {
             sb.append(MapperRuleEmitter.emitCaptureOccurrenceUtilities(parsersClass, ruleByName.keySet()));

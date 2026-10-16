@@ -33,4 +33,4 @@ mvn -pl unlaxer-common,unlaxer-dsl -am test \
   -DrustConformance=true
 ```
 
-#592 は parent #569 の sum/dotted/shared 部分です。associative literal leaf・mixed operand と associative preferred 対応は #593 で継続します。nested container は #583、再帰 transparent helper は #582 の範囲です。#547 / #569 全体をこの変更だけで完了とはしません。
+#592 は parent #569 の sum/dotted/shared 部分です。associative literal leaf・mixed operand と associative preferred は #593 の [結合演算子の投影](associative-projection.md) で対応します。nested container は #583、再帰 transparent helper は #582 の範囲です。#547 / #569 全体をこの変更だけで完了とはしません。

@@ -21,7 +21,14 @@ public final class PreferredAstPlan {
                             ? new CaptureBindingPlan(rule, semantics)
                             : new CaptureBindingPlan(rule);
             var calls = new ArrayList<Call>();
-            body(rule.body(), 0, plan, rules, calls);
+            var right = ParserRuleEmitter.getRightAssocShape(rule);
+            if (right == null) body(rule.body(), 0, plan, rules, calls);
+            else {
+                atom(right.base(),2,plan,rules,calls);
+                atom(right.op(),2,plan,rules,calls);
+                atom(right.right(),2,plan,rules,calls);
+                atom(right.base(),1,plan,rules,calls);
+            }
             result.add(List.copyOf(calls));
         }
         return List.copyOf(result);
