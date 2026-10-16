@@ -425,11 +425,18 @@ jobs:
 
     - name: Point tinyexpression at the unlaxer under test
       working-directory: tinyexpression
-      run: >
-        mvn -B versions:use-dep-version
-        -Dincludes='org.unlaxer:unlaxer-common,org.unlaxer:unlaxer-dsl'
-        -DdepVersion='${{ steps.unlaxer.outputs.version }}'
-        -DforceVersion=true -DgenerateBackupPoms=false
+      run: |
+        mvn -B org.codehaus.mojo:versions-maven-plugin:2.18.0:set-property \
+          -Dproperty=unlaxer.version -DnewVersion='${{ steps.unlaxer.outputs.version }}' \
+          -DgenerateBackupPoms=false
+        mvn -B org.apache.maven.plugins:maven-dependency-plugin:3.8.1:tree \
+          -Dincludes='org.unlaxer:*' -DoutputFile=target/unlaxer-dependencies.txt
+        python3 - '${{ steps.unlaxer.outputs.version }}' target/unlaxer-dependencies.txt <<'PYTHON'
+        import pathlib, re, sys
+        resolved = dict(re.findall(r'org\.unlaxer:(unlaxer-(?:common|dsl)):jar:([^:\s]+):', pathlib.Path(sys.argv[2]).read_text()))
+        assert resolved == {'unlaxer-common': sys.argv[1], 'unlaxer-dsl': sys.argv[1]}, resolved
+        print('Current downstream unlaxer dependencies:', resolved)
+        PYTHON
 
     - name: tinyexpression p4-smoke
       working-directory: tinyexpression
@@ -502,9 +509,26 @@ jobs:
         MAVEN_OPTS: >-
           --add-opens=java.base/java.util=ALL-UNNAMED
           --add-opens=java.base/java.lang=ALL-UNNAMED
-      run: >
-        mvn -B versions:use-dep-version
-        -Dincludes='org.unlaxer:unlaxer-dsl'
-        -DdepVersion='${{ steps.unlaxer.outputs.version }}'
-        -DforceVersion=true -DgenerateBackupPoms=false
-        && mvn -B -P p4-smoke test -Dgpg.skip=true
+      run: |
+        mvn -B org.codehaus.mojo:versions-maven-plugin:2.18.0:use-dep-version \
+          -Dincludes='org.unlaxer:unlaxer-common,org.unlaxer:unlaxer-dsl' \
+          -DdepVersion='${{ steps.unlaxer.outputs.version }}' \
+          -DforceVersion=true -DgenerateBackupPoms=false
+        mvn -B org.apache.maven.plugins:maven-dependency-plugin:3.8.1:tree \
+          -Dincludes='org.unlaxer:*' -DoutputFile=target/unlaxer-dependencies.txt
+        python3 - '${{ steps.unlaxer.outputs.version }}' target/unlaxer-dependencies.txt <<'PYTHON'
+        import pathlib, re, sys
+        resolved = dict(re.findall(r'org\.unlaxer:(unlaxer-(?:common|dsl)):jar:([^:\s]+):', pathlib.Path(sys.argv[2]).read_text()))
+        assert resolved == {'unlaxer-common': sys.argv[1], 'unlaxer-dsl': sys.argv[1]}, resolved
+        print('Current downstream IDE unlaxer dependencies:', resolved)
+        PYTHON
+        mvn -B -P p4-smoke test -Dgpg.skip=true
+
+    - name: Upload downstream dependency versions
+      uses: actions/upload-artifact@v4
+      with:
+        name: downstream-unlaxer-dependencies
+        path: |
+          tinyexpression/target/unlaxer-dependencies.txt
+          tinyexpression/tools/tinyexpression-p4-lsp-vscode/target/unlaxer-dependencies.txt
+        if-no-files-found: error

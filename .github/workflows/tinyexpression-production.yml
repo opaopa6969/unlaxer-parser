@@ -25,6 +25,8 @@ jobs:
           java-version: '21.0.9'
           overwrite-settings: false
       - uses: dtolnay/rust-toolchain@1.85.0
+      - name: Check dependency restoration and compatibility report guards
+        run: python3 -m unittest discover -s scripts/tests -p test_tiny_production_dependencies.py
       - name: Run real production parsers, source mapping and existing editor compatibility
         run: python3 scripts/check-tiny-production.py target/tiny-source
       - uses: actions/upload-artifact@v4
@@ -33,5 +35,7 @@ jobs:
           name: tinyexpression-production-observations
           path: |
             target/tiny-production/*.tsv
+            target/tiny-production/*-dependencies.txt
+            target/tiny-production/*.json
             target/tiny-source/target/surefire-reports
             target/tiny-source/tools/tinyexpression-p4-lsp-vscode/target/surefire-reports

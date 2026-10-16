@@ -118,12 +118,25 @@ Install JDK 21.0.9 and Rust 1.85.0, then check out the exact Tiny pin into a cle
 python3 scripts/check-tiny-production.py /absolute/path/to/pinned-tinyexpression
 ```
 
-The command builds both current host modules, the real Tiny library, and the existing
-Tiny FormulaInfo/P4/source-preserving and LSP/DAP regression tests. It then independently
+The command resolves the current Maven `revision` and installs its parent POM and Java
+common/DSL artifacts. It refuses a dirty Tiny checkout: use a dedicated clone at the pin.
+The Tiny root's `unlaxer.version` property and the IDE's direct dependencies are temporarily
+updated to that revision, and resolved dependency trees must confirm the current common/DSL
+versions in both modules. Original POM bytes are restored on success, command failure,
+timeout, Ctrl-C, or SIGTERM (an uncatchable process kill cannot run cleanup).
+
+The real Tiny library then runs 125 FormulaInfo/P4/source-preserving tests and the IDE
+runs 39 LSP/DAP tests against that same current revision. Only freshly generated reports
+for the selected classes count; any missing, skipped, failing, or unexpected test count
+fails the gate. It then independently
 compiles the Rust production library and runtime with `rustc` (no Cargo dependency added),
 and runs both bridges against committed sources and `expected.tsv`. `--maven-repo` chooses
 an isolated Maven cache; `--skip-build` is only for repeating bridge probes after those
-builds/tests have passed. The dedicated CI runs the full command, checks skipped-test
+builds/tests have passed. That bridge-only mode explicitly reports zero newly executed
+compatibility tests; it is not evidence that the 164 current-version tests passed.
+`target/tiny-production/{tiny,ide}-dependencies.txt` records the resolved versions,
+`{tiny,ide}-compatibility.json` records fresh counts, and `current-dependencies.json`
+identifies the revision and build mode. The dedicated CI runs the full command, checks skipped-test
 counts, and uploads both reports. No assumption or opt-in JUnit skip can satisfy this gate.
 
 Fixtures include all ten original formulas, Unicode+CRLF and positioned compiler errors,
