@@ -60,3 +60,8 @@ syntax/semantic diagnostics を手書き期待値で固定します。言語固�
 [#624 の約41%](../conformance/pure-success-memo/benchmark-results.tsv) を撤回する変更ではありません。
 今回の同位置 epoch stress の測定は保持予算の確認用で、production workload の性能保証ではありません。
 trace付き成功、任意 stateful success、production workload は親 #184/#197 の別条件として残ります。
+
+保持件数の `entryCount` / `maxEntryCount` は実際の異なる cache key の件数を数える。
+同じ key の置換を新しい entry として重複加算していた旧カウンタを修正したため、
+従来の統計値より小さくなる場合がある。TinyCalc の parse equality golden は、
+CST・診断・hit・eviction を変えず、この2カウンタだけの134行を更新している。
