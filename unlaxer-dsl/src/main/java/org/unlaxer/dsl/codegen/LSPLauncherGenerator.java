@@ -7,6 +7,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.StringSettingValue;
 public class LSPLauncherGenerator implements CodeGenerator {
     @Override
     public GeneratedSource generate(GrammarDecl grammar) {
+        org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
         String packageName = grammar.settings().stream()
             .filter(s -> "package".equals(s.key()))
             .map(s -> s.value() instanceof StringSettingValue sv ? sv.value() : "")

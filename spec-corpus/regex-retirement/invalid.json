@@ -1,0 +1,107 @@
+[
+  {
+    "name": "basic",
+    "grammar": "grammar Removed { token T = REGEX('[a-z]+') @root Root ::= T; }",
+    "code": "E-REGEX-RETIRED",
+    "span": [
+      28,
+      33
+    ],
+    "bytes": [
+      28,
+      33
+    ],
+    "line": 1,
+    "column": 29
+  },
+  {
+    "name": "v1",
+    "grammar": "grammar Removed { @ubnf: v1  token T = REGEX('(?s).') @root Root ::= T; }",
+    "code": "E-REGEX-RETIRED",
+    "span": [
+      39,
+      44
+    ],
+    "bytes": [
+      39,
+      44
+    ],
+    "line": 1,
+    "column": 40
+  },
+  {
+    "name": "v2",
+    "grammar": "grammar Removed { @ubnf: v2  token T = REGEX('\\d+') @root Root ::= T; }",
+    "code": "E-REGEX-RETIRED",
+    "span": [
+      39,
+      44
+    ],
+    "bytes": [
+      39,
+      44
+    ],
+    "line": 1,
+    "column": 40
+  },
+  {
+    "name": "unicode-crlf",
+    "grammar": "grammar Removed { // 👨‍👩‍👧‍👦\r\n token T = REGEX('[unterminated') @root Root ::= T; }",
+    "code": "E-REGEX-RETIRED",
+    "span": [
+      41,
+      46
+    ],
+    "bytes": [
+      59,
+      64
+    ],
+    "line": 2,
+    "column": 12
+  },
+  {
+    "name": "short-class",
+    "grammar": "grammar Removed { token T = RegexTokenParser @root Root ::= T; }",
+    "code": "E-REGEX-RETIRED",
+    "span": [
+      28,
+      44
+    ],
+    "bytes": [
+      28,
+      44
+    ],
+    "line": 1,
+    "column": 29
+  },
+  {
+    "name": "qualified-class",
+    "grammar": "grammar Removed { token T = org.unlaxer.dsl.runtime.RegexTokenParser @root Root ::= T; }",
+    "code": "E-REGEX-RETIRED",
+    "span": [
+      28,
+      68
+    ],
+    "bytes": [
+      28,
+      68
+    ],
+    "line": 1,
+    "column": 29
+  },
+  {
+    "name": "keyword-with-whitespace",
+    "grammar": "grammar Removed { token T = REGEX   ('a') @root Root ::= T; }",
+    "code": "E-REGEX-RETIRED",
+    "span": [
+      28,
+      33
+    ],
+    "bytes": [
+      28,
+      33
+    ],
+    "line": 1,
+    "column": 29
+  }
+]

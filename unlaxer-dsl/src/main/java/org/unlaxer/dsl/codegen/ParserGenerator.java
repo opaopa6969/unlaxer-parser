@@ -48,7 +48,6 @@ public class ParserGenerator implements CodeGenerator {
         final Set<String> tokenEmptySet;                // token names backed by EMPTY
         final Map<String, int[]> tokenCharRangeMap;     // token name -> [min char, max char]
         final Map<String, String> tokenCIMap;           // token name -> word (CaseInsensitive)
-        final Map<String, String> tokenRegexMap;        // token name -> regex pattern (Regex)
         final Set<String> ruleNames;
         final Set<String> explicitlySafeMemoTokens;
         final Map<String, List<String>> helpers = new LinkedHashMap<>(); // rule -> helper codes
@@ -99,7 +98,6 @@ public class ParserGenerator implements CodeGenerator {
             this.tokenEmptySet = new LinkedHashSet<>();
             this.tokenCharRangeMap = new LinkedHashMap<>();
             this.tokenCIMap = new LinkedHashMap<>();
-            this.tokenRegexMap = new LinkedHashMap<>();
             for (TokenDecl token : grammar.tokens()) {
                 if (token instanceof TokenDecl.Declarative lexical) {
                     tokenParserMap.put(lexical.name(), ParserCodegenUtil.toParserClassName(lexical.name()));
@@ -126,8 +124,6 @@ public class ParserGenerator implements CodeGenerator {
                     tokenCharRangeMap.put(cr.name(), new int[]{cr.min(), cr.max()});
                 } else if (token instanceof TokenDecl.CaseInsensitive ci) {
                     tokenCIMap.put(ci.name(), ci.word());
-                } else if (token instanceof TokenDecl.Regex rx) {
-                    tokenRegexMap.put(rx.name(), rx.pattern());
                 } else {
                     throw new IllegalStateException("unhandled " + token);
                 }
@@ -186,6 +182,7 @@ public class ParserGenerator implements CodeGenerator {
 
     @Override
     public GeneratedSource generate(GrammarDecl grammar) {
+        org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
         GrammarValidator.requireValidBoundedRepeatElements(grammar);
         LeftRecursionAnalysis.requireValid(grammar);
         TypeofConstraints.validate(grammar);
@@ -281,12 +278,11 @@ public class ParserGenerator implements CodeGenerator {
 
         sb.append(generateNamedWhitespaceClasses(ctx));
 
-        // Simple / NEGATION / CHAR_RANGE / REGEX トークン用の生成内部クラス
+        // Simple / NEGATION / CHAR_RANGE トークン用の生成内部クラス
         sb.append(ParserTokenEmitter.generateSimpleTokenWrappers(ctx));
         sb.append(ParserTokenEmitter.generateNegationClasses(ctx));
         sb.append(ParserTokenEmitter.generateLexicalClasses(ctx));
         sb.append(ParserTokenEmitter.generateCharRangeClasses(ctx));
-        sb.append(ParserTokenEmitter.generateRegexClasses(ctx));
 
         // Phase 2: 各ルールのヘルパー + ルールクラスを出力
         for (RuleDecl rule : grammar.rules()) {

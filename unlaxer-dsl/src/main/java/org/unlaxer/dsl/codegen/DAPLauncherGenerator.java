@@ -7,6 +7,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.StringSettingValue;
 public class DAPLauncherGenerator implements CodeGenerator {
     @Override
     public GeneratedSource generate(GrammarDecl grammar) {
+        org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
         String packageName = grammar.settings().stream()
             .filter(setting -> "package".equals(setting.key()))
             .map(setting -> setting.value() instanceof StringSettingValue value ? value.value() : "")

@@ -54,6 +54,7 @@ public final class RustGrammarLowering {
     private void leaveAnalysis() { analysisDepth--; }
 
     public static GrammarIR lower(GrammarDecl grammar) {
+        org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
         CommonFieldSchema.build(grammar);
         EnumSchema.validate(grammar);
         org.unlaxer.dsl.codegen.TypeofConstraints.validate(grammar);
