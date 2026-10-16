@@ -613,7 +613,7 @@ fn expression_variants_escape_unicode_and_control_characters() {
         "Expr::Except(\"!\")",
         "Expr::JavaUntil(\"#\")",
         "positive: false",
-        ".separated_by(",
+        ".separated_by_java(",
         ".repeat_java(1, Some(2))",
         "Expr::CodeStart",
         "Expr::CodeEnd",

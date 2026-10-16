@@ -558,7 +558,7 @@ fn expression(expr: &Expression) -> String {
             max.map_or_else(|| "None".into(), |max| format!("Some({max})"))
         ),
         Separated { child, separator } => format!(
-            "{}.separated_by({})",
+            "{}.separated_by_java({})",
             expression(child),
             expression(separator)
         ),

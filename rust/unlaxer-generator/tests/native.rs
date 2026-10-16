@@ -516,7 +516,7 @@ fn nullable_cardinality_shared_mapping_and_operator_boundaries_are_explicit() {
     for (accepted, body) in [
         (true, "token E=EMPTY @root @mapping(V,params=[values]) Root ::= ('a' | E)+ @values;"),
         (true, "token E=EMPTY @root @mapping(V,params=[values]) Root ::= E{1,2} @values;"),
-        (false, "token E=EMPTY @root @mapping(V,params=[values]) Root ::= E % E @values;"),
+        (true, "token E=EMPTY @root @mapping(V,params=[values]) Root ::= E % E @values;"),
         (false, "@root @mapping(V) Root ::= [ 'x' ] Root;"),
         (false, "@root @mapping(V) Root ::= Prefix Root | 'x'; Prefix ::= [ 'a' ];"),
         (true, "@root @mapping(V,params=[value]) Root ::= ('a' | Node) @value; @mapping(N) Node ::= 'n';"),

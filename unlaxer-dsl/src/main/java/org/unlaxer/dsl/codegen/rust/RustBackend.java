@@ -477,7 +477,7 @@ public final class RustBackend {
                 + (repeat.max() == null ? "None" : "Some(" + repeat.max() + ")") + ")";
         }
         if (expression instanceof Separated separated) {
-            return expression(separated.child()) + ".separated_by(" + expression(separated.separator()) + ")";
+            return expression(separated.child()) + ".separated_by_java(" + expression(separated.separator()) + ")";
         }
         throw new IllegalStateException("unhandled " + expression);
     }
