@@ -494,6 +494,8 @@ public class MapperGenerator implements CodeGenerator {
                 }
                 private static <T> T guardedMapping(Token token, java.util.function.Supplier<T> operation) {
                     resetMappingMemos();
+                    // Public entry validators retain their root/subtree null argument contract.
+                    if (token == null) return operation.get();
                     MAPPING_GUARD = org.unlaxer.mapper.MappingGuard.prepare(token);
                     try { return operation.get(); }
                     catch (RuntimeException failure) { resetMappingMemos(); throw failure; }
