@@ -26,6 +26,9 @@ public class PredicateAnyMatchForParsedParser extends ConstructedSingleChildPars
 	
 	@Override
 	public Parsed parse(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
+        parseContext.enterParserCall();
+        try {
+
 		
 		parseContext.startParse(this, parseContext, tokenKind, invertMatch);
 		Parsed parsed = getChild().parse(parseContext,tokenKind , invertMatch);
@@ -47,7 +50,14 @@ public class PredicateAnyMatchForParsedParser extends ConstructedSingleChildPars
 		}
 		parseContext.endParse(this , parsed, parseContext, tokenKind, invertMatch);
 		return parsed;
-	}
+
+        } catch (RuntimeException | Error failure) {
+            parseContext.failParserCall(failure);
+            throw failure;
+        } finally {
+            parseContext.leaveParserCall();
+        }
+    }
 
 	
 }

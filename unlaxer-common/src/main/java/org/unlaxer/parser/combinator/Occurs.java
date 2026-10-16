@@ -19,6 +19,9 @@ public interface Occurs extends MetaFunctionParser , NonTerminallSymbol {
   
 	@Override
 	public default Parsed parse(ParseContext parseContext,TokenKind tokenKind,boolean invertMatch) {
+        parseContext.enterParserCall();
+        try {
+
 	  
         // Generated whitespace delimitors use Occurs directly, bypassing AbstractParser.
         var memo = PackratMemoTable.lookup(parseContext, this, tokenKind, invertMatch);
@@ -105,7 +108,14 @@ public interface Occurs extends MetaFunctionParser , NonTerminallSymbol {
             PackratMemoTable.memoizeFailure(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
 			return Parsed.FAILED;
 		}
-	}
+
+        } catch (RuntimeException | Error failure) {
+            parseContext.failParserCall(failure);
+            throw failure;
+        } finally {
+            parseContext.leaveParserCall();
+        }
+    }
 	
     /** Historical negative-zero check. Ordinary bounded repetitions never probe at max=0. */
     public default boolean isZeroMatchCheck() { return false; }

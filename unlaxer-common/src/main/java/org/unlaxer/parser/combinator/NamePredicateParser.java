@@ -26,6 +26,9 @@ public abstract class NamePredicateParser extends ConstructedAbstractParser impl
         };
     }
     @Override public Parsed parse(ParseContext context, TokenKind kind, boolean invert) {
+        context.enterParserCall();
+        try {
+
         context.startParse(this, context, kind, invert);
         context.begin(this);
         int entryStart = context.getConsumedPosition().value();
@@ -63,5 +66,12 @@ public abstract class NamePredicateParser extends ConstructedAbstractParser impl
         context.commit(this, kind);
         context.endParse(this, parsed, context, kind, invert);
         return parsed;
+
+        } catch (RuntimeException | Error failure) {
+            context.failParserCall(failure);
+            throw failure;
+        } finally {
+            context.leaveParserCall();
+        }
     }
 }

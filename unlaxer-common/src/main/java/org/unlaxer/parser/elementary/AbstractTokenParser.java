@@ -26,6 +26,9 @@ public abstract class AbstractTokenParser extends NoneChildParser {
 
 	@Override
 	public Parsed parse(ParseContext parseContext,TokenKind tokenKind,boolean invertMatch){
+        parseContext.enterParserCall();
+        try {
+
 
 		parseContext.startParse(this, parseContext, tokenKind, invertMatch);
 
@@ -46,7 +49,14 @@ public abstract class AbstractTokenParser extends NoneChildParser {
 				Parsed.FAILED;
 		parseContext.endParse(this, result, parseContext, tokenKind, invertMatch);
 		return result;
-	}
+
+        } catch (RuntimeException | Error failure) {
+            parseContext.failParserCall(failure);
+            throw failure;
+        } finally {
+            parseContext.leaveParserCall();
+        }
+    }
 	
 	public abstract Token getToken(ParseContext parseContext,TokenKind tokenKind , boolean invertMatch);
 
