@@ -49,3 +49,13 @@ cargo +1.85.0 test --locked --manifest-path rust/Cargo.toml \
 AST の field 型・コンストラクタ・source span の単位は変更しません。既存の右結合は capture binding による選択を維持し、Rust の mapper 意味も変更しません。通常 associative rule を nested mapped field から参照する経路は対象ですが、nested 所有 rule 自体の associative annotation を新たに許可する変更ではありません。
 
 追加 oracle は直接 literal、同一 literal の別 capture、tokenStream、構造 delimiter、共有 mapping、precedence、補助文字 / CRLF、複数反復、右再帰、nested 参照を扱います。通常 mapper と preferred snapshot の値・候補 CP 範囲・保持値、構文失敗を同じ期待値で確認します。`PreferredAstConformanceTest` の共通 runner は Java / native host の Rust 全生成ファイル一致に加え、各出力を別々に `rustc` で compile/run します。DAP・合成 nullable leaf・mapped/mixed operand・commonField・typeof・autoEval は既存共通 corpus の回帰で検証します。
+
+## 左結合の固定 delimiter（#674）
+
+`Root ::= '(' NUMBER @left { '+' @op NUMBER @right } ')'` のような固定 delimiter を持つ左結合も、Java / native 両 Rust host で生成します。これは基準 Java `6816a2a6` で既に正常だった経路への対応です。Rust の canonical shape 制限を、両版共通の制約として扱い直したものではありません。
+
+検査では、rule の直下 Sequence と、その唯一の無制限 Repeat の直下 Sequence から、capture を持たない**非空の固定 literal**だけを除いた形が `left { op right }` であることを要求します。検査用の列を作るだけで、実 IR・parser・CST から delimiter は取り除きません。prefix、left と Repeat の間、suffix、Repeat 内の op/right の前後に置いた固定 literal は入力として必要で、AST span と preferred source はその原文を保持します。`left` は scalar、`op` と `right` は順序付き List の既存 schema のままです。
+
+Optional delimiter、空 literal、別の Repeat、一般的な helper/choice を挟む形は今回開放しません。これらは Rust の生成前診断を維持し、Java の全ての左結合文法と同等になったとは主張しません。非 canonical な右結合や nested-owner associative annotation も対象外です。
+
+`spec-corpus/associative-delimiters` は NUMBER、literal、tokenStream、Unicode / CRLF、複数 precedence の mapped operand、非捕捉 delimiter、0/1/複数回反復と失敗を共有します。Java21 と両 host の Rust1.85 出力を実 compile/map/eval し、memo OFF / SAFE_FAILURES と診断 AUTO / DETAILED / DETAILED_ON_FAILURE の6組を検証します。CP失敗位置は Java の DETAILED で、構文失敗なら farthest、成功した prefix の後に余剰入力がある場合は consumed end を観測し、Rust の完全入力解析が返す位置と比較します。直接 ParseContext の deferred 診断に、完全入力 API の自動再試行を仮定しません。

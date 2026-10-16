@@ -2267,9 +2267,7 @@ impl Lowering<'_> {
         {
             return Err(error());
         }
-        let Expression::Sequence(elements) = &self.bodies[rule] else {
-            return Err(error());
-        };
+        let elements = assoc_skeleton(&self.bodies[rule]);
         let [Expression::Capture {
             name: left_name,
             expression: left,
@@ -2281,9 +2279,7 @@ impl Lowering<'_> {
         else {
             return Err(error());
         };
-        let Expression::Sequence(tail) = child.as_ref() else {
-            return Err(error());
-        };
+        let tail = assoc_skeleton(child);
         let [Expression::Capture {
             name: op_name,
             expression: op,
@@ -2314,6 +2310,17 @@ impl Lowering<'_> {
             return Err(error());
         }
         Ok(())
+    }
+}
+
+/// Inspect the semantic skeleton without removing delimiters from the emitted body.
+fn assoc_skeleton(expression: &Expression) -> Vec<&Expression> {
+    match expression {
+        Expression::Sequence(elements) => elements
+            .iter()
+            .filter(|element| !matches!(element, Expression::Literal(text) if !text.is_empty()))
+            .collect(),
+        _ => Vec::new(),
     }
 }
 

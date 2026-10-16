@@ -570,14 +570,25 @@ public final class RustGrammarLowering {
         return new Choice(List.of(new Sequence(List.of(left, tail.elements().get(0), tail.elements().get(1))), left));
     }
 
+    /** Validate only the semantic skeleton; retain every delimiter in the emitted body. */
+    private static List<Expression> assocSkeleton(Expression expression) {
+        if (!(expression instanceof Sequence sequence)) return List.of();
+        return sequence.elements().stream()
+            .filter(element -> !(element instanceof Literal literal && !literal.text().isEmpty()))
+            .toList();
+    }
+
     private void checkLeftAssoc(int rule, Mapping mapping) {
+        List<Expression> sequence = assocSkeleton(bodies.get(rule));
+        List<Expression> tail = sequence.size() == 2 && sequence.get(1) instanceof Repeat repeat
+            ? assocSkeleton(repeat.child()) : List.of();
         if (mapping == null || !mapping.fields().stream().map(Field::name).toList().equals(List.of("left", "op", "right"))
-            || !(bodies.get(rule) instanceof Sequence sequence) || sequence.elements().size() != 2
-            || !(sequence.elements().get(0) instanceof Capture left) || !left.name().equals("left")
-            || !(sequence.elements().get(1) instanceof Repeat repeat) || repeat.min() != 0 || repeat.max() != null
-            || !(repeat.child() instanceof Sequence tail) || tail.elements().size() != 2
-            || !(tail.elements().get(0) instanceof Capture op) || !op.name().equals("op")
-            || !(tail.elements().get(1) instanceof Capture right) || !right.name().equals("right")
+            || sequence.size() != 2
+            || !(sequence.get(0) instanceof Capture left) || !left.name().equals("left")
+            || !(sequence.get(1) instanceof Repeat repeat) || repeat.min() != 0 || repeat.max() != null
+            || tail.size() != 2
+            || !(tail.get(0) instanceof Capture op) || !op.name().equals("op")
+            || !(tail.get(1) instanceof Capture right) || !right.name().equals("right")
             || !captures(left.expression()).isEmpty() || !captures(op.expression()).isEmpty()
             || !captures(right.expression()).isEmpty()
             || mapping.fields().get(0).cardinality() != Cardinality.ONE

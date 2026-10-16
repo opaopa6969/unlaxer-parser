@@ -28,16 +28,32 @@ fn operands(rule: &RuleDecl) -> Vec<&AtomicElement> {
     let [seq] = rule.body.alternatives.as_slice() else {
         return vec![];
     };
-    let [left, repeat] = seq.elements.as_slice() else {
+    // Lowering has already checked the left/op/right skeleton. Literal delimiters
+    // keep their source positions, so operands must be selected by capture identity.
+    let Some(left) = seq
+        .elements
+        .iter()
+        .find(|element| element.capture.as_deref() == Some("left"))
+    else {
         return vec![];
     };
-    let ElementKind::Repeat(body) = &repeat.element.kind else {
+    let Some(body) = seq.elements.iter().find_map(|element| {
+        if let ElementKind::Repeat(body) = &element.element.kind {
+            Some(body)
+        } else {
+            None
+        }
+    }) else {
         return vec![];
     };
     let [tail] = body.alternatives.as_slice() else {
         return vec![];
     };
-    let [_, right] = tail.elements.as_slice() else {
+    let Some(right) = tail
+        .elements
+        .iter()
+        .find(|element| element.capture.as_deref() == Some("right"))
+    else {
         return vec![];
     };
     vec![&left.element, &right.element]
