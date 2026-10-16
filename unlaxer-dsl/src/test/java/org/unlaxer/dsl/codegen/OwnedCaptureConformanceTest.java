@@ -38,7 +38,7 @@ public class OwnedCaptureConformanceTest {
                 });
             }
             Path classes=temporary.newFolder().toPath();
-            var compiler=ToolProvider.getSystemJavaCompiler();
+            var compiler=org.unlaxer.dsl.Java21TestSupport.compiler();
             var diagnostics=new DiagnosticCollector<JavaFileObject>();
             try(var manager=compiler.getStandardFileManager(diagnostics,null,null)) {
                 boolean compiled=compiler.getTask(null,manager,diagnostics,
