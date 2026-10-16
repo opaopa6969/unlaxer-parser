@@ -1,0 +1,14 @@
+# action version text hits misses entries current-source
+open	1	a	0	1	1	a
+save	0	~	1	1	1	a
+change	2	a	1	2	1	a
+save	0	~	2	2	1	a
+change	3	😀	2	3	1	😀
+stale	2	b	2	3	1	😀
+invalid-range	4	b	2	3	1	😀
+save	0	~	3	3	1	😀
+invalidate	0	~	3	3	0	😀
+save	0	~	3	4	1	😀
+close	0	~	3	4	0	~
+save	0	~	3	4	0	~
+open	5	ab	3	5	1	ab

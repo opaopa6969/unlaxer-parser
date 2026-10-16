@@ -3,6 +3,7 @@
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::{self, BufRead, Write};
+use unlaxer_runtime::incremental::{Revisions, SnapshotParseCache, Stats};
 use unlaxer_runtime::language_profile::{LanguageProfile, Selection};
 use unlaxer_runtime::language_queries::{LanguageQueries, QueryView};
 use unlaxer_runtime::source::{Operation, State};
@@ -15,6 +16,12 @@ pub trait Backend {
     fn entry(&self) -> &str;
     fn keywords(&self) -> &[String];
     fn validate(&mut self, snapshot: &Snapshot) -> Vec<Diagnostic>;
+    /// Opt in only when validation is pure for the complete key and snapshot. Custom
+    /// backends default to uncached; external state must be represented by revisions.
+    fn validation_cache_key(&self) -> Option<ValidationCacheKey> {
+        None
+    }
+
     /// Return typed/provider items for this exact immutable source and version.
     fn complete(&mut self, _snapshot: &Snapshot, _cursor: usize) -> Vec<Completion> {
         vec![]
@@ -51,6 +58,24 @@ pub struct Completion {
     pub detail: Option<String>,
     pub data: Value,
 }
+/// Retains the actual immutable grammar allocation, preventing in-place mutation or
+/// allocator address reuse from making a stale grammar look current.
+#[derive(Clone)]
+pub struct ValidationCacheKey {
+    pub grammar: SharedGrammar,
+    pub root: usize,
+    pub whitespace: bool,
+    pub revisions: Revisions,
+}
+impl PartialEq for ValidationCacheKey {
+    fn eq(&self, other: &Self) -> bool {
+        std::sync::Arc::ptr_eq(&self.grammar, &other.grammar)
+            && self.root == other.root
+            && self.whitespace == other.whitespace
+            && self.revisions == other.revisions
+    }
+}
+impl Eq for ValidationCacheKey {}
 /// Generated grammar adapter. Extra semantic completion is supplied by implementing Backend.
 pub struct GrammarBackend {
     pub name: String,
@@ -69,6 +94,21 @@ impl Backend for GrammarBackend {
     }
     fn keywords(&self) -> &[String] {
         &self.keywords
+    }
+    fn validation_cache_key(&self) -> Option<ValidationCacheKey> {
+        if !unlaxer_runtime::incremental::grammar_is_snapshot_cacheable(&self.grammar) {
+            return None;
+        }
+        Some(ValidationCacheKey {
+            grammar: self.grammar.clone(),
+            root: self.root,
+            whitespace: self.whitespace,
+            revisions: Revisions {
+                grammar: "generated".into(),
+                profile: String::new(),
+                state: String::new(),
+            },
+        })
     }
     fn validate(&mut self, snapshot: &Snapshot) -> Vec<Diagnostic> {
         match unlaxer_runtime::parse_detailed_shared(
@@ -116,6 +156,8 @@ struct DiagnosticDocument {
 
 pub struct Server<B> {
     backend: B,
+    validation_cache: SnapshotParseCache<Vec<Diagnostic>>,
+    validation_identity: Option<ValidationCacheKey>,
     documents: HashMap<String, Snapshot>,
     diagnostic_contributions: BTreeMap<String, BTreeMap<String, DiagnosticDocument>>,
     profile: Option<Selection>,
@@ -127,6 +169,8 @@ impl<B: Backend> Server<B> {
     pub fn new(backend: B) -> Self {
         Self {
             backend,
+            validation_cache: SnapshotParseCache::new(128, 1_048_576),
+            validation_identity: None,
             documents: HashMap::new(),
             diagnostic_contributions: BTreeMap::new(),
             profile: None,
@@ -134,6 +178,34 @@ impl<B: Backend> Server<B> {
             shutdown: false,
             exited: false,
         }
+    }
+    pub fn validation_cache_stats(&self) -> Stats {
+        self.validation_cache.stats()
+    }
+    pub fn invalidate_parse_cache(&mut self) {
+        self.validation_cache.invalidate_all();
+        self.validation_identity = None;
+    }
+    /// Explicit mutation invalidates any prior pure-validation results.
+    pub fn backend_mut(&mut self) -> &mut B {
+        self.invalidate_parse_cache();
+        &mut self.backend
+    }
+    fn validate(&mut self, snapshot: &Snapshot) -> Vec<Diagnostic> {
+        let Some(key) = self.backend.validation_cache_key() else {
+            self.invalidate_parse_cache();
+            return self.backend.validate(snapshot);
+        };
+        if self.validation_identity.as_ref() != Some(&key) {
+            self.validation_cache.invalidate_all();
+            self.validation_identity = Some(key.clone());
+        }
+        if let Some(result) = self.validation_cache.get(snapshot, &key.revisions) {
+            return result;
+        }
+        let result = self.backend.validate(snapshot);
+        self.validation_cache.put(snapshot, &key.revisions, &result);
+        result
     }
     pub fn snapshot(&self, uri: &str) -> Option<&Snapshot> {
         self.documents.get(uri)
@@ -182,6 +254,7 @@ impl<B: Backend> Server<B> {
             if method == "initialize" {
                 let selection = self.select_profile(&params).map_err(invalid)?;
                 self.profile = selection;
+                self.invalidate_parse_cache();
                 self.initialized = true;
                 let mut caps = json!({"positionEncoding":"utf-16","textDocumentSync":1});
                 if self.allows("COMPLETION") {
@@ -247,6 +320,7 @@ impl<B: Backend> Server<B> {
                     {
                         return Ok(Value::Null);
                     }
+                    self.validation_cache.invalidate(uri);
                     self.documents.insert(uri.into(), snapshot.clone());
                     self.diagnostics(&snapshot, &mut notifications);
                     Ok(Value::Null)
@@ -274,6 +348,7 @@ impl<B: Backend> Server<B> {
                     }
                     let text = string(changes.last().unwrap(), "text")?;
                     let snapshot = Snapshot::new(uri, version, text).map_err(invalid)?;
+                    self.validation_cache.invalidate(uri);
                     self.documents.insert(uri.into(), snapshot.clone());
                     self.diagnostics(&snapshot, &mut notifications);
                     Ok(Value::Null)
@@ -281,6 +356,7 @@ impl<B: Backend> Server<B> {
                 "textDocument/didClose" => {
                     let uri = string(&params["textDocument"], "uri")?;
                     self.documents.remove(uri);
+                    self.validation_cache.invalidate(uri);
                     let mut affected = std::collections::BTreeSet::from([uri.to_owned()]);
                     if let Some(previous) = self.diagnostic_contributions.remove(uri) {
                         affected.extend(previous.into_keys());
@@ -407,7 +483,7 @@ impl<B: Backend> Server<B> {
                     if op == Operation::Definition {
                         return Ok(empty);
                     }
-                    let diagnostics = self.backend.validate(&snapshot);
+                    let diagnostics = self.validate(&snapshot);
                     let text = diagnostics.first().map_or_else(
                         || format!("Valid {}", self.backend.grammar()),
                         |diagnostic| diagnostic.message.clone(),
@@ -477,7 +553,7 @@ impl<B: Backend> Server<B> {
     fn diagnostics(&mut self, snapshot: &Snapshot, output: &mut Vec<Value>) {
         let mut diagnostics = vec![];
         if self.allows("VALIDATE") {
-            for diagnostic in self.backend.validate(snapshot) {
+            for diagnostic in self.validate(snapshot) {
                 let Ok(range) = range(snapshot, diagnostic.span) else {
                     continue;
                 };

@@ -1,0 +1,861 @@
+[
+  {
+    "id": "initial",
+    "uri": "file:///a",
+    "version": 1,
+    "grammar": "Cache",
+    "profile": "normal",
+    "state": "normal",
+    "text": "a",
+    "hit": false,
+    "expected": {
+      "accepted": true,
+      "cst": "a",
+      "span": [
+        0,
+        1
+      ],
+      "ast": {
+        "type": "Value",
+        "span": [
+          0,
+          1
+        ],
+        "fields": {
+          "text": "a"
+        }
+      },
+      "diagnostic": null,
+      "recoveries": [],
+      "coordinates": [
+        1,
+        1,
+        1
+      ]
+    }
+  },
+  {
+    "id": "same-snapshot",
+    "uri": "file:///a",
+    "version": 1,
+    "grammar": "Cache",
+    "profile": "normal",
+    "state": "normal",
+    "text": "a",
+    "hit": true,
+    "expected": {
+      "accepted": true,
+      "cst": "a",
+      "span": [
+        0,
+        1
+      ],
+      "ast": {
+        "type": "Value",
+        "span": [
+          0,
+          1
+        ],
+        "fields": {
+          "text": "a"
+        }
+      },
+      "diagnostic": null,
+      "recoveries": [],
+      "coordinates": [
+        1,
+        1,
+        1
+      ]
+    }
+  },
+  {
+    "id": "insert",
+    "uri": "file:///a",
+    "version": 2,
+    "grammar": "Cache",
+    "profile": "normal",
+    "state": "normal",
+    "text": "ab",
+    "hit": false,
+    "expected": {
+      "accepted": true,
+      "cst": "ab",
+      "span": [
+        0,
+        2
+      ],
+      "ast": {
+        "type": "Value",
+        "span": [
+          0,
+          2
+        ],
+        "fields": {
+          "text": "ab"
+        }
+      },
+      "diagnostic": null,
+      "recoveries": [],
+      "coordinates": [
+        2,
+        2,
+        2
+      ]
+    },
+    "edit": [
+      1,
+      1,
+      "b"
+    ]
+  },
+  {
+    "id": "delete",
+    "uri": "file:///a",
+    "version": 3,
+    "grammar": "Cache",
+    "profile": "normal",
+    "state": "normal",
+    "text": "a",
+    "hit": false,
+    "expected": {
+      "accepted": true,
+      "cst": "a",
+      "span": [
+        0,
+        1
+      ],
+      "ast": {
+        "type": "Value",
+        "span": [
+          0,
+          1
+        ],
+        "fields": {
+          "text": "a"
+        }
+      },
+      "diagnostic": null,
+      "recoveries": [],
+      "coordinates": [
+        1,
+        1,
+        1
+      ]
+    },
+    "edit": [
+      1,
+      2,
+      ""
+    ]
+  },
+  {
+    "id": "replace-supplementary",
+    "uri": "file:///a",
+    "version": 4,
+    "grammar": "Cache",
+    "profile": "normal",
+    "state": "normal",
+    "text": "😀",
+    "hit": false,
+    "expected": {
+      "accepted": true,
+      "cst": "😀",
+      "span": [
+        0,
+        1
+      ],
+      "ast": {
+        "type": "Value",
+        "span": [
+          0,
+          1
+        ],
+        "fields": {
+          "text": "😀"
+        }
+      },
+      "diagnostic": null,
+      "recoveries": [],
+      "coordinates": [
+        1,
+        2,
+        4
+      ]
+    },
+    "edit": [
+      0,
+      1,
+      "😀"
+    ]
+  },
+  {
+    "id": "replace-crlf",
+    "uri": "file:///a",
+    "version": 5,
+    "grammar": "Cache",
+    "profile": "normal",
+    "state": "normal",
+    "text": "a\r\nb",
+    "hit": false,
+    "expected": {
+      "accepted": true,
+      "cst": "a\r\nb",
+      "span": [
+        0,
+        4
+      ],
+      "ast": {
+        "type": "Value",
+        "span": [
+          0,
+          4
+        ],
+        "fields": {
+          "text": "a\r\nb"
+        }
+      },
+      "diagnostic": null,
+      "recoveries": [],
+      "coordinates": [
+        4,
+        4,
+        4
+      ]
+    },
+    "edit": [
+      0,
+      2,
+      "a\r\nb"
+    ]
+  },
+  {
+    "id": "same-crlf",
+    "uri": "file:///a",
+    "version": 5,
+    "grammar": "Cache",
+    "profile": "normal",
+    "state": "normal",
+    "text": "a\r\nb",
+    "hit": true,
+    "expected": {
+      "accepted": true,
+      "cst": "a\r\nb",
+      "span": [
+        0,
+        4
+      ],
+      "ast": {
+        "type": "Value",
+        "span": [
+          0,
+          4
+        ],
+        "fields": {
+          "text": "a\r\nb"
+        }
+      },
+      "diagnostic": null,
+      "recoveries": [],
+      "coordinates": [
+        4,
+        4,
+        4
+      ]
+    }
+  },
+  {
+    "id": "delete-to-invalid",
+    "uri": "file:///a",
+    "version": 6,
+    "grammar": "Cache",
+    "profile": "normal",
+    "state": "normal",
+    "text": "a\r\n",
+    "hit": false,
+    "expected": {
+      "accepted": false,
+      "cst": null,
+      "span": null,
+      "ast": null,
+      "diagnostic": 1,
+      "recoveries": [],
+      "coordinates": [
+        1,
+        1,
+        1
+      ]
+    },
+    "edit": [
+      3,
+      4,
+      ""
+    ]
+  },
+  {
+    "id": "cached-failure",
+    "uri": "file:///a",
+    "version": 6,
+    "grammar": "Cache",
+    "profile": "normal",
+    "state": "normal",
+    "text": "a\r\n",
+    "hit": true,
+    "expected": {
+      "accepted": false,
+      "cst": null,
+      "span": null,
+      "ast": null,
+      "diagnostic": 1,
+      "recoveries": [],
+      "coordinates": [
+        1,
+        1,
+        1
+      ]
+    }
+  },
+  {
+    "id": "repair",
+    "uri": "file:///a",
+    "version": 7,
+    "grammar": "Cache",
+    "profile": "normal",
+    "state": "normal",
+    "text": "a\r\nb",
+    "hit": false,
+    "expected": {
+      "accepted": true,
+      "cst": "a\r\nb",
+      "span": [
+        0,
+        4
+      ],
+      "ast": {
+        "type": "Value",
+        "span": [
+          0,
+          4
+        ],
+        "fields": {
+          "text": "a\r\nb"
+        }
+      },
+      "diagnostic": null,
+      "recoveries": [],
+      "coordinates": [
+        4,
+        4,
+        4
+      ]
+    },
+    "edit": [
+      3,
+      3,
+      "b"
+    ]
+  },
+  {
+    "id": "same-text-new-version",
+    "uri": "file:///a",
+    "version": 8,
+    "grammar": "Cache",
+    "profile": "normal",
+    "state": "normal",
+    "text": "a\r\nb",
+    "hit": false,
+    "expected": {
+      "accepted": true,
+      "cst": "a\r\nb",
+      "span": [
+        0,
+        4
+      ],
+      "ast": {
+        "type": "Value",
+        "span": [
+          0,
+          4
+        ],
+        "fields": {
+          "text": "a\r\nb"
+        }
+      },
+      "diagnostic": null,
+      "recoveries": [],
+      "coordinates": [
+        4,
+        4,
+        4
+      ]
+    }
+  },
+  {
+    "id": "parallel-old-snapshot",
+    "uri": "file:///a",
+    "version": 1,
+    "grammar": "Cache",
+    "profile": "normal",
+    "state": "normal",
+    "text": "a",
+    "hit": true,
+    "expected": {
+      "accepted": true,
+      "cst": "a",
+      "span": [
+        0,
+        1
+      ],
+      "ast": {
+        "type": "Value",
+        "span": [
+          0,
+          1
+        ],
+        "fields": {
+          "text": "a"
+        }
+      },
+      "diagnostic": null,
+      "recoveries": [],
+      "coordinates": [
+        1,
+        1,
+        1
+      ]
+    }
+  },
+  {
+    "id": "same-version-different-text",
+    "uri": "file:///a",
+    "version": 1,
+    "grammar": "Cache",
+    "profile": "normal",
+    "state": "normal",
+    "text": "ab",
+    "hit": false,
+    "expected": {
+      "accepted": true,
+      "cst": "ab",
+      "span": [
+        0,
+        2
+      ],
+      "ast": {
+        "type": "Value",
+        "span": [
+          0,
+          2
+        ],
+        "fields": {
+          "text": "ab"
+        }
+      },
+      "diagnostic": null,
+      "recoveries": [],
+      "coordinates": [
+        2,
+        2,
+        2
+      ]
+    }
+  },
+  {
+    "id": "other-uri",
+    "uri": "file:///b",
+    "version": 1,
+    "grammar": "Cache",
+    "profile": "normal",
+    "state": "normal",
+    "text": "a",
+    "hit": false,
+    "expected": {
+      "accepted": true,
+      "cst": "a",
+      "span": [
+        0,
+        1
+      ],
+      "ast": {
+        "type": "Value",
+        "span": [
+          0,
+          1
+        ],
+        "fields": {
+          "text": "a"
+        }
+      },
+      "diagnostic": null,
+      "recoveries": [],
+      "coordinates": [
+        1,
+        1,
+        1
+      ]
+    }
+  },
+  {
+    "id": "profile-change",
+    "uri": "file:///a",
+    "version": 1,
+    "grammar": "Cache",
+    "profile": "strict",
+    "state": "normal",
+    "text": "a",
+    "hit": false,
+    "expected": {
+      "accepted": false,
+      "cst": null,
+      "span": null,
+      "ast": null,
+      "diagnostic": 0,
+      "recoveries": [],
+      "coordinates": [
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "id": "profile-repeat",
+    "uri": "file:///a",
+    "version": 1,
+    "grammar": "Cache",
+    "profile": "strict",
+    "state": "normal",
+    "text": "a",
+    "hit": true,
+    "expected": {
+      "accepted": false,
+      "cst": null,
+      "span": null,
+      "ast": null,
+      "diagnostic": 0,
+      "recoveries": [],
+      "coordinates": [
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "id": "state-change",
+    "uri": "file:///a",
+    "version": 1,
+    "grammar": "Cache",
+    "profile": "normal",
+    "state": "blocked",
+    "text": "a",
+    "hit": false,
+    "expected": {
+      "accepted": false,
+      "cst": null,
+      "span": null,
+      "ast": null,
+      "diagnostic": 0,
+      "recoveries": [],
+      "coordinates": [
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "id": "grammar-change",
+    "uri": "file:///a",
+    "version": 1,
+    "grammar": "Other",
+    "profile": "normal",
+    "state": "normal",
+    "text": "a",
+    "hit": false,
+    "expected": {
+      "accepted": false,
+      "cst": null,
+      "span": null,
+      "ast": null,
+      "diagnostic": 0,
+      "recoveries": [],
+      "coordinates": [
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "id": "grammar-new-accepted",
+    "uri": "file:///a",
+    "version": 2,
+    "grammar": "Other",
+    "profile": "normal",
+    "state": "normal",
+    "text": "b",
+    "hit": false,
+    "expected": {
+      "accepted": true,
+      "cst": "b",
+      "span": [
+        0,
+        1
+      ],
+      "ast": {
+        "type": "Value",
+        "span": [
+          0,
+          1
+        ],
+        "fields": {
+          "text": "b"
+        }
+      },
+      "diagnostic": null,
+      "recoveries": [],
+      "coordinates": [
+        1,
+        1,
+        1
+      ]
+    }
+  },
+  {
+    "id": "normal-after-failure",
+    "uri": "file:///a",
+    "version": 1,
+    "grammar": "Cache",
+    "profile": "normal",
+    "state": "normal",
+    "text": "a",
+    "hit": true,
+    "expected": {
+      "accepted": true,
+      "cst": "a",
+      "span": [
+        0,
+        1
+      ],
+      "ast": {
+        "type": "Value",
+        "span": [
+          0,
+          1
+        ],
+        "fields": {
+          "text": "a"
+        }
+      },
+      "diagnostic": null,
+      "recoveries": [],
+      "coordinates": [
+        1,
+        1,
+        1
+      ]
+    }
+  },
+  {
+    "id": "empty",
+    "uri": "file:///a",
+    "version": 9,
+    "grammar": "Cache",
+    "profile": "normal",
+    "state": "normal",
+    "text": "",
+    "hit": false,
+    "expected": {
+      "accepted": false,
+      "cst": null,
+      "span": null,
+      "ast": null,
+      "diagnostic": 0,
+      "recoveries": [],
+      "coordinates": [
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "id": "unicode-failure",
+    "uri": "file:///a",
+    "version": 10,
+    "grammar": "Cache",
+    "profile": "normal",
+    "state": "normal",
+    "text": "😀!",
+    "hit": false,
+    "expected": {
+      "accepted": false,
+      "cst": null,
+      "span": null,
+      "ast": null,
+      "diagnostic": 1,
+      "recoveries": [],
+      "coordinates": [
+        1,
+        2,
+        4
+      ]
+    }
+  },
+  {
+    "id": "trailing-text",
+    "uri": "file:///a",
+    "version": 11,
+    "grammar": "Cache",
+    "profile": "normal",
+    "state": "normal",
+    "text": "ab!",
+    "hit": false,
+    "expected": {
+      "accepted": false,
+      "cst": null,
+      "span": null,
+      "ast": null,
+      "diagnostic": 2,
+      "recoveries": [],
+      "coordinates": [
+        2,
+        2,
+        2
+      ]
+    }
+  },
+  {
+    "id": "recovery-valid",
+    "uri": "file:///a",
+    "version": 1,
+    "grammar": "Recovered",
+    "profile": "normal",
+    "state": "normal",
+    "text": "ok;",
+    "hit": false,
+    "expected": {
+      "accepted": true,
+      "cst": "ok;",
+      "span": [
+        0,
+        3
+      ],
+      "ast": {
+        "type": "Value",
+        "span": [
+          0,
+          3
+        ],
+        "fields": {
+          "text": "ok;"
+        }
+      },
+      "diagnostic": null,
+      "recoveries": [],
+      "coordinates": [
+        3,
+        3,
+        3
+      ]
+    }
+  },
+  {
+    "id": "recovery-error",
+    "uri": "file:///a",
+    "version": 2,
+    "grammar": "Recovered",
+    "profile": "normal",
+    "state": "normal",
+    "text": "bad;",
+    "hit": false,
+    "expected": {
+      "accepted": true,
+      "cst": "bad;",
+      "span": [
+        0,
+        4
+      ],
+      "ast": null,
+      "diagnostic": null,
+      "recoveries": [
+        [
+          0,
+          4
+        ]
+      ],
+      "coordinates": [
+        4,
+        4,
+        4
+      ]
+    }
+  },
+  {
+    "id": "recovery-hit",
+    "uri": "file:///a",
+    "version": 2,
+    "grammar": "Recovered",
+    "profile": "normal",
+    "state": "normal",
+    "text": "bad;",
+    "hit": true,
+    "expected": {
+      "accepted": true,
+      "cst": "bad;",
+      "span": [
+        0,
+        4
+      ],
+      "ast": null,
+      "diagnostic": null,
+      "recoveries": [
+        [
+          0,
+          4
+        ]
+      ],
+      "coordinates": [
+        4,
+        4,
+        4
+      ]
+    }
+  },
+  {
+    "id": "recovery-repaired",
+    "uri": "file:///a",
+    "version": 3,
+    "grammar": "Recovered",
+    "profile": "normal",
+    "state": "normal",
+    "text": "ok;",
+    "hit": false,
+    "expected": {
+      "accepted": true,
+      "cst": "ok;",
+      "span": [
+        0,
+        3
+      ],
+      "ast": {
+        "type": "Value",
+        "span": [
+          0,
+          3
+        ],
+        "fields": {
+          "text": "ok;"
+        }
+      },
+      "diagnostic": null,
+      "recoveries": [],
+      "coordinates": [
+        3,
+        3,
+        3
+      ]
+    }
+  }
+]

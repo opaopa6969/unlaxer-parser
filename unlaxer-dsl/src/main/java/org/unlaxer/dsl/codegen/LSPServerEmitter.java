@@ -59,6 +59,10 @@ class LSPServerEmitter {
         w.line("protected LanguageClient client;");
         w.line("protected final Map<String, DocumentState> documents = new HashMap<>();");
         w.line("protected final Map<String, Long> documentVersions = new HashMap<>();");
+        w.line("private final org.unlaxer.parser.incremental.SnapshotParseCache<ParseResult> parseCache = new org.unlaxer.parser.incremental.SnapshotParseCache<>(128, 1_048_576, value -> value);");
+        w.line("public org.unlaxer.parser.incremental.SnapshotParseCache.Stats parseCacheStats() { return parseCache.stats(); }");
+        w.line("public void invalidateParseCache() { parseCache.invalidateAll(); }");
+        w.line("protected String parseStateRevision() { return \"\"; }");
         w.line("private volatile boolean shutdownRequested;");
         w.line("private final CompletableFuture<Integer> exitStatus = new CompletableFuture<>();");
         w.blankLine();
@@ -85,7 +89,7 @@ class LSPServerEmitter {
         w.line("public CompletableFuture<InitializeResult> initialize(InitializeParams params) {");
         w.indent();
         w.line("if (hasStopped()) return stoppedRequest();");
-        w.line("try { selectedLanguageProfile = readLanguageProfile(params); }");
+        w.line("try { selectedLanguageProfile = readLanguageProfile(params); invalidateParseCache(); }");
         w.line("catch (IllegalArgumentException error) {");
         w.line("    return CompletableFuture.failedFuture(new org.eclipse.lsp4j.jsonrpc.ResponseErrorException(");
         w.line("        new org.eclipse.lsp4j.jsonrpc.messages.ResponseError(org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode.InvalidParams, error.getMessage(), null)));");
@@ -189,7 +193,7 @@ class LSPServerEmitter {
         w.line("private ParseResult doParse(String content) {");
         w.indent();
         w.line("Parser parser = " + parsersClass + ".getRootParser();");
-        w.line("ParseContext context = new ParseContext(createRootSourceCompat(content));");
+        w.line("try (ParseContext context = new ParseContext(createRootSourceCompat(content))) {");
         if (hasScopeStore) {
             w.line("ScopeStore.registerDispatcher(context);");
         }
@@ -217,17 +221,30 @@ class LSPServerEmitter {
         w.line("List<String> expectedParsers = failure.getExpectedParsers().stream()");
         w.line("    .filter(s -> s != null && !s.isBlank()).distinct().sorted().limit(20).toList();");
         w.line("String deepestMatchedRule = failure.getDeepestMatchedRule();");
-        w.line("context.close();");
         w.line("return new ParseResult(result.isSucceeded(), consumedLength, content.length(),");
         w.line("    errorOffset, expectedTokens, expectedHints, expectedParsers, deepestMatchedRule);");
+        w.line("}");
         w.dedent();
         w.line("}");
         w.blankLine();
 
-        // parseDocument() — フルパース（didOpen 用）
+        w.line("private ParseResult cachedParse(String uri, String content, long version) {");
+        w.line("    var snapshot = new org.unlaxer.source.DocumentSnapshot(uri, version, content);");
+        w.line("    if (!parseCacheEnabled()) { invalidateParseCache(); return doParse(content); }");
+        w.line("    String profile = selectedLanguageProfile == null ? \"\" : selectedLanguageProfile.profile().canonicalTsv();");
+        w.line("    var revisions = new org.unlaxer.parser.incremental.SnapshotParseCache.Revisions(\"" + parsersClass + "\", profile, parseStateRevision());");
+        w.line("    return parseCache.getOrCompute(snapshot, revisions, () -> doParse(content));");
+        w.line("}");
+        w.blankLine();
+
+        // parseDocument() — 全文 snapshot cache（didOpen / didSave 用）
         w.line("public ParseResult parseDocument(String uri, String content) {");
+        w.line("    return parseDocumentAtVersion(uri, content, documentVersions.getOrDefault(uri, 0L), false);");
+        w.line("}");
+        w.line("private ParseResult parseDocumentAtVersion(String uri, String content, long version, boolean trackVersion) {");
         w.indent();
-        w.line("ParseResult parseResult = doParse(content);");
+        w.line("ParseResult parseResult = cachedParse(uri, content, version);");
+        w.line("if (trackVersion) documentVersions.put(uri, version);");
         w.line("documents.put(uri, new DocumentState(uri, content, parseResult, new IncrementalParseCache()));");
         w.line("if (client != null) {");
         w.indent();
@@ -239,35 +256,9 @@ class LSPServerEmitter {
         w.line("}");
         w.blankLine();
 
-        // parseDocumentIncremental() — チャンクキャッシュを活用（didChange 用）
+        // Edited snapshots are parsed in full; no chunk-based CST reuse is claimed.
         w.line("public ParseResult parseDocumentIncremental(String uri, String content) {");
-        w.indent();
-        w.line("DocumentState previous = documents.get(uri);");
-        w.line("if (previous != null && previous.content().equals(content)) {");
-        w.indent();
-        w.line("if (client != null) publishDiagnostics(uri, content, previous.parseResult());");
-        w.line("return previous.parseResult();");
-        w.dedent();
-        w.line("}");
-        w.line("IncrementalParseCache cache = previous != null ? previous.cache() : new IncrementalParseCache();");
-        w.line("List<String> chunks = cache.splitIntoChunks(content, \";\");");
-        // A set of cached chunks does not identify the order, multiplicity or current document.
-        w.line("ParseResult parseResult = doParse(content);");
-        w.line("int offset = 0;");
-        w.line("for (String chunk : chunks) {");
-        w.indent();
-        w.line("cache.put(chunk, null, offset);");
-        w.line("offset += chunk.length();");
-        w.dedent();
-        w.line("}");
-        w.line("documents.put(uri, new DocumentState(uri, content, parseResult, cache));");
-        w.line("if (client != null) {");
-        w.indent();
-        w.line("publishDiagnostics(uri, content, parseResult);");
-        w.dedent();
-        w.line("}");
-        w.line("return parseResult;");
-        w.dedent();
+        w.line("    return parseDocument(uri, content);");
         w.line("}");
         w.blankLine();
 
@@ -668,10 +659,10 @@ class LSPServerEmitter {
         w.line("long version = params.getTextDocument().getVersion();");
         w.line("if (version < 0 || server.documentVersions.containsKey(uri) && version <= server.documentVersions.get(uri)) return;");
         w.line("try { new org.unlaxer.source.DocumentSnapshot(uri, version, params.getTextDocument().getText()); } catch (IllegalArgumentException invalid) { return; }");
-        w.line("server.documentVersions.put(uri, version);");
-        w.line("server.parseDocument(");
+        w.line("server.parseCache.invalidate(uri);");
+        w.line("server.parseDocumentAtVersion(");
         w.line("    params.getTextDocument().getUri(),");
-        w.line("    params.getTextDocument().getText());");
+        w.line("    params.getTextDocument().getText(), version, true);");
         w.dedent();
         w.line("}");
         w.blankLine();
@@ -687,8 +678,8 @@ class LSPServerEmitter {
         w.line("for (var change : params.getContentChanges()) if (change.getRange() != null || change.getText() == null) return;");
         w.line("String content = params.getContentChanges().get(params.getContentChanges().size() - 1).getText();");
         w.line("try { new org.unlaxer.source.DocumentSnapshot(uri, version, content); } catch (IllegalArgumentException invalid) { return; }");
-        w.line("server.documentVersions.put(uri, version.longValue());");
-        w.line("server.parseDocumentIncremental(uri, content);");
+        w.line("server.parseCache.invalidate(uri);");
+        w.line("server.parseDocumentAtVersion(uri, content, version.longValue(), true);");
         w.dedent();
         w.line("}");
         w.blankLine();
@@ -698,6 +689,7 @@ class LSPServerEmitter {
         w.indent();
         w.line("if (server.hasStopped()) return;");
         w.line("server.documents.remove(params.getTextDocument().getUri());");
+        w.line("server.parseCache.invalidate(params.getTextDocument().getUri());");
         w.line("server.documentVersions.remove(params.getTextDocument().getUri());");
         w.line("server.clearLanguageDiagnostics(params.getTextDocument().getUri());");
         w.dedent();
