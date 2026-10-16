@@ -83,6 +83,7 @@ impl FixedShape {
 }
 
 pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
+    crate::nested_captures::validate(grammar)?;
     crate::lexical_contexts::validate(grammar)?;
     let format_two = grammar.settings.iter().any(|setting| {
         setting.key == "ubnf"
@@ -102,6 +103,7 @@ pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
     crate::common_fields::families(grammar)?;
     let mut ir = Lowering {
         grammar,
+        nested_rule: false,
         ids: HashMap::new(),
         tokens: HashMap::new(),
         bodies: Vec::new(),
@@ -128,6 +130,7 @@ pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
 
 struct Lowering<'a> {
     grammar: &'a ast::GrammarDecl,
+    nested_rule: bool,
     ids: HashMap<String, usize>,
     tokens: HashMap<String, Expression>,
     bodies: Vec<Expression>,
@@ -599,6 +602,7 @@ impl Lowering<'_> {
                     | AnnotationKind::Enum
                     | AnnotationKind::Eval { .. }
                     | AnnotationKind::CommonField { .. } => {}
+                    AnnotationKind::Simple { name } if name == "nestedCaptures" => {}
                     other => {
                         return Err(format!("unsupported annotation {other:?} on {}", rule.name))
                     }
@@ -678,6 +682,7 @@ impl Lowering<'_> {
         let root = root.ok_or("exactly one @root is required")?;
         self.check_parser_names()?;
         for rule in &self.grammar.rules {
+            self.nested_rule = crate::nested_captures::enabled(rule);
             self.bodies.push(self.body(&rule.body)?);
         }
         loop {
@@ -856,8 +861,20 @@ impl Lowering<'_> {
                     let shape = captures[name].clone();
                     fields.push(Field {
                         name: name.clone(),
-                        kind: shape.kind,
-                        cardinality: shape.cardinality,
+                        kind: if crate::nested_captures::enabled(&self.grammar.rules[i]) {
+                            crate::nested_captures::field(
+                                self.grammar,
+                                &self.grammar.rules[i],
+                                name,
+                            )?
+                        } else {
+                            shape.kind
+                        },
+                        cardinality: if crate::nested_captures::enabled(&self.grammar.rules[i]) {
+                            Cardinality::One
+                        } else {
+                            shape.cardinality
+                        },
                     });
                 }
                 let mapping = Mapping {
@@ -1244,7 +1261,14 @@ impl Lowering<'_> {
             for element in &sequence.elements {
                 let value = self.atomic(&element.element)?;
                 elements.push(if let Some(name) = &element.capture {
-                    capture(name, value)?
+                    if self.nested_rule {
+                        Expression::Capture {
+                            name: name.clone(),
+                            expression: Box::new(crate::nested_captures::boundary(value)),
+                        }
+                    } else {
+                        capture(name, value)?
+                    }
                 } else {
                     value
                 });
@@ -1367,6 +1391,9 @@ impl Lowering<'_> {
             | Expression::OptionalExpr(_) => true,
             Expression::Reference(rule) => self.nullable.contains(rule),
             Expression::Capture { expression, .. }
+            | Expression::CaptureBoundary {
+                child: expression, ..
+            }
             | Expression::Delimited(expression)
             | Expression::CaptureEquality {
                 child: expression, ..
@@ -1600,6 +1627,9 @@ impl Lowering<'_> {
         match expression {
             Expression::Reference(rule) => Ok(state[*rule].clone()),
             Expression::Capture { expression, .. }
+            | Expression::CaptureBoundary {
+                child: expression, ..
+            }
             | Expression::Delimited(expression)
             | Expression::CaptureEquality {
                 child: expression, ..
@@ -1661,6 +1691,9 @@ impl Lowering<'_> {
         match expression {
             Expression::Reference(rule) => self.rule_shape_projected(*rule, visiting, enum_nodes),
             Expression::Capture { expression, .. }
+            | Expression::CaptureBoundary {
+                child: expression, ..
+            }
             | Expression::Delimited(expression)
             | Expression::CaptureEquality {
                 child: expression, ..
@@ -1803,6 +1836,9 @@ impl Lowering<'_> {
                 }
             }
             Expression::Capture { expression, .. }
+            | Expression::CaptureBoundary {
+                child: expression, ..
+            }
             | Expression::TextValue(expression)
             | Expression::ValueBoundary(expression)
             | Expression::Delimited(expression)
@@ -2003,9 +2039,9 @@ impl Lowering<'_> {
             Expression::OptionalExpr(child) => {
                 self.wrapped_captures(child, Cardinality::Optional)?
             }
-            Expression::Delimited(child) | Expression::CaptureEquality { child, .. } => {
-                self.captures(child)?
-            }
+            Expression::Delimited(child)
+            | Expression::CaptureBoundary { child, .. }
+            | Expression::CaptureEquality { child, .. } => self.captures(child)?,
             Expression::Repeat { child, .. } => self.wrapped_captures(child, Cardinality::Many)?,
             Expression::Separated { child, separator } => {
                 if !self.captures(separator)?.is_empty() {
@@ -2505,6 +2541,9 @@ fn children(expression: &Expression) -> Vec<&Expression> {
     match expression {
         Expression::Sequence(elements) | Expression::Choice(elements) => elements.iter().collect(),
         Expression::Capture { expression, .. }
+        | Expression::CaptureBoundary {
+            child: expression, ..
+        }
         | Expression::Delimited(expression)
         | Expression::CaptureEquality {
             child: expression, ..

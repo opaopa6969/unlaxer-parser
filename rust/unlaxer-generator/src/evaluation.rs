@@ -142,6 +142,7 @@ fn require(
 }
 fn scalar(field: &Field, expression: &str) -> String {
     match &field.kind {
+        Kind::Nested { .. } => unreachable!("validated nested evaluation restriction"),
         Kind::Text => format!("EvalValue::Text({expression})"),
         Kind::Integer => format!("EvalValue::Integer(*{expression})"),
         Kind::Node => format!("EvalValue::Node({expression})"),
@@ -169,6 +170,7 @@ fn value(field: &Field, expression: &str) -> String {
 fn operand(ir: &GrammarIr, field: &Field, expression: &str) -> String {
     match &field.kind {
         Kind::Node | Kind::NullableNode => format!("evaluate({expression}, self)"),
+        Kind::Nested { .. } => unreachable!("validated nested evaluation restriction"),
         Kind::Text => format!("self.evaluate_literal({expression})"),
         Kind::Integer => format!("self.evaluate_literal(&{expression}.to_string())"),
         Kind::Enum(_) => format!("self.evaluate_literal(&format!(\"{{:?}}\", {expression}))"),

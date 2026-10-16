@@ -75,6 +75,7 @@ public final class RustBackend {
         else if (expression instanceof Repeat v) collectLspKeywords(v.child(), keywords);
         else if (expression instanceof Delimited v) collectLspKeywords(v.child(), keywords);
         else if (expression instanceof TextValue v) collectLspKeywords(v.child(), keywords);
+        else if (expression instanceof CaptureBoundary v) collectLspKeywords(v.child(), keywords);
         else if (expression instanceof ValueBoundary v) collectLspKeywords(v.child(), keywords);
         else if (expression instanceof TriviaScope v) collectLspKeywords(v.child(), keywords);
         else if (expression instanceof LexicalTriviaScope v) collectLspKeywords(v.child(), keywords);
@@ -462,6 +463,7 @@ public final class RustBackend {
         if (expression instanceof TextValue text) {
             return expression(text.child()) + ".text_value()";
         }
+        if (expression instanceof CaptureBoundary b) return "Expr::CaptureBoundary(unlaxer_runtime::capture_tree::Kind::"+switch(b.kind()){case VALUE->"Value";case OPTIONAL->"Optional";case LIST->"List";}+", Box::new("+expression(b.child())+"))";
         if (expression instanceof ValueBoundary boundary) {
             return expression(boundary.child()) + ".value_boundary()";
         }
@@ -631,6 +633,7 @@ public final class RustBackend {
                 Ok(values.pop())
             }
             """);
+        if(ir.mappings().stream().flatMap(m->m.fields().stream()).anyMatch(f->f.kind()==Kind.NESTED)) out.append(NestedEmitter.HELPERS);
         out.append(AssociativeSpines.helpers(ir));
         out.append("""
 
@@ -677,6 +680,7 @@ public final class RustBackend {
                     .append("            for capture in node.captures.iter().filter(|c| c.name == ").append(quote(field.name())).append(") {\n");
                 String associative = AssociativeSpines.capture(mapping,field,"                ");
                 if (associative != null) out.append(associative);
+                else if (field.kind() == Kind.NESTED) out.append("                let nested = nested_capture(tree, capture)?;\n                values.push(").append(NestedEmitter.mapped(field.nested(),"&nested",0)).append("?);\n");
                 else if (field.kind() == Kind.INTEGER) out.append("                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).parse::<i32>().map_err(|_| format!(\"invalid i32 capture {} at {}..{}\", capture.name, capture.span.start, capture.span.end))?);\n");
                 else if (field.kind() == Kind.NODE) out.append("                values.extend(map_nodes(tree, &capture.nodes)?);\n");
                 else if (field.kind() == Kind.VALUE) out.append("                values.extend(map_values(tree, &capture.nodes)?);\n");
@@ -723,7 +727,9 @@ public final class RustBackend {
     }
 
     static String fieldType(Field field, boolean borrowed) {
+        if (field.kind()==Kind.NESTED) return (borrowed?"&":"")+NestedEmitter.type(field.nested());
         String one = switch (field.kind()) {
+            case NESTED -> throw new IllegalStateException("handled nested field");
             case INTEGER -> borrowed ? "&i32" : "i32";
             case NODE -> borrowed ? "&Ast" : "Box<Ast>";
             case NULLABLE_NODE -> borrowed ? "Option<&Ast>" : "Option<Box<Ast>>";
@@ -732,6 +738,7 @@ public final class RustBackend {
             case ENUM -> (borrowed ? "&" : "") + field.enumName();
         };
         String element = switch (field.kind()) {
+            case NESTED -> throw new IllegalStateException("handled nested field");
             case INTEGER -> "i32";
             case NODE -> "Ast";
             case NULLABLE_NODE -> "Option<Box<Ast>>";
@@ -758,6 +765,7 @@ public final class RustBackend {
     private static String fieldJson(Field field) {
         String name = "r#" + field.name();
         if (field.kind() == Kind.NULLABLE_NODE) return name + ".as_ref().map_or_else(|| \"null\".to_owned(), |value| value.canonical_json())";
+        if(field.kind()==Kind.NESTED) return NestedEmitter.json(field.nested(),name,0);
         String value = field.kind() == Kind.INTEGER ? "value.to_string()" : field.kind() != Kind.TEXT ? "value.canonical_json()" : "json_string(value)";
         return switch (field.cardinality()) {
             case ONE -> field.kind() == Kind.INTEGER ? name + ".to_string()" : field.kind() != Kind.TEXT ? name + ".canonical_json()" : "json_string(" + name + ")";
