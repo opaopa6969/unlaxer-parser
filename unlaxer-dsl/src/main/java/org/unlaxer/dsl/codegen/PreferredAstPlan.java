@@ -115,6 +115,11 @@ public final class PreferredAstPlan {
         else if (atom instanceof RepeatElement repeat) nestedBody(repeat.body(),depth+2,plan,rules,calls);
         else if (atom instanceof OneOrMoreElement repeat) nested(repeat.body(),depth+2,plan,rules,calls);
         else if (atom instanceof BoundedRepeatElement repeat) nested(repeat.body(),depth+2,plan,rules,calls);
+        else if (atom instanceof SeparatedElement separated) {
+            nested(separated.element(),depth+2,plan,rules,calls);
+            // Outer list, list chain, tail repetition, tail chain and opaque separator.
+            atom(separated.separator(),depth+5,plan,rules,calls);
+        }
         else if (atom instanceof RuleRefElement ref) {
             int id=rules.indexOf(ref.name());if(id>=0)calls.add(new Call(id,depth+1));
         }

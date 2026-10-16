@@ -219,9 +219,9 @@ fn nominal_leaf(grammar: &GrammarDecl, atom: &AtomicElement) -> Option<String> {
             };
             nominal_leaf(grammar, &element.element)
         }
-        ElementKind::OneOrMore(child) | ElementKind::BoundedRepeat { element: child, .. } => {
-            nominal_leaf(grammar, child)
-        }
+        ElementKind::OneOrMore(child)
+        | ElementKind::BoundedRepeat { element: child, .. }
+        | ElementKind::Separated { element: child, .. } => nominal_leaf(grammar, child),
         _ => None,
     }
 }
@@ -245,6 +245,9 @@ pub fn shape(grammar: &GrammarDecl, atom: &AtomicElement, depth: usize) -> Resul
         return Err("schema depth exceeds 32".into());
     }
     Ok(match &atom.kind {
+        ElementKind::Separated { element, .. } => {
+            wrap(Cardinality::Many, shape(grammar, element, depth + 1)?)
+        }
         ElementKind::Optional(v) => wrap(Cardinality::Optional, body_shape(grammar, v, depth + 1)?),
         ElementKind::Repeat(v) => wrap(Cardinality::Many, body_shape(grammar, v, depth + 1)?),
         ElementKind::OneOrMore(v) | ElementKind::BoundedRepeat { element: v, .. } => {
@@ -366,6 +369,16 @@ pub fn boundary(expression: Expression) -> Expression {
                 child: Box::new(boundary(*child)),
                 min,
                 max,
+            },
+        ),
+        Expression::Separated { child, separator } => (
+            BoundaryKind::List,
+            Expression::Separated {
+                child: Box::new(boundary(*child)),
+                separator: Box::new(Expression::CaptureBoundary {
+                    kind: BoundaryKind::Separator,
+                    child: separator,
+                }),
             },
         ),
         other => (BoundaryKind::Value, other),

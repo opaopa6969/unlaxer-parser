@@ -70,6 +70,7 @@ final class NestedMapperEmitter {
                 guardVisit(current.getKey());
                 if (++visits > 65536 || current.getValue() >= 256) throw new IllegalArgumentException("nested projection traversal limit");
                 Token token = current.getKey();
+                if (token.parser instanceof org.unlaxer.parser.combinator.CaptureBoundaryParser boundary && boundary.boundaryKind() == org.unlaxer.parser.combinator.CaptureBoundaryParser.Kind.SEPARATOR) continue;
                 if (token.parser instanceof org.unlaxer.parser.combinator.CaptureBoundaryParser boundary && boundary.boundaryKind() == org.unlaxer.parser.combinator.CaptureBoundaryParser.Kind.VALUE) values.add(token);
                 else {
                     var children = token.getOriginalChildren();

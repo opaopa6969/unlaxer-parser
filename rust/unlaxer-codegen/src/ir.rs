@@ -92,6 +92,7 @@ pub enum BoundaryKind {
     Value,
     Optional,
     List,
+    Separator,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -157,7 +157,7 @@ public class NestedMappedCaptureConformanceTest extends NestedCaptureConformance
         for(var variant:types.entrySet()) {
             var fields=variant.getValue().getAsJsonObject();
             out.append("fn eval_").append(variant.getKey().toLowerCase(java.util.Locale.ROOT)).append("(&mut self,");
-            for(var field:fields.entrySet())out.append(field.getKey()).append(':').append(borrowed(field.getValue().getAsString(),variant.getKey().equals("Root"))).append(',');
+            for(var field:fields.entrySet())out.append(field.getKey()).append(':').append(borrowed(field.getValue().getAsString(),variant.getKey().equals("Root") || fixture.has("nestedMappings") && fixture.getAsJsonArray("nestedMappings").asList().stream().anyMatch(n->n.getAsString().equals(variant.getKey())))).append(',');
             out.append("_span:unlaxer_runtime::Span)->String{");
             if(variant.getKey().equals("Root")&&fields.size()==1&&fields.has("value"))out.append("value.structure()");
             else out.append("format!(\"node(").append(variant.getKey()).append(",{})\",vec![").append(fields.keySet().stream().map(n->n+".structure()").collect(java.util.stream.Collectors.joining(","))).append("].join(\",\"))");

@@ -19,7 +19,7 @@ public class CaptureBoundaryTest {
     private static String decode(String text) { return text.equals("~") ? "" : new String(HexFormat.of().parseHex(text),StandardCharsets.UTF_8); }
     private static String hex(String text) { return text.isEmpty() ? "~" : HexFormat.of().formatHex(text.getBytes(StandardCharsets.UTF_8)); }
     private static String canonical(CaptureSnapshot.Element e) {
-        String kind=switch(e.kind()) {case VALUE->"V";case OPTIONAL->"O";case LIST->"L";};
+        String kind=switch(e.kind()) {case VALUE->"V";case OPTIONAL->"O";case LIST->"L";case SEPARATOR->throw new AssertionError("separator is not a snapshot value");};
         return kind+"@"+e.startCP()+":"+e.endCP()+":"+hex(e.text())+"["+e.children().stream().map(CaptureBoundaryTest::canonical).collect(Collectors.joining(","))+"]";
     }
     private static Parser word(String text) { return new WordParser(text); }

@@ -7,6 +7,8 @@ pub enum Kind {
     Value,
     Optional,
     List,
+    /// Opaque separator CST: retain parsing/state, exclude it from a parent snapshot.
+    Separator,
 }
 impl Kind {
     pub(crate) const fn rule(self) -> usize {
@@ -15,10 +17,11 @@ impl Kind {
                 Self::Value => 5,
                 Self::Optional => 6,
                 Self::List => 7,
+                Self::Separator => 8,
             }
     }
     pub fn of_rule(rule: usize) -> Option<Self> {
-        [Self::Value, Self::Optional, Self::List]
+        [Self::Value, Self::Optional, Self::List, Self::Separator]
             .into_iter()
             .find(|kind| kind.rule() == rule)
     }
@@ -99,7 +102,7 @@ const MAX_BYTES: usize = 2 * 1024 * 1024;
 /// Reject malformed public CSTs and bound traversal depth, visits, and total retained UTF-8 bytes.
 pub fn snapshot(tree: &Tree, root: usize) -> Result<Element, Error> {
     let root_node = tree.nodes.get(root).ok_or(Error::InvalidTree)?;
-    if Kind::of_rule(root_node.rule).is_none() {
+    if matches!(Kind::of_rule(root_node.rule), None | Some(Kind::Separator)) {
         return Err(Error::NotBoundary);
     }
     let mut budget = Budget {
@@ -131,6 +134,9 @@ fn prepare(tree: &Tree, id: usize, depth: usize, budget: &mut Budget) -> Result<
     visit(depth, budget)?;
     let node = tree.nodes.get(id).ok_or(Error::InvalidTree)?;
     if let Some(kind) = Kind::of_rule(node.rule) {
+        if kind == Kind::Separator {
+            return Ok(());
+        }
         if node.span.start > node.span.end {
             return Err(Error::InvalidTree);
         }
@@ -239,7 +245,9 @@ fn collect(
     out: &mut Vec<Element>,
 ) -> Result<(), Error> {
     let node = tree.nodes.get(id).ok_or(Error::InvalidTree)?;
-    if Kind::of_rule(node.rule).is_some() {
+    if Kind::of_rule(node.rule) == Some(Kind::Separator) {
+        visit(depth, budget)?;
+    } else if Kind::of_rule(node.rule).is_some() {
         out.push(build(tree, id, depth, budget)?);
     } else {
         visit(depth, budget)?;

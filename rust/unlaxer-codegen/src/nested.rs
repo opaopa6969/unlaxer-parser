@@ -114,6 +114,7 @@ fn nested_source_nodes(tree: &Tree, root: usize) -> Result<Vec<usize>, String> {
         visits += 1;
         if visits > 65536 || depth >= 256 { return Err("nested projection traversal limit".into()); }
         let node = tree.nodes.get(id).ok_or("invalid nested projection node")?;
+        if unlaxer_runtime::capture_tree::Kind::of_rule(node.rule) == Some(unlaxer_runtime::capture_tree::Kind::Separator) { continue; }
         if unlaxer_runtime::capture_tree::Kind::of_rule(node.rule) == Some(unlaxer_runtime::capture_tree::Kind::Value) {
             values.push(id);
         } else {

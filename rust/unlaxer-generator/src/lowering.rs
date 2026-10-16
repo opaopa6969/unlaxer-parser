@@ -1648,6 +1648,10 @@ impl Lowering<'_> {
         }
         let _depth = self.enter_analysis()?;
         match expression {
+            Expression::CaptureBoundary {
+                kind: unlaxer_codegen::BoundaryKind::Separator,
+                ..
+            } => Ok(FixedShape::Value(text_shape())),
             Expression::Reference(rule) => Ok(state[*rule].clone()),
             Expression::OwnedCapture {
                 child: expression, ..
@@ -1716,6 +1720,10 @@ impl Lowering<'_> {
     ) -> Result<Shape> {
         let _depth = self.enter_analysis()?;
         match expression {
+            Expression::CaptureBoundary {
+                kind: unlaxer_codegen::BoundaryKind::Separator,
+                ..
+            } => Ok(text_shape()),
             Expression::Reference(rule) => self.rule_shape_projected(*rule, visiting, enum_nodes),
             Expression::OwnedCapture {
                 child: expression, ..

@@ -16,7 +16,7 @@ public final class CaptureSnapshot {
             java.util.Objects.requireNonNull(text);
             children = List.copyOf(children);
             if (startCP < 0 || endCP < startCP || kind == Kind.VALUE && !children.isEmpty()
-                    || kind == Kind.OPTIONAL && children.size() > 1) throw new IllegalArgumentException("invalid capture element");
+                    || kind == Kind.OPTIONAL && children.size() > 1 || kind == Kind.SEPARATOR) throw new IllegalArgumentException("invalid capture element");
         }
     }
     public enum Error { NOT_BOUNDARY, INVALID_TREE, LIMIT }
@@ -35,7 +35,7 @@ public final class CaptureSnapshot {
     private static Element build(Token token, int depth, Budget budget) {
         visit(depth, budget);
         if (token == null) throw new SnapshotException(Error.INVALID_TREE);
-        if (!(token.parser instanceof CaptureBoundaryParser boundary)) throw new SnapshotException(Error.NOT_BOUNDARY);
+        if (!(token.parser instanceof CaptureBoundaryParser boundary) || boundary.boundaryKind() == Kind.SEPARATOR) throw new SnapshotException(Error.NOT_BOUNDARY);
         if (token.source == null) throw new SnapshotException(Error.INVALID_TREE);
         int sourceLength = token.source.codePointLength().value();
         if (sourceLength < 0) throw new SnapshotException(Error.INVALID_TREE);
@@ -63,7 +63,8 @@ public final class CaptureSnapshot {
     }
     private static void collect(Token token, int depth, Budget budget, List<Element> output) {
         if (token == null) throw new SnapshotException(Error.INVALID_TREE);
-        if (token.parser instanceof CaptureBoundaryParser) output.add(build(token, depth, budget));
+        if (token.parser instanceof CaptureBoundaryParser boundary && boundary.boundaryKind() == Kind.SEPARATOR) visit(depth, budget);
+        else if (token.parser instanceof CaptureBoundaryParser) output.add(build(token, depth, budget));
         else {
             visit(depth, budget);
             for (Token child : token.getOriginalChildren()) collect(child, depth + 1, budget, output);

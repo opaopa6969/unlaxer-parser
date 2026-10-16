@@ -314,6 +314,10 @@ impl<'a> Plan<'a> {
             ElementKind::OneOrMore(child) | ElementKind::BoundedRepeat { element: child, .. } => {
                 self.nested_atom(child, depth + 2, out)
             }
+            ElementKind::Separated { element, separator } => {
+                self.nested_atom(element, depth + 2, out);
+                self.atom(separator, depth + 5, out);
+            }
             ElementKind::RuleRef { name, .. } => {
                 if let Some(id) = self.g.rules.iter().position(|r| &r.name == name) {
                     out.push((id, depth + 1));

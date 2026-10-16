@@ -719,6 +719,7 @@ public final class RustGrammarLowering {
         if (expression instanceof Delimited d) { var inner=nestedBoundary(d.child()); return new CaptureBoundary(inner.kind(),new Delimited(inner.child())); }
         if (expression instanceof OptionalExpr o) return new CaptureBoundary(BoundaryKind.OPTIONAL,new OptionalExpr(nestedBoundary(o.child())));
         if (expression instanceof Repeat r) return new CaptureBoundary(BoundaryKind.LIST,new Repeat(nestedBoundary(r.child()),r.min(),r.max()));
+        if (expression instanceof Separated s) return new CaptureBoundary(BoundaryKind.LIST,new Separated(nestedBoundary(s.child()),new CaptureBoundary(BoundaryKind.SEPARATOR,s.separator())));
         return new CaptureBoundary(BoundaryKind.VALUE,expression);
     }
 
@@ -1126,7 +1127,7 @@ public final class RustGrammarLowering {
     }
 
     private Shape shape(Expression expression, Set<Integer> visiting, boolean enumNodes) {
-        if (expression instanceof CaptureBoundary b) { return shape(b.child(),visiting,enumNodes); }
+        if (expression instanceof CaptureBoundary b) { return b.kind()==BoundaryKind.SEPARATOR ? new Shape(Kind.TEXT,Cardinality.ONE) : shape(b.child(),visiting,enumNodes); }
         enterAnalysis();
         try {
             if (expression instanceof ErrorExpected ignored) {

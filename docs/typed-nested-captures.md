@@ -48,7 +48,7 @@ capture / typeof の準備走査も深さ 64 で停止し、schema 解析の再�
 | 直接 mapped node / enum の再帰 container | 後続 #626 で対応。[契約と検証範囲](nested-mapped-leaves.md)参照 |
 | mixed value の再帰 container | 未対応、capture leaf の source shape を拒否 |
 | 透過 rule alias / recursive helper を経由する container | 未対応、capture 内の rule reference を拒否 |
-| separated list | 未対応、nested shape では早期拒否（通常 flat separated は別契約） |
+| separated list | #646 で対応。[型・値・separator 境界の契約](nested-separated-captures.md)参照 |
 | 同一 mapping 型を共有する複数規則 | #637 で全 recursive shape / nominal leaf / opt-in が一致する場合に対応 |
 | nested family の `@commonField` | #637 で nested field の実 accessor と、field を持たない mapped sum の opt-in を検証 |
 | nested 規則の `@typeof` / associative projection / `@eval` | 未対応、明示拒否 |
