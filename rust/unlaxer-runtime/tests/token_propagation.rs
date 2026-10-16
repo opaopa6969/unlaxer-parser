@@ -812,3 +812,161 @@ fn atomic_scope_restores_outer_trivia_after_success_failure_and_rollback() {
         assert_eq!(context.position(), 2);
     });
 }
+
+#[test]
+fn classic_outer_trivia_source_oracle() {
+    for memo in [Memoization::Off, Memoization::SafeFailures] {
+        for diagnostics in [
+            Diagnostics::Detailed,
+            Diagnostics::DetailedOnFailure,
+            Diagnostics::Auto,
+        ] {
+            for traced in [false, true] {
+                for row in
+                    include_str!("../../../conformance/token-propagation/sequence-trivia.tsv")
+                        .lines()
+                        .filter(|s| !s.starts_with('#') && !s.is_empty())
+                {
+                    let c: Vec<_> = row.split('\t').collect();
+                    let input = decode(c[1]);
+                    let options =
+                        ParseOptions::with_memoization(memo).with_diagnostics(diagnostics);
+                    let options = if traced {
+                        options.with_token_trace(Default::default())
+                    } else {
+                        options
+                    };
+                    let mut context = ParseContext::with_options(&input, options);
+                    context.set_reset_matched_with_consumed(false);
+                    let mut committed = vec![];
+                    for (column, kind) in [(5, TokenKind::Consumed), (6, TokenKind::MatchOnly)] {
+                        if c[column] != "~" {
+                            let value = Box::leak(decode(c[column]).into_boxed_str());
+                            committed.extend(
+                                context
+                                    .parse_with_token_mode(&w(value), kind, false)
+                                    .unwrap()
+                                    .nodes,
+                            );
+                        }
+                    }
+                    let first = match c[2] {
+                        "stop-consume" | "named-stop-consume" => w("A").stop_consume(),
+                        "match-first" => w("A").match_only(),
+                        _ => w("A"),
+                    };
+                    let expression = Expr::sequence([first, w("B")]);
+                    let expression = match c[2] {
+                        "rollback" => Expr::choice([Expr::sequence([w("A"), w("X")]), expression]),
+                        "recovery" => expression.recover(
+                            unlaxer_runtime::RecoveryMode::Sync,
+                            [";"],
+                            "syntax error: skipped to sync point",
+                        ),
+                        _ => expression,
+                    };
+                    let expression = if c[2].starts_with("named-") {
+                        expression.lexical_trivia_scope(
+                            unlaxer_runtime::lexical::LexicalExpression {
+                                op: unlaxer_runtime::lexical::Op::LITERAL,
+                                text: "~",
+                                min: 0,
+                                max: 0,
+                                children: vec![],
+                            },
+                        )
+                    } else {
+                        expression
+                    };
+                    let result = context.with_trivia(true, |context| {
+                        context.parse_with_token_mode(&expression, kind(c[3]), c[4] == "true")
+                    });
+                    assert_eq!(
+                        result.is_ok(),
+                        c[7] == "true",
+                        "{} {memo:?} {diagnostics:?} traced={traced}",
+                        c[0]
+                    );
+                    assert_eq!(
+                        (context.position(), context.matched_position()),
+                        (c[8].parse().unwrap(), c[9].parse().unwrap()),
+                        "{}",
+                        c[0]
+                    );
+                    let root = if let Ok(parsed) = result {
+                        let sig = signatures(&mut context, &parsed.nodes);
+                        committed.extend(parsed.nodes);
+                        sig
+                    } else {
+                        "~".into()
+                    };
+                    assert_eq!(root, c[10], "{}", c[0]);
+                    assert_eq!(signatures(&mut context, &committed), c[11], "{}", c[0]);
+                    if traced && c[2] == "recovery" {
+                        assert!(context.token_trace().unwrap().is_err());
+                        assert_eq!(context.recoveries().len(), 1);
+                        assert_eq!(
+                            context.recoveries()[0].span,
+                            unlaxer_runtime::Span { start: 0, end: 5 }
+                        );
+                    } else if traced {
+                        let trace = context.token_trace().unwrap().unwrap();
+                        let text = trace
+                            .iter()
+                            .map(|leaf| leaf.text(&input).unwrap())
+                            .collect::<String>();
+                        let expected = if c[11] == "~" {
+                            String::new()
+                        } else {
+                            c[11]
+                                .split(';')
+                                .map(|s| decode(s.rsplit(':').next().unwrap()))
+                                .collect::<String>()
+                        };
+                        assert_eq!(text, expected, "trace {}", c[0]);
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn classic_trivia_trace_limit_is_observational_and_failed_branch_restores_budget() {
+    use unlaxer_runtime::token_trace::{Error, Limits};
+    let options = ParseOptions::default().with_token_trace(Limits {
+        leaves: 1,
+        source_bytes: 3,
+    });
+    let mut limited = ParseContext::with_options("A B", options);
+    let parsed = limited
+        .with_trivia(true, |c| {
+            c.parse_with_token_mode(
+                &Expr::sequence([w("A"), w("B")]),
+                TokenKind::Consumed,
+                false,
+            )
+        })
+        .unwrap();
+    assert_eq!(
+        signatures(&mut limited, &parsed.nodes),
+        "consumed@0:3:412042"
+    );
+    assert_eq!((limited.position(), limited.matched_position()), (3, 3));
+    assert_eq!(limited.token_trace().unwrap(), Err(Error::Limit));
+
+    let mut rolled_back = ParseContext::with_options("A B", options);
+    let expression = Expr::choice([Expr::sequence([w("A"), w("B"), w("missing")]), w("A B")]);
+    let parsed = rolled_back
+        .with_trivia(true, |c| {
+            c.parse_with_token_mode(&expression, TokenKind::Consumed, false)
+        })
+        .unwrap();
+    assert_eq!(
+        signatures(&mut rolled_back, &parsed.nodes),
+        "consumed@0:3:412042"
+    );
+    let trace = rolled_back.token_trace().unwrap().unwrap();
+    assert_eq!(trace.len(), 1);
+    assert_eq!(trace[0].text("A B").unwrap(), "A B");
+}

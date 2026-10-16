@@ -117,6 +117,44 @@ public class GeneralTokenPropagationTest {
         };
     }
 
+    private static Parser triviaChain(String scenario) {
+        Parser space = new ZeroOrMore(new Choice(new org.unlaxer.parser.posix.SpaceParser(),
+                new org.unlaxer.parser.clang.CPPComment(),new org.unlaxer.parser.clang.BlockComment()));
+        Parser first = scenario.endsWith("stop-consume") ? consume(word("A")) :
+                scenario.equals("match-first") ? match(word("A")) : word("A");
+        Parser result = new Chain(space,first,space,word("B"),space);
+        if (scenario.equals("rollback")) result = new Choice(new Chain(space,word("A"),space,word("X"),space),result);
+        if (scenario.equals("recovery")) result = new SyncPointRecoveryParser(result,";");
+        return result;
+    }
+
+    @Test public void classicOuterTriviaPreservesCollectedSources() throws Exception {
+        var rows = Files.readAllLines(Path.of("../conformance/token-propagation/sequence-trivia.tsv")).stream()
+                .filter(row -> !row.isBlank() && !row.startsWith("#") && !row.startsWith("named-")).toList();
+        var failures = new ArrayList<String>();
+        for (Memoization memo : Memoization.values()) for (ParseOptions.Diagnostics diagnostics : ParseOptions.Diagnostics.values()) for (String row : rows) {
+            String[] c=row.split("\t",-1);String label=c[0]+"/"+memo+"/"+diagnostics;
+            try(var context=ParseContext.withOptions(StringSource.createRootSource(decode(c[1])),ParseOptions.withMemoization(memo).withDiagnostics(diagnostics))) {
+                context.getCurrent().setResetMatchedWithConsumed(false);
+                if(!c[5].equals("~"))word(decode(c[5])).parse(context);
+                if(!c[6].equals("~"))word(decode(c[6])).parse(context,TokenKind.matchOnly,false);
+                var parsed=triviaChain(c[2]).parse(context,TokenKind.valueOf(c[3]),Boolean.parseBoolean(c[4]));
+                assertEquals(label,Boolean.parseBoolean(c[7]),parsed.isSucceeded());
+                assertEquals(label,Integer.parseInt(c[8]),context.getConsumedPosition().value());
+                assertEquals(label,Integer.parseInt(c[9]),context.getMatchedPosition().value());
+                assertEquals(label,c[10],parsed.isSucceeded()?signature(parsed.getRootToken()):"~");
+                assertEquals(label,c[11],signatures(context.getCurrent().getTokens()));
+                if(parsed.isSucceeded()) {
+                    String raw=parsed.getOriginalTokens().stream().filter(t->t.tokenKind==parsed.getRootToken().tokenKind)
+                        .map(t->t.source.sourceAsString()).collect(Collectors.joining());
+                    assertEquals(label,parsed.getRootToken().source.sourceAsString(),raw);
+                }
+                assertEquals(label,1,context.getTokenStack().size());
+            } catch(AssertionError failure){failures.add(failure.getMessage());}
+        }
+        assertTrue(String.join("\n",failures),failures.isEmpty());
+    }
+
     private static String signature(Token token) {
         String text = token.source.sourceAsString();
         return token.tokenKind

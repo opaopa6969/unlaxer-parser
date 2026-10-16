@@ -33,6 +33,6 @@ cargo +1.85.0 test --locked --manifest-path rust/Cargo.toml -p unlaxer-runtime
 
 #601 は既存の組込 token の字句境界を修正する単位です。新しい UBNF token-mode 構文や、全外部 parser の自動変換は追加しません。
 
-## 残る外側 source collection の差
+## 外側 source collection
 
-明示 Classic entry の外側 Sequence は、現在 trivia を skip した文字を collected source に含めません。例えば `A B` の生成 parser は consumed=3 でも root source が `AB` / span=[0,2] になります。同じ明示 Consumed entry の Java は `A B` / span=[0,3] です。通常の生成 Rust mapper は Java と一致しますが、明示 Classic CST を mapper に渡した root source map は [#606](https://github.com/opaopa6969/unlaxer-parser/issues/606) で継続します。本試験の明示 Classic 比較は prefix/cursor であり、この外側 AST/source-map 差の完了根拠にはしません。内部 atomic の字句境界修正とは別の契約です。
+#606 で明示 Classic entry の外側 Sequence も delimiter trivia を collected source に含むようになりました。通常 Consumed の `A B` は Java/Rust とも root text=`A B`、span=[0,3] です。`AtomicTriviaConformanceTest` は明示 Classic CST を mapper に渡した AST/source CP も共通期待値と比較します。virtual / Projected の既存規則との区別は [Classic Sequence の trivia](classic-sequence-trivia.md) を参照してください。
