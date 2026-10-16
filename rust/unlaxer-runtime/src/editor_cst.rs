@@ -311,7 +311,10 @@ pub fn literal_completions(grammar: &SharedGrammar) -> Vec<&'static str> {
         match expression {
             Literal(value) => result.push(value),
             Lexical(_, expression) => lexical(expression, result),
-            Sequence(children) | Choice(children) | LongestChoice(children) => {
+            Sequence(children)
+            | NonOrdered(children)
+            | Choice(children)
+            | LongestChoice(children) => {
                 for child in children {
                     visit(child, result);
                 }
