@@ -48,6 +48,9 @@ public class Zero extends ChildOccursWithTerminator {
 		return new Zero(getName() , getChild(), terminator);
 	}
 
+    /** An explicit negative check, distinct from an ordinary {0} repetition. */
+    @Override public boolean isZeroMatchCheck() { return true; }
+
 	@Override
 	public int min() {
 		return 0;

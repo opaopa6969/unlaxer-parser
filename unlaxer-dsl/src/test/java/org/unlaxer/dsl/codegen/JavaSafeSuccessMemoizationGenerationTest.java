@@ -47,8 +47,8 @@ public class JavaSafeSuccessMemoizationGenerationTest {
             @declares(symbol=name) Declaration ::= ('d' 'e') @name ;
             @backref(name=name) Reference ::= 'r' @name ;
             Pure ::= 'x' @value ;
-            CycleA ::= CycleB | 'a' ;
-            CycleB ::= CycleA | Reference ;
+            CycleA ::= 'a' CycleB | 'a' ;
+            CycleB ::= 'b' CycleA | Reference ;
             Wrapped ::= [ (Scoped 'x') ] ;
             """);
         for (String name : List.of("RootParser", "ScopedParser", "DeclarationParser", "ReferenceParser",

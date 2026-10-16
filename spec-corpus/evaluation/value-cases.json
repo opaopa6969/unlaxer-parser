@@ -1,0 +1,297 @@
+[
+  {
+    "input": "s(on)",
+    "value": [
+      "enum",
+      "Mode",
+      "on"
+    ],
+    "events": [
+      "convert"
+    ],
+    "span": [
+      0,
+      5
+    ]
+  },
+  {
+    "input": "s(off)",
+    "value": [
+      "enum",
+      "Mode",
+      "off"
+    ],
+    "events": [
+      "convert"
+    ],
+    "span": [
+      0,
+      6
+    ]
+  },
+  {
+    "input": "s(raw)",
+    "value": "raw",
+    "events": [
+      "convert"
+    ],
+    "span": [
+      0,
+      6
+    ]
+  },
+  {
+    "input": "s(👨‍👩‍👧‍👦)",
+    "value": "👨‍👩‍👧‍👦",
+    "events": [
+      "convert"
+    ],
+    "span": [
+      0,
+      10
+    ]
+  },
+  {
+    "input": "s(n(😀))",
+    "value": [
+      "node",
+      "😀"
+    ],
+    "events": [
+      "convert"
+    ],
+    "span": [
+      0,
+      7
+    ]
+  },
+  {
+    "input": "o()",
+    "value": null,
+    "events": [
+      "convert"
+    ],
+    "span": [
+      0,
+      3
+    ]
+  },
+  {
+    "input": "o(on)",
+    "value": [
+      "enum",
+      "Mode",
+      "on"
+    ],
+    "events": [
+      "convert"
+    ],
+    "span": [
+      0,
+      5
+    ]
+  },
+  {
+    "input": "o(raw)",
+    "value": "raw",
+    "events": [
+      "convert"
+    ],
+    "span": [
+      0,
+      6
+    ]
+  },
+  {
+    "input": "o(n(é))",
+    "value": [
+      "node",
+      "é"
+    ],
+    "events": [
+      "convert"
+    ],
+    "span": [
+      0,
+      8
+    ]
+  },
+  {
+    "input": "a()",
+    "value": [],
+    "events": [
+      "convert"
+    ],
+    "span": [
+      0,
+      3
+    ]
+  },
+  {
+    "input": "a(onon)",
+    "value": [
+      [
+        "enum",
+        "Mode",
+        "on"
+      ],
+      [
+        "enum",
+        "Mode",
+        "on"
+      ]
+    ],
+    "events": [
+      "convert"
+    ],
+    "span": [
+      0,
+      7
+    ]
+  },
+  {
+    "input": "a(onn(😀)rawoff)",
+    "value": [
+      [
+        "enum",
+        "Mode",
+        "on"
+      ],
+      [
+        "node",
+        "😀"
+      ],
+      "raw",
+      [
+        "enum",
+        "Mode",
+        "off"
+      ]
+    ],
+    "events": [
+      "convert"
+    ],
+    "span": [
+      0,
+      15
+    ]
+  },
+  {
+    "input": "p(raw)",
+    "value": "raw",
+    "events": [
+      "convert"
+    ],
+    "span": [
+      0,
+      6
+    ]
+  },
+  {
+    "input": "p(off)",
+    "value": [
+      "enum",
+      "Mode",
+      "off"
+    ],
+    "events": [
+      "convert"
+    ],
+    "span": [
+      0,
+      6
+    ]
+  },
+  {
+    "input": "p(n(😀))",
+    "value": "evaluated:😀",
+    "events": [
+      "node:😀"
+    ],
+    "span": [
+      0,
+      7
+    ]
+  },
+  {
+    "input": "i(+0012)",
+    "value": 12,
+    "events": [
+      "convert"
+    ],
+    "span": [
+      0,
+      8
+    ]
+  },
+  {
+    "input": "i(-2147483648)",
+    "value": -2147483648,
+    "events": [
+      "convert"
+    ],
+    "span": [
+      0,
+      14
+    ]
+  },
+  {
+    "input": "i(2147483647)",
+    "value": 2147483647,
+    "events": [
+      "convert"
+    ],
+    "span": [
+      0,
+      13
+    ]
+  },
+  {
+    "input": "j()",
+    "value": null,
+    "events": [
+      "convert"
+    ],
+    "span": [
+      0,
+      3
+    ]
+  },
+  {
+    "input": "j(-0)",
+    "value": 0,
+    "events": [
+      "convert"
+    ],
+    "span": [
+      0,
+      5
+    ]
+  },
+  {
+    "input": "k()",
+    "value": [],
+    "events": [
+      "convert"
+    ],
+    "span": [
+      0,
+      3
+    ]
+  },
+  {
+    "input": "k(1,-2,+03,)",
+    "value": [
+      1,
+      -2,
+      3
+    ],
+    "events": [
+      "convert"
+    ],
+    "span": [
+      0,
+      12
+    ]
+  }
+]

@@ -1,0 +1,915 @@
+[
+  {
+    "name": "LiteralSpine",
+    "grammar": "grammar LiteralSpine { @package: preferredprobe @whitespace: none token NUMBER = org.unlaxer.parser.elementary.NumberParser @root @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=10) Expr ::= Term @left { '-' @op Term @right }; @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=20) Term ::= Factor @left { '/' @op Factor @right }; Factor ::= NUMBER | '(' Expr ')'; }",
+    "java": "protected String evalBinary(LiteralSpineAST.Binary n){if(n.left()==null){if(n.op().size()!=1||!n.right().isEmpty())throw new AssertionError();return \"L:\"+n.op().get(0);}return \"B(\"+eval(n.left())+\",\"+String.join(\"|\",n.op())+\",\"+n.right().stream().map(this::eval).collect(java.util.stream.Collectors.joining(\"|\"))+\")\";}",
+    "rust": "fn eval_binary(&mut self,left:Option<&Ast>,op:&[String],right:&[Ast],_:unlaxer_runtime::Span)->String{if let Some(left)=left {format!(\"B({},{},{})\",evaluate(left,self),op.join(\"|\"),right.iter().map(|n|evaluate(n,self)).collect::<Vec<_>>().join(\"|\"))}else{assert_eq!(op.len(),1);assert!(right.is_empty());format!(\"L:{}\",op[0])}}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "9",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            1,
+            "B(B(L:9,,),,)"
+          ],
+          [
+            "Binary",
+            2,
+            0,
+            1,
+            "B(L:9,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "9-3",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            3,
+            "B(B(L:9,,),-,B(L:3,,))"
+          ],
+          [
+            "Binary",
+            2,
+            0,
+            1,
+            "B(L:9,,)"
+          ],
+          [
+            "Binary",
+            4,
+            2,
+            3,
+            "B(L:3,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "9-3-1",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            5,
+            "B(B(L:9,,),-|-,B(L:3,,)|B(L:1,,))"
+          ],
+          [
+            "Binary",
+            2,
+            0,
+            1,
+            "B(L:9,,)"
+          ],
+          [
+            "Binary",
+            4,
+            2,
+            3,
+            "B(L:3,,)"
+          ],
+          [
+            "Binary",
+            4,
+            4,
+            5,
+            "B(L:1,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "?",
+        "stage": "parse"
+      }
+    ],
+    "rustCheck": "let mut missing=generated::parser::parse_tree(source).unwrap(); missing.nodes[missing.root].captures.retain(|capture|capture.name!=\"left\"); assert!(generated::mapper::map(&missing).is_err());"
+  },
+  {
+    "name": "SingleLeftSpine",
+    "grammar": "grammar SingleLeftSpine { @package: preferredprobe @whitespace: none token NUMBER = org.unlaxer.parser.elementary.NumberParser @root @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=10) Expr ::= Factor @left { '^' @op Factor @right }; Factor ::= NUMBER | '(' Expr ')'; }",
+    "java": "private String v(Object n){return n instanceof SingleLeftSpineAST a?eval(a):(String)n;} protected String evalBinary(SingleLeftSpineAST.Binary n){return \"B(\"+v(n.left())+\",\"+String.join(\"|\",n.op())+\",\"+n.right().stream().map(this::v).collect(java.util.stream.Collectors.joining(\"|\"))+\")\";}",
+    "rust": "fn eval_binary(&mut self,left:&generated::ast::AstValue,op:&[String],right:&[generated::ast::AstValue],_:unlaxer_runtime::Span)->String{let left=match left{generated::ast::AstValue::Text{text,..}=>text.clone(),generated::ast::AstValue::Node(n)=>evaluate(n,self)};format!(\"B({},{},{})\",left,op.join(\"|\"),right.iter().map(|n|match n{generated::ast::AstValue::Text{text,..}=>text.clone(),generated::ast::AstValue::Node(n)=>evaluate(n,self)}).collect::<Vec<_>>().join(\"|\"))}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "9",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            1,
+            "B(9,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "9^3",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            3,
+            "B(9,^,3)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "9^",
+        "stage": "parse"
+      }
+    ]
+  },
+  {
+    "name": "RightSpine",
+    "grammar": "grammar RightSpine { @package: preferredprobe @whitespace: none token NUMBER = org.unlaxer.parser.elementary.NumberParser @root @mapping(Binary,params=[left,op,right]) @rightAssoc @precedence(level=10) Expr ::= Factor @left { '^' @op Expr @right }; Factor ::= NUMBER | '(' Expr ')'; }",
+    "java": "private String v(Object n){return n instanceof RightSpineAST a?eval(a):(String)n;} protected String evalBinary(RightSpineAST.Binary n){return \"B(\"+v(n.left())+\",\"+String.join(\"|\",n.op())+\",\"+n.right().stream().map(this::v).collect(java.util.stream.Collectors.joining(\"|\"))+\")\";}",
+    "rust": "fn eval_binary(&mut self,left:&generated::ast::AstValue,op:&[String],right:&[Ast],_:unlaxer_runtime::Span)->String{let left=match left{generated::ast::AstValue::Text{text,..}=>text.clone(),generated::ast::AstValue::Node(n)=>evaluate(n,self)};format!(\"B({},{},{})\",left,op.join(\"|\"),right.iter().map(|n|evaluate(n,self)).collect::<Vec<_>>().join(\"|\"))}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "9",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            1,
+            "B(9,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "9^3",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            3,
+            "B(9,^,B(3,,))"
+          ],
+          [
+            "Binary",
+            3,
+            2,
+            3,
+            "B(3,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "9^",
+        "stage": "parse"
+      },
+      {
+        "input": "9^3^1",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            5,
+            "B(9,^,B(3,^,B(1,,)))"
+          ],
+          [
+            "Binary",
+            3,
+            2,
+            5,
+            "B(3,^,B(1,,))"
+          ],
+          [
+            "Binary",
+            6,
+            4,
+            5,
+            "B(1,,)"
+          ]
+        ],
+        "select": 0
+      }
+    ]
+  },
+  {
+    "name": "MixedLeftSpine",
+    "grammar": "grammar MixedLeftSpine { @package: preferredprobe @whitespace: none token NUMBER = org.unlaxer.parser.elementary.NumberParser @root @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=10) Expr ::= Term @left { '-' @op Term @right }; @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=20) Term ::= Factor @left { '/' @op Factor @right }; Factor ::= Call | NUMBER | '(' Expr ')'; @mapping(Item,params=[value]) Call ::= 'f' (NUMBER) @value; }",
+    "java": "protected String evalBinary(MixedLeftSpineAST.Binary n){if(n.left()==null){if(n.op().size()!=1||!n.right().isEmpty())throw new AssertionError();return \"L:\"+n.op().get(0);}return \"B(\"+eval(n.left())+\",\"+String.join(\"|\",n.op())+\",\"+n.right().stream().map(this::eval).collect(java.util.stream.Collectors.joining(\"|\"))+\")\";} protected String evalItem(MixedLeftSpineAST.Item n){return \"F:\"+n.value();}",
+    "rust": "fn eval_binary(&mut self,left:Option<&Ast>,op:&[String],right:&[Ast],_:unlaxer_runtime::Span)->String{if let Some(left)=left {format!(\"B({},{},{})\",evaluate(left,self),op.join(\"|\"),right.iter().map(|n|evaluate(n,self)).collect::<Vec<_>>().join(\"|\"))}else{assert_eq!(op.len(),1);assert!(right.is_empty());format!(\"L:{}\",op[0])}} fn eval_item(&mut self,value:&str,_:unlaxer_runtime::Span)->String{format!(\"F:{}\",value)}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "f9",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            2,
+            "B(B(F:9,,),,)"
+          ],
+          [
+            "Binary",
+            2,
+            0,
+            2,
+            "B(F:9,,)"
+          ],
+          [
+            "Item",
+            5,
+            0,
+            2,
+            "F:9"
+          ]
+        ],
+        "select": 2
+      },
+      {
+        "input": "9-f3",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            4,
+            "B(B(L:9,,),-,B(F:3,,))"
+          ],
+          [
+            "Binary",
+            2,
+            0,
+            1,
+            "B(L:9,,)"
+          ],
+          [
+            "Binary",
+            4,
+            2,
+            4,
+            "B(F:3,,)"
+          ],
+          [
+            "Item",
+            7,
+            2,
+            4,
+            "F:3"
+          ]
+        ],
+        "select": 3
+      }
+    ]
+  },
+  {
+    "name": "MixedRightSpine",
+    "grammar": "grammar MixedRightSpine { @package: preferredprobe @whitespace: none token NUMBER = org.unlaxer.parser.elementary.NumberParser @root @mapping(Binary,params=[left,op,right]) @rightAssoc @precedence(level=10) Expr ::= Factor @left { '^' @op Expr @right }; Factor ::= Call | NUMBER | '(' Expr ')'; @mapping(Item,params=[value]) Call ::= 'f' (NUMBER) @value; }",
+    "java": "protected String evalBinary(MixedRightSpineAST.Binary n){if(n.left()==null){if(n.op().size()!=1||!n.right().isEmpty())throw new AssertionError();return \"L:\"+n.op().get(0);}return \"B(\"+eval(n.left())+\",\"+String.join(\"|\",n.op())+\",\"+n.right().stream().map(this::eval).collect(java.util.stream.Collectors.joining(\"|\"))+\")\";} protected String evalItem(MixedRightSpineAST.Item n){return \"F:\"+n.value();}",
+    "rust": "fn eval_binary(&mut self,left:Option<&Ast>,op:&[String],right:&[Ast],_:unlaxer_runtime::Span)->String{if let Some(left)=left {format!(\"B({},{},{})\",evaluate(left,self),op.join(\"|\"),right.iter().map(|n|evaluate(n,self)).collect::<Vec<_>>().join(\"|\"))}else{assert_eq!(op.len(),1);assert!(right.is_empty());format!(\"L:{}\",op[0])}} fn eval_item(&mut self,value:&str,_:unlaxer_runtime::Span)->String{format!(\"F:{}\",value)}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "f9",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            2,
+            "B(F:9,,)"
+          ],
+          [
+            "Item",
+            3,
+            0,
+            2,
+            "F:9"
+          ]
+        ],
+        "select": 1
+      },
+      {
+        "input": "9^f3",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            4,
+            "B(L:9,^,B(F:3,,))"
+          ],
+          [
+            "Binary",
+            3,
+            2,
+            4,
+            "B(F:3,,)"
+          ],
+          [
+            "Item",
+            6,
+            2,
+            4,
+            "F:3"
+          ]
+        ],
+        "select": 2
+      },
+      {
+        "input": "(9^f3)^1",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            8,
+            "B(B(L:9,^,B(F:3,,)),^,B(L:1,,))"
+          ],
+          [
+            "Binary",
+            5,
+            1,
+            5,
+            "B(L:9,^,B(F:3,,))"
+          ],
+          [
+            "Binary",
+            8,
+            3,
+            5,
+            "B(F:3,,)"
+          ],
+          [
+            "Item",
+            11,
+            3,
+            5,
+            "F:3"
+          ],
+          [
+            "Binary",
+            3,
+            7,
+            8,
+            "B(L:1,,)"
+          ]
+        ],
+        "select": 3
+      }
+    ]
+  },
+  {
+    "name": "CommonSpine",
+    "grammar": "grammar CommonSpine { @package: preferredprobe @whitespace: none token NUMBER = org.unlaxer.parser.elementary.NumberParser @root @mapping(Family) @commonField(left) Root ::= Expr; @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=10) Expr ::= Term @left { '-' @op Term @right }; @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=20) Term ::= Factor @left { '/' @op Factor @right }; Factor ::= NUMBER | '(' Expr ')'; }",
+    "java": "protected String evalBinary(CommonSpineAST.Binary n){ CommonSpineAST.Family family=n; CommonSpineAST.Binary typed=family.left(); if(typed!=n.left())throw new AssertionError();if(n.left()==null){if(n.op().size()!=1||!n.right().isEmpty())throw new AssertionError();return \"L:\"+n.op().get(0);}return \"B(\"+eval(n.left())+\",\"+String.join(\"|\",n.op())+\",\"+n.right().stream().map(this::eval).collect(java.util.stream.Collectors.joining(\"|\"))+\")\";}",
+    "rust": "fn eval_binary(&mut self,left:Option<&Ast>,op:&[String],right:&[Ast],_:unlaxer_runtime::Span)->String{if let Some(left)=left {format!(\"B({},{},{})\",evaluate(left,self),op.join(\"|\"),right.iter().map(|n|evaluate(n,self)).collect::<Vec<_>>().join(\"|\"))}else{assert_eq!(op.len(),1);assert!(right.is_empty());format!(\"L:{}\",op[0])}}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "9",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            1,
+            "B(B(L:9,,),,)"
+          ],
+          [
+            "Binary",
+            1,
+            0,
+            1,
+            "B(B(L:9,,),,)"
+          ],
+          [
+            "Binary",
+            3,
+            0,
+            1,
+            "B(L:9,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "9-3",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            3,
+            "B(B(L:9,,),-,B(L:3,,))"
+          ],
+          [
+            "Binary",
+            1,
+            0,
+            3,
+            "B(B(L:9,,),-,B(L:3,,))"
+          ],
+          [
+            "Binary",
+            3,
+            0,
+            1,
+            "B(L:9,,)"
+          ],
+          [
+            "Binary",
+            5,
+            2,
+            3,
+            "B(L:3,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "9-3-1",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            5,
+            "B(B(L:9,,),-|-,B(L:3,,)|B(L:1,,))"
+          ],
+          [
+            "Binary",
+            1,
+            0,
+            5,
+            "B(B(L:9,,),-|-,B(L:3,,)|B(L:1,,))"
+          ],
+          [
+            "Binary",
+            3,
+            0,
+            1,
+            "B(L:9,,)"
+          ],
+          [
+            "Binary",
+            5,
+            2,
+            3,
+            "B(L:3,,)"
+          ],
+          [
+            "Binary",
+            5,
+            4,
+            5,
+            "B(L:1,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "?",
+        "stage": "parse"
+      }
+    ],
+    "rustCheck": "{let view=snapshot.select_default().ast().common_family().unwrap();let _: &Option<Box<Ast>>=view.r#left;assert!(view.r#left.is_some());}"
+  },
+  {
+    "name": "TypeofSpine",
+    "grammar": "grammar TypeofSpine { @package: preferredprobe @whitespace: none token NUMBER = org.unlaxer.parser.elementary.NumberParser @root @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=10) Expr ::= @typeof(left) Term @left { '-' @op Term @right }; @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=20) Term ::= @typeof(left) Factor @left { '/' @op Factor @right }; Factor ::= NUMBER | '(' Expr ')'; }",
+    "java": "protected String evalBinary(TypeofSpineAST.Binary n){if(n.left()==null){if(n.op().size()!=1||!n.right().isEmpty())throw new AssertionError();return \"L:\"+n.op().get(0);}return \"B(\"+eval(n.left())+\",\"+String.join(\"|\",n.op())+\",\"+n.right().stream().map(this::eval).collect(java.util.stream.Collectors.joining(\"|\"))+\")\";}",
+    "rust": "fn eval_binary(&mut self,left:Option<&Ast>,op:&[String],right:&[Ast],_:unlaxer_runtime::Span)->String{if let Some(left)=left {format!(\"B({},{},{})\",evaluate(left,self),op.join(\"|\"),right.iter().map(|n|evaluate(n,self)).collect::<Vec<_>>().join(\"|\"))}else{assert_eq!(op.len(),1);assert!(right.is_empty());format!(\"L:{}\",op[0])}}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "9",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            1,
+            "B(B(L:9,,),,)"
+          ],
+          [
+            "Binary",
+            2,
+            0,
+            1,
+            "B(L:9,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "9-3",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            3,
+            "B(B(L:9,,),-,B(L:3,,))"
+          ],
+          [
+            "Binary",
+            2,
+            0,
+            1,
+            "B(L:9,,)"
+          ],
+          [
+            "Binary",
+            4,
+            2,
+            3,
+            "B(L:3,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "9-3-1",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            5,
+            "B(B(L:9,,),-|-,B(L:3,,)|B(L:1,,))"
+          ],
+          [
+            "Binary",
+            2,
+            0,
+            1,
+            "B(L:9,,)"
+          ],
+          [
+            "Binary",
+            4,
+            2,
+            3,
+            "B(L:3,,)"
+          ],
+          [
+            "Binary",
+            4,
+            4,
+            5,
+            "B(L:1,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "?",
+        "stage": "parse"
+      }
+    ]
+  },
+  {
+    "name": "WhitespaceSpine",
+    "grammar": "grammar WhitespaceSpine { @package: preferredprobe @whitespace: javaStyle token NUMBER = org.unlaxer.parser.elementary.NumberParser @root @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=10) Expr ::= Term @left { '-' @op Term @right }; @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=20) Term ::= Factor @left { '/' @op Factor @right }; Factor ::= NUMBER | '(' Expr ')'; }",
+    "java": "protected String evalBinary(WhitespaceSpineAST.Binary n){if(n.left()==null){if(n.op().size()!=1||!n.right().isEmpty())throw new AssertionError();return \"L:\"+n.op().get(0);}return \"B(\"+eval(n.left())+\",\"+String.join(\"|\",n.op())+\",\"+n.right().stream().map(this::eval).collect(java.util.stream.Collectors.joining(\"|\"))+\")\";}",
+    "rust": "fn eval_binary(&mut self,left:Option<&Ast>,op:&[String],right:&[Ast],_:unlaxer_runtime::Span)->String{if let Some(left)=left {format!(\"B({},{},{})\",evaluate(left,self),op.join(\"|\"),right.iter().map(|n|evaluate(n,self)).collect::<Vec<_>>().join(\"|\"))}else{assert_eq!(op.len(),1);assert!(right.is_empty());format!(\"L:{}\",op[0])}}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": " 9 - 3 ",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            7,
+            "B(B(L:9,,),-,B(L:3,,))"
+          ],
+          [
+            "Binary",
+            2,
+            1,
+            3,
+            "B(L:9,,)"
+          ],
+          [
+            "Binary",
+            4,
+            5,
+            7,
+            "B(L:3,,)"
+          ]
+        ],
+        "select": 0
+      }
+    ]
+  },
+  {
+    "name": "UnicodeSpine",
+    "grammar": "grammar UnicodeSpine { @package: preferredprobe @whitespace: none token NUMBER = org.unlaxer.parser.elementary.NumberParser @root @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=10) Expr ::= Term @left { '-' @op Term @right }; @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=20) Term ::= Factor @left { '/' @op Factor @right }; Factor ::= '😀' | 'é' | '(' Expr ')'; }",
+    "java": "protected String evalBinary(UnicodeSpineAST.Binary n){if(n.left()==null){if(n.op().size()!=1||!n.right().isEmpty())throw new AssertionError();return \"L:\"+n.op().get(0);}return \"B(\"+eval(n.left())+\",\"+String.join(\"|\",n.op())+\",\"+n.right().stream().map(this::eval).collect(java.util.stream.Collectors.joining(\"|\"))+\")\";}",
+    "rust": "fn eval_binary(&mut self,left:Option<&Ast>,op:&[String],right:&[Ast],_:unlaxer_runtime::Span)->String{if let Some(left)=left {format!(\"B({},{},{})\",evaluate(left,self),op.join(\"|\"),right.iter().map(|n|evaluate(n,self)).collect::<Vec<_>>().join(\"|\"))}else{assert_eq!(op.len(),1);assert!(right.is_empty());format!(\"L:{}\",op[0])}}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "😀-é",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            4,
+            "B(B(L:😀,,),-,B(L:é,,))"
+          ],
+          [
+            "Binary",
+            2,
+            0,
+            1,
+            "B(L:😀,,)"
+          ],
+          [
+            "Binary",
+            4,
+            2,
+            4,
+            "B(L:é,,)"
+          ]
+        ],
+        "select": 0
+      }
+    ]
+  },
+  {
+    "name": "AutomaticSpine",
+    "grammar": "grammar AutomaticSpine { @package: preferredprobe @whitespace: none token NUMBER = org.unlaxer.parser.elementary.NumberParser @root @mapping(Binary,params=[left,op,right]) @eval(kind='binary_arithmetic',strategy='default') @leftAssoc @precedence(level=10) Expr ::= Term @left { '-' @op Term @right }; @mapping(Binary,params=[left,op,right]) @eval(kind='binary_arithmetic',strategy='default') @leftAssoc @precedence(level=20) Term ::= Factor @left { '/' @op Factor @right }; Factor ::= NUMBER | '(' Expr ')'; }",
+    "java": "protected String evalLeaf(String literal){return literal;} protected String applyBinary(String op,String left,String right){int a=Integer.parseInt(left),b=Integer.parseInt(right);return Integer.toString(op.equals(\"-\")?a-b:a/b);}",
+    "rust": "fn evaluate_literal(&mut self,literal:&str)->String{literal.into()} fn apply_binary(&mut self,op:&str,left:String,right:String)->String{let a=left.parse::<i32>().unwrap();let b=right.parse::<i32>().unwrap();(if op==\"-\"{a-b}else{a/b}).to_string()} fn is_failure(&self,_:&String)->bool{false}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "9",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            1,
+            "9"
+          ],
+          [
+            "Binary",
+            2,
+            0,
+            1,
+            "9"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "9-3",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            3,
+            "6"
+          ],
+          [
+            "Binary",
+            2,
+            0,
+            1,
+            "9"
+          ],
+          [
+            "Binary",
+            4,
+            2,
+            3,
+            "3"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "9-3-1",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            5,
+            "5"
+          ],
+          [
+            "Binary",
+            2,
+            0,
+            1,
+            "9"
+          ],
+          [
+            "Binary",
+            4,
+            2,
+            3,
+            "3"
+          ],
+          [
+            "Binary",
+            4,
+            4,
+            5,
+            "1"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "?",
+        "stage": "parse"
+      }
+    ]
+  },
+  {
+    "name": "TypeofSpineFailure",
+    "grammar": "grammar TypeofSpineFailure { @package: preferredprobe @whitespace: none token NUMBER = org.unlaxer.parser.elementary.NumberParser @root @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=10) Expr ::= @typeof(op) Term @left { '-' @op Term @right }; @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=20) Term ::= @typeof(op) Factor @left { '/' @op Factor @right }; Factor ::= NUMBER | '(' Expr ')'; }",
+    "java": "protected String evalBinary(TypeofSpineFailureAST.Binary n){if(n.left()==null){if(n.op().size()!=1||!n.right().isEmpty())throw new AssertionError();return \"L:\"+n.op().get(0);}return \"B(\"+eval(n.left())+\",\"+String.join(\"|\",n.op())+\",\"+n.right().stream().map(this::eval).collect(java.util.stream.Collectors.joining(\"|\"))+\")\";}",
+    "rust": "fn eval_binary(&mut self,left:Option<&Ast>,op:&[String],right:&[Ast],_:unlaxer_runtime::Span)->String{if let Some(left)=left {format!(\"B({},{},{})\",evaluate(left,self),op.join(\"|\"),right.iter().map(|n|evaluate(n,self)).collect::<Vec<_>>().join(\"|\"))}else{assert_eq!(op.len(),1);assert!(right.is_empty());format!(\"L:{}\",op[0])}}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "9",
+        "stage": "map",
+        "errorCp": [
+          0,
+          1
+        ]
+      },
+      {
+        "input": "9-3",
+        "stage": "map",
+        "errorCp": [
+          0,
+          1
+        ]
+      },
+      {
+        "input": "9^",
+        "stage": "parse"
+      }
+    ]
+  },
+  {
+    "name": "ReversedSpine",
+    "grammar": "grammar ReversedSpine { @package: preferredprobe @whitespace: none token NUMBER = org.unlaxer.parser.elementary.NumberParser @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=20) Term ::= Factor @left { '/' @op Factor @right }; @root @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=10) Expr ::= Term @left { '-' @op Term @right }; Factor ::= NUMBER | '(' Expr ')'; }",
+    "java": "protected String evalBinary(ReversedSpineAST.Binary n){if(n.left()==null){if(n.op().size()!=1||!n.right().isEmpty())throw new AssertionError();return \"L:\"+n.op().get(0);}return \"B(\"+eval(n.left())+\",\"+String.join(\"|\",n.op())+\",\"+n.right().stream().map(this::eval).collect(java.util.stream.Collectors.joining(\"|\"))+\")\";}",
+    "rust": "fn eval_binary(&mut self,left:Option<&Ast>,op:&[String],right:&[Ast],_:unlaxer_runtime::Span)->String{if let Some(left)=left {format!(\"B({},{},{})\",evaluate(left,self),op.join(\"|\"),right.iter().map(|n|evaluate(n,self)).collect::<Vec<_>>().join(\"|\"))}else{assert_eq!(op.len(),1);assert!(right.is_empty());format!(\"L:{}\",op[0])}}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "9",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            1,
+            "B(B(L:9,,),,)"
+          ],
+          [
+            "Binary",
+            2,
+            0,
+            1,
+            "B(L:9,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "9-3",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            3,
+            "B(B(L:9,,),-,B(L:3,,))"
+          ],
+          [
+            "Binary",
+            2,
+            0,
+            1,
+            "B(L:9,,)"
+          ],
+          [
+            "Binary",
+            4,
+            2,
+            3,
+            "B(L:3,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "9-3-1",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            5,
+            "B(B(L:9,,),-|-,B(L:3,,)|B(L:1,,))"
+          ],
+          [
+            "Binary",
+            2,
+            0,
+            1,
+            "B(L:9,,)"
+          ],
+          [
+            "Binary",
+            4,
+            2,
+            3,
+            "B(L:3,,)"
+          ],
+          [
+            "Binary",
+            4,
+            4,
+            5,
+            "B(L:1,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "?",
+        "stage": "parse"
+      }
+    ]
+  },
+  {
+    "name": "DirectMappedOperands",
+    "grammar": "grammar DirectMappedOperands { @package: preferredprobe @whitespace: none @root @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=10) Expr ::= Atom @left { '+' @op Atom @right }; @mapping(Item,params=[value]) Atom ::= ('😀' | 'é') @value; }",
+    "java": "protected String evalBinary(DirectMappedOperandsAST.Binary n){DirectMappedOperandsAST.Item typed=n.left();return eval(typed)+n.right().stream().map(this::eval).collect(java.util.stream.Collectors.joining());} protected String evalItem(DirectMappedOperandsAST.Item n){return String.valueOf(n.value());}",
+    "rust": "fn eval_binary(&mut self,left:&Ast,_op:&[String],right:&[Ast],_:unlaxer_runtime::Span)->String{evaluate(left,self)+&right.iter().map(|n|evaluate(n,self)).collect::<String>()} fn eval_item(&mut self,value:&str,_:unlaxer_runtime::Span)->String{value.into()}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "😀+é",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            4,
+            "😀é"
+          ],
+          [
+            "Item",
+            2,
+            0,
+            1,
+            "😀"
+          ],
+          [
+            "Item",
+            4,
+            2,
+            4,
+            "é"
+          ]
+        ],
+        "select": 1
+      },
+      {
+        "input": "😀+",
+        "stage": "parse"
+      }
+    ]
+  }
+]
