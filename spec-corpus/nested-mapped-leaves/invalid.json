@@ -1,0 +1,14 @@
+[
+  {
+    "id": "mapped-group",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= (Leaf 'x') @value; @mapping(Leaf,params=[text]) Leaf ::= 'a' @text; }",
+    "startCP": 55,
+    "endCP": 134
+  },
+  {
+    "id": "enum-group",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= (Mode 'x') @value; @enum Mode ::= 'a' | 'b'; }",
+    "startCP": 55,
+    "endCP": 134
+  }
+]

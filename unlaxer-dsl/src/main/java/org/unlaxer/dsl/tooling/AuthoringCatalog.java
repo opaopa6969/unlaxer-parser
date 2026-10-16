@@ -46,7 +46,7 @@ public final class AuthoringCatalog {
     private static void collect(UBNFAST.AtomicElement element, Set<String> words) {
         if (element instanceof UBNFAST.TerminalElement terminal) {
             if (terminal.value().matches("[A-Za-z_][A-Za-z_0-9]*")) words.add(terminal.value());
-        } else if (element instanceof UBNFAST.GroupElement group) collect(group.body(), words);
+        } else if (element instanceof UBNFAST.TransparentElement group) collect(group.body(), words);
         else if (element instanceof UBNFAST.OptionalElement optional) collect(optional.body(), words);
         else if (element instanceof UBNFAST.RepeatElement repeat) collect(repeat.body(), words);
         else if (element instanceof UBNFAST.OneOrMoreElement repeat) collect(repeat.body(), words);

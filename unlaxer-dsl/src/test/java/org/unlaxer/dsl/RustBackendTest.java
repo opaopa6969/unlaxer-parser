@@ -75,9 +75,9 @@ public class RustBackendTest {
         reject(SIMPLE.replace("value", "span"), "reserved");
         reject(SIMPLE.replace("value", "semantics"), "reserved");
         reject(SIMPLE.replace("'hello' @value", "[ 'x' ] Root @value"), "left recursion");
-        reject(SIMPLE.replace("'hello' @value", "{ [ 'hello' ] } 'x' @value"), "nullable unbounded");
+        assertEquals(5, new RustBackend().generate(UBNFMapper.parse(SIMPLE.replace("'hello' @value", "{ [ 'hello' ] } 'x' @value")).grammars().get(0)).size());
         reject(SIMPLE.replace("'hello' @value", "[ [ 'hello' ] ] @value"), "nested container capture");
-        reject(SIMPLE.replace("'hello' @value", "{ Maybe } @value").replace("Root ::=", "Maybe ::= [ 'x' ];\nRoot ::="), "nullable unbounded");
+        assertEquals(5, new RustBackend().generate(UBNFMapper.parse(SIMPLE.replace("'hello' @value", "{ Maybe } @value").replace("@root", "Maybe ::= [ 'x' ];\n@root")).grammars().get(0)).size());
         reject(SIMPLE.replace("'hello' @value", "'' @value"), "empty literal");
         reject(SIMPLE.replace("grammar Example {", "grammar Example {\n@whitespace: python"), "whitespace");
         reject(SIMPLE.replace("grammar Example {", "grammar Example {\ntoken TEXT = StringParser"), "external token");
@@ -100,7 +100,7 @@ public class RustBackendTest {
         reject(SIMPLE.replace("grammar Example {", """
             grammar Example {
             @memoSafeToken: BUILTIN
-            token BUILTIN = REGEX('[a-z]+')
+            token BUILTIN = CI('a')
             """), "must name a Simple token BUILTIN");
         reject(SIMPLE.replace("grammar Example {", """
             grammar Example {
@@ -112,13 +112,15 @@ public class RustBackendTest {
     @Test public void zeroWidthTokensCannotCreateUnboundedLoopsOrLeftRecursion() {
         for (String declaration : new String[]{"EMPTY", "EOF", "LOOKAHEAD('x')", "NEGATIVE_LOOKAHEAD('x')", "UNTIL('#')"}) {
             String source = SIMPLE.replace("grammar Example {", "grammar Example { token T = " + declaration + "\n");
-            reject(source.replace("'hello' @value", "{ T } 'hello' @value"), "nullable unbounded");
-            reject(source.replace("'hello' @value", "(T | 'x')+ @value"), "nullable unbounded");
+            assertEquals(5, new RustBackend().generate(UBNFMapper.parse(source.replace("'hello' @value", "{ T } 'hello' @value")).grammars().get(0)).size());
+            assertEquals(5, new RustBackend().generate(UBNFMapper.parse(source.replace("'hello' @value", "(T | 'x')+ @value")).grammars().get(0)).size());
             reject(source.replace("'hello' @value", "T @value Root @value"), "left recursion");
         }
-        reject(SIMPLE.replace("grammar Example {", "grammar Example { token T = REGEX('x')\n"), "token T");
-        reject(SIMPLE.replace("'hello' @value", "Root{0} @value"), "left recursion");
-        reject(SIMPLE.replace("'hello' @value", "(Root | 'x'){0} @value"), "left recursion");
+        reject(SIMPLE.replace("grammar Example {", "grammar Example { token T = REGEX('x')\n"), "E-REGEX-RETIRED");
+        assertEquals(5, new RustBackend().generate(UBNFMapper.parse(
+            SIMPLE.replace("'hello' @value", "Root{0} @value")).grammars().get(0)).size());
+        assertEquals(5, new RustBackend().generate(UBNFMapper.parse(
+            SIMPLE.replace("'hello' @value", "(Root | 'x'){0} @value")).grammars().get(0)).size());
     }
 
     @Test public void invalidUnicodeTextIsRejectedBeforeRustEmission() {
@@ -144,7 +146,7 @@ public class RustBackendTest {
                 .replace("'hello' @value", "T @value");
             assertEquals(5, new RustBackend().generate(UBNFMapper.parse(source).grammars().get(0)).size());
             if (parser.endsWith("EndOfSourceParser")) {
-                reject(source.replace("T @value", "{ T } 'x' @value"), "nullable unbounded");
+                assertEquals(5, new RustBackend().generate(UBNFMapper.parse(source.replace("T @value", "{ T } 'x' @value")).grammars().get(0)).size());
                 reject(source.replace("T @value", "T Root @value"), "left recursion");
             }
         }
@@ -303,7 +305,7 @@ public class RustBackendTest {
             """;
         var ir = RustGrammarLowering.lower(UBNFMapper.parse(source).grammars().get(0));
         assertEquals(ir.rules().get(1).mapping(), ir.rules().get(2).mapping());
-        assertEquals(List.of(GrammarIR.Kind.VALUE, GrammarIR.Kind.TEXT, GrammarIR.Kind.VALUE),
+        assertEquals(List.of(GrammarIR.Kind.NULLABLE_NODE, GrammarIR.Kind.TEXT, GrammarIR.Kind.NODE),
             ir.rules().get(1).mapping().fields().stream().map(GrammarIR.Field::kind).toList());
         reject(source.replace("'a' @right", "Leaf @right"), "@leftAssoc requires");
         reject(source.replace("Leaf @left", "[Leaf] @left"), "@leftAssoc requires");
@@ -324,6 +326,13 @@ public class RustBackendTest {
         assertFalse(power.contains("TextValue"));
     }
 
+    @Test public void literalTextCannotEnableInternalPreferredCaptures() {
+        var grammar = UBNFMapper.parse("grammar LiteralMetadata { @root @mapping(Value,params=[text]) Root ::= '#preferred-depth:' % ',' @text; }").grammars().get(0);
+        var parser = new RustBackend().generate(grammar).get(2).content();
+        assertFalse(parser.contains("#preferred-extra:2"));
+        assertTrue(parser.contains(".separated_by_java("));
+    }
+
     @Test public void leftAssocMetadataDoesNotRewriteTheGrammarAndInvalidShapesAreRejected() {
         String source = """
             grammar Operators {
@@ -334,7 +343,8 @@ public class RustBackendTest {
         var files = new RustBackend().generate(UBNFMapper.parse(source).grammars().get(0));
         var plain = new RustBackend().generate(UBNFMapper.parse(source.replace("@leftAssoc @precedence(level=10)", "")).grammars().get(0));
         assertEquals(plain.get(1), files.get(1));
-        assertEquals(plain.get(3), files.get(3));
+        // Preferred snapshots also fingerprint parser metadata; the ordinary mapper remains unchanged.
+        assertEquals(plain.get(3).content().split("\\nconst __PREFERRED_ROOT:",2)[0], files.get(3).content().split("\\nconst __PREFERRED_ROOT:",2)[0]);
         assertEquals(plain.get(4), files.get(4));
         assertTrue(files.get(2).content().contains("precedence: 10, associativity: Associativity::Left"));
         var defaults = new RustBackend().generate(UBNFMapper.parse(source.replace("@precedence(level=10)", "")).grammars().get(0));
@@ -364,7 +374,7 @@ public class RustBackendTest {
         var grammar = UBNFMapper.parse(source).grammars().get(0);
         var files = new RustBackend().generate(grammar);
         var plain = new RustBackend().generate(UBNFMapper.parse(source.replace("@rightAssoc @precedence(level=10)", "")).grammars().get(0));
-        for (int index : List.of(1, 3, 4)) assertEquals(plain.get(index), files.get(index));
+        for (int index : List.of(1, 3, 4)) assertEquals(plain.get(index).content().split("\\nconst __PREFERRED_ROOT:",2)[0], files.get(index).content().split("\\nconst __PREFERRED_ROOT:",2)[0]);
         assertTrue(files.get(2).content().contains("Associativity { Left, Right, None }"));
         assertTrue(files.get(2).content().contains("associativity: Associativity::Right"));
         assertTrue(files.get(2).content().contains("Expr::Choice"));
@@ -380,8 +390,8 @@ public class RustBackendTest {
     }
 
     private void reject(String source, String reason) {
-        var grammar = UBNFMapper.parse(source).grammars().get(0);
-        var error = assertThrows(IllegalArgumentException.class, () -> new RustBackend().generate(grammar));
+        var error = assertThrows(IllegalArgumentException.class, () -> new RustBackend().generate(
+            UBNFMapper.parse(source).grammars().get(0)));
         assertTrue(error.getMessage(), error.getMessage().contains(reason));
     }
 

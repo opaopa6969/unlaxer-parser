@@ -1,0 +1,374 @@
+[
+  {
+    "name": "DelimitedLiteralLeft",
+    "grammar": "grammar DelimitedLiteralLeft { @package: preferredprobe @whitespace: none  @root @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=10) Root ::= '(' 'a' @left { '|' '+' @op ':' 'a' @right } ')'; }",
+    "java": "protected String evalBinary(DelimitedLiteralLeftAST.Binary n){return \"B(\"+n.left()+\",\"+String.join(\"|\",n.op())+\",\"+String.join(\"|\",n.right())+\")\";}",
+    "rust": "fn eval_binary(&mut self,left:&str,op:&[String],right:&[String],_:unlaxer_runtime::Span)->String{format!(\"B({},{},{})\",left,op.join(\"|\"),right.join(\"|\"))}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "(a)",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            3,
+            "B(a,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "(a|+:a)",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            7,
+            "B(a,+,a)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "(a|+:a|+:a)",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            11,
+            "B(a,+|+,a|a)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "(a|+:)",
+        "stage": "parse"
+      }
+    ],
+    "parseOptions": true
+  },
+  {
+    "name": "NumericDelimiters",
+    "grammar": "grammar NumericDelimiters { @package: preferredprobe @whitespace: none token NUMBER = org.unlaxer.parser.elementary.NumberParser @root @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=10) Root ::= '(' NUMBER @left { '+' @op NUMBER @right } ')'; }",
+    "java": "protected String evalBinary(NumericDelimitersAST.Binary n){return \"B(\"+n.left()+\",\"+String.join(\"|\",n.op())+\",\"+n.right().stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(\"|\"))+\")\";}",
+    "rust": "fn eval_binary(&mut self,left:&i32,op:&[String],right:&[i32],_:unlaxer_runtime::Span)->String{format!(\"B({},{},{})\",left,op.join(\"|\"),right.iter().map(ToString::to_string).collect::<Vec<_>>().join(\"|\"))}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "(1)",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            3,
+            "B(1,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "(1+2)",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            5,
+            "B(1,+,2)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "(1+2+3)",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            7,
+            "B(1,+|+,2|3)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "(1+)",
+        "stage": "parse",
+        "parseCp": 3
+      },
+      {
+        "input": "1)",
+        "stage": "parse",
+        "parseCp": 0
+      },
+      {
+        "input": "(1",
+        "stage": "parse",
+        "parseCp": 2
+      },
+      {
+        "input": "(1))",
+        "stage": "parse",
+        "parseCp": 3
+      }
+    ],
+    "parseOptions": true
+  },
+  {
+    "name": "UnicodeDelimiters",
+    "grammar": "grammar UnicodeDelimiters { @package: preferredprobe @whitespace: javaStyle  @root @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=10) Root ::= '😀(' 'a' @left { '+' @op 'a' @right } ')'; }",
+    "java": "protected String evalBinary(UnicodeDelimitersAST.Binary n){return \"B(\"+n.left()+\",\"+String.join(\"|\",n.op())+\",\"+String.join(\"|\",n.right())+\")\";}",
+    "rust": "fn eval_binary(&mut self,left:&str,op:&[String],right:&[String],_:unlaxer_runtime::Span)->String{format!(\"B({},{},{})\",left,op.join(\"|\"),right.join(\"|\"))}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "😀(a)",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            4,
+            "B(a,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "😀(a+\r\na)",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            8,
+            "B(a,+,a)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "😀(a+)",
+        "stage": "parse",
+        "parseCp": 4
+      }
+    ],
+    "parseOptions": true
+  },
+  {
+    "name": "LexicalDelimiters",
+    "grammar": "grammar LexicalDelimiters { @package: preferredprobe @whitespace: none  @ubnf: v2 @tokenStream: enabled @root @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=10) Root ::= '(' 'a' @left { '|' '+' @op ':' 'a' @right } ')'; }",
+    "java": "protected String evalBinary(LexicalDelimitersAST.Binary n){return \"B(\"+n.left()+\",\"+String.join(\"|\",n.op())+\",\"+String.join(\"|\",n.right())+\")\";}",
+    "rust": "fn eval_binary(&mut self,left:&str,op:&[String],right:&[String],_:unlaxer_runtime::Span)->String{format!(\"B({},{},{})\",left,op.join(\"|\"),right.join(\"|\"))}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "(a)",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            3,
+            "B(a,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "(a|+:a)",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            7,
+            "B(a,+,a)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "(a|+:a|+:a)",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            11,
+            "B(a,+|+,a|a)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "(a|+:)",
+        "stage": "parse"
+      }
+    ],
+    "parseOptions": true
+  },
+  {
+    "name": "MappedDelimiterLevels",
+    "grammar": "grammar MappedDelimiterLevels { @package: preferredprobe @whitespace: none @root @mapping(Sum,params=[left,op,right]) @leftAssoc @precedence(level=10) Root ::= '[' Term @left { '+' @op Term @right } ']'; @mapping(Product,params=[left,op,right]) @leftAssoc @precedence(level=20) Term ::= '(' 'a' @left { '*' @op 'a' @right } ')'; }",
+    "java": "protected String evalSum(MappedDelimiterLevelsAST.Sum n){return \"S(\"+eval(n.left())+\",\"+String.join(\"|\",n.op())+\",\"+n.right().stream().map(this::eval).collect(java.util.stream.Collectors.joining(\"|\"))+\")\";} protected String evalProduct(MappedDelimiterLevelsAST.Product n){return \"P(\"+n.left()+\",\"+String.join(\"|\",n.op())+\",\"+String.join(\"|\",n.right())+\")\";}",
+    "rust": "fn eval_sum(&mut self,left:&Ast,op:&[String],right:&[Ast],_:unlaxer_runtime::Span)->String{format!(\"S({},{},{})\",evaluate(left,self),op.join(\"|\"),right.iter().map(|n|evaluate(n,self)).collect::<Vec<_>>().join(\"|\"))} fn eval_product(&mut self,left:&str,op:&[String],right:&[String],_:unlaxer_runtime::Span)->String{format!(\"P({},{},{})\",left,op.join(\"|\"),right.join(\"|\"))}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "[(a)]",
+        "candidates": [
+          [
+            "Sum",
+            0,
+            0,
+            5,
+            "S(P(a,,),,)"
+          ],
+          [
+            "Product",
+            2,
+            1,
+            4,
+            "P(a,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "[(a*a)+(a)]",
+        "candidates": [
+          [
+            "Sum",
+            0,
+            0,
+            11,
+            "S(P(a,*,a),+,P(a,,))"
+          ],
+          [
+            "Product",
+            2,
+            1,
+            6,
+            "P(a,*,a)"
+          ],
+          [
+            "Product",
+            4,
+            7,
+            10,
+            "P(a,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "[(a)+]",
+        "stage": "parse"
+      }
+    ],
+    "parseOptions": true
+  },
+  {
+    "name": "DenseDelimiters",
+    "grammar": "grammar DenseDelimiters { @package: preferredprobe @whitespace: none  @root @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=10) Root ::= '(' 'a' @left '!' { '|' '+' @op ':' 'a' @right ';' } ')'; }",
+    "java": "protected String evalBinary(DenseDelimitersAST.Binary n){return \"B(\"+n.left()+\",\"+String.join(\"|\",n.op())+\",\"+String.join(\"|\",n.right())+\")\";}",
+    "rust": "fn eval_binary(&mut self,left:&str,op:&[String],right:&[String],_:unlaxer_runtime::Span)->String{format!(\"B({},{},{})\",left,op.join(\"|\"),right.join(\"|\"))}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "(a!)",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            4,
+            "B(a,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "(a!|+:a;)",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            9,
+            "B(a,+,a)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "(a!|+:a;|+:a;)",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            14,
+            "B(a,+|+,a|a)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "(a!|+:a)",
+        "stage": "parse"
+      }
+    ],
+    "parseOptions": true
+  },
+  {
+    "name": "SharedDelimiterLevels",
+    "grammar": "grammar SharedDelimiterLevels { @package: preferredprobe @whitespace: none token NUMBER = org.unlaxer.parser.elementary.NumberParser @root @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=10) Expr ::= '[' Term @left { '-' @op Term @right } ']'; @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=20) Term ::= '(' 'a' @left { '/' @op 'a' @right } ')'; }",
+    "java": "protected String evalBinary(SharedDelimiterLevelsAST.Binary n){if(n.left()==null){if(n.op().size()!=1||!n.right().isEmpty())throw new AssertionError();return \"L:\"+n.op().get(0);}return \"B(\"+eval(n.left())+\",\"+String.join(\"|\",n.op())+\",\"+n.right().stream().map(this::eval).collect(java.util.stream.Collectors.joining(\"|\"))+\")\";}",
+    "rust": "fn eval_binary(&mut self,left:Option<&Ast>,op:&[String],right:&[Ast],_:unlaxer_runtime::Span)->String{if let Some(left)=left {format!(\"B({},{},{})\",evaluate(left,self),op.join(\"|\"),right.iter().map(|n|evaluate(n,self)).collect::<Vec<_>>().join(\"|\"))}else{assert_eq!(op.len(),1);assert!(right.is_empty());format!(\"L:{}\",op[0])}}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "[(a/a)-(a)]",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            11,
+            "B(B(L:a,/,L:a),-,B(L:a,,))"
+          ],
+          [
+            "Binary",
+            2,
+            1,
+            6,
+            "B(L:a,/,L:a)"
+          ],
+          [
+            "Binary",
+            4,
+            7,
+            10,
+            "B(L:a,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "[(a/)]",
+        "stage": "parse"
+      }
+    ],
+    "rustCheck": "let mut missing=generated::parser::parse_tree(source).unwrap(); missing.nodes[missing.root].captures.retain(|capture|capture.name!=\"left\"); assert!(generated::mapper::map(&missing).is_err());",
+    "parseOptions": true
+  }
+]

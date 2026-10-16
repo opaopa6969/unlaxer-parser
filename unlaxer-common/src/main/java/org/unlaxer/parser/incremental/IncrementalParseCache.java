@@ -11,24 +11,26 @@ import java.util.Map;
 import org.unlaxer.Token;
 
 /**
- * Caches parse results by chunk hash for incremental re-parsing.
- *
- * When a document changes, only the modified chunks need re-parsing.
- * Other chunks reuse their cached parse results.
- *
- * <p>Designed for LSP-only optimization. Production uses compiled bytecode
- * and is not affected by this cache.</p>
- *
- * <p>Chunk boundaries are defined by delimiters:
- * <ul>
- *   <li>comma ({@code ,}) for match cases</li>
- *   <li>semicolon ({@code ;}) for var declarations</li>
- * </ul>
- * </p>
+ * Bounded caller-managed chunk memo. This class does not implement partial parsing,
+ * invalidation ranges, CST splicing, or source-position rebasing. A caller may reuse a
+ * chunk only when its grammar/state and coordinates are independently valid.
+ * Tokens are borrowed mutable objects for compatibility; use SnapshotParseCache with
+ * an appropriate copier for isolated document results. Delimiters respect quoted strings,
+ * but do not understand language-specific comments or nesting.
  */
 public class IncrementalParseCache {
 
     private final Map<String, CachedChunk> cache = new LinkedHashMap<>();
+    private final int maxEntries;
+    private final long maxSourceUtf16Units;
+    private long sourceUnits;
+
+    public IncrementalParseCache() { this(1024, 1_048_576); }
+    public IncrementalParseCache(int maxEntries, long maxSourceUtf16Units) {
+        if (maxEntries < 0 || maxSourceUtf16Units < 0) throw new IllegalArgumentException("negative cache limit");
+        this.maxEntries = maxEntries;
+        this.maxSourceUtf16Units = maxSourceUtf16Units;
+    }
     private int hits;
     private int misses;
 
@@ -119,14 +121,15 @@ public class IncrementalParseCache {
      * @param chunkText the text of the chunk to look up
      * @return the cached Token, or null if not found
      */
-    public Token getCached(String chunkText) {
-        String h = hash(chunkText);
-        CachedChunk cached = cache.get(h);
+    public synchronized Token getCached(String chunkText) {
+        CachedChunk cached = cache.get(chunkText);
         if (cached != null) {
-            hits++;
+            if (hits != Integer.MAX_VALUE) hits++;
+            cache.remove(chunkText);
+            cache.put(chunkText, cached);
             return cached.token();
         } else {
-            misses++;
+            if (misses != Integer.MAX_VALUE) misses++;
             return null;
         }
     }
@@ -138,9 +141,18 @@ public class IncrementalParseCache {
      * @param token the parsed Token subtree
      * @param startLine the starting line number of this chunk in the document
      */
-    public void put(String chunkText, Token token, int startLine) {
+    public synchronized void put(String chunkText, Token token, int startLine) {
         String h = hash(chunkText);
-        cache.put(h, new CachedChunk(h, chunkText, token, startLine));
+        long units = chunkText.length();
+        if (maxEntries == 0 || units > maxSourceUtf16Units) return;
+        if (cache.remove(chunkText) != null) sourceUnits -= units;
+        while (!cache.isEmpty() && (cache.size() >= maxEntries || sourceUnits > maxSourceUtf16Units - units)) {
+            String first = cache.keySet().iterator().next();
+            cache.remove(first);
+            sourceUnits -= first.length();
+        }
+        cache.put(chunkText, new CachedChunk(h, chunkText, token, startLine));
+        sourceUnits += units;
     }
 
     /**
@@ -148,7 +160,7 @@ public class IncrementalParseCache {
      *
      * @return current cache stats
      */
-    public CacheStats stats() {
+    public synchronized CacheStats stats() {
         return new CacheStats(cache.size(), hits, misses);
     }
 
@@ -171,7 +183,7 @@ public class IncrementalParseCache {
         public int misses() { return misses; }
 
         public double hitRate() {
-            int total = hits + misses;
+            long total = (long) hits + misses;
             return total == 0 ? 0.0 : (double) hits / total;
         }
     }
@@ -200,15 +212,17 @@ public class IncrementalParseCache {
      * @param chunkText the text of the chunk to check
      * @return true if the chunk has been cached
      */
-    public boolean isCached(String chunkText) {
-        return cache.containsKey(hash(chunkText));
+    public synchronized boolean isCached(String chunkText) {
+        java.util.Objects.requireNonNull(chunkText);
+        return cache.containsKey(chunkText);
     }
 
     /**
      * Clear all cached entries and reset statistics.
      */
-    public void clear() {
+    public synchronized void clear() {
         cache.clear();
+        sourceUnits = 0;
         hits = 0;
         misses = 0;
     }
@@ -216,7 +230,7 @@ public class IncrementalParseCache {
     /**
      * Return the number of cached entries.
      */
-    public int size() {
+    public synchronized int size() {
         return cache.size();
     }
 }
