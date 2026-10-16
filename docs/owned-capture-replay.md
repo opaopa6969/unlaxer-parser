@@ -59,5 +59,7 @@ I/O and unregistered host objects are outside rollback guarantees.
 This general API is separate from AST field captures and the existing lexical
 `CAPTURE`/`SAME_AS` implementation. Lexical bindings remain private to one
 lexical match; existing lexical `SCOPE` starts an isolated empty environment.
-No general UBNF syntax is added by the runtime unit #590. General rule-expression
-syntax and generation from both hosts remain required by #591 / #572.
+The runtime unit #590 is connected to general rule expressions by #591:
+`CAPTURE`, `SAME_AS` and `CAPTURE_SCOPE` generate from both hosts. See the
+[syntax and generated-consumer contract](general-owned-capture-syntax.md).
+Completion of the broader #572 / #545 work still requires its remaining checks.
