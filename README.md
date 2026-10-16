@@ -13,7 +13,7 @@
 
 # unlaxer-parser
 
-Release version: **3.3.0**. Publication verification is tracked in [#522](https://github.com/opaopa6969/unlaxer-parser/issues/522).
+**3.3.0 is published** on [Maven Central](https://repo1.maven.org/maven2/org/unlaxer/unlaxer-parser/3.3.0/unlaxer-parser-3.3.0.pom) and [GitHub Releases](https://github.com/opaopa6969/unlaxer-parser/releases/tag/v3.3.0). See the [verified source, signatures, and consumer results](release/3.3.0-verification.json).
 The development UBNF VSIX includes an in-editor [beginner catalog/help](unlaxer-dsl/ubnf-vscode/README.md).
 Generate a self-contained [language playground from UBNF](docs/ubnf-playground-ja.md), including UBNF's own meta-grammar.
 Try UBNF grammar syntax, AST and CST in the [online UBNF playground](https://opaopa6969.github.io/unlaxer-parser/ubnf/).
