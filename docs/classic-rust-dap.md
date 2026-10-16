@@ -22,6 +22,7 @@ clientはinitialize後、`launch` に `program`（旧Java互換の `formulaSourc
 | 契約 | Java / Rust 共通の挙動 |
 |---|---|
 | protocol | initialize/launch/configurationDone/setBreakpoints/threads/stackTrace/scopes/variables/next/continue/disconnect。未知/無効requestはfailure response |
+| configuration lifecycle | configurationDone は有効な launch ごとに一度だけ受理する。未 launch・処理済み・終了後・source 準備失敗後の要求は、event を出さず stack/scopes/variables を保持して拒否する。再試行には新しい launch を使う（#504） |
 | thread/frame | 単一thread 1、現在nodeのframe 0、variablesReference 1。値そのもののreferenceは0 |
 | 座標 | 内部spanは原文CP。DAPの開始/終了columnはUTF-16、line/columnの基底はclientのlinesStartAt1/columnsStartAt1に従う。省略時は1-based |
 | CR / LF / CRLF | immutable source snapshotで変換する。CRLF途中の境界は表示可能な位置として受理しない |

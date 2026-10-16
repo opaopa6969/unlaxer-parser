@@ -25,6 +25,7 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
     protected String steppingMode = "token";
     protected boolean stopOnEntry;
     private boolean terminated;
+    private boolean configurationPending;
     private int lineBase = 1, columnBase = 1;
     protected Map<String, Object> launchArguments = Map.of();
     protected String sourceContent = "";
@@ -62,12 +63,15 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
         stepPoints = List.of(); astNodeTypes = List.of(); astNodeSpans = List.of(); astNodeCount = 0; stepIndex = 0;
         launchArguments = proposed; pendingProgram = program; runtimeMode = runtime; steppingMode = stepping;
         stopOnEntry = Boolean.TRUE.equals(launchArguments.get("stopOnEntry"));
+        configurationPending = true;
         client.initialized();
         return CompletableFuture.completedFuture(null);
     }
 
     @Override
     public CompletableFuture<Void> configurationDone(ConfigurationDoneArguments args) {
+        if (!configurationPending) return CompletableFuture.failedFuture(new IllegalStateException("configurationDone requires a new launch"));
+        configurationPending = false;
         if (!parseAndCollectSteps()) {
             return CompletableFuture.completedFuture(null); // error already sent
         }
@@ -308,6 +312,7 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
 
     @Override
     public CompletableFuture<Void> disconnect(DisconnectArguments args) {
+        configurationPending = false;
         terminated = true; stepPoints = List.of(); astNodeTypes = List.of(); astNodeSpans = List.of(); runtimeProbeVariables = Map.of();
         return CompletableFuture.completedFuture(null);
     }
