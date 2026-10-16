@@ -70,7 +70,8 @@ Java の `parseDocument` / `parseDocumentIncremental` は同じ安全な全文 c
 Rust `GrammarBackend` は callback のない文法だけを自動 cache 対象とする。実際の
 `SharedGrammar` の強参照、root、空白設定を鍵に含め、同じ pointer の再割当てや mutable
 更新を誤って同一文法と扱わない。`Custom` / `CustomWith` は診断再試行の安全性とは別に
-cache 対象外。一般の `Backend` は既定で opt-out で、純粋性を保証する host だけが
+cache 対象外。新しい expression kind も、明示的な安全性監査で許可するまでは自動 cache の対象外とする。
+未知の種類を安全とみなす既定値は設けない。一般の `Backend` は既定で opt-out で、純粋性を保証する host だけが
 `validation_cache_key()` と revision を返せる。`Server::backend_mut()` は変更前に cache を
 無効化する。`validation_cache_stats()` / `invalidate_parse_cache()` も提供する。
 

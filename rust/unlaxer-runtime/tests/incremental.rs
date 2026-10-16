@@ -185,4 +185,13 @@ fn nonordered_children_obey_snapshot_cache_safety() {
     ));
     rules[0].expression = Expr::NonOrdered(vec![Expr::Literal("a"), Expr::Custom(custom)]);
     assert!(!unlaxer_runtime::incremental::grammar_is_snapshot_cacheable(&rules));
+    // Diagnostic retry permission does not authorize a whole-snapshot cache hit.
+    rules[0].expression = Expr::CustomWith {
+        parser: custom,
+        reads_diagnostics: false,
+        replayable: true,
+    }
+    .capture("value")
+    .optional();
+    assert!(!unlaxer_runtime::incremental::grammar_is_snapshot_cacheable(&rules));
 }
