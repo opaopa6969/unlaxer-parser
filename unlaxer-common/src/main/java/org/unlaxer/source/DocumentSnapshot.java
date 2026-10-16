@@ -47,8 +47,15 @@ public record DocumentSnapshot(String uri, long version, String text) {
         return text.codePointCount(0, offset);
     }
     public int fromUtf8(int offset) {
-        for (int point = 0; point <= length(); point++) {
-            if (utf8(point) == offset) { return point; }
+        // Visit each scalar once; re-encoding every prefix makes this quadratic.
+        long bytes = 0;
+        int point = 0;
+        for (int index = 0; ; point++) {
+            if (bytes == offset) { return point; }
+            if (bytes > offset || index == text.length()) { break; }
+            int scalar = text.codePointAt(index);
+            bytes += scalar <= 0x7f ? 1 : scalar <= 0x7ff ? 2 : scalar <= 0xffff ? 3 : 4;
+            index += Character.charCount(scalar);
         }
         throw new IllegalArgumentException("not a UTF-8 boundary");
     }
@@ -71,10 +78,24 @@ public record DocumentSnapshot(String uri, long version, String text) {
         return new Position(line, end - start);
     }
     public int fromLsp(Position position) {
-        for (int point = 0; point <= length(); point++) {
-            Position candidate;
-            try { candidate = lsp(point); } catch (IllegalArgumentException exception) { continue; }
-            if (candidate.equals(position)) { return point; }
+        if (position == null) { throw new IllegalArgumentException("not an LSP boundary"); }
+        int line = 0;
+        int column = 0;
+        int point = 0;
+        for (int index = 0; ; point++) {
+            if (line == position.line && column == position.character) { return point; }
+            if (index == text.length()) { break; }
+            int scalar = text.codePointAt(index);
+            index += Character.charCount(scalar);
+            if (scalar == '\r' || scalar == '\n') {
+                // CRLF is one line break and has no LSP position between its scalars.
+                if (scalar == '\r' && index < text.length() && text.charAt(index) == '\n') {
+                    index++;
+                    point++;
+                }
+                line++;
+                column = 0;
+            } else { column += Character.charCount(scalar); }
         }
         throw new IllegalArgumentException("not an LSP boundary");
     }
