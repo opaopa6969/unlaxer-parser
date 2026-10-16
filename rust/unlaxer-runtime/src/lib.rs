@@ -495,7 +495,8 @@ pub enum Memoization {
     Off,
     /// Cache failures for context-independent rules and successes for their statically
     /// pure subset. The historical variant name is retained for compatibility.
-    /// Classic mode and opt-in token tracing do not replay successes.
+    /// Explicit Classic modes retain their kind/inversion in the key. Opt-in
+    /// token tracing does not replay successes.
     SafeFailures,
 }
 
@@ -1023,8 +1024,12 @@ enum ExpectedIds {
 
 #[derive(Debug, Clone, Default)]
 struct FailureDiagnostic {
+    memo_expression_depth: usize,
     farthest: Option<usize>,
     expected: ExpectedIds,
+    classic_max_reached: Option<usize>,
+    classic_failure_seen: bool,
+    classic_failure_end: Option<(usize, MatchCursorPolicy)>,
 }
 
 impl FailureDiagnostic {
@@ -1061,6 +1066,10 @@ impl FailureDiagnostic {
     }
 
     fn merge(&mut self, other: &Self) {
+        self.classic_failure_seen |= other.classic_failure_seen;
+        if let Some(reached) = other.classic_max_reached {
+            self.classic_max_reached = Some(self.classic_max_reached.unwrap_or(0).max(reached));
+        }
         let Some(position) = other.farthest else {
             return;
         };
@@ -1118,6 +1127,19 @@ impl FailureMemoKey {
             matched_position,
             depth_and_modes: depth * 8 + 4 + usize::from(whitespace),
         }
+    }
+    fn with_token_mode(mut self, mode: Option<token::ParseMode>) -> Self {
+        if let Some(mode) = mode {
+            let kind = match mode.kind {
+                token::TokenKind::Consumed => 1,
+                token::TokenKind::MatchOnly => 2,
+                token::TokenKind::VirtualConsumed => 3,
+                token::TokenKind::VirtualMatchOnly => 4,
+            };
+            // Rule depth occupies bits3..10; preserve every normal-mode key bit.
+            self.depth_and_modes |= (kind << 11) | (usize::from(mode.invert) << 14);
+        }
+        self
     }
     fn with_match_policy(mut self, policy: MatchCursorPolicy) -> Self {
         self.depth_and_modes = (self.depth_and_modes & !6)
@@ -1186,6 +1208,7 @@ impl MemoValue for FailureDiagnostic {
 /// relative to this snapshot; spans remain absolute original-source CP offsets.
 struct SuccessMemo {
     nodes: Vec<Node>,
+    tokens: token::MemoTokens,
     root: usize,
     captures: Vec<(&'static str, Span)>,
     consumed: usize,
@@ -1332,7 +1355,7 @@ impl<V: MemoValue> MemoBuckets<V> {
 // Java Chain switches its current transaction to an advancing matched cursor.
 // NonOrdered inherits that policy; its Java children otherwise reset on begin.
 // `non_ordered` confines the compatibility policy to the new combinator.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct MatchCursorPolicy {
     reset: bool,
     non_ordered: bool,
@@ -1803,8 +1826,8 @@ impl<'a> ParseContext<'a> {
         self.memoized_failure_hits
     }
 
-    /// Actual successful rule replays in this context's pass. Classic mode,
-    /// tracing, unsafe rules and snapshots exceeding the memo budgets are misses.
+    /// Actual successful rule replays in this context's pass. Tracing, unsafe
+    /// rules and snapshots exceeding the memo budgets are misses.
     pub fn memoized_success_hits(&self) -> usize {
         self.memoized_success_hits
     }
@@ -2320,6 +2343,9 @@ impl<'a> ParseContext<'a> {
     fn fail_without_expected(&mut self) {
         if self.token_mode.is_some() && self.options.diagnostics == Diagnostics::Detailed {
             self.classic_failure_seen = true;
+            if let Some(frame) = self.diagnostic_frames.last_mut() {
+                frame.classic_failure_seen = true;
+            }
         }
         if self.options.diagnostics == Diagnostics::DetailedOnFailure {
             return;
@@ -2337,6 +2363,9 @@ impl<'a> ParseContext<'a> {
     fn fail_at(&mut self, position: usize, expected: &str) {
         if self.token_mode.is_some() && self.options.diagnostics == Diagnostics::Detailed {
             self.classic_failure_seen = true;
+            if let Some(frame) = self.diagnostic_frames.last_mut() {
+                frame.classic_failure_seen = true;
+            }
         }
         if self.options.diagnostics == Diagnostics::DetailedOnFailure {
             return;
@@ -2366,6 +2395,17 @@ impl<'a> ParseContext<'a> {
     fn replay_failure(&mut self, diagnostic: &FailureDiagnostic) {
         if self.options.diagnostics == Diagnostics::DetailedOnFailure {
             return;
+        }
+        self.classic_failure_seen |= diagnostic.classic_failure_seen;
+        if let Some(reached) = diagnostic.classic_max_reached {
+            self.classic_max_reached = Some(self.classic_max_reached.unwrap_or(0).max(reached));
+        }
+        if let Some(frame) = self.diagnostic_frames.last_mut() {
+            frame.classic_failure_seen |= diagnostic.classic_failure_seen;
+            if let Some(reached) = diagnostic.classic_max_reached {
+                frame.classic_max_reached =
+                    Some(frame.classic_max_reached.unwrap_or(0).max(reached));
+            }
         }
         let Some(position) = diagnostic.farthest else {
             return;
@@ -2400,7 +2440,6 @@ impl<'a> ParseContext<'a> {
             return None;
         }
         let memo_key = (self.options.memoization == Memoization::SafeFailures
-            && self.token_mode.is_none()
             && self.names_state.frames.is_empty()
             && self.lexical_trivia.is_none()
             && self.lexical_context.is_none()
@@ -2416,22 +2455,35 @@ impl<'a> ParseContext<'a> {
                     self.whitespace,
                     depth,
                 )
-                .with_match_policy(self.match_cursor_policy),
+                .with_match_policy(self.match_cursor_policy)
+                .with_token_mode(self.token_mode),
             )
         });
         if let Some((position, key)) = memo_key {
-            if let Some(diagnostic) = self.failure_memo.probe(position, &key).cloned() {
+            if let Some(diagnostic) = self
+                .failure_memo
+                .probe(position, &key)
+                .filter(|entry| {
+                    self.token_mode.is_none()
+                        || self.expression_depth <= entry.memo_expression_depth
+                })
+                .cloned()
+            {
                 self.memoized_failure_hits += 1;
                 self.replay_failure(&diagnostic);
+                if let Some((matched, policy)) = diagnostic.classic_failure_end {
+                    self.matched_position = matched;
+                    self.match_cursor_policy = policy;
+                }
                 return None;
             }
         }
         let success_key = memo_key.filter(|_| self.token_trace.is_none());
         if let Some((position, key)) = success_key {
             if let Some(entry) = self.success_memo.probe(position, &key).cloned() {
-                // Same remaining expression budget: never hide an OFF-mode resource
-                // failure by skipping recursive frames from a shallower invocation.
-                if entry.expression_depth == self.expression_depth {
+                // Equal or greater remaining budget: never hide an OFF-mode resource
+                // failure by reusing a shallower invocation from deeper wrappers.
+                if self.expression_depth <= entry.expression_depth {
                     self.memoized_success_hits += 1;
                     return Some(self.replay_success(&entry));
                 }
@@ -2460,16 +2512,27 @@ impl<'a> ParseContext<'a> {
         };
         if let Some((position, key)) = memo_key {
             let diagnostic = if record_diagnostics {
-                let diagnostic = self
+                let mut diagnostic = self
                     .diagnostic_frames
                     .pop()
                     .expect("memoized rule installed a diagnostic frame");
                 if let Some(parent) = self.diagnostic_frames.last_mut() {
                     parent.merge(&diagnostic);
                 }
+                if result.is_none() && self.token_mode.is_some() {
+                    diagnostic.memo_expression_depth = self.expression_depth;
+                    diagnostic.classic_failure_end =
+                        Some((self.matched_position, self.match_cursor_policy));
+                }
                 diagnostic
             } else {
-                FailureDiagnostic::default()
+                let mut diagnostic = FailureDiagnostic::default();
+                if result.is_none() && self.token_mode.is_some() {
+                    diagnostic.memo_expression_depth = self.expression_depth;
+                    diagnostic.classic_failure_end =
+                        Some((self.matched_position, self.match_cursor_policy));
+                }
+                diagnostic
             };
             // Resource exhaustion depends on active wrapper frames. Do not reuse
             // that failure from a shallower call; ordinary syntax failures retain
@@ -2546,16 +2609,21 @@ impl<'a> ParseContext<'a> {
                 return;
             }
         }
+        let Some(token_bytes) = token::MemoTokens::measure(&self.tokens, start, self.nodes.len())
+        else {
+            return;
+        };
+        bytes = bytes.saturating_add(token_bytes);
         let old_bytes = self
             .success_memo
             .get(position / FAILURE_MEMO_BUCKET_SIZE, &key)
             .map_or(0, MemoValue::retained_bytes);
-        if bytes
-            > self
-                .success_memo
-                .max_bytes
-                .saturating_sub(self.success_memo.retained_bytes - old_bytes)
-            || self.tokens.values.range(start..).next().is_some()
+        if bytes > MAX_SUCCESS_MEMO_BYTES
+            || bytes
+                > self
+                    .success_memo
+                    .max_bytes
+                    .saturating_sub(self.success_memo.retained_bytes - old_bytes)
             || self.tokens.calls.range(start..).next().is_some()
         {
             return;
@@ -2586,6 +2654,7 @@ impl<'a> ParseContext<'a> {
             key,
             Rc::new(SuccessMemo {
                 nodes,
+                tokens: token::MemoTokens::capture(&self.tokens, start, self.nodes.len()),
                 root: root - start,
                 captures,
                 consumed: self.position,
@@ -2612,6 +2681,7 @@ impl<'a> ParseContext<'a> {
             }
             self.nodes.push(node);
         }
+        entry.tokens.replay(self, start);
         for &(name, span) in &entry.captures {
             self.captures.push(name, span);
         }
@@ -4554,11 +4624,7 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>, succe
         return false; // Successful symbol/listener effects are not replayable.
     }
     match expression {
-        Expr::MatchOnly(_)
-        | Expr::InvertMatch(_)
-        | Expr::StopInvert(_)
-        | Expr::StopConsume(_)
-        | Expr::Character { .. } => false,
+        Expr::Character { .. } => false,
         Expr::Custom(_)
         | Expr::CustomWith { .. }
         | Expr::Replay(_)
@@ -4583,7 +4649,11 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>, succe
         Expr::PredictiveChoice { alternatives, .. } => alternatives
             .iter()
             .all(|child| expression_is_memo_safe(child, references, success)),
-        Expr::Capture(_, child)
+        Expr::MatchOnly(child)
+        | Expr::InvertMatch(child)
+        | Expr::StopInvert(child)
+        | Expr::StopConsume(child)
+        | Expr::Capture(_, child)
         | Expr::TextValue(child)
         | Expr::CaptureBoundary(_, child)
         | Expr::ValueBoundary(child)
@@ -5050,6 +5120,7 @@ mod tests {
             deferred.replay_failure(&FailureDiagnostic {
                 farthest: Some(input.len()),
                 expected: ExpectedIds::Single(123),
+                ..FailureDiagnostic::default()
             });
             assert_eq!(deferred.farthest, 0);
             assert!(deferred.expected.is_empty());
@@ -6019,7 +6090,43 @@ mod pure_success_memo_tests {
     }
 
     #[test]
-    fn classic_and_traced_calls_keep_their_committed_observations_without_success_hits() {
+    fn classic_structural_metadata_is_budgeted_and_eviction_releases_it() {
+        let mut context = context("ab", Expr::literal("a").then(Expr::literal("b")));
+        context.token_mode = Some(token::ParseMode::default());
+        let key = FailureMemoKey::new(0, 0, 0, false, 0)
+            .with_match_policy(context.match_cursor_policy)
+            .with_token_mode(context.token_mode);
+        let checkpoint = context.checkpoint();
+        assert!(context.rule(0, 0).is_some());
+        let token_bytes = token::MemoTokens::measure(&context.tokens, 0, context.nodes.len())
+            .expect("pure structural tokens");
+        assert!(token_bytes > 0);
+        let bytes = context.success_memo.get(0, &key).unwrap().bytes;
+        assert!(bytes > token_bytes);
+        context.restore(checkpoint);
+
+        context.success_memo = SuccessMemoBuckets::with_window(Some(1024));
+        // The node-only payload would fit; including structural tokens must miss.
+        context.success_memo.max_bytes = bytes - token_bytes;
+        warm(&mut context);
+        assert_eq!(context.success_memo.retained_bytes, 0);
+        warm(&mut context);
+        assert_eq!(context.memoized_success_hits(), 0);
+        assert!(context.resource_failure.is_none());
+
+        context.success_memo.max_bytes = bytes;
+        warm(&mut context);
+        assert_eq!(context.success_memo.retained_bytes, bytes);
+        warm(&mut context);
+        assert_eq!(context.memoized_success_hits(), 1);
+        context.success_memo.observe_cursor(4000);
+        assert_eq!(context.success_memo.retained_bytes, 0);
+        warm(&mut context);
+        assert_eq!(context.success_memo.retained_bytes, bytes);
+    }
+
+    #[test]
+    fn traced_calls_keep_observations_without_success_hits_while_classic_can_replay() {
         for classic in [false, true] {
             for traced in [false, true] {
                 let mut context = context("a", Expr::literal("a"));
@@ -6032,10 +6139,7 @@ mod pure_success_memo_tests {
                 }
                 warm(&mut context);
                 let root = context.rule(0, 0).unwrap();
-                assert_eq!(
-                    context.memoized_success_hits(),
-                    usize::from(!classic && !traced)
-                );
+                assert_eq!(context.memoized_success_hits(), usize::from(!traced));
                 assert_eq!(context.nodes[root].span, Span { start: 0, end: 1 });
                 if traced {
                     assert_eq!(context.token_trace().unwrap().unwrap().len(), 1);
