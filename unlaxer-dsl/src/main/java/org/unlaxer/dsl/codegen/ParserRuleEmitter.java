@@ -9,6 +9,10 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.DeclaresAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.DocAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ErrorElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.OwnedCaptureElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.ReplayElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.CaptureScopeElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.InterleaveAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.LongestChoiceAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.UniqueLongestChoiceAnnotation;
@@ -81,6 +85,9 @@ class ParserRuleEmitter {
         record BoundedRepeatOf(ElementModel inner, String min, String max) implements ElementModel {}
         record Captured(ElementModel inner, List<String> bindings) implements ElementModel {}
         record Boundary(String kind, ElementModel inner) implements ElementModel {}
+        record OwnedCapture(String name, ElementModel inner) implements ElementModel {}
+        record Replay(String name) implements ElementModel {}
+        record CaptureScope(ElementModel inner) implements ElementModel {}
     }
 
     // =========================================================================
@@ -150,7 +157,7 @@ class ParserRuleEmitter {
                 analyzeHelpersInBody(ctx, ruleName, bounded.body(), specs);
                 specs.add(new HelperSpec.ChainHelper(helperName, atomicAsRuleBody(bounded.body())));
             }
-        } else if (element instanceof GroupElement g) {
+        } else if (element instanceof TransparentElement g) {
             int n = ctx.nextGroup(ruleName);
             String helperName = ruleName + "Group" + n + "Parser";
             ctx.registerHelper(ruleName, element, helperName);
@@ -358,7 +365,7 @@ class ParserRuleEmitter {
                 }
                 collectFollowFromBody(ctx, bounded.body(), targetRule, tokens);
             }
-            if (elem instanceof GroupElement g) {
+            if (elem instanceof TransparentElement g) {
                 collectFollowFromBody(ctx, g.body(), targetRule, tokens);
             }
             if (elem instanceof OptionalElement opt) {
@@ -377,7 +384,7 @@ class ParserRuleEmitter {
             ParserGenerator.GenContext ctx, AtomicElement elem, LinkedHashSet<String> tokens, Set<String> visited) {
         if (elem instanceof TerminalElement t) {
             tokens.add(t.value());
-        } else if (elem instanceof GroupElement g) {
+        } else if (elem instanceof TransparentElement g) {
             collectFirstTerminalsFromBody(ctx, g.body(), tokens, visited);
         } else if (elem instanceof OptionalElement opt) {
             collectFirstTerminalsFromBody(ctx, opt.body(), tokens, visited);
@@ -721,7 +728,7 @@ class ParserRuleEmitter {
                 : PredictorSpec.atom("ChoicePredictor.literal(\""
                     + ParserCodegenUtil.escapeString(terminal.value()) + "\")");
         }
-        if (element instanceof GroupElement group) {
+        if (element instanceof TransparentElement group) {
             return predictorSpec(ctx, group.body(), visiting, memo);
         }
         if (element instanceof OneOrMoreElement one) {
@@ -1052,9 +1059,18 @@ class ParserRuleEmitter {
                 model = new ElementModel.BoundedRepeatOf(
                     new ElementModel.ClassRef(helperName + ".class"), minStr, maxStr);
             }
-        } else if (element instanceof GroupElement g) {
+        } else if (element instanceof ReplayElement replay) {
+            model = new ElementModel.Replay(replay.name());
+        } else if (element instanceof TransparentElement g) {
             String helperName = ctx.helperName(ruleName, element);
-            model = new ElementModel.ClassRef(helperName + ".class");
+            // A bare reference must reach the owned boundary directly: collecting
+            // it through a Chain would discard a virtual generated/projected result.
+            ElementModel child = !(element instanceof GroupElement) && isSingleRuleRef(g.body())
+                ? resolveElement(ctx,ruleName,getSingleAtomicElementFrom(g.body()))
+                : new ElementModel.ClassRef(helperName + ".class");
+            model = element instanceof OwnedCaptureElement capture
+                ? new ElementModel.OwnedCapture(capture.name(), child)
+                : element instanceof CaptureScopeElement ? new ElementModel.CaptureScope(child) : child;
         } else if (element instanceof SeparatedElement sep) {
             String outerHelperName = ctx.helperName(ruleName, element);
             model = new ElementModel.ClassRef(outerHelperName + ".class");
@@ -1161,6 +1177,16 @@ class ParserRuleEmitter {
             return "new Repeat(" + renderInner(m.inner(), adapterShadowsWordParser, tokenStream) + ", " + m.min() + ", " + m.max() + ")";
         }
         if (model instanceof ElementModel.Boundary m) return "org.unlaxer.parser.combinator.CaptureBoundaryParser.wrap(org.unlaxer.parser.combinator.CaptureBoundaryParser.Kind."+m.kind()+", "+renderElement(m.inner(),adapterShadowsWordParser,tokenStream)+")";
+        if (model instanceof ElementModel.OwnedCapture m) {
+            return "new org.unlaxer.parser.combinator.NamedCapture(\"" + ParserCodegenUtil.escapeString(m.name())
+                + "\", " + renderElement(m.inner(), adapterShadowsWordParser, tokenStream) + ")";
+        }
+        if (model instanceof ElementModel.Replay m) {
+            return "new org.unlaxer.parser.elementary.ReplayParser(\"" + ParserCodegenUtil.escapeString(m.name()) + "\")";
+        }
+        if (model instanceof ElementModel.CaptureScope m) {
+            return "new org.unlaxer.parser.combinator.CaptureScope(" + renderElement(m.inner(), adapterShadowsWordParser, tokenStream) + ")";
+        }
         if (model instanceof ElementModel.Captured m) {
             return "new __CaptureSite(" + renderElement(m.inner(), adapterShadowsWordParser, tokenStream) + ", " + bindingArguments(m.bindings()) + ")";
         }

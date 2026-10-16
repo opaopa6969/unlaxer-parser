@@ -5,7 +5,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.AnnotatedElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AtomicElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ChoiceBody;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
-import org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.BoundedRepeatElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ErrorElement;
@@ -451,10 +451,11 @@ public class ASTGenerator implements CodeGenerator {
 
     private String inferTypeFromElement(GrammarDecl grammar, AtomicElement element) {
         String astClassName = grammar.name() + "AST";
+        if (element instanceof UBNFAST.ReplayElement) return "String";
         if (element instanceof TerminalElement t) {
             return "String";
         }
-        if (element instanceof RuleRefElement || element instanceof GroupElement) {
+        if (element instanceof RuleRefElement || element instanceof TransparentElement) {
             var enumType=EnumSchema.enumType(grammar,element);
             if(enumType.isPresent()) return grammar.name()+"AST."+enumType.get();
         }
@@ -495,7 +496,7 @@ public class ASTGenerator implements CodeGenerator {
             String inner = inferTypeFromElement(grammar, sep.element());
             return "List<" + MapperTypeResolver.boxedType(inner) + ">";
         }
-        if (element instanceof GroupElement g) {
+        if (element instanceof TransparentElement g) {
             return "Object";
         }
         if (element instanceof ErrorElement e) {
@@ -586,7 +587,7 @@ public class ASTGenerator implements CodeGenerator {
         if (element instanceof UBNFAST.SeparatedElement separated) {
             return findCapturedElementsInAtomic(separated.element(), captureName, inOptional, true);
         }
-        if (element instanceof GroupElement g) {
+        if (element instanceof TransparentElement g) {
             return findCapturedElementsInBody(g.body(), captureName, inOptional, inRepeat);
         }
         return List.of();

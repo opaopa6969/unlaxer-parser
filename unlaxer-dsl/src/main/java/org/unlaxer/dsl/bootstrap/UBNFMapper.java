@@ -24,6 +24,9 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.ChoiceBody;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GlobalSetting;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.OwnedCaptureElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.ReplayElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.CaptureScopeElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.EvalAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.InterleaveAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.KeyValuePair;
@@ -1153,6 +1156,23 @@ public class UBNFMapper {
     }
 
     private AtomicElement mapAtomicElement(Token token) {
+        var captures = findAtElementLevel(token, UBNFParsers.OwnedCaptureElementParser.class);
+        if (!captures.isEmpty()) {
+            Token call = captures.get(0);
+            String name = findAtElementLevel(call, UBNFParsers.IdentifierParser.class).get(0).source.toString().trim();
+            var bodies = findDescendants(call, UBNFParsers.ChoiceBodyParser.class);
+            return new OwnedCaptureElement(name, toChoiceBody(bodies.get(0)));
+        }
+        var replays = findAtElementLevel(token, UBNFParsers.ReplayElementParser.class);
+        if (!replays.isEmpty()) {
+            String name = findAtElementLevel(replays.get(0), UBNFParsers.IdentifierParser.class).get(0).source.toString().trim();
+            return new ReplayElement(name);
+        }
+        var scopes = findAtElementLevel(token, UBNFParsers.CaptureScopeElementParser.class);
+        if (!scopes.isEmpty()) {
+            var bodies = findDescendants(scopes.get(0), UBNFParsers.ChoiceBodyParser.class);
+            return new CaptureScopeElement(toChoiceBody(bodies.get(0)));
+        }
         // GroupElement
         List<Token> groupTokens = findAtElementLevel(token, UBNFParsers.GroupElementParser.class);
         if (false == groupTokens.isEmpty()) {
@@ -1423,7 +1443,10 @@ public class UBNFMapper {
     }
 
     private static boolean isAtomicElementParser(Class<?> clazz) {
-        return clazz == UBNFParsers.GroupElementParser.class
+        return clazz == UBNFParsers.OwnedCaptureElementParser.class
+            || clazz == UBNFParsers.ReplayElementParser.class
+            || clazz == UBNFParsers.CaptureScopeElementParser.class
+            || clazz == UBNFParsers.GroupElementParser.class
             || clazz == UBNFParsers.OptionalElementParser.class
             || clazz == UBNFParsers.RepeatElementParser.class
             || clazz == UBNFParsers.TerminalElementParser.class

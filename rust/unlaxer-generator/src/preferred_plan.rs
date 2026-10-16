@@ -89,7 +89,9 @@ fn shape(g: &GrammarDecl, a: &AtomicElement, seen: &mut HashSet<String>) -> Shap
             seen.remove(name);
             out
         }
-        ElementKind::Group(b) => body_shape(g, b, seen),
+        ElementKind::Group(b)
+        | ElementKind::OwnedCapture { body: b, .. }
+        | ElementKind::CaptureScope(b) => body_shape(g, b, seen),
         ElementKind::Optional(b) => wrap(body_shape(g, b, seen), Count::Optional),
         ElementKind::Repeat(b) => wrap(body_shape(g, b, seen), Count::Many),
         ElementKind::OneOrMore(a)
@@ -164,9 +166,11 @@ impl<'a> Plan<'a> {
     }
     fn visit_atom(&mut self, a: &'a AtomicElement) {
         match &a.kind {
-            ElementKind::Group(b) | ElementKind::Optional(b) | ElementKind::Repeat(b) => {
-                self.visit(b)
-            }
+            ElementKind::Group(b)
+            | ElementKind::OwnedCapture { body: b, .. }
+            | ElementKind::CaptureScope(b)
+            | ElementKind::Optional(b)
+            | ElementKind::Repeat(b) => self.visit(b),
             ElementKind::OneOrMore(a) | ElementKind::BoundedRepeat { element: a, .. } => {
                 self.visit_atom(a)
             }
@@ -215,7 +219,9 @@ impl<'a> Plan<'a> {
     }
     fn semantic_atom(&mut self, a: &'a AtomicElement) {
         match &a.kind {
-            ElementKind::Group(b) => self.semantic_body(b),
+            ElementKind::Group(b)
+            | ElementKind::OwnedCapture { body: b, .. }
+            | ElementKind::CaptureScope(b) => self.semantic_body(b),
             ElementKind::Optional(b) | ElementKind::Repeat(b) => self.semantic_item_body(b),
             ElementKind::OneOrMore(a) | ElementKind::BoundedRepeat { element: a, .. } => {
                 self.semantic_item_atom(a)
@@ -249,6 +255,15 @@ impl<'a> Plan<'a> {
             ElementKind::RuleRef { name, .. } => {
                 if let Some(id) = self.g.rules.iter().position(|r| &r.name == name) {
                     out.push((id, depth));
+                }
+            }
+            ElementKind::OwnedCapture { body: b, .. } | ElementKind::CaptureScope(b) => {
+                if let Some(child) =
+                    one(b).filter(|a| matches!(a.kind, ElementKind::RuleRef { .. }))
+                {
+                    self.atom(child, depth, out)
+                } else {
+                    self.body(b, depth, out)
                 }
             }
             ElementKind::Group(b) => self.body(b, depth, out),

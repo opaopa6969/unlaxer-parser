@@ -30,6 +30,9 @@ grammar UBNF {
   token DIGIT ::= CHAR_RANGE('0', '9');
   token LETTER ::= CHAR_RANGE('a', 'z') | CHAR_RANGE('A', 'Z') | '_';
   token IDENTIFIER ::= LETTER (LETTER | DIGIT)*;
+  // Reserve only adjacent general owned calls; trivia keeps identifier + group syntax.
+  token NOT_OWNED_CALL ::= NEGATIVE_LOOKAHEAD('CAPTURE(')
+    NEGATIVE_LOOKAHEAD('SAME_AS(') NEGATIVE_LOOKAHEAD('CAPTURE_SCOPE(');
   token STRING ::= '\'' { '\\' ANY | NEGATION('\'\\') } '\'';
   token CLASS_NAME ::= IDENTIFIER;
   token UNSIGNED_INTEGER ::= DIGIT+;
@@ -277,7 +280,7 @@ grammar UBNF {
 
   // 連接: A B C
   @mapping(SequenceBody, params=[elements])
-  SequenceBody ::= { AnnotatedElement } @elements ;
+  SequenceBody ::= AnnotatedElement+ @elements ;
 
   // 要素（@typeof制約とキャプチャ名付き可、後置量化子付き可）
   @mapping(AnnotatedElement, params=[element, captureName, typeofConstraint])
@@ -304,12 +307,24 @@ grammar UBNF {
   // RepeatElement を BoundedQuantifier より先に配置して '{' の曖昧性を回避
   // QuantifiedRef（IDENTIFIER ベース）を最後に配置
   AtomicElement ::=
-      GroupElement
+      OwnedCaptureElement
+    | ReplayElement
+    | CaptureScopeElement
+    | GroupElement
     | OptionalElement
     | RepeatElement
     | ErrorElement
     | TerminalElement
     | QuantifiedRef ;
+
+  @mapping(OwnedCaptureElement, params=[name, body])
+  OwnedCaptureElement ::= 'CAPTURE(' IDENTIFIER @name ',' RuleBody @body ')' ;
+
+  @mapping(ReplayElement, params=[name])
+  ReplayElement ::= 'SAME_AS(' IDENTIFIER @name ')' ;
+
+  @mapping(CaptureScopeElement, params=[body])
+  CaptureScopeElement ::= 'CAPTURE_SCOPE(' RuleBody @body ')' ;
 
   // ( A B | C )  グループ
   @mapping(GroupElement, params=[body])
@@ -337,7 +352,7 @@ grammar UBNF {
   // @backref: ルール参照 → 定義へのジャンプ (Go-to-Definition)
   // @mapping なし透過: toAtomicElement が直接 RuleRefElement に変換
   @backref(name=name)
-  QuantifiedRef ::= { IDENTIFIER '.' } @namespace IDENTIFIER @name ;
+  QuantifiedRef ::= NOT_OWNED_CALL { IDENTIFIER '.' } @namespace IDENTIFIER @name ;
 
   // @typeof(captureName) — 要素レベルの型相関アノテーション
   @mapping(TypeofElement, params=[captureName])

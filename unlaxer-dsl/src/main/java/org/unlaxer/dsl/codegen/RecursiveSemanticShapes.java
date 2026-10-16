@@ -1,5 +1,7 @@
 package org.unlaxer.dsl.codegen;
 
+import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
+
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.unlaxer.dsl.bootstrap.UBNFAST.*;
@@ -88,7 +90,7 @@ public final class RecursiveSemanticShapes {
     private Shape element(AtomicElement element, Map<String, Shape> state, int depth) {
         checkDepth(depth);
         if (element instanceof RuleRefElement ref) return rules.containsKey(ref.name()) ? state.get(ref.name()) : TEXT;
-        if (element instanceof GroupElement group) return body(group.body(), state, depth + 1);
+        if (element instanceof TransparentElement group) return body(group.body(), state, depth + 1);
         if (element instanceof OptionalElement optional) return wrapNullable(body(optional.body(), state, depth + 1), Count.OPTIONAL);
         if (element instanceof RepeatElement repeat) return wrapNullable(body(repeat.body(), state, depth + 1), Count.MANY);
         if (element instanceof OneOrMoreElement repeat) return wrap(element(repeat.body(), state, depth + 1), Count.MANY);

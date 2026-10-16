@@ -1,5 +1,7 @@
 package org.unlaxer.dsl;
 
+import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -199,7 +201,7 @@ public final class PortabilityCheck {
             add(out, "P-QUALIFIED-REFERENCE", snapshot, atomic, ref.namespace().get() + "." + ref.name());
         } else if (atomic instanceof TerminalElement terminal && terminal.value().isEmpty()) {
             add(out, "P-EMPTY-LITERAL", snapshot, atomic, "empty literal");
-        } else if (atomic instanceof GroupElement group) {
+        } else if (atomic instanceof TransparentElement group) {
             scanBody(group.body(), snapshot, out);
         } else if (atomic instanceof OptionalElement optional) {
             scanBody(optional.body(), snapshot, out);

@@ -346,9 +346,11 @@ impl Inventory {
     }
     fn element(&mut self, element: &AtomicElement) {
         match &element.kind {
-            ElementKind::Group(body) | ElementKind::Optional(body) | ElementKind::Repeat(body) => {
-                self.body(body)
-            }
+            ElementKind::OwnedCapture { body, .. }
+            | ElementKind::CaptureScope(body)
+            | ElementKind::Group(body)
+            | ElementKind::Optional(body)
+            | ElementKind::Repeat(body) => self.body(body),
             ElementKind::OneOrMore(element) | ElementKind::BoundedRepeat { element, .. } => {
                 self.element(element)
             }
@@ -364,7 +366,7 @@ impl Inventory {
                 format!("{namespace}.{name}"),
                 element.span,
             ),
-            ElementKind::Error(_) => {}
+            ElementKind::Replay { .. } | ElementKind::Error(_) => {}
             ElementKind::Terminal(value) if value.is_empty() => {
                 self.add("P-EMPTY-LITERAL", "empty literal", element.span)
             }

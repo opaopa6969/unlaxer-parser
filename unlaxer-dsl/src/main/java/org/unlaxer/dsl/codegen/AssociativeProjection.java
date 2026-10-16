@@ -80,7 +80,7 @@ public final class AssociativeProjection {
             seen.remove(ref.name());
             return result;
         }
-        if (atom instanceof GroupElement g) return raw(g.body(), rules, seen, depth + 1, work);
+        if (atom instanceof TransparentElement g) return raw(g.body(), rules, seen, depth + 1, work);
         if (atom instanceof OptionalElement || atom instanceof RepeatElement) return true;
         if (atom instanceof OneOrMoreElement r) return raw(r.body(), rules, seen, depth + 1, work);
         if (atom instanceof BoundedRepeatElement r)
