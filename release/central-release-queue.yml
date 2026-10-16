@@ -28,8 +28,19 @@ lastObserved:
 
 nextWindow:
   month: "2026-10"
-  selected: null
+  selected: opaopa6969/unlaxer-parser
   candidates:
+    - repository: opaopa6969/unlaxer-parser
+      status: selected
+      requestedVersion: "3.3.0"
+      checklist: "https://github.com/opaopa6969/unlaxer-parser/issues/522"
+      note: >-
+        Production quality gate for Java/Rust Classic, Unicode 17 grapheme
+        parsing and positions, bounded recursion and IDE lifecycle fixes.
+        Publish the parent POM and four Java 21 / Java 17 library artifacts
+        only after release-source CI succeeds; verify Central signatures and
+        isolated consumers. Tag and GitHub Release include UBNF VSIX and
+        existing Linux x86_64 Rust binaries. Rust crates remain unpublished.
     - repository: opaopa6969/unlaxer-parser
       status: published
       publishedAt: "2026-10-03T14:36Z"

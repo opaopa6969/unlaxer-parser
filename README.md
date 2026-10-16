@@ -13,7 +13,7 @@
 
 # unlaxer-parser
 
-Development: **3.3.0-SNAPSHOT** (not published). The dependency examples below use the latest stable **3.2.0**.
+Release version: **3.3.0**. Publication verification is tracked in [#522](https://github.com/opaopa6969/unlaxer-parser/issues/522).
 The development UBNF VSIX includes an in-editor [beginner catalog/help](unlaxer-dsl/ubnf-vscode/README.md).
 Generate a self-contained [language playground from UBNF](docs/ubnf-playground-ja.md), including UBNF's own meta-grammar.
 Try UBNF grammar syntax, AST and CST in the [online UBNF playground](https://opaopa6969.github.io/unlaxer-parser/ubnf/).
@@ -25,11 +25,11 @@ Try UBNF grammar syntax, AST and CST in the [online UBNF playground](https://opa
 [![Maven Central](https://img.shields.io/maven-central/v/org.unlaxer/unlaxer-common)](https://central.sonatype.com/artifact/org.unlaxer/unlaxer-common)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Java 21+](https://img.shields.io/badge/Java-21%2B-orange.svg)]()
-[![Version](https://img.shields.io/badge/version-3.2.0-blue)]()
+[![Version](https://img.shields.io/badge/version-3.3.0-blue)]()
 
 ---
 
-> **Latest release — 3.2.0**: UBNF v2 declarative tokens and scoped lexical grammar modules. Define NUMBER, STRING, and variable-length fences in UBNF itself and generate their Java/Rust recognizers. Includes token/context contracts, portability checks, and generated API impact reports. Start with the [illustrated UBNF v2 guide (Japanese)](./docs/ubnf-v2-illustrated-ja.md). Java 21 and Java 17 artifacts remain separate. See the [CHANGELOG](./CHANGELOG.md) for details and limits. Historical note: **3.0.2 was never published to Maven Central**. For migrations from `2.x`, also see the [downstream drift warning](#downstream-drift-warning).
+> **Latest release — 3.3.0**: Unicode 17 grapheme parsing and typed coordinates, source-preserving language composition, semantic queries, selectable token streams, and Java/Rust IDE support. Includes recursion limits and source-position/protocol fixes verified against shared corpora. See the [quality criteria](./docs/production-quality.md), [grapheme API](./docs/grapheme-coordinates.md), and [CHANGELOG](./CHANGELOG.md) for scope and compatibility notes. Java 21 and Java 17 artifacts remain separate. Historical note: **3.0.2 was never published to Maven Central**. For migrations from `2.x`, also see the [downstream drift warning](#downstream-drift-warning).
 
 ---
 
@@ -143,7 +143,7 @@ From this, unlaxer generates:
 
 ## Java / Rust Support and Quality
 
-This repository provides Java and Rust implementations of **unlaxer Classic**, the stateful combinator runtime. The table describes development **3.3.0-SNAPSHOT**; distinguish these additions from the published Maven 3.2.0 release.
+This repository provides Java and Rust implementations of **unlaxer Classic**, the stateful combinator runtime. The table describes **3.3.0**; these additions are not present in Maven 3.2.0.
 
 | Area | Java | Rust Classic |
 |---|---|---|
@@ -172,12 +172,12 @@ Downstream `tinyexpression-rs` and `rustcodeblock` AOT exist on the separate **u
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-common</artifactId>
-        <version>3.2.0</version>
+        <version>3.3.0</version>
     </dependency>
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-dsl</artifactId>
-        <version>3.2.0</version>
+        <version>3.3.0</version>
     </dependency>
 </dependencies>
 ```
@@ -190,12 +190,12 @@ packages and classes, compiled with `--release 17` (major 61):
 <dependency>
     <groupId>org.unlaxer</groupId>
     <artifactId>unlaxer-common-jdk17</artifactId>
-    <version>3.2.0</version>
+    <version>3.3.0</version>
 </dependency>
 <dependency>
     <groupId>org.unlaxer</groupId>
     <artifactId>unlaxer-dsl-jdk17</artifactId>
-    <version>3.2.0</version>
+    <version>3.3.0</version>
 </dependency>
 ```
 

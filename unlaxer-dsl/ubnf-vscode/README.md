@@ -64,7 +64,7 @@ npm ci
 npx playwright install chromium
 npm run test:help
 # Linux: 配布する VSIX そのものを、隔離した VS Code profile で起動検証
-xvfb-run -a npm run test:vsix -- target/ubnf-lsp-3.3.0-SNAPSHOT.vsix
+xvfb-run -a npm run test:vsix -- target/ubnf-lsp-3.3.0.vsix
 ```
 
 Chromium で全レッスン・検索・ダウンロード・モバイル幅を操作し、別のテストで

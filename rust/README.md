@@ -8,13 +8,13 @@ Java版を維持しつつ、UBNFからRustのparser・AST・mapper・evaluator d
 
 full-specの進捗は[対応表と受け入れ条件](FULL-SPEC.md)で追跡する。runtimeの機能とUBNFから生成できる機能を区別する。
 
-3.3.0-SNAPSHOT の `unlaxer_runtime::semantic` は、Java と共通の[型・scope・期待型モデル](../docs/semantic-model.md)を提供する。ユーザー定義型と引数補完の[UBNF 接続例](../examples/semantic-model/README.md)がある。LSP の自動生成や TinyExpression の新しい型構文はこの API の対象外。
+3.3.0 の `unlaxer_runtime::semantic` は、Java と共通の[型・scope・期待型モデル](../docs/semantic-model.md)を提供する。ユーザー定義型と引数補完の[UBNF 接続例](../examples/semantic-model/README.md)がある。LSP の自動生成や TinyExpression の新しい型構文はこの API の対象外。
 
 [宣言的な意味規則](../docs/declarative-semantics.md)では、同じ version 付き JSON を Java / Rust で検証し、生成 `EditorCst` から型・scope・参照・call-site と期待型補完を構築する。Rust の JSON loader は `unlaxer_generator::semantic_rules`、実行 IR は `unlaxer_runtime::semantic_rules`。`portableNominal/1` の対応範囲と独自 provider の境界を仕様に記載している。
 
 ## すぐ動かす
 
-3.3.0-SNAPSHOT では `unlaxer playground --grammar ... --output ...` により、
+3.3.0 では `unlaxer playground --grammar ... --output ...` により、
 この生成 parser と runtime source を含む [言語 playground](../docs/ubnf-playground-ja.md) も作れます。
 ブラウザでは WASM を実行し、入門/catalog、CST/AST、位置付き診断を表示します。
 
@@ -206,7 +206,7 @@ ASCII bitset・非 ASCII フラグ・nullable・unknown・「sequence が先に 
 - `@rightAssoc`の`Base @left { Op @op Self @right }`形（`Self`は宣言rule自身への直接参照）。同じparamsとprecedenceを用い、右辺を再帰的に生成する。
 - `@whitespace: javaStyle`（ASCII空白、行/ブロックコメント）または`none`。未指定は`none`。rule の `@whitespace` / `@whitespace(javaStyle)` / `@whitespace(none)` と `@interleave(profile=javaStyle|commentsAndSpaces)` による局所設定も生成する。[優先順位・Javaとの共通契約](../docs/rule-trivia.md)を参照。`@package`はRustでは使用しない。
 - `@catalog(context='...')`。解析時には作用せず、rule名・context・local capture名を`parser::CATALOGS`へ保持する。catalogがない文法の出力は変えない。[metadata契約とJava LSPの現状](../docs/catalog-metadata.md)を参照。Rust の typed/provider completion・hover は実装済み。`CATALOGS` から resolver を自動選択する接続は未対応（[対応表](FULL-SPEC.md)）。
-- `@doc('...')`（3.3.0-SNAPSHOT）。rule 名と順序付き説明を `parser::RULE_DOCS` に保持する。認識・AST は変えない。説明がない文法には定数を出力しない。
+- `@doc('...')`（3.3.0）。rule 名と順序付き説明を `parser::RULE_DOCS` に保持する。認識・AST は変えない。説明がない文法には定数を出力しない。
 - `@skip`。構文・CST・capture・scope/rollback は保持し、その規則と子の AST 投影を省く。明示 capture は text として保持する。[root・型・移行と検証の契約](../docs/skip-ast-projection.md)を参照。
 - `@scopeTree` / `@declares` / `@backref`。scopeのある文法では宣言への参照、ない文法では同一rule内のcapture比較を行う。構文の受理は変えず意味診断を保持する。[capture選択・空text・CP位置・rollbackの契約](../docs/generated-scope-effects.md)を参照。
 
@@ -423,7 +423,7 @@ TSVは`unlaxer-dsl/target/`配下で、CI artifact `rust-conformance`にも添�
 で解放を止められる。両設定は最初のcontext生成時に一度だけ読む。memo化自体は既定OFFのまま。
 詳しくは[測定・Javaとの対称性・制約](../benchmarks/results/2026-09-30-rust-memo-retention.md)を参照。
 
-3.3.0-SNAPSHOT では [`@tokenStream: enabled`](../docs/token-stream.md) により、生成した Java / Rust parser で文字列直接解析・trivia cache・遅延 token 化・事前 token 化を選択できる。原文の位置とコメントを保持し、既定は直接解析を維持する。
+3.3.0 では [`@tokenStream: enabled`](../docs/token-stream.md) により、生成した Java / Rust parser で文字列直接解析・trivia cache・遅延 token 化・事前 token 化を選択できる。原文の位置とコメントを保持し、既定は直接解析を維持する。
 
 文字種境界は既存 token の合成で表せる。実行時辞書には Java と共通の immutable parse bindings を使う。
 [仕様と実行例](../docs/parse-composition.md)を参照。

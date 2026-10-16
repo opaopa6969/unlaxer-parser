@@ -8,9 +8,21 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ## [Unreleased]
 
-## [3.3.0-SNAPSHOT] - Unreleased
+## [3.3.0] - 2026-10-16
 
 ### Added
+
+- Java/Rust の stateful な `@recovery` と回復診断・CST marker を追加 (#331)。失敗した試行の cursor/capture/scope/登録状態を戻して同期点へ進む。回復領域を含む木は通常の typed mapper が拒否し、評価値を捏造しない。[契約](docs/error-recovery.md)。
+- `@tokenStream: enabled` で直接解析・trivia cache・遅延 token 化・事前 token 化を解析ごとに選択できる。名前付きの空白/コメント定義、module/package import、明示した terminal 集合を切り替える lexical context を Java/Rust の両生成経路に追加 (#385, #393, #377, #467)。既定は従来の直接解析。[token stream](docs/token-stream.md)、[lexical context](docs/contextual-lexing.md)。
+- immutable parse bindings による adapter の合成と、同じ ParseContext・元入力上で明示登録した別 grammar の公開 entry を呼ぶ shared-input language calls を追加 (#369)。境界内を全文解析する `@embedded` と、現在位置から prefix を消費する共有入力呼出しを区別し、状態・元文書の CP span・子 CST の所有を保持する。[bindings](docs/parse-composition.md)、[embedded](docs/embedded-grammar-declarations.md)、[shared calls](docs/shared-language-calls.md)。
+- URI/version/原文に束縛した snapshot、CP/UTF-16/UTF-8/LSP 変換、多段 source map、言語領域、partial CST/editor result と言語 query の転送を追加。未完成の埋込み領域、空領域、EOF でも所有元を検査し、古い snapshot の応答や曖昧な edit を拒否する。[source map](docs/source-maps-and-language-regions.md)、[query forwarding](docs/language-query-forwarding.md)。
+- 共通の型・scope・symbol モデル、文書間 symbol index、型関係と上限付き呼出し推論、snapshot/dependency を管理する semantic queries、条件付きの解析 phase pipeline、別 JSON に記述する宣言的意味規則を Java/Rust に追加。補完・hover・定義・診断の provider と、原文 trivia を保持する検査付き rename/edit plan へ接続する。[意味モデル](docs/semantic-model.md)、[型推論](docs/type-system.md)、[query](docs/semantic-queries.md)、[意味規則](docs/declarative-semantics.md)、[edit](docs/source-preserving-edits.md)。
+- UBNF package の builtin/local/HTTPS 依存、exact version・SHA-256・推移依存を固定する manifest/lock/cache、語彙の出典表示を Java/native Rust CLI に追加 (#368, #401, #407, #412)。取得は明示した `deps resolve` だけで行い、通常の生成/check はオフライン。`std/layout` を同梱し、credential を lock や grammar と分離する。[package 契約](docs/ubnf-packages.md)。
+- Java 21 / TypeScript 5.9.3 / Rust 1.85.0 の固定した**部分文法**と source-only language package、明示 profile 選択、登録した外部解析 provider、LSP/Playground の capability 表示を追加。実 javac/TypeScript/rustc の provider は明示設定時に利用し、対象言語全体の構文・意味対応とは区別する。[profile](docs/language-profiles.md)、[外部 provider と機能差](docs/external-language-providers.md)。
+- `@uniqueLongestChoice` と version 付き immutable name snapshot による `@namePredicate` を追加。最大消費の候補が一意な場合だけ選び、同率/空一致、未知の名前分類、version 不一致を拒否する。既存 ordered/longest choice の選択規則は維持する。[曖昧性](docs/explicit-ambiguity-profiles.md)、[名前判定](docs/versioned-name-snapshots.md)。
+- Unicode 17.0.0 固定の `XID_IDENTIFIER` と v2 の scalar escape、`GraphemeIndex` / `GraphemeLength`、snapshot に結び付く G/CP/UTF-16/UTF-8 境界変換、1 extended grapheme cluster を消費する `GraphemeParser` を追加 (#335, #288, #510)。Java/Rust 共通データを用い、書記素の公式766ケースと独立 oracle を検証する。[XID](spec-corpus/xid-identifier/README.md)、[書記素](docs/grapheme-coordinates.md)。
+- Classic Rust の framed stdio LSP と、両 host の opt-in `--lsp` 生成を追加。full document sync、profile、構文/意味診断、keyword/typed/provider 補完、provider hover/definition を対応範囲として公開する (#451)。[契約](docs/classic-rust-lsp.md)。
+- Classic Rust の framed stdio DAP と、両 host の opt-in `--dap` 生成を追加。typed AST と上限付き実 terminal trace による AST/token inspection、breakpoint/next/continue、変数 hook を Java と共通検証する (#462, #463)。portable token metadata と明示した consume/invert stopper API も追加 (#438)。[DAP](docs/classic-rust-dap.md)、[token trace](docs/token-trace.md)、[metadata](docs/portable-token-metadata.md)。
 
 - VSIX の ▶ / Help から保存済み UBNF → 生成 parser → WASM playground を開く操作 (#358)。
   画面内に環境準備・保存・再生成・トラブル時の案内を追加。信頼済み workspace のみ、
@@ -27,17 +39,39 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ### Changed
 
+- 過深解析を通常の構文不一致と区別して中断する。Java は同時 parser frame 1024 を超えると `ParseLimitException` (`ULX-PARSE-DEPTH-LIMIT`) を返し、Rust は rule 呼出256 / 同時 expression1024 の上限を公開再入にも適用して `resource_limit` を返す (#506, #516)。否定 assertion/optional/choice/recovery はこの制限を成功へ変換しない。上限に達した context は再利用せず、新しい context を作る。Java は close 時に登録 transaction 状態を復元する。[Java](docs/java-parser-limits.md)、[Rust の上限と適用範囲](rust/README.md)。
+- Java `PositionResolver` の EOF は最終行の実際の CP 列を返す。従来の常時0列に依存した表示/テストは更新が必要。CP↔UTF-16 の EOF 双方向変換と CRLF 内部の scalar 境界を保持し、`lines` / `lineSize` に改行で終わらない最終行を含める (#503)。空入力と末尾改行後の仮想空行は line slice に追加しない。snapshot の LSP 変換は引き続き CRLF 内部を拒否する。
+
 - UBNF LSP の用語をメタ文法の AST から抽出。宣言的 token を索引へ登録し、
   既定の snippet は外部 Java parser binding ではなく v2 の認識定義を使用する。
-- 開発版を 3.3.0-SNAPSHOT とし、公開済みの 3.2.0 は変更しない。Central への公開は未実施。
+- Maven artifactの版を3.3.0へ更新。Java 21 / Java 17の別artifactと、既定のCP単位のcursor/spanを維持する。
 
 ### Fixed
+
+- Java `REGEX` が UTF-16 の一致幅を CP 数として消費し、補助文字の後ろまで誤消費する問題を修正 (#505)。指定 TokenKind の現在位置を使うため match-only の位置も正しくなる。反転不一致は存在しない matcher group を読まず次の1 scalar を消費し、EOF/ゼロ幅一致では非空 token を作らない。Rust の汎用 REGEX 対応を追加したものではない。[共通 Unicode 契約](spec-corpus/unicode-tokens/README.md)。
+- Java/Rust snapshot の逆位置変換を候補ごとの再走査から単一走査へ変更し、二乗時間を解消 (#509)。CP/UTF-16/UTF-8/LSP の結果、EOF、CRLF、符号化途中位置の拒否を維持する。
+- DAP の `configurationDone` 再送による step 巻戻りと終了後の stopped event を防止し、launch ごとに一度だけ受理する (#504)。breakpoint の source path を正規化した program と照合し、別 source の要求で既存 breakpoint を上書きしない (#507)。[lifecycle/source 契約](docs/classic-rust-dap.md)。
+- Java/Rust LSP の shutdown 後 request を InvalidRequest で拒否し、exit によって transport と所有 worker を終了する (#508)。組込み API は host process を終了せず、stdio main が status を適用する。shutdown 後の exit は0、shutdown のない exit / exit のない EOF は1。[終了契約](docs/classic-rust-lsp.md)。
+- 空の埋込み文書の origin anchor、未閉鎖領域の EOF 所有、shared-input 呼出しの lexical session 分離、古い snapshot から構築した非同期 query の拒否、consumer への意味診断公開を修正。package cache は推移依存の検証後に公開し、manifest/lock/artifact の上限は両言語とも UTF-8 byte 数で判定する。
 
 - UBNF VSIX の import-aware 補完・hover・定義移動と module 診断 (#360)。開いた module の
   編集を反映し、AST 起点の rename でコメント・文字列・capture と grammar ごとのスコープを区別する。
   未完成・曖昧・外部公開 token の rename は拒否し、画面内 help で対応範囲を明記。
 - VSIX が実行時依存の `vscode-languageclient` を除外していた梱包設定を修正。
   配布 VSIX を隔離した VS Code に読み込み、拡張起動・help・Java LSP 補完を CI で検証する。
+- 配布VSIXの内部versionを3.3.0へ更新。従来の0.3.0固定値ではなく、今回の配布ファイル名と同じ版をインストール時に識別できるようにする (#523)。
+- 配布VSIXに既存MIT LICENSE本文を同梱する。著作権表示・許諾条件を変更せず、リポジトリrootの本文と同一内容を収録する (#529)。
+
+### Release notes
+
+- Maven の版は **3.3.0**、UBNF の書式は **v2**。Java 21 の通常 artifact と Java 17 の `-jdk17` artifact は引き続き別配布。同じ source tree を使い、既存 CP cursor/Token/CST/AST span の単位を変更しない。
+- 書記素は表示桁幅や正規化ではない。家族 `👨‍👩‍👧‍👦` は1G/7CP/11UTF16/25UTF8。G→CP/UTF16/UTF8 は対象 snapshot の表で変換し、逆変換のクラスタ内部は strict に拒否する。前後境界は floor/ceiling を明示する。長さだけの換算はできず、開始/終了の変換と差分が必要。[契約](docs/grapheme-coordinates.md)。
+- 再帰上限は文法の括弧数そのものではなく runtime frame 数を制限する。Java/Rust で数値・同じ入力の最大深さ・失敗表現を同一化しない。検証対象は Java `-Xss1m` 以上、Rust 2MiB thread stack。任意 callback の独自再帰、独自 parser の通知省略、極小 stack、mapper 等の別再帰を隔離する sandbox ではない。[本番品質の対象](docs/production-quality.md)、[Java 上限](docs/java-parser-limits.md)。
+- token stream は明示 opt-in。最長一致と literal 優先により、直接解析と受理言語が変わる場合がある。例えば `'if' ID` に対する `ifx` は direct と token mode で異なり得る。`XID_IDENTIFIER` は legacy ASCII identifier の置換ではなく、先頭 `_` を受理しない追加 token。[token stream](docs/token-stream.md)、[XID](spec-corpus/xid-identifier/README.md)。
+- Rust は引き続き汎用 `REGEX` / `CASE_INSENSITIVE` / 任意 Java parser の自動移植、incremental parse cache、全 consume/invert/MatchedToken 互換を完了扱いにしない。Java `MatchOnly` と Rust PEG `ahead()` は既存の異なる契約を保つ。[対応表](rust/FULL-SPEC.md)、[positive assertion](docs/positive-assertion-contracts.md)。
+- Rust LSP の cancellation/semanticTokens/rename/format/code-action transport、高度な DAP/live evaluator 制御、任意の下流 VSIX からの Rust 起動は今回の範囲外。runtime の query/edit API の実装と protocol 全機能の対応は区別する。部分言語 profile は公式言語全体の parser ではなく、一般左再帰/GLR/Earley、rule/evaluator/host-code import、Grapheme の tokenStream lexical opcode も未対応。[対応表](rust/FULL-SPEC.md)。
+- Rust workspace は **0.1.0 / Rust 1.85** の別版体系を維持し、全 crate の `publish = false` を変更しない。crates.io 公開は行わない。GitHub Release の native generator / example assets は、Maven artifact と別の配布物として対象 platform・同梱 license を明記する。
+- Java/Rust の本番品質は公開した対応範囲と固定検証条件に対するもの。エンジン再利用評価 #435 は隔離実験であり、Classic の engine/既定値を変更せず、ubnfc を production engine として組み込まない。[品質基準](docs/production-quality.md)、[実験結論](docs/engine-reuse-experiment-ja.md)。
 
 ## [3.2.0] - 2026-10-03
 

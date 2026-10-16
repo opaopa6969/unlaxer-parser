@@ -167,7 +167,7 @@ CI の既存 downstream pin `7d7bd1c` も同じ grammar hash である。
 
 この実文法はすでに **診断 0 件**。過去の未対応状態を装わず、元文法の成功に加え、コピーへ
 `example.UnportedParser` と未対応の `@portabilityProbe` を明示的に注入した負例で 2 件の全件収集を検査する。
-3.3.0-SNAPSHOT から `@doc` は両 Rust emitter が metadata として保持するため、未対応診断には含めない。
+3.3.0 から `@doc` は両 Rust emitter が metadata として保持するため、未対応診断には含めない。
 注入負例を実 TinyExpression の未対応件数として扱わない。
 
 ```sh
