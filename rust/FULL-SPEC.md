@@ -27,6 +27,7 @@ annotation、`ParseContext` API、consume/invert伝播、incremental、IDE proto
 
 | 機能群 | 現状 | 追加の受け入れ条件 |
 |---|---|---|
+| left recursion生成境界 | Java/Rust両hostで入力非消費の再帰cycleを生成前拒否（#588） | [契約・移行](../docs/left-recursion.md)。nullable rule/group/tokenを含む共通受理拒否、実生成consumerとbounded解析。max=0のruntime補修は#598 |
 | literal enum | Java/Rust両hostで型付きscalar/optional/listとroot wrapperを生成（#537） | [契約・命名移行・出現位置](../docs/enum-values.md)。24文法56入力を6設定で実compile/map/evalし、34負例・生成物/impact一致・exhaustive consumer破壊を検証。enum/Text/Node混在とshared mapping、rootとの併用も対応（#539）。追加9文法116入力×6設定で型・値・出現span・DAP AST stepsを確認。typeof混在制約も両hostで対応（#542） |
 | typed common fields | `@commonField`を両hostで検証・生成（#541）。Javaは実field型のinterface accessor、Rustはfamily所属を表すborrowed view。flat/dotted/中間sumとmixed enum/Text/Nodeをscalar/optional/listで対応 | [契約](../docs/common-fields.md)。10文法30入力・13負例で実compile/eval、CP位置、生成物/API schema一致。preferred type・nested containerは#547 |
 | numeric captures | Javaの既存int契約へRust i32/Option<i32>/Vec<i32>とchecked mappingを統一（#566）。NumberParser/DigitParserの純numeric fieldを対象とし、混合値やtext aliasは変更しない | [契約](../docs/numeric-captures.md)。8文法48入力・実compile/map/eval・上下限/overflow/非整数/CP位置を共有検証。preferred/nested/familyの残差は#567/#568/#569 |
