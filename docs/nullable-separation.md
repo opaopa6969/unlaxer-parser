@@ -55,3 +55,7 @@ original/retained CST and diagnostic frontier/expected presence across all four
 token kinds, inversion, memo modes and diagnostic modes. The runtime tests also
 cover outer bounds, rollback/retry, capture scope and empty/nonempty/unbound replay
 composition, plus resource failure at each of the three list positions.
+
+This is a development change after 3.3.0, tracked in
+[#616](https://github.com/opaopa6969/unlaxer-parser/issues/616).
+The broader generated/runtime parity work remains tracked separately.
