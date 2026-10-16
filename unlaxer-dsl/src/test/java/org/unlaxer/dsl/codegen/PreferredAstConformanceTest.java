@@ -365,6 +365,20 @@ public class PreferredAstConformanceTest {
                             + " mut broken=tree.clone();broken.nodes[tree.root].span.end=usize::MAX;assert!(generated::mapper::map_parsed_tree(&broken).is_err());retained.push(snapshot);"
                             + " }\n");
             }
+            if (fixture.has("foreignGrammar")) {
+                String foreignSource = fixture.get("foreignGrammar").getAsString();
+                Path foreignInput = dir.resolve("foreign.ubnf"), foreignOutput = dir.resolve("foreign");
+                Files.writeString(foreignInput, foreignSource);
+                run(List.of(generator.toString(), "generate", "--grammar", foreignInput.toString(),
+                    "--output", foreignOutput.toString()), "", true, true);
+                var foreignGrammar = UBNFMapper.parse(foreignSource).grammars().get(0);
+                for (var file : new RustBackend().generate(foreignGrammar))
+                    assertEquals(file.relativePath(), file.content(), Files.readString(foreignOutput.resolve(file.relativePath())));
+                code.insert(0, "#[path=\"foreign/mod.rs\"] mod foreign; ");
+                code.append("let foreign=foreign::parser::parse_tree_for_mapping(")
+                    .append(rustString(fixture.getAsJsonArray("cases").get(0).getAsJsonObject().get("input").getAsString()))
+                    .append(").unwrap();assert!(generated::mapper::map_parsed_tree(&foreign).is_err());\n");
+            }
             code.append(
                     "for snapshot in retained"
                         + " {std::thread::scope(|s|{s.spawn(||{assert!(std::ptr::eq(snapshot.select_default(),snapshot.select(None)));});});}}\n");

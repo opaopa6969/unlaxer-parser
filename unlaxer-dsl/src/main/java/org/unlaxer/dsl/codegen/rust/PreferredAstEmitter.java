@@ -52,6 +52,9 @@ final class PreferredAstEmitter {
                 for (var call : calls.get(i))
                     identity.append(call.rule()).append(":").append(call.depth()).append(",");
             identity.append("\n");
+            for (var constraint : ir.rules().get(i).typeConstraints())
+                identity.append("typeof:").append(constraint.capture().name()).append(":")
+                    .append(constraint.reference().name()).append("\n");
         }
         long hash = 0xcbf29ce484222325L;
         for (byte value :

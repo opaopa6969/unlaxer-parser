@@ -36,6 +36,14 @@ pub(crate) fn emit(
             write!(identity, "{target}:{depth},").unwrap();
         }
         identity.push('\n');
+        for constraint in &ir.rules[i].type_constraints {
+            writeln!(
+                identity,
+                "typeof:{}:{}",
+                constraint.capture.name, constraint.reference.name
+            )
+            .unwrap();
+        }
     }
     let mut hash = 0xcbf29ce484222325u64;
     for byte in parser
