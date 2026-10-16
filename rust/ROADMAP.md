@@ -1,5 +1,7 @@
 # Native parserからtinyexpression-rsへ
 
+> 初期計画の記録。本文の「まだ存在しない」「別段階」は計画作成時点を指す。現在は Classic の Rust 単独 frontend/generator と stdio LSP/DAP、下流 ubnfc の tinyexpression-rs / rustcodeblock AOT が実装済み。現状の判定には [README](README.md) と [full-spec 対応表](FULL-SPEC.md) を参照する。
+
 ユーザーの長期目標は、parserをネイティブバイナリとして配布し、最終的にtinyexpressionの式を実行する`tinyexpression-rs`バイナリと`rustcodeblock`を提供すること。この文書は段階的な設計方針であり、未実装の機能が使えるという宣言ではない。
 
 ## バイナリの区別

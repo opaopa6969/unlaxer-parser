@@ -1,7 +1,5 @@
 [English](./README.md) | [日本語](./README-ja.md)
 
-実験的機能: [Rust生成バックエンド](rust/README.md)。parser・typed AST・mapper・evaluatorの限定サブセット対応で、Java版の全面移植ではありません。
-
 ---
 
 ```
@@ -18,6 +16,8 @@
 開発版は **3.3.0-SNAPSHOT**（未公開）です。以下の依存例は最新安定版 **3.2.0** を使用します。
 開発版の UBNF VSIX には、画面内で学べる [はじめの一歩・catalog/help](unlaxer-dsl/ubnf-vscode/README.md) を追加しています。
 書いた文法から [言語の playground を生成](docs/ubnf-playground-ja.md) できます。UBNF 自体の文法も入力にできます。
+
+**Java / Rust 対応。** Rust 単独の UBNF 生成 CLI、runtime、LSP / DAP を提供します。[対応範囲と本番利用の判断](#java--rust-の対応範囲と品質)を参照してください。
 
 **文法を書くだけで言語が手に入る — Parser + AST + Evaluator + LSP + DAP をすべて自動生成**
 
@@ -38,6 +38,7 @@
 - [解決策](#解決策)
 - [クイックサンプル](#クイックサンプル)
 - [生成されるもの](#生成されるもの)
+- [Java / Rust の対応範囲と品質](#java--rust-の対応範囲と品質)
 - [5分クイックスタート](#5分クイックスタート)
 - [アーキテクチャ](#アーキテクチャ)
 - [Bootstrap と自己ホスティング](#bootstrap-と自己ホスティング)
@@ -91,7 +92,7 @@ flowchart TD
     DSL --> DAP
 ```
 
-あなたが書くのは**評価ロジックだけ** — 通常 50〜200 行の `evalXxx` メソッドです。
+評価の意味は `evalXxx` メソッドで実装します。型補完・外部言語連携・実行時デバッグには、用途に応じた provider や hook の接続も必要です。以下の生成例は Java 向けです。
 
 ---
 
@@ -102,10 +103,12 @@ flowchart TD
 ```ubnf
 @mapping(BinaryExpr, params=[left, op, right])
 @leftAssoc
+@precedence(level=1)
 NumberExpression ::= NumberTerm @left { AddOp @op NumberTerm @right } ;
 
 @mapping(BinaryExpr, params=[left, op, right])
 @leftAssoc
+@precedence(level=2)
 NumberTerm ::= NumberFactor @left { MulOp @op NumberFactor @right } ;
 
 AddOp ::= '+' | '-' ;
@@ -116,7 +119,7 @@ MulOp ::= '*' | '/' ;
 
 - 演算子の優先順位と左結合性を正しく処理する**パーサー**
 - 型付きの `left`、`op`、`right` フィールドを持つ **`BinaryExpr` AST レコード**
-- フラットなパースツリーをネストされた AST に変換する**マッパー**
+- 単一の `left` と出現順の `op` / `right` リストを保持する**マッパー**（評価器が左から畳み込む）
 - エバリュエータスケルトン内の **`evalBinaryExpr`** フック
 
 ---
@@ -128,11 +131,33 @@ MulOp ::= '*' | '/' ;
 | 文法規則 (`::=`) | パーサーコンビネータ (`Parsers.java`) |
 | `@mapping` アノテーション | AST sealed interface + record (`AST.java`) |
 | `@left`、`@right`、`@op` キャプチャ | パースツリーから AST へのマッパー (`Mapper.java`) |
-| `@leftAssoc` / `@rightAssoc` | 正しい結合性の処理 |
+| `@leftAssoc` / `@rightAssoc` | 結合性に対応する構造（左結合の評価は利用側で畳み込む） |
 | `@root` | エントリポイントパーサー |
 | （あなたの文法） | `evalXxx` フック付きエバリュエータスケルトン (`Evaluator.java`) |
 | （あなたの文法） | LSP サーバー（補完、診断、ホバー） |
 | （あなたの文法） | DAP サーバー（ブレークポイント、ステッピング、変数） |
+
+---
+
+## Java / Rust の対応範囲と品質
+
+このリポジトリは、状態付きコンビネータ実行系 **unlaxer Classic** の Java 版と Rust 版を提供します。以下は開発版 **3.3.0-SNAPSHOT** の対応状況です。Maven の公開版 3.2.0 と開発版の追加機能を区別してください。
+
+| 項目 | Java | Rust Classic |
+|---|---|---|
+| UBNF からの生成 | `CodegenMain` / Maven | Rust 単独の `unlaxer generate`、または Java host の `generate --target rust` |
+| 生成物 | parser・record AST・mapper・evaluator | parser・enum AST・mapper・`Semantics` trait。通常は5 module |
+| 実行環境 | JVM 21、または別 artifact の JVM 17 | native / WASM。native 実行時に JVM は不要 |
+| IDE | 生成 LSP / DAP と拡張 hook | opt-in `--lsp` / `--dap`。stdio LSP と AST / token inspection |
+| 配布 | Maven Central の安定版 | repo 内の path dependency と CI の Linux x86_64 artifact。crate は `publish = false` |
+
+**Rust は生成・実行・IDE protocol を検証する実装になっています。ただし、Rust 版全体を無条件に production-ready とする根拠はまだ揃っていません。** 対応範囲内の本番採用は、使う文法・負荷・対象環境での検証を前提に判断してください。crates.io 公開の有無と実装品質は別の軸です。
+
+品質の根拠は [CI](.github/workflows/maven.yml) の Rust 1.85 による Cargo test / fmt / Clippy、Java/Rust 共通 corpus の受理・拒否・AST・ソース位置比較、Java host/native generator の生成一致、実 stdio LSP/DAP 通信、release バイナリ smoke です。通常の `mvn test` では Rust conformance は skip されるため、再検証には `-DrustConformance=true` が必要です。再現手順は [Rust README](rust/README.md) にあります。
+
+残る境界は [full-spec 対応表](rust/FULL-SPEC.md) と [IDE 棚卸し](docs/lsp-dap-ide-gap-inventory.md) を参照してください。Rust の増分解析、LSP cancellation / semantic tokens / rename・format transport、一部の token・annotation は未対応です。DAP の AST/token ステップは実装済みですが、live evaluator の停止・再開ではありません。数値 capture の型・変換や一部の診断にも Java/Rust 差があり、全 Java 文法の互換性は保証しません。
+
+下流の `tinyexpression-rs` と `rustcodeblock` AOT は実在しますが、別 engine の **ubnfc** による実装です。その成果を Classic Rust の全面互換性や本番実績の証拠とは扱いません。[engine の選び方](docs/engine-selection-guide-ja.md)と[固定 revision の監査](rust/FULL-SPEC.md#下流tinyexpressionの現状監査2026-09-30)を参照してください。
 
 ---
 
@@ -183,22 +208,29 @@ MulOp ::= '*' | '/' ;
 ```ubnf
 grammar TinyCalc {
   @package: com.example.tinycalc
+  @whitespace: javaStyle
 
-  token NUMBER = NumberParser
-  token EOF    = EndOfSourceParser
+  token NUMBER = org.unlaxer.parser.elementary.NumberParser
+  token EOF    = org.unlaxer.parser.elementary.EndOfSourceParser
 
   @root
   Formula ::= Expression EOF ;
 
   @mapping(BinaryExpr, params=[left, op, right])
   @leftAssoc
+  @precedence(level=1)
   Expression ::= Term @left { AddOp @op Term @right } ;
 
   @mapping(BinaryExpr, params=[left, op, right])
   @leftAssoc
+  @precedence(level=2)
   Term ::= Factor @left { MulOp @op Factor @right } ;
 
-  Factor ::= NUMBER | '(' Expression ')' ;
+  Factor ::= Literal | '(' Expression ')' ;
+
+  @mapping(NumberLiteral, params=[value])
+  Literal ::= Digits @value ;
+  Digits ::= NUMBER ;
 
   AddOp ::= '+' | '-' ;
   MulOp ::= '*' | '/' ;
@@ -208,29 +240,64 @@ grammar TinyCalc {
 ### 3. コードジェネレータプラグインを追加
 
 ```xml
-<plugin>
-    <groupId>org.codehaus.mojo</groupId>
-    <artifactId>exec-maven-plugin</artifactId>
-    <version>3.1.0</version>
-    <executions>
-        <execution>
-            <phase>generate-sources</phase>
-            <goals><goal>java</goal></goals>
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>exec-maven-plugin</artifactId>
+            <version>3.1.0</version>
+            <executions>
+                <execution>
+                    <phase>generate-sources</phase>
+                    <goals>
+                        <goal>java</goal>
+                    </goals>
+                    <configuration>
+                        <mainClass>org.unlaxer.dsl.CodegenMain</mainClass>
+                        <arguments>
+                            <argument>--grammar</argument>
+                            <argument>${project.basedir}/src/main/resources/TinyCalc.ubnf</argument>
+                            <argument>--output</argument>
+                            <argument>${project.build.directory}/generated-sources/ubnf</argument>
+                            <argument>--generators</argument>
+                            <argument>AST,Parser,Mapper,Evaluator</argument>
+                        </arguments>
+                    </configuration>
+                </execution>
+            </executions>
+        </plugin>
+        <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>build-helper-maven-plugin</artifactId>
+            <version>3.5.0</version>
+            <executions>
+                <execution>
+                    <id>add-generated-sources</id>
+                    <phase>generate-sources</phase>
+                    <goals>
+                        <goal>add-source</goal>
+                    </goals>
+                    <configuration>
+                        <sources>
+                            <source>${project.build.directory}/generated-sources/ubnf</source>
+                        </sources>
+                    </configuration>
+                </execution>
+            </executions>
+        </plugin>
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <version>3.13.0</version>
             <configuration>
-                <mainClass>org.unlaxer.dsl.CodegenMain</mainClass>
-                <arguments>
-                    <argument>--grammar</argument>
-                    <argument>${project.basedir}/src/main/resources/TinyCalc.ubnf</argument>
-                    <argument>--output</argument>
-                    <argument>${project.build.directory}/generated-sources/ubnf</argument>
-                    <argument>--generators</argument>
-                    <argument>AST,Parser,Mapper,Evaluator</argument>
-                </arguments>
+                <release>21</release>
             </configuration>
-        </execution>
-    </executions>
-</plugin>
+        </plugin>
+    </plugins>
+</build>
 ```
+
+`pom.xml` の `<project>` 内に追加します。生成先を source root に登録することで `mvn compile` が生成コードもコンパイルします。Java 17 では compiler の `release` も `17` に変更してください。
 
 ### 4. コードを生成
 
@@ -249,24 +316,34 @@ TinyCalcEvaluator.java  -- evalXxx フック付き抽象エバリュエータ
 
 ### 5. エバリュエータを書く
 
+`src/main/java/com/example/tinycalc/CalcEvaluator.java` を作成します。
+
 ```java
+package com.example.tinycalc;
+
+import com.example.tinycalc.TinyCalcAST.BinaryExpr;
+import com.example.tinycalc.TinyCalcAST.NumberLiteral;
+
 public class CalcEvaluator extends TinyCalcEvaluator<Double> {
 
     @Override
     protected Double evalBinaryExpr(BinaryExpr node) {
-        Double left = eval(node.left());
-        Double right = eval(node.right());
-        return switch (node.op()) {
-            case "+" -> left + right;
-            case "-" -> left - right;
-            case "*" -> left * right;
-            case "/" -> left / right;
-            default -> throw new IllegalArgumentException("Unknown op: " + node.op());
-        };
+        double result = eval(node.left());
+        for (int i = 0; i < node.op().size(); i++) {
+            double right = eval(node.right().get(i));
+            result = switch (node.op().get(i).strip()) {
+                case "+" -> result + right;
+                case "-" -> result - right;
+                case "*" -> result * right;
+                case "/" -> result / right;
+                default -> throw new IllegalArgumentException("Unknown op: " + node.op().get(i));
+            };
+        }
+        return result;
     }
 
     @Override
-    protected Double evalNumber(NumberLiteral node) {
+    protected Double evalNumberLiteral(NumberLiteral node) {
         return Double.parseDouble(node.value());
     }
 }
@@ -274,10 +351,10 @@ public class CalcEvaluator extends TinyCalcEvaluator<Double> {
 
 ### 6. 実行する
 
+同じ package の `main` メソッドから呼び出します。
+
 ```java
-var parser = new TinyCalcParsers();
-var tree = parser.parse("1 + 2 * 3");
-var ast = new TinyCalcMapper().map(tree);
+var ast = TinyCalcMapper.parse("1 + 2 * 3");
 var result = new CalcEvaluator().eval(ast);
 System.out.println(result);  // 7.0
 ```
@@ -305,11 +382,12 @@ flowchart TD
     Gen --> Parsers
     Gen --> AST
     Gen --> Mapper
-    Parsers --> PT --> AT --> Eval
-    AST --> AT
-    Mapper --> AT
-    Eval --> LSP
-    Eval --> DAP
+    Parsers --> PT --> Mapper --> AT --> Eval
+    AST -.-> AT
+    Parsers --> LSP
+    PT --> DAP
+    AT --> DAP
+    Eval -.-> DAP
 ```
 
 詳細なパイプライン、コンビネータカタログ、ParserIR 設計については [docs/architecture-ja.md](./docs/architecture-ja.md) を参照してください。
@@ -336,8 +414,8 @@ UBNF 文法ファイル `unlaxer-dsl/grammar/ubnf.ubnf` 自体が UBNF で記述
 
 - 約300行の UBNF 文法
 - 変数、関数（`sin`、`cos`、`sqrt`、`min`、`max`）、三項演算子、if/else、メソッド宣言
-- 完全な LSP サポート（補完、診断、ホバー、定義へのジャンプ）
-- 完全な DAP サポート（ブレークポイント、ステッピング、変数インスペクション）
+- LSP サポート（補完、診断、ホバー、定義へのジャンプ）
+- DAP サポート（ブレークポイント、ステッピング、変数インスペクション）
 - 本番環境で使用中
 
 ---
@@ -348,7 +426,7 @@ UBNF 文法ファイル `unlaxer-dsl/grammar/ubnf.ubnf` 自体が UBNF で記述
 
 | Downstream プロジェクト | 最終検証バージョン | ステータス |
 |----------------------|----------------|----------|
-| [tinyexpression](https://github.com/opaopa6969/tinyexpression) | 3.0.4 | 検証済み。`p4-smoke`（86 テスト）+ LSP smoke（25 テスト）パス（[#28](https://github.com/opaopa6969/unlaxer-parser/issues/28), #38） |
+| [tinyexpression](https://github.com/opaopa6969/tinyexpression) | CI はビルド中の版、過去の記録は 3.0.4 | [Downstream CI](.github/workflows/maven.yml) で固定 revision の Java downstream の `p4-smoke`・mapper・LSP を検証。Classic Rust の本番動作検証とは別 |
 | [onigiri-parser](https://github.com/opaopa6969/onigiri-parser) | 3.0.1 | `mvn compile` 成功（[#27](https://github.com/opaopa6969/unlaxer-parser/issues/27)） |
 | [fraud-alert](https://github.com/opaopa6969/fraud-alert) | 2.8.0 | 3.x 未検証 |
 
@@ -377,7 +455,7 @@ UBNF 文法ファイル `unlaxer-dsl/grammar/ubnf.ubnf` 自体が UBNF で記述
 
 | | ANTLR | tree-sitter | PEG.js | **unlaxer** |
 |---|---|---|---|---|
-| 言語 | Java, C#, Python, ... | C + バインディング | JavaScript | **Java** |
+| 言語 | Java, C#, Python, ... | C + バインディング | JavaScript | **Java / Rust** |
 | パーサー種別 | ALL(*) | GLR | PEG | **PEG + コンビネータ** |
 | AST 生成 | 手動 | 手動 | 手動 | **自動**（`@mapping` から） |
 | エバリュエータスケルトン | なし | なし | なし | **あり** |
@@ -386,9 +464,9 @@ UBNF 文法ファイル `unlaxer-dsl/grammar/ubnf.ubnf` 自体が UBNF で記述
 | 文法アノテーション | なし | なし | なし | **あり**（`@mapping`、`@leftAssoc`、`@eval` など） |
 | 演算子の結合性 | 文法内 | 文法内 | 手動 | **`@leftAssoc` / `@rightAssoc`** |
 | 依存関係ゼロ | なし | なし | なし | **あり** (unlaxer-common) |
-| Bootstrap / 自己ホスティング | なし | あり | なし | **あり**（3.0.0 以降） |
+| Bootstrap / 自己ホスティング | なし | あり | なし | **部分的**（Bootstrap 節を参照） |
 
-unlaxer は、文法から実用的な IDE サポートまでを最小限のボイラープレートで実現したい Java チームのために設計されています。
+unlaxer は、文法から実用的な IDE サポートまでを最小限のボイラープレートで実現したい Java / Rust チームのために設計されています。
 
 ---
 
@@ -400,9 +478,11 @@ unlaxer-parser/
   |     +-- src/          コンビネータ ~50 個、エレメンタリーパーサー ~30 個
   |     +-- docs/         パーサーの基礎チュートリアル
   +-- unlaxer-dsl/        コードジェネレータ: UBNF -> Parsers + AST + Mapper + Evaluator + LSP + DAP
-  |     +-- grammar/      ubnf.ubnf（自己ホスト済み文法定義）
+  |     +-- grammar/      ubnf.ubnf（UBNF 自身の文法定義）
   |     +-- src/          Bootstrap パーサー、codegen パイプライン、IR
   |     +-- docs/         UBNF チュートリアル、拡張ロードマップ、ParserIR 設計
+  +-- rust/               Rust frontend, generator, runtime, LSP / DAP, examples
+  +-- spec-corpus/        Shared Java / Rust fixtures
   +-- docs/               トップレベルガイド（アーキテクチャ、UBNF ガイド、入門）
 ```
 
