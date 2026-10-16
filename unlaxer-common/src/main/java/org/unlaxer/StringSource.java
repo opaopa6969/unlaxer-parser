@@ -335,11 +335,9 @@ public class StringSource implements Source {
 
   @Override
   public StringIndex toStringIndex(CodePointIndex codePointIndex) {
-    StringIndex stringIndexFrom = positionResolver.stringIndexInRootFrom(codePointIndex);
-    if (stringIndexFrom == null) {
-      stringIndexFrom = positionResolver.stringIndexInRootFrom(codePointIndex.newWithMinus(1)).newWithAdd(1);
-    }
-    return stringIndexFrom;
+    // The resolver includes EOF; adding one UTF-16 unit to the preceding point breaks
+    // supplementary characters. Keep the existing null failure for out-of-range positions.
+    return Objects.requireNonNull(positionResolver.stringIndexInRootFrom(codePointIndex));
   }
 
   @Override

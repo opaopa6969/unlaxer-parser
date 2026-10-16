@@ -1,0 +1,59 @@
+# Every scalar boundary including EOF; CP columns count Unicode scalars, not grapheme clusters.
+# CRLF interior: legacy cursors retain the preceding line/CP column; LSP snapshots reject it (-1).
+# Java legacy lines() includes terminators and nonempty final slices; it omits virtual empty lines.
+# id text(escaped CR/LF) cp utf16 legacy_line legacy_cp_column lsp_line lsp_utf16_column utf8
+empty		0	0	0	0	0	0	0
+ascii	abc	0	0	0	0	0	0	0
+ascii	abc	1	1	0	1	0	1	1
+ascii	abc	2	2	0	2	0	2	2
+ascii	abc	3	3	0	3	0	3	3
+supplementary	😀	0	0	0	0	0	0	0
+supplementary	😀	1	2	0	1	0	2	4
+mixed	日😀x	0	0	0	0	0	0	0
+mixed	日😀x	1	1	0	1	0	1	3
+mixed	日😀x	2	3	0	2	0	3	7
+mixed	日😀x	3	4	0	3	0	4	8
+crlf	a\r\nb	0	0	0	0	0	0	0
+crlf	a\r\nb	1	1	0	1	0	1	1
+crlf	a\r\nb	2	2	0	2	-1	-1	2
+crlf	a\r\nb	3	3	1	0	1	0	3
+crlf	a\r\nb	4	4	1	1	1	1	4
+cr	a\rb	0	0	0	0	0	0	0
+cr	a\rb	1	1	0	1	0	1	1
+cr	a\rb	2	2	1	0	1	0	2
+cr	a\rb	3	3	1	1	1	1	3
+lf	a\nb	0	0	0	0	0	0	0
+lf	a\nb	1	1	0	1	0	1	1
+lf	a\nb	2	2	1	0	1	0	2
+lf	a\nb	3	3	1	1	1	1	3
+trailing-crlf	😀\r\n	0	0	0	0	0	0	0
+trailing-crlf	😀\r\n	1	2	0	1	0	2	4
+trailing-crlf	😀\r\n	2	3	0	2	-1	-1	5
+trailing-crlf	😀\r\n	3	4	1	0	1	0	6
+trailing-lf	\n	0	0	0	0	0	0	0
+trailing-lf	\n	1	1	1	0	1	0	1
+trailing-cr	\r	0	0	0	0	0	0	0
+trailing-cr	\r	1	1	1	0	1	0	1
+consecutive	\r\n\r\nx	0	0	0	0	0	0	0
+consecutive	\r\n\r\nx	1	1	0	1	-1	-1	1
+consecutive	\r\n\r\nx	2	2	1	0	1	0	2
+consecutive	\r\n\r\nx	3	3	1	1	-1	-1	3
+consecutive	\r\n\r\nx	4	4	2	0	2	0	4
+consecutive	\r\n\r\nx	5	5	2	1	2	1	5
+family	👨‍👩‍👧‍👦	0	0	0	0	0	0	0
+family	👨‍👩‍👧‍👦	1	2	0	1	0	2	4
+family	👨‍👩‍👧‍👦	2	3	0	2	0	3	7
+family	👨‍👩‍👧‍👦	3	5	0	3	0	5	11
+family	👨‍👩‍👧‍👦	4	6	0	4	0	6	14
+family	👨‍👩‍👧‍👦	5	8	0	5	0	8	18
+family	👨‍👩‍👧‍👦	6	9	0	6	0	9	21
+family	👨‍👩‍👧‍👦	7	11	0	7	0	11	25
+combining	é	0	0	0	0	0	0	0
+combining	é	1	1	0	1	0	1	1
+combining	é	2	2	0	2	0	2	3
+flag	🇯🇵	0	0	0	0	0	0	0
+flag	🇯🇵	1	2	0	1	0	2	4
+flag	🇯🇵	2	4	0	2	0	4	8
+skin-tone	👍🏽	0	0	0	0	0	0	0
+skin-tone	👍🏽	1	2	0	1	0	2	4
+skin-tone	👍🏽	2	4	0	2	0	4	8
