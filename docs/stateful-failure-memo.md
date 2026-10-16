@@ -51,6 +51,6 @@ rollback 後の元 entry、write-only events、両 cursor、原文、位置、AS
 5word keyでの[再測定](../conformance/stateful-failure-memo/benchmark-results.tsv)もno-retry約62% overheadでした。
 記録付き成功 replay、任意 stateful success、production workload の検証は本対応の完了条件と混同せず、親 #184/#197 は未完です。
 
-未達の資源上限: [#644](https://github.com/opaopa6969/unlaxer-parser/issues/644) は両言語の同位置・多数epochに対するfailure entry予算を担当します。
-現在の位置windowはその件数を制限せず、Rust failure の retained byte 計数も0です。
-本対応をfailure entryまで有界と説明しません。success snapshotの既存予算とは別の残差です。
+同位置・多数epochの failure entry は [#644 の保持予算](failure-memo-budget.md) で件数・
+単体/合計 charge を制限します。位置windowだけを有界性の根拠にしません。
+cache-owned payload の制限であり、process RSSや任意外部object graph全体の保証ではありません。

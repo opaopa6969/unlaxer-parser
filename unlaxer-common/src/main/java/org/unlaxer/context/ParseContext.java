@@ -717,6 +717,8 @@ public class ParseContext implements
      */
     private ExpectedSources expected;
     private List<ParseFailureDiagnostics.TrialRecord> trials;
+    // ArrayList.clear() retains storage when an active diagnostic snapshot is restored.
+    private int trialCapacityHighWater;
     private byte[] transactionEvents;
     private int transactionEventCount;
 
@@ -1189,7 +1191,10 @@ public class ParseContext implements
     } else {
       target.expected().copyFrom(source.expected);
     }
-    if (target.trials != null) target.trials.clear();
+    if (target.trials != null) {
+      target.trialCapacityHighWater = Math.max(target.trialCapacityHighWater, target.trials.size());
+      target.trials.clear();
+    }
     if (source.trials != null) target.trials().addAll(source.trials);
   }
 
@@ -1208,6 +1213,35 @@ public class ParseContext implements
   /** A memoized frame is only ever read from here on, so its de-dup indexes can be dropped. */
   static void sealMemoDiagnostic(FailureDiagnostic diagnostic) {
     if (diagnostic.expected != null) diagnostic.expected.releaseIndexes();
+  }
+
+  /** Cache-owned structural charge; excludes shared parser definitions and active diagnostics. */
+  static long failureMemoCharge(FailureDiagnostic diagnostic, long limit) {
+    long bytes = 512; // entry, key, diagnostic, map/index links and object headers
+    bytes = addFailureCharge(bytes, 64L * diagnostic.maxReachedStackElements.size(), limit);
+    bytes = addFailureCharge(bytes, 64L * diagnostic.farthestFailureStackElements.size(), limit);
+    if (diagnostic.expected != null) {
+      ExpectedSources expected = diagnostic.expected;
+      bytes = addFailureCharge(bytes, 64L + 8L * expected.parsers.length
+          + expected.terminal.length + (expected.index == null ? 0 : 4L * expected.index.length), limit);
+    }
+    if (diagnostic.transactionEvents != null)
+      bytes = addFailureCharge(bytes, 16L + diagnostic.transactionEvents.length, limit);
+    if (diagnostic.trials != null) {
+      // Charge slack as well as logical elements, without reflective JDK access.
+      long retainedSlots = Math.max(diagnostic.trials.size(), diagnostic.trialCapacityHighWater);
+      bytes = addFailureCharge(bytes, 128L + 16L * retainedSlots, limit);
+      for (var trial : diagnostic.trials) {
+        if (bytes > limit) break;
+        String name = trial.getParserName();
+        bytes = addFailureCharge(bytes, 64L + (name == null ? 0 : 2L * name.length()), limit);
+      }
+    }
+    return bytes;
+  }
+
+  private static long addFailureCharge(long bytes, long addition, long limit) {
+    return bytes > limit || addition > limit - bytes ? limit + 1 : bytes + addition;
   }
 
   /** One nested operation's code-point diagnostic, without an automatic reparse.

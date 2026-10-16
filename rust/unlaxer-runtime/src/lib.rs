@@ -1034,6 +1034,7 @@ enum ExpectedIds {
 struct FailureDiagnostic {
     // Only memo entries use this field; diagnostic merging does not change it.
     memo_expression_depth: usize,
+    memo_expected_text_bytes: usize,
     farthest: Option<usize>,
     expected: ExpectedIds,
     classic_max_reached: Option<usize>,
@@ -1223,10 +1224,24 @@ const MAX_RETAINED_SUCCESS_MEMO_BYTES: usize = 16 * 1024 * 1024;
 
 trait MemoValue {
     fn retained_bytes(&self) -> usize;
+    fn failure_budget() -> bool {
+        false
+    }
 }
 impl MemoValue for FailureDiagnostic {
     fn retained_bytes(&self) -> usize {
-        0
+        // Structural charge, not an RSS estimate. Include key/map overhead and
+        // conservatively charge shared expected data once per retained entry.
+        let ids = match &self.expected {
+            ExpectedIds::Multiple(values) => values.capacity().saturating_mul(4).saturating_add(32),
+            _ => 0,
+        };
+        256_usize
+            .saturating_add(ids)
+            .saturating_add(self.memo_expected_text_bytes)
+    }
+    fn failure_budget() -> bool {
+        true
     }
 }
 
@@ -1251,6 +1266,46 @@ impl MemoValue for Rc<SuccessMemo> {
 }
 
 const FAILURE_MEMO_BUCKET_SIZE: usize = 256;
+const DEFAULT_FAILURE_MEMO_ENTRIES: usize = 65_536;
+const DEFAULT_FAILURE_MEMO_BYTES: usize = 16 * 1024 * 1024;
+const DEFAULT_FAILURE_MEMO_ENTRY_BYTES: usize = 1024 * 1024;
+
+#[derive(Clone, Copy)]
+struct FailureMemoBudget {
+    entries: usize,
+    bytes: usize,
+    entry_bytes: usize,
+}
+fn parse_failure_budget(value: Option<&str>, default: usize, ceiling: usize) -> usize {
+    value
+        .filter(|s| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit()))
+        .and_then(|s| s.parse::<usize>().ok())
+        .filter(|&n| n <= ceiling)
+        .unwrap_or(default)
+}
+fn configured_failure_budget(name: &str, default: usize, ceiling: usize) -> usize {
+    parse_failure_budget(std::env::var(name).ok().as_deref(), default, ceiling)
+}
+fn failure_memo_budget() -> FailureMemoBudget {
+    static BUDGET: std::sync::OnceLock<FailureMemoBudget> = std::sync::OnceLock::new();
+    *BUDGET.get_or_init(|| FailureMemoBudget {
+        entries: configured_failure_budget(
+            "UNLAXER_FAILURE_MEMO_MAX_ENTRIES",
+            DEFAULT_FAILURE_MEMO_ENTRIES,
+            1_048_576,
+        ),
+        bytes: configured_failure_budget(
+            "UNLAXER_FAILURE_MEMO_MAX_BYTES",
+            DEFAULT_FAILURE_MEMO_BYTES,
+            1024 * 1024 * 1024,
+        ),
+        entry_bytes: configured_failure_budget(
+            "UNLAXER_FAILURE_MEMO_MAX_ENTRY_BYTES",
+            DEFAULT_FAILURE_MEMO_ENTRY_BYTES,
+            64 * 1024 * 1024,
+        ),
+    })
+}
 
 /// Keep nearby outcomes together for lookup and destruction. The first bucket is
 /// inline so inputs shorter than one bucket need no additional allocation.
@@ -1259,6 +1314,10 @@ struct MemoBuckets<V> {
     remaining: Vec<MemoMap<V>>,
     retained_bytes: usize,
     max_bytes: usize,
+    entries: usize,
+    max_entries: usize,
+    max_entry_bytes: usize,
+    budget_misses: usize,
     window: Option<usize>,
     high_water: usize,
     evicted_buckets: usize,
@@ -1289,11 +1348,24 @@ impl<V: MemoValue> Default for MemoBuckets<V> {
 
 impl<V: MemoValue> MemoBuckets<V> {
     fn with_window(window: Option<usize>) -> Self {
+        let budget = if V::failure_budget() {
+            failure_memo_budget()
+        } else {
+            FailureMemoBudget {
+                entries: usize::MAX,
+                bytes: MAX_RETAINED_SUCCESS_MEMO_BYTES,
+                entry_bytes: MAX_SUCCESS_MEMO_BYTES,
+            }
+        };
         Self {
             first: MemoMap::default(),
             remaining: vec![],
             retained_bytes: 0,
-            max_bytes: MAX_RETAINED_SUCCESS_MEMO_BYTES,
+            max_bytes: budget.bytes,
+            entries: 0,
+            max_entries: budget.entries,
+            max_entry_bytes: budget.entry_bytes,
+            budget_misses: 0,
             window,
             high_water: 0,
             evicted_buckets: 0,
@@ -1322,6 +1394,7 @@ impl<V: MemoValue> MemoBuckets<V> {
                 self.evicted_entries += map.len();
             }
             self.retained_bytes -= map.values().map(MemoValue::retained_bytes).sum::<usize>();
+            self.entries -= map.len();
             // clear() would keep the allocation alive. Drop the hash table itself.
             *map = MemoMap::default();
         }
@@ -1359,9 +1432,21 @@ impl<V: MemoValue> MemoBuckets<V> {
             return;
         }
         let bytes = value.retained_bytes();
-        let old_bytes = self.get(bucket, &key).map_or(0, MemoValue::retained_bytes);
+        let old = self.get(bucket, &key);
+        let replacing = old.is_some();
+        let old_bytes = old.map_or(0, MemoValue::retained_bytes);
         let retained = self.retained_bytes - old_bytes;
-        if bytes > self.max_bytes.saturating_sub(retained) {
+        // A distant first insertion must not allocate an unbounded empty bucket
+        // index. The inline first bucket requires no such allocation.
+        let index_too_large = V::failure_budget()
+            && bucket > self.remaining.len()
+            && bucket > self.max_bytes / std::mem::size_of::<MemoMap<V>>();
+        if bytes > self.max_entry_bytes
+            || bytes > self.max_bytes.saturating_sub(retained)
+            || !replacing && self.entries >= self.max_entries
+            || index_too_large
+        {
+            self.budget_misses = self.budget_misses.saturating_add(1);
             return; // A full cache is a safe miss, never a parse/resource failure.
         }
         let map = if bucket == 0 {
@@ -1369,11 +1454,17 @@ impl<V: MemoValue> MemoBuckets<V> {
         } else {
             if self.remaining.len() < bucket {
                 // Empty maps allocate no entry storage, including skipped buckets.
+                if V::failure_budget() {
+                    self.remaining.reserve_exact(bucket - self.remaining.len());
+                }
                 self.remaining.resize_with(bucket, MemoMap::default);
             }
             &mut self.remaining[bucket - 1]
         };
         map.insert(key, value);
+        if !replacing {
+            self.entries += 1;
+        }
         self.retained_bytes = retained + bytes;
     }
 }
@@ -1850,6 +1941,19 @@ impl<'a> ParseContext<'a> {
     /// Hits in this context's pass only; excludes any separate detailed retry.
     pub fn memoized_failure_hits(&self) -> usize {
         self.memoized_failure_hits
+    }
+
+    /// Retained failures in the active grammar session; successes have their own budget.
+    pub fn failure_memo_entries(&self) -> usize {
+        self.failure_memo.entries
+    }
+    /// Conservative cache-owned failure payload charge, not process RSS.
+    pub fn failure_memo_retained_bytes(&self) -> usize {
+        self.failure_memo.retained_bytes
+    }
+    /// Insertions refused by a finite failure budget in the active grammar session.
+    pub fn failure_memo_budget_misses(&self) -> usize {
+        self.failure_memo.budget_misses
     }
 
     /// Actual successful rule replays in this context's pass. Tracing, unsafe
@@ -2610,6 +2714,15 @@ impl<'a> ParseContext<'a> {
                 }
             } else {
                 diagnostic.memo_expression_depth = self.expression_depth;
+                diagnostic.memo_expected_text_bytes =
+                    diagnostic
+                        .expected_values()
+                        .iter()
+                        .fold(0_usize, |bytes, &id| {
+                            bytes
+                                .saturating_add(self.expected_names.name(id).len())
+                                .saturating_add(32)
+                        });
                 self.failure_memo.insert(
                     call.position / FAILURE_MEMO_BUCKET_SIZE,
                     call.key,
