@@ -18,6 +18,9 @@ public final class RustBackend {
 
     public List<GeneratedFile> generate(GrammarDecl grammar) {
         GrammarIR ir = RustGrammarLowering.lower(grammar);
+        String astSource = ast(ir) + CommonFieldEmitter.emit(grammar, ir);
+        String parserSource = parser(ir);
+        var preferred = PreferredAstEmitter.emit(grammar, ir, this, parserSource, astSource);
         return List.of(
             new GeneratedFile("mod.rs", HEADER + """
                 pub mod ast;
@@ -25,9 +28,9 @@ public final class RustBackend {
                 pub mod mapper;
                 pub mod evaluator;
                 """),
-            new GeneratedFile("ast.rs", ast(ir) + CommonFieldEmitter.emit(grammar, ir)),
-            new GeneratedFile("parser.rs", parser(ir) + lexingApi(grammar, ir) + org.unlaxer.dsl.codegen.EmbeddedGrammarEmitter.rustApi(grammar, ir.rules().stream().map(Rule::name).toList(), ir.javaWhitespace())),
-            new GeneratedFile("mapper.rs", mapper(ir)),
+            new GeneratedFile("ast.rs", astSource),
+            new GeneratedFile("parser.rs", parserSource + preferred.parser() + lexingApi(grammar, ir) + org.unlaxer.dsl.codegen.EmbeddedGrammarEmitter.rustApi(grammar, ir.rules().stream().map(Rule::name).toList(), ir.javaWhitespace())),
+            new GeneratedFile("mapper.rs", mapper(ir) + preferred.mapper()),
             new GeneratedFile("evaluator.rs", RustEvalEmitter.apply(grammar, ir, evaluator(ir))));
     }
 
@@ -218,7 +221,7 @@ public final class RustBackend {
                 .collect(Collectors.joining());
     }
 
-    private String parser(GrammarIR ir) {
+    String parser(GrammarIR ir) {
         StringBuilder out = new StringBuilder(HEADER);
         out.append("""
             use std::sync::OnceLock;
@@ -477,7 +480,10 @@ public final class RustBackend {
                 + (repeat.max() == null ? "None" : "Some(" + repeat.max() + ")") + ")";
         }
         if (expression instanceof Separated separated) {
-            return expression(separated.child()) + ".separated_by(" + expression(separated.separator()) + ")";
+            String child = expression(separated.child()), separator = expression(separated.separator());
+            if (PreferredAstEmitter.containsDepth(separated.child()))
+                return "Expr::sequence([" + child + ", Expr::sequence([" + separator + ", Expr::Capture(\"#preferred-extra:2\", Box::new(" + child + "))]).zero_or_more()])";
+            return child + ".separated_by(" + separator + ")";
         }
         throw new IllegalStateException("unhandled " + expression);
     }

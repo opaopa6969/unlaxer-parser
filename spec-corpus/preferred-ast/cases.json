@@ -1,0 +1,639 @@
+[
+  {
+    "name": "OptionalDepth",
+    "grammar": "grammar OptionalDepth { @package: preferredprobe @whitespace: none @root @mapping(Pair,params=[left,right]) Root ::= '😀' Atom @left '+' [ Atom @right ]; @mapping(Item,params=[text]) Atom ::= ('1' | '2') @text; }",
+    "java": "protected String evalPair(OptionalDepthAST.Pair n){return \"pair\";} protected String evalItem(OptionalDepthAST.Item n){return String.valueOf(n.text());}",
+    "rust": "fn eval_pair(&mut self,_left:&Ast,_right:Option<&Ast>,_span:unlaxer_runtime::Span)->String{\"pair\".into()} fn eval_item(&mut self,text:&str,_span:unlaxer_runtime::Span)->String{text.into()}",
+    "cases": [
+      {
+        "input": "😀1+2",
+        "candidates": [
+          [
+            "Pair",
+            0,
+            0,
+            4,
+            "pair"
+          ],
+          [
+            "Item",
+            2,
+            1,
+            2,
+            "1"
+          ],
+          [
+            "Item",
+            3,
+            3,
+            4,
+            "2"
+          ]
+        ],
+        "select": 1
+      },
+      {
+        "input": "😀1+",
+        "candidates": [
+          [
+            "Pair",
+            0,
+            0,
+            3,
+            "pair"
+          ],
+          [
+            "Item",
+            2,
+            1,
+            2,
+            "1"
+          ]
+        ],
+        "select": 1
+      }
+    ]
+  },
+  {
+    "name": "EqualDepth",
+    "grammar": "grammar EqualDepth { @package: preferredprobe @whitespace: none @root @mapping(Pair,params=[left,right]) Root ::= Atom @left '+' Atom @right; @mapping(Item,params=[text]) Atom ::= ('1' | '2') @text; }",
+    "java": "protected String evalPair(EqualDepthAST.Pair n){return \"pair\";} protected String evalItem(EqualDepthAST.Item n){return String.valueOf(n.text());}",
+    "rust": "fn eval_pair(&mut self,_left:&Ast,_right:&Ast,_span:unlaxer_runtime::Span)->String{\"pair\".into()} fn eval_item(&mut self,text:&str,_span:unlaxer_runtime::Span)->String{text.into()}",
+    "cases": [
+      {
+        "input": "1+2",
+        "candidates": [
+          [
+            "Pair",
+            0,
+            0,
+            3,
+            "pair"
+          ],
+          [
+            "Item",
+            2,
+            0,
+            1,
+            "1"
+          ],
+          [
+            "Item",
+            2,
+            2,
+            3,
+            "2"
+          ]
+        ],
+        "select": 2
+      }
+    ]
+  },
+  {
+    "name": "GroupDepth",
+    "grammar": "grammar GroupDepth { @package: preferredprobe @whitespace: none @root @mapping(Pair,params=[left,right]) Root ::= (Atom) @left '+' Atom @right; @mapping(Item,params=[text]) Atom ::= ('1' | '2') @text; }",
+    "java": "protected String evalPair(GroupDepthAST.Pair n){return \"pair\";} protected String evalItem(GroupDepthAST.Item n){return String.valueOf(n.text());}",
+    "rust": "fn eval_pair(&mut self,_left:&Ast,_right:&Ast,_span:unlaxer_runtime::Span)->String{\"pair\".into()} fn eval_item(&mut self,text:&str,_span:unlaxer_runtime::Span)->String{text.into()}",
+    "cases": [
+      {
+        "input": "1+2",
+        "candidates": [
+          [
+            "Pair",
+            0,
+            0,
+            3,
+            "pair"
+          ],
+          [
+            "Item",
+            3,
+            0,
+            1,
+            "1"
+          ],
+          [
+            "Item",
+            2,
+            2,
+            3,
+            "2"
+          ]
+        ],
+        "select": 2
+      }
+    ]
+  },
+  {
+    "name": "RepeatedDepth",
+    "grammar": "grammar RepeatedDepth { @package: preferredprobe @whitespace: none @root @mapping(Pair,params=[items]) Root ::= { Atom } @items; @mapping(Item,params=[text]) Atom ::= ('1' | '2') @text; }",
+    "java": "protected String evalPair(RepeatedDepthAST.Pair n){return \"pair\";} protected String evalItem(RepeatedDepthAST.Item n){return String.valueOf(n.text());}",
+    "rust": "fn eval_pair(&mut self,_items:&[Ast],_span:unlaxer_runtime::Span)->String{\"pair\".into()} fn eval_item(&mut self,text:&str,_span:unlaxer_runtime::Span)->String{text.into()}",
+    "cases": [
+      {
+        "input": "12",
+        "candidates": [
+          [
+            "Pair",
+            0,
+            0,
+            2,
+            "pair"
+          ],
+          [
+            "Item",
+            3,
+            0,
+            1,
+            "1"
+          ],
+          [
+            "Item",
+            3,
+            1,
+            2,
+            "2"
+          ]
+        ],
+        "select": 2
+      }
+    ]
+  },
+  {
+    "name": "SeparatedDepth",
+    "grammar": "grammar SeparatedDepth { @package: preferredprobe @whitespace: none @root @mapping(Pair,params=[items]) Root ::= Atom % ',' @items; @mapping(Item,params=[text]) Atom ::= ('1' | '2') @text; }",
+    "java": "protected String evalPair(SeparatedDepthAST.Pair n){return \"pair\";} protected String evalItem(SeparatedDepthAST.Item n){return String.valueOf(n.text());}",
+    "rust": "fn eval_pair(&mut self,_items:&[Ast],_span:unlaxer_runtime::Span)->String{\"pair\".into()} fn eval_item(&mut self,text:&str,_span:unlaxer_runtime::Span)->String{text.into()}",
+    "cases": [
+      {
+        "input": "1,2",
+        "candidates": [
+          [
+            "Pair",
+            0,
+            0,
+            3,
+            "pair"
+          ],
+          [
+            "Item",
+            3,
+            0,
+            1,
+            "1"
+          ],
+          [
+            "Item",
+            5,
+            2,
+            3,
+            "2"
+          ]
+        ],
+        "select": 1
+      }
+    ]
+  },
+  {
+    "name": "AliasDepth",
+    "grammar": "grammar AliasDepth { @package: preferredprobe @whitespace: none @root @mapping(Pair,params=[left,right]) Root ::= Alias @left '+' Atom @right; Alias ::= Atom; @mapping(Item,params=[text]) Atom ::= ('1' | '2') @text; }",
+    "java": "protected String evalPair(AliasDepthAST.Pair n){return \"pair\";} protected String evalItem(AliasDepthAST.Item n){return String.valueOf(n.text());}",
+    "rust": "fn eval_pair(&mut self,_left:&Ast,_right:&Ast,_span:unlaxer_runtime::Span)->String{\"pair\".into()} fn eval_item(&mut self,text:&str,_span:unlaxer_runtime::Span)->String{text.into()}",
+    "cases": [
+      {
+        "input": "1+2",
+        "candidates": [
+          [
+            "Pair",
+            0,
+            0,
+            3,
+            "pair"
+          ],
+          [
+            "Item",
+            3,
+            0,
+            1,
+            "1"
+          ],
+          [
+            "Item",
+            2,
+            2,
+            3,
+            "2"
+          ]
+        ],
+        "select": 2
+      }
+    ]
+  },
+  {
+    "name": "SharedDepth",
+    "grammar": "grammar SharedDepth { @package: preferredprobe @whitespace: none @root @mapping(Pair,params=[left,right]) Root ::= A @left '+' B @right; @mapping(Item,params=[text]) A ::= '1' @text; @mapping(Item,params=[text]) B ::= '2' @text; }",
+    "java": "protected String evalPair(SharedDepthAST.Pair n){return \"pair\";} protected String evalItem(SharedDepthAST.Item n){return String.valueOf(n.text());}",
+    "rust": "fn eval_pair(&mut self,_left:&Ast,_right:&Ast,_span:unlaxer_runtime::Span)->String{\"pair\".into()} fn eval_item(&mut self,text:&str,_span:unlaxer_runtime::Span)->String{text.into()}",
+    "cases": [
+      {
+        "input": "1+2",
+        "candidates": [
+          [
+            "Pair",
+            0,
+            0,
+            3,
+            "pair"
+          ],
+          [
+            "Item",
+            2,
+            0,
+            1,
+            "1"
+          ],
+          [
+            "Item",
+            2,
+            2,
+            3,
+            "2"
+          ]
+        ],
+        "select": 2
+      }
+    ]
+  },
+  {
+    "name": "SumDotted",
+    "grammar": "grammar SumDotted { @package: preferredprobe @whitespace: none @root @mapping(Family) @commonField(text) Root ::= A | B; @mapping(Family.Item,params=[text]) A ::= 'a' '😀' @text; @mapping(Family.Other,params=[text]) B ::= 'b' 'é' @text; }",
+    "java": "protected String evalFamilyItem(SumDottedAST.Family.Item n){return String.valueOf(n.text());} protected String evalFamilyOther(SumDottedAST.Family.Other n){return String.valueOf(n.text());}",
+    "rust": "fn eval_family__item(&mut self,text:&str,_span:unlaxer_runtime::Span)->String{text.into()} fn eval_family__other(&mut self,text:&str,_span:unlaxer_runtime::Span)->String{text.into()}",
+    "cases": [
+      {
+        "input": "a😀",
+        "candidates": [
+          [
+            "Item",
+            0,
+            0,
+            2,
+            "😀"
+          ],
+          [
+            "Item",
+            1,
+            0,
+            2,
+            "😀"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "bé",
+        "candidates": [
+          [
+            "Other",
+            0,
+            0,
+            3,
+            "é"
+          ],
+          [
+            "Other",
+            1,
+            0,
+            3,
+            "é"
+          ]
+        ],
+        "select": 0
+      }
+    ]
+  },
+  {
+    "name": "MixedValues",
+    "grammar": "grammar MixedValues { @package: preferredprobe @whitespace: none @enum Mode ::= 'on' | 'off'; @root @mapping(Pair,params=[items]) Root ::= { Value } @items; Value ::= Mode | 'raw' | Leaf; @mapping(Item,params=[text]) Leaf ::= '😀' @text; }",
+    "java": "protected String evalPair(MixedValuesAST.Pair n){return \"pair\";} protected String evalItem(MixedValuesAST.Item n){return String.valueOf(n.text());}",
+    "rust": "fn eval_pair(&mut self,_items:&[generated::ast::AstValue],_span:unlaxer_runtime::Span)->String{\"pair\".into()} fn eval_item(&mut self,text:&str,_span:unlaxer_runtime::Span)->String{text.into()}",
+    "cases": [
+      {
+        "input": "onraw😀off",
+        "candidates": [
+          [
+            "Pair",
+            0,
+            0,
+            9,
+            "pair"
+          ],
+          [
+            "Item",
+            4,
+            5,
+            6,
+            "😀"
+          ]
+        ],
+        "select": 1
+      }
+    ]
+  },
+  {
+    "name": "SkippedSubtree",
+    "grammar": "grammar SkippedSubtree { @package: preferredprobe @whitespace: none @root @mapping(Pair,params=[left,right]) Root ::= Atom @left Skip Atom @right; @skip Skip ::= 'x' Atom; @mapping(Item,params=[text]) Atom ::= ('1' | '2') @text; }",
+    "java": "protected String evalPair(SkippedSubtreeAST.Pair n){return \"pair\";} protected String evalItem(SkippedSubtreeAST.Item n){return String.valueOf(n.text());}",
+    "rust": "fn eval_pair(&mut self,_left:&Ast,_right:&Ast,_span:unlaxer_runtime::Span)->String{\"pair\".into()} fn eval_item(&mut self,text:&str,_span:unlaxer_runtime::Span)->String{text.into()}",
+    "cases": [
+      {
+        "input": "1x22",
+        "candidates": [
+          [
+            "Pair",
+            0,
+            0,
+            4,
+            "pair"
+          ],
+          [
+            "Item",
+            2,
+            0,
+            1,
+            "1"
+          ],
+          [
+            "Item",
+            2,
+            3,
+            4,
+            "2"
+          ]
+        ],
+        "select": 2
+      }
+    ]
+  },
+  {
+    "name": "ZeroTie",
+    "grammar": "grammar ZeroTie { @package: preferredprobe @whitespace: none token END = org.unlaxer.parser.elementary.EndOfSourceParser @root @mapping(Pair,params=[left,right]) Root ::= A @left B @right; @mapping(Item) A ::= END; @mapping(Item) B ::= END; }",
+    "java": "protected String evalPair(ZeroTieAST.Pair n){return \"pair\";} protected String evalItem(ZeroTieAST.Item n){return \"empty\";}",
+    "rust": "fn eval_pair(&mut self,_left:&Ast,_right:&Ast,_span:unlaxer_runtime::Span)->String{\"pair\".into()} fn eval_item(&mut self,_span:unlaxer_runtime::Span)->String{\"empty\".into()}",
+    "cases": [
+      {
+        "input": "",
+        "candidates": [
+          [
+            "Pair",
+            0,
+            0,
+            0,
+            "pair"
+          ],
+          [
+            "Item",
+            2,
+            0,
+            0,
+            "empty"
+          ],
+          [
+            "Item",
+            2,
+            0,
+            0,
+            "empty"
+          ]
+        ],
+        "select": 2
+      }
+    ]
+  },
+  {
+    "name": "NumericFailure",
+    "grammar": "grammar NumericFailure { @package: preferredprobe @whitespace: none token NUM = org.unlaxer.parser.elementary.NumberParser @root @mapping(Item,params=[value]) Root ::= '😀' NUM @value; }",
+    "java": "protected String evalItem(NumericFailureAST.Item n){return Integer.toString(n.value());}",
+    "rust": "fn eval_item(&mut self,value:&i32,_span:unlaxer_runtime::Span)->String{value.to_string()}",
+    "cases": [
+      {
+        "input": "😀12",
+        "candidates": [
+          [
+            "Item",
+            0,
+            0,
+            3,
+            "12"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "😀2147483648",
+        "stage": "map"
+      },
+      {
+        "input": "😀NaN",
+        "stage": "parse"
+      }
+    ]
+  },
+  {
+    "name": "RootEnum",
+    "grammar": "grammar RootEnum { @package: preferredprobe @whitespace: none @root @enum Mode ::= 'on' | 'off'; }",
+    "java": "protected String evalModeNode(RootEnumAST.ModeNode n){return n.value().name();}",
+    "rust": "fn eval_mode_node(&mut self,value:&generated::ast::Mode,_span:unlaxer_runtime::Span)->String{format!(\"{:?}\",value)}",
+    "cases": [
+      {
+        "input": "on",
+        "candidates": [
+          [
+            "ModeNode",
+            0,
+            0,
+            2,
+            "ON"
+          ]
+        ],
+        "select": 0
+      }
+    ]
+  },
+  {
+    "name": "ChoiceSequence",
+    "grammar": "grammar ChoiceSequence { @package: preferredprobe @whitespace: none @root @mapping(Pair,params=[left,right]) Root ::= ('x' Atom) @left '+' Atom @right; @mapping(Item,params=[text]) Atom ::= ('1' | '2') @text; }",
+    "java": "protected String evalPair(ChoiceSequenceAST.Pair n){return \"pair\";} protected String evalItem(ChoiceSequenceAST.Item n){return String.valueOf(n.text());}",
+    "rust": "fn eval_pair(&mut self,_left:&Ast,_right:&Ast,_span:unlaxer_runtime::Span)->String{\"pair\".into()} fn eval_item(&mut self,text:&str,_span:unlaxer_runtime::Span)->String{text.into()}",
+    "cases": [
+      {
+        "input": "x1+2",
+        "candidates": [
+          [
+            "Pair",
+            0,
+            0,
+            4,
+            "pair"
+          ],
+          [
+            "Item",
+            3,
+            1,
+            2,
+            "1"
+          ],
+          [
+            "Item",
+            2,
+            3,
+            4,
+            "2"
+          ]
+        ],
+        "select": 2
+      }
+    ]
+  },
+  {
+    "name": "OptionalGroup",
+    "grammar": "grammar OptionalGroup { @package: preferredprobe @whitespace: none @root @mapping(Pair,params=[left,right]) Root ::= [ (Atom) ] @left '+' Atom @right; @mapping(Item,params=[text]) Atom ::= ('1' | '2') @text; }",
+    "java": "protected String evalPair(OptionalGroupAST.Pair n){return \"pair\";} protected String evalItem(OptionalGroupAST.Item n){return String.valueOf(n.text());}",
+    "rust": "fn eval_pair(&mut self,_left:Option<&Ast>,_right:&Ast,_span:unlaxer_runtime::Span)->String{\"pair\".into()} fn eval_item(&mut self,text:&str,_span:unlaxer_runtime::Span)->String{text.into()}",
+    "cases": [
+      {
+        "input": "1+2",
+        "candidates": [
+          [
+            "Pair",
+            0,
+            0,
+            3,
+            "pair"
+          ],
+          [
+            "Item",
+            5,
+            0,
+            1,
+            "1"
+          ],
+          [
+            "Item",
+            2,
+            2,
+            3,
+            "2"
+          ]
+        ],
+        "select": 2
+      }
+    ]
+  },
+  {
+    "name": "RecoveredSnapshot",
+    "grammar": "grammar RecoveredSnapshot { @package: preferredprobe @whitespace: none @root @mapping(Item,params=[text]) @recovery(sync=';') Root ::= 'ok' @text; }",
+    "java": "protected String evalItem(RecoveredSnapshotAST.Item n){return String.valueOf(n.text());}",
+    "rust": "fn eval_item(&mut self,text:&str,_span:unlaxer_runtime::Span)->String{text.into()}",
+    "cases": [
+      {
+        "input": "ok",
+        "candidates": [
+          [
+            "Item",
+            1,
+            0,
+            2,
+            "ok"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "bad;",
+        "stage": "recovery"
+      }
+    ]
+  },
+  {
+    "name": "NameDepth",
+    "bindings": true,
+    "grammar": "grammar NameDepth { @package: preferredprobe @whitespace: none @root @mapping(Pair,params=[value]) Root ::= Atom @value; @mapping(Item,params=[text]) @namePredicate(snapshot='names',version='v1',name='text',kind='type') Atom ::= 'T' @text; }",
+    "java": "protected String evalPair(NameDepthAST.Pair n){return \"pair\";} protected String evalItem(NameDepthAST.Item n){return String.valueOf(n.text());}",
+    "rust": "fn eval_pair(&mut self,_value:&Ast,_span:unlaxer_runtime::Span)->String{\"pair\".into()} fn eval_item(&mut self,text:&str,_span:unlaxer_runtime::Span)->String{text.into()}",
+    "cases": [
+      {
+        "input": "T",
+        "candidates": [
+          [
+            "Pair",
+            0,
+            0,
+            1,
+            "pair"
+          ],
+          [
+            "Item",
+            2,
+            0,
+            1,
+            "T"
+          ]
+        ],
+        "select": 1
+      }
+    ]
+  },
+  {
+    "name": "PendingSum",
+    "unsupported": true,
+    "grammar": "grammar PendingSum { @package: preferredprobe @whitespace: none @root @mapping(Family) Root ::= A | B; @mapping(Item,params=[text]) A ::= '1' @text; @mapping(Other,params=[text]) B ::= '2' @text; }",
+    "java": "protected String evalItem(PendingSumAST.Item n){return n.text();} protected String evalOther(PendingSumAST.Other n){return n.text();}",
+    "rust": "",
+    "cases": [
+      {
+        "input": "1",
+        "candidates": [
+          [
+            "Item",
+            0,
+            0,
+            1,
+            "1"
+          ],
+          [
+            "Item",
+            1,
+            0,
+            1,
+            "1"
+          ]
+        ],
+        "select": 0
+      }
+    ]
+  },
+  {
+    "name": "UnmappedEntry",
+    "unmapped": true,
+    "grammar": "grammar UnmappedEntry { @package: preferredprobe @whitespace: none @root Root ::= Alias; Alias ::= Atom; @mapping(Item,params=[text]) Atom ::= ('1' | '2') @text; }",
+    "java": "protected String evalItem(UnmappedEntryAST.Item n){return String.valueOf(n.text());}",
+    "rust": "fn eval_item(&mut self,text:&str,_span:unlaxer_runtime::Span)->String{text.into()}",
+    "cases": [
+      {
+        "input": "1",
+        "candidates": [
+          [
+            "Item",
+            2,
+            0,
+            1,
+            "1"
+          ]
+        ],
+        "select": 0,
+        "default": 0
+      }
+    ]
+  }
+]
