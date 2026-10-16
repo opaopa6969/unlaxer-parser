@@ -1,6 +1,6 @@
 # Java / Rust Classic の本番品質基準
 
-対象は開発版 **3.3.0-SNAPSHOT** の、対応表に記載した Classic の機能である。
+対象は **3.3.0** の、対応表に記載した Classic の機能である。公開確認は [#522](https://github.com/opaopa6969/unlaxer-parser/issues/522) で追跡する。
 Maven Central の 3.2.0 に以下の修正が含まれるという意味ではない。
 全 Java 文法との互換性、未対応 IDE 機能、任意の負荷に対する性能は別の条件である。
 
@@ -56,7 +56,7 @@ npx playwright install chromium
 ```sh
 mvn -B -pl unlaxer-common,unlaxer-dsl -am install -DskipTests -Dgpg.skip=true
 mvn -B -f /absolute/path/to/tinyexpression/pom.xml compile \
-  -Dunlaxer.version=3.3.0-SNAPSHOT -Dtinyexpression.skipRailroad=true
+  -Dunlaxer.version=3.3.0 -Dtinyexpression.skipRailroad=true
 
 cargo fmt --all --manifest-path rust/Cargo.toml --check
 cargo clippy --locked --manifest-path rust/Cargo.toml --workspace --all-targets -- -D warnings
@@ -100,6 +100,11 @@ mvn -B -pl unlaxer-common-jdk17,unlaxer-dsl-jdk17 -am test \
 Tiny本番bridgeは `f86ce8a5ab0ab7d23fdba2cd477187df8aa7607c` と今回の3.3.0-SNAPSHOTを隔離したMaven repositoryで組み合わせた。
 Java 17の全体再検証中、一度だけテスト内の動的javacが失敗した。単独2件と全体packageの再実行では再現せず、原因は未確定。
 コンパイル完了後に診断を取得するようテストを修正した。再現しないことをruntimeの修正実績には数えない。
+
+3.3.0公開前に、別担当が `83dc40d4` / JDK 17.0.20.1 で追加監査した。
+直前の関連テスト、同一JVM内の反復、fresh JVM 3個を含む134件はすべて成功・skip 0。
+対象の動的javacは100回成功し、12生成ソースのSHA-256は24反復・4 JVM間で一致した。
+共有状態・class loader混入の再現根拠は見つからなかった。単発失敗の原因は未確定のまま記録し、追加の製品コード修正は行っていない。
 
 GitHub Actionsにはself-hosted runner待ちのqueueがある。上記はローカルで実施した結果であり、待機中のCIを成功として数えていない。
 

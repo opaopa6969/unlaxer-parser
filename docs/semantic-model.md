@@ -1,6 +1,6 @@
 # 型・scope・期待型の共通モデル v1
 
-状態: 3.3.0-SNAPSHOT の追加 API。#372。Java / Rust の UBNF parser が返す AST / CST に、言語固有の adapter で意味を与える追加 API である。既存の文法、`ScopeStore`、TinyExpression の構文・実行意味は変更しない。
+状態: 3.3.0 の追加 API。#372。Java / Rust の UBNF parser が返す AST / CST に、言語固有の adapter で意味を与える追加 API である。既存の文法、`ScopeStore`、TinyExpression の構文・実行意味は変更しない。
 
 UBNF の規則・capture から共通モデルを構築するには、[宣言的な意味規則](declarative-semantics.md)を使える。
 同じ JSON を Java / Rust で読み、名前解決・引数の期待型・補完・診断を生成 CST に接続する。

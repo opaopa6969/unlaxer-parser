@@ -68,7 +68,7 @@ grammar Custom {
 - `consumes`: 成功時の consumed cursor 契約。`always`、`maybe`、`never` のいずれか。
 - `context`: 実装が読む read-only accessor をカンマ区切りで列挙する。空または省略は context 非依存。
   使用可能な値は `source`、`remaining`、`position`、`matchedPosition`、`bindings`。
-  `bindings` は `parseBindingsV1` の追加能力（3.3.0-SNAPSHOT）。[仕様と合成例](parse-composition.md)を参照。
+  `bindings` は `parseBindingsV1` の追加能力（3.3.0）。[仕様と合成例](parse-composition.md)を参照。
 
 未知の key・重複 key・必須 key の欠損・不正な accessor は拒否する。外部 manifest や plugin を自動探索しない。
 

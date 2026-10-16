@@ -9,7 +9,7 @@ Java / Rust の共通テストで掲載サンプルを検証します。
 
 ## ルールの利用者向け説明 `@doc`
 
-3.3.0-SNAPSHOT 以降、Java-hosted / native Rust の両 Rust emitter は `@doc('説明')` を
+3.3.0 以降、Java-hosted / native Rust の両 Rust emitter は `@doc('説明')` を
 `parser.rs` の `pub const RULE_DOCS: &[(&str, &[&str])]` に保持します。
 ルール宣言順、同一ルール内の annotation 順を保存し、説明のないルールは含めません。
 説明はデータであり、認識・CST・AST・評価を変更しません。未記載の文法には定数を生成せず、

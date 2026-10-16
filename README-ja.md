@@ -13,7 +13,7 @@
 
 # unlaxer-parser
 
-開発版は **3.3.0-SNAPSHOT**（未公開）です。以下の依存例は最新安定版 **3.2.0** を使用します。
+リリース版は **3.3.0** です。公開確認は [#522](https://github.com/opaopa6969/unlaxer-parser/issues/522) で追跡します。
 開発版の UBNF VSIX には、画面内で学べる [はじめの一歩・catalog/help](unlaxer-dsl/ubnf-vscode/README.md) を追加しています。
 書いた文法から [言語の playground を生成](docs/ubnf-playground-ja.md) できます。UBNF 自体の文法も入力にできます。
 
@@ -24,11 +24,11 @@
 [![Maven Central](https://img.shields.io/maven-central/v/org.unlaxer/unlaxer-common)](https://central.sonatype.com/artifact/org.unlaxer/unlaxer-common)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Java 21+](https://img.shields.io/badge/Java-21%2B-orange.svg)]()
-[![Version](https://img.shields.io/badge/version-3.2.0-blue)]()
+[![Version](https://img.shields.io/badge/version-3.3.0-blue)]()
 
 ---
 
-> **最新リリース — 3.2.0**: UBNF v2 の宣言的 token と字句 grammar の部品化に対応。NUMBER・STRING・可変長 fence の認識仕様を UBNF 自体に書き、Java/Rust の parser を生成できます。token/context 契約、portability check、生成 API の差分レポートも追加しました。[図でわかる UBNF v2](./docs/ubnf-v2-illustrated-ja.md) から始められます。Java 21 と Java 17 用 artifact の区別は維持します。全履歴・制限は [CHANGELOG](./CHANGELOG.md) を参照してください。履歴上の注意: **3.0.2 は Maven Central に公開されていません**。`2.x` からの移行は下記の[downstream ドリフト警告](#downstream-ドリフト警告)も確認してください。
+> **最新リリース — 3.3.0**: Unicode 17の書記素parser・型付き位置変換、原文を保持する言語合成、意味query、選択可能なtoken stream、Java/RustのIDE対応を追加。再帰上限・ソース位置・protocolの修正を共通corpusで検証しました。[品質基準](./docs/production-quality.md)、[書記素API](./docs/grapheme-coordinates.md)、[CHANGELOG](./CHANGELOG.md)で対応範囲と互換性上の注意を確認できます。Java 21とJava 17用artifactは別配布です。履歴上の注意: **3.0.2はMaven Centralに公開されていません**。`2.x`からの移行は[downstreamドリフト警告](#downstream-ドリフト警告)も確認してください。
 
 ---
 
@@ -141,7 +141,7 @@ MulOp ::= '*' | '/' ;
 
 ## Java / Rust の対応範囲と品質
 
-このリポジトリは、状態付きコンビネータ実行系 **unlaxer Classic** の Java 版と Rust 版を提供します。以下は開発版 **3.3.0-SNAPSHOT** の対応状況です。Maven の公開版 3.2.0 と開発版の追加機能を区別してください。
+このリポジトリは、状態付きコンビネータ実行系 **unlaxer Classic** の Java 版と Rust 版を提供します。以下は **3.3.0** の対応状況です。これらの追加機能は Maven 3.2.0 には含まれません。
 
 | 項目 | Java | Rust Classic |
 |---|---|---|
@@ -170,12 +170,12 @@ MulOp ::= '*' | '/' ;
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-common</artifactId>
-        <version>3.2.0</version>
+        <version>3.3.0</version>
     </dependency>
     <dependency>
         <groupId>org.unlaxer</groupId>
         <artifactId>unlaxer-dsl</artifactId>
-        <version>3.2.0</version>
+        <version>3.3.0</version>
     </dependency>
 </dependencies>
 ```
@@ -188,12 +188,12 @@ MulOp ::= '*' | '/' ;
 <dependency>
     <groupId>org.unlaxer</groupId>
     <artifactId>unlaxer-common-jdk17</artifactId>
-    <version>3.2.0</version>
+    <version>3.3.0</version>
 </dependency>
 <dependency>
     <groupId>org.unlaxer</groupId>
     <artifactId>unlaxer-dsl-jdk17</artifactId>
-    <version>3.2.0</version>
+    <version>3.3.0</version>
 </dependency>
 ```
 
@@ -566,9 +566,9 @@ curl http://127.0.0.1:9228/healthz
 
 ## 型に基づく編集支援の API
 
-3.3.0-SNAPSHOT には Java / Rust 共通の[型・scope・期待型モデル](docs/semantic-model.md)がある。UBNF から生成した AST を adapter で接続し、ユーザー定義型を合成して引数の型に適合する変数を補完できる。[実行例](examples/semantic-model/README.md)を参照。既存言語への型構文・LSP の自動追加を意味しない。
+3.3.0 には Java / Rust 共通の[型・scope・期待型モデル](docs/semantic-model.md)がある。UBNF から生成した AST を adapter で接続し、ユーザー定義型を合成して引数の型に適合する変数を補完できる。[実行例](examples/semantic-model/README.md)を参照。既存言語への型構文・LSP の自動追加を意味しない。
 
-3.3.0-SNAPSHOT では [`@tokenStream: enabled`](docs/token-stream.md) により、生成した Java / Rust parser で文字列直接解析・trivia cache・遅延 token 化・事前 token 化を選択できる。原文の位置とコメントを保持し、既定は直接解析を維持する。
+3.3.0 では [`@tokenStream: enabled`](docs/token-stream.md) により、生成した Java / Rust parser で文字列直接解析・trivia cache・遅延 token 化・事前 token 化を選択できる。原文の位置とコメントを保持し、既定は直接解析を維持する。
 
 文字種境界は既存 token の合成で表せる。実行時辞書には Java / Rust 共通の immutable parse bindings を使う。
 [仕様と実行例](docs/parse-composition.md)、[辞書 resolver の実行チュートリアル](examples/resolver-tutorial/README.md)を参照。
