@@ -407,6 +407,15 @@ class MapperRuleEmitter {
               + " to" + MapperElementUtil.methodNameFor(className) + "(Token token) {");
             w.indent();
 
+            if (EnumSchema.isEnum(ruleByName.get(rule.name()))) {
+                w.line("return registerNodeSourceSpan(new " + astClass + "." + className + "("
+                    + astClass + "." + rule.name() + ".fromText(tokenTextCompat(token))), token);");
+                w.dedent();
+                w.line("}");
+                w.blankLine();
+                continue;
+            }
+
             List<RuleDecl> sumVariants = MappingShape.sumVariants(grammar, rule, mapping);
             if (!sumVariants.isEmpty()) {
                 emitSumMappingBody(w, parsersClass, className, sumVariants);
@@ -908,10 +917,75 @@ class MapperRuleEmitter {
         w.line("return registerNodeSourceSpan(mapped, token);");
     }
 
+    private static void emitEnumParam(
+            IndentedWriter w,
+            String parsersClass,
+            String param,
+            String type,
+            List<CaptureBindingPlan.Site> sites,
+            String enumName) {
+        var list = MapperTypeResolver.unwrapListType(type);
+        var optional = MapperTypeResolver.unwrapOptionalType(type);
+        String valueType = list.or(() -> optional).orElse(type);
+        String values = "enumValues_" + MapperElementUtil.safeName(param);
+        w.line("List<" + valueType + "> " + values + " = new ArrayList<>();");
+        String ids =
+                sites.stream()
+                        .map(site -> "\"" + ParserCodegenUtil.escapeString(site.id()) + "\"")
+                        .collect(java.util.stream.Collectors.joining(", "));
+        w.line(
+                "for (CaptureOccurrence occurrence : findCaptureOccurrences(token,"
+                    + " java.util.Set.of("
+                        + ids
+                        + "))) {");
+        w.indent();
+        w.line(
+                "for (Token valueToken : findDescendants(occurrence.token(), "
+                        + parsersClass
+                        + "."
+                        + enumName
+                        + "Parser.class)) {");
+        w.indent();
+        w.line(values + ".add(" + valueType + ".fromText(tokenTextCompat(valueToken)));");
+        w.dedent();
+        w.line("}");
+        w.dedent();
+        w.line("}");
+        if (list.isPresent()) w.line(type + " " + param + " = " + values + ";");
+        else {
+            w.line(
+                    "if ("
+                            + values
+                            + ".size() "
+                            + (optional.isPresent() ? "> 1" : "!= 1")
+                            + ") throw new IllegalArgumentException(\"Invalid enum capture"
+                            + " cardinality: "
+                            + param
+                            + "\");");
+            w.line(
+                    type
+                            + " "
+                            + param
+                            + " = "
+                            + (optional.isPresent()
+                                    ? values
+                                            + ".isEmpty() ? Optional.empty() : Optional.of("
+                                            + values
+                                            + ".get(0))"
+                                    : values + ".get(0)")
+                            + ";");
+        }
+    }
+
     private static void emitBoundParam(IndentedWriter w, String parsersClass, GrammarDecl grammar,
             String param, String type, List<CaptureBindingPlan.Site> sites,
             Map<String, String> mappedClassByRuleName,
             Map<String, TokenDecl> tokenDeclByName, Map<String, RuleDecl> ruleByName) {
+        Optional<String> enumName=sites.stream().map(site -> EnumSchema.enumType(grammar,site.element())).flatMap(Optional::stream).findFirst();
+        if (enumName.isPresent()) {
+            emitEnumParam(w,parsersClass,param,type,sites,enumName.get());
+            return;
+        }
         SemanticCardinality semantics = new SemanticCardinality(grammar);
         if (sites.stream().anyMatch(site -> semantics.needsCollection(site.element()))) {
             emitSemanticParam(w, param, type, sites, semantics);
