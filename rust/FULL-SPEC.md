@@ -27,7 +27,7 @@ annotation、`ParseContext` API、consume/invert伝播、incremental、IDE proto
 
 以下は開発版の実装範囲であり、公開済み3.3.0の機能一覧ではない。個別PRの実装・共通検証と、CI/mergeを含むissueの完了を区別する。未完了は親#111と記載した子issueで追跡する。
 
-2026-10-17の追加実consumer監査では、既存flat tokenStreamの直接literal captureがJavaだけnullになる差（#668）と、結合演算子のliteral operandがJavaで誤選択される差（#669）を再現した。両Rust hostの生成物・値は一致した。各修正と共有回帰が完了するまで、該当経路を同等品質とは扱わない。新nestedの共通制約とは別の既存機能の不具合として追跡する。
+2026-10-17の追加実consumer監査で再現した、flat tokenStreamの直接literal captureがJavaだけnullになる差（#668）と左結合のliteral operand誤選択（#669）は、開発候補で修正し両Rust hostとの共有回帰を通過した。#668は19文法69入力×4 mode×trivia公開有無、#669は21文法69入力で実consumerを検証する。CI/mergeと全体回帰は別の完了条件として残る。非捕捉delimiter付き左結合規則はJavaで利用できる一方、両Rust hostが拒否する既存差を#674で追跡している。これらを新nestedの共通制約と混同しない。
 
 | 機能群 | 現状 | 検証根拠・残る条件 |
 |---|---|---|
@@ -53,7 +53,7 @@ annotation、`ParseContext` API、consume/invert伝播、incremental、IDE proto
 | namePredicate・version付き名前判定 | immutable snapshot の TYPE/VALUE/resolved gate を両frontend・生成器・runtimeへ接続（#425 / #427） | [名前snapshot契約](../docs/versioned-name-snapshots.md)。UNKNOWN・version不一致を拒否し、rollback・memo・子entry・recovery整合と資源上限を比較。外部I/Oや型推論は行わず、完全なC++意味論は未対応。Java/Rustの再帰guard差は上記境界表に記録 |
 | 診断policy・FIRST候補除外 | Java/RustのDetailed/失敗時詳細化/Auto、候補除外を実装 | 再実行可能性・診断参照・custom parserの宣言に依存。低水準APIと生成入口を区別し、意味診断と失敗位置を保持。任意副作用の安全性や常時高速化は保証しない（同ノート ケース25〜27） |
 | nullable Classic Repeat | 通常Repeatを両hostから生成し、Java同等に成功したzero-progress iterationを一度数えて停止（#614） | [契約](../docs/nullable-repetition.md)。11文法30入力×6で実parse/map・typed list・両host byte一致、96state行×6・sticky資源失敗を比較。purePEG/lexical契約は維持。nullable separationも[#616の契約](../docs/nullable-separation.md)で対応 |
-| optional・0/1回以上・bounded repeat・separated | UBNF生成・Option/Vec AST・mapper・Semantics実装 | 70ケースの受理一致、20成功ケースのJava/Rust AST全field・全span一致、Rust評価値oracle。外側captureは明示`@nestedCaptures`の[型契約](../docs/typed-nested-captures.md)で対応。nested typeofは#660で対応。nested所有ruleのauto-eval/assoc、tokenStreamとの併用、nested helper構造は両版で位置付き拒否し、既存flat機能との境界を#583で追跡 |
+| optional・0/1回以上・bounded repeat・separated | UBNF生成・Option/Vec AST・mapper・Semantics実装 | 70ケースの受理一致、20成功ケースのJava/Rust AST全field・全span一致、Rust評価値oracle。外側captureは明示`@nestedCaptures`の[型契約](../docs/typed-nested-captures.md)で対応。nested typeofは#660で対応。既存auto-literal leafとnested manual owner、およびauto-passthrough ownerとnested manual leafの評価は#673の共通corpusで792観測・1080回のトップレベル評価を検証。nested所有ruleのauto-eval/assoc、tokenStreamとの併用、nested helper構造は両版で位置付き拒否し、既存flat機能との境界を#583で追跡 |
 | ANY/EOF/EMPTY/CHAR_RANGE/NEGATION/UNTIL/LOOKAHEAD/NEGATIVE_LOOKAHEAD | UBNF生成とJava互換Expr・両cursorを実装 | 48文法109入力でprefix/両cursor/全入力受理、受理56入力のAST/spanを比較。Classic一般modeは#571、historical EOF/Zeroは#598。全CST形状の同一性は主張しない |
 | positive assertion / match-only | Java PegLookaheadとRust ahead()は純PEG境界。Java MatchOnlyとRust .match_only()はClassicのmatched/token公開境界 | [PEG契約](../docs/peg-assertions.md)の22入力・4状態traceと[Classic契約](../docs/classic-token-propagation.md)を各6設定で検証。[旧入口の監査](../docs/positive-assertion-contracts.md)18入力・retry3入力の観測も維持。[prior-matched診断](../docs/prior-matched-diagnostics.md)は同じClassic/transaction境界で比較し、native PEGのsource-frontierとの差をAPI契約として保持（#655）。親#545は継続 |
 | error | `ERROR(...)`をJava/native Rust両hostから生成（#329）。非消費で必ず失敗し、expected候補を提示 | [12文法19入力の契約・corpus・再現手順](../docs/error-elements.md)。受理/両cursor、CP位置と明示hint、AST/span、状態rollback、診断/memo modeを比較。native候補の表示差は個別oracleで保持。下記の回復とは別 |
