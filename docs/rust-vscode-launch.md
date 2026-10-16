@@ -41,3 +41,5 @@ xvfb-run -a npm run test:vsix -- target/tinycalc.vsix
 ```
 
 配布VSIXを一時directoryへ展開し、実際の拡張hostでJava/Rust両方を起動する。空白を含む実行パス、補完、同期後hover、既定definition非提供、Unicode診断、AST/token DAP、異常終了からの再起動、設定不正からの復帰、停止時のchild process終了を確認する。初期化に応答せずTERMも無視するfixtureを使い、timeout・設定修正・deactivate時の中断と強制終了、未処理Promise rejectionがないことも検査する。観測値は `target/ide-java.json` と `target/ide-rust.json` に保存し、両者を比較する。ユーザーのVS Code profileは使わない。
+
+終了時の残課題: Java DAPの切断時にVS Code側へ `Invalid debug adapter` ログが出る場合がある。操作・後続session・child終了は上記試験で確認しているが、終了handshakeの改善は [#555](https://github.com/opaopa6969/unlaxer-parser/issues/555) で追跡する。
