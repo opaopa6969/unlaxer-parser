@@ -519,7 +519,7 @@ fn expression(expr: &Expression) -> String {
         Delimited(child) => format!("Expr::Sequence(vec![{}])", expression(child)),
         TextValue(child) => format!("{}.text_value()", expression(child)),
         ValueBoundary(child) => format!("{}.value_boundary()", expression(child)),
-        CaptureBoundary { kind, child } => format!("Expr::CaptureBoundary(unlaxer_runtime::capture_tree::Kind::{kind:?}, Box::new({}))", expression(child)),
+        CaptureBoundary { kind, child } => format!("Expr::InputCaptureBoundary(unlaxer_runtime::capture_tree::Kind::{kind:?}, Box::new({}))", expression(child)),
         LexicalContextScope { child, terminals } => format!(
             "{}.lexical_context_scope(vec![{}])", expression(child),
             terminals.iter().map(|(name, literal, definition)| format!(

@@ -711,6 +711,7 @@ public final class RustGrammarLowering {
     }
 
     private CaptureBoundary nestedBoundary(Expression expression) {
+        if (expression instanceof GeneralBody general) { var inner=nestedBoundary(general.child()); return new CaptureBoundary(inner.kind(),general.withChild(inner.child())); }
         if (expression instanceof Sequence s && s.elements().size()==1) {
             var inner=nestedBoundary(s.elements().get(0));
             return new CaptureBoundary(inner.kind(),new Sequence(List.of(inner.child())));

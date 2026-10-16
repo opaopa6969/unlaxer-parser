@@ -61,5 +61,12 @@
     "rule": "B",
     "startCP": 164,
     "endCP": 494
+  },
+  {
+    "id": "owned-nominal-node",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures @mapping(Leaf,params=[text]) Leaf ::= 'x' @text; @mapping(Other,params=[text]) Other ::= 'x' @text; @root @mapping(Family) Root ::= A | B; @nestedCaptures @mapping(Row,params=[value]) A ::= 'a' CAPTURE(word, [Leaf]) @value; @nestedCaptures @mapping(Row,params=[value]) B ::= 'b' CAPTURE_SCOPE([Other]) @value; }",
+    "rule": "A",
+    "startCP": 194,
+    "endCP": 278
   }
 ]

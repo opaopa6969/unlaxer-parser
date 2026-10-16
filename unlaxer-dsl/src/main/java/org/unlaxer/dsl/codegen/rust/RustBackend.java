@@ -469,7 +469,7 @@ public final class RustBackend {
         if (expression instanceof TextValue text) {
             return expression(text.child()) + ".text_value()";
         }
-        if (expression instanceof CaptureBoundary b) return "Expr::CaptureBoundary(unlaxer_runtime::capture_tree::Kind::"+switch(b.kind()){case VALUE->"Value";case OPTIONAL->"Optional";case LIST->"List";}+", Box::new("+expression(b.child())+"))";
+        if (expression instanceof CaptureBoundary b) return "Expr::InputCaptureBoundary(unlaxer_runtime::capture_tree::Kind::"+switch(b.kind()){case VALUE->"Value";case OPTIONAL->"Optional";case LIST->"List";}+", Box::new("+expression(b.child())+"))";
         if (expression instanceof ValueBoundary boundary) {
             return expression(boundary.child()) + ".value_boundary()";
         }
@@ -847,6 +847,7 @@ public final class RustBackend {
         if (expression instanceof LexicalContextScope value) return containsRecovery(value.child());
         if (expression instanceof TextValue value) return containsRecovery(value.child());
         if (expression instanceof ValueBoundary value) return containsRecovery(value.child());
+        if (expression instanceof CaptureBoundary value) return containsRecovery(value.child());
         if (expression instanceof Delimited value) return containsRecovery(value.child());
         if (expression instanceof Capture value) return containsRecovery(value.expression());
         if (expression instanceof OptionalExpr value) return containsRecovery(value.child());

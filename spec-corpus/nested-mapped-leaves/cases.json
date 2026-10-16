@@ -1496,5 +1496,468 @@
         "structure": "some(node(Leaf,some(node(Leaf,none))))"
       }
     ]
+  },
+  {
+    "name": "OwnedNodeOptionalList",
+    "grammar": "grammar OwnedNodeOptionalList { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= '[' CAPTURE(word, [ {Leaf} ]) @value ']'; @mapping(Leaf,params=[text]) Leaf ::= '(' '😀' @text '\\r\\n' ')'; }",
+    "javaFieldTypes": {
+      "Root": {
+        "value": "Optional<List<Leaf>>"
+      },
+      "Leaf": {
+        "text": "String"
+      }
+    },
+    "rustFieldTypes": {
+      "Root": {
+        "value": "Option<Vec<Box<Ast>>>"
+      },
+      "Leaf": {
+        "text": "String"
+      }
+    },
+    "captureNames": [
+      "value"
+    ],
+    "cases": [
+      {
+        "id": "2",
+        "input": "[]",
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            2
+          ],
+          "fields": {
+            "value": []
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              1,
+              1
+            ],
+            "text": ""
+          }
+        ],
+        "structure": "some(list[])",
+        "preferred": [
+          [
+            "Root",
+            0,
+            0,
+            2
+          ]
+        ],
+        "leaves": []
+      },
+      {
+        "id": "12",
+        "input": "[(😀\r\n)(😀\r\n)]",
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            12
+          ],
+          "fields": {
+            "value": [
+              {
+                "type": "Leaf",
+                "span": [
+                  1,
+                  6
+                ],
+                "fields": {
+                  "text": "😀"
+                }
+              },
+              {
+                "type": "Leaf",
+                "span": [
+                  6,
+                  11
+                ],
+                "fields": {
+                  "text": "😀"
+                }
+              }
+            ]
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              1,
+              11
+            ],
+            "text": "(😀\r\n)(😀\r\n)"
+          }
+        ],
+        "structure": "some(list[node(Leaf,text(f09f9880)),node(Leaf,text(f09f9880))])",
+        "preferred": [
+          [
+            "Root",
+            0,
+            0,
+            12
+          ],
+          [
+            "Leaf",
+            7,
+            1,
+            6
+          ],
+          [
+            "Leaf",
+            7,
+            6,
+            11
+          ]
+        ],
+        "leaves": [
+          {
+            "span": [
+              1,
+              6
+            ],
+            "text": "(😀\r\n)"
+          },
+          {
+            "span": [
+              6,
+              11
+            ],
+            "text": "(😀\r\n)"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "ScopedEnumListOptional",
+    "grammar": "grammar ScopedEnumListOptional { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= '[' CAPTURE_SCOPE({ [Mode] }) @value ']'; @enum Mode ::= 'on' | '😀'; }",
+    "javaFieldTypes": {
+      "Root": {
+        "value": "List<Optional<Mode>>"
+      }
+    },
+    "rustFieldTypes": {
+      "Root": {
+        "value": "Vec<Option<Mode>>"
+      }
+    },
+    "captureNames": [
+      "value"
+    ],
+    "cases": [
+      {
+        "id": "2",
+        "input": "[]",
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            2
+          ],
+          "fields": {
+            "value": [
+              null
+            ]
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              1,
+              1
+            ],
+            "text": ""
+          }
+        ],
+        "structure": "list[none]",
+        "preferred": [
+          [
+            "Root",
+            0,
+            0,
+            2
+          ]
+        ],
+        "leaves": []
+      },
+      {
+        "id": "7",
+        "input": "[on😀on]",
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            7
+          ],
+          "fields": {
+            "value": [
+              "ON",
+              "U1F600_",
+              "ON",
+              null
+            ]
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              1,
+              6
+            ],
+            "text": "on😀on"
+          }
+        ],
+        "structure": "list[some(enum(Mode,ON)),some(enum(Mode,U1F600_)),some(enum(Mode,ON)),none]",
+        "preferred": [
+          [
+            "Root",
+            0,
+            0,
+            7
+          ]
+        ],
+        "leaves": [
+          {
+            "span": [
+              1,
+              3
+            ],
+            "text": "on"
+          },
+          {
+            "span": [
+              3,
+              4
+            ],
+            "text": "😀"
+          },
+          {
+            "span": [
+              4,
+              6
+            ],
+            "text": "on"
+          }
+        ]
+      }
+    ],
+    "enumTypes": [
+      "Mode"
+    ]
+  },
+  {
+    "name": "OwnedSamePositionNodes",
+    "grammar": "grammar OwnedSamePositionNodes { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[first,second]) Root ::= '[' CAPTURE(word, [Leaf]) @first CAPTURE_SCOPE([Leaf]) @second ']'; @mapping(Leaf,params=[text]) Leaf ::= ['x'] @text; }",
+    "javaFieldTypes": {
+      "Root": {
+        "first": "Optional<Leaf>",
+        "second": "Optional<Leaf>"
+      },
+      "Leaf": {
+        "text": "Optional<String>"
+      }
+    },
+    "rustFieldTypes": {
+      "Root": {
+        "first": "Option<Box<Ast>>",
+        "second": "Option<Box<Ast>>"
+      },
+      "Leaf": {
+        "text": "Option<String>"
+      }
+    },
+    "captureNames": [
+      "first",
+      "second"
+    ],
+    "distinctFields": [
+      "first",
+      "second"
+    ],
+    "cases": [
+      {
+        "id": "[]",
+        "input": "[]",
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            2
+          ],
+          "fields": {
+            "first": {
+              "type": "Leaf",
+              "span": [
+                1,
+                1
+              ],
+              "fields": {
+                "text": null
+              }
+            },
+            "second": {
+              "type": "Leaf",
+              "span": [
+                1,
+                1
+              ],
+              "fields": {
+                "text": null
+              }
+            }
+          }
+        },
+        "captures": [
+          {
+            "name": "first",
+            "span": [
+              1,
+              1
+            ],
+            "text": ""
+          },
+          {
+            "name": "second",
+            "span": [
+              1,
+              1
+            ],
+            "text": ""
+          }
+        ],
+        "structure": "node(Root,some(node(Leaf,none)),some(node(Leaf,none)))",
+        "leaves": [
+          {
+            "span": [
+              1,
+              1
+            ],
+            "text": ""
+          },
+          {
+            "span": [
+              1,
+              1
+            ],
+            "text": ""
+          }
+        ],
+        "preferred": [
+          [
+            "Root",
+            0,
+            0,
+            2
+          ],
+          [
+            "Leaf",
+            5,
+            1,
+            1
+          ],
+          [
+            "Leaf",
+            5,
+            1,
+            1
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "name": "OwnedScalarPreferred",
+    "grammar": "grammar OwnedScalarPreferred { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= '[' CAPTURE(word, [ {'a'} ]) @value ']' Leaf; @mapping(Leaf,params=[text]) Leaf ::= 'x' @text; }",
+    "javaFieldTypes": {
+      "Root": {
+        "value": "Optional<List<String>>"
+      },
+      "Leaf": {
+        "text": "String"
+      }
+    },
+    "rustFieldTypes": {
+      "Root": {
+        "value": "Option<Vec<String>>"
+      },
+      "Leaf": {
+        "text": "String"
+      }
+    },
+    "captureNames": [
+      "value"
+    ],
+    "cases": [
+      {
+        "id": "scalar",
+        "input": "[aa]x",
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "value": [
+              "a",
+              "a"
+            ]
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              1,
+              3
+            ],
+            "text": "aa"
+          }
+        ],
+        "structure": "some(list[text(61),text(61)])",
+        "preferred": [
+          [
+            "Root",
+            0,
+            0,
+            5
+          ],
+          [
+            "Leaf",
+            1,
+            4,
+            5
+          ]
+        ],
+        "leaves": [
+          {
+            "span": [
+              1,
+              2
+            ],
+            "text": "a"
+          },
+          {
+            "span": [
+              2,
+              3
+            ],
+            "text": "a"
+          }
+        ]
+      }
+    ]
   }
 ]

@@ -61,3 +61,10 @@ resource rollback. `OwnedCaptureConformanceTest` compiles and runs a Java consum
 then checks all five Rust files byte for byte between the Java and native Rust
 hosts and runs the Rust consumer, in every memo/diagnostic mode. The native host
 currently generates Rust, so this comparison does not imply a native-to-Java emitter.
+
+`@nestedCaptures` also preserves the body shape through `CAPTURE` and
+`CAPTURE_SCOPE`; `SAME_AS` is a text leaf, including successful empty replay.
+Generated AST boundaries validate original-input provenance before token
+collection. General runtime snapshots continue to support Projected and Generated
+text. See [typed nested captures](typed-nested-captures.md) for the shape, source
+and unsupported-combination contracts.
