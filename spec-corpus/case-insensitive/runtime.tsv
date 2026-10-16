@@ -1,0 +1,33 @@
+# id	pattern scalar hex	input scalar hex	op	success	consumed CP
+ascii	0049 0066	0069 0046 0021	ATOM	true	2
+kelvin	006B	212A 0021	CHAIN	true	1
+kelvin-reverse	212A	004B	ATOM	true	1
+turkish-dot	0069	0130	CHAIN	true	1
+turkish-dotless	0069	0131	CHAIN	true	1
+long-s	0073	017F	CHAIN	true	1
+sigma	03A3	03C2	CHAIN	true	1
+sharp-s	00DF	1E9E	ATOM	true	1
+not-full-fold	00DF	0073 0073	ATOM	false	0
+not-full-fold-reverse	0073 0073	00DF	ATOM	false	0
+ligature	FB00	0066 0066	ATOM	false	0
+fullwidth	FF21	FF41	ATOM	true	1
+not-width-fold	0061	FF21	ATOM	false	0
+unicode-new	A7D0	A7D1	ATOM	true	1
+deseret	10400	10428 0021	CHAIN	true	1
+non-case-emoji	1F600	1F600 0078	ATOM	true	1
+non-case-han	5B57	5B57	ATOM	true	1
+nfc-nfd	00E9	0065 0301	ATOM	false	0
+combining	0045 0301	0065 0301	ATOM	true	2
+crlf	000D 000A	000D 000A 0021	ATOM	true	2
+eof	0041 0042 0043	~	ATOM	false	0
+empty	~	~	ATOM	false	0
+empty-input-nonempty	~	0078	ATOM	false	0
+partial	0041 0042 0043	0061 0062	ATOM	false	0
+mismatch	0041 0042 0043	0061 0062 0064	ATOM	false	0
+fail-rollback	006B	212A 003F	FAIL	false	0
+retry-rollback	006B	212A 003F	RETRY	true	1
+ahead	006B	212A	AHEAD_CI	true	1
+ahead-nonbmp	10400	10428	AHEAD_CI	true	1
+fail-ahead	006B	0078	AHEAD_CI	false	0
+prefix-offset	006B	1F600 212A	PREFIX	true	2
+no-trivia	0078	0020 0078	ATOM	false	0

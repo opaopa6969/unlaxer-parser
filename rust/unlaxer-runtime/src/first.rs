@@ -135,6 +135,14 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
             .chars()
             .next()
             .map_or(FirstSet::NULLABLE, FirstSet::of_char),
+        // Case-equivalent starting scalars may be outside the forward upper/lower pair.
+        Expr::CaseInsensitive(text) => {
+            if text.is_empty() {
+                FirstSet::EMPTY
+            } else {
+                FirstSet::ANY
+            }
+        }
         Expr::Number => FirstSet::of_chars("+-.0123456789"),
         Expr::Identifier => {
             FirstSet::of_chars("_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")

@@ -293,7 +293,9 @@ public final class FirstSets {
     if (false == wordParser.ignoreCase) {
       return FirstSet.ofCodePoints(first);
     }
-    return FirstSet.ofCodePoints(first, Character.toUpperCase(first), Character.toLowerCase(first));
+    // Forward upper/lower mappings omit inverse equivalents (K also matches Kelvin sign).
+    // Both the legacy JDK matcher and the pinned Unicode matcher need a sound superset.
+    return FirstSet.UNKNOWN;
   }
 
   /**

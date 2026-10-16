@@ -225,6 +225,12 @@ impl ParseContext<'_> {
         }
         let (label, kind, begin, end) = match expression {
             Expr::Literal(_) => ("WordParser", TokenKind::Consumed, start, self.position),
+            Expr::CaseInsensitive(_) => (
+                "UnicodeIgnoreCaseWordParser",
+                TokenKind::Consumed,
+                start,
+                self.position,
+            ),
             Expr::Grapheme => ("GraphemeParser", TokenKind::Consumed, start, self.position),
             Expr::Any => (
                 "WildCardCharacterParser",

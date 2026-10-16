@@ -189,7 +189,8 @@ public class FirstSetExclusionTest {
     FirstSet caseInsensitive = FirstSets.of(new CaseInsensitive());
     assertTrue(caseInsensitive.mayStartWith('T'));
     assertTrue(caseInsensitive.mayStartWith('t'));
-    assertFalse(caseInsensitive.mayStartWith('R'));
+    // Simple forward case mappings cannot enumerate every inverse equivalent.
+    assertTrue(caseInsensitive.isUnknown());
 
     FirstSet unicode = FirstSets.of(new Unicode());
     assertTrue(unicode.mayStartWith('あ'));
