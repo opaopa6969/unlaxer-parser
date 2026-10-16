@@ -19,7 +19,7 @@ import org.unlaxer.parser.combinator.ChoiceInterface;
  * Opt-in packrat memoization table (issue #40).
  *
  * <p>Keyed by (parser identity, start consumed position, start matched position, tokenKind,
- * invertMatch, parser-visible state version). Caches the outcome of parsing a rule at a position so that the exponential
+ * invertMatch, parser-visible state version, matched-cursor reset policy). Caches the outcome of parsing a rule at a position so that the exponential
  * re-parsing of the same sub-tree under backtracking ambiguity collapses to a single attempt.
  *
  * <p>One deliberately narrow flavour, gated by immutable parse options:
@@ -38,7 +38,14 @@ public final class PackratMemoTable {
 
   /** Position component of the memo key (parser identity is the outer map key). */
   public record PositionKey(
-      int consumed, int matched, TokenKind tokenKind, boolean invertMatch, long stateVersion) {}
+      int consumed, int matched, TokenKind tokenKind, boolean invertMatch, long stateVersion,
+      boolean resetMatchedWithConsumed) {
+    /** Compatibility constructor for the historical default reset policy. */
+    public PositionKey(int consumed, int matched, TokenKind tokenKind,
+        boolean invertMatch, long stateVersion) {
+      this(consumed, matched, tokenKind, invertMatch, stateVersion, true);
+    }
+  }
 
   /** A rule outcome, including local diagnostics even when an alternative succeeded. */
   public static final class Entry {
@@ -49,14 +56,16 @@ public final class PackratMemoTable {
     private final Parser chosenChild;
     private final Map<ChoiceInterface, Parser> choices;
     /*
-     * Eviction index (#276 round 4). Every stored entry is also threaded onto a singly linked
+     * Eviction index (#276 round 4). Every stored entry is also threaded onto a doubly linked
      * chain of the entries created at the same start position, so dropping a whole position is
-     * O(entries at that position) instead of a scan of the table. Carrying the three links on the
+     * O(entries at that position) instead of a scan of the table. Carrying the index links on the
      * entry itself rather than in separate index nodes keeps the put path allocation-free.
      */
     private Parser indexedParser;
     private PositionKey indexedKey;
     private Entry nextAtPosition;
+    private Entry previousAtPosition;
+    private long failureCharge;
 
     private Entry(ParseContext.FailureDiagnostic diagnostic) {
       this(diagnostic, null, 0, 0, null, Map.of());
@@ -90,6 +99,11 @@ public final class PackratMemoTable {
       table.reportEvictionUnderrun(positionKey.consumed());
     }
     Entry entry = table.get(parser, positionKey);
+    // A hit must have at least the resource budget available on the original
+    // evaluation. Shallower retries keep their existing reuse and stack rebasing.
+    if (entry != null && parseContext.activeParseDepth() > entry.diagnostic.memoParseDepth) {
+      return null;
+    }
     if (entry != null) {
       int lookback = table.highWater - positionKey.consumed();
       if (lookback > table.maxHitLookback) table.maxHitLookback = lookback;
@@ -114,7 +128,10 @@ public final class PackratMemoTable {
       boolean invertMatch, Entry entry) {
     if (entry.tokens == null) return Parsed.FAILED;
     context.startParse(parser, context, tokenKind, invertMatch);
-    context.begin(parser);
+    if (parser instanceof org.unlaxer.parser.combinator.Occurs occurs
+        && occurs.min() == 0 && occurs.max() == 0 && !occurs.isZeroMatchCheck())
+      context.beginPreservingMatched(parser);
+    else context.begin(parser);
     for (Token token : entry.tokens) context.getCurrent().getTokens().add(token.deepCopy());
     int consumeDelta = entry.endConsumed - context.getConsumedPosition().value();
     // Even a zero-width consumed token can reset a previously advanced matched cursor.
@@ -235,7 +252,8 @@ public final class PackratMemoTable {
     return new PositionKey(
         parseContext.getConsumedPosition().value(),
         parseContext.getMatchedPosition().value(),
-        tokenKind, invertMatch, parseContext.getMemoizationStateVersion());
+        tokenKind, invertMatch, parseContext.getMemoizationStateVersion(),
+        parseContext.getCurrent().isResetMatchedWithConsumed());
   }
 
   private final Map<Parser, Map<PositionKey, Entry>> entryByPositionByParser = new IdentityHashMap<>();
@@ -276,6 +294,43 @@ public final class PackratMemoTable {
   private int evictionUnderruns;
   private int maxHitLookback;
 
+  private static final int DEFAULT_FAILURE_ENTRIES = 65_536;
+  private static final long DEFAULT_FAILURE_BYTES = 16L * 1024 * 1024;
+  private static final long DEFAULT_FAILURE_ENTRY_BYTES = 1024L * 1024;
+  private static final int CONFIGURED_FAILURE_ENTRIES = (int) configuredFailureBudget(
+      System.getProperty("unlaxer.memo.failure.maxEntries"), DEFAULT_FAILURE_ENTRIES, 1_048_576);
+  private static final long CONFIGURED_FAILURE_BYTES = configuredFailureBudget(
+      System.getProperty("unlaxer.memo.failure.maxBytes"), DEFAULT_FAILURE_BYTES, 1024L * 1024 * 1024);
+  private static final long CONFIGURED_FAILURE_ENTRY_BYTES = configuredFailureBudget(
+      System.getProperty("unlaxer.memo.failure.maxEntryBytes"), DEFAULT_FAILURE_ENTRY_BYTES, 64L * 1024 * 1024);
+  private int maxFailureEntries = CONFIGURED_FAILURE_ENTRIES;
+  private long maxFailureBytes = CONFIGURED_FAILURE_BYTES;
+  private long maxFailureEntryBytes = CONFIGURED_FAILURE_ENTRY_BYTES;
+  private int failureEntryCount;
+  private long failureRetainedBytes;
+  private long failureBudgetMisses;
+
+  static long configuredFailureBudget(String value, long fallback, long ceiling) {
+    if (value == null || value.isEmpty()) return fallback;
+    for (int i = 0; i < value.length(); i++)
+      if (value.charAt(i) < '0' || value.charAt(i) > '9') return fallback;
+    try {
+      long parsed = Long.parseLong(value);
+      return parsed >= 0 && parsed <= ceiling ? parsed : fallback;
+    } catch (NumberFormatException invalid) { return fallback; }
+  }
+
+  /** Test seam; production uses finite process-level system-property defaults. */
+  void setFailureBudget(int entries, long bytes, long entryBytes) {
+    if (failureEntryCount != 0 || entries < 0 || entries > 1_048_576 || bytes < 0
+        || bytes > 1024L * 1024 * 1024 || entryBytes < 0 || entryBytes > 64L * 1024 * 1024)
+      throw new IllegalArgumentException("invalid failure memo budget or nonempty cache");
+    maxFailureEntries = entries;
+    maxFailureBytes = bytes;
+    maxFailureEntryBytes = entryBytes;
+  }
+
+
   public Entry get(Parser parser, PositionKey positionKey) {
     Map<PositionKey, Entry> entryByPosition = entryByPositionByParser.get(parser);
     if (entryByPosition == null) {
@@ -287,26 +342,84 @@ public final class PackratMemoTable {
   public void put(Parser parser, PositionKey positionKey, Entry entry) {
     int position = positionKey.consumed();
     if (evictionEnabled && position < evictedBelow) {
-      // This start is outside the current retention window. A later probe may
-      // widen the window and re-parse it; eviction is not a committed frontier.
       deadOnArrival++;
       return;
     }
-    entryByPositionByParser
-        .computeIfAbsent(parser, ignored -> new HashMap<>())
-        .put(positionKey, entry);
-    entryCount++;
-    if (entryCount > maxEntryCount) maxEntryCount = entryCount;
-    if (false == evictionEnabled) return;
-    if (position >= entryChainByPosition.length) {
-      int length = entryChainByPosition.length;
-      while (position >= length) length *= 2;
-      entryChainByPosition = java.util.Arrays.copyOf(entryChainByPosition, length);
+    Map<PositionKey, Entry> byKey = entryByPositionByParser.get(parser);
+    Entry old = byKey == null ? null : byKey.get(positionKey);
+    if (old == entry) return;
+    boolean failure = entry.tokens == null;
+    long charge = 0;
+    int indexLength = entryChainByPosition.length;
+    if (evictionEnabled && position >= indexLength) {
+      long next = indexLength;
+      while (position >= next && next < Integer.MAX_VALUE - 8L)
+        next = Math.min(Integer.MAX_VALUE - 8L, next * 2);
+      if (position >= next) { budgetMiss(); return; }
+      indexLength = (int) next;
     }
+    if (failure) {
+      charge = ParseContext.failureMemoCharge(entry.diagnostic, maxFailureEntryBytes);
+      int count = failureEntryCount - (old != null && old.tokens == null ? 1 : 0);
+      long retained = failureRetainedBytes - (old == null ? 0 : old.failureCharge);
+      if (charge > maxFailureEntryBytes || charge > maxFailureBytes - retained
+          || count >= maxFailureEntries
+          // The shared position index also has a finite failure-driven growth ceiling.
+          || indexLength > entryChainByPosition.length && 8L * indexLength > maxFailureBytes) {
+        budgetMiss();
+        return;
+      }
+    }
+    // The public put surface may receive an already indexed outcome. Share its
+    // immutable payload, never its intrusive index links, with another key.
+    if (entry.indexedKey != null)
+      entry = new Entry(entry.diagnostic, entry.tokens, entry.endConsumed, entry.endMatched,
+          entry.chosenChild, entry.choices);
+    if (indexLength > entryChainByPosition.length)
+      entryChainByPosition = java.util.Arrays.copyOf(entryChainByPosition, indexLength);
+    if (old != null) {
+      unlink(old);
+      if (old.tokens == null) {
+        failureEntryCount--;
+        failureRetainedBytes -= old.failureCharge;
+      }
+    } else {
+      entryCount++;
+      if (entryCount > maxEntryCount) maxEntryCount = entryCount;
+    }
+    if (byKey == null) {
+      byKey = new HashMap<>();
+      entryByPositionByParser.put(parser, byKey);
+    }
+    byKey.put(positionKey, entry);
+    entry.failureCharge = charge;
+    if (failure) {
+      failureEntryCount++;
+      failureRetainedBytes += charge;
+    }
+    if (!evictionEnabled) return;
     entry.indexedParser = parser;
     entry.indexedKey = positionKey;
     entry.nextAtPosition = entryChainByPosition[position];
+    if (entry.nextAtPosition != null) entry.nextAtPosition.previousAtPosition = entry;
     entryChainByPosition[position] = entry;
+  }
+
+  private void budgetMiss() {
+    if (failureBudgetMisses != Long.MAX_VALUE) failureBudgetMisses++;
+  }
+
+  /** Replacement must not leave the old payload reachable through the eviction index. */
+  private void unlink(Entry entry) {
+    if (entry.indexedKey == null) return;
+    Entry previous = entry.previousAtPosition, next = entry.nextAtPosition;
+    if (previous == null) entryChainByPosition[entry.indexedKey.consumed()] = next;
+    else previous.nextAtPosition = next;
+    if (next != null) next.previousAtPosition = previous;
+    entry.previousAtPosition = null;
+    entry.nextAtPosition = null;
+    entry.indexedParser = null;
+    entry.indexedKey = null;
   }
 
   /**
@@ -329,9 +442,14 @@ public final class PackratMemoTable {
       while (entry != null) {
         Entry next = entry.nextAtPosition;
         entry.nextAtPosition = null;
+        entry.previousAtPosition = null;
         Map<PositionKey, Entry> byKey = entryByPositionByParser.get(entry.indexedParser);
         if (byKey != null && byKey.remove(entry.indexedKey, entry)) {
           entryCount--;
+          if (entry.tokens == null) {
+            failureEntryCount--;
+            failureRetainedBytes -= entry.failureCharge;
+          }
           evictedCount++;
           if (byKey.isEmpty()) entryByPositionByParser.remove(entry.indexedParser);
         }
@@ -366,6 +484,11 @@ public final class PackratMemoTable {
   void setWindow(int positions) {
     window = positions;
   }
+
+  /** Failure payload charge retained by this cache, separate from successes and process RSS. */
+  public long failureRetainedBytes() { return failureRetainedBytes; }
+  public int failureEntryCount() { return failureEntryCount; }
+  public long failureBudgetMisses() { return failureBudgetMisses; }
 
   public int failureHits() { return failureHits; }
   public int successHits() { return successHits; }

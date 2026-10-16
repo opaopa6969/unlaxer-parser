@@ -1,5 +1,7 @@
 package org.unlaxer.dsl.codegen;
 
+import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
+
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -14,16 +16,18 @@ final class CaptureBindingPlan {
     private final Map<Object, List<String>> bindings = new IdentityHashMap<>();
     private final Map<String, List<Site>> sites = new LinkedHashMap<>();
     private final String ruleName;
+    final boolean nested;
     private int nextId;
 
     CaptureBindingPlan(RuleDecl rule) {
         ruleName = rule.name();
+        nested = NestedCaptures.enabled(rule);
         visit(rule.body());
     }
 
     CaptureBindingPlan(RuleDecl rule, SemanticCardinality semantics) {
         this(rule);
-        markSemanticValues(rule.body(), semantics);
+        if (!nested) markSemanticValues(rule.body(), semantics);
     }
 
     private void markSemanticValues(RuleBody body, SemanticCardinality semantics) {
@@ -41,7 +45,7 @@ final class CaptureBindingPlan {
     }
 
     private void markSemanticValues(AtomicElement element, SemanticCardinality semantics) {
-        if (element instanceof GroupElement group) {
+        if (element instanceof TransparentElement group) {
             markSemanticValues(group.body(), semantics);
         } else if (element instanceof OptionalElement optional) {
             markSemanticItem(optional.body(), semantics);
@@ -109,7 +113,7 @@ final class CaptureBindingPlan {
                     String id = ruleName + ":" + nextId++;
                     sites.computeIfAbsent(name, ignored -> new ArrayList<>())
                         .add(new Site(id, annotated.element()));
-                    bindValues(annotated.element(), id);
+                    if (nested) bind(annotated.element(), id); else bindValues(annotated.element(), id);
                 });
                 visit(annotated.element());
             });
@@ -119,7 +123,7 @@ final class CaptureBindingPlan {
     }
 
     private void visit(AtomicElement element) {
-        if (element instanceof GroupElement group) {
+        if (element instanceof TransparentElement group) {
             visit(group.body());
         } else if (element instanceof OptionalElement optional) {
             visit(optional.body());

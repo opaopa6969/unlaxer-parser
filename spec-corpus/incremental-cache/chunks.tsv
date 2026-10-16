@@ -1,0 +1,12 @@
+# id delimiters source chunks-separated-by-pipe (~ means empty source/list)
+empty	;	~	~
+no-delimiter	~	a;b	a;b
+commas	,	a,b,c,	a,|b,|c,
+semicolon	;	a;b;c	a;|b;|c
+single-quote	;	'a;b';c;	'a;b';|c;
+double-quote	;	"a;b";c;	"a;b";|c;
+escaped-quote	;	'a\';b';c;	'a\';b';|c;
+crlf	;	a;\r\nb;	a;|\r\nb;
+supplementary	;	😀;é;	😀;|é;
+supplementary-delimiter	😀	a😀b	a😀b
+multiple	,;	a,b;c	a,|b;|c

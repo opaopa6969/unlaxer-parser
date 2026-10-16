@@ -1,5 +1,7 @@
 package org.unlaxer.dsl.tools.railroad;
 
+import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -278,7 +280,7 @@ public class RailroadMain {
         } else if (elem instanceof SeparatedElement sepElem) {
             collectReferences(sepElem.element(), refs);
             collectReferences(sepElem.separator(), refs);
-        } else if (elem instanceof GroupElement grpElem) {
+        } else if (elem instanceof TransparentElement grpElem) {
             collectReferences(grpElem.body(), refs);
         }
     }

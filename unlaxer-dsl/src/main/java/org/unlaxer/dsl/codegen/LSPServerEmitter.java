@@ -1,5 +1,7 @@
 package org.unlaxer.dsl.codegen;
 
+import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
+
 import org.unlaxer.dsl.bootstrap.UBNFAST.AnnotatedElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AtomicElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ChoiceBody;
@@ -50,7 +52,7 @@ class LSPServerEmitter {
         StringBuilder kwBuf = new StringBuilder("private static final List<String> KEYWORDS = List.of(");
         for (int i = 0; i < keywords.size(); i++) {
             if (i > 0) kwBuf.append(", ");
-            kwBuf.append("\"").append(keywords.get(i)).append("\"");
+            kwBuf.append("\"").append(ParserCodegenUtil.escapeString(keywords.get(i))).append("\"");
         }
         kwBuf.append(");");
         w.line(kwBuf.toString());
@@ -59,7 +61,16 @@ class LSPServerEmitter {
         w.line("protected LanguageClient client;");
         w.line("protected final Map<String, DocumentState> documents = new HashMap<>();");
         w.line("protected final Map<String, Long> documentVersions = new HashMap<>();");
+        w.line("private final org.unlaxer.parser.incremental.SnapshotParseCache<ParseResult> parseCache = new org.unlaxer.parser.incremental.SnapshotParseCache<>(128, 1_048_576, value -> value);");
+        w.line("public org.unlaxer.parser.incremental.SnapshotParseCache.Stats parseCacheStats() { return parseCache.stats(); }");
+        w.line("private org.unlaxer.parser.incremental.SnapshotParseCache.Revisions parseCacheRevisions;");
+        w.line("public void invalidateParseCache() { parseCache.invalidateAll(); parseCacheRevisions = null; }");
+        w.line("protected String parseStateRevision() { return \"\"; }");
         w.line("private volatile boolean shutdownRequested;");
+        w.line("private volatile boolean initialized;");
+        w.line("private boolean initializedNotificationReceived;");
+        w.line("private boolean semanticMultiline, semanticOverlapping;");
+        w.line("private volatile SemanticTokensLegend semanticTokenLegend = new SemanticTokensLegend(List.of(\"valid\", \"invalid\"), List.of());");
         w.line("private final CompletableFuture<Integer> exitStatus = new CompletableFuture<>();");
         w.blankLine();
 
@@ -82,7 +93,51 @@ class LSPServerEmitter {
     static void emitLifecycleMethods(IndentedWriter w, String serverClass, boolean hasCatalog) {
         // initialize()
         w.line("@Override");
-        w.line("public CompletableFuture<InitializeResult> initialize(InitializeParams params) {");
+        w.line("public synchronized CompletableFuture<InitializeResult> initialize(InitializeParams params) {");
+        w.indent();
+        w.line("if (hasStopped()) return stoppedRequest();");
+        w.line("if (initialized) return lifecycleError(-32600, \"Server already initialized\");");
+        w.line("return configureServer(params).thenApply(result -> { initialized = true; return result; });");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
+        w.line("@org.eclipse.lsp4j.jsonrpc.services.JsonRequest(\"unlaxer/configure\")");
+        w.line("public synchronized CompletableFuture<InitializeResult> configure(InitializeParams params) {");
+        w.indent();
+        w.line("if (hasStopped()) return stoppedRequest();");
+        w.line("if (!initialized) return lifecycleError(-32002, \"Server not initialized\");");
+        w.line("return configureServer(params);");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
+        w.line("private CompletableFuture<InitializeResult> configureServer(InitializeParams params) {");
+        w.indent();
+        w.line("var previousProfile = selectedLanguageProfile;");
+        w.line("var previousLegend = semanticTokenLegend;");
+        w.line("boolean previousMultiline = semanticMultiline, previousOverlapping = semanticOverlapping;");
+        if (hasCatalog) w.line("var previousCatalog = catalogResolver;");
+        w.line("try {");
+        w.indent();
+        w.line("return buildConfiguration(params).whenComplete((result, failure) -> {");
+        w.line("    if (failure != null) {");
+        w.line("        selectedLanguageProfile = previousProfile; semanticTokenLegend = previousLegend;");
+        w.line("        semanticMultiline = previousMultiline; semanticOverlapping = previousOverlapping;");
+        if (hasCatalog) w.line("        catalogResolver = previousCatalog;");
+        w.line("    } else { invalidateParseCache(); }");
+        w.line("});");
+        w.dedent();
+        w.line("} catch (RuntimeException failure) {");
+        w.indent();
+        w.line("selectedLanguageProfile = previousProfile; semanticTokenLegend = previousLegend;");
+        w.line("semanticMultiline = previousMultiline; semanticOverlapping = previousOverlapping;");
+        if (hasCatalog) w.line("catalogResolver = previousCatalog;");
+        w.line("return CompletableFuture.failedFuture(failure);");
+        w.dedent();
+        w.line("}");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
+        w.line("private CompletableFuture<InitializeResult> buildConfiguration(InitializeParams params) {");
         w.indent();
         w.line("if (hasStopped()) return stoppedRequest();");
         w.line("try { selectedLanguageProfile = readLanguageProfile(params); }");
@@ -108,6 +163,13 @@ class LSPServerEmitter {
         w.line("configureAdditionalCapabilities(capabilities);");
         w.line("configureLanguageQueryCapabilities(capabilities);");
         w.line("applyLanguageProfile(capabilities);");
+        w.line("var textCapabilities = params == null || params.getCapabilities() == null ? null : params.getCapabilities().getTextDocument();");
+        w.line("var semantic = textCapabilities == null ? null : textCapabilities.getSemanticTokens();");
+        w.line("semanticMultiline = semantic != null && Boolean.TRUE.equals(semantic.getMultilineTokenSupport());");
+        w.line("semanticOverlapping = semantic != null && Boolean.TRUE.equals(semantic.getOverlappingTokenSupport());");
+        w.line("var semanticProvider = capabilities.getSemanticTokensProvider();");
+        w.line("var legend = semanticProvider == null ? new SemanticTokensLegend(List.of(), List.of()) : semanticProvider.getLegend();");
+        w.line("semanticTokenLegend = legend == null ? null : new SemanticTokensLegend(List.copyOf(legend.getTokenTypes()), List.copyOf(legend.getTokenModifiers()));");
         w.line("return CompletableFuture.completedFuture(new InitializeResult(capabilities));");
         w.dedent();
         w.line("}");
@@ -118,6 +180,7 @@ class LSPServerEmitter {
         w.line("public CompletableFuture<Object> shutdown() {");
         w.indent();
         w.line("if (hasStopped()) return stoppedRequest();");
+        w.line("if (!initialized) return lifecycleError(-32002, \"Server not initialized\");");
         w.line("shutdownRequested = true;");
         w.line("return CompletableFuture.completedFuture(null);");
         w.dedent();
@@ -135,15 +198,35 @@ class LSPServerEmitter {
         w.line("        new org.eclipse.lsp4j.jsonrpc.messages.ResponseError(org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode.InvalidRequest, \"Server has shut down\", null)));");
         w.line("}");
         w.blankLine();
+        w.line("private static <T> CompletableFuture<T> lifecycleError(int code, String message) {");
+        w.line("    return CompletableFuture.failedFuture(new org.eclipse.lsp4j.jsonrpc.ResponseErrorException(");
+        w.line("        new org.eclipse.lsp4j.jsonrpc.messages.ResponseError(code, message, null)));");
+        w.line("}");
+        w.line("private synchronized boolean acceptInitializedNotification() {");
+        w.line("    if (initializedNotificationReceived) return false;");
+        w.line("    initializedNotificationReceived = true; return true;");
+        w.line("}");
+        w.blankLine();
         w.line("public final org.eclipse.lsp4j.jsonrpc.Endpoint lifecycleEndpoint() {");
         w.indent();
         w.line("var delegate = org.eclipse.lsp4j.jsonrpc.services.ServiceEndpoints.toEndpoint(this);");
+        w.line("var methods = org.eclipse.lsp4j.jsonrpc.services.ServiceEndpoints.getSupportedMethods(getClass());");
         w.line("return new org.eclipse.lsp4j.jsonrpc.Endpoint() {");
         w.line("    @Override public CompletableFuture<?> request(String method, Object params) {");
-        w.line("        return hasStopped() ? stoppedRequest() : delegate.request(method, params);");
+        w.line("        if (hasStopped()) return stoppedRequest();");
+        w.line("        if (initialized && \"initialize\".equals(method)) return lifecycleError(-32600, \"Server already initialized\");");
+        w.line("        if (!initialized && !\"initialize\".equals(method)) return lifecycleError(-32002, \"Server not initialized\");");
+        w.line("        var descriptor = methods.get(method);");
+        w.line("        if (descriptor != null && descriptor.isNotification()) return lifecycleError(-32600, \"Notification method requires a notification\");");
+        w.line("        return delegate.request(method, params);");
         w.line("    }");
         w.line("    @Override public void notify(String method, Object params) {");
-        w.line("        if (\"exit\".equals(method) || !hasStopped()) delegate.notify(method, params);");
+        w.line("        if (\"exit\".equals(method)) { delegate.notify(method, params); return; }");
+        w.line("        if (!initialized || hasStopped()) return;");
+        w.line("        var descriptor = methods.get(method);");
+        w.line("        if (descriptor != null && !descriptor.isNotification()) return;");
+        w.line("        if (\"initialized\".equals(method) && !acceptInitializedNotification()) return;");
+        w.line("        delegate.notify(method, params);");
         w.line("    }");
         w.line("};");
         w.dedent();
@@ -189,7 +272,7 @@ class LSPServerEmitter {
         w.line("private ParseResult doParse(String content) {");
         w.indent();
         w.line("Parser parser = " + parsersClass + ".getRootParser();");
-        w.line("ParseContext context = new ParseContext(createRootSourceCompat(content));");
+        w.line("try (ParseContext context = new ParseContext(createRootSourceCompat(content))) {");
         if (hasScopeStore) {
             w.line("ScopeStore.registerDispatcher(context);");
         }
@@ -217,17 +300,27 @@ class LSPServerEmitter {
         w.line("List<String> expectedParsers = failure.getExpectedParsers().stream()");
         w.line("    .filter(s -> s != null && !s.isBlank()).distinct().sorted().limit(20).toList();");
         w.line("String deepestMatchedRule = failure.getDeepestMatchedRule();");
-        w.line("context.close();");
         w.line("return new ParseResult(result.isSucceeded(), consumedLength, content.length(),");
         w.line("    errorOffset, expectedTokens, expectedHints, expectedParsers, deepestMatchedRule);");
+        w.line("}");
         w.dedent();
         w.line("}");
         w.blankLine();
 
-        // parseDocument() — フルパース（didOpen 用）
+        w.line("private ParseResult cachedParse(String uri, String content, long version) {");
+        w.line("    var snapshot = new org.unlaxer.source.DocumentSnapshot(uri, version, content);");
+        w.line("    if (!parseCacheEnabled()) { invalidateParseCache(); return doParse(content); }");
+        w.line("    String profile = selectedLanguageProfile == null ? \"\" : selectedLanguageProfile.profile().canonicalTsv();");
+        w.line("    var revisions = new org.unlaxer.parser.incremental.SnapshotParseCache.Revisions(\"" + parsersClass + "\", profile, parseStateRevision());");
+        w.line("    if (!revisions.equals(parseCacheRevisions)) { parseCache.invalidateAll(); parseCacheRevisions = revisions; }");
+        w.line("    return parseCache.getOrCompute(snapshot, revisions, () -> doParse(content));");
+        w.line("}");
+        w.blankLine();
+
+        // parseDocument() — 全文 snapshot cache（didOpen / didSave 用）
         w.line("public ParseResult parseDocument(String uri, String content) {");
         w.indent();
-        w.line("ParseResult parseResult = doParse(content);");
+        w.line("ParseResult parseResult = cachedParse(uri, content, documentVersions.getOrDefault(uri, 0L));");
         w.line("documents.put(uri, new DocumentState(uri, content, parseResult, new IncrementalParseCache()));");
         w.line("if (client != null) {");
         w.indent();
@@ -239,35 +332,23 @@ class LSPServerEmitter {
         w.line("}");
         w.blankLine();
 
-        // parseDocumentIncremental() — チャンクキャッシュを活用（didChange 用）
+        // Preserve both public extension hooks, while a throwing hook cannot advance the document.
+        w.line("private ParseResult parseNotifiedDocument(String uri, String content, long version, boolean incremental) {");
+        w.line("    Long previousVersion = documentVersions.put(uri, version);");
+        w.line("    DocumentState previous = documents.get(uri);");
+        w.line("    try { return incremental ? parseDocumentIncremental(uri, content) : parseDocument(uri, content); }");
+        w.line("    catch (RuntimeException | Error failure) {");
+        w.line("        if (previousVersion == null) documentVersions.remove(uri); else documentVersions.put(uri, previousVersion);");
+        w.line("        if (previous == null) documents.remove(uri); else documents.put(uri, previous);");
+        w.line("        parseCache.invalidate(uri);");
+        w.line("        throw failure;");
+        w.line("    }");
+        w.line("}");
+        w.blankLine();
+
+        // Edited snapshots are parsed in full; no chunk-based CST reuse is claimed.
         w.line("public ParseResult parseDocumentIncremental(String uri, String content) {");
-        w.indent();
-        w.line("DocumentState previous = documents.get(uri);");
-        w.line("if (previous != null && previous.content().equals(content)) {");
-        w.indent();
-        w.line("if (client != null) publishDiagnostics(uri, content, previous.parseResult());");
-        w.line("return previous.parseResult();");
-        w.dedent();
-        w.line("}");
-        w.line("IncrementalParseCache cache = previous != null ? previous.cache() : new IncrementalParseCache();");
-        w.line("List<String> chunks = cache.splitIntoChunks(content, \";\");");
-        // A set of cached chunks does not identify the order, multiplicity or current document.
-        w.line("ParseResult parseResult = doParse(content);");
-        w.line("int offset = 0;");
-        w.line("for (String chunk : chunks) {");
-        w.indent();
-        w.line("cache.put(chunk, null, offset);");
-        w.line("offset += chunk.length();");
-        w.dedent();
-        w.line("}");
-        w.line("documents.put(uri, new DocumentState(uri, content, parseResult, cache));");
-        w.line("if (client != null) {");
-        w.indent();
-        w.line("publishDiagnostics(uri, content, parseResult);");
-        w.dedent();
-        w.line("}");
-        w.line("return parseResult;");
-        w.dedent();
+        w.line("    return parseDocument(uri, content);");
         w.line("}");
         w.blankLine();
 
@@ -467,7 +548,9 @@ class LSPServerEmitter {
         w.line("}");
         w.blankLine();
 
-        w.line("// Hook: additional semantic tokens (for embedded languages like Java code blocks)");
+        LSPSemanticTokenEmitter.emitValidation(w);
+        w.line("// Hook: full UTF-16 LSP data indexed by the advertised legend and negotiated client support.");
+        w.line("// Invalid data fails the request with InternalError; null preserves the legacy empty result.");
         w.line("protected int[] additionalSemanticTokenData(String uri, String documentContent) {");
         w.indent();
         w.line("return new int[0];");
@@ -663,15 +746,15 @@ class LSPServerEmitter {
         w.line("@Override");
         w.line("public void didOpen(DidOpenTextDocumentParams params) {");
         w.indent();
-        w.line("if (server.hasStopped()) return;");
+        w.line("if (!server.initialized || server.hasStopped()) return;");
         w.line("String uri = params.getTextDocument().getUri();");
         w.line("long version = params.getTextDocument().getVersion();");
         w.line("if (version < 0 || server.documentVersions.containsKey(uri) && version <= server.documentVersions.get(uri)) return;");
         w.line("try { new org.unlaxer.source.DocumentSnapshot(uri, version, params.getTextDocument().getText()); } catch (IllegalArgumentException invalid) { return; }");
-        w.line("server.documentVersions.put(uri, version);");
-        w.line("server.parseDocument(");
+        w.line("server.parseCache.invalidate(uri);");
+        w.line("server.parseNotifiedDocument(");
         w.line("    params.getTextDocument().getUri(),");
-        w.line("    params.getTextDocument().getText());");
+        w.line("    params.getTextDocument().getText(), version, false);");
         w.dedent();
         w.line("}");
         w.blankLine();
@@ -679,7 +762,7 @@ class LSPServerEmitter {
         w.line("@Override");
         w.line("public void didChange(DidChangeTextDocumentParams params) {");
         w.indent();
-        w.line("if (server.hasStopped()) return;");
+        w.line("if (!server.initialized || server.hasStopped()) return;");
         w.line("String uri = params.getTextDocument().getUri();");
         w.line("Integer version = params.getTextDocument().getVersion();");
         w.line("Long previous = server.documentVersions.get(uri);");
@@ -687,8 +770,8 @@ class LSPServerEmitter {
         w.line("for (var change : params.getContentChanges()) if (change.getRange() != null || change.getText() == null) return;");
         w.line("String content = params.getContentChanges().get(params.getContentChanges().size() - 1).getText();");
         w.line("try { new org.unlaxer.source.DocumentSnapshot(uri, version, content); } catch (IllegalArgumentException invalid) { return; }");
-        w.line("server.documentVersions.put(uri, version.longValue());");
-        w.line("server.parseDocumentIncremental(uri, content);");
+        w.line("server.parseCache.invalidate(uri);");
+        w.line("server.parseNotifiedDocument(uri, content, version.longValue(), true);");
         w.dedent();
         w.line("}");
         w.blankLine();
@@ -696,8 +779,9 @@ class LSPServerEmitter {
         w.line("@Override");
         w.line("public void didClose(DidCloseTextDocumentParams params) {");
         w.indent();
-        w.line("if (server.hasStopped()) return;");
+        w.line("if (!server.initialized || server.hasStopped()) return;");
         w.line("server.documents.remove(params.getTextDocument().getUri());");
+        w.line("server.parseCache.invalidate(params.getTextDocument().getUri());");
         w.line("server.documentVersions.remove(params.getTextDocument().getUri());");
         w.line("server.clearLanguageDiagnostics(params.getTextDocument().getUri());");
         w.dedent();
@@ -705,7 +789,7 @@ class LSPServerEmitter {
         w.blankLine();
 
         w.line("@Override");
-        w.line("public void didSave(DidSaveTextDocumentParams params) { if (server.hasStopped()) return; var state = server.documents.get(params.getTextDocument().getUri()); if (state != null) server.parseDocument(state.uri(), state.content()); }");
+        w.line("public void didSave(DidSaveTextDocumentParams params) { if (!server.initialized || server.hasStopped()) return; var state = server.documents.get(params.getTextDocument().getUri()); if (state != null) server.parseDocument(state.uri(), state.content()); }");
         w.blankLine();
 
         // completion()
@@ -714,6 +798,7 @@ class LSPServerEmitter {
         w.line("        CompletionParams params) {");
         w.indent();
         w.line("if (server.hasStopped()) return server.stoppedRequest();");
+        w.line("if (!server.initialized) return lifecycleError(-32002, \"Server not initialized\");");
         w.line("var queryItems = server.languageCompletionItems(params);");
         w.line("if (queryItems != null) return CompletableFuture.completedFuture(Either.forLeft(queryItems));");
         w.line("if (!server.profileAllows(\"COMPLETION\")) return CompletableFuture.completedFuture(Either.forLeft(List.of()));");
@@ -752,6 +837,7 @@ class LSPServerEmitter {
         w.line("public CompletableFuture<Hover> hover(HoverParams params) {");
         w.indent();
         w.line("if (server.hasStopped()) return server.stoppedRequest();");
+        w.line("if (!server.initialized) return lifecycleError(-32002, \"Server not initialized\");");
         w.line("var queryHover = server.languageHover(params);");
         w.line("if (queryHover != null) return CompletableFuture.completedFuture(queryHover.orElse(null));");
         w.line("if (!server.profileAllows(\"HOVER\")) return CompletableFuture.completedFuture(null);");
@@ -788,6 +874,7 @@ class LSPServerEmitter {
         w.line("public CompletableFuture<SemanticTokens> semanticTokensFull(SemanticTokensParams params) {");
         w.indent();
         w.line("if (server.hasStopped()) return server.stoppedRequest();");
+        w.line("if (!server.initialized) return lifecycleError(-32002, \"Server not initialized\");");
         w.line("String uri = params.getTextDocument().getUri();");
         w.line("DocumentState state = server.documents.get(uri);");
         w.line("if (state == null) {");
@@ -795,15 +882,17 @@ class LSPServerEmitter {
         w.line("return CompletableFuture.completedFuture(new SemanticTokens(Collections.emptyList()));");
         w.dedent();
         w.line("}");
-        w.line("int[] tokenData = server.additionalSemanticTokenData(uri, state.content());");
-        w.line("if (tokenData != null && tokenData.length > 0) {");
+        w.line("try {");
         w.indent();
-        w.line("List<Integer> data = new ArrayList<>();");
-        w.line("for (int v : tokenData) { data.add(v); }");
-        w.line("return CompletableFuture.completedFuture(new SemanticTokens(data));");
+        w.line("int[] tokenData = server.additionalSemanticTokenData(uri, state.content());");
+        w.line("return CompletableFuture.completedFuture(new SemanticTokens(validateSemanticTokenData(state.content(), tokenData, server.semanticTokenLegend, server.semanticMultiline, server.semanticOverlapping)));");
+        w.dedent();
+        w.line("} catch (RuntimeException invalid) {");
+        w.indent();
+        w.line("return CompletableFuture.failedFuture(new org.eclipse.lsp4j.jsonrpc.ResponseErrorException(");
+        w.line("    new org.eclipse.lsp4j.jsonrpc.messages.ResponseError(org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode.InternalError, \"Invalid semantic token provider result\", null)));");
         w.dedent();
         w.line("}");
-        w.line("return CompletableFuture.completedFuture(new SemanticTokens(Collections.emptyList()));");
         w.dedent();
         w.line("}");
         w.dedent();
@@ -958,8 +1047,9 @@ class LSPServerEmitter {
 
     private static void collectFromElement(AtomicElement element, Set<String> acc) {
         if (element instanceof TerminalElement t) {
-            acc.add(stripQuotes(t.value()));
-        } else if (element instanceof GroupElement g) {
+            // TerminalElement already contains the decoded literal, including genuine quotes.
+            acc.add(t.value());
+        } else if (element instanceof TransparentElement g) {
             collectFromBody(g.body(), acc);
         } else if (element instanceof OptionalElement o) {
             collectFromBody(o.body(), acc);
@@ -968,12 +1058,5 @@ class LSPServerEmitter {
         } else {
 
         }
-    }
-
-    private static String stripQuotes(String value) {
-        if (value.length() >= 2 && value.startsWith("'") && value.endsWith("'")) {
-            return value.substring(1, value.length() - 1);
-        }
-        return value;
     }
 }

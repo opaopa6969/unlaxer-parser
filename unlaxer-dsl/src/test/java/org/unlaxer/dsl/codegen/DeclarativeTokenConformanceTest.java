@@ -379,10 +379,13 @@ public class DeclarativeTokenConformanceTest {
     }
 
     @Test public void generatedProgramsPreserveCursorsCapturesSpansAndRollback() throws Exception {
+        verifyRuntimeCorpus(repo.resolve("spec-corpus/declarative-tokens"), "rust-declarative-token-runtime.tsv");
+    }
+
+    void verifyRuntimeCorpus(Path fixtures, String reportFile) throws Exception {
         if (!Boolean.getBoolean("rustConformance")) System.out.println(
             "[assumption] DeclarativeTokenConformanceTest requires -DrustConformance=true");
         assumeTrue(Boolean.getBoolean("rustConformance"));
-        Path fixtures = repo.resolve("spec-corpus/declarative-tokens");
         JsonArray corpus = JsonParser.parseString(Files.readString(fixtures.resolve("runtime.json"))).getAsJsonArray();
         Path library = temporary.getRoot().toPath().resolve("libunlaxer_runtime.rlib");
         success(run(List.of("rustc", "--edition=2021", "--crate-type=rlib", "--crate-name=unlaxer_runtime",
@@ -390,7 +393,7 @@ public class DeclarativeTokenConformanceTest {
         success(run(List.of("cargo", "build", "--locked", "--manifest-path", repo.resolve("rust/Cargo.toml").toString(),
             "-p", "unlaxer-generator"), "", false));
         Path nativeGenerator = repo.resolve("rust/target/debug/unlaxer");
-        List<String> report = new ArrayList<>(List.of("fixture\tinput_json\tprefix\tast\tresult"));
+        List<String> report = new ArrayList<>(List.of("fixture\tinput_json\tprefix\tcp_utf16_utf8\tast\tresult"));
         for (var fixtureValue : corpus) {
             JsonObject fixture = fixtureValue.getAsJsonObject();
             String name = fixture.get("name").getAsString();
@@ -411,7 +414,7 @@ public class DeclarativeTokenConformanceTest {
             for (var file : emitted) assertEquals(name + "/" + file.relativePath(), file.content(),
                 Files.readString(generated.resolve(file.relativePath())));
             Path main = directory.resolve("main.rs");
-            Files.writeString(main, rustProbe(name.equals("fence")));
+            Files.writeString(main, rustProbe(name.equals("fence"), true));
             Path binary = directory.resolve("probe");
             success(run(List.of("rustc", "--edition=2021", "--extern", "unlaxer_runtime=" + library,
                 main.toString(), "-o", binary.toString()), "", false));
@@ -437,6 +440,15 @@ public class DeclarativeTokenConformanceTest {
                     }
                     assertEquals(name + "/" + text, row.get("prefix"), prefix);
                     assertEquals(name + "/" + text, prefix, actualRust.get("prefix"));
+                    if (row.has("offsets")) {
+                        int cp = prefix.get(1).getAsInt();
+                        int utf16 = text.offsetByCodePoints(0, cp);
+                        JsonArray offsets = new JsonArray();
+                        offsets.add(cp); offsets.add(utf16);
+                        offsets.add(text.substring(0, utf16).getBytes(StandardCharsets.UTF_8).length);
+                        assertEquals(name + "/" + text, row.get("offsets"), offsets);
+                        assertEquals(name + "/" + text, offsets, actualRust.get("offsets"));
+                    }
                     if (fixture.has("oracle")) {
                         Parser oracle = switch (fixture.get("oracle").getAsString()) {
                             case "number" -> new org.unlaxer.parser.elementary.NumberParser();
@@ -471,11 +483,11 @@ public class DeclarativeTokenConformanceTest {
                         assertEquals(name + "/" + text, expected, ast);
                     }
                     assertEquals(name + "/" + text, ast, actualRust.get("ast"));
-                    report.add(name + "\t" + row.get("input") + "\t" + prefix + "\t" + ast + "\tequal");
+                    report.add(name + "\t" + row.get("input") + "\t" + prefix + "\t" + actualRust.get("offsets") + "\t" + ast + "\tequal");
                 }
             }
         }
-        Files.write(Path.of("target/rust-declarative-token-runtime.tsv"), report);
+        Files.write(Path.of("target", reportFile), report);
         for (String declaration : List.of(
                 "token T ::= MISSING;", "token T ::= T;", "token T ::= SAME_AS(x);",
                 "token T ::= [CAPTURE(x,'a')] SAME_AS(x);",
@@ -543,6 +555,10 @@ public class DeclarativeTokenConformanceTest {
     }
 
     private String rustProbe(boolean fenceOracle) {
+        return rustProbe(fenceOracle, false);
+    }
+
+    private String rustProbe(boolean fenceOracle, boolean emitOffsets) {
         return """
             mod generated;
             use std::io::{self, BufRead};
@@ -560,7 +576,14 @@ public class DeclarativeTokenConformanceTest {
                         assert_eq!((ok, context.position(), context.matched_position()),
                             (old_ok, legacy.position(), legacy.matched_position()), "{input:?}");
                     }
-                    print!(r#"{{"prefix":[{},{},{}],"ast":"#, ok, context.position(), context.matched_position());
+                    let cp = context.position();
+                    print!("{{");
+                    if EMIT_OFFSETS {
+                        let snapshot = unlaxer_runtime::source::Snapshot::new("memory:probe", 0, &input).unwrap();
+                        print!(r#""offsets":[{},{},{}],"#,
+                            cp, snapshot.utf16(cp).unwrap(), snapshot.utf8(cp).unwrap());
+                    }
+                    print!(r#""prefix":[{},{},{}],"ast":"#, ok, cp, context.matched_position());
                     match generated::parser::parse_tree_detailed(&input) {
                         Ok(tree) => {
                             let ast = generated::mapper::map(&tree).unwrap();
@@ -572,7 +595,8 @@ public class DeclarativeTokenConformanceTest {
                     println!("}}");
                 }
             }
-            """.replace("FENCE_ORACLE", Boolean.toString(fenceOracle));
+            """.replace("FENCE_ORACLE", Boolean.toString(fenceOracle))
+                .replace("EMIT_OFFSETS", Boolean.toString(emitOffsets));
     }
 
     private record Run(int code, String output) {}

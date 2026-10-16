@@ -1,0 +1,7 @@
+# id	word_utf8_hex	code_points	utf16	utf8
+ascii	61	1	1	1
+emoji	f09f9880	1	2	4
+family	f09f91a8e2808df09f91a9e2808df09f91a7e2808df09f91a6	7	11	25
+empty	-	0	0	0
+combining	65cc81	2	2	3
+kelvin	e284aa	1	1	3

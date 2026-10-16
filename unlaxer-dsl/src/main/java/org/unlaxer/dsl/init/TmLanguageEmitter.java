@@ -1,5 +1,7 @@
 package org.unlaxer.dsl.init;
 
+import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
+
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -149,7 +151,7 @@ public final class TmLanguageEmitter {
     private static void collectFromElement(AtomicElement element, Set<String> acc) {
         if (element instanceof TerminalElement t) {
             acc.add(stripQuotes(t.value()));
-        } else if (element instanceof GroupElement g) {
+        } else if (element instanceof TransparentElement g) {
             collectFromBody(g.body(), acc);
         } else if (element instanceof OptionalElement o) {
             collectFromBody(o.body(), acc);

@@ -10,6 +10,11 @@ import org.unlaxer.parser.Parsers;
 
 public interface ChainInterface extends Parser{
 
+    /** Override element validation without inserting another parser/CST/diagnostic boundary. */
+    default Parsed parseChainElement(Parser child, ParseContext context, TokenKind kind, boolean invert) {
+        return child.parse(context, kind, invert);
+    }
+
 	// TransactionListener を実装する parser への通知は、begin/commit/rollback の
 	// 発火元である TransactionListenerContainer が正しいペイロード
 	// (collect 済みトークン) で自己通知する。ここでは通知しない。
@@ -49,7 +54,7 @@ public interface ChainInterface extends Parser{
 				PackratMemoTable.memoizeFailure(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
 				return Parsed.FAILED;
 			}
-			Parsed parsed = parser.parse(parseContext,tokenKind,invertMatch);
+			Parsed parsed = parseChainElement(parser, parseContext, tokenKind, invertMatch);
 
 			if(parsed.isStopped()){
 				break;
