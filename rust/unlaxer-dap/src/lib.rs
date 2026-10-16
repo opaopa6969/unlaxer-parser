@@ -107,7 +107,7 @@ pub struct Server<B> {
     backend: B,
     seq: i64,
     initialized: bool,
-    launched: bool,
+    configuration_pending: bool,
     terminated: bool,
     disconnected: bool,
     program: String,
@@ -130,7 +130,7 @@ impl<B: Backend> Server<B> {
             backend,
             seq: 0,
             initialized: false,
-            launched: false,
+            configuration_pending: false,
             terminated: false,
             disconnected: false,
             program: String::new(),
@@ -199,7 +199,7 @@ impl<B: Backend> Server<B> {
                     self.runtime_mode = runtime.into();
                     self.stop_on_entry = arguments["stopOnEntry"] == true;
                     self.arguments = arguments.clone();
-                    self.launched = true;
+                    self.configuration_pending = true;
                     self.terminated = false;
                     self.snapshot = None;
                     self.steps.clear();
@@ -230,9 +230,10 @@ impl<B: Backend> Server<B> {
                     Ok(json!({"breakpoints":results}))
                 }
                 "configurationDone" => {
-                    if !self.launched {
-                        return Err("not launched".into());
+                    if !self.configuration_pending {
+                        return Err("configurationDone requires a new launch".into());
                     }
+                    self.configuration_pending = false;
                     match self.prepare() {
                         Ok(()) => {
                             if self.stop_on_entry {
@@ -343,6 +344,7 @@ impl<B: Backend> Server<B> {
                 }
                 "disconnect" => {
                     self.disconnected = true;
+                    self.configuration_pending = false;
                     self.snapshot = None;
                     self.steps.clear();
                     self.variables.clear();

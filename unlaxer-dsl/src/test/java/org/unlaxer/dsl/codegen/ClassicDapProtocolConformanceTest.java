@@ -81,6 +81,7 @@ public class ClassicDapProtocolConformanceTest {
         try(var wire=new Wire(new ProcessBuilder(ROOT.resolve("rust/target/debug/classic-dap-fixture").toString()).redirectError(temporary.newFile("rust-stderr.log")).start())) {exercise(wire,"rust"); Files.createDirectories(Path.of("target"));Files.write(Path.of("target/classic-dap-protocol.tsv"),evidence);}
     }
     private void exercise(Wire wire,String backend)throws Exception {
+        exerciseConfigurationLifecycle(wire, backend);
         var rows=JsonParser.parseString(Files.readString(ROOT.resolve("docs/fixtures/classic-dap/ast.json"))).getAsJsonArray();assertEquals(9,rows.size());
         for(boolean startAt1:List.of(true,false)) for(int offset:List.of(0,7)) {
             assertTrue(wire.request("initialize",Map.of("adapterID","fixture","linesStartAt1",startAt1,"columnsStartAt1",startAt1)).get("supportsConfigurationDoneRequest").getAsBoolean());
@@ -129,6 +130,46 @@ public class ClassicDapProtocolConformanceTest {
         while(true){wire.request("continue",Map.of("threadId",1));var event=wire.oneOf("stopped","output");if(event.get("event").getAsString().equals("output")){wire.event("terminated");wire.event("exited");break;}}
         for(var invalid:List.of(Map.entry("stackTrace",Map.of("threadId",99)),Map.entry("scopes",Map.of("frameId",99)),Map.entry("variables",Map.of("variablesReference",99)),Map.entry("next",Map.of("threadId",1)),Map.entry("launch",Map.of("program","missing","steppingMode","unsupported")))) assertFalse(wire.response(invalid.getKey(),invalid.getValue()).get("success").getAsBoolean());
         assertFalse(wire.response("unknown-fixture-command",Map.of()).get("success").getAsBoolean());wire.request("disconnect",Map.of());
+    }
+    private void exerciseConfigurationLifecycle(Wire wire, String backend) throws Exception {
+        wire.request("initialize", Map.of("adapterID", "configuration-lifecycle"));
+        assertConfigurationRejectedWithoutChanges(wire, backend + " before launch");
+        Path program = temporary.newFile("configuration-" + backend + ".txt").toPath();
+        Files.writeString(program, "p<a><b>[]x!");
+        var arguments = Map.<String, Object>of("program", program.toString(), "runtimeMode", "ast", "stopOnEntry", true);
+        wire.request("launch", arguments); wire.event("initialized");
+        wire.request("configurationDone", Map.of()); wire.event("stopped");
+        wire.request("next", Map.of("threadId", 1)); wire.event("stopped");
+        assertConfigurationRejectedWithoutChanges(wire, backend + " while stopped after next");
+        assertFalse(wire.response("launch", Map.of("program", program.toString(), "steppingMode", "unsupported")).get("success").getAsBoolean());
+        assertConfigurationRejectedWithoutChanges(wire, backend + " after rejected launch");
+        wire.request("continue", Map.of("threadId", 1));
+        wire.event("output"); wire.event("terminated"); wire.event("exited");
+        assertConfigurationRejectedWithoutChanges(wire, backend + " after termination");
+        wire.request("launch", Map.of("program", program.resolveSibling("missing-" + UUID.randomUUID()).toString(), "runtimeMode", "ast", "stopOnEntry", true));
+        wire.event("initialized");
+        wire.request("configurationDone", Map.of());
+        assertEquals("stderr", wire.event("output").get("category").getAsString());
+        wire.event("terminated"); wire.event("exited");
+        assertConfigurationRejectedWithoutChanges(wire, backend + " after prepare failure");
+        wire.request("launch", arguments); wire.event("initialized");
+        wire.request("configurationDone", Map.of());
+        assertEquals("entry", wire.event("stopped").get("reason").getAsString());
+        assertFalse(wire.request("stackTrace", Map.of("threadId", 1)).getAsJsonArray("stackFrames").isEmpty());
+        assertTrue("all expected lifecycle events consumed", wire.pending.isEmpty());
+        System.out.println("DAP configuration lifecycle passed: " + backend + " (before launch, stopped, invalid launch, terminated, prepare failure, relaunch)");
+    }
+    private void assertConfigurationRejectedWithoutChanges(Wire wire, String context) throws Exception {
+        var stack = wire.request("stackTrace", Map.of("threadId", 1));
+        var scopes = wire.request("scopes", Map.of("frameId", 0));
+        var variables = wire.request("variables", Map.of("variablesReference", 1));
+        assertTrue(context + ": no pre-existing events", wire.pending.isEmpty());
+        assertFalse(context, wire.response("configurationDone", Map.of()).get("success").getAsBoolean());
+        // These requests also drain events emitted after the rejected response.
+        assertEquals(context, stack, wire.request("stackTrace", Map.of("threadId", 1)));
+        assertEquals(context, scopes, wire.request("scopes", Map.of("frameId", 0)));
+        assertEquals(context, variables, wire.request("variables", Map.of("variablesReference", 1)));
+        assertTrue(context + ": rejected request emitted events", wire.pending.isEmpty());
     }
     private void run(List<String> command)throws Exception {var builder=new ProcessBuilder(command).directory(ROOT.toFile()).redirectErrorStream(true);builder.environment().put("CARGO_INCREMENTAL","0");builder.environment().put("CARGO_TARGET_DIR",ROOT.resolve("rust/target").toString());Path log=temporary.newFile().toPath();builder.redirectOutput(log.toFile());var process=builder.start();try{assertTrue("timeout: "+command,process.waitFor(120,TimeUnit.SECONDS));assertEquals(command+"\n"+Files.readString(log),0,process.exitValue());}finally{if(process.isAlive())process.destroyForcibly();}}
     private static JavaFileObject source(String name,String body){return new SimpleJavaFileObject(URI.create("string:///"+name.replace('.','/')+".java"),JavaFileObject.Kind.SOURCE){@Override public CharSequence getCharContent(boolean ignore){return body;}};}

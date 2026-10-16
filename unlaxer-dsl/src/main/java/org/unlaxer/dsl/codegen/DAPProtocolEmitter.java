@@ -18,6 +18,7 @@ class DAPProtocolEmitter {
         w.line("protected String steppingMode = \"token\";");
         w.line("protected boolean stopOnEntry;");
         w.line("private boolean terminated;");
+        w.line("private boolean configurationPending;");
         w.line("private int lineBase = 1, columnBase = 1;");
         w.line("protected Map<String, Object> launchArguments = Map.of();");
         w.line("protected String sourceContent = \"\";");
@@ -70,6 +71,7 @@ class DAPProtocolEmitter {
         w.line("stepPoints = List.of(); astNodeTypes = List.of(); astNodeSpans = List.of(); astNodeCount = 0; stepIndex = 0;");
         w.line("launchArguments = proposed; pendingProgram = program; runtimeMode = runtime; steppingMode = stepping;");
         w.line("stopOnEntry = Boolean.TRUE.equals(launchArguments.get(\"stopOnEntry\"));");
+        w.line("configurationPending = true;");
         w.line("client.initialized();");
         w.line("return CompletableFuture.completedFuture(null);");
         w.dedent();
@@ -82,6 +84,8 @@ class DAPProtocolEmitter {
         w.line("@Override");
         w.line("public CompletableFuture<Void> configurationDone(ConfigurationDoneArguments args) {");
         w.indent();
+        w.line("if (!configurationPending) return CompletableFuture.failedFuture(new IllegalStateException(\"configurationDone requires a new launch\"));");
+        w.line("configurationPending = false;");
         w.line("if (!parseAndCollectSteps()) {");
         w.indent();
         w.line("return CompletableFuture.completedFuture(null); // error already sent");
@@ -422,6 +426,7 @@ class DAPProtocolEmitter {
         w.line("@Override");
         w.line("public CompletableFuture<Void> disconnect(DisconnectArguments args) {");
         w.indent();
+        w.line("configurationPending = false;");
         w.line("terminated = true; stepPoints = List.of(); astNodeTypes = List.of(); astNodeSpans = List.of(); runtimeProbeVariables = Map.of();");
         w.line("return CompletableFuture.completedFuture(null);");
         w.dedent();
