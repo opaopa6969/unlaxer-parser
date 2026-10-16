@@ -650,6 +650,23 @@ public class SnapshotRightAssocMapper {
             && capture.captureBindings().contains(binding);
     }
 
+    private static Token findFirstCaptureSite(Token token, java.util.Set<String> bindings,
+            boolean root) {
+        guardVisit(token);
+        if (token == null) return null;
+        if (token.parser instanceof SnapshotRightAssocParsers.__CaptureBinding capture) {
+            for (String binding : capture.captureBindings()) {
+                if (bindings.contains(binding)) return token;
+            }
+        }
+        if (!root && CAPTURE_BOUNDARY_PARSERS.contains(token.parser.getClass())) return null;
+        for (Token child : token.filteredChildren) {
+            Token found = findFirstCaptureSite(child, bindings, false);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
     private static List<Token> findCaptureSites(Token token, java.util.Set<String> bindings) {
         guardVisit(token);
         List<Token> result = new ArrayList<>();

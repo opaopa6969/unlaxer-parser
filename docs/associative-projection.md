@@ -41,3 +41,11 @@ cargo +1.85.0 test --locked --manifest-path rust/Cargo.toml \
 この変更は #593（親 #569）の結合演算子投影です。nested container（#583）と recursive helper（#582）は別の意味単位であり、#547 全体の完了を主張しません。
 
 #631 の `MixedRightOperands` fixture は文字列と mapped leaf の左右順、右再帰の多段入力と末尾失敗を検証します。preferred depth は元 CST の branch/fallback 構造から決めています。演算子のない `x` の Leaf は深さ3、branchを持つ `x+a` では内部Chainが1つ加わるため深さ4です。右側Exprは深さ3ずつ増え、そのExprがbranchを持つかどうかも反映します。
+
+## Literal の capture 識別（#669）
+
+左結合の `left` / `op` / `right` は、生成 parser の capture binding を先に特定し、その範囲内から operand の parser 型を探します。同じ `WordParser`（tokenStream / lexical context では `Lexing.LiteralParser`）を使う別の literal や構造 delimiter を代用しません。例えば `'a' @left { '+' @op 'a' @right }` の `a+a` は、Java / Rust とも `left="a", op=["+"], right=["a"]` になります。従来 Java の `right=["+"]` は誤投影でした。共有 mapping の追加 rule にも同じ選択を適用します。
+
+AST の field 型・コンストラクタ・source span の単位は変更しません。既存の右結合は capture binding による選択を維持し、Rust の mapper 意味も変更しません。通常 associative rule を nested mapped field から参照する経路は対象ですが、nested 所有 rule 自体の associative annotation を新たに許可する変更ではありません。
+
+追加 oracle は直接 literal、同一 literal の別 capture、tokenStream、構造 delimiter、共有 mapping、precedence、補助文字 / CRLF、複数反復、右再帰、nested 参照を扱います。通常 mapper と preferred snapshot の値・候補 CP 範囲・保持値、構文失敗を同じ期待値で確認します。`PreferredAstConformanceTest` の共通 runner は Java / native host の Rust 全生成ファイル一致に加え、各出力を別々に `rustc` で compile/run します。DAP・合成 nullable leaf・mapped/mixed operand・commonField・typeof・autoEval は既存共通 corpus の回帰で検証します。

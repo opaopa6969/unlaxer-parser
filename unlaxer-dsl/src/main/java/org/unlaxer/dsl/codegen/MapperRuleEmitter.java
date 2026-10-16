@@ -609,7 +609,8 @@ class MapperRuleEmitter {
             }
             w.dedent();
             w.line("}");
-            w.line("Token leftToken = findFirstDescendant(working, " + leftParserClass + ");");
+            emitAssocCaptureSets(w, rule);
+            w.line("Token leftToken = findFirstDescendant(findFirstCaptureSite(working, leftBindings, true), " + leftParserClass + ");");
             w.line("if (leftToken == null) {");
             w.indent();
             if (leafFallbackSupported) {
@@ -627,14 +628,14 @@ class MapperRuleEmitter {
             w.line("List<" + MapperTypeResolver.boxedType(rightType) + "> rights = new ArrayList<>();");
             w.line("for (Token repeatToken : findAssocRepetitions(working, " + repeatParserClass + ")) {");
             w.indent();
-            w.line("Token opToken = findFirstDescendant(repeatToken, " + opParserClass + ");");
+            w.line("Token opToken = findFirstDescendant(findFirstCaptureSite(repeatToken, opBindings, true), " + opParserClass + ");");
             w.line("String opValue = firstTokenText(opToken == null ? repeatToken : opToken);");
             w.line("if (opValue != null && !opValue.isEmpty()) {");
             w.indent();
             w.line("ops.add(stripQuotes(opValue));");
             w.dedent();
             w.line("}");
-            w.line("Token rightToken = findFirstDescendant(repeatToken, " + rightParserClass + ");");
+            w.line("Token rightToken = findFirstDescendant(findFirstCaptureSite(repeatToken, rightBindings, true), " + rightParserClass + ");");
             w.line("if (rightToken != null) {");
             w.indent();
             w.line("rights.add(" + rightMapper + ");");
@@ -697,7 +698,8 @@ class MapperRuleEmitter {
                 w.line("}");
                 return;
             }
-            w.line("Token addLeftToken = findFirstDescendant(token, " + addLeftParserClass + ");");
+            emitAssocCaptureSets(w, additionalRule);
+            w.line("Token addLeftToken = findFirstDescendant(findFirstCaptureSite(token, leftBindings, true), " + addLeftParserClass + ");");
             w.line("if (addLeftToken == null) {");
             w.indent();
             if (leafFallbackSupported) {
@@ -715,14 +717,14 @@ class MapperRuleEmitter {
             w.line("List<" + MapperTypeResolver.boxedType(rightType) + "> addRights = new ArrayList<>();");
             w.line("for (Token addRepeatToken : findAssocRepetitions(token, " + addRepeatParserClass + ")) {");
             w.indent();
-            w.line("Token addOpToken = findFirstDescendant(addRepeatToken, " + addOpParserClass + ");");
+            w.line("Token addOpToken = findFirstDescendant(findFirstCaptureSite(addRepeatToken, opBindings, true), " + addOpParserClass + ");");
             w.line("String addOpValue = firstTokenText(addOpToken == null ? addRepeatToken : addOpToken);");
             w.line("if (addOpValue != null && !addOpValue.isEmpty()) {");
             w.indent();
             w.line("addOps.add(stripQuotes(addOpValue));");
             w.dedent();
             w.line("}");
-            w.line("Token addRightToken = findFirstDescendant(addRepeatToken, " + addRightParserClass + ");");
+            w.line("Token addRightToken = findFirstDescendant(findFirstCaptureSite(addRepeatToken, rightBindings, true), " + addRightParserClass + ");");
             w.line("if (addRightToken != null) {");
             w.indent();
             w.line("addRights.add(" + addRightMapper + ");");
@@ -740,6 +742,17 @@ class MapperRuleEmitter {
                 + "(addLeft, addOps, addRights), token);");
             w.dedent();
             w.line("}");
+        }
+    }
+
+    // Parser classes are shared by distinct literal sites; resolve the binding first.
+    private static void emitAssocCaptureSets(IndentedWriter w, RuleDecl rule) {
+        CaptureBindingPlan bindings = new CaptureBindingPlan(rule);
+        for (String capture : List.of("left", "op", "right")) {
+            String ids = bindings.sites(capture).stream()
+                .map(site -> "\"" + ParserCodegenUtil.escapeString(site.id()) + "\"")
+                .collect(java.util.stream.Collectors.joining(", "));
+            w.line("java.util.Set<String> " + capture + "Bindings = java.util.Set.of(" + ids + ");");
         }
     }
 
@@ -1294,6 +1307,23 @@ class MapperRuleEmitter {
                         && capture.captureBindings().contains(binding);
                 }
 
+                private static Token findFirstCaptureSite(Token token, java.util.Set<String> bindings,
+                        boolean root) {
+                    guardVisit(token);
+                    if (token == null) return null;
+                    if (token.parser instanceof %s.__CaptureBinding capture) {
+                        for (String binding : capture.captureBindings()) {
+                            if (bindings.contains(binding)) return token;
+                        }
+                    }
+                    if (!root && CAPTURE_BOUNDARY_PARSERS.contains(token.parser.getClass())) return null;
+                    for (Token child : token.filteredChildren) {
+                        Token found = findFirstCaptureSite(child, bindings, false);
+                        if (found != null) return found;
+                    }
+                    return null;
+                }
+
                 private static List<Token> findCaptureSites(Token token, java.util.Set<String> bindings) {
                     guardVisit(token);
                     List<Token> result = new ArrayList<>();
@@ -1316,7 +1346,7 @@ class MapperRuleEmitter {
                     }
                 }
 
-            """.formatted(parsersClass, parsersClass));
+            """.formatted(parsersClass, parsersClass, parsersClass));
 
         // Like findDescendants, but stops at capture-boundary tokens (separate mapped nodes),
         // so a capture absent at this level does not leak into a nested sub-expression of the

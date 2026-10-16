@@ -626,7 +626,10 @@ public class SnapshotMapper {
         if (working == null) {
             throw new IllegalArgumentException("Mapping token not found for rule Expr");
         }
-        Token leftToken = findFirstDescendant(working, SnapshotParsers.TermParser.class);
+        java.util.Set<String> leftBindings = java.util.Set.of("Expr:0");
+        java.util.Set<String> opBindings = java.util.Set.of("Expr:1");
+        java.util.Set<String> rightBindings = java.util.Set.of("Expr:2");
+        Token leftToken = findFirstDescendant(findFirstCaptureSite(working, leftBindings, true), SnapshotParsers.TermParser.class);
         if (leftToken == null) {
             throw new IllegalArgumentException("Left operand not found for rule Expr");
         }
@@ -634,12 +637,12 @@ public class SnapshotMapper {
         List<String> ops = new ArrayList<>();
         List<SnapshotAST.TermNode> rights = new ArrayList<>();
         for (Token repeatToken : findAssocRepetitions(working, SnapshotParsers.ExprRepeat0Parser.class)) {
-            Token opToken = findFirstDescendant(repeatToken, org.unlaxer.parser.elementary.WordParser.class);
+            Token opToken = findFirstDescendant(findFirstCaptureSite(repeatToken, opBindings, true), org.unlaxer.parser.elementary.WordParser.class);
             String opValue = firstTokenText(opToken == null ? repeatToken : opToken);
             if (opValue != null && !opValue.isEmpty()) {
                 ops.add(stripQuotes(opValue));
             }
-            Token rightToken = findFirstDescendant(repeatToken, SnapshotParsers.TermParser.class);
+            Token rightToken = findFirstDescendant(findFirstCaptureSite(repeatToken, rightBindings, true), SnapshotParsers.TermParser.class);
             if (rightToken != null) {
                 rights.add(toTermNode(rightToken));
             }
@@ -656,7 +659,10 @@ public class SnapshotMapper {
         if (working == null) {
             throw new IllegalArgumentException("Mapping token not found for rule Term");
         }
-        Token leftToken = findFirstDescendant(working, SnapshotParsers.FactorParser.class);
+        java.util.Set<String> leftBindings = java.util.Set.of("Term:0");
+        java.util.Set<String> opBindings = java.util.Set.of("Term:1");
+        java.util.Set<String> rightBindings = java.util.Set.of("Term:2");
+        Token leftToken = findFirstDescendant(findFirstCaptureSite(working, leftBindings, true), SnapshotParsers.FactorParser.class);
         if (leftToken == null) {
             throw new IllegalArgumentException("Left operand not found for rule Term");
         }
@@ -664,12 +670,12 @@ public class SnapshotMapper {
         List<String> ops = new ArrayList<>();
         List<String> rights = new ArrayList<>();
         for (Token repeatToken : findAssocRepetitions(working, SnapshotParsers.TermRepeat0Parser.class)) {
-            Token opToken = findFirstDescendant(repeatToken, org.unlaxer.parser.elementary.WordParser.class);
+            Token opToken = findFirstDescendant(findFirstCaptureSite(repeatToken, opBindings, true), org.unlaxer.parser.elementary.WordParser.class);
             String opValue = firstTokenText(opToken == null ? repeatToken : opToken);
             if (opValue != null && !opValue.isEmpty()) {
                 ops.add(stripQuotes(opValue));
             }
-            Token rightToken = findFirstDescendant(repeatToken, SnapshotParsers.FactorParser.class);
+            Token rightToken = findFirstDescendant(findFirstCaptureSite(repeatToken, rightBindings, true), SnapshotParsers.FactorParser.class);
             if (rightToken != null) {
                 rights.add(stripQuotes(firstTokenText(rightToken)));
             }
@@ -690,6 +696,23 @@ public class SnapshotMapper {
         guardVisit(token);
         return token.parser instanceof SnapshotParsers.__CaptureBinding capture
             && capture.captureBindings().contains(binding);
+    }
+
+    private static Token findFirstCaptureSite(Token token, java.util.Set<String> bindings,
+            boolean root) {
+        guardVisit(token);
+        if (token == null) return null;
+        if (token.parser instanceof SnapshotParsers.__CaptureBinding capture) {
+            for (String binding : capture.captureBindings()) {
+                if (bindings.contains(binding)) return token;
+            }
+        }
+        if (!root && CAPTURE_BOUNDARY_PARSERS.contains(token.parser.getClass())) return null;
+        for (Token child : token.filteredChildren) {
+            Token found = findFirstCaptureSite(child, bindings, false);
+            if (found != null) return found;
+        }
+        return null;
     }
 
     private static List<Token> findCaptureSites(Token token, java.util.Set<String> bindings) {

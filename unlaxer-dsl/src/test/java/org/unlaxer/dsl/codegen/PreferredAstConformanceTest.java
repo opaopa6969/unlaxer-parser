@@ -294,11 +294,15 @@ public class PreferredAstConformanceTest {
                     "",
                     true,
                     true);
-            for (var file : new RustBackend().generate(grammar))
+            Path javaOutput = dir.resolve("java-generated");
+            Files.createDirectories(javaOutput);
+            for (var file : new RustBackend().generate(grammar)) {
                 assertEquals(
                         grammar.name() + "/" + file.relativePath(),
                         file.content(),
                         Files.readString(output.resolve(file.relativePath())));
+                Files.writeString(javaOutput.resolve(file.relativePath()), file.content());
+            }
             var code =
                     new StringBuilder(
                                     "#[path=\"generated/mod.rs\"] mod generated; use"
@@ -434,21 +438,24 @@ public class PreferredAstConformanceTest {
                 }
                 code.append("}");
             }
-            Path probe = dir.resolve("main.rs"), exe = dir.resolve("probe");
-            Files.writeString(probe, code);
-            run(
-                    List.of(
-                            "rustc",
-                            "--edition=2021",
-                            probe.toString(),
-                            "--extern",
-                            "unlaxer_runtime=" + runtime,
-                            "-o",
-                            exe.toString()),
-                    "",
-                    false,
-                    true);
-            run(List.of(exe.toString()), "", true, true);
+            for (String host : List.of("generated", "java-generated")) {
+                Path probe = dir.resolve(host + "-main.rs"), exe = dir.resolve(host + "-probe");
+                Files.writeString(probe, code.toString().replace(
+                        "#[path=\"generated/mod.rs\"]", "#[path=\"" + host + "/mod.rs\"]"));
+                run(
+                        List.of(
+                                "rustc", "--crate-name", "probe",
+                                "--edition=2021",
+                                probe.toString(),
+                                "--extern",
+                                "unlaxer_runtime=" + runtime,
+                                "-o",
+                                exe.toString()),
+                        "",
+                        false,
+                        true);
+                run(List.of(exe.toString()), "", true, true);
+            }
         }
     }
 
