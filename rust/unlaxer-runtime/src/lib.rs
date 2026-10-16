@@ -952,7 +952,7 @@ struct Checkpoint {
     captures_journal_mark: usize,
     owned_captures_journal_mark: usize,
     state: Option<Rc<StateMap>>,
-    scopes_journal_mark: usize,
+    scopes_journal_mark: scope::Checkpoint,
     recoveries: usize,
     tokens: Rc<token::Store>,
     token_trace: token_trace::Mark,
@@ -1118,6 +1118,7 @@ struct FailureMemoKey {
     position: usize,
     matched_position: usize,
     depth_and_modes: usize,
+    state_version: usize,
 }
 
 impl FailureMemoKey {
@@ -1133,7 +1134,12 @@ impl FailureMemoKey {
             position,
             matched_position,
             depth_and_modes: depth * 8 + 4 + usize::from(whitespace),
+            state_version: 0,
         }
+    }
+    fn with_state_version(mut self, version: usize) -> Self {
+        self.state_version = version;
+        self
     }
     fn with_token_mode(mut self, mode: Option<token::ParseMode>) -> Self {
         if let Some(mode) = mode {
@@ -1193,6 +1199,17 @@ impl Hasher for FailureMemoHasher {
     fn write_usize(&mut self, value: usize) {
         self.mix(value as u64);
     }
+}
+
+// Only this compact call record lives across recursive execution. Probe/replay
+// and snapshot construction use separate non-recursive frames.
+struct MemoCall {
+    key: FailureMemoKey,
+    position: usize,
+    count: usize,
+    capture_mark: usize,
+    detailed: bool,
+    success: bool,
 }
 
 type MemoMap<V> = HashMap<FailureMemoKey, V, FailureMemoBuildHasher>;
@@ -1987,6 +2004,20 @@ impl<'a> ParseContext<'a> {
         &self.scopes
     }
 
+    /// Current parse-visible state epoch. Rollback restores it; later mutations
+    /// never reuse a prior branch's epoch. None means the allocator is exhausted
+    /// and all memo lookups/inserts are permanently disabled for this context.
+    pub fn memoization_state_version(&self) -> Option<usize> {
+        self.scopes.memo_version()
+    }
+
+    /// Notify memoization before retrying a rule whose result can observe a
+    /// caller-owned state mutation. This does not make opaque custom parsers safe
+    /// or permit replay of stateful successes. Scope mutations do this internally.
+    pub fn mark_memoization_state_changed(&mut self) {
+        self.scopes.mark_memo_changed();
+    }
+
     /// Changes participate in all parser checkpoints, independently of named user state.
     pub fn scopes_mut(&mut self) -> &mut ScopeStore {
         self.scopes_mut_store()
@@ -2446,117 +2477,147 @@ impl<'a> ParseContext<'a> {
             self.fail("valid rule reference");
             return None;
         }
-        let memo_key = (self.options.memoization == Memoization::SafeFailures
+        if self.options.memoization == Memoization::SafeFailures
             && self.names_state.frames.is_empty()
             && self.lexical_trivia.is_none()
             && self.lexical_context.is_none()
-            && self.memo_safe_rules.get(id).copied().unwrap_or(false))
-        .then(|| {
-            (
-                // Route by scalar position; keep the existing byte-based key intact.
-                self.code_point(self.position),
-                FailureMemoKey::new(
-                    id,
-                    self.position,
-                    self.matched_position,
-                    self.whitespace,
-                    depth,
-                )
-                .with_match_policy(self.match_cursor_policy)
-                .with_token_mode(self.token_mode),
-            )
-        });
-        if let Some((position, key)) = memo_key {
-            if let Some(diagnostic) = self
-                .failure_memo
-                .probe(position, &key)
-                .filter(|entry| self.expression_depth <= entry.memo_expression_depth)
-                .cloned()
-            {
-                self.memoized_failure_hits += 1;
-                self.replay_failure(&diagnostic);
-                if let Some((matched, policy)) = diagnostic.classic_failure_end {
-                    self.matched_position = matched;
-                    self.match_cursor_policy = policy;
-                }
-                return None;
-            }
-        }
-        let success_key = memo_key.filter(|_| self.token_trace.is_none());
-        if let Some((position, key)) = success_key {
-            if let Some(entry) = self.success_memo.probe(position, &key).cloned() {
-                // Reuse only with at least the original expression budget.
-                if self.expression_depth <= entry.expression_depth {
-                    self.memoized_success_hits += 1;
-                    return Some(self.replay_success(&entry));
-                }
-            }
-        }
-        let capture_mark = if success_key.is_some() {
-            self.captures.checkpoint()
+            && self.scopes.memo_version().is_some()
+            && self.memo_safe_rules.get(id).copied().unwrap_or(false)
+        {
+            self.memoized_rule(id, depth)
         } else {
-            self.captures.journal.len()
-        };
-        let rules = Arc::clone(&self.rules);
-        let rule = &rules[id];
-        let record_diagnostics = self.options.diagnostics == Diagnostics::Detailed;
-        if memo_key.is_some() && record_diagnostics {
-            self.diagnostic_frames.push(FailureDiagnostic::default());
+            self.execute_rule(id, depth)
         }
+    }
+
+    // A no-cache recursive rule must not retain the large memo snapshot/key
+    // frame. In particular name-resolution rules still reach their depth guard
+    // on the default 2 MiB thread stack after the state-version key was added.
+    #[inline(never)]
+    fn execute_rule(&mut self, id: usize, depth: usize) -> Option<usize> {
+        let rules = Arc::clone(&self.rules);
         let start = self.position;
         let count = self.nodes.len();
-        let result = match self.expression(&rule.expression, depth + 1) {
+        match self.expression(&rules[id].expression, depth + 1) {
             Some(fragment) => Some(self.build_rule_node(id, start, fragment)),
             None => {
                 self.position = start;
                 self.nodes.truncate(count);
                 None
             }
+        }
+    }
+
+    #[inline(never)]
+    fn memoized_rule(&mut self, id: usize, depth: usize) -> Option<usize> {
+        let key = FailureMemoKey::new(
+            id,
+            self.position,
+            self.matched_position,
+            self.whitespace,
+            depth,
+        )
+        .with_match_policy(self.match_cursor_policy)
+        .with_token_mode(self.token_mode)
+        .with_state_version(self.scopes.memo_version().expect("memo version checked"));
+        let position = self.code_point(self.position);
+        if let Some(result) = self.probe_rule_memo(position, &key) {
+            return result;
+        }
+        let success = self.token_trace.is_none();
+        let capture_mark = if success {
+            self.captures.checkpoint()
+        } else {
+            self.captures.journal.len()
         };
-        if let Some((position, key)) = memo_key {
-            let diagnostic = if record_diagnostics {
-                let mut diagnostic = self
-                    .diagnostic_frames
-                    .pop()
-                    .expect("memoized rule installed a diagnostic frame");
-                if let Some(parent) = self.diagnostic_frames.last_mut() {
-                    parent.merge(&diagnostic);
-                }
-                if result.is_none() && self.token_mode.is_some() {
-                    diagnostic.memo_expression_depth = self.expression_depth;
-                    diagnostic.classic_failure_end =
-                        Some((self.matched_position, self.match_cursor_policy));
-                }
-                diagnostic
-            } else {
-                let mut diagnostic = FailureDiagnostic::default();
-                if result.is_none() && self.token_mode.is_some() {
-                    diagnostic.memo_expression_depth = self.expression_depth;
-                    diagnostic.classic_failure_end =
-                        Some((self.matched_position, self.match_cursor_policy));
-                }
-                diagnostic
-            };
-            // Resource exhaustion depends on active wrapper frames. Do not reuse
-            // that failure from a shallower call; ordinary syntax failures retain
-            // their existing memo sharing across wrappers.
-            if self.resource_failure.is_none() {
-                if let Some(root) = result {
-                    if success_key.is_some() {
-                        self.memoize_success(position, key, count, root, capture_mark, diagnostic);
-                    }
-                } else {
-                    let mut diagnostic = diagnostic;
-                    diagnostic.memo_expression_depth = self.expression_depth;
-                    self.failure_memo
-                        .insert(position / FAILURE_MEMO_BUCKET_SIZE, key, diagnostic);
+        let detailed = self.options.diagnostics == Diagnostics::Detailed;
+        if detailed {
+            self.diagnostic_frames.push(FailureDiagnostic::default());
+        }
+        let call = MemoCall {
+            key,
+            position,
+            count: self.nodes.len(),
+            capture_mark,
+            detailed,
+            success,
+        };
+        let result = self.execute_rule(id, depth);
+        self.finish_rule_memo(call, result);
+        result
+    }
+
+    #[inline(never)]
+    fn probe_rule_memo(&mut self, position: usize, key: &FailureMemoKey) -> Option<Option<usize>> {
+        if let Some(diagnostic) = self
+            .failure_memo
+            .probe(position, key)
+            .filter(|entry| self.expression_depth <= entry.memo_expression_depth)
+            .cloned()
+        {
+            self.memoized_failure_hits += 1;
+            self.replay_failure(&diagnostic);
+            if let Some((matched, policy)) = diagnostic.classic_failure_end {
+                self.matched_position = matched;
+                self.match_cursor_policy = policy;
+            }
+            return Some(None);
+        }
+        if self.token_trace.is_none() {
+            if let Some(entry) = self.success_memo.probe(position, key).cloned() {
+                // A shallower retry has at least the saved remaining budget.
+                if self.expression_depth <= entry.expression_depth {
+                    self.memoized_success_hits += 1;
+                    return Some(Some(self.replay_success(&entry)));
                 }
             }
         }
-        if success_key.is_some() {
+        None
+    }
+
+    #[inline(never)]
+    fn finish_rule_memo(&mut self, call: MemoCall, result: Option<usize>) {
+        let mut diagnostic = if call.detailed {
+            let diagnostic = self
+                .diagnostic_frames
+                .pop()
+                .expect("memoized rule installed a diagnostic frame");
+            if let Some(parent) = self.diagnostic_frames.last_mut() {
+                parent.merge(&diagnostic);
+            }
+            diagnostic
+        } else {
+            FailureDiagnostic::default()
+        };
+        if result.is_none() && self.token_mode.is_some() {
+            diagnostic.classic_failure_end =
+                Some((self.matched_position, self.match_cursor_policy));
+        }
+        // Resource exhaustion and epoch exhaustion are never cacheable failures.
+        if self.resource_failure.is_none() && self.scopes.memo_version().is_some() {
+            if let Some(root) = result {
+                if call.success {
+                    self.memoize_success(
+                        call.position,
+                        call.key,
+                        call.count,
+                        root,
+                        call.capture_mark,
+                        diagnostic,
+                    );
+                }
+            } else {
+                diagnostic.memo_expression_depth = self.expression_depth;
+                self.failure_memo.insert(
+                    call.position / FAILURE_MEMO_BUCKET_SIZE,
+                    call.key,
+                    diagnostic,
+                );
+            }
+        }
+        if call.success {
             self.captures.commit_checkpoint();
         }
-        result
     }
 
     /// Snapshot only the newly appended pure arena. No public NodeId, mutable
@@ -3830,6 +3891,7 @@ impl<'a> ParseContext<'a> {
             _ => token::TokenSource::Input(span),
         };
         self.owned_captures.push(name, source);
+        self.mark_memoization_state_changed();
         Some(fragment)
     }
 
@@ -4168,6 +4230,7 @@ impl<'a> ParseContext<'a> {
             winner
                 .scopes
                 .retain_journal_entry_count(self.scopes.journal_entries_created());
+            winner.scopes.retain_memo_allocator(&self.scopes);
             self.scopes = winner.scopes;
             self.recoveries = winner.recoveries;
             winner.fragment

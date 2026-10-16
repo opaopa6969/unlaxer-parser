@@ -101,8 +101,11 @@ fn retry(context: &mut ParseContext<'_>) -> unlaxer_runtime::ParseResult {
         let mut id = None;
         let _: Result<(), unlaxer_runtime::ParseError> = context.transaction(|context| {
             context.set_state("rollback", 99_i32);
-            context.scopes_mut().declare("outer", 0);
             let parsed = context.parse_with_token_mode(&Expr::Rule(1), kind(&f[3]), f[4] == "true");
+            // Keep the rule's entry epoch identical across retries. Mutations made
+            // before it belong to distinct stateful keys after #629; this scope
+            // event still verifies the surrounding transaction's rollback.
+            context.scopes_mut().declare("outer", 0);
             assert_eq!(parsed.is_ok(), f[8] == "true", "{}", f[0]);
             assert!(context.scopes().is_declared("outer"));
             if f[8] == "false" {

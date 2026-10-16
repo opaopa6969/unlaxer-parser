@@ -39,7 +39,7 @@ failure同様、CP位置のbucketを保持窓に従って解放し、successの�
 
 Rust traceを停止するのではなく、success memoをmissにして元のparserを実行します。
 traceをcache hitで欠落させることはありません。failure memoはそのままです。
-[Classic/general modeは #628で実hitへ対応](classic-memo.md)。version付きstateful failureは #629、記録付きsuccess replayの差は親 #184 / #197 に残ります。
+[Classic/general modeは #628で実hitへ対応](classic-memo.md)。[version付きstateful failureは #629で対応](stateful-failure-memo.md)、記録付きsuccess replayの差は親 #184 / #197 に残ります。
 この単位だけでproduction workloadのdeadlineや全stateful parityの完了とはしません。
 
 `ParseContext::memoized_success_hits()` は実際に成功entryを再生した数を返します。

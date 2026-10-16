@@ -66,6 +66,22 @@ public class PureSuccessMemoizationConformanceTest {
 
     @Test
     public void bothRustFrontendsCompileAndMatchIndependentOracle() throws Exception {
+        verifyBothHosts(corpus(), "pure-success-memo-conformance.tsv");
+    }
+
+    @Test
+    public void generatedStatefulFailuresPreserveTypedValuesDiagnosticsAndRealHits()
+            throws Exception {
+        var entries =
+                JsonParser.parseString(
+                                Files.readString(
+                                        repo.resolve(
+                                                "conformance/stateful-failure-memo/generated-cases.json")))
+                        .getAsJsonArray();
+        verifyBothHosts(entries, "stateful-failure-memo-generated.tsv");
+    }
+
+    private void verifyBothHosts(JsonArray entries, String reportName) throws Exception {
         if (!Boolean.getBoolean("rustConformance")) {
             System.out.println(
                     "[assumption] PureSuccessMemoizationConformanceTest requires"
@@ -102,7 +118,7 @@ public class PureSuccessMemoizationConformanceTest {
                 true);
         Path generator = nativeTarget.resolve("debug/unlaxer").toAbsolutePath();
         var report = new ArrayList<>(List.of("grammar\tcase\tconfiguration\tresult"));
-        for (var element : corpus()) {
+        for (var element : entries) {
             var entry = element.getAsJsonObject();
             GrammarDecl grammar =
                     UBNFMapper.parse(entry.get("grammar").getAsString()).grammars().get(0);
@@ -161,7 +177,18 @@ public class PureSuccessMemoizationConformanceTest {
                                                                     + "\t"
                                                                     + row.getAsJsonObject()
                                                                             .get("successHit")
-                                                                            .getAsString())
+                                                                            .getAsString()
+                                                                    + "\t"
+                                                                    + (row.getAsJsonObject()
+                                                                                    .has(
+                                                                                            "failureHit")
+                                                                            && row.getAsJsonObject()
+                                                                                    .get(
+                                                                                            "failureHit")
+                                                                                    .getAsBoolean())
+                                                                    + "\t"
+                                                                    + row.getAsJsonObject()
+                                                                            .has("semantic"))
                                             .toList())
                             + "\n";
             List<String> nativeLines =
@@ -172,7 +199,7 @@ public class PureSuccessMemoizationConformanceTest {
             }
         }
         Files.createDirectories(Path.of("target"));
-        Files.write(Path.of("target/pure-success-memo-conformance.tsv"), report);
+        Files.write(Path.of("target", reportName), report);
     }
 
     @Test
@@ -419,6 +446,13 @@ public class PureSuccessMemoizationConformanceTest {
                                             + " requires a real Java success hit",
                                     context.getPackratMemoTable().successHits() > 0);
                         }
+                        if (memo == Memoization.SAFE_FAILURES
+                                && row.has("failureHit")
+                                && row.get("failureHit").getAsBoolean()) {
+                            assertTrue(
+                                    name + " requires actual Java failure hit",
+                                    context.getPackratMemoTable().failureHits() > 0);
+                        }
                         int consumed = context.getConsumedPosition().value();
                         var snapshot = new DocumentSnapshot("fixture", 1, input);
                         var coordinates = new JsonArray();
@@ -432,6 +466,26 @@ public class PureSuccessMemoizationConformanceTest {
                                         ? new JsonPrimitive(
                                                 parsed.getRootToken(false).source.sourceAsString())
                                         : JsonNull.INSTANCE);
+                        if (row.has("semantic")) {
+                            var semantic = new JsonArray();
+                            semantic.add(
+                                    org.unlaxer.dsl.runtime.ScopeStore.getAllDeclarations(context)
+                                            .size());
+                            semantic.add(
+                                    org.unlaxer.dsl.runtime.ScopeStore.getAllReferences(context)
+                                            .size());
+                            var diagnosticsJson = new JsonArray();
+                            for (var d :
+                                    org.unlaxer.dsl.runtime.ScopeStore.getDiagnostics(context)) {
+                                var value = new JsonArray();
+                                value.add(d.offset());
+                                value.add(d.length());
+                                value.add(d.message());
+                                diagnosticsJson.add(value);
+                            }
+                            semantic.add(diagnosticsJson);
+                            actual.add("semantic", semantic);
+                        }
                         actual.add("ast", JsonNull.INSTANCE);
                         if (row.get("accepted").getAsBoolean()) {
                             var rootToken =
@@ -576,6 +630,7 @@ public class PureSuccessMemoizationConformanceTest {
             ast.add("fields", fields);
             result.add("ast", ast);
         }
+        if (row.has("semantic")) result.add("semantic", row.get("semantic"));
         result.add("diagnostic", row.get("diagnostic"));
         return result;
     }
@@ -648,6 +703,8 @@ public class PureSuccessMemoizationConformanceTest {
                 let mut cells = row.split(char::from(9));
                 let hex = cells.next().unwrap();
                 let require_hit = cells.next().unwrap() == "true";
+                let require_failure_hit = cells.next().unwrap_or("false") == "true";
+                let include_semantic = cells.next().unwrap_or("false") == "true";
                 let bytes = (0..hex.len()).step_by(2).map(|i| u8::from_str_radix(&hex[i..i+2],16).unwrap()).collect();
                 let input = String::from_utf8(bytes).unwrap();
                 for memo in [Memoization::Off, Memoization::SafeFailures] {
@@ -657,6 +714,9 @@ public class PureSuccessMemoizationConformanceTest {
                         let matched = generated::parser::parse_context(&mut context);
                         if memo == Memoization::SafeFailures && require_hit {
                             assert!(context.memoized_success_hits() > 0, "expected actual Rust success replay for {input:?}/{diagnostics:?}");
+                        }
+                        if memo == Memoization::SafeFailures && require_failure_hit {
+                            assert!(context.memoized_failure_hits() > 0, "expected actual stateful failure hit");
                         }
                         let ok = matched.is_ok();
                         let point = context.position();
@@ -677,6 +737,14 @@ public class PureSuccessMemoizationConformanceTest {
                         match generated::parser::parse_tree_detailed_with_options(&input,options) {
                             Ok(tree) => { let ast=generated::mapper::map(&tree).unwrap(); print!("{}",ast.canonical_json()); print!(r#", "diagnostic":null"#); }
                             Err(diagnostic) => { print!(r#"null,"diagnostic":{{"kind":"{}","offset":{}}}"#,diagnostic.kind,diagnostic.offset); }
+                        }
+                        if include_semantic {
+                            print!(r#", "semantic":[{}, {}, ["#, context.scopes().all_declarations().len(), context.scopes().all_references().len());
+                            for (i,d) in context.scopes().diagnostics().iter().enumerate() {
+                                if i>0 { print!(","); }
+                                print!("[{},{},{}]",d.offset,d.length,quoted(&d.message));
+                            }
+                            print!("]]");
                         }
                         println!("}}");
                     }

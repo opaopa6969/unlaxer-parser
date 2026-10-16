@@ -4,13 +4,14 @@ Java/Rustとも既定はOFFです。既存のSafe policyを明示したとき、
 実際にcacheします。4 TokenKindとinvertをkeyに含め、reset/nonOrdered、両cursor、rule depth、
 whitespaceの既存区別を維持します。通常modeと明示Consumedも別entryであり、CSTを混同しません。
 
-Rust keyは従来どおり4個のusizeです。modeは既存depth/modes wordの空きbitに追加します。
+Rust keyは #629 のstate version追加で5個のusizeです（#628導入時は4個）。
+modeは既存depth/modes wordの空きbitに追加します。
 bit0=whitespace、bit1=nonOrdered、bit2=reset、bits3..10=rule depth、bits11..13=mode
 (None0/Consumed1/MatchOnly2/VirtualConsumed3/VirtualMatchOnly4)、bit14=invertです。
 active expression depthはkeyへ入れずentryに保持し、現在depthが記録時以下のときだけ再利用します。
 浅い再試行のhitを維持し、残予算が少ない深い呼出しでは通常実行へ戻します。
 resource failureは保存せずstickyであり、optional等が通常の不一致へ変換できません。
-通常failureの同じ資源差は #634 が担当します。
+通常failureも #634 の同じ資源guardを使用します。
 
 成功snapshotはCSTのrelative edge/capture、両cursorと終了policy、局所診断に加え、
 structural TokenInfo（kind/source/parser label/original token edge）を保持します。
@@ -33,7 +34,9 @@ CST/capture/stateのrollbackと、speculative syntax診断を保持する既存�
 observer記録を省略してhitを増やしません。Java trial/listener記録中は既存どおりmemoを停止し、
 Rust opt-in terminal trace中はsuccess replayを停止して通常実行します（failure memoは有効）。
 それぞれのobserver内容は同じhostのOFF/ONで比較します。異なる2種類のtraceを同じformatと主張しません。
-記録付きsuccess replay、versioned stateful failure (#629)、production workload (#184/#197) は未完です。
+記録付きsuccess replay、production workload (#184/#197) は未完です。
 #624のno-retry microbenchmarkで約41% overheadを観測した事実と既定OFFは維持します。
 
 [共通fixtureと正確な観測数](../conformance/classic-memo/README.md)を参照してください。
+
+[stateful failureのepoch契約](stateful-failure-memo.md) は #629 で対応しました。
