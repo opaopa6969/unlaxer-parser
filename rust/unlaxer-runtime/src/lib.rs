@@ -130,6 +130,12 @@ pub enum Expr {
         predictors: Vec<Predictor>,
     },
     Capture(&'static str, Box<Expr>),
+    /// Read outer bindings, discard local captures on exit without discarding child results.
+    CaptureScope(Box<Expr>),
+    /// General owned binding, separate from AST field captures. CST-transparent.
+    OwnedCapture(&'static str, Box<Expr>),
+    /// Replay a general owned binding at the current input cursor.
+    Replay(&'static str),
     /// Classic MatchOnly: publish matched tokens/cursor, restore owned semantic state.
     MatchOnly(Box<Expr>),
     /// Toggle leaf inversion; unlike PEG not_ahead, this can consume input.
@@ -366,6 +372,15 @@ impl Expr {
     pub fn capture(self, name: &'static str) -> Self {
         Self::Capture(name, Box::new(self))
     }
+    /// Capture this child's actual source in the separate general owned binding store.
+    pub fn capture_owned(self, name: &'static str) -> Self {
+        Self::OwnedCapture(name, Box::new(self))
+    }
+    /// Read through outer captures and discard definitions made by this child.
+    pub fn capture_scope(self) -> Self {
+        Self::CaptureScope(Box::new(self))
+    }
+
     /// Preserve this expression's consumed source as one text value, including trivia.
     /// Inner nodes/captures remain available; no quote stripping or text decoding occurs.
     pub fn text_value(self) -> Self {
@@ -807,6 +822,67 @@ impl CaptureStore {
     }
 }
 
+#[derive(Debug, Clone, Default)]
+struct OwnedCaptureStore {
+    values: HashMap<&'static str, Vec<token::TokenSource>>,
+    journal: Vec<&'static str>,
+    checkpoint_depth: usize,
+}
+
+impl OwnedCaptureStore {
+    fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
+
+    fn get(&self, name: &str) -> Option<&Vec<token::TokenSource>> {
+        self.values.get(name)
+    }
+
+    fn push(&mut self, name: &'static str, source: token::TokenSource) {
+        if self.checkpoint_depth > 0 {
+            self.journal.push(name);
+        }
+        self.values.entry(name).or_default().push(source);
+    }
+
+    fn checkpoint(&mut self) -> usize {
+        let mark = self.journal.len();
+        self.checkpoint_depth += 1;
+        mark
+    }
+
+    fn commit_checkpoint(&mut self) {
+        debug_assert!(self.checkpoint_depth > 0);
+        self.checkpoint_depth -= 1;
+        if self.checkpoint_depth == 0 {
+            self.journal.clear();
+        }
+    }
+
+    fn rollback_checkpoint(&mut self, mark: usize) {
+        debug_assert!(self.checkpoint_depth > 0);
+        debug_assert!(mark <= self.journal.len());
+        while self.journal.len() > mark {
+            let name = self.journal.pop().expect("journal length checked");
+            let remove = {
+                let spans = self
+                    .values
+                    .get_mut(name)
+                    .expect("journaled capture must exist");
+                spans.pop().expect("journaled capture must have a source");
+                spans.is_empty()
+            };
+            if remove {
+                self.values.remove(name);
+            }
+        }
+        self.checkpoint_depth -= 1;
+        if self.checkpoint_depth == 0 {
+            self.journal.clear();
+        }
+    }
+}
+
 /// Opt-in counters for ParseContext checkpoint behavior. Payload counters exclude
 /// cursor and CST-length scalars, which are always copied inline.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -829,6 +905,7 @@ struct Checkpoint {
     nodes: usize,
     metrics_counted: bool,
     captures_journal_mark: usize,
+    owned_captures_journal_mark: usize,
     state: Option<Rc<StateMap>>,
     scopes_journal_mark: usize,
     recoveries: usize,
@@ -842,6 +919,7 @@ struct ChoiceWinner {
     node_start: usize,
     nodes: Vec<Node>,
     captures: CaptureStore,
+    owned_captures: OwnedCaptureStore,
     state: Rc<StateMap>,
     scopes: ScopeStore,
     recoveries: Vec<RecoveryDiagnostic>,
@@ -1224,6 +1302,7 @@ pub struct ParseContext<'a> {
     // non-boundary bytes contain usize::MAX to retain code_point's rejection.
     code_point_offsets: Vec<usize>,
     captures: CaptureStore,
+    owned_captures: OwnedCaptureStore,
     state: Rc<StateMap>,
     scopes: ScopeStore,
     recoveries: Vec<RecoveryDiagnostic>,
@@ -1565,6 +1644,7 @@ impl<'a> ParseContext<'a> {
             byte_offsets,
             code_point_offsets,
             captures: CaptureStore::default(),
+            owned_captures: OwnedCaptureStore::default(),
             state: Rc::new(StateMap::default()),
             scopes: ScopeStore::default(),
             recoveries: Vec::new(),
@@ -1716,8 +1796,41 @@ impl<'a> ParseContext<'a> {
     pub fn captured(&self, name: &str) -> Option<&'a str> {
         self.text(*self.captures.get(name)?.last()?)
     }
+    /// Latest general owned binding; independent of AST field captures.
+    pub fn captured_source(&self, name: &str) -> Option<&token::TokenSource> {
+        self.owned_captures.get(name)?.last()
+    }
+    /// The actual captured text, including projected/generated values.
+    pub fn captured_text(&self, name: &str) -> Option<&str> {
+        match self.captured_source(name)? {
+            token::TokenSource::Input(span) => self.text(*span),
+            token::TokenSource::Projected { text, .. } => Some(text),
+            token::TokenSource::Generated { text, .. } => Some(text),
+        }
+    }
+    /// General binding history, including owned projected/generated sources.
+    pub fn capture_sources(&self, name: &str) -> &[token::TokenSource] {
+        self.owned_captures
+            .get(name)
+            .map(Vec::as_slice)
+            .unwrap_or(&[])
+    }
+    /// Legacy input-backed AST capture history.
     pub fn capture_spans(&self, name: &str) -> &[Span] {
         self.captures.get(name).map(Vec::as_slice).unwrap_or(&[])
+    }
+    /// Read outer bindings and discard local definitions on exit. Controlled errors
+    /// roll back child effects; a panic still requires discarding this context.
+    pub fn with_capture_scope<T>(
+        &mut self,
+        operation: impl FnOnce(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<T, ParseError> {
+        self.transaction(|context| {
+            let mark = context.owned_captures.checkpoint();
+            let result = operation(context);
+            context.owned_captures.rollback_checkpoint(mark);
+            result
+        })
     }
     pub fn set_state<T: Any + Clone>(&mut self, name: impl Into<String>, value: T) {
         self.state_mut_map().0.insert(name.into(), Box::new(value));
@@ -1976,8 +2089,9 @@ impl<'a> ParseContext<'a> {
             self.failure_memo
                 .observe_cursor(self.code_point(self.position));
         }
-        let captures_nonempty = !self.captures.is_empty();
+        let captures_nonempty = !self.captures.is_empty() || !self.owned_captures.is_empty();
         let captures_journal_mark = self.captures.checkpoint();
+        let owned_captures_journal_mark = self.owned_captures.checkpoint();
         let state = (!self.state.0.is_empty()).then(|| Rc::clone(&self.state));
         let scopes_nonempty = !self.scopes.is_empty();
         let scopes_journal_mark = self.scopes.checkpoint();
@@ -1997,6 +2111,7 @@ impl<'a> ParseContext<'a> {
             nodes: self.nodes.len(),
             metrics_counted,
             captures_journal_mark,
+            owned_captures_journal_mark,
             scopes_journal_mark,
             recoveries: self.recoveries.len(),
             tokens: Rc::clone(&self.tokens),
@@ -2007,6 +2122,7 @@ impl<'a> ParseContext<'a> {
 
     fn commit_checkpoint(&mut self, checkpoint: Checkpoint) {
         self.captures.commit_checkpoint();
+        self.owned_captures.commit_checkpoint();
         self.scopes.commit_checkpoint();
         if checkpoint.metrics_counted {
             if let Some(metrics) = &mut self.checkpoint_metrics {
@@ -2030,6 +2146,8 @@ impl<'a> ParseContext<'a> {
         self.recoveries.truncate(checkpoint.recoveries);
         self.captures
             .rollback_checkpoint(checkpoint.captures_journal_mark);
+        self.owned_captures
+            .rollback_checkpoint(checkpoint.owned_captures_journal_mark);
         if let Some(state) = checkpoint.state {
             self.state = state;
         } else if !self.state.0.is_empty() {
@@ -2292,6 +2410,8 @@ impl<'a> ParseContext<'a> {
         let java_transaction = matches!(
             expression,
             Expr::NonOrdered(_)
+                | Expr::OwnedCapture(_, _)
+                | Expr::CaptureScope(_)
                 | Expr::MatchOnly(_)
                 | Expr::InvertMatch(_)
                 | Expr::JavaEmpty
@@ -2339,7 +2459,7 @@ impl<'a> ParseContext<'a> {
                         kind: value.kind,
                         classic: true,
                         generated: matches!(value.source, token::TokenSource::Generated { .. }),
-                        text: value.source.projected_shared(),
+                        text: value.source.owned_shared(),
                     })
                 }),
             }),
@@ -2383,7 +2503,10 @@ impl<'a> ParseContext<'a> {
                 self.expression_repeat(expression, depth)
             }
             Expr::Lookahead { .. } => self.expression_lookahead(expression, depth),
-            Expr::Capture(_, _) => self.expression_capture(expression, depth),
+            Expr::Capture(_, _) | Expr::OwnedCapture(_, _) => {
+                self.expression_capture(expression, depth)
+            }
+            Expr::CaptureScope(child) => self.expression_capture_scope(child, depth),
             Expr::RuleEffects { .. } => self.expression_rule_effects(expression, depth),
             Expr::CaptureEquality { .. } => self.expression_capture_equality(expression, depth),
             Expr::TextValue(_) | Expr::ValueBoundary(_) => {
@@ -2448,6 +2571,7 @@ impl<'a> ParseContext<'a> {
                     expression,
                     Expr::Literal(_)
                         | Expr::CaseInsensitive(_)
+                        | Expr::Replay(_)
                         | Expr::Any
                         | Expr::CharRange(_, _)
                         | Expr::Except(_)
@@ -2642,14 +2766,22 @@ impl<'a> ParseContext<'a> {
                     None
                 }
             }
-            Expr::Backreference(name) => {
-                let text = self.captured(name);
+            Expr::Backreference(name) | Expr::Replay(name) => {
+                let text = if matches!(expression, Expr::Replay(_)) {
+                    self.captured_text(name)
+                } else {
+                    self.captured(name)
+                };
                 if let Some(text) = text.filter(|text| self.remaining().starts_with(text)) {
                     self.position += text.len();
                     self.matched_position = self.position;
                     Some(Fragment::default())
                 } else {
-                    self.fail(name);
+                    if matches!(expression, Expr::Replay(_)) {
+                        self.fail(&format!("SAME_AS({name})"));
+                    } else {
+                        self.fail(name);
+                    }
                     None
                 }
             }
@@ -2928,7 +3060,9 @@ impl<'a> ParseContext<'a> {
                 unreachable!("combinators are dispatched by expression")
             }
 
-            Expr::Capture(_, _) => unreachable!("recursive expression dispatched by expression"),
+            Expr::Capture(_, _) | Expr::OwnedCapture(_, _) | Expr::CaptureScope(_) => {
+                unreachable!("recursive expression dispatched by expression")
+            }
             Expr::RuleEffects { .. } => {
                 unreachable!("recursive expression dispatched by expression")
             }
@@ -2989,7 +3123,7 @@ impl<'a> ParseContext<'a> {
                             generated: info.is_some_and(|info| {
                                 matches!(info.source, token::TokenSource::Generated { .. })
                             }),
-                            text: info.and_then(|info| info.source.projected_shared()),
+                            text: info.and_then(|info| info.source.owned_shared()),
                         })
                     });
                     Fragment {
@@ -3266,36 +3400,78 @@ impl<'a> ParseContext<'a> {
 
     #[inline(never)]
     fn expression_capture(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
-        match expression {
-            Expr::Capture(name, expression) => {
-                let start = self.position;
-                let mut fragment = self.expression(expression, depth)?;
-                // The existing capture store contains original-input slices. A
-                // projected token is not such a slice: reject rather than replay
-                // different input text at its synthetic span (#545 follow-up).
-                if fragment
-                    .source
-                    .as_deref()
-                    .is_some_and(|source| source.text.is_some() || source.generated)
-                {
-                    self.fail("projected token capture/replay is not supported");
-                    return None;
-                }
-                let span = fragment
-                    .source
-                    .as_deref()
-                    .filter(|source| source.classic)
-                    .map_or_else(|| self.span(start), |source| source.span);
-                self.captures.push(name, span);
-                fragment.captures.push(Capture {
-                    name,
-                    span,
-                    nodes: fragment.nodes.clone(),
-                });
-                Some(fragment)
+        let (name, child, owned) = match expression {
+            Expr::Capture(name, child) => (*name, child.as_ref(), false),
+            Expr::OwnedCapture(name, child) => (*name, child.as_ref(), true),
+            _ => unreachable!("capture dispatched by variant"),
+        };
+        let start = self.position;
+        let anchor = self.code_point(self.mode_cursor());
+        let fragment = self.expression(child, depth)?;
+        self.finish_capture(fragment, name, start, anchor, owned)
+    }
+
+    // Source construction and binding publication must not enlarge the recursive
+    // capture frame: 1024 nested wrappers still fail safely on a 2 MiB stack.
+    #[inline(never)]
+    fn finish_capture(
+        &mut self,
+        mut fragment: Fragment,
+        name: &'static str,
+        start: usize,
+        anchor: usize,
+        owned: bool,
+    ) -> Option<Fragment> {
+        let span = fragment
+            .source
+            .as_deref()
+            .filter(|source| source.classic)
+            .map_or_else(|| self.span(start), |source| source.span);
+        if !owned {
+            // Keep the existing AST field contract and its input-only metadata.
+            if fragment
+                .source
+                .as_deref()
+                .is_some_and(|source| source.text.is_some() || source.generated)
+            {
+                self.fail("AST field capture requires original input source; use capture_owned for general replay");
+                return None;
             }
-            _ => unreachable!("recursive expression dispatched by variant"),
+            self.captures.push(name, span);
+            fragment.captures.push(Capture {
+                name,
+                span,
+                nodes: fragment.nodes.clone(),
+            });
+            return Some(fragment);
         }
+        let source = match fragment.source.as_deref().filter(|source| source.classic) {
+            Some(source) if source.generated => token::TokenSource::Generated {
+                anchor: source.span.start,
+                text: source.text.as_deref().unwrap_or("").to_owned(),
+            },
+            Some(source) if source.text.is_some() => token::TokenSource::Projected {
+                span,
+                text: Arc::clone(source.text.as_ref().unwrap()),
+            },
+            Some(source) if source.kind.is_virtual() && span.start == span.end => {
+                token::TokenSource::Generated {
+                    anchor,
+                    text: String::new(),
+                }
+            }
+            _ => token::TokenSource::Input(span),
+        };
+        self.owned_captures.push(name, source);
+        Some(fragment)
+    }
+
+    #[inline(never)]
+    fn expression_capture_scope(&mut self, child: &Expr, depth: usize) -> Option<Fragment> {
+        let mark = self.owned_captures.checkpoint();
+        let result = self.expression(child, depth);
+        self.owned_captures.rollback_checkpoint(mark);
+        result
     }
 
     #[inline(never)]
@@ -3561,6 +3737,11 @@ impl<'a> ParseContext<'a> {
                             captures.commit_checkpoint();
                             captures
                         },
+                        owned_captures: {
+                            let mut captures = self.owned_captures.clone();
+                            captures.commit_checkpoint();
+                            captures
+                        },
                         state: Rc::clone(&self.state),
                         scopes: {
                             let mut scopes = self.scopes.clone();
@@ -3598,6 +3779,7 @@ impl<'a> ParseContext<'a> {
             self.matched_position = winner.matched_position;
             self.nodes.extend(winner.nodes);
             self.captures = winner.captures;
+            self.owned_captures = winner.owned_captures;
             self.state = winner.state;
             self.tokens = winner.tokens;
             self.token_trace = winner.token_trace;
@@ -3869,6 +4051,7 @@ impl<'a> ParseContext<'a> {
             child,
             Expr::Literal(_)
                 | Expr::CaseInsensitive(_)
+                | Expr::Replay(_)
                 | Expr::Any
                 | Expr::CharRange(_, _)
                 | Expr::Except(_)
@@ -3982,6 +4165,8 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
         | Expr::InvertMatch(child)
         | Expr::StopInvert(child)
         | Expr::StopConsume(child)
+        | Expr::OwnedCapture(_, child)
+        | Expr::CaptureScope(child)
         | Expr::Capture(_, child)
         | Expr::TextValue(child)
         | Expr::ValueBoundary(child)
@@ -4019,6 +4204,7 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
         | Expr::JavaEmpty
         | Expr::JavaUntil(_)
         | Expr::Error(_)
+        | Expr::Replay(_)
         | Expr::Backreference(_) => true,
     }
 }
@@ -4065,7 +4251,10 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>) -> bo
         | Expr::Character { .. } => false,
         Expr::Custom(_)
         | Expr::CustomWith { .. }
+        | Expr::Replay(_)
         | Expr::Backreference(_)
+        | Expr::OwnedCapture(_, _)
+        | Expr::CaptureScope(_)
         | Expr::CaptureEquality { .. }
         | Expr::NamePredicate { .. }
         | Expr::NameResolutionScope { .. }
@@ -5328,7 +5517,10 @@ fn requires_classic_mode<'a>(expression: &'a Expr, rules: &'a [Rule]) -> bool {
     let mut current = Some(expression);
     while let Some(expression) = current.take().or_else(|| scan.next()) {
         current = match expression {
-            Expr::MatchOnly(_)
+            Expr::OwnedCapture(_, _)
+            | Expr::Replay(_)
+            | Expr::CaptureScope(_)
+            | Expr::MatchOnly(_)
             | Expr::InvertMatch(_)
             | Expr::StopInvert(_)
             | Expr::StopConsume(_)
