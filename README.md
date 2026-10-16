@@ -169,6 +169,8 @@ Classic Identifier, Number, and quoted tokens now [isolate their internal lexica
 
 See the [full-spec matrix](rust/FULL-SPEC.md) and [IDE inventory](docs/lsp-dap-ide-gap-inventory.md) for remaining limits: Rust incremental parsing, LSP cancellation / semantic tokens / rename and formatting transport, and some tokens and annotations are unsupported. DAP implements AST/token stepping, not live evaluator suspension. Numeric capture types/conversion and some diagnostics also differ between Java and Rust; compatibility with every Java grammar is not guaranteed.
 
+[Classic sequence trivia](docs/classic-sequence-trivia.md) now contributes the same collected source and code-point ranges in Java and Rust, including explicit Classic CST-to-AST mapping. The four token kinds retain their distinct source projection semantics.
+
 Downstream `tinyexpression-rs` and `rustcodeblock` AOT exist on the separate **ubnfc** engine. Their results do not establish Classic Rust parity or production deployment history. See the [engine guide](docs/engine-selection-guide-ja.md) and [pinned downstream audit](rust/FULL-SPEC.md#下流tinyexpressionの現状監査2026-09-30).
 
 ---
