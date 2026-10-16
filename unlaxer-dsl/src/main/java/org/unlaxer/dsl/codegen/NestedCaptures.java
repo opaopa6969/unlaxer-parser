@@ -1,0 +1,121 @@
+package org.unlaxer.dsl.codegen;
+
+import java.util.ArrayList;
+import java.util.List;
+import org.unlaxer.dsl.bootstrap.UBNFAST.*;
+import org.unlaxer.dsl.codegen.rust.GrammarIR;
+import org.unlaxer.dsl.codegen.rust.GrammarIR.Cardinality;
+import org.unlaxer.dsl.codegen.rust.GrammarIR.Kind;
+
+/** Opt-in recursive container schema. The legacy flat capture contract remains the default. */
+public final class NestedCaptures {
+    private NestedCaptures() {}
+    public static boolean enabled(RuleDecl rule) {
+        return rule.annotations().stream().anyMatch(a -> a instanceof SimpleAnnotation s && s.name().equals("nestedCaptures"));
+    }
+    public static void requireValid(GrammarDecl grammar) {
+        var issues=problems(grammar);
+        if (!issues.isEmpty()) throw new IllegalArgumentException(issues.get(0).message());
+    }
+    public static List<GrammarValidator.ValidationIssue> problems(GrammarDecl grammar) {
+        var result=new ArrayList<GrammarValidator.ValidationIssue>();
+        for (RuleDecl rule:grammar.rules()) if(enabled(rule)) {
+            try { validateRule(grammar,rule); }
+            catch(IllegalArgumentException error) { result.add(new GrammarValidator.ValidationIssue("E-NESTED-SHAPE",error.getMessage(),"Use supported explicit nested scalar containers.",rule.name())); }
+        }
+        return List.copyOf(result);
+    }
+    private static void validateRule(GrammarDecl grammar,RuleDecl rule) {
+            checkTraversal(rule.body(), 0);
+            if (rule.annotations().stream().filter(a -> a instanceof SimpleAnnotation s && s.name().equals("nestedCaptures")).count() != 1)
+                throw invalid(rule, "duplicate annotation");
+            var mapping = MapperElementUtil.getMappingAnnotation(rule).orElseThrow(() -> invalid(rule,"@mapping required"));
+            if (rule.annotations().stream().anyMatch(a -> a instanceof LeftAssocAnnotation || a instanceof RightAssocAnnotation || a instanceof SkipAnnotation || a instanceof EnumAnnotation || a instanceof EvalAnnotation || a instanceof CommonFieldAnnotation)
+                    || !TypeofConstraints.collect(rule).isEmpty() || TokenStreamGrammar.enabled(grammar))
+                throw invalid(rule,"combination requires the remaining #583 implementation");
+            var sites = new CaptureBindingPlan(rule);
+            if (sites.allSites().size() != mapping.paramNames().size()) throw invalid(rule,"mapping must name each unique outer capture");
+            for (String field : mapping.paramNames()) {
+                if (sites.sites(field).size() != 1) throw invalid(rule,"one capture site required for " + field);
+                shape(grammar, sites.sites(field).get(0).element(), 0);
+            }
+            // Captures hidden by an enclosing quantifier would need an implicit container.
+            requireOuter(rule, rule.body(), false);
+            long family = grammar.rules().stream().filter(r -> MapperElementUtil.getMappingAnnotation(r).map(m -> m.className().equals(mapping.className())).orElse(false)).count();
+            if (family != 1) throw invalid(rule,"shared mapping requires the remaining #583 implementation");
+    }
+    private static void requireOuter(RuleDecl rule, RuleBody body, boolean inside) {
+        if (body instanceof ChoiceBody c) { for (var s : c.alternatives()) requireOuter(rule,s,inside); }
+        else for (var e : ((SequenceBody)body).elements()) {
+            if (e.captureName().isPresent()) {
+                if (inside) throw invalid(rule,"capture must own its complete container");
+            }
+            visitOuter(rule,e.element(),inside || e.captureName().isPresent());
+        }
+    }
+    private static void visitOuter(RuleDecl rule, AtomicElement e, boolean inside) {
+        if (e instanceof GroupElement g) requireOuter(rule,g.body(),inside);
+        else if (e instanceof OptionalElement o) requireOuter(rule,o.body(),true);
+        else if (e instanceof RepeatElement r) requireOuter(rule,r.body(),true);
+        else if (e instanceof OneOrMoreElement r) visitOuter(rule,r.body(),true);
+        else if (e instanceof BoundedRepeatElement r) visitOuter(rule,r.body(),true);
+        else if (e instanceof SeparatedElement r) { visitOuter(rule,r.element(),true);visitOuter(rule,r.separator(),true); }
+    }
+    public static GrammarIR.NestedShape field(GrammarDecl grammar, RuleDecl rule, String name) {
+        checkTraversal(rule.body(), 0);
+        return shape(grammar,new CaptureBindingPlan(rule).sites(name).get(0).element(),0);
+    }
+    // Bound preparatory capture/typeof visitors before constructing their recursive plans.
+    private static void checkTraversal(Object value, int depth) {
+        if (depth > 64) throw new IllegalArgumentException("E-NESTED-SHAPE: capture traversal depth exceeds 64");
+        if (value instanceof ChoiceBody c) for (var alternative : c.alternatives()) checkTraversal(alternative, depth + 1);
+        else if (value instanceof SequenceBody s) for (var element : s.elements()) checkTraversal(element.element(), depth + 1);
+        else if (value instanceof GroupElement e) checkTraversal(e.body(), depth + 1);
+        else if (value instanceof OptionalElement e) checkTraversal(e.body(), depth + 1);
+        else if (value instanceof RepeatElement e) checkTraversal(e.body(), depth + 1);
+        else if (value instanceof OneOrMoreElement e) checkTraversal(e.body(), depth + 1);
+        else if (value instanceof BoundedRepeatElement e) checkTraversal(e.body(), depth + 1);
+        else if (value instanceof SeparatedElement e) { checkTraversal(e.element(), depth + 1); checkTraversal(e.separator(), depth + 1); }
+    }
+    public static GrammarIR.NestedShape shape(GrammarDecl grammar, AtomicElement element, int depth) {
+        if (depth > 32) throw new IllegalArgumentException("E-NESTED-SHAPE: schema depth exceeds 32");
+        if (element instanceof OptionalElement e) return wrap(Cardinality.OPTIONAL,body(grammar,e.body(),depth+1));
+        if (element instanceof RepeatElement e) return wrap(Cardinality.MANY,body(grammar,e.body(),depth+1));
+        if (element instanceof OneOrMoreElement e) return wrap(Cardinality.MANY,shape(grammar,e.body(),depth+1));
+        if (element instanceof BoundedRepeatElement e) return wrap(Cardinality.MANY,shape(grammar,e.body(),depth+1));
+        if (element instanceof GroupElement e) return body(grammar,e.body(),depth+1);
+        if (element instanceof TerminalElement) return new GrammarIR.NestedShape(Kind.TEXT,null,List.of());
+        if (element instanceof RuleRefElement e) {
+            var token=grammar.tokens().stream().filter(t->t.name().equals(e.name())).findFirst().orElseThrow(()->new IllegalArgumentException("E-NESTED-SHAPE: rule aliases/nodes require the remaining #583 implementation"));
+            boolean integer=token instanceof TokenDecl.Simple t && List.of("NumberParser","DigitParser").contains(t.parserClass().substring(t.parserClass().lastIndexOf('.')+1));
+            return new GrammarIR.NestedShape(integer?Kind.INTEGER:Kind.TEXT,null,List.of());
+        }
+        throw new IllegalArgumentException("E-NESTED-SHAPE: unsupported element " + element.getClass().getSimpleName());
+    }
+    public static GrammarIR.NestedShape body(GrammarDecl grammar, RuleBody body, int depth) {
+        var sequences=body instanceof ChoiceBody c?c.alternatives():List.of((SequenceBody)body);
+        GrammarIR.NestedShape result=null;
+        for (var sequence:sequences) {
+            GrammarIR.NestedShape current;
+            if (sequence.elements().size()==1) current=shape(grammar,sequence.elements().get(0).element(),depth+1);
+            else {
+                for (var e:sequence.elements()) if (!shape(grammar,e.element(),depth+1).containers().isEmpty()) throw new IllegalArgumentException("E-NESTED-SHAPE: multi-element container group needs an explicit mapped node");
+                current=new GrammarIR.NestedShape(Kind.TEXT,null,List.of());
+            }
+            if (result!=null && (!result.equals(current) || !current.containers().isEmpty())) throw new IllegalArgumentException("E-NESTED-SHAPE: heterogeneous/container choice requires the remaining #583 implementation");
+            result=current;
+        }
+        if (result==null) throw new IllegalArgumentException("E-NESTED-SHAPE: empty body");
+        return result;
+    }
+    private static GrammarIR.NestedShape wrap(Cardinality container,GrammarIR.NestedShape inner) {
+        var containers=new ArrayList<Cardinality>();containers.add(container);containers.addAll(inner.containers());
+        return new GrammarIR.NestedShape(inner.leaf(),inner.enumName(),containers);
+    }
+    public static String javaType(GrammarIR.NestedShape shape) {
+        String type=shape.leaf()==Kind.INTEGER?"Integer":"String";
+        for(int i=shape.containers().size()-1;i>=0;i--) type=(shape.containers().get(i)==Cardinality.OPTIONAL?"Optional":"List")+"<"+type+">";
+        return type;
+    }
+    private static IllegalArgumentException invalid(RuleDecl rule,String detail) { return new IllegalArgumentException("E-NESTED-SHAPE: " + rule.name() + ": " + detail); }
+}

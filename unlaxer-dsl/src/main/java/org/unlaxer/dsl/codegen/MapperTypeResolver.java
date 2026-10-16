@@ -38,6 +38,7 @@ class MapperTypeResolver {
 
     // inferType logic is borrowed from ASTGenerator to keep generated constructor argument types compile-safe.
     static String inferType(GrammarDecl grammar, RuleDecl rule, String fieldName) {
+        if (NestedCaptures.enabled(rule)) return NestedCaptures.javaType(NestedCaptures.field(grammar,rule,fieldName));
         return new SemanticCardinality(grammar).fieldType(rule, fieldName, inferLegacyType(grammar, rule, fieldName));
     }
 

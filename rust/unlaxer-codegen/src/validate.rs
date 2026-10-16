@@ -179,6 +179,11 @@ pub(super) fn validate(ir: &GrammarIr) -> Result<(), GenerateError> {
         let mut constraint_fields = BTreeMap::new();
         for constraint in &rule.type_constraints {
             for value in [&constraint.capture, &constraint.reference] {
+                if matches!(value.kind, Kind::Nested { .. }) {
+                    return Err(fail(
+                        "E-NESTED-SHAPE: typeof requires remaining #583 implementation",
+                    ));
+                }
                 identifier(&value.name)?;
                 if constraint_fields
                     .insert(&value.name, value)
@@ -271,6 +276,19 @@ pub(super) fn validate(ir: &GrammarIr) -> Result<(), GenerateError> {
             let mut fields = BTreeSet::new();
             for field in &mapping.fields {
                 identifier(&field.name)?;
+                if let Kind::Nested { leaf, containers } = &field.kind {
+                    if field.cardinality != Cardinality::One
+                        || containers.len() > 32
+                        || !matches!(**leaf, Kind::Text | Kind::Integer)
+                        || containers.contains(&Cardinality::One)
+                        || !rule.type_constraints.is_empty()
+                        || rule.operator.is_some()
+                    {
+                        return Err(fail(
+                            "E-NESTED-SHAPE: invalid or unsupported nested capture schema",
+                        ));
+                    }
+                }
                 if let Kind::Enum(name) = &field.kind {
                     if !enum_names.contains(name.as_str()) {
                         return Err(fail("E-ENUM: unknown enum field type"));
@@ -321,6 +339,9 @@ fn transparent_constraint_projection(root: &Expression) -> bool {
             Capture { expression, .. }
             | Delimited(expression)
             | ValueBoundary(expression)
+            | CaptureBoundary {
+                child: expression, ..
+            }
             | NamePredicate {
                 child: expression, ..
             }
@@ -385,6 +406,9 @@ fn root_reaches_projection_boundary(ir: &GrammarIr) -> bool {
                 | Delimited(expression)
                 | TextValue(expression)
                 | ValueBoundary(expression)
+                | CaptureBoundary {
+                    child: expression, ..
+                }
                 | RuleEffects {
                     child: expression, ..
                 }
@@ -541,6 +565,7 @@ fn expression(
         | Delimited(child)
         | TextValue(child)
         | ValueBoundary(child)
+        | CaptureBoundary { child, .. }
         | TriviaScope { child, .. } => expression(child, count, captures)?,
         LexicalContextScope { child, terminals } => {
             if terminals.len() > 256 {

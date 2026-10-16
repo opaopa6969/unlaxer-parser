@@ -36,6 +36,9 @@ pub(crate) fn refine(grammar: &GrammarDecl, ir: &mut GrammarIr) {
             })
             .collect();
         for field in &mut mapped.fields {
+            if matches!(field.kind, Kind::Nested { .. }) {
+                continue;
+            }
             if contributors.iter().all(|r| {
                 let mut captures = Vec::new();
                 collect(grammar, &r.body, &field.name, &mut captures);
