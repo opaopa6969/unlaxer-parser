@@ -108,9 +108,8 @@ including projected/detached capture storage, [external Tiny code-fence mode gra
 and observer-exception boundaries (#564). The earlier PEG diagnostic-frontier gap
 also remains tracked in #545; new Classic-entry cases do not prove all legacy
 PEG/TokenExpr entry diagnostics equivalent. The original-input capture store
-rejects a projected or detached capture instead of replaying a different input slice. Native
-code-fence scanners without a mode-aware implementation reject this explicit
-mode; normal native parsing remains available. Classic `JavaUntil` and positive /
+rejects a projected or detached capture instead of replaying a different input slice. The Tiny code-fence adapters now have mode-aware implementations (see below).
+Other unsupported native scanner shapes still reject this explicit mode. Classic `JavaUntil` and positive /
 negative `JavaLookahead` preserve their distinct runtime APIs and have shared
 handwritten cases. Full generated capture/replay integration must be verified
 separately before claiming that remaining scope.
@@ -130,3 +129,5 @@ policies. Java also checks actual success-memo hits/tree copying and exceptional
 child frames. Rust additionally checks committed trace and the existing standard
 2 MiB recursion/resource tests. Callback exception rows use Java unchecked
 exceptions and Rust `ParseError`; Rust panics are not asserted to be recoverable.
+
+Tiny CodeStart/CodeEnd/LongCodeBlock also support explicit Classic modes; see the [pinned real-parser contract and corpus](tiny-classic-modes.md).
