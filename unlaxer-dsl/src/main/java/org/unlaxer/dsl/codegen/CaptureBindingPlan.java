@@ -59,6 +59,7 @@ final class CaptureBindingPlan {
         else if(element instanceof RepeatElement e) markNestedMixed(grammar,e.body());
         else if(element instanceof OneOrMoreElement e) markNestedMixed(grammar,e.body());
         else if(element instanceof BoundedRepeatElement e) markNestedMixed(grammar,e.body());
+        else if(element instanceof SeparatedElement e) markNestedMixed(grammar,e.element());
     }
 
     private void markSemanticValues(RuleBody body, SemanticCardinality semantics) {
