@@ -19,9 +19,16 @@ public final class NestedCaptures {
     }
     public static List<GrammarValidator.ValidationIssue> problems(GrammarDecl grammar) {
         var result=new ArrayList<GrammarValidator.ValidationIssue>();
+        var checkedMappings=new java.util.HashSet<String>();
         for (RuleDecl rule:grammar.rules()) if(enabled(rule)) {
             try { validateRule(grammar,rule); }
             catch(IllegalArgumentException error) { result.add(new GrammarValidator.ValidationIssue("E-NESTED-SHAPE",error.getMessage(),"Use supported explicit nested scalar containers.",rule.name())); }
+        }
+        // Validate each contributor before cross-rule traversal and shape comparison.
+        if (result.isEmpty()) for (RuleDecl rule:grammar.rules()) if(enabled(rule)) {
+            var mapping=MapperElementUtil.getMappingAnnotation(rule).orElseThrow();
+            if(checkedMappings.add(mapping.className())) try { requireSharedShape(grammar,rule,mapping); }
+            catch(IllegalArgumentException error) { result.add(new GrammarValidator.ValidationIssue("E-NESTED-SHAPE",error.getMessage(),"Use identical recursive field schemas.",rule.name())); }
         }
         return List.copyOf(result);
     }
@@ -30,7 +37,7 @@ public final class NestedCaptures {
             if (rule.annotations().stream().filter(a -> a instanceof SimpleAnnotation s && s.name().equals("nestedCaptures")).count() != 1)
                 throw invalid(rule, "duplicate annotation");
             var mapping = MapperElementUtil.getMappingAnnotation(rule).orElseThrow(() -> invalid(rule,"@mapping required"));
-            if (rule.annotations().stream().anyMatch(a -> a instanceof LeftAssocAnnotation || a instanceof RightAssocAnnotation || a instanceof SkipAnnotation || a instanceof EnumAnnotation || a instanceof EvalAnnotation || a instanceof CommonFieldAnnotation)
+            if (rule.annotations().stream().anyMatch(a -> a instanceof LeftAssocAnnotation || a instanceof RightAssocAnnotation || a instanceof SkipAnnotation || a instanceof EnumAnnotation || a instanceof EvalAnnotation || a instanceof CommonFieldAnnotation && !mapping.paramNames().isEmpty())
                     || !TypeofConstraints.collect(rule).isEmpty() || TokenStreamGrammar.enabled(grammar))
                 throw invalid(rule,"combination requires the remaining #583 implementation");
             var sites = new CaptureBindingPlan(rule);
@@ -41,8 +48,20 @@ public final class NestedCaptures {
             }
             // Captures hidden by an enclosing quantifier would need an implicit container.
             requireOuter(rule, rule.body(), false);
-            long family = grammar.rules().stream().filter(r -> MapperElementUtil.getMappingAnnotation(r).map(m -> m.className().equals(mapping.className())).orElse(false)).count();
-            if (family != 1) throw invalid(rule,"shared mapping requires the remaining #583 implementation");
+    }
+    // Recursive containers cannot use the legacy flat Object/Value join without losing shape.
+    private static void requireSharedShape(GrammarDecl grammar,RuleDecl owner,MappingAnnotation mapping) {
+        for(var candidate:grammar.rules()) {
+            var other=MapperElementUtil.getMappingAnnotation(candidate).orElse(null);
+            if(other==null || !other.className().equals(mapping.className()) || candidate==owner) continue;
+            if(!enabled(candidate) || !mapping.paramNames().equals(other.paramNames()))
+                throw invalid(owner,"shared nested mapping requires identical opt-in and parameters: "+candidate.name());
+            var sites=new CaptureBindingPlan(candidate);
+            for(String name:mapping.paramNames()) {
+                if(sites.sites(name).size()!=1 || !field(grammar,owner,name).equals(shape(grammar,sites.sites(name).get(0).element(),0)))
+                    throw invalid(owner,"shared nested mapping requires identical shape for "+name+" on "+candidate.name());
+            }
+        }
     }
     private static void requireOuter(RuleDecl rule, RuleBody body, boolean inside) {
         if (body instanceof ChoiceBody c) { for (var s : c.alternatives()) requireOuter(rule,s,inside); }

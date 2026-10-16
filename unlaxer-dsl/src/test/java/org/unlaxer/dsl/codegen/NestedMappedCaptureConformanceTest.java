@@ -73,7 +73,8 @@ public class NestedMappedCaptureConformanceTest extends NestedCaptureConformance
         assertEquals(evaluation,evaluator.getMethod("eval",astType).invoke(evaluator.getConstructor().newInstance(),ast));
         var parser=(org.unlaxer.parser.Parser)loader.loadClass("org.example.nestedcaptures."+grammar.name()+"Parsers").getMethod("getRootParser").invoke(null);
         try(var context=new org.unlaxer.context.ParseContext(org.unlaxer.StringSource.createRootSource(row.get("input").getAsString()))) {
-            var token=parser.parse(context).getRootToken();
+            assertTrue(parser.parse(context).isSucceeded());
+            var token=context.getCurrent().getTokens().stream().filter(t->t.parser==parser).findFirst().orElseThrow();
             var leaves=new com.google.gson.JsonArray();
             collectTokenLeaves(token,leaves);
             assertEquals(grammar.name()+" original nested leaves",row.get("leaves"),leaves);
