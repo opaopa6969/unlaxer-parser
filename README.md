@@ -175,6 +175,8 @@ The development branch supports [literal enum values](docs/enum-values.md) in Ja
 
 See the [full-spec matrix](rust/FULL-SPEC.md) and [IDE inventory](docs/lsp-dap-ide-gap-inventory.md) for remaining limits: Rust incremental parsing, LSP cancellation / semantic tokens / rename and formatting transport, and some tokens and annotations are unsupported. DAP implements AST/token stepping, not live evaluator suspension. Some diagnostics and AST candidate/container behavior still differ between Java and Rust; compatibility with every Java grammar is not guaranteed.
 
+[Zero-bound repetitions](docs/zero-repetition.md) now perform no child or terminator evaluation in both runtimes and generated grammars. Historical Java `Zero` / `LazyZero` / `EOF` negative checks remain available through distinct semantics, including Rust `zero_match`. These development changes preserve both cursors and transactional state.
+
 Downstream `tinyexpression-rs` and `rustcodeblock` AOT exist on the separate **ubnfc** engine. Their results do not establish Classic Rust parity or production deployment history. See the [engine guide](docs/engine-selection-guide-ja.md) and [pinned downstream audit](rust/FULL-SPEC.md#下流tinyexpressionの現状監査2026-09-30).
 
 ---
