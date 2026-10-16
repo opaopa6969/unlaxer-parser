@@ -1,7 +1,8 @@
 grammar ValueEval {
   @package: org.example.valueeval
   token TEXT = UNTIL(')')
-  @root Root ::= Single | OptionalValue | Many | Pass;
+  token NUM = NumberParser
+  @root Root ::= IntegerValue | MaybeInteger | Integers | Single | OptionalValue | Many | Pass;
   @enum Mode ::= 'on' | 'off';
   @mapping(Node,params=[text]) Node ::= 'n(' TEXT @text ')';
   @mapping(Single,params=[value]) @eval(kind='literal')
@@ -12,4 +13,10 @@ grammar ValueEval {
   Many ::= 'a(' { Mode | Node | 'raw' } @value ')';
   @mapping(Pass,params=[value]) @eval(kind='passthrough')
   Pass ::= 'p(' (Mode | Node | 'raw') @value ')';
+  @mapping(IntegerValue,params=[value]) @eval(kind='literal')
+  IntegerValue ::= 'i(' NUM @value ')';
+  @mapping(MaybeInteger,params=[value]) @eval(kind='literal')
+  MaybeInteger ::= 'j(' [ NUM ] @value ')';
+  @mapping(Integers,params=[value]) @eval(kind='literal')
+  Integers ::= 'k(' { NUM @value ',' } ')';
 }

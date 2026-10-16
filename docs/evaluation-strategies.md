@@ -39,7 +39,7 @@ conversion is performed by literal/passthrough defaults.
 
 Rust `Semantics::Output` remains application-defined. Auto-generated methods have
 default bodies; manual/unknown methods remain required. Value conversion uses
-`convert_value(EvalValue<'_>, Span)` with borrowed text/node/enum and explicit
+`convert_value(EvalValue<'_>, Span)` with borrowed text/node/enum, checked `i32` values, and explicit
 optional/list shapes. Consumers inspect this enum exhaustively. Value conversion
 and resolver/arithmetic hooks are required only when used by an automatic kind.
 
@@ -79,6 +79,10 @@ native-host Rust source byte for byte, and compare complete API schemas.
 Manual/unknown methods and conversion hooks are checked by intentionally
 compiling incomplete implementations. Generated default methods appear as
 optional implementations in the API schema; required helpers remain visible.
+
+Java impact overload handling (`evalLeaf(AST.Leaf)` alongside its existing
+`evalLeaf(String)` hook) is tracked separately in #574; this change does not
+complete that existing inspection gap.
 
 Existing grammars without automatic evaluation retain the old evaluator text and
 manual semantics obligations. Public parser IR layouts do not change: evaluation
