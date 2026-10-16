@@ -467,6 +467,11 @@ public final class RustGrammarLowering {
             if (!a.name().equals(b.name()) || a.cardinality() != b.cardinality()) {
                 throw unsupported("incompatible shared mapping schema " + left.name());
             }
+            if (a.kind() == Kind.NESTED || b.kind() == Kind.NESTED) {
+                if (!a.equals(b)) throw unsupported("E-NESTED-SHAPE: incompatible shared mapping schema " + left.name());
+                fields.add(a);
+                continue;
+            }
             Kind kind = a.kind() == b.kind() && java.util.Objects.equals(a.enumName(),b.enumName()) ? a.kind() : Kind.VALUE;
             fields.add(new Field(a.name(), kind, a.cardinality(),kind == Kind.ENUM ? a.enumName() : null));
         }

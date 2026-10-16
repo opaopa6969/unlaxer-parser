@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use unlaxer_codegen::{BoundaryKind, Cardinality, Expression, Kind};
 use unlaxer_ubnf::{
     AnnotationKind, AtomicElement, ElementKind, GrammarDecl, RuleBody, RuleDecl, TokenKind,
@@ -78,6 +78,8 @@ pub fn sites(rule: &RuleDecl) -> Result<BTreeMap<String, &AtomicElement>, String
     Ok(result)
 }
 pub fn validate(grammar: &GrammarDecl) -> Result<(), String> {
+    let mut checked_mappings = HashSet::new();
+    let mut validated = Vec::new();
     for rule in &grammar.rules {
         if !enabled(rule) {
             continue;
@@ -116,13 +118,20 @@ pub fn validate(grammar: &GrammarDecl) -> Result<(), String> {
                     | AnnotationKind::Skip
                     | AnnotationKind::Enum
                     | AnnotationKind::Eval { .. }
-                    | AnnotationKind::CommonField { .. }
             )
         }) {
             return Err(error(
                 rule,
                 "combination requires remaining #583 implementation",
             ));
+        }
+        if !mapping.1.is_empty()
+            && rule
+                .annotations
+                .iter()
+                .any(|a| matches!(a.kind, AnnotationKind::CommonField { .. }))
+        {
+            return Err(error(rule, "commonField requires a mapped sum family"));
         }
         let values = sites(rule)?;
         if values.len() != mapping.1.len() || !mapping.1.iter().all(|p| values.contains_key(p)) {
@@ -131,9 +140,84 @@ pub fn validate(grammar: &GrammarDecl) -> Result<(), String> {
         for value in values.values() {
             shape(grammar, value, 0).map_err(|e| error(rule, &e))?;
         }
-        if grammar.rules.iter().filter(|r|r.annotations.iter().any(|a|matches!(&a.kind,AnnotationKind::Mapping{class_name,..} if class_name==mapping.0))).count()!=1 {return Err(error(rule,"shared mapping requires remaining #583 implementation"));}
+        validated.push((rule, mapping, values));
+    }
+    // Cross-rule comparison only follows bounded validation of every contributor.
+    for (rule, mapping, values) in validated {
+        if !checked_mappings.insert(mapping.0.clone()) {
+            continue;
+        }
+        for candidate in &grammar.rules {
+            let Some(params) = candidate.annotations.iter().find_map(|a| match &a.kind {
+                AnnotationKind::Mapping { class_name, params } if class_name == mapping.0 => {
+                    Some(params)
+                }
+                _ => None,
+            }) else {
+                continue;
+            };
+            if std::ptr::eq(candidate, rule) {
+                continue;
+            }
+            if !enabled(candidate) || params != mapping.1 {
+                return Err(error(
+                    rule,
+                    &format!(
+                        "shared nested mapping requires identical opt-in and parameters: {}",
+                        candidate.name
+                    ),
+                ));
+            }
+            let other_sites = sites(candidate)?;
+            for name in mapping.1 {
+                let own = values[name];
+                let Some(other) = other_sites.get(name) else {
+                    return Err(error(rule, "shared nested mapping is missing a capture"));
+                };
+                if shape(grammar, own, 0).map_err(|e| error(rule, &e))?
+                    != shape(grammar, other, 0).map_err(|e| error(rule, &e))?
+                    || nominal_leaf(grammar, own) != nominal_leaf(grammar, other)
+                {
+                    return Err(error(
+                        rule,
+                        &format!(
+                            "shared nested mapping requires identical shape for {name} on {}",
+                            candidate.name
+                        ),
+                    ));
+                }
+            }
+        }
     }
     Ok(())
+}
+// Rust stores every mapped node in Ast; sharing must still respect Java's nominal leaf type.
+fn nominal_leaf(grammar: &GrammarDecl, atom: &AtomicElement) -> Option<String> {
+    match &atom.kind {
+        ElementKind::RuleRef { name, .. } => grammar
+            .rules
+            .iter()
+            .find(|r| r.name == *name)
+            .and_then(|r| {
+                r.annotations.iter().find_map(|a| match &a.kind {
+                    AnnotationKind::Mapping { class_name, .. } => Some(class_name.clone()),
+                    _ => None,
+                })
+            }),
+        ElementKind::Group(body) | ElementKind::Optional(body) | ElementKind::Repeat(body) => {
+            let [sequence] = body.alternatives.as_slice() else {
+                return None;
+            };
+            let [element] = sequence.elements.as_slice() else {
+                return None;
+            };
+            nominal_leaf(grammar, &element.element)
+        }
+        ElementKind::OneOrMore(child) | ElementKind::BoundedRepeat { element: child, .. } => {
+            nominal_leaf(grammar, child)
+        }
+        _ => None,
+    }
 }
 fn parts(shape: Kind) -> (Kind, Vec<Cardinality>) {
     if let Kind::Nested { leaf, containers } = shape {
