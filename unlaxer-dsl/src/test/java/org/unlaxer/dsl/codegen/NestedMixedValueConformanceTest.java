@@ -131,6 +131,10 @@ public class NestedMixedValueConformanceTest extends PreferredAstConformanceTest
             if(rust)source=source.replace("let value=generated::evaluator::evaluate(&ast,&mut Eval);", "let value=generated::evaluator::evaluate(&ast,&mut Eval);assert_eq!(ast.common_root().unwrap().values.observe(),value);").replace("fn eval_root(&mut self,values:&__RUST_TYPE__,_span:Span)->String{values.observe()}","fn eval_first(&mut self,values:&__RUST_TYPE__,_span:Span)->String{values.observe()}\n fn eval_second(&mut self,values:&__RUST_TYPE__,_span:Span)->String{values.observe()}");
             else source=source.replace("@Override protected JsonElement evalRoot(NestedMixedAST.Root node){checkType(node);return value(node.values());}","@Override protected JsonElement evalFirst(NestedMixedAST.First node){checkType(node);return value(node.values());}\n @Override protected JsonElement evalSecond(NestedMixedAST.Second node){checkType(node);return value(node.values());}");
         }
+        if(fixture.has("leafType")) {
+            String leaf=fixture.get("leafType").getAsString();
+            source=source.replace("Leaf",leaf).replace("eval_leaf","eval_"+leaf.replaceAll("([a-z])([A-Z])","$1_$2").toLowerCase(Locale.ROOT));
+        }
         return source
             .replace("__MIXED_HANDLERS__",handlers).replace("__JAVA_TYPE__",fixture.get("javaType").getAsString()).replace("__RUST_TYPE__",fixture.get("rustType").getAsString())
             .replace("NestedMixed",fixture.has("apiName")?fixture.get("apiName").getAsString():"NestedMixed");

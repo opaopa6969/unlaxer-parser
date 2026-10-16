@@ -100,11 +100,5 @@
     "grammar": "grammar Invalid { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= 'a' % CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE('a'))))))))))))))))))))))))))))))))) @value; }",
     "startCP": 55,
     "endCP": 628
-  },
-  {
-    "id": "separated-mixed-leaf",
-    "grammar": "grammar Invalid { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= ('a' | Leaf) % ',' @value; @mapping(Leaf,params=[text]) Leaf ::= 'b' @text; }",
-    "startCP": 55,
-    "endCP": 142
   }
 ]
