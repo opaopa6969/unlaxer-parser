@@ -30,6 +30,9 @@ public class GeneralTokenPropagationTest {
                 : new String(HexFormat.of().parseHex(value), StandardCharsets.UTF_8);
     }
 
+    private static final class RangeParser extends org.unlaxer.parser.elementary.SingleCharacterParser {
+        @Override public boolean isMatch(int cp) {return cp >= 'a' && cp <= 'c';}
+    }
     private static Parser word(String value) {
         return new WordParser(value);
     }
@@ -42,10 +45,36 @@ public class GeneralTokenPropagationTest {
         return new DoConsumePropagationStopper(child);
     }
 
+    private static Parser generated(boolean forceVirtual) {
+        return new NoneChildParser() {
+            @Override public Parser createParser() {return this;}
+            @Override public Parsed parse(ParseContext context,TokenKind kind,boolean invert) {
+                TokenKind actual=forceVirtual?TokenKind.virtualTokenMatchOnly:kind;
+                Token token=new Token(actual,StringSource.createDetachedSource("x"),this);
+                context.getCurrent().addToken(token,actual);
+                return new Parsed(token);
+            }
+        };
+    }
     private static Parser parser(String scenario) {
         return switch (scenario) {
+            case "generated" -> new Chain(generated(false));
+            case "match-generated" -> match(generated(true));
+            case "lookahead" -> new MatchOnly(word("a"));
+            case "negative" -> new Not(word("a"));
+            case "until" -> new org.unlaxer.parser.elementary.WildCardStringTerminatorParser(";");
+            case "longest" -> new LongestChoice(word("a"),word("ab"));
+            case "unique-longest" -> new UniqueLongestChoice(word("a"),word("ab"));
+            case "unique-tie" -> new UniqueLongestChoice(word("a"),word("a"));
+            case "any" -> new org.unlaxer.parser.elementary.WildCardCharacterParser();
+            case "grapheme" -> new org.unlaxer.parser.elementary.GraphemeParser();
+            case "unicode-ci" -> new org.unlaxer.parser.elementary.UnicodeIgnoreCaseWordParser("k");
+            case "range" -> new RangeParser();
+            case "eof" -> new org.unlaxer.parser.elementary.EndOfSourceParser();
+            case "java-empty" -> new org.unlaxer.parser.elementary.EmptyParser();
             case "word-a" -> word("a");
             case "word-b" -> word("b");
+            case "word-x" -> word("x");
             case "word-ab" -> word("ab");
             case "empty-word" -> word("");
             case "match-word" -> match(word("a"));
@@ -66,6 +95,7 @@ public class GeneralTokenPropagationTest {
             case "nested-consume" -> match(new Chain(word("a"), consume(word("a")), word("b")));
             case "after-match" -> new Chain(word("a"), match(word("b")));
             case "chain-bb" -> new Chain(word("b"), word("b"));
+            case "choice-failure" -> new Choice(word("x"),word("y"));
             case "choice-rollback" ->
                     new Choice(new Chain(word("a"), word("x")), new Chain(word("a"), word("b")));
             case "match-nonordered" -> match(new NonOrdered(word("b"), word("a")));
@@ -122,7 +152,7 @@ public class GeneralTokenPropagationTest {
                 Files.readAllLines(Path.of("../conformance/token-propagation/cases.tsv")).stream()
                         .filter(line -> !line.startsWith("#") && !line.isBlank())
                         .toList();
-        assertEquals(67, rows.size());
+        assertEquals(166, rows.size());
         var failures = new ArrayList<String>();
         for (Memoization memo : Memoization.values()) {
             for (ParseOptions.Diagnostics diagnostics : ParseOptions.Diagnostics.values()) {
@@ -319,6 +349,9 @@ public class GeneralTokenPropagationTest {
                             }
                             parsed = parser.parse(context);
                             assertEquals(label, c[3].equals("success"), parsed.isSucceeded());
+                            if (c[1].equals("raw-consume")) {
+                                assertEquals("matchOnly@2:0:~", signature(parsed.getRootToken()));
+                            }
                             if (c[1].equals("success")) {
                                 var atomLeaves = new ArrayList<Token>();
                                 leaves(parsed.getRootToken(), atomLeaves);
