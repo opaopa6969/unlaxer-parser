@@ -1024,6 +1024,7 @@ enum ExpectedIds {
 
 #[derive(Debug, Clone, Default)]
 struct FailureDiagnostic {
+    // Only memo entries use this field; diagnostic merging does not change it.
     memo_expression_depth: usize,
     farthest: Option<usize>,
     expected: ExpectedIds,
@@ -2463,10 +2464,7 @@ impl<'a> ParseContext<'a> {
             if let Some(diagnostic) = self
                 .failure_memo
                 .probe(position, &key)
-                .filter(|entry| {
-                    self.token_mode.is_none()
-                        || self.expression_depth <= entry.memo_expression_depth
-                })
+                .filter(|entry| self.expression_depth <= entry.memo_expression_depth)
                 .cloned()
             {
                 self.memoized_failure_hits += 1;
@@ -2520,7 +2518,6 @@ impl<'a> ParseContext<'a> {
                     parent.merge(&diagnostic);
                 }
                 if result.is_none() && self.token_mode.is_some() {
-                    diagnostic.memo_expression_depth = self.expression_depth;
                     diagnostic.classic_failure_end =
                         Some((self.matched_position, self.match_cursor_policy));
                 }
@@ -2528,7 +2525,6 @@ impl<'a> ParseContext<'a> {
             } else {
                 let mut diagnostic = FailureDiagnostic::default();
                 if result.is_none() && self.token_mode.is_some() {
-                    diagnostic.memo_expression_depth = self.expression_depth;
                     diagnostic.classic_failure_end =
                         Some((self.matched_position, self.match_cursor_policy));
                 }
@@ -2543,6 +2539,8 @@ impl<'a> ParseContext<'a> {
                         self.memoize_success(position, key, count, root, capture_mark, diagnostic);
                     }
                 } else {
+                    let mut diagnostic = diagnostic;
+                    diagnostic.memo_expression_depth = self.expression_depth;
                     self.failure_memo
                         .insert(position / FAILURE_MEMO_BUCKET_SIZE, key, diagnostic);
                 }

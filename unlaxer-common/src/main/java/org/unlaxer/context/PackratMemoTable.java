@@ -97,6 +97,11 @@ public final class PackratMemoTable {
       table.reportEvictionUnderrun(positionKey.consumed());
     }
     Entry entry = table.get(parser, positionKey);
+    // A hit must have at least the resource budget available on the original
+    // evaluation. Shallower retries keep their existing reuse and stack rebasing.
+    if (entry != null && parseContext.activeParseDepth() > entry.diagnostic.memoParseDepth) {
+      return null;
+    }
     if (entry != null) {
       int lookback = table.highWater - positionKey.consumed();
       if (lookback > table.maxHitLookback) table.maxHitLookback = lookback;

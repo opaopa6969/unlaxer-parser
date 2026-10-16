@@ -686,6 +686,7 @@ public class ParseContext implements
    */
   public static final class FailureDiagnostic {
     int stackBaseDepth;
+    int memoParseDepth;
     int transactionBaseDepth;
     int farthestConsumedOffset;
     int farthestMatchedOffset;
@@ -1211,6 +1212,7 @@ public class ParseContext implements
 
   FailureDiagnostic beginMemoDiagnosticFrame() {
     FailureDiagnostic frame = new FailureDiagnostic();
+    frame.memoParseDepth = activeParseDepth();
     frame.transactionBaseDepth = tokenStack.size();
     if (memoTransactionFrameCount == memoTransactionFrames.length) {
       memoTransactionFrames = Arrays.copyOf(memoTransactionFrames, memoTransactionFrameCount * 2);
@@ -1583,11 +1585,16 @@ public class ParseContext implements
     trackCursorProgress();
   }
 
+  /** Active resource budget is part of a memoized parser invocation. */
+  int activeParseDepth() {
+    return deferredDiagnostics ? deferredFrameDepth : parseFrames.size();
+  }
+
   @Override
   public void startParse(Parser parser, ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
     requireObserverHealthy();
     if (parseLimitFailure != null) throw parseLimitFailure;
-    int activeDepth = deferredDiagnostics ? deferredFrameDepth : parseFrames.size();
+    int activeDepth = activeParseDepth();
     if (activeDepth == 0) beginObserverBoundary(false);
     if (activeDepth >= MAX_PARSE_DEPTH) {
       parseLimitFailure = new ParseLimitException(MAX_PARSE_DEPTH, getPosition(tokenKind).value());
