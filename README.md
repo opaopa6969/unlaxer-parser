@@ -181,6 +181,8 @@ The development branch supports [literal enum values](docs/enum-values.md) in Ja
 
 The development branch also supports [Classic token-mode propagation](docs/classic-token-propagation.md) through general Rust expressions and custom parsers. The four kinds, inherited inversion, both cursors, and source projection are checked against Java. Capture/replay integration, external code-fence adapters, and observer exceptions remain tracked separately; this runtime slice does not complete parity.
 
+The development branch also supports [Classic token-mode propagation](docs/classic-token-propagation.md) through general Rust expressions and custom parsers. The four kinds, inherited inversion, both cursors, and source projection are checked against Java. [Tiny code-fence adapters](docs/tiny-classic-modes.md) also preserve the four modes, both cursors, retained leaf sources, and atomic failures. Capture/replay integration and observer exceptions remain tracked separately; this runtime slice does not complete parity.
+
 [Owned capture and replay](docs/owned-capture-replay.md) now retain actual input, projected, or generated text in both runtimes, with nested scopes and transactional rollback. Java exposes `NamedCapture` / `ReplayParser` / `CaptureScope`; Rust exposes `capture_owned` / `Replay` / `capture_scope`. General UBNF syntax remains tracked in #591. These APIs are development changes after 3.3.0.
 
 Classic Identifier, Number, and quoted tokens now [isolate their internal lexical scans](docs/classic-atomic-trivia.md) from surrounding grammar trivia. This preserves spaces inside quotes and keeps `A B` as two identifiers. The separate Classic outer-source mapping gap remains tracked in #606.
