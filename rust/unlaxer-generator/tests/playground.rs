@@ -57,11 +57,30 @@ fn project_is_self_contained_deterministic_and_never_overwrites() {
             .or_else(|| line.strip_prefix("mod "));
         if let Some(name) = module.and_then(|name| name.strip_suffix(';')) {
             assert!(
-                output.join(format!("runtime/src/{name}.rs")).is_file(),
+                output.join(format!("runtime/src/{name}.rs")).is_file()
+                    || output.join(format!("runtime/src/{name}/mod.rs")).is_file(),
                 "missing runtime module: {name}"
             );
         }
     }
+    // Compile the actual distributed runtime: nested module dependencies must also
+    // be present, even when this grammar does not directly use the feature.
+    let compiled = Command::new("rustc")
+        .args([
+            "--edition=2021",
+            "--crate-type=rlib",
+            "--crate-name=unlaxer_runtime",
+        ])
+        .arg(output.join("runtime/src/lib.rs"))
+        .arg("-o")
+        .arg(scratch.0.join("libbundled_runtime.rlib"))
+        .output()
+        .unwrap();
+    assert!(
+        compiled.status.success(),
+        "{}",
+        String::from_utf8_lossy(&compiled.stderr)
+    );
     assert!(fs::read_to_string(output.join("src/lib.rs"))
         .unwrap()
         .contains("generated::parser::RULE_DOCS"));

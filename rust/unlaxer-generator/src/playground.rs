@@ -136,6 +136,10 @@ fn generate_resolved(
             });
         };
     }
+    runtime!("regex/mod.rs");
+    runtime!("regex/parse.rs");
+    runtime!("regex/sets.rs");
+    runtime!("regex/vm.rs");
     runtime!("lib.rs");
     runtime!("token.rs");
     runtime!("token_trace.rs");
