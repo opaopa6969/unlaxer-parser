@@ -217,6 +217,18 @@ See the [full-spec matrix](rust/FULL-SPEC.md) and [IDE inventory](docs/lsp-dap-i
 
 [Classic sequence trivia](docs/classic-sequence-trivia.md) now contributes the same collected source and code-point ranges in Java and Rust, including explicit Classic CST-to-AST mapping. The four token kinds retain their distinct source projection semantics.
 
+The development branch supports [literal enum values](docs/enum-values.md) in Java and Rust, including typed scalar/optional/list fields and source-positioned root wrappers. Mixed enum/Text/Node captures preserve type identity and per-occurrence positions through Java `EnumValue` and Rust tagged `AstValue`, including scalar/optional/list fields and shared mappings ([contract](docs/enum-values.md#mixed-values)). [Typed common fields](docs/common-fields.md) expose the actual Java member type and a borrowed Rust family view, including mixed values and optional/list fields. [Numeric captures](docs/numeric-captures.md) now share checked 32-bit integer scalar/optional/list values, including mapping failures for out-of-range or non-integer forms. [Mapping-time `@typeof` constraints](docs/typeof-constraints.md) compare scalar, enum, node, and container identities in both languages, including private/forward captures, and report mismatches at code-point source intervals. Both languages reject [untransformed left recursion](docs/left-recursion.md) before code generation, including cycles hidden behind nullable helpers. The parity baseline is Java 21; Java 17 compatibility does not limit new feature design.
+
+[Recursive transparent helpers](docs/recursive-helpers.md) now preserve scalar and collected semantic values in both languages with bounded shape analysis.
+
+[Automatic evaluation](docs/evaluation-strategies.md) now supports literal, passthrough, conditional, binary arithmetic, and variable-reference strategies in both languages, with explicit conversion hooks, short-circuit order, and fallible Rust outputs. Regenerated automatic Java evaluators must implement the new `convertValue` hook.
+
+[Owned capture and replay](docs/owned-capture-replay.md) now retain actual input, projected, or generated text in both runtimes, with nested scopes and transactional rollback. Java exposes `NamedCapture` / `ReplayParser` / `CaptureScope`; Rust exposes `capture_owned` / `Replay` / `capture_scope`. General UBNF syntax remains tracked in #591. These APIs are development changes after 3.3.0.
+
+See the [full-spec matrix](rust/FULL-SPEC.md) and [IDE inventory](docs/lsp-dap-ide-gap-inventory.md) for remaining limits: Rust incremental parsing, LSP cancellation / semantic tokens / rename and formatting transport, and some tokens and annotations are unsupported. DAP implements AST/token stepping, not live evaluator suspension. Some diagnostics and AST candidate/container behavior still differ between Java and Rust; compatibility with every Java grammar is not guaranteed.
+
+[Zero-bound repetitions](docs/zero-repetition.md) now perform no child or terminator evaluation in both runtimes and generated grammars. Historical Java `Zero` / `LazyZero` / `EOF` negative checks remain available through distinct semantics, including Rust `zero_match`. These development changes preserve both cursors and transactional state.
+
 Downstream `tinyexpression-rs` and `rustcodeblock` AOT exist on the separate **ubnfc** engine. Their results do not establish Classic Rust parity or production deployment history. See the [engine guide](docs/engine-selection-guide-ja.md) and [pinned downstream audit](rust/FULL-SPEC.md#下流tinyexpressionの現状監査2026-09-30).
 
 ---

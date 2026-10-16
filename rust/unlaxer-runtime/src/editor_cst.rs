@@ -331,6 +331,7 @@ pub fn literal_completions(grammar: &SharedGrammar) -> Vec<&'static str> {
             | ValueBoundary(child)
             | Optional(child)
             | JavaOptional(child)
+            | ZeroMatch(child)
             | Repeat { child, .. }
             | JavaRepeat { child, .. }
             | RuleEffects { child, .. }

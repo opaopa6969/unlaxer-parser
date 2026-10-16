@@ -29,11 +29,11 @@ when it cannot finish within its bounds. Generation and strict validation still
 reject the corresponding error. Cycle reports follow deterministic declaration
 order; they do not enumerate all possible paths through a strongly connected graph.
 
-The current Classic repetition runtime attempts a child once even at maximum
-zero. Therefore a cycle beneath `{0}` is rejected at this stage as well. The
-runtime correction and corresponding analysis change are tracked together in
-[#598](https://github.com/opaopa6969/unlaxer-parser/issues/598); the validator must
-not assume the child is skipped before that runtime fix is present.
+An ordinary `{0}` does not execute its body, so its leading references are
+excluded from cycle analysis. `Root ::= Root{0} 'x'` therefore parses `x` without
+recursing. Reachable successors are still checked: `Root ::= Root{0} Root | 'x'`
+is rejected. Explicit historical `Zero`/`LazyZero` and EOF checks retain their
+separate one-probe contract; see [zero-repetition.md](zero-repetition.md).
 
 `spec-corpus/left-recursion/cases.json` fixes common accept/reject decisions.
 `LeftRecursionConformanceTest` checks Java's generators, both Rust source hosts,

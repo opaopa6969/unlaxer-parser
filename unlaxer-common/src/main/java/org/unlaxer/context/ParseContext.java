@@ -1927,6 +1927,8 @@ public class ParseContext implements
   }
 
   boolean shouldExpandForExpected(Parser parser) {
+    if (parser instanceof org.unlaxer.parser.combinator.Occurs occurs && !occurs.isZeroMatchCheck()
+        && (occurs.max() == 0 || occurs.min() < 0 || occurs.max() < occurs.min())) return false;
     if (parser instanceof TerminalSymbol) {
       return false;
     }
