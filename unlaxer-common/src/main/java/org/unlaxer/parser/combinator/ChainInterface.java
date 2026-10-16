@@ -20,63 +20,60 @@ public interface ChainInterface extends Parser{
 	// (collect 済みトークン) で自己通知する。ここでは通知しない。
 	@Override
 	public default Parsed parse(ParseContext parseContext,TokenKind tokenKind,boolean invertMatch) {
-        parseContext.enterParserCall();
-        try {
+		parseContext.enterParserCall();
+		try {
+			parseContext.getCurrent().setResetMatchedWithConsumed(false);
 
+			// Opt-in safe failure memoization. The cursor flag above remains observable on a hit;
+			// safe successes replay through the same transaction path as other rules.
+			PackratMemoTable.Entry memo = PackratMemoTable.lookup(parseContext, this, tokenKind, invertMatch);
+			if (memo != null) {
+				return PackratMemoTable.replay(parseContext, this, tokenKind, invertMatch, memo);
+			}
+			var memoDiagnostic = PackratMemoTable.beginFailure(parseContext, this);
+			var memoStart = PackratMemoTable.successKey(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
 
-		parseContext.getCurrent().setResetMatchedWithConsumed(false);
+			parseContext.startParse(this, parseContext, tokenKind, invertMatch);
+			parseContext.begin(this);
 
-		// Opt-in safe failure memoization. The cursor flag above remains observable on a hit;
-		// safe successes replay through the same transaction path as other rules.
-		PackratMemoTable.Entry memo = PackratMemoTable.lookup(parseContext, this, tokenKind, invertMatch);
-		if (memo != null) {
-			return PackratMemoTable.replay(parseContext, this, tokenKind, invertMatch, memo);
+			Parsers children = getChildren();
+
+			/*
+			 * An element whose FIRST set does not contain the code point the cursor is on cannot match
+			 * there, so the sequence is already lost and the element is not evaluated at all. The test is
+			 * repeated per element because earlier elements move the cursor. FirstSet is conservative and
+			 * answers "unknown" for every construct the analysis does not model, and invertMatch flips
+			 * what terminals accept, so neither can lose an element that could have matched.
+			 */
+			boolean excludeElements = false == invertMatch && parseContext.isCandidateExclusionEnabled();
+
+			for (Parser parser : children) {
+				if (excludeElements && false == FirstSets.of(parser)
+						.mayStartWith(parseContext.lookaheadCodePoint(tokenKind))) {
+					parseContext.rollback(this);
+					parseContext.endParse(this, Parsed.FAILED , parseContext, tokenKind, invertMatch);
+					PackratMemoTable.memoizeFailure(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
+					return Parsed.FAILED;
+				}
+				Parsed parsed = parseChainElement(parser, parseContext, tokenKind, invertMatch);
+
+				if(parsed.isStopped()){
+					break;
+				}
+				if (parsed.isFailed()) {
+					parseContext.rollback(this);
+					parseContext.endParse(this, Parsed.FAILED , parseContext, tokenKind, invertMatch);
+					PackratMemoTable.memoizeFailure(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
+					return Parsed.FAILED;
+				}
+			}
+			return PackratMemoTable.commitSuccess(parseContext, this, tokenKind, invertMatch,
+	            memoStart, memoDiagnostic, null, null);
+		} catch (RuntimeException | Error failure) {
+			parseContext.failParserCall(failure);
+			throw failure;
+		} finally {
+			parseContext.leaveParserCall();
 		}
-		var memoDiagnostic = PackratMemoTable.beginFailure(parseContext, this);
-		var memoStart = PackratMemoTable.successKey(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
-
-		parseContext.startParse(this, parseContext, tokenKind, invertMatch);
-		parseContext.begin(this);
-
-		Parsers children = getChildren();
-
-		/*
-		 * An element whose FIRST set does not contain the code point the cursor is on cannot match
-		 * there, so the sequence is already lost and the element is not evaluated at all. The test is
-		 * repeated per element because earlier elements move the cursor. FirstSet is conservative and
-		 * answers "unknown" for every construct the analysis does not model, and invertMatch flips
-		 * what terminals accept, so neither can lose an element that could have matched.
-		 */
-		boolean excludeElements = false == invertMatch && parseContext.isCandidateExclusionEnabled();
-
-		for (Parser parser : children) {
-			if (excludeElements && false == FirstSets.of(parser)
-					.mayStartWith(parseContext.lookaheadCodePoint(tokenKind))) {
-				parseContext.rollback(this);
-				parseContext.endParse(this, Parsed.FAILED , parseContext, tokenKind, invertMatch);
-				PackratMemoTable.memoizeFailure(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
-				return Parsed.FAILED;
-			}
-			Parsed parsed = parseChainElement(parser, parseContext, tokenKind, invertMatch);
-
-			if(parsed.isStopped()){
-				break;
-			}
-			if (parsed.isFailed()) {
-				parseContext.rollback(this);
-				parseContext.endParse(this, Parsed.FAILED , parseContext, tokenKind, invertMatch);
-				PackratMemoTable.memoizeFailure(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
-				return Parsed.FAILED;
-			}
-		}
-		return PackratMemoTable.commitSuccess(parseContext, this, tokenKind, invertMatch,
-            memoStart, memoDiagnostic, null, null);
-
-        } catch (RuntimeException | Error failure) {
-            parseContext.failParserCall(failure);
-            throw failure;
-        } finally {
-            parseContext.leaveParserCall();
-        }
-    }
+	}
 }

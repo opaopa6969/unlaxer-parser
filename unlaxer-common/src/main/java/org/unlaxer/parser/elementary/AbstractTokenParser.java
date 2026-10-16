@@ -26,37 +26,34 @@ public abstract class AbstractTokenParser extends NoneChildParser {
 
 	@Override
 	public Parsed parse(ParseContext parseContext,TokenKind tokenKind,boolean invertMatch){
-        parseContext.enterParserCall();
-        try {
+		parseContext.enterParserCall();
+		try {
+			parseContext.startParse(this, parseContext, tokenKind, invertMatch);
+
+			Token token = getToken(parseContext,tokenKind,invertMatch);
+
+			if(token.source.isPresent()){
+
+				parseContext.getCurrent().addToken(token,tokenKind);
+			}
 
 
-		parseContext.startParse(this, parseContext, tokenKind, invertMatch);
+			Consumer<CodePointLength> positionIncrement = tokenKind.isConsumed() ?
+					parseContext::consume : parseContext::matchOnly;
 
-		Token token = getToken(parseContext,tokenKind,invertMatch);
-
-		if(token.source.isPresent()){
-
-			parseContext.getCurrent().addToken(token,tokenKind);
+			positionIncrement.accept(token.source.codePointLength());
+			Parsed result = token.source.isPresent() ?
+					new Parsed(token):
+					Parsed.FAILED;
+			parseContext.endParse(this, result, parseContext, tokenKind, invertMatch);
+			return result;
+		} catch (RuntimeException | Error failure) {
+			parseContext.failParserCall(failure);
+			throw failure;
+		} finally {
+			parseContext.leaveParserCall();
 		}
-
-
-		Consumer<CodePointLength> positionIncrement = tokenKind.isConsumed() ?
-				parseContext::consume : parseContext::matchOnly;
-
-		positionIncrement.accept(token.source.codePointLength());
-		Parsed result = token.source.isPresent() ?
-				new Parsed(token):
-				Parsed.FAILED;
-		parseContext.endParse(this, result, parseContext, tokenKind, invertMatch);
-		return result;
-
-        } catch (RuntimeException | Error failure) {
-            parseContext.failParserCall(failure);
-            throw failure;
-        } finally {
-            parseContext.leaveParserCall();
-        }
-    }
+	}
 	
 	public abstract Token getToken(ParseContext parseContext,TokenKind tokenKind , boolean invertMatch);
 

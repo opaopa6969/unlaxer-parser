@@ -98,89 +98,86 @@ public class SyncPointRecoveryParser extends ConstructedSingleChildParser {
 
 	@Override
 	public Parsed parse(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
-        parseContext.enterParserCall();
-        try {
+		parseContext.enterParserCall();
+		try {
+			parseContext.startParse(this, parseContext, tokenKind, invertMatch);
 
+			parseContext.begin(this);
 
-		parseContext.startParse(this, parseContext, tokenKind, invertMatch);
+			Parsed result = getChild().parse(parseContext, tokenKind, invertMatch);
 
-		parseContext.begin(this);
+			if (result.isSucceeded()) {
+				// Child succeeded normally — commit and return
+				Committed committed = parseContext.commit(this, tokenKind);
+				Parsed succeededParsed = new Parsed(committed);
+				parseContext.endParse(this, succeededParsed, parseContext, tokenKind, invertMatch);
+				return succeededParsed;
+			}
 
-		Parsed result = getChild().parse(parseContext, tokenKind, invertMatch);
+			// Child failed — attempt recovery by scanning to next sync point
+			parseContext.rollback(this);
 
-		if (result.isSucceeded()) {
-			// Child succeeded normally — commit and return
+			// Scan from the active cursor. Match-only lookahead must not consume input.
+			Source remain = parseContext.getRemain(tokenKind);
+			String remainStr = remain.toString();
+
+			if (remainStr.isEmpty()) {
+				// Nothing left to scan — fail
+				parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);
+				return Parsed.FAILED;
+			}
+
+			// Find the nearest sync point in the remaining input
+			int nearestSyncPos = findNearestSyncPoint(remainStr);
+			int skipUtf16;
+			if (mode == Mode.SYNC) {
+				if (nearestSyncPos < 0) {
+					parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);
+					return Parsed.FAILED;
+				}
+				skipUtf16 = nearestSyncPos + findSyncTokenAt(remainStr, nearestSyncPos).length();
+			} else if (mode == Mode.BEFORE_SYNC) {
+				if (nearestSyncPos <= 0) {
+					parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);
+					return Parsed.FAILED;
+				}
+				skipUtf16 = nearestSyncPos;
+			} else if (syncTokens.isEmpty()) {
+				skipUtf16 = Character.charCount(remainStr.codePointAt(0));
+			} else if (nearestSyncPos < 0) {
+				skipUtf16 = remainStr.length();
+			} else if (nearestSyncPos == 0) {
+				skipUtf16 = Character.charCount(remainStr.codePointAt(0));
+			} else {
+				skipUtf16 = nearestSyncPos;
+			}
+			CodePointLength skipCodePointLength = new CodePointLength(remainStr.codePointCount(0, skipUtf16));
+
+			// Begin a new transaction for the recovery region
+			parseContext.begin(this);
+
+			if (tokenKind.isMatchOnly()) {
+				// Lookahead may succeed, but it must not publish semantic recovery state.
+				parseContext.matchOnly(skipCodePointLength);
+			} else {
+				// A full-span marker is both the CST error and the public recovery diagnostic.
+				Source skippedSource = parseContext.peek(tokenKind, skipCodePointLength);
+				parseContext.getCurrent().addToken(new Token(tokenKind, skippedSource, errorMarker), tokenKind);
+				parseContext.consume(skipCodePointLength);
+			}
+
+			// Commit the recovery
 			Committed committed = parseContext.commit(this, tokenKind);
-			Parsed succeededParsed = new Parsed(committed);
-			parseContext.endParse(this, succeededParsed, parseContext, tokenKind, invertMatch);
-			return succeededParsed;
+			Parsed recoveredParsed = new Parsed(committed);
+			parseContext.endParse(this, recoveredParsed, parseContext, tokenKind, invertMatch);
+			return recoveredParsed;
+		} catch (RuntimeException | Error failure) {
+			parseContext.failParserCall(failure);
+			throw failure;
+		} finally {
+			parseContext.leaveParserCall();
 		}
-
-		// Child failed — attempt recovery by scanning to next sync point
-		parseContext.rollback(this);
-
-		// Scan from the active cursor. Match-only lookahead must not consume input.
-		Source remain = parseContext.getRemain(tokenKind);
-		String remainStr = remain.toString();
-
-		if (remainStr.isEmpty()) {
-			// Nothing left to scan — fail
-			parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);
-			return Parsed.FAILED;
-		}
-
-		// Find the nearest sync point in the remaining input
-		int nearestSyncPos = findNearestSyncPoint(remainStr);
-		int skipUtf16;
-		if (mode == Mode.SYNC) {
-			if (nearestSyncPos < 0) {
-				parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);
-				return Parsed.FAILED;
-			}
-			skipUtf16 = nearestSyncPos + findSyncTokenAt(remainStr, nearestSyncPos).length();
-		} else if (mode == Mode.BEFORE_SYNC) {
-			if (nearestSyncPos <= 0) {
-				parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);
-				return Parsed.FAILED;
-			}
-			skipUtf16 = nearestSyncPos;
-		} else if (syncTokens.isEmpty()) {
-			skipUtf16 = Character.charCount(remainStr.codePointAt(0));
-		} else if (nearestSyncPos < 0) {
-			skipUtf16 = remainStr.length();
-		} else if (nearestSyncPos == 0) {
-			skipUtf16 = Character.charCount(remainStr.codePointAt(0));
-		} else {
-			skipUtf16 = nearestSyncPos;
-		}
-		CodePointLength skipCodePointLength = new CodePointLength(remainStr.codePointCount(0, skipUtf16));
-
-		// Begin a new transaction for the recovery region
-		parseContext.begin(this);
-
-		if (tokenKind.isMatchOnly()) {
-			// Lookahead may succeed, but it must not publish semantic recovery state.
-			parseContext.matchOnly(skipCodePointLength);
-		} else {
-			// A full-span marker is both the CST error and the public recovery diagnostic.
-			Source skippedSource = parseContext.peek(tokenKind, skipCodePointLength);
-			parseContext.getCurrent().addToken(new Token(tokenKind, skippedSource, errorMarker), tokenKind);
-			parseContext.consume(skipCodePointLength);
-		}
-
-		// Commit the recovery
-		Committed committed = parseContext.commit(this, tokenKind);
-		Parsed recoveredParsed = new Parsed(committed);
-		parseContext.endParse(this, recoveredParsed, parseContext, tokenKind, invertMatch);
-		return recoveredParsed;
-
-        } catch (RuntimeException | Error failure) {
-            parseContext.failParserCall(failure);
-            throw failure;
-        } finally {
-            parseContext.leaveParserCall();
-        }
-    }
+	}
 
 	/**
 	 * Finds the index of the nearest sync point in the given string.

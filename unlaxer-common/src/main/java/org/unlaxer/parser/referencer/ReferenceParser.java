@@ -34,25 +34,22 @@ public class ReferenceParser extends AbstractParser{
 
 	@Override
 	public Parsed parse(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
-        parseContext.enterParserCall();
-        try {
+		parseContext.enterParserCall();
+		try {
+			parseContext.startParse(this, parseContext, tokenKind, invertMatch);
 
-		parseContext.startParse(this, parseContext, tokenKind, invertMatch);
-
-		Parsed parsed = getMatchedParser()
-				.map(parser->parser.parse(parseContext,tokenKind,invertMatch))
-				.orElse(Parsed.FAILED);
-		parseContext.endParse(this, parsed , parseContext, tokenKind, invertMatch);
-		return parsed;
-
-
-        } catch (RuntimeException | Error failure) {
-            parseContext.failParserCall(failure);
-            throw failure;
-        } finally {
-            parseContext.leaveParserCall();
-        }
-    }
+			Parsed parsed = getMatchedParser()
+					.map(parser->parser.parse(parseContext,tokenKind,invertMatch))
+					.orElse(Parsed.FAILED);
+			parseContext.endParse(this, parsed , parseContext, tokenKind, invertMatch);
+			return parsed;
+		} catch (RuntimeException | Error failure) {
+			parseContext.failParserCall(failure);
+			throw failure;
+		} finally {
+			parseContext.leaveParserCall();
+		}
+	}
 
 	@Override
 	public ChildOccurs getChildOccurs() {
