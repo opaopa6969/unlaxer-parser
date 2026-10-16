@@ -119,8 +119,13 @@ public final class PortabilityCheck {
         for (TokenDecl token : grammar.tokens()) {
             if (token instanceof TokenDecl.Simple simple && !RustGrammarLowering.supportsSimpleToken(simple.parserClass())) {
                 add(out, "P-EXTERNAL-TOKEN", snapshot, token, simple.parserClass());
-            } else if (token instanceof TokenDecl.Regex) {
-                add(out, "P-TOKEN-KIND", snapshot, token, "REGEX");
+            } else if (token instanceof TokenDecl.Regex regex) {
+                try { org.unlaxer.dsl.codegen.rust.RegexCoreValidator.validate(regex.pattern()); }
+                catch (org.unlaxer.dsl.codegen.rust.RegexCoreValidator.Rejection error) {
+                    add(out, "P-REGEX-" + switch (error.kind()) {
+                        case Syntax -> "SYNTAX"; case Unsupported -> "UNSUPPORTED"; case ResourceLimit -> "LIMIT";
+                    }, snapshot, token, "REGEX:" + error.kind() + "@" + error.offset());
+                }
             }
         }
         for (RuleDecl rule : grammar.rules()) {

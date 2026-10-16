@@ -1,0 +1,11 @@
+use std::io::{self,BufRead};
+fn main() {
+    for line in io::stdin().lock().lines() {
+        let text=line.unwrap();
+        let pattern=if text=="~" {String::new()} else {String::from_utf8((0..text.len()).step_by(2).map(|i|u8::from_str_radix(&text[i..i+2],16).unwrap()).collect()).unwrap()};
+        match unlaxer_runtime::regex::Regex::compile(&pattern) {
+            Ok(_)=>println!("supported"),
+            Err(e)=>println!("{:?}@{}",e.kind,e.offset),
+        }
+    }
+}

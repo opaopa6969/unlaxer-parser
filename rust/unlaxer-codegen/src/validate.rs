@@ -297,6 +297,10 @@ fn expression(
         }
         Literal(s) if s.is_empty() => return Err(fail("empty literal")),
         CaseInsensitiveToken(s) if s.is_empty() => return Err(fail("empty CI literal")),
+        RegexToken(pattern) => {
+            unlaxer_runtime::regex::Regex::compile(pattern)
+                .map_err(|error| fail(error.to_string()))?;
+        }
         Capture {
             name,
             expression: child,

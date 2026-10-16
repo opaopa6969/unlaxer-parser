@@ -381,6 +381,7 @@ fn expression(expr: &Expression) -> String {
         AnyToken => "Expr::Any".into(),
         EofToken => "Expr::Eof".into(),
         EmptyToken => "Expr::JavaEmpty".into(),
+        RegexToken(pattern) => format!("Expr::regex({}).expect(\"validated REGEX\")", quote(pattern)),
         CaseInsensitiveToken(word) => format!("Expr::CaseInsensitive({})", quote(word)),
         CharRangeToken { min, max } => format!(
             "Expr::CharRange('\\u{{{:x}}}', '\\u{{{:x}}}')",

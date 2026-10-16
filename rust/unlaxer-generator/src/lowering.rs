@@ -994,7 +994,8 @@ impl Lowering<'_> {
                 | TokenKind::Adapter { .. }
                 | TokenKind::Until { .. }
                 | TokenKind::Negation { .. }
-                | TokenKind::CharRange { .. } => Some(parser_class_name(&token.name)),
+                | TokenKind::CharRange { .. }
+                | TokenKind::Regex { .. } => Some(parser_class_name(&token.name)),
                 _ => None,
             };
             if let Some(name) = &class {
@@ -1985,6 +1986,10 @@ fn token_expression_with_registry(
                 min: *min,
                 max: *max,
             }
+        }
+        TokenKind::Regex { pattern } => {
+            unlaxer_runtime::regex::Regex::compile(pattern).map_err(|error| error.to_string())?;
+            Expression::RegexToken(pattern.clone())
         }
         TokenKind::CaseInsensitive { word } => {
             if word.is_empty() {

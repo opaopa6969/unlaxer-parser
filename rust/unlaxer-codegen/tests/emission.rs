@@ -618,3 +618,30 @@ fn expression_variants_escape_unicode_and_control_characters() {
         assert!(parser.contains(expected), "{expected}");
     }
 }
+
+#[test]
+fn regex_raw_ir_validates_supported_features_before_emission() {
+    for pattern in ["(?i)[a-z]+", "👨‍👩‍👧‍👦", "", "a*", "(?>a|ab)b"] {
+        let mut ir = support::fixture("evolution");
+        ir.rules[3].body = Expression::RegexToken(pattern.into());
+        let files = generate(&ir).unwrap();
+        assert!(
+            files
+                .iter()
+                .any(|file| file.relative_path == "parser.rs"
+                    && file.content.contains("Expr::regex("))
+        );
+    }
+    for (pattern, kind) in [
+        ("(?=a)", "Unsupported"),
+        ("[", "Syntax"),
+        ("(?U)a", "Unsupported"),
+    ] {
+        let mut ir = support::fixture("evolution");
+        ir.rules[3].body = Expression::RegexToken(pattern.into());
+        assert!(generate(&ir).unwrap_err().0.contains(kind));
+    }
+    let mut ir = support::fixture("evolution");
+    ir.rules[3].body = Expression::RegexToken("(".repeat(5000));
+    assert!(generate(&ir).unwrap_err().0.contains("ResourceLimit"));
+}

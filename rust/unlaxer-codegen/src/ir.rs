@@ -146,6 +146,7 @@ pub enum Expression {
     EmptyToken,
     /// A nonempty word matched using the pinned Unicode simple case mapping.
     CaseInsensitiveToken(String),
+    RegexToken(String),
     CharRangeToken {
         min: char,
         max: char,

@@ -31,4 +31,5 @@ external_integer_flags_api	not_exposed	544	String pattern and embedded flags, li
 zero_width_prefix	supported	578	looking_at may return a zero-width match, including EOF
 nonempty_token_prefix	supported	578	token_prefix rejects EOF/zero-width and inverted success; inverted failure advances one scalar
 resource_limits	supported	578	Pattern size/depth/operands/instructions/set work and input/VM-step/backtracking-state limits
-ubnf_and_token_modes	pending	587	No Expr atom, lowering, portability promotion or ParseContext propagation is added in core
+ubnf_and_token_modes	supported	587	Expr compiled matcher reuse, Classic token propagation, sticky resource errors, both UBNF hosts and pre-generation support diagnostics
+java_pattern_resource_boundary	pending	599	Java adapter retains standard Pattern without the Rust VM resource guarantees; Java stack/time containment remains required

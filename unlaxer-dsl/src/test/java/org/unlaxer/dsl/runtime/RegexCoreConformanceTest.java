@@ -246,6 +246,7 @@ public class RegexCoreConformanceTest {
             }
         }
         for (String pattern : patterns) {
+            org.unlaxer.dsl.codegen.rust.RegexCoreValidator.validate(pattern);
             var java = Pattern.compile(pattern);
             for (String input : inputs) {
                 queries.add(hex(pattern) + "\t" + hex(input));

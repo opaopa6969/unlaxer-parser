@@ -296,6 +296,12 @@ impl ParseContext<'_> {
                 start,
                 self.position,
             ),
+            Expr::Regex { .. } => (
+                "RegexTokenParser",
+                TokenKind::Consumed,
+                start,
+                self.position,
+            ),
             Expr::Grapheme => ("GraphemeParser", TokenKind::Consumed, start, self.position),
             Expr::Any => (
                 "WildCardCharacterParser",

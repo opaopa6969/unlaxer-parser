@@ -818,6 +818,9 @@ public final class RustGrammarLowering {
         if (token instanceof TokenDecl.Empty ignored) {
             return new EmptyToken();
         }
+        if (token instanceof TokenDecl.Regex regex) {
+            return new RegexToken(scalarText(regex.pattern()));
+        }
         if (token instanceof TokenDecl.CaseInsensitive ci) {
             if (ci.word().isEmpty()) throw unsupported("empty CI literal " + ci.name());
             return new CaseInsensitiveToken(scalarText(ci.word()));

@@ -99,6 +99,11 @@ pub enum Expr {
     /// Unicode 17.0.0 simple lower(upper(cp)) equality, preserving original text.
     /// No normalization, locale tailoring, or multi-scalar folding. Empty words fail.
     CaseInsensitive(&'static str),
+    /// Immutable, precompiled Java-compatible REGEX token with bounded execution.
+    Regex {
+        pattern: Arc<regex::Regex>,
+        limits: regex::MatchLimits,
+    },
     Number,
     /// Java clang IdentifierParser: ASCII letter/underscore, then ASCII alphanumeric/underscore.
     Identifier,
@@ -289,6 +294,20 @@ impl Expr {
     /// A pinned Unicode 17 simple case-insensitive word. Empty words fail to parse.
     pub fn case_insensitive(text: &'static str) -> Self {
         Self::CaseInsensitive(text)
+    }
+
+    /// Compile once and share the immutable matcher across clones and parser invocations.
+    pub fn regex(pattern: &str) -> Result<Self, regex::CompileError> {
+        Self::regex_with_limits(pattern, regex::MatchLimits::default())
+    }
+    pub fn regex_with_limits(
+        pattern: &str,
+        limits: regex::MatchLimits,
+    ) -> Result<Self, regex::CompileError> {
+        Ok(Self::Regex {
+            pattern: Arc::new(regex::Regex::compile(pattern)?),
+            limits,
+        })
     }
 
     pub fn literal(text: &'static str) -> Self {
@@ -1209,6 +1228,8 @@ pub struct ParseContext<'a> {
     bindings: BTreeMap<String, Vec<String>>,
     input: &'a str,
     grapheme_boundaries: Option<grapheme::Boundaries>,
+    // Original immutable source scalars, never a projected token source.
+    regex_input: Option<(usize, Vec<char>)>,
     lexing: Option<lexing::Session<'a>>,
     rules: Arc<[Rule]>,
     whitespace: bool,
@@ -1571,6 +1592,7 @@ impl<'a> ParseContext<'a> {
             recoveries: Vec::new(),
             call_depth: 0,
             grapheme_boundaries: None,
+            regex_input: None,
             expression_depth: 0,
             resource_failure: None,
             options,
@@ -1796,6 +1818,62 @@ impl<'a> ParseContext<'a> {
                 self.farthest
             }),
             expected: self.expected_names.strings(&self.expected),
+        }
+    }
+
+    fn regex_prefix(
+        &mut self,
+        pattern: &regex::Regex,
+        limits: regex::MatchLimits,
+        start: usize,
+        invert: bool,
+    ) -> Option<regex::Match> {
+        let start_cp = self.code_point(start);
+        // Bound before allocating the cache, even when only a short prefix would match.
+        if self.input[start..].is_empty() {
+            self.fail_at(start, "REGEX");
+            return None;
+        }
+        if self.byte_offsets.len() - 1 - start_cp > limits.max_input_codepoints {
+            let mut failure = self.resource_error(&regex::MatchError::InputLimit.to_string());
+            failure.offset = start_cp;
+            self.resource_failure = Some(failure);
+            return None;
+        }
+        if self
+            .regex_input
+            .as_ref()
+            .is_none_or(|(base, _)| start_cp < *base)
+        {
+            let source_len = self.byte_offsets.len() - 1;
+            let previous_len = self
+                .regex_input
+                .as_ref()
+                .map_or(0, |(_, source)| source.len());
+            // Keep a suffix, rather than allocating a long already-consumed prefix.
+            // Geometric growth amortizes earlier-cursor retries under the same policy.
+            let width = (source_len - start_cp)
+                .max(previous_len.saturating_mul(2))
+                .min(source_len)
+                .min(limits.max_input_codepoints);
+            let base = source_len - width;
+            let byte = self.byte_offsets[base];
+            self.regex_input = Some((base, self.input[byte..].chars().collect()));
+        }
+        let (base, source) = self.regex_input.as_ref().unwrap();
+        match pattern.token_prefix_codepoints(&source[start_cp - base..], invert, limits) {
+            Ok(found) => {
+                if found.is_none() {
+                    self.fail_at(start, "REGEX");
+                }
+                found
+            }
+            Err(error) => {
+                let mut failure = self.resource_error(&error.to_string());
+                failure.offset = self.code_point(start);
+                self.resource_failure = Some(failure);
+                None
+            }
         }
     }
 
@@ -2449,6 +2527,7 @@ impl<'a> ParseContext<'a> {
                     expression,
                     Expr::Literal(_)
                         | Expr::CaseInsensitive(_)
+                        | Expr::Regex { .. }
                         | Expr::Any
                         | Expr::CharRange(_, _)
                         | Expr::Except(_)
@@ -2762,6 +2841,12 @@ impl<'a> ParseContext<'a> {
                 unreachable!("recursive expression dispatched by expression")
             }
             Expr::Lookahead { .. } => unreachable!("recursive expression dispatched by expression"),
+            Expr::Regex { pattern, limits } => {
+                let found = self.regex_prefix(pattern, *limits, self.position, false)?;
+                self.position += found.end_utf8;
+                self.matched_position = self.position;
+                Some(Fragment::default())
+            }
             Expr::CaseInsensitive(word) => {
                 let mut input = self.input[self.position..].chars();
                 let mut bytes = 0;
@@ -3870,6 +3955,7 @@ impl<'a> ParseContext<'a> {
             child,
             Expr::Literal(_)
                 | Expr::CaseInsensitive(_)
+                | Expr::Regex { .. }
                 | Expr::Any
                 | Expr::CharRange(_, _)
                 | Expr::Except(_)
@@ -4002,6 +4088,7 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
         Expr::Lexical(_, _)
         | Expr::Literal(_)
         | Expr::CaseInsensitive(_)
+        | Expr::Regex { .. }
         | Expr::Number
         | Expr::Identifier
         | Expr::Grapheme
@@ -5370,4 +5457,52 @@ fn requires_classic_mode<'a>(expression: &'a Expr, rules: &'a [Rule]) -> bool {
         };
     }
     false
+}
+
+#[cfg(test)]
+mod regex_input_tests {
+    use super::*;
+    #[test]
+    fn regex_suffix_cache_grows_for_earlier_retries_and_preserves_original_offsets() {
+        let mut context = ParseContext::new("ABCDEFGHIJ");
+        for (prefix, pattern, expected_base, expected_len, expected_end) in [
+            ("ABCDEFGH", "I", 8, 2, 9),
+            ("ABCDEFG", "H", 6, 4, 8),
+            ("ABCDE", "F", 2, 8, 6),
+        ] {
+            let ignored: Result<(), ParseError> = context.transaction(|c| {
+                c.parse(&Expr::literal(prefix))?;
+                c.parse(&Expr::regex(pattern).unwrap())?;
+                assert_eq!(c.position(), expected_end);
+                let (base, source) = c.regex_input.as_ref().unwrap();
+                assert_eq!((*base, source.len()), (expected_base, expected_len));
+                Err(c.error("retry earlier"))
+            });
+            assert!(ignored.is_err());
+            assert_eq!(context.position(), 0);
+        }
+    }
+    #[test]
+    fn regex_source_cache_does_not_allocate_an_already_consumed_long_prefix() {
+        let prefix = "p".repeat(100_000);
+        let input = format!("{prefix}a");
+        let mut context = ParseContext::new(&input);
+        context
+            .parse(&Expr::literal(Box::leak(prefix.into_boxed_str())))
+            .unwrap();
+        context
+            .parse(
+                &Expr::regex_with_limits(
+                    "a",
+                    regex::MatchLimits {
+                        max_input_codepoints: 2,
+                        ..Default::default()
+                    },
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        let (base, source) = context.regex_input.as_ref().unwrap();
+        assert_eq!((*base, source.as_slice()), (100_000, ['a'].as_slice()));
+    }
 }

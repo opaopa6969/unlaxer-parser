@@ -55,7 +55,8 @@ public final class PlaygroundGenerator {
     private static Map<String, String> generate(String source, UBNFAST.UBNFFile file, String vocabulary) {
         var grammar = file.grammars().get(0);
         for (var token : grammar.tokens()) if (!(token instanceof UBNFAST.TokenDecl.Declarative)
-                && !(token instanceof UBNFAST.TokenDecl.CaseInsensitive)) {
+                && !(token instanceof UBNFAST.TokenDecl.CaseInsensitive)
+                && !(token instanceof UBNFAST.TokenDecl.Regex)) {
             throw new IllegalArgumentException("Playground requires declarative token " + token.name() + " ::= expression; (host bindings are not executed)");
         }
         var ir = RustGrammarLowering.lower(grammar);

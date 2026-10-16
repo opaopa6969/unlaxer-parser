@@ -421,8 +421,8 @@ fn lowerer_rejects_unsupported_or_inconsistent_grammars_without_artifacts() {
             "unsupported external token",
         ),
         (
-            simple.replace("grammar G {", "grammar G { token T = REGEX('x')\n"),
-            "unsupported token",
+            simple.replace("grammar G {", "grammar G { token T = REGEX('(?=x)x')\n"),
+            "regex Unsupported",
         ),
         (
             simple.replace("grammar G {", "grammar G { @whitespace: python\n"),

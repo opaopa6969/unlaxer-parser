@@ -312,6 +312,9 @@ dependencies = [
 [[package]]
 name = "unlaxer-codegen"
 version = "0.1.0"
+dependencies = [
+ "unlaxer-runtime",
+]
 
 [[package]]
 name = "unlaxer-dap"

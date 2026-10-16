@@ -35,9 +35,9 @@ prefix. `token_prefix(input, invert)` applies the existing Java `RegexTokenParse
 boundary separately: EOF never produces a token; successful empty matches never
 produce a token; inversion succeeds with exactly one scalar only when the original
 pattern has no prefix match. A successful empty prefix is not inverted failure.
-Neither API changes a parser cursor or commits a CST. Connecting these operations
-to all token modes, sticky parser resource failures and both UBNF generation hosts
-is the next unit, [#587](https://github.com/opaopa6969/unlaxer-parser/issues/587).
+Neither standalone API changes a parser cursor or commits a CST.
+[The integration](regex-integration.md) connects these operations to all token modes,
+sticky parser resource failures and both UBNF generation hosts (#587).
 Java's existing Pattern adapter is preserved.
 
 The core includes scalar literals/escapes, ASCII predefined/POSIX sets, scalar
@@ -87,7 +87,8 @@ with standalone Rust 1.85 `rustc`. A second oracle systematically compares short
 patterns/inputs directly with Java, including nullable nested repetitions and
 atomic/possessive order. Resource tests use a 2 MiB thread, large quantities,
 wide/deep patterns, hostile backtracking, bounded set work and concurrent reuse.
-Rust resource limits are not claimed as limits imposed on Java's standard engine.
+Rust resource limits are not claimed as limits imposed on Java's standard engine;
+Java resource containment remains tracked by #599.
 
 ```sh
 mvn -pl unlaxer-common,unlaxer-dsl -am test \

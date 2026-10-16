@@ -6,5 +6,8 @@ rust-version.workspace = true
 license.workspace = true
 publish = false
 
+[dependencies]
+unlaxer-runtime = { path = "../unlaxer-runtime" }
+
 [lints]
 workspace = true

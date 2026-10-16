@@ -243,7 +243,24 @@ impl Inventory {
                         self.add(code, subject, token.span);
                     }
                 }
-                TokenKind::Regex { .. } => self.add("P-TOKEN-KIND", "REGEX", token.span),
+                TokenKind::Regex { pattern } => {
+                    if let Err(error) = unlaxer_runtime::regex::Regex::compile(pattern) {
+                        let code = match error.kind {
+                            unlaxer_runtime::regex::CompileErrorKind::Syntax => "P-REGEX-SYNTAX",
+                            unlaxer_runtime::regex::CompileErrorKind::Unsupported => {
+                                "P-REGEX-UNSUPPORTED"
+                            }
+                            unlaxer_runtime::regex::CompileErrorKind::ResourceLimit => {
+                                "P-REGEX-LIMIT"
+                            }
+                        };
+                        self.add(
+                            code,
+                            format!("REGEX:{:?}@{}", error.kind, error.offset),
+                            token.span,
+                        );
+                    }
+                }
                 TokenKind::CaseInsensitive { .. } => {}
                 TokenKind::Until { .. }
                 | TokenKind::Negation { .. }

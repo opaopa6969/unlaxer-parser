@@ -151,9 +151,28 @@ impl Regex {
         if remaining_input.is_empty() {
             return Ok(None);
         }
-        match self.looking_at_with_limits(remaining_input, limits)? {
+        let chars: Vec<_> = remaining_input
+            .chars()
+            .take(limits.max_input_codepoints.saturating_add(1))
+            .collect();
+        self.token_prefix_codepoints(&chars, invert, limits)
+    }
+    /// Internal parser path over a cached original-source scalar slice.
+    pub(crate) fn token_prefix_codepoints(
+        &self,
+        input: &[char],
+        invert: bool,
+        limits: MatchLimits,
+    ) -> Result<Option<Match>, MatchError> {
+        if input.is_empty() {
+            return Ok(None);
+        }
+        if input.len() > limits.max_input_codepoints {
+            return Err(MatchError::InputLimit);
+        }
+        match vm::execute(self, input, limits)?.map(|end| Match::at(input, end)) {
             None if invert => {
-                let first = remaining_input.chars().next().unwrap();
+                let first = input[0];
                 Ok(Some(Match {
                     end_cp: 1,
                     end_utf16: first.len_utf16(),

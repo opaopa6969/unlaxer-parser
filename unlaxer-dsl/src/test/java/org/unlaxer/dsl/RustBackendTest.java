@@ -116,7 +116,7 @@ public class RustBackendTest {
             reject(source.replace("'hello' @value", "(T | 'x')+ @value"), "nullable unbounded");
             reject(source.replace("'hello' @value", "T @value Root @value"), "left recursion");
         }
-        reject(SIMPLE.replace("grammar Example {", "grammar Example { token T = REGEX('x')\n"), "token T");
+        reject(SIMPLE.replace("grammar Example {", "grammar Example { token T = REGEX('(?=x)x')\n"), "regex Unsupported");
         reject(SIMPLE.replace("'hello' @value", "Root{0} @value"), "left recursion");
         reject(SIMPLE.replace("'hello' @value", "(Root | 'x'){0} @value"), "left recursion");
     }

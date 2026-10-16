@@ -237,7 +237,8 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
             FirstSet::NULLABLE
         }
         Expr::Error(_) => FirstSet::EMPTY,
-        Expr::Character { .. }
+        Expr::Regex { .. }
+        | Expr::Character { .. }
         | Expr::MatchOnly(_)
         | Expr::InvertMatch(_)
         | Expr::StopInvert(_)

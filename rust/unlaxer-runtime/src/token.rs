@@ -613,6 +613,14 @@ impl ParseContext<'_> {
                     full && (raw.starts_with(word) != mode.invert),
                 )
             }
+            Expr::Regex { pattern, limits } => {
+                let found = self.regex_prefix(pattern, *limits, start, mode.invert);
+                (
+                    "RegexTokenParser",
+                    start + found.map_or(0, |m| m.end_utf8),
+                    found.is_some(),
+                )
+            }
             Expr::CaseInsensitive(word) => {
                 let mut input = raw.chars();
                 let mut end = start;

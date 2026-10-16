@@ -90,7 +90,9 @@ fn generate_resolved(
     for token in &grammar.tokens {
         if !matches!(
             token.kind,
-            TokenKind::Declarative { .. } | TokenKind::CaseInsensitive { .. }
+            TokenKind::Declarative { .. }
+                | TokenKind::CaseInsensitive { .. }
+                | TokenKind::Regex { .. }
         ) {
             return Err(format!("Playground requires declarative token {} ::= expression; (host bindings are not executed)", token.name));
         }

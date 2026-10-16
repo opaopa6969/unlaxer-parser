@@ -1,0 +1,824 @@
+[
+  {
+    "name": "Letters",
+    "grammar": "grammar Letters { @package: regex.probe @whitespace: none token T=REGEX('[a-z]+') @root  @mapping(Value,params=[text]) Root ::= T @text; }",
+    "cases": [
+      {
+        "id": "ascii",
+        "input": "abc",
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "coordinates": [
+          3,
+          3,
+          3
+        ],
+        "accepted": true,
+        "value": "abc",
+        "diagnostic": null
+      },
+      {
+        "id": "prefix",
+        "input": "abc!",
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "coordinates": [
+          3,
+          3,
+          3
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "trailing_input",
+          "offset": 3
+        }
+      },
+      {
+        "id": "mismatch",
+        "input": "é",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        }
+      },
+      {
+        "id": "empty",
+        "input": "",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "Emoji",
+    "grammar": "grammar Emoji { @package: regex.probe @whitespace: none token T=REGEX('👨‍👩‍👧‍👦') @root  @mapping(Value,params=[text]) Root ::= T @text; }",
+    "cases": [
+      {
+        "id": "family",
+        "input": "👨‍👩‍👧‍👦",
+        "prefix": [
+          true,
+          7,
+          7
+        ],
+        "coordinates": [
+          7,
+          11,
+          25
+        ],
+        "accepted": true,
+        "value": "👨‍👩‍👧‍👦",
+        "diagnostic": null
+      },
+      {
+        "id": "prefix",
+        "input": "👨‍👩‍👧‍👦!",
+        "prefix": [
+          true,
+          7,
+          7
+        ],
+        "coordinates": [
+          7,
+          11,
+          25
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "trailing_input",
+          "offset": 7
+        }
+      },
+      {
+        "id": "partial",
+        "input": "👨",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "Combining",
+    "grammar": "grammar Combining { @package: regex.probe @whitespace: none token T=REGEX('é+') @root  @mapping(Value,params=[text]) Root ::= T @text; }",
+    "cases": [
+      {
+        "id": "combining",
+        "input": "é́",
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "coordinates": [
+          3,
+          3,
+          5
+        ],
+        "accepted": true,
+        "value": "é́",
+        "diagnostic": null
+      },
+      {
+        "id": "precomposed",
+        "input": "é",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "Modifier",
+    "grammar": "grammar Modifier { @package: regex.probe @whitespace: none token T=REGEX('👍🏽') @root  @mapping(Value,params=[text]) Root ::= T @text; }",
+    "cases": [
+      {
+        "id": "modifier",
+        "input": "👍🏽",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "coordinates": [
+          2,
+          4,
+          8
+        ],
+        "accepted": true,
+        "value": "👍🏽",
+        "diagnostic": null
+      },
+      {
+        "id": "base",
+        "input": "👍",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "Flag",
+    "grammar": "grammar Flag { @package: regex.probe @whitespace: none token T=REGEX('🇯🇵') @root  @mapping(Value,params=[text]) Root ::= T @text; }",
+    "cases": [
+      {
+        "id": "flag",
+        "input": "🇯🇵",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "coordinates": [
+          2,
+          4,
+          8
+        ],
+        "accepted": true,
+        "value": "🇯🇵",
+        "diagnostic": null
+      },
+      {
+        "id": "partial",
+        "input": "🇯",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "Reluctant",
+    "grammar": "grammar Reluctant { @package: regex.probe @whitespace: none token T=REGEX('[a-z]+?') @root  @mapping(Value,params=[text]) Root ::= T @text; }",
+    "cases": [
+      {
+        "id": "one",
+        "input": "a",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "coordinates": [
+          1,
+          1,
+          1
+        ],
+        "accepted": true,
+        "value": "a",
+        "diagnostic": null
+      },
+      {
+        "id": "short-prefix",
+        "input": "abc",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "coordinates": [
+          1,
+          1,
+          1
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "trailing_input",
+          "offset": 1
+        }
+      }
+    ]
+  },
+  {
+    "name": "Possessive",
+    "grammar": "grammar Possessive { @package: regex.probe @whitespace: none token T=REGEX('a*+a') @root  @mapping(Value,params=[text]) Root ::= T @text; }",
+    "cases": [
+      {
+        "id": "no-retreat",
+        "input": "aa",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "Atomic",
+    "grammar": "grammar Atomic { @package: regex.probe @whitespace: none token T=REGEX('(?>a|ab)b') @root  @mapping(Value,params=[text]) Root ::= T @text; }",
+    "cases": [
+      {
+        "id": "full",
+        "input": "ab",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "coordinates": [
+          2,
+          2,
+          2
+        ],
+        "accepted": true,
+        "value": "ab",
+        "diagnostic": null
+      },
+      {
+        "id": "prefix",
+        "input": "abb",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "coordinates": [
+          2,
+          2,
+          2
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "trailing_input",
+          "offset": 2
+        }
+      },
+      {
+        "id": "mismatch",
+        "input": "ac",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "Ordered",
+    "grammar": "grammar Ordered { @package: regex.probe @whitespace: none token T=REGEX('(a|ab)') @root  @mapping(Value,params=[text]) Root ::= T @text; }",
+    "cases": [
+      {
+        "id": "short-first",
+        "input": "ab",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "coordinates": [
+          1,
+          1,
+          1
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "trailing_input",
+          "offset": 1
+        }
+      },
+      {
+        "id": "one",
+        "input": "a",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "coordinates": [
+          1,
+          1,
+          1
+        ],
+        "accepted": true,
+        "value": "a",
+        "diagnostic": null
+      }
+    ]
+  },
+  {
+    "name": "Flags",
+    "grammar": "grammar Flags { @package: regex.probe @whitespace: none token T=REGEX('(?i:a)+') @root  @mapping(Value,params=[text]) Root ::= T @text; }",
+    "cases": [
+      {
+        "id": "ascii",
+        "input": "aAA",
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "coordinates": [
+          3,
+          3,
+          3
+        ],
+        "accepted": true,
+        "value": "aAA",
+        "diagnostic": null
+      },
+      {
+        "id": "unicode-not-folded",
+        "input": "K",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "Whitespace",
+    "grammar": "grammar Whitespace { @package: regex.probe @whitespace: none token T=REGEX('[ \\r\\n]+') @root  @mapping(Value,params=[text]) Root ::= T @text; }",
+    "cases": [
+      {
+        "id": "crlf",
+        "input": " \r\n",
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "coordinates": [
+          3,
+          3,
+          3
+        ],
+        "accepted": true,
+        "value": "",
+        "diagnostic": null
+      }
+    ]
+  },
+  {
+    "name": "Zero",
+    "grammar": "grammar Zero { @package: regex.probe @whitespace: none token T=REGEX('a*') @root  @mapping(Value,params=[text]) Root ::= T @text; }",
+    "cases": [
+      {
+        "id": "empty",
+        "input": "",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        }
+      },
+      {
+        "id": "zero-on-other",
+        "input": "b",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        }
+      },
+      {
+        "id": "positive",
+        "input": "aa",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "coordinates": [
+          2,
+          2,
+          2
+        ],
+        "accepted": true,
+        "value": "aa",
+        "diagnostic": null
+      }
+    ]
+  },
+  {
+    "name": "Rollback",
+    "grammar": "grammar Rollback { @package: regex.probe @whitespace: none token T=REGEX('a+') @root  @mapping(Value,params=[text]) Root ::= T @text 'x' | T @text; }",
+    "cases": [
+      {
+        "id": "fallback",
+        "input": "aa",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "coordinates": [
+          2,
+          2,
+          2
+        ],
+        "accepted": true,
+        "value": "aa",
+        "diagnostic": null
+      },
+      {
+        "id": "first",
+        "input": "aax",
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "coordinates": [
+          3,
+          3,
+          3
+        ],
+        "accepted": true,
+        "value": "aa",
+        "diagnostic": null
+      }
+    ]
+  },
+  {
+    "name": "Predictive",
+    "grammar": "grammar Predictive { @package: regex.probe @whitespace: none token T=REGEX('[a-z]+') @root @predictiveChoice @mapping(Value,params=[text]) Root ::= T @text | '!' @text; }",
+    "cases": [
+      {
+        "id": "regex",
+        "input": "abc",
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "coordinates": [
+          3,
+          3,
+          3
+        ],
+        "accepted": true,
+        "value": "abc",
+        "diagnostic": null
+      },
+      {
+        "id": "fallback",
+        "input": "!",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "coordinates": [
+          1,
+          1,
+          1
+        ],
+        "accepted": true,
+        "value": "!",
+        "diagnostic": null
+      }
+    ]
+  },
+  {
+    "name": "Longest",
+    "grammar": "grammar Longest { @package: regex.probe @whitespace: none token T=REGEX('a') @root @longestChoice @mapping(Value,params=[text]) Root ::= T @text | 'ab' @text; }",
+    "cases": [
+      {
+        "id": "longer",
+        "input": "ab",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "coordinates": [
+          2,
+          2,
+          2
+        ],
+        "accepted": true,
+        "value": "ab",
+        "diagnostic": null
+      },
+      {
+        "id": "regex",
+        "input": "a",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "coordinates": [
+          1,
+          1,
+          1
+        ],
+        "accepted": true,
+        "value": "a",
+        "diagnostic": null
+      }
+    ]
+  },
+  {
+    "name": "Repeat",
+    "grammar": "grammar Repeat { @package: regex.probe @whitespace: none token T=REGEX('a') @root  @mapping(Value,params=[text]) Root ::= {T} '!' @text; }",
+    "cases": [
+      {
+        "id": "one",
+        "input": "a!",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "coordinates": [
+          2,
+          2,
+          2
+        ],
+        "accepted": true,
+        "value": "!",
+        "diagnostic": null
+      },
+      {
+        "id": "many",
+        "input": "aaa!",
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "coordinates": [
+          4,
+          4,
+          4
+        ],
+        "accepted": true,
+        "value": "!",
+        "diagnostic": null
+      }
+    ]
+  },
+  {
+    "name": "Optional",
+    "grammar": "grammar Optional { @package: regex.probe @whitespace: none token T=REGEX('a') @root  @mapping(Value,params=[text]) Root ::= [T] 'x' @text; }",
+    "cases": [
+      {
+        "id": "present",
+        "input": "ax",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "coordinates": [
+          2,
+          2,
+          2
+        ],
+        "accepted": true,
+        "value": "x",
+        "diagnostic": null
+      },
+      {
+        "id": "absent",
+        "input": "x",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "coordinates": [
+          1,
+          1,
+          1
+        ],
+        "accepted": true,
+        "value": "x",
+        "diagnostic": null
+      }
+    ]
+  },
+  {
+    "name": "AfterEmoji",
+    "grammar": "grammar AfterEmoji { @package: regex.probe @whitespace: none token T=REGEX('[a-z]+') @root  @mapping(Value,params=[text]) Root ::= '😀' T @text; }",
+    "cases": [
+      {
+        "id": "required-at-eof",
+        "input": "😀",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "accepted": false,
+        "value": null,
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 1
+        }
+      },
+      {
+        "id": "tail",
+        "input": "😀a",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "coordinates": [
+          2,
+          3,
+          5
+        ],
+        "accepted": true,
+        "value": "a",
+        "diagnostic": null
+      }
+    ]
+  }
+]

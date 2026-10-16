@@ -341,6 +341,9 @@ public final class RustBackend {
         if (expression instanceof EmptyToken ignored) {
             return "Expr::JavaEmpty";
         }
+        if (expression instanceof RegexToken regex) {
+            return "Expr::regex(" + quote(regex.pattern()) + ").expect(\"validated REGEX\")";
+        }
         if (expression instanceof CaseInsensitiveToken ci) {
             return "Expr::CaseInsensitive(" + quote(ci.word()) + ")";
         }
