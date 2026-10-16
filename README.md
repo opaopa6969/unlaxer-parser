@@ -173,6 +173,8 @@ The development branch supports [literal enum values](docs/enum-values.md) in Ja
 
 See the [full-spec matrix](rust/FULL-SPEC.md) and [IDE inventory](docs/lsp-dap-ide-gap-inventory.md) for remaining limits: Rust incremental parsing, LSP cancellation / semantic tokens / rename and formatting transport, and some tokens and annotations are unsupported. DAP implements AST/token stepping, not live evaluator suspension. Some diagnostics and AST candidate/container behavior still differ between Java and Rust; compatibility with every Java grammar is not guaranteed.
 
+[Nullable Classic repetitions](docs/nullable-repetition.md) now generate in both Rust hosts using the same single-success termination rule as Java. A successful zero-progress item is retained once before stopping; pure PEG and lexical repetition keep their separate contracts. Nullable separated lists remain tracked in #616.
+
 Downstream `tinyexpression-rs` and `rustcodeblock` AOT exist on the separate **ubnfc** engine. Their results do not establish Classic Rust parity or production deployment history. See the [engine guide](docs/engine-selection-guide-ja.md) and [pinned downstream audit](rust/FULL-SPEC.md#下流tinyexpressionの現状監査2026-09-30).
 
 ---
