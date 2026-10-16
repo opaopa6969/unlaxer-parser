@@ -166,7 +166,7 @@ class MapperRuleEmitter {
      * ノードを解決する。ノードが見つからなければ firstTokenText にフォールバック。
      * (unlaxer-parser #43 family / tinyexpression #32)
      */
-    static String emitMapTransparentValue(String astClass, boolean hasSkippedRules) {
+    static String emitMapTransparentValue(String astClass, boolean hasSkippedRules, boolean hasEnums) {
         IndentedWriter w = new IndentedWriter(1);
         w.line("private static Object mapTransparentValue(Token token) {");
         w.indent();
@@ -175,6 +175,7 @@ class MapperRuleEmitter {
         w.line("return null;");
         w.dedent();
         w.line("}");
+        if (hasEnums) w.line("Object enumValue = findEnumValue(token); if (enumValue != null) return enumValue;");
         w.line(astClass + " direct = mapToken(token);");
         w.line("if (direct != null) {");
         w.indent();
@@ -888,20 +889,18 @@ class MapperRuleEmitter {
             emitBoundParam(w, parsersClass, grammar, param, type, bindings.sites(param),
                 mappedClassByRuleName, tokenDeclByName, ruleByName);
         }
-        // Emit @typeof runtime assertions
+        // An occurrence wrapper keeps source identity, while @typeof compares value identity.
+        boolean enumOccurrences = grammar.rules().stream().anyMatch(EnumSchema::isEnum);
         for (Map.Entry<String, String> constraint : typeofConstraints.entrySet()) {
             String ownCapture = constraint.getKey();
             String refCapture = constraint.getValue();
-            w.line("if (" + refCapture + " != null && "
-                + ownCapture + " != null && !"
-                + refCapture + ".getClass().equals("
-                + ownCapture + ".getClass())) {");
+            String ownType = enumOccurrences ? "semanticType(" + ownCapture + ")" : ownCapture + ".getClass()";
+            String refType = enumOccurrences ? "semanticType(" + refCapture + ")" : refCapture + ".getClass()";
+            w.line("if (" + refCapture + " != null && " + ownCapture + " != null && !" + refType + ".equals(" + ownType + ")) {");
             w.indent();
             w.line("throw new IllegalArgumentException(\"@typeof constraint violated: "
-                + ownCapture + " must be same type as "
-                + refCapture + ", expected \" + "
-                + refCapture + ".getClass().getSimpleName() + \" but got \" + "
-                + ownCapture + ".getClass().getSimpleName());");
+                + ownCapture + " must be same type as " + refCapture + ", expected \" + "
+                + refType + ".getSimpleName() + \" but got \" + " + ownType + ".getSimpleName());");
             w.dedent();
             w.line("}");
         }
@@ -982,7 +981,8 @@ class MapperRuleEmitter {
             Map<String, String> mappedClassByRuleName,
             Map<String, TokenDecl> tokenDeclByName, Map<String, RuleDecl> ruleByName) {
         Optional<String> enumName=sites.stream().map(site -> EnumSchema.enumType(grammar,site.element())).flatMap(Optional::stream).findFirst();
-        if (enumName.isPresent()) {
+        String fieldValueType = MapperTypeResolver.unwrapListType(type).or(() -> MapperTypeResolver.unwrapOptionalType(type)).orElse(type);
+        if (enumName.isPresent() && fieldValueType.equals(grammar.name()+"AST."+enumName.get())) {
             emitEnumParam(w,parsersClass,param,type,sites,enumName.get());
             return;
         }
@@ -1127,6 +1127,8 @@ class MapperRuleEmitter {
                 }
 
             """.formatted(String.join(", ", boundaries), SemanticCardinality.TEXT_BINDING, SemanticCardinality.BOUNDARY_BINDING);
+        if (grammar.rules().stream().anyMatch(EnumSchema::isEnum)) source = source.replace(
+            "Object mapped = mapToken(token);", "Object enumValue = directEnumValue(token);\n        if (enumValue != null) return List.of(enumValue);\n        Object mapped = mapToken(token);");
         if (grammar.rules().stream().noneMatch(MapperElementUtil::isSkipped)) return source;
         return source.replace("stripQuotes(firstTokenText(token))",
                 "hasSkippedRuleToken(token) ? skippedRuleText(token) : stripQuotes(firstTokenText(token))")

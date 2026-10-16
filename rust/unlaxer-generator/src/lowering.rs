@@ -152,21 +152,6 @@ impl Lowering<'_> {
             .iter()
             .any(|child| self.contains_enum(child, seen))
     }
-    fn enum_in_capture(&self, expression: &Expression, name: &str) -> bool {
-        if let Expression::Capture {
-            name: capture,
-            expression: child,
-        } = expression
-        {
-            if capture == name {
-                return self.contains_enum(child, &mut HashSet::new());
-            }
-        }
-        children(expression)
-            .iter()
-            .any(|child| self.enum_in_capture(child, name))
-    }
-
     fn lower_recovery(
         &self,
         mode: ast::RecoveryMode,
@@ -666,12 +651,12 @@ impl Lowering<'_> {
             self.check_left_recursion(i, &mut HashSet::new(), &mut HashSet::new())?;
         }
         if !self.expression_reaches_skip(&Expression::Reference(root), &mut HashSet::new())? && {
-            let shape = self.rule_shape(root, &mut HashSet::new())?;
+            let shape = self.rule_shape_projected(root, &mut HashSet::new(), true)?;
             shape.cardinality != Cardinality::One
                 || !(shape.kind == Kind::Node || matches!(shape.kind, Kind::Enum(_)))
         } {
             if self.contains_enum(&Expression::Reference(root), &mut HashSet::new()) {
-                return Err("E-ENUM-JOIN: root must project exactly one enum family/value; mixed root projection requires #539".into());
+                return Err("E-ENUM: root must project exactly one AST node".into());
             }
             return Err("root must resolve to exactly one AST node".into());
         }
@@ -744,6 +729,15 @@ impl Lowering<'_> {
         }
         if name_versions.len() > 64 {
             return Err("E-NAME-PREDICATE-LIMIT: at most 64 snapshots".into());
+        }
+        if self.enums.iter().any(|values| !values.is_empty())
+            && self
+                .mappings
+                .iter()
+                .flatten()
+                .any(|(name, _)| name.split('.').next() == Some("EnumValue"))
+        {
+            return Err("E-ENUM: mapping collides with EnumValue occurrence wrapper".into());
         }
         let mut projected_enums = HashSet::new();
         self.collect_root_enums(root, &mut HashSet::new(), &mut projected_enums);
@@ -955,12 +949,6 @@ impl Lowering<'_> {
                     ));
                 }
                 for (field, other) in previous.fields.iter_mut().zip(&mapping.fields) {
-                    if field.kind != other.kind
-                        && (matches!(field.kind, Kind::Enum(_))
-                            || matches!(other.kind, Kind::Enum(_)))
-                    {
-                        return Err("E-ENUM-JOIN: shared mixed enum capture requires #539".into());
-                    }
                     field.kind = join_kind(field.kind.clone(), other.kind.clone());
                 }
             } else {
@@ -1403,14 +1391,27 @@ impl Lowering<'_> {
         }
     }
 
-    fn rule_shape(&self, rule: usize, visiting: &mut HashSet<usize>) -> Result<Shape> {
+    fn shape(&self, expression: &Expression, visiting: &mut HashSet<usize>) -> Result<Shape> {
+        self.shape_projected(expression, visiting, false)
+    }
+
+    fn rule_shape_projected(
+        &self,
+        rule: usize,
+        visiting: &mut HashSet<usize>,
+        enum_nodes: bool,
+    ) -> Result<Shape> {
         let _depth = self.enter_analysis()?;
         if self.skips[rule] {
             return Ok(text_shape());
         }
         if !self.enums[rule].is_empty() {
             return Ok(Shape {
-                kind: Kind::Enum(self.grammar.rules[rule].name.clone()),
+                kind: if enum_nodes {
+                    Kind::Node
+                } else {
+                    Kind::Enum(self.grammar.rules[rule].name.clone())
+                },
                 cardinality: Cardinality::One,
             });
         }
@@ -1429,37 +1430,46 @@ impl Lowering<'_> {
         if visiting.len() > 256 {
             return Err("rule shape depth exceeds 256".into());
         }
-        let shape = self.shape(&self.bodies[rule], visiting)?;
+        let shape = self.shape_projected(&self.bodies[rule], visiting, enum_nodes)?;
         visiting.remove(&rule);
         Ok(shape)
     }
 
-    fn shape(&self, expression: &Expression, visiting: &mut HashSet<usize>) -> Result<Shape> {
+    fn shape_projected(
+        &self,
+        expression: &Expression,
+        visiting: &mut HashSet<usize>,
+        enum_nodes: bool,
+    ) -> Result<Shape> {
         let _depth = self.enter_analysis()?;
         match expression {
-            Expression::Reference(rule) => self.rule_shape(*rule, visiting),
+            Expression::Reference(rule) => self.rule_shape_projected(*rule, visiting, enum_nodes),
             Expression::Capture { expression, .. }
             | Expression::Delimited(expression)
             | Expression::CaptureEquality {
                 child: expression, ..
-            } => self.shape(expression, visiting),
+            } => self.shape_projected(expression, visiting, enum_nodes),
             Expression::OptionalExpr(child) => Ok(wrap_node(
-                self.shape(child, visiting)?,
+                self.shape_projected(child, visiting, enum_nodes)?,
                 Cardinality::Optional,
             )),
-            Expression::Repeat { child, .. } => {
-                Ok(wrap_node(self.shape(child, visiting)?, Cardinality::Many))
-            }
+            Expression::Repeat { child, .. } => Ok(wrap_node(
+                self.shape_projected(child, visiting, enum_nodes)?,
+                Cardinality::Many,
+            )),
             Expression::Separated { child, separator } => {
-                if self.shape(separator, visiting)?.kind != Kind::Text {
+                if self.shape_projected(separator, visiting, enum_nodes)?.kind != Kind::Text {
                     return Err("mapped separator".into());
                 }
-                Ok(wrap_node(self.shape(child, visiting)?, Cardinality::Many))
+                Ok(wrap_node(
+                    self.shape_projected(child, visiting, enum_nodes)?,
+                    Cardinality::Many,
+                ))
             }
             Expression::Sequence(elements) => {
                 let mut nodes = Vec::new();
                 for element in elements {
-                    let shape = self.shape(element, visiting)?;
+                    let shape = self.shape_projected(element, visiting, enum_nodes)?;
                     if shape.kind != Kind::Text {
                         nodes.push(shape);
                     }
@@ -1478,16 +1488,24 @@ impl Lowering<'_> {
                 })
             }
             Expression::Choice(elements) => {
-                let mut result = self.shape(&elements[0], visiting)?;
+                let mut result = self.shape_projected(&elements[0], visiting, enum_nodes)?;
                 for element in &elements[1..] {
-                    result = merge(result, self.shape(element, visiting)?, false)?;
+                    result = merge(
+                        result,
+                        self.shape_projected(element, visiting, enum_nodes)?,
+                        false,
+                    )?;
                 }
                 Ok(result)
             }
             Expression::PredictiveChoice { alternatives, .. } => {
-                let mut result = self.shape(&alternatives[0], visiting)?;
+                let mut result = self.shape_projected(&alternatives[0], visiting, enum_nodes)?;
                 for element in &alternatives[1..] {
-                    result = merge(result, self.shape(element, visiting)?, false)?;
+                    result = merge(
+                        result,
+                        self.shape_projected(element, visiting, enum_nodes)?,
+                        false,
+                    )?;
                 }
                 Ok(result)
             }

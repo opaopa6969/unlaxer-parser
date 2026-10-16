@@ -196,6 +196,9 @@ public class ASTGenerator implements CodeGenerator {
               .append(" value) implements ").append(className).append(" {}\n\n");
         }
 
+        if (!enumRules.isEmpty()) sb.append("    /** One enum occurrence in a mixed capture; source maps use this wrapper's identity. */\n")
+            .append("    record EnumValue(java.lang.Enum<?> value) { public EnumValue { java.util.Objects.requireNonNull(value); } }\n\n");
+
         // enum ルール
         for (RuleDecl enumRule : enumRules) {
             sb.append(generateEnumClass(enumRule, "    "));
@@ -330,7 +333,10 @@ public class ASTGenerator implements CodeGenerator {
         sb.append(indent).append("            default -> throw new java.lang.IllegalArgumentException(\"Unknown ")
           .append(enumName).append(": \" + text);\n")
           .append(indent).append("        };\n").append(indent).append("    }\n")
-          .append(indent).append("}\n\n");
+          .append(indent).append("    public String text() {\n").append(indent).append("        return switch (this) {\n");
+        for (String literal : literals) sb.append(indent).append("            case ").append(EnumSchema.constantName(literal))
+            .append(" -> ").append(javaString(literal)).append(";\n");
+        sb.append(indent).append("        };\n").append(indent).append("    }\n").append(indent).append("}\n\n");
         return sb.toString();
     }
 
