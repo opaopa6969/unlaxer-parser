@@ -151,6 +151,10 @@ public final class UBNFModuleLoader {
             }
             return new RuleRefElement(name);
         }
+        if (value instanceof UBNFAST.OwnedCaptureElement capture)
+            return new UBNFAST.OwnedCaptureElement(capture.name(), body(capture.body(), imported, tokens, used, synthetic));
+        if (value instanceof UBNFAST.CaptureScopeElement scope)
+            return new UBNFAST.CaptureScopeElement(body(scope.body(), imported, tokens, used, synthetic));
         if (value instanceof GroupElement group)
             return new GroupElement(body(group.body(), imported, tokens, used, synthetic));
         if (value instanceof OptionalElement optional)

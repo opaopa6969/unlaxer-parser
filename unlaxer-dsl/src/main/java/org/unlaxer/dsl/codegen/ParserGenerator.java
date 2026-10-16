@@ -48,7 +48,6 @@ public class ParserGenerator implements CodeGenerator {
         final Set<String> tokenEmptySet;                // token names backed by EMPTY
         final Map<String, int[]> tokenCharRangeMap;     // token name -> [min char, max char]
         final Map<String, String> tokenCIMap;           // token name -> word (CaseInsensitive)
-        final Map<String, String> tokenRegexMap;        // token name -> regex pattern (Regex)
         final Set<String> ruleNames;
         final Set<String> explicitlySafeMemoTokens;
         final Map<String, List<String>> helpers = new LinkedHashMap<>(); // rule -> helper codes
@@ -99,7 +98,6 @@ public class ParserGenerator implements CodeGenerator {
             this.tokenEmptySet = new LinkedHashSet<>();
             this.tokenCharRangeMap = new LinkedHashMap<>();
             this.tokenCIMap = new LinkedHashMap<>();
-            this.tokenRegexMap = new LinkedHashMap<>();
             for (TokenDecl token : grammar.tokens()) {
                 if (token instanceof TokenDecl.Declarative lexical) {
                     tokenParserMap.put(lexical.name(), ParserCodegenUtil.toParserClassName(lexical.name()));
@@ -126,8 +124,6 @@ public class ParserGenerator implements CodeGenerator {
                     tokenCharRangeMap.put(cr.name(), new int[]{cr.min(), cr.max()});
                 } else if (token instanceof TokenDecl.CaseInsensitive ci) {
                     tokenCIMap.put(ci.name(), ci.word());
-                } else if (token instanceof TokenDecl.Regex rx) {
-                    tokenRegexMap.put(rx.name(), rx.pattern());
                 } else {
                     throw new IllegalStateException("unhandled " + token);
                 }
@@ -186,6 +182,10 @@ public class ParserGenerator implements CodeGenerator {
 
     @Override
     public GeneratedSource generate(GrammarDecl grammar) {
+        org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
+        GrammarValidator.requireValidBoundedRepeatElements(grammar);
+        LeftRecursionAnalysis.requireValid(grammar);
+        TypeofConstraints.validate(grammar);
         var ciErrors = GrammarValidator.validateCaseInsensitiveTokens(grammar);
         if (!ciErrors.isEmpty()) throw new IllegalArgumentException(ciErrors.toString());
         if (grammar.rules().stream().anyMatch(rule -> rule.annotations().stream().anyMatch(
@@ -194,6 +194,8 @@ public class ParserGenerator implements CodeGenerator {
                 .filter(issue -> issue.code().startsWith("E-UNIQUE-LONGEST-")).toList();
             if (!profileErrors.isEmpty()) throw new IllegalArgumentException(profileErrors.toString());
         }
+        var javaBindingErrors = GrammarValidator.validateJavaTokenBindings(grammar);
+        if (!javaBindingErrors.isEmpty()) throw new IllegalArgumentException(javaBindingErrors.toString());
         String packageName = ParserCodegenUtil.getPackageName(grammar);
         String grammarName = grammar.name();
         String className = grammarName + "Parsers";
@@ -254,6 +256,20 @@ public class ParserGenerator implements CodeGenerator {
                     }
                     @Override public java.util.List<String> captureBindings() { return bindings; }
                     @Override public Parsers getLazyParsers() { return new Parsers(child); }
+                    // Inspect the actual result before Chain filters virtual tokens.
+                    @Override public org.unlaxer.Parsed parseChainElement(Parser child,
+                            org.unlaxer.context.ParseContext context, org.unlaxer.TokenKind kind, boolean invert) {
+                        org.unlaxer.Parsed parsed = child.parse(context, kind, invert);
+                        if (parsed.isSucceeded() && (parsed.getTokenOptional().isPresent() || !parsed.getOriginalTokens().isEmpty())) {
+                            if (org.unlaxer.CapturedValue.provenanceOf(parsed.getRootToken().source, context.getSource())
+                                    != org.unlaxer.CapturedValue.Provenance.INPUT) {
+                                return org.unlaxer.parser.ErrorMessageParser.expected(
+                                    "AST field capture requires original input source; use CAPTURE/SAME_AS for general replay")
+                                    .parse(context, kind, invert);
+                            }
+                        }
+                        return parsed;
+                    }
                     @Override public java.util.Optional<RecursiveMode> getNotAstNodeSpecifier() {
                         return java.util.Optional.empty();
                     }
@@ -278,12 +294,11 @@ public class ParserGenerator implements CodeGenerator {
 
         sb.append(generateNamedWhitespaceClasses(ctx));
 
-        // Simple / NEGATION / CHAR_RANGE / REGEX トークン用の生成内部クラス
+        // Simple / NEGATION / CHAR_RANGE トークン用の生成内部クラス
         sb.append(ParserTokenEmitter.generateSimpleTokenWrappers(ctx));
         sb.append(ParserTokenEmitter.generateNegationClasses(ctx));
         sb.append(ParserTokenEmitter.generateLexicalClasses(ctx));
         sb.append(ParserTokenEmitter.generateCharRangeClasses(ctx));
-        sb.append(ParserTokenEmitter.generateRegexClasses(ctx));
 
         // Phase 2: 各ルールのヘルパー + ルールクラスを出力
         for (RuleDecl rule : grammar.rules()) {
@@ -463,6 +478,10 @@ public class ParserGenerator implements CodeGenerator {
     }
 
     private static boolean collectMemoDependencies(GenContext ctx, AtomicElement element, Set<String> refs) {
+        // General bindings are context-dependent state, not AST capture-site metadata.
+        if (element instanceof org.unlaxer.dsl.bootstrap.UBNFAST.OwnedCaptureElement
+            || element instanceof org.unlaxer.dsl.bootstrap.UBNFAST.ReplayElement
+            || element instanceof org.unlaxer.dsl.bootstrap.UBNFAST.CaptureScopeElement) return false;
         if (element instanceof org.unlaxer.dsl.bootstrap.UBNFAST.RuleRefElement ref) {
             if (ref.namespace().isPresent()) return false;
             if (ctx.ruleNames.contains(ref.name())) {
