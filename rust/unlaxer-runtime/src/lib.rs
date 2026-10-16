@@ -109,6 +109,10 @@ pub enum Expr {
     Quoted(char),
     Rule(usize),
     Sequence(Vec<Expr>),
+    /// Match each child occurrence once, greedily choosing the first unused match.
+    /// Failed candidates roll back; selected children are never permuted on later failure.
+    /// Empty children succeed, nullable children run once, and no trivia is added here.
+    NonOrdered(Vec<Expr>),
     Choice(Vec<Expr>),
     /// Try every alternative from the same transactional state and commit the
     /// one that consumes the most input. Equal-length matches keep declaration order.
@@ -276,6 +280,10 @@ impl Expr {
     }
     pub fn choice(alternatives: impl IntoIterator<Item = Self>) -> Self {
         Self::Choice(alternatives.into_iter().collect())
+    }
+    /// Java NonOrdered semantics; this is unrelated to UBNF trivia `@interleave`.
+    pub fn non_ordered(children: impl IntoIterator<Item = Self>) -> Self {
+        Self::NonOrdered(children.into_iter().collect())
     }
     pub fn longest_choice(alternatives: impl IntoIterator<Item = Self>) -> Self {
         Self::LongestChoice(alternatives.into_iter().collect())
@@ -762,6 +770,7 @@ pub struct CheckpointMetrics {
 }
 
 struct Checkpoint {
+    match_cursor_policy: MatchCursorPolicy,
     position: usize,
     matched_position: usize,
     nodes: usize,
@@ -923,7 +932,7 @@ struct FailureMemoKey {
     rule: usize,
     position: usize,
     matched_position: usize,
-    depth_and_whitespace: usize,
+    depth_and_modes: usize,
 }
 
 impl FailureMemoKey {
@@ -938,8 +947,14 @@ impl FailureMemoKey {
             rule,
             position,
             matched_position,
-            depth_and_whitespace: depth * 2 + usize::from(whitespace),
+            depth_and_modes: depth * 8 + 4 + usize::from(whitespace),
         }
+    }
+    fn with_match_policy(mut self, policy: MatchCursorPolicy) -> Self {
+        self.depth_and_modes = (self.depth_and_modes & !6)
+            | (usize::from(policy.reset) << 2)
+            | (usize::from(policy.non_ordered) << 1);
+        self
     }
 }
 
@@ -1100,6 +1115,23 @@ impl FailureMemoBuckets {
     }
 }
 
+// Java Chain switches its current transaction to an advancing matched cursor.
+// NonOrdered inherits that policy; its Java children otherwise reset on begin.
+// `non_ordered` confines the compatibility policy to the new combinator.
+#[derive(Clone, Copy)]
+struct MatchCursorPolicy {
+    reset: bool,
+    non_ordered: bool,
+}
+impl Default for MatchCursorPolicy {
+    fn default() -> Self {
+        Self {
+            reset: true,
+            non_ordered: false,
+        }
+    }
+}
+
 /// Per-parse state, shared by generated rules and custom parsers. Transactions restore
 /// cursors, CST nodes, captures and cloneable user values, but retain failure diagnostics.
 /// Clone must isolate mutable values: external effects and shared interior state are not rolled back.
@@ -1116,6 +1148,7 @@ impl FailureMemoBuckets {
 /// Checkpoint counters and memoized-failure hit counts describe only this context's
 /// first pass, not any separate diagnostic retry; semantic diagnostics are unaffected.
 pub struct ParseContext<'a> {
+    match_cursor_policy: MatchCursorPolicy,
     bindings: BTreeMap<String, Vec<String>>,
     input: &'a str,
     grapheme_boundaries: Option<grapheme::Boundaries>,
@@ -1460,6 +1493,7 @@ impl<'a> ParseContext<'a> {
             input,
             lexing: None,
             rules: Arc::from([]),
+            match_cursor_policy: MatchCursorPolicy::default(),
             whitespace: false,
             lexical_trivia: None,
             lexical_context: None,
@@ -1881,6 +1915,7 @@ impl<'a> ParseContext<'a> {
             }
         }
         Checkpoint {
+            match_cursor_policy: self.match_cursor_policy,
             position: self.position,
             matched_position: self.matched_position,
             nodes: self.nodes.len(),
@@ -1910,6 +1945,7 @@ impl<'a> ParseContext<'a> {
                 metrics.rolled_back += 1;
             }
         }
+        self.match_cursor_policy = checkpoint.match_cursor_policy;
         self.position = checkpoint.position;
         self.matched_position = checkpoint.matched_position;
         self.nodes.truncate(checkpoint.nodes);
@@ -2061,7 +2097,8 @@ impl<'a> ParseContext<'a> {
                     self.matched_position,
                     self.whitespace,
                     depth,
-                ),
+                )
+                .with_match_policy(self.match_cursor_policy),
             )
         });
         if let Some((position, key)) = memo_key {
@@ -2132,6 +2169,40 @@ impl<'a> ParseContext<'a> {
         }
         self.expression_depth += 1;
         let checkpoint = self.checkpoint();
+        let parent_policy = self.match_cursor_policy;
+        // Chain sets the policy before beginning its own transaction, so a successful
+        // Sequence changes the policy for following siblings in the same owner.
+        // These built-in lexical parsers are also Chain implementations in Java.
+        if matches!(
+            expression,
+            Expr::Sequence(_) | Expr::Number | Expr::Identifier | Expr::Quoted(_)
+        ) {
+            self.match_cursor_policy.reset = false;
+        }
+        let java_transaction = matches!(
+            expression,
+            Expr::NonOrdered(_)
+                | Expr::JavaEmpty
+                | Expr::JavaLookahead { .. }
+                | Expr::JavaUntil(_)
+                | Expr::JavaOptional(_)
+                | Expr::JavaRepeat { .. }
+                | Expr::Choice(_)
+                | Expr::LongestChoice(_)
+                | Expr::UniqueLongestChoice(_)
+                | Expr::PredictiveChoice { .. }
+                | Expr::Recovery { .. }
+        );
+        if java_transaction {
+            if (self.match_cursor_policy.non_ordered || matches!(expression, Expr::NonOrdered(_)))
+                && self.match_cursor_policy.reset
+            {
+                self.matched_position = self.position;
+            }
+            if matches!(expression, Expr::NonOrdered(_)) {
+                self.match_cursor_policy.non_ordered = true;
+            }
+        }
         // Recursive combinators bypass the large general dispatch frame.
         let result = match expression {
             Expr::Rule(rule) => self.rule(*rule, depth).map(|id| Fragment {
@@ -2148,6 +2219,7 @@ impl<'a> ParseContext<'a> {
                 self.with_trivia(*whitespace, |context| context.expression(child, depth))
             }
             Expr::Sequence(elements) => self.sequence(elements, depth),
+            Expr::NonOrdered(children) => self.non_ordered(children, depth),
             Expr::Choice(alternatives) => self.ordered_choice(alternatives.iter(), depth),
             Expr::LongestChoice(alternatives) => self.longest_choice(alternatives, depth, false),
             Expr::UniqueLongestChoice(alternatives) => {
@@ -2196,6 +2268,10 @@ impl<'a> ParseContext<'a> {
             self.trace_expression(expression, checkpoint.position);
             self.commit_checkpoint(checkpoint);
         }
+        // A Java transaction discards its local cursor policy on both outcomes.
+        if java_transaction {
+            self.match_cursor_policy = parent_policy;
+        }
         self.expression_depth -= 1;
         result
     }
@@ -2243,6 +2319,34 @@ impl<'a> ParseContext<'a> {
             result.nodes.append(&mut fragment.nodes);
             result.captures.append(&mut fragment.captures);
             self.skip();
+        }
+        Some(result)
+    }
+
+    #[inline(never)]
+    fn non_ordered(&mut self, children: &[Expr], depth: usize) -> Option<Fragment> {
+        let mut selected = vec![false; children.len()];
+        let mut result = Fragment::default();
+        for _ in 0..children.len() {
+            let mut found = false;
+            for (index, child) in children.iter().enumerate() {
+                if selected[index] {
+                    continue;
+                }
+                if let Some(mut fragment) = self.expression(child, depth) {
+                    selected[index] = true;
+                    result.nodes.append(&mut fragment.nodes);
+                    result.captures.append(&mut fragment.captures);
+                    found = true;
+                    break;
+                }
+                if self.resource_failure.is_some() {
+                    return None;
+                }
+            }
+            if !found {
+                return None;
+            }
         }
         Some(result)
     }
@@ -2555,6 +2659,7 @@ impl<'a> ParseContext<'a> {
             }
             Expr::Rule(_) => unreachable!("rule references are dispatched by expression"),
             Expr::Sequence(_)
+            | Expr::NonOrdered(_)
             | Expr::Choice(_)
             | Expr::LongestChoice(_)
             | Expr::UniqueLongestChoice(_)
@@ -3426,6 +3531,7 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
             ..
         } => !reads_diagnostics && *replayable,
         Expr::Sequence(children)
+        | Expr::NonOrdered(children)
         | Expr::Choice(children)
         | Expr::LongestChoice(children)
         | Expr::UniqueLongestChoice(children) => {
@@ -3522,6 +3628,7 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>) -> bo
             true
         }
         Expr::Sequence(children)
+        | Expr::NonOrdered(children)
         | Expr::Choice(children)
         | Expr::LongestChoice(children)
         | Expr::UniqueLongestChoice(children) => children
