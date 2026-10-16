@@ -42,7 +42,7 @@ public final class EvalSchema {
                 String type = types.inferType(grammar, rule, name);
                 boolean valid = switch (annotation.kind()) {
                     case "variable_ref" -> type.equals("String");
-                    case "conditional" -> type.equals(grammar.name()+"AST") || MappingShape.astMappings(grammar).containsKey(type.startsWith(grammar.name()+"AST.") ? type.substring(grammar.name().length()+4) : type);
+                    case "conditional" -> scalarAstField(grammar, mapping.className(), name);
                     case "binary_arithmetic" -> name.equals("op") ? type.equals("List<String>")
                         : name.equals("right") ? type.startsWith("List<")
                         : !type.startsWith("List<") && !type.startsWith("Optional<");
@@ -52,6 +52,20 @@ public final class EvalSchema {
             }
         }
         return java.util.Collections.unmodifiableMap(result);
+    }
+    private static boolean scalarAstField(GrammarDecl grammar, String mappingName, String field) {
+        var semantics = new SemanticCardinality(grammar);
+        for (var contributor : grammar.rules()) {
+            if (MapperElementUtil.isSkipped(contributor)
+                    || MapperElementUtil.getMappingAnnotation(contributor)
+                        .filter(mapping -> mapping.className().equals(mappingName)).isEmpty()) continue;
+            var shape = semantics.captureShape(contributor, field);
+            if (shape == null || shape.count() != SemanticCardinality.Count.ONE) return false;
+            var sites = new CaptureBindingPlan(contributor).sites(field);
+            if (sites.isEmpty() || sites.stream().anyMatch(site -> !EnumSchema.onlyAstValues(grammar, site.element())))
+                return false;
+        }
+        return true;
     }
     private static IllegalArgumentException invalid(String rule, String message) {
         return new IllegalArgumentException("E-EVAL: " + message + " on " + rule);

@@ -286,9 +286,9 @@ public class EvaluatorGenerator implements CodeGenerator {
             String methodName, EvalAnnotation eval) {
         sb.append("    protected T ").append(methodName).append("(")
           .append(astClass).append(".").append(name).append(" node) {\n");
-        sb.append("        Object cond = eval(node.condition());\n");
+        sb.append("        Object cond = eval((").append(astClass).append(") node.condition());\n");
         sb.append("        boolean condBool = Boolean.TRUE.equals(cond) || \"true\".equalsIgnoreCase(String.valueOf(cond));\n");
-        sb.append("        return condBool ? eval(node.thenExpr()) : eval(node.elseExpr());\n");
+        sb.append("        return condBool ? eval((").append(astClass).append(") node.thenExpr()) : eval((").append(astClass).append(") node.elseExpr());\n");
         sb.append("    }\n");
     }
 

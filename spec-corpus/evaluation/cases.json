@@ -360,5 +360,41 @@
       0,
       9
     ]
+  },
+  {
+    "input": "d(u(true),l(5),u(unused))",
+    "value": 5,
+    "events": [
+      "unknown:true",
+      "literal:5"
+    ],
+    "span": [
+      0,
+      25
+    ]
+  },
+  {
+    "input": "d(u(false),l(fail),u(7))",
+    "value": 7,
+    "events": [
+      "unknown:false",
+      "unknown:7"
+    ],
+    "span": [
+      0,
+      24
+    ]
+  },
+  {
+    "input": "g(u(false),l(fail),m(9))",
+    "value": 9,
+    "events": [
+      "unknown:false",
+      "manual:9"
+    ],
+    "span": [
+      0,
+      24
+    ]
   }
 ]

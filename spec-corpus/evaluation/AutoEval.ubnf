@@ -2,7 +2,7 @@ grammar AutoEval {
   @package: org.example.autoeval
   token TEXT = UNTIL(')')
   token NUM = NumberParser
-  @root Root ::= BinaryInteger | Shadow | Conditional | Binary | Pass | Variable | Leaf | Manual | Unknown;
+  @root Root ::= SharedConditional | GroupConditional | BinaryInteger | Shadow | Conditional | Binary | Pass | Variable | Leaf | Manual | Unknown;
   @mapping(Leaf, params=[value]) Shadow ::= 'x(' TEXT @value ')';
   @mapping(Leaf, params=[value])
   @eval(kind='literal')
@@ -22,6 +22,10 @@ grammar AutoEval {
   @mapping(Conditional, params=[condition, thenExpr, elseExpr])
   @eval(kind='conditional')
   Conditional ::= 'c(' Leaf @condition ',' Manual @thenExpr ',' Manual @elseExpr ')';
+  @mapping(Conditional, params=[condition, thenExpr, elseExpr])
+  SharedConditional ::= 'd(' Unknown @condition ',' Leaf @thenExpr ',' Unknown @elseExpr ')';
+  @mapping(Conditional, params=[condition, thenExpr, elseExpr])
+  GroupConditional ::= 'g(' (Leaf | Unknown) @condition ',' (Manual | Leaf) @thenExpr ',' (Manual | Unknown) @elseExpr ')';
   @mapping(Manual, params=[value])
   @eval(kind='literal', strategy='manual')
   Manual ::= 'm(' TEXT @value ')';

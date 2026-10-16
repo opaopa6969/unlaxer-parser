@@ -21,6 +21,12 @@ source files are written. An automatic annotation on a sum family belongs on its
 concrete variants instead. Enum declarations themselves remain value types;
 annotate a mapped record that captures an enum.
 
+Shared conditional mappings and scalar choices may contain different nominal
+AST types. Every contributor must still project one AST node for each conditional
+field. Existing Java `Object` joins are preserved and checked as AST values by
+the evaluator; text, enum values, and containers do not become conditions merely
+because another contributor contains an AST.
+
 ## Values and migration
 
 Java evaluators remain generic `Evaluator<T>`. Automatic literal/passthrough
