@@ -42,7 +42,7 @@ jobs:
           rustup toolchain install 1.85.0 --profile minimal
       - name: Verify harness failure detection
         working-directory: parser
-        run: python3 -m unittest discover -s scripts/tests -p test_tiny_classic_benchmark.py
+        run: python3 -m unittest discover -s scripts/tests -p 'test_tiny_classic_*.py'
       - name: Compile current Classic consumers and verify shared semantics
         working-directory: parser
         run: |
