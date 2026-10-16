@@ -53,6 +53,7 @@ public final class TypeofConstraints {
 
     /** Public fields use the joined constructor schema; private locals stay rule-local. */
     public static String valueType(GrammarDecl grammar, RuleDecl rule, String capture) {
+        if (NestedCaptures.enabled(rule)) return NestedCaptures.javaType(NestedCaptures.field(grammar, rule, capture));
         boolean published =
                 MapperElementUtil.getMappingAnnotation(rule)
                         .map(mapping -> mapping.paramNames().contains(capture))

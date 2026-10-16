@@ -644,8 +644,8 @@ public final class RustBackend {
             }
             """);
         if(hasNestedValues(ir)) out.append(NestedEmitter.mixedMapper(ir));
-        if(ir.mappings().stream().flatMap(m->m.fields().stream()).anyMatch(f->f.kind()==Kind.NESTED)) out.append(NestedEmitter.HELPERS);
-        if(ir.mappings().stream().flatMap(m->m.fields().stream()).anyMatch(f->f.kind()==Kind.NESTED && (f.nested().leaf()==Kind.NODE || f.nested().leaf()==Kind.ENUM || f.nested().leaf()==Kind.VALUE))) out.append(NestedEmitter.PROJECT_HELPERS);
+        if(ir.rules().stream().flatMap(rule -> TypeofEmitter.fields(rule).stream()).anyMatch(f->f.kind()==Kind.NESTED)) out.append(NestedEmitter.HELPERS);
+        if(ir.rules().stream().flatMap(rule -> TypeofEmitter.fields(rule).stream()).anyMatch(f->f.kind()==Kind.NESTED && (f.nested().leaf()==Kind.NODE || f.nested().leaf()==Kind.ENUM || f.nested().leaf()==Kind.VALUE))) out.append(NestedEmitter.PROJECT_HELPERS);
         out.append(AssociativeSpines.helpers(ir));
         out.append("""
 
@@ -874,7 +874,7 @@ public final class RustBackend {
     }
 
     private static boolean hasNestedValues(GrammarIR ir) {
-        return ir.mappings().stream().flatMap(mapping -> mapping.fields().stream()).anyMatch(field -> field.kind()==Kind.NESTED && field.nested().leaf()==Kind.VALUE);
+        return ir.rules().stream().flatMap(rule -> TypeofEmitter.fields(rule).stream()).anyMatch(field -> field.kind()==Kind.NESTED && field.nested().leaf()==Kind.VALUE);
     }
     private static boolean hasValues(GrammarIR ir) {
         return ir.mappings().stream().flatMap(mapping -> mapping.fields().stream()).anyMatch(field -> field.kind() == Kind.VALUE);

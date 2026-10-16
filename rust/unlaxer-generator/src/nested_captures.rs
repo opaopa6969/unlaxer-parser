@@ -28,9 +28,6 @@ pub fn sites(rule: &RuleDecl) -> Result<BTreeMap<String, &AtomicElement>, String
         }
         for sequence in &value.alternatives {
             for element in &sequence.elements {
-                if element.typeof_constraint.is_some() {
-                    return Err(error(rule, "typeof requires remaining #583 implementation"));
-                }
                 if let Some(name) = &element.capture {
                     if inside || result.insert(name.clone(), &element.element).is_some() {
                         return Err(error(rule, "one outer capture site required"));
@@ -136,7 +133,20 @@ pub fn validate(grammar: &GrammarDecl) -> Result<(), String> {
             return Err(error(rule, "commonField requires a mapped sum family"));
         }
         let values = sites(rule)?;
-        if values.len() != mapping.1.len() || !mapping.1.iter().all(|p| values.contains_key(p)) {
+        let mut usages = Vec::new();
+        crate::lowering::collect_typeof(&rule.body, &mut usages)?;
+        for (_, reference) in &usages {
+            if !values.contains_key(reference) {
+                return Err(format!("E-TYPEOF-UNKNOWN-CAPTURE: {reference}"));
+            }
+        }
+        let names: HashSet<_> = mapping
+            .1
+            .iter()
+            .cloned()
+            .chain(usages.into_iter().flat_map(|(a, b)| [a, b]))
+            .collect();
+        if values.len() != names.len() || !names.iter().all(|p| values.contains_key(p)) {
             return Err(error(rule, "mapping must name each unique outer capture"));
         }
         for value in values.values() {

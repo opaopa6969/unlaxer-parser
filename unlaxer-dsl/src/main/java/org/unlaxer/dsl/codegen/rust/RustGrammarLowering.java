@@ -355,9 +355,10 @@ public final class RustGrammarLowering {
             var documentation = grammar.rules().get(i).annotations().stream()
                 .filter(DocAnnotation.class::isInstance).map(DocAnnotation.class::cast)
                 .map(DocAnnotation::text).toList();
+            final int ruleIndex = i;
             rules.add(new Rule(grammar.rules().get(i).name(), ruleBody, mapping, operators.get(i), catalog, skips.get(i), documentation, EnumSchema.isEnum(grammar.rules().get(i)) ? EnumSchema.literals(grammar.rules().get(i)) : List.of(),
                 org.unlaxer.dsl.codegen.TypeofConstraints.collect(grammar.rules().get(i)).stream()
-                    .map(value -> new TypeConstraint(constraintField(value.capture(), captures), constraintField(value.reference(), captures))).toList()));
+                    .map(value -> new TypeConstraint(constraintField(value.capture(), captures, grammar.rules().get(ruleIndex)), constraintField(value.reference(), captures, grammar.rules().get(ruleIndex)))).toList()));
         }
         List<Rule> rewritten = new ArrayList<>();
         boolean hasValues = variants.values().stream().flatMap(mapping -> mapping.fields().stream())
@@ -432,7 +433,8 @@ public final class RustGrammarLowering {
         return new Mapping(mapping.name(), List.copyOf(fields.values()));
     }
 
-    private static Field constraintField(String name, Map<String, Shape> captures) {
+    private Field constraintField(String name, Map<String, Shape> captures, RuleDecl rule) {
+        if (org.unlaxer.dsl.codegen.NestedCaptures.enabled(rule)) return new Field(name, Kind.NESTED, Cardinality.ONE, null, org.unlaxer.dsl.codegen.NestedCaptures.field(grammar, rule, name));
         Shape shape = captures.get(name);
         if (shape == null) throw unsupported("E-TYPEOF-UNKNOWN-CAPTURE: " + name);
         return new Field(name, shape.kind(), shape.cardinality(), shape.enumName());
@@ -445,7 +447,7 @@ public final class RustGrammarLowering {
     private Field boundConstraintField(Field field, Mapping mapping, RuleDecl sourceRule) {
         Field bound = mapping == null ? field : mapping.fields().stream()
             .filter(value -> value.name().equals(field.name())).findFirst().orElse(field);
-        return integerConstraint(grammar, sourceRule, field.name())
+        return bound.kind() != Kind.NESTED && integerConstraint(grammar, sourceRule, field.name())
             ? new Field(field.name(), Kind.INTEGER, field.cardinality()) : bound;
     }
 

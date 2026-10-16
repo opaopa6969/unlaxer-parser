@@ -895,6 +895,21 @@ class MapperRuleEmitter {
             mappedClassByRuleName, tokenDeclByName, ruleByName);
     }
 
+    private static void emitNestedParam(IndentedWriter w, GrammarDecl grammar, String parsersClass,
+            RuleDecl rule, CaptureBindingPlan bindings, String capture, String param, String type) {
+        String id=ParserCodegenUtil.escapeString(bindings.sites(capture).get(0).id());
+        w.line("var nestedSites_"+param+" = findCaptureOccurrences(token, java.util.Set.of(\""+id+"\"));");
+        w.line("if (nestedSites_"+param+".size()!=1) throw new IllegalArgumentException(\"expected one nested capture "+param+"\");");
+        w.line("var nestedValue_"+param+" = nestedSnapshot(nestedSites_"+param+".get(0).token());");
+        var nestedShape=NestedCaptures.field(grammar,rule,capture);
+        String projection=nestedShape.leaf()==org.unlaxer.dsl.codegen.rust.GrammarIR.Kind.VALUE ? "candidate -> mapNestedValue(candidate)"
+            : nestedShape.leaf()==org.unlaxer.dsl.codegen.rust.GrammarIR.Kind.NODE ? "candidate -> mapToken(candidate)"
+            : nestedShape.leaf()==org.unlaxer.dsl.codegen.rust.GrammarIR.Kind.ENUM ? "candidate -> candidate.parser instanceof "+parsersClass+"."+nestedShape.enumName()+"Parser ? "+nestedShape.javaLeafType()+".fromText(tokenTextCompat(candidate)) : null" : null;
+        if(projection!=null) w.line("var nestedSources_"+param+" = nestedSourceNodes(nestedSites_"+param+".get(0).token()).iterator();");
+        w.line(type+" "+param+" = "+NestedMapperEmitter.mapped(nestedShape,"nestedValue_"+param,0,"nestedSources_"+param,projection)+";");
+        if(projection!=null) w.line("if (nestedSources_"+param+".hasNext()) throw new IllegalArgumentException(\"unmapped original nested leaf\");");
+    }
+
     private static void emitTypeofChecks(IndentedWriter w, GrammarDecl grammar, String parsersClass,
             RuleDecl rule, Map<String, String> mappedClassByRuleName,
             Map<String, TokenDecl> tokenDeclByName, Map<String, RuleDecl> ruleByName) {
@@ -911,7 +926,9 @@ class MapperRuleEmitter {
             names.put(capture, local);
             String type = TypeofConstraints.valueType(grammar, rule, capture);
             String mapped = MapperElementUtil.getMappingAnnotation(rule).orElseThrow().className();
-            if (AssociativeProjection.literalSpines(grammar).contains(CommonFieldSchema.rustName(mapped))
+            if (NestedCaptures.enabled(rule)) {
+                emitNestedParam(w, grammar, parsersClass, rule, bindings, capture, local, type);
+            } else if (AssociativeProjection.literalSpines(grammar).contains(CommonFieldSchema.rustName(mapped))
                     && (capture.equals("left") || capture.equals("right"))) {
                 boolean many = capture.equals("right");
                 w.line(type + " " + local + " = " + (many ? "new ArrayList<>()" : "null") + ";");
@@ -965,17 +982,7 @@ class MapperRuleEmitter {
             }
 
             if (NestedCaptures.enabled(rule)) {
-                String id=ParserCodegenUtil.escapeString(bindings.sites(param).get(0).id());
-                w.line("var nestedSites_"+param+" = findCaptureOccurrences(token, java.util.Set.of(\""+id+"\"));");
-                w.line("if (nestedSites_"+param+".size()!=1) throw new IllegalArgumentException(\"expected one nested capture "+param+"\");");
-                w.line("var nestedValue_"+param+" = nestedSnapshot(nestedSites_"+param+".get(0).token());");
-                var nestedShape=NestedCaptures.field(grammar,rule,param);
-                String projection=nestedShape.leaf()==org.unlaxer.dsl.codegen.rust.GrammarIR.Kind.VALUE ? "candidate -> mapNestedValue(candidate)"
-                    : nestedShape.leaf()==org.unlaxer.dsl.codegen.rust.GrammarIR.Kind.NODE ? "candidate -> mapToken(candidate)"
-                    : nestedShape.leaf()==org.unlaxer.dsl.codegen.rust.GrammarIR.Kind.ENUM ? "candidate -> candidate.parser instanceof "+parsersClass+"."+nestedShape.enumName()+"Parser ? "+nestedShape.javaLeafType()+".fromText(tokenTextCompat(candidate)) : null" : null;
-                if(projection!=null) w.line("var nestedSources_"+param+" = nestedSourceNodes(nestedSites_"+param+".get(0).token()).iterator();");
-                w.line(type+" "+param+" = "+NestedMapperEmitter.mapped(nestedShape,"nestedValue_"+param,0,"nestedSources_"+param,projection)+";");
-                if(projection!=null) w.line("if (nestedSources_"+param+".hasNext()) throw new IllegalArgumentException(\"unmapped original nested leaf\");");
+                emitNestedParam(w, grammar, parsersClass, rule, bindings, param, param, type);
             } else {
                 emitBoundParam(w, parsersClass, grammar, param, type, bindings.sites(param),
                     mappedClassByRuleName, tokenDeclByName, ruleByName);

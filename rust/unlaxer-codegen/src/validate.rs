@@ -179,10 +179,23 @@ pub(super) fn validate(ir: &GrammarIr) -> Result<(), GenerateError> {
         let mut constraint_fields = BTreeMap::new();
         for constraint in &rule.type_constraints {
             for value in [&constraint.capture, &constraint.reference] {
-                if matches!(value.kind, Kind::Nested { .. }) {
-                    return Err(fail(
-                        "E-NESTED-SHAPE: typeof requires remaining #583 implementation",
-                    ));
+                if let Kind::Nested { leaf, containers } = &value.kind {
+                    if value.cardinality != Cardinality::One
+                        || containers.len() > 32
+                        || containers.contains(&Cardinality::One)
+                        || !matches!(
+                            leaf.as_ref(),
+                            Kind::Text | Kind::Integer | Kind::Node | Kind::Enum(_) | Kind::Value
+                        )
+                        || rule.operator.is_some()
+                    {
+                        return Err(fail("E-NESTED-SHAPE: invalid nested constraint schema"));
+                    }
+                    if let Kind::Enum(name) = leaf.as_ref() {
+                        if !enum_names.contains(name.as_str()) {
+                            return Err(fail("E-NESTED-SHAPE: unknown nested enum type"));
+                        }
+                    }
                 }
                 identifier(&value.name)?;
                 if constraint_fields
@@ -291,7 +304,6 @@ pub(super) fn validate(ir: &GrammarIr) -> Result<(), GenerateError> {
                             Kind::Text | Kind::Integer | Kind::Node | Kind::Enum(_) | Kind::Value
                         )
                         || containers.contains(&Cardinality::One)
-                        || !rule.type_constraints.is_empty()
                         || rule.operator.is_some()
                     {
                         return Err(fail(

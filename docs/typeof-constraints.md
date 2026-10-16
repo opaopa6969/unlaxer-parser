@@ -84,6 +84,10 @@ mapping identity. Rust identities also carry a value-kind namespace: a mapped
 node called `String` or `Integer` is distinct from the scalar type of that name. Supplementary characters and combining sequences do not change
 the code-point coordinate contract.
 
+Typed nested captures use the same shallow identity and empty-container location rules;
+see [nested typeof](nested-typeof.md). Their explicit CST boundaries preserve nested
+shape without reparsing or flattening.
+
 ## Generated IR and verification
 
 The Rust code-generation IR now has `Rule.type_constraints: Vec<TypeConstraint>`.

@@ -38,15 +38,17 @@ public final class NestedCaptures {
                 throw invalid(rule, "duplicate annotation");
             var mapping = MapperElementUtil.getMappingAnnotation(rule).orElseThrow(() -> invalid(rule,"@mapping required"));
             if (rule.annotations().stream().anyMatch(a -> a instanceof LeftAssocAnnotation || a instanceof RightAssocAnnotation || a instanceof SkipAnnotation || a instanceof EnumAnnotation || a instanceof EvalAnnotation || a instanceof CommonFieldAnnotation && !mapping.paramNames().isEmpty())
-                    || !TypeofConstraints.collect(rule).isEmpty() || TokenStreamGrammar.enabled(grammar))
+                    || TokenStreamGrammar.enabled(grammar))
                 throw invalid(rule,"combination requires the remaining #583 implementation");
+            for (var problem : TypeofConstraints.problems(rule))
+                throw new IllegalArgumentException(problem.code() + ": " + problem.message());
             var sites = new CaptureBindingPlan(rule);
-            if (sites.allSites().size() != mapping.paramNames().size()) throw invalid(rule,"mapping must name each unique outer capture");
-            for (String field : mapping.paramNames()) {
+            if (sites.allSites().size() != captureNames(rule).size()) throw invalid(rule,"mapping must name each unique outer capture");
+            for (String field : captureNames(rule)) {
                 if (sites.sites(field).size() != 1) throw invalid(rule,"one capture site required for " + field);
                 shape(grammar, sites.sites(field).get(0).element(), 0);
             }
-            if (mapping.paramNames().stream().anyMatch(name -> field(grammar,rule,name).leaf()==Kind.VALUE)) {
+            if (captureNames(rule).stream().anyMatch(name -> field(grammar,rule,name).leaf()==Kind.VALUE)) {
                 for (var candidate : grammar.rules()) {
                     String name=MapperElementUtil.getMappingAnnotation(candidate).map(MappingAnnotation::className).orElse("");
                     if (name.equals("NestedValue") || name.startsWith("NestedValue.") || EnumSchema.isEnum(candidate) && candidate.name().equals("NestedValue"))
@@ -154,9 +156,14 @@ public final class NestedCaptures {
         if (result==null) throw new IllegalArgumentException("E-NESTED-SHAPE: empty body");
         return result;
     }
+    static java.util.Set<String> captureNames(RuleDecl rule) {
+        var names = new java.util.LinkedHashSet<>(MapperElementUtil.getMappingAnnotation(rule).orElseThrow().paramNames());
+        names.addAll(TypeofConstraints.captures(rule));
+        return names;
+    }
     public static boolean hasMixed(GrammarDecl grammar) {
         return grammar.rules().stream().filter(NestedCaptures::enabled).anyMatch(rule ->
-            MapperElementUtil.getMappingAnnotation(rule).orElseThrow().paramNames().stream()
+            captureNames(rule).stream()
                 .anyMatch(name -> field(grammar,rule,name).leaf() == Kind.VALUE));
     }
     private static GrammarIR.NestedShape wrap(Cardinality container,GrammarIR.NestedShape inner) {

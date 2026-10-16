@@ -35,12 +35,28 @@ final class TypeofEmitter {
                                 field ->
                                         field.kind() == Kind.VALUE
                                                 && field.cardinality() == Cardinality.ONE);
+        boolean nestedValues =
+                fields.stream()
+                        .anyMatch(
+                                field ->
+                                        field.kind() == Kind.NESTED
+                                                && field.nested().containers().isEmpty()
+                                                && field.nested().leaf() == Kind.VALUE);
         boolean nodes =
                 values
+                        || nestedValues
                         || fields.stream()
                                 .anyMatch(
                                         field ->
-                                                (field.kind() == Kind.NODE || field.kind() == Kind.NULLABLE_NODE)
+                                                field.kind() == Kind.NESTED
+                                                        && field.nested().containers().isEmpty()
+                                                        && field.nested().leaf() == Kind.NODE)
+                        || fields.stream()
+                                .anyMatch(
+                                        field ->
+                                                (field.kind() == Kind.NODE
+                                                                || field.kind()
+                                                                        == Kind.NULLABLE_NODE)
                                                         && field.cardinality() == Cardinality.ONE);
         var out = new StringBuilder();
         if (nodes) {
@@ -63,6 +79,23 @@ final class TypeofEmitter {
             for (Rule rule : ir.rules())
                 if (!rule.enumLiterals().isEmpty())
                     out.append("        AstValue::Enum")
+                            .append(rule.name())
+                            .append(" { .. } => ")
+                            .append(RustBackend.quote("enum::" + rule.name()))
+                            .append(",\n");
+            out.append("    }\n}\n");
+        }
+        if (nestedValues) {
+            out.append(
+                    "\n"
+                        + "fn typeof_nested_value(value: &NestedValue) -> &'static str {\n"
+                        + "    match value {\n"
+                        + "        NestedValue::Text { .. } => \"String\",\n"
+                        + "        NestedValue::Integer { .. } => \"Integer\",\n"
+                        + "        NestedValue::Node(node) => typeof_node(node),\n");
+            for (Rule rule : ir.rules())
+                if (!rule.enumLiterals().isEmpty())
+                    out.append("        NestedValue::Enum")
                             .append(rule.name())
                             .append(" { .. } => ")
                             .append(RustBackend.quote("enum::" + rule.name()))
@@ -110,45 +143,88 @@ final class TypeofEmitter {
                                     + " capture.name == ")
                     .append(RustBackend.quote(field.name()))
                     .append(") {\n");
-            String associative = AssociativeSpines.capture(rule.mapping(),field,"            ");
+            String associative = AssociativeSpines.capture(rule.mapping(), field, "            ");
             if (associative != null) out.append(associative);
-            else switch (field.kind()) {
-                case ENUM -> {
-                    int enumId =
-                            java.util.stream.IntStream.range(0, ir.rules().size())
-                                    .filter(i -> ir.rules().get(i).name().equals(field.enumName()))
-                                    .findFirst()
-                                    .orElseThrow();
-                    out.append("            values.extend(map_enum_")
-                            .append(enumId)
-                            .append("(tree, &capture.nodes)?);\n");
+            else
+                switch (field.kind()) {
+                    case ENUM -> {
+                        int enumId =
+                                java.util.stream.IntStream.range(0, ir.rules().size())
+                                        .filter(
+                                                i ->
+                                                        ir.rules()
+                                                                .get(i)
+                                                                .name()
+                                                                .equals(field.enumName()))
+                                        .findFirst()
+                                        .orElseThrow();
+                        out.append("            values.extend(map_enum_")
+                                .append(enumId)
+                                .append("(tree, &capture.nodes)?);\n");
+                    }
+                    case NULLABLE_NODE ->
+                            throw new IllegalArgumentException("invalid nullable node projection");
+                    case NODE ->
+                            out.append(
+                                    rule.mapping() == null
+                                            ? "            if !capture.nodes.is_empty() {"
+                                                  + " values.extend(projected.iter().cloned()); }\n"
+                                            : "            values.extend(map_nodes(tree,"
+                                                    + " &capture.nodes)?);\n");
+                    case VALUE ->
+                            out.append(
+                                    "            values.extend(map_values(tree,"
+                                        + " &capture.nodes)?);\n");
+                    case NESTED -> {
+                        var shape = field.nested();
+                        String projection =
+                                switch (shape.leaf()) {
+                                    case VALUE -> "map_nested_values";
+                                    case NODE -> "map_nodes";
+                                    case ENUM ->
+                                            "map_enum_"
+                                                    + java.util.stream.IntStream.range(
+                                                                    0, ir.rules().size())
+                                                            .filter(
+                                                                    i ->
+                                                                            ir.rules()
+                                                                                    .get(i)
+                                                                                    .name()
+                                                                                    .equals(
+                                                                                            shape
+                                                                                                    .enumName()))
+                                                            .findFirst()
+                                                            .orElseThrow();
+                                    default -> null;
+                                };
+                        out.append("            let nested = nested_capture(tree, capture)?;\n");
+                        if (projection != null)
+                            out.append(
+                                    "            let mut nested_sources = nested_source_nodes(tree,"
+                                        + " capture.nodes[0])?.into_iter();\n");
+                        out.append("            values.push(")
+                                .append(NestedEmitter.mapped(shape, "&nested", 0, projection))
+                                .append("?);\n");
+                        if (projection != null)
+                            out.append(
+                                    "            if nested_sources.next().is_some() { return"
+                                        + " Err(\"unmapped original nested leaf\".into()); }\n");
+                    }
+                    case INTEGER ->
+                            out.append(
+                                    "           "
+                                        + " values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)?).parse::<i32>().map_err(|_|"
+                                        + " format!(\"invalid i32 capture {} at {}..{}\","
+                                        + " capture.name, capture.span.start,"
+                                        + " capture.span.end))?);\n");
+                    case TEXT ->
+                            out.append(
+                                    RustBackend.graphemeCapture(ir, rule.body(), field.name())
+                                            ? "           "
+                                                  + " values.push(tree.text(capture.span)?.to_owned());\n"
+                                            : "           "
+                                                  + " values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)?).to_owned());\n");
                 }
-                case NULLABLE_NODE -> throw new IllegalArgumentException("invalid nullable node projection");
-                case NODE ->
-                        out.append(
-                                rule.mapping() == null
-                                        ? "            if !capture.nodes.is_empty() {"
-                                                + " values.extend(projected.iter().cloned()); }\n"
-                                        : "            values.extend(map_nodes(tree,"
-                                                + " &capture.nodes)?);\n");
-                case VALUE ->
-                        out.append(
-                                "            values.extend(map_values(tree, &capture.nodes)?);\n");
-                case NESTED -> throw new IllegalArgumentException("E-NESTED-SHAPE: typeof requires remaining #583 implementation");
-                        case INTEGER ->
-                        out.append(
-                                "           "
-                                    + " values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)?).parse::<i32>().map_err(|_|"
-                                    + " format!(\"invalid i32 capture {} at {}..{}\", capture.name,"
-                                    + " capture.span.start, capture.span.end))?);\n");
-                case TEXT ->
-                        out.append(
-                                RustBackend.graphemeCapture(ir, rule.body(), field.name())
-                                        ? "           "
-                                              + " values.push(tree.text(capture.span)?.to_owned());\n"
-                                        : "           "
-                                              + " values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)?).to_owned());\n");
-            }
             out.append("        }\n        ")
                     .append(RustBackend.mappedValue(field))
                     .append("\n    };\n");
@@ -159,11 +235,11 @@ final class TypeofEmitter {
             String ownType = type(fields.get(own), own), refType = type(fields.get(ref), ref);
             String span =
                     "typeof_span(node, " + RustBackend.quote(constraint.capture().name()) + ")";
-            if (fields.get(own).cardinality() != Cardinality.ONE)
+            if (outerCardinality(fields.get(own)) != Cardinality.ONE)
                 span =
                         "if _value_"
                                 + own
-                                + (fields.get(own).cardinality() == Cardinality.MANY
+                                + (outerCardinality(fields.get(own)) == Cardinality.MANY
                                         ? ".is_empty()"
                                         : ".is_none()")
                                 + " { node.span } else { "
@@ -204,18 +280,39 @@ final class TypeofEmitter {
         throw new IllegalArgumentException("unknown @typeof capture " + name);
     }
 
+    private static Cardinality outerCardinality(Field field) {
+        return field.kind() == Kind.NESTED
+                ? field.nested().containers().stream().findFirst().orElse(Cardinality.ONE)
+                : field.cardinality();
+    }
+
     private static String type(Field field, int index) {
-        return switch (field.cardinality()) {
+        return switch (outerCardinality(field)) {
             case OPTIONAL -> "\"Optional\"";
             case MANY -> "\"List\"";
             case ONE ->
                     switch (field.kind()) {
-                        case NESTED -> throw new IllegalArgumentException("E-NESTED-SHAPE: typeof requires remaining #583 implementation");
+                        case NESTED ->
+                                switch (field.nested().leaf()) {
+                                    case VALUE -> "typeof_nested_value(&_value_" + index + ")";
+                                    case NODE -> "typeof_node(&_value_" + index + ")";
+                                    case ENUM ->
+                                            RustBackend.quote("enum::" + field.nested().enumName());
+                                    case INTEGER -> "\"Integer\"";
+                                    case TEXT -> "\"String\"";
+                                    default ->
+                                            throw new IllegalArgumentException(
+                                                    "invalid nested leaf");
+                                };
                         case INTEGER -> "\"Integer\"";
                         case TEXT -> "\"String\"";
                         case ENUM -> RustBackend.quote("enum::" + field.enumName());
                         case NODE -> "typeof_node(&_value_" + index + ")";
-                        case NULLABLE_NODE -> "typeof_node(_value_" + index + ".as_deref().ok_or(\"missing associative left operand\")?)";
+                        case NULLABLE_NODE ->
+                                "typeof_node(_value_"
+                                        + index
+                                        + ".as_deref().ok_or(\"missing associative left"
+                                        + " operand\")?)";
                         case VALUE -> "typeof_value(&_value_" + index + ")";
                     };
         };
