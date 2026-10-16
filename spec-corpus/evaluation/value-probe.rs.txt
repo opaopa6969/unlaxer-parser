@@ -1,0 +1,22 @@
+mod generated;
+use generated::{ast::Ast,evaluator::{Semantics,EvalValue,evaluate}};
+use serde_json::{Value,json};
+use unlaxer_runtime::{Span,ParseOptions,Memoization,Diagnostics};
+#[derive(Default)]struct Probe{events:Vec<String>}
+fn value(v:EvalValue<'_>)->Value{match v{
+    EvalValue::Text(text)=>json!(text),EvalValue::Enum{name,text}=>json!(["enum",name,text]),
+    EvalValue::Node(node)=>{let Ast::Node{text,..}=node else{panic!("unexpected node")};json!(["node",text])},
+    EvalValue::Optional(v)=>v.map_or(Value::Null,|v|value(*v)),EvalValue::Many(v)=>json!(v.into_iter().map(value).collect::<Vec<_>>())}}
+impl Semantics for Probe{type Output=Value;
+    fn convert_value(&mut self,v:EvalValue<'_>,_:Span)->Value{self.events.push("convert".into());value(v)}
+    fn eval_node(&mut self,text:&str,_:Span)->Value{self.events.push(format!("node:{text}"));json!(format!("evaluated:{text}"))}}
+fn main(){
+    let cases:Value=serde_json::from_str(&std::fs::read_to_string(std::env::args().nth(1).unwrap()).unwrap()).unwrap();
+    for row in cases.as_array().unwrap(){let source=row["input"].as_str().unwrap();
+        for memoization in [Memoization::Off,Memoization::SafeFailures]{for diagnostics in [Diagnostics::Auto,Diagnostics::Detailed,Diagnostics::DetailedOnFailure]{
+            let tree=generated::parser::parse_tree_with_options(source,ParseOptions{memoization,diagnostics,..ParseOptions::default()}).unwrap();let ast=generated::mapper::map(&tree).unwrap();let mut p=Probe::default();
+            assert_eq!(row["value"],evaluate(&ast,&mut p),"{source}");assert_eq!(row["events"],json!(p.events),"{source}");assert_eq!(row["span"],json!([ast.span().start,ast.span().end]),"{source}");
+        }}
+    }
+    println!("evaluation values oracle passed");
+}

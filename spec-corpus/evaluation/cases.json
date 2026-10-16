@@ -1,0 +1,325 @@
+[
+  {
+    "input": "l(2)",
+    "value": 2,
+    "events": [
+      "literal:2"
+    ],
+    "span": [
+      0,
+      4
+    ]
+  },
+  {
+    "input": "l(true)",
+    "value": true,
+    "events": [
+      "literal:true"
+    ],
+    "span": [
+      0,
+      7
+    ]
+  },
+  {
+    "input": "l(false)",
+    "value": false,
+    "events": [
+      "literal:false"
+    ],
+    "span": [
+      0,
+      8
+    ]
+  },
+  {
+    "input": "l(👨‍👩‍👧‍👦)",
+    "value": "👨‍👩‍👧‍👦",
+    "events": [
+      "literal:👨‍👩‍👧‍👦"
+    ],
+    "span": [
+      0,
+      10
+    ]
+  },
+  {
+    "input": "p(l(é))",
+    "value": "é",
+    "events": [
+      "literal:é"
+    ],
+    "span": [
+      0,
+      8
+    ]
+  },
+  {
+    "input": "v(😀変数)",
+    "value": "resolved:変数",
+    "events": [
+      "variable:変数"
+    ],
+    "span": [
+      0,
+      6
+    ]
+  },
+  {
+    "input": "v(plain)",
+    "value": "resolved:plain",
+    "events": [
+      "variable:plain"
+    ],
+    "span": [
+      0,
+      8
+    ]
+  },
+  {
+    "input": "b(l(2))",
+    "value": 2,
+    "events": [
+      "literal:2"
+    ],
+    "span": [
+      0,
+      7
+    ]
+  },
+  {
+    "input": "b(l(2)+l(3)+l(4))",
+    "value": 9,
+    "events": [
+      "literal:2",
+      "literal:3",
+      "binary:+",
+      "literal:4",
+      "binary:+"
+    ],
+    "span": [
+      0,
+      17
+    ]
+  },
+  {
+    "input": "m(7)",
+    "value": 7,
+    "events": [
+      "manual:7"
+    ],
+    "span": [
+      0,
+      4
+    ]
+  },
+  {
+    "input": "u(hello)",
+    "value": "hello",
+    "events": [
+      "unknown:hello"
+    ],
+    "span": [
+      0,
+      8
+    ]
+  },
+  {
+    "input": "c(l(true),m(1),m(fail))",
+    "value": 1,
+    "events": [
+      "literal:true",
+      "manual:1"
+    ],
+    "span": [
+      0,
+      23
+    ]
+  },
+  {
+    "input": "c(l(TrUe),m(2),m(fail))",
+    "value": 2,
+    "events": [
+      "literal:TrUe",
+      "manual:2"
+    ],
+    "span": [
+      0,
+      23
+    ]
+  },
+  {
+    "input": "c(l(false),m(fail),m(3))",
+    "value": 3,
+    "events": [
+      "literal:false",
+      "manual:3"
+    ],
+    "span": [
+      0,
+      24
+    ]
+  },
+  {
+    "input": "c(l(0),m(fail),m(4))",
+    "value": 4,
+    "events": [
+      "literal:0",
+      "manual:4"
+    ],
+    "span": [
+      0,
+      20
+    ]
+  },
+  {
+    "input": "c(l(1),m(fail),m(5))",
+    "value": 5,
+    "events": [
+      "literal:1",
+      "manual:5"
+    ],
+    "span": [
+      0,
+      20
+    ]
+  },
+  {
+    "input": "c(l(no),m(fail),m(6))",
+    "value": 6,
+    "events": [
+      "literal:no",
+      "manual:6"
+    ],
+    "span": [
+      0,
+      21
+    ]
+  },
+  {
+    "input": "c(l( true ),m(fail),m(7))",
+    "events": [
+      "literal:true",
+      "manual:fail"
+    ],
+    "span": [
+      0,
+      25
+    ],
+    "error": "requested failure"
+  },
+  {
+    "input": "c(l(true),m(fail),m(9))",
+    "error": "requested failure",
+    "events": [
+      "literal:true",
+      "manual:fail"
+    ],
+    "span": [
+      0,
+      23
+    ]
+  },
+  {
+    "input": "m(fail)",
+    "error": "requested failure",
+    "events": [
+      "manual:fail"
+    ],
+    "span": [
+      0,
+      7
+    ]
+  },
+  {
+    "input": "l(fail)",
+    "error": "literal failure",
+    "events": [
+      "literal:fail"
+    ],
+    "span": [
+      0,
+      7
+    ]
+  },
+  {
+    "input": "p(l(fail))",
+    "error": "literal failure",
+    "events": [
+      "literal:fail"
+    ],
+    "span": [
+      0,
+      10
+    ]
+  },
+  {
+    "input": "c(l(fail),m(1),m(2))",
+    "error": "literal failure",
+    "events": [
+      "literal:fail"
+    ],
+    "span": [
+      0,
+      20
+    ]
+  },
+  {
+    "input": "b(l(fail)+l(1))",
+    "error": "literal failure",
+    "events": [
+      "literal:fail"
+    ],
+    "span": [
+      0,
+      15
+    ]
+  },
+  {
+    "input": "b(l(1)+l(fail)+l(3))",
+    "error": "literal failure",
+    "events": [
+      "literal:1",
+      "literal:fail"
+    ],
+    "span": [
+      0,
+      20
+    ]
+  },
+  {
+    "input": "b(l(1)+l(13)+l(fail))",
+    "error": "binary failure",
+    "events": [
+      "literal:1",
+      "literal:13",
+      "binary:+"
+    ],
+    "span": [
+      0,
+      21
+    ]
+  },
+  {
+    "input": "v(😀missing)",
+    "error": "variable failure",
+    "events": [
+      "variable:missing"
+    ],
+    "span": [
+      0,
+      11
+    ]
+  },
+  {
+    "input": "x(8)",
+    "value": 8,
+    "events": [
+      "literal:8"
+    ],
+    "span": [
+      0,
+      4
+    ]
+  }
+]

@@ -40,7 +40,7 @@ public final class RustApiSchema {
             parameters.add(new Parameter("span", "Span"));
             String method = RustGrammarLowering.methodName(mapping.name());
             int methodStart = requireIndex(evaluator, "    fn " + method + "(", 0);
-            methods.add(new Method(method, "Self::Output", parameters, true, origins,
+            methods.add(new Method(method, "Self::Output", parameters, evaluator.substring(methodStart, evaluator.indexOf('\n',methodStart)).endsWith(";"), origins,
                 ApiImpact.location("evaluator.rs", evaluator, methodStart, evaluator.indexOf('\n', methodStart))));
         }
         for(var rule:ir.rules()) if(!rule.enumLiterals().isEmpty()) {
@@ -48,6 +48,19 @@ public final class RustApiSchema {
             var variants=rule.enumLiterals().stream().map(org.unlaxer.dsl.codegen.EnumSchema::constantName).sorted().toList();
             nodes.add(new Node(rule.name(),"enum",List.of(),List.of(),variants,ApiImpact.origins(source,rule.name()),
                 ApiImpact.location("ast.rs",ast,start,ast.indexOf('\n',start))));
+        }
+        var signatures = java.util.regex.Pattern.compile("(?m)^    fn ([A-Za-z_][A-Za-z_0-9]*)\\(([^\\n]*)\\) -> ([^;{]+);").matcher(evaluator);
+        while (signatures.find()) {
+            String name=signatures.group(1);
+            if (methods.stream().anyMatch(m -> m.name().equals(name))) continue;
+            var parameters=new ArrayList<Parameter>();
+            for (String argument:signatures.group(2).split(", ")) {
+                if (argument.equals("&mut self")) parameters.add(new Parameter("self","&mut Self"));
+                else if (argument.equals("&self")) parameters.add(new Parameter("self","&Self"));
+                else {int colon=argument.indexOf(": ");parameters.add(new Parameter(argument.substring(0,colon),argument.substring(colon+2)));}
+            }
+            methods.add(new Method(name,signatures.group(3),parameters,true,ApiImpact.origins(source,null),
+                ApiImpact.location("evaluator.rs",evaluator,signatures.start(),signatures.end())));
         }
         return new Snapshot(grammar.name(), "Ast", "Semantics", nodes, methods);
     }

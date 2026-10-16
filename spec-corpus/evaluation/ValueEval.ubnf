@@ -1,0 +1,15 @@
+grammar ValueEval {
+  @package: org.example.valueeval
+  token TEXT = UNTIL(')')
+  @root Root ::= Single | OptionalValue | Many | Pass;
+  @enum Mode ::= 'on' | 'off';
+  @mapping(Node,params=[text]) Node ::= 'n(' TEXT @text ')';
+  @mapping(Single,params=[value]) @eval(kind='literal')
+  Single ::= 's(' (Mode | Node | 'raw' | '👨‍👩‍👧‍👦') @value ')';
+  @mapping(OptionalValue,params=[value]) @eval(kind='literal')
+  OptionalValue ::= 'o(' [ Mode | Node | 'raw' ] @value ')';
+  @mapping(Many,params=[value]) @eval(kind='literal')
+  Many ::= 'a(' { Mode | Node | 'raw' } @value ')';
+  @mapping(Pass,params=[value]) @eval(kind='passthrough')
+  Pass ::= 'p(' (Mode | Node | 'raw') @value ')';
+}

@@ -310,7 +310,7 @@ impl Inventory {
                     self.add("P-SCOPE-MODE", mode, span);
                 }
             }
-            AnnotationKind::Eval { .. } => self.add("P-ANNOTATION", "eval", span),
+            AnnotationKind::Eval { .. } => {}
             AnnotationKind::Doc { .. } | AnnotationKind::Recovery { .. } => {}
             AnnotationKind::Skip => {}
             AnnotationKind::Simple { name } => self.add("P-ANNOTATION", name, span),

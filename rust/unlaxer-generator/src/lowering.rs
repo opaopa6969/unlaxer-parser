@@ -68,7 +68,8 @@ pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
     }
     crate::embedded::validate(grammar)?;
     validate_enum_rules(grammar)?;
-    Lowering {
+    crate::evaluation::validate(grammar)?;
+    let ir = Lowering {
         grammar,
         ids: HashMap::new(),
         tokens: HashMap::new(),
@@ -86,7 +87,9 @@ pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
         nullable: HashSet::new(),
         analysis_depth: Cell::new(0),
     }
-    .run()
+    .run()?;
+    crate::evaluation::apply(grammar, &ir, String::new())?;
+    Ok(ir)
 }
 
 struct Lowering<'a> {
@@ -553,7 +556,9 @@ impl Lowering<'_> {
                             return Err(format!("duplicate @catalog on {}", rule.name));
                         }
                     }
-                    AnnotationKind::Doc { .. } | AnnotationKind::Enum => {}
+                    AnnotationKind::Doc { .. }
+                    | AnnotationKind::Enum
+                    | AnnotationKind::Eval { .. } => {}
                     other => {
                         return Err(format!("unsupported annotation {other:?} on {}", rule.name))
                     }

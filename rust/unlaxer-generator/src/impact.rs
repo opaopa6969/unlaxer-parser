@@ -161,7 +161,7 @@ fn snapshot(source: &str) -> Result<Snapshot, String> {
         return Err("Rust impact requires exactly one grammar".into());
     };
     let ir = crate::lowering::lower(grammar)?;
-    let files = unlaxer_codegen::generate(&ir).map_err(|error| error.to_string())?;
+    let files = crate::generate_grammar(grammar)?;
     let ast = files
         .iter()
         .find(|file| file.relative_path == "ast.rs")
@@ -260,7 +260,9 @@ fn build_snapshot(
             .unwrap();
         }
         expected_method.push_str(", span: Span) -> Self::Output;");
-        if method_line != expected_method {
+        if method_line != expected_method
+            && method_line != expected_method.trim_end_matches(';').to_string() + " {"
+        {
             return Err(format!(
                 "generated evaluator declaration differs for {method_name}"
             ));
@@ -269,7 +271,7 @@ fn build_snapshot(
             name: method_name,
             return_type: "Self::Output".into(),
             parameters,
-            required: true,
+            required: method_line.ends_with(';'),
             origins: origin_list,
             generated: method_location,
         });
@@ -300,6 +302,60 @@ fn build_snapshot(
             }],
             generated,
         });
+    }
+    for line in evaluator
+        .lines()
+        .filter(|line| line.starts_with("    fn ") && line.ends_with(';'))
+    {
+        let (name, args) = line[7..]
+            .split_once('(')
+            .ok_or("invalid generated method")?;
+        if methods.iter().any(|method| method.name == name) {
+            continue;
+        }
+        let (args, return_type) = args.split_once(") -> ").ok_or("invalid generated method")?;
+        let parameters = args
+            .split(", ")
+            .map(|arg| match arg {
+                "&mut self" => Ok(Parameter {
+                    name: "self".into(),
+                    r#type: "&mut Self".into(),
+                }),
+                "&self" => Ok(Parameter {
+                    name: "self".into(),
+                    r#type: "&Self".into(),
+                }),
+                _ => arg
+                    .split_once(": ")
+                    .map(|(name, ty)| Parameter {
+                        name: name.into(),
+                        r#type: ty.into(),
+                    })
+                    .ok_or("invalid generated parameter"),
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let (_, generated) = declaration(evaluator, "evaluator.rs", line)?;
+        methods.push(Method {
+            name: name.into(),
+            return_type: return_type.trim_end_matches(';').into(),
+            parameters,
+            required: true,
+            origins: grammar
+                .rules
+                .iter()
+                .map(|r| Origin {
+                    rule: r.name.clone(),
+                    span: Span {
+                        start: r.span.codepoint_start,
+                        end: r.span.codepoint_end,
+                    },
+                })
+                .collect(),
+            generated,
+        });
+    }
+    for method in &mut methods {
+        method.origins.sort_by(|a, b| a.rule.cmp(&b.rule));
     }
     nodes.sort_by(|a, b| a.name.cmp(&b.name));
     methods.sort_by(|a, b| a.name.cmp(&b.name));

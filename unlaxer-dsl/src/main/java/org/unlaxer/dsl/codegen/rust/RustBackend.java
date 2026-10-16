@@ -28,7 +28,7 @@ public final class RustBackend {
             new GeneratedFile("ast.rs", ast(ir)),
             new GeneratedFile("parser.rs", parser(ir) + lexingApi(grammar, ir) + org.unlaxer.dsl.codegen.EmbeddedGrammarEmitter.rustApi(grammar, ir.rules().stream().map(Rule::name).toList(), ir.javaWhitespace())),
             new GeneratedFile("mapper.rs", mapper(ir)),
-            new GeneratedFile("evaluator.rs", evaluator(ir)));
+            new GeneratedFile("evaluator.rs", RustEvalEmitter.apply(grammar, ir, evaluator(ir))));
     }
 
     /** Opt-in stdio LSP module, leaving ordinary generation unchanged. */

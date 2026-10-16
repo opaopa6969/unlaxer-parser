@@ -50,8 +50,11 @@ public final class RustGrammarLowering {
 
     public static GrammarIR lower(GrammarDecl grammar) {
         EnumSchema.validate(grammar);
+        org.unlaxer.dsl.codegen.EvalSchema.specifications(grammar);
         org.unlaxer.dsl.codegen.EmbeddedGrammarEmitter.declarations(grammar);
-        return new RustGrammarLowering(grammar).run();
+        var ir = new RustGrammarLowering(grammar).run();
+        RustEvalEmitter.apply(grammar, ir, "");
+        return ir;
     }
 
     private GrammarIR run() {
@@ -156,6 +159,8 @@ public final class RustGrammarLowering {
                     // Applied around this rule body after structural lowering.
                 } else if (annotation instanceof EnumAnnotation) {
                     // Typed value schema is lowered separately from recognition.
+                } else if (annotation instanceof EvalAnnotation) {
+                    // Evaluator defaults are generated separately from parser IR.
                 } else if (annotation instanceof DocAnnotation) {
                     // Preserved as ordered tooling metadata on the lowered rule below.
                 } else if (annotation instanceof SkipAnnotation) {

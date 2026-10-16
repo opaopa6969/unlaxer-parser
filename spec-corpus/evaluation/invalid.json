@@ -1,0 +1,52 @@
+[
+  {
+    "name": "duplicate",
+    "grammar": "grammar G { @root @mapping(A,params=[value]) @eval(kind='literal') @eval(kind='literal') A ::= 'x' @value; }",
+    "code": "E-EVAL"
+  },
+  {
+    "name": "unmapped",
+    "grammar": "grammar G { @root @eval(kind='literal') A ::= 'x'; }",
+    "code": "E-EVAL"
+  },
+  {
+    "name": "missing-value",
+    "grammar": "grammar G { @root @mapping(A,params=[text]) @eval(kind='literal') A ::= 'x' @text; }",
+    "code": "E-EVAL"
+  },
+  {
+    "name": "condition-text",
+    "grammar": "grammar G { @root @mapping(A,params=[condition,thenExpr,elseExpr]) @eval(kind='conditional') A ::= 'a' @condition 'b' @thenExpr 'c' @elseExpr; }",
+    "code": "E-EVAL"
+  },
+  {
+    "name": "variable-list",
+    "grammar": "grammar G { @root @mapping(A,params=[name]) @eval(kind='variable_ref') A ::= { 'x' } @name; }",
+    "code": "E-EVAL"
+  },
+  {
+    "name": "binary-op-scalar",
+    "grammar": "grammar G { @root @mapping(A,params=[left,op,right]) @eval(kind='binary_arithmetic') A ::= 'a' @left '+' @op { 'b' @right }; }",
+    "code": "E-EVAL"
+  },
+  {
+    "name": "binary-left-optional",
+    "grammar": "grammar G { @root @mapping(A,params=[left,op,right]) @eval(kind='binary_arithmetic') A ::= [ 'a' ] @left { '+' @op 'b' @right }; }",
+    "code": "E-EVAL"
+  },
+  {
+    "name": "shared-conflict",
+    "grammar": "grammar G { @root Root ::= A | B; @mapping(V,params=[value]) @eval(kind='literal') A ::= 'a' @value; @mapping(V,params=[value]) @eval(kind='passthrough') B ::= 'b' @value; }",
+    "code": "E-EVAL"
+  },
+  {
+    "name": "skipped",
+    "grammar": "grammar G { @root @skip @mapping(A,params=[value]) @eval(kind='literal') A ::= 'x' @value; }",
+    "code": "E-EVAL"
+  },
+  {
+    "name": "manual-unmapped",
+    "grammar": "grammar G { @root @eval(kind='user',strategy='manual') A ::= 'x'; }",
+    "code": "E-EVAL"
+  }
+]
