@@ -111,7 +111,6 @@ grammar UBNF {
     | NegativeLookaheadExpression
     | CharRangeExpression
     | CIExpression
-    | RegexExpression
     | AdapterExpression
     | AnyExpression
     | EofExpression
@@ -142,10 +141,6 @@ grammar UBNF {
   // CI('keyword')
   @mapping(CIExpression, params=[word])
   CIExpression ::= 'CI' '(' STRING @word ')' ;
-
-  // REGEX('pattern')
-  @mapping(RegexExpression, params=[pattern])
-  RegexExpression ::= 'REGEX' '(' STRING @pattern ')' ;
 
   // ADAPTER('target-neutral.id', version=1)
   @mapping(AdapterExpression, params=[id, version])

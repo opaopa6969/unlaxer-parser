@@ -1,0 +1,5 @@
+retries	memo	median_us	checkpoints	success_hits
+0	Off	2472	37005	0
+0	SafeFailures	4016	37005	0
+8	Off	25732	325005	0
+8	SafeFailures	8257	61005	8000
