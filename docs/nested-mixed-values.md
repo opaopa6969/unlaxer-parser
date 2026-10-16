@@ -36,7 +36,7 @@ DAP の AST step traversal は Optional / List 内の mapped node を宣言順�
 
 ## 今回の範囲と残差
 
-今回対応するのは、直接 choice の各 alternative が scalar で、その外側に Optional / List がある形。container を choice alternative に置く形、mapped / mixed 葉を含む多要素 group は早期拒否を維持する。unmapped alias / recursive helper を介した shape、typeof、auto-eval、associative projection、token-stream の組合せは親 #583 の残条件であり、この変更の完了根拠に含めない。separated list は #646 の境界を利用し、mixed item の Optional/List、nullable item、EOF zero leaf を共通 consumer で確認する。separator に mapped AST があっても、その値と DAP step は除外する。
+今回対応するのは、直接 choice の各 alternative が scalar で、その外側に Optional / List がある形。container を choice alternative に置く形、mapped / mixed 葉を含む多要素 group は早期拒否を維持する。unmapped alias / recursive helper を介した shape、auto-eval、associative projection、token-stream の組合せは親 #583 の残条件であり、この変更の完了根拠に含めない。separated list は #646 の境界を利用し、mixed item の Optional/List、nullable item、EOF zero leaf を共通 consumer で確認する。separator に mapped AST があっても、その値と DAP step は除外する。
 
 `spec-corpus/nested-mixed-values/` の独立期待値を `NestedMixedValueConformanceTest` が検証する。Java 生成コードと、Java host / native host がそれぞれ出した Rust コードを実 compile / run し、6 種の解析 mode、値・型・CP・manual eval・DAP・preferred・保持 snapshot・失敗後 reuse を比較する。Rust 5 基本ファイルと DAP ファイルの byte 一致に加え、両出力を個別に実行する。予約名・不正 shape の source CP 診断、API schema / impact の両 host 一致、旧 flat / uniform nested の回帰も確認する。
 
@@ -45,3 +45,5 @@ RUSTUP_TOOLCHAIN=1.85.0 mvn -pl unlaxer-common,unlaxer-dsl -am test \
   -Dtest=NestedMixedValueConformanceTest -DrustConformance=true \
   -Dsurefire.failIfNoSpecifiedTests=false
 ```
+
+`@typeof`との合成は [nested typeof](nested-typeof.md)（#660）で追加し、scalar mixed wrapperの中の意味型と外側container型を区別して比較する。
