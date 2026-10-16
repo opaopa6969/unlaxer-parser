@@ -27,6 +27,7 @@ annotation、`ParseContext` API、consume/invert伝播、incremental、IDE proto
 
 | 機能群 | 現状 | 追加の受け入れ条件 |
 |---|---|---|
+| AST family / dotted / shared | `@commonField`の有無によらず具体子variantへ透明投影（#592） | [契約・互換性](../docs/family-projection.md)。9文法25入力＋不正schema3文法、両host生成一致・実mapper/eval・preferred選択/CP位置を比較。associativeは#593で継続 |
 | literal enum | Java/Rust両hostで型付きscalar/optional/listとroot wrapperを生成（#537） | [契約・命名移行・出現位置](../docs/enum-values.md)。24文法56入力を6設定で実compile/map/evalし、34負例・生成物/impact一致・exhaustive consumer破壊を検証。enum/Text/Node混在とshared mapping、rootとの併用も対応（#539）。追加9文法116入力×6設定で型・値・出現span・DAP AST stepsを確認。typeof混在制約も両hostで対応（#542） |
 | typed common fields | `@commonField`を両hostで検証・生成（#541）。Javaは実field型のinterface accessor、Rustはfamily所属を表すborrowed view。flat/dotted/中間sumとmixed enum/Text/Nodeをscalar/optional/listで対応 | [契約](../docs/common-fields.md)。10文法30入力・13負例で実compile/eval、CP位置、生成物/API schema一致。preferred type・nested containerは#547 |
 | numeric captures | Javaの既存int契約へRust i32/Option<i32>/Vec<i32>とchecked mappingを統一（#566）。NumberParser/DigitParserの純numeric fieldを対象とし、混合値やtext aliasは変更しない | [契約](../docs/numeric-captures.md)。8文法48入力・実compile/map/eval・上下限/overflow/非整数/CP位置を共有検証。nested/familyの残差は#568/#569 |
@@ -152,7 +153,7 @@ Javaでは従来のStringからObject系のNode保持へ変わるため、文字
 先行する#165はJavaのpreferred選択Tokenとsource snapshotを原子的に取得する追加APIで、
 Rustでは既存のowned AST/spanの後続・並行mapping耐性を検証する。
 tinyexpressionはowned source resolverで従来のslice字句処理を維持する。
-Javaのpreferred型候補探索自体のRust移植は未対応。
+Javaのpreferred型候補探索は[owned snapshot API](../docs/preferred-ast-snapshots.md)でRustへ移植済み。特殊associative projectionは#593で継続する。
 
 tinyexpressionのStringLiteral対応（#168）は[実クラスとの比較・字句契約](../docs/tiny-string-token.md)を参照。
 既存FQNを維持した上で、#158 の [token ID・登録API・位置診断](../docs/token-adapters.md)からも生成・実行を検証する。
