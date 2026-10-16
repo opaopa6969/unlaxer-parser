@@ -280,7 +280,7 @@ public final class FirstSets {
     return FirstSet.UNKNOWN;
   }
 
-  /** A zero length word matches the empty input; otherwise only its first code point can start it. */
+  /** Conservative word prediction: empty words use a nullable overapproximation. */
   private static FirstSet wordOf(WordParser wordParser) {
     int length = wordParser.word.codePointLength().value();
     if (length == 0) {

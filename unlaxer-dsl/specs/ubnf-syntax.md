@@ -292,6 +292,10 @@ token KW_FROM   = CI('from')
 > **ユースケース**: SQL や HTML などの大文字小文字を区別しない言語。
 > MiniLang は区別しますが、`SELECT` を書いても `select` でも通したい場合に使います。
 
+3.3.0公開後の開発版ではJava/RustともUnicode17固定のsimple upper→lower比較を使います。
+`CI`の引数は非空で、原文tokenを保持します。`ß`/`ẞ`は一致し、`ß`/`SS`は不一致です。
+JDK依存の旧生成コードとの差、正規化やlocaleとの関係は[CIの共通契約](../../docs/case-insensitive-tokens.md)を参照してください。
+
 #### `REGEX('pattern')` — 正規表現によるマッチ
 
 ```ubnf

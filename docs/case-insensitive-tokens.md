@@ -17,6 +17,8 @@ Rustの低水準APIは `Expr::CaseInsensitive("select")`、Javaは
 `new UnicodeIgnoreCaseWordParser("select")` である。
 `CI`の引数は非空のUnicode scalar列とする。空tokenは文法検証で拒否する。
 低水準APIへ空文字を渡した場合はtokenを生成せず解析が失敗する。
+Javaで不正なUTF-16 surrogateを含むCIを指定した場合も、生成時の検証で拒否する。
+手書きの固定版parserに不正な文字列を直接渡した場合は通常の解析失敗となる。
 
 ## 比較規則
 
