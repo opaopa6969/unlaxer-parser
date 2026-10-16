@@ -1,0 +1,34 @@
+# id	input hex	children (/ separator; N=empty NonOrdered,O=optional,E=EOF,Z=JavaEmpty)	op	success	consumed	matched	child-index:start:end in CST order	failure offset
+permutation-abc	61 62 63	61/62/63	N	true	3	3	0:0:1,1:1:2,2:2:3	-1
+permutation-acb	61 63 62	61/62/63	N	true	3	3	0:0:1,2:1:2,1:2:3	-1
+permutation-bac	62 61 63	61/62/63	N	true	3	3	1:0:1,0:1:2,2:2:3	-1
+permutation-bca	62 63 61	61/62/63	N	true	3	3	1:0:1,2:1:2,0:2:3	-1
+permutation-cab	63 61 62	61/62/63	N	true	3	3	2:0:1,0:1:2,1:2:3	-1
+permutation-cba	63 62 61	61/62/63	N	true	3	3	2:0:1,1:1:2,0:2:3	-1
+prefix	62 61 78	61/62	N	true	2	2	1:0:1,0:1:2	-1
+missing	61	61/62	N	false	0	0	~	1
+duplicate-input	61 61 62	61/62	N	false	0	0	~	1
+eof	~	61	N	false	0	0	~	0
+empty-children	~	~	N	true	0	0	~	-1
+empty-children-prefix	78	~	N	true	0	0	~	-1
+duplicate-declarations	61 61	61/61	N	true	2	2	0:0:1,1:1:2	-1
+greedy-no-permutation	61 62 61	61/61 62	N	false	0	0	~	1
+greedy-long-first	61 62 61	61 62/61	N	true	3	3	0:0:2,1:2:3	-1
+nullable-first	62	N/62	N	true	1	1	0:0:0,1:0:1	-1
+nullable-after-failed-word	62	61/N/62	N	false	0	0	~	1
+all-nullable	~	N/N	N	true	0	0	0:0:0,1:0:0	-1
+optional-absent	62	O61/62	N	true	1	1	0:0:0,1:0:1	-1
+optional-present	61 62	O61/62	N	true	2	2	0:0:1,1:1:2	-1
+optional-not-revisited	62 61	O61/62	N	true	1	1	0:0:0,1:0:1	-1
+eof-selected-last	61	E/61	N	true	1	1	1:0:1,0:1:1	-1
+supplementary	1F600 754C	754C/1F600	N	true	2	2	1:0:1,0:1:2	-1
+crlf	D A 1F600	1F600/D A	N	true	3	3	1:0:2,0:2:3	-1
+no-implicit-trivia	20 61	61	N	false	0	0	~	0
+suffix-failure	62 61	61/62	FAIL	false	0	0	~	2
+fallback	62 61	61/62	RETRY	true	2	2	1:0:1,0:1:2	-1
+nonzero-offset	1F600 62 61	61/62	PREFIX	true	3	3	1:1:2,0:2:3	-1
+nested	21 62 61	61/62	NESTED	true	3	3	1:1:2,0:2:3	-1
+nested-failed	21 62	61/62	NESTED	false	0	0	~	2
+empty-lookahead	61	Z/61	N	true	1	1	0:0:0,1:0:1	-1
+empty-lookahead-at-eof	~	Z	N	true	0	0	0:0:0	-1
+empty-lookahead-prefix	78	Z	N	true	0	1	0:0:0	-1

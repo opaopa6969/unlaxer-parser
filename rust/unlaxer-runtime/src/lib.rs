@@ -108,6 +108,10 @@ pub enum Expr {
     Quoted(char),
     Rule(usize),
     Sequence(Vec<Expr>),
+    /// Match each child occurrence once, greedily choosing the first unused match.
+    /// Failed candidates roll back; selected children are never permuted on later failure.
+    /// Empty children succeed, nullable children run once, and no trivia is added here.
+    NonOrdered(Vec<Expr>),
     Choice(Vec<Expr>),
     /// Try every alternative from the same transactional state and commit the
     /// one that consumes the most input. Equal-length matches keep declaration order.
@@ -275,6 +279,10 @@ impl Expr {
     }
     pub fn choice(alternatives: impl IntoIterator<Item = Self>) -> Self {
         Self::Choice(alternatives.into_iter().collect())
+    }
+    /// Java NonOrdered semantics; this is unrelated to UBNF trivia `@interleave`.
+    pub fn non_ordered(children: impl IntoIterator<Item = Self>) -> Self {
+        Self::NonOrdered(children.into_iter().collect())
     }
     pub fn longest_choice(alternatives: impl IntoIterator<Item = Self>) -> Self {
         Self::LongestChoice(alternatives.into_iter().collect())
@@ -2147,6 +2155,7 @@ impl<'a> ParseContext<'a> {
                 self.with_trivia(*whitespace, |context| context.expression(child, depth))
             }
             Expr::Sequence(elements) => self.sequence(elements, depth),
+            Expr::NonOrdered(children) => self.non_ordered(children, depth),
             Expr::Choice(alternatives) => self.ordered_choice(alternatives.iter(), depth),
             Expr::LongestChoice(alternatives) => self.longest_choice(alternatives, depth, false),
             Expr::UniqueLongestChoice(alternatives) => {
@@ -2242,6 +2251,34 @@ impl<'a> ParseContext<'a> {
             result.nodes.append(&mut fragment.nodes);
             result.captures.append(&mut fragment.captures);
             self.skip();
+        }
+        Some(result)
+    }
+
+    #[inline(never)]
+    fn non_ordered(&mut self, children: &[Expr], depth: usize) -> Option<Fragment> {
+        let mut selected = vec![false; children.len()];
+        let mut result = Fragment::default();
+        for _ in 0..children.len() {
+            let mut found = false;
+            for (index, child) in children.iter().enumerate() {
+                if selected[index] {
+                    continue;
+                }
+                if let Some(mut fragment) = self.expression(child, depth) {
+                    selected[index] = true;
+                    result.nodes.append(&mut fragment.nodes);
+                    result.captures.append(&mut fragment.captures);
+                    found = true;
+                    break;
+                }
+                if self.resource_failure.is_some() {
+                    return None;
+                }
+            }
+            if !found {
+                return None;
+            }
         }
         Some(result)
     }
@@ -2554,6 +2591,7 @@ impl<'a> ParseContext<'a> {
             }
             Expr::Rule(_) => unreachable!("rule references are dispatched by expression"),
             Expr::Sequence(_)
+            | Expr::NonOrdered(_)
             | Expr::Choice(_)
             | Expr::LongestChoice(_)
             | Expr::UniqueLongestChoice(_)
@@ -3425,6 +3463,7 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
             ..
         } => !reads_diagnostics && *replayable,
         Expr::Sequence(children)
+        | Expr::NonOrdered(children)
         | Expr::Choice(children)
         | Expr::LongestChoice(children)
         | Expr::UniqueLongestChoice(children) => {
@@ -3521,6 +3560,7 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>) -> bo
             true
         }
         Expr::Sequence(children)
+        | Expr::NonOrdered(children)
         | Expr::Choice(children)
         | Expr::LongestChoice(children)
         | Expr::UniqueLongestChoice(children) => children
