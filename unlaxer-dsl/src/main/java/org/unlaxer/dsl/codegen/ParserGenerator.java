@@ -194,6 +194,8 @@ public class ParserGenerator implements CodeGenerator {
                 .filter(issue -> issue.code().startsWith("E-UNIQUE-LONGEST-")).toList();
             if (!profileErrors.isEmpty()) throw new IllegalArgumentException(profileErrors.toString());
         }
+        var javaBindingErrors = GrammarValidator.validateJavaTokenBindings(grammar);
+        if (!javaBindingErrors.isEmpty()) throw new IllegalArgumentException(javaBindingErrors.toString());
         String packageName = ParserCodegenUtil.getPackageName(grammar);
         String grammarName = grammar.name();
         String className = grammarName + "Parsers";
