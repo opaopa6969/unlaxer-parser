@@ -1778,5 +1778,38 @@
         }
       }
     ]
+  },
+  {
+    "name": "automatic-integer-evaluation",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n token NUM = org.unlaxer.parser.elementary.NumberParser\n @root @eval(kind='literal') @mapping(Pair,params=[value,right]) Root ::= NUM @value '=' @typeof(value) NUM @right;\n}",
+    "javaMethods": "@Override protected Integer convertValue(Object value){return (Integer)value;}\n",
+    "rustMethods": "fn convert_value(&mut self,value:generated::evaluator::EvalValue<'_>,_span:Span)->i32{ match value { generated::evaluator::EvalValue::Integer(value)=>value, _=>panic!(\"expected checked integer\") } }\n",
+    "cases": [
+      {
+        "input": "12=-3",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Pair",
+            "span": [
+              0,
+              5
+            ],
+            "fields": {
+              "right": -3,
+              "value": 12
+            }
+          },
+          "eval": 12
+        }
+      },
+      {
+        "input": "?",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
   }
 ]
