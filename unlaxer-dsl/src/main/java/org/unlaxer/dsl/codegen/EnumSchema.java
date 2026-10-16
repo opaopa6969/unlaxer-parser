@@ -144,6 +144,7 @@ public final class EnumSchema {
                     "union",
                     "Ast",
                     "AstValue",
+                    "EnumValue",
                     "Span",
                     "String",
                     "Tree",
@@ -231,43 +232,23 @@ public final class EnumSchema {
                 if (!types.add(rule.name()))
                     throw invalid(rule, "enum type name collision: " + rule.name());
             }
-        var shared = new HashMap<String, Map<String, String>>();
-        for (var rule : grammar.rules()) {
-            var fields = new HashMap<String, String>();
-            var bindings = new CaptureBindingPlan(rule);
-            for (var site : bindings.allSites()) {
-                var names = new HashSet<String>();
-                var rules = new HashMap<String, RuleDecl>();
-                grammar.rules().forEach(r -> rules.put(r.name(), r));
-                collectEnumTypes(site.element(), rules, new HashSet<>(), names);
-                String shape = valueType(site.element(), rules, new HashSet<>());
-                if (!names.isEmpty() && !names.contains(shape))
-                    throw new IllegalArgumentException(
-                            "E-ENUM-JOIN: mixed enum capture requires #539");
-                String old = fields.putIfAbsent(bindings.namesBySite().get(site.id()), shape);
-                if (old != null && !old.equals(shape) && (!names.isEmpty() || !old.startsWith("#")))
-                    throw new IllegalArgumentException(
-                            "E-ENUM-JOIN: mixed enum capture requires #539");
+        if (types.contains("EnumValue"))
+            throw new IllegalArgumentException(
+                    "E-ENUM: mapping collides with EnumValue occurrence wrapper");
+        var sharedParameters = new HashMap<String, List<String>>();
+        for (var rule : grammar.rules())
+            if (!isEnum(rule)) {
+                MapperElementUtil.getMappingAnnotation(rule)
+                        .ifPresent(
+                                mapping -> {
+                                    var previous =
+                                            sharedParameters.putIfAbsent(
+                                                    mapping.className(), mapping.paramNames());
+                                    if (previous != null && !previous.equals(mapping.paramNames()))
+                                        throw new IllegalArgumentException(
+                                                "E-ENUM: incompatible shared mapping field schema");
+                                });
             }
-            MapperElementUtil.getMappingAnnotation(rule)
-                    .ifPresent(
-                            mapping -> {
-                                var old = shared.putIfAbsent(mapping.className(), fields);
-                                if (old != null)
-                                    for (var entry : fields.entrySet()) {
-                                        String previous =
-                                                old.putIfAbsent(entry.getKey(), entry.getValue());
-                                        if (previous != null
-                                                && !previous.equals(entry.getValue())
-                                                && (!previous.startsWith("#")
-                                                        || !entry.getValue().startsWith("#"))) {
-                                            throw new IllegalArgumentException(
-                                                    "E-ENUM-JOIN: shared mixed enum capture"
-                                                            + " requires #539");
-                                        }
-                                    }
-                            });
-        }
         var enumRoots = rootEnums(grammar);
         if (!enumRoots.isEmpty()) {
             var root =
@@ -280,11 +261,6 @@ public final class EnumSchema {
                             .orElseThrow();
             var rules = new HashMap<String, RuleDecl>();
             grammar.rules().forEach(rule -> rules.put(rule.name(), rule));
-            String projectedType =
-                    valueType(new RuleRefElement(root.name()), rules, new HashSet<>());
-            if (projectedType.startsWith("#"))
-                throw new IllegalArgumentException(
-                        "E-ENUM-JOIN: mixed enum root projection requires #539");
             var shape = new SemanticCardinality(grammar).shape(new RuleRefElement(root.name()));
             if (shape.kind() != SemanticCardinality.Kind.NODE
                     || shape.count() != SemanticCardinality.Count.ONE) {
@@ -383,7 +359,9 @@ public final class EnumSchema {
         grammar.rules().forEach(r -> rules.put(r.name(), r));
         var names = new LinkedHashSet<String>();
         collectEnumTypes(element, rules, new HashSet<>(), names);
-        return names.size() == 1 ? Optional.of(names.iterator().next()) : Optional.empty();
+        return names.size() == 1 && names.contains(valueType(element, rules, new HashSet<>()))
+                ? Optional.of(names.iterator().next())
+                : Optional.empty();
     }
 
     private static void collectEnumTypes(

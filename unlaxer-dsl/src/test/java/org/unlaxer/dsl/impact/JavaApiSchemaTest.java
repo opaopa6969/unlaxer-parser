@@ -34,9 +34,13 @@ public class JavaApiSchemaTest {
         var result = JavaApiSchema.build(sourceSnapshot);
         assertEquals("example.schema.SchemaAST", result.astType());
         assertEquals("example.schema.SchemaEvaluator", result.evaluatorType());
-        assertEquals(List.of("Item", "Item.Numeric", "Item.Text", "Mode", "Program"),
+        assertEquals(List.of("EnumValue", "Item", "Item.Numeric", "Item.Text", "Mode", "Program"),
             result.nodes().stream().map(ApiImpact.Node::name).toList());
 
+        var occurrence = node(result, "EnumValue");
+        assertEquals("record", occurrence.kind());
+        assertEquals(List.of("value"), occurrence.fields().stream().map(ApiImpact.Field::name).toList());
+        assertEquals(List.of(), occurrence.parents());
         var sum = node(result, "Item");
         assertEquals("interface", sum.kind());
         assertEquals(List.of("Item.Numeric", "Item.Text"), sum.variants());

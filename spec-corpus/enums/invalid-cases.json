@@ -40,14 +40,6 @@
     "grammar": "grammar Invalid { @package: enumprobe @root @enum Mode ::= 'sync'; @mapping(ModeNode) Other ::= 'other'; }"
   },
   {
-    "name": "enum-text",
-    "grammar": "grammar Invalid { @package: enumprobe @enum Mode ::= 'sync' | 'auto'; @root @mapping(Value,params=[value]) Root ::= (Mode|'text') @value; }"
-  },
-  {
-    "name": "enum-enum",
-    "grammar": "grammar Invalid { @package: enumprobe @enum Mode ::= 'sync' | 'auto'; @enum Other ::= 'other'; @root @mapping(Value,params=[value]) Root ::= (Mode|Other) @value; }"
-  },
-  {
     "name": "reserved-type-record",
     "grammar": "grammar Invalid { @package: enumprobe @enum record ::= 'x'; @root @mapping(Value,params=[value]) Root ::= record @value; }"
   },
@@ -132,19 +124,15 @@
     "grammar": "grammar Invalid { @enum Mode ::= 'sync'; @root Root ::= [Mode]; }"
   },
   {
-    "name": "mixed-root-enums",
-    "grammar": "grammar Invalid { @enum Mode ::= 'sync'; @enum Other ::= 'other'; @root Root ::= Mode | Other; }"
-  },
-  {
-    "name": "mixed-root-node",
-    "grammar": "grammar Invalid { @enum Mode ::= 'sync'; @mapping(Item) Other ::= 'other'; @root Root ::= Mode | Other; }"
-  },
-  {
     "name": "java-package-shadow",
     "grammar": "grammar Invalid { @package: enumprobe @enum java ::= 'sync'; @root @mapping(Value,params=[value]) Root ::= java @value; }"
   },
   {
     "name": "root-callback-collision",
     "grammar": "grammar Invalid { @package: enumprobe @root @enum FooBar ::= 'sync'; @mapping(Foo_BarNode) Other ::= 'other'; }"
+  },
+  {
+    "name": "occurrence-wrapper-collision",
+    "grammar": "grammar Invalid { @package: enumprobe @enum Mode ::= 'sync'; @root @mapping(EnumValue,params=[value]) Root ::= (Mode|'text') @value; }"
   }
 ]

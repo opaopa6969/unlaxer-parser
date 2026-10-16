@@ -7,8 +7,9 @@ are the oracle. `coordinates` uses code points, UTF-16 code units and UTF-8 byte
 The family emoji remains seven code points even though it is one grapheme.
 
 `invalid-cases.json` contains malformed enum declarations, constant/type/wrapper
-name collisions, restricted type names and the explicitly deferred mixed joins
-of #539. Both target generators must reject them before source emission, and
+name collisions, restricted type names and invalid root cardinalities.
+Mixed joins formerly rejected by #537 are now positive cases in
+[`../mixed-enums`](../mixed-enums/README.md). Both target generators must reject them before source emission, and
 both portability checkers retain source positions for structural rejection.
 
 Run `EnumConformanceTest -DrustConformance=true` on JDK21. The test builds the

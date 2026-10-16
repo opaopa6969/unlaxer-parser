@@ -124,6 +124,7 @@ pub fn validate_enum_type(name: &str) -> Result<(), GenerateError> {
             "union",
             "Ast",
             "AstValue",
+            "EnumValue",
             "Span",
             "String",
             "Tree",
