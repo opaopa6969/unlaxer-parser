@@ -38,7 +38,8 @@ public final class ApiImpact {
     public record Snapshot(String grammar, String astType, String evaluatorType, List<Node> nodes,
                            List<Method> methods) {
         public Snapshot { nodes = nodes.stream().sorted(Comparator.comparing(Node::name)).toList();
-            methods = methods.stream().sorted(Comparator.comparing(Method::name)).toList(); }
+            methods = methods.stream().sorted(Comparator.comparing(Method::name)
+                .thenComparing(ApiImpact::methodIdentity)).toList(); }
     }
     public record Change(String kind, String subject, String before, String after,
                          List<Origin> beforeOrigins, List<Origin> afterOrigins,
@@ -151,17 +152,53 @@ public final class ApiImpact {
                 }
             }
         }
-        Map<String, Method> oldMethods = byName(before.methods(), Method::name), newMethods = byName(after.methods(), Method::name);
+        Map<String, List<Method>> oldMethods = methodsByName(before.methods()), newMethods = methodsByName(after.methods());
         for (String name : keys(oldMethods, newMethods)) {
-            Method old = oldMethods.get(name), next = newMethods.get(name);
-            List<Origin> oldOrigins = old == null ? List.of() : old.origins(), newOrigins = next == null ? List.of() : next.origins();
-            Location oldLocation = old == null ? null : old.generated(), newLocation = next == null ? null : next.generated();
-            add(changes, old == null ? "METHOD_ADDED" : next == null ? "METHOD_REMOVED" : "METHOD_SIGNATURE_CHANGED", name,
-                old == null ? null : signature(old), next == null ? null : signature(next), oldOrigins, newOrigins, oldLocation, newLocation);
-            if (old != null && next != null) add(changes, "METHOD_REQUIRED_CHANGED", name,
-                Boolean.toString(old.required()), Boolean.toString(next.required()), oldOrigins, newOrigins, oldLocation, newLocation);
+            List<Method> oldGroup = oldMethods.getOrDefault(name, List.of());
+            List<Method> newGroup = newMethods.getOrDefault(name, List.of());
+            if (oldGroup.size() <= 1 && newGroup.size() <= 1) {
+                compareMethod(changes, name, oldGroup.isEmpty() ? null : oldGroup.get(0),
+                    newGroup.isEmpty() ? null : newGroup.get(0));
+                continue;
+            }
+            Map<String, Method> oldOverloads = byName(oldGroup, ApiImpact::methodIdentity);
+            Map<String, Method> newOverloads = byName(newGroup, ApiImpact::methodIdentity);
+            for (String identity : new ArrayList<>(oldOverloads.keySet())) {
+                if (!newOverloads.containsKey(identity)) continue;
+                compareMethod(changes, identity, oldOverloads.remove(identity), newOverloads.remove(identity));
+            }
+            // A single unmatched pair is an unambiguous parameter change. With multiple
+            // candidates, report additions/removals instead of guessing an overload pairing.
+            if (oldOverloads.size() == 1 && newOverloads.size() == 1) {
+                var old = oldOverloads.values().iterator().next();
+                compareMethod(changes, methodIdentity(old), old, newOverloads.values().iterator().next());
+            } else {
+                oldOverloads.forEach((identity, method) -> compareMethod(changes, identity, method, null));
+                newOverloads.forEach((identity, method) -> compareMethod(changes, identity, null, method));
+            }
         }
         return changes.stream().sorted(Comparator.comparing(Change::kind).thenComparing(Change::subject)).toList();
+    }
+
+    private static Map<String, List<Method>> methodsByName(List<Method> methods) {
+        Map<String, List<Method>> result = new TreeMap<>();
+        // Validate identities even for singleton groups; never silently overwrite an API.
+        for (Method method : byName(methods, ApiImpact::methodIdentity).values())
+            result.computeIfAbsent(method.name(), ignored -> new ArrayList<>()).add(method);
+        return result;
+    }
+
+    private static String methodIdentity(Method method) {
+        return method.name() + "(" + String.join(",", method.parameters().stream().map(Parameter::type).toList()) + ")";
+    }
+
+    private static void compareMethod(List<Change> changes, String subject, Method old, Method next) {
+        List<Origin> oldOrigins = old == null ? List.of() : old.origins(), newOrigins = next == null ? List.of() : next.origins();
+        Location oldLocation = old == null ? null : old.generated(), newLocation = next == null ? null : next.generated();
+        add(changes, old == null ? "METHOD_ADDED" : next == null ? "METHOD_REMOVED" : "METHOD_SIGNATURE_CHANGED", subject,
+            old == null ? null : signature(old), next == null ? null : signature(next), oldOrigins, newOrigins, oldLocation, newLocation);
+        if (old != null && next != null) add(changes, "METHOD_REQUIRED_CHANGED", subject,
+            Boolean.toString(old.required()), Boolean.toString(next.required()), oldOrigins, newOrigins, oldLocation, newLocation);
     }
 
     private static String signature(Method method) {
