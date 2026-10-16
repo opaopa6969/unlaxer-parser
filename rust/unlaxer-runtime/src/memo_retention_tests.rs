@@ -472,3 +472,406 @@ fn failure_budget_invalid_configuration_and_extremes_use_safe_defaults() {
     assert_eq!(parse_failure_budget(Some("0"), 123, 1000), 0);
     assert_eq!(parse_failure_budget(Some("1000"), 123, 1000), 1000);
 }
+
+fn success_budget_attempt(context: &mut ParseContext<'_>) {
+    let (start, matched) = (context.position(), context.matched_position());
+    let at = start;
+    let kind = context
+        .token_mode
+        .map_or(token::TokenKind::Consumed, |m| m.kind);
+    let mut old_id = None;
+    let _: Result<(), ParseError> = context.transaction(|c| {
+        let parsed = c.parse(&Expr::Rule(0)).unwrap();
+        assert_eq!(
+            (c.position(), c.matched_position()),
+            (start + if kind.is_consumed() { 9 } else { 0 }, start + 9)
+        );
+        let id = c.token_node_id(parsed.root_node().unwrap()).unwrap();
+        assert_eq!(c.token_info(id).unwrap().kind, kind);
+        assert_eq!(c.token_text(id), Some(SUCCESS_TEXT));
+        assert_eq!(
+            c.node(parsed.root_node().unwrap()).unwrap().span,
+            Span {
+                start: at,
+                end: at + 9
+            }
+        );
+        assert_eq!(
+            c.capture_spans("field"),
+            &[Span {
+                start: at,
+                end: at + 9
+            }]
+        );
+        assert!(c.token_info(id).unwrap().extra("changed").is_none());
+        assert!(c.put_token_extra(id, "changed", "outside snapshot"));
+        c.scopes_mut().declare("outer", at);
+        assert!(c.scopes().is_declared("outer"));
+        old_id = Some(id);
+        Err(ParseError {
+            offset: 0,
+            expected: vec![],
+        })
+    });
+    assert!(
+        context.token_info(old_id.unwrap()).is_none(),
+        "rollback must stale the returned ID"
+    );
+    assert!(context.capture_spans("field").is_empty());
+    assert!(!context.scopes().is_declared("outer"));
+    assert_eq!(
+        (context.position(), context.matched_position()),
+        (start, matched)
+    );
+    assert!(context.node(0).is_none());
+    assert_eq!(
+        context.scopes().diagnostics(),
+        &[scope::SymbolDiagnostic {
+            message: "kept".into(),
+            offset: 0,
+            length: 1,
+            severity: Severity::Warning
+        }]
+    );
+    assert_eq!(context.state::<i32>("user"), Some(&7));
+}
+const SUCCESS_TEXT: &str = "👨‍👩‍👧‍👦\r\n";
+
+#[test]
+fn success_budget_shared_oracle_bounds_epochs_and_preserves_real_hits() {
+    let rows = include_str!("../../../conformance/success-memo-budget/cases.tsv");
+    let modes = [
+        None,
+        Some(token::ParseMode {
+            kind: token::TokenKind::Consumed,
+            invert: false,
+        }),
+        Some(token::ParseMode {
+            kind: token::TokenKind::MatchOnly,
+            invert: false,
+        }),
+        Some(token::ParseMode {
+            kind: token::TokenKind::VirtualConsumed,
+            invert: false,
+        }),
+        Some(token::ParseMode {
+            kind: token::TokenKind::VirtualMatchOnly,
+            invert: false,
+        }),
+    ];
+    let mut count = 0;
+    for row in rows
+        .lines()
+        .filter(|r| !r.starts_with('#') && !r.is_empty())
+    {
+        let f: Vec<_> = row.split('\t').collect();
+        let n = |i: usize| f[i].parse::<usize>().unwrap();
+        for mode in modes {
+            for reset in [false, true] {
+                for diagnostics in [
+                    Diagnostics::Auto,
+                    Diagnostics::Detailed,
+                    Diagnostics::DetailedOnFailure,
+                ] {
+                    for memo in [Memoization::Off, Memoization::SafeFailures] {
+                        let far = matches!(f[1], "evict" | "underrun");
+                        let input = if far {
+                            SUCCESS_TEXT.to_owned() + &"x".repeat(4000 - 9) + SUCCESS_TEXT + "?"
+                        } else {
+                            SUCCESS_TEXT.to_owned() + "?"
+                        };
+                        let mut c = ParseContext::with_options(
+                            &input,
+                            ParseOptions::with_memoization(memo).with_diagnostics(diagnostics),
+                        );
+                        c.token_mode = mode;
+                        c.match_cursor_policy.reset = reset;
+                        c.rules = share_grammar(vec![Rule {
+                            name: "success",
+                            expression: Expr::choice([
+                                Expr::literal(SUCCESS_TEXT).then(Expr::literal("!")),
+                                Expr::literal(SUCCESS_TEXT).capture("field"),
+                            ]),
+                        }]);
+                        c.memo_safe_rules = memo_safe_rules(&c.rules);
+                        c.success_memo = SuccessMemoBuckets::with_window(Some(64));
+                        c.success_memo.max_entries = n(3);
+                        c.success_memo.max_bytes = n(4);
+                        c.success_memo.max_entry_bytes = n(5);
+                        c.scopes_mut()
+                            .add_diagnostic("kept", 0, 1, Severity::Warning);
+                        c.set_state("user", 7_i32);
+                        match f[1] {
+                            "same" => {
+                                for _ in 0..n(2) {
+                                    success_budget_attempt(&mut c);
+                                }
+                            }
+                            "epoch" => {
+                                for _ in 0..n(2) {
+                                    c.mark_memoization_state_changed();
+                                    success_budget_attempt(&mut c);
+                                }
+                            }
+                            "rollback" => {
+                                success_budget_attempt(&mut c);
+                                let original = c.memoization_state_version();
+                                for _ in 0..n(2) {
+                                    let _: Result<(), ParseError> = c.transaction(|c| {
+                                        c.mark_memoization_state_changed();
+                                        success_budget_attempt(c);
+                                        c.set_state("user", 99_i32);
+                                        Err(ParseError {
+                                            offset: 0,
+                                            expected: vec![],
+                                        })
+                                    });
+                                    assert_eq!(c.memoization_state_version(), original);
+                                }
+                                success_budget_attempt(&mut c);
+                            }
+                            "evict" | "underrun" => {
+                                success_budget_attempt(&mut c);
+                                let _: Result<(), ParseError> = c.transaction(|c| {
+                                    c.position = c.byte_offsets[4000];
+                                    c.matched_position = c.position;
+                                    success_budget_attempt(c);
+                                    if memo == Memoization::SafeFailures {
+                                        assert_eq!(
+                                            c.success_memo.entries, 1,
+                                            "old position must be evicted"
+                                        );
+                                        assert!(c.success_memo.evicted_entries > 0);
+                                    }
+                                    if f[1] == "evict" {
+                                        success_budget_attempt(c);
+                                    }
+                                    Err(ParseError {
+                                        offset: 0,
+                                        expected: vec![],
+                                    })
+                                });
+                                if f[1] == "underrun" {
+                                    success_budget_attempt(&mut c);
+                                    success_budget_attempt(&mut c);
+                                    if memo == Memoization::SafeFailures {
+                                        assert!(c.success_memo.eviction_underruns > 0);
+                                    }
+                                }
+                            }
+                            _ => panic!("unknown action"),
+                        }
+                        let enabled = memo == Memoization::SafeFailures;
+                        assert_eq!(
+                            c.success_memo_entries(),
+                            if enabled { n(6) } else { 0 },
+                            "{} {mode:?}/{reset}/{diagnostics:?}",
+                            f[0]
+                        );
+                        assert_eq!(
+                            c.memoized_success_hits(),
+                            if enabled { n(7) } else { 0 },
+                            "{} hits {mode:?}/{reset}/{diagnostics:?}",
+                            f[0]
+                        );
+                        assert_eq!(
+                            c.success_memo_budget_misses(),
+                            if enabled { n(8) } else { 0 },
+                            "{} rejects",
+                            f[0]
+                        );
+                        assert!(c.success_memo_retained_bytes() <= n(4));
+                        assert_eq!(
+                            c.success_memo_retained_bytes() == 0,
+                            c.success_memo_entries() == 0
+                        );
+                        let at = if diagnostics == Diagnostics::DetailedOnFailure {
+                            0
+                        } else {
+                            n(9)
+                        };
+                        assert_eq!(c.failure().offset, at, "{} diagnostic", f[0]);
+                        assert_eq!(
+                            c.failure().expected,
+                            if at == 0 {
+                                vec![]
+                            } else {
+                                vec!["!".to_owned()]
+                            },
+                            "{} expected",
+                            f[0]
+                        );
+                        let snap = source::Snapshot::new("budget", 1, &input).unwrap();
+                        assert_eq!(
+                            (snap.utf16(at).unwrap(), snap.utf8(at).unwrap()),
+                            if at == 0 { (0, 0) } else { (n(10), n(11)) }
+                        );
+                        assert_eq!((c.position(), c.matched_position()), (0, 0));
+                        assert_eq!(c.source(), input);
+                        println!(
+                            "SUCCESS_BUDGET\t{}\t{mode:?}\t{reset}\t{memo:?}\t{diagnostics:?}\t{}\t{}",
+                            f[0],
+                            c.success_memo_entries(),
+                            c.success_memo_retained_bytes()
+                        );
+                        count += 1;
+                    }
+                }
+            }
+        }
+    }
+    assert_eq!(count, 600);
+}
+
+fn success_budget_sample() -> (FailureMemoKey, Rc<SuccessMemo>) {
+    let mut c = ParseContext::with_options(
+        "x",
+        ParseOptions::with_memoization(Memoization::SafeFailures),
+    );
+    c.rules = share_grammar(vec![Rule {
+        name: "sample",
+        expression: Expr::literal("x"),
+    }]);
+    c.memo_safe_rules = memo_safe_rules(&c.rules);
+    assert!(c.rule(0, 0).is_some());
+    let (&key, value) = c.success_memo.first.iter().next().unwrap();
+    (key, Rc::clone(value))
+}
+
+#[test]
+fn success_budget_replacement_eviction_entry_and_index_capacity_are_accounted() {
+    let (key, entry) = success_budget_sample();
+    let bytes = entry.bytes;
+    let old = Rc::downgrade(&entry);
+    let mut memo = SuccessMemoBuckets::with_window(Some(64));
+    memo.max_entries = 2;
+    memo.max_entry_bytes = bytes;
+    memo.max_bytes = bytes * 2;
+    memo.insert(0, key, entry);
+    let (_, replacement) = success_budget_sample();
+    assert_eq!(replacement.bytes, bytes);
+    memo.insert(0, key, replacement.clone());
+    assert!(
+        old.upgrade().is_none(),
+        "old snapshot payload is released on replacement"
+    );
+    assert_eq!((memo.entries, memo.retained_bytes), (1, bytes));
+    let other = FailureMemoKey::new(1, 0, 0, false, 0);
+    memo.insert(0, other, replacement.clone());
+    assert_eq!((memo.entries, memo.retained_bytes), (2, bytes * 2));
+    assert_eq!(
+        memo.snapshot_room(0, &key),
+        bytes,
+        "replacement can reuse its old charge"
+    );
+    let third = FailureMemoKey::new(2, 0, 0, false, 0);
+    assert_eq!(memo.snapshot_room(0, &third), 0);
+    memo.insert(0, third, replacement.clone());
+    assert_eq!(
+        (memo.entries, memo.retained_bytes, memo.budget_misses),
+        (2, bytes * 2, 1)
+    );
+    let oversized = Rc::new(SuccessMemo {
+        nodes: vec![],
+        tokens: token::MemoTokens::capture(&token::Store::new(), 0, 0),
+        root: 0,
+        captures: vec![],
+        consumed: 0,
+        matched: 0,
+        policy: MatchCursorPolicy::default(),
+        expression_depth: 0,
+        diagnostic: FailureDiagnostic::default(),
+        bytes: usize::MAX,
+    });
+    memo.insert(0, key, oversized);
+    assert_eq!(
+        (memo.entries, memo.retained_bytes, memo.budget_misses),
+        (2, bytes * 2, 2)
+    );
+    assert_eq!(memo.get(0, &key).unwrap().bytes, bytes);
+    memo.observe_cursor(1024);
+    assert_eq!((memo.entries, memo.retained_bytes), (0, 0));
+    assert!(memo.probe(0, &key).is_none());
+    memo.insert(0, key, replacement.clone());
+    assert_eq!((memo.entries, memo.retained_bytes), (1, bytes));
+    let mut distant = SuccessMemoBuckets::with_window(None);
+    distant.max_bytes = bytes * 10;
+    distant.max_entries = 10;
+    assert_eq!(distant.snapshot_room(usize::MAX, &key), 0);
+    distant.insert(usize::MAX, key, replacement.clone());
+    distant.insert(1_000_000, key, replacement);
+    assert!(distant.remaining.is_empty());
+    assert_eq!(
+        (
+            distant.entries,
+            distant.retained_bytes,
+            distant.budget_misses
+        ),
+        (0, 0, 2)
+    );
+}
+
+#[test]
+fn success_budget_large_expected_payloads_and_foreign_edges_miss_before_copy() {
+    let mut c = ParseContext::with_options(
+        "x",
+        ParseOptions::with_memoization(Memoization::SafeFailures),
+    );
+    c.rules = share_grammar(vec![Rule {
+        name: "sample",
+        expression: Expr::literal("x"),
+    }]);
+    c.memo_safe_rules = memo_safe_rules(&c.rules);
+    let root = c.rule(0, 0).unwrap();
+    let key = *c.success_memo.first.keys().next().unwrap();
+    c.success_memo = SuccessMemoBuckets::with_window(None);
+    c.success_memo.max_entry_bytes = 1024;
+    let name = "q".repeat(4096);
+    let id = c.expected_names.intern(&name);
+    let diagnostic = FailureDiagnostic {
+        expected: ExpectedIds::Single(id),
+        ..Default::default()
+    };
+    c.memoize_success(0, key, 0, root, 0, diagnostic);
+    assert_eq!(
+        (
+            c.success_memo.entries,
+            c.success_memo.retained_bytes,
+            c.success_memo.budget_misses
+        ),
+        (0, 0, 1)
+    );
+    let expected = Rc::new(Vec::with_capacity(4096));
+    let held = Rc::clone(&expected);
+    c.memoize_success(
+        0,
+        key,
+        0,
+        root,
+        0,
+        FailureDiagnostic {
+            expected: ExpectedIds::Multiple(expected),
+            ..Default::default()
+        },
+    );
+    assert_eq!(Rc::strong_count(&held), 1);
+    assert_eq!(
+        (
+            c.success_memo.entries,
+            c.success_memo.retained_bytes,
+            c.success_memo.budget_misses
+        ),
+        (0, 0, 2)
+    );
+    c.success_memo.max_entry_bytes = 1048576;
+    c.nodes[root].children.push(usize::MAX);
+    c.memoize_success(0, key, 0, root, 0, FailureDiagnostic::default());
+    assert_eq!(
+        (
+            c.success_memo.entries,
+            c.success_memo.retained_bytes,
+            c.success_memo.budget_misses
+        ),
+        (0, 0, 3)
+    );
+}

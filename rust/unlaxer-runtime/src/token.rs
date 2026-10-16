@@ -160,16 +160,22 @@ impl Store {
 /// caller state, never memoized; replay allocates fresh generation-checked IDs.
 pub(crate) struct MemoTokens(Vec<(usize, TokenInfo, bool)>);
 impl MemoTokens {
+    #[cfg(test)]
     pub(crate) fn measure(store: &Store, start: usize, end: usize) -> Option<usize> {
+        Self::measure_bounded(store, start, end, usize::MAX)
+    }
+    pub(crate) fn measure_bounded(
+        store: &Store,
+        start: usize,
+        end: usize,
+        limit: usize,
+    ) -> Option<usize> {
         let mut bytes = 0_usize;
         for (&index, info) in store.values.range(start..end) {
             if !info.extra.is_empty() || !info.related.is_empty() {
                 return None;
             }
             let original = info.original.as_deref().unwrap_or(&[]);
-            if original.iter().any(|&child| child < start || child >= end) {
-                return None;
-            }
             let text = match &info.source {
                 TokenSource::Input(_) => 0,
                 TokenSource::Projected { text, .. } => text.len(),
@@ -179,6 +185,9 @@ impl MemoTokens {
                 .saturating_add(std::mem::size_of::<(usize, TokenInfo, bool)>())
                 .saturating_add(std::mem::size_of_val(original))
                 .saturating_add(text);
+            if bytes > limit || original.iter().any(|&child| child < start || child >= end) {
+                return None;
+            }
             debug_assert!(index >= start);
         }
         Some(bytes)

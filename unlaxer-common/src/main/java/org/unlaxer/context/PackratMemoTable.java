@@ -66,19 +66,24 @@ public final class PackratMemoTable {
     private Entry nextAtPosition;
     private Entry previousAtPosition;
     private long failureCharge;
+    private long successCharge;
+    private final long successPayloadCharge;
+    private final Token.MemoSnapshot snapshot;
 
     private Entry(ParseContext.FailureDiagnostic diagnostic) {
-      this(diagnostic, null, 0, 0, null, Map.of());
+      this(diagnostic, null, 0, 0, null, Map.of(), null, 0);
     }
 
     private Entry(ParseContext.FailureDiagnostic diagnostic, TokenList tokens,
-        int endConsumed, int endMatched, Parser chosenChild, Map<ChoiceInterface, Parser> choices) {
+        int endConsumed, int endMatched, Parser chosenChild, Map<ChoiceInterface, Parser> choices, Token.MemoSnapshot snapshot, long payloadCharge) {
       this.diagnostic = diagnostic;
       this.tokens = tokens;
       this.endConsumed = endConsumed;
       this.endMatched = endMatched;
       this.chosenChild = chosenChild;
       this.choices = choices;
+      this.snapshot = snapshot;
+      this.successPayloadCharge = payloadCharge;
     }
   }
 
@@ -132,7 +137,8 @@ public final class PackratMemoTable {
         && occurs.min() == 0 && occurs.max() == 0 && !occurs.isZeroMatchCheck())
       context.beginPreservingMatched(parser);
     else context.begin(parser);
-    for (Token token : entry.tokens) context.getCurrent().getTokens().add(token.deepCopy());
+    TokenList copies = java.util.Objects.requireNonNull(entry.snapshot.copy(), "immutable memo snapshot");
+    context.getCurrent().getTokens().addAll(copies);
     int consumeDelta = entry.endConsumed - context.getConsumedPosition().value();
     // Even a zero-width consumed token can reset a previously advanced matched cursor.
     if (consumeDelta > 0 || context.getMatchedPosition().value() > entry.endMatched) {
@@ -154,28 +160,48 @@ public final class PackratMemoTable {
   }
 
   /**
-   * Commit an ordinary success and retain its completed diagnostic frame. Snapshot tokens BEFORE
-   * collection reparents them; copy deeply both here and on replay so later mutations of a
-   * returned tree cannot modify the cache. Choices keep their historical child Parsed on a miss.
+   * Commit an ordinary success and retain its completed diagnostic frame. Capture a bounded
+   * topology/value plan before collection reparents the tokens, then copy the CST only after
+   * the final diagnostic fits the budget. Replay copies isolate later returned-tree mutations.
+   * Choices keep their historical child Parsed on a miss.
    */
   public static Parsed commitSuccess(ParseContext context, Parser parser, TokenKind tokenKind,
       boolean invertMatch, PositionKey startKey, ParseContext.FailureDiagnostic diagnostic,
       Parser chosenChild, Parsed originalParsed) {
-    Entry entry = null;
+    Token.MemoSnapshot plan = null;
+    Map<ChoiceInterface, Parser> choices = Map.of();
+    long payloadCharge = 0;
+    int endConsumed = context.getConsumedPosition().value();
+    int endMatched = context.getMatchedPosition().value();
     if (startKey != null && context.isMemoizationSessionSafe()) {
-      TokenList snapshot = new TokenList();
-      for (Token token : context.getCurrent().getTokens()) snapshot.add(token.deepCopy());
-      entry = new Entry(diagnostic, snapshot, context.getConsumedPosition().value(),
-          context.getMatchedPosition().value(), chosenChild,
-          context.getCurrent().snapshotChosenParsers(context.getChosenParserByChoice()));
+      PackratMemoTable table = context.getPackratMemoTable();
+      long room = table.successRoom(parser, startKey);
+      int count = context.getCurrent().memoChoiceCount();
+      long choiceCharge = count == 0 ? 0 : 64L + 64L * count;
+      long diagnosticCharge = ParseContext.failureMemoCharge(diagnostic, room);
+      plan = Token.prepareMemoSnapshot(context.getCurrent().getTokens(), room - diagnosticCharge - choiceCharge);
+      if (plan == null) table.successBudgetMiss();
+      else {
+        payloadCharge = plan.retainedBytes() + choiceCharge;
+        choices = context.getCurrent().snapshotChosenParsers(context.getChosenParserByChoice());
+      }
     }
     var committed = context.commit(parser, tokenKind, choiceActions(chosenChild));
     Parsed parsed = originalParsed == null ? new Parsed(committed) : originalParsed;
     context.endParse(parser, parsed, context, tokenKind, invertMatch);
     if (diagnostic != null) context.discardMemoDiagnosticFrame(diagnostic);
-    if (entry != null && context.isMemoizationSessionSafe()) {
+    if (plan != null && context.isMemoizationSessionSafe()) {
       ParseContext.sealMemoDiagnostic(diagnostic);
-      context.getPackratMemoTable().put(parser, startKey, entry);
+      PackratMemoTable table = context.getPackratMemoTable();
+      long room = table.successRoom(parser, startKey);
+      // The final frame now includes commit/endParse diagnostics. Check it before CST copies.
+      if (payloadCharge > room || ParseContext.failureMemoCharge(diagnostic, room - payloadCharge) > room - payloadCharge)
+        table.successBudgetMiss();
+      else {
+        TokenList tokens = plan.freeze();
+        table.put(parser, startKey, new Entry(diagnostic, tokens, endConsumed, endMatched,
+            chosenChild, choices, plan, payloadCharge));
+      }
     }
     return parsed;
   }
@@ -310,6 +336,42 @@ public final class PackratMemoTable {
   private long failureRetainedBytes;
   private long failureBudgetMisses;
 
+  private static final int CONFIGURED_SUCCESS_ENTRIES = (int) configuredFailureBudget(
+      System.getProperty("unlaxer.memo.success.maxEntries"), 65_536, 1_048_576);
+  private static final long CONFIGURED_SUCCESS_BYTES = configuredFailureBudget(
+      System.getProperty("unlaxer.memo.success.maxBytes"), 16L * 1024 * 1024, 1024L * 1024 * 1024);
+  private static final long CONFIGURED_SUCCESS_ENTRY_BYTES = configuredFailureBudget(
+      System.getProperty("unlaxer.memo.success.maxEntryBytes"), 2L * 1024 * 1024, 64L * 1024 * 1024);
+  private int maxSuccessEntries = CONFIGURED_SUCCESS_ENTRIES;
+  private long maxSuccessBytes = CONFIGURED_SUCCESS_BYTES;
+  private long maxSuccessEntryBytes = CONFIGURED_SUCCESS_ENTRY_BYTES;
+  private int successEntryCount;
+  private long successRetainedBytes;
+  private long successBudgetMisses;
+
+  void setSuccessBudget(int entries, long bytes, long entryBytes) {
+    if (successEntryCount != 0 || entries < 0 || entries > 1_048_576 || bytes < 0
+        || bytes > 1024L * 1024 * 1024 || entryBytes < 0 || entryBytes > 64L * 1024 * 1024)
+      throw new IllegalArgumentException("invalid success memo budget or nonempty cache");
+    maxSuccessEntries = entries; maxSuccessBytes = bytes; maxSuccessEntryBytes = entryBytes;
+  }
+
+  /** Capacity available before allocating a successful CST copy. */
+  private long successRoom(Parser parser, PositionKey key) {
+    Entry old = get(parser, key);
+    int count = successEntryCount - (old != null && old.tokens != null ? 1 : 0);
+    if (evictionEnabled && key.consumed() < evictedBelow) { deadOnArrival++; return 0; }
+    if (count >= maxSuccessEntries) return 0;
+    long retained = successRetainedBytes - (old == null ? 0 : old.successCharge);
+    if (evictionEnabled && key.consumed() >= entryChainByPosition.length) {
+      long next = entryChainByPosition.length;
+      while (key.consumed() >= next && next < Integer.MAX_VALUE - 8L)
+        next = Math.min(Integer.MAX_VALUE - 8L, next * 2);
+      if (key.consumed() >= next || 8L * next > maxSuccessBytes) return 0;
+    }
+    return Math.min(maxSuccessEntryBytes, maxSuccessBytes - retained);
+  }
+
   static long configuredFailureBudget(String value, long fallback, long ceiling) {
     if (value == null || value.isEmpty()) return fallback;
     for (int i = 0; i < value.length(); i++)
@@ -355,7 +417,7 @@ public final class PackratMemoTable {
       long next = indexLength;
       while (position >= next && next < Integer.MAX_VALUE - 8L)
         next = Math.min(Integer.MAX_VALUE - 8L, next * 2);
-      if (position >= next) { budgetMiss(); return; }
+      if (position >= next) { if (failure) budgetMiss(); else successBudgetMiss(); return; }
       indexLength = (int) next;
     }
     if (failure) {
@@ -370,11 +432,26 @@ public final class PackratMemoTable {
         return;
       }
     }
+    if (!failure) {
+      if (entry.snapshot == null || entry.successPayloadCharge > maxSuccessEntryBytes) {
+        successBudgetMiss(); return;
+      }
+      long diagnosticLimit = maxSuccessEntryBytes - entry.successPayloadCharge;
+      long diagnosticCharge = ParseContext.failureMemoCharge(entry.diagnostic, diagnosticLimit);
+      charge = entry.successPayloadCharge + diagnosticCharge;
+      int count = successEntryCount - (old != null && old.tokens != null ? 1 : 0);
+      long retained = successRetainedBytes - (old == null ? 0 : old.successCharge);
+      if (charge > maxSuccessEntryBytes || charge > maxSuccessBytes - retained
+          || count >= maxSuccessEntries
+          || indexLength > entryChainByPosition.length && 8L * indexLength > maxSuccessBytes) {
+        successBudgetMiss(); return;
+      }
+    }
     // The public put surface may receive an already indexed outcome. Share its
     // immutable payload, never its intrusive index links, with another key.
     if (entry.indexedKey != null)
       entry = new Entry(entry.diagnostic, entry.tokens, entry.endConsumed, entry.endMatched,
-          entry.chosenChild, entry.choices);
+          entry.chosenChild, entry.choices, entry.snapshot, entry.successPayloadCharge);
     if (indexLength > entryChainByPosition.length)
       entryChainByPosition = java.util.Arrays.copyOf(entryChainByPosition, indexLength);
     if (old != null) {
@@ -382,6 +459,8 @@ public final class PackratMemoTable {
       if (old.tokens == null) {
         failureEntryCount--;
         failureRetainedBytes -= old.failureCharge;
+      } else {
+        successEntryCount--; successRetainedBytes -= old.successCharge;
       }
     } else {
       entryCount++;
@@ -392,10 +471,13 @@ public final class PackratMemoTable {
       entryByPositionByParser.put(parser, byKey);
     }
     byKey.put(positionKey, entry);
-    entry.failureCharge = charge;
+    entry.failureCharge = failure ? charge : 0;
+    entry.successCharge = failure ? 0 : charge;
     if (failure) {
       failureEntryCount++;
       failureRetainedBytes += charge;
+    } else {
+      successEntryCount++; successRetainedBytes += charge;
     }
     if (!evictionEnabled) return;
     entry.indexedParser = parser;
@@ -403,6 +485,10 @@ public final class PackratMemoTable {
     entry.nextAtPosition = entryChainByPosition[position];
     if (entry.nextAtPosition != null) entry.nextAtPosition.previousAtPosition = entry;
     entryChainByPosition[position] = entry;
+  }
+
+  private void successBudgetMiss() {
+    if (successBudgetMisses != Long.MAX_VALUE) successBudgetMisses++;
   }
 
   private void budgetMiss() {
@@ -449,6 +535,8 @@ public final class PackratMemoTable {
           if (entry.tokens == null) {
             failureEntryCount--;
             failureRetainedBytes -= entry.failureCharge;
+          } else {
+            successEntryCount--; successRetainedBytes -= entry.successCharge;
           }
           evictedCount++;
           if (byKey.isEmpty()) entryByPositionByParser.remove(entry.indexedParser);
@@ -489,6 +577,11 @@ public final class PackratMemoTable {
   public long failureRetainedBytes() { return failureRetainedBytes; }
   public int failureEntryCount() { return failureEntryCount; }
   public long failureBudgetMisses() { return failureBudgetMisses; }
+
+  /** Successful snapshot charge; external shared sources/host object graphs are excluded. */
+  public long successRetainedBytes() { return successRetainedBytes; }
+  public int successEntryCount() { return successEntryCount; }
+  public long successBudgetMisses() { return successBudgetMisses; }
 
   public int failureHits() { return failureHits; }
   public int successHits() { return successHits; }

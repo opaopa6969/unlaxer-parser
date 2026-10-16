@@ -1,0 +1,11 @@
+# id	action	iterations	max_entries	max_total_bytes	max_single_bytes	retained_entries	actual_hits_on	budget_misses_on	frontier_cp	frontier_utf16	frontier_utf8
+same-state	same	64	4	1048576	262144	1	63	0	9	13	27
+new-state-storm	epoch	64	4	1048576	262144	4	0	60	9	13	27
+rollback-state-storm	rollback	64	4	1048576	262144	4	1	61	9	13	27
+entry-zero	same	64	0	1048576	262144	0	0	64	9	13	27
+total-zero	same	64	4	0	262144	0	0	64	9	13	27
+single-zero	same	64	4	1048576	0	0	0	64	9	13	27
+evict-and-resave	evict	2	4	1048576	262144	1	1	0	4009	4017	4045
+underrun-and-resave	underrun	2	4	1048576	262144	2	1	0	4009	4017	4045
+total-small	same	64	4	1	262144	0	0	64	9	13	27
+single-small	same	64	4	1048576	1	0	0	64	9	13	27

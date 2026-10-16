@@ -1309,6 +1309,23 @@ fn failure_memo_budget() -> FailureMemoBudget {
     })
 }
 
+fn success_memo_budget() -> FailureMemoBudget {
+    static BUDGET: std::sync::OnceLock<FailureMemoBudget> = std::sync::OnceLock::new();
+    *BUDGET.get_or_init(|| FailureMemoBudget {
+        entries: configured_failure_budget("UNLAXER_SUCCESS_MEMO_MAX_ENTRIES", 65_536, 1_048_576),
+        bytes: configured_failure_budget(
+            "UNLAXER_SUCCESS_MEMO_MAX_BYTES",
+            MAX_RETAINED_SUCCESS_MEMO_BYTES,
+            1024 * 1024 * 1024,
+        ),
+        entry_bytes: configured_failure_budget(
+            "UNLAXER_SUCCESS_MEMO_MAX_ENTRY_BYTES",
+            MAX_SUCCESS_MEMO_BYTES,
+            64 * 1024 * 1024,
+        ),
+    })
+}
+
 /// Keep nearby outcomes together for lookup and destruction. The first bucket is
 /// inline so inputs shorter than one bucket need no additional allocation.
 struct MemoBuckets<V> {
@@ -1353,11 +1370,7 @@ impl<V: MemoValue> MemoBuckets<V> {
         let budget = if V::failure_budget() {
             failure_memo_budget()
         } else {
-            FailureMemoBudget {
-                entries: usize::MAX,
-                bytes: MAX_RETAINED_SUCCESS_MEMO_BYTES,
-                entry_bytes: MAX_SUCCESS_MEMO_BYTES,
-            }
+            success_memo_budget()
         };
         Self {
             first: MemoMap::default(),
@@ -1427,6 +1440,21 @@ impl<V: MemoValue> MemoBuckets<V> {
         }
     }
 
+    /// Success snapshot construction consults this before cloning any payload.
+    fn snapshot_room(&self, bucket: usize, key: &FailureMemoKey) -> usize {
+        let old = self.get(bucket, key);
+        if bucket < self.evicted_buckets
+            || old.is_none() && self.entries >= self.max_entries
+            || bucket > self.remaining.len()
+                && bucket > self.max_bytes / std::mem::size_of::<MemoMap<V>>()
+        {
+            return 0;
+        }
+        let retained = self.retained_bytes - old.map_or(0, MemoValue::retained_bytes);
+        self.max_entry_bytes
+            .min(self.max_bytes.saturating_sub(retained))
+    }
+
     fn insert(&mut self, bucket: usize, key: FailureMemoKey, value: V) {
         // An enclosing rule can finish after traversal has passed its start.
         // A later probe below this frontier widens the window and re-evaluates it.
@@ -1440,8 +1468,7 @@ impl<V: MemoValue> MemoBuckets<V> {
         let retained = self.retained_bytes - old_bytes;
         // A distant first insertion must not allocate an unbounded empty bucket
         // index. The inline first bucket requires no such allocation.
-        let index_too_large = V::failure_budget()
-            && bucket > self.remaining.len()
+        let index_too_large = bucket > self.remaining.len()
             && bucket > self.max_bytes / std::mem::size_of::<MemoMap<V>>();
         if bytes > self.max_entry_bytes
             || bytes > self.max_bytes.saturating_sub(retained)
@@ -1456,9 +1483,7 @@ impl<V: MemoValue> MemoBuckets<V> {
         } else {
             if self.remaining.len() < bucket {
                 // Empty maps allocate no entry storage, including skipped buckets.
-                if V::failure_budget() {
-                    self.remaining.reserve_exact(bucket - self.remaining.len());
-                }
+                self.remaining.reserve_exact(bucket - self.remaining.len());
                 self.remaining.resize_with(bucket, MemoMap::default);
             }
             &mut self.remaining[bucket - 1]
@@ -1957,6 +1982,17 @@ impl<'a> ParseContext<'a> {
     /// Insertions refused by a finite failure budget in the active grammar session.
     pub fn failure_memo_budget_misses(&self) -> usize {
         self.failure_memo.budget_misses
+    }
+
+    /// Success snapshot payload charge in the active grammar session, not process RSS.
+    pub fn success_memo_retained_bytes(&self) -> usize {
+        self.success_memo.retained_bytes
+    }
+    pub fn success_memo_entries(&self) -> usize {
+        self.success_memo.entries
+    }
+    pub fn success_memo_budget_misses(&self) -> usize {
+        self.success_memo.budget_misses
     }
 
     /// Actual successful rule replays in this context's pass. Tracing, unsafe
@@ -2752,7 +2788,7 @@ impl<'a> ParseContext<'a> {
         start: usize,
         root: usize,
         capture_mark: usize,
-        diagnostic: FailureDiagnostic,
+        mut diagnostic: FailureDiagnostic,
     ) {
         // Failure-only parses keep their historical zero-extra-allocation path.
         // Compute the stronger proof lazily on the first completed safe rule.
@@ -2767,14 +2803,32 @@ impl<'a> ParseContext<'a> {
         {
             return;
         }
+        let limit = self
+            .success_memo
+            .snapshot_room(position / FAILURE_MEMO_BUCKET_SIZE, &key);
+        if diagnostic.retained_bytes() > limit {
+            self.success_memo.budget_misses = self.success_memo.budget_misses.saturating_add(1);
+            return;
+        }
+        let mut text_bytes = 0_usize;
+        for &id in diagnostic.expected_values() {
+            text_bytes = text_bytes
+                .saturating_add(self.expected_names.name(id).len())
+                .saturating_add(32);
+            if text_bytes > limit {
+                break;
+            }
+        }
+        diagnostic.memo_expected_text_bytes = text_bytes;
         let nodes = &self.nodes[start..];
         let journal = &self.captures.journal[capture_mark..];
         let mut bytes = std::mem::size_of::<SuccessMemo>()
             .saturating_add(std::mem::size_of_val(nodes))
             .saturating_add(std::mem::size_of_val(journal))
             .saturating_add(journal.len().saturating_mul(std::mem::size_of::<Span>()))
-            .saturating_add(std::mem::size_of_val(diagnostic.expected_values()));
-        if bytes > MAX_SUCCESS_MEMO_BYTES {
+            .saturating_add(diagnostic.retained_bytes());
+        if bytes > limit {
+            self.success_memo.budget_misses = self.success_memo.budget_misses.saturating_add(1);
             return;
         }
         for node in nodes {
@@ -2784,7 +2838,8 @@ impl<'a> ParseContext<'a> {
             for capture in &node.captures {
                 bytes = bytes.saturating_add(std::mem::size_of_val(capture.nodes.as_slice()));
             }
-            if bytes > MAX_SUCCESS_MEMO_BYTES {
+            if bytes > limit {
+                self.success_memo.budget_misses = self.success_memo.budget_misses.saturating_add(1);
                 return;
             }
             // Fail closed if a future pure expression introduces foreign edges.
@@ -2794,26 +2849,22 @@ impl<'a> ParseContext<'a> {
                 .chain(node.captures.iter().flat_map(|c| &c.nodes))
                 .any(|&id| id < start || id >= self.nodes.len())
             {
+                self.success_memo.budget_misses = self.success_memo.budget_misses.saturating_add(1);
                 return;
             }
         }
-        let Some(token_bytes) = token::MemoTokens::measure(&self.tokens, start, self.nodes.len())
-        else {
+        let Some(token_bytes) = token::MemoTokens::measure_bounded(
+            &self.tokens,
+            start,
+            self.nodes.len(),
+            limit.saturating_sub(bytes),
+        ) else {
+            self.success_memo.budget_misses = self.success_memo.budget_misses.saturating_add(1);
             return;
         };
         bytes = bytes.saturating_add(token_bytes);
-        let old_bytes = self
-            .success_memo
-            .get(position / FAILURE_MEMO_BUCKET_SIZE, &key)
-            .map_or(0, MemoValue::retained_bytes);
-        if bytes > MAX_SUCCESS_MEMO_BYTES
-            || bytes
-                > self
-                    .success_memo
-                    .max_bytes
-                    .saturating_sub(self.success_memo.retained_bytes - old_bytes)
-            || self.tokens.calls.range(start..).next().is_some()
-        {
+        if bytes > limit || self.tokens.calls.range(start..).next().is_some() {
+            self.success_memo.budget_misses = self.success_memo.budget_misses.saturating_add(1);
             return;
         }
         let mut nodes = nodes.to_vec();

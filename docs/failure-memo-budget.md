@@ -38,9 +38,8 @@ object graph 全体の上限ではありません。Java/Rust のレイアウト
 
 cache を無効にしても必要な active/global syntax diagnostics、Rust の期待名 interner、
 呼出側が保持する Parser・Entry・原文等はこの予算の対象外です。
-Java success snapshot の保持と Rust success snapshot の既存2 MiB/16 MiB予算は別契約であり、
-本変更は Java success snapshot まで有界になったとは主張しません。
-この残差は [#652](https://github.com/opaopa6969/unlaxer-parser/issues/652) で別に追跡します。
+success snapshot は [#652 の別予算](success-memo-budget.md) で計数・制限します。
+failure 予算と混同した全process RSSの上限とは説明しません。
 
 ## 観測と検証
 

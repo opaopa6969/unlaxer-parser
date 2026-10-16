@@ -101,6 +101,9 @@ public class TransactionElement implements Serializable{
         }
     }
 
+    /** Count the exact selection snapshot before allocating it for memoization. */
+    public int memoChoiceCount() { return previousChosenParsers == null ? 0 : previousChosenParsers.size(); }
+
     /** Snapshot only selections committed inside this transaction, for safe success replay. */
     public Map<ChoiceInterface, Parser> snapshotChosenParsers(Map<ChoiceInterface, Parser> chosenParsers) {
         if (previousChosenParsers == null) return Map.of();
