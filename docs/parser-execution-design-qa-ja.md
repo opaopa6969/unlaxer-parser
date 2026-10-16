@@ -189,22 +189,22 @@ Classic の速度作業は [第6ラウンドで打ち止め](performance-tuning-
 ### capability と選択規則
 
 capability は文法revision・生成target・出力profileに属する。エンジン名だけから推測しない。
-次の表は必要な証明と現状の境界であり、全文法の互換性宣言ではない。
+次の表は開発版の必要な証明と現状の境界であり、全文法の互換性宣言ではない。公開済み3.3.0の範囲は[品質記録](production-quality.md)で区別する。
 
 | 要求 | Classic Java | Classic Rust | ubnfc Java / Rust を選べる条件 |
 |---|---|---|---|
 | typed AST と元ソース位置 | mapper と owned source map | typed AST と CP span | 同じ文法の独立oracleで全field・元text・CP/UTF-16位置が一致し、明示AST adapterがある |
-| 完全なCST、virtual token、任意metadata | Token木とparser固有契約、任意Object metadataを維持 | owned Treeと明示APIの4種token・portable metadata / 関連IDは実装済み。全combinator/UBNF接続とJava任意Object互換は未完了（[対応範囲](portable-token-metadata.md)） | 完全CSTを持たないので不適格。typed ASTや字句列で代用しない |
-| 動的parser合成、transactional user state、capture/replay | ParseContext上の公開API | 公開ParseContext/combinator。生成replay等の未対応は対応表に残る | parserを純粋と仮定せず、要求した状態の同等性を実証できなければ不適格 |
+| 完全なCST、virtual token、任意metadata | Token木とparser固有契約、任意Object metadataを維持 | owned Tree、4種token、portable metadata / 関連IDと[一般token伝播](classic-token-propagation.md)を提供。Java任意Objectはportable値・host管理IDへ明示変換する（[対応範囲](portable-token-metadata.md)） | 完全CSTを持たないので不適格。typed ASTや字句列で代用しない |
+| 動的parser合成、transactional user state、capture/replay | ParseContext上の公開API | 公開ParseContext/combinator、transactional scope、[生成capture/replay](general-owned-capture-syntax.md)を提供。任意host callbackの状態と副作用は個別に契約化する | parserを純粋と仮定せず、要求した状態の同等性を実証できなければ不適格 |
 | 詳細な失敗診断 | DETAILED / AUTOの既存契約 | Detailed / Autoの既存契約 | 主位置/expectedと全試行履歴は異なる要求。rich診断が必要なら安全な再解析または最初からClassic |
-| trace / LSP / DAP | Java生成・protocol実装の対応範囲 | opt-in生成stdio [LSP](classic-rust-lsp.md)と[DAP typed AST inspection](classic-rust-dap.md)は実装・共通protocol検証済み。token leaf trace・live evaluator制御・Rust下流VSIX起動は未対応 | 別engineのIDE生成をClassic Rust対応と数えず、要求したprotocolをその生成targetで検証する |
-| incremental、memo方針の実行時選択 | 既存Java APIの対応範囲 | incremental未対応、SafeFailuresの既存範囲 | 全文再解析・静的memo選択との違いを要求として扱う |
+| trace / LSP / DAP | Java生成・protocol実装の対応範囲 | opt-in生成stdio [LSP](classic-rust-lsp.md)、[AST/token DAP](classic-rust-dap.md)、[TinyCalc・生成VSIX起動](rust-vscode-launch.md)を共通検証。live evaluator制御と任意下流拡張の互換性は保証しない | 別engineのIDE生成をClassic Rust対応と数えず、要求したprotocolをその生成targetで検証する |
+| incremental、memo方針の実行時選択 | [snapshot/chunk cache](incremental-cache.md)と明示memo設定 | 同じsnapshot/chunk契約と[有限予算のpure success/failure memo](pure-success-memo.md)。編集時は全文解析 | 部分CSTの再配置・接合、文法依存のinvalidation-rangeは両Classicとも未対応。要求する再利用単位を明示する |
 | 未知のcustom parser / provider | 既存rich経路で宣言された契約を使う | 同左。Java任意classの自動翻訳はしない | 副作用・状態依存・再実行安全性が不明なら自動選択しない |
 
 将来の facade の `auto` は、まず要求を列挙し、その全てを満たす検証済み候補だけを残す。
 ASTだけを要求する固定文法で ubnfc と adapter の同値性が確認できれば、その生成経路を候補にする。
 rich capability が必要なら Classic の対象言語へ進む。どの候補も満たさない要求は、理由付きで拒否する。
-たとえば Rust incremental 要求を Classic Rust に切り替えただけで受理しない。
+たとえば部分CSTの編集再接合を要求する場合、snapshot cacheを提供するだけでは受理しない。
 エンジンを明示した場合も同じcapability検査を行い、不足機能を黙って省かない。
 選択理由、文法revision、target、profile、adapter revisionを結果に記録する案とする。
 
