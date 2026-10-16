@@ -183,6 +183,8 @@ Classic Identifier, Number, and quoted tokens now [isolate their internal lexica
 
 [Classic sequence trivia](docs/classic-sequence-trivia.md) now contributes the same collected source and code-point ranges in Java and Rust, including explicit Classic CST-to-AST mapping. The four token kinds retain their distinct source projection semantics.
 
+[Explicit nested capture boundaries](docs/nested-capture-boundaries.md) preserve missing optionals, present empty lists, order, duplicates, and owned source snapshots in both runtimes. This runtime API is a development addition; generated nested field types and mappers remain tracked in [#583](https://github.com/opaopa6969/unlaxer-parser/issues/583).
+
 Downstream `tinyexpression-rs` and `rustcodeblock` AOT exist on the separate **ubnfc** engine. Their results do not establish Classic Rust parity or production deployment history. See the [engine guide](docs/engine-selection-guide-ja.md) and [pinned downstream audit](rust/FULL-SPEC.md#下流tinyexpressionの現状監査2026-09-30).
 
 ---
