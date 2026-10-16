@@ -1,0 +1,122 @@
+[
+  {
+    "name": "missing",
+    "grammar": "grammar Invalid {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(text,maybe,many,mode)\n Root ::= A | B;\n @enum Mode ::= 'on' | 'off';\n @mapping(A, params=[text,maybe,many,mode])\n A ::= 'a' '😀' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n @mapping(B, params=[maybe,many,mode])\n B ::= 'b' 'é' '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n}",
+    "error": {
+      "code": "P-COMMONFIELD",
+      "rule": "Root",
+      "span": [
+        61,
+        133
+      ]
+    }
+  },
+  {
+    "name": "cardinality",
+    "grammar": "grammar Invalid {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(text,maybe,many,mode)\n Root ::= A | B;\n @enum Mode ::= 'on' | 'off';\n @mapping(A, params=[text,maybe,many,mode])\n A ::= 'a' '😀' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n @mapping(B, params=[text,maybe,many,mode])\n B ::= 'b' 'é' @text '[' 'x' @maybe ']' '{' { 'z' @many } '}' Mode @mode;\n}",
+    "error": {
+      "code": "P-COMMONFIELD",
+      "rule": "Root",
+      "span": [
+        61,
+        133
+      ]
+    }
+  },
+  {
+    "name": "enum-type",
+    "grammar": "grammar Invalid {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(text,maybe,many,mode)\n Root ::= A | B;\n @enum Mode ::= 'on' | 'off';\n @mapping(A, params=[text,maybe,many,mode])\n A ::= 'a' '😀' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n @mapping(B, params=[text,maybe,many,mode])\n B ::= 'b' Mode @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n}",
+    "error": {
+      "code": "P-COMMONFIELD",
+      "rule": "Root",
+      "span": [
+        61,
+        133
+      ]
+    }
+  },
+  {
+    "name": "duplicate",
+    "grammar": "grammar Invalid {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(text,text)\n Root ::= A | B;\n @enum Mode ::= 'on' | 'off';\n @mapping(A, params=[text,maybe,many,mode])\n A ::= 'a' '😀' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n @mapping(B, params=[text,maybe,many,mode])\n B ::= 'b' 'é' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n}",
+    "error": {
+      "code": "P-COMMONFIELD",
+      "rule": "Root",
+      "span": [
+        61,
+        122
+      ]
+    }
+  },
+  {
+    "name": "not-sum",
+    "grammar": "grammar Invalid {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(text,maybe,many,mode)\n Root ::= 'prefix' A;\n @enum Mode ::= 'on' | 'off';\n @mapping(A, params=[text,maybe,many,mode])\n A ::= 'a' '😀' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n @mapping(B, params=[text,maybe,many,mode])\n B ::= 'b' 'é' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n}",
+    "error": {
+      "code": "P-COMMONFIELD",
+      "rule": "Root",
+      "span": [
+        61,
+        138
+      ]
+    }
+  },
+  {
+    "name": "numeric-type",
+    "grammar": "grammar Numeric {\n @package: commonprobe\n token NUMBER = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Node) @commonField(value)\n Root ::= A | B;\n @mapping(A,params=[value]) A ::= 'a' NUMBER @value;\n @mapping(B,params=[value]) B ::= 'b' 'word' @value;\n}",
+    "error": {
+      "code": "P-COMMONFIELD",
+      "rule": "Root",
+      "span": [
+        101,
+        158
+      ]
+    }
+  },
+  {
+    "name": "view-collision",
+    "grammar": "grammar Flat {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(text,maybe,many,mode)\n Root ::= A | B;\n @mapping(NodeFields) Extra ::= 'q';\n @enum Mode ::= 'on' | 'off';\n @mapping(A, params=[text,maybe,many,mode])\n A ::= 'a' '😀' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n @mapping(B, params=[text,maybe,many,mode])\n B ::= 'b' 'é' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n}",
+    "error": {
+      "code": "P-COMMONFIELD",
+      "rule": "Root",
+      "span": [
+        58,
+        130
+      ]
+    }
+  },
+  {
+    "name": "duplicate-family",
+    "grammar": "grammar Flat {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(text,maybe,many,mode)\n Root ::= A | B;\n @mapping(Node) @commonField(text) Extra ::= A | B;\n @enum Mode ::= 'on' | 'off';\n @mapping(A, params=[text,maybe,many,mode])\n A ::= 'a' '😀' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n @mapping(B, params=[text,maybe,many,mode])\n B ::= 'b' 'é' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n}",
+    "error": {
+      "code": "P-COMMONFIELD",
+      "rule": "Extra",
+      "span": [
+        132,
+        182
+      ]
+    }
+  },
+  {
+    "name": "reserved-field",
+    "grammar": "grammar Flat {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(hashCode,maybe,many,mode)\n Root ::= A | B;\n @enum Mode ::= 'on' | 'off';\n @mapping(A, params=[hashCode,maybe,many,mode])\n A ::= 'a' '😀' @hashCode '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n @mapping(B, params=[hashCode,maybe,many,mode])\n B ::= 'b' 'é' @hashCode '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n}",
+    "error": {
+      "code": "P-COMMONFIELD",
+      "rule": "Root",
+      "span": [
+        58,
+        134
+      ]
+    }
+  },
+  {
+    "name": "normalized-collision",
+    "grammar": "grammar Dotted {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(text,maybe,many,mode)\n Root ::= A | B;\n @mapping(Node__A) Extra ::= 'q';\n @enum Mode ::= 'on' | 'off';\n @mapping(Node.A, params=[text,maybe,many,mode])\n A ::= 'a' '😀' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n @mapping(Node.B, params=[text,maybe,many,mode])\n B ::= 'b' 'é' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n}",
+    "error": {
+      "code": "P-COMMONFIELD",
+      "rule": "A",
+      "span": [
+        198,
+        323
+      ]
+    }
+  }
+]

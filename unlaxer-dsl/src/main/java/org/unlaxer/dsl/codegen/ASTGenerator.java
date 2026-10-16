@@ -65,6 +65,7 @@ public class ASTGenerator implements CodeGenerator {
     @Override
     public GeneratedSource generate(GrammarDecl grammar) {
         EnumSchema.validate(grammar);
+        CommonFieldSchema.build(grammar);
         var enumRoots = EnumSchema.rootEnums(grammar);
         String packageName = getPackageName(grammar);
         String grammarName = grammar.name();
@@ -268,6 +269,9 @@ public class ASTGenerator implements CodeGenerator {
         sb.append("    sealed interface ").append(outerName)
           .append(" extends ").append(astClassName).append(" permits\n")
           .append("        ").append(innerPermits).append(" {\n\n");
+        for(var family:CommonFieldSchema.build(grammar)) if(family.name().equals(outerName))
+            for(var field:family.fields()) sb.append("        ").append(field.javaType()).append(" ")
+                .append(field.name()).append("();\n");
         for (Map.Entry<String, RuleDecl> entry : inners.entrySet()) {
             String recordName = entry.getKey();
             RuleDecl rule = entry.getValue();
@@ -283,17 +287,8 @@ public class ASTGenerator implements CodeGenerator {
             throw new IllegalStateException("Mapped sum has no permitted types: " + midSealedName);
         }
         String permitsList = permits.stream().collect(Collectors.joining(",\n        "));
-        // @commonField アノテーションで abstract method を生成
-        List<String> commonFields = grammar.rules().stream()
-            .filter(r -> {
-                MappingAnnotation m = getMappingAnnotation(r).orElse(null);
-                return m != null && m.className().equals(midSealedName);
-            })
-            .flatMap(r -> r.annotations().stream())
-            .filter(a -> a instanceof UBNFAST.CommonFieldAnnotation)
-            .flatMap(a -> ((UBNFAST.CommonFieldAnnotation) a).fieldNames().stream())
-            .distinct()
-            .toList();
+        var commonFields = CommonFieldSchema.build(grammar).stream().filter(f -> f.name().equals(midSealedName))
+            .flatMap(f -> f.fields().stream()).toList();
 
         sb.append("    sealed interface ").append(midSealedName)
           .append(" extends ").append(parentTypes).append(" permits\n")
@@ -302,9 +297,9 @@ public class ASTGenerator implements CodeGenerator {
             sb.append("}\n\n");
         } else {
             sb.append("\n");
-            for (String field : commonFields) {
-                String type = inferCommonFieldType(grammar, midSealedName, field, astClassName);
-                sb.append("        ").append(type).append(" ").append(field).append("();\n");
+            for (var field : commonFields) {
+                String type = field.javaType();
+                sb.append("        ").append(type).append(" ").append(field.name()).append("();\n");
             }
             sb.append("    }\n\n");
         }
@@ -337,20 +332,6 @@ public class ASTGenerator implements CodeGenerator {
     private static String javaString(String value) {
         return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"")
             .replace("\r", "\\r").replace("\n", "\\n").replace("\t", "\\t") + "\"";
-    }
-
-    private String inferCommonFieldType(GrammarDecl grammar, String sealedName,
-            String fieldName, String astClassName) {
-        // 最初の permit ルールで型を推論
-        return grammar.rules().stream()
-            .filter(r -> {
-                MappingAnnotation m = getMappingAnnotation(r).orElse(null);
-                return m != null && m.className().startsWith(sealedName + ".");
-            })
-            .map(r -> inferType(grammar, r, fieldName))
-            .filter(t -> !"Object".equals(t))
-            .findFirst()
-            .orElse("String");
     }
 
     // =========================================================================
