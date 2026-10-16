@@ -7,6 +7,43 @@ use unlaxer_generator::impact::{compare, Location};
 const BASE: &str = "grammar G { @root @mapping(Value,params=[value]) Root ::= 'x' @value; }";
 static NEXT: AtomicUsize = AtomicUsize::new(0);
 
+#[test]
+fn shared_corpus_preserves_rust_method_identity_and_reports() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../spec-corpus/api-impact");
+    let corpus: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(root.join("cases.json")).unwrap()).unwrap();
+    for case in corpus.as_array().unwrap() {
+        let before = fs::read_to_string(root.join(case["before"].as_str().unwrap())).unwrap();
+        let after = fs::read_to_string(root.join(case["after"].as_str().unwrap())).unwrap();
+        let report = compare(&before, &after);
+        assert!(report.ok, "{}: {:?}", case["name"], report.diagnostics);
+        let changes: Vec<_> = report
+            .changes
+            .iter()
+            .map(|change| format!("{}:{}", change.kind, change.subject))
+            .collect();
+        let expected: Vec<_> = case["rustChanges"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|change| change.as_str().unwrap().to_owned())
+            .collect();
+        assert_eq!(expected, changes, "{}", case["name"]);
+    }
+}
+
+#[test]
+fn rust_rejects_duplicate_names_instead_of_treating_them_as_overloads() {
+    let source = include_str!("../../../spec-corpus/api-impact/rust-name-collision.ubnf");
+    let report = compare(source, source);
+    assert!(!report.ok && !report.has_changes);
+    assert_eq!(2, report.diagnostics.len());
+    assert!(report
+        .diagnostics
+        .iter()
+        .all(|diagnostic| diagnostic.code == "I-SCHEMA"));
+}
+
 struct Directory(PathBuf);
 impl Directory {
     fn new() -> Self {
