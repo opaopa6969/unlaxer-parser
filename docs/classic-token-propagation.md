@@ -60,7 +60,9 @@ or empty word still fails under inversion. Number, ASCII identifier and quoted
 parsers propagate through their leaf graph. Quote delimiters explicitly use
 `Consumed` and inversion false, as Java's `ParserWrapper` does. Consequently a
 match-only quoted parser can consume delimiters; it is not a scanner followed
-by a rewind. `Expr::character(label, fn(char) -> bool)` provides a mode-aware
+by a rewind. Built-in Number/Identifier/Quoted leaf graphs isolate outer whitespace and
+declarative trivia; see the [atomic lexical boundary contract](classic-atomic-trivia.md).
+`Expr::character(label, fn(char) -> bool)` provides a mode-aware
 terminal for custom predicates. Its FIRST/memo/deferred-diagnostic analysis is
 conservative because the callback can read external state.
 

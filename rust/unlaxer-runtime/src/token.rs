@@ -570,10 +570,16 @@ impl ParseContext<'_> {
     }
     pub(crate) fn classic_atom(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
         match expression {
-            Expr::Number => return self.expression(classic_number(), depth),
-            Expr::Identifier => return self.expression(classic_identifier(), depth),
+            // Java's internal token Chain has no grammar delimiter. Its leaves
+            // must never inherit the surrounding sequence's trivia policy.
+            Expr::Number => {
+                return self.with_trivia(false, |c| c.expression(classic_number(), depth))
+            }
+            Expr::Identifier => {
+                return self.with_trivia(false, |c| c.expression(classic_identifier(), depth))
+            }
             Expr::Quoted(quote) if matches!(quote, '\'' | '"') => {
-                return self.expression(classic_quoted(*quote), depth)
+                return self.with_trivia(false, |c| c.expression(classic_quoted(*quote), depth))
             }
             Expr::JavaEmpty => {
                 return self
@@ -1232,4 +1238,40 @@ fn classic_quoted(quote: char) -> &'static Expr {
             fixed,
         ])
     })
+}
+
+#[cfg(test)]
+mod atomic_trivia_tests {
+    use super::*;
+    #[test]
+    fn lexical_scope_restores_parent_policy_when_internal_frame_hits_resource_limit() {
+        for expression in [
+            Expr::Number,
+            Expr::Identifier,
+            Expr::Quoted('\''),
+            Expr::Quoted('"'),
+        ] {
+            let mut context = ParseContext::new("A B");
+            context.whitespace = true;
+            let definition = crate::lexical::LexicalExpression {
+                op: crate::lexical::Op::LITERAL,
+                text: " ",
+                min: 0,
+                max: 0,
+                children: vec![],
+            };
+            context.lexical_trivia = Some(definition.clone());
+            // The outer token enters, then its internal graph exhausts the shared budget.
+            context.expression_depth = 1023;
+            assert!(context
+                .parse_with_token_mode(&expression, TokenKind::Consumed, false)
+                .is_err());
+            assert!(context.resource_failure.is_some());
+            assert!(context.whitespace);
+            assert_eq!(context.lexical_trivia, Some(definition));
+            assert_eq!(context.expression_depth, 1023);
+            assert_eq!((context.position(), context.matched_position()), (0, 0));
+            assert!(context.token_mode.is_none());
+        }
+    }
 }

@@ -105,6 +105,10 @@ public class GeneralTokenPropagationTest {
             case "identifier" -> new IdentifierParser();
             case "match-identifier" -> match(new IdentifierParser());
             case "match-quoted" -> match(new SingleQuotedParser());
+            case "quoted" -> new SingleQuotedParser();
+            case "double-quoted" -> new org.unlaxer.parser.elementary.DoubleQuotedParser();
+            case "stop-invert-identifier" -> new InvertMatchPropagationStopper(new IdentifierParser());
+            case "stop-consume-number" -> consume(new NumberParser());
             case "optional-a" -> new org.unlaxer.parser.combinator.Optional(word("a"));
             case "match-optional-a" -> match(new org.unlaxer.parser.combinator.Optional(word("a")));
             case "repeat-a" -> new ZeroOrMore(word("a"));
@@ -138,7 +142,8 @@ public class GeneralTokenPropagationTest {
         return token.parser instanceof WordParser
                 || token.parser instanceof NumberParser
                 || token.parser instanceof IdentifierParser
-                || token.parser instanceof SingleQuotedParser;
+                || token.parser instanceof SingleQuotedParser
+                || token.parser instanceof org.unlaxer.parser.elementary.DoubleQuotedParser;
     }
 
     private static void leaves(Token token, List<Token> target) {
@@ -153,6 +158,17 @@ public class GeneralTokenPropagationTest {
                         .filter(line -> !line.startsWith("#") && !line.isBlank())
                         .toList();
         assertEquals(166, rows.size());
+        verifyOracle(rows);
+    }
+
+    @Test public void atomicTriviaOraclePreservesLexicalSourceAndCursors() throws Exception {
+        var rows = Files.readAllLines(Path.of("../conformance/token-propagation/atomic-trivia.tsv")).stream()
+                .filter(line -> !line.startsWith("#") && !line.isBlank()).toList();
+        assertEquals(52, rows.size());
+        verifyOracle(rows);
+    }
+
+    private void verifyOracle(List<String> rows) {
         var failures = new ArrayList<String>();
         for (Memoization memo : Memoization.values()) {
             for (ParseOptions.Diagnostics diagnostics : ParseOptions.Diagnostics.values()) {
