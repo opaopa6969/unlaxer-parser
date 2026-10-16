@@ -18,6 +18,8 @@ The development UBNF VSIX includes an in-editor [beginner catalog/help](unlaxer-
 Generate a self-contained [language playground from UBNF](docs/ubnf-playground-ja.md), including UBNF's own meta-grammar.
 Try UBNF grammar syntax, AST and CST in the [online UBNF playground](https://opaopa6969.github.io/unlaxer-parser/ubnf/).
 
+**Java / Rust support.** Includes a native Rust UBNF generator, runtime, and LSP / DAP. See [support and production readiness](#java--rust-support-and-quality).
+
 **Write a grammar, get a language — Parser + AST + Evaluator + LSP + DAP, all generated**
 
 [![Maven Central](https://img.shields.io/maven-central/v/org.unlaxer/unlaxer-common)](https://central.sonatype.com/artifact/org.unlaxer/unlaxer-common)
@@ -33,12 +35,11 @@ Try UBNF grammar syntax, AST and CST in the [online UBNF playground](https://opa
 
 ## Table of Contents
 
-Experimental: [Rust code-generation backend](rust/README.md) (parser, typed AST, mapper, evaluator; not a full Java port).
-
 - [The Problem](#the-problem)
 - [The Solution](#the-solution)
 - [Quick Example](#quick-example)
 - [What Gets Generated](#what-gets-generated)
+- [Java / Rust Support and Quality](#java--rust-support-and-quality)
 - [5-Minute Quick Start](#5-minute-quick-start)
 - [Architecture](#architecture)
 - [Bootstrap and Self-Hosting](#bootstrap-and-self-hosting)
@@ -93,7 +94,7 @@ flowchart TD
     DSL --> DAP
 ```
 
-You write **only** the evaluation logic — typically 50–200 lines of `evalXxx` methods.
+Implement evaluation in the `evalXxx` methods. Typed completion, external-language integration, and runtime debugging also need application providers or hooks. The generation examples below target Java.
 
 ---
 
@@ -104,10 +105,12 @@ Here is a fragment from the [tinyexpression](https://github.com/opaopa6969/tinye
 ```ubnf
 @mapping(BinaryExpr, params=[left, op, right])
 @leftAssoc
+@precedence(level=1)
 NumberExpression ::= NumberTerm @left { AddOp @op NumberTerm @right } ;
 
 @mapping(BinaryExpr, params=[left, op, right])
 @leftAssoc
+@precedence(level=2)
 NumberTerm ::= NumberFactor @left { MulOp @op NumberFactor @right } ;
 
 AddOp ::= '+' | '-' ;
@@ -118,7 +121,7 @@ From this, unlaxer generates:
 
 - A **parser** that handles operator precedence and left-associativity correctly
 - A **`BinaryExpr` AST record** with typed `left`, `op`, `right` fields
-- A **mapper** that transforms the flat parse tree into a nested AST
+- A **mapper** that preserves a scalar `left` and ordered `op` / `right` lists; the evaluator folds these lists from the left
 - An **`evalBinaryExpr`** hook in the evaluator skeleton
 
 ---
@@ -130,11 +133,33 @@ From this, unlaxer generates:
 | Grammar rules (`::=`) | Parser combinators (`Parsers.java`) |
 | `@mapping` annotations | AST sealed interfaces + records (`AST.java`) |
 | `@left`, `@right`, `@op` captures | Parse-tree-to-AST mapper (`Mapper.java`) |
-| `@leftAssoc` / `@rightAssoc` | Correct associativity handling |
+| `@leftAssoc` / `@rightAssoc` | Associativity structure (left fold in user evaluation) |
 | `@root` | Entry point parser |
 | (your grammar) | Evaluator skeleton with `evalXxx` hooks (`Evaluator.java`) |
 | (your grammar) | LSP server (completion, diagnostics, hover) |
 | (your grammar) | DAP server (breakpoints, stepping, variables) |
+
+---
+
+## Java / Rust Support and Quality
+
+This repository provides Java and Rust implementations of **unlaxer Classic**, the stateful combinator runtime. The table describes development **3.3.0-SNAPSHOT**; distinguish these additions from the published Maven 3.2.0 release.
+
+| Area | Java | Rust Classic |
+|---|---|---|
+| UBNF generation | `CodegenMain` / Maven | Native `unlaxer generate`, or Java-hosted `generate --target rust` |
+| Generated code | Parser, record AST, mapper, evaluator | Parser, enum AST, mapper, `Semantics` trait; five modules by default |
+| Execution | JVM 21, or separate JVM 17 artifacts | Native / WASM; native execution needs no JVM |
+| IDE | Generated LSP / DAP and extension hooks | Opt-in `--lsp` / `--dap`: stdio LSP and AST / token inspection |
+| Distribution | Stable Maven Central artifacts | Repository path dependencies and Linux x86_64 CI artifacts; crates use `publish = false` |
+
+**Rust now has tested generation, execution, and IDE protocols. The evidence does not yet justify an unconditional production-ready claim for the entire Rust implementation.** Evaluate production use within the documented scope against your grammar, workload, and deployment environment. Publication on crates.io and implementation quality are separate questions.
+
+The evidence includes [CI](.github/workflows/maven.yml) on Rust 1.85 with Cargo test / fmt / Clippy, shared Java/Rust acceptance, rejection, AST and source-position corpora, Java-host/native generator agreement, actual stdio LSP/DAP exchanges, and release-binary smoke tests. Plain `mvn test` skips Rust conformance; enable `-DrustConformance=true` to reproduce it. Commands are in the [Rust README](rust/README.md).
+
+See the [full-spec matrix](rust/FULL-SPEC.md) and [IDE inventory](docs/lsp-dap-ide-gap-inventory.md) for remaining limits: Rust incremental parsing, LSP cancellation / semantic tokens / rename and formatting transport, and some tokens and annotations are unsupported. DAP implements AST/token stepping, not live evaluator suspension. Numeric capture types/conversion and some diagnostics also differ between Java and Rust; compatibility with every Java grammar is not guaranteed.
+
+Downstream `tinyexpression-rs` and `rustcodeblock` AOT exist on the separate **ubnfc** engine. Their results do not establish Classic Rust parity or production deployment history. See the [engine guide](docs/engine-selection-guide-ja.md) and [pinned downstream audit](rust/FULL-SPEC.md#下流tinyexpressionの現状監査2026-09-30).
 
 ---
 
@@ -185,22 +210,29 @@ Create `src/main/resources/TinyCalc.ubnf`:
 ```ubnf
 grammar TinyCalc {
   @package: com.example.tinycalc
+  @whitespace: javaStyle
 
-  token NUMBER = NumberParser
-  token EOF    = EndOfSourceParser
+  token NUMBER = org.unlaxer.parser.elementary.NumberParser
+  token EOF    = org.unlaxer.parser.elementary.EndOfSourceParser
 
   @root
   Formula ::= Expression EOF ;
 
   @mapping(BinaryExpr, params=[left, op, right])
   @leftAssoc
+  @precedence(level=1)
   Expression ::= Term @left { AddOp @op Term @right } ;
 
   @mapping(BinaryExpr, params=[left, op, right])
   @leftAssoc
+  @precedence(level=2)
   Term ::= Factor @left { MulOp @op Factor @right } ;
 
-  Factor ::= NUMBER | '(' Expression ')' ;
+  Factor ::= Literal | '(' Expression ')' ;
+
+  @mapping(NumberLiteral, params=[value])
+  Literal ::= Digits @value ;
+  Digits ::= NUMBER ;
 
   AddOp ::= '+' | '-' ;
   MulOp ::= '*' | '/' ;
@@ -210,29 +242,64 @@ grammar TinyCalc {
 ### 3. Add the code generator plugin
 
 ```xml
-<plugin>
-    <groupId>org.codehaus.mojo</groupId>
-    <artifactId>exec-maven-plugin</artifactId>
-    <version>3.1.0</version>
-    <executions>
-        <execution>
-            <phase>generate-sources</phase>
-            <goals><goal>java</goal></goals>
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>exec-maven-plugin</artifactId>
+            <version>3.1.0</version>
+            <executions>
+                <execution>
+                    <phase>generate-sources</phase>
+                    <goals>
+                        <goal>java</goal>
+                    </goals>
+                    <configuration>
+                        <mainClass>org.unlaxer.dsl.CodegenMain</mainClass>
+                        <arguments>
+                            <argument>--grammar</argument>
+                            <argument>${project.basedir}/src/main/resources/TinyCalc.ubnf</argument>
+                            <argument>--output</argument>
+                            <argument>${project.build.directory}/generated-sources/ubnf</argument>
+                            <argument>--generators</argument>
+                            <argument>AST,Parser,Mapper,Evaluator</argument>
+                        </arguments>
+                    </configuration>
+                </execution>
+            </executions>
+        </plugin>
+        <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>build-helper-maven-plugin</artifactId>
+            <version>3.5.0</version>
+            <executions>
+                <execution>
+                    <id>add-generated-sources</id>
+                    <phase>generate-sources</phase>
+                    <goals>
+                        <goal>add-source</goal>
+                    </goals>
+                    <configuration>
+                        <sources>
+                            <source>${project.build.directory}/generated-sources/ubnf</source>
+                        </sources>
+                    </configuration>
+                </execution>
+            </executions>
+        </plugin>
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <version>3.13.0</version>
             <configuration>
-                <mainClass>org.unlaxer.dsl.CodegenMain</mainClass>
-                <arguments>
-                    <argument>--grammar</argument>
-                    <argument>${project.basedir}/src/main/resources/TinyCalc.ubnf</argument>
-                    <argument>--output</argument>
-                    <argument>${project.build.directory}/generated-sources/ubnf</argument>
-                    <argument>--generators</argument>
-                    <argument>AST,Parser,Mapper,Evaluator</argument>
-                </arguments>
+                <release>21</release>
             </configuration>
-        </execution>
-    </executions>
-</plugin>
+        </plugin>
+    </plugins>
+</build>
 ```
+
+Add this under `<project>` in `pom.xml`. Registering the generated source root makes `mvn compile` compile the generated code too. For Java 17, also change the compiler `release` to `17`.
 
 ### 4. Generate code
 
@@ -251,24 +318,34 @@ TinyCalcEvaluator.java  -- abstract evaluator with evalXxx hooks
 
 ### 5. Write the evaluator
 
+Create `src/main/java/com/example/tinycalc/CalcEvaluator.java`.
+
 ```java
+package com.example.tinycalc;
+
+import com.example.tinycalc.TinyCalcAST.BinaryExpr;
+import com.example.tinycalc.TinyCalcAST.NumberLiteral;
+
 public class CalcEvaluator extends TinyCalcEvaluator<Double> {
 
     @Override
     protected Double evalBinaryExpr(BinaryExpr node) {
-        Double left = eval(node.left());
-        Double right = eval(node.right());
-        return switch (node.op()) {
-            case "+" -> left + right;
-            case "-" -> left - right;
-            case "*" -> left * right;
-            case "/" -> left / right;
-            default -> throw new IllegalArgumentException("Unknown op: " + node.op());
-        };
+        double result = eval(node.left());
+        for (int i = 0; i < node.op().size(); i++) {
+            double right = eval(node.right().get(i));
+            result = switch (node.op().get(i).strip()) {
+                case "+" -> result + right;
+                case "-" -> result - right;
+                case "*" -> result * right;
+                case "/" -> result / right;
+                default -> throw new IllegalArgumentException("Unknown op: " + node.op().get(i));
+            };
+        }
+        return result;
     }
 
     @Override
-    protected Double evalNumber(NumberLiteral node) {
+    protected Double evalNumberLiteral(NumberLiteral node) {
         return Double.parseDouble(node.value());
     }
 }
@@ -276,10 +353,10 @@ public class CalcEvaluator extends TinyCalcEvaluator<Double> {
 
 ### 6. Run it
 
+Call the mapper from a `main` method in the same package.
+
 ```java
-var parser = new TinyCalcParsers();
-var tree = parser.parse("1 + 2 * 3");
-var ast = new TinyCalcMapper().map(tree);
+var ast = TinyCalcMapper.parse("1 + 2 * 3");
 var result = new CalcEvaluator().eval(ast);
 System.out.println(result);  // 7.0
 ```
@@ -307,11 +384,12 @@ flowchart TD
     Gen --> Parsers
     Gen --> AST
     Gen --> Mapper
-    Parsers --> PT --> AT --> Eval
-    AST --> AT
-    Mapper --> AT
-    Eval --> LSP
-    Eval --> DAP
+    Parsers --> PT --> Mapper --> AT --> Eval
+    AST -.-> AT
+    Parsers --> LSP
+    PT --> DAP
+    AT --> DAP
+    Eval -.-> DAP
 ```
 
 See [docs/architecture.md](./docs/architecture.md) for the full pipeline, combinator catalog, and ParserIR design.
@@ -338,8 +416,8 @@ See [docs/architecture.md — Bootstrap](./docs/architecture.md#bootstrap-and-se
 
 - ~300-line UBNF grammar
 - Variables, functions (`sin`, `cos`, `sqrt`, `min`, `max`), ternary operator, if/else, method declarations
-- Full LSP support (completion, diagnostics, hover, go-to-definition)
-- Full DAP support (breakpoints, stepping, variable inspection)
+- LSP support (completion, diagnostics, hover, go-to-definition)
+- DAP support (breakpoints, stepping, variable inspection)
 - Used in production
 
 ---
@@ -350,7 +428,7 @@ See [docs/architecture.md — Bootstrap](./docs/architecture.md#bootstrap-and-se
 
 | Downstream project | Last validated against | Status |
 |--------------------|----------------------|--------|
-| [tinyexpression](https://github.com/opaopa6969/tinyexpression) | 3.0.4 | Verified; `p4-smoke` (86 tests) + LSP smoke (25 tests) pass ([#28](https://github.com/opaopa6969/unlaxer-parser/issues/28), #38) |
+| [tinyexpression](https://github.com/opaopa6969/tinyexpression) | Current reactor version in CI; historical 3.0.4 | [Downstream CI](.github/workflows/maven.yml) tests a pinned Java downstream against the build under test (`p4-smoke`, mapper and LSP); this does not validate Classic Rust deployment |
 | [onigiri-parser](https://github.com/opaopa6969/onigiri-parser) | 3.0.1 | `mvn compile` success ([#27](https://github.com/opaopa6969/unlaxer-parser/issues/27)) |
 | [fraud-alert](https://github.com/opaopa6969/fraud-alert) | 2.8.0 | Unverified against 3.x |
 
@@ -386,7 +464,7 @@ Public API removals and renames go through at least **one minor version with an 
 
 | | ANTLR | tree-sitter | PEG.js | **unlaxer** |
 |---|---|---|---|---|
-| Language | Java, C#, Python, ... | C + bindings | JavaScript | **Java** |
+| Language | Java, C#, Python, ... | C + bindings | JavaScript | **Java / Rust** |
 | Parser type | ALL(*) | GLR | PEG | **PEG + combinators** |
 | AST generation | Manual | Manual | Manual | **Automatic** (from `@mapping`) |
 | Evaluator skeleton | No | No | No | **Yes** |
@@ -395,9 +473,9 @@ Public API removals and renames go through at least **one minor version with an 
 | Grammar annotations | No | No | No | **Yes** (`@mapping`, `@leftAssoc`, `@eval`, ...) |
 | Operator associativity | In grammar | In grammar | Manual | **`@leftAssoc` / `@rightAssoc`** |
 | Zero dependencies | No | No | No | **Yes** (unlaxer-common) |
-| Bootstrap / self-hosting | No | Yes | No | **Yes** (since 3.0.0) |
+| Bootstrap / self-hosting | No | Yes | No | **Partial** (see bootstrap section) |
 
-unlaxer is designed for Java teams who want to go from grammar to working IDE support with minimal boilerplate.
+unlaxer is designed for Java / Rust teams who want to go from grammar to working IDE support with minimal boilerplate.
 
 ---
 
@@ -409,9 +487,11 @@ unlaxer-parser/
   |     +-- src/          ~50 combinators, ~30 elementary parsers
   |     +-- docs/         Parser fundamentals tutorial
   +-- unlaxer-dsl/        Code generator: UBNF -> Parsers + AST + Mapper + Evaluator + LSP + DAP
-  |     +-- grammar/      ubnf.ubnf (self-hosted grammar definition)
+  |     +-- grammar/      ubnf.ubnf (UBNF grammar definition)
   |     +-- src/          Bootstrap parsers, codegen pipeline, IR
   |     +-- docs/         UBNF tutorials, extension roadmap, ParserIR design
+  +-- rust/               Rust frontend, generator, runtime, LSP / DAP, examples
+  +-- spec-corpus/        Shared Java / Rust fixtures
   +-- docs/               Top-level guides (architecture, UBNF guide, getting started)
 ```
 

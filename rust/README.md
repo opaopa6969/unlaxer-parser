@@ -1,8 +1,10 @@
-# 実験的Rust生成バックエンド
+# Rust Classic — 生成器・runtime・LSP / DAP
 
 Java版を維持しつつ、UBNFからRustのparser・AST・mapper・evaluator dispatchを生成する構成。Java frontend経路に加え、RustだけでUBNF読込・構造検証・5module生成を行うnative generatorも利用できる。独立リリース前のruntimeと生成器は同一repoに置く。crateは`publish = false`で、crates.ioへ公開しない。
 
-最終的なparserバイナリ・`tinyexpression-rs`・`rustcodeblock`への[段階的な設計方針](ROADMAP.md)を参照。tinyexpression本体とRustコードブロック実行はまだ未実装。
+下流には `tinyexpression-rs` と `rustcodeblock` AOT が実装されているが、ubnfc 生成 parser を使う別 engine である。この repository の Classic runtime の全面移植とは区別する。[固定 revision の監査](FULL-SPEC.md#下流tinyexpressionの現状監査2026-09-30)を参照。[ROADMAP](ROADMAP.md) は初期の段階的な設計記録として読む。
+
+品質と本番利用の判断は [トップレベル README](../README-ja.md#java--rust-の対応範囲と品質) にまとめている。対応範囲内の生成・実行・実 protocol は CI で検証する一方、全体を無条件に production-ready とする宣言は行わない。増分解析・一部の IDE transport・文法互換性の残差は下記の対応表に残す。
 
 full-specの進捗は[対応表と受け入れ条件](FULL-SPEC.md)で追跡する。runtimeの機能とUBNFから生成できる機能を区別する。
 
@@ -100,11 +102,13 @@ targetは現在`rust`のみ。fail-firstの構造検証との区別、位置・�
 ### 実行経路
 
 ```text
-UBNF → 既存Java frontend → RustGrammarLowering → GrammarIR → RustBackend
-                                                           ↓
-                                   parser / enum AST / mapper / Semantics trait
-                                                           ↓
-                                             手書きimpl + 小さなRust runtime
+UBNF → Java frontend → RustGrammarLowering → GrammarIR → RustBackend
+     → Rust frontend (unlaxer-ubnf) → native lowering → unlaxer-codegen
+                                                        ↓
+                           parser / enum AST / mapper / Semantics trait
+                                                        ↓
+                                   手書きimpl + unlaxer-runtime
+                           opt-in: LSP / DAP module + transport crate
 ```
 
 `codegen.rust.GrammarIR`は規則・連接・順序付き選択・captureを保持する構造IRであり、既存のmetadata用Parser IRとは別物。既存Java生成器はまだこのIRを使わない。全backend共通IRへの全面移行や、言語非依存性の一般的な証明を済ませたものではない。
@@ -201,7 +205,7 @@ ASCII bitset・非 ASCII フラグ・nullable・unknown・「sequence が先に 
 - `@leftAssoc`の`Left @left { Op @op Right @right }`形と`params=[left, op, right]`、`@precedence(level=N)`。詳細は下記参照。
 - `@rightAssoc`の`Base @left { Op @op Self @right }`形（`Self`は宣言rule自身への直接参照）。同じparamsとprecedenceを用い、右辺を再帰的に生成する。
 - `@whitespace: javaStyle`（ASCII空白、行/ブロックコメント）または`none`。未指定は`none`。rule の `@whitespace` / `@whitespace(javaStyle)` / `@whitespace(none)` と `@interleave(profile=javaStyle|commentsAndSpaces)` による局所設定も生成する。[優先順位・Javaとの共通契約](../docs/rule-trivia.md)を参照。`@package`はRustでは使用しない。
-- `@catalog(context='...')`。解析時には作用せず、rule名・context・local capture名を`parser::CATALOGS`へ保持する。catalogがない文法の出力は変えない。[metadata契約とJava LSPの現状](../docs/catalog-metadata.md)を参照。Rustのcatalog completion/hoverは未実装。
+- `@catalog(context='...')`。解析時には作用せず、rule名・context・local capture名を`parser::CATALOGS`へ保持する。catalogがない文法の出力は変えない。[metadata契約とJava LSPの現状](../docs/catalog-metadata.md)を参照。Rust の typed/provider completion・hover は実装済み。`CATALOGS` から resolver を自動選択する接続は未対応（[対応表](FULL-SPEC.md)）。
 - `@doc('...')`（3.3.0-SNAPSHOT）。rule 名と順序付き説明を `parser::RULE_DOCS` に保持する。認識・AST は変えない。説明がない文法には定数を出力しない。
 - `@skip`。構文・CST・capture・scope/rollback は保持し、その規則と子の AST 投影を省く。明示 capture は text として保持する。[root・型・移行と検証の契約](../docs/skip-ast-projection.md)を参照。
 - `@scopeTree` / `@declares` / `@backref`。scopeのある文法では宣言への参照、ない文法では同一rule内のcapture比較を行う。構文の受理は変えず意味診断を保持する。[capture選択・空text・CP位置・rollbackの契約](../docs/generated-scope-effects.md)を参照。
@@ -258,7 +262,7 @@ Rustの生成ASTはもともとspanを所有するため、別parseや別thread�
 
 `[[ Item ]] @head`など入れ子container全体のcaptureは、`Option<Option<_>>`を失わないよう現時点では明示拒否する。内側の要素に名前を付けるか、各階層をmapped ruleに分ける。再帰的なunmapped ruleの型推論、入れ子container型、全Java capture規則との互換性は今後の作業。scalarからoptionalに変わると手書きSemanticsも型変更が必要になり、古い引数型は`E0053`で検出される。
 
-RustのLSP/DAP、回復・incremental cache、PropagationStopper、Java MatchedTokenParserとの完全互換、tinyexpressionのstring/variable/function-call意味論、proc macroは未実装。Rust製UBNF frontendの構文対応とbackend生成対応は上記のとおり区別する。性能最適化・Java比の速度優位も未評価。文法構造はparseごとに構築し、runtimeのrule呼出深さには256の上限がある。大規模・敵対的入力の資源量保証はない。
+Classic Rust の LSP/DAP、回復、明示的な PropagationStopper 相当 API は実装済み。incremental cache、Java MatchedTokenParser との完全互換、全 combinator への consume/invert 伝播などの残差は [対応表](FULL-SPEC.md) を参照する。TinyExpression の評価意味論は下流 ubnfc 側の実装と区別する。生成文法 graph は `OnceLock<SharedGrammar>` で共有し、runtime の既定 rule 呼出深さ上限は256。[性能測定](../docs/performance-tuning-ja.md)は個々の文法・条件での結果であり、任意入力の速度優位や資源量を保証しない。
 
 ### 公開ParseContextと手書きcombinator
 
@@ -424,4 +428,4 @@ TSVは`unlaxer-dsl/target/`配下で、CI artifact `rust-conformance`にも添�
 文字種境界は既存 token の合成で表せる。実行時辞書には Java と共通の immutable parse bindings を使う。
 [仕様と実行例](../docs/parse-composition.md)を参照。
 
-Classic の opt-in stdio LSP は [利用方法・Java/Rust共通契約](../docs/classic-rust-lsp.md) を参照。`generate --lsp` は通常の5-file契約を保持してLSP moduleを追加する。DAP等の残差は [full-spec対応表](FULL-SPEC.md) に残す。
+Classic の opt-in stdio [LSP](../docs/classic-rust-lsp.md) と [AST / token DAP](../docs/classic-rust-dap.md) を利用できる。`generate --lsp` / `--dap` は通常の5-file出力に各 module を追加し、両指定では7ファイルになる。live evaluator 制御などの残差は [full-spec対応表](FULL-SPEC.md) に残す。
