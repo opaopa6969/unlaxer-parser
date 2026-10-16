@@ -106,6 +106,12 @@ public final class GrammarValidator {
 
     private static List<ValidationIssue> validate(GrammarDecl grammar, boolean resolveParserClasses) {
         List<ValidationIssue> errors = new ArrayList<>();
+        for (TokenDecl token : grammar.tokens()) {
+            if (org.unlaxer.dsl.bootstrap.RegexRetirement.retired(token)) {
+                errors.add(new ValidationIssue(org.unlaxer.dsl.bootstrap.RegexRetirement.CODE,
+                    org.unlaxer.dsl.bootstrap.RegexRetirement.MESSAGE, "Use token NAME ::= expression;", token.name()));
+            }
+        }
         validateScalarRanges(grammar, errors);
         errors.addAll(validateCaseInsensitiveTokens(grammar));
 

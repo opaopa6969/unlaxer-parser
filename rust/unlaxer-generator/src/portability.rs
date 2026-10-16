@@ -75,6 +75,17 @@ fn quote(value: &str) -> String {
 pub fn check(source: &str) -> Report {
     let snapshot = match parse_with_source(source) {
         Ok(snapshot) => snapshot,
+        Err(error) if error.message.starts_with("E-REGEX-RETIRED:") => {
+            return Report {
+                portable: false,
+                structure: "unavailable",
+                diagnostics: vec![Diagnostic {
+                    code: "E-REGEX-RETIRED",
+                    subject: "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)".into(),
+                    span: Some(error.span),
+                }],
+            }
+        }
         Err(_) => {
             return Report {
                 portable: false,

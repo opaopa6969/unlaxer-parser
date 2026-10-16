@@ -53,6 +53,14 @@ struct Shape {
 }
 
 pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
+    for token in &grammar.tokens {
+        if matches!(&token.kind, TokenKind::Regex { .. })
+            || matches!(&token.kind, TokenKind::Simple { parser_class }
+                if parser_class == "RegexTokenParser" || parser_class == "org.unlaxer.dsl.runtime.RegexTokenParser")
+        {
+            return Err("E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)".into());
+        }
+    }
     crate::lexical_contexts::validate(grammar)?;
     let format_two = grammar.settings.iter().any(|setting| {
         setting.key == "ubnf"
