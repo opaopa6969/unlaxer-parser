@@ -138,6 +138,7 @@ fn generate_resolved(
     }
     runtime!("lib.rs");
     runtime!("token.rs");
+    runtime!("capture_tree.rs");
     runtime!("token_trace.rs");
     runtime!("scope.rs");
     runtime!("names.rs");
