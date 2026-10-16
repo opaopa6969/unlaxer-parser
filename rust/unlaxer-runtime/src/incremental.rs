@@ -229,7 +229,6 @@ pub fn grammar_is_snapshot_cacheable(rules: &[crate::Rule]) -> bool {
     let mut pending: Vec<&Expr> = rules.iter().map(|rule| &rule.expression).collect();
     while let Some(expression) = pending.pop() {
         match expression {
-            Expr::Custom(_) | Expr::CustomWith { .. } => return false,
             Expr::Sequence(children)
             | Expr::NonOrdered(children)
             | Expr::Choice(children)
@@ -274,6 +273,9 @@ pub fn grammar_is_snapshot_cacheable(rules: &[crate::Rule]) -> bool {
             | Expr::JavaUntil(_)
             | Expr::Error(_)
             | Expr::Backreference(_) => {}
+            // Custom callbacks and newly added expression kinds require an explicit
+            // cache-safety review; adding a variant must never enable stale reuse.
+            _ => return false,
         }
     }
     true
