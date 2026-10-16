@@ -2470,9 +2470,7 @@ impl<'a> ParseContext<'a> {
             if let Some(diagnostic) = self
                 .failure_memo
                 .probe(position, &key)
-                .filter(|entry| {
-                    self.expression_depth <= entry.memo_expression_depth
-                })
+                .filter(|entry| self.expression_depth <= entry.memo_expression_depth)
                 .cloned()
             {
                 self.memoized_failure_hits += 1;
