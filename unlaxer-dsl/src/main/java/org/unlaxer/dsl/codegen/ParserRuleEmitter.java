@@ -1001,7 +1001,13 @@ class ParserRuleEmitter {
         if (element instanceof RepeatElement e) return new ElementModel.Boundary("LIST",new ElementModel.ZeroOrMoreOf(nestedBody(ctx,ruleName,e.body(),element)));
         if (element instanceof OneOrMoreElement e) return new ElementModel.Boundary("LIST",new ElementModel.OneOrMoreOf(resolveNested(ctx,ruleName,e.body())));
         if (element instanceof BoundedRepeatElement e) return new ElementModel.Boundary("LIST",new ElementModel.BoundedRepeatOf(resolveNested(ctx,ruleName,e.body()),Integer.toString(e.min()),e.max()==BoundedRepeatElement.UNBOUNDED?"Integer.MAX_VALUE":Integer.toString(e.max())));
-        if (element instanceof GroupElement e) return nestedBody(ctx,ruleName,e.body(),element);
+        if (element instanceof TransparentElement e) {
+            var boundary=(ElementModel.Boundary)nestedBody(ctx,ruleName,e.body(),element);
+            ElementModel child=boundary.inner();
+            if (element instanceof OwnedCaptureElement capture) child=new ElementModel.OwnedCapture(capture.name(),child);
+            else if (element instanceof CaptureScopeElement) child=new ElementModel.CaptureScope(child);
+            return new ElementModel.Boundary(boundary.kind(),child);
+        }
         var plain=resolveFlatElement(ctx,ruleName,element);
         if (plain instanceof ElementModel.Captured c) plain=c.inner();
         return new ElementModel.Boundary("VALUE",plain);
@@ -1176,7 +1182,7 @@ class ParserRuleEmitter {
         if (model instanceof ElementModel.BoundedRepeatOf m) {
             return "new Repeat(" + renderInner(m.inner(), adapterShadowsWordParser, tokenStream) + ", " + m.min() + ", " + m.max() + ")";
         }
-        if (model instanceof ElementModel.Boundary m) return "org.unlaxer.parser.combinator.CaptureBoundaryParser.wrap(org.unlaxer.parser.combinator.CaptureBoundaryParser.Kind."+m.kind()+", "+renderElement(m.inner(),adapterShadowsWordParser,tokenStream)+")";
+        if (model instanceof ElementModel.Boundary m) return "org.unlaxer.parser.combinator.CaptureBoundaryParser.input(org.unlaxer.parser.combinator.CaptureBoundaryParser.Kind."+m.kind()+", "+renderElement(m.inner(),adapterShadowsWordParser,tokenStream)+")";
         if (model instanceof ElementModel.OwnedCapture m) {
             return "new org.unlaxer.parser.combinator.NamedCapture(\"" + ParserCodegenUtil.escapeString(m.name())
                 + "\", " + renderElement(m.inner(), adapterShadowsWordParser, tokenStream) + ")";

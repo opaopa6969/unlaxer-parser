@@ -88,5 +88,17 @@
     "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @nestedCaptures @mapping(Root, params=[value]) Root ::= [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[ 'a' ]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]] @value; }",
     "startCP": 56,
     "endCP": 211
+  },
+  {
+    "id": "deep-owned-scope",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE(CAPTURE_SCOPE('a'))))))))))))))))))))))))))))))))) @value; }",
+    "startCP": 55,
+    "endCP": 622
+  },
+  {
+    "id": "owned-inner-capture",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= CAPTURE_SCOPE({ 'a' @value }); }",
+    "startCP": 55,
+    "endCP": 146
   }
 ]

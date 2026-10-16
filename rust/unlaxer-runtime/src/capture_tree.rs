@@ -29,7 +29,10 @@ impl Expr {
         Self::CaptureBoundary(Kind::Value, Box::new(self))
     }
     fn capture_item(self) -> Self {
-        if matches!(self, Self::CaptureBoundary(_, _)) {
+        if matches!(
+            self,
+            Self::CaptureBoundary(_, _) | Self::InputCaptureBoundary(_, _)
+        ) {
             self
         } else {
             self.capture_value()

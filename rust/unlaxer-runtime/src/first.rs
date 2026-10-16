@@ -204,6 +204,7 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
         | Expr::Capture(_, child)
         | Expr::TextValue(child)
         | Expr::CaptureBoundary(_, child)
+        | Expr::InputCaptureBoundary(_, child)
         | Expr::ValueBoundary(child)
         | Expr::RuleEffects { child, .. }
         | Expr::CaptureEquality { child, .. } => of(child, rules),

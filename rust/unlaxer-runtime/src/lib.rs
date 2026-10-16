@@ -152,6 +152,8 @@ pub enum Expr {
     ValueBoundary(Box<Expr>),
     /// Explicit nested capture CST boundary; existing flat Capture remains unchanged.
     CaptureBoundary(capture_tree::Kind, Box<Expr>),
+    /// AST field boundary: validate input provenance before Classic collection.
+    InputCaptureBoundary(capture_tree::Kind, Box<Expr>),
     /// Apply rule-local symbol effects to this child's captures after a successful parse.
     RuleEffects {
         child: Box<Expr>,
@@ -2806,6 +2808,7 @@ impl<'a> ParseContext<'a> {
                 | Expr::CodeStart
                 | Expr::CodeEnd
                 | Expr::CaptureBoundary(_, _)
+                | Expr::InputCaptureBoundary(_, _)
         ) {
             self.match_cursor_policy.reset = false;
         }
@@ -2916,9 +2919,10 @@ impl<'a> ParseContext<'a> {
             Expr::CaptureScope(child) => self.expression_capture_scope(child, depth),
             Expr::RuleEffects { .. } => self.expression_rule_effects(expression, depth),
             Expr::CaptureEquality { .. } => self.expression_capture_equality(expression, depth),
-            Expr::TextValue(_) | Expr::ValueBoundary(_) | Expr::CaptureBoundary(_, _) => {
-                self.expression_value_boundary(expression, depth)
-            }
+            Expr::TextValue(_)
+            | Expr::ValueBoundary(_)
+            | Expr::CaptureBoundary(_, _)
+            | Expr::InputCaptureBoundary(_, _) => self.expression_value_boundary(expression, depth),
             Expr::Character { .. } => self.classic_atom(expression, depth),
             _ if self.token_mode.is_some() => self.classic_atom(expression, depth),
             _ => self.expression_inner(expression, depth),
@@ -3011,6 +3015,7 @@ impl<'a> ParseContext<'a> {
                         || matches!(
                             expression,
                             Expr::CaptureBoundary(_, _)
+                                | Expr::InputCaptureBoundary(_, _)
                                 | Expr::Rule(_)
                                 | Expr::MatchOnly(_)
                                 | Expr::InvertMatch(_)
@@ -3033,6 +3038,7 @@ impl<'a> ParseContext<'a> {
                     || matches!(
                         expression,
                         Expr::CaptureBoundary(_, _)
+                            | Expr::InputCaptureBoundary(_, _)
                             | Expr::MatchOnly(_)
                             | Expr::InvertMatch(_)
                             | Expr::Rule(_)
@@ -3494,7 +3500,10 @@ impl<'a> ParseContext<'a> {
             | Expr::TriviaScope { .. } => {
                 unreachable!("trivia scopes are dispatched by expression")
             }
-            Expr::TextValue(_) | Expr::ValueBoundary(_) | Expr::CaptureBoundary(_, _) => {
+            Expr::TextValue(_)
+            | Expr::ValueBoundary(_)
+            | Expr::CaptureBoundary(_, _)
+            | Expr::InputCaptureBoundary(_, _) => {
                 unreachable!("recursive expression dispatched by expression")
             }
         }
@@ -4001,10 +4010,22 @@ impl<'a> ParseContext<'a> {
         match expression {
             Expr::TextValue(child)
             | Expr::ValueBoundary(child)
-            | Expr::CaptureBoundary(_, child) => {
+            | Expr::CaptureBoundary(_, child)
+            | Expr::InputCaptureBoundary(_, child) => {
                 let start = self.position;
                 let fragment = self.expression(child, depth)?;
-                if let Expr::CaptureBoundary(kind, _) = expression {
+                if matches!(expression, Expr::InputCaptureBoundary(_, _))
+                    && fragment
+                        .source
+                        .as_deref()
+                        .is_some_and(|source| source.text.is_some() || source.generated)
+                {
+                    self.fail("AST field capture requires original input source; use capture_owned for general replay");
+                    return None;
+                }
+                if let Expr::CaptureBoundary(kind, _) | Expr::InputCaptureBoundary(kind, _) =
+                    expression
+                {
                     if self.token_mode.is_some() {
                         let fragment = self.classic_meta_node(
                             fragment,
@@ -4017,7 +4038,9 @@ impl<'a> ParseContext<'a> {
                 }
                 let node_id = self.nodes.len();
                 self.nodes.push(Node {
-                    rule: if let Expr::CaptureBoundary(kind, _) = expression {
+                    rule: if let Expr::CaptureBoundary(kind, _)
+                    | Expr::InputCaptureBoundary(kind, _) = expression
+                    {
                         kind.rule()
                     } else if matches!(expression, Expr::TextValue(_)) {
                         TEXT_VALUE_RULE
@@ -4485,6 +4508,7 @@ impl<'a> ParseContext<'a> {
         }
         if let Expr::TextValue(child)
         | Expr::CaptureBoundary(_, child)
+        | Expr::InputCaptureBoundary(_, child)
         | Expr::ValueBoundary(child)
         | Expr::TriviaScope { child, .. }
         | Expr::LexicalTriviaScope { child, .. }
@@ -4616,6 +4640,7 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
         | Expr::Capture(_, child)
         | Expr::TextValue(child)
         | Expr::CaptureBoundary(_, child)
+        | Expr::InputCaptureBoundary(_, child)
         | Expr::ValueBoundary(child)
         | Expr::Optional(child)
         | Expr::JavaOptional(child)
@@ -4735,6 +4760,7 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>, succe
         | Expr::Capture(_, child)
         | Expr::TextValue(child)
         | Expr::CaptureBoundary(_, child)
+        | Expr::InputCaptureBoundary(_, child)
         | Expr::ValueBoundary(child)
         | Expr::Optional(child)
         | Expr::JavaOptional(child)
@@ -6030,6 +6056,7 @@ fn requires_classic_mode<'a>(expression: &'a Expr, rules: &'a [Rule]) -> bool {
             Expr::Capture(_, child)
             | Expr::TextValue(child)
             | Expr::CaptureBoundary(_, child)
+            | Expr::InputCaptureBoundary(_, child)
             | Expr::ValueBoundary(child)
             | Expr::Optional(child)
             | Expr::JavaOptional(child)

@@ -16,7 +16,7 @@ public class NestedMappedCaptureConformanceTest extends NestedCaptureConformance
     @Override protected java.nio.file.Path nativeTarget() { return java.nio.file.Path.of("target/nested-mapped-native").toAbsolutePath(); }
     @Override protected List<GeneratedSource> extraJavaSources(GrammarDecl grammar) {
         var evaluator=new EvaluatorGenerator(21).generate(grammar);
-        boolean rootValue=!grammar.name().equals("SamePositionNodes");
+        boolean rootValue=!grammar.name().endsWith("SamePositionNodes");
         var methods=java.util.regex.Pattern.compile("protected abstract T (\\w+)\\(([^)]*)\\);").matcher(evaluator.source());
         var body=new StringBuilder("package org.example.nestedcaptures; public class NestedMappedProbe extends "+grammar.name()+"Evaluator<String> {");
         while(methods.find()) {

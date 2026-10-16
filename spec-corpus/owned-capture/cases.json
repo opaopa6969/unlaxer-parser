@@ -845,5 +845,117 @@
         "word": null
       }
     ]
+  },
+  {
+    "name": "nested-direct-generated-ast-field-requires-input",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @tokenAdapter: { id: 'owned.generated' version: '1' java: 'org.unlaxer.dsl.codegen.OwnedGeneratedTokenParser' rust: 'crate::generated_token' } token T = ADAPTER('owned.generated', version=1) @root @nestedCaptures @mapping(Value, params=[first,again]) Root ::= CAPTURE(word,T) @first SAME_AS(word) @again; }",
+    "cases": [
+      {
+        "input": "bb",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null
+      }
+    ]
+  },
+  {
+    "name": "nested-optional-generated-ast-field-absence-on-noninput",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @tokenAdapter: { id: 'owned.generated' version: '1' java: 'org.unlaxer.dsl.codegen.OwnedGeneratedTokenParser' rust: 'crate::generated_token' } token T = ADAPTER('owned.generated', version=1) @root @nestedCaptures @mapping(Value, params=[first,again]) Root ::= CAPTURE(word,[T]) @first SAME_AS(word) @again; }",
+    "cases": [
+      {
+        "input": "bb",
+        "success": true,
+        "consumed": 0,
+        "matched": 0,
+        "word": "",
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            0
+          ],
+          "fields": {
+            "first": null,
+            "again": ""
+          }
+        },
+        "binding": {
+          "text": "",
+          "source": "INPUT",
+          "start": 0,
+          "end": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "nested-direct-projected-ast-field-requires-input",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @tokenAdapter: { id: 'owned.projected' version: '1' java: 'org.unlaxer.dsl.codegen.OwnedProjectedTokenParser' rust: 'crate::projected_token' } token T = ADAPTER('owned.projected', version=1) @root @nestedCaptures @mapping(Value, params=[first,again]) Root ::= CAPTURE(word,T) @first SAME_AS(word) @again; }",
+    "cases": [
+      {
+        "input": "abb",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null
+      }
+    ]
+  },
+  {
+    "name": "nested-optional-projected-ast-field-absence-on-noninput",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @tokenAdapter: { id: 'owned.projected' version: '1' java: 'org.unlaxer.dsl.codegen.OwnedProjectedTokenParser' rust: 'crate::projected_token' } token T = ADAPTER('owned.projected', version=1) @root @nestedCaptures @mapping(Value, params=[first,again]) Root ::= CAPTURE(word,[T]) @first SAME_AS(word) @again; }",
+    "cases": [
+      {
+        "input": "abb",
+        "success": true,
+        "consumed": 0,
+        "matched": 0,
+        "word": "",
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            0
+          ],
+          "fields": {
+            "first": null,
+            "again": ""
+          }
+        },
+        "binding": {
+          "text": "",
+          "source": "INPUT",
+          "start": 0,
+          "end": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "nested-optional-generated-ast-field-complete-rejects-noninput",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @tokenAdapter: { id: 'owned.generated' version: '1' java: 'org.unlaxer.dsl.codegen.OwnedGeneratedTokenParser' rust: 'crate::generated_token' } token E = EOF token T = ADAPTER('owned.generated', version=1) @root @nestedCaptures @mapping(Value, params=[first,again]) Root ::= CAPTURE(word,[T]) @first SAME_AS(word) @again E; }",
+    "cases": [
+      {
+        "input": "bb",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null
+      }
+    ]
+  },
+  {
+    "name": "nested-optional-projected-ast-field-complete-rejects-noninput",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @tokenAdapter: { id: 'owned.projected' version: '1' java: 'org.unlaxer.dsl.codegen.OwnedProjectedTokenParser' rust: 'crate::projected_token' } token E = EOF token T = ADAPTER('owned.projected', version=1) @root @nestedCaptures @mapping(Value, params=[first,again]) Root ::= CAPTURE(word,[T]) @first SAME_AS(word) @again E; }",
+    "cases": [
+      {
+        "input": "abb",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null
+      }
+    ]
   }
 ]

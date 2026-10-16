@@ -110,7 +110,7 @@ public final class PreferredAstPlan {
     /** Mirror resolveNested: each explicit container and leaf adds a boundary token. */
     private static void nested(AtomicElement atom, int depth, CaptureBindingPlan plan,
             List<String> rules, List<Call> calls) {
-        if (atom instanceof GroupElement group) nestedBody(group.body(),depth,plan,rules,calls);
+        if (atom instanceof TransparentElement group) nestedBody(group.body(),depth,plan,rules,calls);
         else if (atom instanceof OptionalElement optional) nestedBody(optional.body(),depth+2,plan,rules,calls);
         else if (atom instanceof RepeatElement repeat) nestedBody(repeat.body(),depth+2,plan,rules,calls);
         else if (atom instanceof OneOrMoreElement repeat) nested(repeat.body(),depth+2,plan,rules,calls);
