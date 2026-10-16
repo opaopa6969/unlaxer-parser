@@ -1,0 +1,266 @@
+[
+  {
+    "name": "eof-star",
+    "grammar": "grammar Nullable { @package: nullableprobe token E = EOF @root @mapping(Node) Root ::= { E };  }",
+    "cases": [
+      {
+        "input": "",
+        "success": true,
+        "consumed": 0,
+        "matched": 0
+      },
+      {
+        "input": "x",
+        "success": true,
+        "consumed": 0,
+        "matched": 0
+      }
+    ]
+  },
+  {
+    "name": "optional-star",
+    "grammar": "grammar Nullable { @package: nullableprobe  @root @mapping(Node) Root ::= { [ 'a' ] };  }",
+    "cases": [
+      {
+        "input": "",
+        "success": true,
+        "consumed": 0,
+        "matched": 0
+      },
+      {
+        "input": "a",
+        "success": true,
+        "consumed": 1,
+        "matched": 1
+      },
+      {
+        "input": "aaa",
+        "success": true,
+        "consumed": 3,
+        "matched": 3
+      },
+      {
+        "input": "b",
+        "success": true,
+        "consumed": 0,
+        "matched": 0
+      }
+    ]
+  },
+  {
+    "name": "empty-star",
+    "grammar": "grammar Nullable { @package: nullableprobe token E = EMPTY @root @mapping(Node) Root ::= E*;  }",
+    "cases": [
+      {
+        "input": "",
+        "success": true,
+        "consumed": 0,
+        "matched": 0
+      },
+      {
+        "input": "😀x",
+        "success": true,
+        "consumed": 0,
+        "matched": 1
+      }
+    ]
+  },
+  {
+    "name": "optional-plus",
+    "grammar": "grammar Nullable { @package: nullableprobe  @root @mapping(Node) Root ::= [ 'a' ]+;  }",
+    "cases": [
+      {
+        "input": "",
+        "success": true,
+        "consumed": 0,
+        "matched": 0
+      },
+      {
+        "input": "a",
+        "success": true,
+        "consumed": 1,
+        "matched": 1
+      },
+      {
+        "input": "b",
+        "success": true,
+        "consumed": 0,
+        "matched": 0
+      }
+    ]
+  },
+  {
+    "name": "nullable-before-unicode",
+    "grammar": "grammar Nullable { @package: nullableprobe token E = EOF @root @mapping(Node) Root ::= { [ E ] } '😀';  }",
+    "cases": [
+      {
+        "input": "😀",
+        "success": true,
+        "consumed": 1,
+        "matched": 1
+      },
+      {
+        "input": "",
+        "success": false,
+        "consumed": 0,
+        "matched": 0
+      }
+    ]
+  },
+  {
+    "name": "nested-nullable",
+    "grammar": "grammar Nullable { @package: nullableprobe  @root @mapping(Node) Root ::= { { [ 'x' ] } } '😀';  }",
+    "cases": [
+      {
+        "input": "xxx😀",
+        "success": true,
+        "consumed": 4,
+        "matched": 4
+      },
+      {
+        "input": "😀",
+        "success": true,
+        "consumed": 1,
+        "matched": 1
+      },
+      {
+        "input": "xxx",
+        "success": false,
+        "consumed": 0,
+        "matched": 0
+      }
+    ]
+  },
+  {
+    "name": "nullable-helper",
+    "grammar": "grammar Nullable { @package: nullableprobe  @root @mapping(Node) Root ::= { Maybe } '😀'; Maybe ::= [ 'x' ]; }",
+    "cases": [
+      {
+        "input": "x😀",
+        "success": true,
+        "consumed": 2,
+        "matched": 2
+      },
+      {
+        "input": "😀",
+        "success": true,
+        "consumed": 1,
+        "matched": 1
+      },
+      {
+        "input": "xx",
+        "success": false,
+        "consumed": 0,
+        "matched": 0
+      }
+    ]
+  },
+  {
+    "name": "choice-rollback",
+    "grammar": "grammar Nullable { @package: nullableprobe  @root @mapping(Node) Root ::= { [ 'a' ] } 'z' | 'a';  }",
+    "cases": [
+      {
+        "input": "a",
+        "success": true,
+        "consumed": 1,
+        "matched": 1
+      },
+      {
+        "input": "aaz",
+        "success": true,
+        "consumed": 3,
+        "matched": 3
+      },
+      {
+        "input": "b",
+        "success": false,
+        "consumed": 0,
+        "matched": 0
+      }
+    ]
+  },
+  {
+    "name": "dead-zero-recursion",
+    "grammar": "grammar Nullable { @package: nullableprobe  @root @mapping(Node) Root ::= (Root{0})* 'x';  }",
+    "cases": [
+      {
+        "input": "x",
+        "success": true,
+        "consumed": 1,
+        "matched": 1
+      },
+      {
+        "input": "",
+        "success": false,
+        "consumed": 0,
+        "matched": 0
+      }
+    ]
+  },
+  {
+    "name": "empty-star-items",
+    "grammar": "grammar Nullable { @package: nullableprobe token E=EMPTY @root @mapping(Node, params=[items]) Root ::= E* @items; }",
+    "cases": [
+      {
+        "input": "",
+        "success": true,
+        "consumed": 0,
+        "matched": 0,
+        "items": [
+          ""
+        ]
+      },
+      {
+        "input": "😀",
+        "success": true,
+        "consumed": 0,
+        "matched": 1,
+        "items": [
+          ""
+        ]
+      }
+    ]
+  },
+  {
+    "name": "nullable-tail-items",
+    "grammar": "grammar Nullable { @package: nullableprobe token E=EOF @root @mapping(Node, params=[items]) Root ::= ('x' | E)* @items; }",
+    "cases": [
+      {
+        "input": "",
+        "success": true,
+        "consumed": 0,
+        "matched": 0,
+        "items": [
+          ""
+        ]
+      },
+      {
+        "input": "xx",
+        "success": true,
+        "consumed": 2,
+        "matched": 2,
+        "items": [
+          "x",
+          "x",
+          ""
+        ]
+      },
+      {
+        "input": "x😀",
+        "success": true,
+        "consumed": 1,
+        "matched": 1,
+        "items": [
+          "x"
+        ]
+      },
+      {
+        "input": "😀",
+        "success": true,
+        "consumed": 0,
+        "matched": 0,
+        "items": []
+      }
+    ]
+  }
+]
