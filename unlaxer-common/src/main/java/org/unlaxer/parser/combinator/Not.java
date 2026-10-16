@@ -20,6 +20,9 @@ public class Not extends ConstructedSingleChildParser {
 
 	@Override
 	public Parsed parse(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
+        parseContext.enterParserCall();
+        try {
+
 
 		parseContext.startParse(this, parseContext, tokenKind, invertMatch);
 
@@ -47,6 +50,13 @@ public class Not extends ConstructedSingleChildParser {
 		}
 		parseContext.endParse(this, committed, parseContext, tokenKind, invertMatch);
 		return committed;
-	}
+
+        } catch (RuntimeException | Error failure) {
+            parseContext.failParserCall(failure);
+            throw failure;
+        } finally {
+            parseContext.leaveParserCall();
+        }
+    }
 
 }

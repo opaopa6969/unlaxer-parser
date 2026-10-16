@@ -26,6 +26,9 @@ public class ReplayParser extends NoneChildParser implements TerminalSymbol {
     @Override public Optional<String> expectedDisplayText() { return Optional.of("SAME_AS(" + binding + ")"); }
 
     @Override public Parsed parse(ParseContext context, TokenKind kind, boolean invert) {
+        context.enterParserCall();
+        try {
+
         context.startParse(this, context, kind, invert);
         Optional<CapturedValue> captured = context.captured(binding);
         int width = captured.map(value -> value.text().codePointCount(0, value.text().length())).orElse(0);
@@ -44,5 +47,12 @@ public class ReplayParser extends NoneChildParser implements TerminalSymbol {
         }
         context.endParse(this, result, context, kind, invert);
         return result;
+
+        } catch (RuntimeException | Error failure) {
+            context.failParserCall(failure);
+            throw failure;
+        } finally {
+            context.leaveParserCall();
+        }
     }
 }

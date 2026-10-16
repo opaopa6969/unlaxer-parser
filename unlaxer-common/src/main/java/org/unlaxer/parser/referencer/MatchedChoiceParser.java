@@ -27,6 +27,9 @@ public class MatchedChoiceParser extends NoneChildParser{
 
 	@Override
 	public Parsed parse(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
+        parseContext.enterParserCall();
+        try {
+
 		
 		parseContext.startParse(this, parseContext, tokenKind, invertMatch);
 
@@ -50,7 +53,14 @@ public class MatchedChoiceParser extends NoneChildParser{
 		parseContext.endParse(this, parsed , parseContext, tokenKind, invertMatch);
 		return parsed;
 
-	}
+
+        } catch (RuntimeException | Error failure) {
+            parseContext.failParserCall(failure);
+            throw failure;
+        } finally {
+            parseContext.leaveParserCall();
+        }
+    }
 
 	@Override
 	public Parser createParser() {

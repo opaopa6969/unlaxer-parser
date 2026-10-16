@@ -20,6 +20,9 @@ public interface ChainInterface extends Parser{
 	// (collect 済みトークン) で自己通知する。ここでは通知しない。
 	@Override
 	public default Parsed parse(ParseContext parseContext,TokenKind tokenKind,boolean invertMatch) {
+        parseContext.enterParserCall();
+        try {
+
 
 		parseContext.getCurrent().setResetMatchedWithConsumed(false);
 
@@ -68,5 +71,12 @@ public interface ChainInterface extends Parser{
 		}
 		return PackratMemoTable.commitSuccess(parseContext, this, tokenKind, invertMatch,
             memoStart, memoDiagnostic, null, null);
-	}
+
+        } catch (RuntimeException | Error failure) {
+            parseContext.failParserCall(failure);
+            throw failure;
+        } finally {
+            parseContext.leaveParserCall();
+        }
+    }
 }

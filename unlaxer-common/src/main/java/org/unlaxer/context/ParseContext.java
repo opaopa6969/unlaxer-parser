@@ -45,6 +45,38 @@ public class ParseContext implements
   public static final int MAX_PARSE_DEPTH = 1024;
   private ParseLimitException parseLimitFailure;
   private Throwable observerFailure;
+  private Throwable parserCallFailure;
+  private int parserCallDepth;
+
+  /** Internal allocation-free guard for built-in parser entry points. */
+  public void enterParserCall() {
+    requireParseHealthy();
+    parserCallDepth++;
+  }
+
+  /** Restore the outer publication boundary once; swallowed errors cannot publish success. */
+  public void failParserCall(Throwable failure) {
+    if (observerFailure != null || parseLimitFailure != null || parserCallFailure != null) return;
+    parserCallFailure = java.util.Objects.requireNonNull(failure);
+    abortPublication();
+  }
+
+  /** Ordinary callbacks permit a fresh parse after every active parser call has unwound. */
+  public void leaveParserCall() {
+    Throwable failure = parserCallFailure;
+    if (--parserCallDepth == 0 && failure != null) {
+      restoreObserverPublication();
+      releaseObserverBoundary();
+      parserCallFailure = null;
+    }
+    if (failure != null) rethrowParserCallFailure(failure);
+  }
+
+  private static void rethrowParserCallFailure(Throwable failure) {
+    if (failure instanceof RuntimeException runtime) throw runtime;
+    throw (Error) failure;
+  }
+
   private boolean observerBoundaryActive;
   private TransactionElement observerEntry;
   private ParserCursor observerCursor;
@@ -78,6 +110,10 @@ public class ParseContext implements
 
   /** Internal parser/transaction boundary; controlled resource aborts retain their first error. */
   void requireParseHealthy() {
+    if (parserCallFailure != null) {
+      restoreObserverPublication();
+      rethrowParserCallFailure(parserCallFailure);
+    }
     requireObserverHealthy();
     if (parseLimitFailure != null) {
       restoreObserverPublication();
@@ -156,7 +192,7 @@ public class ParseContext implements
   }
 
   private void releaseObserverBoundaryIfIdle() {
-    if (parseLimitFailure == null && parseFrames.isEmpty() && deferredFrameDepth == 0
+    if (parserCallFailure == null && parseLimitFailure == null && parseFrames.isEmpty() && deferredFrameDepth == 0
         && (!observerExplicitTransaction || tokenStack.size() <= observerTransactionDepth))
       releaseObserverBoundary();
   }
@@ -971,6 +1007,9 @@ public class ParseContext implements
    * transactional-state contract; external I/O is not rolled back.
    */
   public Parsed parsePegAssertion(Parser owner, Parser child, boolean positive) {
+        enterParserCall();
+        try {
+
     startParse(owner, this, TokenKind.consumed, false);
     DiagnosticSpeculation diagnostics = beginDiagnosticSpeculation();
     ParseFrame frame = parseFrames.peekFirst();
@@ -989,8 +1028,11 @@ public class ParseContext implements
       succeeded = child.parse(this, TokenKind.consumed, false).isSucceeded() == positive;
       rollback(owner);
       completed = true;
+    } catch (RuntimeException | Error failure) {
+      failParserCall(failure);
+      throw failure;
     } finally {
-      if (observerFailure == null && parseLimitFailure == null) {
+      if (parserCallFailure == null && observerFailure == null && parseLimitFailure == null) {
         // Unwind only frames opened by this assertion if a callback throws. Resource
         // failures remain fatal; do not turn them into successful negative assertions.
         while (tokenStack.size() > tokensBefore) {
@@ -1022,7 +1064,14 @@ public class ParseContext implements
     Parsed result = succeeded ? Parsed.SUCCEEDED : Parsed.FAILED;
     endParse(owner, result, this, TokenKind.consumed, false);
     return result;
-  }
+
+        } catch (RuntimeException | Error failure) {
+            failParserCall(failure);
+            throw failure;
+        } finally {
+            leaveParserCall();
+        }
+    }
 
   /**
    * Classic MatchOnly publishes the child's tokens and cursor result, while
@@ -1030,6 +1079,9 @@ public class ParseContext implements
    * diagnostics remain visible. A throwing child cannot leave abandoned frames.
    */
   public Parsed parseMatchOnly(Parser owner, Parser child, TokenKind kind, boolean invert) {
+        enterParserCall();
+        try {
+
     startParse(owner, this, kind, invert);
     ParseFrame frame = parseFrames.peekFirst();
     int tokensBefore = tokenStack.size();
@@ -1051,14 +1103,17 @@ public class ParseContext implements
         try {
           result = new Parsed(commit(owner, TokenKind.matchOnly));
         } finally {
-          if (observerFailure == null && parseLimitFailure == null) stateBoundary.restoreState();
+          if (parserCallFailure == null && observerFailure == null && parseLimitFailure == null) stateBoundary.restoreState();
         }
       }
       endParse(owner, result, this, kind, invert);
       completed = true;
       return result;
+    } catch (RuntimeException | Error failure) {
+      failParserCall(failure);
+      throw failure;
     } finally {
-      if (!completed && observerFailure == null && parseLimitFailure == null) {
+      if (!completed && parserCallFailure == null && observerFailure == null && parseLimitFailure == null) {
         // State owners obey the checkpoint/restore no-throw contract. Keep the
         // original callback or resource exception; do not synthesize callbacks.
         while (tokenStack.size() > tokensBefore) {
@@ -1079,7 +1134,14 @@ public class ParseContext implements
         releaseObserverBoundaryIfIdle();
       }
     }
-  }
+
+        } catch (RuntimeException | Error failure) {
+            failParserCall(failure);
+            throw failure;
+        } finally {
+            leaveParserCall();
+        }
+    }
 
   private CaptureBindings captureBindings;
 
@@ -1109,6 +1171,9 @@ public class ParseContext implements
   /** Internal transparent capture/scope boundary, including exceptional child cleanup. */
   public Parsed parseCaptureBoundary(Parser owner, Parser child, String binding,
       boolean scoped, TokenKind kind, boolean invert) {
+        enterParserCall();
+        try {
+
     startParse(owner, this, kind, invert);
     ParseFrame frame = parseFrames.peekFirst();
     int tokensBefore = tokenStack.size();
@@ -1136,8 +1201,11 @@ public class ParseContext implements
       endParse(owner, result, this, kind, invert);
       completed = true;
       return result;
+    } catch (RuntimeException | Error failure) {
+      failParserCall(failure);
+      throw failure;
     } finally {
-      if (!completed && observerFailure == null && parseLimitFailure == null) {
+      if (!completed && parserCallFailure == null && observerFailure == null && parseLimitFailure == null) {
         while (tokenStack.size() > tokensBefore) {
           TransactionElement abandoned = tokenStack.pollFirst();
           abandoned.restoreSelectionChanges(chosenParserByChoice, orderedParsersByNonOrdered);
@@ -1155,7 +1223,14 @@ public class ParseContext implements
         releaseObserverBoundaryIfIdle();
       }
     }
-  }
+
+        } catch (RuntimeException | Error failure) {
+            failParserCall(failure);
+            throw failure;
+        } finally {
+            leaveParserCall();
+        }
+    }
 
   private FailureDiagnostic globalFailureDiagnostic() {
     FailureDiagnostic result = new FailureDiagnostic();

@@ -16,6 +16,9 @@ public interface PredictiveChoiceInterface extends ChoiceInterface {
 
     @Override
     default Parsed parse(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
+        parseContext.enterParserCall();
+        try {
+
         PackratMemoTable.Entry memo = PackratMemoTable.lookup(parseContext, this, tokenKind, invertMatch);
         if (memo != null) return PackratMemoTable.replay(parseContext, this, tokenKind, invertMatch, memo);
         var memoDiagnostic = PackratMemoTable.beginFailure(parseContext, this);
@@ -63,5 +66,12 @@ public interface PredictiveChoiceInterface extends ChoiceInterface {
         parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);
         PackratMemoTable.memoizeFailure(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
         return Parsed.FAILED;
+
+        } catch (RuntimeException | Error failure) {
+            parseContext.failParserCall(failure);
+            throw failure;
+        } finally {
+            parseContext.leaveParserCall();
+        }
     }
 }

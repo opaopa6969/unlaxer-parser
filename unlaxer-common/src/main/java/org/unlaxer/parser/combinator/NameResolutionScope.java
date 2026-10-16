@@ -19,6 +19,9 @@ public final class NameResolutionScope extends ConstructedAbstractParser impleme
         return new NameResolutionScope(children.get(0),requirements);
     }
     @Override public Parsed parse(ParseContext context, TokenKind kind, boolean invert) {
+        context.enterParserCall();
+        try {
+
         context.startParse(this, context, kind, invert);
         context.begin(this);
         var frame = NameResolution.begin(context, requirements);
@@ -34,5 +37,12 @@ public final class NameResolutionScope extends ConstructedAbstractParser impleme
             context.endParse(this, parsed, context, kind, invert);
             return parsed;
         } finally { NameResolution.end(context, frame); }
+
+        } catch (RuntimeException | Error failure) {
+            context.failParserCall(failure);
+            throw failure;
+        } finally {
+            context.leaveParserCall();
+        }
     }
 }

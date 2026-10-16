@@ -98,6 +98,9 @@ public class SyncPointRecoveryParser extends ConstructedSingleChildParser {
 
 	@Override
 	public Parsed parse(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
+        parseContext.enterParserCall();
+        try {
+
 
 		parseContext.startParse(this, parseContext, tokenKind, invertMatch);
 
@@ -170,7 +173,14 @@ public class SyncPointRecoveryParser extends ConstructedSingleChildParser {
 		Parsed recoveredParsed = new Parsed(committed);
 		parseContext.endParse(this, recoveredParsed, parseContext, tokenKind, invertMatch);
 		return recoveredParsed;
-	}
+
+        } catch (RuntimeException | Error failure) {
+            parseContext.failParserCall(failure);
+            throw failure;
+        } finally {
+            parseContext.leaveParserCall();
+        }
+    }
 
 	/**
 	 * Finds the index of the nearest sync point in the given string.

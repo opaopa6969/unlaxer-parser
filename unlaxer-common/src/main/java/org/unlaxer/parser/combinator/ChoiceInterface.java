@@ -15,6 +15,9 @@ public interface ChoiceInterface extends Parser{
 
 	@Override
 	public default Parsed parse(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
+        parseContext.enterParserCall();
+        try {
+
 
 		// Opt-in safe failure memoization: a cached failure short-circuits after the original call
 		// exhausted every alternative. Safe successes replay the chosen token tree.
@@ -54,7 +57,14 @@ public interface ChoiceInterface extends Parser{
 		parseContext.endParse(this, Parsed.FAILED , parseContext, tokenKind, invertMatch);
 		PackratMemoTable.memoizeFailure(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
 		return Parsed.FAILED;
-	}
+
+        } catch (RuntimeException | Error failure) {
+            parseContext.failParserCall(failure);
+            throw failure;
+        } finally {
+            parseContext.leaveParserCall();
+        }
+    }
 
 	@TokenExtractor
 	public static Token choiced(Token thisChoiceToken) {

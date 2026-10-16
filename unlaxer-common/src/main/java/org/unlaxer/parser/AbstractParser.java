@@ -68,6 +68,9 @@ public abstract class AbstractParser implements Parser {
 	
 	@Override
 	public Parsed parse(ParseContext parseContext , TokenKind tokenKind ,boolean invertMatch) {
+        parseContext.enterParserCall();
+        try {
+
 
 		// Opt-in safe failure memoization. Generated exact-class markers keep state-dependent
 		// parsers out; safe successes also replay their token trees. Off by default.
@@ -92,7 +95,14 @@ public abstract class AbstractParser implements Parser {
 		parseContext.endParse(this, Parsed.FAILED , parseContext, tokenKind, invertMatch);
 		PackratMemoTable.memoizeFailure(parseContext, this, tokenKind, invertMatch, memoDiagnostic);
 		return Parsed.FAILED;
-	}
+
+        } catch (RuntimeException | Error failure) {
+            parseContext.failParserCall(failure);
+            throw failure;
+        } finally {
+            parseContext.leaveParserCall();
+        }
+    }
 
 	public Parser getParser() {
 		

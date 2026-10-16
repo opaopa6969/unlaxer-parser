@@ -57,6 +57,9 @@ public class NonOrdered extends ConstructedCombinatorParser {
 
 	@Override
 	public Parsed parse(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
+        parseContext.enterParserCall();
+        try {
+
 
 		parseContext.startParse(this, parseContext, tokenKind, invertMatch);
 
@@ -110,7 +113,14 @@ public class NonOrdered extends ConstructedCombinatorParser {
 		
 		parseContext.endParse(this, committed, parseContext, tokenKind, invertMatch);
 		return committed;
-	}
+
+        } catch (RuntimeException | Error failure) {
+            parseContext.failParserCall(failure);
+            throw failure;
+        } finally {
+            parseContext.leaveParserCall();
+        }
+    }
 	
     private static final Parser CANDIDATE_BOUNDARY = new CandidateBoundary();
 
