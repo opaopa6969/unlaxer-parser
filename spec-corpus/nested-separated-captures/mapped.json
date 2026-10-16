@@ -1,0 +1,729 @@
+[
+  {
+    "name": "SeparatedNodes",
+    "grammar": "grammar SeparatedNodes { @package: org.example.nestedcaptures token C=ANY  @root @nestedCaptures @mapping(Root,params=[value]) Root ::= Leaf % ',' @value; @mapping(Leaf,params=[text]) Leaf ::= C @text; }",
+    "javaFieldTypes": {
+      "Root": {
+        "value": "List<Leaf>"
+      },
+      "Leaf": {
+        "text": "String"
+      }
+    },
+    "rustFieldTypes": {
+      "Root": {
+        "value": "Vec<Box<Ast>>"
+      },
+      "Leaf": {
+        "text": "String"
+      }
+    },
+    "captureNames": [
+      "value"
+    ],
+    "cases": [
+      {
+        "id": "1-61",
+        "input": "a",
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            1
+          ],
+          "fields": {
+            "value": [
+              {
+                "type": "Leaf",
+                "span": [
+                  0,
+                  1
+                ],
+                "fields": {
+                  "text": "a"
+                }
+              }
+            ]
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              0,
+              1
+            ],
+            "text": "a"
+          }
+        ],
+        "structure": "list[node(Leaf,text(61))]",
+        "preferred": [
+          [
+            "Root",
+            0,
+            0,
+            1
+          ],
+          [
+            "Leaf",
+            5,
+            0,
+            1
+          ]
+        ],
+        "leaves": [
+          {
+            "span": [
+              0,
+              1
+            ],
+            "text": "a"
+          }
+        ]
+      },
+      {
+        "id": "5-612cf09f98802c61",
+        "input": "a,😀,a",
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "value": [
+              {
+                "type": "Leaf",
+                "span": [
+                  0,
+                  1
+                ],
+                "fields": {
+                  "text": "a"
+                }
+              },
+              {
+                "type": "Leaf",
+                "span": [
+                  2,
+                  3
+                ],
+                "fields": {
+                  "text": "😀"
+                }
+              },
+              {
+                "type": "Leaf",
+                "span": [
+                  4,
+                  5
+                ],
+                "fields": {
+                  "text": "a"
+                }
+              }
+            ]
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              0,
+              5
+            ],
+            "text": "a,😀,a"
+          }
+        ],
+        "structure": "list[node(Leaf,text(61)),node(Leaf,text(f09f9880)),node(Leaf,text(61))]",
+        "preferred": [
+          [
+            "Root",
+            0,
+            0,
+            5
+          ],
+          [
+            "Leaf",
+            5,
+            0,
+            1
+          ],
+          [
+            "Leaf",
+            7,
+            2,
+            3
+          ],
+          [
+            "Leaf",
+            7,
+            4,
+            5
+          ]
+        ],
+        "leaves": [
+          {
+            "span": [
+              0,
+              1
+            ],
+            "text": "a"
+          },
+          {
+            "span": [
+              2,
+              3
+            ],
+            "text": "😀"
+          },
+          {
+            "span": [
+              4,
+              5
+            ],
+            "text": "a"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "SeparatedOpaqueSeparator",
+    "grammar": "grammar SeparatedOpaqueSeparator { @package: org.example.nestedcaptures token C=ANY  @root @nestedCaptures @mapping(Root,params=[value]) Root ::= Leaf % Sep @value; @mapping(Leaf,params=[text]) Leaf ::= C @text; @nestedCaptures @mapping(Sep,params=[marks]) Sep ::= [ {','} ] @marks; }",
+    "javaFieldTypes": {
+      "Root": {
+        "value": "List<Leaf>"
+      },
+      "Leaf": {
+        "text": "String"
+      },
+      "Sep": {
+        "marks": "Optional<List<String>>"
+      }
+    },
+    "rustFieldTypes": {
+      "Root": {
+        "value": "Vec<Box<Ast>>"
+      },
+      "Leaf": {
+        "text": "String"
+      },
+      "Sep": {
+        "marks": "Option<Vec<String>>"
+      }
+    },
+    "captureNames": [
+      "value"
+    ],
+    "cases": [
+      {
+        "id": "3-612cf09f9880",
+        "input": "a,😀",
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {
+            "value": [
+              {
+                "type": "Leaf",
+                "span": [
+                  0,
+                  1
+                ],
+                "fields": {
+                  "text": "a"
+                }
+              },
+              {
+                "type": "Leaf",
+                "span": [
+                  2,
+                  3
+                ],
+                "fields": {
+                  "text": "😀"
+                }
+              }
+            ]
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              0,
+              3
+            ],
+            "text": "a,😀"
+          }
+        ],
+        "structure": "list[node(Leaf,text(61)),node(Leaf,text(f09f9880))]",
+        "preferred": [
+          [
+            "Root",
+            0,
+            0,
+            3
+          ],
+          [
+            "Leaf",
+            5,
+            0,
+            1
+          ],
+          [
+            "Sep",
+            7,
+            1,
+            2
+          ],
+          [
+            "Leaf",
+            7,
+            2,
+            3
+          ]
+        ],
+        "leaves": [
+          {
+            "span": [
+              0,
+              1
+            ],
+            "text": "a"
+          },
+          {
+            "span": [
+              2,
+              3
+            ],
+            "text": "😀"
+          }
+        ]
+      }
+    ],
+    "nestedMappings": [
+      "Root",
+      "Sep"
+    ]
+  },
+  {
+    "name": "SeparatedEnums",
+    "grammar": "grammar SeparatedEnums { @package: org.example.nestedcaptures  @root @nestedCaptures @mapping(Root,params=[value]) Root ::= Mode % ',' @value; @enum Mode ::= 'on' | 'off'; }",
+    "javaFieldTypes": {
+      "Root": {
+        "value": "List<Mode>"
+      }
+    },
+    "rustFieldTypes": {
+      "Root": {
+        "value": "Vec<Mode>"
+      }
+    },
+    "captureNames": [
+      "value"
+    ],
+    "cases": [
+      {
+        "id": "5-6f6e2c6f6e",
+        "input": "on,on",
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "value": [
+              "ON",
+              "ON"
+            ]
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              0,
+              5
+            ],
+            "text": "on,on"
+          }
+        ],
+        "structure": "list[enum(Mode,ON),enum(Mode,ON)]",
+        "preferred": [
+          [
+            "Root",
+            0,
+            0,
+            5
+          ]
+        ],
+        "leaves": [
+          {
+            "span": [
+              0,
+              2
+            ],
+            "text": "on"
+          },
+          {
+            "span": [
+              3,
+              5
+            ],
+            "text": "on"
+          }
+        ]
+      }
+    ],
+    "enumTypes": [
+      "Mode"
+    ]
+  },
+  {
+    "name": "SeparatedShared",
+    "grammar": "grammar SeparatedShared { @package: org.example.nestedcaptures token C=ANY  @root @nestedCaptures @mapping(Root,params=[value]) Root ::= '[' Leaf % ',' @value ']'; @nestedCaptures @mapping(Root,params=[value]) Other ::= '(' Leaf % ',' @value ')'; @mapping(Leaf,params=[text]) Leaf ::= C @text; }",
+    "javaFieldTypes": {
+      "Root": {
+        "value": "List<Leaf>"
+      },
+      "Leaf": {
+        "text": "String"
+      }
+    },
+    "rustFieldTypes": {
+      "Root": {
+        "value": "Vec<Box<Ast>>"
+      },
+      "Leaf": {
+        "text": "String"
+      }
+    },
+    "captureNames": [
+      "value"
+    ],
+    "cases": [
+      {
+        "id": "5-5b612cf09f98805d",
+        "input": "[a,😀]",
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "value": [
+              {
+                "type": "Leaf",
+                "span": [
+                  1,
+                  2
+                ],
+                "fields": {
+                  "text": "a"
+                }
+              },
+              {
+                "type": "Leaf",
+                "span": [
+                  3,
+                  4
+                ],
+                "fields": {
+                  "text": "😀"
+                }
+              }
+            ]
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              1,
+              4
+            ],
+            "text": "a,😀"
+          }
+        ],
+        "structure": "list[node(Leaf,text(61)),node(Leaf,text(f09f9880))]",
+        "preferred": [
+          [
+            "Root",
+            0,
+            0,
+            5
+          ],
+          [
+            "Leaf",
+            5,
+            1,
+            2
+          ],
+          [
+            "Leaf",
+            7,
+            3,
+            4
+          ]
+        ],
+        "leaves": [
+          {
+            "span": [
+              1,
+              2
+            ],
+            "text": "a"
+          },
+          {
+            "span": [
+              3,
+              4
+            ],
+            "text": "😀"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "SeparatedEmptyNodes",
+    "grammar": "grammar SeparatedEmptyNodes { @package: org.example.nestedcaptures token E=EOF @root @nestedCaptures @mapping(Root,params=[value]) Root ::= Leaf % E @value; @mapping(Leaf,params=[text]) Leaf ::= ['a'] @text; }",
+    "javaFieldTypes": {
+      "Root": {
+        "value": "List<Leaf>"
+      },
+      "Leaf": {
+        "text": "Optional<String>"
+      }
+    },
+    "rustFieldTypes": {
+      "Root": {
+        "value": "Vec<Box<Ast>>"
+      },
+      "Leaf": {
+        "text": "Option<String>"
+      }
+    },
+    "captureNames": [
+      "value"
+    ],
+    "cases": [
+      {
+        "id": "0-",
+        "input": "",
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            0
+          ],
+          "fields": {
+            "value": [
+              {
+                "type": "Leaf",
+                "span": [
+                  0,
+                  0
+                ],
+                "fields": {
+                  "text": null
+                }
+              },
+              {
+                "type": "Leaf",
+                "span": [
+                  0,
+                  0
+                ],
+                "fields": {
+                  "text": null
+                }
+              }
+            ]
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              0,
+              0
+            ],
+            "text": ""
+          }
+        ],
+        "structure": "list[node(Leaf,none),node(Leaf,none)]",
+        "preferred": [
+          [
+            "Root",
+            0,
+            0,
+            0
+          ],
+          [
+            "Leaf",
+            5,
+            0,
+            0
+          ],
+          [
+            "Leaf",
+            7,
+            0,
+            0
+          ]
+        ],
+        "leaves": [
+          {
+            "span": [
+              0,
+              0
+            ],
+            "text": ""
+          },
+          {
+            "span": [
+              0,
+              0
+            ],
+            "text": ""
+          }
+        ]
+      }
+    ],
+    "distinctItems": true
+  },
+  {
+    "name": "SeparatedFamily",
+    "grammar": "grammar SeparatedFamily { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= '[' [ Item % ',' ] @value ']'; @mapping(Node) @commonField(text) Item ::= A | B; @mapping(A,params=[text]) A ::= 'a' @text; @mapping(B,params=[text]) B ::= '😀' @text; }",
+    "javaFieldTypes": {
+      "Root": {
+        "value": "Optional<List<Node>>"
+      },
+      "A": {
+        "text": "String"
+      },
+      "B": {
+        "text": "String"
+      }
+    },
+    "rustFieldTypes": {
+      "Root": {
+        "value": "Option<Vec<Box<Ast>>>"
+      },
+      "A": {
+        "text": "String"
+      },
+      "B": {
+        "text": "String"
+      }
+    },
+    "captureNames": [
+      "value"
+    ],
+    "commonField": "text",
+    "cases": [
+      {
+        "id": "family-separated",
+        "input": "[a,😀]",
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "value": [
+              {
+                "type": "A",
+                "span": [
+                  1,
+                  2
+                ],
+                "fields": {
+                  "text": "a"
+                }
+              },
+              {
+                "type": "B",
+                "span": [
+                  3,
+                  4
+                ],
+                "fields": {
+                  "text": "😀"
+                }
+              }
+            ]
+          }
+        },
+        "captures": [
+          {
+            "name": "value",
+            "span": [
+              1,
+              4
+            ],
+            "text": "a,😀"
+          }
+        ],
+        "structure": "some(list[node(A,text(61)),node(B,text(f09f9880))])",
+        "leaves": [
+          {
+            "span": [
+              1,
+              2
+            ],
+            "text": "a"
+          },
+          {
+            "span": [
+              3,
+              4
+            ],
+            "text": "😀"
+          }
+        ],
+        "preferred": [
+          [
+            "Root",
+            0,
+            0,
+            5
+          ],
+          [
+            "A",
+            7,
+            1,
+            2
+          ],
+          [
+            "A",
+            8,
+            1,
+            2
+          ],
+          [
+            "B",
+            9,
+            3,
+            4
+          ],
+          [
+            "B",
+            10,
+            3,
+            4
+          ]
+        ]
+      }
+    ]
+  }
+]

@@ -1,0 +1,29 @@
+{
+  "grammar": "grammar SharedNumericNode { @package: org.example.nestedcaptures token NUM = org.unlaxer.parser.elementary.NumberParser @root @mapping(Family) @commonField(value) Start ::= A | B; @nestedCaptures @mapping(Root,params=[value]) A ::= 'a' '[' [Leaf] @value ']'; @nestedCaptures @mapping(Root,params=[value]) B ::= 'b' '[' [Leaf] @value ']'; @mapping(Leaf,params=[text]) Leaf ::= NUM @text; }",
+  "cases": [
+    {
+      "input": "a[2147483648]",
+      "parse": true,
+      "id": "0"
+    },
+    {
+      "input": "a[-2147483649]",
+      "parse": true,
+      "id": "1"
+    },
+    {
+      "input": "a[1.5]",
+      "parse": true,
+      "id": "2"
+    },
+    {
+      "input": "a[?]",
+      "parse": false,
+      "consumed": 0,
+      "matched": 0,
+      "id": "3"
+    }
+  ],
+  "validInput": "b[7]",
+  "validStructure": "some(node(Leaf,int(7)))"
+}

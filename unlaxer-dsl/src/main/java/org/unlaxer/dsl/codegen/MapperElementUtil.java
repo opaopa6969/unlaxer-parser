@@ -1,6 +1,9 @@
 package org.unlaxer.dsl.codegen;
 
+import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
+
 import org.unlaxer.dsl.bootstrap.UBNFAST;
+import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AnnotatedElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AtomicElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ChoiceBody;
@@ -17,7 +20,6 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.SequenceBody;
 import org.unlaxer.dsl.bootstrap.UBNFAST.SkipAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.TerminalElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.TokenDecl;
-import org.unlaxer.dsl.bootstrap.UBNFAST.TypeofElement;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -204,7 +206,7 @@ class MapperElementUtil {
     private static void collectRuleRefsFromElement(AtomicElement element, List<RuleRefElement> refs) {
         if (element instanceof RuleRefElement ref) {
             refs.add(ref);
-        } else if (element instanceof GroupElement g) {
+        } else if (element instanceof TransparentElement g) {
             collectRuleRefsFromBody(g.body(), refs);
         } else if (element instanceof OptionalElement o) {
             collectRuleRefsFromBody(o.body(), refs);
@@ -254,7 +256,7 @@ class MapperElementUtil {
     }
 
     static Optional<AtomicElement> findCapturedElementInAtomic(AtomicElement element, String captureName) {
-        if (element instanceof GroupElement groupElement) {
+        if (element instanceof TransparentElement groupElement) {
             return findCapturedElement(groupElement.body(), captureName);
         }
         if (element instanceof OptionalElement optionalElement) {
@@ -295,7 +297,7 @@ class MapperElementUtil {
     }
 
     static List<AtomicElement> findCapturedElementsInAtomic(AtomicElement element, String captureName) {
-        if (element instanceof GroupElement groupElement) {
+        if (element instanceof TransparentElement groupElement) {
             return findCapturedElements(groupElement.body(), captureName);
         }
         if (element instanceof OptionalElement optionalElement) {
@@ -316,7 +318,7 @@ class MapperElementUtil {
         return List.of();
     }
 
-    static Optional<String> parserClassLiteral(AtomicElement element, String parsersClass,
+    static Optional<String> parserClassLiteral(GrammarDecl grammar, AtomicElement element, String parsersClass,
         Map<String, TokenDecl> tokenDeclByName, Map<String, RuleDecl> ruleByName) {
 
         if (element instanceof RuleRefElement ruleRefElement) {
@@ -362,9 +364,16 @@ class MapperElementUtil {
             return Optional.empty();
         }
         if (element instanceof TerminalElement ignored) {
-            return Optional.of("org.unlaxer.parser.elementary.WordParser.class");
+            return Optional.of(literalParserClass(grammar));
         }
         return Optional.empty();
+    }
+
+    /** Match the exact literal class emitted by ParserRuleEmitter in lexical profiles. */
+    static String literalParserClass(GrammarDecl grammar) {
+        return TokenStreamGrammar.enabled(grammar) || LexicalContexts.enabled(grammar)
+            ? "org.unlaxer.dsl.runtime.Lexing.LiteralParser.class"
+            : "org.unlaxer.parser.elementary.WordParser.class";
     }
 
     /**
@@ -426,7 +435,7 @@ class MapperElementUtil {
                 ruleByName.get(simpleName).annotations().stream()
                     .anyMatch(a -> a instanceof UBNFAST.EnumAnnotation);
             if (isEnum) {
-                return targetType + ".fromText(stripQuotes(firstTokenText(" + tokenVar + ")))";
+                return targetType + ".fromText(tokenTextCompat(" + tokenVar + "))";
             }
         }
         // A heterogeneous Object @value bound to a transparent choice rule (no @mapping of
@@ -474,12 +483,12 @@ class MapperElementUtil {
         if (element instanceof RuleRefElement ref) {
             if (!visited.add(ref.name())) return false;
             RuleDecl rule = ruleByName.get(ref.name());
-            return rule != null && !isSkipped(rule) && (getMappingAnnotation(rule).isPresent()
+            return rule != null && !isSkipped(rule) && (getMappingAnnotation(rule).isPresent() || EnumSchema.isEnum(rule)
                 || containsMappedValue(new GroupElement(rule.body()), ruleByName, visited));
         }
         Object value = captureValueShape(element);
         if (value instanceof RuleRefElement ref) return containsMappedValue(ref, ruleByName, visited);
-        RuleBody body = value instanceof GroupElement group ? group.body()
+        RuleBody body = value instanceof TransparentElement group ? group.body()
             : value instanceof RuleBody compound ? compound : null;
         return body != null && collectRuleRefs(body).stream().anyMatch(ref -> containsMappedValue(ref, ruleByName, visited));
     }
@@ -504,7 +513,7 @@ class MapperElementUtil {
                 && !containsMappedValue(ref, ruleByName);
         }
         final RuleBody body;
-        if (value instanceof GroupElement group) {
+        if (value instanceof TransparentElement group) {
             body = group.body();
         } else if (value instanceof RuleBody compound) {
             body = compound;
@@ -523,7 +532,7 @@ class MapperElementUtil {
         Object value = captureValueShape(element);
         var visited = new java.util.HashSet<String>();
         if (value instanceof RuleRefElement ref) return reachesGrapheme(ref.name(), rules, tokens, visited);
-        RuleBody body = value instanceof GroupElement group ? group.body()
+        RuleBody body = value instanceof TransparentElement group ? group.body()
             : value instanceof RuleBody compound ? compound : null;
         return body != null && collectRuleRefs(body).stream().anyMatch(ref -> reachesGrapheme(ref.name(), rules, tokens, visited));
     }
@@ -545,7 +554,7 @@ class MapperElementUtil {
         if (value instanceof RuleRefElement ref) {
             return reachesSkippedRule(ref.name(), ruleByName, new java.util.HashSet<>());
         }
-        RuleBody body = value instanceof GroupElement group ? group.body()
+        RuleBody body = value instanceof TransparentElement group ? group.body()
             : value instanceof RuleBody compound ? compound : null;
         return body != null && collectRuleRefs(body).stream()
             .anyMatch(ref -> reachesSkippedRule(ref.name(), ruleByName, new java.util.HashSet<>()));
@@ -604,7 +613,7 @@ class MapperElementUtil {
     }
 
     static Optional<AtomicElement> normalizeCapturedElement(AtomicElement element) {
-        if (element instanceof GroupElement groupElement) {
+        if (element instanceof TransparentElement groupElement) {
             return firstAtomicElement(groupElement.body());
         }
         if (element instanceof OptionalElement optionalElement) {
@@ -656,42 +665,4 @@ class MapperElementUtil {
         return rule != null && rule.annotations().stream().anyMatch(SkipAnnotation.class::isInstance);
     }
 
-    /** ルール本体から @typeof(x) @param の関係を収集する: paramName -> referencedCaptureName */
-    static Map<String, String> collectTypeofConstraints(RuleBody body) {
-        Map<String, String> result = new LinkedHashMap<>();
-        collectTypeofConstraintsFromBody(body, result);
-        return result;
-    }
-
-    static void collectTypeofConstraintsFromBody(RuleBody body, Map<String, String> result) {
-        if (body instanceof ChoiceBody choiceBody) {
-            for (SequenceBody seq : choiceBody.alternatives()) {
-                collectTypeofConstraintsFromSequence(seq, result);
-            }
-        } else if (body instanceof SequenceBody seq) {
-            collectTypeofConstraintsFromSequence(seq, result);
-        } else {
-            throw new IllegalStateException("unhandled " + body);
-        }
-    }
-
-    static void collectTypeofConstraintsFromSequence(SequenceBody seq, Map<String, String> result) {
-        for (AnnotatedElement ae : seq.elements()) {
-            if (ae.typeofConstraint().isPresent() && ae.captureName().isPresent()) {
-                TypeofElement te = ae.typeofConstraint().get();
-                result.put(ae.captureName().get(), te.captureName());
-            } else {
-                var switchSubject = ae.element();
-                if (switchSubject instanceof GroupElement g) {
-                    collectTypeofConstraintsFromBody(g.body(), result);
-                } else if (switchSubject instanceof OptionalElement o) {
-                    collectTypeofConstraintsFromBody(o.body(), result);
-                } else if (switchSubject instanceof RepeatElement r) {
-                    collectTypeofConstraintsFromBody(r.body(), result);
-                } else {
-
-                }
-            }
-        }
-    }
 }

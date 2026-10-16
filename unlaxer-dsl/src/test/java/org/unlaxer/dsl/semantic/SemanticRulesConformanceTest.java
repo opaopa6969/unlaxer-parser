@@ -33,7 +33,7 @@ public class SemanticRulesConformanceTest {
                 var source=generator.generate(grammar);Path path=java.resolve(source.className()+".java");Files.writeString(path,source.source());paths.add(path.toString());
             }
             var arguments=new ArrayList<>(List.of("--release","21","-classpath",System.getProperty("java.class.path"),"-d",java.toString()));arguments.addAll(paths);
-            assertEquals(0,ToolProvider.getSystemJavaCompiler().run(null,System.out,System.err,arguments.toArray(String[]::new)));
+            assertEquals(0,org.unlaxer.dsl.Java21TestSupport.compiler().run(null,System.out,System.err,arguments.toArray(String[]::new)));
             String evolvedSource=Files.readString(CORPUS.resolve("model.ubnf"))
                 .replace("@mapping(ValueDecl, params=[name, type])","@mapping(ValueDeclV2, params=[identifier, type])")
                 .replace("ValueDecl ::= 'let' ID @name", "ValueDecl ::= 'let' ID @identifier");
@@ -46,7 +46,7 @@ public class SemanticRulesConformanceTest {
                 var file=generator.generate(evolvedGrammar);Path path=evolvedJava.resolve(file.className()+".java");Files.writeString(path,file.source());evolvedPaths.add(path.toString());
             }
             var evolvedArguments=new ArrayList<>(List.of("--release","21","-classpath",System.getProperty("java.class.path"),"-d",java.toString()));evolvedArguments.addAll(evolvedPaths);
-            assertEquals(0,ToolProvider.getSystemJavaCompiler().run(null,System.out,System.err,evolvedArguments.toArray(String[]::new)));
+            assertEquals(0,org.unlaxer.dsl.Java21TestSupport.compiler().run(null,System.out,System.err,evolvedArguments.toArray(String[]::new)));
             String recoveredSource=Files.readString(CORPUS.resolve("model.ubnf"))
                 .replace("Call ::= 'call' ID @name", "Call ::= 'call' RecoverName @name");
             recoveredSource=recoveredSource.substring(0,recoveredSource.lastIndexOf('}'))+"  @recovery(sync='f')\n  RecoverName ::= '@' ID;\n}\n";
@@ -59,7 +59,7 @@ public class SemanticRulesConformanceTest {
                 var file=generator.generate(recoveredGrammar);Path path=recoveredJava.resolve(file.className()+".java");Files.writeString(path,file.source());recoveredPaths.add(path.toString());
             }
             var recoveredArguments=new ArrayList<>(List.of("--release","21","-classpath",System.getProperty("java.class.path"),"-d",java.toString()));recoveredArguments.addAll(recoveredPaths);
-            assertEquals(0,ToolProvider.getSystemJavaCompiler().run(null,System.out,System.err,recoveredArguments.toArray(String[]::new)));
+            assertEquals(0,org.unlaxer.dsl.Java21TestSupport.compiler().run(null,System.out,System.err,recoveredArguments.toArray(String[]::new)));
             Path src=Files.createDirectories(directory.resolve("src")),generated=Files.createDirectories(src.resolve("generated"));
             var files=new RustBackend().generate(grammar);for(var file:files)Files.writeString(generated.resolve(file.relativePath()),file.content());
             Path target=REPO.resolve("rust/target");

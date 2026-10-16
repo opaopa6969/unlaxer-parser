@@ -1,0 +1,66 @@
+package nestedmixed;
+import java.util.*;
+import com.google.gson.*;
+import org.unlaxer.*;
+import org.unlaxer.context.*;
+public final class Probe extends NestedMixedEvaluator<JsonElement> {
+    private final NestedMixedMapper.SourceMappedAst<?> source;
+    Probe(NestedMixedMapper.SourceMappedAst<?> source){this.source=source;}
+    private static __JAVA_TYPE__ checkType(NestedMixedAST.Root root){return root.values();}
+    @Override protected JsonElement evalRoot(NestedMixedAST.Root node){checkType(node);return value(node.values());}
+    @Override protected JsonElement evalLeaf(NestedMixedAST.Leaf node){return array("node","Leaf",node.text(),span(node)[0],span(node)[1]);}
+    private int[] span(Object value){return source.sourceSpanOf(value).orElseThrow();}
+    private static JsonArray array(Object... values){var out=new JsonArray();for(var value:values)out.add(new Gson().toJsonTree(value));return out;}
+    private JsonElement value(Object value) {
+        if(value instanceof Optional<?> option)return option.isEmpty()?array("none"):array("some",value(option.orElseThrow()));
+        if(value instanceof List<?> list){var children=new JsonArray();for(var child:list)children.add(value(child));return array("list",children);}
+        if(value instanceof NestedMixedAST node)return eval(node);
+        __MIXED_HANDLERS__
+        throw new AssertionError(value);
+    }
+    public static JsonObject run(String input,String stage,int memo,int diagnostics,String valid) throws Exception {
+        var parser=NestedMixedParsers.getRootParser();
+        var result=new JsonObject();
+        try(var context=ParseContext.withOptions(StringSource.createRootSource(input),ParseOptions.withMemoization(Memoization.values()[memo]).withDiagnostics(ParseOptions.Diagnostics.values()[diagnostics]))) {
+            var parsed=parser.parse(context);
+            if(stage.equals("parse")){
+                if(!parsed.isFailed()||context.position()!=0||!context.getCurrent().getTokens().isEmpty())throw new AssertionError("failed parser state");
+                if(!new org.unlaxer.parser.elementary.WordParser(input).parse(context).isSucceeded())throw new AssertionError("context retry");
+                result.addProperty("stage","parse");
+            } else {
+                if(!parsed.isSucceeded()||context.position()!=input.codePointCount(0,input.length()))throw new AssertionError("acceptance");
+                var token=context.getCurrent().getTokens().stream().filter(t->t.parser==parser).findFirst().orElseThrow();
+                if(stage.equals("map")){
+                    try{NestedMixedMapper.mapParsedTokenWithSourceMap(token);throw new AssertionError("invalid number accepted");}catch(IllegalArgumentException expected){}
+                    result.addProperty("stage","map");
+                }else{
+                    var mapped=NestedMixedMapper.mapParsedTokenWithSourceMap(token);var ast=(NestedMixedAST.Root)mapped.ast();
+                    var observation=new Probe(mapped).eval(ast);
+                    var preferred=NestedMixedMapper.mapParsedTree(token).selectDefault().sourceMap();
+                    if(!observation.equals(new Probe(preferred).eval(preferred.ast())))throw new AssertionError("preferred value");
+                    result.add("value",observation);result.add("rootSpan",new Gson().toJsonTree(mapped.sourceSpanOf(ast).orElseThrow()));
+                    result.add("dap",dap(input));
+                    token.getOriginalChildren().add(token);
+                    try{NestedMixedMapper.mapParsedTokenWithSourceMap(token);throw new AssertionError("cycle accepted");}catch(IllegalArgumentException expected){}
+                    finally{token.getOriginalChildren().remove(token.getOriginalChildren().size()-1);}
+                    NestedMixedMapper.parse(valid);
+                    if(!observation.equals(new Probe(mapped).eval(ast)))throw new AssertionError("retained source identity");
+                }
+            }
+        }
+        NestedMixedMapper.parse(valid);
+        return result;
+    }
+    private static JsonArray dap(String input) throws Exception {
+        var adapter=new DapProbe();var type=NestedMixedDebugAdapter.class;
+        var content=type.getDeclaredField("sourceContent");content.setAccessible(true);content.set(adapter,input);
+        var collect=type.getDeclaredMethod("collectAstSteps");collect.setAccessible(true);collect.invoke(adapter);
+        var error=type.getDeclaredField("astStepError");error.setAccessible(true);if(!error.get(adapter).equals(""))throw new AssertionError(error.get(adapter));
+        var labels=type.getDeclaredField("astNodeTypes");labels.setAccessible(true);
+        var spans=type.getDeclaredField("astNodeSpans");spans.setAccessible(true);
+        var names=(List<?>)labels.get(adapter);var positions=(List<?>)spans.get(adapter);var result=new JsonArray();
+        for(int i=0;i<names.size();i++){int[] span=(int[])positions.get(i);result.add(array(names.get(i),span[0],span[1]));}
+        return result;
+    }
+}
+final class DapProbe extends NestedMixedDebugAdapter {}

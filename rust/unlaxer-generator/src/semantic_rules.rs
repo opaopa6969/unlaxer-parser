@@ -193,9 +193,11 @@ fn atomic(
 ) -> Result<(), SchemaError> {
     budget(count, depth)?;
     match &value.kind {
-        ElementKind::Group(value) | ElementKind::Optional(value) | ElementKind::Repeat(value) => {
-            body(value, captures, count, depth + 1)?
-        }
+        ElementKind::OwnedCapture { body: value, .. }
+        | ElementKind::CaptureScope(value)
+        | ElementKind::Group(value)
+        | ElementKind::Optional(value)
+        | ElementKind::Repeat(value) => body(value, captures, count, depth + 1)?,
         ElementKind::OneOrMore(value) | ElementKind::BoundedRepeat { element: value, .. } => {
             atomic(value, captures, count, depth + 1)?
         }

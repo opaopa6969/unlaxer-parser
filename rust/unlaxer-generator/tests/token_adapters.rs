@@ -231,10 +231,11 @@ fn custom_tokens_are_conservatively_nullable_and_not_memo_safe() {
     let settings = "@tokenAdapter: { id: 'example.word' version: '1' java: 'example.WordParser' rust: 'crate::word_token' }";
     let tokens = "token W = ADAPTER('example.word', version=1)";
     let repeat = grammar(settings, tokens, "W*");
-    assert!(!check(&repeat).portable);
-    assert!(generate(&repeat)
-        .unwrap_err()
-        .contains("nullable unbounded repetition"));
+    assert!(check(&repeat).portable);
+    assert!(generate(&repeat).is_ok());
+    // Unknown/custom progress still cannot justify a left-recursive leading edge.
+    let cycle = grammar(settings, tokens, "W Root");
+    assert!(generate(&cycle).unwrap_err().contains("left recursion"));
 
     let custom_memo = grammar(&format!("{settings} @memoSafeToken: W"), tokens, "W");
     assert_eq!("failed", check(&custom_memo).structure);

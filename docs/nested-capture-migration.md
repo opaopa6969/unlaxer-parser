@@ -28,7 +28,7 @@ Javaのplain text captureも出現ごとのString identityに位置を登録す�
 Rustの`Vec`と`Semantics`のスライス引数は既存の全出現契約を維持する。
 欠損する選択肢も型へ反映する。たとえば`NUMBER @value | 'absent'`は
 Javaで`Optional<Integer>`となり、`absent`を数値欠損例外にせず`Optional.empty()`で表す。
-直接数値captureの変換・範囲検査はそのままで、Rustの字句保持との既知の差も今回変更しない。
+直接数値captureの変換・範囲検査はそのままで、Rustもchecked i32として同じ範囲検査を行う（[数値capture契約](numeric-captures.md)、#566）。
 
 parser・AST・mapper・evaluatorを同じgenerator revisionで一緒に再生成し、
 手書きconsumerを新しいlist型へ更新する。旧scalarが必要なら、不要な内側captureを外して
@@ -49,4 +49,4 @@ CIは`target/rust-nested-captures.tsv`を必須artifactとする。
 
 Rust単独の`nested_capture_shapes`とnative compile/runテストは、shape推論・全出現・scope位置・
 CST破棄後のASTとlist型Semanticsを検証する。
-これは入れ子container型全般や、Java数値変換とRust字句保持の完全統一を完了するものではない。
+入れ子containerの構造保存は#583で継続する。再帰unmapped helperのflat投影は[再帰helper契約](recursive-helpers.md)（#582）、直接数値captureのJava/Rust統一は[数値capture契約](numeric-captures.md)（#566）を参照。

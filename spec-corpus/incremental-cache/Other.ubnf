@@ -1,0 +1,5 @@
+grammar Other {
+  @package: cache.fixture
+  @root @mapping(Value, params=[text])
+  Root ::= 'b' @text;
+}

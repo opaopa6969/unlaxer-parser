@@ -1,0 +1,107 @@
+[
+  {
+    "depth": 19,
+    "accepted": true,
+    "grammar": "grammar DepthBoundary { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | 'a' @value))))))))))))))))))); }",
+    "startCP": 61,
+    "endCP": 285
+  },
+  {
+    "depth": 20,
+    "accepted": true,
+    "grammar": "grammar DepthBoundary { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | 'a' @value)))))))))))))))))))); }",
+    "startCP": 61,
+    "endCP": 293
+  },
+  {
+    "depth": 21,
+    "accepted": true,
+    "grammar": "grammar DepthBoundary { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | 'a' @value))))))))))))))))))))); }",
+    "startCP": 61,
+    "endCP": 301
+  },
+  {
+    "depth": 22,
+    "accepted": true,
+    "grammar": "grammar DepthBoundary { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | 'a' @value)))))))))))))))))))))); }",
+    "startCP": 61,
+    "endCP": 309
+  },
+  {
+    "depth": 23,
+    "accepted": true,
+    "grammar": "grammar DepthBoundary { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | 'a' @value))))))))))))))))))))))); }",
+    "startCP": 61,
+    "endCP": 317
+  },
+  {
+    "depth": 24,
+    "accepted": true,
+    "grammar": "grammar DepthBoundary { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | 'a' @value)))))))))))))))))))))))); }",
+    "startCP": 61,
+    "endCP": 325
+  },
+  {
+    "depth": 25,
+    "accepted": true,
+    "grammar": "grammar DepthBoundary { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | 'a' @value))))))))))))))))))))))))); }",
+    "startCP": 61,
+    "endCP": 333
+  },
+  {
+    "depth": 26,
+    "accepted": true,
+    "grammar": "grammar DepthBoundary { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | 'a' @value)))))))))))))))))))))))))); }",
+    "startCP": 61,
+    "endCP": 341
+  },
+  {
+    "depth": 27,
+    "accepted": true,
+    "grammar": "grammar DepthBoundary { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | 'a' @value))))))))))))))))))))))))))); }",
+    "startCP": 61,
+    "endCP": 349
+  },
+  {
+    "depth": 28,
+    "accepted": true,
+    "grammar": "grammar DepthBoundary { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | 'a' @value)))))))))))))))))))))))))))); }",
+    "startCP": 61,
+    "endCP": 357
+  },
+  {
+    "depth": 29,
+    "accepted": true,
+    "grammar": "grammar DepthBoundary { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | 'a' @value))))))))))))))))))))))))))))); }",
+    "startCP": 61,
+    "endCP": 365
+  },
+  {
+    "depth": 30,
+    "accepted": true,
+    "grammar": "grammar DepthBoundary { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | 'a' @value)))))))))))))))))))))))))))))); }",
+    "startCP": 61,
+    "endCP": 373
+  },
+  {
+    "depth": 31,
+    "accepted": true,
+    "grammar": "grammar DepthBoundary { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | 'a' @value))))))))))))))))))))))))))))))); }",
+    "startCP": 61,
+    "endCP": 381
+  },
+  {
+    "depth": 32,
+    "accepted": false,
+    "grammar": "grammar DepthBoundary { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | 'a' @value)))))))))))))))))))))))))))))))); }",
+    "startCP": 61,
+    "endCP": 389
+  },
+  {
+    "depth": 33,
+    "accepted": false,
+    "grammar": "grammar DepthBoundary { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | 'a' @value))))))))))))))))))))))))))))))))); }",
+    "startCP": 61,
+    "endCP": 397
+  }
+]

@@ -32,7 +32,7 @@ public class SemanticModelUbnfTest {
             }
             Path adapter=java.resolve("TypedModelExample.java");Files.copy(REPO.resolve("examples/semantic-model/TypedModelExample.java"),adapter);sources.add(adapter.toString());
             var command=new ArrayList<>(List.of("--release","21","-classpath",System.getProperty("java.class.path"),"-d",java.toString()));command.addAll(sources);
-            assertEquals(0,ToolProvider.getSystemJavaCompiler().run(null,System.out,System.err,command.toArray(String[]::new)));
+            assertEquals(0,org.unlaxer.dsl.Java21TestSupport.compiler().run(null,System.out,System.err,command.toArray(String[]::new)));
             var files=new RustBackend().generate(grammar);
             Path generated=Files.createDirectories(dir.resolve("generated"));for(var f:files) Files.writeString(generated.resolve(f.relativePath()),f.content());
             // The native frontend sees the exact same grammar, including package metadata.
