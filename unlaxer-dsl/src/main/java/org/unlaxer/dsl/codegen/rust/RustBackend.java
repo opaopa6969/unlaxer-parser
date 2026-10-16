@@ -482,7 +482,7 @@ public final class RustBackend {
         if (expression instanceof Separated separated) {
             String child = expression(separated.child()), separator = expression(separated.separator());
             if (PreferredAstEmitter.containsDepth(separated.child()))
-                return "Expr::sequence([" + child + ", Expr::sequence([" + separator + ", Expr::Capture(\"#preferred-extra:2\", Box::new(" + child + "))]).zero_or_more()])";
+                return "Expr::sequence([" + child + ", Expr::sequence([" + separator + ", Expr::Capture(\"#preferred-extra:2\", Box::new(" + child + "))]).repeat_java(0, None)])";
             return child + ".separated_by_java(" + separator + ")";
         }
         throw new IllegalStateException("unhandled " + expression);

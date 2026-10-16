@@ -671,5 +671,180 @@
       }
     ],
     "foreignGrammar": "grammar TypeofDepth { @package: preferredprobe @whitespace: none @root @mapping(Pair,params=[left,right]) Root ::= Atom @left '+' Atom @right; @mapping(Item,params=[text]) Atom ::= ('1' | '2') @text; }"
+  },
+  {
+    "name": "NullableSeparatedDepth",
+    "grammar": "grammar NullableSeparatedDepth { @package: preferredprobe @whitespace: none token E=EOF @root @mapping(Pair,params=[items]) Root ::= Atom % E @items; @mapping(Item,params=[text]) Atom ::= E @text; }",
+    "java": "protected String evalPair(NullableSeparatedDepthAST.Pair n){return \"items=\"+n.items().size();} protected String evalItem(NullableSeparatedDepthAST.Item n){return String.valueOf(n.text());}",
+    "rust": "fn eval_pair(&mut self,items:&[Ast],_span:unlaxer_runtime::Span)->String{format!(\"items={}\",items.len())} fn eval_item(&mut self,text:&str,_span:unlaxer_runtime::Span)->String{text.into()}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "",
+        "candidates": [
+          [
+            "Pair",
+            0,
+            0,
+            0,
+            "items=2"
+          ],
+          [
+            "Item",
+            3,
+            0,
+            0,
+            ""
+          ],
+          [
+            "Item",
+            5,
+            0,
+            0,
+            ""
+          ]
+        ],
+        "select": 1
+      },
+      {
+        "input": "x",
+        "stage": "parse"
+      }
+    ]
+  },
+  {
+    "name": "NullableSeparatedUnicodeDepth",
+    "grammar": "grammar NullableSeparatedUnicodeDepth { @package: preferredprobe @whitespace: none token E=EOF @root @mapping(Pair,params=[items]) Root ::= Atom % [','] @items; @mapping(Item,params=[text]) Atom ::= ('😀' | E) @text; }",
+    "java": "protected String evalPair(NullableSeparatedUnicodeDepthAST.Pair n){return \"items=\"+n.items().size();} protected String evalItem(NullableSeparatedUnicodeDepthAST.Item n){return String.valueOf(n.text());}",
+    "rust": "fn eval_pair(&mut self,items:&[Ast],_span:unlaxer_runtime::Span)->String{format!(\"items={}\",items.len())} fn eval_item(&mut self,text:&str,_span:unlaxer_runtime::Span)->String{text.into()}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "",
+        "candidates": [
+          [
+            "Pair",
+            0,
+            0,
+            0,
+            "items=2"
+          ],
+          [
+            "Item",
+            3,
+            0,
+            0,
+            ""
+          ],
+          [
+            "Item",
+            5,
+            0,
+            0,
+            ""
+          ]
+        ],
+        "select": 1
+      },
+      {
+        "input": "😀",
+        "candidates": [
+          [
+            "Pair",
+            0,
+            0,
+            1,
+            "items=2"
+          ],
+          [
+            "Item",
+            3,
+            0,
+            1,
+            "😀"
+          ],
+          [
+            "Item",
+            5,
+            1,
+            1,
+            ""
+          ]
+        ],
+        "select": 1
+      },
+      {
+        "input": "😀,😀",
+        "candidates": [
+          [
+            "Pair",
+            0,
+            0,
+            3,
+            "items=3"
+          ],
+          [
+            "Item",
+            3,
+            0,
+            1,
+            "😀"
+          ],
+          [
+            "Item",
+            5,
+            2,
+            3,
+            "😀"
+          ],
+          [
+            "Item",
+            5,
+            3,
+            3,
+            ""
+          ]
+        ],
+        "select": 1
+      },
+      {
+        "input": "😀,",
+        "candidates": [
+          [
+            "Pair",
+            0,
+            0,
+            2,
+            "items=3"
+          ],
+          [
+            "Item",
+            3,
+            0,
+            1,
+            "😀"
+          ],
+          [
+            "Item",
+            5,
+            2,
+            2,
+            ""
+          ],
+          [
+            "Item",
+            5,
+            2,
+            2,
+            ""
+          ]
+        ],
+        "select": 1
+      },
+      {
+        "input": "😀x",
+        "stage": "parse"
+      }
+    ]
   }
 ]
