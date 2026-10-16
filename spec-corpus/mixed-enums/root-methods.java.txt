@@ -1,0 +1,5 @@
+    @Override protected JsonElement evalModeNode(MixedEnumsAST.ModeNode node) { return root("Mode",node.value().text()); }
+    @Override protected JsonElement evalHeatNode(MixedEnumsAST.HeatNode node) { return root("Heat",node.value().text()); }
+    private JsonElement root(String type,String text) {
+        var result=new JsonObject();var value=new JsonArray();value.add("enum");value.add(type);value.add(text);result.add("root",value);return result;
+    }

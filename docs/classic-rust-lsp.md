@@ -75,6 +75,84 @@ completion は host UTF-16 TextEdit と additionalTextEdits、region/state/versi
 hover と definition も実 provider を呼び、別文書の definition はその文書の Snapshot で range を変換する。
 未登録時は keyword/typed hook と grammar hover を使う。登録した binding が missing/stale/failed の場合は空応答。
 
+## Semantic tokens full
+
+[#535](https://github.com/opaopa6969/unlaxer-parser/issues/535) adds
+`textDocument/semanticTokens/full` to both generated Rust hosts. The default
+`Backend::semantic_tokens_legend()` advertises `valid` / `invalid` with no
+modifiers, matching the Java generated server. `Backend::semantic_tokens()`
+returns an empty successful result by default. Neither default performs
+syntax coloring automatically.
+
+Applications override both hooks for nonempty tokens:
+
+```rust
+fn semantic_tokens_legend(&self) -> unlaxer_lsp::SemanticTokensLegend {
+    unlaxer_lsp::SemanticTokensLegend {
+        token_types: vec!["word".into(), "emoji".into()],
+        token_modifiers: vec!["declaration".into()],
+    }
+}
+fn semantic_tokens(
+    &mut self,
+    snapshot: &unlaxer_runtime::source::Snapshot,
+) -> Result<Vec<u32>, String> {
+    // Example for the complete source "<😀x>!": emoji at UTF-16 column 1,
+    // then x at column 3. Real providers compute data from this exact snapshot.
+    if snapshot.text == "<😀x>!" {
+        Ok(vec![0, 1, 2, 1, 1, 0, 2, 1, 0, 0])
+    } else {
+        Ok(vec![])
+    }
+}
+```
+
+This hook uses the existing Java `additionalSemanticTokenData(uri, content)`
+encoding, **not CP spans**: groups are `[deltaLine, deltaStart, UTF16Length,
+tokenTypeIndex, modifierBits]`. Java custom legends use
+`configureAdditionalCapabilities`; Rust legends use the public struct above.
+The legend selected at initialize validates subsequent data. Only `full: true`
+is advertised; range, delta, result IDs and automatic provider installation
+are outside this contract. Language profiles currently have no semantic-token
+operation, so this hook remains available under a profile just as in Java.
+
+Tokens must be ordered. Zero-length tokens retain the existing Java raw-hook
+behavior and do not count as overlapping spans. `initialize` saves the client capabilities
+`textDocument.semanticTokens.multilineTokenSupport` and
+`overlappingTokenSupport` (missing/false means unsupported). With multiline
+support, length may span line terminators and the absolute UTF-16 endpoint
+must be a valid document boundary. Without it, length extending past a line
+is interpreted at that line's end, as specified by
+[LSP 3.17](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_semanticTokens).
+The encoded raw length is preserved; the client applies that clipping rule.
+Overlapping effective spans require overlapping support. CR/LF/CRLF are line
+terminators; endpoints cannot bisect CRLF or a supplementary scalar.
+All fields must fit LSP `uinteger` (0 through 2147483647), token type must also
+be below 65536, and type/modifier indices must exist in the advertised legend.
+Both transports build UTF-16 line/boundary indices in O(source + tokens), so
+overlap does not cause repeated scans of source prefixes. Invalid provider
+data or explicit provider failure returns InternalError (-32603), preserving
+the document and the ability to serve later requests. This differs from an
+unopened/closed document or a successful empty provider, which returns
+`{"data":[]}`. Java's legacy `null` hook result remains an empty success.
+
+The immutable Rust Snapshot supplies URI, text and accepted version. No token
+cache is kept: accepted full-sync changes reach the next hook call, while
+stale versions and rejected ranged edits preserve the old source. Close
+removes it; reopening may restart the version. Shutdown rejects full requests
+with -32600 before invoking hooks. Existing lifecycle behavior is retained:
+Both transports reject requests before initialize with -32002; see the
+[shared lifecycle and configure migration](classic-lsp-lifecycle.md).
+
+[semantic-tokens.json](fixtures/classic-lsp/semantic-tokens.json) is the shared
+30-case oracle for actual nonempty hooks, custom legends, supplementary
+characters, CR/LF/CRLF, malformed data and provider failure. It also covers
+all four multiline/overlap capability combinations, omitted capabilities,
+and token types 65535/65536 against a real 65537-entry custom legend. The Java21
+`ClassicSemanticTokensConformanceTest` starts real generated Java and Rust
+stdio servers, compares both Rust generation hosts byte for byte, and checks
+version transactions, close/reopen, profile selection and shutdown/exit.
+
 ## 検証と残る差
 
 [positions.tsv](fixtures/classic-lsp/positions.tsv) の独立期待値18件を Java/Rust の生成 server の実 stdio frame で検証する。
@@ -86,14 +164,14 @@ Rust はさらに typed partial/source/version/range 不一致を検証する。
 ```sh
 CARGO_INCREMENTAL=0 cargo test --locked --manifest-path rust/Cargo.toml -p unlaxer-lsp
 mvn -pl unlaxer-common,unlaxer-dsl -am test \
-  -Dtest=ClassicLspProtocolConformanceTest,LSPQueryConsumerTest,LSPNonBmpOffsetTest,LSPProfileInitializationTest,RustUbnfFrontendConformanceTest \
+  -Dtest=ClassicLspProtocolConformanceTest,ClassicSemanticTokensConformanceTest,LSPQueryConsumerTest,LSPNonBmpOffsetTest,LSPProfileInitializationTest,RustUbnfFrontendConformanceTest \
   -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
 ```
 
 Rust transport は serial 実行で、parse 中の cancel notification を読み取って割り込む仕組みは未実装。
 `$/cancelRequest` は未処理 request を捏造せず、すでに完了した同期 request に対して結果を再送しない。
 Java の LSP4J の非同期 cancellation と同等とはしない。
-Rust incremental parse/cache、semanticTokens、rename/format/code-action の transport は未対応で、能力を広告しない。DAP は [AST / token inspection](classic-rust-dap.md) に対応する。
+Rust incremental parse/cache、rename/format/code-action の transport は未対応で、能力を広告しない。DAP は [AST / token inspection](classic-rust-dap.md) に対応する。
 provider runtime の対応と protocol method の実装は別であり、親 issue は残す。
 TinyExpression/ubnfc の LSP や Java サーバー起動で Classic Rust LSP の完了を代用しない。
 root retry と性能 freeze の方針は変更しない。

@@ -5,7 +5,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.AnnotatedElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AtomicElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ChoiceBody;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
-import org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.BoundedRepeatElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ErrorElement;
@@ -64,6 +64,14 @@ public class ASTGenerator implements CodeGenerator {
 
     @Override
     public GeneratedSource generate(GrammarDecl grammar) {
+        org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
+        NestedCaptures.requireValid(grammar);
+        GrammarValidator.requireValidBoundedRepeatElements(grammar);
+        LeftRecursionAnalysis.requireValid(grammar);
+        CommonFieldSchema.build(grammar);
+        EnumSchema.validate(grammar);
+        TypeofConstraints.validate(grammar);
+        var enumRoots = EnumSchema.rootEnums(grammar);
         String packageName = getPackageName(grammar);
         String grammarName = grammar.name();
         String className = grammarName + "AST";
@@ -131,7 +139,7 @@ public class ASTGenerator implements CodeGenerator {
         sb.append("\n");
         sb.append(CodeGenerator.generatedAnnotation("org.unlaxer.dsl.codegen.ASTGenerator"));
 
-        if (flatRules.isEmpty() && nestedRules.isEmpty() && midSealedRules.isEmpty()) {
+        if (flatRules.isEmpty() && nestedRules.isEmpty() && midSealedRules.isEmpty() && enumRules.isEmpty()) {
             sb.append("public interface ").append(className).append(" {}\n");
             return new GeneratedSource(packageName, className, sb.toString());
         }
@@ -151,11 +159,14 @@ public class ASTGenerator implements CodeGenerator {
             if (!recordToMidSealed.containsKey(name)) astPermits.add(name);
         }
 
+        astPermits.addAll(enumRoots.values());
         String permitsClause = astPermits.stream()
             .map(name -> className + "." + name)
             .collect(Collectors.joining(",\n    "));
 
-        sb.append("public sealed interface ").append(className).append(" permits\n")
+        if (astPermits.isEmpty()) {
+            sb.append("public interface ").append(className).append(" {\n\n");
+        } else sb.append("public sealed interface ").append(className).append(" permits\n")
           .append("    ").append(permitsClause).append(" {\n\n");
 
         // ----- Pass 4: 出力 -----
@@ -185,6 +196,14 @@ public class ASTGenerator implements CodeGenerator {
             String parentTypes = String.join(", ", recordToMidSealed.getOrDefault(outerName, Set.of(className)));
             emitNestedSealed(sb, outerName, inners, grammar, parentTypes);
         }
+
+        for (var entry : enumRoots.entrySet()) {
+            sb.append("    record ").append(entry.getValue()).append("(").append(entry.getKey())
+              .append(" value) implements ").append(className).append(" {}\n\n");
+        }
+
+        if (!enumRules.isEmpty()) sb.append("    /** One enum occurrence in a mixed capture; source maps use this wrapper's identity. */\n")
+            .append("    record EnumValue(java.lang.Enum<?> value) { public EnumValue { java.util.Objects.requireNonNull(value); } }\n\n");
 
         // enum ルール
         for (RuleDecl enumRule : enumRules) {
@@ -258,6 +277,9 @@ public class ASTGenerator implements CodeGenerator {
         sb.append("    sealed interface ").append(outerName)
           .append(" extends ").append(astClassName).append(" permits\n")
           .append("        ").append(innerPermits).append(" {\n\n");
+        for(var family:CommonFieldSchema.build(grammar)) if(family.name().equals(outerName))
+            for(var field:family.fields()) sb.append("        ").append(field.javaType()).append(" ")
+                .append(field.name()).append("();\n");
         for (Map.Entry<String, RuleDecl> entry : inners.entrySet()) {
             String recordName = entry.getKey();
             RuleDecl rule = entry.getValue();
@@ -273,17 +295,8 @@ public class ASTGenerator implements CodeGenerator {
             throw new IllegalStateException("Mapped sum has no permitted types: " + midSealedName);
         }
         String permitsList = permits.stream().collect(Collectors.joining(",\n        "));
-        // @commonField アノテーションで abstract method を生成
-        List<String> commonFields = grammar.rules().stream()
-            .filter(r -> {
-                MappingAnnotation m = getMappingAnnotation(r).orElse(null);
-                return m != null && m.className().equals(midSealedName);
-            })
-            .flatMap(r -> r.annotations().stream())
-            .filter(a -> a instanceof UBNFAST.CommonFieldAnnotation)
-            .flatMap(a -> ((UBNFAST.CommonFieldAnnotation) a).fieldNames().stream())
-            .distinct()
-            .toList();
+        var commonFields = CommonFieldSchema.build(grammar).stream().filter(f -> f.name().equals(midSealedName))
+            .flatMap(f -> f.fields().stream()).toList();
 
         sb.append("    sealed interface ").append(midSealedName)
           .append(" extends ").append(parentTypes).append(" permits\n")
@@ -292,9 +305,9 @@ public class ASTGenerator implements CodeGenerator {
             sb.append("}\n\n");
         } else {
             sb.append("\n");
-            for (String field : commonFields) {
-                String type = inferCommonFieldType(grammar, midSealedName, field, astClassName);
-                sb.append("        ").append(type).append(" ").append(field).append("();\n");
+            for (var field : commonFields) {
+                String type = field.javaType();
+                sb.append("        ").append(type).append(" ").append(field.name()).append("();\n");
             }
             sb.append("    }\n\n");
         }
@@ -306,83 +319,30 @@ public class ASTGenerator implements CodeGenerator {
      */
     private String generateEnumClass(RuleDecl rule, String indent) {
         String enumName = rule.name();
-        List<String> literals = collectTerminalLiterals(rule.body());
-        if (literals.isEmpty()) {
-            return "";
-        }
+        var literals = EnumSchema.literals(rule);
         StringBuilder sb = new StringBuilder();
         sb.append(indent).append("public enum ").append(enumName).append(" {\n");
-        List<String> constNames = literals.stream()
-            .map(ASTGenerator::toEnumConstantName)
-            .toList();
-        sb.append(indent).append("    ")
-          .append(String.join(", ", constNames)).append(";\n\n");
-        // fromText(String text) factory
-        sb.append(indent).append("    public static ").append(enumName)
-          .append(" fromText(String text) {\n");
-        sb.append(indent).append("        return switch (text) {\n");
-        for (int i = 0; i < literals.size(); i++) {
-            sb.append(indent).append("            case \"").append(literals.get(i))
-              .append("\" -> ").append(constNames.get(i)).append(";\n");
+        sb.append(indent).append("    ").append(literals.stream().map(EnumSchema::constantName)
+            .collect(Collectors.joining(", "))).append(";\n\n");
+        sb.append(indent).append("    public static ").append(enumName).append(" fromText(String text) {\n")
+          .append(indent).append("        return switch (text) {\n");
+        for (String literal : literals) {
+            sb.append(indent).append("            case ").append(javaString(literal)).append(" -> ")
+              .append(EnumSchema.constantName(literal)).append(";\n");
         }
-        sb.append(indent).append("            default -> throw new IllegalArgumentException(")
-          .append("\"Unknown ").append(enumName).append(": \" + text);\n");
-        sb.append(indent).append("        };\n");
-        sb.append(indent).append("    }\n");
-        sb.append(indent).append("}\n\n");
+        sb.append(indent).append("            default -> throw new java.lang.IllegalArgumentException(\"Unknown ")
+          .append(enumName).append(": \" + text);\n")
+          .append(indent).append("        };\n").append(indent).append("    }\n")
+          .append(indent).append("    public String text() {\n").append(indent).append("        return switch (this) {\n");
+        for (String literal : literals) sb.append(indent).append("            case ").append(EnumSchema.constantName(literal))
+            .append(" -> ").append(javaString(literal)).append(";\n");
+        sb.append(indent).append("        };\n").append(indent).append("    }\n").append(indent).append("}\n\n");
         return sb.toString();
     }
 
-    private static String toEnumConstantName(String literal) {
-        // camelCase → CAMEL_CASE, kebab-case → KEBAB_CASE, simple → SIMPLE
-        StringBuilder sb = new StringBuilder();
-        boolean prevLower = false;
-        for (char c : literal.toCharArray()) {
-            if (c == '-' || c == '_' || c == ' ') {
-                sb.append('_');
-                prevLower = false;
-            } else if (Character.isUpperCase(c) && prevLower) {
-                sb.append('_').append(c);
-                prevLower = false;
-            } else {
-                sb.append(Character.toUpperCase(c));
-                prevLower = Character.isLowerCase(c);
-            }
-        }
-        return sb.toString();
-    }
-
-    private List<String> collectTerminalLiterals(UBNFAST.RuleBody body) {
-        if (body instanceof UBNFAST.ChoiceBody choice) {
-            return choice.alternatives().stream()
-                .flatMap(seq -> seq.elements().stream())
-                .map(ae -> ae.element())
-                .filter(e -> e instanceof UBNFAST.TerminalElement)
-                .map(e -> ((UBNFAST.TerminalElement) e).value())
-                .toList();
-        }
-        if (body instanceof UBNFAST.SequenceBody seq) {
-            return seq.elements().stream()
-                .map(ae -> ae.element())
-                .filter(e -> e instanceof UBNFAST.TerminalElement)
-                .map(e -> ((UBNFAST.TerminalElement) e).value())
-                .toList();
-        }
-        throw new IllegalStateException("unhandled " + body);
-    }
-
-    private String inferCommonFieldType(GrammarDecl grammar, String sealedName,
-            String fieldName, String astClassName) {
-        // 最初の permit ルールで型を推論
-        return grammar.rules().stream()
-            .filter(r -> {
-                MappingAnnotation m = getMappingAnnotation(r).orElse(null);
-                return m != null && m.className().startsWith(sealedName + ".");
-            })
-            .map(r -> inferType(grammar, r, fieldName))
-            .filter(t -> !"Object".equals(t))
-            .findFirst()
-            .orElse("String");
+    private static String javaString(String value) {
+        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"")
+            .replace("\r", "\\r").replace("\n", "\\n").replace("\t", "\\t") + "\"";
     }
 
     // =========================================================================
@@ -393,6 +353,7 @@ public class ASTGenerator implements CodeGenerator {
      * ルール内の指定フィールド名に対応する Java 型を推論する。
      */
     String inferType(GrammarDecl grammar, RuleDecl rule, String fieldName) {
+        if (NestedCaptures.enabled(rule)) return NestedCaptures.javaType(NestedCaptures.field(grammar,rule,fieldName));
         Optional<String> shared = SharedPlainSchema.fieldType(grammar, rule, fieldName);
         if (shared.isPresent()) return shared.get();
         return new SemanticCardinality(grammar).fieldType(rule, fieldName, inferLegacyType(grammar, rule, fieldName));
@@ -447,6 +408,16 @@ public class ASTGenerator implements CodeGenerator {
         if (!(grammar.name() + "AST." + className).equals(narrowInnerType)) {
             return false;
         }
+        // Widen only when both sides form the nominal recursive fold used by
+        // MapperRuleEmitter. A mixed Object left and recursive right retain
+        // their own types; widening just the right breaks List invariance.
+        String nominal = grammar.name() + "AST." + className;
+        if (!nominal.equals(MapperTypeResolver.inferType(grammar, rule, "left"))
+                || !"List<String>".equals(MapperTypeResolver.inferType(grammar, rule, "op"))
+                || !nominal.equals(MapperTypeResolver.unwrapListType(
+                        MapperTypeResolver.inferType(grammar, rule, "right")).orElse("Object"))) {
+            return false;
+        }
         Map<String, RuleDecl> ruleByName = new LinkedHashMap<>();
         List<RuleDecl> rulesForClass = new ArrayList<>();
         for (RuleDecl r : grammar.rules()) {
@@ -480,8 +451,13 @@ public class ASTGenerator implements CodeGenerator {
 
     private String inferTypeFromElement(GrammarDecl grammar, AtomicElement element) {
         String astClassName = grammar.name() + "AST";
+        if (element instanceof UBNFAST.ReplayElement) return "String";
         if (element instanceof TerminalElement t) {
             return "String";
+        }
+        if (element instanceof RuleRefElement || element instanceof TransparentElement) {
+            var enumType=EnumSchema.enumType(grammar,element);
+            if(enumType.isPresent()) return grammar.name()+"AST."+enumType.get();
         }
         if (element instanceof RuleRefElement r) {
             if (grammar.rules().stream().anyMatch(rule -> rule.name().equals(r.name())
@@ -520,7 +496,7 @@ public class ASTGenerator implements CodeGenerator {
             String inner = inferTypeFromElement(grammar, sep.element());
             return "List<" + MapperTypeResolver.boxedType(inner) + ">";
         }
-        if (element instanceof GroupElement g) {
+        if (element instanceof TransparentElement g) {
             return "Object";
         }
         if (element instanceof ErrorElement e) {
@@ -611,7 +587,7 @@ public class ASTGenerator implements CodeGenerator {
         if (element instanceof UBNFAST.SeparatedElement separated) {
             return findCapturedElementsInAtomic(separated.element(), captureName, inOptional, true);
         }
-        if (element instanceof GroupElement g) {
+        if (element instanceof TransparentElement g) {
             return findCapturedElementsInBody(g.body(), captureName, inOptional, inRepeat);
         }
         return List.of();

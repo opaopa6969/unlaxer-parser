@@ -24,6 +24,8 @@ fn rule(name: &str, body: Expression, mapping: Option<(&str, Vec<Field>)>) -> Ru
         }),
         operator: None,
         catalog: None,
+        enum_literals: Vec::new(),
+        type_constraints: Vec::new(),
         documentation: Vec::new(),
     }
 }
@@ -130,7 +132,7 @@ pub fn fixture(name: &str) -> GrammarIr {
             rule(
                 "Leaf",
                 Sequence(vec![cap("value", NumberToken)]),
-                Some(("Leaf", vec![field("value", Text, One)])),
+                Some(("Leaf", vec![field("value", Integer, One)])),
             ),
         ],
         "shared" => {

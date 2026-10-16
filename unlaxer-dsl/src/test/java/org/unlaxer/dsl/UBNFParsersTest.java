@@ -569,21 +569,21 @@ public class UBNFParsersTest {
     }
 
     // =========================================================================
-    // T4-3: REGEX token
+    // Retired REGEX syntax is recognized only to report a migration error in UBNFMapper.
     // =========================================================================
 
     @Test
-    public void testTokenDecl_regex() {
+    public void testRemovedRegexRecognizedForMigrationDiagnostic() {
         Parsed parsed = parse(Parser.get(UBNFParsers.TokenDeclParser.class),
             "token ID = REGEX('[a-zA-Z_][a-zA-Z0-9_]*')");
-        assertTrue("REGEX token should parse successfully", parsed.isSucceeded());
+        assertTrue("recognize retired syntax for mapper migration diagnostic", parsed.isSucceeded());
     }
 
     @Test
-    public void testTokenDecl_regexDigits() {
+    public void testRemovedRegexDigitsRecognizedForMigrationDiagnostic() {
         Parsed parsed = parse(Parser.get(UBNFParsers.TokenDeclParser.class),
             "token DIGITS = REGEX('[0-9]+')");
-        assertTrue("REGEX digits token should parse successfully", parsed.isSucceeded());
+        assertTrue("recognize retired syntax for mapper migration diagnostic", parsed.isSucceeded());
     }
 
     // =========================================================================

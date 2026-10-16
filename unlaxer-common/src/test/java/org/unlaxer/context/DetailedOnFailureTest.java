@@ -276,7 +276,7 @@ public class DetailedOnFailureTest {
             assertTrue(root.parse(context).isFailed());
             int parsedCheckpoints = checkpoints[0];
             int parsedRestores = restores[0];
-            assertEquals(25, parsedCheckpoints);
+            assertEquals("25 real transactions plus the root observer boundary", 26, parsedCheckpoints);
             assertTrue(root.parse(context).isFailed());
             assertEquals(1, context.getPackratMemoTable().failureHits());
             return context.getPackratMemoTable().failureHits()

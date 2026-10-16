@@ -128,8 +128,8 @@ cst.lines=26
   #23 3 consumed ZeroOrMore subSource 1/1 0/0 [0] 0/0 - ""
   #24 3 consumed TinyCalcSpaceDelimitor subSource 1/1 0/0 [0] 0/0 - ""
   #25 1 consumed TinyCalcSpaceDelimitor subSource 1/1 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=11 entryCount=5 maxEntryCount=5 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=61 committed=31 rolledBack=30 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=61 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=7 entryCount=9 maxEntryCount=9 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=81 committed=31 rolledBack=50 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=81 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=1 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=1
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -162,8 +162,8 @@ diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 li
 
 === grammar=memoSafe input="1" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=true consumedChars=1
-memo failureHits=0 successHits=11 entryCount=12 maxEntryCount=12 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=61 committed=31 rolledBack=30 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=61 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=7 entryCount=16 maxEntryCount=16 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=81 committed=31 rolledBack=50 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=81 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=1 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=1
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -266,7 +266,7 @@ cst.lines=26
   #23 3 consumed ZeroOrMore subSource 1/1 0/0 [0] 0/0 - ""
   #24 3 consumed TinyCalcSpaceDelimitor subSource 1/1 0/0 [0] 0/0 - ""
   #25 1 consumed TinyCalcSpaceDelimitor subSource 1/1 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=7 entryCount=2 maxEntryCount=2 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=5 entryCount=4 maxEntryCount=4 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=31 committed=27 rolledBack=4 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=31 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -274,7 +274,7 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 
 === grammar=memoSafe input="1" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=true consumedChars=1
-memo failureHits=0 successHits=7 entryCount=6 maxEntryCount=6 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=5 entryCount=8 maxEntryCount=8 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=31 committed=27 rolledBack=4 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=31 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -452,8 +452,8 @@ cst.lines=48
   #45 5 consumed TinyCalcSpaceDelimitor subSource 3/3 0/0 [0] 0/0 - ""
   #46 3 consumed TinyCalcSpaceDelimitor subSource 3/3 0/0 [0] 0/0 - ""
   #47 1 consumed TinyCalcSpaceDelimitor subSource 3/3 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=17 entryCount=9 maxEntryCount=9 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=106 committed=55 rolledBack=51 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=106 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=10 entryCount=16 maxEntryCount=16 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=141 committed=55 rolledBack=86 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=141 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=3 farthestConsumedOffset=3 farthestMatchedOffset=3 line=0 column=3 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=3
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -488,8 +488,8 @@ diagnostics farthestOffset=3 farthestConsumedOffset=3 farthestMatchedOffset=3 li
 
 === grammar=memoSafe input="1+2" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=true consumedChars=3
-memo failureHits=0 successHits=17 entryCount=20 maxEntryCount=20 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=106 committed=55 rolledBack=51 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=106 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=10 entryCount=27 maxEntryCount=27 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=141 committed=55 rolledBack=86 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=141 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=3 farthestConsumedOffset=3 farthestMatchedOffset=3 line=0 column=3 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=3
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -638,7 +638,7 @@ cst.lines=48
   #45 5 consumed TinyCalcSpaceDelimitor subSource 3/3 0/0 [0] 0/0 - ""
   #46 3 consumed TinyCalcSpaceDelimitor subSource 3/3 0/0 [0] 0/0 - ""
   #47 1 consumed TinyCalcSpaceDelimitor subSource 3/3 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=11 entryCount=5 maxEntryCount=5 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=8 entryCount=8 maxEntryCount=8 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=57 committed=49 rolledBack=8 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=57 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -646,7 +646,7 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 
 === grammar=memoSafe input="1+2" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=true consumedChars=3
-memo failureHits=0 successHits=11 entryCount=12 maxEntryCount=12 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=8 entryCount=15 maxEntryCount=15 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=57 committed=49 rolledBack=8 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=57 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -860,8 +860,8 @@ cst.lines=64
   #61 5 consumed TinyCalcSpaceDelimitor subSource 5/5 0/0 [0] 0/0 - ""
   #62 3 consumed TinyCalcSpaceDelimitor subSource 5/5 0/0 [0] 0/0 - ""
   #63 1 consumed TinyCalcSpaceDelimitor subSource 5/5 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=19 entryCount=12 maxEntryCount=12 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=140 committed=72 rolledBack=68 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=140 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=11 entryCount=20 maxEntryCount=20 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=180 committed=72 rolledBack=108 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=180 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=5 farthestConsumedOffset=5 farthestMatchedOffset=5 line=0 column=5 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=5
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -898,8 +898,8 @@ diagnostics farthestOffset=5 farthestConsumedOffset=5 farthestMatchedOffset=5 li
 
 === grammar=memoSafe input="1+2*3" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=true consumedChars=5
-memo failureHits=0 successHits=19 entryCount=25 maxEntryCount=25 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=140 committed=72 rolledBack=68 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=140 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=11 entryCount=33 maxEntryCount=33 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=180 committed=72 rolledBack=108 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=180 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=5 farthestConsumedOffset=5 farthestMatchedOffset=5 line=0 column=5 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=5
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -1082,7 +1082,7 @@ cst.lines=64
   #61 5 consumed TinyCalcSpaceDelimitor subSource 5/5 0/0 [0] 0/0 - ""
   #62 3 consumed TinyCalcSpaceDelimitor subSource 5/5 0/0 [0] 0/0 - ""
   #63 1 consumed TinyCalcSpaceDelimitor subSource 5/5 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=12 entryCount=8 maxEntryCount=8 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=8 entryCount=12 maxEntryCount=12 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=77 committed=65 rolledBack=12 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=77 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -1090,7 +1090,7 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 
 === grammar=memoSafe input="1+2*3" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=true consumedChars=5
-memo failureHits=0 successHits=12 entryCount=17 maxEntryCount=17 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=8 entryCount=21 maxEntryCount=21 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=77 committed=65 rolledBack=12 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=77 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -1340,8 +1340,8 @@ cst.lines=84
   #81 3 consumed ZeroOrMore subSource 7/7 0/0 [0] 0/0 - ""
   #82 3 consumed TinyCalcSpaceDelimitor subSource 7/7 0/0 [0] 0/0 - ""
   #83 1 consumed TinyCalcSpaceDelimitor subSource 7/7 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=29 entryCount=16 maxEntryCount=16 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=178 committed=92 rolledBack=86 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=178 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=18 entryCount=27 maxEntryCount=27 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=233 committed=92 rolledBack=141 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=233 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=7 farthestConsumedOffset=7 farthestMatchedOffset=7 line=0 column=7 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=7
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -1376,8 +1376,8 @@ diagnostics farthestOffset=7 farthestConsumedOffset=7 farthestMatchedOffset=7 li
 
 === grammar=memoSafe input="(1+2)*3" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=true consumedChars=7
-memo failureHits=0 successHits=29 entryCount=34 maxEntryCount=34 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=178 committed=92 rolledBack=86 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=178 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=18 entryCount=45 maxEntryCount=45 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=233 committed=92 rolledBack=141 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=233 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=7 farthestConsumedOffset=7 farthestMatchedOffset=7 line=0 column=7 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=7
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -1598,7 +1598,7 @@ cst.lines=84
   #81 3 consumed ZeroOrMore subSource 7/7 0/0 [0] 0/0 - ""
   #82 3 consumed TinyCalcSpaceDelimitor subSource 7/7 0/0 [0] 0/0 - ""
   #83 1 consumed TinyCalcSpaceDelimitor subSource 7/7 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=20 entryCount=10 maxEntryCount=10 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=14 entryCount=16 maxEntryCount=16 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=95 committed=83 rolledBack=12 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=95 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -1606,7 +1606,7 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 
 === grammar=memoSafe input="(1+2)*3" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=true consumedChars=7
-memo failureHits=0 successHits=20 entryCount=22 maxEntryCount=22 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=14 entryCount=28 maxEntryCount=28 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=95 committed=83 rolledBack=12 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=95 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -1720,8 +1720,8 @@ cst.lines=22
   #19 3 consumed ZeroOrMore subSource 1/1 0/0 [0] 0/0 - ""
   #20 3 consumed TinyCalcSpaceDelimitor subSource 1/1 0/0 [0] 0/0 - ""
   #21 1 consumed TinyCalcSpaceDelimitor subSource 1/1 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=11 entryCount=5 maxEntryCount=5 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=64 committed=26 rolledBack=38 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=64 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=7 entryCount=9 maxEntryCount=9 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=84 committed=26 rolledBack=58 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=84 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=1 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=1
   expectedParsers=[AlphabetNumericUnderScoreParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', AlphabetNumericUnderScoreParser, ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -1750,8 +1750,8 @@ diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 li
 
 === grammar=memoSafe input="a" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=true consumedChars=1
-memo failureHits=0 successHits=11 entryCount=12 maxEntryCount=12 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=64 committed=26 rolledBack=38 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=64 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=7 entryCount=16 maxEntryCount=16 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=84 committed=26 rolledBack=58 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=84 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=1 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=1
   expectedParsers=[AlphabetNumericUnderScoreParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', AlphabetNumericUnderScoreParser, ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -1842,7 +1842,7 @@ cst.lines=22
   #19 3 consumed ZeroOrMore subSource 1/1 0/0 [0] 0/0 - ""
   #20 3 consumed TinyCalcSpaceDelimitor subSource 1/1 0/0 [0] 0/0 - ""
   #21 1 consumed TinyCalcSpaceDelimitor subSource 1/1 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=7 entryCount=2 maxEntryCount=2 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=5 entryCount=4 maxEntryCount=4 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=21 committed=21 rolledBack=0 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=21 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -1850,7 +1850,7 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 
 === grammar=memoSafe input="a" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=true consumedChars=1
-memo failureHits=0 successHits=7 entryCount=6 maxEntryCount=6 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=5 entryCount=8 maxEntryCount=8 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=21 committed=21 rolledBack=0 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=21 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -2042,8 +2042,8 @@ cst.lines=60
   #57 5 consumed TinyCalcSpaceDelimitor subSource 9/9 0/0 [0] 0/0 - ""
   #58 3 consumed TinyCalcSpaceDelimitor subSource 9/9 0/0 [0] 0/0 - ""
   #59 1 consumed TinyCalcSpaceDelimitor subSource 9/9 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=13 entryCount=13 maxEntryCount=13 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=132 committed=61 rolledBack=71 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=132 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=10 entryCount=16 maxEntryCount=16 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=147 committed=61 rolledBack=86 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=147 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=9 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=9
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -2073,8 +2073,8 @@ diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 li
 
 === grammar=memoSafe input="  1 + 2  " diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=true consumedChars=9
-memo failureHits=0 successHits=13 entryCount=24 maxEntryCount=24 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=132 committed=61 rolledBack=71 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=132 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=10 entryCount=27 maxEntryCount=27 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=147 committed=61 rolledBack=86 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=147 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=9 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=9
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -2242,7 +2242,7 @@ cst.lines=60
   #57 5 consumed TinyCalcSpaceDelimitor subSource 9/9 0/0 [0] 0/0 - ""
   #58 3 consumed TinyCalcSpaceDelimitor subSource 9/9 0/0 [0] 0/0 - ""
   #59 1 consumed TinyCalcSpaceDelimitor subSource 9/9 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=7 entryCount=9 maxEntryCount=9 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=5 entryCount=11 maxEntryCount=11 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=63 committed=55 rolledBack=8 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=63 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -2250,7 +2250,7 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 
 === grammar=memoSafe input="  1 + 2  " diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=true consumedChars=9
-memo failureHits=0 successHits=7 entryCount=16 maxEntryCount=16 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=5 entryCount=18 maxEntryCount=18 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=63 committed=55 rolledBack=8 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=63 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -2536,8 +2536,8 @@ cst.lines=102
   #99 5 consumed TinyCalcSpaceDelimitor subSource 9/9 0/0 [0] 0/0 - ""
   #100 3 consumed TinyCalcSpaceDelimitor subSource 9/9 0/0 [0] 0/0 - ""
   #101 1 consumed TinyCalcSpaceDelimitor subSource 9/9 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=27 entryCount=19 maxEntryCount=19 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=221 committed=113 rolledBack=108 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=221 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=15 entryCount=31 maxEntryCount=31 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=281 committed=113 rolledBack=168 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=281 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=9 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=9
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -2572,8 +2572,8 @@ diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 li
 
 === grammar=memoSafe input="1*2/3-4+5" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=true consumedChars=9
-memo failureHits=0 successHits=27 entryCount=38 maxEntryCount=38 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=221 committed=113 rolledBack=108 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=221 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=15 entryCount=50 maxEntryCount=50 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=281 committed=113 rolledBack=168 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=281 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=9 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=9
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -2830,7 +2830,7 @@ cst.lines=102
   #99 5 consumed TinyCalcSpaceDelimitor subSource 9/9 0/0 [0] 0/0 - ""
   #100 3 consumed TinyCalcSpaceDelimitor subSource 9/9 0/0 [0] 0/0 - ""
   #101 1 consumed TinyCalcSpaceDelimitor subSource 9/9 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=17 entryCount=14 maxEntryCount=14 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=12 entryCount=19 maxEntryCount=19 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=127 committed=103 rolledBack=24 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=127 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -2838,7 +2838,7 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 
 === grammar=memoSafe input="1*2/3-4+5" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=true consumedChars=9
-memo failureHits=0 successHits=17 entryCount=28 maxEntryCount=28 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=12 entryCount=33 maxEntryCount=33 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=127 committed=103 rolledBack=24 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=127 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -3120,8 +3120,8 @@ cst.lines=106
   #103 3 consumed ZeroOrMore subSource 9/9 0/0 [0] 0/0 - ""
   #104 3 consumed TinyCalcSpaceDelimitor subSource 9/9 0/0 [0] 0/0 - ""
   #105 1 consumed TinyCalcSpaceDelimitor subSource 9/9 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=51 entryCount=21 maxEntryCount=21 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=213 committed=111 rolledBack=102 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=213 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=35 entryCount=37 maxEntryCount=37 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=293 committed=111 rolledBack=182 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=293 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=9 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=9
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -3150,8 +3150,8 @@ diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 li
 
 === grammar=memoSafe input="((((1))))" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=true consumedChars=9
-memo failureHits=0 successHits=51 entryCount=48 maxEntryCount=48 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=213 committed=111 rolledBack=102 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=213 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=35 entryCount=64 maxEntryCount=64 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=293 committed=111 rolledBack=182 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=293 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=9 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=9
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -3410,7 +3410,7 @@ cst.lines=106
   #103 3 consumed ZeroOrMore subSource 9/9 0/0 [0] 0/0 - ""
   #104 3 consumed TinyCalcSpaceDelimitor subSource 9/9 0/0 [0] 0/0 - ""
   #105 1 consumed TinyCalcSpaceDelimitor subSource 9/9 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=39 entryCount=10 maxEntryCount=10 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=25 entryCount=24 maxEntryCount=24 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=103 committed=99 rolledBack=4 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=103 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -3418,7 +3418,7 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 
 === grammar=memoSafe input="((((1))))" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=true consumedChars=9
-memo failureHits=0 successHits=39 entryCount=26 maxEntryCount=26 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=25 entryCount=40 maxEntryCount=40 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=103 committed=99 rolledBack=4 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=103 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -3860,8 +3860,8 @@ cst.lines=180
   #177 5 consumed TinyCalcSpaceDelimitor subSource 15/15 0/0 [0] 0/0 - ""
   #178 3 consumed TinyCalcSpaceDelimitor subSource 15/15 0/0 [0] 0/0 - ""
   #179 1 consumed TinyCalcSpaceDelimitor subSource 15/15 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=53 entryCount=33 maxEntryCount=33 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=376 committed=199 rolledBack=177 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=376 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=28 entryCount=58 maxEntryCount=58 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=501 committed=199 rolledBack=302 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=501 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=15 farthestConsumedOffset=15 farthestMatchedOffset=15 line=0 column=15 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=15
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -3896,8 +3896,8 @@ diagnostics farthestOffset=15 farthestConsumedOffset=15 farthestMatchedOffset=15
 
 === grammar=memoSafe input="1+2+3+4+5+6+7+8" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=true consumedChars=15
-memo failureHits=0 successHits=53 entryCount=68 maxEntryCount=68 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=376 committed=199 rolledBack=177 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=376 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=28 entryCount=93 maxEntryCount=93 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=501 committed=199 rolledBack=302 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=501 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=15 farthestConsumedOffset=15 farthestMatchedOffset=15 line=0 column=15 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=15
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -4310,7 +4310,7 @@ cst.lines=180
   #177 5 consumed TinyCalcSpaceDelimitor subSource 15/15 0/0 [0] 0/0 - ""
   #178 3 consumed TinyCalcSpaceDelimitor subSource 15/15 0/0 [0] 0/0 - ""
   #179 1 consumed TinyCalcSpaceDelimitor subSource 15/15 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=35 entryCount=23 maxEntryCount=23 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=26 entryCount=32 maxEntryCount=32 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=213 committed=181 rolledBack=32 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=213 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -4318,7 +4318,7 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 
 === grammar=memoSafe input="1+2+3+4+5+6+7+8" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=true consumedChars=15
-memo failureHits=0 successHits=35 entryCount=48 maxEntryCount=48 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=26 entryCount=57 maxEntryCount=57 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=213 committed=181 rolledBack=32 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=213 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -4676,8 +4676,8 @@ cst.lines=142
   #139 3 consumed ZeroOrMore subSource 13/13 0/0 [0] 0/0 - ""
   #140 3 consumed TinyCalcSpaceDelimitor subSource 13/13 0/0 [0] 0/0 - ""
   #141 1 consumed TinyCalcSpaceDelimitor subSource 13/13 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=47 entryCount=27 maxEntryCount=27 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=297 committed=153 rolledBack=144 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=297 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=27 entryCount=47 maxEntryCount=47 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=397 committed=153 rolledBack=244 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=397 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=13 farthestConsumedOffset=13 farthestMatchedOffset=13 line=0 column=13 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=13
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -4708,8 +4708,8 @@ diagnostics farthestOffset=13 farthestConsumedOffset=13 farthestMatchedOffset=13
 
 === grammar=memoSafe input="1/(2+3)*(4-5)" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=true consumedChars=13
-memo failureHits=0 successHits=47 entryCount=56 maxEntryCount=56 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=297 committed=153 rolledBack=144 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=297 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=27 entryCount=76 maxEntryCount=76 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=397 committed=153 rolledBack=244 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=397 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=13 farthestConsumedOffset=13 farthestMatchedOffset=13 line=0 column=13 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=13
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -5042,16 +5042,16 @@ cst.lines=142
   #139 3 consumed ZeroOrMore subSource 13/13 0/0 [0] 0/0 - ""
   #140 3 consumed TinyCalcSpaceDelimitor subSource 13/13 0/0 [0] 0/0 - ""
   #141 1 consumed TinyCalcSpaceDelimitor subSource 13/13 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=33 entryCount=18 maxEntryCount=18 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=163 committed=139 rolledBack=24 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=163 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=22 entryCount=29 maxEntryCount=29 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=167 committed=139 rolledBack=28 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=167 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
   expectedTokens=[]
 
 === grammar=memoSafe input="1/(2+3)*(4-5)" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=true consumedChars=13
-memo failureHits=0 successHits=33 entryCount=38 maxEntryCount=38 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=163 committed=139 rolledBack=24 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=163 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=22 entryCount=49 maxEntryCount=49 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=167 committed=139 rolledBack=28 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=167 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
   expectedTokens=[]
@@ -5610,8 +5610,8 @@ cst.lines=241
   #238 5 consumed TinyCalcSpaceDelimitor subSource 24/24 0/0 [0] 0/0 - ""
   #239 3 consumed TinyCalcSpaceDelimitor subSource 24/24 0/0 [0] 0/0 - ""
   #240 1 consumed TinyCalcSpaceDelimitor subSource 24/24 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=69 entryCount=45 maxEntryCount=45 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=502 committed=259 rolledBack=243 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=502 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=39 entryCount=75 maxEntryCount=75 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=652 committed=259 rolledBack=393 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=652 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=24 farthestConsumedOffset=24 farthestMatchedOffset=24 line=0 column=24 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=24
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -5644,8 +5644,8 @@ diagnostics farthestOffset=24 farthestConsumedOffset=24 farthestMatchedOffset=24
 
 === grammar=memoSafe input="1+2*3-4/5+(6*7-8)/(9+10)" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=true consumedChars=24
-memo failureHits=0 successHits=69 entryCount=90 maxEntryCount=90 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=502 committed=259 rolledBack=243 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=502 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=39 entryCount=120 maxEntryCount=120 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=652 committed=259 rolledBack=393 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=652 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=24 farthestConsumedOffset=24 farthestMatchedOffset=24 line=0 column=24 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=24
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -6178,16 +6178,16 @@ cst.lines=241
   #238 5 consumed TinyCalcSpaceDelimitor subSource 24/24 0/0 [0] 0/0 - ""
   #239 3 consumed TinyCalcSpaceDelimitor subSource 24/24 0/0 [0] 0/0 - ""
   #240 1 consumed TinyCalcSpaceDelimitor subSource 24/24 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=47 entryCount=33 maxEntryCount=33 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=285 committed=237 rolledBack=48 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=285 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=31 entryCount=49 maxEntryCount=49 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=289 committed=237 rolledBack=52 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=289 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
   expectedTokens=[]
 
 === grammar=memoSafe input="1+2*3-4/5+(6*7-8)/(9+10)" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=true consumedChars=24
-memo failureHits=0 successHits=47 entryCount=66 maxEntryCount=66 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=285 committed=237 rolledBack=48 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=285 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=31 entryCount=82 maxEntryCount=82 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=289 committed=237 rolledBack=52 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=289 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
   expectedTokens=[]
@@ -6400,8 +6400,8 @@ cst.lines=72
   #69 3 consumed ZeroOrMore subSource 14/14 0/0 [0] 0/0 - ""
   #70 3 consumed TinyCalcSpaceDelimitor subSource 14/14 0/0 [0] 0/0 - ""
   #71 1 consumed TinyCalcSpaceDelimitor subSource 14/14 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=20 entryCount=16 maxEntryCount=16 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=165 committed=72 rolledBack=93 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=165 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=13 entryCount=23 maxEntryCount=23 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=200 committed=72 rolledBack=128 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=200 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=14 farthestConsumedOffset=14 farthestMatchedOffset=14 line=0 column=14 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=14
   expectedParsers=[AlphabetNumericUnderScoreParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', AlphabetNumericUnderScoreParser, ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -6430,8 +6430,8 @@ diagnostics farthestOffset=14 farthestConsumedOffset=14 farthestMatchedOffset=14
 
 === grammar=memoSafe input="var x set 1; x" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=true consumedChars=14
-memo failureHits=0 successHits=20 entryCount=30 maxEntryCount=30 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=165 committed=72 rolledBack=93 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=165 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=13 entryCount=37 maxEntryCount=37 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=200 committed=72 rolledBack=128 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=200 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=14 farthestConsumedOffset=14 farthestMatchedOffset=14 line=0 column=14 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=14
   expectedParsers=[AlphabetNumericUnderScoreParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', AlphabetNumericUnderScoreParser, ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -6622,7 +6622,7 @@ cst.lines=72
   #69 3 consumed ZeroOrMore subSource 14/14 0/0 [0] 0/0 - ""
   #70 3 consumed TinyCalcSpaceDelimitor subSource 14/14 0/0 [0] 0/0 - ""
   #71 1 consumed TinyCalcSpaceDelimitor subSource 14/14 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=13 entryCount=11 maxEntryCount=11 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=9 entryCount=15 maxEntryCount=15 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=68 committed=64 rolledBack=4 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=68 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -6630,7 +6630,7 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 
 === grammar=memoSafe input="var x set 1; x" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=true consumedChars=14
-memo failureHits=0 successHits=13 entryCount=20 maxEntryCount=20 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=9 entryCount=24 maxEntryCount=24 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=68 committed=64 rolledBack=4 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=68 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -6764,8 +6764,8 @@ cst.lines=31
   #28 3 consumed ZeroOrMore subSource 9/9 0/0 [0] 0/0 - ""
   #29 3 consumed TinyCalcSpaceDelimitor subSource 9/9 0/0 [0] 0/0 - ""
   #30 1 consumed TinyCalcSpaceDelimitor subSource 9/9 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=13 entryCount=7 maxEntryCount=7 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=9
-transactions opened=83 committed=37 rolledBack=46 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=83 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=8 entryCount=12 maxEntryCount=12 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=9
+transactions opened=109 committed=38 rolledBack=71 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=109 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=9 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=9
   expectedParsers=[' ', '//', '/*', '*/', 'set', ';', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ';', 'set', ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -6795,8 +6795,8 @@ diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 li
 
 === grammar=memoSafe input="variable y set 2*3; y+1" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=true consumedChars=9
-memo failureHits=0 successHits=13 entryCount=15 maxEntryCount=15 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=9
-transactions opened=83 committed=37 rolledBack=46 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=83 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=8 entryCount=20 maxEntryCount=20 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=9
+transactions opened=109 committed=38 rolledBack=71 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=109 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=9 farthestConsumedOffset=9 farthestMatchedOffset=9 line=0 column=9 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=9
   expectedParsers=[' ', '//', '/*', '*/', 'set', ';', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ';', 'set', ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -6906,16 +6906,16 @@ cst.lines=31
   #28 3 consumed ZeroOrMore subSource 9/9 0/0 [0] 0/0 - ""
   #29 3 consumed TinyCalcSpaceDelimitor subSource 9/9 0/0 [0] 0/0 - ""
   #30 1 consumed TinyCalcSpaceDelimitor subSource 9/9 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=9 entryCount=5 maxEntryCount=5 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=9
-transactions opened=34 committed=32 rolledBack=2 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=34 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=5 entryCount=9 maxEntryCount=9 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=9
+transactions opened=35 committed=33 rolledBack=2 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=35 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
   expectedTokens=[]
 
 === grammar=memoSafe input="variable y set 2*3; y+1" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=true consumedChars=9
-memo failureHits=0 successHits=9 entryCount=10 maxEntryCount=10 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=9
-transactions opened=34 committed=32 rolledBack=2 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=34 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=5 entryCount=14 maxEntryCount=14 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=9
+transactions opened=35 committed=33 rolledBack=2 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=35 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
   expectedTokens=[]
@@ -7308,8 +7308,8 @@ cst.lines=156
   #153 5 consumed TinyCalcSpaceDelimitor subSource 31/31 0/0 [0] 0/0 - ""
   #154 3 consumed TinyCalcSpaceDelimitor subSource 31/31 0/0 [0] 0/0 - ""
   #155 1 consumed TinyCalcSpaceDelimitor subSource 31/31 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=37 entryCount=34 maxEntryCount=34 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=348 committed=154 rolledBack=194 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=348 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=23 entryCount=48 maxEntryCount=48 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=418 committed=154 rolledBack=264 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=418 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=31 farthestConsumedOffset=31 farthestMatchedOffset=31 line=0 column=31 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=31
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -7344,8 +7344,8 @@ diagnostics farthestOffset=31 farthestConsumedOffset=31 farthestMatchedOffset=31
 
 === grammar=memoSafe input="var a set 1; var b set 2; a*b+3" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=true consumedChars=31
-memo failureHits=0 successHits=37 entryCount=61 maxEntryCount=61 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=348 committed=154 rolledBack=194 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=348 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=23 entryCount=75 maxEntryCount=75 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=418 committed=154 rolledBack=264 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=418 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=31 farthestConsumedOffset=31 farthestMatchedOffset=31 line=0 column=31 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=31
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -7710,7 +7710,7 @@ cst.lines=156
   #153 5 consumed TinyCalcSpaceDelimitor subSource 31/31 0/0 [0] 0/0 - ""
   #154 3 consumed TinyCalcSpaceDelimitor subSource 31/31 0/0 [0] 0/0 - ""
   #155 1 consumed TinyCalcSpaceDelimitor subSource 31/31 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=24 entryCount=26 maxEntryCount=26 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=17 entryCount=33 maxEntryCount=33 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=151 committed=139 rolledBack=12 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=151 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -7718,7 +7718,7 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 
 === grammar=memoSafe input="var a set 1; var b set 2; a*b+3" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=true consumedChars=31
-memo failureHits=0 successHits=24 entryCount=45 maxEntryCount=45 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=17 entryCount=52 maxEntryCount=52 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=151 committed=139 rolledBack=12 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=151 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -7928,8 +7928,8 @@ cst.lines=64
   #61 5 consumed TinyCalcSpaceDelimitor subSource 10/10 0/0 [0] 0/0 - ""
   #62 3 consumed TinyCalcSpaceDelimitor subSource 10/10 0/0 [0] 0/0 - ""
   #63 1 consumed TinyCalcSpaceDelimitor subSource 10/10 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=19 entryCount=14 maxEntryCount=14 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=146 committed=66 rolledBack=80 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=146 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=11 entryCount=22 maxEntryCount=22 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=186 committed=66 rolledBack=120 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=186 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=10 farthestConsumedOffset=10 farthestMatchedOffset=10 line=0 column=10 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=10
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -7964,8 +7964,8 @@ diagnostics farthestOffset=10 farthestConsumedOffset=10 farthestMatchedOffset=10
 
 === grammar=memoSafe input="var x; x+1" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=true consumedChars=10
-memo failureHits=0 successHits=19 entryCount=27 maxEntryCount=27 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=146 committed=66 rolledBack=80 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=146 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=11 entryCount=35 maxEntryCount=35 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=186 committed=66 rolledBack=120 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=186 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=10 farthestConsumedOffset=10 farthestMatchedOffset=10 line=0 column=10 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=10
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -8146,7 +8146,7 @@ cst.lines=64
   #61 5 consumed TinyCalcSpaceDelimitor subSource 10/10 0/0 [0] 0/0 - ""
   #62 3 consumed TinyCalcSpaceDelimitor subSource 10/10 0/0 [0] 0/0 - ""
   #63 1 consumed TinyCalcSpaceDelimitor subSource 10/10 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=12 entryCount=10 maxEntryCount=10 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=8 entryCount=14 maxEntryCount=14 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=62 committed=58 rolledBack=4 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=62 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -8154,7 +8154,7 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 
 === grammar=memoSafe input="var x; x+1" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=true consumedChars=10
-memo failureHits=0 successHits=12 entryCount=18 maxEntryCount=18 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=8 entryCount=22 maxEntryCount=22 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=62 committed=58 rolledBack=4 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=62 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -8668,8 +8668,8 @@ cst.lines=221
   #218 3 consumed ZeroOrMore subSource 49/49 0/0 [0] 0/0 - ""
   #219 3 consumed TinyCalcSpaceDelimitor subSource 49/49 0/0 [0] 0/0 - ""
   #220 1 consumed TinyCalcSpaceDelimitor subSource 49/49 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=58 entryCount=41 maxEntryCount=41 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=438 committed=206 rolledBack=232 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=438 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=35 entryCount=64 maxEntryCount=64 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=553 committed=206 rolledBack=347 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=553 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=49 farthestConsumedOffset=49 farthestMatchedOffset=49 line=0 column=49 hasFailureCandidate=true deepestMatchedRule="AlphabetNumericUnderScoreParser" deepestConsumedPosition=49
   expectedParsers=[AlphabetNumericUnderScoreParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', AlphabetNumericUnderScoreParser, ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -8699,8 +8699,8 @@ diagnostics farthestOffset=49 farthestConsumedOffset=49 farthestMatchedOffset=49
 
 === grammar=memoSafe input="var longName set (1+2)*(3-4)/5; longName*longName" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=true consumedChars=49
-memo failureHits=0 successHits=58 entryCount=79 maxEntryCount=79 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=438 committed=206 rolledBack=232 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=438 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=35 entryCount=102 maxEntryCount=102 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=553 committed=206 rolledBack=347 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=553 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=49 farthestConsumedOffset=49 farthestMatchedOffset=49 line=0 column=49 hasFailureCandidate=true deepestMatchedRule="AlphabetNumericUnderScoreParser" deepestConsumedPosition=49
   expectedParsers=[AlphabetNumericUnderScoreParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', AlphabetNumericUnderScoreParser, ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -9190,7 +9190,7 @@ cst.lines=221
   #218 3 consumed ZeroOrMore subSource 49/49 0/0 [0] 0/0 - ""
   #219 3 consumed TinyCalcSpaceDelimitor subSource 49/49 0/0 [0] 0/0 - ""
   #220 1 consumed TinyCalcSpaceDelimitor subSource 49/49 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=40 entryCount=30 maxEntryCount=30 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=27 entryCount=43 maxEntryCount=43 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=210 committed=186 rolledBack=24 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=210 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -9198,7 +9198,7 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 
 === grammar=memoSafe input="var longName set (1+2)*(3-4)/5; longName*longName" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=true consumedChars=49
-memo failureHits=0 successHits=40 entryCount=57 maxEntryCount=57 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=27 entryCount=70 maxEntryCount=70 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=210 committed=186 rolledBack=24 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=210 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -9290,8 +9290,8 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 === grammar=shipped input="" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=false consumedChars=0
 cst.lines=0
-memo failureHits=0 successHits=5 entryCount=2 maxEntryCount=2 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=41 committed=8 rolledBack=33 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=41 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=2 entryCount=5 maxEntryCount=5 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=56 committed=8 rolledBack=48 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=56 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=0
   expectedParsers=[' ', '//', '/*', '*/', 'var', 'variable', ';', '(', ')', SignParser, DigitParser, OneOrMore, '.', Chain, NumberParser, AlphabetUnderScoreParser, IdentifierParser, __CaptureSite, TermParser, ExpressionParser, TinyCalcParser]
   expectedTokens=[' ', '(', ')', '*/', '.', '/*', '//', ';', 'var', 'variable', AlphabetUnderScoreParser, Chain, DigitParser, ExpressionParser, IdentifierParser, NumberParser, OneOrMore, SignParser, TermParser, TinyCalcParser, __CaptureSite]
@@ -9331,8 +9331,8 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 
 === grammar=memoSafe input="" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=false consumedChars=0
-memo failureHits=0 successHits=5 entryCount=7 maxEntryCount=7 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=41 committed=8 rolledBack=33 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=41 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=2 entryCount=10 maxEntryCount=10 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=56 committed=8 rolledBack=48 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=56 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=0
   expectedParsers=[' ', '//', '/*', '*/', 'var', 'variable', ';', '(', ')', SignParser, DigitParser, OneOrMore, '.', Chain, NumberParser, AlphabetUnderScoreParser, IdentifierParser, __CaptureSite, TermParser, ExpressionParser, TinyCalcParser]
   expectedTokens=[' ', '(', ')', '*/', '.', '/*', '//', ';', 'var', 'variable', AlphabetUnderScoreParser, Chain, DigitParser, ExpressionParser, IdentifierParser, NumberParser, OneOrMore, SignParser, TermParser, TinyCalcParser, __CaptureSite]
@@ -9456,8 +9456,8 @@ diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 li
 === grammar=shipped input="+" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=false consumedChars=0
 cst.lines=0
-memo failureHits=0 successHits=5 entryCount=2 maxEntryCount=2 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=41 committed=8 rolledBack=33 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=41 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=2 entryCount=5 maxEntryCount=5 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=56 committed=8 rolledBack=48 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=56 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=1 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=1
   expectedParsers=[DigitParser, OneOrMore, '.', Chain]
   expectedTokens=['.', Chain, DigitParser, OneOrMore]
@@ -9480,8 +9480,8 @@ diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 li
 
 === grammar=memoSafe input="+" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=false consumedChars=0
-memo failureHits=0 successHits=5 entryCount=7 maxEntryCount=7 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=41 committed=8 rolledBack=33 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=41 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=2 entryCount=10 maxEntryCount=10 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=56 committed=8 rolledBack=48 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=56 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=1 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=1
   expectedParsers=[DigitParser, OneOrMore, '.', Chain]
   expectedTokens=['.', Chain, DigitParser, OneOrMore]
@@ -9522,7 +9522,7 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 === grammar=shipped input="+" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=false consumedChars=0
 cst.lines=0
-memo failureHits=0 successHits=3 entryCount=1 maxEntryCount=1 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=1 entryCount=3 maxEntryCount=3 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=14 committed=6 rolledBack=8 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=14 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -9530,7 +9530,7 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 
 === grammar=memoSafe input="+" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=false consumedChars=0
-memo failureHits=0 successHits=3 entryCount=5 maxEntryCount=5 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=1 entryCount=7 maxEntryCount=7 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=14 committed=6 rolledBack=8 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=14 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -9622,8 +9622,8 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 === grammar=shipped input="*1" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=false consumedChars=0
 cst.lines=0
-memo failureHits=0 successHits=5 entryCount=2 maxEntryCount=2 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=41 committed=8 rolledBack=33 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=41 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=2 entryCount=5 maxEntryCount=5 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=56 committed=8 rolledBack=48 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=56 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=0
   expectedParsers=[' ', '//', '/*', '*/', 'var', 'variable', ';', '(', ')', SignParser, DigitParser, OneOrMore, '.', Chain, NumberParser, AlphabetUnderScoreParser, IdentifierParser, __CaptureSite, TermParser, ExpressionParser, TinyCalcParser]
   expectedTokens=[' ', '(', ')', '*/', '.', '/*', '//', ';', 'var', 'variable', AlphabetUnderScoreParser, Chain, DigitParser, ExpressionParser, IdentifierParser, NumberParser, OneOrMore, SignParser, TermParser, TinyCalcParser, __CaptureSite]
@@ -9663,8 +9663,8 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 
 === grammar=memoSafe input="*1" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=false consumedChars=0
-memo failureHits=0 successHits=5 entryCount=7 maxEntryCount=7 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=41 committed=8 rolledBack=33 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=41 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=2 entryCount=10 maxEntryCount=10 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=56 committed=8 rolledBack=48 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=56 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=0
   expectedParsers=[' ', '//', '/*', '*/', 'var', 'variable', ';', '(', ')', SignParser, DigitParser, OneOrMore, '.', Chain, NumberParser, AlphabetUnderScoreParser, IdentifierParser, __CaptureSite, TermParser, ExpressionParser, TinyCalcParser]
   expectedTokens=[' ', '(', ')', '*/', '.', '/*', '//', ';', 'var', 'variable', AlphabetUnderScoreParser, Chain, DigitParser, ExpressionParser, IdentifierParser, NumberParser, OneOrMore, SignParser, TermParser, TinyCalcParser, __CaptureSite]
@@ -9868,8 +9868,8 @@ cst.lines=26
   #23 3 consumed ZeroOrMore subSource 1/1 0/0 [0] 0/0 - ""
   #24 3 consumed TinyCalcSpaceDelimitor subSource 1/1 0/0 [0] 0/0 - ""
   #25 1 consumed TinyCalcSpaceDelimitor subSource 1/1 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=13 entryCount=6 maxEntryCount=6 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=1
-transactions opened=89 committed=37 rolledBack=52 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=89 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=7 entryCount=12 maxEntryCount=12 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=1
+transactions opened=119 committed=37 rolledBack=82 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=119 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 line=0 column=2 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=2
   expectedParsers=[' ', '//', '/*', '*/', '(', ')', SignParser, DigitParser, OneOrMore, '.', Chain, NumberParser, AlphabetUnderScoreParser, IdentifierParser, __CaptureSite, TermParser]
   expectedTokens=[' ', '(', ')', '*/', '.', '/*', '//', AlphabetUnderScoreParser, Chain, DigitParser, IdentifierParser, NumberParser, OneOrMore, SignParser, TermParser, __CaptureSite]
@@ -9906,8 +9906,8 @@ diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 li
 
 === grammar=memoSafe input="1+" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=true consumedChars=1
-memo failureHits=0 successHits=13 entryCount=15 maxEntryCount=15 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=1
-transactions opened=89 committed=37 rolledBack=52 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=89 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=7 entryCount=21 maxEntryCount=21 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=1
+transactions opened=119 committed=37 rolledBack=82 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=119 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 line=0 column=2 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=2
   expectedParsers=[' ', '//', '/*', '*/', '(', ')', SignParser, DigitParser, OneOrMore, '.', Chain, NumberParser, AlphabetUnderScoreParser, IdentifierParser, __CaptureSite, TermParser]
   expectedTokens=[' ', '(', ')', '*/', '.', '/*', '//', AlphabetUnderScoreParser, Chain, DigitParser, IdentifierParser, NumberParser, OneOrMore, SignParser, TermParser, __CaptureSite]
@@ -10014,7 +10014,7 @@ cst.lines=26
   #23 3 consumed ZeroOrMore subSource 1/1 0/0 [0] 0/0 - ""
   #24 3 consumed TinyCalcSpaceDelimitor subSource 1/1 0/0 [0] 0/0 - ""
   #25 1 consumed TinyCalcSpaceDelimitor subSource 1/1 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=8 entryCount=4 maxEntryCount=4 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=1
+memo failureHits=0 successHits=6 entryCount=6 maxEntryCount=6 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=1
 transactions opened=36 committed=31 rolledBack=5 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=36 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -10022,7 +10022,7 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 
 === grammar=memoSafe input="1+" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=true consumedChars=1
-memo failureHits=0 successHits=8 entryCount=9 maxEntryCount=9 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=1
+memo failureHits=0 successHits=6 entryCount=11 maxEntryCount=11 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=1
 transactions opened=36 committed=31 rolledBack=5 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=36 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -10114,8 +10114,8 @@ diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 li
 === grammar=shipped input="(1" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=false consumedChars=0
 cst.lines=0
-memo failureHits=0 successHits=14 entryCount=6 maxEntryCount=6 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=92 committed=34 rolledBack=58 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=92 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=7 entryCount=13 maxEntryCount=13 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=127 committed=34 rolledBack=93 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=127 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 line=0 column=2 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=2
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser, ')']
   expectedTokens=[' ', ')', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -10155,8 +10155,8 @@ diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 li
 
 === grammar=memoSafe input="(1" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=false consumedChars=0
-memo failureHits=0 successHits=14 entryCount=16 maxEntryCount=16 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=92 committed=34 rolledBack=58 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=92 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=7 entryCount=23 maxEntryCount=23 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=127 committed=34 rolledBack=93 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=127 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 line=0 column=2 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=2
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser, ')']
   expectedTokens=[' ', ')', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -10214,7 +10214,7 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 === grammar=shipped input="(1" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=false consumedChars=0
 cst.lines=0
-memo failureHits=0 successHits=10 entryCount=3 maxEntryCount=3 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=5 entryCount=8 maxEntryCount=8 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=41 committed=29 rolledBack=12 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=41 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -10222,7 +10222,7 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 
 === grammar=memoSafe input="(1" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=false consumedChars=0
-memo failureHits=0 successHits=10 entryCount=10 maxEntryCount=10 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=5 entryCount=15 maxEntryCount=15 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=41 committed=29 rolledBack=12 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=41 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -10352,8 +10352,8 @@ cst.lines=26
   #23 3 consumed ZeroOrMore subSource 1/1 0/0 [0] 0/0 - ""
   #24 3 consumed TinyCalcSpaceDelimitor subSource 1/1 0/0 [0] 0/0 - ""
   #25 1 consumed TinyCalcSpaceDelimitor subSource 1/1 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=11 entryCount=5 maxEntryCount=5 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=61 committed=31 rolledBack=30 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=61 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=7 entryCount=9 maxEntryCount=9 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=81 committed=31 rolledBack=50 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=81 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=1 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=1
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -10386,8 +10386,8 @@ diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 li
 
 === grammar=memoSafe input="1)" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=true consumedChars=1
-memo failureHits=0 successHits=11 entryCount=12 maxEntryCount=12 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=61 committed=31 rolledBack=30 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=61 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=7 entryCount=16 maxEntryCount=16 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=81 committed=31 rolledBack=50 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=81 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=1 hasFailureCandidate=true deepestMatchedRule="DigitParser" deepestConsumedPosition=1
   expectedParsers=[DigitParser, '.', EParser, ExponentParser, ' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '.', '/', '/*', '//', DigitParser, EParser, ExponentParser, ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -10490,7 +10490,7 @@ cst.lines=26
   #23 3 consumed ZeroOrMore subSource 1/1 0/0 [0] 0/0 - ""
   #24 3 consumed TinyCalcSpaceDelimitor subSource 1/1 0/0 [0] 0/0 - ""
   #25 1 consumed TinyCalcSpaceDelimitor subSource 1/1 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=7 entryCount=2 maxEntryCount=2 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=5 entryCount=4 maxEntryCount=4 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=31 committed=27 rolledBack=4 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=31 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -10498,7 +10498,7 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 
 === grammar=memoSafe input="1)" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=true consumedChars=1
-memo failureHits=0 successHits=7 entryCount=6 maxEntryCount=6 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=5 entryCount=8 maxEntryCount=8 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=31 committed=27 rolledBack=4 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=31 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -10594,8 +10594,8 @@ diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 li
 === grammar=shipped input="()" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=false consumedChars=0
 cst.lines=0
-memo failureHits=0 successHits=8 entryCount=3 maxEntryCount=3 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=72 committed=13 rolledBack=59 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=72 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=2 entryCount=9 maxEntryCount=9 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=102 committed=13 rolledBack=89 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=102 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=1 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=1
   expectedParsers=[' ', '//', '/*', '*/', '(', ')', SignParser, DigitParser, OneOrMore, '.', Chain, NumberParser, AlphabetUnderScoreParser, IdentifierParser, __CaptureSite, TermParser, ExpressionParser]
   expectedTokens=[' ', '(', ')', '*/', '.', '/*', '//', AlphabetUnderScoreParser, Chain, DigitParser, ExpressionParser, IdentifierParser, NumberParser, OneOrMore, SignParser, TermParser, __CaptureSite]
@@ -10637,8 +10637,8 @@ diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 li
 
 === grammar=memoSafe input="()" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=false consumedChars=0
-memo failureHits=0 successHits=8 entryCount=11 maxEntryCount=11 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=72 committed=13 rolledBack=59 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=72 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=2 entryCount=17 maxEntryCount=17 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=102 committed=13 rolledBack=89 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=102 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=1 farthestConsumedOffset=1 farthestMatchedOffset=1 line=0 column=1 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=1
   expectedParsers=[' ', '//', '/*', '*/', '(', ')', SignParser, DigitParser, OneOrMore, '.', Chain, NumberParser, AlphabetUnderScoreParser, IdentifierParser, __CaptureSite, TermParser, ExpressionParser]
   expectedTokens=[' ', '(', ')', '*/', '.', '/*', '//', AlphabetUnderScoreParser, Chain, DigitParser, ExpressionParser, IdentifierParser, NumberParser, OneOrMore, SignParser, TermParser, __CaptureSite]
@@ -10698,7 +10698,7 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 === grammar=shipped input="()" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=false consumedChars=0
 cst.lines=0
-memo failureHits=0 successHits=4 entryCount=2 maxEntryCount=2 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=1 entryCount=5 maxEntryCount=5 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=15 committed=7 rolledBack=8 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=15 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -10706,7 +10706,7 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 
 === grammar=memoSafe input="()" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=false consumedChars=0
-memo failureHits=0 successHits=4 entryCount=6 maxEntryCount=6 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=1 entryCount=9 maxEntryCount=9 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=15 committed=7 rolledBack=8 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=15 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -10842,8 +10842,8 @@ cst.lines=26
   #23 3 consumed ZeroOrMore subSource 1/1 0/0 [0] 0/0 - ""
   #24 3 consumed TinyCalcSpaceDelimitor subSource 1/1 0/0 [0] 0/0 - ""
   #25 1 consumed TinyCalcSpaceDelimitor subSource 1/1 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=12 entryCount=6 maxEntryCount=6 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=1
-transactions opened=86 committed=36 rolledBack=50 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=86 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=7 entryCount=11 maxEntryCount=11 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=1
+transactions opened=111 committed=36 rolledBack=75 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=111 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 line=0 column=2 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=2
   expectedParsers=[' ', '//', '/*', '*/', '(', ')', SignParser, DigitParser, OneOrMore, '.', Chain, NumberParser, AlphabetUnderScoreParser, IdentifierParser, __CaptureSite]
   expectedTokens=[' ', '(', ')', '*/', '.', '/*', '//', AlphabetUnderScoreParser, Chain, DigitParser, IdentifierParser, NumberParser, OneOrMore, SignParser, __CaptureSite]
@@ -10879,8 +10879,8 @@ diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 li
 
 === grammar=memoSafe input="1**2" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=true consumedChars=1
-memo failureHits=0 successHits=12 entryCount=14 maxEntryCount=14 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=1
-transactions opened=86 committed=36 rolledBack=50 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=86 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=7 entryCount=19 maxEntryCount=19 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=1
+transactions opened=111 committed=36 rolledBack=75 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=111 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 line=0 column=2 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=2
   expectedParsers=[' ', '//', '/*', '*/', '(', ')', SignParser, DigitParser, OneOrMore, '.', Chain, NumberParser, AlphabetUnderScoreParser, IdentifierParser, __CaptureSite]
   expectedTokens=[' ', '(', ')', '*/', '.', '/*', '//', AlphabetUnderScoreParser, Chain, DigitParser, IdentifierParser, NumberParser, OneOrMore, SignParser, __CaptureSite]
@@ -10986,7 +10986,7 @@ cst.lines=26
   #23 3 consumed ZeroOrMore subSource 1/1 0/0 [0] 0/0 - ""
   #24 3 consumed TinyCalcSpaceDelimitor subSource 1/1 0/0 [0] 0/0 - ""
   #25 1 consumed TinyCalcSpaceDelimitor subSource 1/1 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=8 entryCount=4 maxEntryCount=4 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=1
+memo failureHits=0 successHits=5 entryCount=7 maxEntryCount=7 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=1
 transactions opened=36 committed=31 rolledBack=5 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=36 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -10994,7 +10994,7 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 
 === grammar=memoSafe input="1**2" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=true consumedChars=1
-memo failureHits=0 successHits=8 entryCount=9 maxEntryCount=9 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=1
+memo failureHits=0 successHits=5 entryCount=12 maxEntryCount=12 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=1
 transactions opened=36 committed=31 rolledBack=5 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=36 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -11118,8 +11118,8 @@ cst.lines=28
   #25 3 consumed ZeroOrMore subSource 2/2 0/0 [0] 0/0 - ""
   #26 3 consumed TinyCalcSpaceDelimitor subSource 2/2 0/0 [0] 0/0 - ""
   #27 1 consumed TinyCalcSpaceDelimitor subSource 2/2 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=10 entryCount=6 maxEntryCount=6 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=67 committed=32 rolledBack=35 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=67 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=7 entryCount=9 maxEntryCount=9 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=82 committed=32 rolledBack=50 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=82 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 line=0 column=2 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=2
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -11147,8 +11147,8 @@ diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 li
 
 === grammar=memoSafe input="1 2" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=true consumedChars=2
-memo failureHits=0 successHits=10 entryCount=13 maxEntryCount=13 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=67 committed=32 rolledBack=35 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=67 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=7 entryCount=16 maxEntryCount=16 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=82 committed=32 rolledBack=50 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=82 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 line=0 column=2 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=2
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -11250,7 +11250,7 @@ cst.lines=28
   #25 3 consumed ZeroOrMore subSource 2/2 0/0 [0] 0/0 - ""
   #26 3 consumed TinyCalcSpaceDelimitor subSource 2/2 0/0 [0] 0/0 - ""
   #27 1 consumed TinyCalcSpaceDelimitor subSource 2/2 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=6 entryCount=3 maxEntryCount=3 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=4 entryCount=5 maxEntryCount=5 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=32 committed=28 rolledBack=4 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=32 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -11258,7 +11258,7 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 
 === grammar=memoSafe input="1 2" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=true consumedChars=2
-memo failureHits=0 successHits=6 entryCount=7 maxEntryCount=7 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=4 entryCount=9 maxEntryCount=9 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=32 committed=28 rolledBack=4 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=32 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -11350,8 +11350,8 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 === grammar=shipped input="@" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=false consumedChars=0
 cst.lines=0
-memo failureHits=0 successHits=5 entryCount=2 maxEntryCount=2 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=41 committed=8 rolledBack=33 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=41 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=2 entryCount=5 maxEntryCount=5 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=56 committed=8 rolledBack=48 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=56 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=0
   expectedParsers=[' ', '//', '/*', '*/', 'var', 'variable', ';', '(', ')', SignParser, DigitParser, OneOrMore, '.', Chain, NumberParser, AlphabetUnderScoreParser, IdentifierParser, __CaptureSite, TermParser, ExpressionParser, TinyCalcParser]
   expectedTokens=[' ', '(', ')', '*/', '.', '/*', '//', ';', 'var', 'variable', AlphabetUnderScoreParser, Chain, DigitParser, ExpressionParser, IdentifierParser, NumberParser, OneOrMore, SignParser, TermParser, TinyCalcParser, __CaptureSite]
@@ -11391,8 +11391,8 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 
 === grammar=memoSafe input="@" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=false consumedChars=0
-memo failureHits=0 successHits=5 entryCount=7 maxEntryCount=7 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=41 committed=8 rolledBack=33 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=41 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=2 entryCount=10 maxEntryCount=10 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=56 committed=8 rolledBack=48 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=56 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=0
   expectedParsers=[' ', '//', '/*', '*/', 'var', 'variable', ';', '(', ')', SignParser, DigitParser, OneOrMore, '.', Chain, NumberParser, AlphabetUnderScoreParser, IdentifierParser, __CaptureSite, TermParser, ExpressionParser, TinyCalcParser]
   expectedTokens=[' ', '(', ')', '*/', '.', '/*', '//', ';', 'var', 'variable', AlphabetUnderScoreParser, Chain, DigitParser, ExpressionParser, IdentifierParser, NumberParser, OneOrMore, SignParser, TermParser, TinyCalcParser, __CaptureSite]
@@ -11596,8 +11596,8 @@ cst.lines=26
   #23 3 consumed ZeroOrMore subSource 1/1 0/0 [0] 0/0 - ""
   #24 3 consumed TinyCalcSpaceDelimitor subSource 1/1 0/0 [0] 0/0 - ""
   #25 1 consumed TinyCalcSpaceDelimitor subSource 1/1 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=13 entryCount=6 maxEntryCount=6 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=1
-transactions opened=89 committed=37 rolledBack=52 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=89 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=7 entryCount=12 maxEntryCount=12 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=1
+transactions opened=119 committed=37 rolledBack=82 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=119 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 line=0 column=2 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=2
   expectedParsers=[' ', '//', '/*', '*/', '(', ')', SignParser, DigitParser, OneOrMore, '.', Chain, NumberParser, AlphabetUnderScoreParser, IdentifierParser, __CaptureSite, TermParser]
   expectedTokens=[' ', '(', ')', '*/', '.', '/*', '//', AlphabetUnderScoreParser, Chain, DigitParser, IdentifierParser, NumberParser, OneOrMore, SignParser, TermParser, __CaptureSite]
@@ -11634,8 +11634,8 @@ diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 li
 
 === grammar=memoSafe input="1+@" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=true consumedChars=1
-memo failureHits=0 successHits=13 entryCount=15 maxEntryCount=15 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=1
-transactions opened=89 committed=37 rolledBack=52 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=89 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=7 entryCount=21 maxEntryCount=21 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=1
+transactions opened=119 committed=37 rolledBack=82 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=119 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 line=0 column=2 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=2
   expectedParsers=[' ', '//', '/*', '*/', '(', ')', SignParser, DigitParser, OneOrMore, '.', Chain, NumberParser, AlphabetUnderScoreParser, IdentifierParser, __CaptureSite, TermParser]
   expectedTokens=[' ', '(', ')', '*/', '.', '/*', '//', AlphabetUnderScoreParser, Chain, DigitParser, IdentifierParser, NumberParser, OneOrMore, SignParser, TermParser, __CaptureSite]
@@ -11742,7 +11742,7 @@ cst.lines=26
   #23 3 consumed ZeroOrMore subSource 1/1 0/0 [0] 0/0 - ""
   #24 3 consumed TinyCalcSpaceDelimitor subSource 1/1 0/0 [0] 0/0 - ""
   #25 1 consumed TinyCalcSpaceDelimitor subSource 1/1 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=8 entryCount=4 maxEntryCount=4 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=1
+memo failureHits=0 successHits=6 entryCount=6 maxEntryCount=6 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=1
 transactions opened=36 committed=31 rolledBack=5 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=36 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -11750,7 +11750,7 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 
 === grammar=memoSafe input="1+@" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=true consumedChars=1
-memo failureHits=0 successHits=8 entryCount=9 maxEntryCount=9 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=1
+memo failureHits=0 successHits=6 entryCount=11 maxEntryCount=11 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=1
 transactions opened=36 committed=31 rolledBack=5 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=36 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -11834,8 +11834,8 @@ diagnostics farthestOffset=6 farthestConsumedOffset=6 farthestMatchedOffset=6 li
 === grammar=shipped input="((1+2)" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=false consumedChars=0
 cst.lines=0
-memo failureHits=0 successHits=30 entryCount=14 maxEntryCount=14 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=175 committed=78 rolledBack=97 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=175 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=17 entryCount=27 maxEntryCount=27 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=240 committed=78 rolledBack=162 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=240 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=6 farthestConsumedOffset=6 farthestMatchedOffset=6 line=0 column=6 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=6
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser, ')']
   expectedTokens=[' ', ')', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -11871,8 +11871,8 @@ diagnostics farthestOffset=6 farthestConsumedOffset=6 farthestMatchedOffset=6 li
 
 === grammar=memoSafe input="((1+2)" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=false consumedChars=0
-memo failureHits=0 successHits=30 entryCount=33 maxEntryCount=33 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=175 committed=78 rolledBack=97 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=175 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=17 entryCount=46 maxEntryCount=46 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=240 committed=78 rolledBack=162 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=240 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=6 farthestConsumedOffset=6 farthestMatchedOffset=6 line=0 column=6 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=6
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser, ')']
   expectedTokens=[' ', ')', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -11926,7 +11926,7 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 === grammar=shipped input="((1+2)" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=false consumedChars=0
 cst.lines=0
-memo failureHits=0 successHits=22 entryCount=8 maxEntryCount=8 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=13 entryCount=17 maxEntryCount=17 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=85 committed=69 rolledBack=16 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=85 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -11934,7 +11934,7 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 
 === grammar=memoSafe input="((1+2)" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=false consumedChars=0
-memo failureHits=0 successHits=22 entryCount=21 maxEntryCount=21 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=13 entryCount=30 maxEntryCount=30 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=85 committed=69 rolledBack=16 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=85 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -12058,8 +12058,8 @@ cst.lines=24
   #21 3 consumed ZeroOrMore subSource 3/3 0/0 [0] 0/0 - ""
   #22 3 consumed TinyCalcSpaceDelimitor subSource 3/3 0/0 [0] 0/0 - ""
   #23 1 consumed TinyCalcSpaceDelimitor subSource 3/3 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=12 entryCount=5 maxEntryCount=5 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=3
-transactions opened=66 committed=29 rolledBack=37 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=66 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=7 entryCount=10 maxEntryCount=10 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=3
+transactions opened=91 committed=29 rolledBack=62 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=91 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=3 farthestConsumedOffset=3 farthestMatchedOffset=3 line=0 column=3 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=3
   expectedParsers=[' ', '//', '/*', '*/', AlphabetUnderScoreParser, IdentifierParser, __CaptureSite, AlphabetNumericUnderScoreParser, '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', AlphabetNumericUnderScoreParser, AlphabetUnderScoreParser, ExpressionRepeat0Parser, IdentifierParser, TermRepeat0Parser, __CaptureSite]
@@ -12091,8 +12091,8 @@ diagnostics farthestOffset=3 farthestConsumedOffset=3 farthestMatchedOffset=3 li
 
 === grammar=memoSafe input="var" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=true consumedChars=3
-memo failureHits=0 successHits=12 entryCount=12 maxEntryCount=12 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=3
-transactions opened=66 committed=29 rolledBack=37 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=66 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=7 entryCount=17 maxEntryCount=17 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=3
+transactions opened=91 committed=29 rolledBack=62 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=91 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=3 farthestConsumedOffset=3 farthestMatchedOffset=3 line=0 column=3 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=3
   expectedParsers=[' ', '//', '/*', '*/', AlphabetUnderScoreParser, IdentifierParser, __CaptureSite, AlphabetNumericUnderScoreParser, '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', AlphabetNumericUnderScoreParser, AlphabetUnderScoreParser, ExpressionRepeat0Parser, IdentifierParser, TermRepeat0Parser, __CaptureSite]
@@ -12190,7 +12190,7 @@ cst.lines=24
   #21 3 consumed ZeroOrMore subSource 3/3 0/0 [0] 0/0 - ""
   #22 3 consumed TinyCalcSpaceDelimitor subSource 3/3 0/0 [0] 0/0 - ""
   #23 1 consumed TinyCalcSpaceDelimitor subSource 3/3 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=9 entryCount=3 maxEntryCount=3 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=3
+memo failureHits=0 successHits=6 entryCount=6 maxEntryCount=6 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=3
 transactions opened=27 committed=25 rolledBack=2 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=27 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -12198,7 +12198,7 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 
 === grammar=memoSafe input="var" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=true consumedChars=3
-memo failureHits=0 successHits=9 entryCount=8 maxEntryCount=8 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=3
+memo failureHits=0 successHits=6 entryCount=11 maxEntryCount=11 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=3
 transactions opened=27 committed=25 rolledBack=2 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=27 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -12324,8 +12324,8 @@ cst.lines=26
   #23 3 consumed ZeroOrMore subSource 4/4 0/0 [0] 0/0 - ""
   #24 3 consumed TinyCalcSpaceDelimitor subSource 4/4 0/0 [0] 0/0 - ""
   #25 1 consumed TinyCalcSpaceDelimitor subSource 4/4 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=11 entryCount=6 maxEntryCount=6 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=4
-transactions opened=72 committed=30 rolledBack=42 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=72 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=7 entryCount=10 maxEntryCount=10 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=4
+transactions opened=93 committed=31 rolledBack=62 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=93 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=4 farthestConsumedOffset=4 farthestMatchedOffset=4 line=0 column=4 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=4
   expectedParsers=[' ', '//', '/*', '*/', AlphabetUnderScoreParser, IdentifierParser, __CaptureSite, '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', AlphabetUnderScoreParser, ExpressionRepeat0Parser, IdentifierParser, TermRepeat0Parser, __CaptureSite]
@@ -12356,8 +12356,8 @@ diagnostics farthestOffset=4 farthestConsumedOffset=4 farthestMatchedOffset=4 li
 
 === grammar=memoSafe input="var ;" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=true consumedChars=4
-memo failureHits=0 successHits=11 entryCount=13 maxEntryCount=13 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=4
-transactions opened=72 committed=30 rolledBack=42 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=72 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=7 entryCount=17 maxEntryCount=17 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=4
+transactions opened=93 committed=31 rolledBack=62 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=93 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=4 farthestConsumedOffset=4 farthestMatchedOffset=4 line=0 column=4 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=4
   expectedParsers=[' ', '//', '/*', '*/', AlphabetUnderScoreParser, IdentifierParser, __CaptureSite, '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', AlphabetUnderScoreParser, ExpressionRepeat0Parser, IdentifierParser, TermRepeat0Parser, __CaptureSite]
@@ -12458,16 +12458,16 @@ cst.lines=26
   #23 3 consumed ZeroOrMore subSource 4/4 0/0 [0] 0/0 - ""
   #24 3 consumed TinyCalcSpaceDelimitor subSource 4/4 0/0 [0] 0/0 - ""
   #25 1 consumed TinyCalcSpaceDelimitor subSource 4/4 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=8 entryCount=4 maxEntryCount=4 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=3
-transactions opened=28 committed=26 rolledBack=2 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=28 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=5 entryCount=7 maxEntryCount=7 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=3
+transactions opened=29 committed=27 rolledBack=2 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=29 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
   expectedTokens=[]
 
 === grammar=memoSafe input="var ;" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=true consumedChars=4
-memo failureHits=0 successHits=8 entryCount=9 maxEntryCount=9 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=3
-transactions opened=28 committed=26 rolledBack=2 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=28 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=5 entryCount=12 maxEntryCount=12 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=3
+transactions opened=29 committed=27 rolledBack=2 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=29 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
   expectedTokens=[]
@@ -12576,8 +12576,8 @@ cst.lines=26
   #23 3 consumed ZeroOrMore subSource 4/4 0/0 [0] 0/0 - ""
   #24 3 consumed TinyCalcSpaceDelimitor subSource 4/4 0/0 [0] 0/0 - ""
   #25 1 consumed TinyCalcSpaceDelimitor subSource 4/4 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=12 entryCount=8 maxEntryCount=8 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=6
-transactions opened=89 committed=38 rolledBack=51 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=89 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=8 entryCount=12 maxEntryCount=12 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=6
+transactions opened=110 committed=39 rolledBack=71 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=110 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=6 farthestConsumedOffset=6 farthestMatchedOffset=6 line=0 column=6 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=6
   expectedParsers=[' ', '//', '/*', '*/', 'set', ';']
   expectedTokens=[' ', '*/', '/*', '//', ';', 'set']
@@ -12600,8 +12600,8 @@ diagnostics farthestOffset=6 farthestConsumedOffset=6 farthestMatchedOffset=6 li
 
 === grammar=memoSafe input="var x 1; x" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=true consumedChars=4
-memo failureHits=0 successHits=12 entryCount=16 maxEntryCount=16 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=6
-transactions opened=89 committed=38 rolledBack=51 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=89 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=8 entryCount=20 maxEntryCount=20 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=6
+transactions opened=110 committed=39 rolledBack=71 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=110 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=6 farthestConsumedOffset=6 farthestMatchedOffset=6 line=0 column=6 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=6
   expectedParsers=[' ', '//', '/*', '*/', 'set', ';']
   expectedTokens=[' ', '*/', '/*', '//', ';', 'set']
@@ -12694,16 +12694,16 @@ cst.lines=26
   #23 3 consumed ZeroOrMore subSource 4/4 0/0 [0] 0/0 - ""
   #24 3 consumed TinyCalcSpaceDelimitor subSource 4/4 0/0 [0] 0/0 - ""
   #25 1 consumed TinyCalcSpaceDelimitor subSource 4/4 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=8 entryCount=6 maxEntryCount=6 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=6
-transactions opened=35 committed=33 rolledBack=2 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=35 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=5 entryCount=9 maxEntryCount=9 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=6
+transactions opened=36 committed=34 rolledBack=2 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=36 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
   expectedTokens=[]
 
 === grammar=memoSafe input="var x 1; x" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=true consumedChars=4
-memo failureHits=0 successHits=8 entryCount=11 maxEntryCount=11 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=6
-transactions opened=35 committed=33 rolledBack=2 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=35 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=5 entryCount=14 maxEntryCount=14 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=6
+transactions opened=36 committed=34 rolledBack=2 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=36 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
   expectedTokens=[]
@@ -12848,8 +12848,8 @@ cst.lines=26
   #23 3 consumed ZeroOrMore subSource 4/4 0/0 [0] 0/0 - ""
   #24 3 consumed TinyCalcSpaceDelimitor subSource 4/4 0/0 [0] 0/0 - ""
   #25 1 consumed TinyCalcSpaceDelimitor subSource 4/4 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=14 entryCount=10 maxEntryCount=10 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=10
-transactions opened=127 committed=44 rolledBack=83 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=127 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=8 entryCount=16 maxEntryCount=16 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=10
+transactions opened=158 committed=45 rolledBack=113 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=158 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=10 farthestConsumedOffset=10 farthestMatchedOffset=10 line=0 column=10 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=10
   expectedParsers=[' ', '//', '/*', '*/', '(', ')', SignParser, DigitParser, OneOrMore, '.', Chain, NumberParser, AlphabetUnderScoreParser, IdentifierParser, __CaptureSite, TermParser, ExpressionParser]
   expectedTokens=[' ', '(', ')', '*/', '.', '/*', '//', AlphabetUnderScoreParser, Chain, DigitParser, ExpressionParser, IdentifierParser, NumberParser, OneOrMore, SignParser, TermParser, __CaptureSite]
@@ -12890,8 +12890,8 @@ diagnostics farthestOffset=10 farthestConsumedOffset=10 farthestMatchedOffset=10
 
 === grammar=memoSafe input="var x set ; x" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=true consumedChars=4
-memo failureHits=0 successHits=14 entryCount=21 maxEntryCount=21 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=10
-transactions opened=127 committed=44 rolledBack=83 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=127 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=8 entryCount=27 maxEntryCount=27 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=10
+transactions opened=158 committed=45 rolledBack=113 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=158 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=10 farthestConsumedOffset=10 farthestMatchedOffset=10 line=0 column=10 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=10
   expectedParsers=[' ', '//', '/*', '*/', '(', ')', SignParser, DigitParser, OneOrMore, '.', Chain, NumberParser, AlphabetUnderScoreParser, IdentifierParser, __CaptureSite, TermParser, ExpressionParser]
   expectedTokens=[' ', '(', ')', '*/', '.', '/*', '//', AlphabetUnderScoreParser, Chain, DigitParser, ExpressionParser, IdentifierParser, NumberParser, OneOrMore, SignParser, TermParser, __CaptureSite]
@@ -13002,16 +13002,16 @@ cst.lines=26
   #23 3 consumed ZeroOrMore subSource 4/4 0/0 [0] 0/0 - ""
   #24 3 consumed TinyCalcSpaceDelimitor subSource 4/4 0/0 [0] 0/0 - ""
   #25 1 consumed TinyCalcSpaceDelimitor subSource 4/4 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=9 entryCount=7 maxEntryCount=7 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=9
-transactions opened=39 committed=36 rolledBack=3 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=39 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=6 entryCount=10 maxEntryCount=10 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=9
+transactions opened=40 committed=37 rolledBack=3 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=40 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
   expectedTokens=[]
 
 === grammar=memoSafe input="var x set ; x" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=true consumedChars=4
-memo failureHits=0 successHits=9 entryCount=13 maxEntryCount=13 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=9
-transactions opened=39 committed=36 rolledBack=3 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=39 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=6 entryCount=16 maxEntryCount=16 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=9
+transactions opened=40 committed=37 rolledBack=3 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=40 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
   expectedTokens=[]
@@ -13142,8 +13142,8 @@ cst.lines=26
   #23 3 consumed ZeroOrMore subSource 4/4 0/0 [0] 0/0 - ""
   #24 3 consumed TinyCalcSpaceDelimitor subSource 4/4 0/0 [0] 0/0 - ""
   #25 1 consumed TinyCalcSpaceDelimitor subSource 4/4 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=19 entryCount=14 maxEntryCount=14 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=12
-transactions opened=153 committed=68 rolledBack=85 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=153 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=13 entryCount=20 maxEntryCount=20 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=12
+transactions opened=184 committed=69 rolledBack=115 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=184 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=12 farthestConsumedOffset=12 farthestMatchedOffset=12 line=0 column=12 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=12
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser, ';']
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ';', ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -13177,8 +13177,8 @@ diagnostics farthestOffset=12 farthestConsumedOffset=12 farthestMatchedOffset=12
 
 === grammar=memoSafe input="var x set 1 x" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=true consumedChars=4
-memo failureHits=0 successHits=19 entryCount=27 maxEntryCount=27 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=12
-transactions opened=153 committed=68 rolledBack=85 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=153 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=13 entryCount=33 maxEntryCount=33 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=12
+transactions opened=184 committed=69 rolledBack=115 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=184 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=12 farthestConsumedOffset=12 farthestMatchedOffset=12 line=0 column=12 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=12
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser, ';']
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ';', ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -13282,16 +13282,16 @@ cst.lines=26
   #23 3 consumed ZeroOrMore subSource 4/4 0/0 [0] 0/0 - ""
   #24 3 consumed TinyCalcSpaceDelimitor subSource 4/4 0/0 [0] 0/0 - ""
   #25 1 consumed TinyCalcSpaceDelimitor subSource 4/4 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=13 entryCount=10 maxEntryCount=10 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=12
-transactions opened=67 committed=61 rolledBack=6 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=67 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=9 entryCount=14 maxEntryCount=14 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=12
+transactions opened=68 committed=62 rolledBack=6 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=68 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
   expectedTokens=[]
 
 === grammar=memoSafe input="var x set 1 x" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=true consumedChars=4
-memo failureHits=0 successHits=13 entryCount=19 maxEntryCount=19 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=12
-transactions opened=67 committed=61 rolledBack=6 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=67 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=9 entryCount=23 maxEntryCount=23 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=12
+transactions opened=68 committed=62 rolledBack=6 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=68 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
   expectedTokens=[]
@@ -13416,8 +13416,8 @@ cst.lines=26
   #23 3 consumed ZeroOrMore subSource 4/4 0/0 [0] 0/0 - ""
   #24 3 consumed TinyCalcSpaceDelimitor subSource 4/4 0/0 [0] 0/0 - ""
   #25 1 consumed TinyCalcSpaceDelimitor subSource 4/4 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=11 entryCount=6 maxEntryCount=6 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=4
-transactions opened=72 committed=30 rolledBack=42 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=72 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=7 entryCount=10 maxEntryCount=10 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=4
+transactions opened=93 committed=31 rolledBack=62 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=93 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=4 farthestConsumedOffset=4 farthestMatchedOffset=4 line=0 column=4 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=4
   expectedParsers=[' ', '//', '/*', '*/', AlphabetUnderScoreParser, IdentifierParser, __CaptureSite, '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', AlphabetUnderScoreParser, ExpressionRepeat0Parser, IdentifierParser, TermRepeat0Parser, __CaptureSite]
@@ -13448,8 +13448,8 @@ diagnostics farthestOffset=4 farthestConsumedOffset=4 farthestMatchedOffset=4 li
 
 === grammar=memoSafe input="var 1 set 2; 1" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=true consumedChars=4
-memo failureHits=0 successHits=11 entryCount=13 maxEntryCount=13 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=4
-transactions opened=72 committed=30 rolledBack=42 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=72 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=7 entryCount=17 maxEntryCount=17 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=4
+transactions opened=93 committed=31 rolledBack=62 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=93 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=4 farthestConsumedOffset=4 farthestMatchedOffset=4 line=0 column=4 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=4
   expectedParsers=[' ', '//', '/*', '*/', AlphabetUnderScoreParser, IdentifierParser, __CaptureSite, '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', AlphabetUnderScoreParser, ExpressionRepeat0Parser, IdentifierParser, TermRepeat0Parser, __CaptureSite]
@@ -13550,16 +13550,16 @@ cst.lines=26
   #23 3 consumed ZeroOrMore subSource 4/4 0/0 [0] 0/0 - ""
   #24 3 consumed TinyCalcSpaceDelimitor subSource 4/4 0/0 [0] 0/0 - ""
   #25 1 consumed TinyCalcSpaceDelimitor subSource 4/4 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=8 entryCount=4 maxEntryCount=4 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=3
-transactions opened=28 committed=26 rolledBack=2 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=28 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=5 entryCount=7 maxEntryCount=7 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=3
+transactions opened=29 committed=27 rolledBack=2 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=29 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
   expectedTokens=[]
 
 === grammar=memoSafe input="var 1 set 2; 1" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=true consumedChars=4
-memo failureHits=0 successHits=8 entryCount=9 maxEntryCount=9 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=3
-transactions opened=28 committed=26 rolledBack=2 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=28 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=5 entryCount=12 maxEntryCount=12 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=3
+transactions opened=29 committed=27 rolledBack=2 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=29 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
   expectedTokens=[]
@@ -13674,8 +13674,8 @@ cst.lines=24
   #21 3 consumed ZeroOrMore subSource 2/2 0/0 [0] 0/0 - ""
   #22 3 consumed TinyCalcSpaceDelimitor subSource 2/2 0/0 [0] 0/0 - ""
   #23 1 consumed TinyCalcSpaceDelimitor subSource 2/2 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=10 entryCount=6 maxEntryCount=6 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=70 committed=27 rolledBack=43 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=70 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=7 entryCount=9 maxEntryCount=9 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=85 committed=27 rolledBack=58 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=85 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 line=0 column=2 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=2
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -13703,8 +13703,8 @@ diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 li
 
 === grammar=memoSafe input="x set 1" diagnostics=DETAILED memoization=SAFE_FAILURES
 succeeded=true consumedChars=2
-memo failureHits=0 successHits=10 entryCount=13 maxEntryCount=13 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
-transactions opened=70 committed=27 rolledBack=43 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=70 copyOnWriteDeepCopies=0
+memo failureHits=0 successHits=7 entryCount=16 maxEntryCount=16 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+transactions opened=85 committed=27 rolledBack=58 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=85 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=2 farthestConsumedOffset=2 farthestMatchedOffset=2 line=0 column=2 hasFailureCandidate=true deepestMatchedRule="WordParser" deepestConsumedPosition=2
   expectedParsers=[' ', '//', '/*', '*/', '*', '/', TermRepeat0Parser, '+', '-', ExpressionRepeat0Parser]
   expectedTokens=[' ', '*', '*/', '+', '-', '/', '/*', '//', ExpressionRepeat0Parser, TermRepeat0Parser]
@@ -13798,7 +13798,7 @@ cst.lines=24
   #21 3 consumed ZeroOrMore subSource 2/2 0/0 [0] 0/0 - ""
   #22 3 consumed TinyCalcSpaceDelimitor subSource 2/2 0/0 [0] 0/0 - ""
   #23 1 consumed TinyCalcSpaceDelimitor subSource 2/2 0/0 [0] 0/0 - ""
-memo failureHits=0 successHits=6 entryCount=3 maxEntryCount=3 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=4 entryCount=5 maxEntryCount=5 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=22 committed=22 rolledBack=0 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=22 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
@@ -13806,7 +13806,7 @@ diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 li
 
 === grammar=memoSafe input="x set 1" diagnostics=DETAILED_ON_FAILURE memoization=SAFE_FAILURES
 succeeded=true consumedChars=2
-memo failureHits=0 successHits=6 entryCount=7 maxEntryCount=7 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
+memo failureHits=0 successHits=4 entryCount=9 maxEntryCount=9 evicted=0 deadOnArrival=0 underruns=0 maxHitLookback=0
 transactions opened=22 committed=22 rolledBack=0 nonemptyPayloadSnapshots=0 emptyPayloadCheckpoints=22 copyOnWriteDeepCopies=0
 diagnostics farthestOffset=0 farthestConsumedOffset=0 farthestMatchedOffset=0 line=0 column=0 hasFailureCandidate=false deepestMatchedRule="" deepestConsumedPosition=0
   expectedParsers=[]
