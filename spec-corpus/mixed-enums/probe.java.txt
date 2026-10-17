@@ -1,0 +1,31 @@
+package org.example.mixedenum;
+import com.google.gson.*;
+public final class Probe extends MixedEnumsEvaluator<JsonElement> {
+    public static JsonElement run(MixedEnumsAST node) {
+        var value=new Probe().eval(node);
+        if(node instanceof MixedEnumsAST.Leaf) {var root=new JsonObject();root.add("root",value);return root;}
+        return value;
+    }
+    @Override protected JsonElement evalValues(MixedEnumsAST.Values node) {
+        var result=new JsonObject();
+        result.add("head",node.head().map(this::value).orElse(JsonNull.INSTANCE));
+        var values=new JsonArray();for(var item:node.values())values.add(value(item));
+        result.add("values",values);return result;
+    }
+    @Override protected JsonElement evalLeaf(MixedEnumsAST.Leaf node) {
+        var result=new JsonArray();result.add("node");result.add("Leaf");result.add(node.text());return result;
+    }
+    private JsonElement value(Object value) {
+        if(value instanceof MixedEnumsAST ast)return eval(ast);
+        var result=new JsonArray();
+        if(value instanceof MixedEnumsAST.EnumValue occurrence) {
+            result.add("enum");
+            var item=occurrence.value();result.add(item.getDeclaringClass().getSimpleName());
+            if(item instanceof MixedEnumsAST.Mode mode)result.add(mode.text());
+            else if(item instanceof MixedEnumsAST.Heat heat)result.add(heat.text());
+            else throw new AssertionError(item);
+        } else if(value instanceof String text) { result.add("text");result.add(text); }
+        else throw new AssertionError(value);
+        return result;
+    }
+}

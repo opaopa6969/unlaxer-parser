@@ -77,6 +77,10 @@ class MapperTypeResolver {
         if (element instanceof TerminalElement ignored) {
             return "String";
         }
+        if (element instanceof RuleRefElement || element instanceof GroupElement) {
+            var enumType=EnumSchema.enumType(grammar,element);
+            if(enumType.isPresent()) return grammar.name()+"AST."+enumType.get();
+        }
         if (element instanceof RuleRefElement ruleRefElement) {
             if (grammar.rules().stream().anyMatch(r -> r.name().equals(ruleRefElement.name())
                     && MapperElementUtil.isSkipped(r))) return "String";
