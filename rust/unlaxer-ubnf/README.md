@@ -45,7 +45,7 @@ ASTは入力の借用を持たず、入力文字列破棄後も使用できる�
 
 | 分類 | Rust AST・対応する構文 |
 |---|---|
-| file/grammar | 複数`grammar NAME { ... }`、各grammarに1個以上のrule |
+| file/grammar | 複数`grammar NAME { ... }`、空のgrammarも構文として受理（生成可能性は後続validatorで検査） |
 | declarations | import→setting→token→ruleの順序、`@import alias from 'path'` |
 | settings | `@key: dotted.value`、`@key: { key: 'value' ... }` |
 | token（12種類） | Simple(parser class/FQN)、UNTIL、NEGATION、LOOKAHEAD、NEGATIVE_LOOKAHEAD、ANY、EOF、EMPTY、CHAR_RANGE、CI、REGEX、ADAPTER |
@@ -85,16 +85,21 @@ mvn -B -pl unlaxer-common,unlaxer-dsl -am test \
 
 共有positive fixtureは全構文種、既存self-host grammar、tinycalc-vscode、cardinality、
 evolution文法を比較する。negative fixtureも両frontendへ同じ入力を与える。
-Java側の明白な取りこぼしを再現する`tests/fixtures/known`は一致検査から分離し、
-Javaの実際の誤結果とRustの正しいASTをそれぞれassertする。
+`tests/fixtures/known`に残るファイル名は過去の不具合の回帰fixtureであり、現在は
+すべてJava/nativeのAST一致検査へ含める。3.3.0公開後の #538 でannotationの差を修正した。
 
-| fixture | Java bootstrapの観測結果 | nativeの契約 |
-|---|---|---|
-| eval-default | `@eval(kind='variable_ref',strip_prefix='$')`のstrategyを`$`と誤認 | strategyは`default`、strip_prefixは独立param |
-| namespace | `a.b.Value`をnamespace=`a`, name=`b`へ切り詰める | namespace=`a.b`, name=`Value`を保持 |
-| keyword-boundary | `@rooted`が`@root`のprefixに奪われparse失敗 | `Simple { name: "rooted" }` |
-| common-field-space | `@commonField(left, right)`のcomma後空白でparse失敗 | 通常のtriviaとして許容 |
-| negative.tsv / trailing-input | 最初のgrammarの後のgarbageを無視してprefix成功 | 全入力を検査して拒否 |
+| fixture | 現在のJava/native共通契約 |
+|---|---|
+| eval-default | strategyは`default`、strip_prefixは独立param。明示strategyは他paramの前後で指定でき、重複引数は拒否 |
+| namespace | namespace=`a.b`, name=`Value`を保持（#284で修正済み） |
+| keyword-boundary | `@rooted`を`Simple { name: "rooted" }`として保持。引数なし組込みannotationの識別子境界を検査 |
+| common-field-space | comma後の空白・改行・行コメントを通常のtriviaとして許容 |
+| negative.tsv / trailing-input | 全入力を検査して拒否（#282で修正済み） |
+
+`positive/annotation-parity.ubnf`には27個のprefix名、名前付きeval引数・escape、
+commentを含むcommonFieldを保存する。両言語で値を独立期待値と比較し、
+source snapshot比較はLF/CRLFと補助文字を含む全ノードのCP範囲・原文を検査する。
+Java17向け専用の追加設計は行わず、今後の機能・品質基準はJava21以上とする。
 
 Javaのdiagnosticsは先頭80文字のparse失敗文で、正確なエラー位置は公開しないため位置同値を
 主張しない。native位置は独立のUnicode/CRLF/spanテストで検査する。

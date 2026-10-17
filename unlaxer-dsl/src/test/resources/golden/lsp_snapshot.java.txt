@@ -21,6 +21,8 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
     protected final Map<String, DocumentState> documents = new HashMap<>();
     protected final Map<String, Long> documentVersions = new HashMap<>();
     private volatile boolean shutdownRequested;
+    private boolean semanticMultiline, semanticOverlapping;
+    private volatile SemanticTokensLegend semanticTokenLegend = new SemanticTokensLegend(List.of("valid", "invalid"), List.of());
     private final CompletableFuture<Integer> exitStatus = new CompletableFuture<>();
 
     private volatile org.unlaxer.source.LanguageProfile.Selection selectedLanguageProfile;
@@ -49,6 +51,13 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
         configureAdditionalCapabilities(capabilities);
         configureLanguageQueryCapabilities(capabilities);
         applyLanguageProfile(capabilities);
+        var textCapabilities = params == null || params.getCapabilities() == null ? null : params.getCapabilities().getTextDocument();
+        var semantic = textCapabilities == null ? null : textCapabilities.getSemanticTokens();
+        semanticMultiline = semantic != null && Boolean.TRUE.equals(semantic.getMultilineTokenSupport());
+        semanticOverlapping = semantic != null && Boolean.TRUE.equals(semantic.getOverlappingTokenSupport());
+        var semanticProvider = capabilities.getSemanticTokensProvider();
+        var legend = semanticProvider == null ? new SemanticTokensLegend(List.of(), List.of()) : semanticProvider.getLegend();
+        semanticTokenLegend = legend == null ? null : new SemanticTokensLegend(List.copyOf(legend.getTokenTypes()), List.copyOf(legend.getTokenModifiers()));
         return CompletableFuture.completedFuture(new InitializeResult(capabilities));
     }
 
@@ -517,7 +526,55 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
         return null;
     }
 
-    // Hook: additional semantic tokens (for embedded languages like Java code blocks)
+    private static List<Integer> validateSemanticTokenData(String content, int[] data, SemanticTokensLegend legend,
+            boolean multiline, boolean overlapping) {
+        if (data == null) return List.of();
+        if (data.length % 5 != 0 || legend == null) throw new IllegalArgumentException("invalid semantic token encoding");
+        if (data.length == 0) return List.of();
+        int modifiers = legend.getTokenModifiers().size();
+        int allowedModifiers = modifiers >= 31 ? Integer.MAX_VALUE : (1 << modifiers) - 1;
+        List<Integer> starts = new ArrayList<>(), ends = new ArrayList<>();
+        BitSet boundaries = new BitSet(content.length() + 1);
+        starts.add(0); boundaries.set(0);
+        for (int index = 0; index < content.length();) {
+            int scalar = content.codePointAt(index);
+            if (scalar == '\r' || scalar == '\n') {
+                ends.add(index++);
+                if (scalar == '\r' && index < content.length() && content.charAt(index) == '\n') index++;
+                starts.add(index);
+            } else index += Character.charCount(scalar);
+            boundaries.set(index);
+        }
+        ends.add(content.length());
+        long tokenLine = 0, tokenStart = 0, previousEnd = 0;
+        List<Integer> result = new ArrayList<>(data.length);
+        for (int offset = 0; offset < data.length; offset += 5) {
+            for (int part = 0; part < 5; part++) {
+                if (data[offset + part] < 0) throw new IllegalArgumentException("invalid semantic token encoding");
+                result.add(data[offset + part]);
+            }
+            tokenLine += data[offset];
+            tokenStart = data[offset] == 0 ? tokenStart + data[offset + 1] : data[offset + 1];
+            if (data[offset + 3] >= 65536 || data[offset + 3] >= legend.getTokenTypes().size()
+                    || (data[offset + 4] & ~allowedModifiers) != 0)
+                throw new IllegalArgumentException("invalid semantic token length or legend index");
+            if (tokenLine >= starts.size()) throw new IllegalArgumentException("semantic token outside document");
+            long absolute = starts.get((int) tokenLine) + tokenStart;
+            int lineEnd = ends.get((int) tokenLine);
+            if (absolute > lineEnd) throw new IllegalArgumentException("semantic token outside line");
+            long rawEnd = absolute + data[offset + 2];
+            // LSP 3.17: excess length is interpreted at line end without multiline support.
+            long end = multiline ? rawEnd : Math.min(rawEnd, lineEnd);
+            if (end > content.length() || !boundaries.get((int) absolute) || !boundaries.get((int) end)
+                    || !overlapping && end > absolute && absolute < previousEnd)
+                throw new IllegalArgumentException("invalid semantic token position or overlap");
+            previousEnd = Math.max(previousEnd, end);
+        }
+        return result;
+    }
+
+    // Hook: full UTF-16 LSP data indexed by the advertised legend and negotiated client support.
+    // Invalid data fails the request with InternalError; null preserves the legacy empty result.
     protected int[] additionalSemanticTokenData(String uri, String documentContent) {
         return new int[0];
     }
@@ -680,13 +737,13 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
             if (state == null) {
                 return CompletableFuture.completedFuture(new SemanticTokens(Collections.emptyList()));
             }
-            int[] tokenData = server.additionalSemanticTokenData(uri, state.content());
-            if (tokenData != null && tokenData.length > 0) {
-                List<Integer> data = new ArrayList<>();
-                for (int v : tokenData) { data.add(v); }
-                return CompletableFuture.completedFuture(new SemanticTokens(data));
+            try {
+                int[] tokenData = server.additionalSemanticTokenData(uri, state.content());
+                return CompletableFuture.completedFuture(new SemanticTokens(validateSemanticTokenData(state.content(), tokenData, server.semanticTokenLegend, server.semanticMultiline, server.semanticOverlapping)));
+            } catch (RuntimeException invalid) {
+                return CompletableFuture.failedFuture(new org.eclipse.lsp4j.jsonrpc.ResponseErrorException(
+                    new org.eclipse.lsp4j.jsonrpc.messages.ResponseError(org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode.InternalError, "Invalid semantic token provider result", null)));
             }
-            return CompletableFuture.completedFuture(new SemanticTokens(Collections.emptyList()));
         }
     }
 
