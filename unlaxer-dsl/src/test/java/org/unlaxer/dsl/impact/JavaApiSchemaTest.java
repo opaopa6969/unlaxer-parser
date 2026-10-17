@@ -34,9 +34,13 @@ public class JavaApiSchemaTest {
         var result = JavaApiSchema.build(sourceSnapshot);
         assertEquals("example.schema.SchemaAST", result.astType());
         assertEquals("example.schema.SchemaEvaluator", result.evaluatorType());
-        assertEquals(List.of("Item", "Item.Numeric", "Item.Text", "Mode", "Program"),
+        assertEquals(List.of("EnumValue", "Item", "Item.Numeric", "Item.Text", "Mode", "Program"),
             result.nodes().stream().map(ApiImpact.Node::name).toList());
 
+        var occurrence = node(result, "EnumValue");
+        assertEquals("record", occurrence.kind());
+        assertEquals(List.of("value"), occurrence.fields().stream().map(ApiImpact.Field::name).toList());
+        assertEquals(List.of(), occurrence.parents());
         var sum = node(result, "Item");
         assertEquals("interface", sum.kind());
         assertEquals(List.of("Item.Numeric", "Item.Text"), sum.variants());
@@ -148,17 +152,17 @@ public class JavaApiSchemaTest {
             new String[]{"""
                 @root @mapping(Foo) Root ::= 'x';
                 @enum Foo ::= 'on' | 'off';
-                """, "duplicate generated node: Foo"},
+                """, "enum type name collision: Foo"},
             new String[]{"""
                 @root @mapping(Value) Root ::= 'x';
                 @enum Mode ::= 'on' | 'ON';
-                """, "duplicate generated variant: Mode.ON"}
+                """, "enum constant name collision: ON"}
         )) {
             String source = "grammar Ambiguous {\n" + caseAndCode[0] + "\n}";
             try {
                 JavaApiSchema.build(UBNFMapper.parseWithSource(source));
                 fail("expected schema failure: " + caseAndCode[1]);
-            } catch (IllegalStateException error) {
+            } catch (IllegalArgumentException | IllegalStateException error) {
                 assertTrue(error.getMessage(), error.getMessage().contains(caseAndCode[1]));
             }
         }

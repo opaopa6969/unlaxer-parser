@@ -64,6 +64,8 @@ public class ASTGenerator implements CodeGenerator {
 
     @Override
     public GeneratedSource generate(GrammarDecl grammar) {
+        EnumSchema.validate(grammar);
+        var enumRoots = EnumSchema.rootEnums(grammar);
         String packageName = getPackageName(grammar);
         String grammarName = grammar.name();
         String className = grammarName + "AST";
@@ -131,7 +133,7 @@ public class ASTGenerator implements CodeGenerator {
         sb.append("\n");
         sb.append(CodeGenerator.generatedAnnotation("org.unlaxer.dsl.codegen.ASTGenerator"));
 
-        if (flatRules.isEmpty() && nestedRules.isEmpty() && midSealedRules.isEmpty()) {
+        if (flatRules.isEmpty() && nestedRules.isEmpty() && midSealedRules.isEmpty() && enumRules.isEmpty()) {
             sb.append("public interface ").append(className).append(" {}\n");
             return new GeneratedSource(packageName, className, sb.toString());
         }
@@ -151,11 +153,14 @@ public class ASTGenerator implements CodeGenerator {
             if (!recordToMidSealed.containsKey(name)) astPermits.add(name);
         }
 
+        astPermits.addAll(enumRoots.values());
         String permitsClause = astPermits.stream()
             .map(name -> className + "." + name)
             .collect(Collectors.joining(",\n    "));
 
-        sb.append("public sealed interface ").append(className).append(" permits\n")
+        if (astPermits.isEmpty()) {
+            sb.append("public interface ").append(className).append(" {\n\n");
+        } else sb.append("public sealed interface ").append(className).append(" permits\n")
           .append("    ").append(permitsClause).append(" {\n\n");
 
         // ----- Pass 4: 出力 -----
@@ -185,6 +190,14 @@ public class ASTGenerator implements CodeGenerator {
             String parentTypes = String.join(", ", recordToMidSealed.getOrDefault(outerName, Set.of(className)));
             emitNestedSealed(sb, outerName, inners, grammar, parentTypes);
         }
+
+        for (var entry : enumRoots.entrySet()) {
+            sb.append("    record ").append(entry.getValue()).append("(").append(entry.getKey())
+              .append(" value) implements ").append(className).append(" {}\n\n");
+        }
+
+        if (!enumRules.isEmpty()) sb.append("    /** One enum occurrence in a mixed capture; source maps use this wrapper's identity. */\n")
+            .append("    record EnumValue(java.lang.Enum<?> value) { public EnumValue { java.util.Objects.requireNonNull(value); } }\n\n");
 
         // enum ルール
         for (RuleDecl enumRule : enumRules) {
@@ -306,69 +319,30 @@ public class ASTGenerator implements CodeGenerator {
      */
     private String generateEnumClass(RuleDecl rule, String indent) {
         String enumName = rule.name();
-        List<String> literals = collectTerminalLiterals(rule.body());
-        if (literals.isEmpty()) {
-            return "";
-        }
+        var literals = EnumSchema.literals(rule);
         StringBuilder sb = new StringBuilder();
         sb.append(indent).append("public enum ").append(enumName).append(" {\n");
-        List<String> constNames = literals.stream()
-            .map(ASTGenerator::toEnumConstantName)
-            .toList();
-        sb.append(indent).append("    ")
-          .append(String.join(", ", constNames)).append(";\n\n");
-        // fromText(String text) factory
-        sb.append(indent).append("    public static ").append(enumName)
-          .append(" fromText(String text) {\n");
-        sb.append(indent).append("        return switch (text) {\n");
-        for (int i = 0; i < literals.size(); i++) {
-            sb.append(indent).append("            case \"").append(literals.get(i))
-              .append("\" -> ").append(constNames.get(i)).append(";\n");
+        sb.append(indent).append("    ").append(literals.stream().map(EnumSchema::constantName)
+            .collect(Collectors.joining(", "))).append(";\n\n");
+        sb.append(indent).append("    public static ").append(enumName).append(" fromText(String text) {\n")
+          .append(indent).append("        return switch (text) {\n");
+        for (String literal : literals) {
+            sb.append(indent).append("            case ").append(javaString(literal)).append(" -> ")
+              .append(EnumSchema.constantName(literal)).append(";\n");
         }
-        sb.append(indent).append("            default -> throw new IllegalArgumentException(")
-          .append("\"Unknown ").append(enumName).append(": \" + text);\n");
-        sb.append(indent).append("        };\n");
-        sb.append(indent).append("    }\n");
-        sb.append(indent).append("}\n\n");
+        sb.append(indent).append("            default -> throw new java.lang.IllegalArgumentException(\"Unknown ")
+          .append(enumName).append(": \" + text);\n")
+          .append(indent).append("        };\n").append(indent).append("    }\n")
+          .append(indent).append("    public String text() {\n").append(indent).append("        return switch (this) {\n");
+        for (String literal : literals) sb.append(indent).append("            case ").append(EnumSchema.constantName(literal))
+            .append(" -> ").append(javaString(literal)).append(";\n");
+        sb.append(indent).append("        };\n").append(indent).append("    }\n").append(indent).append("}\n\n");
         return sb.toString();
     }
 
-    private static String toEnumConstantName(String literal) {
-        // camelCase → CAMEL_CASE, kebab-case → KEBAB_CASE, simple → SIMPLE
-        StringBuilder sb = new StringBuilder();
-        boolean prevLower = false;
-        for (char c : literal.toCharArray()) {
-            if (c == '-' || c == '_' || c == ' ') {
-                sb.append('_');
-                prevLower = false;
-            } else if (Character.isUpperCase(c) && prevLower) {
-                sb.append('_').append(c);
-                prevLower = false;
-            } else {
-                sb.append(Character.toUpperCase(c));
-                prevLower = Character.isLowerCase(c);
-            }
-        }
-        return sb.toString();
-    }
-
-    private List<String> collectTerminalLiterals(UBNFAST.RuleBody body) {
-        if (body instanceof UBNFAST.ChoiceBody choice) {
-            return choice.alternatives().stream()
-                .flatMap(seq -> seq.elements().stream())
-                .map(ae -> ae.element())
-                .filter(e -> e instanceof UBNFAST.TerminalElement)
-                .map(e -> ((UBNFAST.TerminalElement) e).value())
-                .toList();
-        }
-        if (body instanceof UBNFAST.SequenceBody seq) {
-            return seq.elements().stream()
-                .map(ae -> ae.element())
-                .filter(e -> e instanceof UBNFAST.TerminalElement)
-                .map(e -> ((UBNFAST.TerminalElement) e).value())
-                .toList();
-        }
-        throw new IllegalStateException("unhandled " + body);
+    private static String javaString(String value) {
+        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"")
+            .replace("\r", "\\r").replace("\n", "\\n").replace("\t", "\\t") + "\"";
     }
 
     private String inferCommonFieldType(GrammarDecl grammar, String sealedName,
@@ -482,6 +456,10 @@ public class ASTGenerator implements CodeGenerator {
         String astClassName = grammar.name() + "AST";
         if (element instanceof TerminalElement t) {
             return "String";
+        }
+        if (element instanceof RuleRefElement || element instanceof GroupElement) {
+            var enumType=EnumSchema.enumType(grammar,element);
+            if(enumType.isPresent()) return grammar.name()+"AST."+enumType.get();
         }
         if (element instanceof RuleRefElement r) {
             if (grammar.rules().stream().anyMatch(rule -> rule.name().equals(r.name())
