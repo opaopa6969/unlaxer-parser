@@ -176,7 +176,9 @@ impl<B: Backend> Server<B> {
                 self.column_base = usize::from(arguments["columnsStartAt1"] != false);
                 return Ok(json!({"supportsConfigurationDoneRequest":true}));
             }
-            if !self.initialized {
+            // Cancellation may arrive before initialize completes. Disconnect still
+            // acknowledges and closes this transport, matching generated Java launchers.
+            if !self.initialized && command != "disconnect" {
                 return Err("not initialized".into());
             }
             match command.as_str() {
