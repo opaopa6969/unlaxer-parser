@@ -60,6 +60,8 @@ class LSPServerEmitter {
         w.line("protected final Map<String, DocumentState> documents = new HashMap<>();");
         w.line("protected final Map<String, Long> documentVersions = new HashMap<>();");
         w.line("private volatile boolean shutdownRequested;");
+        w.line("private boolean semanticMultiline, semanticOverlapping;");
+        w.line("private volatile SemanticTokensLegend semanticTokenLegend = new SemanticTokensLegend(List.of(\"valid\", \"invalid\"), List.of());");
         w.line("private final CompletableFuture<Integer> exitStatus = new CompletableFuture<>();");
         w.blankLine();
 
@@ -108,6 +110,13 @@ class LSPServerEmitter {
         w.line("configureAdditionalCapabilities(capabilities);");
         w.line("configureLanguageQueryCapabilities(capabilities);");
         w.line("applyLanguageProfile(capabilities);");
+        w.line("var textCapabilities = params == null || params.getCapabilities() == null ? null : params.getCapabilities().getTextDocument();");
+        w.line("var semantic = textCapabilities == null ? null : textCapabilities.getSemanticTokens();");
+        w.line("semanticMultiline = semantic != null && Boolean.TRUE.equals(semantic.getMultilineTokenSupport());");
+        w.line("semanticOverlapping = semantic != null && Boolean.TRUE.equals(semantic.getOverlappingTokenSupport());");
+        w.line("var semanticProvider = capabilities.getSemanticTokensProvider();");
+        w.line("var legend = semanticProvider == null ? new SemanticTokensLegend(List.of(), List.of()) : semanticProvider.getLegend();");
+        w.line("semanticTokenLegend = legend == null ? null : new SemanticTokensLegend(List.copyOf(legend.getTokenTypes()), List.copyOf(legend.getTokenModifiers()));");
         w.line("return CompletableFuture.completedFuture(new InitializeResult(capabilities));");
         w.dedent();
         w.line("}");
@@ -467,7 +476,9 @@ class LSPServerEmitter {
         w.line("}");
         w.blankLine();
 
-        w.line("// Hook: additional semantic tokens (for embedded languages like Java code blocks)");
+        LSPSemanticTokenEmitter.emitValidation(w);
+        w.line("// Hook: full UTF-16 LSP data indexed by the advertised legend and negotiated client support.");
+        w.line("// Invalid data fails the request with InternalError; null preserves the legacy empty result.");
         w.line("protected int[] additionalSemanticTokenData(String uri, String documentContent) {");
         w.indent();
         w.line("return new int[0];");
@@ -795,15 +806,17 @@ class LSPServerEmitter {
         w.line("return CompletableFuture.completedFuture(new SemanticTokens(Collections.emptyList()));");
         w.dedent();
         w.line("}");
-        w.line("int[] tokenData = server.additionalSemanticTokenData(uri, state.content());");
-        w.line("if (tokenData != null && tokenData.length > 0) {");
+        w.line("try {");
         w.indent();
-        w.line("List<Integer> data = new ArrayList<>();");
-        w.line("for (int v : tokenData) { data.add(v); }");
-        w.line("return CompletableFuture.completedFuture(new SemanticTokens(data));");
+        w.line("int[] tokenData = server.additionalSemanticTokenData(uri, state.content());");
+        w.line("return CompletableFuture.completedFuture(new SemanticTokens(validateSemanticTokenData(state.content(), tokenData, server.semanticTokenLegend, server.semanticMultiline, server.semanticOverlapping)));");
+        w.dedent();
+        w.line("} catch (RuntimeException invalid) {");
+        w.indent();
+        w.line("return CompletableFuture.failedFuture(new org.eclipse.lsp4j.jsonrpc.ResponseErrorException(");
+        w.line("    new org.eclipse.lsp4j.jsonrpc.messages.ResponseError(org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode.InternalError, \"Invalid semantic token provider result\", null)));");
         w.dedent();
         w.line("}");
-        w.line("return CompletableFuture.completedFuture(new SemanticTokens(Collections.emptyList()));");
         w.dedent();
         w.line("}");
         w.dedent();
