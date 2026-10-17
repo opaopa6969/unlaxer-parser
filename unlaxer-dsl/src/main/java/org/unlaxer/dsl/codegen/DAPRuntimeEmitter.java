@@ -258,8 +258,7 @@ class DAPRuntimeEmitter {
         w.line("return false;");
         w.dedent();
         w.line("}");
-        w.line("String className = value.getClass().getName();");
-        w.line("return className.startsWith(\"" + packageName + "." + grammarName + "AST\");");
+        w.line("return value instanceof " + grammarName + "AST;");
         w.dedent();
         w.line("}");
         w.blankLine();

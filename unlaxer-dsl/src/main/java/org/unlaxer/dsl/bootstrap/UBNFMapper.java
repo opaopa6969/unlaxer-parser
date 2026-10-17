@@ -1120,7 +1120,7 @@ public class UBNFMapper {
 
     Optional<TypeofElement> findTypeofConstraintInAnnotatedElement(Token token) {
         // AnnotatedElementParser のプレフィックス Optional 内の TypeofElementParser を探す
-        List<Token> typeofTokens = findDescendants(token, UBNFParsers.TypeofElementParser.class);
+        List<Token> typeofTokens = findAtElementLevel(token, UBNFParsers.TypeofElementParser.class);
         if (typeofTokens.isEmpty()) return Optional.empty();
         Token typeofToken = typeofTokens.get(0);
         List<Token> identifiers = findDescendants(typeofToken, UBNFParsers.IdentifierParser.class);

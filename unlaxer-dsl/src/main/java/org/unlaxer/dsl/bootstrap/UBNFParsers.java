@@ -1516,6 +1516,7 @@ public class UBNFParsers {
                         @Override
                         public Parsers getLazyParsers() {
                             return new Parsers(
+                                new org.unlaxer.parser.combinator.Not(Parser.get(TypeofElementParser.class)),
                                 Parser.get(AtSignParser.class),
                                 Parser.get(IdentifierParser.class)
                             );

@@ -34,7 +34,7 @@ public class ParseContextTransactionMetricsTest {
             context.commit(parser, TokenKind.consumed);
             context.rollback(parser);
 
-            assertEquals(new TransactionMetrics(2, 1, 1, 2, 0, 2),
+            assertEquals(new TransactionMetrics(2, 1, 1, 2, 0, 3),
                 context.snapshotTransactionMetrics());
         }
     }
@@ -53,8 +53,8 @@ public class ParseContextTransactionMetricsTest {
             context.rollback(parser);
 
             assertEquals(0, state.value);
-            assertEquals(2, state.checkpoints);
-            assertEquals(new TransactionMetrics(2, 1, 1, 2, 0, 2),
+            assertEquals("two transactions and one root observer boundary", 3, state.checkpoints);
+            assertEquals(new TransactionMetrics(2, 1, 1, 2, 0, 3),
                 context.snapshotTransactionMetrics());
         }
     }

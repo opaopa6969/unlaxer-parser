@@ -56,6 +56,7 @@ public class LSPGenerator implements CodeGenerator {
 
         // ----- parseDocument & utilities -----
         LSPServerEmitter.emitParseDocument(w, parsersClass, hasScopeStore);
+        w.line("protected boolean parseCacheEnabled() { return " + snapshotCacheable(grammar) + "; }");
 
         // ----- Hook methods -----
         LSPServerEmitter.emitHookMethods(w);
@@ -83,6 +84,20 @@ public class LSPGenerator implements CodeGenerator {
         w.line("}");
 
         return new GeneratedSource(packageName, serverClass, w.build());
+    }
+
+    /** External parser callbacks need an explicit host contract; retry-safe is not cache-safe. */
+    private boolean snapshotCacheable(GrammarDecl grammar) {
+        if (!grammar.imports().isEmpty()) return false;
+        for (var token : grammar.tokens()) {
+            if (token instanceof org.unlaxer.dsl.bootstrap.UBNFAST.TokenDecl.Simple simple) {
+                if (!simple.parserClass().contains(".")
+                    || !org.unlaxer.dsl.codegen.rust.RustGrammarLowering.supportsSimpleToken(simple.parserClass())) return false;
+            } else if (token instanceof org.unlaxer.dsl.bootstrap.UBNFAST.TokenDecl.Adapter adapter) {
+                if (!org.unlaxer.dsl.bootstrap.TokenAdapterRegistry.isBuiltin(adapter.id(),Integer.parseInt(adapter.version()))) return false;
+            }
+        }
+        return true;
     }
 
     private String getPackageName(GrammarDecl grammar) {

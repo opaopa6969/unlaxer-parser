@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
+import org.unlaxer.dsl.codegen.EnumSchema;
 import org.unlaxer.dsl.codegen.rust.GrammarIR.*;
 
 /**
@@ -17,6 +18,9 @@ public final class RustBackend {
 
     public List<GeneratedFile> generate(GrammarDecl grammar) {
         GrammarIR ir = RustGrammarLowering.lower(grammar);
+        String astSource = ast(ir) + CommonFieldEmitter.emit(grammar, ir);
+        String parserSource = parser(ir);
+        var preferred = PreferredAstEmitter.emit(grammar, ir, this, parserSource, astSource);
         return List.of(
             new GeneratedFile("mod.rs", HEADER + """
                 pub mod ast;
@@ -24,10 +28,10 @@ public final class RustBackend {
                 pub mod mapper;
                 pub mod evaluator;
                 """),
-            new GeneratedFile("ast.rs", ast(ir)),
-            new GeneratedFile("parser.rs", parser(ir) + lexingApi(grammar, ir) + org.unlaxer.dsl.codegen.EmbeddedGrammarEmitter.rustApi(grammar, ir.rules().stream().map(Rule::name).toList(), ir.javaWhitespace())),
-            new GeneratedFile("mapper.rs", mapper(ir)),
-            new GeneratedFile("evaluator.rs", evaluator(ir)));
+            new GeneratedFile("ast.rs", astSource),
+            new GeneratedFile("parser.rs", parserSource + preferred.parser() + lexingApi(grammar, ir) + org.unlaxer.dsl.codegen.EmbeddedGrammarEmitter.rustApi(grammar, ir.rules().stream().map(Rule::name).toList(), ir.javaWhitespace())),
+            new GeneratedFile("mapper.rs", mapper(ir) + preferred.mapper()),
+            new GeneratedFile("evaluator.rs", RustEvalEmitter.apply(grammar, ir, evaluator(ir))));
     }
 
     /** Opt-in stdio LSP module, leaving ordinary generation unchanged. */
@@ -96,32 +100,10 @@ public final class RustBackend {
 
     private String ast(GrammarIR ir) {
         StringBuilder out = new StringBuilder(HEADER);
-        out.append(ir.mappings().isEmpty() ? "use unlaxer_runtime::Span;\n\n"
+        out.append(ir.mappings().isEmpty() && ir.rules().stream().allMatch(rule -> rule.enumLiterals().isEmpty()) ? "use unlaxer_runtime::Span;\n\n"
             : "use unlaxer_runtime::{Span, json_string};\n\n");
-        if (hasValues(ir)) out.append("""
-            #[derive(Debug, Clone, PartialEq)]
-            pub enum AstValue {
-                Text { text: String, span: Span },
-                Node(Box<Ast>),
-            }
-
-            impl AstValue {
-                pub fn span(&self) -> Span {
-                    match self {
-                        Self::Text { span, .. } => *span,
-                        Self::Node(node) => node.span(),
-                    }
-                }
-
-                pub fn canonical_json(&self) -> String {
-                    match self {
-                        Self::Text { text, .. } => json_string(text),
-                        Self::Node(node) => node.canonical_json(),
-                    }
-                }
-            }
-
-            """);
+        out.append(enumDeclarations(ir));
+        if (needsValues(ir)) out.append(astValues(ir));
         out.append("#[allow(non_snake_case, non_camel_case_types)]\n#[derive(Debug, Clone, PartialEq)]\npub enum Ast {\n");
         for (Mapping mapping : ir.mappings()) {
             out.append("    r#").append(mapping.name()).append(" { span: Span");
@@ -150,7 +132,96 @@ public final class RustBackend {
         return out.toString();
     }
 
-    private String parser(GrammarIR ir) {
+    private static String enumDeclarations(GrammarIR ir) {
+        var out = new StringBuilder();
+        for (var rule : ir.rules())
+            if (!rule.enumLiterals().isEmpty()) {
+                out.append(
+                                "#[allow(non_camel_case_types)]\n"
+                                    + "#[derive(Debug, Clone, Copy, PartialEq, Eq)]\n"
+                                    + "pub enum ")
+                        .append(rule.name())
+                        .append(" {\n");
+                for (String literal : rule.enumLiterals())
+                    out.append("    ").append(EnumSchema.constantName(literal)).append(",\n");
+                out.append("}\n\nimpl ")
+                        .append(rule.name())
+                        .append(" {\n")
+                        .append(
+                                "    pub fn from_text(text: &str) -> Result<Self, String> {\n"
+                                    + "        match text {\n");
+                for (String literal : rule.enumLiterals())
+                    out.append("            ")
+                            .append(quote(literal))
+                            .append(" => Ok(Self::")
+                            .append(EnumSchema.constantName(literal))
+                            .append("),\n");
+                out.append("            _ => Err(format!(\"unknown ")
+                        .append(rule.name())
+                        .append(": {text}\")),\n        }\n    }\n\n")
+                        .append(
+                                "    pub fn canonical_json(&self) -> String {\n"
+                                    + "        json_string(match self {\n");
+                for (String literal : rule.enumLiterals())
+                    out.append("            Self::")
+                            .append(EnumSchema.constantName(literal))
+                            .append(" => ")
+                            .append(quote(EnumSchema.constantName(literal)))
+                            .append(",\n");
+                out.append("        })\n    }\n\n    pub fn text(&self) -> &'static str {\n        match self {\n");
+                for (String literal : rule.enumLiterals()) out.append("            Self::").append(EnumSchema.constantName(literal)).append(" => ").append(quote(literal)).append(",\n");
+                out.append("        }\n    }\n}\n\n");
+            }
+        return out.toString();
+    }
+
+    private static String astValues(GrammarIR ir) {
+        String template = """
+            #[derive(Debug, Clone, PartialEq)]
+            pub enum AstValue {
+                Text { text: String, span: Span },
+                Node(Box<Ast>),
+            }
+
+            impl AstValue {
+                pub fn span(&self) -> Span {
+                    match self {
+                        Self::Text { span, .. } => *span,
+                        Self::Node(node) => node.span(),
+                    }
+                }
+
+                pub fn canonical_json(&self) -> String {
+                    match self {
+                        Self::Text { text, .. } => json_string(text),
+                        Self::Node(node) => node.canonical_json(),
+                    }
+                }
+            }
+
+            """;
+        StringBuilder variants = new StringBuilder(), spans = new StringBuilder(), json = new StringBuilder();
+        for (Rule rule : ir.rules()) if (!rule.enumLiterals().isEmpty()) {
+            String name = rule.name();
+            variants.append("    Enum").append(name).append(" { value: ").append(name).append(", span: Span },\n");
+            spans.append("            Self::Enum").append(name).append(" { span, .. } => *span,\n");
+            json.append("            Self::Enum").append(name).append(" { value, span } => format!(r#\"{{\"enum\":{},\"value\":{},\"span\":[{},{}]}}\"#, json_string(")
+                .append(quote(name)).append("), value.canonical_json(), span.start, span.end),\n");
+        }
+        if (variants.isEmpty()) return template;
+        return "#[allow(non_camel_case_types)]\n" + template.replace("    Node(Box<Ast>),\n", "    Node(Box<Ast>),\n" + variants)
+            .replace("            Self::Node(node) => node.span(),\n", "            Self::Node(node) => node.span(),\n" + spans)
+            .replace("            Self::Node(node) => node.canonical_json(),\n", "            Self::Node(node) => node.canonical_json(),\n" + json);
+    }
+
+    private static String enumImports(GrammarIR ir) {
+        return ir.rules().stream()
+                .filter(r -> !r.enumLiterals().isEmpty())
+                .map(r -> "use super::ast::" + r.name() + ";\n")
+                .collect(Collectors.joining());
+    }
+
+    String parser(GrammarIR ir) {
         StringBuilder out = new StringBuilder(HEADER);
         out.append("""
             use std::sync::OnceLock;
@@ -409,7 +480,10 @@ public final class RustBackend {
                 + (repeat.max() == null ? "None" : "Some(" + repeat.max() + ")") + ")";
         }
         if (expression instanceof Separated separated) {
-            return expression(separated.child()) + ".separated_by(" + expression(separated.separator()) + ")";
+            String child = expression(separated.child()), separator = expression(separated.separator());
+            if (PreferredAstEmitter.containsDepth(separated.child()))
+                return "Expr::sequence([" + child + ", Expr::sequence([" + separator + ", Expr::Capture(\"#preferred-extra:2\", Box::new(" + child + "))]).zero_or_more()])";
+            return child + ".separated_by(" + separator + ")";
         }
         throw new IllegalStateException("unhandled " + expression);
     }
@@ -459,7 +533,8 @@ public final class RustBackend {
 
     private String mapper(GrammarIR ir) {
         StringBuilder out = new StringBuilder(HEADER);
-        if (hasValues(ir)) out.append("use super::ast::AstValue;\n");
+        if (needsValues(ir)) out.append("use super::ast::AstValue;\n");
+        out.append(enumImports(ir));
         out.append("use super::ast::Ast;\nuse unlaxer_runtime::Tree;\n\n");
         if (ir.rules().stream().anyMatch(rule -> containsRecovery(rule.body()))) {
             out.append("pub fn map(tree: &Tree) -> Result<Ast, String> {\n"
@@ -481,7 +556,31 @@ public final class RustBackend {
                 Ok(found)
             }
             """);
-        if (hasValues(ir)) {
+        if (ir.rules().stream().anyMatch(rule -> !rule.typeConstraints().isEmpty())) out.append(TypeofEmitter.helpers(ir));
+        for (int i = 0; i < ir.rules().size(); i++) {
+            var rule = ir.rules().get(i);
+            if (rule.enumLiterals().isEmpty()) continue;
+            out.append("\nfn map_enum_")
+                    .append(i)
+                    .append("(tree: &Tree, ids: &[usize]) -> Result<Vec<")
+                    .append(rule.name())
+                    .append(">, String> {\n")
+                    .append(
+                            "    let mut found = Vec::new();\n"
+                                + "    for &id in ids {\n"
+                                + "        let node = &tree.nodes[id];\n")
+                    .append("        if node.rule == ")
+                    .append(i)
+                    .append(" {\n            found.push(")
+                    .append(rule.name())
+                    .append(
+                            "::from_text(tree.text(node.span))?);\n"
+                                + "        } else {\n"
+                                + "            found.extend(map_enum_")
+                    .append(i)
+                    .append("(tree, &node.children)?);\n        }\n    }\n    Ok(found)\n}\n");
+        }
+        if (needsValues(ir)) {
             out.append("""
 
                 fn map_values(tree: &Tree, ids: &[usize]) -> Result<Vec<AstValue>, String> {
@@ -505,8 +604,13 @@ public final class RustBackend {
                                 }
                             },
                 """);
+            for (int i = 0; i < ir.rules().size(); i++) {
+                Rule rule = ir.rules().get(i);
+                if (!rule.enumLiterals().isEmpty()) out.append("            ").append(i).append(" => found.push(AstValue::Enum")
+                    .append(rule.name()).append(" { value: ").append(rule.name()).append("::from_text(tree.text(node.span))?, span: node.span }),\n");
+            }
             List<String> ids = new ArrayList<>();
-            for (int i = 0; i < ir.rules().size(); i++) if (ir.rules().get(i).mapping() != null) ids.add(Integer.toString(i));
+            for (int i = 0; i < ir.rules().size(); i++) if ((ir.rules().get(i).mapping() != null || !ir.rules().get(i).typeConstraints().isEmpty()) && ir.rules().get(i).enumLiterals().isEmpty()) ids.add(Integer.toString(i));
             out.append("            ").append(String.join(" | ", ids))
                 .append(" => found.extend(map_node(tree, id)?.into_iter().map(|node| AstValue::Node(Box::new(node)))),\n");
             List<String> skipped = new ArrayList<>();
@@ -519,7 +623,7 @@ public final class RustBackend {
                 """);
             out.append("            _ => found.extend(map_values(tree, &node.children)?),\n        }\n    }\n    Ok(found)\n}\n");
         }
-        if (ir.rules().stream().filter(r -> r.mapping() != null).flatMap(r -> r.mapping().fields().stream())
+        if (ir.rules().stream().filter(r -> r.mapping() != null || !r.typeConstraints().isEmpty()).flatMap(r -> TypeofEmitter.fields(r).stream())
             .anyMatch(f -> f.cardinality() == Cardinality.OPTIONAL)) out.append("""
 
             fn optional<T>(mut values: Vec<T>, name: &str) -> Result<Option<T>, String> {
@@ -527,6 +631,7 @@ public final class RustBackend {
                 Ok(values.pop())
             }
             """);
+        out.append(AssociativeSpines.helpers(ir));
         out.append("""
 
             fn map_node(tree: &Tree, id: usize) -> Result<Vec<Ast>, String> {
@@ -534,21 +639,46 @@ public final class RustBackend {
             """);
         for (int i = 0; i < ir.rules().size(); i++) {
             if (ir.rules().get(i).skip()) out.append("        ").append(i).append(" => Ok(Vec::new()),\n");
-            else if (ir.rules().get(i).mapping() != null) {
+            else if (ir.rules().get(i).mapping() != null || !ir.rules().get(i).typeConstraints().isEmpty()) {
                 out.append("        ").append(i).append(" => map_rule_").append(i).append("(tree, id),\n");
             }
         }
         out.append("        _ => map_nodes(tree, &tree.nodes[id].children),\n    }\n}\n");
-        for (int i = 0; i < ir.rules().size(); i++) if (ir.rules().get(i).mapping() != null) {
+        for (int i = 0; i < ir.rules().size(); i++) if (ir.rules().get(i).mapping() != null || !ir.rules().get(i).typeConstraints().isEmpty()) {
             var mapping = ir.rules().get(i).mapping();
+            if (!ir.rules().get(i).typeConstraints().isEmpty()) { out.append(TypeofEmitter.rule(ir,i)); continue; }
             out.append("\n#[inline(never)]\nfn map_rule_").append(i)
                 .append("(tree: &Tree, id: usize) -> Result<Vec<Ast>, String> {\n")
                 .append("    let node = &tree.nodes[id];\n")
                 .append("    Ok(vec![Ast::r#").append(mapping.name()).append(" {\n        span: node.span,\n");
+            if (!ir.rules().get(i).enumLiterals().isEmpty()) {
+                out.append("        r#value: ")
+                    .append(ir.rules().get(i).name())
+                    .append("::from_text(tree.text(node.span))?,\n    }])\n}\n");
+                continue;
+            }
             for (Field field : mapping.fields()) {
+                if (field.kind() == Kind.ENUM) {
+                    int enumId = java.util.stream.IntStream.range(0, ir.rules().size())
+                        .filter(id -> ir.rules().get(id).name().equals(field.enumName()))
+                        .findFirst().orElseThrow();
+                    out.append("        r#").append(field.name())
+                        .append(": {\n            let mut values = Vec::new();\n")
+                        .append("            for capture in node.captures.iter().filter(|c| c.name == ")
+                        .append(quote(field.name()))
+                        .append(") {\n                values.extend(map_enum_")
+                        .append(enumId)
+                        .append("(tree, &capture.nodes)?);\n            }\n            ")
+                        .append(mappedValue(field))
+                        .append("\n        },\n");
+                    continue;
+                }
                 out.append("        r#").append(field.name()).append(": {\n            let mut values = Vec::new();\n")
                     .append("            for capture in node.captures.iter().filter(|c| c.name == ").append(quote(field.name())).append(") {\n");
-                if (field.kind() == Kind.NODE) out.append("                values.extend(map_nodes(tree, &capture.nodes)?);\n");
+                String associative = AssociativeSpines.capture(mapping,field,"                ");
+                if (associative != null) out.append(associative);
+                else if (field.kind() == Kind.INTEGER) out.append("                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).parse::<i32>().map_err(|_| format!(\"invalid i32 capture {} at {}..{}\", capture.name, capture.span.start, capture.span.end))?);\n");
+                else if (field.kind() == Kind.NODE) out.append("                values.extend(map_nodes(tree, &capture.nodes)?);\n");
                 else if (field.kind() == Kind.VALUE) out.append("                values.extend(map_values(tree, &capture.nodes)?);\n");
                 else if (graphemeCapture(ir, ir.rules().get(i).body(), field.name()))
                     out.append("                values.push(tree.text(capture.span).to_owned());\n");
@@ -563,6 +693,7 @@ public final class RustBackend {
     private String evaluator(GrammarIR ir) {
         StringBuilder out = new StringBuilder(HEADER);
         if (hasValues(ir)) out.append("use super::ast::AstValue;\n");
+        out.append(enumImports(ir));
         out.append("use super::ast::Ast;\n");
         if (!ir.mappings().isEmpty()) out.append("use unlaxer_runtime::Span;\n");
         out.append("\n#[allow(non_snake_case)]\npub trait Semantics {\n    type Output;\n");
@@ -578,7 +709,7 @@ public final class RustBackend {
             .append(ir.mappings().isEmpty() ? "*node" : "node").append(" {\n");
         for (Mapping mapping : ir.mappings()) {
             var args = new ArrayList<>(mapping.fields().stream().map(f -> "r#" + f.name()
-                + (f.cardinality() == Cardinality.OPTIONAL ? (f.kind() == Kind.VALUE ? ".as_ref()" : ".as_deref()") : "")).toList());
+                + ((f.cardinality() == Cardinality.OPTIONAL || f.kind() == Kind.NULLABLE_NODE) ? (f.kind() == Kind.VALUE || f.kind() == Kind.ENUM || f.kind() == Kind.INTEGER ? ".as_ref()" : ".as_deref()") : "")).toList());
             args.add("*span");
             out.append("        ").append(pattern(mapping, "Ast")).append(" => semantics.")
                 .append(RustGrammarLowering.methodName(mapping.name())).append("(").append(String.join(", ", args)).append("),\n");
@@ -593,14 +724,20 @@ public final class RustBackend {
 
     static String fieldType(Field field, boolean borrowed) {
         String one = switch (field.kind()) {
+            case INTEGER -> borrowed ? "&i32" : "i32";
             case NODE -> borrowed ? "&Ast" : "Box<Ast>";
+            case NULLABLE_NODE -> borrowed ? "Option<&Ast>" : "Option<Box<Ast>>";
             case TEXT -> borrowed ? "&str" : "String";
             case VALUE -> borrowed ? "&AstValue" : "AstValue";
+            case ENUM -> (borrowed ? "&" : "") + field.enumName();
         };
         String element = switch (field.kind()) {
+            case INTEGER -> "i32";
             case NODE -> "Ast";
+            case NULLABLE_NODE -> "Option<Box<Ast>>";
             case TEXT -> "String";
             case VALUE -> "AstValue";
+            case ENUM -> field.enumName();
         };
         return switch (field.cardinality()) {
             case ONE -> one;
@@ -609,9 +746,9 @@ public final class RustBackend {
         };
     }
 
-    private static String mappedValue(Field field) {
+    static String mappedValue(Field field) {
         return switch (field.cardinality()) {
-            case ONE -> field.kind() == Kind.NODE ? "Box::new(required(values, " + quote(field.name()) + ")?)"
+            case ONE -> field.kind() == Kind.NULLABLE_NODE ? "Some(Box::new(required(values, " + quote(field.name()) + ")?))" : field.kind() == Kind.NODE ? "Box::new(required(values, " + quote(field.name()) + ")?)"
                 : "required(values, " + quote(field.name()) + ")?";
             case OPTIONAL -> "optional(values, " + quote(field.name()) + ")?" + (field.kind() == Kind.NODE ? ".map(Box::new)" : "");
             case MANY -> "values";
@@ -620,16 +757,17 @@ public final class RustBackend {
 
     private static String fieldJson(Field field) {
         String name = "r#" + field.name();
-        String value = field.kind() != Kind.TEXT ? "value.canonical_json()" : "json_string(value)";
+        if (field.kind() == Kind.NULLABLE_NODE) return name + ".as_ref().map_or_else(|| \"null\".to_owned(), |value| value.canonical_json())";
+        String value = field.kind() == Kind.INTEGER ? "value.to_string()" : field.kind() != Kind.TEXT ? "value.canonical_json()" : "json_string(value)";
         return switch (field.cardinality()) {
-            case ONE -> field.kind() != Kind.TEXT ? name + ".canonical_json()" : "json_string(" + name + ")";
+            case ONE -> field.kind() == Kind.INTEGER ? name + ".to_string()" : field.kind() != Kind.TEXT ? name + ".canonical_json()" : "json_string(" + name + ")";
             case OPTIONAL -> name + ".as_ref().map_or_else(|| \"null\".to_owned(), |value| " + value + ")";
             case MANY -> "format!(\"[{}]\", " + name + ".iter().map(|value| " + value + ").collect::<Vec<_>>().join(\",\"))";
         };
     }
 
     // New grapheme captures preserve raw source; existing text captures retain their contract.
-    private static boolean graphemeCapture(GrammarIR ir, Expression body, String name) {
+    static boolean graphemeCapture(GrammarIR ir, Expression body, String name) {
         record Visit(Expression expression, boolean captured) {}
         var pending = new java.util.ArrayDeque<Visit>();
         var visited = new java.util.HashSet<Integer>();
@@ -696,6 +834,11 @@ public final class RustBackend {
         if (expression instanceof LongestChoice value) return value.alternatives().stream().anyMatch(RustBackend::containsRecovery);
         if (expression instanceof PredictiveChoice value) return value.alternatives().stream().anyMatch(RustBackend::containsRecovery);
         return false;
+    }
+
+    private static boolean needsValues(GrammarIR ir) {
+        return hasValues(ir) || ir.rules().stream().flatMap(rule -> rule.typeConstraints().stream())
+            .anyMatch(value -> value.capture().kind() == Kind.VALUE || value.reference().kind() == Kind.VALUE);
     }
 
     private static boolean hasValues(GrammarIR ir) {

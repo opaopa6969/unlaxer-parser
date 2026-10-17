@@ -321,11 +321,20 @@ public class TinyCodeFenceConformanceTest {
                     let input = String::from_utf8(bytes).unwrap();
                     let mut context = unlaxer_runtime::ParseContext::new(&input);
                     let prefix_ok = generated::parser::parse_context(&mut context).is_ok();
+                    let mut classic = unlaxer_runtime::ParseContext::new(&input);
+                    let classic_result = classic.parse_with_token_mode(&generated::parser::GeneratedParser,
+                        unlaxer_runtime::token::TokenKind::Consumed, false);
+                    assert_eq!((prefix_ok,context.position(),context.matched_position()),
+                        (classic_result.is_ok(),classic.position(),classic.matched_position()), "Classic prefix: {input}");
                     print!(r#"{{"prefix":[{},{},{}],"ast":"#,
                         prefix_ok, context.position(), context.matched_position());
                     match generated::parser::parse_tree_detailed(&input) {
                         Ok(tree) => {
                             let ast = generated::mapper::map(&tree).unwrap();
+                            let parsed=classic_result.as_ref().unwrap();
+                            let classic_tree=classic.tree(parsed.nodes[0]).unwrap();
+                            let classic_ast=generated::mapper::map(&classic_tree).unwrap();
+                            assert_eq!(ast.canonical_json(),classic_ast.canonical_json(),"Classic AST: {input}");
                             drop(tree);
                             print!("{}", ast.canonical_json());
                         }

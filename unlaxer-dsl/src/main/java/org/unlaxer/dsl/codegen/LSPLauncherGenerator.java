@@ -33,6 +33,14 @@ public class LSPLauncherGenerator implements CodeGenerator {
 
                 protected abstract %s createServer();
 
+                /** Standalone entry point used by generated extension JAR manifests. */
+                public static void main(String[] args) throws Exception {
+                    var launcher = new %s() {
+                        @Override protected %s createServer() { return new %s() {}; }
+                    };
+                    System.exit(launcher.launchStdio());
+                }
+
                 public void launch() throws IOException {
                     launch(System.in, System.out);
                 }
@@ -84,7 +92,7 @@ public class LSPLauncherGenerator implements CodeGenerator {
                     }
                 }
             }
-            """.formatted(packageName, CodeGenerator.generatedAnnotation("org.unlaxer.dsl.codegen.LSPLauncherGenerator"), launcherClass, serverClass);
+            """.formatted(packageName, CodeGenerator.generatedAnnotation("org.unlaxer.dsl.codegen.LSPLauncherGenerator"), launcherClass, serverClass, launcherClass, serverClass, serverClass);
         return new GeneratedSource(packageName, launcherClass, body);
     }
 }

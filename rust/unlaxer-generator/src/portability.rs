@@ -153,8 +153,16 @@ pub fn check_ast(file: &UbnfFile) -> Report {
         for grammar in &file.grammars {
             let result = crate::lowering::lower(grammar)
                 .and_then(|ir| unlaxer_codegen::validate_ir(&ir).map_err(|e| e.to_string()));
-            if result.is_err() {
-                inventory.add("P-STRUCTURE", "Rust structural constraints", grammar.span);
+            if let Err(error) = result {
+                if let Some(rule) = error
+                    .strip_prefix("E-COMMONFIELD-MISMATCH: ")
+                    .and_then(|s| s.split(": ").next())
+                    .and_then(|name| grammar.rules.iter().find(|r| r.name == name))
+                {
+                    inventory.add("P-COMMONFIELD", "commonField schema", rule.span);
+                } else {
+                    inventory.add("P-STRUCTURE", "Rust structural constraints", grammar.span);
+                }
             }
         }
         if inventory.diagnostics.is_empty() {
@@ -267,10 +275,9 @@ impl Inventory {
             }
         }
         for rule in &grammar.rules {
-            let skip = rule
-                .annotations
-                .iter()
-                .any(|annotation| matches!(annotation.kind, AnnotationKind::Skip));
+            let skip = rule.annotations.iter().any(|annotation| {
+                matches!(annotation.kind, AnnotationKind::Skip | AnnotationKind::Enum)
+            });
             for annotation in &rule.annotations {
                 if skip && matches!(annotation.kind, AnnotationKind::Mapping { .. }) {
                     continue;
@@ -296,7 +303,7 @@ impl Inventory {
             | AnnotationKind::Catalog { .. }
             | AnnotationKind::LexicalContext { .. } => {}
             AnnotationKind::Mapping { class_name, params } => {
-                if !identifier(class_name) {
+                if !identifier(&crate::common_fields::rust_name(class_name)) {
                     self.add("P-MAPPING-TYPE", class_name, span);
                 }
                 for param in params {
@@ -322,22 +329,17 @@ impl Inventory {
                     self.add("P-SCOPE-MODE", mode, span);
                 }
             }
-            AnnotationKind::Eval { .. } => self.add("P-ANNOTATION", "eval", span),
+            AnnotationKind::Eval { .. } => {}
             AnnotationKind::Doc { .. } | AnnotationKind::Recovery { .. } => {}
             AnnotationKind::Skip => {}
             AnnotationKind::Simple { name } => self.add("P-ANNOTATION", name, span),
-            AnnotationKind::CommonField { .. } => self.add("P-ANNOTATION", "commonField", span),
-            AnnotationKind::Enum => self.add("P-ANNOTATION", "enum", span),
+            AnnotationKind::CommonField { .. } => {}
+            AnnotationKind::Enum => {}
         }
     }
     fn body(&mut self, body: &RuleBody) {
         for sequence in &body.alternatives {
             for annotated in &sequence.elements {
-                if let (Some(name), Some(span)) =
-                    (&annotated.typeof_constraint, annotated.typeof_span)
-                {
-                    self.add("P-TYPEOF", name, span);
-                }
                 self.element(&annotated.element);
             }
         }
