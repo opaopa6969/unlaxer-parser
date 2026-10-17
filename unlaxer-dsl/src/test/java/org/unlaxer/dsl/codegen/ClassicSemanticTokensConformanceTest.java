@@ -186,10 +186,10 @@ public class ClassicSemanticTokensConformanceTest {
                 change(wire, uri, 3, "<>!"); assertEquals(JSON.toJsonTree(List.of()), tokens(wire, uri));
                 change(wire, uri, 4, "<foo>!"); assertEquals(expected, tokens(wire, uri));
                 String profile = Files.readString(ROOT.resolve("language-profiles/java/profile.tsv")).replace("Java21", "Emoji").replace("CompilationUnit", "Root");
-                var selected = wire.request("initialize", Map.of("initializationOptions", Map.of("languageProfile", Map.of("tsv", profile, "entry", "Root"))));
+                var selected = wire.request("unlaxer/configure", Map.of("initializationOptions", Map.of("languageProfile", Map.of("tsv", profile, "entry", "Root"))));
                 assertTrue("semantic tokens have no profile operation and remain available", selected.getAsJsonObject("capabilities").has("semanticTokensProvider"));
                 assertEquals(expected, tokens(wire, uri));
-                assertEquals(-32602, wire.response("initialize", Map.of("initializationOptions", Map.of("languageProfile", Map.of("tsv", profile, "entry", "wrong")))).getAsJsonObject("error").get("code").getAsInt());
+                assertEquals(-32602, wire.response("unlaxer/configure", Map.of("initializationOptions", Map.of("languageProfile", Map.of("tsv", profile, "entry", "wrong")))).getAsJsonObject("error").get("code").getAsInt());
                 assertEquals("invalid initialize preserves provider", expected, tokens(wire, uri));
                 close(wire, uri); open(wire, uri, 1, "<foo>!"); assertEquals(expected, tokens(wire, uri));
                 wire.response("shutdown", null);
