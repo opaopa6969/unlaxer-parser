@@ -723,6 +723,12 @@ impl ParseContext<'_> {
                     },
                 )
             }
+            Expr::LongCodeBlock => {
+                let end = (!mode.invert)
+                    .then(|| super::long_code_fence::end(self.input, start))
+                    .flatten();
+                ("LongCodeBlockParser", end.unwrap_or(start), end.is_some())
+            }
             Expr::Replay(name) => {
                 let text = self.captured_text(name);
                 let width = text.map_or(0, |text| text.chars().count());
@@ -742,12 +748,6 @@ impl ParseContext<'_> {
                     end,
                     full && (text.is_some_and(|text| raw.starts_with(text)) != mode.invert),
                 )
-            }
-            Expr::LongCodeBlock => {
-                let end = (!mode.invert)
-                    .then(|| super::long_code_fence::end(self.input, start))
-                    .flatten();
-                ("LongCodeBlockParser", end.unwrap_or(start), end.is_some())
             }
             Expr::Until(terminator) => {
                 let at = raw.find(terminator);
@@ -1387,30 +1387,6 @@ fn classic_quoted(quote: char) -> &'static Expr {
     })
 }
 
-fn classic_class_name() -> &'static Expr {
-    static VALUE: std::sync::OnceLock<Expr> = std::sync::OnceLock::new();
-    VALUE.get_or_init(|| {
-        Expr::sequence([
-            Expr::Identifier,
-            Expr::sequence([
-                Expr::character("DotParser", |cp| cp == '.'),
-                Expr::Identifier,
-            ])
-            .repeat_java(0, None),
-        ])
-    })
-}
-fn classic_line_end() -> &'static Expr {
-    static VALUE: std::sync::OnceLock<Expr> = std::sync::OnceLock::new();
-    VALUE.get_or_init(|| {
-        Expr::choice([
-            Expr::Literal("\r\n"),
-            Expr::Literal("\r"),
-            Expr::Literal("\n"),
-            Expr::Eof,
-        ])
-    })
-}
 fn classic_whitespace() -> &'static Expr {
     static VALUE: std::sync::OnceLock<Expr> = std::sync::OnceLock::new();
     VALUE.get_or_init(|| {
@@ -1448,6 +1424,31 @@ fn classic_line_body(context: &mut ParseContext<'_>) -> ParseResult {
         span,
         nodes: fragment.nodes,
         captures: fragment.captures,
+    })
+}
+
+fn classic_class_name() -> &'static Expr {
+    static VALUE: std::sync::OnceLock<Expr> = std::sync::OnceLock::new();
+    VALUE.get_or_init(|| {
+        Expr::sequence([
+            Expr::Identifier,
+            Expr::sequence([
+                Expr::character("DotParser", |cp| cp == '.'),
+                Expr::Identifier,
+            ])
+            .repeat_java(0, None),
+        ])
+    })
+}
+fn classic_line_end() -> &'static Expr {
+    static VALUE: std::sync::OnceLock<Expr> = std::sync::OnceLock::new();
+    VALUE.get_or_init(|| {
+        Expr::choice([
+            Expr::Literal("\r\n"),
+            Expr::Literal("\r"),
+            Expr::Literal("\n"),
+            Expr::Eof,
+        ])
     })
 }
 

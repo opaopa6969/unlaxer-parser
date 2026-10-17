@@ -102,7 +102,7 @@ public class LSPQueryConsumerTest {
             assertTrue(service.completion(request).join().getLeft().isEmpty());
             // The same consumer routes a different concrete provider and keeps foreign-document coordinates.
             type.getField("binding").set(server, (Function<DocumentSnapshot, LanguageQueries>) LSPQueryConsumerTest::projectBinding);
-            var capabilities = server.initialize(new InitializeParams()).join().getCapabilities();
+            var capabilities = ((java.util.concurrent.CompletableFuture<org.eclipse.lsp4j.InitializeResult>) type.getMethod("configure", InitializeParams.class).invoke(server, new InitializeParams())).join().getCapabilities();
             assertEquals(Boolean.TRUE, capabilities.getDefinitionProvider().getLeft());
             var table = new com.google.gson.Gson().toJsonTree(capabilities.getExperimental()).getAsJsonObject().getAsJsonObject("languageQueryConsumer").getAsJsonObject("operations");
             for (String operation : List.of("RENAME", "FORMAT", "CODE_ACTION")) {

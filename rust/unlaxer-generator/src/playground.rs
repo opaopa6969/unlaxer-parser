@@ -168,6 +168,7 @@ fn generate_resolved(
     runtime!("unicode_xid.rs");
     runtime!("unicode_grapheme_data.rs");
     runtime!("unicode_case_data.rs");
+    runtime!("incremental.rs");
     runtime!("grapheme.rs");
     runtime!("long_code_fence.rs");
     runtime!("memo_retention_tests.rs");

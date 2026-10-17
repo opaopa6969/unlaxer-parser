@@ -78,8 +78,10 @@ final class LeftRecursionAnalysis {
                 empty |= body(alternative, leading, depth + 1);
             return empty;
         }
+        // A sequence owns the annotated atoms; it is not another nested grammar element.
+        // Counting this representation wrapper rejected the established 96-group contract.
         for (var element : ((SequenceBody) body).elements())
-            if (!atom(element.element(), leading, depth + 1)) return false;
+            if (!atom(element.element(), leading, depth)) return false;
         return true;
     }
 

@@ -27,6 +27,10 @@ public final class PortabilityCheck {
         UBNFSourceSnapshot snapshot;
         try {
             snapshot = UBNFMapper.parseWithSource(source);
+        } catch (org.unlaxer.dsl.bootstrap.RegexRetirement.MigrationException error) {
+            return new Result(false, "unavailable", List.of(new Diagnostic(
+                org.unlaxer.dsl.bootstrap.RegexRetirement.CODE, new Span(error.start(), error.end()),
+                org.unlaxer.dsl.bootstrap.RegexRetirement.MESSAGE)));
         } catch (IllegalArgumentException error) {
             return new Result(false, "unavailable", List.of(new Diagnostic("P-SYNTAX", null, "UBNF syntax")));
         }
@@ -38,6 +42,10 @@ public final class PortabilityCheck {
         UBNFSourceSnapshot snapshot;
         try {
             snapshot = UBNFMapper.parseWithSource(java.nio.file.Files.readString(path));
+        } catch (org.unlaxer.dsl.bootstrap.RegexRetirement.MigrationException error) {
+            return new Result(false, "unavailable", List.of(new Diagnostic(
+                org.unlaxer.dsl.bootstrap.RegexRetirement.CODE, new Span(error.start(), error.end()),
+                org.unlaxer.dsl.bootstrap.RegexRetirement.MESSAGE)));
         } catch (IllegalArgumentException error) {
             return new Result(false, "unavailable", List.of(new Diagnostic("P-SYNTAX", null, "UBNF syntax")));
         }
@@ -121,10 +129,11 @@ public final class PortabilityCheck {
             }
         }
         for (TokenDecl token : grammar.tokens()) {
-            if (token instanceof TokenDecl.Simple simple && !RustGrammarLowering.supportsSimpleToken(simple.parserClass())) {
+            if (org.unlaxer.dsl.bootstrap.RegexRetirement.retired(token)) {
+                add(out, org.unlaxer.dsl.bootstrap.RegexRetirement.CODE, snapshot, token,
+                    org.unlaxer.dsl.bootstrap.RegexRetirement.MESSAGE);
+            } else if (token instanceof TokenDecl.Simple simple && !RustGrammarLowering.supportsSimpleToken(simple.parserClass())) {
                 add(out, "P-EXTERNAL-TOKEN", snapshot, token, simple.parserClass());
-            } else if (token instanceof TokenDecl.Regex) {
-                add(out, "P-TOKEN-KIND", snapshot, token, "REGEX");
             }
         }
         for (RuleDecl rule : grammar.rules()) {

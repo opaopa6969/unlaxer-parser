@@ -44,6 +44,51 @@ public class TinyClassicModeConformanceTest {
     }
 
     @Test
+    public void chainFailureResetAndOuterRollbackAgreeWithPinnedParsers() throws Exception {
+        assumeTrue("requires -DrustConformance=true", Boolean.getBoolean("rustConformance"));
+        String classes = System.getProperty("tinyexpression.classes");
+        assumeTrue("requires pinned tinyexpression.classes", classes != null && !classes.isBlank());
+        Path oracle = Path.of(classes).toRealPath();
+        var rows = Files.readAllLines(Path.of("../conformance/nullable-separation/chain-reset.tsv"))
+                .stream().filter(row -> !row.startsWith("#") && !row.isBlank()).toList();
+        assertEquals(24, rows.size());
+        var report = new ArrayList<String>();
+        try (var loader = new URLClassLoader(new URL[] {oracle.toUri().toURL()}, getClass().getClassLoader())) {
+            for (int mi = 0; mi < Memoization.values().length; mi++)
+                for (int di = 0; di < ParseOptions.Diagnostics.values().length; di++)
+                    for (String row : rows) {
+                        String[] cells = row.split("\t");
+                        Parser parser;
+                        if (cells[0].equals("capture-value")) {
+                            parser = org.unlaxer.parser.combinator.CaptureBoundaryParser.value(new WordParser("a"));
+                        } else {
+                            String name = cells[0].equals("code-start") ? "CodeStartParser" : "CodeEndParser";
+                            Class<?> type = Class.forName("org.unlaxer.tinyexpression.parser.javalang." + name, true, loader);
+                            assertEquals(oracle, Path.of(type.getProtectionDomain().getCodeSource().getLocation().toURI()).toRealPath());
+                            parser = (Parser) type.getConstructor().newInstance();
+                        }
+                        var diagnostics = new ParseOptions.Diagnostics[] {
+                                ParseOptions.Diagnostics.DETAILED, ParseOptions.Diagnostics.DETAILED_ON_FAILURE, ParseOptions.Diagnostics.AUTO};
+                        try (var context = ParseContext.withOptions(StringSource.createRootSource("?"),
+                                ParseOptions.withMemoization(Memoization.values()[mi]).withDiagnostics(diagnostics[di]))) {
+                            context.getCurrent().setResetMatchedWithConsumed(Boolean.parseBoolean(cells[2]));
+                            context.beginPreservingMatched(parser);
+                            assertTrue(row, parser.parse(context, TokenKind.valueOf(cells[1]), false).isFailed());
+                            assertEquals(row, Boolean.parseBoolean(cells[3]), context.getCurrent().isResetMatchedWithConsumed());
+                            assertEquals(row, 0, context.getConsumedPosition().value());
+                            assertEquals(row, 0, context.getMatchedPosition().value());
+                            context.rollback(parser);
+                            assertEquals(row, Boolean.parseBoolean(cells[4]), context.getCurrent().isResetMatchedWithConsumed());
+                            assertEquals(row, 1, context.getTokenStack().size());
+                            assertTrue(row, context.getCurrent().getTokens().isEmpty());
+                        }
+                        report.add(mi + "\t" + di + "\t" + row);
+                    }
+        }
+        Files.write(Path.of("target/chain-reset-java.tsv"), report);
+    }
+
+    @Test
     public void pinnedParsersShareClassicModesAndPositions() throws Exception {
         assumeTrue("requires -DrustConformance=true", Boolean.getBoolean("rustConformance"));
         String classes = System.getProperty("tinyexpression.classes");
