@@ -20,7 +20,7 @@ public class PredictiveChoiceGenerationTest {
           Root ::= Keyword @value | NumberToken @value | IdentifierToken @value
                  | SingleString @value | DoubleString @value | CustomToken @value | Recursive @value ;
           Keyword ::= 'if' | 'else' ;
-          Recursive ::= Recursive 'x' | 'r' ;
+          Recursive ::= [ 'r' Recursive ] 'x' ;
         }
         """;
 

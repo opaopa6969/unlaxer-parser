@@ -58,9 +58,7 @@ public class RuleTriviaConformanceTest {
             nativeTarget.toString()), "", false));
         Path nativeGenerator = nativeTarget.resolve("debug/unlaxer").toAbsolutePath();
 
-        Path fixtures = repo.resolve("unlaxer-dsl/src/test/resources/rule-trivia");
-        JsonArray corpus = JsonParser.parseString(
-            Files.readString(fixtures.resolve("corpus.json"))).getAsJsonArray();
+        JsonArray corpus = JsonParser.parseString(Files.readString(fixtureCorpus())).getAsJsonArray();
         var report = new ArrayList<>(List.of(
             "fixture\tcase\tinput_json\texpected_prefix\tjava_prefix\texpected_ast\tjava_ast\trust"));
 
@@ -240,7 +238,7 @@ public class RuleTriviaConformanceTest {
         return canonical(value, mapped);
     }
 
-    private String rustProbe() {
+    protected String rustProbe() {
         return """
             mod generated;
             use std::io::{self, BufRead};
@@ -277,6 +275,10 @@ public class RuleTriviaConformanceTest {
                 }
             }
             """;
+    }
+
+    protected Path fixtureCorpus() {
+        return repo.resolve("unlaxer-dsl/src/test/resources/rule-trivia/corpus.json");
     }
 
     private record ProcessResult(int code, String output) {}
