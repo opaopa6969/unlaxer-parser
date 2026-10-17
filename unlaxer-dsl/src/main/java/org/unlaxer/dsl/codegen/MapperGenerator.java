@@ -22,6 +22,9 @@ public class MapperGenerator implements CodeGenerator {
 
     @Override
     public GeneratedSource generate(GrammarDecl grammar) {
+        CommonFieldSchema.build(grammar);
+        EnumSchema.validate(grammar);
+        var enumRoots = EnumSchema.rootEnums(grammar);
         String packageName = getPackageName(grammar);
         String grammarName = grammar.name();
         String astClass = grammarName + "AST";
@@ -43,13 +46,21 @@ public class MapperGenerator implements CodeGenerator {
         Map<String, String> mappedClassByRuleName = new LinkedHashMap<>();
         for (RuleDecl rule : grammar.rules()) {
             boolean isSkip = rule.annotations().stream().anyMatch(a -> a instanceof SkipAnnotation);
-            if (!isSkip) {
+            if (!isSkip && !EnumSchema.isEnum(rule)) {
                 MapperElementUtil.getMappingAnnotation(rule).ifPresent(m -> {
                     mappingRules.putIfAbsent(m.className(), rule);
                     allMappingRules.computeIfAbsent(m.className(), k -> new ArrayList<>()).add(rule);
                     mappedClassByRuleName.putIfAbsent(rule.name(), m.className());
                 });
             }
+        }
+
+        for (var entry : enumRoots.entrySet()) {
+            RuleDecl source = ruleByName.get(entry.getKey());
+            RuleDecl projected = EnumSchema.projection(source, entry.getValue());
+            mappingRules.put(entry.getValue(), projected);
+            allMappingRules.put(entry.getValue(), List.of(projected));
+            mappedClassByRuleName.put(source.name(), entry.getValue());
         }
 
         StringBuilder sb = new StringBuilder();
@@ -105,7 +116,7 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("    private static final java.util.IdentityHashMap<Token, MappingCandidate> BEST_MEMO =\n");
         sb.append("        new java.util.IdentityHashMap<>();\n\n");
 
-        String rootClassName = rootRule.flatMap(MapperElementUtil::getMappingAnnotation)
+        String rootClassName = rootRule.filter(r -> !EnumSchema.isEnum(r)).flatMap(MapperElementUtil::getMappingAnnotation)
             .map(m -> astClass + "." + m.className())
             .orElse(astClass);
 
@@ -146,7 +157,23 @@ public class MapperGenerator implements CodeGenerator {
 
         // ----- mapTransparentValue (heterogeneous @value node resolution) -----
         sb.append(MapperRuleEmitter.emitMapTransparentValue(astClass,
-            grammar.rules().stream().anyMatch(MapperElementUtil::isSkipped)));
+            grammar.rules().stream().anyMatch(MapperElementUtil::isSkipped), grammar.rules().stream().anyMatch(EnumSchema::isEnum)));
+
+        if (grammar.rules().stream().anyMatch(EnumSchema::isEnum)) {
+            sb.append("    private static Class<?> semanticType(Object value) {\n        return value instanceof ").append(astClass).append(".EnumValue item ? item.value().getDeclaringClass() : value.getClass();\n    }\n\n");
+            sb.append("    private static Object directEnumValue(Token token) {\n        if (token == null) return null;\n");
+            for (RuleDecl rule : grammar.rules()) if (EnumSchema.isEnum(rule)) sb.append("        if (token.parser instanceof ")
+                .append(parsersClass).append(".").append(rule.name()).append("Parser) return registerNodeSourceSpan(new ")
+                .append(astClass).append(".EnumValue(").append(astClass).append(".").append(rule.name())
+                .append(".fromText(tokenTextCompat(token))), token);\n");
+            sb.append("        return null;\n    }\n    private static Object findEnumValue(Token token) {\n        if (token == null) return null;\n");
+            if (grammar.rules().stream().anyMatch(MapperElementUtil::isSkipped)) sb.append("        if (isSkippedRuleToken(token)) return null;\n");
+            sb.append("        Object direct = directEnumValue(token); if (direct != null) return direct;\n");
+            for (String name : mappedClassByRuleName.keySet()) if (!EnumSchema.isEnum(ruleByName.get(name))) {
+                sb.append("        if (token.parser instanceof ").append(parsersClass).append(".").append(name).append("Parser) return null;\n");
+            }
+            sb.append("        for (Token child : token.filteredChildren) { Object value = findEnumValue(child); if (value != null) return value; }\n        return null;\n    }\n\n");
+        }
 
         // ----- Mapping Methods -----
         sb.append(MapperRuleEmitter.emitMappingMethods(grammar, astClass, parsersClass,

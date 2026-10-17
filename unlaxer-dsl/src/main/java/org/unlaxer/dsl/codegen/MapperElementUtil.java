@@ -426,7 +426,7 @@ class MapperElementUtil {
                 ruleByName.get(simpleName).annotations().stream()
                     .anyMatch(a -> a instanceof UBNFAST.EnumAnnotation);
             if (isEnum) {
-                return targetType + ".fromText(stripQuotes(firstTokenText(" + tokenVar + ")))";
+                return targetType + ".fromText(tokenTextCompat(" + tokenVar + "))";
             }
         }
         // A heterogeneous Object @value bound to a transparent choice rule (no @mapping of
@@ -474,7 +474,7 @@ class MapperElementUtil {
         if (element instanceof RuleRefElement ref) {
             if (!visited.add(ref.name())) return false;
             RuleDecl rule = ruleByName.get(ref.name());
-            return rule != null && !isSkipped(rule) && (getMappingAnnotation(rule).isPresent()
+            return rule != null && !isSkipped(rule) && (getMappingAnnotation(rule).isPresent() || EnumSchema.isEnum(rule)
                 || containsMappedValue(new GroupElement(rule.body()), ruleByName, visited));
         }
         Object value = captureValueShape(element);

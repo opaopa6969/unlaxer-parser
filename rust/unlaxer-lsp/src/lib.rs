@@ -6,6 +6,7 @@ pub use semantic_tokens::SemanticTokensLegend;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::{self, BufRead, Write};
+use unlaxer_runtime::incremental::{Revisions, SnapshotParseCache, Stats};
 use unlaxer_runtime::language_profile::{LanguageProfile, Selection};
 use unlaxer_runtime::language_queries::{LanguageQueries, QueryView};
 use unlaxer_runtime::source::{Operation, State};
@@ -18,6 +19,12 @@ pub trait Backend {
     fn entry(&self) -> &str;
     fn keywords(&self) -> &[String];
     fn validate(&mut self, snapshot: &Snapshot) -> Vec<Diagnostic>;
+    /// Opt in only when validation is pure for the complete key and snapshot. Custom
+    /// backends default to uncached; external state must be represented by revisions.
+    fn validation_cache_key(&self) -> Option<ValidationCacheKey> {
+        None
+    }
+
     /// Return typed/provider items for this exact immutable source and version.
     fn complete(&mut self, _snapshot: &Snapshot, _cursor: usize) -> Vec<Completion> {
         vec![]
@@ -63,6 +70,24 @@ pub struct Completion {
     pub detail: Option<String>,
     pub data: Value,
 }
+/// Retains the actual immutable grammar allocation, preventing in-place mutation or
+/// allocator address reuse from making a stale grammar look current.
+#[derive(Clone)]
+pub struct ValidationCacheKey {
+    pub grammar: SharedGrammar,
+    pub root: usize,
+    pub whitespace: bool,
+    pub revisions: Revisions,
+}
+impl PartialEq for ValidationCacheKey {
+    fn eq(&self, other: &Self) -> bool {
+        std::sync::Arc::ptr_eq(&self.grammar, &other.grammar)
+            && self.root == other.root
+            && self.whitespace == other.whitespace
+            && self.revisions == other.revisions
+    }
+}
+impl Eq for ValidationCacheKey {}
 /// Generated grammar adapter. Extra semantic completion is supplied by implementing Backend.
 pub struct GrammarBackend {
     pub name: String,
@@ -82,6 +107,21 @@ impl Backend for GrammarBackend {
     fn keywords(&self) -> &[String] {
         &self.keywords
     }
+    fn validation_cache_key(&self) -> Option<ValidationCacheKey> {
+        if !unlaxer_runtime::incremental::grammar_is_snapshot_cacheable(&self.grammar) {
+            return None;
+        }
+        Some(ValidationCacheKey {
+            grammar: self.grammar.clone(),
+            root: self.root,
+            whitespace: self.whitespace,
+            revisions: Revisions {
+                grammar: "generated".into(),
+                profile: String::new(),
+                state: String::new(),
+            },
+        })
+    }
     fn validate(&mut self, snapshot: &Snapshot) -> Vec<Diagnostic> {
         match unlaxer_runtime::parse_detailed_shared(
             &self.grammar,
@@ -91,7 +131,16 @@ impl Backend for GrammarBackend {
         ) {
             Ok(_) => vec![],
             Err(error) => {
-                let mut start = error.offset.min(snapshot.len());
+                // Editor diagnostics follow Java's farthest syntax failure, while the
+                // public parse_detailed primary still identifies unconsumed input.
+                // Keep non-syntax failures (in particular resource limits) primary.
+                let (offset, expected) =
+                    if error.kind == "trailing_input" && error.farthest.offset >= error.offset {
+                        (error.farthest.offset, &error.farthest.expected)
+                    } else {
+                        (error.offset, &error.expected)
+                    };
+                let mut start = offset.min(snapshot.len());
                 if snapshot.lsp(start).is_err() {
                     start = start.saturating_sub(1);
                 }
@@ -102,15 +151,15 @@ impl Backend for GrammarBackend {
                 }
                 vec![Diagnostic {
                     span: Span { start, end },
-                    message: if error.expected.is_empty() {
+                    message: if expected.is_empty() {
                         format!(
                             "Parse error at offset {}",
                             snapshot.utf16(start).unwrap_or(0)
                         )
                     } else {
-                        format!("Expected {}", error.expected.join(" or "))
+                        format!("Expected {}", expected.join(" or "))
                     },
-                    data: json!({"schemaVersion":1,"code":"ULX-PARSE-001","kind":"syntax","offset":snapshot.utf16(start).unwrap_or(0),"totalLength":snapshot.utf16(snapshot.len()).unwrap_or(0),"expectedTokens":error.expected}),
+                    data: json!({"schemaVersion":1,"code":"ULX-PARSE-001","kind":"syntax","offset":snapshot.utf16(start).unwrap_or(0),"totalLength":snapshot.utf16(snapshot.len()).unwrap_or(0),"expectedTokens":expected}),
                 }]
             }
         }
@@ -128,6 +177,8 @@ struct DiagnosticDocument {
 
 pub struct Server<B> {
     backend: B,
+    validation_cache: SnapshotParseCache<Vec<Diagnostic>>,
+    validation_identity: Option<ValidationCacheKey>,
     documents: HashMap<String, Snapshot>,
     diagnostic_contributions: BTreeMap<String, BTreeMap<String, DiagnosticDocument>>,
     profile: Option<Selection>,
@@ -142,6 +193,8 @@ impl<B: Backend> Server<B> {
     pub fn new(backend: B) -> Self {
         Self {
             backend,
+            validation_cache: SnapshotParseCache::new(128, 1_048_576),
+            validation_identity: None,
             documents: HashMap::new(),
             diagnostic_contributions: BTreeMap::new(),
             profile: None,
@@ -152,6 +205,34 @@ impl<B: Backend> Server<B> {
             shutdown: false,
             exited: false,
         }
+    }
+    pub fn validation_cache_stats(&self) -> Stats {
+        self.validation_cache.stats()
+    }
+    pub fn invalidate_parse_cache(&mut self) {
+        self.validation_cache.invalidate_all();
+        self.validation_identity = None;
+    }
+    /// Explicit mutation invalidates any prior pure-validation results.
+    pub fn backend_mut(&mut self) -> &mut B {
+        self.invalidate_parse_cache();
+        &mut self.backend
+    }
+    fn validate(&mut self, snapshot: &Snapshot) -> Vec<Diagnostic> {
+        let Some(key) = self.backend.validation_cache_key() else {
+            self.invalidate_parse_cache();
+            return self.backend.validate(snapshot);
+        };
+        if self.validation_identity.as_ref() != Some(&key) {
+            self.validation_cache.invalidate_all();
+            self.validation_identity = Some(key.clone());
+        }
+        if let Some(result) = self.validation_cache.get(snapshot, &key.revisions) {
+            return result;
+        }
+        let result = self.backend.validate(snapshot);
+        self.validation_cache.put(snapshot, &key.revisions, &result);
+        result
     }
     pub fn snapshot(&self, uri: &str) -> Option<&Snapshot> {
         self.documents.get(uri)
@@ -197,64 +278,65 @@ impl<B: Backend> Server<B> {
             if self.exited || self.shutdown {
                 return Err((-32600, "Server has shut down".into()));
             }
+            if !request
+                && matches!(
+                    method,
+                    "initialize"
+                        | "shutdown"
+                        | "unlaxer/configure"
+                        | "textDocument/semanticTokens/full"
+                        | "textDocument/completion"
+                        | "textDocument/hover"
+                        | "textDocument/definition"
+                )
+            {
+                return Ok(Value::Null);
+            }
             if method == "initialize" {
-                let selection = self.select_profile(&params).map_err(invalid)?;
-                self.profile = selection;
+                if self.initialized {
+                    return Err((-32600, "Server already initialized".into()));
+                }
+                let result = self.configure(&params)?;
                 self.initialized = true;
-                self.semantic_tokens_legend = self.backend.semantic_tokens_legend();
-                let semantic = &params["capabilities"]["textDocument"]["semanticTokens"];
-                self.semantic_multiline = semantic["multilineTokenSupport"] == true;
-                self.semantic_overlapping = semantic["overlappingTokenSupport"] == true;
-                let mut caps = json!({"positionEncoding":"utf-16","textDocumentSync":1,
-                    "semanticTokensProvider":{"legend":{
-                        "tokenTypes":self.semantic_tokens_legend.token_types,
-                        "tokenModifiers":self.semantic_tokens_legend.token_modifiers},"full":true}});
-                if self.allows("COMPLETION") {
-                    caps["completionProvider"] = json!({"resolveProvider":false});
-                }
-                if self.allows("HOVER") {
-                    caps["hoverProvider"] = json!(true);
-                }
-                if self.allows("DEFINITION")
-                    && self
-                        .backend
-                        .query_capabilities()
-                        .contains(&Operation::Definition)
-                {
-                    caps["definitionProvider"] = json!(true);
-                }
-                let mut operations = serde_json::Map::new();
-                for name in [
-                    "VALIDATE",
-                    "COMPLETION",
-                    "HOVER",
-                    "DEFINITION",
-                    "RENAME",
-                    "FORMAT",
-                    "CODE_ACTION",
-                ] {
-                    let transport =
-                        matches!(name, "VALIDATE" | "COMPLETION" | "HOVER" | "DEFINITION");
-                    let registered = operation(name)
-                        .is_some_and(|op| self.backend.query_capabilities().contains(&op));
-                    let allowed = self.allows(name);
-                    operations.insert(name.into(), json!({"transport":transport,"providerRegistered":registered,"profileAllowed":allowed,"available":transport && registered && allowed}));
-                }
-                caps["experimental"] =
-                    json!({"languageQueryConsumer":{"schemaVersion":1,"operations":operations}});
-                if let Some(p) = &self.profile {
-                    let l = &p.language;
-                    caps["experimental"]["languageProfile"] = json!({"schemaVersion":1,"tsv":p.profile.canonical_tsv(),"entry":l.entry,"grammar":l.grammar,"language":l.id,"package":l.package_id,"version":l.version});
-                }
-                return Ok(
-                    json!({"capabilities":caps,"serverInfo":{"name":"unlaxer-classic-rust"}}),
-                );
+                return Ok(result);
             }
             if !self.initialized {
-                return Err((-32002, "Server not initialized".into()));
+                return if request {
+                    Err((-32002, "Server not initialized".into()))
+                } else {
+                    Ok(Value::Null)
+                };
+            }
+            if request
+                && matches!(
+                    method,
+                    "exit"
+                        | "initialized"
+                        | "$/setTrace"
+                        | "textDocument/didOpen"
+                        | "textDocument/didChange"
+                        | "textDocument/didClose"
+                        | "textDocument/didSave"
+                        | "workspace/didChangeConfiguration"
+                        | "workspace/didChangeWatchedFiles"
+                        | "textDocument/willSave"
+                        | "window/workDoneProgress/cancel"
+                        | "notebookDocument/didOpen"
+                        | "notebookDocument/didChange"
+                        | "notebookDocument/didSave"
+                        | "notebookDocument/didClose"
+                        | "workspace/didCreateFiles"
+                        | "workspace/didDeleteFiles"
+                        | "workspace/didRenameFiles"
+                        | "workspace/didChangeWorkspaceFolders"
+                )
+            {
+                return Err((-32600, "Notification method requires a notification".into()));
             }
             match method {
-                "initialized" | "$/cancelRequest" => Ok(Value::Null),
+                "unlaxer/configure" => self.configure(&params),
+                "initialized" => Ok(Value::Null),
+                "$/cancelRequest" if !request => Ok(Value::Null),
                 "shutdown" if request => {
                     self.shutdown = true;
                     Ok(Value::Null)
@@ -272,6 +354,7 @@ impl<B: Backend> Server<B> {
                     {
                         return Ok(Value::Null);
                     }
+                    self.validation_cache.invalidate(uri);
                     self.documents.insert(uri.into(), snapshot.clone());
                     self.diagnostics(&snapshot, &mut notifications);
                     Ok(Value::Null)
@@ -299,6 +382,7 @@ impl<B: Backend> Server<B> {
                     }
                     let text = string(changes.last().unwrap(), "text")?;
                     let snapshot = Snapshot::new(uri, version, text).map_err(invalid)?;
+                    self.validation_cache.invalidate(uri);
                     self.documents.insert(uri.into(), snapshot.clone());
                     self.diagnostics(&snapshot, &mut notifications);
                     Ok(Value::Null)
@@ -306,6 +390,7 @@ impl<B: Backend> Server<B> {
                 "textDocument/didClose" => {
                     let uri = string(&params["textDocument"], "uri")?;
                     self.documents.remove(uri);
+                    self.validation_cache.invalidate(uri);
                     let mut affected = std::collections::BTreeSet::from([uri.to_owned()]);
                     if let Some(previous) = self.diagnostic_contributions.remove(uri) {
                         affected.extend(previous.into_keys());
@@ -451,7 +536,7 @@ impl<B: Backend> Server<B> {
                     if op == Operation::Definition {
                         return Ok(empty);
                     }
-                    let diagnostics = self.backend.validate(&snapshot);
+                    let diagnostics = self.validate(&snapshot);
                     let text = diagnostics.first().map_or_else(
                         || format!("Valid {}", self.backend.grammar()),
                         |diagnostic| diagnostic.message.clone(),
@@ -470,6 +555,58 @@ impl<B: Backend> Server<B> {
         }
         notifications
     }
+    /// Explicit application extension for profile/client configuration after initialize.
+    fn configure(&mut self, params: &Value) -> Result<Value, (i64, String)> {
+        let selection = self.select_profile(params).map_err(invalid)?;
+        self.profile = selection;
+        self.semantic_tokens_legend = self.backend.semantic_tokens_legend();
+        let semantic = &params["capabilities"]["textDocument"]["semanticTokens"];
+        self.semantic_multiline = semantic["multilineTokenSupport"] == true;
+        self.semantic_overlapping = semantic["overlappingTokenSupport"] == true;
+        let mut caps = json!({"positionEncoding":"utf-16","textDocumentSync":1,
+        "semanticTokensProvider":{"legend":{
+            "tokenTypes":self.semantic_tokens_legend.token_types,
+            "tokenModifiers":self.semantic_tokens_legend.token_modifiers},"full":true}});
+        if self.allows("COMPLETION") {
+            caps["completionProvider"] = json!({"resolveProvider":false});
+        }
+        if self.allows("HOVER") {
+            caps["hoverProvider"] = json!(true);
+        }
+        if self.allows("DEFINITION")
+            && self
+                .backend
+                .query_capabilities()
+                .contains(&Operation::Definition)
+        {
+            caps["definitionProvider"] = json!(true);
+        }
+        let mut operations = serde_json::Map::new();
+        for name in [
+            "VALIDATE",
+            "COMPLETION",
+            "HOVER",
+            "DEFINITION",
+            "RENAME",
+            "FORMAT",
+            "CODE_ACTION",
+        ] {
+            let transport = matches!(name, "VALIDATE" | "COMPLETION" | "HOVER" | "DEFINITION");
+            let registered =
+                operation(name).is_some_and(|op| self.backend.query_capabilities().contains(&op));
+            let allowed = self.allows(name);
+            operations.insert(name.into(), json!({"transport":transport,"providerRegistered":registered,"profileAllowed":allowed,"available":transport && registered && allowed}));
+        }
+        caps["experimental"] =
+            json!({"languageQueryConsumer":{"schemaVersion":1,"operations":operations}});
+        if let Some(p) = &self.profile {
+            let l = &p.language;
+            caps["experimental"]["languageProfile"] = json!({"schemaVersion":1,"tsv":p.profile.canonical_tsv(),"entry":l.entry,"grammar":l.grammar,"language":l.id,"package":l.package_id,"version":l.version});
+        }
+        self.invalidate_parse_cache();
+        Ok(json!({"capabilities":caps,"serverInfo":{"name":"unlaxer-classic-rust"}}))
+    }
+
     fn query(
         &mut self,
         snapshot: &Snapshot,
@@ -521,7 +658,7 @@ impl<B: Backend> Server<B> {
     fn diagnostics(&mut self, snapshot: &Snapshot, output: &mut Vec<Value>) {
         let mut diagnostics = vec![];
         if self.allows("VALIDATE") {
-            for diagnostic in self.backend.validate(snapshot) {
+            for diagnostic in self.validate(snapshot) {
                 let Ok(range) = range(snapshot, diagnostic.span) else {
                     continue;
                 };
