@@ -588,3 +588,15 @@ fn cli_refuses_output_file_directory_and_ancestor_symlinks() {
         .file_type()
         .is_symlink());
 }
+
+#[test]
+fn literal_text_cannot_enable_internal_preferred_captures() {
+    let files=unlaxer_generator::generate("grammar LiteralMetadata { @root @mapping(Value,params=[text]) Root ::= '#preferred-depth:' % ',' @text; }").unwrap();
+    let parser = &files
+        .iter()
+        .find(|f| f.relative_path == "parser.rs")
+        .unwrap()
+        .content;
+    assert!(!parser.contains("#preferred-extra:2"));
+    assert!(parser.contains(".separated_by("));
+}

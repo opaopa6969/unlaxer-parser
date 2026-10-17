@@ -209,10 +209,10 @@ public class SafeSuccessMemoizationTest {
             var frame = context.beginMemoDiagnosticFrame();
             parser.parse(context);
             context.discardMemoDiagnosticFrame(frame);
-            assertEquals("only the replay's real begin checkpoints", 1, checkpoints[0]);
+            assertEquals("root observer boundary plus the replay's real begin", 2, checkpoints[0]);
             assertEquals("safe success does not replay failed alternatives' restores", 0, restores[0]);
             context.replayMemoTransactionEvents(frame);
-            assertEquals(2, checkpoints[0]);
+            assertEquals(3, checkpoints[0]);
             assertEquals(0, restores[0]);
         }
     }
