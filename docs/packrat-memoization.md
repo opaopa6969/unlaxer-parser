@@ -20,7 +20,8 @@ Ast.Root root = GeneratedMapper.parseWithOptions(text, options);
 - `SAFE_FAILURES` は安全な失敗に加え、`SafeSuccessMemoizable` を直接 implements する exact class の
   安全な成功も自動で保存・再生する。enum 名・既定値は変えず、新しい enum 値は追加しない。
 - キーは parser identity、consumed/matched position、`TokenKind`、invert flag、
-  parser-visible state version。
+  parser-visible state version、matched cursor reset policy (`resetMatchedWithConsumed`)。
+  [policy切替時のkeyと互換constructor](memo-reset-policy.md)も参照。
 - failure/success hit は最初の rule call が生成した診断を再生するため、OFF/ON で farthest offset と
   expected hints が変わらない。
 - cache は 1 個の `ParseContext` に閉じ、session をまたいで共有しない。

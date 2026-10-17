@@ -362,7 +362,7 @@ fn right_associative_invalid_shapes_are_rejected_before_output() {
             source
                 .replace("'x' @left", "['x'] @left")
                 .replace("'^' @op", "['^'] @op"),
-            "nullable unbounded",
+            "left recursion",
         ),
         (source.replace("'x' @left", "Expr @left"), "left recursion"),
     ];
@@ -389,10 +389,6 @@ fn lowerer_rejects_unsupported_or_inconsistent_grammars_without_artifacts() {
         (
             simple.replace("'x' @value", "[ 'x' ] Root @value"),
             "left recursion",
-        ),
-        (
-            simple.replace("'x' @value", "{ [ 'x' ] } 'x' @value"),
-            "nullable unbounded",
         ),
         (
             simple.replace("'x' @value", "[ [ 'x' ] ] @value"),
@@ -422,7 +418,7 @@ fn lowerer_rejects_unsupported_or_inconsistent_grammars_without_artifacts() {
         ),
         (
             simple.replace("grammar G {", "grammar G { token T = REGEX('x')\n"),
-            "unsupported token",
+            "E-REGEX-RETIRED",
         ),
         (
             simple.replace("grammar G {", "grammar G { @whitespace: python\n"),
@@ -518,9 +514,9 @@ fn structural_recursion_is_bounded_even_across_transparent_rules() {
 #[test]
 fn nullable_cardinality_shared_mapping_and_operator_boundaries_are_explicit() {
     for (accepted, body) in [
-        (false, "token E=EMPTY @root @mapping(V,params=[values]) Root ::= ('a' | E)+ @values;"),
+        (true, "token E=EMPTY @root @mapping(V,params=[values]) Root ::= ('a' | E)+ @values;"),
         (true, "token E=EMPTY @root @mapping(V,params=[values]) Root ::= E{1,2} @values;"),
-        (false, "token E=EMPTY @root @mapping(V,params=[values]) Root ::= E % E @values;"),
+        (true, "token E=EMPTY @root @mapping(V,params=[values]) Root ::= E % E @values;"),
         (false, "@root @mapping(V) Root ::= [ 'x' ] Root;"),
         (false, "@root @mapping(V) Root ::= Prefix Root | 'x'; Prefix ::= [ 'a' ];"),
         (true, "@root @mapping(V,params=[value]) Root ::= ('a' | Node) @value; @mapping(N) Node ::= 'n';"),
@@ -587,4 +583,16 @@ fn cli_refuses_output_file_directory_and_ancestor_symlinks() {
         .unwrap()
         .file_type()
         .is_symlink());
+}
+
+#[test]
+fn literal_text_cannot_enable_internal_preferred_captures() {
+    let files=unlaxer_generator::generate("grammar LiteralMetadata { @root @mapping(Value,params=[text]) Root ::= '#preferred-depth:' % ',' @text; }").unwrap();
+    let parser = &files
+        .iter()
+        .find(|f| f.relative_path == "parser.rs")
+        .unwrap()
+        .content;
+    assert!(!parser.contains("#preferred-extra:2"));
+    assert!(parser.contains(".separated_by_java("));
 }

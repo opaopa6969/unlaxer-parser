@@ -145,7 +145,8 @@ public sealed interface UBNFAST permits
         /** token NAME = CI('keyword') — case-insensitive literal match */
         record CaseInsensitive(String name, String word) implements TokenDecl {}
 
-        /** token NAME = REGEX('pattern') — regex-based multi-char token matching */
+        /** Removed syntax retained solely for migration diagnostics on directly constructed ASTs. */
+        @Deprecated
         record Regex(String name, String pattern) implements TokenDecl {}
     }
 

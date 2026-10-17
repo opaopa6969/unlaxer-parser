@@ -1220,14 +1220,11 @@ class ParserRuleEmitter {
      * @recovery アノテーション付きルールを参照する場合は RecoveryWrapper クラスを返す。
      */
     static String resolveParserClass(ParserGenerator.GenContext ctx, String name) {
-        // Negation / CharRange / Regex tokens → generated inner class name
+        // Negation / CharRange tokens → generated inner class name
         if (ctx.tokenNegationMap.containsKey(name)) {
             return ParserCodegenUtil.toParserClassName(name) + ".class";
         }
         if (ctx.tokenCharRangeMap.containsKey(name)) {
-            return ParserCodegenUtil.toParserClassName(name) + ".class";
-        }
-        if (ctx.tokenRegexMap.containsKey(name)) {
             return ParserCodegenUtil.toParserClassName(name) + ".class";
         }
         String tokenClass = ctx.tokenParserMap.get(name);
