@@ -161,7 +161,11 @@ The development branch adds [Unicode-pinned `CI('word')` tokens](docs/case-insen
 
 The development branch adds [Java/Rust server selection in VS Code](docs/rust-vscode-launch.md) for TinyCalc and newly scaffolded extensions, with packaged editor tests. Java remains the default. This is not included in 3.3.0.
 
+The development branch adds [transactional NonOrdered](docs/nonordered-runtime.md) to the Rust runtime and fixes failed-candidate state leakage in Java. Each declared child occurrence is selected once, with declaration-order priority; later failure does not explore other permutations. This is not included in 3.3.0.
+
 The development branch also adds [full semantic-token providers](docs/classic-rust-lsp.md) to Rust and validates the existing Java hook against the same protocol corpus. Both default to empty data; applications supply the token legend and encoded tokens. Range and delta requests remain unsupported. This is not included in 3.3.0.
+
+The development branch aligns [LSP syntax diagnostic positions](docs/classic-lsp-diagnostics.md), including incomplete expressions, EOF and supplementary Unicode characters. A shared 20-case corpus exercises generated Java and Rust servers over stdio. Parser-specific diagnostic wording remains different.
 
 See the [full-spec matrix](rust/FULL-SPEC.md) and [IDE inventory](docs/lsp-dap-ide-gap-inventory.md) for remaining limits: Rust incremental parsing, LSP cancellation / rename and formatting transport, and some tokens and annotations are unsupported. DAP implements AST/token stepping, not live evaluator suspension. Numeric capture types/conversion and some diagnostics also differ between Java and Rust; compatibility with every Java grammar is not guaranteed.
 
