@@ -1,0 +1,5 @@
+grammar Recovered {
+  @package: cache.fixture
+  @root @recovery(sync=';') @mapping(Value, params=[text])
+  Root ::= 'ok;' @text;
+}

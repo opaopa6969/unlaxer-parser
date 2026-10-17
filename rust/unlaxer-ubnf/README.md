@@ -48,7 +48,7 @@ ASTは入力の借用を持たず、入力文字列破棄後も使用できる�
 | file/grammar | 複数`grammar NAME { ... }`、空のgrammarも構文として受理（生成可能性は後続validatorで検査） |
 | declarations | import→setting→token→ruleの順序、`@import alias from 'path'` |
 | settings | `@key: dotted.value`、`@key: { key: 'value' ... }` |
-| token（12種類） | Simple(parser class/FQN)、UNTIL、NEGATION、LOOKAHEAD、NEGATIVE_LOOKAHEAD、ANY、EOF、EMPTY、CHAR_RANGE、CI、REGEX、ADAPTER |
+| token | Simple(parser class/FQN)、UNTIL、NEGATION、LOOKAHEAD、NEGATIVE_LOOKAHEAD、ANY、EOF、EMPTY、CHAR_RANGE、CI、ADAPTER、宣言的字句式 |
 | annotation（18種類） | root、mapping(dotted class, params)、eval、whitespace、interleave、backref、scopeTree、declares、catalog、leftAssoc、rightAssoc、precedence、doc、recovery、skip、Simple、commonField、enum |
 | element（9種類） | Group、Optional、Repeat、OneOrMore、BoundedRepeat、Separated、Terminal、RuleRef(namespace)、Error |
 | element付加構文 | 前置`@typeof(name)`、後置`@capture`、`+ ? * {n} {n,m} {n,} % separator`（suffixは一つ） |
@@ -61,7 +61,7 @@ ID / schema / target binding の意味検証は [token adapter 契約](../../doc
 UBNF内triviaはASCII空白（space/tab/LF/CR/VT/FF）と`//`行コメント。
 対象言語の`@whitespace: javaStyle`とは別で、UBNF自身の`/*...*/`は未対応として診断する。
 文字列はsingle quote。`\n \t \r \\ \'`を復号し、それ以外のescapeはbackslashごと保持する
-（REGEX等に必要）。文字列・コメント内のUnicode、実改行も保持する。
+（字句リテラル等に必要）。文字列・コメント内のUnicode、実改行も保持する。
 
 `CHAR_RANGE`は現Java APIに合わせ、各境界を1個の非surrogate BMP文字、min≤maxへ制限。
 補助文字rangeは明示エラー。`BoundedRepeat.max=None`は上限なし。
@@ -106,3 +106,5 @@ Javaのdiagnosticsは先頭80文字のparse失敗文で、正確なエラー位�
 JavaのUnicode数字・keyword prefixの偶発的受理、空白を含むFQNのraw文字列化は互換保証しない。
 古い`unlaxer-dsl/examples/tinycalc.ubnf`のdouble quote設定は現bootstrap構文外。
 比較には現行`tinycalc-vscode/grammar/tinycalc.ubnf`を使う。
+
+旧 `REGEX(...)` と `RegexTokenParser` は `E-REGEX-RETIRED` と該当 source span で拒否する。[移行契約](../../docs/regex-retirement.md)。

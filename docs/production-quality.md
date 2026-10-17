@@ -28,7 +28,7 @@ Maven Central の 3.2.0 に以下の修正が含まれるという意味では�
 | [#516](https://github.com/opaopa6969/unlaxer-parser/issues/516) | Java再帰上限と解析中断時のtransaction終了 |
 
 Javaの公開履歴・API範囲はRustより広い。一方で今回の監査ではJavaにも位置・REGEX・lifecycle・再帰の不具合があり、公開年数だけで品質を判定しない。
-Rustの汎用REGEX未対応は継続する。#505のRust literal/ANY共通corpus成功を、REGEX対応の証拠にはしない。
+開発版ではREGEX DSLとJava RegexTokenParser APIを廃止し、[宣言的字句式への移行](regex-retirement.md)を採用した (#612)。公開済み3.3.0と#505の歴史的結果は変更しない。
 
 ## 位置・文字の契約
 
@@ -75,7 +75,7 @@ JDK 17を選択し、CIと同じ専用artifactの全体packageと、今回の変
 ```sh
 mvn -B -pl unlaxer-common-jdk17,unlaxer-dsl-jdk17 -am clean package -Dgpg.skip=true
 mvn -B -pl unlaxer-common-jdk17,unlaxer-dsl-jdk17 -am test \
-  -Dtest=GraphemeTest,GraphemeConformanceTest,RegexTokenParserTest,ParseDepthLimitTest,JavaParseDepthLimitTest,ClassicLspProtocolConformanceTest,ClassicDapProtocolConformanceTest,RustUbnfFrontendConformanceTest \
+  -Dtest=GraphemeTest,GraphemeConformanceTest,RegexRetirementConformanceTest,ParseDepthLimitTest,JavaParseDepthLimitTest,ClassicLspProtocolConformanceTest,ClassicDapProtocolConformanceTest,RustUbnfFrontendConformanceTest \
   -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
 ```
 
