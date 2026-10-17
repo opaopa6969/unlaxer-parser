@@ -163,7 +163,23 @@ The development branch supports [literal enum values](docs/enum-values.md) in Ja
 
 [Automatic evaluation](docs/evaluation-strategies.md) now supports literal, passthrough, conditional, binary arithmetic, and variable-reference strategies in both languages, with explicit conversion hooks, short-circuit order, and fallible Rust outputs. Regenerated automatic Java evaluators must implement the new `convertValue` hook.
 
-See the [full-spec matrix](rust/FULL-SPEC.md) and [IDE inventory](docs/lsp-dap-ide-gap-inventory.md) for remaining limits: Rust incremental parsing, LSP cancellation / semantic tokens / rename and formatting transport, and some tokens and annotations are unsupported. DAP implements AST/token stepping, not live evaluator suspension. Some diagnostics and AST candidate/container behavior still differ between Java and Rust; compatibility with every Java grammar is not guaranteed.
+The development branch adds [Java/Rust server selection in VS Code](docs/rust-vscode-launch.md) for TinyCalc and newly scaffolded extensions, with packaged editor tests. Java remains the default. This is not included in 3.3.0.
+
+The development branch adds [transactional `NonOrdered`](docs/nonordered-runtime.md) to the Rust runtime and fixes failed-candidate state leakage in Java. Each declared child occurrence is selected once, with declaration-order priority; later failure does not explore other permutations. This is not included in 3.3.0.
+
+Java also gains [explicit PEG assertions](docs/peg-assertions.md), matching the state rollback of Rust `ahead()` / `not_ahead()`. Classic match-only remains a separate contract; general consume/invert propagation, replay, and diagnostic-frontier gaps remain tracked in [#545](https://github.com/opaopa6969/unlaxer-parser/issues/545).
+
+The development branch also supports [Classic token-mode propagation](docs/classic-token-propagation.md) through general Rust expressions and custom parsers. The four kinds, inherited inversion, both cursors, and source projection are checked against Java. Capture/replay integration, external code-fence adapters, and observer exceptions remain tracked separately; this runtime slice does not complete parity.
+
+The development branch also adds [full semantic-token providers](docs/classic-rust-lsp.md) to Rust and validates the existing Java hook against the same protocol corpus. Both default to empty data; applications supply the token legend and encoded tokens. Range and delta requests remain unsupported. This is not included in 3.3.0.
+
+Java and Rust development runtimes provide [bounded snapshot and chunk caches](docs/incremental-cache.md). Generated LSP servers reuse complete unchanged snapshots and invalidate on edits, configuration and external-state revisions. Edited documents are reparsed in full; partial CST splicing is not implemented in either version. This addition is not included in 3.3.0.
+
+Development servers also enforce the [single-initialize LSP lifecycle](docs/classic-lsp-lifecycle.md). Applications that previously reinitialized a connection to change its profile must use `unlaxer/configure`; failed configuration preserves the active settings.
+
+The development branch aligns [LSP syntax diagnostic positions](docs/classic-lsp-diagnostics.md), including incomplete expressions, EOF and supplementary Unicode characters. A shared 20-case corpus exercises generated Java and Rust servers over stdio. Parser-specific diagnostic wording remains different.
+
+See the [full-spec matrix](rust/FULL-SPEC.md) and [IDE inventory](docs/lsp-dap-ide-gap-inventory.md) for remaining limits: partial CST reparsing, LSP cancellation / rename and formatting transport, and some tokens and annotations are unsupported. DAP implements AST/token stepping, not live evaluator suspension. Some diagnostics and AST candidate/container behavior still differ between Java and Rust; compatibility with every Java grammar is not guaranteed.
 
 Downstream `tinyexpression-rs` and `rustcodeblock` AOT exist on the separate **ubnfc** engine. Their results do not establish Classic Rust parity or production deployment history. See the [engine guide](docs/engine-selection-guide-ja.md) and [pinned downstream audit](rust/FULL-SPEC.md#下流tinyexpressionの現状監査2026-09-30).
 
