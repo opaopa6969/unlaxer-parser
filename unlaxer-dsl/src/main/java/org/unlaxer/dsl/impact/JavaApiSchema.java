@@ -175,6 +175,9 @@ public final class JavaApiSchema {
     }
 
     private static String mappingForMethod(UBNFSourceSnapshot snapshot, String methodName) {
+        for (var wrapper : org.unlaxer.dsl.codegen.EnumSchema.rootEnums(snapshot.ast().grammars().get(0)).values()) {
+            if (methodName.equals("eval" + wrapper)) return wrapper;
+        }
         for (var rule : snapshot.ast().grammars().get(0).rules()) {
             Optional<org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation> mapping = rule.annotations().stream()
                 .filter(org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation.class::isInstance)
