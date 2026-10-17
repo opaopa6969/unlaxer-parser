@@ -170,3 +170,12 @@ shapes and 116 inputs under six parse configurations, native/Java-host output
 agreement (including DAP), generated evaluator execution, retained/concurrent
 source maps, root/capture composition, and an independent DAP label/span oracle.
 API impact reports expose enum-to-mixed field widening in both targets.
+
+## Browser lesson boundary
+
+The separate `unlaxer-learning` interpreter rejects `@enum` at compile time (#580).
+It uses a limited projection implementation; accepting enum syntax there would
+lose values or defer an unsupported feature to a mapping error. Use generated
+Java/Rust CLI or a generated Playground for enum values. The shared enum and
+mixed-enum corpora are accepted by both generators and rejected explicitly by
+the lesson adapter. This restriction does not change generated enum behavior.
