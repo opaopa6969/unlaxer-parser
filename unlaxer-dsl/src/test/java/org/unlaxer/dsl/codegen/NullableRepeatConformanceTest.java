@@ -37,7 +37,7 @@ public class NullableRepeatConformanceTest {
                 });
             }
             Path classes=temporary.newFolder().toPath();
-            var compiler=ToolProvider.getSystemJavaCompiler();
+            var compiler=org.unlaxer.dsl.Java21TestSupport.compiler();
             var diagnostics=new DiagnosticCollector<JavaFileObject>();
             try(var manager=compiler.getStandardFileManager(diagnostics,null,null)) {
                 assertTrue(row.get("name")+" "+diagnostics.getDiagnostics(),compiler.getTask(null,manager,diagnostics,

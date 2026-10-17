@@ -134,7 +134,8 @@ final class TypeofEmitter {
                 case VALUE ->
                         out.append(
                                 "            values.extend(map_values(tree, &capture.nodes)?);\n");
-                case INTEGER ->
+                case NESTED -> throw new IllegalArgumentException("E-NESTED-SHAPE: typeof requires remaining #583 implementation");
+                        case INTEGER ->
                         out.append(
                                 "           "
                                     + " values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).parse::<i32>().map_err(|_|"
@@ -209,6 +210,7 @@ final class TypeofEmitter {
             case MANY -> "\"List\"";
             case ONE ->
                     switch (field.kind()) {
+                        case NESTED -> throw new IllegalArgumentException("E-NESTED-SHAPE: typeof requires remaining #583 implementation");
                         case INTEGER -> "\"Integer\"";
                         case TEXT -> "\"String\"";
                         case ENUM -> RustBackend.quote("enum::" + field.enumName());

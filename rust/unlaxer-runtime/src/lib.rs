@@ -499,7 +499,9 @@ pub type SharedGrammar = Arc<[Rule]>;
 pub enum Memoization {
     #[default]
     Off,
-    /// Cache failures only for rules that cannot reach context-dependent expressions.
+    /// Cache failures for context-independent rules and successes for their statically
+    /// pure subset. The historical variant name is retained for compatibility.
+    /// Classic mode and opt-in token tracing do not replay successes.
     SafeFailures,
 }
 
@@ -1170,15 +1172,50 @@ impl Hasher for FailureMemoHasher {
     }
 }
 
-type FailureMemoMap = HashMap<FailureMemoKey, FailureDiagnostic, FailureMemoBuildHasher>;
+type MemoMap<V> = HashMap<FailureMemoKey, V, FailureMemoBuildHasher>;
+type FailureMemoBuckets = MemoBuckets<FailureDiagnostic>;
+type SuccessMemoBuckets = MemoBuckets<Rc<SuccessMemo>>;
+
+const MAX_SUCCESS_MEMO_BYTES: usize = 2 * 1024 * 1024;
+const MAX_RETAINED_SUCCESS_MEMO_BYTES: usize = 16 * 1024 * 1024;
+
+trait MemoValue {
+    fn retained_bytes(&self) -> usize;
+}
+impl MemoValue for FailureDiagnostic {
+    fn retained_bytes(&self) -> usize {
+        0
+    }
+}
+
+/// No arena IDs or caller-owned metadata escape into the memo. Node edges are
+/// relative to this snapshot; spans remain absolute original-source CP offsets.
+struct SuccessMemo {
+    nodes: Vec<Node>,
+    root: usize,
+    captures: Vec<(&'static str, Span)>,
+    consumed: usize,
+    matched: usize,
+    policy: MatchCursorPolicy,
+    expression_depth: usize,
+    diagnostic: FailureDiagnostic,
+    bytes: usize,
+}
+impl MemoValue for Rc<SuccessMemo> {
+    fn retained_bytes(&self) -> usize {
+        self.bytes
+    }
+}
 
 const FAILURE_MEMO_BUCKET_SIZE: usize = 256;
 
-/// Keep nearby failures together for lookup and destruction. The first bucket is
+/// Keep nearby outcomes together for lookup and destruction. The first bucket is
 /// inline so inputs shorter than one bucket need no additional allocation.
-struct FailureMemoBuckets {
-    first: FailureMemoMap,
-    remaining: Vec<FailureMemoMap>,
+struct MemoBuckets<V> {
+    first: MemoMap<V>,
+    remaining: Vec<MemoMap<V>>,
+    retained_bytes: usize,
+    max_bytes: usize,
     window: Option<usize>,
     high_water: usize,
     evicted_buckets: usize,
@@ -1187,7 +1224,7 @@ struct FailureMemoBuckets {
     evicted_entries: usize,
 }
 
-impl Default for FailureMemoBuckets {
+impl<V: MemoValue> Default for MemoBuckets<V> {
     fn default() -> Self {
         // Like Java's system properties, read process-level tuning only once.
         static WINDOW: std::sync::OnceLock<Option<usize>> = std::sync::OnceLock::new();
@@ -1207,11 +1244,13 @@ impl Default for FailureMemoBuckets {
     }
 }
 
-impl FailureMemoBuckets {
+impl<V: MemoValue> MemoBuckets<V> {
     fn with_window(window: Option<usize>) -> Self {
         Self {
-            first: FailureMemoMap::default(),
+            first: MemoMap::default(),
             remaining: vec![],
+            retained_bytes: 0,
+            max_bytes: MAX_RETAINED_SUCCESS_MEMO_BYTES,
             window,
             high_water: 0,
             evicted_buckets: 0,
@@ -1239,13 +1278,14 @@ impl FailureMemoBuckets {
             {
                 self.evicted_entries += map.len();
             }
+            self.retained_bytes -= map.values().map(MemoValue::retained_bytes).sum::<usize>();
             // clear() would keep the allocation alive. Drop the hash table itself.
-            *map = FailureMemoMap::default();
+            *map = MemoMap::default();
         }
         self.evicted_buckets = target;
     }
 
-    fn probe(&mut self, position: usize, key: &FailureMemoKey) -> Option<&FailureDiagnostic> {
+    fn probe(&mut self, position: usize, key: &FailureMemoKey) -> Option<&V> {
         self.observe_cursor(position);
         let bucket = position / FAILURE_MEMO_BUCKET_SIZE;
         if bucket < self.evicted_buckets {
@@ -1261,7 +1301,7 @@ impl FailureMemoBuckets {
         self.get(bucket, key)
     }
 
-    fn get(&self, bucket: usize, key: &FailureMemoKey) -> Option<&FailureDiagnostic> {
+    fn get(&self, bucket: usize, key: &FailureMemoKey) -> Option<&V> {
         if bucket == 0 {
             self.first.get(key)
         } else {
@@ -1269,22 +1309,29 @@ impl FailureMemoBuckets {
         }
     }
 
-    fn insert(&mut self, bucket: usize, key: FailureMemoKey, diagnostic: FailureDiagnostic) {
+    fn insert(&mut self, bucket: usize, key: FailureMemoKey, value: V) {
         // An enclosing rule can finish after traversal has passed its start.
         // A later probe below this frontier widens the window and re-evaluates it.
         if bucket < self.evicted_buckets {
             return;
+        }
+        let bytes = value.retained_bytes();
+        let old_bytes = self.get(bucket, &key).map_or(0, MemoValue::retained_bytes);
+        let retained = self.retained_bytes - old_bytes;
+        if bytes > self.max_bytes.saturating_sub(retained) {
+            return; // A full cache is a safe miss, never a parse/resource failure.
         }
         let map = if bucket == 0 {
             &mut self.first
         } else {
             if self.remaining.len() < bucket {
                 // Empty maps allocate no entry storage, including skipped buckets.
-                self.remaining.resize_with(bucket, FailureMemoMap::default);
+                self.remaining.resize_with(bucket, MemoMap::default);
             }
             &mut self.remaining[bucket - 1]
         };
-        map.insert(key, diagnostic);
+        map.insert(key, value);
+        self.retained_bytes = retained + bytes;
     }
 }
 
@@ -1318,7 +1365,7 @@ impl Default for MatchCursorPolicy {
 /// [`Self::failure`] and [`Self::error`] then return offset zero and an empty expected
 /// list; errors supplied by custom parsers are still returned unchanged.
 /// Use the free full-input parsing functions for automatic diagnostic retries.
-/// Checkpoint counters and memoized-failure hit counts describe only this context's
+/// Checkpoint counters and memoized-rule hit counts describe only this context's
 /// first pass, not any separate diagnostic retry; semantic diagnostics are unaffected.
 pub struct ParseContext<'a> {
     token_mode: Option<token::ParseMode>,
@@ -1355,9 +1402,12 @@ pub struct ParseContext<'a> {
     grammar_session: u64,
     next_grammar_session: u64,
     memo_safe_rules: Vec<bool>,
+    success_memo_safe_rules: Vec<bool>,
     failure_memo: FailureMemoBuckets,
+    success_memo: SuccessMemoBuckets,
     diagnostic_frames: Vec<FailureDiagnostic>,
     memoized_failure_hits: usize,
+    memoized_success_hits: usize,
     checkpoint_metrics: Option<CheckpointMetrics>,
     checkpoint_metrics_scope_journal_base: u64,
     // FIRST sets of `rules` (#300) while candidate exclusion is active, i.e. only
@@ -1698,9 +1748,12 @@ impl<'a> ParseContext<'a> {
             grammar_session: 0,
             next_grammar_session: 1,
             memo_safe_rules: vec![],
+            success_memo_safe_rules: vec![],
             failure_memo: FailureMemoBuckets::default(),
+            success_memo: SuccessMemoBuckets::default(),
             diagnostic_frames: vec![],
             memoized_failure_hits: 0,
+            memoized_success_hits: 0,
             checkpoint_metrics: None,
             checkpoint_metrics_scope_journal_base: 0,
             first_sets: None,
@@ -1754,6 +1807,12 @@ impl<'a> ParseContext<'a> {
     /// Hits in this context's pass only; excludes any separate detailed retry.
     pub fn memoized_failure_hits(&self) -> usize {
         self.memoized_failure_hits
+    }
+
+    /// Actual successful rule replays in this context's pass. Classic mode,
+    /// tracing, unsafe rules and snapshots exceeding the memo budgets are misses.
+    pub fn memoized_success_hits(&self) -> usize {
+        self.memoized_success_hits
     }
 
     /// Read-only external data, independent of captures and transactional state.
@@ -2060,15 +2119,18 @@ impl<'a> ParseContext<'a> {
             vec![]
         };
         let previous_safe_rules = std::mem::replace(&mut self.memo_safe_rules, safe_rules);
+        let previous_success_safe_rules = std::mem::take(&mut self.success_memo_safe_rules);
         let first_sets = self.first_sets.as_ref().map(|_| first::table(grammar));
         let previous_first_sets = std::mem::replace(&mut self.first_sets, first_sets);
         let previous_failure_memo = std::mem::take(&mut self.failure_memo);
+        let previous_success_memo = std::mem::take(&mut self.success_memo);
         let previous_session = self.grammar_session;
         let active_session = self.next_grammar_session;
         self.next_grammar_session = self.next_grammar_session.wrapping_add(1);
         self.grammar_session = active_session;
         let result = self.parse_expression(&Expr::Rule(root));
         self.failure_memo = previous_failure_memo;
+        self.success_memo = previous_success_memo;
         self.rules = previous_rules;
         self.lexical_context = previous_goal;
         if !outer_entry {
@@ -2077,6 +2139,7 @@ impl<'a> ParseContext<'a> {
         self.whitespace = previous_whitespace;
         self.lexical_trivia = previous_definition;
         self.memo_safe_rules = previous_safe_rules;
+        self.success_memo_safe_rules = previous_success_safe_rules;
         self.first_sets = previous_first_sets;
         self.grammar_session = previous_session;
         self.call_depth -= 1;
@@ -2129,6 +2192,8 @@ impl<'a> ParseContext<'a> {
     fn checkpoint(&mut self) -> Checkpoint {
         if self.options.memoization == Memoization::SafeFailures {
             self.failure_memo
+                .observe_cursor(self.code_point(self.position));
+            self.success_memo
                 .observe_cursor(self.code_point(self.position));
         }
         let captures_nonempty = !self.captures.is_empty() || !self.owned_captures.is_empty();
@@ -2329,6 +2394,9 @@ impl<'a> ParseContext<'a> {
     }
 
     fn rule(&mut self, id: usize, depth: usize) -> Option<usize> {
+        if self.resource_failure.is_some() {
+            return None;
+        }
         if depth >= 256 {
             self.resource_error("rule nesting below 256");
             return None;
@@ -2364,6 +2432,22 @@ impl<'a> ParseContext<'a> {
                 return None;
             }
         }
+        let success_key = memo_key.filter(|_| self.token_trace.is_none());
+        if let Some((position, key)) = success_key {
+            if let Some(entry) = self.success_memo.probe(position, &key).cloned() {
+                // Same remaining expression budget: never hide an OFF-mode resource
+                // failure by skipping recursive frames from a shallower invocation.
+                if entry.expression_depth == self.expression_depth {
+                    self.memoized_success_hits += 1;
+                    return Some(self.replay_success(&entry));
+                }
+            }
+        }
+        let capture_mark = if success_key.is_some() {
+            self.captures.checkpoint()
+        } else {
+            self.captures.journal.len()
+        };
         let rules = Arc::clone(&self.rules);
         let rule = &rules[id];
         let record_diagnostics = self.options.diagnostics == Diagnostics::Detailed;
@@ -2396,12 +2480,152 @@ impl<'a> ParseContext<'a> {
             // Resource exhaustion depends on active wrapper frames. Do not reuse
             // that failure from a shallower call; ordinary syntax failures retain
             // their existing memo sharing across wrappers.
-            if result.is_none() && self.resource_failure.is_none() {
-                self.failure_memo
-                    .insert(position / FAILURE_MEMO_BUCKET_SIZE, key, diagnostic);
+            if self.resource_failure.is_none() {
+                if let Some(root) = result {
+                    if success_key.is_some() {
+                        self.memoize_success(position, key, count, root, capture_mark, diagnostic);
+                    }
+                } else {
+                    self.failure_memo
+                        .insert(position / FAILURE_MEMO_BUCKET_SIZE, key, diagnostic);
+                }
             }
         }
+        if success_key.is_some() {
+            self.captures.commit_checkpoint();
+        }
         result
+    }
+
+    /// Snapshot only the newly appended pure arena. No public NodeId, mutable
+    /// TokenInfo, scope, owned binding, or user value can be retained here.
+    #[inline(never)]
+    fn memoize_success(
+        &mut self,
+        position: usize,
+        key: FailureMemoKey,
+        start: usize,
+        root: usize,
+        capture_mark: usize,
+        diagnostic: FailureDiagnostic,
+    ) {
+        // Failure-only parses keep their historical zero-extra-allocation path.
+        // Compute the stronger proof lazily on the first completed safe rule.
+        if self.success_memo_safe_rules.len() != self.rules.len() {
+            self.success_memo_safe_rules = memo_success_safe_rules(&self.rules);
+        }
+        if !self
+            .success_memo_safe_rules
+            .get(key.rule)
+            .copied()
+            .unwrap_or(false)
+        {
+            return;
+        }
+        let nodes = &self.nodes[start..];
+        let journal = &self.captures.journal[capture_mark..];
+        let mut bytes = std::mem::size_of::<SuccessMemo>()
+            .saturating_add(std::mem::size_of_val(nodes))
+            .saturating_add(std::mem::size_of_val(journal))
+            .saturating_add(journal.len().saturating_mul(std::mem::size_of::<Span>()))
+            .saturating_add(std::mem::size_of_val(diagnostic.expected_values()));
+        if bytes > MAX_SUCCESS_MEMO_BYTES {
+            return;
+        }
+        for node in nodes {
+            bytes = bytes
+                .saturating_add(std::mem::size_of_val(node.children.as_slice()))
+                .saturating_add(std::mem::size_of_val(node.captures.as_slice()));
+            for capture in &node.captures {
+                bytes = bytes.saturating_add(std::mem::size_of_val(capture.nodes.as_slice()));
+            }
+            if bytes > MAX_SUCCESS_MEMO_BYTES {
+                return;
+            }
+            // Fail closed if a future pure expression introduces foreign edges.
+            if node
+                .children
+                .iter()
+                .chain(node.captures.iter().flat_map(|c| &c.nodes))
+                .any(|&id| id < start || id >= self.nodes.len())
+            {
+                return;
+            }
+        }
+        let old_bytes = self
+            .success_memo
+            .get(position / FAILURE_MEMO_BUCKET_SIZE, &key)
+            .map_or(0, MemoValue::retained_bytes);
+        if bytes
+            > self
+                .success_memo
+                .max_bytes
+                .saturating_sub(self.success_memo.retained_bytes - old_bytes)
+            || self.tokens.values.range(start..).next().is_some()
+            || self.tokens.calls.range(start..).next().is_some()
+        {
+            return;
+        }
+        let mut nodes = nodes.to_vec();
+        for node in &mut nodes {
+            for child in node
+                .children
+                .iter_mut()
+                .chain(node.captures.iter_mut().flat_map(|c| &mut c.nodes))
+            {
+                *child -= start;
+            }
+        }
+        // Journal order matters for repeated names. Values themselves are immutable
+        // input spans; record only this successful branch's appended occurrences.
+        let mut counts = HashMap::new();
+        let mut captures = Vec::with_capacity(journal.len());
+        for &name in journal.iter().rev() {
+            let count = counts.entry(name).or_insert(0);
+            let spans = &self.captures.values[name];
+            *count += 1;
+            captures.push((name, spans[spans.len() - *count]));
+        }
+        captures.reverse();
+        self.success_memo.insert(
+            position / FAILURE_MEMO_BUCKET_SIZE,
+            key,
+            Rc::new(SuccessMemo {
+                nodes,
+                root: root - start,
+                captures,
+                consumed: self.position,
+                matched: self.matched_position,
+                policy: self.match_cursor_policy,
+                expression_depth: self.expression_depth,
+                diagnostic,
+                bytes,
+            }),
+        );
+    }
+
+    #[inline(never)]
+    fn replay_success(&mut self, entry: &SuccessMemo) -> usize {
+        let start = self.nodes.len();
+        for node in &entry.nodes {
+            let mut node = node.clone();
+            for child in node
+                .children
+                .iter_mut()
+                .chain(node.captures.iter_mut().flat_map(|c| &mut c.nodes))
+            {
+                *child += start;
+            }
+            self.nodes.push(node);
+        }
+        for &(name, span) in &entry.captures {
+            self.captures.push(name, span);
+        }
+        self.position = entry.consumed;
+        self.matched_position = entry.matched;
+        self.match_cursor_policy = entry.policy;
+        self.replay_failure(&entry.diagnostic);
+        start + entry.root
     }
 
     #[inline(never)]
@@ -2647,7 +2871,13 @@ impl<'a> ParseContext<'a> {
                 if self.token_mode.is_some()
                     && matches!(
                         expression,
-                        Expr::Sequence(_) | Expr::Number | Expr::Identifier | Expr::Quoted(_)
+                        Expr::Sequence(_)
+                            | Expr::Number
+                            | Expr::Identifier
+                            | Expr::Quoted(_)
+                            | Expr::CodeStart
+                            | Expr::CodeEnd
+                            | Expr::CaptureBoundary(_, _)
                     )
                 {
                     self.match_cursor_policy.reset = false;
@@ -4302,11 +4532,19 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
 }
 
 fn memo_safe_rules(rules: &[Rule]) -> Vec<bool> {
+    memo_safe_rules_for(rules, false)
+}
+
+fn memo_success_safe_rules(rules: &[Rule]) -> Vec<bool> {
+    memo_safe_rules_for(rules, true)
+}
+
+fn memo_safe_rules_for(rules: &[Rule], success: bool) -> Vec<bool> {
     let mut references = vec![Vec::new(); rules.len()];
     let mut safe = rules
         .iter()
         .enumerate()
-        .map(|(id, rule)| expression_is_memo_safe(&rule.expression, &mut references[id]))
+        .map(|(id, rule)| expression_is_memo_safe(&rule.expression, &mut references[id], success))
         .collect::<Vec<_>>();
     let mut referenced_by = vec![Vec::new(); rules.len()];
     for (parent, children) in references.iter().enumerate() {
@@ -4334,7 +4572,10 @@ fn memo_safe_rules(rules: &[Rule]) -> Vec<bool> {
     safe
 }
 
-fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>) -> bool {
+fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>, success: bool) -> bool {
+    if success && matches!(expression, Expr::RuleEffects { .. }) {
+        return false; // Successful symbol/listener effects are not replayable.
+    }
     match expression {
         Expr::MatchOnly(_)
         | Expr::InvertMatch(_)
@@ -4361,10 +4602,10 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>) -> bo
         | Expr::LongestChoice(children)
         | Expr::UniqueLongestChoice(children) => children
             .iter()
-            .all(|child| expression_is_memo_safe(child, references)),
+            .all(|child| expression_is_memo_safe(child, references, success)),
         Expr::PredictiveChoice { alternatives, .. } => alternatives
             .iter()
-            .all(|child| expression_is_memo_safe(child, references)),
+            .all(|child| expression_is_memo_safe(child, references, success)),
         Expr::Capture(_, child)
         | Expr::TextValue(child)
         | Expr::CaptureBoundary(_, child)
@@ -4378,8 +4619,29 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>) -> bo
         | Expr::RuleEffects { child, .. }
         | Expr::TriviaScope { child, .. }
         | Expr::LexicalTriviaScope { child, .. }
-        | Expr::LexicalContextScope { child, .. } => expression_is_memo_safe(child, references),
-        _ => true,
+        | Expr::LexicalContextScope { child, .. } => {
+            expression_is_memo_safe(child, references, success)
+        }
+        Expr::Lexical(_, _)
+        | Expr::Literal(_)
+        | Expr::CaseInsensitive(_)
+        | Expr::Number
+        | Expr::Identifier
+        | Expr::Grapheme
+        | Expr::CodeStart
+        | Expr::CodeEnd
+        | Expr::LongCodeBlock
+        | Expr::Quoted(_)
+        | Expr::Any
+        | Expr::Eof
+        | Expr::Empty
+        | Expr::CharRange(_, _)
+        | Expr::Except(_)
+        | Expr::Until(_)
+        | Expr::JavaLookahead { .. }
+        | Expr::JavaEmpty
+        | Expr::JavaUntil(_)
+        | Expr::Error(_) => true,
     }
 }
 
@@ -5659,4 +5921,230 @@ fn requires_classic_mode<'a>(expression: &'a Expr, rules: &'a [Rule]) -> bool {
         };
     }
     false
+}
+
+#[cfg(test)]
+mod pure_success_memo_tests {
+    use super::*;
+
+    fn context(input: &str, expression: Expr) -> ParseContext<'_> {
+        let mut context = ParseContext::with_options(
+            input,
+            ParseOptions::with_memoization(Memoization::SafeFailures)
+                .with_diagnostics(Diagnostics::Detailed),
+        );
+        context.rules = share_grammar(vec![Rule {
+            name: "pure",
+            expression,
+        }]);
+        context.memo_safe_rules = memo_safe_rules(&context.rules);
+        context.success_memo_safe_rules = memo_success_safe_rules(&context.rules);
+        context
+    }
+
+    fn warm(context: &mut ParseContext<'_>) {
+        let checkpoint = context.checkpoint();
+        assert!(context.rule(0, 0).is_some());
+        context.restore(checkpoint);
+    }
+
+    #[test]
+    fn successful_memo_replays_only_local_diagnostics_and_independent_edges() {
+        let mut context = context(
+            "😀?",
+            Expr::choice([
+                Expr::literal("😀").then(Expr::literal("!")),
+                Expr::literal("😀").capture_value().capture("x"),
+            ]),
+        );
+        context.fail_at(5, "earlier unrelated sibling");
+        warm(&mut context);
+        context.farthest = 0;
+        context.expected.clear();
+        let root = context.rule(0, 0).unwrap();
+        assert_eq!(context.memoized_success_hits(), 1);
+        assert_eq!(context.failure().offset, 1);
+        assert_eq!(context.failure().expected, ["!"]);
+        assert_eq!(context.captured("x"), Some("😀"));
+        context.nodes[root].children.clear();
+        context.nodes[root].captures.clear();
+        context.position = 0;
+        context.matched_position = 0;
+        let root = context.rule(0, 0).unwrap();
+        assert_eq!(context.memoized_success_hits(), 2);
+        assert_eq!(context.nodes[root].children.len(), 1);
+        assert_eq!(context.nodes[root].captures.len(), 1);
+        assert_eq!(context.capture_spans("x").len(), 2);
+    }
+
+    #[test]
+    fn success_memo_never_shortcuts_a_different_expression_budget_or_sticky_failure() {
+        let mut context = context("x", Expr::literal("x").capture_value());
+        warm(&mut context);
+        assert!(context.success_memo.retained_bytes > 0);
+        context.expression_depth = 1024;
+        assert!(context.rule(0, 0).is_none());
+        assert_eq!(context.memoized_success_hits(), 0);
+        assert_eq!(
+            context.failure().expected,
+            ["expression nesting below 1024"]
+        );
+        context.expression_depth = 0;
+        assert!(context.rule(0, 0).is_none());
+        assert_eq!(context.memoized_success_hits(), 0);
+    }
+
+    #[test]
+    fn single_snapshot_budget_is_a_safe_miss() {
+        let expression = Expr::Sequence((0..30000).map(|_| Expr::Empty.capture_value()).collect());
+        let mut context = context("", expression);
+        warm(&mut context);
+        assert_eq!(context.success_memo.retained_bytes, 0);
+        assert!(context.rule(0, 0).is_some());
+        assert_eq!(context.memoized_success_hits(), 0);
+        assert_eq!(context.nodes.len(), 30001);
+        assert!(context.resource_failure.is_none());
+    }
+
+    #[test]
+    fn aggregate_budget_eviction_and_replacement_return_accounted_bytes() {
+        let mut context = context("a", Expr::literal("a"));
+        warm(&mut context);
+        let key = FailureMemoKey::new(0, 0, 0, false, 0);
+        let entry = context.success_memo.get(0, &key).unwrap().clone();
+        let bytes = entry.bytes;
+        let mut memo = SuccessMemoBuckets::with_window(Some(1024));
+        memo.max_bytes = bytes;
+        memo.insert(0, key, entry.clone());
+        assert_eq!(memo.retained_bytes, bytes);
+        memo.insert(0, key, entry.clone());
+        assert_eq!(memo.retained_bytes, bytes);
+        let other = FailureMemoKey::new(1, 0, 0, false, 0);
+        memo.insert(0, other, entry.clone());
+        assert!(memo.get(0, &other).is_none());
+        assert_eq!(memo.retained_bytes, bytes);
+        memo.observe_cursor(4000);
+        assert_eq!(memo.retained_bytes, 0);
+        assert!(memo.probe(0, &key).is_none());
+        memo.insert(0, key, entry);
+        assert_eq!(memo.retained_bytes, bytes);
+        assert!(memo.probe(0, &key).is_some());
+    }
+
+    #[test]
+    fn aggregate_budget_parse_falls_back_without_a_resource_failure() {
+        let mut context = context("a", Expr::literal("a"));
+        context.success_memo.max_bytes = 0;
+        warm(&mut context);
+        assert!(context.rule(0, 0).is_some());
+        assert_eq!(context.memoized_success_hits(), 0);
+        assert!(context.resource_failure.is_none());
+    }
+
+    #[test]
+    fn classic_and_traced_calls_keep_their_committed_observations_without_success_hits() {
+        for classic in [false, true] {
+            for traced in [false, true] {
+                let mut context = context("a", Expr::literal("a"));
+                if classic {
+                    context.token_mode = Some(token::ParseMode::default());
+                }
+                if traced {
+                    context.token_trace =
+                        Some(token_trace::Trace::new(token_trace::Limits::default()));
+                }
+                warm(&mut context);
+                let root = context.rule(0, 0).unwrap();
+                assert_eq!(
+                    context.memoized_success_hits(),
+                    usize::from(!classic && !traced)
+                );
+                assert_eq!(context.nodes[root].span, Span { start: 0, end: 1 });
+                if traced {
+                    assert_eq!(context.token_trace().unwrap().unwrap().len(), 1);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn effectful_parent_reexecutes_while_its_pure_child_can_hit() {
+        let grammar = share_grammar(vec![
+            Rule {
+                name: "root",
+                expression: Expr::choice([
+                    Expr::Rule(1).then(Expr::literal("!")),
+                    Expr::Rule(1).then(Expr::literal("?")),
+                ]),
+            },
+            Rule {
+                name: "declaration",
+                expression: Expr::Rule(2).capture("name").rule_effects(RuleEffects {
+                    declares: Some(Declaration {
+                        symbol_capture: "name",
+                        description: None,
+                    }),
+                    ..RuleEffects::default()
+                }),
+            },
+            Rule {
+                name: "pure",
+                expression: Expr::literal("a"),
+            },
+        ]);
+        let mut observations = Vec::new();
+        for memo in [Memoization::Off, Memoization::SafeFailures] {
+            let mut context =
+                ParseContext::with_options("a?", ParseOptions::with_memoization(memo));
+            context.rules = Arc::clone(&grammar);
+            context.memo_safe_rules = memo_safe_rules(&grammar);
+            let matched = context.parse(&Expr::Rule(0)).unwrap();
+            assert_eq!(context.position(), 2);
+            assert!(context.scopes.is_declared("a"));
+            if memo == Memoization::SafeFailures {
+                assert_eq!(context.memoized_success_hits(), 1);
+                assert!(context.success_memo.first.keys().all(|key| key.rule == 2));
+            }
+            observations.push((
+                context
+                    .tree(matched.root_node().unwrap())
+                    .unwrap()
+                    .nodes
+                    .len(),
+                format!("{:?}", context.scopes),
+                context.failure(),
+            ));
+        }
+        assert_eq!(observations[0], observations[1]);
+    }
+
+    #[test]
+    fn stronger_success_proof_taints_effectful_rules_and_all_ancestors() {
+        let expressions = vec![
+            Expr::Rule(1),
+            Expr::Rule(2).rule_effects(RuleEffects::default()),
+            Expr::literal("x").capture("value"),
+            Expr::Rule(4),
+            Expr::Custom(|c| Err(c.failure())),
+            Expr::literal("x").capture_owned("owned"),
+            Expr::literal("x").recover(RecoveryMode::Skip, ["!"], "bad"),
+            Expr::Rule(8),
+            Expr::Backreference("value"),
+        ];
+        let rules = expressions
+            .into_iter()
+            .map(|expression| Rule {
+                name: "rule",
+                expression,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            memo_safe_rules(&rules),
+            [true, true, true, false, false, false, false, false, false]
+        );
+        assert_eq!(
+            memo_success_safe_rules(&rules),
+            [false, false, true, false, false, false, false, false, false]
+        );
+    }
 }

@@ -23,6 +23,7 @@ public class MapperGenerator implements CodeGenerator {
     @Override
     public GeneratedSource generate(GrammarDecl grammar) {
         org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
+        NestedCaptures.requireValid(grammar);
         GrammarValidator.requireValidBoundedRepeatElements(grammar);
         LeftRecursionAnalysis.requireValid(grammar);
         CommonFieldSchema.build(grammar);
@@ -86,6 +87,7 @@ public class MapperGenerator implements CodeGenerator {
         sb.append(" */\n");
         sb.append("public class ").append(mapperClass).append(" {\n\n");
         sb.append("    private ").append(mapperClass).append("() {}\n\n");
+        if(grammar.rules().stream().anyMatch(NestedCaptures::enabled)) sb.append(NestedMapperEmitter.HELPERS);
         // Span layers of the current mapping call. SourceMappedAst snapshots freeze the layers they
         // reference instead of copying every span, so later registrations open a new layer and the
         // next mapping call starts from an empty layer; a snapshot therefore never changes after
