@@ -46,7 +46,7 @@ fn direct_ref_in_body(body: &ast::RuleBody, target: &str) -> bool {
             .any(|annotated| direct_ref(&annotated.element, target))
     })
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct Shape {
     kind: Kind,
     cardinality: Cardinality,
@@ -67,12 +67,14 @@ pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
         return Err("E-TOKEN-RANGE-SURROGATE: range must not contain surrogates".into());
     }
     crate::embedded::validate(grammar)?;
+    validate_enum_rules(grammar)?;
     Lowering {
         grammar,
         ids: HashMap::new(),
         tokens: HashMap::new(),
         bodies: Vec::new(),
         mappings: Vec::new(),
+        enums: Vec::new(),
         comparisons: Vec::new(),
         skips: Vec::new(),
         operators: Vec::new(),
@@ -93,6 +95,7 @@ struct Lowering<'a> {
     tokens: HashMap<String, Expression>,
     bodies: Vec<Expression>,
     mappings: Vec<Option<(String, Vec<String>)>>,
+    enums: Vec<Vec<String>>,
     comparisons: Vec<Option<String>>,
     skips: Vec<bool>,
     operators: Vec<Option<Operator>>,
@@ -113,6 +116,57 @@ impl Drop for AnalysisDepth<'_> {
 }
 
 impl Lowering<'_> {
+    fn collect_root_enums(
+        &self,
+        id: usize,
+        seen: &mut HashSet<usize>,
+        result: &mut HashSet<usize>,
+    ) {
+        if !seen.insert(id) || self.skips[id] {
+            return;
+        }
+        if !self.enums[id].is_empty() {
+            result.insert(id);
+            return;
+        }
+        if self.mappings[id].is_some() {
+            return;
+        }
+        let mut refs = HashSet::new();
+        references(&self.bodies[id], &mut refs);
+        for target in refs {
+            self.collect_root_enums(target, seen, result);
+        }
+    }
+    fn contains_enum(&self, expression: &Expression, seen: &mut HashSet<usize>) -> bool {
+        if let Expression::Reference(id) = expression {
+            if !self.enums[*id].is_empty() {
+                return true;
+            }
+            if self.mappings[*id].is_some() || self.skips[*id] || !seen.insert(*id) {
+                return false;
+            }
+            return self.contains_enum(&self.bodies[*id], seen);
+        }
+        children(expression)
+            .iter()
+            .any(|child| self.contains_enum(child, seen))
+    }
+    fn enum_in_capture(&self, expression: &Expression, name: &str) -> bool {
+        if let Expression::Capture {
+            name: capture,
+            expression: child,
+        } = expression
+        {
+            if capture == name {
+                return self.contains_enum(child, &mut HashSet::new());
+            }
+        }
+        children(expression)
+            .iter()
+            .any(|child| self.enum_in_capture(child, name))
+    }
+
     fn lower_recovery(
         &self,
         mode: ast::RecoveryMode,
@@ -371,6 +425,10 @@ impl Lowering<'_> {
                 .annotations
                 .iter()
                 .any(|annotation| matches!(annotation.kind, AnnotationKind::Skip));
+            let is_enum = rule
+                .annotations
+                .iter()
+                .any(|annotation| matches!(annotation.kind, AnnotationKind::Enum));
             let mut associativity = None;
             let mut longest_choice = false;
             let mut unique_longest_choice = false;
@@ -394,13 +452,13 @@ impl Lowering<'_> {
                         if mapping.is_some() {
                             return Err(format!("multiple @mapping on {}", rule.name));
                         }
-                        if !skip {
+                        if !skip && !is_enum {
                             identifier(class_name)?;
                         }
-                        if !skip {
+                        if !skip && !is_enum {
                             let method = method_name(class_name);
-                            if let Some(previous) = methods.insert(method, class_name) {
-                                if previous != class_name {
+                            if let Some(previous) = methods.insert(method, class_name.clone()) {
+                                if previous != *class_name {
                                     return Err(format!(
                                         "mapping method collision {previous} / {class_name}"
                                     ));
@@ -510,7 +568,7 @@ impl Lowering<'_> {
                             return Err(format!("duplicate @catalog on {}", rule.name));
                         }
                     }
-                    AnnotationKind::Doc { .. } => {}
+                    AnnotationKind::Doc { .. } | AnnotationKind::Enum => {}
                     other => {
                         return Err(format!("unsupported annotation {other:?} on {}", rule.name))
                     }
@@ -576,7 +634,12 @@ impl Lowering<'_> {
                 precedence,
             }));
             self.catalogs.push(catalog);
-            self.mappings.push(mapping);
+            self.enums.push(enum_literals(rule)?);
+            self.mappings.push(if self.enums[i].is_empty() {
+                mapping
+            } else {
+                None
+            });
             self.comparisons.push(comparison);
             self.skips.push(skip);
         }
@@ -602,13 +665,14 @@ impl Lowering<'_> {
         for i in 0..self.bodies.len() {
             self.check_left_recursion(i, &mut HashSet::new(), &mut HashSet::new())?;
         }
-        if !self.expression_reaches_skip(&Expression::Reference(root), &mut HashSet::new())?
-            && self.rule_shape(root, &mut HashSet::new())?
-                != (Shape {
-                    kind: Kind::Node,
-                    cardinality: Cardinality::One,
-                })
-        {
+        if !self.expression_reaches_skip(&Expression::Reference(root), &mut HashSet::new())? && {
+            let shape = self.rule_shape(root, &mut HashSet::new())?;
+            shape.cardinality != Cardinality::One
+                || !(shape.kind == Kind::Node || matches!(shape.kind, Kind::Enum(_)))
+        } {
+            if self.contains_enum(&Expression::Reference(root), &mut HashSet::new()) {
+                return Err("E-ENUM-JOIN: root must project exactly one enum family/value; mixed root projection requires #539".into());
+            }
             return Err("root must resolve to exactly one AST node".into());
         }
         let mut name_versions = Vec::<(String, String)>::new();
@@ -681,9 +745,32 @@ impl Lowering<'_> {
         if name_versions.len() > 64 {
             return Err("E-NAME-PREDICATE-LIMIT: at most 64 snapshots".into());
         }
+        let mut projected_enums = HashSet::new();
+        self.collect_root_enums(root, &mut HashSet::new(), &mut projected_enums);
+        for id in &projected_enums {
+            let wrapper = format!("{}Node", self.grammar.rules[*id].name);
+            if let Some(previous) = methods.insert(method_name(&wrapper), wrapper.clone()) {
+                if previous != wrapper {
+                    return Err("E-ENUM: enum root semantic method collision".into());
+                }
+            }
+            if self
+                .mappings
+                .iter()
+                .flatten()
+                .any(|(name, _)| name == &wrapper)
+            {
+                return Err("E-ENUM: enum root wrapper name collision".into());
+            }
+        }
         let mut rules = Vec::new();
         for (i, expression) in self.bodies.iter().enumerate() {
             let captures = self.captures(expression)?;
+            for (name, shape) in &captures {
+                if shape.kind == Kind::Value && self.enum_in_capture(expression, name) {
+                    return Err("E-ENUM-JOIN: mixed enum capture requires #539".into());
+                }
+            }
             let effects = &rule_effects[i];
             for target in effects
                 .declares
@@ -699,7 +786,16 @@ impl Lowering<'_> {
                     ));
                 }
             }
-            let mapping = if let Some((name, params)) = &self.mappings[i] {
+            let mapping = if projected_enums.contains(&i) {
+                Some(Mapping {
+                    name: format!("{}Node", self.grammar.rules[i].name),
+                    fields: vec![Field {
+                        name: "value".into(),
+                        kind: Kind::Enum(self.grammar.rules[i].name.clone()),
+                        cardinality: Cardinality::One,
+                    }],
+                })
+            } else if let Some((name, params)) = &self.mappings[i] {
                 let names: HashSet<_> = params.iter().collect();
                 if names.len() != params.len() || captures.keys().collect::<HashSet<_>>() != names {
                     return Err(format!(
@@ -715,7 +811,7 @@ impl Lowering<'_> {
                             return Err(format!("reserved capture name {name}"));
                         }
                     }
-                    let shape = captures[name];
+                    let shape = captures[name].clone();
                     fields.push(Field {
                         name: name.clone(),
                         kind: shape.kind,
@@ -817,6 +913,7 @@ impl Lowering<'_> {
                 mapping: if self.skips[i] { None } else { mapping },
                 operator: self.operators[i],
                 catalog,
+                enum_literals: self.enums[i].clone(),
                 documentation: self.grammar.rules[i]
                     .annotations
                     .iter()
@@ -841,13 +938,30 @@ impl Lowering<'_> {
                         .zip(&mapping.fields)
                         .any(|(a, b)| a.name != b.name || a.cardinality != b.cardinality)
                 {
+                    if previous
+                        .fields
+                        .iter()
+                        .chain(&mapping.fields)
+                        .any(|f| matches!(f.kind, Kind::Enum(_)))
+                    {
+                        return Err(
+                            "E-ENUM-JOIN: incompatible shared enum mapping schema requires #539"
+                                .into(),
+                        );
+                    }
                     return Err(format!(
                         "incompatible shared mapping schema {}",
                         mapping.name
                     ));
                 }
                 for (field, other) in previous.fields.iter_mut().zip(&mapping.fields) {
-                    field.kind = join_kind(field.kind, other.kind);
+                    if field.kind != other.kind
+                        && (matches!(field.kind, Kind::Enum(_))
+                            || matches!(other.kind, Kind::Enum(_)))
+                    {
+                        return Err("E-ENUM-JOIN: shared mixed enum capture requires #539".into());
+                    }
+                    field.kind = join_kind(field.kind.clone(), other.kind.clone());
                 }
             } else {
                 variants.insert(mapping.name.clone(), mapping.clone());
@@ -1294,6 +1408,12 @@ impl Lowering<'_> {
         if self.skips[rule] {
             return Ok(text_shape());
         }
+        if !self.enums[rule].is_empty() {
+            return Ok(Shape {
+                kind: Kind::Enum(self.grammar.rules[rule].name.clone()),
+                cardinality: Cardinality::One,
+            });
+        }
         if self.mappings[rule].is_some() {
             return Ok(Shape {
                 kind: Kind::Node,
@@ -1346,11 +1466,11 @@ impl Lowering<'_> {
                 }
                 Ok(match nodes.len() {
                     0 => text_shape(),
-                    1 => nodes[0],
+                    1 => nodes[0].clone(),
                     _ => Shape {
                         kind: nodes
                             .iter()
-                            .map(|s| s.kind)
+                            .map(|s| s.kind.clone())
                             .reduce(join_kind)
                             .expect("nonempty nodes"),
                         cardinality: Cardinality::Many,
@@ -1676,7 +1796,7 @@ impl Lowering<'_> {
                 let mut result = HashMap::new();
                 for alternative in &alternatives {
                     for (name, shape) in alternative {
-                        insert_capture(&mut result, name, *shape, false)?;
+                        insert_capture(&mut result, name, shape.clone(), false)?;
                     }
                 }
                 for (name, shape) in &mut result {
@@ -1684,7 +1804,7 @@ impl Lowering<'_> {
                         .iter()
                         .any(|alternative| !alternative.contains_key(name))
                     {
-                        *shape = wrap(*shape, Cardinality::Optional);
+                        *shape = wrap(shape.clone(), Cardinality::Optional);
                     }
                 }
                 result
@@ -2149,10 +2269,98 @@ fn insert_capture(
     sequence: bool,
 ) -> Result<()> {
     let shape = if let Some(previous) = result.get(name) {
-        merge(*previous, shape, sequence)?
+        merge(previous.clone(), shape, sequence)?
     } else {
         shape
     };
     result.insert(name.into(), shape);
+    Ok(())
+}
+
+fn enum_literals(rule: &ast::RuleDecl) -> Result<Vec<String>> {
+    if !rule
+        .annotations
+        .iter()
+        .any(|a| matches!(a.kind, AnnotationKind::Enum))
+    {
+        return Ok(Vec::new());
+    }
+    let mut result = Vec::new();
+    for sequence in &rule.body.alternatives {
+        if sequence.elements.len() != 1 {
+            return Err("E-ENUM: requires one literal per alternative".into());
+        }
+        let element = &sequence.elements[0];
+        if element.capture.is_some() || element.typeof_constraint.is_some() {
+            return Err("E-ENUM: requires uncaptured literal alternatives".into());
+        }
+        let ElementKind::Terminal(text) = &element.element.kind else {
+            return Err("E-ENUM: requires literal alternatives".into());
+        };
+        result.push(text.clone());
+    }
+    Ok(result)
+}
+fn validate_enum_rules(grammar: &ast::GrammarDecl) -> Result<()> {
+    let mut types = HashSet::new();
+    types.insert(format!("{}AST", grammar.name));
+    for rule in &grammar.rules {
+        if !rule
+            .annotations
+            .iter()
+            .any(|a| matches!(a.kind, AnnotationKind::Enum))
+        {
+            for annotation in &rule.annotations {
+                if let AnnotationKind::Mapping { class_name, .. } = &annotation.kind {
+                    types.insert(class_name.clone());
+                }
+            }
+        }
+    }
+    for rule in &grammar.rules {
+        let literals = enum_literals(rule)?;
+        if literals.is_empty() {
+            continue;
+        }
+        if rule
+            .annotations
+            .iter()
+            .filter(|a| matches!(a.kind, AnnotationKind::Enum))
+            .count()
+            != 1
+            || rule.annotations.iter().any(|a| {
+                matches!(
+                    a.kind,
+                    AnnotationKind::Skip
+                        | AnnotationKind::Eval { .. }
+                        | AnnotationKind::CommonField { .. }
+                )
+            })
+        {
+            return Err("E-ENUM: conflicting or duplicate @enum annotation".into());
+        }
+        unlaxer_codegen::validate_enum_type(&rule.name).map_err(|e| e.0)?;
+        if rule
+            .annotations
+            .iter()
+            .any(|a| matches!(&a.kind,AnnotationKind::Mapping{params,..} if !params.is_empty()))
+        {
+            return Err("E-ENUM: enum mapping parameters are not supported".into());
+        }
+        if !types.insert(rule.name.clone()) {
+            return Err("E-ENUM: enum type name collision".into());
+        }
+        let mut names = HashSet::new();
+        let mut texts = HashSet::new();
+        for literal in literals {
+            let name = unlaxer_codegen::enum_constant_name(&literal).map_err(|e| e.0)?;
+            if !texts.insert(literal) {
+                return Err("E-ENUM: duplicate enum literal".into());
+            }
+            if !names.insert(name) {
+                return Err("E-ENUM: enum constant name collision".into());
+            }
+        }
+    }
     Ok(())
 }

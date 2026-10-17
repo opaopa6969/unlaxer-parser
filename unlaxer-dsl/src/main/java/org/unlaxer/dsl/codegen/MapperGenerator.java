@@ -22,6 +22,8 @@ public class MapperGenerator implements CodeGenerator {
 
     @Override
     public GeneratedSource generate(GrammarDecl grammar) {
+        EnumSchema.validate(grammar);
+        var enumRoots = EnumSchema.rootEnums(grammar);
         String packageName = getPackageName(grammar);
         String grammarName = grammar.name();
         String astClass = grammarName + "AST";
@@ -43,13 +45,21 @@ public class MapperGenerator implements CodeGenerator {
         Map<String, String> mappedClassByRuleName = new LinkedHashMap<>();
         for (RuleDecl rule : grammar.rules()) {
             boolean isSkip = rule.annotations().stream().anyMatch(a -> a instanceof SkipAnnotation);
-            if (!isSkip) {
+            if (!isSkip && !EnumSchema.isEnum(rule)) {
                 MapperElementUtil.getMappingAnnotation(rule).ifPresent(m -> {
                     mappingRules.putIfAbsent(m.className(), rule);
                     allMappingRules.computeIfAbsent(m.className(), k -> new ArrayList<>()).add(rule);
                     mappedClassByRuleName.putIfAbsent(rule.name(), m.className());
                 });
             }
+        }
+
+        for (var entry : enumRoots.entrySet()) {
+            RuleDecl source = ruleByName.get(entry.getKey());
+            RuleDecl projected = EnumSchema.projection(source, entry.getValue());
+            mappingRules.put(entry.getValue(), projected);
+            allMappingRules.put(entry.getValue(), List.of(projected));
+            mappedClassByRuleName.put(source.name(), entry.getValue());
         }
 
         StringBuilder sb = new StringBuilder();
@@ -105,7 +115,7 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("    private static final java.util.IdentityHashMap<Token, MappingCandidate> BEST_MEMO =\n");
         sb.append("        new java.util.IdentityHashMap<>();\n\n");
 
-        String rootClassName = rootRule.flatMap(MapperElementUtil::getMappingAnnotation)
+        String rootClassName = rootRule.filter(r -> !EnumSchema.isEnum(r)).flatMap(MapperElementUtil::getMappingAnnotation)
             .map(m -> astClass + "." + m.className())
             .orElse(astClass);
 
