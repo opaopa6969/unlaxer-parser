@@ -58,12 +58,14 @@ jobs:
     - name: Cross-language fixtures, compile failures, and generated-file drift
       run: >
         mvn -B -pl unlaxer-common,unlaxer-dsl -am test
-        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,RustPortabilityConformanceTest,TokenAdapterConformanceTest,UnicodeIgnoreCaseWordParserTest,CaseInsensitiveConformanceTest,GraphemeTest,GraphemeConformanceTest,ParseBindingsConformanceTest,DeclarativeTokenConformanceTest,ApiImpactConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest,SkipMappingConformanceTest,CaptureEqualityConformanceTest,ErrorElementConformanceTest,RecoveryConformanceTest,SemanticModelConformanceTest,ProjectSymbolIndexConformanceTest,EditorParseResultConformanceTest,EditorPipelineConformanceTest,EditorCstTest,SemanticModelUbnfTest,TokenStreamConformanceTest,TypeSystemConformanceTest,CallInferenceConformanceTest,SemanticQueriesConformanceTest,SemanticQueryEditsTest,PackageResolverConformanceTest,HttpsPackageConformanceTest,VocabularyOriginsConformanceTest,SemanticRulesConformanceTest,SemanticDiagnosticConformanceTest,ClassicLspProtocolConformanceTest,LSPQueryConsumerTest,LSPNonBmpOffsetTest,LSPProfileInitializationTest,PreprocessingConformanceTest,UniqueLongestConformanceTest,NameSnapshotConformanceTest,NamePredicateConformanceTest,ContextualLexingConformanceTest,CodePointEscapeConformanceTest,ClassicDapProtocolConformanceTest,DapLauncherLifecycleConformanceTest,ClassicTokenDapProtocolConformanceTest,TokenTraceConformanceTest -DrustConformance=true -DtokenStreamBench=true
+        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,RustPortabilityConformanceTest,TokenAdapterConformanceTest,UnicodeIgnoreCaseWordParserTest,CaseInsensitiveConformanceTest,GraphemeTest,GraphemeConformanceTest,ParseBindingsConformanceTest,DeclarativeTokenConformanceTest,ApiImpactConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest,SkipMappingConformanceTest,CaptureEqualityConformanceTest,ErrorElementConformanceTest,RecoveryConformanceTest,SemanticModelConformanceTest,ProjectSymbolIndexConformanceTest,EditorParseResultConformanceTest,EditorPipelineConformanceTest,EditorCstTest,SemanticModelUbnfTest,TokenStreamConformanceTest,TypeSystemConformanceTest,CallInferenceConformanceTest,SemanticQueriesConformanceTest,SemanticQueryEditsTest,PackageResolverConformanceTest,HttpsPackageConformanceTest,VocabularyOriginsConformanceTest,SemanticRulesConformanceTest,SemanticDiagnosticConformanceTest,ClassicLspProtocolConformanceTest,ClassicSemanticTokensConformanceTest,LSPQueryConsumerTest,LSPNonBmpOffsetTest,LSPProfileInitializationTest,PreprocessingConformanceTest,UniqueLongestConformanceTest,NameSnapshotConformanceTest,NamePredicateConformanceTest,ContextualLexingConformanceTest,CodePointEscapeConformanceTest,ClassicDapProtocolConformanceTest,DapLauncherLifecycleConformanceTest,ClassicTokenDapProtocolConformanceTest,TokenTraceConformanceTest -DrustConformance=true -DtokenStreamBench=true
         -Dsurefire.failIfNoSpecifiedTests=false
     - name: Require generated case-insensitive token conformance evidence
       run: |
         test -s unlaxer-dsl/target/case-insensitive-conformance.tsv
         test -s unlaxer-dsl/target/case-insensitive-java.tsv
+    - name: Require real Java and Rust semantic-token protocol evidence
+      run: test -s unlaxer-dsl/target/classic-semantic-tokens.tsv
     - name: Require real Java and Rust DAP protocol evidence
       run: |
         test -s unlaxer-dsl/target/classic-dap-protocol.tsv
@@ -158,6 +160,7 @@ jobs:
       with:
         name: rust-conformance
         path: |
+          unlaxer-dsl/target/classic-semantic-tokens.tsv
           unlaxer-dsl/target/case-insensitive-conformance.tsv
           unlaxer-dsl/target/case-insensitive-java.tsv
           unlaxer-dsl/target/rust-token-stream.tsv
@@ -339,6 +342,7 @@ jobs:
       with:
         name: case-insensitive-jdk17-conformance
         path: |
+          unlaxer-dsl/target/classic-semantic-tokens.tsv
           unlaxer-dsl/target/case-insensitive-conformance.tsv
           unlaxer-dsl/target/case-insensitive-java.tsv
         if-no-files-found: error
