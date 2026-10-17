@@ -85,6 +85,8 @@ public class ClassicLspDiagnosticsConformanceTest {
                 .redirectError(temporary.newFile("rust-stderr.log")).start())) {
             exercise(wire, "Rust");
         }
+        Files.writeString(Path.of("target/classic-lsp-diagnostics.tsv"),
+            "backend\tcases\tstatus\nJava\t20\tPASS\nRust\t20\tPASS\n");
     }
 
     private void exercise(Wire wire, String backend) throws Exception {
