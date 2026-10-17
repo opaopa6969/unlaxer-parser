@@ -107,7 +107,7 @@ cache.update(newSource, changeRange, parser);
 
 ## 設計上のヒント
 
-1. **トークン定義を活用**: 正規表現トークン (`REGEX`) でレキサーレベルの高速マッチ
+1. **トークン定義を活用**: 宣言的字句式 (`token NAME ::= expression;`) で字句定義をまとめる
 2. **@whitespace で自動空白スキップ**: 手動の空白処理を避ける
 3. **@recovery で部分パース**: エラー後も続行してフィードバックを最大化
 4. **選択肢の順序**: 頻度の高い代替を先頭に配置（PEG は ordered choice）
