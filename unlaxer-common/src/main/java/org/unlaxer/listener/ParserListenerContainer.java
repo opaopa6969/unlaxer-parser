@@ -33,8 +33,8 @@ public interface ParserListenerContainer{
 		if (listeners.isEmpty()) {
 			return;
 		}
-		for (ParserListener parserListener : listeners) {
-			parserListener.onStart(parser, parseContext, tokenKind, invertMatch);
+		for (ParserListener parserListener : new java.util.ArrayList<>(listeners)) {
+			parseContext.notifyObserver(() -> parserListener.onStart(parser, parseContext, tokenKind, invertMatch));
 		}
 	}
 
@@ -45,8 +45,8 @@ public interface ParserListenerContainer{
 		if (listeners.isEmpty()) {
 			return;
 		}
-		for (ParserListener parserListener : listeners) {
-			parserListener.onEnd(parser , parsed ,  parseContext, tokenKind, invertMatch);
+		for (ParserListener parserListener : new java.util.ArrayList<>(listeners)) {
+			parseContext.notifyObserver(() -> parserListener.onEnd(parser , parsed ,  parseContext, tokenKind, invertMatch));
 		}
 	}
 	

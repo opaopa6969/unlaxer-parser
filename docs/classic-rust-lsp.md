@@ -141,8 +141,8 @@ cache is kept: accepted full-sync changes reach the next hook call, while
 stale versions and rejected ranged edits preserve the old source. Close
 removes it; reopening may restart the version. Shutdown rejects full requests
 with -32600 before invoking hooks. Existing lifecycle behavior is retained:
-Rust also rejects requests before initialize with -32002; Java's generated
-endpoint does not yet enforce that general pre-initialize boundary.
+Both transports reject requests before initialize with -32002; see the
+[shared lifecycle and configure migration](classic-lsp-lifecycle.md).
 
 [semantic-tokens.json](fixtures/classic-lsp/semantic-tokens.json) is the shared
 30-case oracle for actual nonempty hooks, custom legends, supplementary
