@@ -42,7 +42,7 @@ public class UBNFSourceSnapshotTest {
         assertFalse(snapshot.spanOf(null).isPresent());
     }
 
-    @Test public void syntheticAndRepairedNodesHaveHonestOrigins() {
+    @Test public void syntheticAndDeclaredNodesHaveHonestOrigins() {
         var snapshot = UBNFMapper.parseWithSource(
             "grammar G { R ::= 'x' @typeof(first) T @next T? T* T+ T{2,3} T % ','; }");
         var elements = ((ChoiceBody) snapshot.ast().grammars().get(0).rules().get(0).body())
@@ -50,7 +50,8 @@ public class UBNFSourceSnapshotTest {
         assertSource(snapshot, elements.get(0), "'x'");
         assertSource(snapshot, elements.get(1), "@typeof(first) T @next");
         assertSource(snapshot, elements.get(1).typeofConstraint().orElseThrow(), "@typeof(first)");
-        assertEquals(Kind.REWRITTEN, snapshot.originOf(elements.get(1)).orElseThrow().kind());
+        // Prefix @typeof is parsed directly, rather than repaired from a postfix capture.
+        assertEquals(Kind.SOURCE, snapshot.originOf(elements.get(1)).orElseThrow().kind());
         assertEquals("@next", snapshot.slice(snapshot.captureSpan(elements.get(1)).orElseThrow()));
         assertFalse(snapshot.captureSpan(elements.get(0)).isPresent());
         assertSource(snapshot, elements.get(2).element(), "T?");

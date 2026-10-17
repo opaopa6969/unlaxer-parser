@@ -9,6 +9,8 @@ import java.util.Set;
 import org.unlaxer.dsl.bootstrap.UBNFAST.*;
 import org.unlaxer.dsl.bootstrap.TokenAdapterRegistry;
 import org.unlaxer.dsl.codegen.RecoverySupport;
+import org.unlaxer.dsl.codegen.EnumSchema;
+import org.unlaxer.dsl.codegen.CommonFieldSchema;
 import org.unlaxer.dsl.codegen.rust.GrammarIR.*;
 
 /** Validates the entire input before emitting anything; unsupported syntax never silently degrades. */
@@ -31,10 +33,16 @@ public final class RustGrammarLowering {
     private final List<RecoveryAnnotation> recoveries = new ArrayList<>();
     private final Set<Integer> nullableRules = new HashSet<>();
     private int analysisDepth;
-    private record Shape(Kind kind, Cardinality cardinality) {}
+    private final org.unlaxer.dsl.codegen.RecursiveSemanticShapes[] recursiveShapes;
+    private record Shape(Kind kind, Cardinality cardinality, String enumName) {
+        Shape(Kind kind,Cardinality cardinality) { this(kind,cardinality,null); }
+    }
 
     private RustGrammarLowering(GrammarDecl grammar) {
         this.grammar = grammar;
+        this.recursiveShapes = new org.unlaxer.dsl.codegen.RecursiveSemanticShapes[] {
+            new org.unlaxer.dsl.codegen.RecursiveSemanticShapes(grammar, false),
+            new org.unlaxer.dsl.codegen.RecursiveSemanticShapes(grammar, true) };
         this.adapters = TokenAdapterRegistry.requireValid(grammar);
     }
 
@@ -46,8 +54,14 @@ public final class RustGrammarLowering {
     private void leaveAnalysis() { analysisDepth--; }
 
     public static GrammarIR lower(GrammarDecl grammar) {
+        CommonFieldSchema.build(grammar);
+        EnumSchema.validate(grammar);
+        org.unlaxer.dsl.codegen.TypeofConstraints.validate(grammar);
+        org.unlaxer.dsl.codegen.EvalSchema.specifications(grammar);
         org.unlaxer.dsl.codegen.EmbeddedGrammarEmitter.declarations(grammar);
-        return new RustGrammarLowering(grammar).run();
+        var ir = new RustGrammarLowering(grammar).run();
+        RustEvalEmitter.apply(grammar, ir, "");
+        return ir;
     }
 
     private GrammarIR run() {
@@ -138,16 +152,22 @@ public final class RustGrammarLowering {
                     root = i;
                 } else if (annotation instanceof MappingAnnotation value) {
                     if (mapping != null) throw unsupported("multiple @mapping on " + rule.name());
-                    if (!skip) identifier(value.className());
-                    String previous = skip ? null : methods.putIfAbsent(methodName(value.className()), value.className());
+                    boolean projectsMapping = !skip && !EnumSchema.isEnum(rule);
+                    if (projectsMapping) identifier(CommonFieldSchema.rustName(value.className()));
+                    String previous = projectsMapping
+                        ? methods.putIfAbsent(methodName(CommonFieldSchema.rustName(value.className())), value.className()) : null;
                     if (previous != null && !previous.equals(value.className())) {
                         throw unsupported("mapping method collision " + previous + " / " + value.className());
                     }
-                    mapping = value;
+                    mapping = new MappingAnnotation(CommonFieldSchema.rustName(value.className()), value.paramNames());
                 } else if (annotation instanceof NamePredicateAnnotation) {
                     // Applied around this rule body after structural lowering.
                 } else if (annotation instanceof LexicalContextAnnotation) {
                     // Applied around this rule body after structural lowering.
+                } else if (annotation instanceof EnumAnnotation || annotation instanceof CommonFieldAnnotation) {
+                    // Typed value schema is lowered separately from recognition.
+                } else if (annotation instanceof EvalAnnotation) {
+                    // Evaluator defaults are generated separately from parser IR.
                 } else if (annotation instanceof DocAnnotation) {
                     // Preserved as ordered tooling metadata on the lowered rule below.
                 } else if (annotation instanceof SkipAnnotation) {
@@ -234,7 +254,7 @@ public final class RustGrammarLowering {
             recoveries.add(recovery);
             hasLocalTrivia |= localWhitespace != null || interleave;
             ruleWhitespace.add(localWhitespace == null ? whitespace || interleave : localWhitespace);
-            mappings.add(mapping);
+            mappings.add(EnumSchema.isEnum(rule) || CommonFieldSchema.isSum(grammar, rule) ? null : mapping);
             skips.add(skip);
             operators.add(leftAssoc || rightAssoc || precedence != null
                 ? new Operator(leftAssoc ? Associativity.LEFT : rightAssoc ? Associativity.RIGHT : Associativity.NONE, precedence == null ? -1 : precedence)
@@ -250,10 +270,14 @@ public final class RustGrammarLowering {
         } while (changed);
         bodies.forEach(this::checkRepetition);
         for (int i = 0; i < bodies.size(); i++) checkLeftRecursion(i, new HashSet<>(), new HashSet<>());
-        if (!skippedProjection(new Reference(root), new HashSet<>())
-            && !shape(root, new HashSet<>()).equals(new Shape(Kind.NODE, Cardinality.ONE))) {
-            throw unsupported("root must resolve to exactly one AST node");
+        if (!skippedProjection(new Reference(root), new HashSet<>())) {
+            Shape rootShape = shape(root, new HashSet<>(), true);
+            if (rootShape.cardinality() != Cardinality.ONE
+                || (rootShape.kind() != Kind.NODE && rootShape.kind() != Kind.ENUM)) {
+                throw unsupported("root must resolve to exactly one AST node");
         }
+        }
+        var enumRoots = EnumSchema.rootEnums(grammar);
         List<Rule> rules = new ArrayList<>();
         Map<String, Mapping> variants = new LinkedHashMap<>();
         for (int i = 0; i < bodies.size(); i++) {
@@ -277,14 +301,16 @@ public final class RustGrammarLowering {
                 catalog = new Catalog(catalogs.get(i), captures.keySet().stream().sorted().toList());
             }
             Mapping mapping = null;
-            if (annotation == null) {
-                if (!captures.isEmpty() && effects == null && catalog == null && !skips.get(i)
-                        && comparisons.get(i) == null) {
-                    throw unsupported("captures without @mapping on " + grammar.rules().get(i).name());
-                }
+            if (enumRoots.containsKey(grammar.rules().get(i).name())) {
+                String name = grammar.rules().get(i).name();
+                mapping = new Mapping(enumRoots.get(name),
+                    List.of(new Field("value", Kind.ENUM, Cardinality.ONE, name)));
+            } else if (annotation == null) {
+                // Helper-local captures remain CST metadata; only a mapping publishes AST fields.
             } else {
                 if (new HashSet<>(annotation.paramNames()).size() != annotation.paramNames().size()
-                    || !captures.keySet().equals(new HashSet<>(annotation.paramNames()))) {
+                    || (!captures.keySet().containsAll(annotation.paramNames())
+                        || !java.util.stream.Stream.concat(annotation.paramNames().stream(), org.unlaxer.dsl.codegen.TypeofConstraints.captures(grammar.rules().get(i)).stream()).collect(java.util.stream.Collectors.toSet()).containsAll(captures.keySet()))) {
                     throw unsupported("@mapping params must match capture names on " + grammar.rules().get(i).name());
                 }
                 List<Field> fields = new ArrayList<>();
@@ -293,7 +319,8 @@ public final class RustGrammarLowering {
                         identifier(name);
                         if (Set.of("span", "semantics").contains(name)) throw unsupported("capture name " + name + " is reserved");
                     }
-                    fields.add(new Field(name, captures.get(name).kind(), captures.get(name).cardinality()));
+                    Shape shape = captures.get(name);
+                    fields.add(new Field(name, shape.kind(), shape.cardinality(),shape.enumName()));
                 }
                 mapping = new Mapping(annotation.className(), fields);
             }
@@ -319,16 +346,25 @@ public final class RustGrammarLowering {
             var documentation = grammar.rules().get(i).annotations().stream()
                 .filter(DocAnnotation.class::isInstance).map(DocAnnotation.class::cast)
                 .map(DocAnnotation::text).toList();
-            rules.add(new Rule(grammar.rules().get(i).name(), ruleBody, mapping, operators.get(i), catalog, skips.get(i), documentation));
+            rules.add(new Rule(grammar.rules().get(i).name(), ruleBody, mapping, operators.get(i), catalog, skips.get(i), documentation, EnumSchema.isEnum(grammar.rules().get(i)) ? EnumSchema.literals(grammar.rules().get(i)) : List.of(),
+                org.unlaxer.dsl.codegen.TypeofConstraints.collect(grammar.rules().get(i)).stream()
+                    .map(value -> new TypeConstraint(constraintField(value.capture(), captures), constraintField(value.reference(), captures))).toList()));
         }
         List<Rule> rewritten = new ArrayList<>();
         boolean hasValues = variants.values().stream().flatMap(mapping -> mapping.fields().stream())
-            .anyMatch(field -> field.kind() == Kind.VALUE);
+            .anyMatch(field -> field.kind() == Kind.VALUE) || rules.stream().flatMap(rule -> rule.typeConstraints().stream())
+                .anyMatch(value -> value.capture().kind() == Kind.VALUE || value.reference().kind() == Kind.VALUE);
         for (int i = 0; i < rules.size(); i++) {
             Rule rule = rules.get(i);
             Mapping mapping = rule.mapping() == null ? null : variants.get(rule.mapping().name());
+            if (mapping != null) {
+                var declared = grammar.rules().get(i);
+                mapping = new Mapping(mapping.name(), mapping.fields().stream().map(field ->
+                    org.unlaxer.dsl.codegen.NumericFields.isInteger(grammar, declared, field.name())
+                        ? new Field(field.name(), Kind.INTEGER, field.cardinality()) : field).toList());
+            }
             Expression expression = hasValues && !rule.skip()
-                ? mapping == null ? retainHelperValue(rule.body()) : retainTextValues(rule.body(), mapping)
+                ? mapping == null ? retainHelperValue(rule.body()) : retainTextValues(rule.body(), projectionMapping(mapping, rule.typeConstraints()))
                 : rule.body();
             // Rewrite only after source-level shapes have been analyzed: this synthetic choice
             // is not a heterogeneous source choice and must not introduce text sentinels.
@@ -369,9 +405,39 @@ public final class RustGrammarLowering {
             }
             if(i==root && org.unlaxer.dsl.codegen.NamePredicates.enabled(grammar)) expression=new NameResolutionScope(expression,
                 org.unlaxer.dsl.codegen.NamePredicates.requirements(grammar).stream().map(value->new NameRequirement(value.id(),value.version())).toList());
-            rewritten.add(new Rule(rule.name(), expression, mapping, rule.operator(), rule.catalog(), rule.skip(), rule.documentation()));
+            var sourceRule = grammar.rules().get(i);
+            var effectiveMapping = mapping;
+            rewritten.add(new Rule(rule.name(), expression, mapping, rule.operator(), rule.catalog(), rule.skip(), rule.documentation(),rule.enumLiterals(), rule.typeConstraints().stream().map(value ->
+                    new TypeConstraint(boundConstraintField(value.capture(), effectiveMapping, sourceRule), boundConstraintField(value.reference(), effectiveMapping, sourceRule))).toList()));
         }
         return new GrammarIR(rewritten, root, whitespace);
+    }
+
+    private static Mapping projectionMapping(Mapping mapping, List<TypeConstraint> constraints) {
+        var fields = new LinkedHashMap<String, Field>();
+        for (Field field : mapping.fields()) fields.put(field.name(), field);
+        for (TypeConstraint value : constraints) {
+            fields.putIfAbsent(value.capture().name(), value.capture());
+            fields.putIfAbsent(value.reference().name(), value.reference());
+        }
+        return new Mapping(mapping.name(), List.copyOf(fields.values()));
+    }
+
+    private static Field constraintField(String name, Map<String, Shape> captures) {
+        Shape shape = captures.get(name);
+        if (shape == null) throw unsupported("E-TYPEOF-UNKNOWN-CAPTURE: " + name);
+        return new Field(name, shape.kind(), shape.cardinality(), shape.enumName());
+    }
+    private static boolean integerConstraint(GrammarDecl grammar, RuleDecl rule, String name) {
+        String type = org.unlaxer.dsl.codegen.TypeofConstraints.valueType(grammar, rule, name);
+        return type.equals("int") || type.equals("Optional<Integer>") || type.equals("List<Integer>");
+    }
+
+    private Field boundConstraintField(Field field, Mapping mapping, RuleDecl sourceRule) {
+        Field bound = mapping == null ? field : mapping.fields().stream()
+            .filter(value -> value.name().equals(field.name())).findFirst().orElse(field);
+        return integerConstraint(grammar, sourceRule, field.name())
+            ? new Field(field.name(), Kind.INTEGER, field.cardinality()) : bound;
     }
 
     private static boolean whitespaceStyle(String style) {
@@ -392,7 +458,8 @@ public final class RustGrammarLowering {
             if (!a.name().equals(b.name()) || a.cardinality() != b.cardinality()) {
                 throw unsupported("incompatible shared mapping schema " + left.name());
             }
-            fields.add(new Field(a.name(), joinKind(a.kind(), b.kind()), a.cardinality()));
+            Kind kind = a.kind() == b.kind() && java.util.Objects.equals(a.enumName(),b.enumName()) ? a.kind() : Kind.VALUE;
+            fields.add(new Field(a.name(), kind, a.cardinality(),kind == Kind.ENUM ? a.enumName() : null));
         }
         return new Mapping(left.name(), fields);
     }
@@ -503,8 +570,10 @@ public final class RustGrammarLowering {
             || mapping.fields().get(2).cardinality() != Cardinality.MANY
             || mapping.fields().get(0).kind() != mapping.fields().get(2).kind()
             || shape(right.expression(), new HashSet<>()).cardinality() != Cardinality.ONE) {
-            throw unsupported("@leftAssoc requires left { op right } with scalar operands and params=[left, op, right] on "
-                + grammar.rules().get(rule).name());
+            throw unsupported(
+                    "@leftAssoc requires left { op right } with scalar operands and params=[left,"
+                        + " op, right] on "
+                            + grammar.rules().get(rule).name());
         }
     }
 
@@ -534,8 +603,10 @@ public final class RustGrammarLowering {
             || mapping.fields().get(0).cardinality() != Cardinality.ONE
             || !mapping.fields().get(1).equals(new Field("op", Kind.TEXT, Cardinality.MANY))
             || !mapping.fields().get(2).equals(new Field("right", skips.get(rule) ? Kind.TEXT : Kind.NODE, Cardinality.MANY))) {
-            throw unsupported("@rightAssoc requires left { op Self } with scalar base and params=[left, op, right] on "
-                + grammar.rules().get(rule).name());
+            throw unsupported(
+                    "@rightAssoc requires left { op Self } with scalar base and params=[left, op,"
+                        + " right] on "
+                            + grammar.rules().get(rule).name());
         }
         return new Choice(List.of(new Sequence(List.of(left, op, right)), left));
     }
@@ -550,7 +621,6 @@ public final class RustGrammarLowering {
         }
         if (body instanceof SequenceBody sequence) {
             return new Sequence(sequence.elements().stream().map(element -> {
-                if (element.typeofConstraint().isPresent()) throw unsupported("@typeof");
                 Expression expression = atomic(element.element());
                 if (element.captureName().isEmpty()) return expression;
                 return capture(element.captureName().get(), expression);
@@ -626,7 +696,9 @@ public final class RustGrammarLowering {
             Expression inner = sequence.elements().get(0);
             while (inner instanceof Sequence nested && nested.elements().size() == 1) inner = nested.elements().get(0);
             if (inner instanceof OptionalExpr || inner instanceof Repeat || inner instanceof Separated) {
-                throw unsupported("nested container capture; name the inner element or a mapped wrapper rule");
+                throw unsupported(
+                        "nested container capture; name the inner element or a mapped wrapper"
+                            + " rule");
             }
         }
         if (expression instanceof Delimited delimited) {
@@ -853,6 +925,7 @@ public final class RustGrammarLowering {
         return switch (parserClass) {
                 case "GraphemeParser", "org.unlaxer.parser.elementary.GraphemeParser" -> new GraphemeToken();
                 case "NumberParser", "org.unlaxer.parser.elementary.NumberParser" -> new NumberToken();
+                case "DigitParser", "org.unlaxer.parser.posix.DigitParser" -> new CharRangeToken('0', '9');
                 case "IdentifierParser", "org.unlaxer.parser.clang.IdentifierParser" -> new IdentifierToken();
                 case "SingleQuotedParser", "org.unlaxer.parser.elementary.SingleQuotedParser" -> new QuotedToken('\'');
                 case "DoubleQuotedParser", "org.unlaxer.parser.elementary.DoubleQuotedParser" -> new QuotedToken('"');
@@ -898,7 +971,7 @@ public final class RustGrammarLowering {
 
     private void checkLeftRecursion(int rule, Set<Integer> visiting, Set<Integer> done) {
         if (done.contains(rule)) return;
-        if (!visiting.add(rule)) throw unsupported("left recursion at " + grammar.rules().get(rule).name());
+        if (!visiting.add(rule)) throw unsupported("E-LEFT-RECURSION: left recursion at " + grammar.rules().get(rule).name());
         if (visiting.size() > MAX_ANALYSIS_DEPTH) throw unsupported("rule analysis depth exceeds 256");
         for (int child : leadingRules(bodies.get(rule))) checkLeftRecursion(child, visiting, done);
         visiting.remove(rule);
@@ -978,13 +1051,31 @@ public final class RustGrammarLowering {
     }
 
     private Shape shape(int rule, Set<Integer> visiting) {
+        return shape(rule, visiting, false);
+    }
+    private Shape shape(Expression expression, Set<Integer> visiting) {
+        return shape(expression, visiting, false);
+    }
+
+    private Shape shape(int rule, Set<Integer> visiting, boolean enumNodes) {
         enterAnalysis();
         try {
             if (skips.get(rule)) return new Shape(Kind.TEXT, Cardinality.ONE);
+            if (EnumSchema.isEnum(grammar.rules().get(rule))) return enumNodes ? new Shape(Kind.NODE, Cardinality.ONE) : new Shape(Kind.ENUM,Cardinality.ONE,grammar.rules().get(rule).name());
             if (mappings.get(rule) != null) return new Shape(Kind.NODE, Cardinality.ONE);
-            if (!visiting.add(rule)) throw unsupported("recursive unmapped rule " + grammar.rules().get(rule).name());
+            if (!visiting.add(rule)) {
+                var recursive = recursiveShapes[enumNodes ? 1 : 0].rule(grammar.rules().get(rule).name());
+                Kind kind = switch (recursive.kind()) {
+                    case "#text" -> Kind.TEXT;
+                    case "#node" -> Kind.NODE;
+                    case "#join" -> Kind.VALUE;
+                    default -> enumNodes ? Kind.NODE : Kind.ENUM;
+                };
+                return new Shape(kind, Cardinality.valueOf(recursive.count().name()),
+                    kind == Kind.ENUM ? recursive.kind() : null);
+            }
             if (visiting.size() > MAX_ANALYSIS_DEPTH) throw unsupported("rule shape depth exceeds 256");
-            Shape result = shape(bodies.get(rule), visiting);
+            Shape result = shape(bodies.get(rule), visiting, enumNodes);
             visiting.remove(rule);
             return result;
         } finally {
@@ -992,45 +1083,45 @@ public final class RustGrammarLowering {
         }
     }
 
-    private Shape shape(Expression expression, Set<Integer> visiting) {
+    private Shape shape(Expression expression, Set<Integer> visiting, boolean enumNodes) {
         enterAnalysis();
         try {
             if (expression instanceof ErrorExpected ignored) {
                 return new Shape(Kind.TEXT, Cardinality.ONE);
             }
             if (expression instanceof Reference reference) {
-                return shape(reference.rule(), visiting);
+                return shape(reference.rule(), visiting, enumNodes);
             }
             if (expression instanceof Capture capture) {
-                return shape(capture.expression(), visiting);
+                return shape(capture.expression(), visiting, enumNodes);
             }
             if (expression instanceof Delimited delimited) {
-                return shape(delimited.child(), visiting);
+                return shape(delimited.child(), visiting, enumNodes);
             }
             if (expression instanceof OptionalExpr optional) {
-                return wrapNode(shape(optional.child(), visiting), Cardinality.OPTIONAL);
+                return wrapNode(shape(optional.child(), visiting, enumNodes), Cardinality.OPTIONAL);
             }
             if (expression instanceof Repeat repeat) {
-                return wrapNode(shape(repeat.child(), visiting), Cardinality.MANY);
+                return wrapNode(shape(repeat.child(), visiting, enumNodes), Cardinality.MANY);
             }
             if (expression instanceof Separated separated) {
-                if (shape(separated.separator(), visiting).kind() != Kind.TEXT) throw unsupported("mapped separator");
-                return wrapNode(shape(separated.child(), visiting), Cardinality.MANY);
+                if (shape(separated.separator(), visiting, enumNodes).kind() != Kind.TEXT) throw unsupported("mapped separator");
+                return wrapNode(shape(separated.child(), visiting, enumNodes), Cardinality.MANY);
             }
             if (expression instanceof Sequence sequence) {
-                var nodes = sequence.elements().stream().map(e -> shape(e, visiting)).filter(s -> s.kind() != Kind.TEXT).toList();
+                var nodes = sequence.elements().stream().map(e -> shape(e, visiting, enumNodes)).filter(s -> s.kind() != Kind.TEXT).toList();
                 Shape result = nodes.isEmpty() ? new Shape(Kind.TEXT, Cardinality.ONE) : nodes.get(0);
                 for (int i = 1; i < nodes.size(); i++) result = merge(result, nodes.get(i), true);
                 return result;
             }
             if (expression instanceof Choice choice) {
-                var shapes = choice.alternatives().stream().map(e -> shape(e, visiting)).toList();
+                var shapes = choice.alternatives().stream().map(e -> shape(e, visiting, enumNodes)).toList();
                 Shape result = shapes.get(0);
                 for (Shape alternative : shapes) result = merge(result, alternative, false);
                 return result;
             }
             if (expression instanceof PredictiveChoice choice) {
-                var shapes = choice.alternatives().stream().map(e -> shape(e, visiting)).toList();
+                var shapes = choice.alternatives().stream().map(e -> shape(e, visiting, enumNodes)).toList();
                 Shape result = shapes.get(0);
                 for (Shape alternative : shapes) result = merge(result, alternative, false);
                 return result;
@@ -1047,13 +1138,15 @@ public final class RustGrammarLowering {
 
     private Shape wrap(Shape shape, Cardinality cardinality) {
         return new Shape(shape.kind(), shape.cardinality() == Cardinality.MANY || cardinality == Cardinality.MANY
-            ? Cardinality.MANY : cardinality == Cardinality.OPTIONAL ? Cardinality.OPTIONAL : shape.cardinality());
+            ? Cardinality.MANY : cardinality == Cardinality.OPTIONAL ? Cardinality.OPTIONAL : shape.cardinality(),shape.enumName());
     }
 
     private Shape merge(Shape left, Shape right, boolean sequence) {
-        return new Shape(joinKind(left.kind(), right.kind()), sequence || left.cardinality() == Cardinality.MANY || right.cardinality() == Cardinality.MANY
+        boolean sameEnum=java.util.Objects.equals(left.enumName(),right.enumName());
+        Kind kind=left.kind()==right.kind() && sameEnum ? left.kind() : Kind.VALUE;
+        return new Shape(kind, sequence || left.cardinality() == Cardinality.MANY || right.cardinality() == Cardinality.MANY
             ? Cardinality.MANY : left.cardinality() == Cardinality.OPTIONAL || right.cardinality() == Cardinality.OPTIONAL
-            ? Cardinality.OPTIONAL : Cardinality.ONE);
+            ? Cardinality.OPTIONAL : Cardinality.ONE, kind==Kind.ENUM ? left.enumName() : null);
     }
 
     private Kind joinKind(Kind left, Kind right) {

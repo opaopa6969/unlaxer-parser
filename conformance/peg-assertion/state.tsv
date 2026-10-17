@@ -1,0 +1,5 @@
+# id	positive	childSucceeds	assertionSucceeds	state	scopeDepth	declarations	references	semanticDiagnostics	recoveries	consumed	matched	publishedTokens
+positive-commit-rollback	true	true	true	7	0	1	1	1	0	0	0	0
+positive-failure-rollback	true	false	false	7	0	1	1	1	0	0	0	0
+negative-failure-rollback	false	true	false	7	0	1	1	1	0	0	0	0
+negative-commit-rollback	false	false	true	7	0	1	1	1	0	0	0	0

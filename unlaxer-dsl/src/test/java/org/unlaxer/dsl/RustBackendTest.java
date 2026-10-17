@@ -324,6 +324,13 @@ public class RustBackendTest {
         assertFalse(power.contains("TextValue"));
     }
 
+    @Test public void literalTextCannotEnableInternalPreferredCaptures() {
+        var grammar = UBNFMapper.parse("grammar LiteralMetadata { @root @mapping(Value,params=[text]) Root ::= '#preferred-depth:' % ',' @text; }").grammars().get(0);
+        var parser = new RustBackend().generate(grammar).get(2).content();
+        assertFalse(parser.contains("#preferred-extra:2"));
+        assertTrue(parser.contains(".separated_by("));
+    }
+
     @Test public void leftAssocMetadataDoesNotRewriteTheGrammarAndInvalidShapesAreRejected() {
         String source = """
             grammar Operators {
@@ -334,7 +341,8 @@ public class RustBackendTest {
         var files = new RustBackend().generate(UBNFMapper.parse(source).grammars().get(0));
         var plain = new RustBackend().generate(UBNFMapper.parse(source.replace("@leftAssoc @precedence(level=10)", "")).grammars().get(0));
         assertEquals(plain.get(1), files.get(1));
-        assertEquals(plain.get(3), files.get(3));
+        // Preferred snapshots also fingerprint parser metadata; the ordinary mapper remains unchanged.
+        assertEquals(plain.get(3).content().split("\\nconst __PREFERRED_ROOT:",2)[0], files.get(3).content().split("\\nconst __PREFERRED_ROOT:",2)[0]);
         assertEquals(plain.get(4), files.get(4));
         assertTrue(files.get(2).content().contains("precedence: 10, associativity: Associativity::Left"));
         var defaults = new RustBackend().generate(UBNFMapper.parse(source.replace("@precedence(level=10)", "")).grammars().get(0));
@@ -364,7 +372,7 @@ public class RustBackendTest {
         var grammar = UBNFMapper.parse(source).grammars().get(0);
         var files = new RustBackend().generate(grammar);
         var plain = new RustBackend().generate(UBNFMapper.parse(source.replace("@rightAssoc @precedence(level=10)", "")).grammars().get(0));
-        for (int index : List.of(1, 3, 4)) assertEquals(plain.get(index), files.get(index));
+        for (int index : List.of(1, 3, 4)) assertEquals(plain.get(index).content().split("\\nconst __PREFERRED_ROOT:",2)[0], files.get(index).content().split("\\nconst __PREFERRED_ROOT:",2)[0]);
         assertTrue(files.get(2).content().contains("Associativity { Left, Right, None }"));
         assertTrue(files.get(2).content().contains("associativity: Associativity::Right"));
         assertTrue(files.get(2).content().contains("Expr::Choice"));
