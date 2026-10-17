@@ -15,10 +15,10 @@ final class RustDapEmitter {
             out.append("    let mut out = Vec::new();\n    collect(&ast, &mut out);\n    Ok(out)\n}\n\nfn collect(node: &super::ast::Ast, out: &mut Vec<unlaxer_dap::Step>) {\n    match node {\n");
             for (var mapping : mappings.values()) {
                 out.append("        super::ast::Ast::r#").append(mapping.name()).append(" { span");
-                for (var field : mapping.fields()) if (field.kind() != Kind.TEXT) out.append(", r#").append(field.name());
+                for (var field : mapping.fields()) if ((field.kind() == Kind.NODE || field.kind() == Kind.VALUE)) out.append(", r#").append(field.name());
                 out.append(", .. } => {\n            out.push(unlaxer_dap::Step { label: ").append(RustBackend.quote(mapping.name())).append(".into(), span: *span });\n");
                 for (var field : mapping.fields()) {
-                    if (field.kind() == Kind.TEXT) continue;
+                    if (field.kind() != Kind.NODE && field.kind() != Kind.VALUE) continue;
                     String name = "r#" + field.name();
                     String body = field.kind() == Kind.NODE ? "collect(child, out);" : "if let super::ast::AstValue::Node(child) = child { collect(child, out); }";
                     String row = switch(field.cardinality()) {

@@ -1,0 +1,9 @@
+package org.example.mixedenum;
+import com.google.gson.*;
+public final class Probe extends MixedEnumsEvaluator<JsonArray> {
+    public static JsonObject run(MixedEnumsAST node) { var result=new JsonObject();result.add("root",new Probe().eval(node));return result; }
+    @Override protected JsonArray evalModeNode(MixedEnumsAST.ModeNode node) { return value("enum","Mode",node.value().text()); }
+    @Override protected JsonArray evalHeatNode(MixedEnumsAST.HeatNode node) { return value("enum","Heat",node.value().text()); }
+    @Override protected JsonArray evalLeaf(MixedEnumsAST.Leaf node) { return value("node","Leaf",node.text()); }
+    private JsonArray value(String kind,String type,String text) {var result=new JsonArray();result.add(kind);result.add(type);result.add(text);return result;}
+}

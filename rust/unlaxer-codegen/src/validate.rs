@@ -89,6 +89,62 @@ pub(super) fn validate(ir: &GrammarIr) -> Result<(), GenerateError> {
     if ir.root >= ir.rules.len() {
         return Err(fail("root rule index out of range"));
     }
+    let mut enum_names = BTreeSet::new();
+    for rule in &ir.rules {
+        if rule.enum_literals.is_empty() {
+            continue;
+        }
+        validate_enum_type(&rule.name)?;
+        if !enum_names.insert(rule.name.as_str()) {
+            return Err(fail("E-ENUM: duplicate enum type"));
+        }
+        let mut names = BTreeSet::new();
+        let mut texts = BTreeSet::new();
+        for literal in &rule.enum_literals {
+            let name = enum_constant_name(literal)?;
+            if !texts.insert(literal) {
+                return Err(fail("E-ENUM: duplicate enum literal"));
+            }
+            if !names.insert(name) {
+                return Err(fail("E-ENUM: enum constant name collision"));
+            }
+        }
+        let mut actual = Vec::new();
+        if !enum_body_literals(&rule.body, &mut actual)
+            || actual
+                != rule
+                    .enum_literals
+                    .iter()
+                    .map(String::as_str)
+                    .collect::<Vec<_>>()
+        {
+            return Err(fail("E-ENUM: declaration differs from literal rule body"));
+        }
+        if rule.skip || rule.operator.is_some() || rule.catalog.is_some() {
+            return Err(fail("E-ENUM: conflicting enum metadata"));
+        }
+        if let Some(mapping) = &rule.mapping {
+            if ir.rules.iter().any(|other| {
+                other.name != rule.name
+                    && other
+                        .mapping
+                        .as_ref()
+                        .is_some_and(|m| m.name == mapping.name)
+            }) {
+                return Err(fail("E-ENUM: enum root wrapper name collision"));
+            }
+            if mapping.name != format!("{}Node", rule.name)
+                || mapping.fields
+                    != vec![Field {
+                        name: "value".into(),
+                        kind: Kind::Enum(rule.name.clone()),
+                        cardinality: Cardinality::One,
+                    }]
+            {
+                return Err(fail("E-ENUM: invalid enum root wrapper"));
+            }
+        }
+    }
     let mut names = BTreeSet::new();
     let mut mappings = BTreeMap::new();
     let mut methods = BTreeMap::new();
@@ -109,6 +165,9 @@ pub(super) fn validate(ir: &GrammarIr) -> Result<(), GenerateError> {
         }
         if let Some(mapping) = &rule.mapping {
             identifier(&mapping.name)?;
+            if enum_names.contains(mapping.name.as_str()) {
+                return Err(fail("E-ENUM: enum type name collision"));
+            }
             if mappings
                 .insert(&mapping.name, mapping)
                 .is_some_and(|old| old != mapping)
@@ -130,13 +189,18 @@ pub(super) fn validate(ir: &GrammarIr) -> Result<(), GenerateError> {
             let mut fields = BTreeSet::new();
             for field in &mapping.fields {
                 identifier(&field.name)?;
+                if let Kind::Enum(name) = &field.kind {
+                    if !enum_names.contains(name.as_str()) {
+                        return Err(fail("E-ENUM: unknown enum field type"));
+                    }
+                }
                 if matches!(field.name.as_str(), "span" | "semantics")
                     || !fields.insert(field.name.clone())
                 {
                     return Err(fail(format!("duplicate or reserved field: {}", field.name)));
                 }
             }
-            if fields != captures {
+            if rule.enum_literals.is_empty() && fields != captures {
                 return Err(fail(format!(
                     "mapping fields differ from captures: {}",
                     rule.name
@@ -400,4 +464,33 @@ fn name_requirement(id: &str, version: &str) -> Result<(), GenerateError> {
         return Err(fail("invalid name snapshot identity"));
     }
     Ok(())
+}
+
+fn enum_body_literals<'a>(expression: &'a Expression, out: &mut Vec<&'a str>) -> bool {
+    match expression {
+        Expression::Literal(text) => {
+            out.push(text);
+            true
+        }
+        Expression::Choice(children)
+        | Expression::LongestChoice(children)
+        | Expression::UniqueLongestChoice(children) => {
+            children.iter().all(|child| enum_body_literals(child, out))
+        }
+        Expression::PredictiveChoice { alternatives, .. } => alternatives
+            .iter()
+            .all(|child| enum_body_literals(child, out)),
+        Expression::Sequence(children) if children.len() == 1 => {
+            enum_body_literals(&children[0], out)
+        }
+        Expression::Delimited(child)
+        | Expression::TriviaScope { child, .. }
+        | Expression::LexicalTriviaScope { child, .. }
+        | Expression::LexicalContextScope { child, .. }
+        | Expression::RuleEffects { child, .. }
+        | Expression::NameResolutionScope { child, .. }
+        | Expression::NamePredicate { child, .. }
+        | Expression::Recovery { child, .. } => enum_body_literals(child, out),
+        _ => false,
+    }
 }
