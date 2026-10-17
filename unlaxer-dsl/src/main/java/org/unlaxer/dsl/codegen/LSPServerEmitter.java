@@ -50,7 +50,7 @@ class LSPServerEmitter {
         StringBuilder kwBuf = new StringBuilder("private static final List<String> KEYWORDS = List.of(");
         for (int i = 0; i < keywords.size(); i++) {
             if (i > 0) kwBuf.append(", ");
-            kwBuf.append("\"").append(keywords.get(i)).append("\"");
+            kwBuf.append("\"").append(ParserCodegenUtil.escapeString(keywords.get(i))).append("\"");
         }
         kwBuf.append(");");
         w.line(kwBuf.toString());
@@ -971,7 +971,8 @@ class LSPServerEmitter {
 
     private static void collectFromElement(AtomicElement element, Set<String> acc) {
         if (element instanceof TerminalElement t) {
-            acc.add(stripQuotes(t.value()));
+            // TerminalElement already contains the decoded literal, including genuine quotes.
+            acc.add(t.value());
         } else if (element instanceof GroupElement g) {
             collectFromBody(g.body(), acc);
         } else if (element instanceof OptionalElement o) {
@@ -981,12 +982,5 @@ class LSPServerEmitter {
         } else {
 
         }
-    }
-
-    private static String stripQuotes(String value) {
-        if (value.length() >= 2 && value.startsWith("'") && value.endsWith("'")) {
-            return value.substring(1, value.length() - 1);
-        }
-        return value;
     }
 }
