@@ -1,0 +1,2691 @@
+[
+  {
+    "name": "EnumScalar",
+    "grammar": "grammar EnumScalar { @package: enumprobe @whitespace: none @enum Mode ::= 'sync' | 'auto'; @root @mapping(Value,params=[value]) Root ::= Mode @value; }",
+    "rootMapping": "Value",
+    "fields": [
+      {
+        "name": "value",
+        "enum": "Mode",
+        "cardinality": "one"
+      }
+    ],
+    "cases": [
+      {
+        "id": "sync",
+        "input": "sync",
+        "accepted": true,
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "coordinates": [
+          4,
+          4,
+          4
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {
+            "value": "SYNC"
+          }
+        },
+        "eval": 1,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "sync",
+            "span": [
+              0,
+              4
+            ],
+            "utf16": [
+              0,
+              4
+            ],
+            "utf8": [
+              0,
+              4
+            ]
+          }
+        ]
+      },
+      {
+        "id": "auto",
+        "input": "auto",
+        "accepted": true,
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "coordinates": [
+          4,
+          4,
+          4
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {
+            "value": "AUTO"
+          }
+        },
+        "eval": 2,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "auto",
+            "span": [
+              0,
+              4
+            ],
+            "utf16": [
+              0,
+              4
+            ],
+            "utf8": [
+              0,
+              4
+            ]
+          }
+        ]
+      },
+      {
+        "id": "empty",
+        "input": "",
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        },
+        "ast": null,
+        "eval": null,
+        "enums": []
+      },
+      {
+        "id": "bad",
+        "input": "bad",
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        },
+        "ast": null,
+        "eval": null,
+        "enums": []
+      },
+      {
+        "id": "trailing",
+        "input": "sync!",
+        "accepted": false,
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "coordinates": [
+          4,
+          4,
+          4
+        ],
+        "diagnostic": {
+          "kind": "trailing_input",
+          "offset": 4
+        },
+        "ast": null,
+        "eval": null,
+        "enums": []
+      }
+    ],
+    "enumRules": [
+      "Mode"
+    ]
+  },
+  {
+    "name": "EnumOptional",
+    "grammar": "grammar EnumOptional { @package: enumprobe @whitespace: none @enum Mode ::= 'sync' | 'auto'; @root @mapping(Value,params=[value]) Root ::= '[' [Mode] @value ']'; }",
+    "rootMapping": "Value",
+    "fields": [
+      {
+        "name": "value",
+        "enum": "Mode",
+        "cardinality": "optional"
+      }
+    ],
+    "cases": [
+      {
+        "id": "some",
+        "input": "[sync]",
+        "accepted": true,
+        "prefix": [
+          true,
+          6,
+          6
+        ],
+        "coordinates": [
+          6,
+          6,
+          6
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            6
+          ],
+          "fields": {
+            "value": "SYNC"
+          }
+        },
+        "eval": 1,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "sync",
+            "span": [
+              1,
+              5
+            ],
+            "utf16": [
+              1,
+              5
+            ],
+            "utf8": [
+              1,
+              5
+            ]
+          }
+        ]
+      },
+      {
+        "id": "none",
+        "input": "[]",
+        "accepted": true,
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "coordinates": [
+          2,
+          2,
+          2
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            2
+          ],
+          "fields": {
+            "value": null
+          }
+        },
+        "eval": 0,
+        "enums": []
+      },
+      {
+        "id": "rollback",
+        "input": "[sync",
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 5
+        },
+        "ast": null,
+        "eval": null,
+        "enums": []
+      }
+    ],
+    "enumRules": [
+      "Mode"
+    ]
+  },
+  {
+    "name": "EnumMany",
+    "grammar": "grammar EnumMany { @package: enumprobe @whitespace: none @enum Mode ::= 'sync' | 'auto'; @root @mapping(Value,params=[value]) Root ::= '[' {Mode} @value ']'; }",
+    "rootMapping": "Value",
+    "fields": [
+      {
+        "name": "value",
+        "enum": "Mode",
+        "cardinality": "many"
+      }
+    ],
+    "cases": [
+      {
+        "id": "many",
+        "input": "[syncautosync]",
+        "accepted": true,
+        "prefix": [
+          true,
+          14,
+          14
+        ],
+        "coordinates": [
+          14,
+          14,
+          14
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            14
+          ],
+          "fields": {
+            "value": [
+              "SYNC",
+              "AUTO",
+              "SYNC"
+            ]
+          }
+        },
+        "eval": 4,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "sync",
+            "span": [
+              1,
+              5
+            ],
+            "utf16": [
+              1,
+              5
+            ],
+            "utf8": [
+              1,
+              5
+            ]
+          },
+          {
+            "rule": "Mode",
+            "text": "auto",
+            "span": [
+              5,
+              9
+            ],
+            "utf16": [
+              5,
+              9
+            ],
+            "utf8": [
+              5,
+              9
+            ]
+          },
+          {
+            "rule": "Mode",
+            "text": "sync",
+            "span": [
+              9,
+              13
+            ],
+            "utf16": [
+              9,
+              13
+            ],
+            "utf8": [
+              9,
+              13
+            ]
+          }
+        ]
+      },
+      {
+        "id": "none",
+        "input": "[]",
+        "accepted": true,
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "coordinates": [
+          2,
+          2,
+          2
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            2
+          ],
+          "fields": {
+            "value": []
+          }
+        },
+        "eval": 0,
+        "enums": []
+      },
+      {
+        "id": "rollback",
+        "input": "[sync!",
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 5
+        },
+        "ast": null,
+        "eval": null,
+        "enums": []
+      }
+    ],
+    "enumRules": [
+      "Mode"
+    ]
+  },
+  {
+    "name": "EnumPlus",
+    "grammar": "grammar EnumPlus { @package: enumprobe @whitespace: none @enum Mode ::= 'sync' | 'auto'; @root @mapping(Value,params=[value]) Root ::= Mode+ @value '!'; }",
+    "rootMapping": "Value",
+    "fields": [
+      {
+        "name": "value",
+        "enum": "Mode",
+        "cardinality": "many"
+      }
+    ],
+    "cases": [
+      {
+        "id": "many",
+        "input": "autosync!",
+        "accepted": true,
+        "prefix": [
+          true,
+          9,
+          9
+        ],
+        "coordinates": [
+          9,
+          9,
+          9
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            9
+          ],
+          "fields": {
+            "value": [
+              "AUTO",
+              "SYNC"
+            ]
+          }
+        },
+        "eval": 3,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "auto",
+            "span": [
+              0,
+              4
+            ],
+            "utf16": [
+              0,
+              4
+            ],
+            "utf8": [
+              0,
+              4
+            ]
+          },
+          {
+            "rule": "Mode",
+            "text": "sync",
+            "span": [
+              4,
+              8
+            ],
+            "utf16": [
+              4,
+              8
+            ],
+            "utf8": [
+              4,
+              8
+            ]
+          }
+        ]
+      },
+      {
+        "id": "empty",
+        "input": "!",
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        },
+        "ast": null,
+        "eval": null,
+        "enums": []
+      }
+    ],
+    "enumRules": [
+      "Mode"
+    ]
+  },
+  {
+    "name": "EnumSeparated",
+    "grammar": "grammar EnumSeparated { @package: enumprobe @whitespace: none @enum Mode ::= 'sync' | 'auto'; @root @mapping(Value,params=[value]) Root ::= Mode % ',' @value '!'; }",
+    "rootMapping": "Value",
+    "fields": [
+      {
+        "name": "value",
+        "enum": "Mode",
+        "cardinality": "many"
+      }
+    ],
+    "cases": [
+      {
+        "id": "many",
+        "input": "auto,sync,auto!",
+        "accepted": true,
+        "prefix": [
+          true,
+          15,
+          15
+        ],
+        "coordinates": [
+          15,
+          15,
+          15
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            15
+          ],
+          "fields": {
+            "value": [
+              "AUTO",
+              "SYNC",
+              "AUTO"
+            ]
+          }
+        },
+        "eval": 5,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "auto",
+            "span": [
+              0,
+              4
+            ],
+            "utf16": [
+              0,
+              4
+            ],
+            "utf8": [
+              0,
+              4
+            ]
+          },
+          {
+            "rule": "Mode",
+            "text": "sync",
+            "span": [
+              5,
+              9
+            ],
+            "utf16": [
+              5,
+              9
+            ],
+            "utf8": [
+              5,
+              9
+            ]
+          },
+          {
+            "rule": "Mode",
+            "text": "auto",
+            "span": [
+              10,
+              14
+            ],
+            "utf16": [
+              10,
+              14
+            ],
+            "utf8": [
+              10,
+              14
+            ]
+          }
+        ]
+      },
+      {
+        "id": "rollback",
+        "input": "sync,",
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 5
+        },
+        "ast": null,
+        "eval": null,
+        "enums": []
+      }
+    ],
+    "enumRules": [
+      "Mode"
+    ]
+  },
+  {
+    "name": "EnumAlias",
+    "grammar": "grammar EnumAlias { @package: enumprobe @whitespace: none @enum Mode ::= 'sync' | 'auto'; Alias ::= Mode; @root @mapping(Value,params=[value]) Root ::= Alias @value; }",
+    "rootMapping": "Value",
+    "fields": [
+      {
+        "name": "value",
+        "enum": "Mode",
+        "cardinality": "one"
+      }
+    ],
+    "cases": [
+      {
+        "id": "through-alias",
+        "input": "auto",
+        "accepted": true,
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "coordinates": [
+          4,
+          4,
+          4
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {
+            "value": "AUTO"
+          }
+        },
+        "eval": 2,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "auto",
+            "span": [
+              0,
+              4
+            ],
+            "utf16": [
+              0,
+              4
+            ],
+            "utf8": [
+              0,
+              4
+            ]
+          }
+        ]
+      }
+    ],
+    "enumRules": [
+      "Mode"
+    ]
+  },
+  {
+    "name": "EnumGroup",
+    "grammar": "grammar EnumGroup { @package: enumprobe @whitespace: none @enum Mode ::= 'sync' | 'auto'; @root @mapping(Value,params=[value]) Root ::= ('(' Mode ')') @value; }",
+    "rootMapping": "Value",
+    "fields": [
+      {
+        "name": "value",
+        "enum": "Mode",
+        "cardinality": "one"
+      }
+    ],
+    "cases": [
+      {
+        "id": "through-group",
+        "input": "(sync)",
+        "accepted": true,
+        "prefix": [
+          true,
+          6,
+          6
+        ],
+        "coordinates": [
+          6,
+          6,
+          6
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            6
+          ],
+          "fields": {
+            "value": "SYNC"
+          }
+        },
+        "eval": 1,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "sync",
+            "span": [
+              1,
+              5
+            ],
+            "utf16": [
+              1,
+              5
+            ],
+            "utf8": [
+              1,
+              5
+            ]
+          }
+        ]
+      }
+    ],
+    "enumRules": [
+      "Mode"
+    ]
+  },
+  {
+    "name": "EnumRoot",
+    "grammar": "grammar EnumRoot { @package: enumprobe @whitespace: none @root @enum Mode ::= 'sync' | 'auto'; }",
+    "rootMapping": "ModeNode",
+    "fields": [
+      {
+        "name": "value",
+        "enum": "Mode",
+        "cardinality": "one"
+      }
+    ],
+    "cases": [
+      {
+        "id": "root-sync",
+        "input": "sync",
+        "accepted": true,
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "coordinates": [
+          4,
+          4,
+          4
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "ModeNode",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {
+            "value": "SYNC"
+          }
+        },
+        "eval": 1,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "sync",
+            "span": [
+              0,
+              4
+            ],
+            "utf16": [
+              0,
+              4
+            ],
+            "utf8": [
+              0,
+              4
+            ]
+          }
+        ]
+      },
+      {
+        "id": "root-auto",
+        "input": "auto",
+        "accepted": true,
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "coordinates": [
+          4,
+          4,
+          4
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "ModeNode",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {
+            "value": "AUTO"
+          }
+        },
+        "eval": 2,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "auto",
+            "span": [
+              0,
+              4
+            ],
+            "utf16": [
+              0,
+              4
+            ],
+            "utf8": [
+              0,
+              4
+            ]
+          }
+        ]
+      },
+      {
+        "id": "root-failure",
+        "input": "bad",
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        },
+        "ast": null,
+        "eval": null,
+        "enums": []
+      }
+    ],
+    "enumRules": [
+      "Mode"
+    ]
+  },
+  {
+    "name": "EnumAliasRoot",
+    "grammar": "grammar EnumAliasRoot { @package: enumprobe @whitespace: none @enum Mode ::= 'sync' | 'auto'; @root Root ::= Mode; }",
+    "rootMapping": "ModeNode",
+    "fields": [
+      {
+        "name": "value",
+        "enum": "Mode",
+        "cardinality": "one"
+      }
+    ],
+    "cases": [
+      {
+        "id": "alias-root",
+        "input": "auto",
+        "accepted": true,
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "coordinates": [
+          4,
+          4,
+          4
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "ModeNode",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {
+            "value": "AUTO"
+          }
+        },
+        "eval": 2,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "auto",
+            "span": [
+              0,
+              4
+            ],
+            "utf16": [
+              0,
+              4
+            ],
+            "utf8": [
+              0,
+              4
+            ]
+          }
+        ]
+      }
+    ],
+    "enumRules": [
+      "Mode"
+    ]
+  },
+  {
+    "name": "EnumRollback",
+    "grammar": "grammar EnumRollback { @package: enumprobe @whitespace: none @enum Mode ::= 'sync' | 'auto'; @root @mapping(Value,params=[value]) Root ::= ('a' Mode @value '!' | 'a' Mode @value '?'); }",
+    "rootMapping": "Value",
+    "fields": [
+      {
+        "name": "value",
+        "enum": "Mode",
+        "cardinality": "one"
+      }
+    ],
+    "cases": [
+      {
+        "id": "second-choice",
+        "input": "async?",
+        "accepted": true,
+        "prefix": [
+          true,
+          6,
+          6
+        ],
+        "coordinates": [
+          6,
+          6,
+          6
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            6
+          ],
+          "fields": {
+            "value": "SYNC"
+          }
+        },
+        "eval": 1,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "sync",
+            "span": [
+              1,
+              5
+            ],
+            "utf16": [
+              1,
+              5
+            ],
+            "utf8": [
+              1,
+              5
+            ]
+          }
+        ]
+      },
+      {
+        "id": "failure",
+        "input": "asyncx",
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 5
+        },
+        "ast": null,
+        "eval": null,
+        "enums": []
+      }
+    ],
+    "enumRules": [
+      "Mode"
+    ]
+  },
+  {
+    "name": "EnumUnicode",
+    "grammar": "grammar EnumUnicode { @package: enumprobe @whitespace: none @enum Mode ::= '日本' | '𐐨' | '👨‍👩‍👧‍👦' | 'a\"b' | 'a\\b' | 'a\nb' | 'a\r\nb'; @root @mapping(Value,params=[value]) Root ::= Mode @value; }",
+    "rootMapping": "Value",
+    "fields": [
+      {
+        "name": "value",
+        "enum": "Mode",
+        "cardinality": "one"
+      }
+    ],
+    "cases": [
+      {
+        "id": "cjk",
+        "input": "日本",
+        "accepted": true,
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "coordinates": [
+          2,
+          2,
+          6
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            2
+          ],
+          "fields": {
+            "value": "U65E5__U672C_"
+          }
+        },
+        "eval": 1,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "日本",
+            "span": [
+              0,
+              2
+            ],
+            "utf16": [
+              0,
+              2
+            ],
+            "utf8": [
+              0,
+              6
+            ]
+          }
+        ]
+      },
+      {
+        "id": "supplementary",
+        "input": "𐐨",
+        "accepted": true,
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "coordinates": [
+          1,
+          2,
+          4
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            1
+          ],
+          "fields": {
+            "value": "U10428_"
+          }
+        },
+        "eval": 2,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "𐐨",
+            "span": [
+              0,
+              1
+            ],
+            "utf16": [
+              0,
+              2
+            ],
+            "utf8": [
+              0,
+              4
+            ]
+          }
+        ]
+      },
+      {
+        "id": "family",
+        "input": "👨‍👩‍👧‍👦",
+        "accepted": true,
+        "prefix": [
+          true,
+          7,
+          7
+        ],
+        "coordinates": [
+          7,
+          11,
+          25
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            7
+          ],
+          "fields": {
+            "value": "U1F468__U200D__U1F469__U200D__U1F467__U200D__U1F466_"
+          }
+        },
+        "eval": 3,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "👨‍👩‍👧‍👦",
+            "span": [
+              0,
+              7
+            ],
+            "utf16": [
+              0,
+              11
+            ],
+            "utf8": [
+              0,
+              25
+            ]
+          }
+        ]
+      },
+      {
+        "id": "quote",
+        "input": "a\"b",
+        "accepted": true,
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "coordinates": [
+          3,
+          3,
+          3
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {
+            "value": "A_U22_B"
+          }
+        },
+        "eval": 4,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "a\"b",
+            "span": [
+              0,
+              3
+            ],
+            "utf16": [
+              0,
+              3
+            ],
+            "utf8": [
+              0,
+              3
+            ]
+          }
+        ]
+      },
+      {
+        "id": "backslash",
+        "input": "a\\b",
+        "accepted": true,
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "coordinates": [
+          3,
+          3,
+          3
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {
+            "value": "A_U5C_B"
+          }
+        },
+        "eval": 5,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "a\\b",
+            "span": [
+              0,
+              3
+            ],
+            "utf16": [
+              0,
+              3
+            ],
+            "utf8": [
+              0,
+              3
+            ]
+          }
+        ]
+      },
+      {
+        "id": "lf",
+        "input": "a\nb",
+        "accepted": true,
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "coordinates": [
+          3,
+          3,
+          3
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {
+            "value": "A_UA_B"
+          }
+        },
+        "eval": 6,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "a\nb",
+            "span": [
+              0,
+              3
+            ],
+            "utf16": [
+              0,
+              3
+            ],
+            "utf8": [
+              0,
+              3
+            ]
+          }
+        ]
+      },
+      {
+        "id": "crlf",
+        "input": "a\r\nb",
+        "accepted": true,
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "coordinates": [
+          4,
+          4,
+          4
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {
+            "value": "A_UD__UA_B"
+          }
+        },
+        "eval": 7,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "a\r\nb",
+            "span": [
+              0,
+              4
+            ],
+            "utf16": [
+              0,
+              4
+            ],
+            "utf8": [
+              0,
+              4
+            ]
+          }
+        ]
+      }
+    ],
+    "enumRules": [
+      "Mode"
+    ]
+  },
+  {
+    "name": "EnumMultiple",
+    "grammar": "grammar EnumMultiple { @package: enumprobe @whitespace: none @enum Mode ::= 'sync' | 'auto'; @enum Level ::= 'low' | 'high'; @root @mapping(Value,params=[value,other]) Root ::= Mode @value ':' Level @other; }",
+    "rootMapping": "Value",
+    "fields": [
+      {
+        "name": "value",
+        "enum": "Mode",
+        "cardinality": "one"
+      },
+      {
+        "name": "other",
+        "enum": "Level",
+        "cardinality": "one"
+      }
+    ],
+    "cases": [
+      {
+        "id": "two-enums",
+        "input": "auto:high",
+        "accepted": true,
+        "prefix": [
+          true,
+          9,
+          9
+        ],
+        "coordinates": [
+          9,
+          9,
+          9
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            9
+          ],
+          "fields": {
+            "value": "AUTO",
+            "other": "HIGH"
+          }
+        },
+        "eval": 4,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "auto",
+            "span": [
+              0,
+              4
+            ],
+            "utf16": [
+              0,
+              4
+            ],
+            "utf8": [
+              0,
+              4
+            ]
+          },
+          {
+            "rule": "Level",
+            "text": "high",
+            "span": [
+              5,
+              9
+            ],
+            "utf16": [
+              5,
+              9
+            ],
+            "utf8": [
+              5,
+              9
+            ]
+          }
+        ]
+      }
+    ],
+    "enumRules": [
+      "Mode",
+      "Level"
+    ]
+  },
+  {
+    "name": "EnumBounded",
+    "grammar": "grammar EnumBounded { @package: enumprobe @whitespace: none @enum Mode ::= 'sync'|'auto'; @root @mapping(Value,params=[value]) Root ::= Mode{2,3} @value '!'; }",
+    "rootMapping": "Value",
+    "fields": [
+      {
+        "name": "value",
+        "enum": "Mode",
+        "cardinality": "many"
+      }
+    ],
+    "cases": [
+      {
+        "id": "bounded",
+        "input": "syncauto!",
+        "accepted": true,
+        "prefix": [
+          true,
+          9,
+          9
+        ],
+        "coordinates": [
+          9,
+          9,
+          9
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            9
+          ],
+          "fields": {
+            "value": [
+              "SYNC",
+              "AUTO"
+            ]
+          }
+        },
+        "eval": 3,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "sync",
+            "span": [
+              0,
+              4
+            ],
+            "utf16": [
+              0,
+              4
+            ],
+            "utf8": [
+              0,
+              4
+            ]
+          },
+          {
+            "rule": "Mode",
+            "text": "auto",
+            "span": [
+              4,
+              8
+            ],
+            "utf16": [
+              4,
+              8
+            ],
+            "utf8": [
+              4,
+              8
+            ]
+          }
+        ]
+      }
+    ],
+    "enumRules": [
+      "Mode"
+    ]
+  },
+  {
+    "name": "EnumRepeatedSites",
+    "grammar": "grammar EnumRepeatedSites { @package: enumprobe @whitespace: none @enum Mode ::= 'sync'|'auto'; @root @mapping(Value,params=[value]) Root ::= Mode @value ':' Mode @value; }",
+    "rootMapping": "Value",
+    "fields": [
+      {
+        "name": "value",
+        "enum": "Mode",
+        "cardinality": "many"
+      }
+    ],
+    "cases": [
+      {
+        "id": "repeated-sites",
+        "input": "sync:auto",
+        "accepted": true,
+        "prefix": [
+          true,
+          9,
+          9
+        ],
+        "coordinates": [
+          9,
+          9,
+          9
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            9
+          ],
+          "fields": {
+            "value": [
+              "SYNC",
+              "AUTO"
+            ]
+          }
+        },
+        "eval": 3,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "sync",
+            "span": [
+              0,
+              4
+            ],
+            "utf16": [
+              0,
+              4
+            ],
+            "utf8": [
+              0,
+              4
+            ]
+          },
+          {
+            "rule": "Mode",
+            "text": "auto",
+            "span": [
+              5,
+              9
+            ],
+            "utf16": [
+              5,
+              9
+            ],
+            "utf8": [
+              5,
+              9
+            ]
+          }
+        ]
+      }
+    ],
+    "enumRules": [
+      "Mode"
+    ]
+  },
+  {
+    "name": "EnumSpaces",
+    "grammar": "grammar EnumSpaces { @package: enumprobe @whitespace: none @enum Mode ::= ' K '; @root @mapping(Value,params=[value]) Root ::= Mode @value; }",
+    "rootMapping": "Value",
+    "fields": [
+      {
+        "name": "value",
+        "enum": "Mode",
+        "cardinality": "one"
+      }
+    ],
+    "cases": [
+      {
+        "id": "preserve-spaces",
+        "input": " K ",
+        "accepted": true,
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "coordinates": [
+          3,
+          3,
+          3
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {
+            "value": "_K_"
+          }
+        },
+        "eval": 1,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": " K ",
+            "span": [
+              0,
+              3
+            ],
+            "utf16": [
+              0,
+              3
+            ],
+            "utf8": [
+              0,
+              3
+            ]
+          }
+        ]
+      }
+    ],
+    "enumRules": [
+      "Mode"
+    ]
+  },
+  {
+    "name": "EnumSkippedAlias",
+    "grammar": "grammar EnumSkippedAlias { @package: enumprobe @whitespace: none @enum Mode ::= 'sync'|'auto'; @skip Alias ::= Mode; @root @mapping(Value,params=[value]) Root ::= Alias @value; }",
+    "rootMapping": "Value",
+    "enumRules": [
+      "Mode"
+    ],
+    "fields": [
+      {
+        "name": "value",
+        "type": "text",
+        "cardinality": "one"
+      }
+    ],
+    "cases": [
+      {
+        "id": "skip-projects-text",
+        "input": "sync",
+        "accepted": true,
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "coordinates": [
+          4,
+          4,
+          4
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {
+            "value": "sync"
+          }
+        },
+        "eval": 4,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "sync",
+            "span": [
+              0,
+              4
+            ],
+            "utf16": [
+              0,
+              4
+            ],
+            "utf8": [
+              0,
+              4
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "EnumUnicodeMany",
+    "grammar": "grammar EnumUnicodeMany { @package: enumprobe @whitespace: none @enum Mode ::= '𐐨'|'日本'; @root @mapping(Value,params=[value]) Root ::= '[' {Mode} @value ']'; }",
+    "rootMapping": "Value",
+    "enumRules": [
+      "Mode"
+    ],
+    "fields": [
+      {
+        "name": "value",
+        "enum": "Mode",
+        "cardinality": "many"
+      }
+    ],
+    "cases": [
+      {
+        "id": "nonzero-unicode-boundaries",
+        "input": "[𐐨日本𐐨]",
+        "accepted": true,
+        "prefix": [
+          true,
+          6,
+          6
+        ],
+        "coordinates": [
+          6,
+          8,
+          16
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            6
+          ],
+          "fields": {
+            "value": [
+              "U10428_",
+              "U65E5__U672C_",
+              "U10428_"
+            ]
+          }
+        },
+        "eval": 4,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "𐐨",
+            "span": [
+              1,
+              2
+            ],
+            "utf16": [
+              1,
+              3
+            ],
+            "utf8": [
+              1,
+              5
+            ]
+          },
+          {
+            "rule": "Mode",
+            "text": "日本",
+            "span": [
+              2,
+              4
+            ],
+            "utf16": [
+              3,
+              5
+            ],
+            "utf8": [
+              5,
+              11
+            ]
+          },
+          {
+            "rule": "Mode",
+            "text": "𐐨",
+            "span": [
+              4,
+              5
+            ],
+            "utf16": [
+              5,
+              7
+            ],
+            "utf8": [
+              11,
+              15
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "EnumHelperMany",
+    "grammar": "grammar EnumHelperMany { @package: enumprobe @whitespace: none @enum Mode ::= 'sync'|'auto'; Pair ::= Mode ':' Mode; @root @mapping(Value,params=[value]) Root ::= Pair @value; }",
+    "rootMapping": "Value",
+    "enumRules": [
+      "Mode"
+    ],
+    "fields": [
+      {
+        "name": "value",
+        "enum": "Mode",
+        "cardinality": "many"
+      }
+    ],
+    "cases": [
+      {
+        "id": "helper-values",
+        "input": "sync:auto",
+        "accepted": true,
+        "prefix": [
+          true,
+          9,
+          9
+        ],
+        "coordinates": [
+          9,
+          9,
+          9
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            9
+          ],
+          "fields": {
+            "value": [
+              "SYNC",
+              "AUTO"
+            ]
+          }
+        },
+        "eval": 3,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "sync",
+            "span": [
+              0,
+              4
+            ],
+            "utf16": [
+              0,
+              4
+            ],
+            "utf8": [
+              0,
+              4
+            ]
+          },
+          {
+            "rule": "Mode",
+            "text": "auto",
+            "span": [
+              5,
+              9
+            ],
+            "utf16": [
+              5,
+              9
+            ],
+            "utf8": [
+              5,
+              9
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "EnumBareMany",
+    "grammar": "grammar EnumBareMany { @package: enumprobe @whitespace: none @enum Mode ::= 'sync'|'auto'; @root @mapping(Value,params=[value]) Root ::= {Mode} @value; }",
+    "rootMapping": "Value",
+    "enumRules": [
+      "Mode"
+    ],
+    "fields": [
+      {
+        "name": "value",
+        "enum": "Mode",
+        "cardinality": "many"
+      }
+    ],
+    "cases": [
+      {
+        "id": "empty-root",
+        "input": "",
+        "accepted": true,
+        "prefix": [
+          true,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            0
+          ],
+          "fields": {
+            "value": []
+          }
+        },
+        "eval": 0,
+        "enums": []
+      },
+      {
+        "id": "many-root",
+        "input": "syncauto",
+        "accepted": true,
+        "prefix": [
+          true,
+          8,
+          8
+        ],
+        "coordinates": [
+          8,
+          8,
+          8
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            8
+          ],
+          "fields": {
+            "value": [
+              "SYNC",
+              "AUTO"
+            ]
+          }
+        },
+        "eval": 3,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "sync",
+            "span": [
+              0,
+              4
+            ],
+            "utf16": [
+              0,
+              4
+            ],
+            "utf8": [
+              0,
+              4
+            ]
+          },
+          {
+            "rule": "Mode",
+            "text": "auto",
+            "span": [
+              4,
+              8
+            ],
+            "utf16": [
+              4,
+              8
+            ],
+            "utf8": [
+              4,
+              8
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "EnumWhitespace",
+    "grammar": "grammar EnumWhitespace { @package: enumprobe @whitespace: javaStyle @enum Mode ::= 'sync'|'auto'; @root @mapping(Value,params=[value]) Root ::= Mode @value; }",
+    "rootMapping": "Value",
+    "enumRules": [
+      "Mode"
+    ],
+    "fields": [
+      {
+        "name": "value",
+        "enum": "Mode",
+        "cardinality": "one"
+      }
+    ],
+    "cases": [
+      {
+        "id": "trivia-boundaries",
+        "input": " sync ",
+        "accepted": true,
+        "prefix": [
+          true,
+          6,
+          6
+        ],
+        "coordinates": [
+          6,
+          6,
+          6
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            6
+          ],
+          "fields": {
+            "value": "SYNC"
+          }
+        },
+        "eval": 1,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "sync",
+            "span": [
+              1,
+              5
+            ],
+            "utf16": [
+              1,
+              5
+            ],
+            "utf8": [
+              1,
+              5
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "EnumDelimitedRoot",
+    "grammar": "grammar EnumDelimitedRoot { @package: enumprobe @whitespace: none @enum Mode ::= 'sync'|'auto'; @root Root ::= '(' Mode ')'; }",
+    "rootMapping": "ModeNode",
+    "enumRules": [
+      "Mode"
+    ],
+    "fields": [
+      {
+        "name": "value",
+        "enum": "Mode",
+        "cardinality": "one"
+      }
+    ],
+    "cases": [
+      {
+        "id": "inner-root-span",
+        "input": "(sync)",
+        "accepted": true,
+        "prefix": [
+          true,
+          6,
+          6
+        ],
+        "coordinates": [
+          6,
+          6,
+          6
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "ModeNode",
+          "span": [
+            1,
+            5
+          ],
+          "fields": {
+            "value": "SYNC"
+          }
+        },
+        "eval": 1,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "sync",
+            "span": [
+              1,
+              5
+            ],
+            "utf16": [
+              1,
+              5
+            ],
+            "utf8": [
+              1,
+              5
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "ExceptionName",
+    "grammar": "grammar ExceptionName { @package: enumprobe @whitespace: none @enum IllegalArgumentException ::= 'sync' | 'auto'; @root @mapping(Foo_Bar,params=[value]) Root ::= IllegalArgumentException @value; }",
+    "rootMapping": "Foo_Bar",
+    "fields": [
+      {
+        "name": "value",
+        "enum": "IllegalArgumentException",
+        "cardinality": "one"
+      }
+    ],
+    "cases": [
+      {
+        "id": "sync",
+        "input": "sync",
+        "accepted": true,
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "coordinates": [
+          4,
+          4,
+          4
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Foo_Bar",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {
+            "value": "SYNC"
+          }
+        },
+        "eval": 1,
+        "enums": [
+          {
+            "rule": "IllegalArgumentException",
+            "text": "sync",
+            "span": [
+              0,
+              4
+            ],
+            "utf16": [
+              0,
+              4
+            ],
+            "utf8": [
+              0,
+              4
+            ]
+          }
+        ]
+      },
+      {
+        "id": "auto",
+        "input": "auto",
+        "accepted": true,
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "coordinates": [
+          4,
+          4,
+          4
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Foo_Bar",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {
+            "value": "AUTO"
+          }
+        },
+        "eval": 2,
+        "enums": [
+          {
+            "rule": "IllegalArgumentException",
+            "text": "auto",
+            "span": [
+              0,
+              4
+            ],
+            "utf16": [
+              0,
+              4
+            ],
+            "utf8": [
+              0,
+              4
+            ]
+          }
+        ]
+      },
+      {
+        "id": "empty",
+        "input": "",
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        },
+        "ast": null,
+        "eval": null,
+        "enums": []
+      },
+      {
+        "id": "bad",
+        "input": "bad",
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        },
+        "ast": null,
+        "eval": null,
+        "enums": []
+      },
+      {
+        "id": "trailing",
+        "input": "sync!",
+        "accepted": false,
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "coordinates": [
+          4,
+          4,
+          4
+        ],
+        "diagnostic": {
+          "kind": "trailing_input",
+          "offset": 4
+        },
+        "ast": null,
+        "eval": null,
+        "enums": []
+      }
+    ],
+    "enumRules": [
+      "IllegalArgumentException"
+    ]
+  },
+  {
+    "name": "IgnoredMapping",
+    "grammar": "grammar IgnoredMapping { @package: enumprobe @whitespace: none @enum @mapping(FooBar) Mode ::= 'sync' | 'auto'; @root @mapping(Foo_Bar,params=[value]) Root ::= Mode @value; }",
+    "rootMapping": "Foo_Bar",
+    "fields": [
+      {
+        "name": "value",
+        "enum": "Mode",
+        "cardinality": "one"
+      }
+    ],
+    "cases": [
+      {
+        "id": "sync",
+        "input": "sync",
+        "accepted": true,
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "coordinates": [
+          4,
+          4,
+          4
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Foo_Bar",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {
+            "value": "SYNC"
+          }
+        },
+        "eval": 1,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "sync",
+            "span": [
+              0,
+              4
+            ],
+            "utf16": [
+              0,
+              4
+            ],
+            "utf8": [
+              0,
+              4
+            ]
+          }
+        ]
+      },
+      {
+        "id": "auto",
+        "input": "auto",
+        "accepted": true,
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "coordinates": [
+          4,
+          4,
+          4
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Foo_Bar",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {
+            "value": "AUTO"
+          }
+        },
+        "eval": 2,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "auto",
+            "span": [
+              0,
+              4
+            ],
+            "utf16": [
+              0,
+              4
+            ],
+            "utf8": [
+              0,
+              4
+            ]
+          }
+        ]
+      },
+      {
+        "id": "empty",
+        "input": "",
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        },
+        "ast": null,
+        "eval": null,
+        "enums": []
+      },
+      {
+        "id": "bad",
+        "input": "bad",
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        },
+        "ast": null,
+        "eval": null,
+        "enums": []
+      },
+      {
+        "id": "trailing",
+        "input": "sync!",
+        "accepted": false,
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "coordinates": [
+          4,
+          4,
+          4
+        ],
+        "diagnostic": {
+          "kind": "trailing_input",
+          "offset": 4
+        },
+        "ast": null,
+        "eval": null,
+        "enums": []
+      }
+    ],
+    "enumRules": [
+      "Mode"
+    ]
+  },
+  {
+    "name": "IgnoredQualifiedMapping",
+    "grammar": "grammar IgnoredQualifiedMapping { @package: enumprobe @whitespace: none @enum @mapping(Outer.Inner) Mode ::= 'sync' | 'auto'; @root @mapping(Foo_Bar,params=[value]) Root ::= Mode @value; }",
+    "rootMapping": "Foo_Bar",
+    "fields": [
+      {
+        "name": "value",
+        "enum": "Mode",
+        "cardinality": "one"
+      }
+    ],
+    "cases": [
+      {
+        "id": "sync",
+        "input": "sync",
+        "accepted": true,
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "coordinates": [
+          4,
+          4,
+          4
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Foo_Bar",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {
+            "value": "SYNC"
+          }
+        },
+        "eval": 1,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "sync",
+            "span": [
+              0,
+              4
+            ],
+            "utf16": [
+              0,
+              4
+            ],
+            "utf8": [
+              0,
+              4
+            ]
+          }
+        ]
+      },
+      {
+        "id": "auto",
+        "input": "auto",
+        "accepted": true,
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "coordinates": [
+          4,
+          4,
+          4
+        ],
+        "diagnostic": null,
+        "ast": {
+          "type": "Foo_Bar",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {
+            "value": "AUTO"
+          }
+        },
+        "eval": 2,
+        "enums": [
+          {
+            "rule": "Mode",
+            "text": "auto",
+            "span": [
+              0,
+              4
+            ],
+            "utf16": [
+              0,
+              4
+            ],
+            "utf8": [
+              0,
+              4
+            ]
+          }
+        ]
+      },
+      {
+        "id": "empty",
+        "input": "",
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        },
+        "ast": null,
+        "eval": null,
+        "enums": []
+      },
+      {
+        "id": "bad",
+        "input": "bad",
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "coordinates": [
+          0,
+          0,
+          0
+        ],
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 0
+        },
+        "ast": null,
+        "eval": null,
+        "enums": []
+      },
+      {
+        "id": "trailing",
+        "input": "sync!",
+        "accepted": false,
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "coordinates": [
+          4,
+          4,
+          4
+        ],
+        "diagnostic": {
+          "kind": "trailing_input",
+          "offset": 4
+        },
+        "ast": null,
+        "eval": null,
+        "enums": []
+      }
+    ],
+    "enumRules": [
+      "Mode"
+    ]
+  }
+]
