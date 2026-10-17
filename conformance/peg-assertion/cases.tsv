@@ -1,0 +1,23 @@
+# id	input	prefix	peek	child	positive	suffix	accepted	consumed	matched	javaOffset	rustOffset	hasExpected
+positive	ab	~	~	ab	true	~	true	0	0	0	0	false
+positive-consume	ab	~	~	ab	true	ab	true	2	2	2	0	false
+positive-suffix-failure	ab	~	~	ab	true	Z	false	0	0	0	0	true
+negative-failure	ab	~	~	ab	false	~	false	0	0	0	0	true
+negative-success	ab	~	~	Z	false	~	true	0	0	0	0	false
+positive-child-failure	ab	~	~	failure	true	~	false	0	0	2	2	true
+negative-child-failure	ab	~	~	failure	false	~	true	0	0	0	0	false
+positive-hints-discarded	ab	~	~	hint	true	~	true	0	0	0	0	false
+positive-hints-suffix	ab	~	~	hint	true	Z	false	0	0	0	0	true
+negative-hints-retained	ab	~	~	hint	false	~	false	0	0	2	2	true
+nested-positive	ab	~	~	nested	true	~	false	0	0	0	0	true
+nested-negative	ab	~	~	nested	false	~	true	0	0	0	0	false
+empty-positive	~	~	~	~	true	~	true	0	0	0	0	false
+empty-negative	~	~	~	~	false	~	false	0	0	0	0	true
+empty-word	~	~	~	ab	true	~	false	0	0	0	0	true
+unicode-prefix	😀P:ab;	😀P:	~	ab	true	~	true	3	3	3	0	false
+unicode-child-failure	😀P:ab;	😀P:	~	failure	true	~	false	3	3	5	5	true
+crlf-prefix	😀\r\nab;	😀\r\n	~	ab	true	~	true	3	3	3	0	false
+unicode-body	P:😀\r\n界;	P:	~	😀\r\n界	true	~	true	2	2	2	0	false
+matched-ahead	ab	~	a	ab	true	~	true	0	1	1	0	false
+matched-ahead-failure	ab	~	a	ab	true	Z	false	0	1	1	0	true
+matched-negative-failure	ab	~	a	ab	false	~	false	0	1	1	0	true

@@ -23,11 +23,18 @@ public class LSPProfileInitializationTest {
         files.add(source("profile.fixture.Server", """
             package profile.fixture;
             public final class Server extends Java21LanguageServer {
+                public int failureMode;
                 @Override protected void configureAdditionalCapabilities(org.eclipse.lsp4j.ServerCapabilities caps) {
+                    if (failureMode == 1) throw new IllegalStateException("configuration hook failed");
+                    caps.getSemanticTokensProvider().setLegend(new org.eclipse.lsp4j.SemanticTokensLegend(
+                        failureMode == 2 ? java.util.Arrays.asList("valid", null) : java.util.List.of("valid", "invalid"), java.util.List.of("declaration")));
                     caps.setDefinitionProvider(true); caps.setRenameProvider(true);
                     caps.setDocumentFormattingProvider(true); caps.setCodeActionProvider(true);
                     caps.setExecuteCommandProvider(new org.eclipse.lsp4j.ExecuteCommandOptions(java.util.List.of("arbitrary")));
                     caps.setExperimental(java.util.Map.of("existing", "preserved"));
+                }
+                @Override protected int[] additionalSemanticTokenData(String uri, String content) {
+                    return new int[]{0,0,9,1,1,0,1,1,0,0};
                 }
             }
             """));
@@ -44,7 +51,7 @@ public class LSPProfileInitializationTest {
             String profile = Files.readString(Path.of("../language-profiles/java/profile.tsv"));
             var params = new InitializeParams();
             params.setInitializationOptions(Map.of("languageProfile", Map.of("tsv", profile, "entry", "CompilationUnit")));
-            var selected = server.initialize(params).join().getCapabilities();
+            var selected = configure(serverClass, server, params).join().getCapabilities();
             assertNull(selected.getExecuteCommandProvider()); assertNull(selected.getCompletionProvider()); assertEquals(Boolean.FALSE, selected.getHoverProvider().getLeft());
             assertEquals(Boolean.FALSE, selected.getDefinitionProvider().getLeft()); assertEquals(Boolean.FALSE, selected.getRenameProvider().getLeft());
             assertEquals(Boolean.FALSE, selected.getDocumentFormattingProvider().getLeft()); assertEquals(Boolean.FALSE, selected.getCodeActionProvider().getLeft());
@@ -62,7 +69,7 @@ public class LSPProfileInitializationTest {
                     Map.of("tsv", profile, "entry", "CompilationUnit", "path", "/unused"),
                     Map.of("tsv", 7, "entry", "CompilationUnit"), "bad")) {
                 params.setInitializationOptions(Map.of("languageProfile", invalid));
-                CompletionException failure = assertThrows(CompletionException.class, () -> server.initialize(params).join());
+                CompletionException failure = assertThrows(CompletionException.class, () -> configure(serverClass, server, params).join());
                 var protocol = (org.eclipse.lsp4j.jsonrpc.ResponseErrorException) failure.getCause();
                 assertEquals(-32602, protocol.getResponseError().getCode());
                 assertEquals(selection, serverClass.getMethod("languageProfile").invoke(server));
@@ -70,12 +77,35 @@ public class LSPProfileInitializationTest {
             // Gson JsonObject is the production JSON-RPC representation; SUPPORTED/PARTIAL may retain existing capability.
             String local = profile.replace("COMPLETION\tUNSUPPORTED", "COMPLETION\tPARTIAL");
             params.setInitializationOptions(new com.google.gson.Gson().toJsonTree(Map.of("languageProfile", Map.of("tsv", local, "entry", "CompilationUnit"))));
-            var localCaps = server.initialize(params).join().getCapabilities(); assertNotNull(localCaps.getCompletionProvider());
+            var localCaps = configure(serverClass, server, params).join().getCapabilities(); assertNotNull(localCaps.getCompletionProvider());
             CompletionParams completion = new CompletionParams(new TextDocumentIdentifier("file:///unicode"), new Position(0, 0));
             assertFalse(server.getTextDocumentService().completion(completion).join().getLeft().isEmpty());
             // Explicit profile selection does not change the parser's CP/UTF-16 conversion.
             var parse = serverClass.getMethod("parseDocument", String.class, String.class).invoke(server, "file:///unicode", "hello😀");
             assertEquals(Boolean.TRUE, parse.getClass().getMethod("succeeded").invoke(parse));
+            // Fail after profile selection and after client flags change, not just during validation.
+            var semantic = new SemanticTokensCapabilities();
+            semantic.setMultilineTokenSupport(true); semantic.setOverlappingTokenSupport(true);
+            var textCapabilities = new TextDocumentClientCapabilities(); textCapabilities.setSemanticTokens(semantic);
+            var clientCapabilities = new ClientCapabilities(); clientCapabilities.setTextDocument(textCapabilities);
+            params.setCapabilities(clientCapabilities);
+            configure(serverClass, server, params).join();
+            Object goodSelection = serverClass.getMethod("languageProfile").invoke(server);
+            serverClass.getMethod("parseDocument", String.class, String.class).invoke(server, "file:///unicode", "hello\r\n😀");
+            var tokens = new SemanticTokensParams(new TextDocumentIdentifier("file:///unicode"));
+            var expectedTokens = List.of(0,0,9,1,1,0,1,1,0,0);
+            assertEquals(expectedTokens, server.getTextDocumentService().semanticTokensFull(tokens).join().getData());
+            var invalidConstruction = new InitializeParams();
+            invalidConstruction.setInitializationOptions(Map.of("languageProfile", Map.of("tsv", profile, "entry", "CompilationUnit")));
+            for (int mode : List.of(1, 2)) {
+                serverClass.getField("failureMode").setInt(server, mode);
+                assertThrows(CompletionException.class, () -> configure(serverClass, server, invalidConstruction).join());
+                assertEquals(goodSelection, serverClass.getMethod("languageProfile").invoke(server));
+                assertFalse(server.getTextDocumentService().completion(completion).join().getLeft().isEmpty());
+                assertEquals(expectedTokens, server.getTextDocumentService().semanticTokensFull(tokens).join().getData());
+            }
+            serverClass.getField("failureMode").setInt(server, 0);
+            configure(serverClass, server, params).join();
         }
     }
     private JavaFileObject source(String name, String text) {
@@ -83,4 +113,11 @@ public class LSPProfileInitializationTest {
             @Override public CharSequence getCharContent(boolean ignored) { return text; }
         };
     }
+    @SuppressWarnings("unchecked")
+    private static java.util.concurrent.CompletableFuture<org.eclipse.lsp4j.InitializeResult> configure(
+            Class<?> type, Object server, org.eclipse.lsp4j.InitializeParams params) throws Exception {
+        return (java.util.concurrent.CompletableFuture<org.eclipse.lsp4j.InitializeResult>)
+            type.getMethod("configure", org.eclipse.lsp4j.InitializeParams.class).invoke(server, params);
+    }
+
 }

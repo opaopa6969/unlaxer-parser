@@ -43,6 +43,12 @@ public final class RustApiSchema {
             methods.add(new Method(method, "Self::Output", parameters, true, origins,
                 ApiImpact.location("evaluator.rs", evaluator, methodStart, evaluator.indexOf('\n', methodStart))));
         }
+        for(var rule:ir.rules()) if(!rule.enumLiterals().isEmpty()) {
+            int start=requireIndex(ast,"pub enum "+rule.name()+" {",0);
+            var variants=rule.enumLiterals().stream().map(org.unlaxer.dsl.codegen.EnumSchema::constantName).sorted().toList();
+            nodes.add(new Node(rule.name(),"enum",List.of(),List.of(),variants,ApiImpact.origins(source,rule.name()),
+                ApiImpact.location("ast.rs",ast,start,ast.indexOf('\n',start))));
+        }
         return new Snapshot(grammar.name(), "Ast", "Semantics", nodes, methods);
     }
     private static int requireIndex(String source, String declaration, int from) {
