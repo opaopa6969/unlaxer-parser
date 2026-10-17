@@ -18,7 +18,6 @@ public final class CommonFieldSchema {
     }
 
     public static List<Family> build(GrammarDecl grammar) {
-        if (!enabled(grammar)) return List.of();
         var result = new ArrayList<Family>();
         var normalized = new HashMap<String, String>();
         for (var candidate : grammar.rules()) {
@@ -31,6 +30,9 @@ public final class CommonFieldSchema {
                     throw invalid(candidate, "normalized mapping name collision");
             }
         }
+        // Validate transparent families even when no common accessor is requested.
+        for (var rule : grammar.rules())
+            if (isSum(grammar, rule)) collect(grammar, rule, new HashSet<>(), new LinkedHashMap<>());
         var names = new HashSet<String>();
         for (var rule : grammar.rules()) {
             var requested =

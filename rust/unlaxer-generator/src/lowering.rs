@@ -121,6 +121,7 @@ pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
     }
     .run()?;
     crate::numeric_fields::refine(grammar, &mut ir);
+    crate::associative_spines::refine(grammar, &mut ir)?;
     crate::evaluation::apply(grammar, &ir, String::new())?;
     Ok(ir)
 }
@@ -665,10 +666,7 @@ impl Lowering<'_> {
             self.catalogs.push(catalog);
             self.enums.push(enum_literals(rule)?);
             self.mappings.push(
-                if self.enums[i].is_empty()
-                    && !(crate::common_fields::enabled(self.grammar)
-                        && crate::common_fields::is_sum(self.grammar, rule))
-                {
+                if self.enums[i].is_empty() && !crate::common_fields::is_sum(self.grammar, rule) {
                     mapping
                 } else {
                     None
