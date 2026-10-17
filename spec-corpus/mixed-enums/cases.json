@@ -1,0 +1,269 @@
+[
+  {
+    "input": ":",
+    "head": null,
+    "values": []
+  },
+  {
+    "input": "sync:",
+    "head": [
+      "enum",
+      "Mode",
+      "sync",
+      0,
+      4
+    ],
+    "values": []
+  },
+  {
+    "input": "hot:",
+    "head": [
+      "enum",
+      "Heat",
+      "hot",
+      0,
+      3
+    ],
+    "values": []
+  },
+  {
+    "input": "text:",
+    "head": [
+      "text",
+      "text",
+      0,
+      4
+    ],
+    "values": []
+  },
+  {
+    "input": "<node>:",
+    "head": [
+      "node",
+      "Leaf",
+      "node",
+      0,
+      6
+    ],
+    "values": []
+  },
+  {
+    "input": ":syncsync",
+    "head": null,
+    "values": [
+      [
+        "enum",
+        "Mode",
+        "sync",
+        1,
+        5
+      ],
+      [
+        "enum",
+        "Mode",
+        "sync",
+        5,
+        9
+      ]
+    ]
+  },
+  {
+    "input": "auto:hottext<node>😀cold",
+    "head": [
+      "enum",
+      "Mode",
+      "auto",
+      0,
+      4
+    ],
+    "values": [
+      [
+        "enum",
+        "Heat",
+        "hot",
+        5,
+        8
+      ],
+      [
+        "text",
+        "text",
+        8,
+        12
+      ],
+      [
+        "node",
+        "Leaf",
+        "node",
+        12,
+        18
+      ],
+      [
+        "enum",
+        "Mode",
+        "😀",
+        18,
+        19
+      ],
+      [
+        "enum",
+        "Heat",
+        "cold",
+        19,
+        23
+      ]
+    ]
+  },
+  {
+    "input": "👨‍👩‍👧‍👦:😀👨‍👩‍👧‍👦",
+    "head": [
+      "enum",
+      "Mode",
+      "👨‍👩‍👧‍👦",
+      0,
+      7
+    ],
+    "values": [
+      [
+        "enum",
+        "Mode",
+        "😀",
+        8,
+        9
+      ],
+      [
+        "enum",
+        "Mode",
+        "👨‍👩‍👧‍👦",
+        9,
+        16
+      ]
+    ]
+  },
+  {
+    "input": "unknown:",
+    "failure": true
+  },
+  {
+    "input": ":sync?",
+    "failure": true
+  },
+  {
+    "input": "sync",
+    "failure": true
+  },
+  {
+    "input": "auto:synctext",
+    "head": [
+      "enum",
+      "Mode",
+      "auto",
+      0,
+      4
+    ],
+    "values": [
+      [
+        "enum",
+        "Mode",
+        "sync",
+        5,
+        9
+      ],
+      [
+        "text",
+        "text",
+        9,
+        13
+      ]
+    ]
+  },
+  {
+    "input": "<node>:sync<node>",
+    "head": [
+      "node",
+      "Leaf",
+      "node",
+      0,
+      6
+    ],
+    "values": [
+      [
+        "enum",
+        "Mode",
+        "sync",
+        7,
+        11
+      ],
+      [
+        "node",
+        "Leaf",
+        "node",
+        11,
+        17
+      ]
+    ]
+  },
+  {
+    "input": "hot:coldsync",
+    "head": [
+      "enum",
+      "Heat",
+      "hot",
+      0,
+      3
+    ],
+    "values": [
+      [
+        "enum",
+        "Heat",
+        "cold",
+        4,
+        8
+      ],
+      [
+        "enum",
+        "Mode",
+        "sync",
+        8,
+        12
+      ]
+    ]
+  },
+  {
+    "input": ":😀text",
+    "head": null,
+    "values": [
+      [
+        "enum",
+        "Mode",
+        "😀",
+        1,
+        2
+      ],
+      [
+        "text",
+        "text",
+        2,
+        6
+      ]
+    ]
+  },
+  {
+    "input": "a\r\nb:a\r\nb",
+    "head": [
+      "enum",
+      "Mode",
+      "a\r\nb",
+      0,
+      4
+    ],
+    "values": [
+      [
+        "enum",
+        "Mode",
+        "a\r\nb",
+        5,
+        9
+      ]
+    ]
+  }
+]
