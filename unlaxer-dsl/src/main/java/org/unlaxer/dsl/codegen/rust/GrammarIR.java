@@ -6,10 +6,18 @@ import java.util.List;
 public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     public GrammarIR { rules = List.copyOf(rules); }
     /** Skip hides an entire AST projection, never the parser/CST or its state effects. */
-    public record Rule(String name, Expression body, Mapping mapping, Operator operator, Catalog catalog, boolean skip, List<String> documentation) {
+    public record Rule(String name, Expression body, Mapping mapping, Operator operator, Catalog catalog, boolean skip, List<String> documentation, List<String> enumLiterals, List<TypeConstraint> typeConstraints) {
         public Rule {
             documentation = List.copyOf(documentation);
+            enumLiterals = List.copyOf(enumLiterals);
+            typeConstraints = List.copyOf(typeConstraints);
             if (skip && mapping != null) throw new IllegalArgumentException("skipped rule has mapping: " + name);
+        }
+        public Rule(String name, Expression body, Mapping mapping, Operator operator, Catalog catalog, boolean skip, List<String> documentation, List<String> enumLiterals) {
+            this(name, body, mapping, operator, catalog, skip, documentation, enumLiterals, List.of());
+        }
+        public Rule(String name, Expression body, Mapping mapping, Operator operator, Catalog catalog, boolean skip, List<String> documentation) {
+            this(name,body,mapping,operator,catalog,skip,documentation,List.of());
         }
         public Rule(String name, Expression body, Mapping mapping, Operator operator, Catalog catalog, boolean skip) {
             this(name, body, mapping, operator, catalog, skip, List.of());
@@ -18,6 +26,7 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
             this(name, body, mapping, operator, catalog, false);
         }
     }
+    public record TypeConstraint(Field capture, Field reference) {}
     public record Catalog(String context, List<String> captures) {
         public Catalog { captures = List.copyOf(captures); }
     }
@@ -30,8 +39,10 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     public record Mapping(String name, List<Field> fields) {
         public Mapping { fields = List.copyOf(fields); }
     }
-    public record Field(String name, Kind kind, Cardinality cardinality) {}
-    public enum Kind { TEXT, NODE, VALUE }
+    public record Field(String name, Kind kind, Cardinality cardinality, String enumName) {
+        public Field(String name, Kind kind, Cardinality cardinality) { this(name,kind,cardinality,null); }
+    }
+    public enum Kind { TEXT, NODE, VALUE, ENUM, INTEGER }
     public enum Cardinality { ONE, OPTIONAL, MANY }
     public enum ScopeMode { LEXICAL, DYNAMIC }
     public record Declaration(String symbolCapture, String description) {}
