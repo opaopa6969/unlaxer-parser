@@ -1,5 +1,6 @@
 grammar Tokens {
   @import json from 'json.ubnf'
+  @ubnf: v2
   @package: org.example.tokens
   @comment: { line: '//' blockOpen: '/*' blockClose: '*/' }
   token N = org.unlaxer.parser.elementary.NumberParser
@@ -12,7 +13,7 @@ grammar Tokens {
   token Z = EMPTY
   token R = CHAR_RANGE('a','z')
   token C = CI('select')
-  token RE = REGEX('\d+\\.\d+')
+  token RE ::= CHAR_RANGE('0','9')+ '.' CHAR_RANGE('0','9')+;
   @root Root ::= json.Value N U X L NL A E Z R C RE;
 }
 grammar Second { Rule ::= '😀\n\t\r\'\\\q'; }

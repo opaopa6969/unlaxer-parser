@@ -13,6 +13,7 @@ pub mod editor_queries;
 pub mod embedded;
 mod first;
 pub mod grapheme;
+pub mod incremental;
 pub mod language_profile;
 pub mod language_queries;
 pub mod lexical;
