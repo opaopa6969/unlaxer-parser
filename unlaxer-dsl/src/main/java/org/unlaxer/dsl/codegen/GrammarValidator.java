@@ -1164,31 +1164,9 @@ public final class GrammarValidator {
     }
 
     private static void validateEnumRules(GrammarDecl grammar, List<ValidationIssue> errors) {
-        for (RuleDecl rule : grammar.rules()) {
-            boolean isEnum = rule.annotations().stream()
-                .anyMatch(a -> a instanceof UBNFAST.EnumAnnotation);
-            if (!isEnum) {
-                continue;
-            }
-            // @enum ルールは Choice+Terminal のみ許容
-            final boolean allTerminals;
-            var switchSubject2 = rule.body();
-            if (switchSubject2 instanceof UBNFAST.ChoiceBody choice) {
-                allTerminals = choice.alternatives().stream()
-                    .allMatch(seq -> seq.elements().size() == 1
-                        && seq.elements().get(0).element() instanceof UBNFAST.TerminalElement);
-            } else if (switchSubject2 instanceof UBNFAST.SequenceBody seq) {
-                allTerminals = seq.elements().size() == 1
-                    && seq.elements().get(0).element() instanceof UBNFAST.TerminalElement;
-            } else {
-                throw new IllegalStateException("unhandled " + switchSubject2);
-            }
-            if (!allTerminals) {
-                addRuleError(errors, rule.name(),
-                    "@enum rule " + rule.name() + " must consist only of terminal literals (e.g. 'a' | 'b')",
-                    "Use only quoted string literals as alternatives in an @enum rule.",
-                    "E-ENUM-NON-TERMINAL");
-            }
+        try { EnumSchema.validate(grammar); }
+        catch (IllegalArgumentException error) {
+            addError(errors, error.getMessage(), "Use distinct nonempty literal alternatives and valid enum names.", "E-ENUM");
         }
     }
 

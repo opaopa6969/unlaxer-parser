@@ -93,7 +93,8 @@ public final class ApiImpact {
     /** All contributing source rules, including shared mappings; null selects all rules. */
     public static List<Origin> origins(UBNFSourceSnapshot snapshot, String mappingName) {
         return snapshot.ast().grammars().get(0).rules().stream()
-            .filter(rule -> mappingName == null || (!rule.annotations().stream().anyMatch(SkipAnnotation.class::isInstance)
+            .filter(rule -> mappingName == null || (org.unlaxer.dsl.codegen.EnumSchema.isEnum(rule)
+                && (rule.name().equals(mappingName) || mappingName.equals(org.unlaxer.dsl.codegen.EnumSchema.rootEnums(snapshot.ast().grammars().get(0)).get(rule.name())))) || (!rule.annotations().stream().anyMatch(SkipAnnotation.class::isInstance)
                 && rule.annotations().stream().filter(MappingAnnotation.class::isInstance)
                 .map(MappingAnnotation.class::cast).anyMatch(mapping -> mapping.className().equals(mappingName)
                     || mapping.className().startsWith(mappingName + "."))))
