@@ -17,6 +17,14 @@ public abstract class SnapshotLspLauncher {
 
     protected abstract SnapshotLanguageServer createServer();
 
+    /** Standalone entry point used by generated extension JAR manifests. */
+    public static void main(String[] args) throws Exception {
+        var launcher = new SnapshotLspLauncher() {
+            @Override protected SnapshotLanguageServer createServer() { return new SnapshotLanguageServer() {}; }
+        };
+        System.exit(launcher.launchStdio());
+    }
+
     public void launch() throws IOException {
         launch(System.in, System.out);
     }

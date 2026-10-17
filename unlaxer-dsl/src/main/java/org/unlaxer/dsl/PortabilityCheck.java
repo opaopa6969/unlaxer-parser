@@ -76,7 +76,11 @@ public final class PortabilityCheck {
                     && rule.annotations().stream().noneMatch(annotation -> annotation instanceof PrecedenceAnnotation));
             if (invalid) add(diagnostics, "P-STRUCTURE", snapshot, grammar, "Rust structural constraints");
         } catch (RuntimeException error) {
-            add(diagnostics, "P-STRUCTURE", snapshot, grammar, "Rust structural constraints");
+            var commonRule=org.unlaxer.dsl.codegen.CommonFieldSchema.errorRule(error);
+            if(commonRule.isPresent()) {
+                var origin=grammar.rules().stream().filter(r->r.name().equals(commonRule.get())).findFirst().orElseThrow();
+                add(diagnostics,"P-COMMONFIELD",snapshot,origin,"commonField schema");
+            } else add(diagnostics, "P-STRUCTURE", snapshot, grammar, "Rust structural constraints");
         }
         return diagnostics.isEmpty() ? result(true, "passed", diagnostics) : result(false, "failed", diagnostics);
     }
@@ -124,7 +128,7 @@ public final class PortabilityCheck {
             }
         }
         for (RuleDecl rule : grammar.rules()) {
-            boolean skip = rule.annotations().stream().anyMatch(SkipAnnotation.class::isInstance);
+            boolean skip = rule.annotations().stream().anyMatch(a -> a instanceof SkipAnnotation || a instanceof EnumAnnotation);
             for (Annotation annotation : rule.annotations()) {
                 if (!(skip && annotation instanceof MappingAnnotation)) scanAnnotation(grammar, annotation, snapshot, out);
             }
@@ -144,14 +148,12 @@ public final class PortabilityCheck {
 
     private static void scanAnnotation(GrammarDecl grammar, Annotation annotation, UBNFSourceSnapshot snapshot, List<Diagnostic> out) {
         String unsupported = null;
-        if (annotation instanceof EvalAnnotation) unsupported = "eval";
-        else if (annotation instanceof SimpleAnnotation simple) unsupported = simple.name();
-        else if (annotation instanceof CommonFieldAnnotation) unsupported = "commonField";
-        else if (annotation instanceof EnumAnnotation) unsupported = "enum";
+        if (annotation instanceof SimpleAnnotation simple) unsupported = simple.name();
+
         if (unsupported != null) add(out, "P-ANNOTATION", snapshot, annotation, unsupported);
 
         if (annotation instanceof MappingAnnotation mapping) {
-            if (!identifier(mapping.className())) add(out, "P-MAPPING-TYPE", snapshot, annotation, mapping.className());
+            if (!identifier(org.unlaxer.dsl.codegen.CommonFieldSchema.rustName(mapping.className()))) add(out, "P-MAPPING-TYPE", snapshot, annotation, mapping.className());
             for (String param : mapping.paramNames()) {
                 if (!identifier(param) || Set.of("span", "semantics").contains(param)) {
                     add(out, "P-FIELD-NAME", snapshot, annotation, param);
@@ -178,8 +180,6 @@ public final class PortabilityCheck {
             for (SequenceBody alternative : choice.alternatives()) scanBody(alternative, snapshot, out);
         } else if (body instanceof SequenceBody sequence) {
             for (AnnotatedElement element : sequence.elements()) {
-                element.typeofConstraint().ifPresent(typeof ->
-                    add(out, "P-TYPEOF", snapshot, typeof, typeof.captureName()));
                 scanAtomic(element.element(), snapshot, out);
             }
         }
