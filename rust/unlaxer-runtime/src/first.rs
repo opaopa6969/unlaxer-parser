@@ -183,7 +183,9 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
             .fold(FirstSet::EMPTY, |set, alternative| {
                 set.union(of(alternative, rules))
             }),
-        Expr::Capture(_, child)
+        Expr::OwnedCapture(_, child)
+        | Expr::CaptureScope(child)
+        | Expr::Capture(_, child)
         | Expr::TextValue(child)
         | Expr::ValueBoundary(child)
         | Expr::RuleEffects { child, .. }
@@ -237,13 +239,19 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
             FirstSet::NULLABLE
         }
         Expr::Error(_) => FirstSet::EMPTY,
-        Expr::NonOrdered(_)
+        Expr::Character { .. }
+        | Expr::MatchOnly(_)
+        | Expr::InvertMatch(_)
+        | Expr::StopInvert(_)
+        | Expr::StopConsume(_)
+        | Expr::NonOrdered(_)
         | Expr::Lexical(_, _)
         | Expr::Until(_)
         | Expr::JavaUntil(_)
         | Expr::Custom(_)
         | Expr::CustomWith { .. }
         | Expr::Recovery { .. }
+        | Expr::Replay(_)
         | Expr::Backreference(_)
         | Expr::NamePredicate { .. }
         | Expr::NameResolutionScope { .. } => FirstSet::UNKNOWN,

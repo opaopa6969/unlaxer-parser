@@ -1,0 +1,4 @@
+grammar CallbackCollision {
+  @root @mapping(FooBar, params=[value]) Root ::= 'x' @value;
+  @mapping(Foo_Bar, params=[value]) Other ::= 'y' @value;
+}
