@@ -62,3 +62,9 @@ See **[IMPLEMENTATION.md](IMPLEMENTATION.md)** ([日本語](IMPLEMENTATION.ja.md
 ## License
 
 MIT (or your choice — edit this section).
+
+## Rust stdio servers
+
+The extension defaults to Java. To use generated Rust servers, set `{{name}}Lsp.server.backend` to `rust` and `{{name}}Lsp.server.rustLspPath` to the native LSP executable.{{#dap}} Set `{{name}}Lsp.server.rustDapPath` to the native DAP executable for AST/token inspection.{{/dap}} Build these executables using unlaxer's `generate --target rust --lsp`{{#dap}} / `--dap`{{/dap}} and the documented Cargo runtime dependencies. The Maven build still builds the Java server.
+
+Server settings restart LSP; the **{{ClassName}}: Restart Language Server** command also retries after errors. Arguments use the `rustLspArgs`{{#dap}} / `rustDapArgs`{{/dap}} arrays without shell expansion.
