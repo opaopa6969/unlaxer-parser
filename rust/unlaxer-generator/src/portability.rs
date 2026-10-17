@@ -256,10 +256,9 @@ impl Inventory {
             }
         }
         for rule in &grammar.rules {
-            let skip = rule
-                .annotations
-                .iter()
-                .any(|annotation| matches!(annotation.kind, AnnotationKind::Skip));
+            let skip = rule.annotations.iter().any(|annotation| {
+                matches!(annotation.kind, AnnotationKind::Skip | AnnotationKind::Enum)
+            });
             for annotation in &rule.annotations {
                 if skip && matches!(annotation.kind, AnnotationKind::Mapping { .. }) {
                     continue;
@@ -316,7 +315,7 @@ impl Inventory {
             AnnotationKind::Skip => {}
             AnnotationKind::Simple { name } => self.add("P-ANNOTATION", name, span),
             AnnotationKind::CommonField { .. } => self.add("P-ANNOTATION", "commonField", span),
-            AnnotationKind::Enum => self.add("P-ANNOTATION", "enum", span),
+            AnnotationKind::Enum => {}
         }
     }
     fn body(&mut self, body: &RuleBody) {

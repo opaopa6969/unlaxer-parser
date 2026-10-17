@@ -98,6 +98,7 @@ final class SemanticCardinality {
     private Shape shape(AtomicElement element, Set<String> visiting) {
         if (element instanceof RuleRefElement ref) {
             RuleDecl rule = rules.get(ref.name());
+            if (rule != null && EnumSchema.isEnum(rule)) return new Shape(Kind.NODE,Count.ONE);
             if (rule == null || !MapperElementUtil.containsMappedValue(ref, rules)) return text();
             if (MapperElementUtil.getMappingAnnotation(rule).isPresent()) return new Shape(Kind.NODE, Count.ONE);
             if (!visiting.add(ref.name())) throw new IllegalArgumentException("Recursive unmapped semantic helper: " + ref.name());
