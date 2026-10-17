@@ -1,0 +1,150 @@
+[
+  {
+    "name": "empty",
+    "grammar": "grammar Invalid { @package: enumprobe @enum Mode ::= ''; @root @mapping(Value,params=[value]) Root ::= Mode @value; }"
+  },
+  {
+    "name": "duplicate",
+    "grammar": "grammar Invalid { @package: enumprobe @enum Mode ::= 'sync'|'sync'; @root @mapping(Value,params=[value]) Root ::= Mode @value; }"
+  },
+  {
+    "name": "name-collision",
+    "grammar": "grammar Invalid { @package: enumprobe @enum Mode ::= 'foo-bar'|'foo_bar'; @root @mapping(Value,params=[value]) Root ::= Mode @value; }"
+  },
+  {
+    "name": "numeric",
+    "grammar": "grammar Invalid { @package: enumprobe @enum Mode ::= '1'; @root @mapping(Value,params=[value]) Root ::= Mode @value; }"
+  },
+  {
+    "name": "nonliteral",
+    "grammar": "grammar Invalid { @package: enumprobe @enum Mode ::= Other; Other ::= 'sync'; @root @mapping(Value,params=[value]) Root ::= Mode @value; }"
+  },
+  {
+    "name": "sequence",
+    "grammar": "grammar Invalid { @package: enumprobe @enum Mode ::= 'a' 'b'; @root @mapping(Value,params=[value]) Root ::= Mode @value; }"
+  },
+  {
+    "name": "captured",
+    "grammar": "grammar Invalid { @package: enumprobe @enum Mode ::= 'sync' @value; @root @mapping(Value,params=[value]) Root ::= Mode @value; }"
+  },
+  {
+    "name": "duplicate-annotation",
+    "grammar": "grammar Invalid { @package: enumprobe @enum @enum Mode ::= 'sync'; @root @mapping(Value,params=[value]) Root ::= Mode @value; }"
+  },
+  {
+    "name": "type-collision",
+    "grammar": "grammar Invalid { @package: enumprobe @enum Mode ::= 'sync'; @mapping(Mode) Other ::= 'other'; @root @mapping(Value,params=[value]) Root ::= Mode @value; }"
+  },
+  {
+    "name": "wrapper-collision",
+    "grammar": "grammar Invalid { @package: enumprobe @root @enum Mode ::= 'sync'; @mapping(ModeNode) Other ::= 'other'; }"
+  },
+  {
+    "name": "enum-text",
+    "grammar": "grammar Invalid { @package: enumprobe @enum Mode ::= 'sync' | 'auto'; @root @mapping(Value,params=[value]) Root ::= (Mode|'text') @value; }"
+  },
+  {
+    "name": "enum-enum",
+    "grammar": "grammar Invalid { @package: enumprobe @enum Mode ::= 'sync' | 'auto'; @enum Other ::= 'other'; @root @mapping(Value,params=[value]) Root ::= (Mode|Other) @value; }"
+  },
+  {
+    "name": "reserved-type-record",
+    "grammar": "grammar Invalid { @package: enumprobe @enum record ::= 'x'; @root @mapping(Value,params=[value]) Root ::= record @value; }"
+  },
+  {
+    "name": "reserved-type-sealed",
+    "grammar": "grammar Invalid { @package: enumprobe @enum sealed ::= 'x'; @root @mapping(Value,params=[value]) Root ::= sealed @value; }"
+  },
+  {
+    "name": "reserved-type-permits",
+    "grammar": "grammar Invalid { @package: enumprobe @enum permits ::= 'x'; @root @mapping(Value,params=[value]) Root ::= permits @value; }"
+  },
+  {
+    "name": "reserved-type-var",
+    "grammar": "grammar Invalid { @package: enumprobe @enum var ::= 'x'; @root @mapping(Value,params=[value]) Root ::= var @value; }"
+  },
+  {
+    "name": "reserved-type-try",
+    "grammar": "grammar Invalid { @package: enumprobe @enum try ::= 'x'; @root @mapping(Value,params=[value]) Root ::= try @value; }"
+  },
+  {
+    "name": "reserved-type-box",
+    "grammar": "grammar Invalid { @package: enumprobe @enum box ::= 'x'; @root @mapping(Value,params=[value]) Root ::= box @value; }"
+  },
+  {
+    "name": "reserved-type-become",
+    "grammar": "grammar Invalid { @package: enumprobe @enum become ::= 'x'; @root @mapping(Value,params=[value]) Root ::= become @value; }"
+  },
+  {
+    "name": "reserved-type-override",
+    "grammar": "grammar Invalid { @package: enumprobe @enum override ::= 'x'; @root @mapping(Value,params=[value]) Root ::= override @value; }"
+  },
+  {
+    "name": "reserved-type-priv",
+    "grammar": "grammar Invalid { @package: enumprobe @enum priv ::= 'x'; @root @mapping(Value,params=[value]) Root ::= priv @value; }"
+  },
+  {
+    "name": "reserved-type-typeof",
+    "grammar": "grammar Invalid { @package: enumprobe @enum typeof ::= 'x'; @root @mapping(Value,params=[value]) Root ::= typeof @value; }"
+  },
+  {
+    "name": "reserved-type-unsized",
+    "grammar": "grammar Invalid { @package: enumprobe @enum unsized ::= 'x'; @root @mapping(Value,params=[value]) Root ::= unsized @value; }"
+  },
+  {
+    "name": "reserved-type-virtual",
+    "grammar": "grammar Invalid { @package: enumprobe @enum virtual ::= 'x'; @root @mapping(Value,params=[value]) Root ::= virtual @value; }"
+  },
+  {
+    "name": "reserved-type-String",
+    "grammar": "grammar Invalid { @package: enumprobe @enum String ::= 'x'; @root @mapping(Value,params=[value]) Root ::= String @value; }"
+  },
+  {
+    "name": "reserved-type-List",
+    "grammar": "grammar Invalid { @package: enumprobe @enum List ::= 'x'; @root @mapping(Value,params=[value]) Root ::= List @value; }"
+  },
+  {
+    "name": "reserved-type-Optional",
+    "grammar": "grammar Invalid { @package: enumprobe @enum Optional ::= 'x'; @root @mapping(Value,params=[value]) Root ::= Optional @value; }"
+  },
+  {
+    "name": "escaped-name-collision",
+    "grammar": "grammar Invalid { @enum Mode ::= '😀'|'U1F600_'; @root @mapping(Value,params=[value]) Root ::= Mode @value; }"
+  },
+  {
+    "name": "third-shared-mapping",
+    "grammar": "grammar Invalid { @enum Mode ::= 'sync'; @enum Other ::= 'other'; @mapping(Shared) Empty ::= 'empty'; @mapping(Shared,params=[value]) First ::= Mode @value; @root @mapping(Shared,params=[value]) Last ::= Other @value; }"
+  },
+  {
+    "name": "enclosing-ast-type-collision",
+    "grammar": "grammar Invalid { @enum InvalidAST ::= 'x'; @root @mapping(Value,params=[value]) Root ::= InvalidAST @value; }"
+  },
+  {
+    "name": "enum-mapping-parameters",
+    "grammar": "grammar Invalid { @root @enum @mapping(Mode,params=[value]) Mode ::= 'sync'; }"
+  },
+  {
+    "name": "unmapped-root-many",
+    "grammar": "grammar Invalid { @enum Mode ::= 'sync'; @root Root ::= {Mode}; }"
+  },
+  {
+    "name": "unmapped-root-optional",
+    "grammar": "grammar Invalid { @enum Mode ::= 'sync'; @root Root ::= [Mode]; }"
+  },
+  {
+    "name": "mixed-root-enums",
+    "grammar": "grammar Invalid { @enum Mode ::= 'sync'; @enum Other ::= 'other'; @root Root ::= Mode | Other; }"
+  },
+  {
+    "name": "mixed-root-node",
+    "grammar": "grammar Invalid { @enum Mode ::= 'sync'; @mapping(Item) Other ::= 'other'; @root Root ::= Mode | Other; }"
+  },
+  {
+    "name": "java-package-shadow",
+    "grammar": "grammar Invalid { @package: enumprobe @enum java ::= 'sync'; @root @mapping(Value,params=[value]) Root ::= java @value; }"
+  },
+  {
+    "name": "root-callback-collision",
+    "grammar": "grammar Invalid { @package: enumprobe @root @enum FooBar ::= 'sync'; @mapping(Foo_BarNode) Other ::= 'other'; }"
+  }
+]
