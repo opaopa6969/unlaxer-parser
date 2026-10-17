@@ -387,3 +387,78 @@ fn first_item_separator_and_tail_item_cannot_swallow_sticky_resource_abort() {
         }
     }
 }
+
+#[test]
+fn chain_failure_reset_and_outer_rollback_match_shared_oracle() {
+    let rows: Vec<_> = include_str!("../../../conformance/nullable-separation/chain-reset.tsv")
+        .lines()
+        .filter(|row| !row.starts_with('#') && !row.is_empty())
+        .collect();
+    assert_eq!(rows.len(), 24);
+    let mut report = Vec::new();
+    for (mi, memo) in [Memoization::Off, Memoization::SafeFailures]
+        .into_iter()
+        .enumerate()
+    {
+        for (di, diagnostic) in [
+            Diagnostics::Detailed,
+            Diagnostics::DetailedOnFailure,
+            Diagnostics::Auto,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            for row in &rows {
+                let cells: Vec<_> = row.split('\t').collect();
+                let parser = match cells[0] {
+                    "code-start" => Expr::CodeStart,
+                    "code-end" => Expr::CodeEnd,
+                    "capture-value" => Expr::literal("a").capture_value(),
+                    _ => panic!("unknown shared parser"),
+                };
+                let mut context = ParseContext::with_options(
+                    "?",
+                    ParseOptions::with_memoization(memo).with_diagnostics(diagnostic),
+                );
+                context.set_reset_matched_with_consumed(cells[2] == "true");
+                let rollback: Result<(), _> = context.transaction(|context| {
+                    assert!(
+                        context
+                            .parse_with_token_mode(&parser, kind(cells[1]), false)
+                            .is_err(),
+                        "{row}"
+                    );
+                    assert_eq!(
+                        context.reset_matched_with_consumed(),
+                        cells[3] == "true",
+                        "{row}"
+                    );
+                    assert_eq!(
+                        (context.position(), context.matched_position()),
+                        (0, 0),
+                        "{row}"
+                    );
+                    assert!(context.node(0).is_none(), "{row}");
+                    Err(context.error("force parent rollback"))
+                });
+                assert!(rollback.is_err());
+                assert_eq!(
+                    context.reset_matched_with_consumed(),
+                    cells[4] == "true",
+                    "{row}"
+                );
+                assert_eq!(
+                    (context.position(), context.matched_position()),
+                    (0, 0),
+                    "{row}"
+                );
+                assert!(context.node(0).is_none(), "{row}");
+                report.push(format!("{mi}\t{di}\t{row}"));
+            }
+        }
+    }
+    let output =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../target/chain-reset-rust.tsv");
+    std::fs::create_dir_all(output.parent().unwrap()).unwrap();
+    std::fs::write(output, report.join("\n") + "\n").unwrap();
+}

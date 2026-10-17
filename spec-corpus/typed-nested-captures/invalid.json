@@ -30,12 +30,6 @@
     "endCP": 127
   },
   {
-    "id": "node",
-    "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @nestedCaptures @mapping(Root, params=[value]) Root ::= A @value; @mapping(A) A ::= 'a'; }",
-    "startCP": 56,
-    "endCP": 127
-  },
-  {
     "id": "separated",
     "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @nestedCaptures @mapping(Root, params=[value]) Root ::= 'a' % ',' @value; }",
     "startCP": 56,
@@ -88,12 +82,6 @@
     "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @tokenStream: enabled @root @nestedCaptures @mapping(Root, params=[value]) Root ::= 'a' @value; }",
     "startCP": 78,
     "endCP": 151
-  },
-  {
-    "id": "enum",
-    "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @nestedCaptures @mapping(Root, params=[value]) Root ::= Mode @value; @enum Mode ::= 'a' | 'b'; }",
-    "startCP": 56,
-    "endCP": 130
   },
   {
     "id": "preparatory-depth",

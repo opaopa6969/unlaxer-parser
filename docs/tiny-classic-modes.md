@@ -45,9 +45,10 @@ return a controlled resource failure with cursors restored.
 The existing generated FQN and adapter corpus (14 grammars, 86 inputs per route)
 is rerun with the same pinned real Java classes, both Rust generator hosts,
 actual compilation, values and source positions. Generated Rust consumers also
-exercise the explicit Classic entry: prefix cursors agree for every fixture,
-and ASTs agree for grammars without outer whitespace. The outer Classic trivia
-source-map difference remains tracked separately in #606. CI's downstream job supplies
+exercise the explicit Classic entry: prefix cursors and canonical AST values,
+including source CP ranges, agree for every fixture, including grammars with
+outer whitespace. The #606 sequence delimiter fix collects those trivia sources;
+the Classic AST comparison has no outer-whitespace exemption. CI's downstream job supplies
 the pinned classes and requires the Java/native observation files.
 
 ```sh

@@ -279,7 +279,10 @@ pub(super) fn validate(ir: &GrammarIr) -> Result<(), GenerateError> {
                 if let Kind::Nested { leaf, containers } = &field.kind {
                     if field.cardinality != Cardinality::One
                         || containers.len() > 32
-                        || !matches!(**leaf, Kind::Text | Kind::Integer)
+                        || !matches!(
+                            **leaf,
+                            Kind::Text | Kind::Integer | Kind::Node | Kind::Enum(_)
+                        )
                         || containers.contains(&Cardinality::One)
                         || !rule.type_constraints.is_empty()
                         || rule.operator.is_some()
@@ -287,6 +290,11 @@ pub(super) fn validate(ir: &GrammarIr) -> Result<(), GenerateError> {
                         return Err(fail(
                             "E-NESTED-SHAPE: invalid or unsupported nested capture schema",
                         ));
+                    }
+                    if let Kind::Enum(name) = leaf.as_ref() {
+                        if !enum_names.contains(name.as_str()) {
+                            return Err(fail("E-NESTED-SHAPE: unknown nested enum type"));
+                        }
                     }
                 }
                 if let Kind::Enum(name) = &field.kind {

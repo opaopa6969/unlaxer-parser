@@ -59,6 +59,9 @@ public class NestedCaptureConformanceTest {
     protected String extraRustObservation(JsonObject fixture) { return ""; }
     protected void observeJava(JsonObject fixture, JsonObject row, GrammarDecl grammar, URLClassLoader loader, Object ast) throws Exception {}
 
+    protected void observeJavaMapped(JsonObject fixture, JsonObject row, GrammarDecl grammar, URLClassLoader loader, Object ast, Object mapped) throws Exception { observeJava(fixture,row,grammar,loader,ast); }
+    protected String canonicalType(Object ast) { return ast.getClass().getSimpleName(); }
+
     @Test public void nestedCapturesKeepCompletionOrderAndSemanticCardinality() throws Exception {
         assumeTrue("enable with -DrustConformance=true (requires rustc/cargo)",
             Boolean.getBoolean("rustConformance"));
@@ -139,7 +142,7 @@ public class NestedCaptureConformanceTest {
                         expectedValueSpans, rust.get("valueSpans"));
                     Object mapped = mapper.getMethod("parseWithSourceMap", String.class).invoke(null, input);
                     Object ast = mapped.getClass().getMethod("ast").invoke(mapped);
-                    observeJava(fixture,row,grammar,loader,ast);
+                    observeJavaMapped(fixture,row,grammar,loader,ast,mapped);
                     JsonObject javaAst = canonical(ast, mapped);
                     assertEquals(context + " Java AST contract", row.get("ast"), javaAst);
                     JsonArray javaValueSpans = javaValueSpans(fixture, ast, mapped);
@@ -195,7 +198,7 @@ public class NestedCaptureConformanceTest {
             URLClassLoader loader) throws Exception {
         var types = new JsonObject();
         for (var record : expected.entrySet()) {
-            Class<?> type = loader.loadClass(PACKAGE + "." + grammar.name() + "AST$" + record.getKey());
+            Class<?> type = loader.loadClass(PACKAGE + "." + grammar.name() + "AST$" + record.getKey().replace('.', '$'));
             var actual = new JsonObject();
             for (var component : type.getRecordComponents()) {
                 actual.addProperty(component.getName(), javaTypeName(component.getGenericType()));
@@ -265,7 +268,7 @@ public class NestedCaptureConformanceTest {
 
     private JsonObject canonical(Object ast, Object mapped) throws Exception {
         var result = new JsonObject();
-        result.addProperty("type", ast.getClass().getSimpleName());
+        result.addProperty("type", canonicalType(ast));
         int[] span = (int[]) ((Optional<?>) mapped.getClass().getMethod("sourceSpanOf", Object.class)
             .invoke(mapped, ast)).orElseThrow();
         var position = new JsonArray();
@@ -284,6 +287,7 @@ public class NestedCaptureConformanceTest {
         if (value == null) return JsonNull.INSTANCE;
         if (value instanceof String text) return new JsonPrimitive(text);
         if (value instanceof Number number) return new JsonPrimitive(number);
+        if (value instanceof Enum<?> item) return new JsonPrimitive(item.name());
         if (value instanceof Optional<?> optional) return canonicalValue(optional.orElse(null), mapped);
         if (value instanceof List<?> list) {
             var result = new JsonArray();

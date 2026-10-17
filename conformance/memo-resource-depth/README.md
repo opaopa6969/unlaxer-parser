@@ -2,8 +2,12 @@
 
 `cases.tsv` is read by Java `MemoResourceDepthTest` and Rust `memo_resource_depth`.
 Each host evaluates all 12 cases under OFF/SAFE_FAILURES and all three diagnostic
-policies (72 observations). No limit is raised and candidate exclusion keeps its
-default behavior.
+policies (72 normal observations per host). Rust additionally executes the same
+72 observations through the Classic consumed-token entry. Classic memoization is
+still disabled at this stage, so its expected actual hit count is zero; this is
+not evidence of Classic memo reuse. Normal same-depth and shallower rows require
+nonzero actual hits. Java uses its consumed-token parser entry for all rows.
+No limit is raised and candidate exclusion keeps its default behavior.
 
 The target is 64 optional wrappers around `z`, followed by EOF (success) or a
 negative EOF assertion (failure), on empty input. The assertion keeps the target
@@ -24,3 +28,15 @@ The baseline accepted `failure_limit` with memo enabled, although OFF hit the
 1024-frame guard. Both hosts now return the resource failure. Success rows cover
 the equivalent skip path. Tests use an explicit 2 MiB native thread stack to
 reach the library guard deterministically, independently of JVM/Rust defaults.
+
+Deeper retries deliberately miss even when a cached result could happen to finish
+within the remaining budget. This conservative guard can increase work and
+transaction counts; it does not change the public key ABI or successful CST.
+The checked-in parse-equality golden records those counter changes separately.
+
+The complementary `recursion_budget` tests exercise rule-depth and public-entry
+limits and optional/choice/recovery propagation. `ResourcePublicationTest` and
+Rust `resource_publication` assert the Classic resource-abort cursor, capture,
+state, CST/metadata rollback and refusal to reuse the same context. These are
+separate runtime checks, not claims that the shared memo fixture covers every
+resource boundary or that Classic memo support is complete.

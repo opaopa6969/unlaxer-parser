@@ -124,7 +124,7 @@ public class TinyCodeFenceConformanceTest {
             for (var file : javaRust) {
                 Files.writeString(javaGenerated.resolve(file.relativePath()), file.content());
             }
-            Files.writeString(fixtureDir.resolve("main.rs"), rustProbe(!fixture.has("whitespace")));
+            Files.writeString(fixtureDir.resolve("main.rs"), rustProbe());
             success(run(List.of("rustc", "--edition=2021", "--extern",
                 "unlaxer_runtime=" + runtime, fixtureDir.resolve("main.rs").toString(), "-o",
                 fixtureDir.resolve("probe").toString()), "", false));
@@ -309,7 +309,7 @@ public class TinyCodeFenceConformanceTest {
         return canonical(value, mapped);
     }
 
-    private String rustProbe(boolean compareClassicMap) {
+    private String rustProbe() {
         return """
             mod generated;
             use std::io::{self, BufRead};
@@ -331,7 +331,10 @@ public class TinyCodeFenceConformanceTest {
                     match generated::parser::parse_tree_detailed(&input) {
                         Ok(tree) => {
                             let ast = generated::mapper::map(&tree).unwrap();
-                            $CLASSIC_MAP
+                            let parsed=classic_result.as_ref().unwrap();
+                            let classic_tree=classic.tree(parsed.nodes[0]).unwrap();
+                            let classic_ast=generated::mapper::map(&classic_tree).unwrap();
+                            assert_eq!(ast.canonical_json(),classic_ast.canonical_json(),"Classic AST: {input}");
                             drop(tree);
                             print!("{}", ast.canonical_json());
                         }
@@ -340,12 +343,7 @@ public class TinyCodeFenceConformanceTest {
                     println!("}}");
                 }
             }
-            """.replace("$CLASSIC_MAP", compareClassicMap ? """
-                let parsed=classic_result.as_ref().unwrap();
-                let classic_tree=classic.tree(parsed.nodes[0]).unwrap();
-                let classic_ast=generated::mapper::map(&classic_tree).unwrap();
-                assert_eq!(ast.canonical_json(),classic_ast.canonical_json(),"Classic AST: {input}");
-                """ : "// Outer Classic trivia source mapping is tracked separately in #606.");
+            """;
     }
 
     private record ProcessResult(int code, String output) {}

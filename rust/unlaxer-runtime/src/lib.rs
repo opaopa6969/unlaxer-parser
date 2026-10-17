@@ -2878,7 +2878,13 @@ impl<'a> ParseContext<'a> {
                 if self.token_mode.is_some()
                     && matches!(
                         expression,
-                        Expr::Sequence(_) | Expr::Number | Expr::Identifier | Expr::Quoted(_)
+                        Expr::Sequence(_)
+                            | Expr::Number
+                            | Expr::Identifier
+                            | Expr::Quoted(_)
+                            | Expr::CodeStart
+                            | Expr::CodeEnd
+                            | Expr::CaptureBoundary(_, _)
                     )
                 {
                     self.match_cursor_policy.reset = false;

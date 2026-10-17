@@ -330,7 +330,7 @@ public class RustBackendTest {
         var grammar = UBNFMapper.parse("grammar LiteralMetadata { @root @mapping(Value,params=[text]) Root ::= '#preferred-depth:' % ',' @text; }").grammars().get(0);
         var parser = new RustBackend().generate(grammar).get(2).content();
         assertFalse(parser.contains("#preferred-extra:2"));
-        assertTrue(parser.contains(".separated_by("));
+        assertTrue(parser.contains(".separated_by_java("));
     }
 
     @Test public void leftAssocMetadataDoesNotRewriteTheGrammarAndInvalidShapesAreRejected() {

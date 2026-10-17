@@ -49,10 +49,15 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
         public Field(String name, Kind kind, Cardinality cardinality, String enumName) { this(name,kind,cardinality,enumName,null); }
         public Field(String name, Kind kind, Cardinality cardinality) { this(name,kind,cardinality,null); }
     }
-    public record NestedShape(Kind leaf, String enumName, List<Cardinality> containers) {
+    public record NestedShape(Kind leaf, String enumName, List<Cardinality> containers, String javaLeafType) {
+        public NestedShape(Kind leaf, String enumName, List<Cardinality> containers) { this(leaf,enumName,containers,null); }
         public NestedShape {
             containers = List.copyOf(containers);
-            if ((leaf != Kind.TEXT && leaf != Kind.INTEGER) || enumName != null || containers.size() > 32
+            boolean mapped = leaf == Kind.NODE || leaf == Kind.ENUM;
+            if ((leaf != Kind.TEXT && leaf != Kind.INTEGER && !mapped)
+                    || (leaf == Kind.ENUM ? enumName == null || enumName.isBlank() : enumName != null)
+                    || (mapped ? javaLeafType == null || javaLeafType.isBlank() : javaLeafType != null)
+                    || containers.size() > 32
                     || containers.contains(Cardinality.ONE)) {
                 throw new IllegalArgumentException("E-NESTED-SHAPE: invalid nested leaf or containers");
             }
