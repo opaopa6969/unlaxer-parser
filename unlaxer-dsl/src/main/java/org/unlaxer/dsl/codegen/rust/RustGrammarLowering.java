@@ -33,12 +33,16 @@ public final class RustGrammarLowering {
     private final List<RecoveryAnnotation> recoveries = new ArrayList<>();
     private final Set<Integer> nullableRules = new HashSet<>();
     private int analysisDepth;
+    private final org.unlaxer.dsl.codegen.RecursiveSemanticShapes[] recursiveShapes;
     private record Shape(Kind kind, Cardinality cardinality, String enumName) {
         Shape(Kind kind,Cardinality cardinality) { this(kind,cardinality,null); }
     }
 
     private RustGrammarLowering(GrammarDecl grammar) {
         this.grammar = grammar;
+        this.recursiveShapes = new org.unlaxer.dsl.codegen.RecursiveSemanticShapes[] {
+            new org.unlaxer.dsl.codegen.RecursiveSemanticShapes(grammar, false),
+            new org.unlaxer.dsl.codegen.RecursiveSemanticShapes(grammar, true) };
         this.adapters = TokenAdapterRegistry.requireValid(grammar);
     }
 
@@ -302,12 +306,7 @@ public final class RustGrammarLowering {
                 mapping = new Mapping(enumRoots.get(name),
                     List.of(new Field("value", Kind.ENUM, Cardinality.ONE, name)));
             } else if (annotation == null) {
-                boolean constrainedSum = CommonFieldSchema.isSum(grammar, grammar.rules().get(i))
-                    && org.unlaxer.dsl.codegen.TypeofConstraints.captures(grammar.rules().get(i)).containsAll(captures.keySet());
-                if (!captures.isEmpty() && effects == null && catalog == null && !skips.get(i)
-                        && comparisons.get(i) == null && !constrainedSum) {
-                    throw unsupported("captures without @mapping on " + grammar.rules().get(i).name());
-                }
+                // Helper-local captures remain CST metadata; only a mapping publishes AST fields.
             } else {
                 if (new HashSet<>(annotation.paramNames()).size() != annotation.paramNames().size()
                     || (!captures.keySet().containsAll(annotation.paramNames())
@@ -1064,7 +1063,17 @@ public final class RustGrammarLowering {
             if (skips.get(rule)) return new Shape(Kind.TEXT, Cardinality.ONE);
             if (EnumSchema.isEnum(grammar.rules().get(rule))) return enumNodes ? new Shape(Kind.NODE, Cardinality.ONE) : new Shape(Kind.ENUM,Cardinality.ONE,grammar.rules().get(rule).name());
             if (mappings.get(rule) != null) return new Shape(Kind.NODE, Cardinality.ONE);
-            if (!visiting.add(rule)) throw unsupported("recursive unmapped rule " + grammar.rules().get(rule).name());
+            if (!visiting.add(rule)) {
+                var recursive = recursiveShapes[enumNodes ? 1 : 0].rule(grammar.rules().get(rule).name());
+                Kind kind = switch (recursive.kind()) {
+                    case "#text" -> Kind.TEXT;
+                    case "#node" -> Kind.NODE;
+                    case "#join" -> Kind.VALUE;
+                    default -> enumNodes ? Kind.NODE : Kind.ENUM;
+                };
+                return new Shape(kind, Cardinality.valueOf(recursive.count().name()),
+                    kind == Kind.ENUM ? recursive.kind() : null);
+            }
             if (visiting.size() > MAX_ANALYSIS_DEPTH) throw unsupported("rule shape depth exceeds 256");
             Shape result = shape(bodies.get(rule), visiting, enumNodes);
             visiting.remove(rule);

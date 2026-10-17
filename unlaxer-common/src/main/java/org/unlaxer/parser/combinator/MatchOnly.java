@@ -27,28 +27,7 @@ public class MatchOnly extends ConstructedSingleChildParser implements MetaFunct
 	@Override
 	public Parsed parse(ParseContext parseContext, TokenKind tokenKind,boolean invertMatch) {
 		
-		parseContext.startParse(this, parseContext, tokenKind, invertMatch);
-
-		parseContext.begin(this);
-		org.unlaxer.TransactionElement stateBoundary = parseContext.getCurrent();
-		
-		Parsed parsed = getChild().parse(parseContext,TokenKind.matchOnly,invertMatch);
-
-		if (parsed.isFailed()) {
-			parseContext.rollback(this);
-			parseContext.endParse(this, Parsed.FAILED , parseContext, tokenKind, invertMatch);
-			return Parsed.FAILED;
-		}
-		Parsed committed;
-		try {
-			committed = new Parsed(parseContext.commit(this ,TokenKind.matchOnly));
-		} finally {
-			// Child commits remain visible within this lookahead. Publish only the
-			// existing match cursor/token result, never its semantic side effects.
-			stateBoundary.restoreState();
-		}
-		parseContext.endParse(this, committed , parseContext, tokenKind, invertMatch);
-		return committed;
+		return parseContext.parseMatchOnly(this, getChild(), tokenKind, invertMatch);
 	}
 
 	@Override
