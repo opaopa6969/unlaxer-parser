@@ -1164,74 +1164,24 @@ public final class GrammarValidator {
     }
 
     private static void validateEnumRules(GrammarDecl grammar, List<ValidationIssue> errors) {
-        for (RuleDecl rule : grammar.rules()) {
-            boolean isEnum = rule.annotations().stream()
-                .anyMatch(a -> a instanceof UBNFAST.EnumAnnotation);
-            if (!isEnum) {
-                continue;
-            }
-            // @enum ルールは Choice+Terminal のみ許容
-            final boolean allTerminals;
-            var switchSubject2 = rule.body();
-            if (switchSubject2 instanceof UBNFAST.ChoiceBody choice) {
-                allTerminals = choice.alternatives().stream()
-                    .allMatch(seq -> seq.elements().size() == 1
-                        && seq.elements().get(0).element() instanceof UBNFAST.TerminalElement);
-            } else if (switchSubject2 instanceof UBNFAST.SequenceBody seq) {
-                allTerminals = seq.elements().size() == 1
-                    && seq.elements().get(0).element() instanceof UBNFAST.TerminalElement;
-            } else {
-                throw new IllegalStateException("unhandled " + switchSubject2);
-            }
-            if (!allTerminals) {
-                addRuleError(errors, rule.name(),
-                    "@enum rule " + rule.name() + " must consist only of terminal literals (e.g. 'a' | 'b')",
-                    "Use only quoted string literals as alternatives in an @enum rule.",
-                    "E-ENUM-NON-TERMINAL");
-            }
+        try { EnumSchema.validate(grammar); }
+        catch (IllegalArgumentException error) {
+            addError(errors, error.getMessage(), "Use distinct nonempty literal alternatives and valid enum names.", "E-ENUM");
         }
     }
 
     private static void validateCommonFields(GrammarDecl grammar, List<ValidationIssue> errors) {
-        // @commonField(field) が付いたルールの全 permit に該当フィールドが存在するか確認
-        for (RuleDecl rule : grammar.rules()) {
-            rule.annotations().stream()
-                .filter(a -> a instanceof UBNFAST.CommonFieldAnnotation)
-                .map(a -> (UBNFAST.CommonFieldAnnotation) a)
-                .forEach(commonField -> {
-                    MappingAnnotation mapping = rule.annotations().stream()
-                        .filter(a -> a instanceof MappingAnnotation)
-                        .map(a -> (MappingAnnotation) a)
-                        .findFirst().orElse(null);
-                    if (mapping == null) {
-                        return;
-                    }
-                    String sealedName = mapping.className();
-                    List<RuleDecl> permits = grammar.rules().stream()
-                        .filter(r -> {
-                            MappingAnnotation m = r.annotations().stream()
-                                .filter(a -> a instanceof MappingAnnotation)
-                                .map(a -> (MappingAnnotation) a)
-                                .findFirst().orElse(null);
-                            return m != null && m.className().startsWith(sealedName + ".");
-                        })
-                        .toList();
-                    for (String field : commonField.fieldNames()) {
-                        for (RuleDecl permit : permits) {
-                            MappingAnnotation pm = permit.annotations().stream()
-                                .filter(a -> a instanceof MappingAnnotation)
-                                .map(a -> (MappingAnnotation) a)
-                                .findFirst().orElse(null);
-                            if (pm != null && !pm.paramNames().contains(field)) {
-                                addRuleError(errors, rule.name(),
-                                    "@commonField(" + field + ") is declared on " + rule.name()
-                                        + " but permit " + pm.className() + " does not have param '" + field + "'",
-                                    "Add @" + field + " capture to " + pm.className() + " rule.",
-                                    "E-COMMONFIELD-MISMATCH");
-                            }
-                        }
-                    }
-                });
+        try {
+            CommonFieldSchema.build(grammar);
+        } catch (CommonFieldSchema.SchemaException error) {
+            String message = error.getMessage();
+            String rule = error.rule;
+            addRuleError(
+                    errors,
+                    rule,
+                    message,
+                    "Align family fields and cardinalities.",
+                    "E-COMMONFIELD-MISMATCH");
         }
     }
 

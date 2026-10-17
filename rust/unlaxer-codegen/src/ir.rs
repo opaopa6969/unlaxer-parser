@@ -17,6 +17,8 @@ pub struct Rule {
     pub catalog: Option<Catalog>,
     /// Ordered @doc paragraphs. Tooling metadata; never changes recognition.
     pub documentation: Vec<String>,
+    /// Ordered literal alternatives for a grammar @enum; empty for ordinary rules.
+    pub enum_literals: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -53,8 +55,11 @@ pub struct Field {
     pub cardinality: Cardinality,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Kind {
+    /// Java generated numeric capture contract: signed 32-bit integer.
+    Integer,
+    Enum(String),
     Text,
     Node,
     Value,
