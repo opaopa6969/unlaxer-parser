@@ -62,3 +62,9 @@ make install-vsix
 ## ライセンス
 
 MIT (またはお好みで編集してください)。
+
+## Rustのstdioサーバー
+
+拡張の既定はJavaです。生成したRustサーバーを使う場合は `{{name}}Lsp.server.backend` を `rust`、`{{name}}Lsp.server.rustLspPath` をnative LSP実行ファイルへ設定します。{{#dap}} AST/token inspection用には `{{name}}Lsp.server.rustDapPath` も指定します。{{/dap}} `generate --target rust --lsp`{{#dap}} / `--dap`{{/dap}} とドキュメントのCargo依存を使って実行ファイルをビルドしてください。Mavenビルドは従来どおりJavaサーバーを生成します。
+
+サーバー設定の変更でLSPを再起動します。エラー後は **{{ClassName}}: Restart Language Server** でも再試行できます。引数は `rustLspArgs`{{#dap}} / `rustDapArgs`{{/dap}} の配列で指定し、shell展開は行いません。

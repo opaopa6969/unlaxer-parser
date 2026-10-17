@@ -302,7 +302,7 @@ public class ASTGeneratorTest {
         ASTGenerator gen = new ASTGenerator();
         String source = gen.generate(grammar).source();
         assertTrue("fromText should throw on unknown",
-            source.contains("throw new IllegalArgumentException(\"Unknown RecoveryMode: \" + text)"));
+            source.contains("throw new java.lang.IllegalArgumentException(\"Unknown RecoveryMode: \" + text)"));
     }
 
     @Test

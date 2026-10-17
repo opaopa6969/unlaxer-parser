@@ -1,0 +1,7 @@
+# operation input success consumed state declarations references semantic-diagnostics recoveries capture-span
+STATE	b;a	true	3	9	1	1	1	~	2:3
+STATE_FAIL	b;a	false	0	7	0	0	0	~	~
+STATE_RETRY	b;a	true	3	9	1	1	1	~	2:3
+RECOVER	bad;a	true	5	7	0	0	0	0:4	~
+RECOVER_FAIL	bad;a	false	0	7	0	0	0	~	~
+RECOVER_RETRY	bad;a	true	5	7	0	0	0	0:4	~
