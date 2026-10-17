@@ -1,0 +1,6 @@
+    fn eval_mode_node(&mut self,item:&generated::ast::Mode,span:Span)->String {
+        format!(r#"{{"root":["enum","Mode",{},{},{}]}}"#,json_string(item.text()),span.start,span.end)
+    }
+    fn eval_heat_node(&mut self,item:&generated::ast::Heat,span:Span)->String {
+        format!(r#"{{"root":["enum","Heat",{},{},{}]}}"#,json_string(item.text()),span.start,span.end)
+    }

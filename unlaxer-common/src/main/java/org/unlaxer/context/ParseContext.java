@@ -797,6 +797,118 @@ public class ParseContext implements
     }
   }
 
+  /**
+   * Evaluate a pure PEG assertion. Unlike Classic MatchOnly, this publishes no
+   * token or cursor movement. Child callbacks must obey the ordinary registered
+   * transactional-state contract; external I/O is not rolled back.
+   */
+  public Parsed parsePegAssertion(Parser owner, Parser child, boolean positive) {
+    startParse(owner, this, TokenKind.consumed, false);
+    DiagnosticSpeculation diagnostics = beginDiagnosticSpeculation();
+    ParseFrame frame = parseFrames.peekFirst();
+    int consumed = frame == null ? 0 : frame.maxConsumedOffset;
+    int matched = frame == null ? 0 : frame.maxMatchedOffset;
+    int tokensBefore = tokenStack.size();
+    int framesBefore = parseFrames.size();
+    int terminalsBefore = terminalFrames.size();
+    int deferredBefore = deferredFrameDepth;
+    int diagnosticsBefore = memoDiagnosticFrames.size();
+    int transactionFramesBefore = memoTransactionFrameCount;
+    boolean completed = false;
+    boolean succeeded;
+    try {
+      begin(owner);
+      succeeded = child.parse(this, TokenKind.consumed, false).isSucceeded() == positive;
+      rollback(owner);
+      completed = true;
+    } finally {
+      // Unwind only frames opened by this assertion if a callback throws. Resource
+      // failures remain fatal; do not turn them into successful negative assertions.
+      while (tokenStack.size() > tokensBefore) {
+        TransactionElement abandoned = tokenStack.pollFirst();
+        abandoned.restoreSelectionChanges(chosenParserByChoice, orderedParsersByNonOrdered);
+        finishTransactionalState(abandoned, true);
+      }
+      while (parseFrames.size() > framesBefore) parseFrames.pollFirst();
+      while (terminalFrames.size() > terminalsBefore) terminalFrames.pollFirst();
+      while (memoDiagnosticFrames.size() > diagnosticsBefore) memoDiagnosticFrames.pollFirst();
+      while (memoTransactionFrameCount > transactionFramesBefore) {
+        memoTransactionFrames[--memoTransactionFrameCount] = null;
+      }
+      deferredFrameDepth = deferredBefore;
+      if (frame != null) {
+        frame.maxConsumedOffset = consumed;
+        frame.maxMatchedOffset = matched;
+        frame.snapshot = null;
+      }
+      if (!completed) {
+        if (frame != null && parseFrames.peekFirst() == frame) parseFrames.pollFirst();
+        if (frame != null && terminalFrames.peekFirst() == frame) terminalFrames.pollFirst();
+        if (deferredDiagnostics) deferredFrameDepth--;
+      }
+    }
+    if (succeeded) discardDiagnosticSpeculation(diagnostics);
+    Parsed result = succeeded ? Parsed.SUCCEEDED : Parsed.FAILED;
+    endParse(owner, result, this, TokenKind.consumed, false);
+    return result;
+  }
+
+  /**
+   * Classic MatchOnly publishes the child's tokens and cursor result, while
+   * restoring registered semantic state. Unlike PEG assertions, syntax
+   * diagnostics remain visible. A throwing child cannot leave abandoned frames.
+   */
+  public Parsed parseMatchOnly(Parser owner, Parser child, TokenKind kind, boolean invert) {
+    startParse(owner, this, kind, invert);
+    ParseFrame frame = parseFrames.peekFirst();
+    int tokensBefore = tokenStack.size();
+    int framesBefore = parseFrames.size();
+    int terminalsBefore = terminalFrames.size();
+    int deferredBefore = deferredFrameDepth;
+    int diagnosticsBefore = memoDiagnosticFrames.size();
+    int transactionFramesBefore = memoTransactionFrameCount;
+    boolean completed = false;
+    try {
+      begin(owner);
+      TransactionElement stateBoundary = getCurrent();
+      Parsed parsed = child.parse(this, TokenKind.matchOnly, invert);
+      Parsed result;
+      if (parsed.isFailed()) {
+        rollback(owner);
+        result = Parsed.FAILED;
+      } else {
+        try {
+          result = new Parsed(commit(owner, TokenKind.matchOnly));
+        } finally {
+          stateBoundary.restoreState();
+        }
+      }
+      endParse(owner, result, this, kind, invert);
+      completed = true;
+      return result;
+    } finally {
+      if (!completed) {
+        // State owners obey the checkpoint/restore no-throw contract. Keep the
+        // original callback or resource exception; do not synthesize callbacks.
+        while (tokenStack.size() > tokensBefore) {
+          TransactionElement abandoned = tokenStack.pollFirst();
+          abandoned.restoreSelectionChanges(chosenParserByChoice, orderedParsersByNonOrdered);
+          finishTransactionalState(abandoned, true);
+        }
+        while (parseFrames.size() > framesBefore) parseFrames.pollFirst();
+        while (terminalFrames.size() > terminalsBefore) terminalFrames.pollFirst();
+        while (memoDiagnosticFrames.size() > diagnosticsBefore) memoDiagnosticFrames.pollFirst();
+        while (memoTransactionFrameCount > transactionFramesBefore) {
+          memoTransactionFrames[--memoTransactionFrameCount] = null;
+        }
+        deferredFrameDepth = deferredBefore;
+        if (frame != null && parseFrames.peekFirst() == frame) parseFrames.pollFirst();
+        if (frame != null && terminalFrames.peekFirst() == frame) terminalFrames.pollFirst();
+        if (deferredDiagnostics) deferredFrameDepth--;
+      }
+    }
+  }
+
   private FailureDiagnostic globalFailureDiagnostic() {
     FailureDiagnostic result = new FailureDiagnostic();
     result.farthestConsumedOffset = farthestConsumedOffset;
