@@ -44,6 +44,13 @@ class MapperRuleEmitter {
                         this.spans = spans;
                     }
 
+                    /** Immutable preorder views; AST instances and span snapshots belong to this mapping. */
+                    public List<SourceMappedCandidate> candidates() {
+                        return candidates.stream().map(mapped -> new SourceMappedCandidate(
+                            mapped.token, mapped.depth, mapped.startOffset, mapped.simpleName,
+                            new SourceMappedAst<%1$s>(mapped.ast, spans))).toList();
+                    }
+
                     /** Selects without a preferred AST type. */
                     public SourceMappedSelection selectDefault() {
                         return select(null);
@@ -71,6 +78,9 @@ class MapperRuleEmitter {
                         return new SourceMappedSelection(best.token, new SourceMappedAst<>(ast, spans));
                     }
                 }
+
+                public record SourceMappedCandidate(Token token, int depth, int startOffset,
+                        String simpleName, SourceMappedAst<%1$s> sourceMap) {}
 
                 private record MappedTreeCandidate(Token token, int depth, int startOffset,
                         String simpleName, %1$s ast) {}
@@ -887,8 +897,23 @@ class MapperRuleEmitter {
             String local = "__typeofValue" + names.size();
             names.put(capture, local);
             String type = TypeofConstraints.valueType(grammar, rule, capture);
-            emitBoundParam(w, parsersClass, grammar, local, type, bindings.sites(capture),
-                mappedClassByRuleName, tokenDeclByName, ruleByName);
+            String mapped = MapperElementUtil.getMappingAnnotation(rule).orElseThrow().className();
+            if (AssociativeProjection.literalSpines(grammar).contains(CommonFieldSchema.rustName(mapped))
+                    && (capture.equals("left") || capture.equals("right"))) {
+                boolean many = capture.equals("right");
+                w.line(type + " " + local + " = " + (many ? "new ArrayList<>()" : "null") + ";");
+                String ids = bindings.sites(capture).stream().map(site -> "\"" + ParserCodegenUtil.escapeString(site.id()) + "\"")
+                    .collect(java.util.stream.Collectors.joining(", "));
+                w.line("for (CaptureOccurrence occurrence : findCaptureOccurrences(token, java.util.Set.of(" + ids + "))) {");
+                w.indent();
+                String value = "mapAssocOperandTo" + MapperElementUtil.methodNameFor(mapped) + "(occurrence.token())";
+                w.line(many ? local + ".add(" + value + ");" : local + " = " + value + ";");
+                if (!many) w.line("break;");
+                w.dedent(); w.line("}");
+            } else {
+                emitBoundParam(w, parsersClass, grammar, local, type, bindings.sites(capture),
+                    mappedClassByRuleName, tokenDeclByName, ruleByName);
+            }
         }
         for (var constraint : constraints) {
             String own = names.get(constraint.capture());

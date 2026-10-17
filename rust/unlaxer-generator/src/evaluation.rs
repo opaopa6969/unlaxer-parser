@@ -145,6 +145,7 @@ fn scalar(field: &Field, expression: &str) -> String {
         Kind::Text => format!("EvalValue::Text({expression})"),
         Kind::Integer => format!("EvalValue::Integer(*{expression})"),
         Kind::Node => format!("EvalValue::Node({expression})"),
+        Kind::NullableNode => unreachable!("nullable node only permitted as associative left"),
         Kind::Enum(name) => format!(
             "EvalValue::Enum {{ name: {}, text: {expression}.text() }}",
             quote(name)
@@ -167,7 +168,7 @@ fn value(field: &Field, expression: &str) -> String {
 }
 fn operand(ir: &GrammarIr, field: &Field, expression: &str) -> String {
     match &field.kind {
-        Kind::Node => format!("evaluate({expression}, self)"),
+        Kind::Node | Kind::NullableNode => format!("evaluate({expression}, self)"),
         Kind::Text => format!("self.evaluate_literal({expression})"),
         Kind::Integer => format!("self.evaluate_literal(&{expression}.to_string())"),
         Kind::Enum(_) => format!("self.evaluate_literal(&format!(\"{{:?}}\", {expression}))"),
@@ -248,7 +249,12 @@ pub(crate) fn apply(
                         mapping.name
                     ));
                 }
-                format!("assert_eq!(r#op.len(), r#right.len(), \"binary operator/operand count mismatch\");\n        let mut current = {};\n        if self.is_failure(&current) {{ return current; }}\n        for (op, right) in r#op.iter().zip(r#right) {{\n            let next = {};\n            if self.is_failure(&next) {{ return next; }}\n            current = self.apply_binary(op, current, next);\n            if self.is_failure(&current) {{ return current; }}\n        }}\n        current",operand(ir,left,"r#left"),operand(ir,right,"right"))
+                let leaf = if left.kind == Kind::NullableNode {
+                    "let Some(r#left) = r#left else { assert_eq!(r#op.len(), 1, \"invalid associative literal leaf\"); assert!(r#right.is_empty(), \"invalid associative literal leaf\"); return self.evaluate_literal(&r#op[0]); };\n        "
+                } else {
+                    ""
+                };
+                format!("{leaf}assert_eq!(r#op.len(), r#right.len(), \"binary operator/operand count mismatch\");\n        let mut current = {};\n        if self.is_failure(&current) {{ return current; }}\n        for (op, right) in r#op.iter().zip(r#right) {{\n            let next = {};\n            if self.is_failure(&next) {{ return next; }}\n            current = self.apply_binary(op, current, next);\n            if self.is_failure(&current) {{ return current; }}\n        }}\n        current",operand(ir,left,"r#left"),operand(ir,right,"right"))
             }
             _ => unreachable!(),
         };

@@ -53,13 +53,6 @@ fn variants<'a>(grammar: &'a GrammarDecl, rule: &RuleDecl) -> Vec<&'a RuleDecl> 
     }
     result
 }
-pub(crate) fn enabled(grammar: &GrammarDecl) -> bool {
-    grammar.rules.iter().any(|r| {
-        r.annotations
-            .iter()
-            .any(|a| matches!(a.kind, AnnotationKind::CommonField { .. }))
-    })
-}
 pub(crate) fn is_sum(grammar: &GrammarDecl, rule: &RuleDecl) -> bool {
     !variants(grammar, rule).is_empty()
 }
@@ -98,7 +91,7 @@ fn collect(
 pub(crate) fn families(grammar: &GrammarDecl) -> Result<Vec<Family>, String> {
     let mut result = Vec::new();
     let mut names = HashSet::new();
-    if enabled(grammar) {
+    {
         let mut normalized = std::collections::HashMap::new();
         for rule in &grammar.rules {
             if let Some((name, _)) = mapping(rule) {
@@ -112,6 +105,12 @@ pub(crate) fn families(grammar: &GrammarDecl) -> Result<Vec<Family>, String> {
                     return Err(invalid(&rule.name, "normalized mapping name collision"));
                 }
             }
+        }
+    }
+    // Plain sums have the same finite family contract as common-field sums.
+    for rule in &grammar.rules {
+        if is_sum(grammar, rule) {
+            collect(grammar, rule, &mut HashSet::new(), &mut Vec::new())?;
         }
     }
     for rule in &grammar.rules {
@@ -315,7 +314,21 @@ pub(crate) fn emit(grammar: &GrammarDecl, ir: &GrammarIr) -> Result<String, Stri
                         invalid(&family.rule, &format!("missing field {name} on {variant}"))
                     })?;
                 // Value is the normalized mixed contract; its source alternatives need not be nominally identical.
-                if !matches!(actual.kind, Kind::Enum(_) | Kind::Value) {
+                let spine = lowered_mapping
+                    .fields
+                    .iter()
+                    .any(|f| f.kind == Kind::NullableNode);
+                if spine && matches!(name.as_str(), "left" | "right") {
+                    let actual =
+                        HashSet::from([crate::associative_spines::nominal(grammar, variant)?]);
+                    if nominal.as_ref().is_some_and(|previous| previous != &actual) {
+                        return Err(invalid(
+                            &family.rule,
+                            &format!("incompatible field {name} on {variant}"),
+                        ));
+                    }
+                    nominal = Some(actual);
+                } else if !matches!(actual.kind, Kind::Enum(_) | Kind::Value) {
                     for rule in grammar
                         .rules
                         .iter()

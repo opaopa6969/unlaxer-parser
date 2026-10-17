@@ -2,9 +2,11 @@
 //!
 //! This crate accepts normalized IR, not UBNF source. Frontends must validate
 //! grammar semantics (including capture shapes, nullability and left recursion).
+mod associative;
 pub mod dap;
 mod enums;
 pub mod ir;
+pub mod preferred;
 pub use enums::{enum_constant_name, validate_enum_type};
 pub mod lexical;
 pub mod lsp;
@@ -557,11 +559,16 @@ fn expression(expr: &Expression) -> String {
             expression(child),
             max.map_or_else(|| "None".into(), |max| format!("Some({max})"))
         ),
-        Separated { child, separator } => format!(
-            "{}.separated_by({})",
-            expression(child),
-            expression(separator)
-        ),
+        Separated { child, separator } => {
+            let metadata = preferred::contains_depth(child);
+            let child = expression(child);
+            let separator = expression(separator);
+            if metadata {
+                format!("Expr::sequence([{child}, Expr::sequence([{separator}, Expr::Capture({}, Box::new({child}))]).zero_or_more()])",quote(preferred::EXTRA))
+            } else {
+                format!("{child}.separated_by({separator})")
+            }
+        },
     }
 }
 
@@ -715,6 +722,7 @@ fn mapper(ir: &GrammarIr) -> String {
     {
         out.push_str("\nfn optional<T>(mut values: Vec<T>, name: &str) -> Result<Option<T>, String> {\n    if values.len() > 1 { return Err(format!(\"expected at most one value for {name}, got {}\", values.len())); }\n    Ok(values.pop())\n}\n");
     }
+    out.push_str(&associative::helpers(ir));
     out.push_str("\nfn map_node(tree: &Tree, id: usize) -> Result<Vec<Ast>, String> {\n    match tree.nodes[id].rule {\n");
     for (index, rule) in ir.rules.iter().enumerate() {
         if rule.skip {
@@ -756,14 +764,19 @@ fn mapper(ir: &GrammarIr) -> String {
                     continue;
                 }
                 writeln!(out, "        r#{}: {{\n            let mut values = Vec::new();\n            for capture in node.captures.iter().filter(|c| c.name == {}) {{", field.name, quote(&field.name)).unwrap();
-                out.push_str(match field.kind {
+                if let Some(code) = associative::capture(Some(mapping), field, "                ") {
+                    out.push_str(&code);
+                } else {
+                    out.push_str(match field.kind {
                     Kind::Integer => "                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).parse::<i32>().map_err(|_| format!(\"invalid i32 capture {} at {}..{}\", capture.name, capture.span.start, capture.span.end))?);\n",
+                    Kind::NullableNode => unreachable!("validated associative projection"),
                     Kind::Node => "                values.extend(map_nodes(tree, &capture.nodes)?);\n",
                     Kind::Value => "                values.extend(map_values(tree, &capture.nodes)?);\n",
                     Kind::Text if grapheme_capture(ir, &rule.body, &field.name) => "                values.push(tree.text(capture.span).to_owned());\n",
                     Kind::Enum(_) => unreachable!("handled enum field"),
                     Kind::Text => "                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).to_owned());\n",
                 });
+                }
                 writeln!(
                     out,
                     "            }}\n            {}\n        }},",
@@ -808,7 +821,7 @@ fn evaluator(ir: &GrammarIr) -> String {
                 format!(
                     "r#{}{}",
                     f.name,
-                    if f.cardinality == Cardinality::Optional {
+                    if f.cardinality == Cardinality::Optional || f.kind == Kind::NullableNode {
                         if matches!(f.kind, Kind::Value | Kind::Integer | Kind::Enum(_)) {
                             ".as_ref()"
                         } else {
@@ -849,6 +862,8 @@ fn field_type(field: &Field, borrowed: bool) -> String {
         (Kind::Integer, false) => "i32",
         (Kind::Node, true) => "&Ast",
         (Kind::Node, false) => "Box<Ast>",
+        (Kind::NullableNode, true) => "Option<&Ast>",
+        (Kind::NullableNode, false) => "Option<Box<Ast>>",
         (Kind::Text, true) => "&str",
         (Kind::Text, false) => "String",
         (Kind::Value, true) => "&AstValue",
@@ -874,6 +889,7 @@ fn field_type(field: &Field, borrowed: bool) -> String {
             let element = match field.kind {
                 Kind::Integer => "i32",
                 Kind::Node => "Ast",
+                Kind::NullableNode => "Option<Box<Ast>>",
                 Kind::Text => "String",
                 Kind::Value => "AstValue",
                 Kind::Enum(_) => unreachable!("handled enum field"),
@@ -900,6 +916,9 @@ pub fn evaluator_parameter_type(field: &Field) -> String {
 fn mapped_value(field: &Field) -> String {
     let name = quote(&field.name);
     match field.cardinality {
+        Cardinality::One if field.kind == Kind::NullableNode => {
+            format!("Some(Box::new(required(values, {name})?))")
+        }
         Cardinality::One if field.kind == Kind::Node => {
             format!("Box::new(required(values, {name})?)")
         }
@@ -926,6 +945,7 @@ fn field_json(field: &Field) -> String {
         "json_string(value)"
     };
     match field.cardinality {
+        Cardinality::One if field.kind == Kind::NullableNode => format!("{name}.as_ref().map_or_else(|| \"null\".to_owned(), |value| value.canonical_json())"),
         Cardinality::One if field.kind == Kind::Integer => format!("{name}.to_string()"),
         Cardinality::One if field.kind != Kind::Text => format!("{name}.canonical_json()"),
         Cardinality::One => format!("json_string({name})"),

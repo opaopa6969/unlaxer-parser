@@ -64,6 +64,7 @@ public class ASTGenerator implements CodeGenerator {
 
     @Override
     public GeneratedSource generate(GrammarDecl grammar) {
+        org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
         GrammarValidator.requireValidBoundedRepeatElements(grammar);
         LeftRecursionAnalysis.requireValid(grammar);
         CommonFieldSchema.build(grammar);
@@ -403,6 +404,16 @@ public class ASTGenerator implements CodeGenerator {
         // Only number-style folds: the operand nominally resolves to the assoc class
         // itself. Excludes source-string-leaf folds whose operands resolve to String.
         if (!(grammar.name() + "AST." + className).equals(narrowInnerType)) {
+            return false;
+        }
+        // Widen only when both sides form the nominal recursive fold used by
+        // MapperRuleEmitter. A mixed Object left and recursive right retain
+        // their own types; widening just the right breaks List invariance.
+        String nominal = grammar.name() + "AST." + className;
+        if (!nominal.equals(MapperTypeResolver.inferType(grammar, rule, "left"))
+                || !"List<String>".equals(MapperTypeResolver.inferType(grammar, rule, "op"))
+                || !nominal.equals(MapperTypeResolver.unwrapListType(
+                        MapperTypeResolver.inferType(grammar, rule, "right")).orElse("Object"))) {
             return false;
         }
         Map<String, RuleDecl> ruleByName = new LinkedHashMap<>();

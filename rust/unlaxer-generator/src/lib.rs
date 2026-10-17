@@ -1,5 +1,6 @@
 //! Native UBNF -> normalized IR -> Rust modules. No Java process is launched.
 pub mod adapters;
+mod associative_spines;
 mod common_fields;
 mod embedded;
 mod evaluation;
@@ -13,6 +14,8 @@ pub mod packaged_profiles;
 pub mod packages;
 pub mod playground;
 pub mod portability;
+mod preferred;
+mod preferred_plan;
 pub mod semantic_rules;
 mod token_stream;
 
@@ -52,6 +55,29 @@ pub(crate) fn generate_grammar(
         .unwrap()
         .content
         .push_str(&common_fields::emit(grammar, &ir)?);
+    let parser_source = &files
+        .iter()
+        .find(|f| f.relative_path == "parser.rs")
+        .unwrap()
+        .content;
+    let ast_source = &files
+        .iter()
+        .find(|f| f.relative_path == "ast.rs")
+        .unwrap()
+        .content;
+    let (parser, mapper) = preferred::emit(grammar, &ir, parser_source, ast_source);
+    files
+        .iter_mut()
+        .find(|f| f.relative_path == "parser.rs")
+        .unwrap()
+        .content
+        .push_str(&parser);
+    files
+        .iter_mut()
+        .find(|f| f.relative_path == "mapper.rs")
+        .unwrap()
+        .content
+        .push_str(&mapper);
     if token_stream::enabled(grammar) {
         let api = unlaxer_codegen::lexing_api_with_profile(
             &token_stream::terminals(grammar)?,

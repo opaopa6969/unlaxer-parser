@@ -60,7 +60,9 @@ or empty word still fails under inversion. Number, ASCII identifier and quoted
 parsers propagate through their leaf graph. Quote delimiters explicitly use
 `Consumed` and inversion false, as Java's `ParserWrapper` does. Consequently a
 match-only quoted parser can consume delimiters; it is not a scanner followed
-by a rewind. `Expr::character(label, fn(char) -> bool)` provides a mode-aware
+by a rewind. Built-in Number/Identifier/Quoted leaf graphs isolate outer whitespace and
+declarative trivia; see the [atomic lexical boundary contract](classic-atomic-trivia.md).
+`Expr::character(label, fn(char) -> bool)` provides a mode-aware
 terminal for custom predicates. Its FIRST/memo/deferred-diagnostic analysis is
 conservative because the callback can read external state.
 
@@ -104,15 +106,16 @@ contract still requires discarding a context after a panicking callback. Neither
 runtime rolls back arbitrary external I/O.
 
 Remaining #545 work is explicit: [capture/replay and name lifetime](https://github.com/opaopa6969/unlaxer-parser/issues/572),
-including its remaining generated UBNF integration, and [external Tiny code-fence mode graphs](https://github.com/opaopa6969/unlaxer-parser/issues/573). The earlier PEG diagnostic-frontier gap
+including its remaining generated UBNF integration. The [external Tiny code-fence mode graphs](https://github.com/opaopa6969/unlaxer-parser/issues/573) are implemented as described below. The earlier PEG diagnostic-frontier gap
 also remains tracked in #545; new Classic-entry cases do not prove all legacy
 PEG/TokenExpr entry diagnostics equivalent. [General owned capture/replay](owned-capture-replay.md)
 now has separate runtime APIs for input, projected and generated values (#590).
 The existing Rust AST field capture store retains its original-input boundary:
 it rejects a projected or detached field capture instead of reading a different
-input slice. Generated UBNF integration remains #591 / #572. Native
-code-fence scanners without a mode-aware implementation reject this explicit
-mode; normal native parsing remains available. Classic `JavaUntil` and positive /
+input slice. Generated UBNF integration remains #591 / #572. The Tiny
+code-fence adapters now have mode-aware implementations (see below). Other
+unsupported native scanner shapes still reject this explicit mode; normal native
+parsing remains available. Classic `JavaUntil` and positive /
 negative `JavaLookahead` preserve their distinct runtime APIs and have shared
 handwritten cases. Full generated capture/replay integration must be verified
 separately before claiming that remaining scope.
@@ -132,3 +135,5 @@ policies. Java also checks actual success-memo hits/tree copying and exceptional
 child frames. Rust additionally checks committed trace and the existing standard
 2 MiB recursion/resource tests. Callback exception rows use Java unchecked
 exceptions and Rust `ParseError`; Rust panics are not asserted to be recoverable.
+
+Tiny CodeStart/CodeEnd/LongCodeBlock also support explicit Classic modes; see the [pinned real-parser contract and corpus](tiny-classic-modes.md).

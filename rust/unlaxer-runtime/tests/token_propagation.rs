@@ -136,6 +136,10 @@ fn parser(s: &str) -> Expr {
         "identifier" => Expr::Identifier,
         "match-identifier" => Expr::Identifier.match_only(),
         "match-quoted" => Expr::Quoted('\'').match_only(),
+        "quoted" => Expr::Quoted('\''),
+        "double-quoted" => Expr::Quoted('"'),
+        "stop-invert-identifier" => Expr::Identifier.stop_invert(),
+        "stop-consume-number" => Expr::Number.stop_consume(),
         "optional-a" => w("a").optional_java(),
         "match-optional-a" => w("a").optional_java().match_only(),
         "repeat-a" => w("a").repeat_java(0, None),
@@ -182,7 +186,11 @@ fn label(c: &mut ParseContext<'_>, index: usize) -> String {
 fn leaves(c: &mut ParseContext<'_>, index: usize, target: &mut Vec<usize>) {
     let atomic = matches!(
         label(c, index).as_str(),
-        "WordParser" | "NumberParser" | "IdentifierParser" | "SingleQuotedParser"
+        "WordParser"
+            | "NumberParser"
+            | "IdentifierParser"
+            | "SingleQuotedParser"
+            | "DoubleQuotedParser"
     );
     let children = c.node(index).unwrap().children.clone();
     if atomic || children.is_empty() {
@@ -193,13 +201,18 @@ fn leaves(c: &mut ParseContext<'_>, index: usize, target: &mut Vec<usize>) {
         }
     }
 }
-fn verify_classic_oracle(traced: bool) {
+fn verify_classic_oracle(traced: bool, trivia: u8) {
     let mut failures = Vec::new();
-    let rows: Vec<_> = include_str!("../../../conformance/token-propagation/cases.tsv")
+    let corpus = if trivia != 0 {
+        include_str!("../../../conformance/token-propagation/atomic-trivia.tsv")
+    } else {
+        include_str!("../../../conformance/token-propagation/cases.tsv")
+    };
+    let rows: Vec<_> = corpus
         .lines()
         .filter(|l| !l.starts_with('#') && !l.is_empty())
         .collect();
-    assert_eq!(rows.len(), 166);
+    assert_eq!(rows.len(), if trivia != 0 { 52 } else { 166 });
     for memo in [Memoization::Off, Memoization::SafeFailures] {
         for diag in [
             Diagnostics::Detailed,
@@ -230,8 +243,14 @@ fn verify_classic_oracle(traced: bool) {
                     }
                 }
                 context.set_reset_matched_with_consumed(c[7] == "true");
-                let parsed =
-                    context.parse_with_token_mode(&parser(c[2]), kind(c[3]), c[4] == "true");
+                let parsed = context.with_trivia(trivia == 1, |context| {
+                    let expression = if trivia == 2 {
+                        parser(c[2]).lexical_trivia_scope(atomic_trivia())
+                    } else {
+                        parser(c[2])
+                    };
+                    context.parse_with_token_mode(&expression, kind(c[3]), c[4] == "true")
+                });
                 let mut values = vec![
                     parsed.is_ok().to_string(),
                     context.position().to_string(),
@@ -299,6 +318,22 @@ fn verify_classic_oracle(traced: bool) {
                     };
                     assert_eq!(actual, c[15], "trace {}", c[0]);
                 }
+                if traced && trivia != 0 {
+                    let trace = context.token_trace().unwrap().unwrap();
+                    let actual = trace
+                        .iter()
+                        .map(|leaf| leaf.text(&input).unwrap())
+                        .collect::<String>();
+                    let expected_text = if c[14] == "~" {
+                        String::new()
+                    } else {
+                        c[14]
+                            .split(';')
+                            .map(|sig| decode(sig.rsplit(':').next().unwrap()))
+                            .collect::<String>()
+                    };
+                    assert_eq!(actual, expected_text, "retained trace source {}", c[0]);
+                }
                 if values != expected {
                     failures.push(format!(
                         "{}/{memo:?}/{diag:?}\n expected {expected:?}\n actual   {values:?}",
@@ -312,11 +347,11 @@ fn verify_classic_oracle(traced: bool) {
 }
 #[test]
 fn independent_classic_oracle() {
-    verify_classic_oracle(false);
+    verify_classic_oracle(false, 0);
 }
 #[test]
 fn independent_classic_trace_oracle() {
-    verify_classic_oracle(true);
+    verify_classic_oracle(true, 0);
 }
 
 thread_local! {static FRESH:std::cell::Cell<Option<unlaxer_runtime::token::NodeId>>=const{std::cell::Cell::new(None)};}
@@ -659,17 +694,17 @@ fn native_repeat_progress_uses_the_inherited_cursor() {
     assert_eq!(signatures(&mut c, &result.nodes), "matchOnly@0:2:6161");
 }
 #[test]
-fn unsupported_native_scanner_is_not_a_resource_abort() {
-    let mut c = ParseContext::new("```java:Demo\n");
+fn unsupported_token_mode_is_not_a_resource_abort() {
+    let mut c = ParseContext::new("`native delimiter`");
     let error = c
-        .parse_with_token_mode(&Expr::CodeStart, TokenKind::MatchOnly, false)
+        .parse_with_token_mode(&Expr::Quoted('`'), TokenKind::MatchOnly, false)
         .unwrap_err();
     assert!(error
         .expected
         .iter()
         .any(|hint| hint.contains("mode-aware parser")));
     assert_eq!((c.position(), c.matched_position()), (0, 0));
-    assert!(c.parse(&Expr::CodeStart).is_ok());
+    assert!(c.parse(&w("`native delimiter`")).is_ok());
 }
 
 #[test]
@@ -695,4 +730,243 @@ fn classic_unique_choice_limit_retains_the_structured_diagnostic_kind() {
             assert_eq!(error.kind, "choice_limit");
         }
     }
+}
+
+#[test]
+fn atomic_trivia_oracle() {
+    for trivia in [1, 2] {
+        verify_classic_oracle(false, trivia);
+        verify_classic_oracle(true, trivia);
+    }
+}
+
+fn atomic_trivia() -> unlaxer_runtime::lexical::LexicalExpression {
+    use unlaxer_runtime::lexical::{LexicalExpression as L, Op};
+    L {
+        op: Op::CHOICE,
+        text: "",
+        min: 0,
+        max: 0,
+        children: [" ", "/*😀*/", "\r\n"]
+            .into_iter()
+            .map(|text| L {
+                op: Op::LITERAL,
+                text,
+                min: 0,
+                max: 0,
+                children: vec![],
+            })
+            .collect(),
+    }
+}
+
+#[test]
+fn atomic_scope_restores_outer_trivia_after_success_failure_and_rollback() {
+    for (source, first, second) in [
+        ("A B", Expr::Identifier, "B"),
+        ("1 2", Expr::Number, "2"),
+        ("'a b' B", Expr::Quoted('\''), "B"),
+        ("\"a b\" B", Expr::Quoted('"'), "B"),
+    ] {
+        for named in [false, true] {
+            let expression = Expr::sequence([
+                Expr::choice([
+                    Expr::sequence([first.clone(), Expr::literal("missing")]),
+                    first.clone(),
+                ]),
+                Expr::literal(second),
+            ]);
+            let expression = if named {
+                expression.lexical_trivia_scope(atomic_trivia())
+            } else {
+                expression.trivia_scope(true)
+            };
+            let mut context = ParseContext::new(source);
+            assert!(
+                context
+                    .parse_with_token_mode(&expression, TokenKind::Consumed, false)
+                    .is_ok(),
+                "{source}"
+            );
+            assert_eq!(
+                (context.position(), context.matched_position()),
+                (source.chars().count(), source.chars().count())
+            );
+        }
+        // Ordinary scanner entry remains atomic too; it must not skip leading/trailing trivia.
+        let mut native = ParseContext::new(source);
+        let parsed = native.with_trivia(true, |c| c.parse(&first)).unwrap();
+        assert_eq!(native.position(), source.chars().count() - 2);
+        assert_eq!(parsed.span.end, native.position());
+        assert!(native.parse(&Expr::literal(" ")).is_ok());
+    }
+    let mut context = ParseContext::new(" 1");
+    context.with_trivia(true, |context| {
+        assert!(context
+            .parse_with_token_mode(&Expr::Number, TokenKind::Consumed, false)
+            .is_err());
+        assert_eq!((context.position(), context.matched_position()), (0, 0));
+        assert!(context
+            .parse_with_token_mode(&Expr::sequence([Expr::Number]), TokenKind::Consumed, false)
+            .is_ok());
+        assert_eq!(context.position(), 2);
+    });
+}
+
+#[test]
+fn classic_outer_trivia_source_oracle() {
+    for memo in [Memoization::Off, Memoization::SafeFailures] {
+        for diagnostics in [
+            Diagnostics::Detailed,
+            Diagnostics::DetailedOnFailure,
+            Diagnostics::Auto,
+        ] {
+            for traced in [false, true] {
+                for row in
+                    include_str!("../../../conformance/token-propagation/sequence-trivia.tsv")
+                        .lines()
+                        .filter(|s| !s.starts_with('#') && !s.is_empty())
+                {
+                    let c: Vec<_> = row.split('\t').collect();
+                    let input = decode(c[1]);
+                    let options =
+                        ParseOptions::with_memoization(memo).with_diagnostics(diagnostics);
+                    let options = if traced {
+                        options.with_token_trace(Default::default())
+                    } else {
+                        options
+                    };
+                    let mut context = ParseContext::with_options(&input, options);
+                    context.set_reset_matched_with_consumed(false);
+                    let mut committed = vec![];
+                    for (column, kind) in [(5, TokenKind::Consumed), (6, TokenKind::MatchOnly)] {
+                        if c[column] != "~" {
+                            let value = Box::leak(decode(c[column]).into_boxed_str());
+                            committed.extend(
+                                context
+                                    .parse_with_token_mode(&w(value), kind, false)
+                                    .unwrap()
+                                    .nodes,
+                            );
+                        }
+                    }
+                    let first = match c[2] {
+                        "stop-consume" | "named-stop-consume" => w("A").stop_consume(),
+                        "match-first" => w("A").match_only(),
+                        _ => w("A"),
+                    };
+                    let expression = Expr::sequence([first, w("B")]);
+                    let expression = match c[2] {
+                        "rollback" => Expr::choice([Expr::sequence([w("A"), w("X")]), expression]),
+                        "recovery" => expression.recover(
+                            unlaxer_runtime::RecoveryMode::Sync,
+                            [";"],
+                            "syntax error: skipped to sync point",
+                        ),
+                        _ => expression,
+                    };
+                    let expression = if c[2].starts_with("named-") {
+                        expression.lexical_trivia_scope(
+                            unlaxer_runtime::lexical::LexicalExpression {
+                                op: unlaxer_runtime::lexical::Op::LITERAL,
+                                text: "~",
+                                min: 0,
+                                max: 0,
+                                children: vec![],
+                            },
+                        )
+                    } else {
+                        expression
+                    };
+                    let result = context.with_trivia(true, |context| {
+                        context.parse_with_token_mode(&expression, kind(c[3]), c[4] == "true")
+                    });
+                    assert_eq!(
+                        result.is_ok(),
+                        c[7] == "true",
+                        "{} {memo:?} {diagnostics:?} traced={traced}",
+                        c[0]
+                    );
+                    assert_eq!(
+                        (context.position(), context.matched_position()),
+                        (c[8].parse().unwrap(), c[9].parse().unwrap()),
+                        "{}",
+                        c[0]
+                    );
+                    let root = if let Ok(parsed) = result {
+                        let sig = signatures(&mut context, &parsed.nodes);
+                        committed.extend(parsed.nodes);
+                        sig
+                    } else {
+                        "~".into()
+                    };
+                    assert_eq!(root, c[10], "{}", c[0]);
+                    assert_eq!(signatures(&mut context, &committed), c[11], "{}", c[0]);
+                    if traced && c[2] == "recovery" {
+                        assert!(context.token_trace().unwrap().is_err());
+                        assert_eq!(context.recoveries().len(), 1);
+                        assert_eq!(
+                            context.recoveries()[0].span,
+                            unlaxer_runtime::Span { start: 0, end: 5 }
+                        );
+                    } else if traced {
+                        let trace = context.token_trace().unwrap().unwrap();
+                        let text = trace
+                            .iter()
+                            .map(|leaf| leaf.text(&input).unwrap())
+                            .collect::<String>();
+                        let expected = if c[11] == "~" {
+                            String::new()
+                        } else {
+                            c[11]
+                                .split(';')
+                                .map(|s| decode(s.rsplit(':').next().unwrap()))
+                                .collect::<String>()
+                        };
+                        assert_eq!(text, expected, "trace {}", c[0]);
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn classic_trivia_trace_limit_is_observational_and_failed_branch_restores_budget() {
+    use unlaxer_runtime::token_trace::{Error, Limits};
+    let options = ParseOptions::default().with_token_trace(Limits {
+        leaves: 1,
+        source_bytes: 3,
+    });
+    let mut limited = ParseContext::with_options("A B", options);
+    let parsed = limited
+        .with_trivia(true, |c| {
+            c.parse_with_token_mode(
+                &Expr::sequence([w("A"), w("B")]),
+                TokenKind::Consumed,
+                false,
+            )
+        })
+        .unwrap();
+    assert_eq!(
+        signatures(&mut limited, &parsed.nodes),
+        "consumed@0:3:412042"
+    );
+    assert_eq!((limited.position(), limited.matched_position()), (3, 3));
+    assert_eq!(limited.token_trace().unwrap(), Err(Error::Limit));
+
+    let mut rolled_back = ParseContext::with_options("A B", options);
+    let expression = Expr::choice([Expr::sequence([w("A"), w("B"), w("missing")]), w("A B")]);
+    let parsed = rolled_back
+        .with_trivia(true, |c| {
+            c.parse_with_token_mode(&expression, TokenKind::Consumed, false)
+        })
+        .unwrap();
+    assert_eq!(
+        signatures(&mut rolled_back, &parsed.nodes),
+        "consumed@0:3:412042"
+    );
+    let trace = rolled_back.token_trace().unwrap().unwrap();
+    assert_eq!(trace.len(), 1);
+    assert_eq!(trace[0].text("A B").unwrap(), "A B");
 }

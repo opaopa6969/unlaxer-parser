@@ -418,7 +418,7 @@ fn lowerer_rejects_unsupported_or_inconsistent_grammars_without_artifacts() {
         ),
         (
             simple.replace("grammar G {", "grammar G { token T = REGEX('x')\n"),
-            "unsupported token",
+            "E-REGEX-RETIRED",
         ),
         (
             simple.replace("grammar G {", "grammar G { @whitespace: python\n"),
@@ -583,4 +583,16 @@ fn cli_refuses_output_file_directory_and_ancestor_symlinks() {
         .unwrap()
         .file_type()
         .is_symlink());
+}
+
+#[test]
+fn literal_text_cannot_enable_internal_preferred_captures() {
+    let files=unlaxer_generator::generate("grammar LiteralMetadata { @root @mapping(Value,params=[text]) Root ::= '#preferred-depth:' % ',' @text; }").unwrap();
+    let parser = &files
+        .iter()
+        .find(|f| f.relative_path == "parser.rs")
+        .unwrap()
+        .content;
+    assert!(!parser.contains("#preferred-extra:2"));
+    assert!(parser.contains(".separated_by("));
 }

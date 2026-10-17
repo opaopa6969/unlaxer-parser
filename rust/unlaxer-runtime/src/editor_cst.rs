@@ -328,6 +328,7 @@ pub fn literal_completions(grammar: &SharedGrammar) -> Vec<&'static str> {
             | CaptureScope(child)
             | Capture(_, child)
             | TextValue(child)
+            | CaptureBoundary(_, child)
             | ValueBoundary(child)
             | Optional(child)
             | JavaOptional(child)

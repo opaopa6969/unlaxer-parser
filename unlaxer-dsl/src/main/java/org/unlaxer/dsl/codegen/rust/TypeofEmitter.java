@@ -40,7 +40,7 @@ final class TypeofEmitter {
                         || fields.stream()
                                 .anyMatch(
                                         field ->
-                                                field.kind() == Kind.NODE
+                                                (field.kind() == Kind.NODE || field.kind() == Kind.NULLABLE_NODE)
                                                         && field.cardinality() == Cardinality.ONE);
         var out = new StringBuilder();
         if (nodes) {
@@ -110,7 +110,9 @@ final class TypeofEmitter {
                                     + " capture.name == ")
                     .append(RustBackend.quote(field.name()))
                     .append(") {\n");
-            switch (field.kind()) {
+            String associative = AssociativeSpines.capture(rule.mapping(),field,"            ");
+            if (associative != null) out.append(associative);
+            else switch (field.kind()) {
                 case ENUM -> {
                     int enumId =
                             java.util.stream.IntStream.range(0, ir.rules().size())
@@ -121,6 +123,7 @@ final class TypeofEmitter {
                             .append(enumId)
                             .append("(tree, &capture.nodes)?);\n");
                 }
+                case NULLABLE_NODE -> throw new IllegalArgumentException("invalid nullable node projection");
                 case NODE ->
                         out.append(
                                 rule.mapping() == null
@@ -210,6 +213,7 @@ final class TypeofEmitter {
                         case TEXT -> "\"String\"";
                         case ENUM -> RustBackend.quote("enum::" + field.enumName());
                         case NODE -> "typeof_node(&_value_" + index + ")";
+                        case NULLABLE_NODE -> "typeof_node(_value_" + index + ".as_deref().ok_or(\"missing associative left operand\")?)";
                         case VALUE -> "typeof_value(&_value_" + index + ")";
                     };
         };

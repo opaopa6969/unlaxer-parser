@@ -570,10 +570,21 @@ impl ParseContext<'_> {
     }
     pub(crate) fn classic_atom(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
         match expression {
-            Expr::Number => return self.expression(classic_number(), depth),
-            Expr::Identifier => return self.expression(classic_identifier(), depth),
+            Expr::CodeStart | Expr::CodeEnd => {
+                return self.with_trivia(false, |context| {
+                    context.classic_code_fence(matches!(expression, Expr::CodeStart), depth)
+                });
+            }
+            // Java's internal token Chain has no grammar delimiter. Its leaves
+            // must never inherit the surrounding sequence's trivia policy.
+            Expr::Number => {
+                return self.with_trivia(false, |c| c.expression(classic_number(), depth))
+            }
+            Expr::Identifier => {
+                return self.with_trivia(false, |c| c.expression(classic_identifier(), depth))
+            }
             Expr::Quoted(quote) if matches!(quote, '\'' | '"') => {
-                return self.expression(classic_quoted(*quote), depth)
+                return self.with_trivia(false, |c| c.expression(classic_quoted(*quote), depth))
             }
             Expr::JavaEmpty => {
                 return self
@@ -712,6 +723,12 @@ impl ParseContext<'_> {
                     },
                 )
             }
+            Expr::LongCodeBlock => {
+                let end = (!mode.invert)
+                    .then(|| super::long_code_fence::end(self.input, start))
+                    .flatten();
+                ("LongCodeBlockParser", end.unwrap_or(start), end.is_some())
+            }
             Expr::Replay(name) => {
                 let text = self.captured_text(name);
                 let width = text.map_or(0, |text| text.chars().count());
@@ -761,11 +778,12 @@ impl ParseContext<'_> {
                     at,
                     match expression {
                         Expr::Literal(word) | Expr::CaseInsensitive(word) => word,
+                        Expr::LongCodeBlock => "long code block",
                         _ => "character",
                     },
                 );
             }
-            if mode.kind.is_consumed() {
+            if mode.kind.is_consumed() && !matches!(expression, Expr::LongCodeBlock) {
                 self.matched_position = self.position;
             }
             return None;
@@ -809,6 +827,69 @@ impl ParseContext<'_> {
                 text: None,
             })),
         })
+    }
+    // Mirror the pinned Tiny parser graph: line-boundary assertion has no CST,
+    // while each ordinary child retains its own Classic mode and diagnostics.
+    fn classic_code_fence(&mut self, opening: bool, depth: usize) -> Option<Fragment> {
+        let start = self.mode_cursor();
+        if self.token_mode().invert
+            || (start > 0 && !matches!(self.input.as_bytes()[start - 1], b'\r' | b'\n'))
+        {
+            return None;
+        }
+        let owner_start = self.code_point(start);
+        let mut result = Fragment::default();
+        let fence = self.expression(&Expr::Literal("```"), depth)?;
+        let fence = self.classic_alias(fence, "TripleBackTickParser");
+        self.append_classic_fragment(
+            &mut result,
+            fence,
+            Span {
+                start: owner_start,
+                end: self.code_point(self.mode_cursor()),
+            },
+            owner_start,
+        );
+        if opening {
+            for child in [Expr::Identifier, Expr::Literal(":")] {
+                let before = self.code_point(self.mode_cursor());
+                let fragment = self.expression(&child, depth)?;
+                self.append_classic_fragment(
+                    &mut result,
+                    fragment,
+                    Span {
+                        start: before,
+                        end: self.code_point(self.mode_cursor()),
+                    },
+                    owner_start,
+                );
+            }
+            let before = self.code_point(self.mode_cursor());
+            let name = self.expression(classic_class_name(), depth)?;
+            let name = self.classic_alias(name, "JavaClassNameParser");
+            self.append_classic_fragment(
+                &mut result,
+                name,
+                Span {
+                    start: before,
+                    end: self.code_point(self.mode_cursor()),
+                },
+                owner_start,
+            );
+        }
+        let before = self.code_point(self.mode_cursor());
+        let ending = self.expression(classic_line_end(), depth)?;
+        let ending = self.classic_alias(ending, "EndOfLineParser");
+        self.append_classic_fragment(
+            &mut result,
+            ending,
+            Span {
+                start: before,
+                end: self.code_point(self.mode_cursor()),
+            },
+            owner_start,
+        );
+        Some(result)
     }
     #[inline(never)]
     pub(crate) fn classic_longest_choice(
@@ -922,13 +1003,22 @@ impl ParseContext<'_> {
     }
     #[inline(never)]
     fn classic_until(&mut self, terminator: &'static str, depth: usize) -> Option<Fragment> {
+        self.classic_until_parser(&Expr::Literal(terminator).match_only(), "Choice", depth)
+    }
+    #[inline(never)]
+    fn classic_until_parser(
+        &mut self,
+        terminator: &Expr,
+        collector: &'static str,
+        depth: usize,
+    ) -> Option<Fragment> {
         let mode = self.token_mode();
         let start = self.position();
         let mut result = Fragment::default();
         loop {
             let checkpoint = self.checkpoint();
             self.token_mode = Some(ParseMode::default());
-            let term = self.expression(&Expr::Literal(terminator).match_only(), depth);
+            let term = self.expression(terminator, depth);
             self.token_mode = Some(mode);
             if self.resource_failure.is_some() {
                 self.restore(checkpoint);
@@ -938,8 +1028,8 @@ impl ParseContext<'_> {
                 if mode.kind.is_consumed() {
                     self.commit_checkpoint(checkpoint);
                     // Occurs invokes its terminator with normal default arguments;
-                    // that Choice collector is Consumed even for a virtual parent.
-                    let term = self.classic_meta_node(term, TokenKind::Consumed, "Choice");
+                    // that terminator collector is Consumed even for a virtual parent.
+                    let term = self.classic_meta_node(term, TokenKind::Consumed, collector);
                     let fallback = Span {
                         start: self.position(),
                         end: self.position(),
@@ -975,6 +1065,44 @@ impl ParseContext<'_> {
 }
 
 impl ParseContext<'_> {
+    #[inline(never)]
+    pub(crate) fn sequence_trivia(
+        &mut self,
+        result: &mut Fragment,
+        owner_start: usize,
+        depth: usize,
+    ) -> Option<()> {
+        if self.token_mode.is_none() || !self.whitespace && self.lexical_trivia.is_none() {
+            self.skip();
+            return Some(());
+        }
+        let start = self.position;
+        let definition = self.lexical_trivia.clone();
+        // Java generated delimiters own their lexical program. They do not run
+        // through the surrounding contextual lexer or recursively delimit themselves.
+        let previous_context = self.lexical_context.take();
+        let previous_lexing = self.lexing.take();
+        let parsed = self.with_trivia(false, |context| {
+            if let Some(definition) = definition {
+                context.expression(
+                    &Expr::Lexical("Whitespace", definition).repeat_java(0, None),
+                    depth,
+                )
+            } else {
+                context.expression(classic_whitespace(), depth)
+            }
+        });
+        self.lexical_context = previous_context;
+        self.lexing = previous_lexing;
+        let fragment = parsed?;
+        self.append_classic_fragment(
+            result,
+            fragment,
+            self.span(start),
+            self.code_point(owner_start),
+        );
+        Some(())
+    }
     fn token_kind_at(&self, index: usize) -> TokenKind {
         self.tokens
             .values
@@ -1257,4 +1385,108 @@ fn classic_quoted(quote: char) -> &'static Expr {
             fixed,
         ])
     })
+}
+
+fn classic_whitespace() -> &'static Expr {
+    static VALUE: std::sync::OnceLock<Expr> = std::sync::OnceLock::new();
+    VALUE.get_or_init(|| {
+        Expr::choice([
+            Expr::character("SpaceParser", |cp| {
+                matches!(cp, ' ' | '\t' | '\n' | '\r' | '\u{b}' | '\u{c}')
+            }),
+            Expr::sequence([Expr::literal("//"), Expr::Custom(classic_line_body)]),
+            Expr::sequence([
+                Expr::literal("/*"),
+                Expr::JavaUntil("*/"),
+                Expr::literal("*/"),
+            ]),
+        ])
+        .repeat_java(0, None)
+    })
+}
+fn classic_line_body(context: &mut ParseContext<'_>) -> ParseResult {
+    context.declare_complete_token_trace();
+    let terminator = Expr::choice([
+        Expr::literal("\r\n"),
+        Expr::literal("\r"),
+        Expr::literal("\n"),
+        Expr::Eof,
+    ])
+    .match_only();
+    let fragment = context
+        .classic_until_parser(&terminator, "MatchOnly", context.call_depth)
+        .ok_or_else(|| context.failure())?;
+    let span = fragment.source.as_ref().map(|s| s.span).unwrap_or(Span {
+        start: context.position(),
+        end: context.position(),
+    });
+    Ok(ParseMatch {
+        span,
+        nodes: fragment.nodes,
+        captures: fragment.captures,
+    })
+}
+
+fn classic_class_name() -> &'static Expr {
+    static VALUE: std::sync::OnceLock<Expr> = std::sync::OnceLock::new();
+    VALUE.get_or_init(|| {
+        Expr::sequence([
+            Expr::Identifier,
+            Expr::sequence([
+                Expr::character("DotParser", |cp| cp == '.'),
+                Expr::Identifier,
+            ])
+            .repeat_java(0, None),
+        ])
+    })
+}
+fn classic_line_end() -> &'static Expr {
+    static VALUE: std::sync::OnceLock<Expr> = std::sync::OnceLock::new();
+    VALUE.get_or_init(|| {
+        Expr::choice([
+            Expr::Literal("\r\n"),
+            Expr::Literal("\r"),
+            Expr::Literal("\n"),
+            Expr::Eof,
+        ])
+    })
+}
+
+#[cfg(test)]
+mod atomic_trivia_tests {
+    use super::*;
+    #[test]
+    fn lexical_scope_restores_parent_policy_when_internal_frame_hits_resource_limit() {
+        for expression in [
+            Expr::Number,
+            Expr::Identifier,
+            Expr::Quoted('\''),
+            Expr::Quoted('"'),
+            Expr::sequence([Expr::literal("A"), Expr::literal("B")]),
+        ] {
+            let mut context = ParseContext::new("A B");
+            context.whitespace = true;
+            context.lexical_context = Some(std::sync::Arc::from([]));
+            let definition = crate::lexical::LexicalExpression {
+                op: crate::lexical::Op::LITERAL,
+                text: " ",
+                min: 0,
+                max: 0,
+                children: vec![],
+            };
+            context.lexical_trivia = Some(definition.clone());
+            // The outer token enters, then its internal graph exhausts the shared budget.
+            context.expression_depth = 1023;
+            assert!(context
+                .parse_with_token_mode(&expression, TokenKind::Consumed, false)
+                .is_err());
+            assert!(context.resource_failure.is_some());
+            assert!(context.whitespace);
+            assert!(context.lexical_context.is_some());
+            assert_eq!(context.lexical_trivia, Some(definition));
+            assert_eq!(context.expression_depth, 1023);
+            assert_eq!((context.position(), context.matched_position()), (0, 0));
+            assert!(context.token_mode.is_none());
+        }
+    }
 }
