@@ -7,6 +7,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.StringSettingValue;
 public class LSPLauncherGenerator implements CodeGenerator {
     @Override
     public GeneratedSource generate(GrammarDecl grammar) {
+        org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
         String packageName = grammar.settings().stream()
             .filter(s -> "package".equals(s.key()))
             .map(s -> s.value() instanceof StringSettingValue sv ? sv.value() : "")
@@ -31,6 +32,14 @@ public class LSPLauncherGenerator implements CodeGenerator {
             %spublic abstract class %s {
 
                 protected abstract %s createServer();
+
+                /** Standalone entry point used by generated extension JAR manifests. */
+                public static void main(String[] args) throws Exception {
+                    var launcher = new %s() {
+                        @Override protected %s createServer() { return new %s() {}; }
+                    };
+                    System.exit(launcher.launchStdio());
+                }
 
                 public void launch() throws IOException {
                     launch(System.in, System.out);
@@ -83,7 +92,7 @@ public class LSPLauncherGenerator implements CodeGenerator {
                     }
                 }
             }
-            """.formatted(packageName, CodeGenerator.generatedAnnotation("org.unlaxer.dsl.codegen.LSPLauncherGenerator"), launcherClass, serverClass);
+            """.formatted(packageName, CodeGenerator.generatedAnnotation("org.unlaxer.dsl.codegen.LSPLauncherGenerator"), launcherClass, serverClass, launcherClass, serverClass, serverClass);
         return new GeneratedSource(packageName, launcherClass, body);
     }
 }

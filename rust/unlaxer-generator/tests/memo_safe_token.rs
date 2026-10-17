@@ -34,7 +34,7 @@ fn validates_memo_safe_aliases_deterministically() {
             "memoSafeToken undefined token alias MISSING",
         ),
         (
-            "@memoSafeToken: BUILTIN token BUILTIN = REGEX('[a-z]+')",
+            "@memoSafeToken: BUILTIN token BUILTIN = CI('a')",
             "memoSafeToken alias must name a Simple token BUILTIN",
         ),
         (
