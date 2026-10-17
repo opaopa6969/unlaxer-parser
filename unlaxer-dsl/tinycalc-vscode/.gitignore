@@ -3,3 +3,5 @@ out/
 target/
 server-dist/
 *.vsix
+
+.vscode-test/

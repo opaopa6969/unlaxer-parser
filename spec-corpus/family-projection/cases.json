@@ -1,0 +1,490 @@
+[
+  {
+    "name": "PlainSum",
+    "grammar": "grammar PlainSum { @package: preferredprobe @whitespace: none @root @mapping(Family) Root ::= A | B; @mapping(Item,params=[text]) A ::= '1' @text; @mapping(Other,params=[text]) B ::= '2' @text; }",
+    "java": "protected String evalItem(PlainSumAST.Item n){return n.text();} protected String evalOther(PlainSumAST.Other n){return n.text();}",
+    "rust": "fn eval_item(&mut self,text:&str,_:unlaxer_runtime::Span)->String{text.into()} fn eval_other(&mut self,text:&str,_:unlaxer_runtime::Span)->String{text.into()}",
+    "cases": [
+      {
+        "input": "1",
+        "candidates": [
+          [
+            "Item",
+            0,
+            0,
+            1,
+            "1"
+          ],
+          [
+            "Item",
+            1,
+            0,
+            1,
+            "1"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "2",
+        "candidates": [
+          [
+            "Other",
+            0,
+            0,
+            1,
+            "2"
+          ],
+          [
+            "Other",
+            1,
+            0,
+            1,
+            "2"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "?",
+        "stage": "parse"
+      }
+    ],
+    "ordinary": true
+  },
+  {
+    "name": "MappedAlias",
+    "grammar": "grammar MappedAlias { @package: preferredprobe @whitespace: none @root @mapping(Family) Root ::= A; @mapping(Item,params=[text]) A ::= '😀' @text; }",
+    "java": "protected String evalItem(MappedAliasAST.Item n){return n.text();}",
+    "rust": "fn eval_item(&mut self,text:&str,_:unlaxer_runtime::Span)->String{text.into()}",
+    "cases": [
+      {
+        "input": "😀",
+        "candidates": [
+          [
+            "Item",
+            0,
+            0,
+            1,
+            "😀"
+          ],
+          [
+            "Item",
+            1,
+            0,
+            1,
+            "😀"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "?",
+        "stage": "parse"
+      }
+    ],
+    "ordinary": true
+  },
+  {
+    "name": "SharedSum",
+    "grammar": "grammar SharedSum { @package: preferredprobe @whitespace: none @root @mapping(Family) Root ::= A | B; @mapping(Item,params=[text]) A ::= '😀' @text; @mapping(Item,params=[text]) B ::= 'é' @text; }",
+    "java": "protected String evalItem(SharedSumAST.Item n){return n.text();}",
+    "rust": "fn eval_item(&mut self,text:&str,_:unlaxer_runtime::Span)->String{text.into()}",
+    "cases": [
+      {
+        "input": "😀",
+        "candidates": [
+          [
+            "Item",
+            0,
+            0,
+            1,
+            "😀"
+          ],
+          [
+            "Item",
+            1,
+            0,
+            1,
+            "😀"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "é",
+        "candidates": [
+          [
+            "Item",
+            0,
+            0,
+            2,
+            "é"
+          ],
+          [
+            "Item",
+            1,
+            0,
+            2,
+            "é"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "?",
+        "stage": "parse"
+      }
+    ],
+    "ordinary": true
+  },
+  {
+    "name": "NestedFamily",
+    "grammar": "grammar NestedFamily { @package: preferredprobe @whitespace: none @root @mapping(Outer) Root ::= Mid | C; @mapping(Family) Mid ::= A | B; @mapping(Item,params=[text]) A ::= '😀' @text; @mapping(Other,params=[text]) B ::= 'é' @text; @mapping(Third,params=[text]) C ::= 'z' @text; }",
+    "java": "protected String evalItem(NestedFamilyAST.Item n){return n.text();} protected String evalOther(NestedFamilyAST.Other n){return n.text();} protected String evalThird(NestedFamilyAST.Third n){return n.text();}",
+    "rust": "fn eval_item(&mut self,text:&str,_:unlaxer_runtime::Span)->String{text.into()} fn eval_other(&mut self,text:&str,_:unlaxer_runtime::Span)->String{text.into()} fn eval_third(&mut self,text:&str,_:unlaxer_runtime::Span)->String{text.into()}",
+    "cases": [
+      {
+        "input": "😀",
+        "candidates": [
+          [
+            "Item",
+            0,
+            0,
+            1,
+            "😀"
+          ],
+          [
+            "Item",
+            1,
+            0,
+            1,
+            "😀"
+          ],
+          [
+            "Item",
+            2,
+            0,
+            1,
+            "😀"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "é",
+        "candidates": [
+          [
+            "Other",
+            0,
+            0,
+            2,
+            "é"
+          ],
+          [
+            "Other",
+            1,
+            0,
+            2,
+            "é"
+          ],
+          [
+            "Other",
+            2,
+            0,
+            2,
+            "é"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "z",
+        "candidates": [
+          [
+            "Third",
+            0,
+            0,
+            1,
+            "z"
+          ],
+          [
+            "Third",
+            1,
+            0,
+            1,
+            "z"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "?",
+        "stage": "parse"
+      }
+    ],
+    "ordinary": true
+  },
+  {
+    "name": "DottedPlain",
+    "grammar": "grammar DottedPlain { @package: preferredprobe @whitespace: none @root @mapping(Family) Root ::= A | B; @mapping(Family.Item,params=[text]) A ::= 'a' '😀' @text; @mapping(Family.Other,params=[text]) B ::= 'b' 'é' @text; }",
+    "java": "protected String evalFamilyItem(DottedPlainAST.Family.Item n){return String.valueOf(n.text());} protected String evalFamilyOther(DottedPlainAST.Family.Other n){return String.valueOf(n.text());}",
+    "rust": "fn eval_family__item(&mut self,text:&str,_span:unlaxer_runtime::Span)->String{text.into()} fn eval_family__other(&mut self,text:&str,_span:unlaxer_runtime::Span)->String{text.into()}",
+    "cases": [
+      {
+        "input": "a😀",
+        "candidates": [
+          [
+            "Item",
+            0,
+            0,
+            2,
+            "😀"
+          ],
+          [
+            "Item",
+            1,
+            0,
+            2,
+            "😀"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "bé",
+        "candidates": [
+          [
+            "Other",
+            0,
+            0,
+            3,
+            "é"
+          ],
+          [
+            "Other",
+            1,
+            0,
+            3,
+            "é"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "?",
+        "stage": "parse"
+      }
+    ],
+    "ordinary": true
+  },
+  {
+    "name": "DottedCommon",
+    "grammar": "grammar DottedCommon { @package: preferredprobe @whitespace: none @root @mapping(Family) @commonField(text) Root ::= A | B; @mapping(Family.Item,params=[text]) A ::= 'a' '😀' @text; @mapping(Family.Other,params=[text]) B ::= 'b' 'é' @text; }",
+    "java": "protected String evalFamilyItem(DottedCommonAST.Family.Item n){return String.valueOf(n.text());} protected String evalFamilyOther(DottedCommonAST.Family.Other n){return String.valueOf(n.text());}",
+    "rust": "fn eval_family__item(&mut self,text:&str,_span:unlaxer_runtime::Span)->String{text.into()} fn eval_family__other(&mut self,text:&str,_span:unlaxer_runtime::Span)->String{text.into()}",
+    "cases": [
+      {
+        "input": "a😀",
+        "candidates": [
+          [
+            "Item",
+            0,
+            0,
+            2,
+            "😀"
+          ],
+          [
+            "Item",
+            1,
+            0,
+            2,
+            "😀"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "bé",
+        "candidates": [
+          [
+            "Other",
+            0,
+            0,
+            3,
+            "é"
+          ],
+          [
+            "Other",
+            1,
+            0,
+            3,
+            "é"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "?",
+        "stage": "parse"
+      }
+    ],
+    "ordinary": true
+  },
+  {
+    "name": "SharedRecord",
+    "grammar": "grammar SharedRecord { @package: preferredprobe @whitespace: none @root @mapping(Pair,params=[left,right]) Root ::= A @left '+' B @right; @mapping(Item,params=[text]) A ::= '1' @text; @mapping(Item,params=[text]) B ::= '2' @text; }",
+    "java": "protected String evalPair(SharedRecordAST.Pair n){return \"pair\";} protected String evalItem(SharedRecordAST.Item n){return String.valueOf(n.text());}",
+    "rust": "fn eval_pair(&mut self,_left:&Ast,_right:&Ast,_span:unlaxer_runtime::Span)->String{\"pair\".into()} fn eval_item(&mut self,text:&str,_span:unlaxer_runtime::Span)->String{text.into()}",
+    "cases": [
+      {
+        "input": "1+2",
+        "candidates": [
+          [
+            "Pair",
+            0,
+            0,
+            3,
+            "pair"
+          ],
+          [
+            "Item",
+            2,
+            0,
+            1,
+            "1"
+          ],
+          [
+            "Item",
+            2,
+            2,
+            3,
+            "2"
+          ]
+        ],
+        "select": 2
+      }
+    ],
+    "ordinary": true
+  },
+  {
+    "name": "PlainCommon",
+    "grammar": "grammar PlainCommon { @package: preferredprobe @whitespace: none @root @mapping(Family) @commonField(text) Root ::= A | B; @mapping(Item,params=[text]) A ::= '1' @text; @mapping(Other,params=[text]) B ::= '2' @text; }",
+    "java": "protected String evalItem(PlainCommonAST.Item n){return n.text();} protected String evalOther(PlainCommonAST.Other n){return n.text();}",
+    "rust": "fn eval_item(&mut self,text:&str,_:unlaxer_runtime::Span)->String{text.into()} fn eval_other(&mut self,text:&str,_:unlaxer_runtime::Span)->String{text.into()}",
+    "cases": [
+      {
+        "input": "1",
+        "candidates": [
+          [
+            "Item",
+            0,
+            0,
+            1,
+            "1"
+          ],
+          [
+            "Item",
+            1,
+            0,
+            1,
+            "1"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "2",
+        "candidates": [
+          [
+            "Other",
+            0,
+            0,
+            1,
+            "2"
+          ],
+          [
+            "Other",
+            1,
+            0,
+            1,
+            "2"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "?",
+        "stage": "parse"
+      }
+    ],
+    "ordinary": true
+  },
+  {
+    "name": "CapturedFamily",
+    "grammar": "grammar CapturedFamily { @package: preferredprobe @whitespace: none @root @mapping(Pair,params=[value]) Root ::= Family @value; @mapping(Sum) Family ::= A | B; @mapping(Item,params=[text]) A ::= '😀' @text; @mapping(Other,params=[text]) B ::= 'é' @text; }",
+    "java": "protected String evalPair(CapturedFamilyAST.Pair n){CapturedFamilyAST.Sum v=n.value();return eval(v);} protected String evalItem(CapturedFamilyAST.Item n){return n.text();} protected String evalOther(CapturedFamilyAST.Other n){return n.text();}",
+    "rust": "fn eval_pair(&mut self,value:&Ast,_:unlaxer_runtime::Span)->String{evaluate(value,self)} fn eval_item(&mut self,text:&str,_:unlaxer_runtime::Span)->String{text.into()} fn eval_other(&mut self,text:&str,_:unlaxer_runtime::Span)->String{text.into()}",
+    "cases": [
+      {
+        "input": "😀",
+        "candidates": [
+          [
+            "Pair",
+            0,
+            0,
+            1,
+            "😀"
+          ],
+          [
+            "Item",
+            2,
+            0,
+            1,
+            "😀"
+          ],
+          [
+            "Item",
+            3,
+            0,
+            1,
+            "😀"
+          ]
+        ],
+        "select": 1
+      },
+      {
+        "input": "é",
+        "candidates": [
+          [
+            "Pair",
+            0,
+            0,
+            2,
+            "é"
+          ],
+          [
+            "Other",
+            2,
+            0,
+            2,
+            "é"
+          ],
+          [
+            "Other",
+            3,
+            0,
+            2,
+            "é"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "?",
+        "stage": "parse"
+      }
+    ],
+    "ordinary": true
+  }
+]

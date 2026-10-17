@@ -166,33 +166,6 @@ class ParserTokenEmitter {
     }
 
     /**
-     * REGEX トークン用の RegexTokenParser 内部クラス群を生成する。
-     * 例: token ID = REGEX('[a-z]+')
-     *   → public static class IdParser extends org.unlaxer.dsl.runtime.RegexTokenParser { ... }
-     */
-    static String generateRegexClasses(ParserGenerator.GenContext ctx) {
-        if (ctx.tokenRegexMap.isEmpty()) return "";
-        StringBuilder sb = new StringBuilder();
-        for (Map.Entry<String, String> e : ctx.tokenRegexMap.entrySet()) {
-            String tokenName = e.getKey();
-            String pattern = e.getValue();
-            String className = ParserCodegenUtil.toParserClassName(tokenName);
-            if (collidesWithRuleName(className, ctx)) {
-                continue;
-            }
-            sb.append("    // --- REGEX parser for token ").append(tokenName).append(" ---\n");
-            sb.append("    public static class ").append(className)
-              .append(" extends org.unlaxer.dsl.runtime.RegexTokenParser implements org.unlaxer.context.DiagnosticsAgnostic {\n");
-            sb.append("        private static final long serialVersionUID = 1L;\n");
-            sb.append("        public ").append(className).append("() {\n");
-            sb.append("            super(\"").append(ParserCodegenUtil.escapeString(pattern)).append("\");\n");
-            sb.append("        }\n");
-            sb.append("    }\n\n");
-        }
-        return sb.toString();
-    }
-
-    /**
      * Mirrors {@link #generateSimpleTokenWrappers}'s skip guard: returns true when the
      * generated token parser class name collides with a rule-derived parser class name,
      * which would produce a duplicate class in the generated {@code Parsers} class.

@@ -47,6 +47,13 @@ public class EvaluatorGenerator implements CodeGenerator {
 
     @Override
     public GeneratedSource generate(GrammarDecl grammar) {
+        org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
+        GrammarValidator.requireValidBoundedRepeatElements(grammar);
+        LeftRecursionAnalysis.requireValid(grammar);
+        CommonFieldSchema.build(grammar);
+        EnumSchema.validate(grammar);
+        TypeofConstraints.validate(grammar);
+        var evaluations = EvalSchema.specifications(grammar);
         String packageName = getPackageName(grammar);
         String grammarName = grammar.name();
         String astClass = grammarName + "AST";
@@ -54,11 +61,15 @@ public class EvaluatorGenerator implements CodeGenerator {
 
         // A semantic method is required for each emitted concrete record, not for
         // intermediate sum interfaces. Keep declaration order and flat API names.
-        Map<String, RuleDecl> mappedRules = MappingShape.astMappings(grammar);
+        Map<String, RuleDecl> mappedRules = new java.util.LinkedHashMap<>(MappingShape.astMappings(grammar));
+        var rootEnums = EnumSchema.rootEnums(grammar);
+        for (var rule : grammar.rules()) if (rootEnums.containsKey(rule.name())) {
+            mappedRules.put(rootEnums.get(rule.name()), EnumSchema.projection(rule,rootEnums.get(rule.name())));
+        }
         Set<String> sumTypes = MappingShape.sumTypeNames(grammar);
         for (var entry : mappedRules.entrySet()) {
-            if (sumTypes.contains(entry.getKey()) && getEvalAnnotation(entry.getValue())
-                    .filter(eval -> !"manual".equals(eval.strategy())).isPresent()) {
+            if (sumTypes.contains(entry.getKey()) && Optional.ofNullable(evaluations.get(entry.getKey()))
+                    .filter(EvalSchema::automatic).isPresent()) {
                 throw new IllegalArgumentException("Automatic @eval requires a concrete mapping, not sum "
                     + entry.getKey() + "; annotate its variants instead");
             }
@@ -68,6 +79,7 @@ public class EvaluatorGenerator implements CodeGenerator {
         boolean needsEvalLeaf = false;
         boolean needsApplyBinary = false;
         boolean needsResolveVariable = false;
+        boolean needsConvertValue = false;
 
         StringBuilder sb = new StringBuilder();
         sb.append("package ").append(packageName).append(";\n\n");
@@ -133,7 +145,7 @@ public class EvaluatorGenerator implements CodeGenerator {
                     methodsSb.append("    }\n");
                     continue;
                 }
-                Optional<EvalAnnotation> evalOpt = getEvalAnnotation(rule);
+                Optional<EvalAnnotation> evalOpt = Optional.ofNullable(evaluations.get(name));
 
                 if (evalOpt.isPresent() && !"manual".equals(evalOpt.get().strategy())) {
                     EvalAnnotation eval = evalOpt.get();
@@ -152,9 +164,11 @@ public class EvaluatorGenerator implements CodeGenerator {
                             generateConditionalMethod(methodsSb, astClass, name, methodName, eval);
                         }
                         case "passthrough" -> {
+                            needsConvertValue = true;
                             generatePassthroughMethod(methodsSb, astClass, name, methodName, eval, grammarName);
                         }
                         case "literal" -> {
+                            needsConvertValue = true;
                             generateLiteralMethod(methodsSb, astClass, name, methodName, eval);
                         }
                         default -> {
@@ -173,8 +187,16 @@ public class EvaluatorGenerator implements CodeGenerator {
             sb.append("\n");
 
             // 追加の abstract ヘルパーメソッド
+            if (needsConvertValue) {
+                sb.append("    /** Explicit conversion into T; no unchecked generic cast is generated. */\n");
+                sb.append("    protected abstract T convertValue(Object value);\n");
+            }
             if (needsEvalLeaf) {
                 sb.append("    protected abstract T evalLeaf(String literal);\n");
+                sb.append("    private T evalBinaryOperand(Object value) {\n");
+                sb.append("        if (value instanceof ").append(astClass).append(" ast) return eval(ast);\n");
+                if (grammar.rules().stream().anyMatch(EnumSchema::isEnum)) sb.append("        if (value instanceof ").append(astClass).append(".EnumValue occurrence) value = occurrence.value();\n");
+                sb.append("        return evalLeaf(java.util.Objects.requireNonNull(value).toString());\n    }\n");
             }
             if (needsApplyBinary) {
                 sb.append("    protected abstract T applyBinary(String op, T left, T right);\n");
@@ -233,15 +255,17 @@ public class EvaluatorGenerator implements CodeGenerator {
             String methodName, EvalAnnotation eval) {
         sb.append("    protected T ").append(methodName).append("(")
           .append(astClass).append(".").append(name).append(" node) {\n");
-        sb.append("        if (node.left() == null && node.right().isEmpty() && node.op().size() == 1) {\n");
+        sb.append("        Object left = node.left();\n");
+        sb.append("        if (left == null && node.right().isEmpty() && node.op().size() == 1) {\n");
         sb.append("            return evalLeaf(node.op().get(0));\n");
         sb.append("        }\n");
-        sb.append("        if (node.left() != null && node.op().isEmpty() && node.right().isEmpty()) {\n");
-        sb.append("            return eval(node.left());\n");
+        sb.append("        if (left != null && node.op().isEmpty() && node.right().isEmpty()) {\n");
+        sb.append("            return evalBinaryOperand(left);\n");
         sb.append("        }\n");
-        sb.append("        T current = eval(node.left());\n");
-        sb.append("        for (int i = 0; i < Math.min(node.op().size(), node.right().size()); i++) {\n");
-        sb.append("            current = applyBinary(node.op().get(i), current, eval(node.right().get(i)));\n");
+        sb.append("        if (node.op().size() != node.right().size()) throw new IllegalArgumentException(\"binary operator/operand count mismatch\");\n");
+        sb.append("        T current = evalBinaryOperand(left);\n");
+        sb.append("        for (int i = 0; i < node.op().size(); i++) {\n");
+        sb.append("            current = applyBinary(node.op().get(i), current, evalBinaryOperand(node.right().get(i)));\n");
         sb.append("        }\n");
         sb.append("        return current;\n");
         sb.append("    }\n");
@@ -266,30 +290,28 @@ public class EvaluatorGenerator implements CodeGenerator {
             String methodName, EvalAnnotation eval) {
         sb.append("    protected T ").append(methodName).append("(")
           .append(astClass).append(".").append(name).append(" node) {\n");
-        sb.append("        Object cond = eval(node.condition());\n");
+        sb.append("        Object cond = eval((").append(astClass).append(") node.condition());\n");
         sb.append("        boolean condBool = Boolean.TRUE.equals(cond) || \"true\".equalsIgnoreCase(String.valueOf(cond));\n");
-        sb.append("        return condBool ? eval(node.thenExpr()) : eval(node.elseExpr());\n");
+        sb.append("        return condBool ? eval((").append(astClass).append(") node.thenExpr()) : eval((").append(astClass).append(") node.elseExpr());\n");
         sb.append("    }\n");
     }
 
     private void generatePassthroughMethod(StringBuilder sb, String astClass, String name,
             String methodName, EvalAnnotation eval, String grammarName) {
         String p4AstClass = grammarName + "AST";
-        sb.append("    @SuppressWarnings(\"unchecked\")\n");
         sb.append("    protected T ").append(methodName).append("(")
           .append(astClass).append(".").append(name).append(" node) {\n");
         sb.append("        Object value = node.value();\n");
         sb.append("        if (value instanceof ").append(p4AstClass).append(" ast) return eval(ast);\n");
-        sb.append("        return (T) value;\n");
+        sb.append("        return convertValue(value);\n");
         sb.append("    }\n");
     }
 
     private void generateLiteralMethod(StringBuilder sb, String astClass, String name,
             String methodName, EvalAnnotation eval) {
-        sb.append("    @SuppressWarnings(\"unchecked\")\n");
         sb.append("    protected T ").append(methodName).append("(")
           .append(astClass).append(".").append(name).append(" node) {\n");
-        sb.append("        return (T) (Object) node.value();\n");
+        sb.append("        return convertValue(node.value());\n");
         sb.append("    }\n");
     }
 
@@ -313,6 +335,6 @@ public class EvaluatorGenerator implements CodeGenerator {
     }
 
     private static String escapeJavaString(String s) {
-        return s.replace("\\", "\\\\").replace("\"", "\\\"");
+        return org.unlaxer.dsl.codegen.ParserCodegenUtil.escapeString(s);
     }
 }

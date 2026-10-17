@@ -1,0 +1,27 @@
+[
+  {
+    "name": "unknown",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n \n @root @mapping(Pair,params=[left,right]) Root ::= 'a' @left '=' @typeof(missing) 'a' @right;\n}",
+    "code": "E-TYPEOF-UNKNOWN-CAPTURE"
+  },
+  {
+    "name": "missing-own",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n \n @root @mapping(Pair,params=[left]) Root ::= 'a' @left '=' @typeof(left) 'a';\n}",
+    "code": "E-TYPEOF-MISSING-CAPTURE"
+  },
+  {
+    "name": "nested-unknown",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n \n @root @mapping(Pair,params=[left,right,whole]) Root ::= 'a' @left '=' @typeof(left) (@typeof(missing) 'a' @right) @whole;\n}",
+    "code": "E-TYPEOF-UNKNOWN-CAPTURE"
+  },
+  {
+    "name": "unmapped-helper",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n Helper ::= 'a' @left @typeof(left) 'a' @right;\n @root @mapping(Pair,params=[left,right]) Root ::= 'a' @left '=' 'a' @right;\n}",
+    "code": "E-TYPEOF-MAPPING"
+  },
+  {
+    "name": "skipped-helper",
+    "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n @skip @mapping(Skipped,params=[left,right]) Helper ::= 'a' @left @typeof(left) 'a' @right;\n @root @mapping(Pair,params=[left,right]) Root ::= 'a' @left '=' 'a' @right;\n}",
+    "code": "E-TYPEOF-MAPPING"
+  }
+]
