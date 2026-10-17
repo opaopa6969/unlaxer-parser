@@ -116,6 +116,7 @@ public final class GrammarValidator {
             errors.add(new ValidationIssue(error.getMessage().split(":", 2)[0], error.getMessage(),
                 "Rewrite using repetition or input-consuming right recursion."));
         }
+        errors.addAll(NestedCaptures.problems(grammar));
         validateScalarRanges(grammar, errors);
         errors.addAll(validateCaseInsensitiveTokens(grammar));
 

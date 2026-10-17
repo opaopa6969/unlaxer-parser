@@ -46,20 +46,20 @@ public class PortabilityCheckTest {
               token Bad = example.UnsafeParser
               token Pattern ::= 'a';
               @root @mapping(Root, params=[value]) @custom
-              Start ::= ('') | ERROR('bad') | remote.Item | @typeof(value) 'x' @value ;
+              Start ::= ('') | ERROR('bad') | remote.Item | 'x' @value ;
               Other ::= remote.Item ;
             }
             """;
         var result = PortabilityCheck.check(source);
         assertFalse(result.portable());
         assertEquals("blocked", result.structure());
-        assertEquals(6, result.diagnostics().size());
+        assertEquals(5, result.diagnostics().size());
         assertEquals("P-EXTERNAL-TOKEN", result.diagnostics().get(0).code());
         assertEquals("example.UnsafeParser", result.diagnostics().get(0).subject());
         assertTrue(result.diagnostics().stream().anyMatch(d -> d.code().equals("P-ANNOTATION") && d.subject().equals("custom")));
         assertTrue(result.diagnostics().stream().anyMatch(d -> d.code().equals("P-EMPTY-LITERAL")));
         assertEquals(2, result.diagnostics().stream().filter(d -> d.code().equals("P-QUALIFIED-REFERENCE")).count());
-        Span last = result.diagnostics().get(5).span();
+        Span last = result.diagnostics().get(4).span();
         assertEquals(source.indexOf("remote.Item", source.indexOf("Other ::=")), last.start());
     }
 

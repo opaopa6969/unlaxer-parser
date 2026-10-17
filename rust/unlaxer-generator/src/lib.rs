@@ -9,6 +9,7 @@ mod lexical;
 mod lexical_contexts;
 pub mod lowering;
 pub mod modules;
+mod nested_captures;
 mod numeric_fields;
 pub mod packaged_profiles;
 pub mod packages;

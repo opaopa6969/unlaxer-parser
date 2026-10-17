@@ -80,6 +80,7 @@ class ParserRuleEmitter {
         record OptionalOf(ElementModel inner) implements ElementModel {}
         record BoundedRepeatOf(ElementModel inner, String min, String max) implements ElementModel {}
         record Captured(ElementModel inner, List<String> bindings) implements ElementModel {}
+        record Boundary(String kind, ElementModel inner) implements ElementModel {}
     }
 
     // =========================================================================
@@ -983,6 +984,26 @@ class ParserRuleEmitter {
     // =========================================================================
 
     static ElementModel resolveElement(ParserGenerator.GenContext ctx, String ruleName, AtomicElement element) {
+        var plan=ctx.captureBindings.get(ruleName);
+        var bindings=plan.bindings(element);
+        if (plan.nested && !bindings.isEmpty()) return new ElementModel.Captured(resolveNested(ctx,ruleName,element),bindings);
+        return resolveFlatElement(ctx,ruleName,element);
+    }
+    private static ElementModel resolveNested(ParserGenerator.GenContext ctx,String ruleName,AtomicElement element) {
+        if (element instanceof OptionalElement e) return new ElementModel.Boundary("OPTIONAL",new ElementModel.OptionalOf(nestedBody(ctx,ruleName,e.body(),element)));
+        if (element instanceof RepeatElement e) return new ElementModel.Boundary("LIST",new ElementModel.ZeroOrMoreOf(nestedBody(ctx,ruleName,e.body(),element)));
+        if (element instanceof OneOrMoreElement e) return new ElementModel.Boundary("LIST",new ElementModel.OneOrMoreOf(resolveNested(ctx,ruleName,e.body())));
+        if (element instanceof BoundedRepeatElement e) return new ElementModel.Boundary("LIST",new ElementModel.BoundedRepeatOf(resolveNested(ctx,ruleName,e.body()),Integer.toString(e.min()),e.max()==BoundedRepeatElement.UNBOUNDED?"Integer.MAX_VALUE":Integer.toString(e.max())));
+        if (element instanceof GroupElement e) return nestedBody(ctx,ruleName,e.body(),element);
+        var plain=resolveFlatElement(ctx,ruleName,element);
+        if (plain instanceof ElementModel.Captured c) plain=c.inner();
+        return new ElementModel.Boundary("VALUE",plain);
+    }
+    private static ElementModel nestedBody(ParserGenerator.GenContext ctx,String ruleName,RuleBody body,AtomicElement owner) {
+        if (isSingleAtomicElement(body)) return resolveNested(ctx,ruleName,getSingleAtomicElementFrom(body));
+        return new ElementModel.Boundary("VALUE",new ElementModel.ClassRef(ctx.helperName(ruleName,owner)+".class"));
+    }
+    private static ElementModel resolveFlatElement(ParserGenerator.GenContext ctx, String ruleName, AtomicElement element) {
         final ElementModel model;
         if (element instanceof TerminalElement t) {
             model = new ElementModel.WordMatch(t.value());
@@ -1139,6 +1160,7 @@ class ParserRuleEmitter {
         if (model instanceof ElementModel.BoundedRepeatOf m) {
             return "new Repeat(" + renderInner(m.inner(), adapterShadowsWordParser, tokenStream) + ", " + m.min() + ", " + m.max() + ")";
         }
+        if (model instanceof ElementModel.Boundary m) return "org.unlaxer.parser.combinator.CaptureBoundaryParser.wrap(org.unlaxer.parser.combinator.CaptureBoundaryParser.Kind."+m.kind()+", "+renderElement(m.inner(),adapterShadowsWordParser,tokenStream)+")";
         if (model instanceof ElementModel.Captured m) {
             return "new __CaptureSite(" + renderElement(m.inner(), adapterShadowsWordParser, tokenStream) + ", " + bindingArguments(m.bindings()) + ")";
         }

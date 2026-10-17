@@ -6,6 +6,7 @@ mod associative;
 pub mod dap;
 mod enums;
 pub mod ir;
+mod nested;
 pub mod preferred;
 pub use enums::{enum_constant_name, validate_enum_type};
 pub mod lexical;
@@ -159,6 +160,7 @@ fn contains_recovery(expression: &Expression) -> bool {
         | LexicalContextScope { child, .. }
         | TextValue(child)
         | ValueBoundary(child)
+        | CaptureBoundary { child, .. }
         | Delimited(child)
         | OptionalExpr(child)
         | Repeat { child, .. } => contains_recovery(child),
@@ -513,6 +515,7 @@ fn expression(expr: &Expression) -> String {
         Delimited(child) => format!("Expr::Sequence(vec![{}])", expression(child)),
         TextValue(child) => format!("{}.text_value()", expression(child)),
         ValueBoundary(child) => format!("{}.value_boundary()", expression(child)),
+        CaptureBoundary { kind, child } => format!("Expr::CaptureBoundary(unlaxer_runtime::capture_tree::Kind::{kind:?}, Box::new({}))", expression(child)),
         LexicalContextScope { child, terminals } => format!(
             "{}.lexical_context_scope(vec![{}])", expression(child),
             terminals.iter().map(|(name, literal, definition)| format!(
@@ -564,9 +567,9 @@ fn expression(expr: &Expression) -> String {
             let child = expression(child);
             let separator = expression(separator);
             if metadata {
-                format!("Expr::sequence([{child}, Expr::sequence([{separator}, Expr::Capture({}, Box::new({child}))]).zero_or_more()])",quote(preferred::EXTRA))
+                format!("Expr::sequence([{child}, Expr::sequence([{separator}, Expr::Capture({}, Box::new({child}))]).repeat_java(0, None)])",quote(preferred::EXTRA))
             } else {
-                format!("{child}.separated_by({separator})")
+                format!("{child}.separated_by_java({separator})")
             }
         },
     }
@@ -626,6 +629,7 @@ fn grapheme_capture(ir: &GrammarIr, body: &Expression, name: &str) -> bool {
             | Delimited(child)
             | TextValue(child)
             | ValueBoundary(child)
+            | CaptureBoundary { child, .. }
             | Repeat { child, .. }
             | TriviaScope { child, .. }
             | RuleEffects { child, .. }
@@ -722,6 +726,15 @@ fn mapper(ir: &GrammarIr) -> String {
     {
         out.push_str("\nfn optional<T>(mut values: Vec<T>, name: &str) -> Result<Option<T>, String> {\n    if values.len() > 1 { return Err(format!(\"expected at most one value for {name}, got {}\", values.len())); }\n    Ok(values.pop())\n}\n");
     }
+    if ir
+        .rules
+        .iter()
+        .filter_map(|r| r.mapping.as_ref())
+        .flat_map(|m| &m.fields)
+        .any(|f| matches!(f.kind, Kind::Nested { .. }))
+    {
+        out.push_str(nested::HELPERS);
+    }
     out.push_str(&associative::helpers(ir));
     out.push_str("\nfn map_node(tree: &Tree, id: usize) -> Result<Vec<Ast>, String> {\n    match tree.nodes[id].rule {\n");
     for (index, rule) in ir.rules.iter().enumerate() {
@@ -764,10 +777,15 @@ fn mapper(ir: &GrammarIr) -> String {
                     continue;
                 }
                 writeln!(out, "        r#{}: {{\n            let mut values = Vec::new();\n            for capture in node.captures.iter().filter(|c| c.name == {}) {{", field.name, quote(&field.name)).unwrap();
-                if let Some(code) = associative::capture(Some(mapping), field, "                ") {
+                if let Kind::Nested { leaf, containers } = &field.kind {
+                    writeln!(out, "                let nested = nested_capture(tree, capture)?;\n                values.push({}?);", nested::mapped(leaf, containers, "&nested", 0)).unwrap();
+                } else if let Some(code) =
+                    associative::capture(Some(mapping), field, "                ")
+                {
                     out.push_str(&code);
                 } else {
                     out.push_str(match field.kind {
+                    Kind::Nested { .. } => unreachable!("handled nested field"),
                     Kind::Integer => "                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).parse::<i32>().map_err(|_| format!(\"invalid i32 capture {} at {}..{}\", capture.name, capture.span.start, capture.span.end))?);\n",
                     Kind::NullableNode => unreachable!("validated associative projection"),
                     Kind::Node => "                values.extend(map_nodes(tree, &capture.nodes)?);\n",
@@ -857,7 +875,12 @@ fn pattern(mapping: &Mapping, ty: &str) -> String {
 }
 
 fn field_type(field: &Field, borrowed: bool) -> String {
+    if let Kind::Nested { leaf, containers } = &field.kind {
+        let value = nested::ty(leaf, containers);
+        return if borrowed { format!("&{value}") } else { value };
+    }
     let one = match (&field.kind, borrowed) {
+        (Kind::Nested { .. }, _) => unreachable!("handled nested field"),
         (Kind::Integer, true) => "&i32",
         (Kind::Integer, false) => "i32",
         (Kind::Node, true) => "&Ast",
@@ -887,6 +910,7 @@ fn field_type(field: &Field, borrowed: bool) -> String {
         Cardinality::Optional => format!("Option<{one}>"),
         Cardinality::Many => {
             let element = match field.kind {
+                Kind::Nested { .. } => unreachable!("handled nested field"),
                 Kind::Integer => "i32",
                 Kind::Node => "Ast",
                 Kind::NullableNode => "Option<Box<Ast>>",
@@ -937,6 +961,9 @@ fn mapped_value(field: &Field) -> String {
 
 fn field_json(field: &Field) -> String {
     let name = format!("r#{}", field.name);
+    if let Kind::Nested { leaf, containers } = &field.kind {
+        return nested::json(leaf, containers, &name, 0);
+    }
     let value = if field.kind == Kind::Integer {
         "value.to_string()"
     } else if field.kind != Kind::Text {
