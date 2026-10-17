@@ -3,7 +3,9 @@
 //! This crate accepts normalized IR, not UBNF source. Frontends must validate
 //! grammar semantics (including capture shapes, nullability and left recursion).
 pub mod dap;
+mod enums;
 pub mod ir;
+pub use enums::{enum_constant_name, validate_enum_type};
 pub mod lexical;
 pub mod lsp;
 mod validate;
@@ -160,11 +162,12 @@ fn contains_recovery(expression: &Expression) -> bool {
 
 fn ast(ir: &GrammarIr) -> String {
     let mut out = String::from(HEADER);
-    if mappings(ir).is_empty() {
+    if mappings(ir).is_empty() && ir.rules.iter().all(|r| r.enum_literals.is_empty()) {
         out.push_str("use unlaxer_runtime::Span;\n\n");
     } else {
         out.push_str("use unlaxer_runtime::{Span, json_string};\n\n");
     }
+    out.push_str(&enum_declarations(ir));
     if has_values(ir) {
         out.push_str("#[derive(Debug, Clone, PartialEq)]\npub enum AstValue {\n    Text { text: String, span: Span },\n    Node(Box<Ast>),\n}\n\nimpl AstValue {\n    pub fn span(&self) -> Span {\n        match self {\n            Self::Text { span, .. } => *span,\n            Self::Node(node) => node.span(),\n        }\n    }\n\n    pub fn canonical_json(&self) -> String {\n        match self {\n            Self::Text { text, .. } => json_string(text),\n            Self::Node(node) => node.canonical_json(),\n        }\n    }\n}\n\n");
     }
@@ -211,6 +214,58 @@ fn ast(ir: &GrammarIr) -> String {
         out.push_str("), span.start, span.end, fields.join(\",\"))\n            },\n");
     }
     out.push_str("        }\n    }\n}\n");
+    out
+}
+
+fn enum_declarations(ir: &GrammarIr) -> String {
+    let mut out = String::new();
+    for rule in ir.rules.iter().filter(|r| !r.enum_literals.is_empty()) {
+        out.push_str("#[allow(non_camel_case_types)]\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum ");
+        writeln!(out, "{} {{", rule.name).unwrap();
+        for literal in &rule.enum_literals {
+            writeln!(
+                out,
+                "    {},",
+                enum_constant_name(literal).expect("validated enum")
+            )
+            .unwrap();
+        }
+        writeln!(out, "}}\n\nimpl {} {{", rule.name).unwrap();
+        out.push_str(
+            "    pub fn from_text(text: &str) -> Result<Self, String> {\n        match text {\n",
+        );
+        for literal in &rule.enum_literals {
+            writeln!(
+                out,
+                "            {} => Ok(Self::{}),",
+                quote(literal),
+                enum_constant_name(literal).unwrap()
+            )
+            .unwrap();
+        }
+        writeln!(
+            out,
+            "            _ => Err(format!(\"unknown {}: {{text}}\")),\n        }}\n    }}\n",
+            rule.name
+        )
+        .unwrap();
+        out.push_str(
+            "    pub fn canonical_json(&self) -> String {\n        json_string(match self {\n",
+        );
+        for literal in &rule.enum_literals {
+            let name = enum_constant_name(literal).unwrap();
+            writeln!(out, "            Self::{name} => {},", quote(&name)).unwrap();
+        }
+        out.push_str("        })\n    }\n}\n\n");
+    }
+    out
+}
+
+fn enum_imports(ir: &GrammarIr) -> String {
+    let mut out = String::new();
+    for rule in ir.rules.iter().filter(|r| !r.enum_literals.is_empty()) {
+        writeln!(out, "use super::ast::{};", rule.name).unwrap();
+    }
     out
 }
 
@@ -530,11 +585,27 @@ fn mapper(ir: &GrammarIr) -> String {
     if has_values(ir) {
         out.push_str("use super::ast::AstValue;\n");
     }
+    out.push_str(&enum_imports(ir));
     out.push_str("use super::ast::Ast;\nuse unlaxer_runtime::Tree;\n\npub fn map(tree: &Tree) -> Result<Ast, String> {\n");
     if ir.rules.iter().any(|rule| contains_recovery(&rule.body)) {
         out.push_str("    if !tree.recoveries().is_empty() { return Err(\"cannot map recovered syntax\".into()); }\n");
     }
     out.push_str("    required(map_node(tree, tree.root)?, \"root\")\n}\n\nfn required<T>(mut values: Vec<T>, name: &str) -> Result<T, String> {\n    if values.len() != 1 { return Err(format!(\"expected one value for {name}, got {}\", values.len())); }\n    Ok(values.remove(0))\n}\n\nfn map_nodes(tree: &Tree, ids: &[usize]) -> Result<Vec<Ast>, String> {\n    let mut found = Vec::new();\n    for &id in ids { found.extend(map_node(tree, id)?); }\n    Ok(found)\n}\n");
+    for (index, rule) in ir
+        .rules
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| !r.enum_literals.is_empty())
+    {
+        writeln!(
+            out,
+            "\nfn map_enum_{index}(tree: &Tree, ids: &[usize]) -> Result<Vec<{}>, String> {{",
+            rule.name
+        )
+        .unwrap();
+        out.push_str("    let mut found = Vec::new();\n    for &id in ids {\n        let node = &tree.nodes[id];\n");
+        writeln!(out, "        if node.rule == {index} {{\n            found.push({}::from_text(tree.text(node.span))?);\n        }} else {{\n            found.extend(map_enum_{index}(tree, &node.children)?);\n        }}\n    }}\n    Ok(found)\n}}",rule.name).unwrap();
+    }
     if has_values(ir) {
         out.push_str("\nfn map_values(tree: &Tree, ids: &[usize]) -> Result<Vec<AstValue>, String> {\n    let mut found = Vec::new();\n    for &id in ids {\n        let node = &tree.nodes[id];\n        match node.rule {\n            unlaxer_runtime::TEXT_VALUE_RULE => found.push(AstValue::Text {\n                text: unlaxer_runtime::java_capture_text(tree.text(node.span)).to_owned(),\n                span: node.span,\n            }),\n");
         out.push_str("            unlaxer_runtime::VALUE_BOUNDARY_RULE => {\n                let values = map_values(tree, &node.children)?;\n                if !values.is_empty() && values.iter().all(|value| matches!(value, AstValue::Text { .. })) {\n                    found.push(AstValue::Text {\n                        text: unlaxer_runtime::java_capture_text(tree.text(node.span)).to_owned(),\n                        span: node.span,\n                    });\n                } else {\n                    found.extend(values);\n                }\n            },\n");
@@ -582,12 +653,31 @@ fn mapper(ir: &GrammarIr) -> String {
                 mapping.name
             )
             .unwrap();
+            if !rule.enum_literals.is_empty() {
+                writeln!(
+                    out,
+                    "        r#value: {}::from_text(tree.text(node.span))?,\n    }}])\n}}",
+                    rule.name
+                )
+                .unwrap();
+                continue;
+            }
             for field in &mapping.fields {
+                if let Kind::Enum(name) = &field.kind {
+                    let enum_id = ir
+                        .rules
+                        .iter()
+                        .position(|r| &r.name == name && !r.enum_literals.is_empty())
+                        .expect("validated enum field");
+                    writeln!(out, "        r#{}: {{\n            let mut values = Vec::new();\n            for capture in node.captures.iter().filter(|c| c.name == {}) {{\n                values.extend(map_enum_{enum_id}(tree, &capture.nodes)?);\n            }}\n            {}\n        }},",field.name,quote(&field.name),mapped_value(field)).unwrap();
+                    continue;
+                }
                 writeln!(out, "        r#{}: {{\n            let mut values = Vec::new();\n            for capture in node.captures.iter().filter(|c| c.name == {}) {{", field.name, quote(&field.name)).unwrap();
                 out.push_str(match field.kind {
                     Kind::Node => "                values.extend(map_nodes(tree, &capture.nodes)?);\n",
                     Kind::Value => "                values.extend(map_values(tree, &capture.nodes)?);\n",
                     Kind::Text if grapheme_capture(ir, &rule.body, &field.name) => "                values.push(tree.text(capture.span).to_owned());\n",
+                    Kind::Enum(_) => unreachable!("handled enum field"),
                     Kind::Text => "                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).to_owned());\n",
                 });
                 writeln!(
@@ -608,6 +698,7 @@ fn evaluator(ir: &GrammarIr) -> String {
     if has_values(ir) {
         out.push_str("use super::ast::AstValue;\n");
     }
+    out.push_str(&enum_imports(ir));
     out.push_str("use super::ast::Ast;\n");
     if !mappings(ir).is_empty() {
         out.push_str("use unlaxer_runtime::Span;\n");
@@ -634,7 +725,7 @@ fn evaluator(ir: &GrammarIr) -> String {
                     "r#{}{}",
                     f.name,
                     if f.cardinality == Cardinality::Optional {
-                        if f.kind == Kind::Value {
+                        if f.kind == Kind::Value || matches!(f.kind, Kind::Enum(_)) {
                             ".as_ref()"
                         } else {
                             ".as_deref()"
@@ -669,13 +760,26 @@ fn pattern(mapping: &Mapping, ty: &str) -> String {
 }
 
 fn field_type(field: &Field, borrowed: bool) -> String {
-    let one = match (field.kind, borrowed) {
+    let one = match (&field.kind, borrowed) {
         (Kind::Node, true) => "&Ast",
         (Kind::Node, false) => "Box<Ast>",
         (Kind::Text, true) => "&str",
         (Kind::Text, false) => "String",
         (Kind::Value, true) => "&AstValue",
         (Kind::Value, false) => "AstValue",
+        (Kind::Enum(name), _) => {
+            let one = if borrowed {
+                format!("&{name}")
+            } else {
+                name.clone()
+            };
+            return match field.cardinality {
+                Cardinality::One => one,
+                Cardinality::Optional => format!("Option<{one}>"),
+                Cardinality::Many if borrowed => format!("&[{name}]"),
+                Cardinality::Many => format!("Vec<{name}>"),
+            };
+        }
     };
     match field.cardinality {
         Cardinality::One => one.into(),
@@ -685,6 +789,7 @@ fn field_type(field: &Field, borrowed: bool) -> String {
                 Kind::Node => "Ast",
                 Kind::Text => "String",
                 Kind::Value => "AstValue",
+                Kind::Enum(_) => unreachable!("handled enum field"),
             };
             if borrowed {
                 format!("&[{element}]")

@@ -87,6 +87,8 @@ public class EditorPipelineConformanceTest {
                     }
                     if (!id.equals("inserted-identifier") && !id.equals("crossing-name") && !id.equals("limit") && !id.equals("keyword-fragment")) {
                         var languageServer=(org.eclipse.lsp4j.services.LanguageServer)loader.loadClass("example.semantic.TypedModelEditorServer").getConstructor().newInstance();
+                        languageServer.initialize(new org.eclipse.lsp4j.InitializeParams()).get();
+                        languageServer.initialized(new org.eclipse.lsp4j.InitializedParams());
                         var service=languageServer.getTextDocumentService();
                         service.didOpen(new org.eclipse.lsp4j.DidOpenTextDocumentParams(new org.eclipse.lsp4j.TextDocumentItem("memory:editor","TypedModel",7,source)));
                         int offset=source.offsetByCodePoints(0,test.get("cursor").getAsInt());String before=source.substring(0,offset);
