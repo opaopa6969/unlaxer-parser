@@ -30,7 +30,7 @@ pub struct Leaf {
 impl Leaf {
     pub fn span(&self) -> Span {
         match &self.source {
-            TokenSource::Input(span) => *span,
+            TokenSource::Input(span) | TokenSource::Projected { span, .. } => *span,
             TokenSource::Generated { anchor, .. } => Span {
                 start: *anchor,
                 end: *anchor,
@@ -40,6 +40,7 @@ impl Leaf {
     pub fn text<'a>(&'a self, source: &'a str) -> Option<&'a str> {
         match &self.source {
             TokenSource::Generated { text, .. } => Some(text),
+            TokenSource::Projected { text, .. } => Some(text),
             TokenSource::Input(span) => {
                 let start = source
                     .char_indices()
@@ -71,6 +72,7 @@ impl std::error::Error for Error {}
 pub(crate) struct Trace {
     limits: Limits,
     leaves: Vec<Leaf>,
+    nodes: Vec<Option<usize>>,
     bytes: usize,
     error: Option<Error>,
 }
@@ -83,6 +85,7 @@ impl Trace {
                 source_bytes: limits.source_bytes.min(hard.source_bytes),
             },
             leaves: vec![],
+            nodes: vec![],
             bytes: 0,
             error: None,
         }
@@ -114,6 +117,7 @@ impl Mark {
     pub(crate) fn restore(self, trace: Option<&mut Trace>) {
         if let Some(t) = trace {
             t.leaves.truncate(self.leaves);
+            t.nodes.truncate(self.leaves);
             t.bytes = self.bytes;
             t.error = self.error;
         }
@@ -160,6 +164,7 @@ impl ParseContext<'_> {
         let bytes = match &source {
             TokenSource::Input(span) => self.text(*span).map_or(0, str::len),
             TokenSource::Generated { text, .. } => text.len(),
+            TokenSource::Projected { text, .. } => text.len(),
         };
         let consumed = self.position();
         let matched = self.matched_position();
@@ -174,6 +179,7 @@ impl ParseContext<'_> {
             return;
         }
         trace.bytes += bytes;
+        trace.nodes.push(None);
         trace.leaves.push(Leaf {
             label,
             kind,
@@ -181,6 +187,65 @@ impl ParseContext<'_> {
             consumed,
             matched,
         });
+    }
+    pub(crate) fn record_trace_node(
+        &mut self,
+        label: &'static str,
+        kind: TokenKind,
+        source: &TokenSource,
+        node: usize,
+    ) {
+        let before = self
+            .token_trace
+            .as_ref()
+            .map_or(0, |trace| trace.leaves.len());
+        self.record_trace(label, kind, source);
+        if let Some(trace) = self.token_trace.as_mut() {
+            if trace.leaves.len() > before {
+                trace.nodes[before] = Some(node);
+            }
+        }
+    }
+    pub(crate) fn rename_trace_node(&mut self, node: usize, label: &'static str) {
+        if let Some(trace) = self.token_trace.as_mut() {
+            if trace.nodes.last() == Some(&Some(node)) {
+                if let Some(leaf) = trace.leaves.last_mut() {
+                    leaf.label = label;
+                }
+            }
+        }
+    }
+    pub(crate) fn collect_classic_trace(&mut self, start: usize, roots: &[usize]) {
+        if self.token_trace.is_none() {
+            return;
+        }
+        let mut retained = std::collections::BTreeSet::new();
+        let mut pending = roots.to_vec();
+        while let Some(node) = pending.pop() {
+            if retained.insert(node) {
+                pending.extend(&self.nodes[node].children);
+            }
+        }
+        let trace = self.token_trace.as_mut().unwrap();
+        let mut removed = 0;
+        // Visit only this collector's suffix, never every earlier committed leaf.
+        let leaves = trace.leaves.split_off(start);
+        let nodes = trace.nodes.split_off(start);
+        for (leaf, node) in leaves.into_iter().zip(nodes) {
+            if node.is_none_or(|node| retained.contains(&node)) {
+                trace.leaves.push(leaf);
+                trace.nodes.push(node);
+            } else {
+                removed += match &leaf.source {
+                    TokenSource::Input(span) => {
+                        self.byte_offsets[span.end] - self.byte_offsets[span.start]
+                    }
+                    TokenSource::Generated { text, .. } => text.len(),
+                    TokenSource::Projected { text, .. } => text.len(),
+                };
+            }
+        }
+        trace.bytes -= removed;
     }
     pub(crate) fn trace_empty(&mut self, label: &'static str) {
         if self.token_trace.is_some() {

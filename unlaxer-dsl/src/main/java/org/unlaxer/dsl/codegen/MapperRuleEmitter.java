@@ -166,7 +166,7 @@ class MapperRuleEmitter {
      * ノードを解決する。ノードが見つからなければ firstTokenText にフォールバック。
      * (unlaxer-parser #43 family / tinyexpression #32)
      */
-    static String emitMapTransparentValue(String astClass, boolean hasSkippedRules) {
+    static String emitMapTransparentValue(String astClass, boolean hasSkippedRules, boolean hasEnums) {
         IndentedWriter w = new IndentedWriter(1);
         w.line("private static Object mapTransparentValue(Token token) {");
         w.indent();
@@ -175,6 +175,7 @@ class MapperRuleEmitter {
         w.line("return null;");
         w.dedent();
         w.line("}");
+        if (hasEnums) w.line("Object enumValue = findEnumValue(token); if (enumValue != null) return enumValue;");
         w.line(astClass + " direct = mapToken(token);");
         w.line("if (direct != null) {");
         w.indent();
@@ -406,6 +407,20 @@ class MapperRuleEmitter {
             w.line("static " + astClass + "." + className
               + " to" + MapperElementUtil.methodNameFor(className) + "(Token token) {");
             w.indent();
+
+            if (EnumSchema.isEnum(ruleByName.get(rule.name()))) {
+                w.line("return registerNodeSourceSpan(new " + astClass + "." + className + "("
+                    + astClass + "." + rule.name() + ".fromText(tokenTextCompat(token))), token);");
+                w.dedent();
+                w.line("}");
+                w.blankLine();
+                continue;
+            }
+
+            for (RuleDecl constrained : allMappingRules.getOrDefault(className, List.of())) {
+                emitTypeofChecks(w, grammar, parsersClass, constrained,
+                    mappedClassByRuleName, tokenDeclByName, ruleByName);
+            }
 
             List<RuleDecl> sumVariants = MappingShape.sumVariants(grammar, rule, mapping);
             if (!sumVariants.isEmpty()) {
@@ -857,6 +872,43 @@ class MapperRuleEmitter {
             mappedClassByRuleName, tokenDeclByName, ruleByName);
     }
 
+    private static void emitTypeofChecks(IndentedWriter w, GrammarDecl grammar, String parsersClass,
+            RuleDecl rule, Map<String, String> mappedClassByRuleName,
+            Map<String, TokenDecl> tokenDeclByName, Map<String, RuleDecl> ruleByName) {
+        var constraints = TypeofConstraints.collect(rule);
+        if (constraints.isEmpty()) return;
+        w.line("if (token.parser.getClass() == " + parsersClass + "." + rule.name() + "Parser.class) {");
+        w.indent();
+        var bindings = new CaptureBindingPlan(rule);
+        var names = new LinkedHashMap<String, String>();
+        var captures = new java.util.LinkedHashSet<>(MapperElementUtil.getMappingAnnotation(rule).orElseThrow().paramNames());
+        captures.addAll(TypeofConstraints.captures(rule));
+        for (String capture : captures) {
+            String local = "__typeofValue" + names.size();
+            names.put(capture, local);
+            String type = TypeofConstraints.valueType(grammar, rule, capture);
+            emitBoundParam(w, parsersClass, grammar, local, type, bindings.sites(capture),
+                mappedClassByRuleName, tokenDeclByName, ruleByName);
+        }
+        for (var constraint : constraints) {
+            String own = names.get(constraint.capture());
+            String ref = names.get(constraint.reference());
+            String ids = bindings.sites(constraint.capture()).stream()
+                .map(site -> "\"" + ParserCodegenUtil.escapeString(site.id()) + "\"")
+                .collect(java.util.stream.Collectors.joining(", "));
+            w.line("if (" + ref + " != null && " + own + " != null && !semanticType(" + ref + ").equals(semanticType(" + own + "))) {");
+            w.indent();
+            w.line("int[] at = typeofSpan(token, java.util.Set.of(" + ids + "), " + own + ");");
+            w.line("throw new java.lang.IllegalArgumentException(\"@typeof constraint violated: "
+                + constraint.capture() + " must be same type as " + constraint.reference()
+                + ", expected \" + semanticType(" + ref + ").getSimpleName() + \" but got \" + semanticType(" + own + ").getSimpleName() + \" at CP \" + at[0] + \":\" + at[1]);");
+            w.dedent();
+            w.line("}");
+        }
+        w.dedent();
+        w.line("}");
+    }
+
     private static void emitPlainMappingResolution(IndentedWriter w, GrammarDecl grammar,
             String astClass, String parsersClass, String className,
             RuleDecl rule, MappingAnnotation mapping,
@@ -864,8 +916,6 @@ class MapperRuleEmitter {
             Map<String, TokenDecl> tokenDeclByName, Map<String, RuleDecl> ruleByName) {
 
         CaptureBindingPlan bindings = new CaptureBindingPlan(rule);
-        // Collect @typeof constraints: ownCaptureName -> referencedCaptureName
-        Map<String, String> typeofConstraints = MapperElementUtil.collectTypeofConstraints(rule.body());
         for (String param : mapping.paramNames()) {
             String type = SharedPlainSchema.fieldType(grammar, rule, param)
                 .orElseGet(() -> MapperTypeResolver.inferType(grammar, rule, param));
@@ -879,23 +929,6 @@ class MapperRuleEmitter {
             emitBoundParam(w, parsersClass, grammar, param, type, bindings.sites(param),
                 mappedClassByRuleName, tokenDeclByName, ruleByName);
         }
-        // Emit @typeof runtime assertions
-        for (Map.Entry<String, String> constraint : typeofConstraints.entrySet()) {
-            String ownCapture = constraint.getKey();
-            String refCapture = constraint.getValue();
-            w.line("if (" + refCapture + " != null && "
-                + ownCapture + " != null && !"
-                + refCapture + ".getClass().equals("
-                + ownCapture + ".getClass())) {");
-            w.indent();
-            w.line("throw new IllegalArgumentException(\"@typeof constraint violated: "
-                + ownCapture + " must be same type as "
-                + refCapture + ", expected \" + "
-                + refCapture + ".getClass().getSimpleName() + \" but got \" + "
-                + ownCapture + ".getClass().getSimpleName());");
-            w.dedent();
-            w.line("}");
-        }
         w.line(astClass + "." + className + " mapped = new "
             + astClass + "." + className + "(");
         for (int i = 0; i < mapping.paramNames().size(); i++) {
@@ -908,10 +941,76 @@ class MapperRuleEmitter {
         w.line("return registerNodeSourceSpan(mapped, token);");
     }
 
+    private static void emitEnumParam(
+            IndentedWriter w,
+            String parsersClass,
+            String param,
+            String type,
+            List<CaptureBindingPlan.Site> sites,
+            String enumName) {
+        var list = MapperTypeResolver.unwrapListType(type);
+        var optional = MapperTypeResolver.unwrapOptionalType(type);
+        String valueType = list.or(() -> optional).orElse(type);
+        String values = "enumValues_" + MapperElementUtil.safeName(param);
+        w.line("List<" + valueType + "> " + values + " = new ArrayList<>();");
+        String ids =
+                sites.stream()
+                        .map(site -> "\"" + ParserCodegenUtil.escapeString(site.id()) + "\"")
+                        .collect(java.util.stream.Collectors.joining(", "));
+        w.line(
+                "for (CaptureOccurrence occurrence : findCaptureOccurrences(token,"
+                    + " java.util.Set.of("
+                        + ids
+                        + "))) {");
+        w.indent();
+        w.line(
+                "for (Token valueToken : findDescendants(occurrence.token(), "
+                        + parsersClass
+                        + "."
+                        + enumName
+                        + "Parser.class)) {");
+        w.indent();
+        w.line(values + ".add(" + valueType + ".fromText(tokenTextCompat(valueToken)));");
+        w.dedent();
+        w.line("}");
+        w.dedent();
+        w.line("}");
+        if (list.isPresent()) w.line(type + " " + param + " = " + values + ";");
+        else {
+            w.line(
+                    "if ("
+                            + values
+                            + ".size() "
+                            + (optional.isPresent() ? "> 1" : "!= 1")
+                            + ") throw new IllegalArgumentException(\"Invalid enum capture"
+                            + " cardinality: "
+                            + param
+                            + "\");");
+            w.line(
+                    type
+                            + " "
+                            + param
+                            + " = "
+                            + (optional.isPresent()
+                                    ? values
+                                            + ".isEmpty() ? Optional.empty() : Optional.of("
+                                            + values
+                                            + ".get(0))"
+                                    : values + ".get(0)")
+                            + ";");
+        }
+    }
+
     private static void emitBoundParam(IndentedWriter w, String parsersClass, GrammarDecl grammar,
             String param, String type, List<CaptureBindingPlan.Site> sites,
             Map<String, String> mappedClassByRuleName,
             Map<String, TokenDecl> tokenDeclByName, Map<String, RuleDecl> ruleByName) {
+        Optional<String> enumName=sites.stream().map(site -> EnumSchema.enumType(grammar,site.element())).flatMap(Optional::stream).findFirst();
+        String fieldValueType = MapperTypeResolver.unwrapListType(type).or(() -> MapperTypeResolver.unwrapOptionalType(type)).orElse(type);
+        if (enumName.isPresent() && fieldValueType.equals(grammar.name()+"AST."+enumName.get())) {
+            emitEnumParam(w,parsersClass,param,type,sites,enumName.get());
+            return;
+        }
         SemanticCardinality semantics = new SemanticCardinality(grammar);
         if (sites.stream().anyMatch(site -> semantics.needsCollection(site.element()))) {
             emitSemanticParam(w, param, type, sites, semantics);
@@ -1053,6 +1152,8 @@ class MapperRuleEmitter {
                 }
 
             """.formatted(String.join(", ", boundaries), SemanticCardinality.TEXT_BINDING, SemanticCardinality.BOUNDARY_BINDING);
+        if (grammar.rules().stream().anyMatch(EnumSchema::isEnum)) source = source.replace(
+            "Object mapped = mapToken(token);", "Object enumValue = directEnumValue(token);\n        if (enumValue != null) return List.of(enumValue);\n        Object mapped = mapToken(token);");
         if (grammar.rules().stream().noneMatch(MapperElementUtil::isSkipped)) return source;
         return source.replace("stripQuotes(firstTokenText(token))",
                 "hasSkippedRuleToken(token) ? skippedRuleText(token) : stripQuotes(firstTokenText(token))")
