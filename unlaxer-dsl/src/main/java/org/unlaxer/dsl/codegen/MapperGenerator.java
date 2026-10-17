@@ -22,6 +22,14 @@ public class MapperGenerator implements CodeGenerator {
 
     @Override
     public GeneratedSource generate(GrammarDecl grammar) {
+        org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
+        NestedCaptures.requireValid(grammar);
+        GrammarValidator.requireValidBoundedRepeatElements(grammar);
+        LeftRecursionAnalysis.requireValid(grammar);
+        CommonFieldSchema.build(grammar);
+        EnumSchema.validate(grammar);
+        TypeofConstraints.validate(grammar);
+        var enumRoots = EnumSchema.rootEnums(grammar);
         String packageName = getPackageName(grammar);
         String grammarName = grammar.name();
         String astClass = grammarName + "AST";
@@ -43,13 +51,21 @@ public class MapperGenerator implements CodeGenerator {
         Map<String, String> mappedClassByRuleName = new LinkedHashMap<>();
         for (RuleDecl rule : grammar.rules()) {
             boolean isSkip = rule.annotations().stream().anyMatch(a -> a instanceof SkipAnnotation);
-            if (!isSkip) {
+            if (!isSkip && !EnumSchema.isEnum(rule)) {
                 MapperElementUtil.getMappingAnnotation(rule).ifPresent(m -> {
                     mappingRules.putIfAbsent(m.className(), rule);
                     allMappingRules.computeIfAbsent(m.className(), k -> new ArrayList<>()).add(rule);
                     mappedClassByRuleName.putIfAbsent(rule.name(), m.className());
                 });
             }
+        }
+
+        for (var entry : enumRoots.entrySet()) {
+            RuleDecl source = ruleByName.get(entry.getKey());
+            RuleDecl projected = EnumSchema.projection(source, entry.getValue());
+            mappingRules.put(entry.getValue(), projected);
+            allMappingRules.put(entry.getValue(), List.of(projected));
+            mappedClassByRuleName.put(source.name(), entry.getValue());
         }
 
         StringBuilder sb = new StringBuilder();
@@ -71,6 +87,8 @@ public class MapperGenerator implements CodeGenerator {
         sb.append(" */\n");
         sb.append("public class ").append(mapperClass).append(" {\n\n");
         sb.append("    private ").append(mapperClass).append("() {}\n\n");
+        if(grammar.rules().stream().anyMatch(NestedCaptures::enabled)) sb.append(NestedMapperEmitter.HELPERS);
+        if(grammar.rules().stream().filter(NestedCaptures::enabled).anyMatch(rule -> MapperElementUtil.getMappingAnnotation(rule).orElseThrow().paramNames().stream().anyMatch(name -> NestedCaptures.field(grammar,rule,name).javaLeafType()!=null))) sb.append(NestedMapperEmitter.PROJECT_HELPERS);
         // Span layers of the current mapping call. SourceMappedAst snapshots freeze the layers they
         // reference instead of copying every span, so later registrations open a new layer and the
         // next mapping call starts from an empty layer; a snapshot therefore never changes after
@@ -105,7 +123,7 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("    private static final java.util.IdentityHashMap<Token, MappingCandidate> BEST_MEMO =\n");
         sb.append("        new java.util.IdentityHashMap<>();\n\n");
 
-        String rootClassName = rootRule.flatMap(MapperElementUtil::getMappingAnnotation)
+        String rootClassName = rootRule.filter(r -> !EnumSchema.isEnum(r)).flatMap(MapperElementUtil::getMappingAnnotation)
             .map(m -> astClass + "." + m.className())
             .orElse(astClass);
 
@@ -146,7 +164,43 @@ public class MapperGenerator implements CodeGenerator {
 
         // ----- mapTransparentValue (heterogeneous @value node resolution) -----
         sb.append(MapperRuleEmitter.emitMapTransparentValue(astClass,
-            grammar.rules().stream().anyMatch(MapperElementUtil::isSkipped)));
+            grammar.rules().stream().anyMatch(MapperElementUtil::isSkipped), grammar.rules().stream().anyMatch(EnumSchema::isEnum)));
+
+        boolean hasTypeof = grammar.rules().stream().anyMatch(rule -> !TypeofConstraints.collect(rule).isEmpty());
+        if (hasTypeof || grammar.rules().stream().anyMatch(EnumSchema::isEnum)) {
+            sb.append("    private static Class<?> semanticType(Object value) {\n");
+            if (grammar.rules().stream().anyMatch(EnumSchema::isEnum))
+                sb.append("        if (value instanceof ").append(astClass).append(".EnumValue item) return item.value().getDeclaringClass();\n");
+            sb.append("        if (value instanceof java.util.List<?>) return java.util.List.class;\n")
+                .append("        if (value instanceof java.util.Optional<?>) return java.util.Optional.class;\n")
+                .append("        return value instanceof Enum<?> item ? item.getDeclaringClass() : value.getClass();\n    }\n\n");
+        }
+        if (hasTypeof) {
+            sb.append("    private static int[] typeofSpan(Token token, java.util.Set<String> bindings, Object value) {\n")
+                .append("        int start = Integer.MAX_VALUE, end = -1;\n")
+                .append("        boolean empty = value instanceof List<?> list && list.isEmpty() || value instanceof Optional<?> option && option.isEmpty();\n")
+                .append("        for (CaptureOccurrence occurrence : empty ? java.util.List.<CaptureOccurrence>of() : findCaptureOccurrences(token, bindings)) {\n")
+                .append("            Token site = occurrence.token();\n")
+                .append("            int at = site.source.offsetFromRoot().value();\n")
+                .append("            start = Math.min(start, at); end = Math.max(end, at + site.source.codePointLength().value());\n")
+                .append("        }\n")
+                .append("        if (end < 0) { start = token.source.offsetFromRoot().value(); end = start + token.source.codePointLength().value(); }\n")
+                .append("        return new int[]{start, end};\n    }\n\n");
+        }
+        if (grammar.rules().stream().anyMatch(EnumSchema::isEnum)) {
+            sb.append("    private static Object directEnumValue(Token token) {\n        if (token == null) return null;\n");
+            for (RuleDecl rule : grammar.rules()) if (EnumSchema.isEnum(rule)) sb.append("        if (token.parser instanceof ")
+                .append(parsersClass).append(".").append(rule.name()).append("Parser) return registerNodeSourceSpan(new ")
+                .append(astClass).append(".EnumValue(").append(astClass).append(".").append(rule.name())
+                .append(".fromText(tokenTextCompat(token))), token);\n");
+            sb.append("        return null;\n    }\n    private static Object findEnumValue(Token token) {\n        if (token == null) return null;\n");
+            if (grammar.rules().stream().anyMatch(MapperElementUtil::isSkipped)) sb.append("        if (isSkippedRuleToken(token)) return null;\n");
+            sb.append("        Object direct = directEnumValue(token); if (direct != null) return direct;\n");
+            for (String name : mappedClassByRuleName.keySet()) if (!EnumSchema.isEnum(ruleByName.get(name))) {
+                sb.append("        if (token.parser instanceof ").append(parsersClass).append(".").append(name).append("Parser) return null;\n");
+            }
+            sb.append("        for (Token child : token.filteredChildren) { Object value = findEnumValue(child); if (value != null) return value; }\n        return null;\n    }\n\n");
+        }
 
         // ----- Mapping Methods -----
         sb.append(MapperRuleEmitter.emitMappingMethods(grammar, astClass, parsersClass,
@@ -154,7 +208,7 @@ public class MapperGenerator implements CodeGenerator {
 
         // ----- Utilities -----
         sb.append(MapperRuleEmitter.emitUtilities(parsersClass, mappedClassByRuleName.keySet()));
-        if (grammar.rules().stream().anyMatch(rule -> !MapperElementUtil.isSkipped(rule)
+        if (hasTypeof || grammar.rules().stream().anyMatch(rule -> !MapperElementUtil.isSkipped(rule)
                 && !SemanticCardinality.associative(rule)
                 && MapperElementUtil.getMappingAnnotation(rule).isPresent())) {
             sb.append(MapperRuleEmitter.emitCaptureOccurrenceUtilities(parsersClass, ruleByName.keySet()));

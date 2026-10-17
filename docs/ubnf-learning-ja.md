@@ -65,6 +65,7 @@ token 宣言は規則より前に書き、Java の生成クラス名と衝突し
 | リテラル・宣言的 token・参照・選択・optional・repeat・capture | 対応 | 対応 |
 | text / node の mapping、javaStyle 空白、ソース位置 | 対応 | 対応 |
 | import、host binding、状態付きルール、mixed-value capture、高度な選択・述語 | 対象外として拒否 | 各 backend の対応範囲に従う |
+| `@enum` のscalar/optional/list/root/mixed値 | compile時に明示拒否（#580） | 両生成器で対応。生成Playgroundでも利用可能 |
 | 教材 AST の計算 | 固定の学習用評価器 | 生成した AST にアプリ側の評価器を実装 |
 
 文法16 KiB、入力8 KiB、1回5秒、結果4 MiB、WASM メモリ256 MiB。

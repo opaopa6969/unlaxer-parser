@@ -34,7 +34,7 @@ changes: Change[], diagnostics: Diagnostic[]
 ```
 
 Snapshot は `grammar`, `astType`, `evaluatorType`, `nodes`, `methods`。
-node / method は name 順。field / parameter は実際の宣言順を保持する。
+node は name 順、method は name、次に引数型列の辞書順。field / parameter は実際の宣言順を保持する。
 
 ```text
 Node: name, kind, fields, parents, variants, origins, generated
@@ -72,8 +72,20 @@ parents / variants / origin rule 名は整列して比較する。
 - NODE_PARENTS_CHANGED / NODE_VARIANTS_CHANGED / NODE_RULES_CHANGED: subject は node 名、値は comma 連結名。
 - FIELD_ADDED / FIELD_REMOVED / FIELD_TYPE_CHANGED / FIELD_CARDINALITY_CHANGED: subject は Node.field、値は type または cardinality。
 - FIELD_ORDER_CHANGED: 同じ field 集合の順序だけが変わった場合。subject は node 名、値は comma 連結 field 名。生成位置は並び全体を持つ node 宣言。
-- METHOD_ADDED / METHOD_REMOVED / METHOD_SIGNATURE_CHANGED: subject は method 名、値は `(name:type,...)->returnType`。
+- METHOD_ADDED / METHOD_REMOVED / METHOD_SIGNATURE_CHANGED: subject は通常 method 名、値は `(name:type,...)->returnType`。
 - METHOD_REQUIRED_CHANGED: subject は method 名、値は true / false。
+
+Java は同じ名前で引数型列が異なる合法な overload をすべて保持する。戻り値や引数名だけが
+異なる同一 signature は重複として拒否する（型引数の消去、varargs と配列の同一視を含む）。
+既存の型参照解決を行わない境界は維持し、別表記の型 alias の解決までは保証しない。
+どちらかの snapshot に同名 method が複数あれば、その群の subject は `name(type,...)`。
+まず引数型列が同じ method を比較し、残りが旧・新それぞれ一つなら引数変更として比較する。
+その場合の subject は旧 signature。複数候補が残る場合は推測せず追加・削除を列挙する。
+引数名・戻り値・required の変更も、他の overload を失わず比較する。
+同名 method が両側とも一つ以下なら従来の subject と引数変更判定を維持する。
+Rust の trait は同名 method の overload を許容しないため、重複名は生成段階で拒否する。
+たとえば Java の `evalLeaf(AST.Leaf)` と `evalLeaf(String)` に対応する Rust の hook は
+`eval_leaf` と `evaluate_literal` の異なる名前を持ち、既存 API 名を変更しない。
 
 node の追加・削除では配下の field 差分は重複列挙しない。method の追加・削除は別に列挙する。
 changes は (kind, subject) 順。差分は変更候補を示すもので、一律に breaking と分類しない。
@@ -94,7 +106,7 @@ repo ルートで実行する。通常の `mvn test` だけでは Rust conforman
 
 ```sh
 mvn -B -pl unlaxer-common,unlaxer-dsl -am test \
-  -Dtest=JavaApiSchemaTest,ApiImpactCommandTest,ApiImpactConformanceTest \
+  -Dtest=JavaApiSchemaTest,ApiImpactOverloadTest,ApiImpactCommandTest,ApiImpactConformanceTest,EvaluationConformanceTest \
   -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
 cargo test --locked --manifest-path rust/Cargo.toml -p unlaxer-generator
 cargo build --release --locked --manifest-path rust/Cargo.toml -p unlaxer-generator
@@ -107,13 +119,13 @@ Java host は `org.unlaxer.dsl.CodegenMain impact` に同じ引数を渡す。
 Java API: `ApiImpact.compare("java" /* または "rust" */, beforeSource, afterSource).toJson()`。
 Rust API: `unlaxer_generator::impact::compare(before_source, after_source).to_json()`。
 
-[共通 corpus](../spec-corpus/api-impact/cases.json) は13組の before / after と独立した期待値を持つ。
+[共通 corpus](../spec-corpus/api-impact/cases.json) は16組の before / after と独立した期待値を持つ。
 コメント、node 追加・削除、数値→文字列、文字列→node、optional、list、field 追加・削除・順序、
-shared mapping 統合、演算子のみ変更、grammar 名変更を検証する。
+shared mapping 統合、演算子のみ変更、grammar 名変更、overload の追加・削除・同一入力を検証する。
 
-- `unlaxer-dsl/target/api-impact-conformance.tsv`: 13組 × LF/CRLF × 2 target = 52行。
+- `unlaxer-dsl/target/api-impact-conformance.tsv`: 16組 × LF/CRLF × 2 target = 64行。
   Rust target は Java/native host の JSON 全体（位置を含む）を比較する。Java target は実生成ソースと照合する。
-- `unlaxer-dsl/target/api-impact-compile.tsv`: 13組 × 2 target × 2利用者 = 52行。
+- `unlaxer-dsl/target/api-impact-compile.tsv`: 16組 × 2 target × 2利用者 = 64行。
   変更前 schema から作った評価器・AST 利用者を凍結し、旧・新 API に対して実 javac/rustc でコンパイルする。
   新 schema に合わせた利用者もコンパイルし、失敗が単に不正な生成コードによるものではないことを確認する。
   成否・compiler 診断コード・生成バイト数・コンパイル所要時間を記録する。
@@ -129,10 +141,14 @@ shared mapping 統合、演算子のみ変更、grammar 名変更を検証する
 | 文法変更 | Java の旧利用者 | Rust の旧利用者 |
 |---|---|---|
 | node 追加 | evaluator の abstract method 未実装 | Semantics の required method 未実装（E0046） |
-| 数値 capture →文字列 | `int` を期待する利用者が型エラー | 元から字句 `String` なのでこの例では API 差分なし |
+| 数値 capture →文字列 | `int` を期待する利用者が型エラー | `i32` の field / Semantics 引数を期待する利用者が型エラー |
 | scalar → optional / list | evaluator の node 引数型は同じだが field 利用者は型エラー | Semantics 引数型と field 利用者の両方が型エラー |
-| field 順序入替え | この corpus の位置引数 constructor は型エラー | 名前付き field の構築は成功。両引数が `&str` の impl も成功 |
+| field 順序入替え | この corpus の位置引数 constructor は型エラー | 名前付き field の構築は成功。`i32` と `&str` の Semantics 引数順は型エラー |
 | 演算子文字列だけ変更 | API 差分なし・コンパイル成功 | API 差分なし・コンパイル成功 |
 
-最後の2例のように、差分検出やコンパイル成功だけでは評価の意味的互換性を保証できない。
+演算子文字列だけの変更のように、差分検出やコンパイル成功だけでは評価の意味的互換性を保証できない。
 shared mapping 統合では Java の `Object` と Rust の `AstValue` への型変化をそれぞれ記録する。
+
+評価の共通 corpus `spec-corpus/evaluation/AutoEval.ubnf` は `Leaf` mapping と binary helper を併用する。
+Java 21 と Rust 1.85 の実生成 compile / parse / map / evaluate、両 Rust host の source と schema 一致、
+必須 conversion / manual / unknown / leaf helper の欠落による compile 失敗を同じ入力で検証する。

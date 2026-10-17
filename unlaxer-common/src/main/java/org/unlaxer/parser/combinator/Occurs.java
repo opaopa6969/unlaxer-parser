@@ -28,9 +28,12 @@ public interface Occurs extends MetaFunctionParser , NonTerminallSymbol {
 
 		parseContext.startParse(this, parseContext, tokenKind, invertMatch);
 		
-		parseContext.begin(this);
+        boolean invalidBounds = min() < 0 || max() < min();
+        boolean noAttempt = invalidBounds || max() == 0 && !isZeroMatchCheck();
+        if (noAttempt) parseContext.beginPreservingMatched(this);
+        else parseContext.begin(this);
 		int matchCount = 0;
-		Optional<Parser> terminator = getTerminator();
+		Optional<Parser> terminator = noAttempt ? Optional.empty() : getTerminator();
 		/*
 		 * Same conservative FIRST-set test as ChoiceInterface: when the body cannot start on the next
 		 * code point the loop is already over, so the body is not evaluated even once. A terminator
@@ -42,10 +45,10 @@ public interface Occurs extends MetaFunctionParser , NonTerminallSymbol {
 		 * has moved the matched cursor ahead, even a failed body is observable. The body is therefore
 		 * skipped only while the two cursors coincide, where that reset changes nothing.
 		 */
-		boolean excludeBody = false == invertMatch && terminator.isEmpty()
+		boolean excludeBody = !noAttempt && false == invertMatch && terminator.isEmpty()
 			&& parseContext.isCandidateExclusionEnabled();
 		FirstSet bodyFirstSet = excludeBody ? FirstSets.of(getChild()) : null;
-		while (true) {
+		while (!noAttempt) {
 		  
 //		  infiniteLoopDetector.incrementsAndThrow(1000);
 		  
@@ -91,7 +94,7 @@ public interface Occurs extends MetaFunctionParser , NonTerminallSymbol {
 			}
 		}
 		
-		if (matchCount >= min() && matchCount <=max()) {
+		if (!invalidBounds && matchCount >= min() && matchCount <=max()) {
 			
             return PackratMemoTable.commitSuccess(parseContext, this, tokenKind, invertMatch,
                 memoStart, memoDiagnostic, null, null);
@@ -104,6 +107,9 @@ public interface Occurs extends MetaFunctionParser , NonTerminallSymbol {
 		}
 	}
 	
+    /** Historical negative-zero check. Ordinary bounded repetitions never probe at max=0. */
+    public default boolean isZeroMatchCheck() { return false; }
+
 	public int min();
 	
 	public int max();

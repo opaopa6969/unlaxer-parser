@@ -599,7 +599,7 @@ public class UBNFParsers {
     }
 
     /**
-     * RegexExpressionParser: REGEX '(' STRING_LITERAL ')'
+     * Removed REGEX syntax: recognized only for a positioned migration error in UBNFMapper.
      * 例: REGEX('[a-z]+')
      */
     public static class RegexExpressionParser extends UBNFLazyChain {
@@ -1516,6 +1516,7 @@ public class UBNFParsers {
                         @Override
                         public Parsers getLazyParsers() {
                             return new Parsers(
+                                new org.unlaxer.parser.combinator.Not(Parser.get(TypeofElementParser.class)),
                                 Parser.get(AtSignParser.class),
                                 Parser.get(IdentifierParser.class)
                             );
