@@ -38,6 +38,7 @@ class MapperTypeResolver {
 
     // inferType logic is borrowed from ASTGenerator to keep generated constructor argument types compile-safe.
     static String inferType(GrammarDecl grammar, RuleDecl rule, String fieldName) {
+        if (NestedCaptures.enabled(rule)) return NestedCaptures.javaType(NestedCaptures.field(grammar,rule,fieldName));
         return new SemanticCardinality(grammar).fieldType(rule, fieldName, inferLegacyType(grammar, rule, fieldName));
     }
 
@@ -76,6 +77,10 @@ class MapperTypeResolver {
         String astClassName = grammar.name() + "AST";
         if (element instanceof TerminalElement ignored) {
             return "String";
+        }
+        if (element instanceof RuleRefElement || element instanceof GroupElement) {
+            var enumType=EnumSchema.enumType(grammar,element);
+            if(enumType.isPresent()) return grammar.name()+"AST."+enumType.get();
         }
         if (element instanceof RuleRefElement ruleRefElement) {
             if (grammar.rules().stream().anyMatch(r -> r.name().equals(ruleRefElement.name())

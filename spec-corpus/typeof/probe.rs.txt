@@ -1,0 +1,29 @@
+#![allow(dead_code,unused_imports)]
+#![deny(unused_variables)]
+mod generated;
+use generated::{ast::*,evaluator::{evaluate,Semantics}};
+use unlaxer_runtime::{Span,ParseOptions,Diagnostics,Memoization};
+use std::io::{self,BufRead};
+struct Probe;
+impl Semantics for Probe {
+    type Output=i32;
+    /*METHODS*/
+}
+fn main() {
+    for line in io::stdin().lock().lines() {
+        let hex=line.unwrap();
+        let input=String::from_utf8((0..hex.len()).step_by(2).map(|i|u8::from_str_radix(&hex[i..i+2],16).unwrap()).collect()).unwrap();
+        for memo in [Memoization::Off,Memoization::SafeFailures] {
+            for diagnostics in [Diagnostics::Auto,Diagnostics::Detailed,Diagnostics::DetailedOnFailure] {
+                let result=match generated::parser::parse_tree_with_options(&input,ParseOptions::with_memoization(memo).with_diagnostics(diagnostics)) {
+                    Ok(tree)=>match generated::mapper::map(&tree) {
+                        Ok(ast)=>serde_json::json!({"status":"ok","value":serde_json::from_str::<serde_json::Value>(&ast.canonical_json()).unwrap(),"eval":evaluate(&ast,&mut Probe)}),
+                        Err(message)=>serde_json::json!({"status":"map_error","message":message}),
+                    },
+                    Err(error)=>serde_json::json!({"status":"syntax","offset":error.offset}),
+                };
+                println!("{}",result);
+            }
+        }
+    }
+}

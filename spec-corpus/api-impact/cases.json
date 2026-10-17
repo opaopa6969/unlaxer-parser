@@ -69,14 +69,17 @@
     "javaChanges": [
       "FIELD_TYPE_CHANGED:Value.value"
     ],
-    "rustChanges": [],
+    "rustChanges": [
+      "FIELD_TYPE_CHANGED:Value.value",
+      "METHOD_SIGNATURE_CHANGED:eval_value"
+    ],
     "legacySemantics": {
       "java": true,
-      "rust": true
+      "rust": false
     },
     "legacyConsumer": {
       "java": false,
-      "rust": true
+      "rust": false
     },
     "node": "Value",
     "consumer": "field"
@@ -212,7 +215,7 @@
     ],
     "legacySemantics": {
       "java": true,
-      "rust": true
+      "rust": false
     },
     "legacyConsumer": {
       "java": false,
@@ -286,6 +289,75 @@
       "rust": true
     },
     "node": "Value",
+    "consumer": "field"
+  },
+  {
+    "name": "overload-add",
+    "before": "overload/before.ubnf",
+    "after": "overload/after.ubnf",
+    "javaChanges": [
+      "METHOD_ADDED:applyBinary",
+      "METHOD_ADDED:evalLeaf(String)",
+      "METHOD_REQUIRED_CHANGED:evalBinary"
+    ],
+    "rustChanges": [
+      "METHOD_ADDED:apply_binary",
+      "METHOD_ADDED:evaluate_literal",
+      "METHOD_ADDED:is_failure",
+      "METHOD_REQUIRED_CHANGED:eval_binary"
+    ],
+    "legacySemantics": {
+      "java": false,
+      "rust": false
+    },
+    "legacyConsumer": {
+      "java": true,
+      "rust": true
+    },
+    "node": "Leaf",
+    "consumer": "field"
+  },
+  {
+    "name": "overload-remove",
+    "before": "overload/after.ubnf",
+    "after": "overload/before.ubnf",
+    "javaChanges": [
+      "METHOD_REMOVED:applyBinary",
+      "METHOD_REMOVED:evalLeaf(String)",
+      "METHOD_REQUIRED_CHANGED:evalBinary"
+    ],
+    "rustChanges": [
+      "METHOD_REMOVED:apply_binary",
+      "METHOD_REMOVED:evaluate_literal",
+      "METHOD_REMOVED:is_failure",
+      "METHOD_REQUIRED_CHANGED:eval_binary"
+    ],
+    "legacySemantics": {
+      "java": false,
+      "rust": false
+    },
+    "legacyConsumer": {
+      "java": true,
+      "rust": true
+    },
+    "node": "Leaf",
+    "consumer": "field"
+  },
+  {
+    "name": "overload-comments",
+    "before": "overload/after.ubnf",
+    "after": "overload/after.ubnf",
+    "javaChanges": [],
+    "rustChanges": [],
+    "legacySemantics": {
+      "java": true,
+      "rust": true
+    },
+    "legacyConsumer": {
+      "java": true,
+      "rust": true
+    },
+    "node": "Leaf",
     "consumer": "field"
   }
 ]

@@ -1,0 +1,8 @@
+grammar Overloads {
+  @package: org.example.impact
+  // supplementary scalar keeps declaration and origin code-point locations observable: 😀
+  @root Root ::= Leaf | Binary;
+  @mapping(Leaf, params=[value]) Leaf ::= 'x' @value;
+  @mapping(Binary, params=[left,op,right])
+  Binary ::= Leaf @left { '+' @op Leaf @right };
+}
