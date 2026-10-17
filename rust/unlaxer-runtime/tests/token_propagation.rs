@@ -661,7 +661,7 @@ fn projected_sources_are_shared_and_cannot_be_replayed_as_other_input() {
     assert!(error
         .expected
         .iter()
-        .any(|name| name.contains("projected token capture")));
+        .any(|name| name.contains("AST field capture requires original input source")));
     assert_eq!((c.position(), c.matched_position()), (0, 1));
     assert!(c.capture_spans("value").is_empty());
 }
@@ -694,17 +694,17 @@ fn native_repeat_progress_uses_the_inherited_cursor() {
     assert_eq!(signatures(&mut c, &result.nodes), "matchOnly@0:2:6161");
 }
 #[test]
-fn unsupported_native_scanner_is_not_a_resource_abort() {
-    let mut c = ParseContext::new("```java:Demo\n");
+fn unsupported_token_mode_is_not_a_resource_abort() {
+    let mut c = ParseContext::new("`native delimiter`");
     let error = c
-        .parse_with_token_mode(&Expr::CodeStart, TokenKind::MatchOnly, false)
+        .parse_with_token_mode(&Expr::Quoted('`'), TokenKind::MatchOnly, false)
         .unwrap_err();
     assert!(error
         .expected
         .iter()
         .any(|hint| hint.contains("mode-aware parser")));
     assert_eq!((c.position(), c.matched_position()), (0, 0));
-    assert!(c.parse(&Expr::CodeStart).is_ok());
+    assert!(c.parse(&w("`native delimiter`")).is_ok());
 }
 
 #[test]

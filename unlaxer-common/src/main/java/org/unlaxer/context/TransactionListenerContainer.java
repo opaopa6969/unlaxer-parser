@@ -41,11 +41,13 @@ public interface TransactionListenerContainer{
 		if (false == parserIsListener && listeners.isEmpty()) {
 			return;
 		}
+        var snapshot = listeners.isEmpty() ? java.util.List.<TransactionListener>of()
+            : new java.util.ArrayList<>(listeners);
 		if (parserIsListener) {
-			((TransactionListener) parser).onBegin(parseContext, parser);
+			parseContext.notifyObserver(() -> ((TransactionListener) parser).onBegin(parseContext, parser));
 		}
-		for (TransactionListener listener : listeners) {
-			listener.onBegin(parseContext, parser);
+		for (TransactionListener listener : snapshot) {
+			parseContext.notifyObserver(() -> listener.onBegin(parseContext, parser));
 		}
 	}
 
@@ -56,11 +58,13 @@ public interface TransactionListenerContainer{
 		if (false == parserIsListener && listeners.isEmpty()) {
 			return;
 		}
+        var snapshot = listeners.isEmpty() ? java.util.List.<TransactionListener>of()
+            : new java.util.ArrayList<>(listeners);
 		if (parserIsListener) {
-			((TransactionListener) parser).onCommit(parseContext, parser, committedTokens);
+			parseContext.notifyObserver(() -> ((TransactionListener) parser).onCommit(parseContext, parser, committedTokens));
 		}
-		for (TransactionListener listener : listeners) {
-			listener.onCommit(parseContext, parser, committedTokens);
+		for (TransactionListener listener : snapshot) {
+			parseContext.notifyObserver(() -> listener.onCommit(parseContext, parser, committedTokens));
 		}
 	}
 
@@ -71,11 +75,13 @@ public interface TransactionListenerContainer{
 		if (false == parserIsListener && listeners.isEmpty()) {
 			return;
 		}
+        var snapshot = listeners.isEmpty() ? java.util.List.<TransactionListener>of()
+            : new java.util.ArrayList<>(listeners);
 		if (parserIsListener) {
-			((TransactionListener) parser).onRollback(parseContext, parser, rollbackedTokens);
+			parseContext.notifyObserver(() -> ((TransactionListener) parser).onRollback(parseContext, parser, rollbackedTokens));
 		}
-		for (TransactionListener listener : listeners) {
-			listener.onRollback(parseContext, parser, rollbackedTokens);
+		for (TransactionListener listener : snapshot) {
+			parseContext.notifyObserver(() -> listener.onRollback(parseContext, parser, rollbackedTokens));
 		}
 	}
 	public default void onClose(ParseContext parseContext){
