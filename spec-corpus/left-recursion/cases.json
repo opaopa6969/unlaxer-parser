@@ -152,5 +152,21 @@
     "grammar": "grammar LeftRec { @package: leftrecprobe @root @mapping(Node) Root ::= Root{0} Root | 'x'; }",
     "status": "reject",
     "inputs": []
+  },
+  {
+    "name": "nested-groups-64",
+    "grammar": "grammar LeftRec { @package: leftrecprobe @root @mapping(Node) Root ::= (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((('😀')))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))); }",
+    "status": "accept",
+    "inputs": [
+      "😀"
+    ]
+  },
+  {
+    "name": "nested-groups-96",
+    "grammar": "grammar LeftRec { @package: leftrecprobe @root @mapping(Node) Root ::= (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((('😀')))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))); }",
+    "status": "accept",
+    "inputs": [
+      "😀"
+    ]
   }
 ]

@@ -42,3 +42,5 @@ memo/diagnostic configurations, and the small-stack resource boundary. The
 existing associative and recursive-helper corpora remain separate regressions.
 No automatic left-recursion transformation or left-recursive packrat algorithm is
 introduced. This development change is not in the published 3.3.0 artifacts.
+
+Javaのsource解析ではSequenceBodyからatomへの表現上のwrapperを追加の深さとして数えません（#618）。既存の64/96重groupを両hostで受理し、実生成parser/mapperとCP位置を共通corpusで確認します。depth/work上限と、真の非消費cycle・過大なrule chainの拒否は維持します。

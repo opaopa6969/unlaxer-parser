@@ -13,6 +13,7 @@ pub mod editor_queries;
 pub mod embedded;
 mod first;
 pub mod grapheme;
+pub mod incremental;
 pub mod language_profile;
 pub mod language_queries;
 pub mod lexical;
@@ -471,6 +472,12 @@ impl Expr {
     }
     pub fn separated_by(self, separator: Self) -> Self {
         Self::sequence([self.clone(), separator.then(self).zero_or_more()])
+    }
+    /// Classic separated list: require the first item, then count a successful
+    /// no-progress separator/item tail once and stop, matching Java Occurs.
+    /// The existing [`Self::separated_by`] retains its pure PEG repeat contract.
+    pub fn separated_by_java(self, separator: Self) -> Self {
+        Self::sequence([self.clone(), separator.then(self).repeat_java(0, None)])
     }
 }
 
@@ -2633,6 +2640,23 @@ impl<'a> ParseContext<'a> {
                     self.matched_position = self.position;
                 } else if transparent {
                     self.matched_position = failed_matched;
+                }
+                // Java Chain sets this on its owner before beginning the local
+                // transaction, so syntax failure retains it until an enclosing
+                // transaction rolls back. Resource failures keep full rollback.
+                if self.token_mode.is_some()
+                    && matches!(
+                        expression,
+                        Expr::Sequence(_)
+                            | Expr::Number
+                            | Expr::Identifier
+                            | Expr::Quoted(_)
+                            | Expr::CodeStart
+                            | Expr::CodeEnd
+                            | Expr::CaptureBoundary(_, _)
+                    )
+                {
+                    self.match_cursor_policy.reset = false;
                 }
                 if self.token_mode.is_some()
                     && (classic_collector_label(expression).is_some()

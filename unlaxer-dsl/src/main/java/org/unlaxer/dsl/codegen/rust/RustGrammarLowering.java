@@ -55,6 +55,7 @@ public final class RustGrammarLowering {
     private void leaveAnalysis() { analysisDepth--; }
 
     public static GrammarIR lower(GrammarDecl grammar) {
+        org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
         org.unlaxer.dsl.codegen.NestedCaptures.requireValid(grammar);
         CommonFieldSchema.build(grammar);
         EnumSchema.validate(grammar);
@@ -972,7 +973,6 @@ public final class RustGrammarLowering {
             // Nullable bodies are safe here; source left-recursion analysis remains separate.
             checkRepetition(repeat.child());
         } else if (expression instanceof Separated separated) {
-            if (nullable(separated.child()) && nullable(separated.separator())) throw unsupported("nullable unbounded separation");
             if (shape(separated.separator(), new HashSet<>()).kind() != Kind.TEXT) throw unsupported("mapped separator");
             checkRepetition(separated.child()); checkRepetition(separated.separator());
         } else if (expression instanceof OptionalExpr optional) {
