@@ -159,6 +159,8 @@ The evidence includes [CI](.github/workflows/maven.yml) on Rust 1.85 with Cargo 
 
 The development branch adds [Unicode-pinned `CI('word')` tokens](docs/case-insensitive-tokens.md) to both Java and Rust, removing JDK Unicode-version drift and correcting unsafe Java candidate pruning. This addition is **not included in the published 3.3.0 artifacts**.
 
+The development branch adds [transactional NonOrdered](docs/nonordered-runtime.md) to the Rust runtime and fixes failed-candidate state leakage in Java. Each declared child occurrence is selected once, with declaration-order priority; later failure does not explore other permutations. This is not included in 3.3.0.
+
 The development branch also adds [full semantic-token providers](docs/classic-rust-lsp.md) to Rust and validates the existing Java hook against the same protocol corpus. Both default to empty data; applications supply the token legend and encoded tokens. Range and delta requests remain unsupported. This is not included in 3.3.0.
 
 See the [full-spec matrix](rust/FULL-SPEC.md) and [IDE inventory](docs/lsp-dap-ide-gap-inventory.md) for remaining limits: Rust incremental parsing, LSP cancellation / rename and formatting transport, and some tokens and annotations are unsupported. DAP implements AST/token stepping, not live evaluator suspension. Numeric capture types/conversion and some diagnostics also differ between Java and Rust; compatibility with every Java grammar is not guaranteed.

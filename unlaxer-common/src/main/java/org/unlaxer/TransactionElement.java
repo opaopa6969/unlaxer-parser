@@ -187,6 +187,11 @@ public class TransactionElement implements Serializable{
 		this.parserCursor = cursor;
 	}
 	
+    /** Whether a child transaction begins with matched reset to consumed. */
+    public boolean isResetMatchedWithConsumed() {
+        return resetMatchedWithConsumed;
+    }
+
 	public void setResetMatchedWithConsumed(boolean resetMatchedWithConsumed) {
 		this.resetMatchedWithConsumed = resetMatchedWithConsumed;
 	}
