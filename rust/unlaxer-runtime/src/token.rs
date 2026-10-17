@@ -89,11 +89,11 @@ impl TokenSource {
             None
         }
     }
-    pub(crate) fn projected_shared(&self) -> Option<std::sync::Arc<str>> {
-        if let Self::Projected { text, .. } = self {
-            Some(std::sync::Arc::clone(text))
-        } else {
-            None
+    pub(crate) fn owned_shared(&self) -> Option<std::sync::Arc<str>> {
+        match self {
+            Self::Projected { text, .. } => Some(std::sync::Arc::clone(text)),
+            Self::Generated { text, .. } => Some(std::sync::Arc::from(text.as_str())),
+            Self::Input(_) => None,
         }
     }
 }
@@ -718,6 +718,26 @@ impl ParseContext<'_> {
                     },
                 )
             }
+            Expr::Replay(name) => {
+                let text = self.captured_text(name);
+                let width = text.map_or(0, |text| text.chars().count());
+                let mut end = start;
+                let mut input = raw.chars();
+                let mut full = text.is_some();
+                for _ in 0..width {
+                    if let Some(cp) = input.next() {
+                        end += cp.len_utf8();
+                    } else {
+                        full = false;
+                        break;
+                    }
+                }
+                (
+                    "ReplayParser",
+                    end,
+                    full && (text.is_some_and(|text| raw.starts_with(text)) != mode.invert),
+                )
+            }
             Expr::Until(terminator) => {
                 let at = raw.find(terminator);
                 (
@@ -739,13 +759,18 @@ impl ParseContext<'_> {
             }
         };
         if !accepted {
-            self.fail_at(
-                start.max(self.position).max(self.matched_position),
-                match expression {
-                    Expr::Literal(word) | Expr::CaseInsensitive(word) => word,
-                    _ => "character",
-                },
-            );
+            let at = start.max(self.position).max(self.matched_position);
+            if let Expr::Replay(name) = expression {
+                self.fail_at(at, &format!("SAME_AS({name})"));
+            } else {
+                self.fail_at(
+                    at,
+                    match expression {
+                        Expr::Literal(word) | Expr::CaseInsensitive(word) => word,
+                        _ => "character",
+                    },
+                );
+            }
             if mode.kind.is_consumed() {
                 self.matched_position = self.position;
             }
@@ -1008,7 +1033,7 @@ impl ParseContext<'_> {
                 };
                 end = node.span.end;
                 if parts.is_empty() {
-                    single_projection = source.and_then(TokenSource::projected_shared);
+                    single_projection = source.and_then(TokenSource::owned_shared);
                 } else {
                     single_projection = None;
                 }

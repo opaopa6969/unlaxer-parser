@@ -15,10 +15,12 @@ final class SemanticCardinality {
     static final String TEXT_BINDING = "#semantic:text";
     static final String BOUNDARY_BINDING = "#semantic:boundary";
     private final GrammarDecl grammar;
+    private final RecursiveSemanticShapes recursiveShapes;
     private final Map<String, RuleDecl> rules = new LinkedHashMap<>();
 
     SemanticCardinality(GrammarDecl grammar) {
         this.grammar = grammar;
+        this.recursiveShapes = new RecursiveSemanticShapes(grammar, true);
         grammar.rules().forEach(rule -> rules.put(rule.name(), rule));
     }
 
@@ -98,9 +100,15 @@ final class SemanticCardinality {
     private Shape shape(AtomicElement element, Set<String> visiting) {
         if (element instanceof RuleRefElement ref) {
             RuleDecl rule = rules.get(ref.name());
+            if (rule != null && EnumSchema.isEnum(rule)) return new Shape(Kind.NODE,Count.ONE);
             if (rule == null || !MapperElementUtil.containsMappedValue(ref, rules)) return text();
             if (MapperElementUtil.getMappingAnnotation(rule).isPresent()) return new Shape(Kind.NODE, Count.ONE);
-            if (!visiting.add(ref.name())) throw new IllegalArgumentException("Recursive unmapped semantic helper: " + ref.name());
+            if (!visiting.add(ref.name())) {
+                var recursive = recursiveShapes.rule(ref.name());
+                return new Shape(recursive.kind().equals("#text") ? Kind.TEXT
+                    : recursive.kind().equals("#join") ? Kind.VALUE : Kind.NODE,
+                    Count.valueOf(recursive.count().name()));
+            }
             Shape result = shape(rule.body(), visiting);
             visiting.remove(ref.name());
             return result;

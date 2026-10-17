@@ -78,6 +78,13 @@ impl LessonGrammar {
         if file.grammars.len() != 1 || !file.grammars[0].imports.is_empty() {
             return Err("学習画面では import のない 1 つの grammar を使います。".into());
         }
+        if file.grammars[0].rules.iter().any(|rule| {
+            rule.annotations.iter().any(|annotation| {
+                matches!(annotation.kind, unlaxer_ubnf::ast::AnnotationKind::Enum)
+            })
+        }) {
+            return Err("学習画面は @enum の値投影に未対応です。Java / Rust の CLI または生成 Playground を使ってください。".into());
+        }
         if file.grammars[0]
             .tokens
             .iter()
@@ -87,6 +94,13 @@ impl LessonGrammar {
         }
         let ir = unlaxer_generator::lowering::lower(&file.grammars[0])?;
         unlaxer_codegen::validate_ir(&ir).map_err(|e| e.to_string())?;
+        if ir
+            .rules
+            .iter()
+            .any(|rule| !rule.type_constraints.is_empty())
+        {
+            return Err("学習エンジンでは @typeof は対応範囲外です。CLI / VS Code / 生成 Playground の mapper を使ってください。".into());
+        }
         if ir.rules.iter().any(|r| {
             r.mapping
                 .as_ref()
