@@ -229,7 +229,8 @@ public class ApiImpactConformanceTest {
             for (var method : before.methods()) {
                 source.append("@Override protected ").append(method.returnType().replace("T", "Integer")).append(' ')
                     .append(method.name()).append('(').append(String.join(",", method.parameters().stream()
-                        .map(p -> p.type() + " " + p.name()).toList())).append(") { return 0; }\n");
+                        .map(p -> (p.type().equals("T") ? "Integer" : p.type()) + " " + p.name()).toList()))
+                    .append(") { return ").append(method.returnType().equals("boolean") ? "false" : "0").append("; }\n");
             }
         } else {
             var node = before.nodes().stream().filter(n -> n.name().equals(fixture.get("node").getAsString())).findFirst().orElseThrow();
@@ -256,7 +257,9 @@ public class ApiImpactConformanceTest {
             source.append("struct Legacy; impl generated::evaluator::Semantics for Legacy { type Output = ();\n");
             for (var method : before.methods()) source.append("fn ").append(method.name()).append('(')
                 .append(String.join(",", method.parameters().stream().map(p -> p.name().equals("self")
-                    ? "&mut self" : "r#" + p.name() + ": " + p.type()).toList())).append(") -> Self::Output { () }\n");
+                    ? p.type().replace("Self", "self") : "r#" + p.name() + ": " + p.type()).toList()))
+                .append(") -> ").append(method.returnType()).append(" { ")
+                .append(method.returnType().equals("bool") ? "false" : "()").append(" }\n");
             source.append("}\n");
         } else {
             var node = before.nodes().stream().filter(n -> n.name().equals(fixture.get("node").getAsString())).findFirst().orElseThrow();

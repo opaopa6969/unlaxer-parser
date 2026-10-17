@@ -79,7 +79,7 @@ fn full_tokens_use_shared_utf16_legend_and_reject_invalid_provider_data() {
         ))[0]["result"]["data"]
     );
     for (multiline, overlapping) in [(false, false), (true, false), (false, true), (true, true)] {
-        server.handle(request("initialize", json!({"capabilities":{"textDocument":{"semanticTokens":{"multilineTokenSupport":multiline,"overlappingTokenSupport":overlapping}}}})));
+        server.handle(request("unlaxer/configure", json!({"capabilities":{"textDocument":{"semanticTokens":{"multilineTokenSupport":multiline,"overlappingTokenSupport":overlapping}}}})));
         for row in fixture["cases"].as_array().unwrap() {
             if row["largeLegend"] == true {
                 continue;

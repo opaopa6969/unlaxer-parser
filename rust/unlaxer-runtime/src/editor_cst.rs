@@ -324,7 +324,9 @@ pub fn literal_completions(grammar: &SharedGrammar) -> Vec<&'static str> {
                     visit(child, result);
                 }
             }
-            Capture(_, child)
+            OwnedCapture(_, child)
+            | CaptureScope(child)
+            | Capture(_, child)
             | TextValue(child)
             | ValueBoundary(child)
             | Optional(child)
