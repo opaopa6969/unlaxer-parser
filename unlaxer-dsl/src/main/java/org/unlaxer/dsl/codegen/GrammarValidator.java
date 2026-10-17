@@ -28,7 +28,6 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.ScopeTreeAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.SequenceBody;
 import org.unlaxer.dsl.bootstrap.UBNFAST.StringSettingValue;
 import org.unlaxer.dsl.bootstrap.UBNFAST.TokenDecl;
-import org.unlaxer.dsl.bootstrap.UBNFAST.TypeofElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.WhitespaceAnnotation;
 import org.unlaxer.dsl.bootstrap.TokenAdapterRegistry;
 import org.unlaxer.dsl.bootstrap.TokenContractRegistry;
@@ -550,8 +549,9 @@ public final class GrammarValidator {
             }
         }
 
+        Set<String> constraintCaptures = TypeofConstraints.captures(rule);
         for (String capture : captures) {
-            if (!paramSet.contains(capture)) {
+            if (!paramSet.contains(capture) && !constraintCaptures.contains(capture)) {
                 addRuleError(errors, rule.name(),
                     "rule " + rule.name() + " has capture @" + capture
                         + " not listed in @mapping(" + mapping.className() + ") params",
@@ -1164,74 +1164,24 @@ public final class GrammarValidator {
     }
 
     private static void validateEnumRules(GrammarDecl grammar, List<ValidationIssue> errors) {
-        for (RuleDecl rule : grammar.rules()) {
-            boolean isEnum = rule.annotations().stream()
-                .anyMatch(a -> a instanceof UBNFAST.EnumAnnotation);
-            if (!isEnum) {
-                continue;
-            }
-            // @enum ルールは Choice+Terminal のみ許容
-            final boolean allTerminals;
-            var switchSubject2 = rule.body();
-            if (switchSubject2 instanceof UBNFAST.ChoiceBody choice) {
-                allTerminals = choice.alternatives().stream()
-                    .allMatch(seq -> seq.elements().size() == 1
-                        && seq.elements().get(0).element() instanceof UBNFAST.TerminalElement);
-            } else if (switchSubject2 instanceof UBNFAST.SequenceBody seq) {
-                allTerminals = seq.elements().size() == 1
-                    && seq.elements().get(0).element() instanceof UBNFAST.TerminalElement;
-            } else {
-                throw new IllegalStateException("unhandled " + switchSubject2);
-            }
-            if (!allTerminals) {
-                addRuleError(errors, rule.name(),
-                    "@enum rule " + rule.name() + " must consist only of terminal literals (e.g. 'a' | 'b')",
-                    "Use only quoted string literals as alternatives in an @enum rule.",
-                    "E-ENUM-NON-TERMINAL");
-            }
+        try { EnumSchema.validate(grammar); }
+        catch (IllegalArgumentException error) {
+            addError(errors, error.getMessage(), "Use distinct nonempty literal alternatives and valid enum names.", "E-ENUM");
         }
     }
 
     private static void validateCommonFields(GrammarDecl grammar, List<ValidationIssue> errors) {
-        // @commonField(field) が付いたルールの全 permit に該当フィールドが存在するか確認
-        for (RuleDecl rule : grammar.rules()) {
-            rule.annotations().stream()
-                .filter(a -> a instanceof UBNFAST.CommonFieldAnnotation)
-                .map(a -> (UBNFAST.CommonFieldAnnotation) a)
-                .forEach(commonField -> {
-                    MappingAnnotation mapping = rule.annotations().stream()
-                        .filter(a -> a instanceof MappingAnnotation)
-                        .map(a -> (MappingAnnotation) a)
-                        .findFirst().orElse(null);
-                    if (mapping == null) {
-                        return;
-                    }
-                    String sealedName = mapping.className();
-                    List<RuleDecl> permits = grammar.rules().stream()
-                        .filter(r -> {
-                            MappingAnnotation m = r.annotations().stream()
-                                .filter(a -> a instanceof MappingAnnotation)
-                                .map(a -> (MappingAnnotation) a)
-                                .findFirst().orElse(null);
-                            return m != null && m.className().startsWith(sealedName + ".");
-                        })
-                        .toList();
-                    for (String field : commonField.fieldNames()) {
-                        for (RuleDecl permit : permits) {
-                            MappingAnnotation pm = permit.annotations().stream()
-                                .filter(a -> a instanceof MappingAnnotation)
-                                .map(a -> (MappingAnnotation) a)
-                                .findFirst().orElse(null);
-                            if (pm != null && !pm.paramNames().contains(field)) {
-                                addRuleError(errors, rule.name(),
-                                    "@commonField(" + field + ") is declared on " + rule.name()
-                                        + " but permit " + pm.className() + " does not have param '" + field + "'",
-                                    "Add @" + field + " capture to " + pm.className() + " rule.",
-                                    "E-COMMONFIELD-MISMATCH");
-                            }
-                        }
-                    }
-                });
+        try {
+            CommonFieldSchema.build(grammar);
+        } catch (CommonFieldSchema.SchemaException error) {
+            String message = error.getMessage();
+            String rule = error.rule;
+            addRuleError(
+                    errors,
+                    rule,
+                    message,
+                    "Align family fields and cardinalities.",
+                    "E-COMMONFIELD-MISMATCH");
         }
     }
 
@@ -1472,68 +1422,10 @@ public final class GrammarValidator {
     // @typeof バリデーション
     // =========================================================================
 
-    /** (TypeofElement.captureName → parent capture name) のペアを収集する */
-    private record TypeofUsage(String referencedCapture, String ownCapture) {}
-
     private static void validateTypeofElements(RuleDecl rule, List<ValidationIssue> errors) {
-        List<TypeofUsage> usages = new ArrayList<>();
-        collectTypeofUsagesFromBody(rule.body(), usages);
-        if (usages.isEmpty()) {
-            return;
-        }
-
-        Set<String> captures = collectCaptureNames(rule.body());
-
-        for (TypeofUsage usage : usages) {
-            if (!captures.contains(usage.referencedCapture())) {
-                addRuleError(errors, rule.name(),
-                    "rule " + rule.name() + ": @typeof(" + usage.referencedCapture()
-                        + ") refers to unknown capture '" + usage.referencedCapture() + "'",
-                    "Use a capture name defined in the same rule (e.g. @captureRef).",
-                    "E-TYPEOF-UNKNOWN-CAPTURE");
-            }
-            if (usage.ownCapture() == null || usage.ownCapture().isEmpty()) {
-                addRuleError(errors, rule.name(),
-                    "rule " + rule.name() + ": @typeof(" + usage.referencedCapture()
-                        + ") must be paired with a capture name (e.g. @typeof(x) @myCapture)",
-                    "Add a capture name after @typeof(x).",
-                    "E-TYPEOF-MISSING-CAPTURE");
-            }
-        }
-    }
-
-    private static void collectTypeofUsagesFromBody(RuleBody body, List<TypeofUsage> usages) {
-        if (body instanceof ChoiceBody choice) {
-            for (SequenceBody seq : choice.alternatives()) {
-                collectTypeofUsagesFromSequence(seq, usages);
-            }
-        } else if (body instanceof SequenceBody seq) {
-            collectTypeofUsagesFromSequence(seq, usages);
-        } else {
-            throw new IllegalStateException("unhandled " + body);
-        }
-    }
-
-    private static void collectTypeofUsagesFromSequence(SequenceBody seq, List<TypeofUsage> usages) {
-        for (AnnotatedElement ae : seq.elements()) {
-            if (ae.typeofConstraint().isPresent()) {
-                TypeofElement te = ae.typeofConstraint().get();
-                usages.add(new TypeofUsage(te.captureName(), ae.captureName().orElse(null)));
-            } else {
-                collectTypeofUsagesFromAtomic(ae.element(), usages);
-            }
-        }
-    }
-
-    private static void collectTypeofUsagesFromAtomic(AtomicElement element, List<TypeofUsage> usages) {
-        if (element instanceof GroupElement group) {
-            collectTypeofUsagesFromBody(group.body(), usages);
-        } else if (element instanceof OptionalElement opt) {
-            collectTypeofUsagesFromBody(opt.body(), usages);
-        } else if (element instanceof RepeatElement rep) {
-            collectTypeofUsagesFromBody(rep.body(), usages);
-        } else {
-
+        for (var problem : TypeofConstraints.problems(rule)) {
+            addRuleError(errors, rule.name(), problem.message(),
+                "Use named captures in the same mapped rule; forward references are allowed.", problem.code());
         }
     }
 

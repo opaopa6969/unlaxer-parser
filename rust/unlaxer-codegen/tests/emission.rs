@@ -159,6 +159,8 @@ fn parser_only_raw_ir_requires_a_root_reachable_projection_boundary() {
             mapping: None,
             operator: None,
             catalog: None,
+            enum_literals: Vec::new(),
+            type_constraints: Vec::new(),
             documentation: Vec::new(),
         }
     }
@@ -569,6 +571,8 @@ fn expression_variants_escape_unicode_and_control_characters() {
         mapping: None,
         operator: None,
         catalog: None,
+        enum_literals: Vec::new(),
+        type_constraints: Vec::new(),
         documentation: Vec::new(),
         body: Sequence(vec![
             Literal("\"\\\n\r\t\0\u{7f}😀".into()),
@@ -617,4 +621,46 @@ fn expression_variants_escape_unicode_and_control_characters() {
     ] {
         assert!(parser.contains(expected), "{expected}");
     }
+}
+
+#[test]
+fn enum_names_are_host_independent_and_raw_ir_rejects_invalid_enum_contracts() {
+    assert_eq!(
+        unlaxer_codegen::enum_constant_name("camelCase").unwrap(),
+        "CAMEL_CASE"
+    );
+    assert_eq!(
+        unlaxer_codegen::enum_constant_name("kebab-case").unwrap(),
+        "KEBAB_CASE"
+    );
+    assert_eq!(
+        unlaxer_codegen::enum_constant_name("日本").unwrap(),
+        "U65E5__U672C_"
+    );
+    assert_eq!(unlaxer_codegen::enum_constant_name("𐐨").unwrap(), "U10428_");
+    assert_eq!(
+        unlaxer_codegen::enum_constant_name("a\"b").unwrap(),
+        "A_U22_B"
+    );
+    for invalid in ["", "1", "_"] {
+        assert!(unlaxer_codegen::enum_constant_name(invalid).is_err());
+    }
+    let mut grammar = support::fixture("evolution");
+    grammar.rules[0].enum_literals = vec!["sync".into()];
+    assert!(validate_ir(&grammar)
+        .unwrap_err()
+        .0
+        .contains("declaration differs"));
+    let mut grammar = support::fixture("evolution");
+    grammar
+        .rules
+        .iter_mut()
+        .find_map(|r| r.mapping.as_mut())
+        .unwrap()
+        .fields[0]
+        .kind = Kind::Enum("Missing".into());
+    assert!(validate_ir(&grammar)
+        .unwrap_err()
+        .0
+        .contains("unknown enum field type"));
 }
