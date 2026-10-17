@@ -15,7 +15,7 @@ custom-version.ubnf	blocked	P-ADAPTER-VERSION
 rust-underscore.ubnf	blocked	P-ADAPTER-DEFINITION
 overflow-version.ubnf	blocked	P-ADAPTER-DEFINITION
 multiple-versions.ubnf	passed	-
-custom-repeat.ubnf	failed	P-STRUCTURE
+custom-repeat.ubnf	passed	-
 custom-memo.ubnf	failed	P-STRUCTURE
 builtin-memo.ubnf	passed	-
 adapter-name-collision.ubnf	failed	P-STRUCTURE

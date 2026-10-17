@@ -58,6 +58,7 @@ public final class UBNFToBNFConverter {
 
         for (int i = 0; i < grammars.size(); i++) {
             GrammarDecl grammar = grammars.get(i);
+            org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
             convertGrammarDecl(grammar, builder, context);
 
             if (false == (i == grammars.size() - 1)) {
@@ -168,8 +169,6 @@ public final class UBNFToBNFConverter {
             tokenValue = "CHAR_RANGE('" + cr.min() + "','" + cr.max() + "')";
         } else if (token instanceof UBNFAST.TokenDecl.CaseInsensitive ci) {
             tokenValue = "CI('" + ci.word() + "')";
-        } else if (token instanceof UBNFAST.TokenDecl.Regex rx) {
-            tokenValue = "REGEX('" + rx.pattern() + "')";
         } else {
             throw new IllegalStateException("unhandled " + token);
         }

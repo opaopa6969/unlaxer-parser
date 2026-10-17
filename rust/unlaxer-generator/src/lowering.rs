@@ -83,6 +83,14 @@ impl FixedShape {
 }
 
 pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
+    for token in &grammar.tokens {
+        if matches!(&token.kind, TokenKind::Regex { .. })
+            || matches!(&token.kind, TokenKind::Simple { parser_class }
+                if parser_class == "RegexTokenParser" || parser_class == "org.unlaxer.dsl.runtime.RegexTokenParser")
+        {
+            return Err("E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)".into());
+        }
+    }
     crate::lexical_contexts::validate(grammar)?;
     let format_two = grammar.settings.iter().any(|setting| {
         setting.key == "ubnf"
@@ -1380,20 +1388,11 @@ impl Lowering<'_> {
     }
 
     fn check_repetition(&self, expression: &Expression) -> Result<()> {
-        if let Expression::Repeat {
-            child, max: None, ..
-        } = expression
-        {
-            if self.is_nullable(child) {
-                return Err("nullable unbounded repetition".into());
-            }
-        }
-        if let Expression::Separated { child, separator } = expression {
+        // Generated repeats use JavaRepeat's successful no-progress termination.
+        // Source left-recursion and lexical nullability are validated independently.
+        if let Expression::Separated { separator, .. } = expression {
             if self.shape(separator, &mut HashSet::new())?.kind != Kind::Text {
                 return Err("mapped separator".into());
-            }
-            if self.is_nullable(child) && self.is_nullable(separator) {
-                return Err("nullable unbounded separation".into());
             }
         }
         for child in children(expression) {

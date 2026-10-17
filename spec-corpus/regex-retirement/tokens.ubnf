@@ -1,0 +1,20 @@
+grammar LexicalProbe {
+ @ubnf: v2
+ @package: lexical.probe
+ token DIGIT ::= CHAR_RANGE('0','9');
+ token LETTER ::= CHAR_RANGE('a','z') | CHAR_RANGE('A','Z') | '_';
+ token ID ::= LETTER (LETTER | DIGIT)*;
+ token DECIMAL ::= ['+'|'-'] DIGIT+ ['.' DIGIT+];
+ token NUMBER ::= DECIMAL;
+ token QUOTED ::= '"' { '\\' ANY | NEGATION('"\\') } '"';
+ token NL ::= '\r\n' | '\r' | '\n';
+ token FAMILY ::= '👨‍👩‍👧‍👦';
+ token KEYWORD ::= 'if' NEGATIVE_LOOKAHEAD(LETTER | DIGIT);
+ token PAIR ::= CAPTURE(name, ID) ':' SAME_AS(name);
+ token ROLLBACK ::= CAPTURE(x,'😀') (CAPTURE(x,'a') '!' | 'a') SAME_AS(x);
+ token POSSESSIVE ::= 'a'+ 'a';
+ token ORDERED ::= ('a' | 'ab') 'c';
+ token PEEK ::= LOOKAHEAD('😀') ANY EOF;
+ @root @mapping(Value,params=[value])
+ Root ::= NUMBER @value;
+}

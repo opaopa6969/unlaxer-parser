@@ -61,7 +61,7 @@ fn owned_values_and_all_token_kinds_are_preserved() {
     assert!(
         matches!(&g.tokens[2].kind,TokenKind::Negation{excluded_chars} if excluded_chars=="😀\n\t")
     );
-    assert!(matches!(&g.tokens[10].kind,TokenKind::Regex{pattern} if pattern==r"\d+\.\d+"));
+    assert!(matches!(&g.tokens[10].kind, TokenKind::Declarative { .. }));
     let e = &ast.grammars[1].rules[0].body.alternatives[0].elements[0].element;
     assert_eq!(e.kind, ElementKind::Terminal("😀\n\t\r'\\\\q".to_owned()));
 }
