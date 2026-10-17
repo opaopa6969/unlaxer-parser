@@ -397,8 +397,8 @@ public final class EnumSchema {
             if (seen.size() >= 128)
                 throw new IllegalArgumentException("E-ENUM: enum value analysis exceeds 128 rules");
             RuleDecl rule = rules.get(ref.name());
-            if (rule == null || MapperElementUtil.isSkipped(rule) || !seen.add(ref.name()))
-                return "#text";
+            if (rule == null || MapperElementUtil.isSkipped(rule)) return "#text";
+            if (!seen.add(ref.name())) return new RecursiveSemanticShapes(rules).rule(ref.name()).kind();
             if (isEnum(rule)) return rule.name();
             if (MapperElementUtil.getMappingAnnotation(rule).isPresent()) return "#node";
             return valueType(new GroupElement(rule.body()), rules, seen);

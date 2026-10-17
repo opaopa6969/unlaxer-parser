@@ -25,8 +25,14 @@ public class FamilyProjectionConformanceTest extends PreferredAstConformanceTest
             String code = fixture.get("error").getAsString();
             assertTrue(GrammarValidator.validateWithoutClassLoading(grammar).stream()
                 .anyMatch(issue -> issue.code().equals(code)));
+            String javaCode = fixture.has("javaGeneratorError") ? fixture.get("javaGeneratorError").getAsString() : code;
+            if (fixture.has("additionalValidationError")) {
+                String additional=fixture.get("additionalValidationError").getAsString();
+                assertTrue(GrammarValidator.validateWithoutClassLoading(grammar).stream()
+                    .anyMatch(issue -> issue.code().equals(additional)));
+            }
             for (CodeGenerator generator : List.of(new ASTGenerator(),new MapperGenerator(),new EvaluatorGenerator(21)))
-                assertTrue(assertThrows(IllegalArgumentException.class, () -> generator.generate(grammar)).getMessage().contains(code));
+                assertTrue(assertThrows(IllegalArgumentException.class, () -> generator.generate(grammar)).getMessage().contains(javaCode));
             assertTrue(assertThrows(IllegalArgumentException.class, () -> new RustBackend().generate(grammar)).getMessage().contains(code));
         }
     }

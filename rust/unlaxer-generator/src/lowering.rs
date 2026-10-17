@@ -52,6 +52,36 @@ struct Shape {
     cardinality: Cardinality,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum FixedShape {
+    Unknown,
+    Empty,
+    Value(Shape),
+}
+impl FixedShape {
+    fn wrap(self, count: Cardinality, nullable: bool) -> Self {
+        match self {
+            Self::Unknown if nullable => Self::Empty,
+            Self::Value(value) => Self::Value(wrap_node(value, count)),
+            other => other,
+        }
+    }
+    fn join(self, other: Self, sequence: bool) -> Result<Self> {
+        Ok(match (self, other) {
+            (Self::Unknown, b) | (b, Self::Unknown) if !sequence => b,
+            (Self::Unknown, _) | (_, Self::Unknown) => Self::Unknown,
+            (Self::Empty, b) | (b, Self::Empty) => {
+                if sequence {
+                    b
+                } else {
+                    b.wrap(Cardinality::Optional, true)
+                }
+            }
+            (Self::Value(a), Self::Value(b)) => Self::Value(merge(a, b, sequence)?),
+        })
+    }
+}
+
 pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
     crate::lexical_contexts::validate(grammar)?;
     let format_two = grammar.settings.iter().any(|setting| {
@@ -87,6 +117,7 @@ pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
         recoveries: Vec::new(),
         nullable: HashSet::new(),
         analysis_depth: Cell::new(0),
+        recursive_shapes: std::array::from_fn(|_| std::cell::OnceCell::new()),
     }
     .run()?;
     crate::numeric_fields::refine(grammar, &mut ir);
@@ -112,6 +143,7 @@ struct Lowering<'a> {
     recoveries: Vec<Option<(ast::RecoveryMode, Vec<String>)>>,
     nullable: HashSet<usize>,
     analysis_depth: Cell<usize>,
+    recursive_shapes: [std::cell::OnceCell<Vec<Shape>>; 2],
 }
 
 struct AnalysisDepth<'a>(&'a Cell<usize>);
@@ -834,19 +866,7 @@ impl Lowering<'_> {
                 };
                 Some(mapping)
             } else {
-                if !self.skips[i]
-                    && !captures.is_empty()
-                    && *effects == RuleEffects::default()
-                    && self.comparisons[i].is_none()
-                    && self.catalogs[i].is_none()
-                    && !(crate::common_fields::is_sum(self.grammar, &self.grammar.rules[i])
-                        && captures.keys().all(|name| constraint_names.contains(name)))
-                {
-                    return Err(format!(
-                        "captures without @mapping on {}",
-                        self.grammar.rules[i].name
-                    ));
-                }
+                // Helper-local captures remain CST metadata; only a mapping publishes AST fields.
                 None
             };
             let catalog = self.catalogs[i].as_ref().map(|context| {
@@ -1393,7 +1413,7 @@ impl Lowering<'_> {
         }
         if !visiting.insert(rule) {
             return Err(format!(
-                "left recursion at {}",
+                "E-LEFT-RECURSION: left recursion at {}",
                 self.grammar.rules[rule].name
             ));
         }
@@ -1501,10 +1521,11 @@ impl Lowering<'_> {
             });
         }
         if !visiting.insert(rule) {
-            return Err(format!(
-                "recursive unmapped rule {}",
-                self.grammar.rules[rule].name
-            ));
+            let cache = &self.recursive_shapes[usize::from(enum_nodes)];
+            if cache.get().is_none() {
+                let _ = cache.set(self.recursive_shapes(enum_nodes)?);
+            }
+            return Ok(cache.get().expect("shape cache initialized")[rule].clone());
         }
         if visiting.len() > 256 {
             return Err("rule shape depth exceeds 256".into());
@@ -1512,6 +1533,127 @@ impl Lowering<'_> {
         let shape = self.shape_projected(&self.bodies[rule], visiting, enum_nodes)?;
         visiting.remove(&rule);
         Ok(shape)
+    }
+
+    // Solve rule references as a finite graph. None is an as-yet unknown finite
+    // derivation, not a text alternative: using Text as a cycle seed widens
+    // otherwise pure node/enum aliases incorrectly.
+    fn recursive_shapes(&self, enum_nodes: bool) -> Result<Vec<Shape>> {
+        let terminal = |rule: usize| -> Option<Shape> {
+            if self.skips[rule] {
+                return Some(text_shape());
+            }
+            if !self.enums[rule].is_empty() {
+                return Some(Shape {
+                    kind: if enum_nodes {
+                        Kind::Node
+                    } else {
+                        Kind::Enum(self.grammar.rules[rule].name.clone())
+                    },
+                    cardinality: Cardinality::One,
+                });
+            }
+            self.mappings[rule].as_ref().map(|_| Shape {
+                kind: Kind::Node,
+                cardinality: Cardinality::One,
+            })
+        };
+        let mut current: Vec<_> = (0..self.bodies.len())
+            .map(|r| {
+                terminal(r)
+                    .map(FixedShape::Value)
+                    .unwrap_or(FixedShape::Unknown)
+            })
+            .collect();
+        let mut work = 0;
+        for _ in 0..4 * self.bodies.len() + 4 {
+            let mut next = current.clone();
+            for (rule, body) in self.bodies.iter().enumerate() {
+                if terminal(rule).is_some() {
+                    continue;
+                }
+                next[rule] = self.fixed_shape(body, &current, &mut work)?;
+            }
+            if next == current {
+                return Ok(next
+                    .into_iter()
+                    .map(|shape| {
+                        if let FixedShape::Value(value) = shape {
+                            value
+                        } else {
+                            text_shape()
+                        }
+                    })
+                    .collect());
+            }
+            current = next;
+        }
+        Err("E-RECURSIVE-SHAPE: transparent shape analysis did not converge".into())
+    }
+
+    fn fixed_shape(
+        &self,
+        expression: &Expression,
+        state: &[FixedShape],
+        work: &mut usize,
+    ) -> Result<FixedShape> {
+        *work += 1;
+        if *work > 1_000_000 {
+            return Err("E-RECURSIVE-SHAPE: analysis work exceeds 1000000".into());
+        }
+        let _depth = self.enter_analysis()?;
+        match expression {
+            Expression::Reference(rule) => Ok(state[*rule].clone()),
+            Expression::Capture { expression, .. }
+            | Expression::Delimited(expression)
+            | Expression::CaptureEquality {
+                child: expression, ..
+            } => self.fixed_shape(expression, state, work),
+            Expression::OptionalExpr(child) => Ok(self
+                .fixed_shape(child, state, work)?
+                .wrap(Cardinality::Optional, true)),
+            Expression::Repeat { child, min, .. } => Ok(self
+                .fixed_shape(child, state, work)?
+                .wrap(Cardinality::Many, *min == 0)),
+            Expression::Separated { child, separator } => {
+                if matches!(self.fixed_shape(separator, state, work)?, FixedShape::Value(s) if s.kind != Kind::Text)
+                {
+                    return Err("mapped separator".into());
+                }
+                Ok(self
+                    .fixed_shape(child, state, work)?
+                    .wrap(Cardinality::Many, false))
+            }
+            Expression::Sequence(elements) => {
+                let mut result = FixedShape::Empty;
+                let mut text = false;
+                for element in elements {
+                    let shape = self.fixed_shape(element, state, work)?;
+                    if matches!(&shape, FixedShape::Value(s) if s.kind == Kind::Text) {
+                        text = true;
+                        continue;
+                    }
+                    result = result.join(shape, true)?;
+                }
+                Ok(if text && result == FixedShape::Empty {
+                    FixedShape::Value(text_shape())
+                } else {
+                    result
+                })
+            }
+            Expression::Choice(elements)
+            | Expression::PredictiveChoice {
+                alternatives: elements,
+                ..
+            } => {
+                let mut result = FixedShape::Unknown;
+                for element in elements {
+                    result = result.join(self.fixed_shape(element, state, work)?, false)?;
+                }
+                Ok(result)
+            }
+            _ => Ok(FixedShape::Value(text_shape())),
+        }
     }
 
     fn shape_projected(
