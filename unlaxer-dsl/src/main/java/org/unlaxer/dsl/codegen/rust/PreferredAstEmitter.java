@@ -1,7 +1,6 @@
 package org.unlaxer.dsl.codegen.rust;
 
 import org.unlaxer.dsl.bootstrap.UBNFAST.*;
-import org.unlaxer.dsl.codegen.CommonFieldSchema;
 import org.unlaxer.dsl.codegen.PreferredAstPlan;
 import org.unlaxer.dsl.codegen.rust.GrammarIR.*;
 
@@ -68,17 +67,7 @@ final class PreferredAstEmitter {
         String marker = "#preferred-schema:" + Long.toUnsignedString(hash, 16);
         var rules = new ArrayList<Rule>();
         try {
-            if (unsupported != null
-                    || grammar.rules().stream()
-                            .flatMap(rule -> rule.annotations().stream())
-                            .anyMatch(
-                                    annotation ->
-                                            annotation instanceof LeftAssocAnnotation
-                                                    || annotation instanceof RightAssocAnnotation)
-                    || (!CommonFieldSchema.enabled(grammar)
-                            && grammar.rules().stream()
-                                    .anyMatch(rule -> CommonFieldSchema.isSum(grammar, rule))))
-                throw new IllegalArgumentException("sum family pending #569");
+            if (unsupported != null) throw new IllegalArgumentException(unsupported);
             for (int i = 0; i < ir.rules().size(); i++) {
                 var rule = ir.rules().get(i);
                 var iter = calls.get(i).iterator();

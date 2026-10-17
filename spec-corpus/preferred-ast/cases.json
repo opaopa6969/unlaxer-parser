@@ -585,11 +585,10 @@
     ]
   },
   {
-    "name": "PendingSum",
-    "unsupported": true,
-    "grammar": "grammar PendingSum { @package: preferredprobe @whitespace: none @root @mapping(Family) Root ::= A | B; @mapping(Item,params=[text]) A ::= '1' @text; @mapping(Other,params=[text]) B ::= '2' @text; }",
-    "java": "protected String evalItem(PendingSumAST.Item n){return n.text();} protected String evalOther(PendingSumAST.Other n){return n.text();}",
-    "rust": "",
+    "name": "PlainSum",
+    "grammar": "grammar PlainSum { @package: preferredprobe @whitespace: none @root @mapping(Family) Root ::= A | B; @mapping(Item,params=[text]) A ::= '1' @text; @mapping(Other,params=[text]) B ::= '2' @text; }",
+    "java": "protected String evalItem(PlainSumAST.Item n){return n.text();} protected String evalOther(PlainSumAST.Other n){return n.text();}",
+    "rust": "fn eval_item(&mut self,text:&str,_:unlaxer_runtime::Span)->String{text.into()} fn eval_other(&mut self,text:&str,_:unlaxer_runtime::Span)->String{text.into()}",
     "cases": [
       {
         "input": "1",

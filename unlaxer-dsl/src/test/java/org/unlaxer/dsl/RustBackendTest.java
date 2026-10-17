@@ -100,7 +100,7 @@ public class RustBackendTest {
         reject(SIMPLE.replace("grammar Example {", """
             grammar Example {
             @memoSafeToken: BUILTIN
-            token BUILTIN = REGEX('[a-z]+')
+            token BUILTIN = CI('a')
             """), "must name a Simple token BUILTIN");
         reject(SIMPLE.replace("grammar Example {", """
             grammar Example {
@@ -116,7 +116,7 @@ public class RustBackendTest {
             assertEquals(5, new RustBackend().generate(UBNFMapper.parse(source.replace("'hello' @value", "(T | 'x')+ @value")).grammars().get(0)).size());
             reject(source.replace("'hello' @value", "T @value Root @value"), "left recursion");
         }
-        reject(SIMPLE.replace("grammar Example {", "grammar Example { token T = REGEX('x')\n"), "token T");
+        reject(SIMPLE.replace("grammar Example {", "grammar Example { token T = REGEX('x')\n"), "E-REGEX-RETIRED");
         assertEquals(5, new RustBackend().generate(UBNFMapper.parse(
             SIMPLE.replace("'hello' @value", "Root{0} @value")).grammars().get(0)).size());
         assertEquals(5, new RustBackend().generate(UBNFMapper.parse(
@@ -305,7 +305,7 @@ public class RustBackendTest {
             """;
         var ir = RustGrammarLowering.lower(UBNFMapper.parse(source).grammars().get(0));
         assertEquals(ir.rules().get(1).mapping(), ir.rules().get(2).mapping());
-        assertEquals(List.of(GrammarIR.Kind.VALUE, GrammarIR.Kind.TEXT, GrammarIR.Kind.VALUE),
+        assertEquals(List.of(GrammarIR.Kind.NULLABLE_NODE, GrammarIR.Kind.TEXT, GrammarIR.Kind.NODE),
             ir.rules().get(1).mapping().fields().stream().map(GrammarIR.Field::kind).toList());
         reject(source.replace("'a' @right", "Leaf @right"), "@leftAssoc requires");
         reject(source.replace("Leaf @left", "[Leaf] @left"), "@leftAssoc requires");
@@ -390,8 +390,8 @@ public class RustBackendTest {
     }
 
     private void reject(String source, String reason) {
-        var grammar = UBNFMapper.parse(source).grammars().get(0);
-        var error = assertThrows(IllegalArgumentException.class, () -> new RustBackend().generate(grammar));
+        var error = assertThrows(IllegalArgumentException.class, () -> new RustBackend().generate(
+            UBNFMapper.parse(source).grammars().get(0)));
         assertTrue(error.getMessage(), error.getMessage().contains(reason));
     }
 

@@ -6,12 +6,14 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 pub mod call_inference;
+pub mod capture_tree;
 pub mod editor;
 pub mod editor_cst;
 pub mod editor_queries;
 pub mod embedded;
 mod first;
 pub mod grapheme;
+pub mod incremental;
 pub mod language_profile;
 pub mod language_queries;
 pub mod lexical;
@@ -148,6 +150,8 @@ pub enum Expr {
     TextValue(Box<Expr>),
     /// Preserve a scalar mixed-value capture span without deciding text versus node.
     ValueBoundary(Box<Expr>),
+    /// Explicit nested capture CST boundary; existing flat Capture remains unchanged.
+    CaptureBoundary(capture_tree::Kind, Box<Expr>),
     /// Apply rule-local symbol effects to this child's captures after a successful parse.
     RuleEffects {
         child: Box<Expr>,
@@ -2441,7 +2445,13 @@ impl<'a> ParseContext<'a> {
         // These built-in lexical parsers are also Chain implementations in Java.
         if matches!(
             expression,
-            Expr::Sequence(_) | Expr::Number | Expr::Identifier | Expr::Quoted(_)
+            Expr::Sequence(_)
+                | Expr::Number
+                | Expr::Identifier
+                | Expr::Quoted(_)
+                | Expr::CodeStart
+                | Expr::CodeEnd
+                | Expr::CaptureBoundary(_, _)
         ) {
             self.match_cursor_policy.reset = false;
         }
@@ -2552,7 +2562,7 @@ impl<'a> ParseContext<'a> {
             Expr::CaptureScope(child) => self.expression_capture_scope(child, depth),
             Expr::RuleEffects { .. } => self.expression_rule_effects(expression, depth),
             Expr::CaptureEquality { .. } => self.expression_capture_equality(expression, depth),
-            Expr::TextValue(_) | Expr::ValueBoundary(_) => {
+            Expr::TextValue(_) | Expr::ValueBoundary(_) | Expr::CaptureBoundary(_, _) => {
                 self.expression_value_boundary(expression, depth)
             }
             Expr::Character { .. } => self.classic_atom(expression, depth),
@@ -2637,7 +2647,13 @@ impl<'a> ParseContext<'a> {
                 if self.token_mode.is_some()
                     && matches!(
                         expression,
-                        Expr::Sequence(_) | Expr::Number | Expr::Identifier | Expr::Quoted(_)
+                        Expr::Sequence(_)
+                            | Expr::Number
+                            | Expr::Identifier
+                            | Expr::Quoted(_)
+                            | Expr::CodeStart
+                            | Expr::CodeEnd
+                            | Expr::CaptureBoundary(_, _)
                     )
                 {
                     self.match_cursor_policy.reset = false;
@@ -2646,7 +2662,8 @@ impl<'a> ParseContext<'a> {
                     && (classic_collector_label(expression).is_some()
                         || matches!(
                             expression,
-                            Expr::Rule(_)
+                            Expr::CaptureBoundary(_, _)
+                                | Expr::Rule(_)
                                 | Expr::MatchOnly(_)
                                 | Expr::InvertMatch(_)
                                 | Expr::JavaLookahead { .. }
@@ -2667,7 +2684,8 @@ impl<'a> ParseContext<'a> {
                 && (classic_collector_label(expression).is_some()
                     || matches!(
                         expression,
-                        Expr::MatchOnly(_)
+                        Expr::CaptureBoundary(_, _)
+                            | Expr::MatchOnly(_)
                             | Expr::InvertMatch(_)
                             | Expr::Rule(_)
                             | Expr::JavaUntil(_)
@@ -2725,7 +2743,7 @@ impl<'a> ParseContext<'a> {
     fn sequence(&mut self, elements: &[Expr], depth: usize) -> Option<Fragment> {
         let mut result = Fragment::default();
         let owner_start = self.position;
-        self.skip();
+        self.sequence_trivia(&mut result, owner_start, depth)?;
         for element in elements {
             if self.excludes(element, depth) {
                 return None;
@@ -2738,7 +2756,7 @@ impl<'a> ParseContext<'a> {
                 self.span(child_start),
                 self.code_point(owner_start),
             );
-            self.skip();
+            self.sequence_trivia(&mut result, owner_start, depth)?;
         }
         Some(result)
     }
@@ -3128,7 +3146,7 @@ impl<'a> ParseContext<'a> {
             | Expr::TriviaScope { .. } => {
                 unreachable!("trivia scopes are dispatched by expression")
             }
-            Expr::TextValue(_) | Expr::ValueBoundary(_) => {
+            Expr::TextValue(_) | Expr::ValueBoundary(_) | Expr::CaptureBoundary(_, _) => {
                 unreachable!("recursive expression dispatched by expression")
             }
         }
@@ -3632,12 +3650,27 @@ impl<'a> ParseContext<'a> {
     #[inline(never)]
     fn expression_value_boundary(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
         match expression {
-            Expr::TextValue(child) | Expr::ValueBoundary(child) => {
+            Expr::TextValue(child)
+            | Expr::ValueBoundary(child)
+            | Expr::CaptureBoundary(_, child) => {
                 let start = self.position;
                 let fragment = self.expression(child, depth)?;
+                if let Expr::CaptureBoundary(kind, _) = expression {
+                    if self.token_mode.is_some() {
+                        let fragment = self.classic_meta_node(
+                            fragment,
+                            self.token_mode().kind,
+                            "CaptureBoundaryParser",
+                        );
+                        self.nodes[fragment.nodes[0]].rule = kind.rule();
+                        return Some(fragment);
+                    }
+                }
                 let node_id = self.nodes.len();
                 self.nodes.push(Node {
-                    rule: if matches!(expression, Expr::TextValue(_)) {
+                    rule: if let Expr::CaptureBoundary(kind, _) = expression {
+                        kind.rule()
+                    } else if matches!(expression, Expr::TextValue(_)) {
                         TEXT_VALUE_RULE
                     } else {
                         VALUE_BOUNDARY_RULE
@@ -4101,6 +4134,7 @@ impl<'a> ParseContext<'a> {
             return;
         }
         if let Expr::TextValue(child)
+        | Expr::CaptureBoundary(_, child)
         | Expr::ValueBoundary(child)
         | Expr::TriviaScope { child, .. }
         | Expr::LexicalTriviaScope { child, .. }
@@ -4231,6 +4265,7 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
         | Expr::CaptureScope(child)
         | Expr::Capture(_, child)
         | Expr::TextValue(child)
+        | Expr::CaptureBoundary(_, child)
         | Expr::ValueBoundary(child)
         | Expr::Optional(child)
         | Expr::JavaOptional(child)
@@ -4338,6 +4373,7 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>) -> bo
             .all(|child| expression_is_memo_safe(child, references)),
         Expr::Capture(_, child)
         | Expr::TextValue(child)
+        | Expr::CaptureBoundary(_, child)
         | Expr::ValueBoundary(child)
         | Expr::Optional(child)
         | Expr::JavaOptional(child)
@@ -5505,6 +5541,8 @@ fn classic_collector_label(expression: &Expr) -> Option<&'static str> {
             min: 1, max: None, ..
         } => Some("OneOrMore"),
         Expr::Repeat { .. } | Expr::JavaRepeat { .. } | Expr::ZeroMatch(_) => Some("Occurs"),
+        Expr::CodeStart => Some("CodeStartParser"),
+        Expr::CodeEnd => Some("CodeEndParser"),
         Expr::Number => Some("NumberParser"),
         Expr::Identifier => Some("IdentifierParser"),
         Expr::Quoted('\'') => Some("SingleQuotedParser"),
@@ -5608,6 +5646,7 @@ fn requires_classic_mode<'a>(expression: &'a Expr, rules: &'a [Rule]) -> bool {
             } => scan.children(children),
             Expr::Capture(_, child)
             | Expr::TextValue(child)
+            | Expr::CaptureBoundary(_, child)
             | Expr::ValueBoundary(child)
             | Expr::Optional(child)
             | Expr::JavaOptional(child)

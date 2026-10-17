@@ -28,7 +28,7 @@ public class PreferredAstConformanceTest {
     @Rule public TemporaryFolder temporary = new TemporaryFolder();
     private final Path repo = Path.of("..").toAbsolutePath().normalize();
 
-    private JsonArray corpus() throws Exception {
+    protected JsonArray corpus() throws Exception {
         return JsonParser.parseString(
                         Files.readString(repo.resolve("spec-corpus/preferred-ast/cases.json")))
                 .getAsJsonArray();
@@ -91,11 +91,15 @@ public class PreferredAstConformanceTest {
                                         .findFirst()
                                         .orElseThrow();
                         if (row.has("stage")) {
-                            assertThrows(
+                            var failure = assertThrows(
                                     java.lang.reflect.InvocationTargetException.class,
                                     () ->
                                             mapper.getMethod("mapParsedTree", Token.class)
                                                     .invoke(null, token));
+                            if (row.has("errorCp")) {
+                                String at = "at CP " + row.getAsJsonArray("errorCp").get(0).getAsInt() + ":" + row.getAsJsonArray("errorCp").get(1).getAsInt();
+                                assertTrue(failure.getCause().toString(),failure.getCause().toString().contains(at));
+                            }
                             continue;
                         }
                         var snapshot =
@@ -125,6 +129,10 @@ public class PreferredAstConformanceTest {
                             var sourceMap = type.getMethod("sourceMap").invoke(candidate);
                             var ast = sourceMap.getClass().getMethod("ast").invoke(sourceMap);
                             var selectedToken = (Token) type.getMethod("token").invoke(candidate);
+                            if (i == 0 && fixture.has("ordinary")) {
+                                var ordinary = mapper.getMethod("mapParsedTokenWithSourceMap", Token.class).invoke(null, token);
+                                assertEquals(ast, ordinary.getClass().getMethod("ast").invoke(ordinary));
+                            }
                             assertEquals(
                                     grammar.name(),
                                     want.get(0).getAsString(),
@@ -220,7 +228,7 @@ public class PreferredAstConformanceTest {
                                             .getClass()
                                             .getMethod("depth")
                                             .invoke(children.get(0)));
-                            if (!fixture.has("unmapped"))
+                            if (!fixture.has("unmapped") && child.parser.getClass() != token.parser.getClass())
                                 assertThrows(
                                         java.lang.reflect.InvocationTargetException.class,
                                         () ->
@@ -298,7 +306,7 @@ public class PreferredAstConformanceTest {
                                         + " struct Eval; impl Semantics for Eval { type"
                                         + " Output=String; ")
                             .append(fixture.get("rust").getAsString())
-                            .append("} fn main(){let mut retained=Vec::new();\n");
+                            .append("} fn main(){let mut retained:Vec<generated::mapper::MappedTree>=Vec::new();\n");
             for (var raw : fixture.getAsJsonArray("cases")) {
                 var row = raw.getAsJsonObject();
                 String value = row.get("input").getAsString();
@@ -307,6 +315,9 @@ public class PreferredAstConformanceTest {
                         code.append("assert!(generated::parser::parse_tree_for_mapping(")
                                 .append(rustString(value))
                                 .append(").is_err());\n");
+                    } else if (row.has("errorCp")) {
+                        String at = "at CP " + row.getAsJsonArray("errorCp").get(0).getAsInt() + ":" + row.getAsJsonArray("errorCp").get(1).getAsInt();
+                        code.append("{let tree=generated::parser::parse_tree_for_mapping(").append(rustString(value)).append(").unwrap();let error=generated::mapper::map_parsed_tree(&tree).err().expect(\"mapping failure\");assert!(error.contains(").append(rustString(at)).append("),\"{}\",error);}");
                     } else {
                         code.append("{let tree=generated::parser::parse_tree_for_mapping(")
                                 .append(rustString(value))
@@ -339,6 +350,8 @@ public class PreferredAstConformanceTest {
                         "];assert_eq!(snapshot.candidates().len(),expected.len());for(c,e) in"
                             + " snapshot.candidates().iter().zip(expected){assert_eq!((c.simple_name(),c.depth(),c.span().start,c.span().end,evaluate(c.ast(),&mut"
                             + " Eval).as_str()),(e.0,e.1,e.2,e.3,e.4));assert_eq!(snapshot.source_text(c.span()),Some(tree.text(c.span())));}");
+                if (fixture.has("rustCheck")) code.append(fixture.get("rustCheck").getAsString());
+                if (fixture.has("ordinary")) code.append("assert_eq!(generated::mapper::map(&generated::parser::parse_tree(source).unwrap()).unwrap().canonical_json(),snapshot.select_default().ast().canonical_json());");
                 code.append(
                         "for name in [None,Some(\"\"),Some(\""
                             + " \"),Some(\"Missing\"),Some(\"Pair\")]{assert!(std::ptr::eq(snapshot.select(name),&snapshot.candidates()["
@@ -356,7 +369,7 @@ public class PreferredAstConformanceTest {
                             + " snapshot.candidates()[0].node_id()!=tree.root {let"
                             + " id=snapshot.candidates().last().unwrap().node_id();let"
                             + " sub=generated::mapper::map_subtree_tree(&tree,id).unwrap();assert_eq!(sub.candidates()[0].depth(),0);let"
-                            + " mut wrong=tree.clone();wrong.root=id;assert!(generated::mapper::map_parsed_tree(&wrong).is_err());}");
+                            + " mut wrong=tree.clone();wrong.root=id;if tree.nodes[id].rule!=tree.nodes[tree.root].rule{assert!(generated::mapper::map_parsed_tree(&wrong).is_err());}else{assert!(generated::mapper::map_parsed_tree(&wrong).is_ok());}}");
                 code.append(
                         "let mut"
                             + " broken=tree.clone();broken.root=usize::MAX;assert!(generated::mapper::map_parsed_tree(&broken).is_err());let"
@@ -472,7 +485,7 @@ public class PreferredAstConformanceTest {
                                 + methods
                                 + " }"));
         Path output = temporary.newFolder().toPath();
-        var compiler = ToolProvider.getSystemJavaCompiler();
+        var compiler = org.unlaxer.dsl.Java21TestSupport.compiler();
         var diagnostics = new DiagnosticCollector<JavaFileObject>();
         try (var manager =
                 compiler.getStandardFileManager(diagnostics, Locale.ROOT, StandardCharsets.UTF_8)) {
@@ -507,7 +520,7 @@ public class PreferredAstConformanceTest {
         };
     }
 
-    private String run(List<String> command, String input, boolean withoutJava, boolean success)
+    protected String run(List<String> command, String input, boolean withoutJava, boolean success)
             throws Exception {
         Path log = temporary.newFile().toPath();
         var builder =
