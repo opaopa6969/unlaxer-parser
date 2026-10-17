@@ -1,0 +1,9 @@
+grammar MixedEnums {
+  @package: org.example.mixedenum
+  @whitespace: none
+  @enum Mode ::= 'sync' | '😀';
+  @enum Heat ::= 'hot' | 'cold';
+  @mapping(Leaf, params=[text]) Leaf ::= '<' 'node' @text '>';
+  @root Root ::= Helper;
+  Helper ::= Mode | Heat | Leaf;
+}

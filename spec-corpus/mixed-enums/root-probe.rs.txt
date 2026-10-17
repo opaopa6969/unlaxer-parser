@@ -1,0 +1,28 @@
+mod generated;
+use generated::{ast::{Mode,Heat},evaluator::{evaluate,Semantics}};
+use unlaxer_runtime::{json_string,Span,ParseOptions,Diagnostics,Memoization};
+use std::io::{self,BufRead};
+struct Observe;
+fn value(kind:&str,kind_type:&str,text:&str,span:Span)->String {
+    format!(r#"{{"root":["{}","{}",{},{},{}]}}"#,kind,kind_type,json_string(text),span.start,span.end)
+}
+impl Semantics for Observe {
+    type Output=String;
+    fn eval_mode_node(&mut self,item:&Mode,span:Span)->String {value("enum","Mode",item.text(),span)}
+    fn eval_heat_node(&mut self,item:&Heat,span:Span)->String {value("enum","Heat",item.text(),span)}
+    fn eval_leaf(&mut self,text:&str,span:Span)->String {value("node","Leaf",text,span)}
+}
+fn main() {
+    for line in io::stdin().lock().lines() {
+        let encoded=line.unwrap();
+        let input=String::from_utf8((0..encoded.len()).step_by(2).map(|i|u8::from_str_radix(&encoded[i..i+2],16).unwrap()).collect()).unwrap();
+        for memo in [Memoization::Off,Memoization::SafeFailures] {
+        for diagnostics in [Diagnostics::Auto,Diagnostics::Detailed,Diagnostics::DetailedOnFailure] {
+        match generated::parser::parse_tree_with_options(&input,ParseOptions::with_memoization(memo).with_diagnostics(diagnostics)) {
+            Ok(tree)=>{let ast=generated::mapper::map(&tree).unwrap();drop(tree);println!("{}",with_dap(evaluate(&ast,&mut Observe),&input));},
+            Err(_)=>println!(r#"{{"failure":true}}"#),
+        }
+        }
+        }
+    }
+}
