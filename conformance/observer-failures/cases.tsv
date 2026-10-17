@@ -1,0 +1,21 @@
+# id	scenario	failure_event	input_utf8hex	consumed_prefix_utf8hex	matched_prefix_utf8hex	events	consumedCP	matchedCP	committed_roots	state	metadata_label	fresh_valid	scope_depth	declarations	references	semantic_diagnostics
+start	match	start	7a61	7a		start	1	1	1	7	before	false	1	1	1	0
+begin	match	begin	7a61	7a		start,begin	1	1	1	7	before	false	1	1	1	0
+commit	match	commit	7a61	7a		start,begin,commit	1	1	1	7	before	false	1	1	1	0
+rollback	fail	rollback	7a61	7a		start,begin,rollback	1	1	1	7	before	false	1	1	1	0
+end-success	match	end	7a61	7a		start,begin,commit,end	1	1	1	7	before	false	1	1	1	0
+end-failure	fail	end	7a61	7a		start,begin,rollback,end	1	1	1	7	before	false	1	1	1	0
+leaf-start	leaf	start	7a61	7a		start	1	1	1	7	before	false	1	1	1	0
+leaf-end	leaf	end	7a61	7a		start,end	1	1	1	7	before	false	1	1	1	0
+nested-start	nested	start	7a61	7a		start	1	1	1	7	before	false	1	1	1	0
+nested-commit	nested	commit	7a61	7a		start,begin,commit	1	1	1	7	before	false	1	1	1	0
+nested-end	nested	end	7a61	7a		start,begin,commit,end	1	1	1	7	before	false	1	1	1	0
+child-end	child	end	7a61	7a		start,end	1	1	1	7	before	false	1	1	1	0
+peg-end	peg	end	7a61	7a		start,end	1	1	1	7	before	false	1	1	1	0
+unicode-start	match	start	f09f98800d0a61	f09f98800d0a		start	3	3	1	7	before	false	1	1	1	0
+unicode-commit	nested	commit	f09f98800d0a61	f09f98800d0a		start,begin,commit	3	3	1	7	before	false	1	1	1	0
+unicode-child	child	end	f09f98800d0a61	f09f98800d0a		start,end	3	3	1	7	before	false	1	1	1	0
+prior-matched	match	commit	7a7861	7a	78	start,begin,commit	1	2	2	7	before	false	1	1	1	0
+prior-matched-leaf	leaf	end	7a6178	7a	61	start,end	1	2	2	7	before	false	1	1	1	0
+precommit	match	precommit	7a61	7a		start,begin,precommit	1	1	1	7	before	false	1	1	1	0
+postcommit	match	postcommit	7a61	7a		start,begin,commit,postcommit	1	1	1	7	before	false	1	1	1	0
