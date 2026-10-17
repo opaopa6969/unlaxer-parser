@@ -47,6 +47,8 @@ public class EvaluatorGenerator implements CodeGenerator {
 
     @Override
     public GeneratedSource generate(GrammarDecl grammar) {
+        CommonFieldSchema.build(grammar);
+        EnumSchema.validate(grammar);
         String packageName = getPackageName(grammar);
         String grammarName = grammar.name();
         String astClass = grammarName + "AST";
@@ -54,7 +56,11 @@ public class EvaluatorGenerator implements CodeGenerator {
 
         // A semantic method is required for each emitted concrete record, not for
         // intermediate sum interfaces. Keep declaration order and flat API names.
-        Map<String, RuleDecl> mappedRules = MappingShape.astMappings(grammar);
+        Map<String, RuleDecl> mappedRules = new java.util.LinkedHashMap<>(MappingShape.astMappings(grammar));
+        var rootEnums = EnumSchema.rootEnums(grammar);
+        for (var rule : grammar.rules()) if (rootEnums.containsKey(rule.name())) {
+            mappedRules.put(rootEnums.get(rule.name()), EnumSchema.projection(rule,rootEnums.get(rule.name())));
+        }
         Set<String> sumTypes = MappingShape.sumTypeNames(grammar);
         for (var entry : mappedRules.entrySet()) {
             if (sumTypes.contains(entry.getKey()) && getEvalAnnotation(entry.getValue())

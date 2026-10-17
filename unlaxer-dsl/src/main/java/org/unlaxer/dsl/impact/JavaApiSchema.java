@@ -95,7 +95,7 @@ public final class JavaApiSchema {
                 case ENUM -> "enum";
                 default -> "interface";
             };
-            List<ApiImpact.Field> fields = kind.equals("record") ? recordFields(parsed, type) : List.of();
+            List<ApiImpact.Field> fields = kind.equals("record") ? recordFields(parsed, type) : kind.equals("interface") ? interfaceFields(parsed,type) : List.of();
             List<String> parents = new ArrayList<>();
             if (type.getExtendsClause() != null) parents.add(type.getExtendsClause().toString());
             for (Tree implemented : type.getImplementsClause()) parents.add(implemented.toString());
@@ -142,6 +142,30 @@ public final class JavaApiSchema {
             }).sorted(Comparator.comparing(ApiImpact.Origin::rule)).toList();
     }
 
+    private static List<ApiImpact.Field> interfaceFields(Parsed parsed, ClassTree type) {
+        List<ApiImpact.Field> fields = new ArrayList<>();
+        for (Tree member : type.getMembers())
+            if (member instanceof MethodTree method
+                    && method.getParameters().isEmpty()
+                    && method.getReturnType() != null) {
+                String fieldType = method.getReturnType().toString();
+                String outer = fieldType.replace(" ", "");
+                String cardinality =
+                        outer.startsWith("Optional<") || outer.startsWith("java.util.Optional<")
+                                ? "optional"
+                                : outer.startsWith("List<") || outer.startsWith("java.util.List<")
+                                        ? "many"
+                                        : "one";
+                fields.add(
+                        new ApiImpact.Field(
+                                method.getName().toString(),
+                                fieldType,
+                                cardinality,
+                                parsed.location(method)));
+            }
+        return fields;
+    }
+
     private static List<ApiImpact.Field> recordFields(Parsed parsed, ClassTree type) {
         List<ApiImpact.Field> fields = new ArrayList<>();
         for (Tree member : type.getMembers()) {
@@ -175,6 +199,9 @@ public final class JavaApiSchema {
     }
 
     private static String mappingForMethod(UBNFSourceSnapshot snapshot, String methodName) {
+        for (var wrapper : org.unlaxer.dsl.codegen.EnumSchema.rootEnums(snapshot.ast().grammars().get(0)).values()) {
+            if (methodName.equals("eval" + wrapper)) return wrapper;
+        }
         for (var rule : snapshot.ast().grammars().get(0).rules()) {
             Optional<org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation> mapping = rule.annotations().stream()
                 .filter(org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation.class::isInstance)

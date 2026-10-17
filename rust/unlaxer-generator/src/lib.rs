@@ -1,11 +1,13 @@
 //! Native UBNF -> normalized IR -> Rust modules. No Java process is launched.
 pub mod adapters;
+mod common_fields;
 mod embedded;
 pub mod impact;
 mod lexical;
 mod lexical_contexts;
 pub mod lowering;
 pub mod modules;
+mod numeric_fields;
 pub mod packaged_profiles;
 pub mod packages;
 pub mod playground;
@@ -38,6 +40,12 @@ pub(crate) fn generate_grammar(
 ) -> Result<Vec<unlaxer_codegen::GeneratedFile>, String> {
     let ir = lowering::lower(grammar)?;
     let mut files = unlaxer_codegen::generate(&ir).map_err(|error| error.to_string())?;
+    files
+        .iter_mut()
+        .find(|f| f.relative_path == "ast.rs")
+        .unwrap()
+        .content
+        .push_str(&common_fields::emit(grammar, &ir)?);
     if token_stream::enabled(grammar) {
         let api = unlaxer_codegen::lexing_api_with_profile(
             &token_stream::terminals(grammar)?,
