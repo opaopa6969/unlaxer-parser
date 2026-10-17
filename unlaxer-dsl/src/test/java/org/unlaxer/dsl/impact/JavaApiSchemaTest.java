@@ -6,6 +6,8 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.util.List;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.junit.Test;
 import org.unlaxer.dsl.bootstrap.UBNFMapper;
 import org.unlaxer.dsl.codegen.ASTGenerator;
@@ -99,7 +101,7 @@ public class JavaApiSchemaTest {
         String before = """
             grammar Eval {
               @root @mapping(Binary, params=[left,op,right])
-              Root ::= '1' @left '+' @op '2' @right;
+              Root ::= '1' @left { '+' @op '2' @right };
             }
             """;
         String after = before.replace("@mapping(Binary, params=[left,op,right])",
@@ -140,12 +142,59 @@ public class JavaApiSchemaTest {
     }
 
     @Test
+    public void legalOverloadsRetainBothGeneratedMethodsAndTheirOwnOrigins() {
+        String source = """
+            grammar Overloaded {
+              @root @mapping(A.B, params=[value]) Root ::= 'x' @value;
+              @mapping(AB, params=[value]) Other ::= 'y' @value;
+            }
+            """;
+        var report = ApiImpact.compare("java", source, source);
+        assertTrue(report.toJson(), report.ok());
+        assertFalse(report.hasChanges());
+        var methods = report.before().methods().stream().filter(m -> m.name().equals("evalAB")).toList();
+        assertEquals(2, methods.size());
+        assertEquals(List.of("OverloadedAST.A.B", "OverloadedAST.AB"),
+            methods.stream().map(m -> m.parameters().get(0).type()).toList());
+        assertEquals(List.of(List.of("Root"), List.of("Other")), methods.stream()
+            .map(m -> m.origins().stream().map(ApiImpact.Origin::rule).toList()).toList());
+    }
+
+    @Test
+    public void leafHelperKeepsGrammarOriginsAndCodePointLocationWhenItsNameIsOverloaded() throws Exception {
+        String source = Files.readString(Path.of("../spec-corpus/evaluation/AutoEval.ubnf"));
+        var parsed = UBNFMapper.parseWithSource(source);
+        var schema = JavaApiSchema.build(parsed);
+        var overloads = schema.methods().stream().filter(m -> m.name().equals("evalLeaf")).toList();
+        assertEquals(2, overloads.size());
+        var mapped = overloads.get(0);
+        var helper = overloads.get(1);
+        assertEquals("AutoEvalAST.Leaf", mapped.parameters().get(0).type());
+        assertEquals(List.of("Leaf", "Shadow"), mapped.origins().stream().map(ApiImpact.Origin::rule).toList());
+        assertFalse(mapped.required());
+        assertEquals("String", helper.parameters().get(0).type());
+        assertEquals(parsed.ast().grammars().get(0).rules().size(), helper.origins().size());
+        assertTrue(helper.required());
+        String generated = new EvaluatorGenerator(17).generate(parsed.ast().grammars().get(0)).source();
+        assertEquals("protected abstract T evalLeaf(String literal);", slice(generated, helper.generated().span()));
+        int start = generated.indexOf("protected abstract T evalLeaf(String");
+        assertTrue(start > generated.indexOf("😀"));
+        assertEquals(generated.codePointCount(0, start), helper.generated().span().start());
+    }
+
+    @Test
+    public void rustCannotOverloadCollidingSnakeCaseCallbacks() throws Exception {
+        String source = Files.readString(Path.of("../spec-corpus/api-impact/rust-name-collision.ubnf"));
+        assertTrue(ApiImpact.compare("java", source, source).ok());
+        var report = ApiImpact.compare("rust", source, source);
+        assertFalse(report.ok());
+        assertEquals(List.of("I-SCHEMA", "I-SCHEMA"), report.diagnostics().stream()
+            .map(ApiImpact.Diagnostic::code).toList());
+    }
+
+    @Test
     public void ambiguousGeneratedNamesFailBeforeTheDiffPhase() {
         for (String[] caseAndCode : List.of(
-            new String[]{"""
-                @root @mapping(A.B, params=[value]) Root ::= 'x' @value;
-                @mapping(AB, params=[value]) Other ::= 'y' @value;
-                """, "duplicate generated method: evalAB"},
             new String[]{"""
                 @root @mapping(Value, params=[value,value]) Root ::= 'x' @value;
                 """, "duplicate generated field: Value.value"},

@@ -68,6 +68,7 @@ pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
     }
     crate::embedded::validate(grammar)?;
     validate_enum_rules(grammar)?;
+    crate::evaluation::validate(grammar)?;
     crate::common_fields::families(grammar)?;
     let mut ir = Lowering {
         grammar,
@@ -89,6 +90,7 @@ pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
     }
     .run()?;
     crate::numeric_fields::refine(grammar, &mut ir);
+    crate::evaluation::apply(grammar, &ir, String::new())?;
     Ok(ir)
 }
 
@@ -559,6 +561,7 @@ impl Lowering<'_> {
                     }
                     AnnotationKind::Doc { .. }
                     | AnnotationKind::Enum
+                    | AnnotationKind::Eval { .. }
                     | AnnotationKind::CommonField { .. } => {}
                     other => {
                         return Err(format!("unsupported annotation {other:?} on {}", rule.name))
