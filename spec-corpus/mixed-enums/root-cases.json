@@ -1,0 +1,10 @@
+[
+  {"input":"sync","root":["enum","Mode","sync",0,4]},
+  {"input":"😀","root":["enum","Mode","😀",0,1]},
+  {"input":"hot","root":["enum","Heat","hot",0,3]},
+  {"input":"cold","root":["enum","Heat","cold",0,4]},
+  {"input":"<node>","root":["node","Leaf","node",0,6]},
+  {"input":"","failure":true},
+  {"input":"synchot","failure":true},
+  {"input":"<node","failure":true}
+]

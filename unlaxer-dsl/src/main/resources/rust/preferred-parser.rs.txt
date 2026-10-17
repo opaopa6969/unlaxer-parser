@@ -1,0 +1,19 @@
+
+/// Opt-in CST metadata for preferred AST snapshots; the ordinary parse API is unchanged.
+pub fn parse_tree_for_mapping(source: &str) -> Result<Tree, ParseError> {
+    parse_tree_for_mapping_with_options(source, ParseOptions::default())
+}
+pub fn parse_tree_for_mapping_with_options(source: &str, options: ParseOptions) -> Result<Tree, ParseError> {
+    let grammar = mapping_grammar().ok_or_else(|| ParseError {
+        offset: 0, expected: vec!["supported preferred AST projection".into()],
+    })?;
+    unlaxer_runtime::parse_detailed_shared_with_options(grammar, $ROOT, $WHITESPACE, source, options)
+        .map_err(|diagnostic| diagnostic.farthest)
+}
+pub fn parse_tree_for_mapping_with_name_snapshots(source: &str, snapshots: &[unlaxer_runtime::names::Snapshot], options: ParseOptions) -> Result<Tree, ParseDiagnostic> {
+    let grammar = mapping_grammar().ok_or_else(|| ParseDiagnostic {
+        kind: "preferred_projection", offset: 0, expected: vec!["supported preferred AST projection".into()],
+        farthest: ParseError { offset: 0, expected: vec!["supported preferred AST projection".into()] },
+    })?;
+    unlaxer_runtime::parse_detailed_shared_with_name_snapshots(grammar, $ROOT, $WHITESPACE, source, options, snapshots)
+}
