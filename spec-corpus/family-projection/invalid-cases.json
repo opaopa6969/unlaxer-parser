@@ -1,0 +1,19 @@
+[
+  {
+    "name": "normalized-collision",
+    "grammar": "grammar Invalid { @package: invalidprobe @root @mapping(Family.Item) Root ::= 'x'; @mapping(Family__Item) Other ::= 'y'; }",
+    "error": "E-COMMONFIELD-MISMATCH"
+  },
+  {
+    "name": "over-deep-dotted",
+    "grammar": "grammar Invalid { @package: invalidprobe @root @mapping(Family.Inner.Item) Root ::= 'x'; }",
+    "error": "E-COMMONFIELD-MISMATCH"
+  },
+  {
+    "name": "cyclic-sum",
+    "grammar": "grammar Invalid { @package: invalidprobe @root @mapping(Alpha) Root ::= B; @mapping(Beta) B ::= Root; }",
+    "error": "E-COMMONFIELD-MISMATCH",
+    "javaGeneratorError": "E-LEFT-RECURSION",
+    "additionalValidationError": "E-LEFT-RECURSION"
+  }
+]

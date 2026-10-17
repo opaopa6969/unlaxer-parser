@@ -52,7 +52,7 @@ public class NumericCaptureRuntimeTest {
         }
     }
 
-    @Test public void rustRetainsLexemeForTheSameNumericBoundaryCorpus() throws Exception {
+    @Test public void rustMapsTheSameCheckedIntegersAndRetainsOriginalSource() throws Exception {
         org.junit.Assume.assumeTrue("enable with -DrustConformance=true", Boolean.getBoolean("rustConformance"));
         Path directory = temporary.newFolder().toPath();
         Path library = directory.resolve("libunlaxer_runtime.rlib");
@@ -70,8 +70,12 @@ public class NumericCaptureRuntimeTest {
                 for line in io::stdin().lock().lines() {
                     let source = line.unwrap();
                     let tree = generated::parser::parse_tree(&source).unwrap();
-                    let ast = generated::mapper::map(&tree).unwrap();
-                    println!("{}", ast.canonical_json());
+                    assert_eq!(tree.source, source);
+                    match generated::mapper::map(&tree) {
+                        Ok(ast) => println!("{}", ast.canonical_json()),
+                        Err(error) => { assert!(error.starts_with("invalid i32 capture")); println!("null"); }
+                    }
+                    assert_eq!(tree.source, source);
                 }
             }
             """);
@@ -84,8 +88,9 @@ public class NumericCaptureRuntimeTest {
         var output = run(List.of(binary.toString()), input).lines().toList();
         assertEquals(corpus.size(), output.size());
         for (int i = 0; i < corpus.size(); i++) {
-            assertEquals(corpus.get(i).getAsJsonObject().get("input"), JsonParser.parseString(output.get(i))
-                .getAsJsonObject().getAsJsonObject("fields").get("value"));
+            var actual = JsonParser.parseString(output.get(i));
+            assertEquals(corpus.get(i).getAsJsonObject().get("javaInt"), actual.isJsonNull() ? actual
+                : actual.getAsJsonObject().getAsJsonObject("fields").get("value"));
         }
     }
 

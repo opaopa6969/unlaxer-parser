@@ -114,7 +114,10 @@ public final class PackratMemoTable {
       boolean invertMatch, Entry entry) {
     if (entry.tokens == null) return Parsed.FAILED;
     context.startParse(parser, context, tokenKind, invertMatch);
-    context.begin(parser);
+    if (parser instanceof org.unlaxer.parser.combinator.Occurs occurs
+        && occurs.min() == 0 && occurs.max() == 0 && !occurs.isZeroMatchCheck())
+      context.beginPreservingMatched(parser);
+    else context.begin(parser);
     for (Token token : entry.tokens) context.getCurrent().getTokens().add(token.deepCopy());
     int consumeDelta = entry.endConsumed - context.getConsumedPosition().value();
     // Even a zero-width consumed token can reset a previously advanced matched cursor.
