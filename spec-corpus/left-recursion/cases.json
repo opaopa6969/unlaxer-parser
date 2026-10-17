@@ -1,0 +1,172 @@
+[
+  {
+    "name": "direct",
+    "grammar": "grammar LeftRec { @package: leftrecprobe  @root @mapping(Node) Root ::= Root 'x' | 'x'; }",
+    "status": "reject",
+    "inputs": []
+  },
+  {
+    "name": "mutual",
+    "grammar": "grammar LeftRec { @package: leftrecprobe  @root @mapping(Node) Root ::= A; A ::= B; B ::= Root | 'x'; }",
+    "status": "reject",
+    "inputs": []
+  },
+  {
+    "name": "nullable-helper",
+    "grammar": "grammar LeftRec { @package: leftrecprobe  @root @mapping(Node) Root ::= N Root | 'x'; N ::= [ 'n' ]; }",
+    "status": "reject",
+    "inputs": []
+  },
+  {
+    "name": "nullable-group",
+    "grammar": "grammar LeftRec { @package: leftrecprobe  @root @mapping(Node) Root ::= ( [ 'n' ] ) Root | 'x'; }",
+    "status": "reject",
+    "inputs": []
+  },
+  {
+    "name": "nullable-chain",
+    "grammar": "grammar LeftRec { @package: leftrecprobe  @root @mapping(Node) Root ::= A Root | 'x'; A ::= B; B ::= [ 'n' ]; }",
+    "status": "reject",
+    "inputs": []
+  },
+  {
+    "name": "optional-cycle",
+    "grammar": "grammar LeftRec { @package: leftrecprobe  @root @mapping(Node) Root ::= [ Root ] 'x'; }",
+    "status": "reject",
+    "inputs": []
+  },
+  {
+    "name": "plus-cycle",
+    "grammar": "grammar LeftRec { @package: leftrecprobe  @root @mapping(Node) Root ::= Root+; }",
+    "status": "reject",
+    "inputs": []
+  },
+  {
+    "name": "bounded-cycle",
+    "grammar": "grammar LeftRec { @package: leftrecprobe  @root @mapping(Node) Root ::= Root{1,2}; }",
+    "status": "reject",
+    "inputs": []
+  },
+  {
+    "name": "zero-min-cycle",
+    "grammar": "grammar LeftRec { @package: leftrecprobe  @root @mapping(Node) Root ::= Root{0,1} 'x'; }",
+    "status": "reject",
+    "inputs": []
+  },
+  {
+    "name": "empty-token",
+    "grammar": "grammar LeftRec { @package: leftrecprobe token E = EMPTY @root @mapping(Node) Root ::= E Root | 'x'; }",
+    "status": "reject",
+    "inputs": []
+  },
+  {
+    "name": "eof-token",
+    "grammar": "grammar LeftRec { @package: leftrecprobe token E = EOF @root @mapping(Node) Root ::= E Root | 'x'; }",
+    "status": "reject",
+    "inputs": []
+  },
+  {
+    "name": "lookahead-token",
+    "grammar": "grammar LeftRec { @package: leftrecprobe token P = LOOKAHEAD('x') @root @mapping(Node) Root ::= P Root | 'x'; }",
+    "status": "reject",
+    "inputs": []
+  },
+  {
+    "name": "until-token",
+    "grammar": "grammar LeftRec { @package: leftrecprobe token P = UNTIL('x') @root @mapping(Node) Root ::= P Root | 'x'; }",
+    "status": "reject",
+    "inputs": []
+  },
+  {
+    "name": "error-guard",
+    "grammar": "grammar LeftRec { @package: leftrecprobe  @root @mapping(Node) Root ::= ERROR('no') Root | 'x'; }",
+    "status": "accept",
+    "inputs": [
+      "x"
+    ]
+  },
+  {
+    "name": "right-recursive",
+    "grammar": "grammar LeftRec { @package: leftrecprobe  @root @mapping(Node) Root ::= '😀' [ Root ] | 'x'; }",
+    "status": "accept",
+    "inputs": [
+      "x",
+      "😀x",
+      "😀😀x"
+    ]
+  },
+  {
+    "name": "consuming-group",
+    "grammar": "grammar LeftRec { @package: leftrecprobe  @root @mapping(Node) Root ::= ( '😀' [ 'n' ] ) [ Root ] | 'x'; }",
+    "status": "accept",
+    "inputs": [
+      "x",
+      "😀x",
+      "😀n😀x"
+    ]
+  },
+  {
+    "name": "zero-maximum",
+    "grammar": "grammar LeftRec { @package: leftrecprobe  @root @mapping(Node) Root ::= Root{0} 'x'; }",
+    "status": "accept",
+    "inputs": [
+      "x"
+    ]
+  },
+  {
+    "name": "consuming-token",
+    "grammar": "grammar LeftRec { @package: leftrecprobe token D = DigitParser @root @mapping(Node) Root ::= D [ Root ] | 'x'; }",
+    "status": "accept",
+    "inputs": [
+      "x",
+      "1x",
+      "21x"
+    ]
+  },
+  {
+    "name": "zero-maximum-group",
+    "grammar": "grammar LeftRec { @package: leftrecprobe @root @mapping(Node) Root ::= (Root{0}) 'x'; }",
+    "status": "accept",
+    "inputs": [
+      "x"
+    ]
+  },
+  {
+    "name": "zero-maximum-nested",
+    "grammar": "grammar LeftRec { @package: leftrecprobe @root @mapping(Node) Root ::= (Root{0} 'z'){0} 'x'; }",
+    "status": "accept",
+    "inputs": [
+      "x"
+    ]
+  },
+  {
+    "name": "zero-maximum-mutual",
+    "grammar": "grammar LeftRec { @package: leftrecprobe @root @mapping(Node) Root ::= Alias{0} 'x'; Alias ::= Root '!'; }",
+    "status": "accept",
+    "inputs": [
+      "x"
+    ]
+  },
+  {
+    "name": "zero-maximum-live-successor",
+    "grammar": "grammar LeftRec { @package: leftrecprobe @root @mapping(Node) Root ::= Root{0} Root | 'x'; }",
+    "status": "reject",
+    "inputs": []
+  },
+  {
+    "name": "nested-groups-64",
+    "grammar": "grammar LeftRec { @package: leftrecprobe @root @mapping(Node) Root ::= (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((('😀')))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))); }",
+    "status": "accept",
+    "inputs": [
+      "😀"
+    ]
+  },
+  {
+    "name": "nested-groups-96",
+    "grammar": "grammar LeftRec { @package: leftrecprobe @root @mapping(Node) Root ::= (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((('😀')))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))); }",
+    "status": "accept",
+    "inputs": [
+      "😀"
+    ]
+  }
+]

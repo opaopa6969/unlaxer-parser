@@ -1,15 +1,21 @@
 //! Native UBNF -> normalized IR -> Rust modules. No Java process is launched.
 pub mod adapters;
+mod associative_spines;
+mod common_fields;
 mod embedded;
+mod evaluation;
 pub mod impact;
 mod lexical;
 mod lexical_contexts;
 pub mod lowering;
 pub mod modules;
+mod numeric_fields;
 pub mod packaged_profiles;
 pub mod packages;
 pub mod playground;
 pub mod portability;
+mod preferred;
+mod preferred_plan;
 pub mod semantic_rules;
 mod token_stream;
 
@@ -38,6 +44,40 @@ pub(crate) fn generate_grammar(
 ) -> Result<Vec<unlaxer_codegen::GeneratedFile>, String> {
     let ir = lowering::lower(grammar)?;
     let mut files = unlaxer_codegen::generate(&ir).map_err(|error| error.to_string())?;
+    let evaluator = files
+        .iter_mut()
+        .find(|f| f.relative_path == "evaluator.rs")
+        .unwrap();
+    evaluator.content = evaluation::apply(grammar, &ir, std::mem::take(&mut evaluator.content))?;
+    files
+        .iter_mut()
+        .find(|f| f.relative_path == "ast.rs")
+        .unwrap()
+        .content
+        .push_str(&common_fields::emit(grammar, &ir)?);
+    let parser_source = &files
+        .iter()
+        .find(|f| f.relative_path == "parser.rs")
+        .unwrap()
+        .content;
+    let ast_source = &files
+        .iter()
+        .find(|f| f.relative_path == "ast.rs")
+        .unwrap()
+        .content;
+    let (parser, mapper) = preferred::emit(grammar, &ir, parser_source, ast_source);
+    files
+        .iter_mut()
+        .find(|f| f.relative_path == "parser.rs")
+        .unwrap()
+        .content
+        .push_str(&parser);
+    files
+        .iter_mut()
+        .find(|f| f.relative_path == "mapper.rs")
+        .unwrap()
+        .content
+        .push_str(&mapper);
     if token_stream::enabled(grammar) {
         let api = unlaxer_codegen::lexing_api_with_profile(
             &token_stream::terminals(grammar)?,

@@ -546,8 +546,7 @@ public class UBNFMapper {
         // REGEX('pattern') 形式のチェック
         List<Token> regexTokens = findDescendants(token, UBNFParsers.RegexExpressionParser.class);
         if (!regexTokens.isEmpty()) {
-            String pattern = extractQuotedValue(regexTokens.get(0));
-            return new TokenDecl.Regex(name, pattern);
+            throw RegexRetirement.at(regexTokens.get(0), 5);
         }
 
         // ANY / EOF / EMPTY (parameterless) のチェック
@@ -575,6 +574,10 @@ public class UBNFMapper {
             parserClass = identifiers.size() > 1
                 ? firstWord(identifiers.get(1).source.toString())
                 : "";
+        }
+        if (RegexRetirement.legacyClass(parserClass)) {
+            Token origin = qualifiedTokens.isEmpty() ? identifiers.get(1) : qualifiedTokens.get(0);
+            throw RegexRetirement.at(origin, parserClass.codePointCount(0, parserClass.length()));
         }
         if (parserClass.equals("XID_IDENTIFIER")) {
             return new TokenDecl.Declarative(name, org.unlaxer.dsl.runtime.LexicalExpression.leaf(
@@ -1117,7 +1120,7 @@ public class UBNFMapper {
 
     Optional<TypeofElement> findTypeofConstraintInAnnotatedElement(Token token) {
         // AnnotatedElementParser のプレフィックス Optional 内の TypeofElementParser を探す
-        List<Token> typeofTokens = findDescendants(token, UBNFParsers.TypeofElementParser.class);
+        List<Token> typeofTokens = findAtElementLevel(token, UBNFParsers.TypeofElementParser.class);
         if (typeofTokens.isEmpty()) return Optional.empty();
         Token typeofToken = typeofTokens.get(0);
         List<Token> identifiers = findDescendants(typeofToken, UBNFParsers.IdentifierParser.class);

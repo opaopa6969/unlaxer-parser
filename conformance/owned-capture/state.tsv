@@ -1,0 +1,12 @@
+# id	wrapper	outcome	consumedCP	matchedCP	state	capture-utf8	metadata	fresh-live	committed-roots
+capture-success	capture	success	2	2	99	f09f9880	during	true	2
+scope-success	scope	success	2	2	99	70	during	true	2
+match-success	match	success	1	2	7	70	before	false	2
+peg-success	peg	success	1	1	7	70	before	false	1
+capture-failure	capture	failure	1	1	7	70	before	false	1
+scope-failure	scope	failure	1	1	7	70	before	false	1
+capture-exception	capture	exception	1	1	7	70	before	false	1
+scope-exception	scope	exception	1	1	7	70	before	false	1
+capture-resource	capture	resource	1	1	7	70	before	false	1
+scope-resource	scope	resource	1	1	7	70	before	false	1
+outer-rollback	capture	rollback	1	1	7	70	before	false	1
