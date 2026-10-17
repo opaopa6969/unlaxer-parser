@@ -283,3 +283,30 @@ fn token_backend_requires_complete_real_trace_and_rejects_detached_source() {
             .contains("detached generated")
     );
 }
+
+#[test]
+fn disconnect_flushes_response_without_consuming_or_closing_borrowed_transport() {
+    use std::io::{Read, Write};
+    let mut bytes = Vec::new();
+    unlaxer_protocol::write_frame(
+        &mut bytes,
+        &serde_json::to_vec(&request(1, "disconnect", json!({}))).unwrap(),
+    )
+    .unwrap();
+    bytes.extend_from_slice(b"TAIL");
+    let mut input = Cursor::new(bytes);
+    let mut output = Vec::new();
+    Server::new(Hooks(Arc::new(Mutex::new(vec![]))))
+        .serve(&mut input, &mut output)
+        .unwrap();
+    let mut tail = String::new();
+    input.read_to_string(&mut tail).unwrap();
+    assert_eq!(tail, "TAIL");
+    let frame = unlaxer_protocol::read_frame(&mut Cursor::new(&output))
+        .unwrap()
+        .unwrap();
+    let reply: Value = serde_json::from_slice(&frame).unwrap();
+    assert_eq!(reply["command"], "disconnect");
+    assert_eq!(reply["success"], true);
+    output.write_all(b"caller still owns output").unwrap();
+}

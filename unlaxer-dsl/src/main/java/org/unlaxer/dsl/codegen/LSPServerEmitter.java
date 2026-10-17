@@ -50,7 +50,7 @@ class LSPServerEmitter {
         StringBuilder kwBuf = new StringBuilder("private static final List<String> KEYWORDS = List.of(");
         for (int i = 0; i < keywords.size(); i++) {
             if (i > 0) kwBuf.append(", ");
-            kwBuf.append("\"").append(keywords.get(i)).append("\"");
+            kwBuf.append("\"").append(ParserCodegenUtil.escapeString(keywords.get(i))).append("\"");
         }
         kwBuf.append(");");
         w.line(kwBuf.toString());
@@ -60,6 +60,8 @@ class LSPServerEmitter {
         w.line("protected final Map<String, DocumentState> documents = new HashMap<>();");
         w.line("protected final Map<String, Long> documentVersions = new HashMap<>();");
         w.line("private volatile boolean shutdownRequested;");
+        w.line("private volatile boolean initialized;");
+        w.line("private boolean initializedNotificationReceived;");
         w.line("private boolean semanticMultiline, semanticOverlapping;");
         w.line("private volatile SemanticTokensLegend semanticTokenLegend = new SemanticTokensLegend(List.of(\"valid\", \"invalid\"), List.of());");
         w.line("private final CompletableFuture<Integer> exitStatus = new CompletableFuture<>();");
@@ -84,7 +86,51 @@ class LSPServerEmitter {
     static void emitLifecycleMethods(IndentedWriter w, String serverClass, boolean hasCatalog) {
         // initialize()
         w.line("@Override");
-        w.line("public CompletableFuture<InitializeResult> initialize(InitializeParams params) {");
+        w.line("public synchronized CompletableFuture<InitializeResult> initialize(InitializeParams params) {");
+        w.indent();
+        w.line("if (hasStopped()) return stoppedRequest();");
+        w.line("if (initialized) return lifecycleError(-32600, \"Server already initialized\");");
+        w.line("return configureServer(params).thenApply(result -> { initialized = true; return result; });");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
+        w.line("@org.eclipse.lsp4j.jsonrpc.services.JsonRequest(\"unlaxer/configure\")");
+        w.line("public synchronized CompletableFuture<InitializeResult> configure(InitializeParams params) {");
+        w.indent();
+        w.line("if (hasStopped()) return stoppedRequest();");
+        w.line("if (!initialized) return lifecycleError(-32002, \"Server not initialized\");");
+        w.line("return configureServer(params);");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
+        w.line("private CompletableFuture<InitializeResult> configureServer(InitializeParams params) {");
+        w.indent();
+        w.line("var previousProfile = selectedLanguageProfile;");
+        w.line("var previousLegend = semanticTokenLegend;");
+        w.line("boolean previousMultiline = semanticMultiline, previousOverlapping = semanticOverlapping;");
+        if (hasCatalog) w.line("var previousCatalog = catalogResolver;");
+        w.line("try {");
+        w.indent();
+        w.line("return buildConfiguration(params).whenComplete((result, failure) -> {");
+        w.line("    if (failure != null) {");
+        w.line("        selectedLanguageProfile = previousProfile; semanticTokenLegend = previousLegend;");
+        w.line("        semanticMultiline = previousMultiline; semanticOverlapping = previousOverlapping;");
+        if (hasCatalog) w.line("        catalogResolver = previousCatalog;");
+        w.line("    }");
+        w.line("});");
+        w.dedent();
+        w.line("} catch (RuntimeException failure) {");
+        w.indent();
+        w.line("selectedLanguageProfile = previousProfile; semanticTokenLegend = previousLegend;");
+        w.line("semanticMultiline = previousMultiline; semanticOverlapping = previousOverlapping;");
+        if (hasCatalog) w.line("catalogResolver = previousCatalog;");
+        w.line("return CompletableFuture.failedFuture(failure);");
+        w.dedent();
+        w.line("}");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
+        w.line("private CompletableFuture<InitializeResult> buildConfiguration(InitializeParams params) {");
         w.indent();
         w.line("if (hasStopped()) return stoppedRequest();");
         w.line("try { selectedLanguageProfile = readLanguageProfile(params); }");
@@ -127,6 +173,7 @@ class LSPServerEmitter {
         w.line("public CompletableFuture<Object> shutdown() {");
         w.indent();
         w.line("if (hasStopped()) return stoppedRequest();");
+        w.line("if (!initialized) return lifecycleError(-32002, \"Server not initialized\");");
         w.line("shutdownRequested = true;");
         w.line("return CompletableFuture.completedFuture(null);");
         w.dedent();
@@ -144,15 +191,35 @@ class LSPServerEmitter {
         w.line("        new org.eclipse.lsp4j.jsonrpc.messages.ResponseError(org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode.InvalidRequest, \"Server has shut down\", null)));");
         w.line("}");
         w.blankLine();
+        w.line("private static <T> CompletableFuture<T> lifecycleError(int code, String message) {");
+        w.line("    return CompletableFuture.failedFuture(new org.eclipse.lsp4j.jsonrpc.ResponseErrorException(");
+        w.line("        new org.eclipse.lsp4j.jsonrpc.messages.ResponseError(code, message, null)));");
+        w.line("}");
+        w.line("private synchronized boolean acceptInitializedNotification() {");
+        w.line("    if (initializedNotificationReceived) return false;");
+        w.line("    initializedNotificationReceived = true; return true;");
+        w.line("}");
+        w.blankLine();
         w.line("public final org.eclipse.lsp4j.jsonrpc.Endpoint lifecycleEndpoint() {");
         w.indent();
         w.line("var delegate = org.eclipse.lsp4j.jsonrpc.services.ServiceEndpoints.toEndpoint(this);");
+        w.line("var methods = org.eclipse.lsp4j.jsonrpc.services.ServiceEndpoints.getSupportedMethods(getClass());");
         w.line("return new org.eclipse.lsp4j.jsonrpc.Endpoint() {");
         w.line("    @Override public CompletableFuture<?> request(String method, Object params) {");
-        w.line("        return hasStopped() ? stoppedRequest() : delegate.request(method, params);");
+        w.line("        if (hasStopped()) return stoppedRequest();");
+        w.line("        if (initialized && \"initialize\".equals(method)) return lifecycleError(-32600, \"Server already initialized\");");
+        w.line("        if (!initialized && !\"initialize\".equals(method)) return lifecycleError(-32002, \"Server not initialized\");");
+        w.line("        var descriptor = methods.get(method);");
+        w.line("        if (descriptor != null && descriptor.isNotification()) return lifecycleError(-32600, \"Notification method requires a notification\");");
+        w.line("        return delegate.request(method, params);");
         w.line("    }");
         w.line("    @Override public void notify(String method, Object params) {");
-        w.line("        if (\"exit\".equals(method) || !hasStopped()) delegate.notify(method, params);");
+        w.line("        if (\"exit\".equals(method)) { delegate.notify(method, params); return; }");
+        w.line("        if (!initialized || hasStopped()) return;");
+        w.line("        var descriptor = methods.get(method);");
+        w.line("        if (descriptor != null && !descriptor.isNotification()) return;");
+        w.line("        if (\"initialized\".equals(method) && !acceptInitializedNotification()) return;");
+        w.line("        delegate.notify(method, params);");
         w.line("    }");
         w.line("};");
         w.dedent();
@@ -674,7 +741,7 @@ class LSPServerEmitter {
         w.line("@Override");
         w.line("public void didOpen(DidOpenTextDocumentParams params) {");
         w.indent();
-        w.line("if (server.hasStopped()) return;");
+        w.line("if (!server.initialized || server.hasStopped()) return;");
         w.line("String uri = params.getTextDocument().getUri();");
         w.line("long version = params.getTextDocument().getVersion();");
         w.line("if (version < 0 || server.documentVersions.containsKey(uri) && version <= server.documentVersions.get(uri)) return;");
@@ -690,7 +757,7 @@ class LSPServerEmitter {
         w.line("@Override");
         w.line("public void didChange(DidChangeTextDocumentParams params) {");
         w.indent();
-        w.line("if (server.hasStopped()) return;");
+        w.line("if (!server.initialized || server.hasStopped()) return;");
         w.line("String uri = params.getTextDocument().getUri();");
         w.line("Integer version = params.getTextDocument().getVersion();");
         w.line("Long previous = server.documentVersions.get(uri);");
@@ -707,7 +774,7 @@ class LSPServerEmitter {
         w.line("@Override");
         w.line("public void didClose(DidCloseTextDocumentParams params) {");
         w.indent();
-        w.line("if (server.hasStopped()) return;");
+        w.line("if (!server.initialized || server.hasStopped()) return;");
         w.line("server.documents.remove(params.getTextDocument().getUri());");
         w.line("server.documentVersions.remove(params.getTextDocument().getUri());");
         w.line("server.clearLanguageDiagnostics(params.getTextDocument().getUri());");
@@ -716,7 +783,7 @@ class LSPServerEmitter {
         w.blankLine();
 
         w.line("@Override");
-        w.line("public void didSave(DidSaveTextDocumentParams params) { if (server.hasStopped()) return; var state = server.documents.get(params.getTextDocument().getUri()); if (state != null) server.parseDocument(state.uri(), state.content()); }");
+        w.line("public void didSave(DidSaveTextDocumentParams params) { if (!server.initialized || server.hasStopped()) return; var state = server.documents.get(params.getTextDocument().getUri()); if (state != null) server.parseDocument(state.uri(), state.content()); }");
         w.blankLine();
 
         // completion()
@@ -725,6 +792,7 @@ class LSPServerEmitter {
         w.line("        CompletionParams params) {");
         w.indent();
         w.line("if (server.hasStopped()) return server.stoppedRequest();");
+        w.line("if (!server.initialized) return lifecycleError(-32002, \"Server not initialized\");");
         w.line("var queryItems = server.languageCompletionItems(params);");
         w.line("if (queryItems != null) return CompletableFuture.completedFuture(Either.forLeft(queryItems));");
         w.line("if (!server.profileAllows(\"COMPLETION\")) return CompletableFuture.completedFuture(Either.forLeft(List.of()));");
@@ -763,6 +831,7 @@ class LSPServerEmitter {
         w.line("public CompletableFuture<Hover> hover(HoverParams params) {");
         w.indent();
         w.line("if (server.hasStopped()) return server.stoppedRequest();");
+        w.line("if (!server.initialized) return lifecycleError(-32002, \"Server not initialized\");");
         w.line("var queryHover = server.languageHover(params);");
         w.line("if (queryHover != null) return CompletableFuture.completedFuture(queryHover.orElse(null));");
         w.line("if (!server.profileAllows(\"HOVER\")) return CompletableFuture.completedFuture(null);");
@@ -799,6 +868,7 @@ class LSPServerEmitter {
         w.line("public CompletableFuture<SemanticTokens> semanticTokensFull(SemanticTokensParams params) {");
         w.indent();
         w.line("if (server.hasStopped()) return server.stoppedRequest();");
+        w.line("if (!server.initialized) return lifecycleError(-32002, \"Server not initialized\");");
         w.line("String uri = params.getTextDocument().getUri();");
         w.line("DocumentState state = server.documents.get(uri);");
         w.line("if (state == null) {");
@@ -971,7 +1041,8 @@ class LSPServerEmitter {
 
     private static void collectFromElement(AtomicElement element, Set<String> acc) {
         if (element instanceof TerminalElement t) {
-            acc.add(stripQuotes(t.value()));
+            // TerminalElement already contains the decoded literal, including genuine quotes.
+            acc.add(t.value());
         } else if (element instanceof GroupElement g) {
             collectFromBody(g.body(), acc);
         } else if (element instanceof OptionalElement o) {
@@ -981,12 +1052,5 @@ class LSPServerEmitter {
         } else {
 
         }
-    }
-
-    private static String stripQuotes(String value) {
-        if (value.length() >= 2 && value.startsWith("'") && value.endsWith("'")) {
-            return value.substring(1, value.length() - 1);
-        }
-        return value;
     }
 }

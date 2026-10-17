@@ -237,7 +237,8 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
             FirstSet::NULLABLE
         }
         Expr::Error(_) => FirstSet::EMPTY,
-        Expr::Lexical(_, _)
+        Expr::NonOrdered(_)
+        | Expr::Lexical(_, _)
         | Expr::Until(_)
         | Expr::JavaUntil(_)
         | Expr::Custom(_)
