@@ -50,7 +50,7 @@ public class LeftRecursionConformanceTest {
                 });
             }
             Path classes=temporary.newFolder().toPath();
-            var compiler=ToolProvider.getSystemJavaCompiler();
+            var compiler=org.unlaxer.dsl.Java21TestSupport.compiler();
             var diagnostics=new DiagnosticCollector<JavaFileObject>();
             try(var manager=compiler.getStandardFileManager(diagnostics,null,null)) {
                 assertTrue(row.get("name")+" "+diagnostics.getDiagnostics(),compiler.getTask(null,manager,diagnostics,
@@ -62,8 +62,11 @@ public class LeftRecursionConformanceTest {
                     String input=value.getAsString();
                     for(var memo:Memoization.values()) for(var mode:ParseOptions.Diagnostics.values())
                     try(var context=ParseContext.withOptions(StringSource.createRootSource(input),ParseOptions.withMemoization(memo).withDiagnostics(mode))) {
-                        assertTrue(row.get("name")+" "+input,parser.parse(context).isSucceeded());
+                        var parsed = parser.parse(context);
+                        assertTrue(row.get("name")+" "+input,parsed.isSucceeded());
                         assertEquals(input.codePointCount(0,input.length()),context.getConsumedPosition().value());
+                        assertNotNull(loader.loadClass("leftrecprobe.LeftRecMapper")
+                            .getMethod("mapParsedToken", org.unlaxer.Token.class).invoke(null, context.getCurrent().getTokens().get(0)));
                     }
                 }
             }
@@ -88,7 +91,7 @@ public class LeftRecursionConformanceTest {
                 continue;
             }
             for(var file:new RustBackend().generate(grammar)) assertEquals(row.get("name")+" "+file.relativePath(),file.content(),Files.readString(out.resolve(file.relativePath())));
-            Files.writeString(dir.resolve("main.rs"),"#![allow(dead_code,unused_imports)]\nmod generated; fn main(){for input in std::env::args().skip(1){for memo in [unlaxer_runtime::Memoization::Off,unlaxer_runtime::Memoization::SafeFailures] {for mode in [unlaxer_runtime::Diagnostics::Auto,unlaxer_runtime::Diagnostics::Detailed,unlaxer_runtime::Diagnostics::DetailedOnFailure] {let tree=generated::parser::parse_tree_with_options(&input,unlaxer_runtime::ParseOptions::with_memoization(memo).with_diagnostics(mode)).unwrap(); generated::mapper::map(&tree).unwrap();}}}}\n");
+            Files.writeString(dir.resolve("main.rs"),"#![allow(dead_code,unused_imports)]\nmod generated; fn main(){for input in std::env::args().skip(1){for memo in [unlaxer_runtime::Memoization::Off,unlaxer_runtime::Memoization::SafeFailures] {for mode in [unlaxer_runtime::Diagnostics::Auto,unlaxer_runtime::Diagnostics::Detailed,unlaxer_runtime::Diagnostics::DetailedOnFailure] {let tree=generated::parser::parse_tree_with_options(&input,unlaxer_runtime::ParseOptions::with_memoization(memo).with_diagnostics(mode)).unwrap(); generated::mapper::map(&tree).unwrap(); assert_eq!(tree.nodes[tree.root].span, unlaxer_runtime::Span { start: 0, end: input.chars().count() });}}}}\n");
             Files.writeString(dir.resolve("Cargo.toml"),"[package]\nname=\"left-recursion-probe\"\nversion=\"0.1.0\"\nedition=\"2021\"\n[[bin]]\nname=\"probe\"\npath=\"main.rs\"\n[dependencies]\nunlaxer-runtime={path=\""+ROOT.resolve("rust/unlaxer-runtime")+"\"}\n");
             Path target=ROOT.resolve("rust/target/left-recursion-probe");
             run(List.of("cargo","build","--offline","--quiet","--manifest-path",dir.resolve("Cargo.toml").toString(),"--target-dir",target.toString()),0);
