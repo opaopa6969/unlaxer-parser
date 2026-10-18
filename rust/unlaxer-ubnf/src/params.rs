@@ -19,8 +19,11 @@ use std::collections::{HashMap, HashSet};
 /// Total atomic elements in all expanded instances, aligned with the existing
 /// 65536-visit traversal limits of the generators.
 pub const MAX_EXPANDED_ELEMENTS: usize = 65_536;
-/// Nesting of one expanded instance body, aligned with [`crate::MAX_NESTING`].
+/// Nesting of one expanded instance body or argument, aligned with [`crate::MAX_NESTING`].
 pub const MAX_EXPANDED_NESTING: usize = crate::MAX_NESTING;
+/// Instances under expansion at once (the parameterized call chain), so that the
+/// recursive expansion has a fixed stack budget on both hosts.
+pub const MAX_EXPANSION_DEPTH: usize = crate::MAX_NESTING;
 /// Builtin call spellings that a parameterized rule must not reuse.
 const RESERVED: [&str; 4] = ["CAPTURE", "SAME_AS", "CAPTURE_SCOPE", "ERROR"];
 /// Placeholder prefix. NUL never occurs in an identifier, so no user name can match.
@@ -51,11 +54,51 @@ fn position(source: &str, span: Span) -> String {
     format!("line {}, column {}", at.line, at.column)
 }
 
-/// Names whose definition is `Name(params) ::=` with the opening parenthesis adjacent.
-/// Only these names turn an adjacent `Name(` into a call; every other spelling keeps
-/// its previous meaning (a reference followed by a group), so grammars without
+/// For each `grammar Name { ... }` in source order, the names defined there as
+/// `Name(params) ::=` with the opening parenthesis adjacent. Only these names turn
+/// an adjacent `Name(` of the same grammar into a call; every other spelling keeps its
+/// previous meaning (a reference followed by a group), so grammars without
 /// parameterized definitions parse exactly as before.
-pub(crate) fn prescan(tokens: &[crate::lexer::Token]) -> HashSet<String> {
+pub(crate) fn prescan(tokens: &[crate::lexer::Token]) -> Vec<HashSet<String>> {
+    use crate::lexer::Kind;
+    let mut grammars = Vec::new();
+    let mut i = 0;
+    while i < tokens.len() {
+        let header = matches!(&tokens[i].kind, Kind::Identifier(word) if word == "grammar")
+            && matches!(
+                tokens.get(i + 1).map(|t| &t.kind),
+                Some(Kind::Identifier(_))
+            )
+            && tokens
+                .get(i + 2)
+                .is_some_and(|t| t.kind == Kind::Symbol('{'));
+        if !header {
+            i += 1;
+            continue;
+        }
+        // Braces are balanced inside a valid grammar (settings, repeats, bounds).
+        let (start, mut end, mut depth) = (i + 3, i + 2, 0usize);
+        while end < tokens.len() {
+            match tokens[end].kind {
+                Kind::Symbol('{') => depth += 1,
+                Kind::Symbol('}') => {
+                    depth -= 1;
+                    if depth == 0 {
+                        break;
+                    }
+                }
+                Kind::Eof => break,
+                _ => {}
+            }
+            end += 1;
+        }
+        grammars.push(definitions(&tokens[start..end.min(tokens.len())]));
+        i = end + 1;
+    }
+    grammars
+}
+
+fn definitions(tokens: &[crate::lexer::Token]) -> HashSet<String> {
     use crate::lexer::Kind;
     let mut names = HashSet::new();
     for (i, token) in tokens.iter().enumerate() {
@@ -108,6 +151,10 @@ pub(crate) fn expand(
     }
     let rules = &grammar.rules;
     let tokens: HashSet<&str> = grammar.tokens.iter().map(|t| t.name.as_str()).collect();
+    let mut rule_counts: HashMap<&str, usize> = HashMap::new();
+    for rule in rules {
+        *rule_counts.entry(rule.name.as_str()).or_default() += 1;
+    }
     let mut defs: HashMap<&str, Def> = HashMap::new();
     for (index, rule) in rules.iter().enumerate() {
         let Some(list) = &params[index] else {
@@ -128,25 +175,21 @@ pub(crate) fn expand(
                 "E-PARAM-ANNOTATION: parameterized rule {name} cannot have annotations; only transparent rules take parameters"
             )));
         }
-        if tokens.contains(name)
-            || rules
-                .iter()
-                .enumerate()
-                .any(|(other, r)| other != index && r.name == name)
-        {
+        if tokens.contains(name) || rule_counts[name] > 1 {
             return Err(error(
                 source,
                 rule.span,
                 format!("E-PARAM-DUPLICATE: rule {name} is defined more than once"),
             ));
         }
-        for (k, parameter) in list.iter().enumerate() {
-            if list[..k].contains(parameter) {
+        let mut seen = HashSet::new();
+        for parameter in list {
+            if !seen.insert(parameter.as_str()) {
                 return Err(error(source, rule.span, format!(
                     "E-PARAM-DUPLICATE: parameter {parameter} is declared more than once in rule {name}"
                 )));
             }
-            if tokens.contains(parameter.as_str()) || rules.iter().any(|r| &r.name == parameter) {
+            if tokens.contains(parameter.as_str()) || rule_counts.contains_key(parameter.as_str()) {
                 return Err(error(source, rule.span, format!(
                     "E-PARAM-SHADOW: parameter {parameter} of rule {name} has the same name as a rule or token"
                 )));
@@ -196,6 +239,7 @@ pub(crate) fn expand(
         by_key: HashMap::new(),
         names: HashSet::new(),
         total: 0,
+        depth: 0,
     };
     let empty = HashMap::new();
     let mut expanded = Vec::with_capacity(rules.len());
@@ -412,10 +456,21 @@ struct Expander<'a> {
     instances: Vec<Option<RuleDecl>>,
     by_key: HashMap<String, String>,
     names: HashSet<String>,
+    /// Atomic elements materialized so far: call arguments and instance bodies.
     total: usize,
+    /// Instances whose bodies are being expanded (the current call chain).
+    depth: usize,
 }
 
-type Env<'a> = HashMap<&'a str, AtomicElement>;
+/// A substituted argument with its measured size and nesting, so that measuring a
+/// body never walks into a replacement again.
+struct Rep {
+    element: AtomicElement,
+    size: usize,
+    depth: usize,
+}
+
+type Env<'a> = HashMap<&'a str, Rep>;
 
 impl Expander<'_> {
     fn body(&mut self, body: &RuleBody, env: &Env) -> Result<RuleBody> {
@@ -451,6 +506,21 @@ impl Expander<'_> {
             } => {
                 if let Some(index) = call_index(name) {
                     let call = &self.calls[index];
+                    // Bound the arguments before materializing them or their key: a
+                    // shared callee can still receive exponentially growing arguments.
+                    let (mut size, mut depth) = (0usize, 0usize);
+                    for argument in &call.args {
+                        let (n, d) = measure_body(argument, env);
+                        size = size.saturating_add(n);
+                        depth = depth.max(d);
+                    }
+                    if depth > MAX_EXPANDED_NESTING {
+                        return Err(error(self.source, call.span, format!(
+                            "E-PARAM-LIMIT: argument of rule {} nests {depth} levels; the limit is {MAX_EXPANDED_NESTING}",
+                            call.name
+                        )));
+                    }
+                    self.charge(size, call.span)?;
                     let mut args = Vec::with_capacity(call.args.len());
                     for argument in &call.args {
                         args.push(self.body(argument, env)?);
@@ -460,7 +530,7 @@ impl Expander<'_> {
                         name: self.instance(&call.name, args, call.span)?,
                     }
                 } else if let Some(replacement) = env.get(name.as_str()) {
-                    return Ok(replacement.clone());
+                    return Ok(replacement.element.clone());
                 } else {
                     return Ok(element.clone());
                 }
@@ -500,6 +570,16 @@ impl Expander<'_> {
         })
     }
 
+    fn charge(&mut self, size: usize, span: Span) -> Result<()> {
+        self.total = self.total.saturating_add(size);
+        if self.total > MAX_EXPANDED_ELEMENTS {
+            return Err(error(self.source, span, format!(
+                "E-PARAM-LIMIT: expanded parameterized rules exceed {MAX_EXPANDED_ELEMENTS} elements"
+            )));
+        }
+        Ok(())
+    }
+
     fn instance(&mut self, callee: &str, args: Vec<RuleBody>, span: Span) -> Result<String> {
         let mut key = format!("{callee}(");
         for (index, argument) in args.iter().enumerate() {
@@ -518,13 +598,28 @@ impl Expander<'_> {
                 "E-PARAM-NAME-COLLISION: expanded rule name {name} collides with another rule, token or expansion"
             )));
         }
+        if self.depth + 1 > MAX_EXPANSION_DEPTH {
+            return Err(error(self.source, span, format!(
+                "E-PARAM-LIMIT: expansion of rule {callee} is nested {} calls deep; the limit is {MAX_EXPANSION_DEPTH}",
+                self.depth + 1
+            )));
+        }
         let def = &self.defs[callee];
         let rule = &self.rules[def.rule];
+        let empty = HashMap::new();
         let env: Env = def
             .params
             .iter()
             .map(String::as_str)
-            .zip(args.into_iter().map(replacement))
+            .zip(args.into_iter().map(|argument| {
+                let element = replacement(argument);
+                let (size, depth) = measure_atomic(&element, &empty);
+                Rep {
+                    element,
+                    size,
+                    depth,
+                }
+            }))
             .collect();
         let (size, depth) = measure_body(&rule.body, &env);
         if depth > MAX_EXPANDED_NESTING {
@@ -532,17 +627,14 @@ impl Expander<'_> {
                 "E-PARAM-LIMIT: expansion of rule {callee} nests {depth} levels; the limit is {MAX_EXPANDED_NESTING}"
             )));
         }
-        self.total += size;
-        if self.total > MAX_EXPANDED_ELEMENTS {
-            return Err(error(self.source, span, format!(
-                "E-PARAM-LIMIT: expanded parameterized rules exceed {MAX_EXPANDED_ELEMENTS} elements"
-            )));
-        }
+        self.charge(size, span)?;
         self.by_key.insert(key, name.clone());
         self.names.insert(name.clone());
         let slot = self.instances.len();
         self.instances.push(None);
+        self.depth += 1;
         let body = self.body(&rule.body, &env)?;
+        self.depth -= 1;
         self.instances[slot] = Some(RuleDecl {
             annotations: Vec::new(),
             name: name.clone(),
@@ -569,12 +661,14 @@ fn replacement(argument: RuleBody) -> AtomicElement {
     }
 }
 
+/// (atomic elements, nesting in bodies) after substitution, saturating. Calls count
+/// as one element (they become references); arguments are measured at their call.
 fn measure_body(body: &RuleBody, env: &Env) -> (usize, usize) {
-    let (mut size, mut depth) = (0, 0);
+    let (mut size, mut depth) = (0usize, 0);
     for sequence in &body.alternatives {
         for element in &sequence.elements {
             let (n, d) = measure_atomic(&element.element, env);
-            size += n;
+            size = size.saturating_add(n);
             depth = depth.max(d);
         }
     }
@@ -587,7 +681,8 @@ fn measure_atomic(element: &AtomicElement, env: &Env) -> (usize, usize) {
             namespace: None,
             name,
         } if call_index(name).is_none() && env.contains_key(name.as_str()) => {
-            measure_atomic(&env[name.as_str()], &HashMap::new())
+            let rep = &env[name.as_str()];
+            (rep.size, rep.depth)
         }
         ElementKind::RuleRef { .. }
         | ElementKind::Terminal(_)
@@ -599,16 +694,16 @@ fn measure_atomic(element: &AtomicElement, env: &Env) -> (usize, usize) {
         | ElementKind::Optional(body)
         | ElementKind::Repeat(body) => {
             let (n, d) = measure_body(body, env);
-            (n + 1, d)
+            (n.saturating_add(1), d)
         }
         ElementKind::OneOrMore(inner) | ElementKind::BoundedRepeat { element: inner, .. } => {
             let (n, d) = measure_atomic(inner, env);
-            (n + 1, d)
+            (n.saturating_add(1), d)
         }
         ElementKind::Separated { element, separator } => {
             let (a, da) = measure_atomic(element, env);
             let (b, db) = measure_atomic(separator, env);
-            (a + b + 1, da.max(db))
+            (a.saturating_add(b).saturating_add(1), da.max(db))
         }
     }
 }

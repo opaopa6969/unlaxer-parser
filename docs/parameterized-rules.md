@@ -23,14 +23,15 @@ grammar Let {
 - 定義は `Name(p1, ..., pn) ::= body ;`、呼び出しは `Name(e1, ..., en)`。名前と `(` の間に
   空白・改行・コメントを置かない。各引数は空でない規則本体で、`|` の choice も書ける。
   呼び出しにも後置の `?` `*` `+` `{n,m}` `% sep` と `@capture` を付けられる。
-- 隣接した `Name(` が呼び出しになるのは、**同じファイルに `Name(params) ::=` の定義がある名前だけ**。
-  それ以外の `Foo('a')` は従来どおり「参照 `Foo` と group `('a')`」のまま。定義を持たない
+- 隣接した `Name(` が呼び出しになるのは、**同じ grammar ブロックに `Name(params) ::=` の定義がある
+  名前だけ**。同じファイルの別の grammar の定義は影響しない。それ以外の `Foo('a')` は従来どおり
+  「参照 `Foo` と group `('a')`」のまま。定義を持たない
   文法の構文木・生成物は変わらない（両 frontend は展開処理そのものを通らない）。
 - `CAPTURE` `SAME_AS` `CAPTURE_SCOPE` `ERROR` は既存の関数形式の綴りなので、引数付き規則の名前に
   できない（`E-PARAM-RESERVED`）。これらの呼び出しの構文は従来どおり。
 - 定義側の `F (x) ::=`、空の `F()`、末尾 `,`、引数位置の literal は構文エラー。
 - UBNF 自身を記述した `unlaxer-dsl/grammar/ubnf.ubnf` には入れていない。呼び出しかどうかが
-  同じファイルの定義に依存する（文脈依存）ためで、frontend の手書き解析だけが扱う。
+  同じ grammar の定義に依存する（文脈依存）ためで、frontend の手書き解析だけが扱う。
 
 ## 検査の順序
 
@@ -39,25 +40,33 @@ frontend は構文解析のあと、文法ごとに次の順で検査し、最�
 1. **定義**: 予約名（`E-PARAM-RESERVED`）、注釈付きの定義（`E-PARAM-ANNOTATION`）、規則名・
    引数名の重複（`E-PARAM-DUPLICATE`）、規則名・token 名と同じ引数名（`E-PARAM-SHADOW`）。
 2. **使用**: 引数の数（`E-PARAM-ARITY`。引数なしの裸の参照 `F` と `F ('a')` は 0 個として数える）、
-   定義本体の中の未定義の名前と、同じ文法にない引数付き規則の呼び出し（`E-PARAM-UNDEFINED`）、
+   定義本体の中の未定義の名前（`E-PARAM-UNDEFINED`）、
    定義本体と実引数の中の `@capture` / `@typeof`（`E-PARAM-CAPTURE`）。
 3. **循環**: 引数付きの呼び出しのグラフ（下記）が循環すれば拒否（`E-PARAM-CYCLE`）。
-4. **展開**: 単相化する。全 instance の atomic 要素の合計が 65536 を超える、または 1 instance の
-   入れ子が 128 段を超えると拒否（`E-PARAM-LIMIT`）。生成した名前が既存の規則・token・別 instance と
-   重なれば拒否（`E-PARAM-NAME-COLLISION`）。
+4. **展開**: 単相化する。次のどれかで拒否する（`E-PARAM-LIMIT`）。
+   - 実体化した atomic 要素の合計が 65536 を超える。数えるのは、呼び出しごとに作る実引数と、
+     新しく作る instance の本体（同じ鍵の呼び出しが instance を共有しても、実引数は呼び出しの度に数える）。
+   - 1 個の実引数、または 1 instance の本体の入れ子が 128 段を超える。
+   - 同時に展開中の instance（引数付き呼び出しの連鎖）が 128 段を超える。
+   生成した名前が既存の規則・token・別 instance と重なれば拒否（`E-PARAM-NAME-COLLISION`）。
 5. 展開後の文法に、既存の validator と生成器の検査（`E-LEFT-RECURSION` の nullable 不動点と
    消費前到達グラフ、`E-RULE-UNDEFINED` など）をそのまま当てる。
 
 上限は既存の値にそろえた。65536 は生成器の traversal の visits 上限、128 は native frontend の
-入れ子上限（`MAX_NESTING`）である。どちらも展開前に大きさを見積もってから判定するので、
-上限を超える文法のために大きな構文木を作らない。
+入れ子上限（`MAX_NESTING`）である。大きさは、代入する実引数ごとに一度だけ測った大きさと深さを使い、
+置換後の木を作らずに飽和加算で見積もる（呼び出しは参照になるので 1 要素、その実引数は呼び出しの
+位置で数える）。実引数は見積もりが上限内のときだけ作り、正規形の鍵もその後で作る。したがって鍵の
+文字列と作る木は上限に比例する大きさに収まり、呼び出し先が引数を使わない場合
+（`D0(x) ::= 'a'; Dk(x) ::= D(k-1)(x x)`）の指数的な引数の成長も位置付きで拒否する。
+呼び出しの連鎖の上限は、展開の再帰の深さを両 host で固定するためのもの（Java の
+`StackOverflowError` や Rust の stack overflow ではなく `E-PARAM-LIMIT` にする）。
 
 | code | 位置 | 内容 |
 |---|---|---|
 | `E-PARAM-ARITY` | 呼び出し・参照 | 引数の数が定義と違う。定義の行・列も示す |
-| `E-PARAM-UNDEFINED` | 参照・呼び出し | 定義本体の未定義の名前、または同じ文法にない引数付き規則 |
+| `E-PARAM-UNDEFINED` | 参照 | 定義本体の未定義の名前 |
 | `E-PARAM-CYCLE` | 循環を閉じる呼び出し | `F -> G -> F` の経路を示す |
-| `E-PARAM-LIMIT` | 上限を超えた instance の呼び出し | 要素数 65536、入れ子 128 |
+| `E-PARAM-LIMIT` | 上限を超えた呼び出し | 要素数 65536、実引数・本体の入れ子 128、呼び出しの連鎖 128 |
 | `E-PARAM-ANNOTATION` | 定義 | `@mapping` などの注釈を持つ引数付き規則 |
 | `E-PARAM-CAPTURE` | 呼び出し・定義 | 引数・定義本体の `@capture` / `@typeof` |
 | `E-PARAM-SHADOW` | 定義 | 規則名・token 名と同じ引数名 |
@@ -109,6 +118,8 @@ Java は `ParameterizedRules.ExpansionException`（`code()` `start()` `end()` `l
 rank(H) < rank(F)。H(a1, ..., an) の展開では、まず各 ai を展開して呼び出しを含まない式 ai' にする。
 ai' を H の本体に代入しても呼び出しは増えない（M-PEG-5 `subst_hasCall_eq_false`）。したがって代入後に
 残る呼び出しは H の本体にもともとあったものだけで、その callee の rank は rank(H) より真に小さい。
+手順 4 の上限は展開を途中で拒否するだけで、受理した展開結果は変えない。展開の再帰は呼び出しの連鎖の
+長さ（rank 以下、かつ 128 以下）を超えない。
 （rank, 式の大きさ）の辞書式順序がどの再帰でも下がるので、展開は有限回で終わり、出力に呼び出しは
 残らない（T-fix）。instance の共有は同じ鍵の再計算を省くだけで、この測度を増やさない。
 
@@ -152,8 +163,9 @@ corpus の `ce002-self-argument` と、nullable な接頭辞が展開後にだ�
 
 ## 検証
 
-`spec-corpus/parameterized-rules/cases.json` は 7 文法 20 入力の受理例、展開後の検査で拒否する
-2 例、位置付きで拒否する 18 例を持つ。期待値はすべて手書きで、受理例は手で展開した等価文法、
+`spec-corpus/parameterized-rules/cases.json` は 8 文法 22 入力の受理例（#699 の `@nestedCaptures` が
+instance を alias として透過する例を含む）、展開後の検査で拒否する 2 例、位置付きで拒否する 21 例を持つ。
+上限の負例の位置は、生成 script が上記の数え方を手で追って求める。期待値はすべて手書きで、受理例は手で展開した等価文法、
 instance 名は手書きの正規形の鍵から独立に計算した FNV 値、入力ごとの受理・拒否、CP 位置、AST を
 持つ。
 
@@ -165,8 +177,10 @@ instance 名は手書きの正規形の鍵から独立に計算した FNV 値、
   期待値どおりになること。`-DrustConformance=true` では、native の生成物が手書き展開の生成物・
   Java host の Rust 生成物と byte 単位で一致し、両 host の生成物から作った consumer が 6 設定で
   期待値どおりになること、native の `generate` / `check` / `impact` の結果。
-- `RustUbnfFrontendConformanceTest`: `tests/fixtures/positive/parameterized-rules.ubnf` の展開後の
-  構文木が両 frontend で一致すること、`negative.tsv` の構文エラー 6 例。
+- `RustUbnfFrontendConformanceTest`: `tests/fixtures/positive/parameterized-rules.ubnf` と、定義が
+  grammar 単位で効くことを示す `parameterized-rules-two-grammars.ubnf` の展開後の構文木が両 frontend で
+  一致すること、`negative.tsv` の構文エラー 6 例。上限ちょうど 128 段の呼び出し連鎖は、両 host とも
+  2 MiB の thread stack で展開できることを別に確認する。
 
 ```sh
 RUSTUP_TOOLCHAIN=1.85.0 cargo test --locked --manifest-path rust/Cargo.toml -p unlaxer-ubnf --test parameterized_rules

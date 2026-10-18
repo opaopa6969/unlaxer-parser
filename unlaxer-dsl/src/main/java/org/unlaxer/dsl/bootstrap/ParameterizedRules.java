@@ -43,8 +43,10 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.UBNFFile;
 public final class ParameterizedRules {
     /** Total atomic elements of all expanded instances (the generators' 65536-visit limit). */
     public static final int MAX_EXPANDED_ELEMENTS = 65536;
-    /** Nesting of one expanded instance body (the native frontend's nesting limit). */
+    /** Nesting of one expanded instance body or argument (the native frontend's nesting limit). */
     public static final int MAX_EXPANDED_NESTING = 128;
+    /** Instances under expansion at once (the parameterized call chain): a fixed stack budget. */
+    public static final int MAX_EXPANSION_DEPTH = 128;
     static final Set<String> RESERVED = Set.of("CAPTURE", "SAME_AS", "CAPTURE_SCOPE", "ERROR");
     /** NUL never occurs in an identifier, so no user reference can match a placeholder. */
     private static final String CALL_PREFIX = "\0call";
@@ -90,12 +92,16 @@ public final class ParameterizedRules {
     // Prescan: which adjacent NAME( spellings are calls
     // =========================================================================
 
+    /** A {@code grammar Name { ... }} block in code points and its parameterized rule names. */
+    record Region(int start, int end, Set<String> names) {}
+
     /**
-     * Names defined as {@code Name(params) ::=} (opening parenthesis adjacent) anywhere in
-     * the file. Only these names make an adjacent {@code Name(} a call, so a grammar
-     * without such definitions parses exactly as before.
+     * For each grammar block in source order, the names defined there as
+     * {@code Name(params) ::=} (opening parenthesis adjacent). Only these names make an
+     * adjacent {@code Name(} of the same grammar a call, so a grammar without such
+     * definitions parses exactly as before. Mirrors the native Rust prescan.
      */
-    static Set<String> prescan(String source) {
+    static List<Region> prescan(String source) {
         int[] text = source.codePoints().toArray();
         List<int[]> tokens = new ArrayList<>(); // {kind, start, end}; kind: 0 ident, 1 define, else the symbol
         int i = 0;
@@ -133,6 +139,35 @@ public final class ParameterizedRules {
             tokens.add(new int[] {c, i, i + 1});
             i++;
         }
+        List<Region> regions = new ArrayList<>();
+        int t = 0;
+        while (t < tokens.size()) {
+            int[] word = tokens.get(t);
+            boolean header = word[0] == 0 && "grammar".equals(new String(text, word[1], word[2] - word[1]))
+                && t + 2 < tokens.size() && tokens.get(t + 1)[0] == 0 && tokens.get(t + 2)[0] == '{';
+            if (!header) { t++; continue; }
+            int start = t + 3, end = t + 2, depth = 0;
+            while (end < tokens.size()) {
+                int kind = tokens.get(end)[0];
+                if (kind == '{') depth++;
+                else if (kind == '}' && --depth == 0) break;
+                end++;
+            }
+            int last = Math.min(end, tokens.size());
+            int from = tokens.get(t)[1];
+            int to = end < tokens.size() ? tokens.get(end)[2] : text.length;
+            regions.add(new Region(from, to, definitions(text, tokens.subList(start, last))));
+            t = end + 1;
+        }
+        return regions;
+    }
+
+    static boolean any(List<Region> regions) {
+        for (Region region : regions) if (!region.names().isEmpty()) return true;
+        return false;
+    }
+
+    private static Set<String> definitions(int[] text, List<int[]> tokens) {
         Set<String> names = new HashSet<>();
         for (int t = 0; t + 1 < tokens.size(); t++) {
             int[] name = tokens.get(t), open = tokens.get(t + 1);
@@ -182,6 +217,14 @@ public final class ParameterizedRules {
 
     private record Def(int rule, List<String> params) {}
 
+    /** A substituted argument with its measured size and nesting (never re-walked). */
+    private record Rep(AtomicElement element, long size, long depth) {}
+
+    private static long saturating(long a, long b) {
+        long sum = a + b;
+        return sum < 0 ? Long.MAX_VALUE : sum;
+    }
+
     private static final class Grammar {
         final GrammarDecl grammar;
         final List<RuleDecl> rules;
@@ -195,7 +238,10 @@ public final class ParameterizedRules {
         final List<RuleDecl> instances = new ArrayList<>();
         final Map<String, String> byKey = new HashMap<>();
         final Set<String> names = new HashSet<>();
-        int total;
+        /** Atomic elements materialized so far: call arguments and instance bodies. */
+        long total;
+        /** Instances whose bodies are being expanded (the current call chain). */
+        int depth;
 
         Grammar(GrammarDecl grammar, IdentityHashMap<RuleDecl, List<String>> params, List<Call> calls,
                 UBNFSourceSnapshot.Builder origins) {
@@ -227,6 +273,8 @@ public final class ParameterizedRules {
             if (!any && calls.isEmpty()) return grammar;
             Set<String> tokens = new HashSet<>();
             for (TokenDecl token : grammar.tokens()) tokens.add(token.name());
+            Map<String, Integer> ruleCounts = new HashMap<>();
+            for (RuleDecl rule : rules) ruleCounts.merge(rule.name(), 1, Integer::sum);
             for (int index = 0; index < rules.size(); index++) {
                 RuleDecl rule = rules.get(index);
                 List<String> list = params.get(rule);
@@ -237,17 +285,12 @@ public final class ParameterizedRules {
                 if (!rule.annotations().isEmpty()) throw error(span(rule),
                     "E-PARAM-ANNOTATION: parameterized rule " + name
                         + " cannot have annotations; only transparent rules take parameters");
-                boolean duplicate = tokens.contains(name);
-                for (int other = 0; other < rules.size(); other++)
-                    duplicate |= other != index && rules.get(other).name().equals(name);
-                if (duplicate) throw error(span(rule), "E-PARAM-DUPLICATE: rule " + name + " is defined more than once");
-                for (int k = 0; k < list.size(); k++) {
-                    String parameter = list.get(k);
-                    if (list.subList(0, k).contains(parameter)) throw error(span(rule),
+                if (tokens.contains(name) || ruleCounts.get(name) > 1) throw error(span(rule), "E-PARAM-DUPLICATE: rule " + name + " is defined more than once");
+                Set<String> seen = new HashSet<>();
+                for (String parameter : list) {
+                    if (!seen.add(parameter)) throw error(span(rule),
                         "E-PARAM-DUPLICATE: parameter " + parameter + " is declared more than once in rule " + name);
-                    boolean shadow = tokens.contains(parameter);
-                    for (RuleDecl other : rules) shadow |= other.name().equals(parameter);
-                    if (shadow) throw error(span(rule), "E-PARAM-SHADOW: parameter " + parameter + " of rule " + name
+                    if (tokens.contains(parameter) || ruleCounts.containsKey(parameter)) throw error(span(rule), "E-PARAM-SHADOW: parameter " + parameter + " of rule " + name
                         + " has the same name as a rule or token");
                 }
                 defs.put(name, new Def(index, list));
@@ -264,7 +307,7 @@ public final class ParameterizedRules {
             }
             rejectCycles();
 
-            Map<String, AtomicElement> empty = Map.of();
+            Map<String, Rep> empty = Map.of();
             List<RuleDecl> expanded = new ArrayList<>();
             for (RuleDecl rule : rules) {
                 if (params.containsKey(rule)) continue;
@@ -372,7 +415,7 @@ public final class ParameterizedRules {
             }
         }
 
-        RuleBody body(RuleBody body, Map<String, AtomicElement> env) {
+        RuleBody body(RuleBody body, Map<String, Rep> env) {
             if (body instanceof SequenceBody sequence) return sequence(sequence, env);
             ChoiceBody choice = (ChoiceBody) body;
             List<SequenceBody> alternatives = new ArrayList<>();
@@ -385,7 +428,7 @@ public final class ParameterizedRules {
             return changed ? copy(origins, new ChoiceBody(List.copyOf(alternatives)), choice) : choice;
         }
 
-        SequenceBody sequence(SequenceBody sequence, Map<String, AtomicElement> env) {
+        SequenceBody sequence(SequenceBody sequence, Map<String, Rep> env) {
             List<AnnotatedElement> elements = new ArrayList<>();
             boolean changed = false;
             for (AnnotatedElement element : sequence.elements()) {
@@ -404,18 +447,29 @@ public final class ParameterizedRules {
             return changed ? copy(origins, new SequenceBody(List.copyOf(elements)), sequence) : sequence;
         }
 
-        AtomicElement atomic(AtomicElement element, Map<String, AtomicElement> env) {
+        AtomicElement atomic(AtomicElement element, Map<String, Rep> env) {
             if (element instanceof RuleRefElement ref) {
                 if (ref.namespace().isPresent()) return ref;
                 int index = callIndex(ref);
                 if (index >= 0) {
                     Call call = calls.get(index);
+                    // Bound the arguments before materializing them or their key: a shared
+                    // callee can still receive exponentially growing arguments.
+                    long size = 0, nesting = 0;
+                    for (RuleBody argument : call.args()) {
+                        long[] measured = measureBody(argument, env);
+                        size = saturating(size, measured[0]);
+                        nesting = Math.max(nesting, measured[1]);
+                    }
+                    if (nesting > MAX_EXPANDED_NESTING) throw error(span(ref), "E-PARAM-LIMIT: argument of rule "
+                        + call.name() + " nests " + nesting + " levels; the limit is " + MAX_EXPANDED_NESTING);
+                    charge(size, span(ref));
                     List<RuleBody> args = new ArrayList<>();
                     for (RuleBody argument : call.args()) args.add(body(argument, env));
                     return copy(origins, new RuleRefElement(instance(call.name(), args, span(ref))), ref);
                 }
-                AtomicElement replacement = env.get(ref.name());
-                return replacement != null ? replacement : ref;
+                Rep replacement = env.get(ref.name());
+                return replacement != null ? replacement.element() : ref;
             }
             if (element instanceof GroupElement group) {
                 RuleBody body = body(group.body(), env);
@@ -455,6 +509,12 @@ public final class ParameterizedRules {
             return element;
         }
 
+        void charge(long size, UBNFSourceSnapshot.Span at) {
+            total = saturating(total, size);
+            if (total > MAX_EXPANDED_ELEMENTS) throw error(at,
+                "E-PARAM-LIMIT: expanded parameterized rules exceed " + MAX_EXPANDED_ELEMENTS + " elements");
+        }
+
         String instance(String callee, List<RuleBody> args, UBNFSourceSnapshot.Span at) {
             StringBuilder key = new StringBuilder(callee).append('(');
             for (int i = 0; i < args.size(); i++) {
@@ -467,21 +527,27 @@ public final class ParameterizedRules {
             String name = callee + "_" + String.format("%016x", fnv1a64(key.toString()));
             if (known.contains(name) || names.contains(name)) throw error(at, "E-PARAM-NAME-COLLISION: expanded rule name "
                 + name + " collides with another rule, token or expansion");
+            if (depth + 1 > MAX_EXPANSION_DEPTH) throw error(at, "E-PARAM-LIMIT: expansion of rule " + callee
+                + " is nested " + (depth + 1) + " calls deep; the limit is " + MAX_EXPANSION_DEPTH);
             Def def = defs.get(callee);
             RuleDecl rule = rules.get(def.rule());
-            Map<String, AtomicElement> env = new HashMap<>();
-            for (int i = 0; i < args.size(); i++) env.put(def.params().get(i), replacement(args.get(i)));
-            int[] measured = measureBody(rule.body(), env);
+            Map<String, Rep> env = new HashMap<>();
+            for (int i = 0; i < args.size(); i++) {
+                AtomicElement element = replacement(args.get(i));
+                long[] measured = measureAtomic(element, Map.of());
+                env.put(def.params().get(i), new Rep(element, measured[0], measured[1]));
+            }
+            long[] measured = measureBody(rule.body(), env);
             if (measured[1] > MAX_EXPANDED_NESTING) throw error(at, "E-PARAM-LIMIT: expansion of rule " + callee
                 + " nests " + measured[1] + " levels; the limit is " + MAX_EXPANDED_NESTING);
-            total += measured[0];
-            if (total > MAX_EXPANDED_ELEMENTS) throw error(at,
-                "E-PARAM-LIMIT: expanded parameterized rules exceed " + MAX_EXPANDED_ELEMENTS + " elements");
+            charge(measured[0], at);
             byKey.put(key.toString(), name);
             names.add(name);
             int slot = instances.size();
             instances.add(null);
+            depth++;
             RuleBody body = body(rule.body(), env);
+            depth--;
             instances.set(slot, synthetic(origins, new RuleDecl(List.of(), name, body), rule));
             return name;
         }
@@ -501,43 +567,49 @@ public final class ParameterizedRules {
         return body instanceof ChoiceBody choice ? choice.alternatives() : List.of((SequenceBody) body);
     }
 
-    /** {size in atomic elements, nesting in bodies}, identical to the Rust measure. */
-    private static int[] measureBody(RuleBody body, Map<String, AtomicElement> env) {
-        int size = 0, depth = 0;
+    /**
+     * {atomic elements, nesting in bodies} after substitution, saturating and identical to the
+     * Rust measure. Calls count as one element (they become references); their arguments are
+     * measured at the call.
+     */
+    private static long[] measureBody(RuleBody body, Map<String, Rep> env) {
+        long size = 0, depth = 0;
         for (SequenceBody sequence : alternatives(body)) {
             for (AnnotatedElement element : sequence.elements()) {
-                int[] measured = measureAtomic(element.element(), env);
-                size += measured[0];
+                long[] measured = measureAtomic(element.element(), env);
+                size = saturating(size, measured[0]);
                 depth = Math.max(depth, measured[1]);
             }
         }
-        return new int[] {size, depth + 1};
+        return new long[] {size, depth + 1};
     }
 
-    private static int[] measureAtomic(AtomicElement element, Map<String, AtomicElement> env) {
+    private static long[] measureAtomic(AtomicElement element, Map<String, Rep> env) {
         if (element instanceof RuleRefElement ref) {
-            if (ref.namespace().isEmpty() && callIndex(ref) < 0 && env.containsKey(ref.name()))
-                return measureAtomic(env.get(ref.name()), Map.of());
-            return new int[] {1, 0};
+            if (ref.namespace().isEmpty() && callIndex(ref) < 0 && env.containsKey(ref.name())) {
+                Rep rep = env.get(ref.name());
+                return new long[] {rep.size(), rep.depth()};
+            }
+            return new long[] {1, 0};
         }
         RuleBody body = element instanceof UBNFAST.TransparentElement transparent ? transparent.body()
             : element instanceof OptionalElement optional ? optional.body()
             : element instanceof RepeatElement repeat ? repeat.body() : null;
         if (body != null) {
-            int[] measured = measureBody(body, env);
-            return new int[] {measured[0] + 1, measured[1]};
+            long[] measured = measureBody(body, env);
+            return new long[] {saturating(measured[0], 1), measured[1]};
         }
         AtomicElement inner = element instanceof OneOrMoreElement more ? more.body()
             : element instanceof BoundedRepeatElement bounded ? bounded.body() : null;
         if (inner != null) {
-            int[] measured = measureAtomic(inner, env);
-            return new int[] {measured[0] + 1, measured[1]};
+            long[] measured = measureAtomic(inner, env);
+            return new long[] {saturating(measured[0], 1), measured[1]};
         }
         if (element instanceof SeparatedElement separated) {
-            int[] a = measureAtomic(separated.element(), env), b = measureAtomic(separated.separator(), env);
-            return new int[] {a[0] + b[0] + 1, Math.max(a[1], b[1])};
+            long[] a = measureAtomic(separated.element(), env), b = measureAtomic(separated.separator(), env);
+            return new long[] {saturating(saturating(a[0], b[0]), 1), Math.max(a[1], b[1])};
         }
-        return new int[] {1, 0};
+        return new long[] {1, 0};
     }
 
     // =========================================================================

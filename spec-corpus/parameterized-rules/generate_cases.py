@@ -264,6 +264,31 @@ cases.append({"name": "compatibility-reference-and-group",
         {"input": "b", "expected": {"status": "syntax", "offset": 1}},
     ]})
 
+# 8. #699: @nestedCaptures reaches its container through transparent instances, exactly as
+# through the hand-written aliases of nested-alias-captures/AliasOptionalList.
+g8a = HEAD + """  @root @nestedCaptures @mapping(Root, params=[value])
+  Root ::= '[' Opt(Many(Glyph)) @value ']' ;
+  Glyph ::= '😀' | 'a' ;
+  Opt(x) ::= [ x ] ;
+  Many(x) ::= { x } ;
+}
+"""
+many = inst("Many(" + r("Glyph") + ")")
+k8a = ["Many(" + r("Glyph") + ")", "Opt(" + r(many) + ")"]
+e8a = HEAD + """  @root @nestedCaptures @mapping(Root, params=[value])
+  Root ::= '[' {i1} @value ']' ;
+  Glyph ::= '😀' | 'a' ;
+  {i0} ::= { Glyph } ;
+  {i1} ::= [ {i0} ] ;
+}
+"""
+accept("nested-captures-through-instances", "#699 alias transparency for @nestedCaptures through expanded instances",
+    g8a, k8a, e8a, [(0, "Many(x) ::= { x } ;"), (1, "Opt(x) ::= [ x ] ;")],
+    [
+        {"input": "[]", "expected": {"status": "ok", "value": node("Root", (0, 2), value=[])}},
+        {"input": "[😀a😀]", "expected": {"status": "ok", "value": node("Root", (0, 5), value=["😀", "a", "😀"])}},
+    ])
+
 # Post-expansion validation (CE-002 and a nullable prefix that only expansion reveals).
 def validate_reject(name, description, grammar, keys, expanded):
     names = {k: inst(k) for k in keys}
@@ -327,8 +352,56 @@ reject("reserved-name", g, "E-PARAM-RESERVED", "CAPTURE(x) ::= x;", "parameteriz
 collision = inst("F(" + t("a") + ")")
 g = "grammar Bad { Root ::= F('a'); F(x) ::= x; " + collision + " ::= 'b'; }"
 reject("name-collision", g, "E-PARAM-NAME-COLLISION", "F('a')", "expanded rule name " + collision + " collides with another rule, token or expansion")
-g = "grammar Bad { Root ::= D15('a'); D0(x) ::= x x; " + " ".join(f"D{k}(x) ::= D{k-1}(x x);" for k in range(1, 16)) + " }"
-reject("limit-elements", g, "E-PARAM-LIMIT", "D0(x x)", "expanded parameterized rules exceed 65536 elements")
+LIMIT, NESTING, CALL_DEPTH = 65536, 128, 128
+
+def doubling_chain(n, base):
+    """Root ::= Dn('a'); D0(x) ::= base; Dk(x) ::= D(k-1)(x x).
+
+    Hand evaluation of the documented accounting: each call charges its arguments
+    (calls count as one element) before they are built, each new instance charges
+    its body after substitution. Returns the grammar, the failing call and message.
+    """
+    g = "grammar Bad { Root ::= D%d('a'); D0(x) ::= %s; " % (n, base) + " ".join(
+        "D%d(x) ::= D%d(x x);" % (k, k - 1) for k in range(1, n + 1)) + " }"
+    total = 1 + 1                       # Root's argument 'a', then Dn's body (one call)
+    rep_size, rep_depth = 1, 0          # 'a' is substituted as itself
+    for k in range(n - 1, -1, -1):      # the call D{k}(x x) inside D{k+1}
+        call = "D%d(x x)" % k
+        site = "D%d(x) ::= D%d(x x);" % (k + 1, k)
+        start = g.index(site) + len("D%d(x) ::= " % (k + 1))
+        arg_size, arg_depth = 2 * rep_size, 1 + rep_depth
+        assert arg_depth <= NESTING and n - k + 1 <= CALL_DEPTH
+        total += arg_size
+        if total > LIMIT:
+            return g, start, call
+        rep_size, rep_depth = 1 + arg_size, arg_depth   # two elements: substituted as a group
+        body = 1 if k > 0 else (1 if base == "'a'" else 2 * rep_size)
+        total += body
+        if total > LIMIT:
+            return g, start, call
+    raise AssertionError("within the limit")
+
+def reject_at(name, grammar, start, needle, code, message):
+    line, column = line_col(grammar, start)
+    assert grammar[start:start + len(needle)] == needle
+    cases.append({"name": name, "grammar": grammar, "status": "reject",
+        "error": {"stage": "frontend", "code": code, "start": start, "end": start + len(needle),
+                  "line": line, "column": column, "message": code + ": " + message}})
+
+g, start, call = doubling_chain(15, "x x")
+reject_at("limit-elements", g, start, call, "E-PARAM-LIMIT", "expanded parameterized rules exceed 65536 elements")
+# The callee ignores its argument, so instance bodies stay tiny; only the arguments grow.
+g, start, call = doubling_chain(20, "'a'")
+reject_at("limit-unused-argument-growth", g, start, call, "E-PARAM-LIMIT", "expanded parameterized rules exceed 65536 elements")
+# A long call chain: the 129th nested instance is refused before its body is expanded.
+g = "grammar Bad { Root ::= C0('a'); " + " ".join("C%d(x) ::= C%d(x);" % (k, k + 1) for k in range(200)) + " C200(x) ::= x; }"
+reject_at("limit-call-depth", g, g.index("C127(x) ::= C128(x);") + len("C127(x) ::= "), "C128(x)", "E-PARAM-LIMIT",
+          "expansion of rule C128 is nested 129 calls deep; the limit is 128")
+# Arguments wrapped once more per level: N_k receives a replacement k groups deep, and the
+# argument (x) of the call in N_k nests 2 + k levels, so N127's call fails.
+g = "grammar Bad { Root ::= N0('a'); " + " ".join("N%d(x) ::= N%d((x));" % (k, k + 1) for k in range(200)) + " N200(x) ::= 'a'; }"
+reject_at("limit-argument-nesting", g, g.index("N127(x) ::= N128((x));") + len("N127(x) ::= "), "N128((x))", "E-PARAM-LIMIT",
+          "argument of rule N128 nests 129 levels; the limit is 128")
 g = "grammar Bad { Root ::= F(" + "(" * 10 + "'a'" + ")" * 10 + "); F(x) ::= " + "(" * 120 + "x" + ")" * 120 + "; }"
 reject("limit-nesting", g, "E-PARAM-LIMIT", "F(" + "(" * 10, "expansion of rule F nests 131 levels; the limit is 128",
        length=len("F(" + "(" * 10 + "'a'" + ")" * 10 + ")"))

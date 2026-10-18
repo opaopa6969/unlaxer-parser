@@ -600,6 +600,77 @@
     ]
   },
   {
+    "name": "nested-captures-through-instances",
+    "description": "#699 alias transparency for @nestedCaptures through expanded instances",
+    "grammar": "grammar Param {\n  @package: paramprobe\n  @whitespace: none\n  @root @nestedCaptures @mapping(Root, params=[value])\n  Root ::= '[' Opt(Many(Glyph)) @value ']' ;\n  Glyph ::= '😀' | 'a' ;\n  Opt(x) ::= [ x ] ;\n  Many(x) ::= { x } ;\n}\n",
+    "status": "accept",
+    "instances": [
+      {
+        "key": "Many(r(Glyph))",
+        "name": "Many_27658bfa177dcd40"
+      },
+      {
+        "key": "Opt(r(Many_27658bfa177dcd40))",
+        "name": "Opt_503bb3eea8d60543"
+      }
+    ],
+    "expanded": "grammar Param {\n  @package: paramprobe\n  @whitespace: none\n  @root @nestedCaptures @mapping(Root, params=[value])\n  Root ::= '[' Opt_503bb3eea8d60543 @value ']' ;\n  Glyph ::= '😀' | 'a' ;\n  Many_27658bfa177dcd40 ::= { Glyph } ;\n  Opt_503bb3eea8d60543 ::= [ Many_27658bfa177dcd40 ] ;\n}\n",
+    "spans": [
+      {
+        "rule": "Many_27658bfa177dcd40",
+        "span": [
+          206,
+          225
+        ]
+      },
+      {
+        "rule": "Opt_503bb3eea8d60543",
+        "span": [
+          185,
+          203
+        ]
+      }
+    ],
+    "inputs": [
+      {
+        "input": "[]",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Root",
+            "span": [
+              0,
+              2
+            ],
+            "fields": {
+              "value": []
+            }
+          }
+        }
+      },
+      {
+        "input": "[😀a😀]",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Root",
+            "span": [
+              0,
+              5
+            ],
+            "fields": {
+              "value": [
+                "😀",
+                "a",
+                "😀"
+              ]
+            }
+          }
+        }
+      }
+    ]
+  },
+  {
     "name": "ce002-self-argument",
     "description": "lean4-peg CE-002: F(x)=x; S=F(S) passes pre-expansion checks but diverges",
     "grammar": "grammar LeftRec { @package: paramprobe @root @mapping(Node) Root ::= F(Root); F(x) ::= x; }",
@@ -873,6 +944,48 @@
       "line": 1,
       "column": 59,
       "message": "E-PARAM-LIMIT: expanded parameterized rules exceed 65536 elements"
+    }
+  },
+  {
+    "name": "limit-unused-argument-growth",
+    "grammar": "grammar Bad { Root ::= D20('a'); D0(x) ::= 'a'; D1(x) ::= D0(x x); D2(x) ::= D1(x x); D3(x) ::= D2(x x); D4(x) ::= D3(x x); D5(x) ::= D4(x x); D6(x) ::= D5(x x); D7(x) ::= D6(x x); D8(x) ::= D7(x x); D9(x) ::= D8(x x); D10(x) ::= D9(x x); D11(x) ::= D10(x x); D12(x) ::= D11(x x); D13(x) ::= D12(x x); D14(x) ::= D13(x x); D15(x) ::= D14(x x); D16(x) ::= D15(x x); D17(x) ::= D16(x x); D18(x) ::= D17(x x); D19(x) ::= D18(x x); D20(x) ::= D19(x x); }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-LIMIT",
+      "start": 153,
+      "end": 160,
+      "line": 1,
+      "column": 154,
+      "message": "E-PARAM-LIMIT: expanded parameterized rules exceed 65536 elements"
+    }
+  },
+  {
+    "name": "limit-call-depth",
+    "grammar": "grammar Bad { Root ::= C0('a'); C0(x) ::= C1(x); C1(x) ::= C2(x); C2(x) ::= C3(x); C3(x) ::= C4(x); C4(x) ::= C5(x); C5(x) ::= C6(x); C6(x) ::= C7(x); C7(x) ::= C8(x); C8(x) ::= C9(x); C9(x) ::= C10(x); C10(x) ::= C11(x); C11(x) ::= C12(x); C12(x) ::= C13(x); C13(x) ::= C14(x); C14(x) ::= C15(x); C15(x) ::= C16(x); C16(x) ::= C17(x); C17(x) ::= C18(x); C18(x) ::= C19(x); C19(x) ::= C20(x); C20(x) ::= C21(x); C21(x) ::= C22(x); C22(x) ::= C23(x); C23(x) ::= C24(x); C24(x) ::= C25(x); C25(x) ::= C26(x); C26(x) ::= C27(x); C27(x) ::= C28(x); C28(x) ::= C29(x); C29(x) ::= C30(x); C30(x) ::= C31(x); C31(x) ::= C32(x); C32(x) ::= C33(x); C33(x) ::= C34(x); C34(x) ::= C35(x); C35(x) ::= C36(x); C36(x) ::= C37(x); C37(x) ::= C38(x); C38(x) ::= C39(x); C39(x) ::= C40(x); C40(x) ::= C41(x); C41(x) ::= C42(x); C42(x) ::= C43(x); C43(x) ::= C44(x); C44(x) ::= C45(x); C45(x) ::= C46(x); C46(x) ::= C47(x); C47(x) ::= C48(x); C48(x) ::= C49(x); C49(x) ::= C50(x); C50(x) ::= C51(x); C51(x) ::= C52(x); C52(x) ::= C53(x); C53(x) ::= C54(x); C54(x) ::= C55(x); C55(x) ::= C56(x); C56(x) ::= C57(x); C57(x) ::= C58(x); C58(x) ::= C59(x); C59(x) ::= C60(x); C60(x) ::= C61(x); C61(x) ::= C62(x); C62(x) ::= C63(x); C63(x) ::= C64(x); C64(x) ::= C65(x); C65(x) ::= C66(x); C66(x) ::= C67(x); C67(x) ::= C68(x); C68(x) ::= C69(x); C69(x) ::= C70(x); C70(x) ::= C71(x); C71(x) ::= C72(x); C72(x) ::= C73(x); C73(x) ::= C74(x); C74(x) ::= C75(x); C75(x) ::= C76(x); C76(x) ::= C77(x); C77(x) ::= C78(x); C78(x) ::= C79(x); C79(x) ::= C80(x); C80(x) ::= C81(x); C81(x) ::= C82(x); C82(x) ::= C83(x); C83(x) ::= C84(x); C84(x) ::= C85(x); C85(x) ::= C86(x); C86(x) ::= C87(x); C87(x) ::= C88(x); C88(x) ::= C89(x); C89(x) ::= C90(x); C90(x) ::= C91(x); C91(x) ::= C92(x); C92(x) ::= C93(x); C93(x) ::= C94(x); C94(x) ::= C95(x); C95(x) ::= C96(x); C96(x) ::= C97(x); C97(x) ::= C98(x); C98(x) ::= C99(x); C99(x) ::= C100(x); C100(x) ::= C101(x); C101(x) ::= C102(x); C102(x) ::= C103(x); C103(x) ::= C104(x); C104(x) ::= C105(x); C105(x) ::= C106(x); C106(x) ::= C107(x); C107(x) ::= C108(x); C108(x) ::= C109(x); C109(x) ::= C110(x); C110(x) ::= C111(x); C111(x) ::= C112(x); C112(x) ::= C113(x); C113(x) ::= C114(x); C114(x) ::= C115(x); C115(x) ::= C116(x); C116(x) ::= C117(x); C117(x) ::= C118(x); C118(x) ::= C119(x); C119(x) ::= C120(x); C120(x) ::= C121(x); C121(x) ::= C122(x); C122(x) ::= C123(x); C123(x) ::= C124(x); C124(x) ::= C125(x); C125(x) ::= C126(x); C126(x) ::= C127(x); C127(x) ::= C128(x); C128(x) ::= C129(x); C129(x) ::= C130(x); C130(x) ::= C131(x); C131(x) ::= C132(x); C132(x) ::= C133(x); C133(x) ::= C134(x); C134(x) ::= C135(x); C135(x) ::= C136(x); C136(x) ::= C137(x); C137(x) ::= C138(x); C138(x) ::= C139(x); C139(x) ::= C140(x); C140(x) ::= C141(x); C141(x) ::= C142(x); C142(x) ::= C143(x); C143(x) ::= C144(x); C144(x) ::= C145(x); C145(x) ::= C146(x); C146(x) ::= C147(x); C147(x) ::= C148(x); C148(x) ::= C149(x); C149(x) ::= C150(x); C150(x) ::= C151(x); C151(x) ::= C152(x); C152(x) ::= C153(x); C153(x) ::= C154(x); C154(x) ::= C155(x); C155(x) ::= C156(x); C156(x) ::= C157(x); C157(x) ::= C158(x); C158(x) ::= C159(x); C159(x) ::= C160(x); C160(x) ::= C161(x); C161(x) ::= C162(x); C162(x) ::= C163(x); C163(x) ::= C164(x); C164(x) ::= C165(x); C165(x) ::= C166(x); C166(x) ::= C167(x); C167(x) ::= C168(x); C168(x) ::= C169(x); C169(x) ::= C170(x); C170(x) ::= C171(x); C171(x) ::= C172(x); C172(x) ::= C173(x); C173(x) ::= C174(x); C174(x) ::= C175(x); C175(x) ::= C176(x); C176(x) ::= C177(x); C177(x) ::= C178(x); C178(x) ::= C179(x); C179(x) ::= C180(x); C180(x) ::= C181(x); C181(x) ::= C182(x); C182(x) ::= C183(x); C183(x) ::= C184(x); C184(x) ::= C185(x); C185(x) ::= C186(x); C186(x) ::= C187(x); C187(x) ::= C188(x); C188(x) ::= C189(x); C189(x) ::= C190(x); C190(x) ::= C191(x); C191(x) ::= C192(x); C192(x) ::= C193(x); C193(x) ::= C194(x); C194(x) ::= C195(x); C195(x) ::= C196(x); C196(x) ::= C197(x); C197(x) ::= C198(x); C198(x) ::= C199(x); C199(x) ::= C200(x); C200(x) ::= x; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-LIMIT",
+      "start": 2493,
+      "end": 2500,
+      "line": 1,
+      "column": 2494,
+      "message": "E-PARAM-LIMIT: expansion of rule C128 is nested 129 calls deep; the limit is 128"
+    }
+  },
+  {
+    "name": "limit-argument-nesting",
+    "grammar": "grammar Bad { Root ::= N0('a'); N0(x) ::= N1((x)); N1(x) ::= N2((x)); N2(x) ::= N3((x)); N3(x) ::= N4((x)); N4(x) ::= N5((x)); N5(x) ::= N6((x)); N6(x) ::= N7((x)); N7(x) ::= N8((x)); N8(x) ::= N9((x)); N9(x) ::= N10((x)); N10(x) ::= N11((x)); N11(x) ::= N12((x)); N12(x) ::= N13((x)); N13(x) ::= N14((x)); N14(x) ::= N15((x)); N15(x) ::= N16((x)); N16(x) ::= N17((x)); N17(x) ::= N18((x)); N18(x) ::= N19((x)); N19(x) ::= N20((x)); N20(x) ::= N21((x)); N21(x) ::= N22((x)); N22(x) ::= N23((x)); N23(x) ::= N24((x)); N24(x) ::= N25((x)); N25(x) ::= N26((x)); N26(x) ::= N27((x)); N27(x) ::= N28((x)); N28(x) ::= N29((x)); N29(x) ::= N30((x)); N30(x) ::= N31((x)); N31(x) ::= N32((x)); N32(x) ::= N33((x)); N33(x) ::= N34((x)); N34(x) ::= N35((x)); N35(x) ::= N36((x)); N36(x) ::= N37((x)); N37(x) ::= N38((x)); N38(x) ::= N39((x)); N39(x) ::= N40((x)); N40(x) ::= N41((x)); N41(x) ::= N42((x)); N42(x) ::= N43((x)); N43(x) ::= N44((x)); N44(x) ::= N45((x)); N45(x) ::= N46((x)); N46(x) ::= N47((x)); N47(x) ::= N48((x)); N48(x) ::= N49((x)); N49(x) ::= N50((x)); N50(x) ::= N51((x)); N51(x) ::= N52((x)); N52(x) ::= N53((x)); N53(x) ::= N54((x)); N54(x) ::= N55((x)); N55(x) ::= N56((x)); N56(x) ::= N57((x)); N57(x) ::= N58((x)); N58(x) ::= N59((x)); N59(x) ::= N60((x)); N60(x) ::= N61((x)); N61(x) ::= N62((x)); N62(x) ::= N63((x)); N63(x) ::= N64((x)); N64(x) ::= N65((x)); N65(x) ::= N66((x)); N66(x) ::= N67((x)); N67(x) ::= N68((x)); N68(x) ::= N69((x)); N69(x) ::= N70((x)); N70(x) ::= N71((x)); N71(x) ::= N72((x)); N72(x) ::= N73((x)); N73(x) ::= N74((x)); N74(x) ::= N75((x)); N75(x) ::= N76((x)); N76(x) ::= N77((x)); N77(x) ::= N78((x)); N78(x) ::= N79((x)); N79(x) ::= N80((x)); N80(x) ::= N81((x)); N81(x) ::= N82((x)); N82(x) ::= N83((x)); N83(x) ::= N84((x)); N84(x) ::= N85((x)); N85(x) ::= N86((x)); N86(x) ::= N87((x)); N87(x) ::= N88((x)); N88(x) ::= N89((x)); N89(x) ::= N90((x)); N90(x) ::= N91((x)); N91(x) ::= N92((x)); N92(x) ::= N93((x)); N93(x) ::= N94((x)); N94(x) ::= N95((x)); N95(x) ::= N96((x)); N96(x) ::= N97((x)); N97(x) ::= N98((x)); N98(x) ::= N99((x)); N99(x) ::= N100((x)); N100(x) ::= N101((x)); N101(x) ::= N102((x)); N102(x) ::= N103((x)); N103(x) ::= N104((x)); N104(x) ::= N105((x)); N105(x) ::= N106((x)); N106(x) ::= N107((x)); N107(x) ::= N108((x)); N108(x) ::= N109((x)); N109(x) ::= N110((x)); N110(x) ::= N111((x)); N111(x) ::= N112((x)); N112(x) ::= N113((x)); N113(x) ::= N114((x)); N114(x) ::= N115((x)); N115(x) ::= N116((x)); N116(x) ::= N117((x)); N117(x) ::= N118((x)); N118(x) ::= N119((x)); N119(x) ::= N120((x)); N120(x) ::= N121((x)); N121(x) ::= N122((x)); N122(x) ::= N123((x)); N123(x) ::= N124((x)); N124(x) ::= N125((x)); N125(x) ::= N126((x)); N126(x) ::= N127((x)); N127(x) ::= N128((x)); N128(x) ::= N129((x)); N129(x) ::= N130((x)); N130(x) ::= N131((x)); N131(x) ::= N132((x)); N132(x) ::= N133((x)); N133(x) ::= N134((x)); N134(x) ::= N135((x)); N135(x) ::= N136((x)); N136(x) ::= N137((x)); N137(x) ::= N138((x)); N138(x) ::= N139((x)); N139(x) ::= N140((x)); N140(x) ::= N141((x)); N141(x) ::= N142((x)); N142(x) ::= N143((x)); N143(x) ::= N144((x)); N144(x) ::= N145((x)); N145(x) ::= N146((x)); N146(x) ::= N147((x)); N147(x) ::= N148((x)); N148(x) ::= N149((x)); N149(x) ::= N150((x)); N150(x) ::= N151((x)); N151(x) ::= N152((x)); N152(x) ::= N153((x)); N153(x) ::= N154((x)); N154(x) ::= N155((x)); N155(x) ::= N156((x)); N156(x) ::= N157((x)); N157(x) ::= N158((x)); N158(x) ::= N159((x)); N159(x) ::= N160((x)); N160(x) ::= N161((x)); N161(x) ::= N162((x)); N162(x) ::= N163((x)); N163(x) ::= N164((x)); N164(x) ::= N165((x)); N165(x) ::= N166((x)); N166(x) ::= N167((x)); N167(x) ::= N168((x)); N168(x) ::= N169((x)); N169(x) ::= N170((x)); N170(x) ::= N171((x)); N171(x) ::= N172((x)); N172(x) ::= N173((x)); N173(x) ::= N174((x)); N174(x) ::= N175((x)); N175(x) ::= N176((x)); N176(x) ::= N177((x)); N177(x) ::= N178((x)); N178(x) ::= N179((x)); N179(x) ::= N180((x)); N180(x) ::= N181((x)); N181(x) ::= N182((x)); N182(x) ::= N183((x)); N183(x) ::= N184((x)); N184(x) ::= N185((x)); N185(x) ::= N186((x)); N186(x) ::= N187((x)); N187(x) ::= N188((x)); N188(x) ::= N189((x)); N189(x) ::= N190((x)); N190(x) ::= N191((x)); N191(x) ::= N192((x)); N192(x) ::= N193((x)); N193(x) ::= N194((x)); N194(x) ::= N195((x)); N195(x) ::= N196((x)); N196(x) ::= N197((x)); N197(x) ::= N198((x)); N198(x) ::= N199((x)); N199(x) ::= N200((x)); N200(x) ::= 'a'; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-LIMIT",
+      "start": 2747,
+      "end": 2756,
+      "line": 1,
+      "column": 2748,
+      "message": "E-PARAM-LIMIT: argument of rule N128 nests 129 levels; the limit is 128"
     }
   },
   {

@@ -1401,7 +1401,7 @@ public class UBNFParsers {
     // =========================================================================
 
     /** Per-parse state installed by {@link UBNFMapper}; absent means no parameterized rule. */
-    record ParameterizedSyntax(java.util.Set<String> names, int[] codePoints) {}
+    record ParameterizedSyntax(List<ParameterizedRules.Region> regions, int[] codePoints) {}
 
     static final Name PARAMETERIZED_SYNTAX = Name.of(UBNFParsers.class, "parameterizedSyntax");
 
@@ -1442,14 +1442,17 @@ public class UBNFParsers {
         public org.unlaxer.Token getToken(org.unlaxer.context.ParseContext context,
                 org.unlaxer.TokenKind tokenKind, boolean invertMatch) {
             Object state = context.getGlobalScopeTreeMap().get(PARAMETERIZED_SYNTAX);
-            if (state instanceof ParameterizedSyntax syntax && !syntax.names().isEmpty()) {
+            if (state instanceof ParameterizedSyntax syntax) {
                 int[] text = syntax.codePoints();
                 int start = context.getConsumedPosition().value(), end = start;
+                java.util.Set<String> names = java.util.Set.of();
+                for (ParameterizedRules.Region region : syntax.regions())
+                    if (region.start() <= start && start < region.end()) names = region.names();
                 if (end < text.length && text[end] < 128 && (Character.isLetter(text[end]) || text[end] == '_')) {
                     while (end < text.length && identifierPart(text[end])) end++;
                     String name = new String(text, start, end - start);
                     // Builtin spellings keep their own syntax; their definitions are rejected later.
-                    if (end < text.length && text[end] == '(' && syntax.names().contains(name)
+                    if (end < text.length && text[end] == '(' && names.contains(name)
                             && !ParameterizedRules.RESERVED.contains(name)) {
                         return new org.unlaxer.Token(tokenKind,
                             context.peek(tokenKind, new org.unlaxer.CodePointLength(end - start)), this);

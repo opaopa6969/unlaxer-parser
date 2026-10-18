@@ -8,7 +8,8 @@ type Result<T> = std::result::Result<T, Diagnostic>;
 pub(crate) fn parse(source: &str, tokens: Vec<Token>) -> Result<UbnfFile> {
     let mut parser = Parser {
         source,
-        parameterized: crate::params::prescan(&tokens),
+        scans: crate::params::prescan(&tokens),
+        parameterized: Default::default(),
         tokens,
         pos: 0,
         depth: 0,
@@ -37,7 +38,9 @@ struct Parser<'a> {
     tokens: Vec<Token>,
     pos: usize,
     depth: usize,
-    /// Rules defined as `Name(params) ::=` anywhere in this file.
+    /// Per grammar in source order: rules defined as `Name(params) ::=`.
+    scans: Vec<std::collections::HashSet<String>>,
+    /// The entry of `scans` for the grammar being parsed.
     parameterized: std::collections::HashSet<String>,
     calls: Vec<crate::params::Call>,
     rule_params: Vec<Vec<Option<Vec<String>>>>,
@@ -151,6 +154,11 @@ impl Parser<'_> {
                 .is_some_and(|t| t.kind == Kind::Symbol(':'))
     }
     fn grammar(&mut self) -> Result<GrammarDecl> {
+        self.parameterized = self
+            .scans
+            .get(self.rule_params.len())
+            .cloned()
+            .unwrap_or_default();
         let start = self.current().span;
         self.word("grammar")?;
         let name = self.identifier()?;

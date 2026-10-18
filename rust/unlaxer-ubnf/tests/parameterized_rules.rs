@@ -11,6 +11,7 @@ mod canonical;
 mod json;
 
 use json::Json;
+use unlaxer_ubnf::ElementKind;
 
 fn cases() -> Vec<Json> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -105,7 +106,7 @@ fn corpus_expansions_equal_hand_written_grammars() {
         }
         accepted += 1;
     }
-    assert_eq!(accepted, 9);
+    assert_eq!(accepted, 10);
 }
 
 #[test]
@@ -124,6 +125,38 @@ fn call_sites_keep_their_source_spans() {
     let second = &outer.body.alternatives[0].elements[1].element;
     assert_eq!(snapshot.slice(first.span), Some("'a'"));
     assert_eq!(snapshot.slice(second.span), Some("Pair('b', 'c')"));
+}
+
+fn chain(levels: usize) -> String {
+    let mut source = String::from("grammar G { Root ::= C0('a'); ");
+    for k in 0..levels {
+        source.push_str(&format!("C{k}(x) ::= C{}(x); ", k + 1));
+    }
+    source.push_str(&format!("C{levels}(x) ::= x; }}"));
+    source
+}
+
+#[test]
+fn the_deepest_allowed_call_chain_expands_on_the_default_test_stack() {
+    let limit = unlaxer_ubnf::MAX_EXPANSION_DEPTH;
+    let file = unlaxer_ubnf::parse(&chain(limit - 1)).unwrap();
+    assert_eq!(file.grammars[0].rules.len(), 1 + limit);
+    let error = unlaxer_ubnf::parse(&chain(limit)).unwrap_err();
+    assert!(error.message.starts_with("E-PARAM-LIMIT:"), "{error}");
+}
+
+#[test]
+fn calls_are_scoped_to_the_grammar_that_defines_them() {
+    let file = unlaxer_ubnf::parse(include_str!(
+        "fixtures/positive/parameterized-rules-two-grammars.ubnf"
+    ))
+    .unwrap();
+    assert_eq!(file.grammars[0].rules.len(), 2);
+    // Grammar B has no Name(params) definition: F('b') stays a reference and a group.
+    let elements = &file.grammars[1].rules[0].body.alternatives[0].elements;
+    assert_eq!(elements.len(), 2);
+    assert!(matches!(&elements[0].element.kind, ElementKind::RuleRef { name, .. } if name == "F"));
+    assert!(matches!(elements[1].element.kind, ElementKind::Group(_)));
 }
 
 #[test]

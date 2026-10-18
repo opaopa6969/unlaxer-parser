@@ -123,10 +123,30 @@ public class ParameterizedRuleConformanceTest {
             }
             accepted++;
         }
-        assertEquals(List.of(7, 2, 18), List.of(accepted, validated, rejected));
+        assertEquals(List.of(8, 2, 21), List.of(accepted, validated, rejected));
     }
 
-    @Test public void grammarsWithoutDefinitionsKeepTheirPreviousParse() {
+    @Test public void theDeepestAllowedCallChainExpandsOnASmallStack() throws Exception {
+        int limit = ParameterizedRules.MAX_EXPANSION_DEPTH;
+        var outcome = new java.util.concurrent.atomic.AtomicReference<Object>();
+        var thread = new Thread(null, () -> {
+            try {
+                outcome.set(List.of(UBNFMapper.parse(chain(limit - 1)).grammars().get(0).rules().size(),
+                    assertThrows(ParameterizedRules.ExpansionException.class, () -> UBNFMapper.parse(chain(limit))).code()));
+            } catch (Throwable error) { outcome.set(error); }
+        }, "parameterized-chain", 2 * 1024 * 1024);
+        thread.start();
+        thread.join(60_000);
+        assertEquals(String.valueOf(outcome.get()), List.of(1 + limit, "E-PARAM-LIMIT"), outcome.get());
+    }
+
+    private static String chain(int levels) {
+        StringBuilder source = new StringBuilder("grammar G { Root ::= C0('a'); ");
+        for (int k = 0; k < levels; k++) source.append("C").append(k).append("(x) ::= C").append(k + 1).append("(x); ");
+        return source.append("C").append(levels).append("(x) ::= x; }").toString();
+    }
+
+    @Test public void grammarsWithoutDefinitionsKeepTheirPreviousParse() throws Exception {
         // Reference followed by a group, as before; a later definition is what reserves NAME(.
         var plain = UBNFMapper.parse("grammar G { Root ::= Foo('a') CAPTUREX('b'); Foo ::= 'c'; CAPTUREX ::= 'd'; }");
         assertEquals(4, ((org.unlaxer.dsl.bootstrap.UBNFAST.ChoiceBody) plain.grammars().get(0).rules().get(0).body())
@@ -134,6 +154,14 @@ public class ParameterizedRuleConformanceTest {
         var error = assertThrows(IllegalArgumentException.class,
             () -> UBNFMapper.parse("grammar G { Root ::= F ('a'); F (x) ::= x; }"));
         assertFalse(error instanceof ParameterizedRules.ExpansionException);
+        // Calls are scoped to the grammar that defines Name(params): B keeps F + group.
+        var two = UBNFMapper.parse(Files.readString(
+            ROOT.resolve("rust/unlaxer-ubnf/tests/fixtures/positive/parameterized-rules-two-grammars.ubnf")));
+        assertEquals(2, two.grammars().get(0).rules().size());
+        var elements = ((org.unlaxer.dsl.bootstrap.UBNFAST.ChoiceBody) two.grammars().get(1).rules().get(0).body())
+            .alternatives().get(0).elements();
+        assertEquals(new org.unlaxer.dsl.bootstrap.UBNFAST.RuleRefElement("F"), elements.get(0).element());
+        assertTrue(elements.get(1).element() instanceof org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement);
     }
 
     @Test public void javaGeneratedParsersEqualTheHandExpansionAndMatchExpectedValues() throws Exception {

@@ -112,8 +112,8 @@ public class UBNFMapper {
     public static UBNFFile parse(String source) {
         // Parameterized rules need positions for their diagnostics; every other
         // grammar keeps the original position-free path.
-        java.util.Set<String> parameterized = ParameterizedRules.prescan(source);
-        return new UBNFMapper(parameterized.isEmpty() ? null : new UBNFSourceSnapshot.Builder(source))
+        List<ParameterizedRules.Region> parameterized = ParameterizedRules.prescan(source);
+        return new UBNFMapper(ParameterizedRules.any(parameterized) ? new UBNFSourceSnapshot.Builder(source) : null)
             .parseInternal(source, parameterized);
     }
 
@@ -131,12 +131,12 @@ public class UBNFMapper {
         return new UBNFSourceSnapshot(ast, builder);
     }
 
-    private UBNFFile parseInternal(String source, java.util.Set<String> parameterized) {
+    private UBNFFile parseInternal(String source, List<ParameterizedRules.Region> parameterized) {
         StringSource stringSource = StringSource.createRootSource(source);
         try (ParseContext context = new ParseContext(stringSource)) {
-            if (!parameterized.isEmpty()) {
+            if (ParameterizedRules.any(parameterized)) {
                 context.getGlobalScopeTreeMap().put(UBNFParsers.PARAMETERIZED_SYNTAX,
-                    new UBNFParsers.ParameterizedSyntax(java.util.Set.copyOf(parameterized), source.codePoints().toArray()));
+                    new UBNFParsers.ParameterizedSyntax(List.copyOf(parameterized), source.codePoints().toArray()));
             }
             Parser rootParser = UBNFParsers.getRootParser();
             Parsed parsed = rootParser.parse(context);
