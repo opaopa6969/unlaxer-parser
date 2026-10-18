@@ -26,5 +26,12 @@
     "code": "E-COMMIT-EMPTY-MESSAGE",
     "startCP": 29,
     "endCP": 44
+  },
+  {
+    "id": "raising-repetition",
+    "grammar": "grammar Bad { @root Root ::= 'k' COMMIT('a', 'm')+ ; }",
+    "code": "E-RAISING-REPETITION",
+    "startCP": 33,
+    "endCP": 50
   }
 ]

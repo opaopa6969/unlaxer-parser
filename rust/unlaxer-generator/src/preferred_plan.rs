@@ -266,11 +266,15 @@ impl<'a> Plan<'a> {
                     out.push((id, depth));
                 }
             }
+            // CatchLabels adds no CST node: each operand is its own group, as on Java (#700).
+            ElementKind::Catch { choice, operands } => {
+                self.body(&operands.body(choice), depth, out);
+                self.body(&operands.alternative(choice), depth, out);
+            }
             ElementKind::OwnedCapture { body: b, .. }
             | ElementKind::CaptureScope(b)
             | ElementKind::Commit { body: b, .. }
-            | ElementKind::Label { body: b, .. }
-            | ElementKind::Catch { choice: b, .. } => {
+            | ElementKind::Label { body: b, .. } => {
                 if let Some(child) =
                     one(b).filter(|a| matches!(a.kind, ElementKind::RuleRef { .. }))
                 {

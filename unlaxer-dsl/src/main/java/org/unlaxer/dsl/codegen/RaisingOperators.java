@@ -34,7 +34,10 @@ public final class RaisingOperators {
         for (RuleDecl rule : grammar.rules()) body(rule.name(), rule.body(), declared, sites);
         List<Problem> problems = new ArrayList<>();
         for (Site site : sites) {
-            if (site.element() instanceof UBNFAST.CommitElement commit) {
+            if (raisingRepetition(site.element())) {
+                problems.add(new Problem("E-RAISING-REPETITION", site.rule(), site.element(),
+                    "unbounded repetition of COMMIT or LABEL always ends with that failure"));
+            } else if (site.element() instanceof UBNFAST.CommitElement commit) {
                 if (commit.message().isPresent() && commit.message().get().isEmpty()) {
                     problems.add(new Problem("E-COMMIT-EMPTY-MESSAGE", site.rule(), commit, "COMMIT message must not be empty"));
                 }
@@ -83,7 +86,29 @@ public final class RaisingOperators {
         }
     }
 
+    /**
+     * An unbounded repetition whose whole body is one COMMIT or LABEL: the attempt that finds no
+     * further item raises instead of ending the repetition, so it can never succeed.
+     */
+    static boolean raisingRepetition(AtomicElement element) {
+        AtomicElement item = null;
+        if (element instanceof UBNFAST.RepeatElement repeat) item = single(repeat.body());
+        else if (element instanceof UBNFAST.OneOrMoreElement repeat) item = repeat.body();
+        else if (element instanceof UBNFAST.BoundedRepeatElement repeat
+            && repeat.max() == UBNFAST.BoundedRepeatElement.UNBOUNDED) item = repeat.body();
+        return item instanceof UBNFAST.CommitElement || item instanceof UBNFAST.LabelElement;
+    }
+
+    private static AtomicElement single(RuleBody body) {
+        if (body instanceof ChoiceBody choice) {
+            return choice.alternatives().size() == 1 ? single(choice.alternatives().get(0)) : null;
+        }
+        var elements = ((SequenceBody) body).elements();
+        return elements.size() == 1 ? elements.get(0).element() : null;
+    }
+
     private static void element(String rule, AtomicElement element, Set<String> declared, List<Site> sites) {
+        if (raisingRepetition(element)) sites.add(new Site(rule, element));
         if (element instanceof UBNFAST.CatchElement caught) {
             sites.add(new Site(rule, caught));
             body(rule, caught.child().body(), declared, sites);

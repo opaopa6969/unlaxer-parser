@@ -76,7 +76,7 @@ public class RaisingOperatorConformanceTest {
 
     @Test public void validatorRejectsWithSourcePositions() throws Exception {
         var rows = corpus("invalid.json");
-        assertEquals(4, rows.size());
+        assertEquals(5, rows.size());
         for (var raw : rows) {
             var row = raw.getAsJsonObject();
             String id = row.get("id").getAsString(), code = row.get("code").getAsString();
@@ -221,6 +221,28 @@ public class RaisingOperatorConformanceTest {
         }
     }
 
+    private static String nestedCatch(int depth) {
+        String body = "LABEL(L, 'a')";
+        for (int i = 0; i < depth; i++) body = "CATCH(" + body + ", 'b', L)";
+        return "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= " + body + " ;\n}\n";
+    }
+
+    /** Nested CATCH stays linear: each operand is stored once on both hosts (40 levels, ~1 KB). */
+    @Test(timeout = 120_000) public void deeplyNestedCatchGeneratesInLinearSpaceOnBothHosts() throws Exception {
+        String source = nestedCatch(40);
+        var grammar = UBNFMapper.parse(source).grammars().get(0);
+        assertFalse(new ParserGenerator().generate(grammar).source().isEmpty());
+        var modules = new RustBackend().generate(grammar);
+        if (!Boolean.getBoolean("rustConformance")) return;
+        run(List.of("cargo", "build", "--locked", "--manifest-path", ROOT.resolve("rust/Cargo.toml").toString(), "-p", "unlaxer-generator"), 0);
+        Path dir = temporary.newFolder().toPath(), input = dir.resolve("deep.ubnf"), out = dir.resolve("generated");
+        Files.writeString(input, source);
+        long started = System.nanoTime();
+        run(List.of(ROOT.resolve("rust/target/debug/unlaxer").toString(), "generate", "--grammar", input.toString(), "--output", out.toString()), 0);
+        assertTrue("native generation must not grow with 2^depth", System.nanoTime() - started < 30_000_000_000L);
+        for (var file : modules) assertEquals(file.relativePath(), file.content(), Files.readString(out.resolve(file.relativePath())));
+    }
+
     private static final String RUST_PROBE = """
         #![allow(dead_code, unused_imports, unused_variables)]
         mod generated;
@@ -253,10 +275,21 @@ public class RaisingOperatorConformanceTest {
         }
         """;
 
-    /** LSP diagnostics of both hosts report the label at the raised offset. */
+    private static final String LSP_GRAMMAR = """
+        grammar Cut {
+          @package: cutprobe
+          @whitespace: none
+          @root @mapping(Doc)
+          Root ::= { Item } ;
+          Item ::= 'a' LABEL(semi, ';') | 'k' COMMIT('n', 'need n') ;
+        }
+        """;
+
+    /** LSP diagnostics of both hosts report the declared message and kind at the raised offset. */
     @Test public void lspDiagnosticsCarryTheLabeledMessage() throws Exception {
-        var row = corpus("cases.json").asList().stream().map(JsonElement::getAsJsonObject)
-            .filter(value -> value.get("name").getAsString().equals("label-repeat")).findFirst().orElseThrow();
+        var row = new JsonObject();
+        row.addProperty("name", "lsp");
+        row.addProperty("grammar", LSP_GRAMMAR);
         Path classes = compileJava(row, true);
         String javaExecutable = Path.of(System.getProperty("java.home"), "bin", "java").toString();
         try (var wire = new Wire(new ProcessBuilder(javaExecutable, "-cp", classes + File.pathSeparator + System.getProperty("java.class.path"),
@@ -304,19 +337,27 @@ public class RaisingOperatorConformanceTest {
         wire.request("initialize", Map.of("capabilities", Map.of()));
         wire.notify("initialized", Map.of());
         String uri = "file:///cut-fixture";
-        wire.notify("textDocument/didOpen", Map.of("textDocument", Map.of("uri", uri, "languageId", "cut", "version", 1, "text", "a;ab")));
-        var diagnostics = wire.notification("textDocument/publishDiagnostics").getAsJsonArray("diagnostics");
-        assertEquals(backend + diagnostics, 1, diagnostics.size());
-        var diagnostic = diagnostics.get(0).getAsJsonObject();
-        var start = diagnostic.getAsJsonObject("range").getAsJsonObject("start");
-        assertEquals(backend + diagnostic, List.of(0, 3), List.of(start.get("line").getAsInt(), start.get("character").getAsInt()));
-        assertTrue(backend + diagnostic, diagnostic.get("message").getAsString().contains("semi")
-            || diagnostic.getAsJsonObject("data").getAsJsonArray("expectedTokens").contains(new JsonPrimitive("semi")));
-        assertEquals(backend + diagnostic, 3, diagnostic.getAsJsonObject("data").get("offset").getAsInt());
-        assertTrue(backend + diagnostic, diagnostic.getAsJsonObject("data").getAsJsonArray("expectedTokens").contains(new JsonPrimitive("semi")));
-        wire.notify("textDocument/didChange", Map.of("textDocument", Map.of("uri", uri, "version", 2),
-            "contentChanges", List.of(Map.of("text", "a;a;"))));
-        assertEquals(backend, 0, wire.notification("textDocument/publishDiagnostics").getAsJsonArray("diagnostics").size());
+        int version = 0;
+        for (var expected : List.of(List.<Object>of("a;ab", 3, "semi", "label"), List.<Object>of("kx", 1, "need n", "commit"))) {
+            String text = (String) expected.get(0);
+            String label = backend + " " + text;
+            wire.notify("textDocument/didOpen", Map.of("textDocument", Map.of("uri", uri, "languageId", "cut", "version", ++version, "text", text)));
+            var diagnostics = wire.notification("textDocument/publishDiagnostics").getAsJsonArray("diagnostics");
+            assertEquals(label + diagnostics, 1, diagnostics.size());
+            var diagnostic = diagnostics.get(0).getAsJsonObject();
+            var start = diagnostic.getAsJsonObject("range").getAsJsonObject("start");
+            assertEquals(label + diagnostic, List.of(0, expected.get(1)), List.of(start.get("line").getAsInt(), start.get("character").getAsInt()));
+            assertEquals(label + diagnostic, expected.get(2), diagnostic.get("message").getAsString());
+            var data = diagnostic.getAsJsonObject("data");
+            assertEquals(label + diagnostic, expected.get(3), data.get("kind").getAsString());
+            assertEquals(label + diagnostic, (int) expected.get(1), data.get("offset").getAsInt());
+            assertTrue(label + diagnostic, data.getAsJsonArray("expectedTokens").contains(new JsonPrimitive((String) expected.get(2))));
+            wire.notify("textDocument/didChange", Map.of("textDocument", Map.of("uri", uri, "version", ++version),
+                "contentChanges", List.of(Map.of("text", "a;kn"))));
+            assertEquals(label, 0, wire.notification("textDocument/publishDiagnostics").getAsJsonArray("diagnostics").size());
+            wire.notify("textDocument/didClose", Map.of("textDocument", Map.of("uri", uri)));
+            wire.notification("textDocument/publishDiagnostics");
+        }
         wire.response("shutdown", null);
         wire.notify("exit", null);
         assertTrue(backend, wire.process.waitFor(5, TimeUnit.SECONDS));

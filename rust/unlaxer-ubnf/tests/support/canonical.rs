@@ -223,11 +223,11 @@ fn atomic(e: &AtomicElement) -> String {
             tag("CommitElement", [body(b), optional(message)])
         }
         ElementKind::Label { label, body: b } => tag("LabelElement", [quote(label), body(b)]),
-        ElementKind::Catch { operands, .. } => tag(
+        ElementKind::Catch { choice, operands } => tag(
             "CatchElement",
             [
-                tag("GroupElement", [body(&operands.body)]),
-                tag("GroupElement", [body(&operands.alternative)]),
+                tag("GroupElement", [body(&operands.body(choice))]),
+                tag("GroupElement", [body(&operands.alternative(choice))]),
                 strings(&operands.labels),
             ],
         ),

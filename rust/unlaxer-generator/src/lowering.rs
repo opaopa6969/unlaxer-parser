@@ -1382,9 +1382,9 @@ impl Lowering<'_> {
                 label: label.clone(),
                 child: Box::new(self.single_body(body, true)?),
             },
-            ElementKind::Catch { operands, .. } => Expression::CatchLabels {
-                child: Box::new(self.single_body(&operands.body, true)?),
-                alternative: Box::new(self.single_body(&operands.alternative, true)?),
+            ElementKind::Catch { choice, operands } => Expression::CatchLabels {
+                child: Box::new(self.single_body(&operands.body(choice), true)?),
+                alternative: Box::new(self.single_body(&operands.alternative(choice), true)?),
                 labels: operands.labels.clone(),
             },
             ElementKind::Group(body) => self.body(body)?,

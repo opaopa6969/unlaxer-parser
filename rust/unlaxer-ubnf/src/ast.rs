@@ -9,24 +9,48 @@ pub struct Span {
     pub codepoint_end: usize,
 }
 
-/// The operands of `CATCH(body, alternative {, label})`.
+/// The operands of `CATCH(body, alternative {, label})`, stored once inside the choice:
+/// the first `split` alternatives of [`ElementKind::Catch::choice`] are the body, the
+/// rest the alternative. No operand is duplicated, so nesting depth stays linear.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CatchOperands {
-    pub body: RuleBody,
-    pub alternative: RuleBody,
+    pub split: usize,
+    pub body_span: Span,
+    pub alternative_span: Span,
     pub labels: Vec<String>,
 }
 
-/// The choice of both CATCH operands, as stored in [`ElementKind::Catch`].
-pub fn catch_choice(body: &RuleBody, alternative: &RuleBody) -> RuleBody {
-    RuleBody {
-        alternatives: body
-            .alternatives
-            .iter()
-            .chain(&alternative.alternatives)
-            .cloned()
-            .collect(),
-        span: body.span.through(alternative.span),
+impl CatchOperands {
+    /// The body operand as an owned rule body (a copy of its share of `choice`).
+    pub fn body(&self, choice: &RuleBody) -> RuleBody {
+        RuleBody {
+            alternatives: choice.alternatives[..self.split].to_vec(),
+            span: self.body_span,
+        }
+    }
+    /// The alternative operand as an owned rule body.
+    pub fn alternative(&self, choice: &RuleBody) -> RuleBody {
+        RuleBody {
+            alternatives: choice.alternatives[self.split..].to_vec(),
+            span: self.alternative_span,
+        }
+    }
+}
+
+/// `CATCH(body, alternative {, labels})`, moving both operands into the stored choice.
+pub fn catch_element(body: RuleBody, alternative: RuleBody, labels: Vec<String>) -> ElementKind {
+    let operands = CatchOperands {
+        split: body.alternatives.len(),
+        body_span: body.span,
+        alternative_span: alternative.span,
+        labels,
+    };
+    let span = body.span.through(alternative.span);
+    let mut alternatives = body.alternatives;
+    alternatives.extend(alternative.alternatives);
+    ElementKind::Catch {
+        choice: RuleBody { alternatives, span },
+        operands: Box::new(operands),
     }
 }
 
@@ -271,7 +295,7 @@ pub enum ElementKind {
     /// An empty label list is syntax; validation rejects it with this element's span.
     Catch {
         /// Exactly one operand produces the CST, so shape analyses see the choice of both
-        /// operands' alternatives (Java `CatchElement.body()`). Build it with [`catch_choice`].
+        /// operands' alternatives (Java `CatchElement.body()`). Build it with [`catch_element`].
         choice: RuleBody,
         /// Boxed so that the recursive element type does not grow (deep nesting limit).
         operands: Box<CatchOperands>,

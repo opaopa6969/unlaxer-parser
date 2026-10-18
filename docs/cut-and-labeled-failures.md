@@ -142,10 +142,25 @@ and in both portability checks:
 | `E-CATCH-EMPTY` | a `CATCH` without labels (the syntax admits it so the error is positioned) |
 | `E-CATCH-DUPLICATE-LABEL` | a label listed twice in one `CATCH` |
 | `E-COMMIT-EMPTY-MESSAGE` | `COMMIT(body, '')` |
+| `E-RAISING-REPETITION` | an unbounded repetition (`{ X }`, `X*`, `X+`, `X{n,}`) whose whole body is one `COMMIT` or `LABEL`: the attempt that finds no further item raises, so it can never succeed |
+
+The unknown-label check is grammar-wide: a label counts as declared when any
+`LABEL(...)` in the grammar raises it, even in an unreachable rule or only in the
+`CATCH` alternative. It does not prove that the label can reach that `CATCH`.
+A bounded repetition (`LABEL(L, 'a'){2,3}`) is not rejected: it succeeds when it
+stops at its maximum, and fails with the label otherwise.
 
 The generated Java `diagnose` and the Rust `parse_tree_detailed*` functions
-return kind `commit` or `label` with the raised offset and message, and both
-generated language servers publish that message at that position.
+return kind `commit` or `label` with the raised offset and message. Both generated
+language servers publish exactly that message at that position, with `data.kind`
+`commit` or `label` (code `ULX-PARSE-001` as for every parse diagnostic). Generated
+code of grammars without the operators is unchanged.
+
+Preferred AST snapshots count `CATCH` as adding no CST level: each operand is its own
+group, as in the Java runtime CST, so candidate depths agree on all three paths
+(`spec-corpus/preferred-ast` fixture `CatchOperandDepth`). The native AST stores the
+two operands once (`ElementKind::Catch { choice, operands }`, `operands.split` marks
+the boundary), so nested `CATCH` stays linear in size on both frontends.
 
 ## API names
 

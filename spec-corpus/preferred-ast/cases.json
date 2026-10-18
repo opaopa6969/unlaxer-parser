@@ -845,5 +845,67 @@
         "stage": "parse"
       }
     ]
+  },
+  {
+    "name": "CatchOperandDepth",
+    "grammar": "grammar CatchOperandDepth { @package: preferredprobe @whitespace: none @root @mapping(Pair,params=[left,right]) Root ::= ( Atom @left ) CATCH(Atom @right LABEL(L, ';'), Atom @right ']', L); @mapping(Item,params=[text]) Atom ::= 'i' @text; }",
+    "java": "protected String evalPair(CatchOperandDepthAST.Pair n){return \"pair\";} protected String evalItem(CatchOperandDepthAST.Item n){return String.valueOf(n.text());}",
+    "rust": "fn eval_pair(&mut self,_left:&Ast,_right:&Ast,_span:unlaxer_runtime::Span)->String{\"pair\".into()} fn eval_item(&mut self,text:&str,_span:unlaxer_runtime::Span)->String{text.into()}",
+    "cases": [
+      {
+        "input": "ii;",
+        "candidates": [
+          [
+            "Pair",
+            0,
+            0,
+            3,
+            "pair"
+          ],
+          [
+            "Item",
+            3,
+            0,
+            1,
+            "i"
+          ],
+          [
+            "Item",
+            3,
+            1,
+            2,
+            "i"
+          ]
+        ],
+        "select": 2
+      },
+      {
+        "input": "ii]",
+        "candidates": [
+          [
+            "Pair",
+            0,
+            0,
+            3,
+            "pair"
+          ],
+          [
+            "Item",
+            3,
+            0,
+            1,
+            "i"
+          ],
+          [
+            "Item",
+            3,
+            1,
+            2,
+            "i"
+          ]
+        ],
+        "select": 2
+      }
+    ]
   }
 ]

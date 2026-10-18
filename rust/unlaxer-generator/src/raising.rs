@@ -33,6 +33,13 @@ pub fn problems(grammar: &GrammarDecl) -> Vec<Problem> {
             span: element.span,
             subject,
         };
+        if raising_repetition(element) {
+            problems.push(problem(
+                "E-RAISING-REPETITION",
+                "unbounded repetition of COMMIT or LABEL always ends with that failure".into(),
+            ));
+            continue;
+        }
         match &element.kind {
             ElementKind::Commit {
                 message: Some(message),
@@ -92,17 +99,47 @@ fn body<'a>(
     }
 }
 
+/// An unbounded repetition whose whole body is one COMMIT or LABEL: the attempt that finds
+/// no further item raises instead of ending the repetition, so it can never succeed.
+fn raising_repetition(element: &AtomicElement) -> bool {
+    let item = match &element.kind {
+        ElementKind::Repeat(body) => match body.alternatives.as_slice() {
+            [sequence] => match sequence.elements.as_slice() {
+                [item] => Some(&item.element),
+                _ => None,
+            },
+            _ => None,
+        },
+        ElementKind::OneOrMore(item)
+        | ElementKind::BoundedRepeat {
+            element: item,
+            max: None,
+            ..
+        } => Some(&**item),
+        _ => None,
+    };
+    item.is_some_and(|item| {
+        matches!(
+            item.kind,
+            ElementKind::Commit { .. } | ElementKind::Label { .. }
+        )
+    })
+}
+
 fn element<'a>(
     rule: &'a str,
     value: &'a AtomicElement,
     declared: &mut HashSet<&'a str>,
     sites: &mut Vec<(&'a str, &'a AtomicElement)>,
 ) {
+    if raising_repetition(value) {
+        sites.push((rule, value));
+    }
     match &value.kind {
-        ElementKind::Catch { operands, .. } => {
+        ElementKind::Catch { choice, .. } => {
             sites.push((rule, value));
-            body(rule, &operands.body, declared, sites);
-            body(rule, &operands.alternative, declared, sites);
+            // The stored choice is both operands in order.
+            body(rule, choice, declared, sites);
         }
         ElementKind::Label { label, body: inner } => {
             declared.insert(label);

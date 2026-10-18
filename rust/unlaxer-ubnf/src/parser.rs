@@ -969,14 +969,7 @@ impl Parser<'_> {
                 while self.eat(',') {
                     labels.push(self.identifier()?);
                 }
-                ElementKind::Catch {
-                    choice: crate::ast::catch_choice(&body, &alternative),
-                    operands: Box::new(crate::ast::CatchOperands {
-                        body,
-                        alternative,
-                        labels,
-                    }),
-                }
+                crate::ast::catch_element(body, alternative, labels)
             }
             _ => unreachable!(),
         };
