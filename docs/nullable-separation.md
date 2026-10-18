@@ -59,3 +59,12 @@ composition, plus resource failure at each of the three list positions.
 This is a development change after 3.3.0, tracked in
 [#616](https://github.com/opaopa6969/unlaxer-parser/issues/616).
 The broader generated/runtime parity work remains tracked separately.
+
+### Chain 互換 wrapper の失敗と reset policy
+
+区切り付きリストとの合成では、通常の構文失敗後も Java Chain が開始前に設定した
+`resetMatchedWithConsumed=false` を保持します。Rust の `CodeStart` / `CodeEnd` /
+`CaptureBoundary` も同じ規約に従い、外側 transaction の rollback では元の policy に戻ります。
+resource failure の全面 rollback はこの構文失敗処理とは別に維持します。
+`conformance/nullable-separation/chain-reset.tsv` の24行を memo2×診断3で比較し、
+Java の CodeStart/CodeEnd は固定 Tiny 実ソースから新規コンパイルした parser を使用します。

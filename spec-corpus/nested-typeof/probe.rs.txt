@@ -27,7 +27,16 @@ fn main() {
                         },
                         Err(message)=>{ assert_eq!(generated::mapper::map(&tree).unwrap_err(),message); serde_json::json!({"status":"map_error","message":message}) },
                     },
-                    Err(error)=>serde_json::json!({"status":"syntax","offset":error.offset}),
+                    Err(error)=>{
+                        let mut context=unlaxer_runtime::ParseContext::with_options(&input,ParseOptions::with_memoization(memo).with_diagnostics(diagnostics));
+                        assert_eq!(generated::parser::parse_context(&mut context).unwrap_err().offset,error.offset);
+                        assert_eq!((context.position(),context.matched_position()),(0,0));assert!(context.node(0).is_none());
+                        let reset=context.reset_matched_with_consumed();
+                        assert!(generated::parser::parse_context(&mut context).is_err());
+                        assert_eq!((context.position(),context.matched_position()),(0,0));assert_eq!(context.reset_matched_with_consumed(),reset);assert!(context.node(0).is_none());
+                        assert!(context.parse(&unlaxer_runtime::Expr::Any.repeat_java(input.chars().count(),Some(input.chars().count()))).is_ok());assert_eq!(context.position(),input.chars().count());
+                        serde_json::json!({"status":"syntax","offset":error.offset})
+                    },
                 };
                 println!("{}",result);
             }

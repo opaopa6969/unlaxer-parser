@@ -62,9 +62,9 @@ fn instrument(
         | Delimited(child)
         | TextValue(child)
         | ValueBoundary(child)
-        | CaptureBoundary { child, .. }
         | OwnedCapture { child, .. }
         | CaptureScope(child)
+        | CaptureBoundary { child, .. }
         | Repeat { child, .. }
         | RuleEffects { child, .. }
         | CaptureEquality { child, .. }
@@ -104,9 +104,9 @@ pub(crate) fn contains_depth(expr: &Expression) -> bool {
         | Delimited(child)
         | TextValue(child)
         | ValueBoundary(child)
-        | CaptureBoundary { child, .. }
         | OwnedCapture { child, .. }
         | CaptureScope(child)
+        | CaptureBoundary { child, .. }
         | Repeat { child, .. }
         | RuleEffects { child, .. }
         | CaptureEquality { child, .. }

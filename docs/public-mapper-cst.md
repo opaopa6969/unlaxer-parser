@@ -30,3 +30,5 @@ Rust preferred `MappingLimits` の既存既定値（candidate 4,096、projection
 budget と検証 table は呼出し単位。Java は各公開 mapping 入口で memo/span layer を新規化し、投影失敗時に部分 memo/span を破棄する。成功して既に返した source snapshot は保持され、後の失敗や別 parse/map で内容を変えない。Rust の公開 map は呼出しのローカル state を破棄して `Err` を返す。
 
 共通 corpus は `spec-corpus/public-mapper-cst/`。`PublicMapperCstConformanceTest` は Java consumer と Java/native 両 host の Rust 生成 consumer を実 compile/run し、入口ごとの不正グラフ分類、共有 DAG の実投影上限、失敗後の正常値、補助文字の CP span、retained snapshot を照合する。型の正常系は既存の preferred・typed nested・mapped leaf・family・enum・typeof corpus を併用する。
+
+追加の合成試験は `composition-cases.json`。scalar/flat/node/enum/mixed/nested/family/typeof/recovery の代表9文法で、6入口の不正metadata拒否後の正常CSTによる値・CP span・保持snapshotをJavaと両Rust生成consumerで比較する。Rustのtransparent typeof検査は既存ASTを参照し、参照展開数をworkに計上する。Javaの公開Token入口のrecovery検査はguardで訪問済みのunique original tokenのmarkerを使い、DAGを診断一覧へ全展開しない。

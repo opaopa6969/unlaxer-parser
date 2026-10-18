@@ -1,0 +1,204 @@
+[
+  {
+    "name": "scalar",
+    "grammar": "grammar Composition { @package: guardcomposition @whitespace: none @root @mapping(Root,params=[text]) Root ::= '😀' @text; }",
+    "input": "😀",
+    "expected": {
+      "type": "Root",
+      "span": [
+        0,
+        1
+      ],
+      "fields": {
+        "text": "😀"
+      }
+    },
+    "kind": "normal"
+  },
+  {
+    "name": "flat",
+    "grammar": "grammar Composition { @package: guardcomposition @whitespace: none @root @mapping(Root,params=[text]) Root ::= {'😀'} @text; }",
+    "input": "😀😀",
+    "expected": {
+      "type": "Root",
+      "span": [
+        0,
+        2
+      ],
+      "fields": {
+        "text": [
+          "😀",
+          "😀"
+        ]
+      }
+    },
+    "kind": "normal"
+  },
+  {
+    "name": "node",
+    "grammar": "grammar Composition { @package: guardcomposition @whitespace: none @root @mapping(Root,params=[value]) Root ::= Leaf @value; @mapping(Leaf,params=[text]) Leaf ::= '😀' @text; }",
+    "input": "😀",
+    "expected": {
+      "type": "Root",
+      "span": [
+        0,
+        1
+      ],
+      "fields": {
+        "value": {
+          "type": "Leaf",
+          "span": [
+            0,
+            1
+          ],
+          "fields": {
+            "text": "😀"
+          }
+        }
+      }
+    },
+    "kind": "normal"
+  },
+  {
+    "name": "enum",
+    "grammar": "grammar Composition { @package: guardcomposition @whitespace: none @root @mapping(Root,params=[value]) Root ::= Mode @value; @enum Mode ::= 'auto' | 'sync'; }",
+    "input": "auto",
+    "expected": {
+      "type": "Root",
+      "span": [
+        0,
+        4
+      ],
+      "fields": {
+        "value": "AUTO"
+      }
+    },
+    "kind": "normal"
+  },
+  {
+    "name": "mixed",
+    "grammar": "grammar Composition { @package: guardcomposition @whitespace: none @root @mapping(Root,params=[value]) Root ::= Item @value; Item ::= Leaf | 'text'; @mapping(Leaf,params=[text]) Leaf ::= '😀' @text; }",
+    "input": "😀",
+    "expected": {
+      "type": "Root",
+      "span": [
+        0,
+        1
+      ],
+      "fields": {
+        "value": {
+          "type": "Leaf",
+          "span": [
+            0,
+            1
+          ],
+          "fields": {
+            "text": "😀"
+          }
+        }
+      }
+    },
+    "kind": "normal"
+  },
+  {
+    "name": "nested",
+    "grammar": "grammar Composition { @package: guardcomposition @whitespace: none @root @nestedCaptures @mapping(Root,params=[value]) Root ::= '[' [ {Leaf} ] @value ']'; @mapping(Leaf,params=[text]) Leaf ::= '😀' @text; }",
+    "input": "[😀😀]",
+    "expected": {
+      "type": "Root",
+      "span": [
+        0,
+        4
+      ],
+      "fields": {
+        "value": [
+          {
+            "type": "Leaf",
+            "span": [
+              1,
+              2
+            ],
+            "fields": {
+              "text": "😀"
+            }
+          },
+          {
+            "type": "Leaf",
+            "span": [
+              2,
+              3
+            ],
+            "fields": {
+              "text": "😀"
+            }
+          }
+        ]
+      }
+    },
+    "kind": "normal"
+  },
+  {
+    "name": "family",
+    "grammar": "grammar Composition { @package: guardcomposition @whitespace: none @root @mapping(Root,params=[value]) Root ::= Alias @value; @mapping(Family) @commonField(text) Alias ::= A | B; @mapping(Family.A,params=[text]) A ::= '😀' @text; @mapping(Family.B,params=[text]) B ::= 'x' @text; }",
+    "input": "😀",
+    "expected": {
+      "type": "Root",
+      "span": [
+        0,
+        1
+      ],
+      "fields": {
+        "value": {
+          "type": "Family__A",
+          "span": [
+            0,
+            1
+          ],
+          "fields": {
+            "text": "😀"
+          }
+        }
+      }
+    },
+    "kind": "normal"
+  },
+  {
+    "name": "typeof-projection",
+    "grammar": "grammar Composition { @package: guardcomposition @whitespace: none @root @mapping(Root,params=[value]) Root ::= Alias @value; @mapping(Family) @commonField(text) Alias ::= @typeof(value) A @value | @typeof(value) B @value; @mapping(Family.A,params=[text]) A ::= '😀' @text; @mapping(Family.B,params=[text]) B ::= 'x' @text; }",
+    "input": "😀",
+    "expected": {
+      "type": "Root",
+      "span": [
+        0,
+        1
+      ],
+      "fields": {
+        "value": {
+          "type": "Family__A",
+          "span": [
+            0,
+            1
+          ],
+          "fields": {
+            "text": "😀"
+          }
+        }
+      }
+    },
+    "kind": "typeof"
+  },
+  {
+    "name": "recovery-dag",
+    "grammar": "grammar Composition { @package: guardcomposition @whitespace: none @root @mapping(Root) Root ::= 'ok'; @recovery(sync=';') Unused ::= 'x'; }",
+    "input": "ok",
+    "expected": {
+      "type": "Root",
+      "span": [
+        0,
+        2
+      ],
+      "fields": {}
+    },
+    "kind": "recovery"
+  }
+]

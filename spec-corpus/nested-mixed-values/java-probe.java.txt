@@ -25,7 +25,12 @@ public final class Probe extends NestedMixedEvaluator<JsonElement> {
             var parsed=parser.parse(context);
             if(stage.equals("parse")){
                 if(!parsed.isFailed()||context.position()!=0||!context.getCurrent().getTokens().isEmpty())throw new AssertionError("failed parser state");
-                if(!new org.unlaxer.parser.elementary.WordParser(input).parse(context).isSucceeded())throw new AssertionError("context retry");
+                int matched=context.matchedPosition();boolean reset=context.getCurrent().isResetMatchedWithConsumed();
+                if(!parser.parse(context).isFailed()||context.position()!=0||context.matchedPosition()!=matched
+                        ||context.getCurrent().isResetMatchedWithConsumed()!=reset||context.getTokenStack().size()!=1
+                        ||!context.getCurrent().getTokens().isEmpty())throw new AssertionError("same parser retry state");
+                if(!new org.unlaxer.parser.elementary.WordParser(input).parse(context).isSucceeded()
+                        ||context.position()!=input.codePointCount(0,input.length()))throw new AssertionError("same context fallback");
                 result.addProperty("stage","parse");
             } else {
                 if(!parsed.isSucceeded()||context.position()!=input.codePointCount(0,input.length()))throw new AssertionError("acceptance");

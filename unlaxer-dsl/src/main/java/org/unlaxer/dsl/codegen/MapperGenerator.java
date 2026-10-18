@@ -466,7 +466,7 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("    }\n\n");
         if (mayRecover) {
             sb.append("    private static void rejectRecoveredSyntax(Token token) {\n");
-            sb.append("        if (!org.unlaxer.parser.combinator.RecoveryDiagnostic.from(token).isEmpty()) {\n");
+            sb.append("        if (MAPPING_GUARD.hasRecoveredSyntax()) {\n");
             sb.append("            throw new IllegalArgumentException(\"cannot map recovered syntax\");\n");
             sb.append("        }\n");
             sb.append("    }\n\n");

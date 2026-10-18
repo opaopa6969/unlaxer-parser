@@ -40,7 +40,7 @@ public class NestedTypeofConformanceTest {
     @Test
     public void javaCompileMapAndEvaluateAgainstIndependentValuesAndFailureSpans()
             throws Exception {
-        var report = new ArrayList<String>(List.of("fixture\tinput\tmemo\tdiagnostics\tstatus"));
+        var report = new ArrayList<String>(List.of("fixture\tinput\tmemo\tdiagnostics\tactual"));
         for (var fixture : corpus("generated")) {
             var row = fixture.getAsJsonObject();
             var grammar = UBNFMapper.parse(row.get("grammar").getAsString()).grammars().get(0);
@@ -116,13 +116,19 @@ public class NestedTypeofConformanceTest {
                                     assertEquals(0, context.getConsumedPosition().value());
                                     assertEquals(0, context.getMatchedPosition().value());
                                     assertTrue(context.getCurrent().getTokens().isEmpty());
+                                    boolean reset=context.getCurrent().isResetMatchedWithConsumed();
                                     assertTrue(parser.parse(context).isFailed());
+                                    assertEquals(0,context.position());assertEquals(0,context.matchedPosition());
+                                    assertEquals(reset,context.getCurrent().isResetMatchedWithConsumed());
+                                    assertEquals(1,context.getTokenStack().size());assertTrue(context.getCurrent().getTokens().isEmpty());
                                     actual = new JsonObject();
                                     actual.addProperty("status", "syntax");
                                     actual.addProperty(
                                             "offset",
                                             context.getParseFailureDiagnostics()
                                                     .getFarthestOffset());
+                                    assertTrue(new org.unlaxer.parser.elementary.WordParser(text).parse(context).isSucceeded());
+                                    assertEquals(text.codePointCount(0,text.length()),context.position());
                                 } else {
                                     assertEquals(
                                             text.codePointCount(0, text.length()),
@@ -221,7 +227,7 @@ public class NestedTypeofConformanceTest {
                                             + "\t"
                                             + mode
                                             + "\t"
-                                            + actual.get("status"));
+                                            + actual);
                         }
                 }
                 retained.forEach(Runnable::run);
@@ -285,7 +291,7 @@ public class NestedTypeofConformanceTest {
         Assume.assumeTrue(
                 "Rust oracle requires -DrustConformance=true",
                 Boolean.getBoolean("rustConformance"));
-        var report = new ArrayList<String>(List.of("fixture\tinput\tmode\tstatus"));
+        var report = new ArrayList<String>(List.of("fixture\tinput\thost\tmode\tactual"));
         for (var fixture : corpus("generated")) {
             var row = fixture.getAsJsonObject();
             String source = row.get("grammar").getAsString();
@@ -323,15 +329,15 @@ public class NestedTypeofConformanceTest {
                             + "unlaxer-runtime={path=\""
                             + ROOT.resolve("rust/unlaxer-runtime")
                             + "\"}\nserde_json=\"1\"\n");
-            Path target = ROOT.resolve("rust/target/nested-typeof-probe");
             for (Path hostOutput : List.of(generated, nativeOut)) {
-                if (!hostOutput.equals(generated))
-                    for (String file :
-                            List.of("ast.rs", "parser.rs", "mapper.rs", "evaluator.rs", "mod.rs"))
-                        Files.copy(
-                                hostOutput.resolve(file),
-                                generated.resolve(file),
-                                StandardCopyOption.REPLACE_EXISTING);
+                String host=hostOutput.equals(generated)?"java":"native";
+                Path consumer=Files.createDirectories(dir.resolve(host+"-consumer"));
+                Path consumerGenerated=Files.createDirectories(consumer.resolve("generated"));
+                Files.copy(dir.resolve("main.rs"),consumer.resolve("main.rs"));
+                Files.copy(dir.resolve("Cargo.toml"),consumer.resolve("Cargo.toml"));
+                for(String file:List.of("ast.rs","parser.rs","mapper.rs","evaluator.rs","mod.rs"))
+                    Files.copy(hostOutput.resolve(file),consumerGenerated.resolve(file));
+                Path target=ROOT.resolve("rust/target/nested-typeof-probe-"+host);
                 run(
                         List.of(
                                 "cargo",
@@ -339,7 +345,7 @@ public class NestedTypeofConformanceTest {
                                 "--quiet",
                                 "--offline",
                                 "--manifest-path",
-                                dir.resolve("Cargo.toml").toString(),
+                                consumer.resolve("Cargo.toml").toString(),
                                 "--target-dir",
                                 target.toString()),
                         "",
@@ -377,8 +383,11 @@ public class NestedTypeofConformanceTest {
                                     + "\t"
                                     + input.get("input")
                                     + "\t"
+                                    + host
+                                    + "\t"
                                     + (i % 6)
-                                    + "\tchecked");
+                                    + "\t"
+                                    + lines.get(i));
                 }
             }
         }

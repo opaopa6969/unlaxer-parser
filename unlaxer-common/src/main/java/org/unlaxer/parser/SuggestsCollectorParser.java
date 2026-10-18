@@ -20,20 +20,29 @@ public class SuggestsCollectorParser extends ContainerParser<Suggests>{
 	
 	@Override
 	public Parsed parse(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
-		Parsed parsed = super.parse(parseContext, tokenKind, invertMatch);
-		parsed.status = Status.stopped;
-		//TODO reamin with terminator. 
-		//eg. terminator=';'
-		Source remain = parseContext.getRemain(TokenKind.consumed);
-		List<Suggest> collect = getSiblings(false).stream()
-			.filter(SuggestableParser.class::isInstance)
-			.map(SuggestableParser.class::cast)
-			.map(suggestableParser->suggestableParser.getSuggests(remain.toString()))
-			.filter(Optional::isPresent)
-			.map(Optional::get)
-			.collect(Collectors.toList());
-		suggests = new Suggests(collect);
-		return parsed;
+		parseContext.enterParserCall(true);
+		try {
+			Parsed parsed = super.parse(parseContext, tokenKind, invertMatch);
+			parsed.status = Status.stopped;
+			//TODO reamin with terminator.
+			//eg. terminator=';'
+			Source remain = parseContext.getRemain(TokenKind.consumed);
+			List<Suggest> collect = getSiblings(false).stream()
+				.filter(SuggestableParser.class::isInstance)
+				.map(SuggestableParser.class::cast)
+				.map(suggestableParser->suggestableParser.getSuggests(remain.toString()))
+				.filter(Optional::isPresent)
+				.map(Optional::get)
+				.collect(Collectors.toList());
+			suggests = new Suggests(collect);
+			return parsed;
+
+		} catch (RuntimeException | Error failure) {
+			parseContext.failParserCall(failure);
+			throw failure;
+		} finally {
+			parseContext.leaveParserCall();
+		}
 	}
 
 

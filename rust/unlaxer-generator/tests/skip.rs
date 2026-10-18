@@ -119,6 +119,26 @@ fn main() {
 }
 
 #[test]
+fn skipped_sum_shaped_root_keeps_preferred_syntax_without_exposing_child_ast() {
+    run_generated(
+        "grammar G { @root @skip @mapping(Ghost) Root ::= Child; @mapping(Child,params=[value]) Child ::= 'q' @value; }",
+        r#"
+mod generated;
+fn main() {
+    let tree = generated::parser::parse_tree_for_mapping("q").unwrap();
+    let root = &tree.nodes[tree.root];
+    assert_eq!(root.rule, 0);
+    assert_eq!((root.span.start, root.span.end), (0, 1));
+    assert_eq!(tree.nodes.iter().filter(|node| node.rule == 1).count(), 1);
+    assert_eq!(generated::mapper::map(&tree).unwrap_err(), "expected one value for root, got 0");
+    assert_eq!(generated::mapper::map_parsed_tree(&tree).unwrap_err(), "No mapped node found in token tree");
+    assert!(generated::parser::parse_tree_for_mapping("x").is_err());
+}
+"#,
+    );
+}
+
+#[test]
 fn skipped_mapping_does_not_claim_a_generated_name_or_field() {
     let grammar = "grammar G { @root @mapping(Visible) Root ::= 'v'; @skip @mapping(Visible.Inner,params=[span,semantics]) Hidden ::= 'a' @span 'b' @semantics; }";
     assert!(unlaxer_generator::portability::check(grammar).portable);
